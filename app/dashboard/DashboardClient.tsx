@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
+import TransitPanel from './TransitPanel'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string>  = { water: '💧', energy: '⚡', metal: '⛏️' }
@@ -45,7 +46,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   prices: any[]
   orders: any[]
 }) {
-  const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loaded, loadFromServer } = useGameStore()
+  const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loaded, loadFromServer, inTransit } = useGameStore()
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [amounts, setAmounts] = useState<Record<string, number>>({ water: 1, energy: 1, metal: 1 })
   const [worldData, setWorldData] = useState<any>(null)
@@ -99,10 +100,10 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[resource]} verkauft · +${sold * price} Cr`, true)
   }
 
-  async function handleTravel(dest: LocationSlug) {
-    await travel(dest)
-    showToast(`Angeflogen: ${LOC_NAME[dest]}`, true)
-  }
+async function handleTravel(dest: LocationSlug) {
+  if (inTransit) return
+  await travel(dest)
+}
 
   async function handleLogout() {
     const { createClient } = await import('@/lib/supabase/client')
@@ -164,6 +165,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     <div style={{ minHeight: '100vh', background: '#f4f2ed', color: '#1e2a36', fontFamily: 'system-ui, sans-serif' }}>
 
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
+      <TransitPanel onArrival={() => {}} />
 
       {/* TOPBAR */}
       <header style={{ background: '#fff', borderBottom: '1px solid #e2ddd4', padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>

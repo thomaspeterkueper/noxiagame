@@ -1,5 +1,6 @@
 // lib/store/gameStore.ts
 // Erstellt: 30.05.2026
+// Aktualisiert: 30.05.2026 – Transit-Mechanik
 
 import { create } from 'zustand'
 
@@ -12,6 +13,13 @@ interface Cargo {
   metal:  number
 }
 
+// Reisezeiten in Sekunden
+const TRAVEL_TIME: Record<string, Record<string, number>> = {
+  moon:   { mars: 30, phobos: 25 },
+  mars:   { moon: 30, phobos: 10 },
+  phobos: { moon: 25, mars: 10   },
+}
+
 interface GameState {
   credits:   number
   cargo:     Cargo
@@ -20,6 +28,13 @@ interface GameState {
   shipId:    string | null
   loaded:    boolean
 
+  // Transit
+  inTransit:    boolean
+  transitFrom:  LocationSlug | null
+  transitTo:    LocationSlug | null
+  transitTotal: number   // Gesamtdauer in Sekunden
+  transitLeft:  number   // Verbleibende Sekunden
+
   cargoUsed: () => number
   cargoFree: () => number
 
@@ -27,6 +42,7 @@ interface GameState {
   buy:    (resource: ResourceType, price: number) => Promise<{ ok: boolean; msg: string }>
   sell:   (resource: ResourceType, price: number) => Promise<{ ok: boolean; msg: string }>
   travel: (dest: LocationSlug) => Promise<void>
+  tickTransit: () => void   // wird jede Sekunde aufgerufen
 }
 
 async function getToken(): Promise<string | null> {
@@ -42,11 +58,9 @@ async function getToken(): Promise<string | null> {
 async function tradeRequest(params: Record<string, string | number>) {
   const token = await getToken()
   if (!token) throw new Error('Nicht eingeloggt')
-
   const query = new URLSearchParams(
     Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
   ).toString()
-
   const res = await fetch(`/api/game/trade${query ? '?' + query : ''}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   })
@@ -60,6 +74,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   location: 'moon',
   shipId:   null,
   loaded:   false,
+
+  inTransit:    false,
+  transitFrom:  null,
+  transitTo:    null,
+  transitTotal: 0,
+  transitLeft:  0,
 
   cargoUsed: () => {
     const { cargo } = get()
@@ -86,7 +106,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   buy: async (resource, price) => {
-    const { credits, cargoFree, location } = get()
+    const { credits, cargoFree, location, inTransit } = get()
+    if (inTransit)        return { ok: false, msg: 'Im Transit – warte auf Landung.' }
     if (credits < price)  return { ok: false, msg: 'Unzureichende Credits.' }
     if (cargoFree() < 1)  return { ok: false, msg: 'Frachtraum voll.' }
 
@@ -106,7 +127,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       set({ credits: data.credits, cargo: data.cargo })
       return { ok: true, msg: `Gekauft für ${price} Cr.` }
-    } catch (err) {
+    } catch {
       set(s => ({
         credits: s.credits + price,
         cargo:   { ...s.cargo, [resource]: Math.max(0, s.cargo[resource] - 1) },
@@ -116,7 +137,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   sell: async (resource, price) => {
-    const { cargo, location } = get()
+    const { cargo, location, inTransit } = get()
+    if (inTransit)           return { ok: false, msg: 'Im Transit – warte auf Landung.' }
     if (cargo[resource] < 1) return { ok: false, msg: 'Keine Ware an Bord.' }
 
     set(s => ({
@@ -135,7 +157,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       set({ credits: data.credits, cargo: data.cargo })
       return { ok: true, msg: `Verkauft für ${price} Cr.` }
-    } catch (err) {
+    } catch {
       set(s => ({
         credits: s.credits - price,
         cargo:   { ...s.cargo, [resource]: s.cargo[resource] + 1 },
@@ -145,11 +167,45 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   travel: async (dest) => {
-    set({ location: dest })
+    const { location, inTransit } = get()
+    if (inTransit) return
+    if (location === dest) return
+
+    const duration = TRAVEL_TIME[location]?.[dest] ?? 20
+
+    // Transit starten
+    set({
+      inTransit:    true,
+      transitFrom:  location,
+      transitTo:    dest,
+      transitTotal: duration,
+      transitLeft:  duration,
+    })
+
+    // Server informieren (passiert sofort, Ankunft ist clientseitig)
     try {
       await tradeRequest({ action: 'travel', resource: dest, amount: 0, price: 0, location: dest })
     } catch (err) {
       console.error('travel error:', err)
+    }
+  },
+
+  tickTransit: () => {
+    const { inTransit, transitLeft, transitTo } = get()
+    if (!inTransit) return
+
+    if (transitLeft <= 1) {
+      // Angekommen
+      set({
+        inTransit:    false,
+        location:     transitTo as LocationSlug,
+        transitFrom:  null,
+        transitTo:    null,
+        transitTotal: 0,
+        transitLeft:  0,
+      })
+    } else {
+      set(s => ({ transitLeft: s.transitLeft - 1 }))
     }
   },
 }))
