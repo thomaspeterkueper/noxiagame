@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/population",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/prices",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/orders",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
