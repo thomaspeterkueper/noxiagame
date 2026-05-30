@@ -1,7 +1,6 @@
-// ============================================================
-// NOXIA – Cron: Handelsaufträge generieren
-// Läuft stündlich (vercel.json)
-// ============================================================
+// app/api/cron/orders/route.ts
+// Erstellt: 30.05.2026
+// Aktualisiert: 30.05.2026 – Bessere Auftragslogik mit Dringlichkeit
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -14,8 +13,6 @@ import {
   CRON_SECRET_HEADER,
 } from '@/lib/game/config'
 
-export const runtime = 'edge'
-
 export async function GET(req: NextRequest) {
   const secret = req.headers.get(CRON_SECRET_HEADER)
   if (secret !== process.env.CRON_SECRET) {
@@ -24,75 +21,101 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
   const created: Record<string, unknown>[] = []
+  const expired: number[] = []
 
   try {
     // Abgelaufene Aufträge schließen
-    await supabase
+    const { data: expiredOrders } = await supabase
       .from('trade_orders')
       .update({ status: 'expired' })
       .eq('status', 'open')
       .lt('expires_at', new Date().toISOString())
+      .select('id')
 
-    // Kolonien mit knappen Ressourcen finden
-    const { data: scarce, error: scarceError } = await supabase
-      .from('location_resources')
-      .select('*, locations(id, slug)')
-      .lt('stock', STOCK_LOW_THRESHOLD)
+    expired.push(...(expiredOrders ?? []).map((o: any) => o.id))
 
-    if (scarceError) throw scarceError
+    // Alle Kolonien mit Ressourcen laden
+    const { data: locations } = await supabase
+      .from('locations')
+      .select('id, slug, name, population, is_supplied')
 
-    for (const entry of scarce ?? []) {
-      // Prüfen ob bereits offener Auftrag für diese Kolonie/Ressource existiert
-      const { data: existing } = await supabase
-        .from('trade_orders')
-        .select('id')
-        .eq('location_id', entry.location_id)
-        .eq('resource', entry.resource)
-        .eq('status', 'open')
-        .limit(1)
+    for (const loc of locations ?? []) {
+      const { data: resources } = await supabase
+        .from('location_resources')
+        .select('resource, stock, consumption, production')
+        .eq('location_id', loc.id)
 
-      if (existing && existing.length > 0) continue
+      for (const res of resources ?? []) {
+        const balance = res.production - res.consumption
+        const isUrgent = res.stock < STOCK_LOW_THRESHOLD
+        const isSinking = balance < 0 && res.stock < 150
 
-      // Marktpreis laden
-      const { data: price } = await supabase
-        .from('market_prices')
-        .select('buy_price')
-        .eq('location_id', entry.location_id)
-        .eq('resource', entry.resource)
-        .single()
+        if (!isUrgent && !isSinking) continue
 
-      if (!price) continue
+        // Prüfen ob bereits offener Auftrag existiert
+        const { data: existing } = await supabase
+          .from('trade_orders')
+          .select('id')
+          .eq('location_id', loc.id)
+          .eq('resource', res.resource)
+          .eq('status', 'open')
+          .limit(1)
 
-      // Auftrag generieren
-      const amount = Math.floor(
-        ORDER_MIN_AMOUNT + Math.random() * (ORDER_MAX_AMOUNT - ORDER_MIN_AMOUNT)
-      )
-      const reward = Math.round(price.buy_price * amount * ORDER_REWARD_MULT)
-      const expiresAt = new Date()
-      expiresAt.setHours(expiresAt.getHours() + ORDER_EXPIRE_HOURS)
+        if (existing && existing.length > 0) continue
 
-      const { error: insertError } = await supabase
-        .from('trade_orders')
-        .insert({
-          location_id: entry.location_id,
-          resource:    entry.resource,
+        // Marktpreis laden
+        const { data: price } = await supabase
+          .from('market_prices')
+          .select('buy_price')
+          .eq('location_id', loc.id)
+          .eq('resource', res.resource)
+          .single()
+
+        if (!price) continue
+
+        // Auftragsmenge basierend auf Dringlichkeit
+        const urgencyMultiplier = 1.0
+        const amount = Math.floor(
+          (ORDER_MIN_AMOUNT + Math.random() * (ORDER_MAX_AMOUNT - ORDER_MIN_AMOUNT)) * urgencyMultiplier
+        )
+
+        // Belohnung: höher bei dringenden Aufträgen
+        const rewardMult = isUrgent ? ORDER_REWARD_MULT * 1.3 : ORDER_REWARD_MULT
+        const reward = Math.round(price.buy_price * amount * rewardMult)
+
+        const expiresAt = new Date()
+        expiresAt.setHours(expiresAt.getHours() + ORDER_EXPIRE_HOURS)
+
+        const { error: insertError } = await supabase
+          .from('trade_orders')
+          .insert({
+            location_id: loc.id,
+            resource:    res.resource,
+            amount,
+            reward,
+            expires_at:  expiresAt.toISOString(),
+          })
+
+        if (insertError) throw insertError
+
+        created.push({
+          location: loc.slug,
+          resource: res.resource,
           amount,
           reward,
-          expires_at:  expiresAt.toISOString(),
+          stock:   res.stock,
+          urgent:  isUrgent,
         })
-
-      if (insertError) throw insertError
-
-      created.push({
-        location: entry.locations?.slug,
-        resource: entry.resource,
-        amount,
-        reward,
-        stock:   entry.stock,
-      })
+      }
     }
 
-    return NextResponse.json({ ok: true, tick: 'orders', created })
+    return NextResponse.json({
+      ok: true,
+      tick: 'orders',
+      created: created.length,
+      expired: expired.length,
+      orders: created,
+    })
 
   } catch (err) {
     console.error('Orders tick error:', err)

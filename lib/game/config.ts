@@ -36,11 +36,11 @@ export const STOCK_HIGH_THRESHOLD = 400   // über 400 → Preis sinkt
 
 // Preisgrenzen (verhindert extreme Ausschläge)
 export const PRICE_MIN = 10
-export const PRICE_MAX = 500
+export const PRICE_MAX = 50
 
 // Auftrags-Generator
-export const ORDER_MIN_AMOUNT  = 50
-export const ORDER_MAX_AMOUNT  = 500
+export const ORDER_MIN_AMOUNT  = 10
+export const ORDER_MAX_AMOUNT  = 30
 export const ORDER_REWARD_MULT = 1.3   // Belohnung = Marktpreis × 1.3
 export const ORDER_EXPIRE_HOURS = 24
 
