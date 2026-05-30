@@ -25,7 +25,7 @@ function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   )
 }
 
-export default function DashboardClient({ locations, prices, orders }: {
+export default function DashboardClient({ locations: initialLocations, prices, orders: initialOrders }: {
   locations: any[]
   prices: any[]
   orders: any[]
@@ -33,10 +33,32 @@ export default function DashboardClient({ locations, prices, orders }: {
   const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loaded, loadFromServer } = useGameStore()
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [amounts, setAmounts] = useState<Record<string, number>>({ water: 1, energy: 1, metal: 1 })
+  const [worldData, setWorldData] = useState<any>(null)
 
   useEffect(() => {
     if (!loaded) loadFromServer()
   }, [])
+
+  useEffect(() => {
+    async function fetchWorld() {
+      try {
+        const res = await fetch('/api/game/world')
+        const data = await res.json()
+        setWorldData(data)
+      } catch (err) {
+        console.error('world fetch error:', err)
+      }
+    }
+    fetchWorld()
+    const interval = setInterval(fetchWorld, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const locations = worldData?.locations ?? initialLocations
+  const orders = worldData ? [] : initialOrders
+  const news = worldData?.news ?? []
+  const stats = worldData?.stats
+  const transactions = worldData?.transactions ?? []
 
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok })
@@ -99,19 +121,8 @@ export default function DashboardClient({ locations, prices, orders }: {
     }
   }
 
-  // Weltmeldungen
-  const news: string[] = []
-  for (const loc of locations) {
-    if (!loc.is_supplied) news.push(`${LOC_ICON[loc.slug]} ${LOC_NAME[loc.slug]} meldet Versorgungsengpass`)
-    const water = loc.location_resources?.find((r: any) => r.resource === 'water')
-    if (water && water.stock < 100) news.push(`${LOC_ICON[loc.slug]} ${LOC_NAME[loc.slug]}: Wasserreserven kritisch (${water.stock}t)`)
-  }
-  if (news.length === 0) {
-    news.push('🟢 Alle Kolonien stabil versorgt')
-    news.push('📈 Handelsvolumen im Sonnensystem steigt')
-  }
-
   const suppliedCount = locations.filter((l: any) => l.is_supplied).length
+  const totalPop = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
 
   const s = {
     label:        { fontSize: '0.65rem', textTransform: 'uppercase' as const, letterSpacing: '3px', color: '#b99b6b', fontWeight: 700, marginBottom: '0.75rem', display: 'block' },
@@ -145,10 +156,8 @@ export default function DashboardClient({ locations, prices, orders }: {
             <div style={{ fontWeight: 700, color: '#2a4e7a' }}>{LOC_ICON[location]} {LOC_NAME[location]}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>Kolonien versorgt</div>
-            <div style={{ fontWeight: 700, color: suppliedCount === locations.length ? '#27ae60' : '#c0392b' }}>
-              {suppliedCount} / {locations.length}
-            </div>
+            <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>Gesamtbevölkerung</div>
+            <div style={{ fontWeight: 700, color: '#2a4e7a' }}>{totalPop.toLocaleString('de')}</div>
           </div>
           <button style={{ ...s.btnSecondary, fontSize: '0.65rem' }} onClick={handleLogout}>
             Abmelden
@@ -159,7 +168,10 @@ export default function DashboardClient({ locations, prices, orders }: {
       {/* WELTMELDUNGEN */}
       <div style={{ background: '#2a4e7a', color: '#fff', padding: '0.6rem 2rem' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', gap: '2rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
-          {news.map((n, i) => <span key={i} style={{ opacity: i === 0 ? 1 : 0.7 }}>{n}</span>)}
+          {news.length > 0
+            ? news.map((n: any, i: number) => <span key={i} style={{ opacity: i === 0 ? 1 : 0.75 }}>{n.icon} {n.text}</span>)
+            : <span>🟢 Sonnensystem stabil</span>
+          }
         </div>
       </div>
 
@@ -180,57 +192,108 @@ export default function DashboardClient({ locations, prices, orders }: {
           </div>
         )}
 
-        {/* KOLONIEN */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <span style={s.label}>Kolonien – Weltstatus</span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-            {locations.map((loc: any) => {
-              const popPct = Math.round((loc.population / loc.population_max) * 100)
-              const isHere = loc.slug === location
-              return (
-                <div key={loc.id} style={{ ...s.card, padding: '1.25rem', borderTop: `3px solid ${isHere ? '#b99b6b' : loc.is_supplied ? '#27ae60' : '#c0392b'}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <div>
-                      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#2a4e7a' }}>
-                        {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
-                        {isHere && <span style={{ fontSize: '0.6rem', background: '#b99b6b', color: '#fff', borderRadius: '3px', padding: '1px 6px', marginLeft: '6px' }}>HIER</span>}
+        {/* WELTENTWICKLUNG + KOLONIEN */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', marginBottom: '1.5rem' }}>
+
+          {/* KOLONIEN */}
+          <div>
+            <span style={s.label}>Kolonien – Weltstatus</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {locations.map((loc: any) => {
+                const popPct = Math.round((loc.population / loc.population_max) * 100)
+                const isHere = loc.slug === location
+                return (
+                  <div key={loc.id} style={{ ...s.card, padding: '1rem 1.25rem', borderLeft: `4px solid ${isHere ? '#b99b6b' : loc.is_supplied ? '#27ae60' : '#c0392b'}` }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', alignItems: 'center', gap: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2a4e7a' }}>
+                          {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
+                          {isHere && <span style={{ fontSize: '0.55rem', background: '#b99b6b', color: '#fff', borderRadius: '3px', padding: '1px 5px', marginLeft: '5px' }}>HIER</span>}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{loc.name}</div>
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{loc.name}</div>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', marginBottom: '0.2rem' }}>
+                          <span>Bevölkerung</span>
+                          <span style={{ color: '#1e2a36' }}>{loc.population.toLocaleString('de')} / {loc.population_max.toLocaleString('de')}</span>
+                        </div>
+                        <div style={{ background: '#f1f1f1', height: '4px', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${popPct}%`, height: '100%', background: isHere ? '#b99b6b' : '#2a4e7a' }} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.72rem', color: '#64748b' }}>
+                        {(loc.location_resources ?? []).map((r: any) => {
+                          const bal = r.production - r.consumption
+                          return (
+                            <span key={r.resource}>
+                              {RESOURCE_ICON[r.resource]} {r.stock}t
+                              <span style={{ color: bal >= 0 ? '#27ae60' : '#c0392b', marginLeft: '2px', fontSize: '0.65rem' }}>
+                                ({bal >= 0 ? '+' : ''}{bal})
+                              </span>
+                            </span>
+                          )
+                        })}
+                      </div>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: loc.is_supplied ? '#27ae60' : '#c0392b' }}>
+                        {loc.is_supplied ? '✓' : '⚠'}
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: loc.is_supplied ? '#27ae60' : '#c0392b' }}>
-                      {loc.is_supplied ? '✓ Versorgt' : '⚠ Mangel'}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* WELTENTWICKLUNG */}
+          <div>
+            <span style={s.label}>Weltentwicklung</span>
+            <div style={{ ...s.card, padding: '1rem' }}>
+              <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Sonnensystem</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                  <span style={{ color: '#64748b' }}>Gesamtbevölkerung</span>
+                  <span style={{ fontWeight: 600 }}>{totalPop.toLocaleString('de')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                  <span style={{ color: '#64748b' }}>Versorgte Kolonien</span>
+                  <span style={{ fontWeight: 600, color: suppliedCount === locations.length ? '#27ae60' : '#c0392b' }}>
+                    {suppliedCount} / {locations.length}
+                  </span>
+                </div>
+                {stats?.tickNumber > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#64748b' }}>Tick</span>
+                    <span style={{ fontWeight: 600 }}>#{stats.tickNumber}</span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Letzte Transaktionen</div>
+                {transactions.slice(0, 4).map((t: any, i: number) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: '#64748b' }}>
+                      {t.profiles?.username ?? 'Pilot'} · {RESOURCE_LABEL[t.resource] ?? t.resource}
+                    </span>
+                    <span style={{ color: t.profit > 0 ? '#27ae60' : '#c0392b', fontWeight: 600 }}>
+                      {t.profit > 0 ? '+' : ''}{t.profit} Cr
                     </span>
                   </div>
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                      <span>Bevölkerung</span>
-                      <span style={{ color: '#1e2a36', fontWeight: 600 }}>{loc.population.toLocaleString('de')} / {loc.population_max.toLocaleString('de')}</span>
-                    </div>
-                    <div style={{ background: '#f1f1f1', height: '4px', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ width: `${popPct}%`, height: '100%', background: isHere ? '#b99b6b' : '#2a4e7a' }} />
-                    </div>
+                ))}
+                {transactions.length === 0 && (
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Noch keine Transaktionen.</div>
+                )}
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Meldungen</div>
+                {news.slice(0, 3).map((n: any, i: number) => (
+                  <div key={i} style={{ fontSize: '0.72rem', marginBottom: '0.3rem', color: n.type === 'danger' ? '#c0392b' : n.type === 'warning' ? '#e67e22' : n.type === 'success' ? '#27ae60' : '#64748b' }}>
+                    {n.icon} {n.text}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    {(loc.location_resources ?? []).map((r: any) => {
-                      const bal = r.production - r.consumption
-                      const status = r.stock < 50 ? { label: 'Kritisch', color: '#c0392b' }
-                        : bal < 0 ? { label: 'Sinkend', color: '#e67e22' }
-                        : bal > 0 ? { label: 'Überschuss', color: '#27ae60' }
-                        : { label: 'Stabil', color: '#64748b' }
-                      return (
-                        <div key={r.resource} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                          <span style={{ color: '#64748b' }}>{RESOURCE_ICON[r.resource]} {RESOURCE_LABEL[r.resource]}</span>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <span>{r.stock}t</span>
-                            <span style={{ color: status.color, fontWeight: 600, fontSize: '0.65rem' }}>{status.label}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -260,15 +323,15 @@ export default function DashboardClient({ locations, prices, orders }: {
           <div>
             <span style={s.label}>Dringende Aufträge</span>
             <div style={s.card}>
-              {orders.length === 0 ? (
+              {initialOrders.length === 0 ? (
                 <div style={{ padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' }}>
                   Keine offenen Aufträge.
                 </div>
-              ) : orders.map((o: any, i: number) => (
-                <div key={o.id} style={{ padding: '1rem 1.25rem', borderBottom: i < orders.length - 1 ? '1px solid #f1f1f1' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              ) : initialOrders.map((o: any, i: number) => (
+                <div key={o.id} style={{ padding: '1rem 1.25rem', borderBottom: i < initialOrders.length - 1 ? '1px solid #f1f1f1' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2a4e7a' }}>{LOC_ICON[o.locations?.slug]} {o.locations?.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.amount}t {RESOURCE_LABEL[o.resource]} · Versorgung kritisch</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.amount}t {RESOURCE_LABEL[o.resource]}</div>
                   </div>
                   <div style={{ fontWeight: 700, color: '#b99b6b', fontSize: '1rem' }}>+{o.reward.toLocaleString('de')} Cr</div>
                 </div>
