@@ -2,18 +2,43 @@ import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#040910] text-[#b8d4e8] flex flex-col items-center justify-center">
+    <main className="min-h-screen bg-[#040910] flex flex-col items-center justify-center">
       <div className="text-center space-y-8">
-        <h1 className="font-mono text-6xl font-black tracking-[0.3em] text-[#00c8ff]">
-          NOX<span className="text-[#ff6b2b]">IA</span>
+        <h1
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: 'clamp(3rem, 10vw, 5.5rem)',
+            fontWeight: 300,
+            letterSpacing: '0.15em',
+            color: '#2a4e7a',
+          }}
+        >
+          noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
         </h1>
-        <p className="text-[#3a6080] text-sm tracking-widest uppercase">
+        <p style={{
+          color: '#8a6d2b',
+          fontSize: '0.85rem',
+          letterSpacing: '5px',
+          textTransform: 'uppercase',
+          fontFamily: 'Georgia, serif',
+        }}>
           Sonnensystem-Handelssimulation · Alpha 0.1
         </p>
-        <div className="flex flex-col gap-3 mt-12">
+        <div className="mt-12">
           <Link
             href="/dashboard"
-            className="px-8 py-3 border border-[#00c8ff] text-[#00c8ff] hover:bg-[#00c8ff] hover:text-[#040910] transition-colors tracking-widest text-sm uppercase"
+            style={{
+              display: 'inline-block',
+              color: '#c9a961',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '3px',
+              borderBottom: '1px solid #c9a961',
+              paddingBottom: '8px',
+              textDecoration: 'none',
+              fontFamily: 'sans-serif',
+            }}
           >
             Ins Universum
           </Link>

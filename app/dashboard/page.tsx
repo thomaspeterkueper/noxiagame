@@ -33,7 +33,9 @@ export default async function Dashboard() {
       {/* Topbar */}
       <div className="flex items-center justify-between mb-8 border-b border-[#162f4a] pb-4">
         <h1 className="font-mono text-xl font-black tracking-[0.3em] text-[#00c8ff]">
-          NOX<span className="text-[#ff6b2b]">IA</span>
+         <span style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.15em', color: '#2a4e7a' }}>
+  noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
+</span>
         </h1>
         <span className="text-[#3a6080] text-xs tracking-widest uppercase">Alpha 0.1</span>
       </div>
