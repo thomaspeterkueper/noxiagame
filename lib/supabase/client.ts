@@ -1,3 +1,6 @@
+// lib/supabase/client.ts
+// Erstellt: 30.05.2026
+
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {

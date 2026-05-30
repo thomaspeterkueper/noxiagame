@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
@@ -30,17 +30,41 @@ export default function DashboardClient({ locations, prices, orders }: {
   prices: any[]
   orders: any[]
 }) {
-  const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed } = useGameStore()
+  const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loaded, loadFromServer } = useGameStore()
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [amounts, setAmounts] = useState<Record<string, number>>({ water: 1, energy: 1, metal: 1 })
+
+  useEffect(() => {
+    if (!loaded) loadFromServer()
+  }, [])
 
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 2500)
   }
 
-  function handleTravel(dest: LocationSlug) {
-    travel(dest)
+  async function handleBuy(resource: ResourceType, price: number, amount: number) {
+    let bought = 0
+    for (let j = 0; j < amount; j++) {
+      const result = await buy(resource, price)
+      if (!result.ok) { showToast(result.msg, false); break }
+      bought++
+    }
+    if (bought > 0) showToast(`${bought}t ${RESOURCE_LABEL[resource]} gekauft · ${bought * price} Cr`, true)
+  }
+
+  async function handleSell(resource: ResourceType, price: number, amount: number) {
+    let sold = 0
+    for (let j = 0; j < amount; j++) {
+      const result = await sell(resource, price)
+      if (!result.ok) { showToast(result.msg, false); break }
+      sold++
+    }
+    if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[resource]} verkauft · +${sold * price} Cr`, true)
+  }
+
+  async function handleTravel(dest: LocationSlug) {
+    await travel(dest)
     showToast(`Angeflogen: ${LOC_NAME[dest]}`, true)
   }
 
@@ -274,27 +298,11 @@ export default function DashboardClient({ locations, prices, orders }: {
                     <button style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
                       onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.min(Math.max(1, cargoFreeSpace), a[p.resource] + 1) }))}>+</button>
                     <button style={s.btnPrimary}
-                      onClick={() => {
-                        let bought = 0
-                        for (let j = 0; j < amounts[p.resource]; j++) {
-                          const result = buy(p.resource as ResourceType, p.buy_price)
-                          if (!result.ok) { showToast(result.msg, false); break }
-                          bought++
-                        }
-                        if (bought > 0) showToast(`${bought}t ${RESOURCE_LABEL[p.resource]} gekauft · ${bought * p.buy_price} Cr`, true)
-                      }}>
+                      onClick={() => handleBuy(p.resource as ResourceType, p.buy_price, amounts[p.resource])}>
                       Kaufen
                     </button>
                     <button style={{ ...s.btnSecondary, opacity: cargo[p.resource as ResourceType] > 0 ? 1 : 0.4 }}
-                      onClick={() => {
-                        let sold = 0
-                        for (let j = 0; j < amounts[p.resource]; j++) {
-                          const result = sell(p.resource as ResourceType, p.sell_price)
-                          if (!result.ok) { showToast(result.msg, false); break }
-                          sold++
-                        }
-                        if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[p.resource]} verkauft · +${sold * p.sell_price} Cr`, true)
-                      }}>
+                      onClick={() => handleSell(p.resource as ResourceType, p.sell_price, amounts[p.resource])}>
                       Verk.
                     </button>
                   </div>
