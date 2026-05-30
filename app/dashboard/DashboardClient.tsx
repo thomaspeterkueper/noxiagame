@@ -5,6 +5,17 @@
 
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
+
+const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
+const RESOURCE_ICON:  Record<string, string>  = { water: '💧', energy: '⚡', metal: '⛏️' }
+const LOC_ICON:       Record<string, string>  = { moon: '🌙', mars: '🔴', phobos: '🪨' }
+const LOC_NAME:       Record<string, string>  = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
+const LOC_IMAGE:      Record<string, string>  = {
+  moon:   '/images/locations/moon.png',
+  mars:   '/images/locations/mars.png',
+  phobos: '/images/locations/phobos.png',
+}
+
 async function getToken(): Promise<string | null> {
   const { createBrowserClient } = await import('@supabase/ssr')
   const supabase = createBrowserClient(
@@ -14,11 +25,6 @@ async function getToken(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession()
   return session?.access_token ?? null
 }
-
-const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
-const RESOURCE_ICON:  Record<string, string>  = { water: '💧', energy: '⚡', metal: '⛏️' }
-const LOC_ICON:       Record<string, string>  = { moon: '🌙', mars: '🔴', phobos: '🪨' }
-const LOC_NAME:       Record<string, string>  = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -64,7 +70,6 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   }, [])
 
   const locations = worldData?.locations ?? initialLocations
-  const orders = worldData ? [] : initialOrders
   const news = worldData?.news ?? []
   const stats = worldData?.stats
   const transactions = worldData?.transactions ?? []
@@ -106,8 +111,23 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     window.location.href = '/auth/login'
   }
 
+  async function handleFulfillOrder(orderId: string, reward: number) {
+    const token = await getToken()
+    const res = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const data = await res.json()
+    if (data.ok) {
+      showToast(`Auftrag erfüllt! +${data.reward.toLocaleString('de')} Cr`, true)
+      await loadFromServer()
+    } else {
+      showToast(data.error, false)
+    }
+  }
+
   const currentPrices = prices.filter((p: any) => p.locations?.slug === location)
   const otherLocations = locations.filter((l: any) => l.slug !== location)
+  const currentLocationData = locations.find((l: any) => l.slug === location)
   const used = cargoUsed()
   const cargoFreeSpace = cargoMax - used
 
@@ -186,6 +206,27 @@ export default function DashboardClient({ locations: initialLocations, prices, o
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' }}>
 
+        {/* AKTUELLER ORT */}
+        <div style={{ ...s.card, marginBottom: '1.5rem', overflow: 'hidden', display: 'flex', height: '140px', background: '#0a0f1a' }}>
+          <img
+            src={LOC_IMAGE[location]}
+            alt={LOC_NAME[location]}
+            style={{ width: '220px', objectFit: 'cover', flexShrink: 0 }}
+          />
+          <div style={{ padding: '1.25rem', flex: 1, background: '#0a0f1a' }}>
+            <div style={{ fontSize: '0.65rem', color: '#5a7a9a', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '0.5rem' }}>Aktueller Standort</div>
+            <div style={{ fontSize: '1.4rem', fontFamily: 'Georgia, serif', fontWeight: 300, color: '#c9a961', marginBottom: '0.3rem' }}>
+              {LOC_ICON[location]} {LOC_NAME[location]}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#7a9ab8' }}>
+              {currentLocationData?.name}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#5a7a9a', marginTop: '0.3rem' }}>
+              {currentLocationData?.description}
+            </div>
+          </div>
+        </div>
+
         {/* FRACHTSTATUS */}
         {used > 0 && (
           <div style={{ ...s.card, padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
@@ -201,10 +242,8 @@ export default function DashboardClient({ locations: initialLocations, prices, o
           </div>
         )}
 
-        {/* WELTENTWICKLUNG + KOLONIEN */}
+        {/* KOLONIEN + WELTENTWICKLUNG */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', marginBottom: '1.5rem' }}>
-
-          {/* KOLONIEN */}
           <div>
             <span style={s.label}>Kolonien – Weltstatus</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -276,14 +315,11 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                   </div>
                 )}
               </div>
-
               <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Letzte Transaktionen</div>
                 {transactions.slice(0, 4).map((t: any, i: number) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.3rem' }}>
-                    <span style={{ color: '#64748b' }}>
-                      {t.profiles?.username ?? 'Pilot'} · {RESOURCE_LABEL[t.resource] ?? t.resource}
-                    </span>
+                    <span style={{ color: '#64748b' }}>{t.profiles?.username ?? 'Pilot'} · {RESOURCE_LABEL[t.resource] ?? t.resource}</span>
                     <span style={{ color: t.profit > 0 ? '#27ae60' : '#c0392b', fontWeight: 600 }}>
                       {t.profit > 0 ? '+' : ''}{t.profit} Cr
                     </span>
@@ -293,7 +329,6 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Noch keine Transaktionen.</div>
                 )}
               </div>
-
               <div>
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Meldungen</div>
                 {news.slice(0, 3).map((n: any, i: number) => (
@@ -307,44 +342,55 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         </div>
 
         {/* BESTE HANDELSCHANCE + AUFTRÄGE */}
-<div>
-  <span style={s.label}>Dringende Aufträge</span>
-  <div style={s.card}>
-    {initialOrders.length === 0 ? (
-      <div style={{ padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' }}>
-        Keine offenen Aufträge.
-      </div>
-    ) : initialOrders.map((o: any, i: number) => (
-      <div key={o.id} style={{ padding: '1rem 1.25rem', borderBottom: i < initialOrders.length - 1 ? '1px solid #f1f1f1' : 'none' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2a4e7a' }}>{LOC_ICON[o.locations?.slug]} {o.locations?.name}</div>
-            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.amount}t {RESOURCE_LABEL[o.resource]}</div>
+            <span style={s.label}>Beste Handelschance</span>
+            {best ? (
+              <div style={{ ...s.card, padding: '1.25rem' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#2a4e7a', marginBottom: '0.3rem' }}>
+                  {RESOURCE_ICON[best.resource]} {RESOURCE_LABEL[best.resource]}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                  {LOC_ICON[best.from]} {LOC_NAME[best.from]} → {LOC_ICON[best.to]} {LOC_NAME[best.to]}
+                </div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#27ae60', marginBottom: '0.5rem' }}>
+                  +{best.profit} Cr / t
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                  Kaufen auf {LOC_NAME[best.from]} · Verkaufen auf {LOC_NAME[best.to]}
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...s.card, padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Arbitrage gefunden.</div>
+            )}
           </div>
-          <div style={{ fontWeight: 700, color: '#b99b6b', fontSize: '1rem' }}>+{o.reward.toLocaleString('de')} Cr</div>
+          <div>
+            <span style={s.label}>Dringende Aufträge</span>
+            <div style={s.card}>
+              {initialOrders.length === 0 ? (
+                <div style={{ padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' }}>
+                  Keine offenen Aufträge.
+                </div>
+              ) : initialOrders.map((o: any, i: number) => (
+                <div key={o.id} style={{ padding: '1rem 1.25rem', borderBottom: i < initialOrders.length - 1 ? '1px solid #f1f1f1' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2a4e7a' }}>{LOC_ICON[o.locations?.slug]} {o.locations?.name}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.amount}t {RESOURCE_LABEL[o.resource]}</div>
+                    </div>
+                    <div style={{ fontWeight: 700, color: '#b99b6b', fontSize: '1rem' }}>+{o.reward.toLocaleString('de')} Cr</div>
+                  </div>
+                  <button
+                    style={{ ...s.btnPrimary, width: '100%', padding: '0.4rem', fontSize: '0.65rem' }}
+                    onClick={() => handleFulfillOrder(o.id, o.reward)}
+                  >
+                    Erfüllen
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <button
-          style={{ ...s.btnPrimary, width: '100%', padding: '0.4rem', fontSize: '0.65rem' }}
-          onClick={async () => {
-            const token = await getToken()
-            const res = await fetch(`/api/game/orders?action=fulfill&orderId=${o.id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const data = await res.json()
-            if (data.ok) {
-              showToast(`Auftrag erfüllt! +${data.reward.toLocaleString('de')} Cr`, true)
-              await loadFromServer()
-            } else {
-              showToast(data.error, false)
-            }
-          }}
-        >
-          Erfüllen
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
 
         {/* HANDELSZENTRALE + FLOTTENKONTROLLE */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1rem' }}>
