@@ -1,3 +1,6 @@
+// app/dashboard/DashboardClient.tsx
+// Erstellt: 30.05.2026
+
 'use client'
 
 import { useState } from 'react'
@@ -41,8 +44,14 @@ export default function DashboardClient({ locations, prices, orders }: {
     showToast(`Angeflogen: ${LOC_NAME[dest]}`, true)
   }
 
+  async function handleLogout() {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/auth/login'
+  }
+
   const currentPrices = prices.filter((p: any) => p.locations?.slug === location)
-  const currentLocation = locations.find((l: any) => l.slug === location)
   const otherLocations = locations.filter((l: any) => l.slug !== location)
   const used = cargoUsed()
   const cargoFreeSpace = cargoMax - used
@@ -54,13 +63,13 @@ export default function DashboardClient({ locations, prices, orders }: {
     if (!byResource[p.resource]) byResource[p.resource] = []
     byResource[p.resource].push(p)
   }
-  for (const [res, locs] of Object.entries(byResource)) {
+  for (const [, locs] of Object.entries(byResource)) {
     for (const a of locs) {
       for (const b of locs) {
         if (a.locations?.slug === b.locations?.slug) continue
         const profit = b.sell_price - a.buy_price
         if (profit > (best?.profit ?? 0)) {
-          best = { from: a.locations?.slug, to: b.locations?.slug, resource: res, profit }
+          best = { from: a.locations?.slug, to: b.locations?.slug, resource: a.resource, profit }
         }
       }
     }
@@ -117,6 +126,9 @@ export default function DashboardClient({ locations, prices, orders }: {
               {suppliedCount} / {locations.length}
             </div>
           </div>
+          <button style={{ ...s.btnSecondary, fontSize: '0.65rem' }} onClick={handleLogout}>
+            Abmelden
+          </button>
         </div>
       </header>
 
@@ -129,7 +141,7 @@ export default function DashboardClient({ locations, prices, orders }: {
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' }}>
 
-        {/* FRACHTSTATUS – nur wenn beladen */}
+        {/* FRACHTSTATUS */}
         {used > 0 && (
           <div style={{ ...s.card, padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>An Bord:</span>
@@ -256,21 +268,12 @@ export default function DashboardClient({ locations, prices, orders }: {
                     Verk <strong style={{ color: '#27ae60' }}>{p.sell_price} Cr</strong>
                   </span>
                   <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                    {/* Mengenauswahl */}
-                    <button
-                      style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
-                      onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.max(1, a[p.resource] - 1) }))}
-                    >−</button>
-                    <span style={{ minWidth: '24px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
-                      {amounts[p.resource]}
-                    </span>
-                    <button
-                      style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
-                      onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.min(Math.max(1, cargoFreeSpace), a[p.resource] + 1) }))}
-                    >+</button>
-                    {/* Kaufen */}
-                    <button
-                      style={s.btnPrimary}
+                    <button style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
+                      onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.max(1, a[p.resource] - 1) }))}>−</button>
+                    <span style={{ minWidth: '24px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>{amounts[p.resource]}</span>
+                    <button style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
+                      onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.min(Math.max(1, cargoFreeSpace), a[p.resource] + 1) }))}>+</button>
+                    <button style={s.btnPrimary}
                       onClick={() => {
                         let bought = 0
                         for (let j = 0; j < amounts[p.resource]; j++) {
@@ -279,13 +282,10 @@ export default function DashboardClient({ locations, prices, orders }: {
                           bought++
                         }
                         if (bought > 0) showToast(`${bought}t ${RESOURCE_LABEL[p.resource]} gekauft · ${bought * p.buy_price} Cr`, true)
-                      }}
-                    >
+                      }}>
                       Kaufen
                     </button>
-                    {/* Verkaufen */}
-                    <button
-                      style={{ ...s.btnSecondary, opacity: cargo[p.resource as ResourceType] > 0 ? 1 : 0.4 }}
+                    <button style={{ ...s.btnSecondary, opacity: cargo[p.resource as ResourceType] > 0 ? 1 : 0.4 }}
                       onClick={() => {
                         let sold = 0
                         for (let j = 0; j < amounts[p.resource]; j++) {
@@ -294,8 +294,7 @@ export default function DashboardClient({ locations, prices, orders }: {
                           sold++
                         }
                         if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[p.resource]} verkauft · +${sold * p.sell_price} Cr`, true)
-                      }}
-                    >
+                      }}>
                       Verk.
                     </button>
                   </div>
@@ -319,11 +318,9 @@ export default function DashboardClient({ locations, prices, orders }: {
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Fliegen nach</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   {otherLocations.map((loc: any) => (
-                    <button
-                      key={loc.id}
+                    <button key={loc.id}
                       style={{ ...s.btnSecondary, width: '100%', padding: '0.6rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}
-                      onClick={() => handleTravel(loc.slug as LocationSlug)}
-                    >
+                      onClick={() => handleTravel(loc.slug as LocationSlug)}>
                       <span>{LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}</span>
                       <span style={{ color: '#94a3b8', fontSize: '0.65rem' }}>Sofortflug →</span>
                     </button>
