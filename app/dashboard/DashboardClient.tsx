@@ -22,6 +22,9 @@ import ShipyardPanel from './ShipyardPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
 import ColonyStats from './ColonyStats'
+import ShipyardCard from './ShipyardCard'
+import ShipHeader from './ShipHeader'
+// ShipFlyby wird in TransitPanel.tsx eingebunden, nicht hier
 
 // ─── Konstanten ────────────────────────────────────────────────────────────────
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
@@ -74,6 +77,7 @@ export default function DashboardClient({
   const {
     credits, cargo, cargoMax, location, buy, sell, travel,
     cargoUsed, loaded, loadFromServer, inTransit,
+    shipTypeId,  // für ShipHeader + ShipyardCard
   } = useGameStore()
 
   // UI-State
@@ -116,7 +120,7 @@ export default function DashboardClient({
       const data = await res.json()
 
       console.log('playerBuilds:', data.builds)
-      
+
       setPlayerBuilds(data.builds ?? [])
     } catch (err) {
       console.error('build fetch error:', err)
@@ -347,21 +351,22 @@ export default function DashboardClient({
         {/* ── TAB: ÜBERSICHT ────────────────────────────────────────────────── */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Aktueller Standort mit Bild */}
-            <div style={{ ...s.card, marginBottom: '1.5rem', overflow: 'hidden', display: 'flex', height: '140px', background: '#0a0f1a' }}>
-              <img
-                src={LOC_IMAGE[location]}
-                alt={LOC_NAME[location]}
-                style={{ width: '220px', objectFit: 'cover', flexShrink: 0 }}
+            {/*
+              ── STANDORT-HEADER ─────────────────────────────────────────────
+              ShipHeader zeigt Schiff (Seitenansicht) + Standortname + Status.
+              Bilder: public/images/ships/freighter_side.png (und courier/hauler)
+              Bei fehlendem Bild: automatischer Fallback, kein Layout-Bruch.
+              shipTypeId kommt aus gameStore (wird mit loadFromServer befüllt).
+            */}
+            <div style={{ marginBottom: '1.5rem', borderRadius: '8px', overflow: 'hidden' }}>
+              <ShipHeader
+                location={location as 'moon' | 'mars' | 'phobos'}
+                locationName={currentLocationData?.name ?? LOC_NAME[location]}
+                locationDesc={currentLocationData?.description ?? ''}
+                shipType={(shipTypeId ?? 'freighter_mk1') as any}
+                credits={credits}
+                inTransit={inTransit}
               />
-              <div style={{ padding: '1.25rem', flex: 1, background: '#0a0f1a' }}>
-                <div style={{ fontSize: '0.65rem', color: '#5a7a9a', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '0.5rem' }}>Aktueller Standort</div>
-                <div style={{ fontSize: '1.4rem', fontFamily: 'Georgia, serif', fontWeight: 300, color: '#c9a961', marginBottom: '0.3rem' }}>
-                  {LOC_ICON[location]} {LOC_NAME[location]}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#7a9ab8' }}>{currentLocationData?.name}</div>
-                <div style={{ fontSize: '0.72rem', color: '#5a7a9a', marginTop: '0.3rem' }}>{currentLocationData?.description}</div>
-              </div>
             </div>
 
             {/* Frachtstatus – nur wenn Ladung an Bord */}
@@ -577,30 +582,53 @@ export default function DashboardClient({
                 </div>
               </div>
 
-              {/* Flottenkontrolle: Laderaum + Reiseziele */}
+              {/*
+                ── FLOTTENKONTROLLE → ShipyardCard ─────────────────────────
+                ShipyardCard zeigt:
+                  - Draufsicht des Schiffs (public/images/ships/freighter_topdown.png)
+                  - Laderaum-Balken (cargoUsed / cargoMax)
+                  - Reisezeiten je nach Schiffstyp
+                  - Werft-Kaufoptionen NUR wenn location === 'moon' && has_shipyard
+                  - Außerhalb des Monds: Hinweis "Fliege nach Shackleton"
+                Fliegen-Buttons bleiben separat unten in diesem Block.
+              */}
               <div>
                 <span style={s.label}>Flottenkontrolle</span>
-                <div style={{ ...s.card, padding: '1.25rem' }}>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.3rem' }}>Frachtraum</div>
-                    <div style={{ background: '#f1f1f1', height: '8px', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.3rem' }}>
-                      <div style={{ width: `${(used / cargoMax) * 100}%`, height: '100%', background: '#2a4e7a', transition: 'width 0.3s' }} />
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{used} / {cargoMax} t · {cargoFreeSpace}t frei</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Fliegen nach</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      {otherLocations.map((loc: any) => (
-                        <button key={loc.id}
-                          style={{ ...s.btnSecondary, width: '100%', padding: '0.6rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: inTransit ? 0.5 : 1 }}
-                          disabled={inTransit}
-                          onClick={() => handleTravel(loc.slug as LocationSlug)}>
-                          <span>{LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}</span>
-                          <span style={{ color: '#94a3b8', fontSize: '0.65rem' }}>Sofortflug →</span>
-                        </button>
-                      ))}
-                    </div>
+                <ShipyardCard
+                  shipType={(shipTypeId ?? 'freighter_mk1') as any}
+                  location={location as 'moon' | 'mars' | 'phobos'}
+                  cargoUsed={used}
+                  cargoMax={cargoMax}
+                  credits={credits}
+                  hasShipyard={locations.find((l: any) => l.slug === 'moon')?.has_shipyard ?? false}
+                  onBuyShip={async (type) => {
+                    const token = await getToken()
+                    const res = await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, {
+                      headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    const data = await res.json()
+                    if (data.ok) {
+                      showToast(`${type} gekauft!`, true)
+                      await loadFromServer()
+                    } else {
+                      showToast(data.error ?? 'Kauf fehlgeschlagen', false)
+                    }
+                  }}
+                />
+
+                {/* Fliegen-Buttons – bleiben direkt unter der ShipyardCard */}
+                <div style={{ marginTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Fliegen nach</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {otherLocations.map((loc: any) => (
+                      <button key={loc.id}
+                        style={{ ...s.btnSecondary, width: '100%', padding: '0.6rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: inTransit ? 0.5 : 1 }}
+                        disabled={inTransit}
+                        onClick={() => handleTravel(loc.slug as LocationSlug)}>
+                        <span>{LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}</span>
+                        <span style={{ color: '#94a3b8', fontSize: '0.65rem' }}>Sofortflug →</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
