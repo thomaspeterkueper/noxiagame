@@ -24,6 +24,17 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action')
 
+   // Handelshistorie laden (für Statistiken)
+if (action === 'getTrades') {
+  const { data: trades } = await serviceClient
+    .from('trade_transactions')
+    .select('*')
+    .eq('profile_id', user.id)
+    .order('traded_at', { ascending: false })
+    .limit(100)
+  return NextResponse.json({ trades: trades ?? [] })
+}
+  // Spielstand laden (kein action Parameter)
   if (!action) {
     const { data: profile } = await serviceClient
       .from('profiles').select('credits').eq('id', user.id).single()
@@ -44,6 +55,7 @@ export async function GET(req: NextRequest) {
       shipId:   ship?.id,
       shipTypeId: ship?.ship_type_id ?? 'freighter_mk1',
     })
+   
   }
 
   const resource = searchParams.get('resource') as string
