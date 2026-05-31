@@ -289,12 +289,34 @@ export default function ColonyGrid({
   const [grid, setGrid] = useState<string[][]>([])
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
+  const [loadedTiles, setLoadedTiles] = useState<Set<string>>(new Set())
   const styles = TILE_STYLES[slug] ?? TILE_STYLES.moon
   const popPercent = Math.round((population / populationMax) * 100)
 
   useEffect(() => {
     setGrid(generateGrid(slug, population, populationMax, buildings, COLS, ROWS))
   }, [slug, population, populationMax, buildings])
+
+// Prüft welche Kachelbilder vorhanden sind ← NEU
+useEffect(() => {
+  const tileTypes = new Set(grid.flat())
+  const newLoaded = new Set<string>()
+  let pending = tileTypes.size
+  if (pending === 0) return
+  tileTypes.forEach(tileType => {
+    const img = new window.Image()
+    img.onload = () => {
+      newLoaded.add(tileType)
+      pending--
+      if (pending === 0) setLoadedTiles(new Set(newLoaded))
+    }
+    img.onerror = () => {
+      pending--
+      if (pending === 0) setLoadedTiles(new Set(newLoaded))
+    }
+    img.src = `/images/grid/${slug}/${tileType}.webp`
+  })
+}, [grid, slug])
 
   function handleTileClick(r: number, c: number, tileType: string) {
     setSelectedTile({ r, c, type: tileType })
@@ -360,7 +382,10 @@ export default function ColonyGrid({
                 onClick={() => handleTileClick(r, c, tileType)}
                 style={{
                   width: TILE_SIZE, height: TILE_SIZE,
-                  background: styles[tileType] ?? '#4a5260',
+                  backgroundImage: `url(/images/grid/${slug}/${tileType}.webp)`,
+backgroundSize: 'cover',
+backgroundColor: styles[tileType] ?? '#4a5260',
+backgroundRepeat: 'no-repeat',
                   boxSizing: 'border-box',
                   border: isSelected ? '2px solid #c9a961' : '0.5px solid rgba(0,0,0,0.15)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -370,7 +395,7 @@ export default function ColonyGrid({
                   opacity: isSelected ? 0.9 : 1,
                 }}
               >
-                {emoji}
+              {loadedTiles.has(tileType) ? null : (TILE_EMOJI[tileType] ?? '·')}
               </div>
             )
           })
