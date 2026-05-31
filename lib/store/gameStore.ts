@@ -179,7 +179,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (inTransit) return
     if (location === dest) return
 
-    const duration = TRAVEL_TIME[location]?.[dest] ?? 20
+    const { speedMult } = get()
+const baseDuration = TRAVEL_TIME[location]?.[dest] ?? 20
+const duration = Math.round(baseDuration * speedMult)
 
     // Transit starten
     set({

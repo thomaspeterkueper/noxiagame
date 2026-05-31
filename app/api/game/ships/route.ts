@@ -103,6 +103,8 @@ export async function GET(req: NextRequest) {
       .update({ credits: newCredits })
       .eq('id', user.id)
 
+      console.log('buy attempt:', { shipTypeId, location: ship.location, available_at: shipType.available_at, credits: profile.credits, cost: shipType.cost_credits })
+
     await serviceClient
       .from('ships')
       .update({
@@ -117,7 +119,7 @@ export async function GET(req: NextRequest) {
       .delete()
       .eq('ship_id', ship.id)
 
-      console.log('shipTypes result:', JSON.stringify(shipTypes), 'error:', shipTypesError)
+    
 
     return NextResponse.json({
       ok:           true,

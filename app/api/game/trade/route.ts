@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
       cargoMax: ship?.cargo_max ?? 100,
       cargo:    cargoMap,
       shipId:   ship?.id,
+      shipTypeId: ship?.ship_type_id ?? 'freighter_mk1',
     })
   }
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
   if (!profile) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
 
   const { data: ship } = await serviceClient
-    .from('ships').select('id, cargo_max').eq('profile_id', user.id).single()
+    .from('ships').select('id, location, cargo_max, ship_type_id').eq('profile_id', user.id).single()
   if (!ship) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
 
   const { data: cargoRows } = await serviceClient

@@ -6,6 +6,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 
+///-> hier?
+
 async function getToken(): Promise<string | null> {
   const { createBrowserClient } = await import('@supabase/ssr')
   const supabase = createBrowserClient(
@@ -34,7 +36,7 @@ export default function ShipyardPanel({ onPurchase, locations }: {
   onPurchase: () => void
   locations: any[]
 }) {
-  const { location, credits, shipTypeId, loadFromServer } = useGameStore()
+  const { location, credits, shipTypeId, loadFromServer, loaded } = useGameStore()
   const [shipTypes, setShipTypes] = useState<ShipType[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
@@ -65,6 +67,12 @@ export default function ShipyardPanel({ onPurchase, locations }: {
 
   if (!hasShipyard) return null
 
+if (!loaded) return (
+  <div style={{ marginBottom: '1.5rem', color: '#94a3b8', fontSize: '0.8rem' }}>
+    🔧 Werft wird geladen...
+  </div>
+)
+
   async function handleBuyShip(typeId: string) {
     setLoading(true)
     setMsg(null)
@@ -73,6 +81,9 @@ export default function ShipyardPanel({ onPurchase, locations }: {
       headers: { 'Authorization': `Bearer ${token}` }
     })
     const data = await res.json()
+
+    
+
     setLoading(false)
     if (data.ok) {
       setMsg({ text: `Schiff gekauft! Neuer Laderaum: ${data.cargoMax}t`, ok: true })
@@ -150,20 +161,26 @@ export default function ShipyardPanel({ onPurchase, locations }: {
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                {isCurrent ? (
-                  <button style={s.btnDisabled} disabled>Aktuell</button>
-                ) : st.cost_credits === 0 ? (
-                  <button style={s.btnDisabled} disabled>Startschiff</button>
-                ) : (
-                  <button
-                    style={{ ...s.btnPrimary, opacity: canAfford ? 1 : 0.5 }}
-                    disabled={!canAfford || loading}
-                    onClick={() => handleBuyShip(st.id)}
-                  >
-                    {st.cost_credits.toLocaleString('de')} Cr
-                  </button>
-                )}
-              </div>
+  {isCurrent ? (
+    <button style={s.btnDisabled} disabled>Aktuell</button>
+  ) : st.cost_credits === 0 ? (
+    <button
+      style={s.btnPrimary}
+      disabled={loading}
+      onClick={() => handleBuyShip(st.id)}
+    >
+      Wechseln
+    </button>
+  ) : (
+    <button
+      style={{ ...s.btnPrimary, opacity: canAfford ? 1 : 0.5 }}
+      disabled={!canAfford || loading}
+      onClick={() => handleBuyShip(st.id)}
+    >
+      {st.cost_credits.toLocaleString('de')} Cr
+    </button>
+  )}
+</div>
             </div>
           )
         })}
