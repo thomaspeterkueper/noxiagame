@@ -1,6 +1,17 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt: 30.05.2026
-// Aktualisiert: 31.05.2026 – Tab-Navigation, Statistiken
+// Aktualisiert: 31.05.2026
+//
+// Haupt-Client-Komponente des Dashboards.
+// Enthält drei Tabs:
+//   1. Übersicht   – Handel, Kolonien-Status, Weltentwicklung, Aufträge, Werft
+//   2. Statistiken – Handelshistorie, Wochenchart, Erfolge
+//   3. Kolonien    – Kachelgrid pro Kolonie mit Bausystem
+//
+// Auth: Bearer Token aus Supabase-Session wird bei allen API-Calls mitgeschickt.
+// State: Zustand-Store (gameStore) für Credits, Cargo, Location, Transit.
+// Weltdaten werden alle 30s von /api/game/world aktualisiert.
+// Spieler-Builds werden bei Tab-Wechsel und nach Baustart neu geladen.
 
 'use client'
 
@@ -10,8 +21,9 @@ import TransitPanel from './TransitPanel'
 import ShipyardPanel from './ShipyardPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
+import ColonyStats from './ColonyStats'
 
-// Konstanten
+// ─── Konstanten ────────────────────────────────────────────────────────────────
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string>  = { water: '💧', energy: '⚡', metal: '⛏️' }
 const LOC_ICON:       Record<string, string>  = { moon: '🌙', mars: '🔴', phobos: '🪨' }
@@ -22,7 +34,7 @@ const LOC_IMAGE:      Record<string, string>  = {
   phobos: '/images/locations/phobos.png',
 }
 
-// Bearer Token für direkte API-Calls aus Komponenten
+// ─── Hilfsfunktion: Bearer Token aus Supabase-Session holen ──────────────────
 async function getToken(): Promise<string | null> {
   const { createBrowserClient } = await import('@supabase/ssr')
   const supabase = createBrowserClient(
@@ -33,7 +45,7 @@ async function getToken(): Promise<string | null> {
   return session?.access_token ?? null
 }
 
-// Toast-Benachrichtigung
+// ─── Toast-Benachrichtigung ───────────────────────────────────────────────────
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
     <div style={{
@@ -48,31 +60,41 @@ function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   )
 }
 
-export default function DashboardClient({ locations: initialLocations, prices, orders: initialOrders }: {
+// ─── Haupt-Komponente ─────────────────────────────────────────────────────────
+export default function DashboardClient({
+  locations: initialLocations,
+  prices,
+  orders: initialOrders,
+}: {
   locations: any[]
-  prices: any[]
-  orders: any[]
+  prices:    any[]
+  orders:    any[]
 }) {
+  // Store: Spielerzustand
   const {
     credits, cargo, cargoMax, location, buy, sell, travel,
     cargoUsed, loaded, loadFromServer, inTransit,
   } = useGameStore()
 
-  const [toast, setToast]       = useState<{ msg: string; ok: boolean } | null>(null)
-  const [amounts, setAmounts]   = useState<Record<string, number>>({ water: 1, energy: 1, metal: 1 })
-  const [worldData, setWorldData] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics'>('dashboard')
+  // UI-State
+  const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
+  const [amounts, setAmounts]     = useState<Record<string, number>>({ water: 1, energy: 1, metal: 1 })
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'colonies'>('dashboard')
 
-  // Spielstand laden beim ersten Render
+  // Welt- und Build-Daten
+  const [worldData, setWorldData]     = useState<any>(null)
+  const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
+
+  // ── Spielstand laden beim ersten Render ────────────────────────────────────
   useEffect(() => {
     if (!loaded) loadFromServer()
   }, [])
 
-  // Weltdaten alle 30 Sekunden aktualisieren
+  // ── Weltdaten alle 30 Sekunden aktualisieren ────────────────────────────────
   useEffect(() => {
     async function fetchWorld() {
       try {
-        const res = await fetch('/api/game/world')
+        const res  = await fetch('/api/game/world')
         const data = await res.json()
         setWorldData(data)
       } catch (err) {
@@ -84,18 +106,39 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     return () => clearInterval(interval)
   }, [])
 
-  // Abgeleitete Daten
+  // ── Spieler-Builds laden (beim Tab-Wechsel zu Kolonien oder nach Baustart) ──
+  async function fetchBuilds() {
+    try {
+      const token = await getToken()
+      const res   = await fetch('/api/game/build', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      setPlayerBuilds(data.builds ?? [])
+    } catch (err) {
+      console.error('build fetch error:', err)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'colonies') fetchBuilds()
+  }, [activeTab])
+
+  // ── Abgeleitete Daten aus Weltdaten ────────────────────────────────────────
   const locations    = worldData?.locations ?? initialLocations
   const news         = worldData?.news ?? []
   const stats        = worldData?.stats
   const transactions = worldData?.transactions ?? []
 
+  // ── Toast anzeigen ─────────────────────────────────────────────────────────
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 2500)
   }
 
-  // Kaufen (mehrere Tonnen)
+  // ── Handelsfunktionen ──────────────────────────────────────────────────────
+
+  // Kauft mehrere Tonnen einer Ressource (Loop weil API immer 1t pro Call)
   async function handleBuy(resource: ResourceType, price: number, amount: number) {
     let bought = 0
     for (let j = 0; j < amount; j++) {
@@ -106,7 +149,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     if (bought > 0) showToast(`${bought}t ${RESOURCE_LABEL[resource]} gekauft · ${bought * price} Cr`, true)
   }
 
-  // Verkaufen (mehrere Tonnen)
+  // Verkauft mehrere Tonnen einer Ressource
   async function handleSell(resource: ResourceType, price: number, amount: number) {
     let sold = 0
     for (let j = 0; j < amount; j++) {
@@ -117,7 +160,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[resource]} verkauft · +${sold * price} Cr`, true)
   }
 
-  // Fliegen
+  // Startet eine Reise (Transit-Panel übernimmt Countdown)
   async function handleTravel(dest: LocationSlug) {
     if (inTransit) return
     await travel(dest)
@@ -131,10 +174,10 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     window.location.href = '/auth/login'
   }
 
-  // Auftrag erfüllen
-  async function handleFulfillOrder(orderId: string, reward: number) {
+  // Auftrag erfüllen: prüft Standort + Cargo, schreibt Credits + Transaktion
+  async function handleFulfillOrder(orderId: string) {
     const token = await getToken()
-    const res = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}`, {
+    const res   = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
     const data = await res.json()
@@ -146,16 +189,16 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     }
   }
 
-  // Berechnungen
-  const currentPrices      = prices.filter((p: any) => p.locations?.slug === location)
-  const otherLocations     = locations.filter((l: any) => l.slug !== location)
+  // ── Berechnungen ───────────────────────────────────────────────────────────
+  const currentPrices       = prices.filter((p: any) => p.locations?.slug === location)
+  const otherLocations      = locations.filter((l: any) => l.slug !== location)
   const currentLocationData = locations.find((l: any) => l.slug === location)
-  const used               = cargoUsed()
-  const cargoFreeSpace     = cargoMax - used
-  const suppliedCount      = locations.filter((l: any) => l.is_supplied).length
-  const totalPop           = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
+  const used                = cargoUsed()
+  const cargoFreeSpace      = cargoMax - used
+  const suppliedCount       = locations.filter((l: any) => l.is_supplied).length
+  const totalPop            = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
 
-  // Beste Handelschance berechnen
+  // Beste Arbitrage-Chance berechnen (günstig kaufen, teuer verkaufen)
   let best: { from: string; to: string; resource: string; profit: number } | null = null
   const byResource: Record<string, any[]> = {}
   for (const p of prices) {
@@ -174,7 +217,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     }
   }
 
-  // Style-Objekte
+  // ── Style-Objekte (wiederverwendbar) ───────────────────────────────────────
   const s = {
     label:        { fontSize: '0.65rem', textTransform: 'uppercase' as const, letterSpacing: '3px', color: '#b99b6b', fontWeight: 700, marginBottom: '0.75rem', display: 'block' },
     card:         { background: '#fff', border: '1px solid #e2ddd4', borderRadius: '8px' },
@@ -182,13 +225,17 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     btnSecondary: { background: '#f4f2ed', color: '#2a4e7a', border: '1px solid #d4cec4', padding: '0.3rem 0.8rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', borderRadius: '4px', cursor: 'pointer' },
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: '#f4f2ed', color: '#1e2a36', fontFamily: 'system-ui, sans-serif' }}>
 
+      {/* Toast-Benachrichtigungen */}
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
+
+      {/* Transit-Overlay (blockiert UI während Reise) */}
       <TransitPanel onArrival={() => {}} />
 
-      {/* TOPBAR */}
+      {/* ── TOPBAR ──────────────────────────────────────────────────────────── */}
       <header style={{ background: '#fff', borderBottom: '1px solid #e2ddd4', padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.15em', color: '#2a4e7a', fontSize: '1.3rem', margin: 0 }}>
           noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
@@ -217,23 +264,25 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         </div>
       </header>
 
-      {/* WELTMELDUNGEN */}
+      {/* ── WELTMELDUNGEN (Ticker) ───────────────────────────────────────────── */}
       <div style={{ background: '#2a4e7a', color: '#fff', padding: '0.6rem 2rem' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', gap: '2rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
           {news.length > 0
-            ? news.map((n: any, i: number) => <span key={i} style={{ opacity: i === 0 ? 1 : 0.75 }}>{n.icon} {n.text}</span>)
+            ? news.map((n: any, i: number) => (
+                <span key={i} style={{ opacity: i === 0 ? 1 : 0.75 }}>{n.icon} {n.text}</span>
+              ))
             : <span>🟢 Sonnensystem stabil</span>
           }
         </div>
       </div>
 
-      {/* TAB-NAVIGATION */}
+      {/* ── TAB-NAVIGATION ──────────────────────────────────────────────────── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2ddd4', padding: '0 2rem' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex' }}>
           {[
             { id: 'dashboard',  label: 'Übersicht' },
             { id: 'statistics', label: '📊 Statistiken' },
-            { id: 'colonies', label: '🌍 Kolonien' }, 
+            { id: 'colonies',   label: '🌍 Kolonien' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -252,36 +301,56 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         </div>
       </div>
 
-      {/* HAUPTINHALT */}
+      {/* ── HAUPTINHALT ──────────────────────────────────────────────────────── */}
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' }}>
 
-        {/* STATISTIKEN TAB */}
+        {/* ── TAB: STATISTIKEN ──────────────────────────────────────────────── */}
         {activeTab === 'statistics' && (
           <StatisticsTab locations={locations} />
         )}
 
+        {/* ── TAB: KOLONIEN ─────────────────────────────────────────────────── */}
         {activeTab === 'colonies' && (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-    {locations.map((loc: any) => (
-      <ColonyGrid
-        key={loc.id}
-        slug={loc.slug}
-        name={loc.name}
-        population={loc.population}
-        populationMax={loc.population_max}
-        isSupplied={loc.is_supplied}
-        buildings={[]}
-      />
-    ))}
-  </div>
-)}
+          <div>
+            {/* Mini-Übersicht aller Kolonien */}
+            <ColonyStats locations={locations} />
 
-        {/* ÜBERSICHT TAB */}
+            {/* Kachelgrid pro Kolonie */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
+              {locations.map((loc: any) => (
+                <ColonyGrid
+                  key={loc.id}
+                  slug={loc.slug}
+                  name={loc.name}
+                  population={loc.population}
+                  populationMax={loc.population_max}
+                  isSupplied={loc.is_supplied}
+                  // Gebäude dieser Kolonie aus der DB filtern
+                  buildings={playerBuilds
+                    .filter((b: any) => b.locations?.slug === loc.slug)
+                    .map((b: any) => ({
+                      type:   b.buildable_id,
+                      row:    b.tile_row,
+                      col:    b.tile_col,
+                      status: b.status,
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: ÜBERSICHT ────────────────────────────────────────────────── */}
         {activeTab === 'dashboard' && (
           <>
-            {/* AKTUELLER ORT */}
+            {/* Aktueller Standort mit Bild */}
             <div style={{ ...s.card, marginBottom: '1.5rem', overflow: 'hidden', display: 'flex', height: '140px', background: '#0a0f1a' }}>
-              <img src={LOC_IMAGE[location]} alt={LOC_NAME[location]} style={{ width: '220px', objectFit: 'cover', flexShrink: 0 }} />
+              <img
+                src={LOC_IMAGE[location]}
+                alt={LOC_NAME[location]}
+                style={{ width: '220px', objectFit: 'cover', flexShrink: 0 }}
+              />
               <div style={{ padding: '1.25rem', flex: 1, background: '#0a0f1a' }}>
                 <div style={{ fontSize: '0.65rem', color: '#5a7a9a', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '0.5rem' }}>Aktueller Standort</div>
                 <div style={{ fontSize: '1.4rem', fontFamily: 'Georgia, serif', fontWeight: 300, color: '#c9a961', marginBottom: '0.3rem' }}>
@@ -292,7 +361,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
               </div>
             </div>
 
-            {/* FRACHTSTATUS – nur wenn beladen */}
+            {/* Frachtstatus – nur wenn Ladung an Bord */}
             {used > 0 && (
               <div style={{ ...s.card, padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>An Bord:</span>
@@ -307,8 +376,10 @@ export default function DashboardClient({ locations: initialLocations, prices, o
               </div>
             )}
 
-            {/* KOLONIEN + WELTENTWICKLUNG */}
+            {/* Kolonien-Status + Weltentwicklung nebeneinander */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', marginBottom: '1.5rem' }}>
+
+              {/* Kolonien-Statusliste */}
               <div>
                 <span style={s.label}>Kolonien – Weltstatus</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -357,10 +428,11 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                 </div>
               </div>
 
-              {/* WELTENTWICKLUNG */}
+              {/* Weltentwicklungs-Widget */}
               <div>
                 <span style={s.label}>Weltentwicklung</span>
                 <div style={{ ...s.card, padding: '1rem' }}>
+                  {/* Sonnensystem-Statistiken */}
                   <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
                     <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Sonnensystem</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
@@ -380,6 +452,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                       </div>
                     )}
                   </div>
+                  {/* Letzte Transaktionen anderer Spieler */}
                   <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
                     <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Letzte Transaktionen</div>
                     {transactions.slice(0, 4).map((t: any, i: number) => (
@@ -394,6 +467,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                       <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Noch keine Transaktionen.</div>
                     )}
                   </div>
+                  {/* Weltmeldungen */}
                   <div>
                     <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Meldungen</div>
                     {news.slice(0, 3).map((n: any, i: number) => (
@@ -406,8 +480,10 @@ export default function DashboardClient({ locations: initialLocations, prices, o
               </div>
             </div>
 
-            {/* BESTE HANDELSCHANCE + AUFTRÄGE */}
+            {/* Beste Handelschance + Offene Aufträge */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+
+              {/* Beste Arbitrage */}
               <div>
                 <span style={s.label}>Beste Handelschance</span>
                 {best ? (
@@ -429,6 +505,8 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                   <div style={{ ...s.card, padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Arbitrage gefunden.</div>
                 )}
               </div>
+
+              {/* Offene Aufträge */}
               <div>
                 <span style={s.label}>Dringende Aufträge</span>
                 <div style={s.card}>
@@ -447,7 +525,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                       </div>
                       <button
                         style={{ ...s.btnPrimary, width: '100%', padding: '0.4rem', fontSize: '0.65rem' }}
-                        onClick={() => handleFulfillOrder(o.id, o.reward)}
+                        onClick={() => handleFulfillOrder(o.id)}
                       >
                         Erfüllen
                       </button>
@@ -457,11 +535,13 @@ export default function DashboardClient({ locations: initialLocations, prices, o
               </div>
             </div>
 
-            {/* WERFT (nur wenn Kolonie eine Werft hat) */}
+            {/* Werft – nur sichtbar wenn Kolonie eine Werft hat */}
             <ShipyardPanel onPurchase={() => loadFromServer()} locations={locations} />
 
-            {/* HANDELSZENTRALE + FLOTTENKONTROLLE */}
+            {/* Handelszentrale + Flottenkontrolle */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1rem' }}>
+
+              {/* Kauf/Verkauf */}
               <div>
                 <span style={s.label}>Handelszentrale – {LOC_ICON[location]} {LOC_NAME[location]}</span>
                 <div style={s.card}>
@@ -494,7 +574,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
                 </div>
               </div>
 
-              {/* FLOTTENKONTROLLE */}
+              {/* Flottenkontrolle: Laderaum + Reiseziele */}
               <div>
                 <span style={s.label}>Flottenkontrolle</span>
                 <div style={{ ...s.card, padding: '1.25rem' }}>

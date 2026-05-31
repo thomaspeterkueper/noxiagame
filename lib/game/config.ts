@@ -52,3 +52,33 @@ export const STARTING_CREDITS = 5000
 
 // Frachter-Laderaum
 export const SHIP_CARGO_MAX = 100
+
+// Baubare Objekte mit Kosten und Bauzeit
+export const BUILDABLE_ITEMS: Record<string, {
+  type:             'building' | 'ship' | 'module'
+  name:             string
+  cost:             number
+  buildTimeTicks:   number   // Bauzeit in Ticks (1 Tick = 1 Cron-Durchlauf)
+  produces?:        { resource: string; amount: number }
+  populationBonus?: number
+  description:      string
+}> = {
+  mine: {
+    type: 'building', name: 'Mine',
+    cost: 1500, buildTimeTicks: 2,
+    produces: { resource: 'metal', amount: 5 },
+    description: '+5 Metall pro Tick',
+  },
+  solar: {
+    type: 'building', name: 'Solarfeld',
+    cost: 1200, buildTimeTicks: 1,
+    produces: { resource: 'energy', amount: 4 },
+    description: '+4 Energie pro Tick',
+  },
+  habitat: {
+    type: 'building', name: 'Habitat',
+    cost: 2000, buildTimeTicks: 3,
+    populationBonus: 100,
+    description: '+100 max. Bevölkerung',
+  },
+}
