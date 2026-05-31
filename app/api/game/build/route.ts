@@ -29,12 +29,13 @@ export async function GET(req: NextRequest) {
 
   // Aktive Bauaufträge laden
   if (!action) {
-    const { data: builds } = await serviceClient
-      .from('player_builds')
-      .select('*, locations(slug, name)')
-      .eq('profile_id', user.id)
-      .eq('status', 'building')
-      .order('completes_at')
+ // Alle Builds laden (building + complete) für Grid-Anzeige
+const { data: builds } = await serviceClient
+  .from('player_builds')
+  .select('*, locations(slug, name)')
+  .eq('profile_id', user.id)
+  .in('status', ['building', 'complete'])  // ← beide Status
+  .order('completes_at')
 
     // Fertige Builds automatisch abschließen
     const now = new Date()
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
       .from('player_builds')
       .select('*, locations(slug, name)')
       .eq('profile_id', user.id)
-      .eq('status', 'building')
+      .in('status', ['building', 'complete'])
       .order('completes_at')
 
     return NextResponse.json({ builds: activeBuild ?? [] })
@@ -148,7 +149,7 @@ export async function GET(req: NextRequest) {
       .select('*')
       .eq('id', buildId)
       .eq('profile_id', user.id)
-      .eq('status', 'building')
+      .in('status', ['building', 'complete'])
       .single()
 
     if (!build) return NextResponse.json({ error: 'Bauauftrag nicht gefunden' }, { status: 404 })

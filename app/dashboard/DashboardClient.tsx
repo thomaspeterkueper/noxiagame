@@ -114,6 +114,9 @@ export default function DashboardClient({
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const data = await res.json()
+
+      console.log('playerBuilds:', data.builds)
+      
       setPlayerBuilds(data.builds ?? [])
     } catch (err) {
       console.error('build fetch error:', err)
