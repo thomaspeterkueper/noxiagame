@@ -9,6 +9,7 @@ import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import TransitPanel from './TransitPanel'
 import ShipyardPanel from './ShipyardPanel'
 import StatisticsTab from './StatisticsTab'
+import ColonyGrid from './ColonyGrid'
 
 // Konstanten
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
@@ -232,6 +233,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
           {[
             { id: 'dashboard',  label: 'Übersicht' },
             { id: 'statistics', label: '📊 Statistiken' },
+            { id: 'colonies', label: '🌍 Kolonien' }, 
           ].map(tab => (
             <button
               key={tab.id}
@@ -257,6 +259,22 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         {activeTab === 'statistics' && (
           <StatisticsTab locations={locations} />
         )}
+
+        {activeTab === 'colonies' && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+    {locations.map((loc: any) => (
+      <ColonyGrid
+        key={loc.id}
+        slug={loc.slug}
+        name={loc.name}
+        population={loc.population}
+        populationMax={loc.population_max}
+        isSupplied={loc.is_supplied}
+        buildings={[]}
+      />
+    ))}
+  </div>
+)}
 
         {/* ÜBERSICHT TAB */}
         {activeTab === 'dashboard' && (
