@@ -56,7 +56,13 @@ export async function GET() {
   // Handelsaktivität
   if (transactions && transactions.length > 0) {
     const lastTrade = transactions[0]
-    const resource = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }[lastTrade.resource] ?? lastTrade.resource
+    const RESOURCE_LABELS: Record<string, string> = {
+  water: 'Wasser',
+  energy: 'Energie',
+  metal: 'Metall',
+}
+
+const resource = RESOURCE_LABELS[String(lastTrade.resource)] ?? String(lastTrade.resource)
     news.push({
       type: 'info',
       icon: '📦',
