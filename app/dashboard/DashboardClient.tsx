@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import TransitPanel from './TransitPanel'
+import ShipyardPanel from './ShipyardPanel'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string>  = { water: '💧', energy: '⚡', metal: '⛏️' }
@@ -393,6 +394,7 @@ async function handleTravel(dest: LocationSlug) {
             </div>
           </div>
         </div>
+        <ShipyardPanel onPurchase={() => loadFromServer()} locations={locations} />
 
         {/* HANDELSZENTRALE + FLOTTENKONTROLLE */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1rem' }}>

@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
   if (!action) {
     const { data: profile } = await serviceClient
       .from('profiles').select('credits').eq('id', user.id).single()
-    const { data: ship } = await serviceClient
-      .from('ships').select('id, location, cargo_max').eq('profile_id', user.id).single()
+   const { data: ship } = await serviceClient
+  .from('ships').select('id, location, cargo_max, ship_type_id').eq('profile_id', user.id).single()
     const { data: cargo } = ship
       ? await serviceClient.from('ship_cargo').select('resource, amount').eq('ship_id', ship.id)
       : { data: [] }
@@ -106,9 +106,12 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({
-    ok: true,
-    credits: newCredits,
-    cargo: { ...cargoMap, [resource]: newCargoAmount },
-  })
+ return NextResponse.json({
+  credits:    profile?.credits ?? 5000,
+  location:   ship?.location ?? 'moon',
+  cargoMax:   ship?.cargo_max ?? 100,
+  cargo:      cargoMap,
+  shipId:     ship?.id,
+  shipTypeId: ship?.ship_type_id ?? 'freighter_mk1',
+})
 }

@@ -21,12 +21,17 @@ const TRAVEL_TIME: Record<string, Record<string, number>> = {
 }
 
 interface GameState {
+
+
+
   credits:   number
   cargo:     Cargo
   cargoMax:  number
   location:  LocationSlug
   shipId:    string | null
   loaded:    boolean
+  shipTypeId: string
+  speedMult:  number
 
   // Transit
   inTransit:    boolean
@@ -73,6 +78,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   cargoMax: 100,
   location: 'moon',
   shipId:   null,
+  shipTypeId: 'freighter_mk1', 
+  speedMult:  1.0,               
   loaded:   false,
 
   inTransit:    false,
@@ -98,6 +105,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         cargoMax: data.cargoMax,
         location: data.location,
         shipId:   data.shipId,
+        shipTypeId: data.shipTypeId ?? 'freighter_mk1',
         loaded:   true,
       })
     } catch (err) {
