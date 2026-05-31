@@ -112,19 +112,21 @@ if (action === 'getTrades') {
       .eq('ship_id', ship.id).eq('resource', resource)
   }
 
-  if (action !== 'travel') {
-    await serviceClient.from('trade_transactions').insert({
-      profile_id: user.id, from_location: location, to_location: location,
-      resource, amount, profit,
-    })
-  }
+  await serviceClient.from('trade_transactions').insert({
+  profile_id: user.id,
+  from_location: location,
+  to_location: location,
+  resource,
+  amount,
+  profit,
+})
 
  return NextResponse.json({
-  credits:    profile?.credits ?? 5000,
-  location:   ship?.location ?? 'moon',
-  cargoMax:   ship?.cargo_max ?? 100,
-  cargo:      cargoMap,
-  shipId:     ship?.id,
+credits: newCredits,
+  location: ship?.location ?? 'moon',
+  cargoMax: ship?.cargo_max ?? 100,
+  cargo: updatedCargoMap,
+  shipId: ship?.id,
   shipTypeId: ship?.ship_type_id ?? 'freighter_mk1',
 })
 }
