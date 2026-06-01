@@ -197,9 +197,11 @@ export default function DashboardClient({
     window.location.href = '/auth/login'
   }
 
-  async function handleFulfillOrder(orderId: string) {
+  async function handleFulfillOrder(orderId: string, agreedReward?: number) {
     const token = await getToken()
-    const res   = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+    const url   = `/api/game/orders?action=fulfill&orderId=${orderId}` +
+      (agreedReward != null ? `&agreedReward=${Math.round(agreedReward)}` : '')
+    const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
     const data  = await res.json()
     if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward.toLocaleString('de')} Cr`, true); await loadFromServer() }
     else showToast(data.error, false)
@@ -260,7 +262,7 @@ export default function DashboardClient({
         onClose={() => setNegotiateOrder(null)}
         canFulfill={negotiateOrder?.locations?.slug === location && cargo[negotiateOrder?.resource as ResourceType] >= negotiateOrder?.amount}
         fulfillHint={negotiateOrder?.locations?.slug !== location ? 'Falscher Standort — hierhin fliegen.' : 'Nicht genug Ladung an Bord.'}
-        onAccept={async (id) => { await handleFulfillOrder(id); return true }}
+        onAccept={async (id, bonus) => { await handleFulfillOrder(id, bonus); return true }}
       />
       <ColonyDetail
         colony={detailColony}
