@@ -552,7 +552,15 @@ export default function DashboardClient({
 }
 
 // ─── Handelszeile (Kauf/Verkauf einer Ressource) ─────────────────────────────
-function BuyRow({ p, last, cargoFree, owned, onBuy, onSell, T }: any) {
+function BuyRow({ p, last, cargoFree, owned, onBuy, onSell, T }: {
+  p: any
+  last: boolean
+  cargoFree: number
+  owned: number
+  onBuy: (amt: number) => void
+  onSell: (amt: number) => void
+  T: Record<string, string>
+}) {
   const [amount, setAmount] = useState(1)
   const stepBtn: React.CSSProperties = { width: '26px', height: '26px', borderRadius: '7px', border: `1px solid ${T.line}`, background: T.bg, color: T.blue, cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }
   return (
