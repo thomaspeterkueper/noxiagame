@@ -28,11 +28,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ResourceType, LocationSlug } from '@/lib/store/gameStore'
+import { PRICE_MIN, PRICE_MAX, STOCK_LOW_THRESHOLD } from '@/lib/game/config'
 
-// ─── Konstanten (aus lib/game/config.ts gespiegelt) ──────────────────────────
-const PRICE_MIN = 10
-const PRICE_MAX = 500
-const STOCK_LOW_THRESHOLD = 50
+// ─── Konstanten ──────────────────────────────────────────────────────────────
+// PRICE_MIN, PRICE_MAX, STOCK_LOW_THRESHOLD kommen jetzt aus der Config (eine Quelle).
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
