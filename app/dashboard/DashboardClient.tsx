@@ -1,43 +1,77 @@
 // app/dashboard/DashboardClient.tsx
-// Erstellt: 30.05.2026
-// Aktualisiert: 31.05.2026
+// Erstellt:     30.05.2026
+// Aktualisiert: 01.06.2026
+// Version:      0.2.0
 //
-// Haupt-Client-Komponente des Dashboards.
-// Enthält drei Tabs:
-//   1. Übersicht   – Handel, Kolonien-Status, Weltentwicklung, Aufträge, Werft
+// Haupt-Client-Komponente des Dashboards. Drei Tabs:
+//   1. Übersicht   – Standort, Kolonien, Welt, Handel, Aufträge (verschlankt)
 //   2. Statistiken – Handelshistorie, Wochenchart, Erfolge
 //   3. Kolonien    – Kachelgrid pro Kolonie mit Bausystem
 //
-// Auth: Bearer Token aus Supabase-Session wird bei allen API-Calls mitgeschickt.
-// State: Zustand-Store (gameStore) für Credits, Cargo, Location, Transit.
-// Weltdaten werden alle 30s von /api/game/world aktualisiert.
-// Spieler-Builds werden bei Tab-Wechsel und nach Baustart neu geladen.
+// v0.2.0: Visuell verfeinert (hell, mehr Raum, klarere Typo). Schwere Inline-Blöcke
+// in vier Aufruf-Overlays ausgelagert:
+//   - MarketAuction     (Live-Auktion, ⚡-Button in der Handelszentrale)
+//   - OrderNegotiation  (Auftrags-Verhandlung statt sofortigem Erfüllen)
+//   - ColonyDetail      (Klick auf Kolonie-Karte → Detailansicht)
+//   - ShipyardOverlay   (Werft als betretbarer Ort, nur auf Mond)
+//
+// Auth: Bearer Token aus Supabase-Session bei allen API-Calls.
+// State: Zustand-Store (gameStore). Weltdaten alle 30s von /api/game/world.
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import TransitPanel from './TransitPanel'
-import ShipyardPanel from './ShipyardPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
 import ColonyStats from './ColonyStats'
 import ShipyardCard from './ShipyardCard'
 import ShipHeader from './ShipHeader'
-// ShipFlyby wird in TransitPanel.tsx eingebunden, nicht hier
+import MarketAuction from './MarketAuction'
+import OrderNegotiation from './OrderNegotiation'
+import ColonyDetail from './ColonyDetail'
+import ShipyardOverlay from './ShipyardOverlay'
 
 // ─── Konstanten ────────────────────────────────────────────────────────────────
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
-const RESOURCE_ICON:  Record<string, string>  = { water: '💧', energy: '⚡', metal: '⛏️' }
-const LOC_ICON:       Record<string, string>  = { moon: '🌙', mars: '🔴', phobos: '🪨' }
-const LOC_NAME:       Record<string, string>  = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
-const LOC_IMAGE:      Record<string, string>  = {
-  moon:   '/images/locations/moon.png',
-  mars:   '/images/locations/mars.png',
-  phobos: '/images/locations/phobos.png',
+const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
+const LOC_ICON:       Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨' }
+const LOC_NAME:       Record<string, string> = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
+
+// ─── Design-Tokens ───────────────────────────────────────────────────────────
+// Zentralisierte Farben/Maße für konsistente, verfeinerte Optik.
+const T = {
+  ink:      '#1b2733',   // Haupttext
+  inkSoft:  '#5a6b7b',   // Sekundärtext
+  inkFaint: '#94a3b8',   // Labels, Hinweise
+  blue:     '#2a4e7a',   // Primär (Marke)
+  blueDeep: '#1d3a5f',
+  gold:     '#b99b6b',   // Akzent (Marke, etwas gedämpfter fürs Helle)
+  goldHot:  '#c9a961',
+  bg:       '#f4f2ed',   // Warmweiß-Hintergrund
+  surface:  '#ffffff',
+  line:     '#e7e2d8',   // feine Trennlinie
+  lineSoft: '#f0ece3',
+  green:    '#2f9e6b',
+  red:      '#c0563f',
+  radius:   '10px',
+  radiusLg: '14px',
 }
 
-// ─── Hilfsfunktion: Bearer Token aus Supabase-Session holen ──────────────────
+// ─── Inline-SVG-Icons (schlank, fürs UI) ─────────────────────────────────────
+const Icon = {
+  trade: (c = 'currentColor') => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg>,
+  bolt:  (c = 'currentColor') => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>,
+  ship:  (c = 'currentColor') => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17h18M5 17l1-5h12l1 5M9 12V7h6v5M11 7V4h2v3"/></svg>,
+  globe: (c = 'currentColor') => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" strokeLinecap="round"/></svg>,
+  chart: (c = 'currentColor') => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>,
+  arrow: (c = 'currentColor') => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>,
+  logout:(c = 'currentColor') => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
+  alert: (c = 'currentColor') => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>,
+}
+
+// ─── Bearer Token aus Supabase-Session ───────────────────────────────────────
 async function getToken(): Promise<string | null> {
   const { createBrowserClient } = await import('@supabase/ssr')
   const supabase = createBrowserClient(
@@ -48,17 +82,25 @@ async function getToken(): Promise<string | null> {
   return session?.access_token ?? null
 }
 
-// ─── Toast-Benachrichtigung ───────────────────────────────────────────────────
+// ─── Toast ────────────────────────────────────────────────────────────────────
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
     <div style={{
       position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
-      background: ok ? '#2a4e7a' : '#c0392b', color: '#fff',
-      padding: '0.6rem 1.5rem', borderRadius: '4px',
-      fontSize: '0.8rem', fontWeight: 600, zIndex: 1000,
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    }}>
-      {msg}
+      background: ok ? T.blue : T.red, color: '#fff', padding: '0.7rem 1.6rem',
+      borderRadius: T.radius, fontSize: '0.82rem', fontWeight: 600, zIndex: 3000,
+      boxShadow: '0 8px 24px rgba(27,39,51,0.18)', letterSpacing: '0.01em',
+    }}>{msg}</div>
+  )
+}
+
+// ─── Kleine Bausteine ─────────────────────────────────────────────────────────
+// Abschnitts-Überschrift mit Georgia-Akzent + optionaler Aktion rechts.
+function SectionHead({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+      <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: '1.05rem', color: T.blueDeep, margin: 0, letterSpacing: '0.01em' }}>{title}</h2>
+      {action}
     </div>
   )
 }
@@ -73,79 +115,61 @@ export default function DashboardClient({
   prices:    any[]
   orders:    any[]
 }) {
-  // Store: Spielerzustand
   const {
     credits, cargo, cargoMax, location, buy, sell, travel,
-    cargoUsed, loaded, loadFromServer, inTransit,
-    shipTypeId,  // für ShipHeader + ShipyardCard
+    cargoUsed, loaded, loadFromServer, inTransit, shipTypeId,
   } = useGameStore()
 
   // UI-State
   const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
-  const [amounts, setAmounts]     = useState<Record<string, number>>({ water: 1, energy: 1, metal: 1 })
   const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'colonies'>('dashboard')
-
-  // Welt- und Build-Daten
-  const [worldData, setWorldData]     = useState<any>(null)
+  const [worldData, setWorldData] = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
 
-  // ── Spielstand laden beim ersten Render ────────────────────────────────────
-  useEffect(() => {
-    if (!loaded) loadFromServer()
-  }, [])
+  // Overlay-State
+  const [auctionOpen, setAuctionOpen]       = useState(false)
+  const [negotiateOrder, setNegotiateOrder] = useState<any>(null)
+  const [detailColony, setDetailColony]     = useState<any>(null)
+  const [shipyardOpen, setShipyardOpen]     = useState(false)
 
-  // ── Weltdaten alle 30 Sekunden aktualisieren ────────────────────────────────
+  // ── Spielstand laden ────────────────────────────────────────────────────────
+  useEffect(() => { if (!loaded) loadFromServer() }, [])
+
+  // ── Weltdaten alle 30s ──────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchWorld() {
       try {
         const res  = await fetch('/api/game/world')
-        const data = await res.json()
-        setWorldData(data)
-      } catch (err) {
-        console.error('world fetch error:', err)
-      }
+        setWorldData(await res.json())
+      } catch (err) { console.error('world fetch error:', err) }
     }
     fetchWorld()
     const interval = setInterval(fetchWorld, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  // ── Spieler-Builds laden (beim Tab-Wechsel zu Kolonien oder nach Baustart) ──
+  // ── Spieler-Builds laden ────────────────────────────────────────────────────
   async function fetchBuilds() {
     try {
       const token = await getToken()
-      const res   = await fetch('/api/game/build', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await res.json()
-
-      console.log('playerBuilds:', data.builds)
-
+      const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
+      const data  = await res.json()
       setPlayerBuilds(data.builds ?? [])
-    } catch (err) {
-      console.error('build fetch error:', err)
-    }
+    } catch (err) { console.error('build fetch error:', err) }
   }
+  useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [activeTab])
 
-  useEffect(() => {
-    if (activeTab === 'colonies') fetchBuilds()
-  }, [activeTab])
-
-  // ── Abgeleitete Daten aus Weltdaten ────────────────────────────────────────
+  // ── Abgeleitete Daten ───────────────────────────────────────────────────────
   const locations    = worldData?.locations ?? initialLocations
   const news         = worldData?.news ?? []
   const stats        = worldData?.stats
   const transactions = worldData?.transactions ?? []
 
-  // ── Toast anzeigen ─────────────────────────────────────────────────────────
   function showToast(msg: string, ok: boolean) {
-    setToast({ msg, ok })
-    setTimeout(() => setToast(null), 2500)
+    setToast({ msg, ok }); setTimeout(() => setToast(null), 2500)
   }
 
-  // ── Handelsfunktionen ──────────────────────────────────────────────────────
-
-  // Kauft mehrere Tonnen einer Ressource (Loop weil API immer 1t pro Call)
+  // ── Handel ──────────────────────────────────────────────────────────────────
   async function handleBuy(resource: ResourceType, price: number, amount: number) {
     let bought = 0
     for (let j = 0; j < amount; j++) {
@@ -155,8 +179,6 @@ export default function DashboardClient({
     }
     if (bought > 0) showToast(`${bought}t ${RESOURCE_LABEL[resource]} gekauft · ${bought * price} Cr`, true)
   }
-
-  // Verkauft mehrere Tonnen einer Ressource
   async function handleSell(resource: ResourceType, price: number, amount: number) {
     let sold = 0
     for (let j = 0; j < amount; j++) {
@@ -166,14 +188,8 @@ export default function DashboardClient({
     }
     if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[resource]} verkauft · +${sold * price} Cr`, true)
   }
+  async function handleTravel(dest: LocationSlug) { if (!inTransit) await travel(dest) }
 
-  // Startet eine Reise (Transit-Panel übernimmt Countdown)
-  async function handleTravel(dest: LocationSlug) {
-    if (inTransit) return
-    await travel(dest)
-  }
-
-  // Abmelden
   async function handleLogout() {
     const { createClient } = await import('@/lib/supabase/client')
     const supabase = createClient()
@@ -181,22 +197,15 @@ export default function DashboardClient({
     window.location.href = '/auth/login'
   }
 
-  // Auftrag erfüllen: prüft Standort + Cargo, schreibt Credits + Transaktion
   async function handleFulfillOrder(orderId: string) {
     const token = await getToken()
-    const res   = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    const data = await res.json()
-    if (data.ok) {
-      showToast(`Auftrag erfüllt! +${data.reward.toLocaleString('de')} Cr`, true)
-      await loadFromServer()
-    } else {
-      showToast(data.error, false)
-    }
+    const res   = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+    const data  = await res.json()
+    if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward.toLocaleString('de')} Cr`, true); await loadFromServer() }
+    else showToast(data.error, false)
   }
 
-  // ── Berechnungen ───────────────────────────────────────────────────────────
+  // ── Berechnungen ──────────────────────────────────────────────────────────
   const currentPrices       = prices.filter((p: any) => p.locations?.slug === location)
   const otherLocations      = locations.filter((l: any) => l.slug !== location)
   const currentLocationData = locations.find((l: any) => l.slug === location)
@@ -205,229 +214,209 @@ export default function DashboardClient({
   const suppliedCount       = locations.filter((l: any) => l.is_supplied).length
   const totalPop            = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
 
-  // Beste Arbitrage-Chance berechnen (günstig kaufen, teuer verkaufen)
   let best: { from: string; to: string; resource: string; profit: number } | null = null
   const byResource: Record<string, any[]> = {}
-  for (const p of prices) {
-    if (!byResource[p.resource]) byResource[p.resource] = []
-    byResource[p.resource].push(p)
-  }
+  for (const p of prices) { (byResource[p.resource] ??= []).push(p) }
   for (const [, locs] of Object.entries(byResource)) {
-    for (const a of locs) {
-      for (const b of locs) {
-        if (a.locations?.slug === b.locations?.slug) continue
-        const profit = b.sell_price - a.buy_price
-        if (profit > (best?.profit ?? 0)) {
-          best = { from: a.locations?.slug, to: b.locations?.slug, resource: a.resource, profit }
-        }
-      }
+    for (const a of locs) for (const b of locs) {
+      if (a.locations?.slug === b.locations?.slug) continue
+      const profit = b.sell_price - a.buy_price
+      if (profit > (best?.profit ?? 0)) best = { from: a.locations?.slug, to: b.locations?.slug, resource: a.resource, profit }
     }
   }
 
-  // ── Style-Objekte (wiederverwendbar) ───────────────────────────────────────
-  const s = {
-    label:        { fontSize: '0.65rem', textTransform: 'uppercase' as const, letterSpacing: '3px', color: '#b99b6b', fontWeight: 700, marginBottom: '0.75rem', display: 'block' },
-    card:         { background: '#fff', border: '1px solid #e2ddd4', borderRadius: '8px' },
-    btnPrimary:   { background: '#2a4e7a', color: '#fff', border: 'none', padding: '0.3rem 0.8rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', borderRadius: '4px', cursor: 'pointer' },
-    btnSecondary: { background: '#f4f2ed', color: '#2a4e7a', border: '1px solid #d4cec4', padding: '0.3rem 0.8rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', borderRadius: '4px', cursor: 'pointer' },
-  }
+  // ── Wiederverwendbare Styles ────────────────────────────────────────────────
+  const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
+  const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '6px', background: T.blue, color: '#fff', border: 'none', padding: '0.5rem 0.95rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: T.radius, cursor: 'pointer' }
+  const btnGhost: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.5rem 0.95rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: T.radius, cursor: 'pointer' }
+  const metricLabel: React.CSSProperties = { fontSize: '0.6rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f2ed', color: '#1e2a36', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* Toast-Benachrichtigungen */}
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
-
-      {/* Transit-Overlay (blockiert UI während Reise) */}
       <TransitPanel onArrival={() => {}} />
 
-      {/* ── TOPBAR ──────────────────────────────────────────────────────────── */}
-      <header style={{ background: '#fff', borderBottom: '1px solid #e2ddd4', padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.15em', color: '#2a4e7a', fontSize: '1.3rem', margin: 0 }}>
+      {/* Overlays */}
+      <MarketAuction
+        open={auctionOpen}
+        onClose={() => setAuctionOpen(false)}
+        location={location as LocationSlug}
+        locationName={currentLocationData?.name ?? LOC_NAME[location]}
+        rows={currentPrices.map((p: any) => ({
+          resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price,
+          stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100,
+        }))}
+        credits={credits} cargo={cargo} cargoMax={cargoMax}
+        onTrade={async (resource, m, amount, price) => {
+          if (m === 'buy') await handleBuy(resource, price, amount)
+          else await handleSell(resource, price, amount)
+          return true
+        }}
+      />
+      <OrderNegotiation
+        order={negotiateOrder ? { ...negotiateOrder, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === negotiateOrder.resource)?.stock } : null}
+        onClose={() => setNegotiateOrder(null)}
+        canFulfill={negotiateOrder?.locations?.slug === location && cargo[negotiateOrder?.resource as ResourceType] >= negotiateOrder?.amount}
+        fulfillHint={negotiateOrder?.locations?.slug !== location ? 'Falscher Standort — hierhin fliegen.' : 'Nicht genug Ladung an Bord.'}
+        onAccept={async (id) => { await handleFulfillOrder(id); return true }}
+      />
+      <ColonyDetail
+        colony={detailColony}
+        isHere={detailColony?.slug === location}
+        cargo={cargo}
+        onClose={() => setDetailColony(null)}
+        onTravel={(dest) => handleTravel(dest)}
+      />
+      <ShipyardOverlay
+        open={shipyardOpen}
+        onClose={() => setShipyardOpen(false)}
+        currentShipTypeId={shipTypeId ?? 'freighter_mk1'}
+        credits={credits}
+        onBuyShip={async (type) => {
+          const token = await getToken()
+          const res = await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { 'Authorization': `Bearer ${token}` } })
+          const data = await res.json()
+          if (data.ok) { showToast(`${type} gekauft!`, true); await loadFromServer(); setShipyardOpen(false) }
+          else showToast(data.error ?? 'Kauf fehlgeschlagen', false)
+        }}
+      />
+
+      {/* ── TOPBAR ─────────────────────────────────────────────────────────── */}
+      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2.5rem', height: '66px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.4rem', margin: 0 }}>
           noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
-          <span style={{ fontSize: '0.5rem', letterSpacing: '4px', color: '#b99b6b', marginLeft: '1rem', verticalAlign: 'middle', textTransform: 'uppercase' }}>Alpha 0.1</span>
+          <span style={{ fontSize: '0.5rem', letterSpacing: '0.3em', color: T.gold, marginLeft: '1rem', verticalAlign: 'middle', textTransform: 'uppercase' }}>Alpha 0.1</span>
         </h1>
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', fontSize: '0.8rem' }}>
-          <div>
-            <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>Credits</div>
-            <div style={{ fontWeight: 700, color: '#2a4e7a' }}>{credits.toLocaleString('de')} Cr</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>Frachter</div>
-            <div style={{ fontWeight: 700, color: used > 0 ? '#2a4e7a' : '#94a3b8' }}>{used} / {cargoMax} t</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>Standort</div>
-            <div style={{ fontWeight: 700, color: '#2a4e7a' }}>{LOC_ICON[location]} {LOC_NAME[location]}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>Gesamtbevölkerung</div>
-            <div style={{ fontWeight: 700, color: '#2a4e7a' }}>{totalPop.toLocaleString('de')}</div>
-          </div>
-          <button style={{ ...s.btnSecondary, fontSize: '0.65rem' }} onClick={handleLogout}>
-            Abmelden
-          </button>
+        <div style={{ display: 'flex', gap: '2.2rem', alignItems: 'center' }}>
+          {[
+            ['Credits', `${credits.toLocaleString('de')} Cr`, T.blue],
+            ['Frachter', `${used} / ${cargoMax} t`, used > 0 ? T.blue : T.inkFaint],
+            ['Standort', `${LOC_ICON[location]} ${LOC_NAME[location]}`, T.blue],
+            ['Bevölkerung', totalPop.toLocaleString('de'), T.blue],
+          ].map(([l, v, c], i) => (
+            <div key={i}>
+              <div style={metricLabel}>{l}</div>
+              <div style={{ fontWeight: 700, color: c as string, fontSize: '0.92rem', marginTop: '2px' }}>{v}</div>
+            </div>
+          ))}
+          <button style={btnGhost} onClick={handleLogout}>{Icon.logout(T.blue)} Abmelden</button>
         </div>
       </header>
 
-      {/* ── WELTMELDUNGEN (Ticker) ───────────────────────────────────────────── */}
-      <div style={{ background: '#2a4e7a', color: '#fff', padding: '0.6rem 2rem' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', gap: '2rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+      {/* ── TICKER ─────────────────────────────────────────────────────────── */}
+      <div style={{ background: T.blue, color: '#fff', padding: '0.55rem 2.5rem' }}>
+        <div style={{ maxWidth: '1140px', margin: '0 auto', display: 'flex', gap: '2.5rem', fontSize: '0.76rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {news.length > 0
-            ? news.map((n: any, i: number) => (
-                <span key={i} style={{ opacity: i === 0 ? 1 : 0.75 }}>{n.icon} {n.text}</span>
-              ))
-            : <span>🟢 Sonnensystem stabil</span>
-          }
+            ? news.map((n: any, i: number) => <span key={i} style={{ opacity: i === 0 ? 1 : 0.7 }}>{n.icon} {n.text}</span>)
+            : <span style={{ opacity: 0.85 }}>🟢 Sonnensystem stabil</span>}
         </div>
       </div>
 
-      {/* ── TAB-NAVIGATION ──────────────────────────────────────────────────── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e2ddd4', padding: '0 2rem' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex' }}>
+      {/* ── TABS ───────────────────────────────────────────────────────────── */}
+      <div style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2.5rem' }}>
+        <div style={{ maxWidth: '1140px', margin: '0 auto', display: 'flex', gap: '0.5rem' }}>
           {[
-            { id: 'dashboard',  label: 'Übersicht' },
-            { id: 'statistics', label: '📊 Statistiken' },
-            { id: 'colonies',   label: '🌍 Kolonien' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              style={{
-                padding: '0.75rem 1.5rem', border: 'none', background: 'none',
-                fontSize: '0.75rem', fontWeight: activeTab === tab.id ? 700 : 400,
-                color: activeTab === tab.id ? '#2a4e7a' : '#94a3b8',
-                borderBottom: activeTab === tab.id ? '2px solid #2a4e7a' : '2px solid transparent',
-                cursor: 'pointer', textTransform: 'uppercase' as const, letterSpacing: '1px',
-              }}
-              onClick={() => setActiveTab(tab.id as any)}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'dashboard',  label: 'Übersicht',   icon: Icon.trade },
+            { id: 'statistics', label: 'Statistiken', icon: Icon.chart },
+            { id: 'colonies',   label: 'Kolonien',    icon: Icon.globe },
+          ].map(tab => {
+            const on = activeTab === tab.id
+            return (
+              <button key={tab.id}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '0.9rem 1.1rem', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: on ? 700 : 500, color: on ? T.blue : T.inkFaint, borderBottom: on ? `2px solid ${T.gold}` : '2px solid transparent', cursor: 'pointer', marginBottom: '-1px' }}
+                onClick={() => setActiveTab(tab.id as any)}>
+                {tab.icon(on ? T.blue : T.inkFaint)} {tab.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* ── HAUPTINHALT ──────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' }}>
+      {/* ── INHALT ─────────────────────────────────────────────────────────── */}
+      <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '2rem 1.5rem 3rem' }}>
 
-        {/* ── TAB: STATISTIKEN ──────────────────────────────────────────────── */}
-        {activeTab === 'statistics' && (
-          <StatisticsTab locations={locations} />
-        )}
+        {activeTab === 'statistics' && <StatisticsTab locations={locations} />}
 
-        {/* ── TAB: KOLONIEN ─────────────────────────────────────────────────── */}
         {activeTab === 'colonies' && (
           <div>
-            {/* Mini-Übersicht aller Kolonien */}
             <ColonyStats locations={locations} />
-
-            {/* Kachelgrid pro Kolonie */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
               {locations.map((loc: any) => (
-                <ColonyGrid
-                  key={loc.id}
-                  slug={loc.slug}
-                  name={loc.name}
-                  population={loc.population}
-                  populationMax={loc.population_max}
-                  isSupplied={loc.is_supplied}
-                  // Gebäude dieser Kolonie aus der DB filtern
-                  buildings={playerBuilds
-                    .filter((b: any) => b.locations?.slug === loc.slug)
-                    .map((b: any) => ({
-                      type:   b.buildable_id,
-                      row:    b.tile_row,
-                      col:    b.tile_col,
-                      status: b.status,
-                    }))
-                  }
+                <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
+                  population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
+                  buildings={playerBuilds.filter((b: any) => b.locations?.slug === loc.slug).map((b: any) => ({ type: b.buildable_id, row: b.tile_row, col: b.tile_col, status: b.status }))}
                 />
               ))}
             </div>
           </div>
         )}
 
-        {/* ── TAB: ÜBERSICHT ────────────────────────────────────────────────── */}
         {activeTab === 'dashboard' && (
           <>
-            {/*
-              ── STANDORT-HEADER ─────────────────────────────────────────────
-              ShipHeader zeigt Schiff (Seitenansicht) + Standortname + Status.
-              Bilder: public/images/ships/freighter_side.png (und courier/hauler)
-              Bei fehlendem Bild: automatischer Fallback, kein Layout-Bruch.
-              shipTypeId kommt aus gameStore (wird mit loadFromServer befüllt).
-            */}
-            <div style={{ marginBottom: '1.5rem', borderRadius: '8px', overflow: 'hidden' }}>
+            {/* Standort-Header */}
+            <div style={{ marginBottom: '2rem', borderRadius: T.radiusLg, overflow: 'hidden' }}>
               <ShipHeader
                 location={location as 'moon' | 'mars' | 'phobos'}
                 locationName={currentLocationData?.name ?? LOC_NAME[location]}
                 locationDesc={currentLocationData?.description ?? ''}
                 shipType={(shipTypeId ?? 'freighter_mk1') as any}
-                credits={credits}
-                inTransit={inTransit}
+                credits={credits} inTransit={inTransit}
               />
             </div>
 
-            {/* Frachtstatus – nur wenn Ladung an Bord */}
+            {/* Frachtstatus */}
             {used > 0 && (
-              <div style={{ ...s.card, padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px' }}>An Bord:</span>
+              <div style={{ ...card, padding: '0.85rem 1.4rem', marginBottom: '2rem', display: 'flex', gap: '1.8rem', alignItems: 'center' }}>
+                <span style={metricLabel}>An Bord</span>
                 {(Object.entries(cargo) as [ResourceType, number][]).filter(([, v]) => v > 0).map(([res, amt]) => (
-                  <span key={res} style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2a4e7a' }}>
-                    {RESOURCE_ICON[res]} {RESOURCE_LABEL[res]} {amt}t
-                  </span>
+                  <span key={res} style={{ fontSize: '0.88rem', fontWeight: 600, color: T.blue }}>{RESOURCE_ICON[res]} {RESOURCE_LABEL[res]} {amt}t</span>
                 ))}
-                <div style={{ marginLeft: 'auto', background: '#f4f2ed', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.7rem', color: '#64748b' }}>
-                  {cargoFreeSpace}t frei
-                </div>
+                <div style={{ marginLeft: 'auto', background: T.bg, borderRadius: '999px', padding: '0.25rem 0.8rem', fontSize: '0.72rem', color: T.inkSoft }}>{cargoFreeSpace}t frei</div>
               </div>
             )}
 
-            {/* Kolonien-Status + Weltentwicklung nebeneinander */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', marginBottom: '1.5rem' }}>
-
-              {/* Kolonien-Statusliste */}
+            {/* Kolonien + Welt */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', marginBottom: '2rem' }}>
               <div>
-                <span style={s.label}>Kolonien – Weltstatus</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <SectionHead title="Kolonien" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
                   {locations.map((loc: any) => {
                     const popPct = Math.round((loc.population / loc.population_max) * 100)
                     const isHere = loc.slug === location
+                    const accent = isHere ? T.gold : loc.is_supplied ? T.green : T.red
                     return (
-                      <div key={loc.id} style={{ ...s.card, padding: '1rem 1.25rem', borderLeft: `4px solid ${isHere ? '#b99b6b' : loc.is_supplied ? '#27ae60' : '#c0392b'}` }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', alignItems: 'center', gap: '1rem' }}>
+                      <div key={loc.id} onClick={() => setDetailColony(loc)}
+                        style={{ ...card, padding: '1.1rem 1.35rem', borderLeft: `3px solid ${accent}`, cursor: 'pointer', transition: 'border-color 0.15s' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr auto auto', alignItems: 'center', gap: '1.1rem' }}>
                           <div>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2a4e7a' }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: T.blueDeep, display: 'flex', alignItems: 'center', gap: '5px' }}>
                               {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
-                              {isHere && <span style={{ fontSize: '0.55rem', background: '#b99b6b', color: '#fff', borderRadius: '3px', padding: '1px 5px', marginLeft: '5px' }}>HIER</span>}
+                              {isHere && <span style={{ fontSize: '0.52rem', background: T.gold, color: '#fff', borderRadius: '4px', padding: '2px 6px', letterSpacing: '0.05em' }}>HIER</span>}
                             </div>
-                            <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{loc.name}</div>
+                            <div style={{ fontSize: '0.66rem', color: T.inkFaint, marginTop: '2px' }}>{loc.name}</div>
                           </div>
                           <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', marginBottom: '0.2rem' }}>
-                              <span>Bevölkerung</span>
-                              <span style={{ color: '#1e2a36' }}>{loc.population.toLocaleString('de')} / {loc.population_max.toLocaleString('de')}</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', color: T.inkFaint, marginBottom: '0.3rem' }}>
+                              <span>Bevölkerung</span><span style={{ color: T.ink }}>{loc.population.toLocaleString('de')} / {loc.population_max.toLocaleString('de')}</span>
                             </div>
-                            <div style={{ background: '#f1f1f1', height: '4px', borderRadius: '2px', overflow: 'hidden' }}>
-                              <div style={{ width: `${popPct}%`, height: '100%', background: isHere ? '#b99b6b' : '#2a4e7a' }} />
+                            <div style={{ background: T.lineSoft, height: '5px', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${popPct}%`, height: '100%', background: isHere ? T.gold : T.blue }} />
                             </div>
                           </div>
-                          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.72rem', color: '#64748b' }}>
+                          <div style={{ display: 'flex', gap: '0.9rem', fontSize: '0.72rem', color: T.inkSoft }}>
                             {(loc.location_resources ?? []).map((r: any) => {
                               const bal = r.production - r.consumption
                               return (
-                                <span key={r.resource}>
-                                  {RESOURCE_ICON[r.resource]} {r.stock}t
-                                  <span style={{ color: bal >= 0 ? '#27ae60' : '#c0392b', marginLeft: '2px', fontSize: '0.65rem' }}>
-                                    ({bal >= 0 ? '+' : ''}{bal})
-                                  </span>
+                                <span key={r.resource}>{RESOURCE_ICON[r.resource]} {r.stock}t
+                                  <span style={{ color: bal >= 0 ? T.green : T.red, marginLeft: '3px', fontSize: '0.64rem' }}>({bal >= 0 ? '+' : ''}{bal})</span>
                                 </span>
                               )
                             })}
                           </div>
-                          <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: loc.is_supplied ? '#27ae60' : '#c0392b' }}>
-                            {loc.is_supplied ? '✓' : '⚠'}
+                          <div style={{ color: loc.is_supplied ? T.green : T.red, display: 'flex' }}>
+                            {loc.is_supplied ? Icon.arrow(T.green) : Icon.alert(T.red)}
                           </div>
                         </div>
                       </div>
@@ -436,197 +425,117 @@ export default function DashboardClient({
                 </div>
               </div>
 
-              {/* Weltentwicklungs-Widget */}
               <div>
-                <span style={s.label}>Weltentwicklung</span>
-                <div style={{ ...s.card, padding: '1rem' }}>
-                  {/* Sonnensystem-Statistiken */}
-                  <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Sonnensystem</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-                      <span style={{ color: '#64748b' }}>Gesamtbevölkerung</span>
-                      <span style={{ fontWeight: 600 }}>{totalPop.toLocaleString('de')}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-                      <span style={{ color: '#64748b' }}>Versorgte Kolonien</span>
-                      <span style={{ fontWeight: 600, color: suppliedCount === locations.length ? '#27ae60' : '#c0392b' }}>
-                        {suppliedCount} / {locations.length}
-                      </span>
-                    </div>
-                    {stats?.tickNumber > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                        <span style={{ color: '#64748b' }}>Tick</span>
-                        <span style={{ fontWeight: 600 }}>#{stats.tickNumber}</span>
+                <SectionHead title="Weltentwicklung" />
+                <div style={{ ...card, padding: '1.2rem' }}>
+                  <div style={{ marginBottom: '1.1rem', paddingBottom: '1.1rem', borderBottom: `1px solid ${T.lineSoft}` }}>
+                    <div style={{ ...metricLabel, marginBottom: '0.6rem' }}>Sonnensystem</div>
+                    {[
+                      ['Gesamtbevölkerung', totalPop.toLocaleString('de'), T.ink],
+                      ['Versorgte Kolonien', `${suppliedCount} / ${locations.length}`, suppliedCount === locations.length ? T.green : T.red],
+                      ...(stats?.tickNumber > 0 ? [['Tick', `#${stats.tickNumber}`, T.ink]] : []),
+                    ].map(([l, v, c], i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                        <span style={{ color: T.inkSoft }}>{l}</span><span style={{ fontWeight: 600, color: c as string }}>{v}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                  {/* Letzte Transaktionen anderer Spieler */}
-                  <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f1f1' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Letzte Transaktionen</div>
+                  <div style={{ marginBottom: '1.1rem', paddingBottom: '1.1rem', borderBottom: `1px solid ${T.lineSoft}` }}>
+                    <div style={{ ...metricLabel, marginBottom: '0.6rem' }}>Letzte Transaktionen</div>
                     {transactions.slice(0, 4).map((t: any, i: number) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.3rem' }}>
-                        <span style={{ color: '#64748b' }}>{t.profiles?.username ?? 'Pilot'} · {RESOURCE_LABEL[t.resource] ?? t.resource}</span>
-                        <span style={{ color: t.profit > 0 ? '#27ae60' : '#c0392b', fontWeight: 600 }}>
-                          {t.profit > 0 ? '+' : ''}{t.profit} Cr
-                        </span>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.35rem' }}>
+                        <span style={{ color: T.inkSoft }}>{t.profiles?.username ?? 'Pilot'} · {RESOURCE_LABEL[t.resource] ?? t.resource}</span>
+                        <span style={{ color: t.profit > 0 ? T.green : T.red, fontWeight: 600 }}>{t.profit > 0 ? '+' : ''}{t.profit} Cr</span>
                       </div>
                     ))}
-                    {transactions.length === 0 && (
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Noch keine Transaktionen.</div>
-                    )}
+                    {transactions.length === 0 && <div style={{ fontSize: '0.72rem', color: T.inkFaint }}>Noch keine Transaktionen.</div>}
                   </div>
-                  {/* Weltmeldungen */}
                   <div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Meldungen</div>
+                    <div style={{ ...metricLabel, marginBottom: '0.6rem' }}>Meldungen</div>
                     {news.slice(0, 3).map((n: any, i: number) => (
-                      <div key={i} style={{ fontSize: '0.72rem', marginBottom: '0.3rem', color: n.type === 'danger' ? '#c0392b' : n.type === 'warning' ? '#e67e22' : n.type === 'success' ? '#27ae60' : '#64748b' }}>
-                        {n.icon} {n.text}
-                      </div>
+                      <div key={i} style={{ fontSize: '0.72rem', marginBottom: '0.35rem', color: n.type === 'danger' ? T.red : n.type === 'warning' ? '#d08020' : n.type === 'success' ? T.green : T.inkSoft }}>{n.icon} {n.text}</div>
                     ))}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Beste Handelschance + Offene Aufträge */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-
-              {/* Beste Arbitrage */}
+            {/* Beste Chance + Aufträge */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
               <div>
-                <span style={s.label}>Beste Handelschance</span>
+                <SectionHead title="Beste Handelschance" />
                 {best ? (
-                  <div style={{ ...s.card, padding: '1.25rem' }}>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#2a4e7a', marginBottom: '0.3rem' }}>
-                      {RESOURCE_ICON[best.resource]} {RESOURCE_LABEL[best.resource]}
+                  <div style={{ ...card, padding: '1.5rem' }}>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: T.blueDeep, marginBottom: '0.3rem' }}>{RESOURCE_ICON[best.resource]} {RESOURCE_LABEL[best.resource]}</div>
+                    <div style={{ fontSize: '0.85rem', color: T.inkSoft, marginBottom: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {LOC_ICON[best.from]} {LOC_NAME[best.from]} {Icon.arrow(T.inkFaint)} {LOC_ICON[best.to]} {LOC_NAME[best.to]}
                     </div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
-                      {LOC_ICON[best.from]} {LOC_NAME[best.from]} → {LOC_ICON[best.to]} {LOC_NAME[best.to]}
-                    </div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#27ae60', marginBottom: '0.5rem' }}>
-                      +{best.profit} Cr / t
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                      Kaufen auf {LOC_NAME[best.from]} · Verkaufen auf {LOC_NAME[best.to]}
-                    </div>
+                    <div style={{ fontSize: '1.7rem', fontWeight: 700, color: T.green, fontFamily: 'Georgia, serif' }}>+{best.profit} Cr<span style={{ fontSize: '0.8rem', color: T.inkFaint, fontFamily: 'system-ui' }}> / t</span></div>
                   </div>
-                ) : (
-                  <div style={{ ...s.card, padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem' }}>Keine Arbitrage gefunden.</div>
-                )}
+                ) : <div style={{ ...card, padding: '1.5rem', color: T.inkFaint, fontSize: '0.82rem' }}>Keine Arbitrage gefunden.</div>}
               </div>
 
-              {/* Offene Aufträge */}
               <div>
-                <span style={s.label}>Dringende Aufträge</span>
-                <div style={s.card}>
+                <SectionHead title="Dringende Aufträge" />
+                <div style={card}>
                   {initialOrders.length === 0 ? (
-                    <div style={{ padding: '1.25rem', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' }}>
-                      Keine offenen Aufträge.
-                    </div>
+                    <div style={{ padding: '1.5rem', color: T.inkFaint, fontSize: '0.82rem', textAlign: 'center' }}>Keine offenen Aufträge.</div>
                   ) : initialOrders.map((o: any, i: number) => (
-                    <div key={o.id} style={{ padding: '1rem 1.25rem', borderBottom: i < initialOrders.length - 1 ? '1px solid #f1f1f1' : 'none' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <div key={o.id} style={{ padding: '1.1rem 1.35rem', borderBottom: i < initialOrders.length - 1 ? `1px solid ${T.lineSoft}` : 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2a4e7a' }}>{LOC_ICON[o.locations?.slug]} {o.locations?.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.amount}t {RESOURCE_LABEL[o.resource]}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: T.blueDeep }}>{LOC_ICON[o.locations?.slug]} {o.locations?.name}</div>
+                          <div style={{ fontSize: '0.72rem', color: T.inkSoft }}>{o.amount}t {RESOURCE_LABEL[o.resource]}</div>
                         </div>
-                        <div style={{ fontWeight: 700, color: '#b99b6b', fontSize: '1rem' }}>+{o.reward.toLocaleString('de')} Cr</div>
+                        <div style={{ fontWeight: 700, color: T.gold, fontSize: '1.05rem', fontFamily: 'Georgia, serif' }}>+{o.reward.toLocaleString('de')} Cr</div>
                       </div>
-                      <button
-                        style={{ ...s.btnPrimary, width: '100%', padding: '0.4rem', fontSize: '0.65rem' }}
-                        onClick={() => handleFulfillOrder(o.id)}
-                      >
-                        Erfüllen
-                      </button>
+                      <button style={{ ...btnGhost, width: '100%', justifyContent: 'center' }} onClick={() => setNegotiateOrder(o)}>{Icon.trade(T.blue)} Verhandeln</button>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Werft – nur sichtbar wenn Kolonie eine Werft hat */}
-            <ShipyardPanel onPurchase={() => loadFromServer()} locations={locations} />
-
-            {/* Handelszentrale + Flottenkontrolle */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1rem' }}>
-
-              {/* Kauf/Verkauf */}
+            {/* Handel + Flotte */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
               <div>
-                <span style={s.label}>Handelszentrale – {LOC_ICON[location]} {LOC_NAME[location]}</span>
-                <div style={s.card}>
+                <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`}
+                  action={<button style={{ ...btnPrimary, padding: '0.45rem 0.85rem', fontSize: '0.74rem' }} onClick={() => setAuctionOpen(true)}>{Icon.bolt('#fff')} Live-Auktion</button>} />
+                <div style={card}>
                   {currentPrices.map((p: any, i: number) => (
-                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 220px', alignItems: 'center', padding: '0.75rem 1.25rem', borderBottom: i < currentPrices.length - 1 ? '1px solid #f1f1f1' : 'none' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{RESOURCE_ICON[p.resource]} {RESOURCE_LABEL[p.resource]}</span>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        Kauf <strong style={{ color: '#c0392b' }}>{p.buy_price} Cr</strong>
-                      </span>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        Verk <strong style={{ color: '#27ae60' }}>{p.sell_price} Cr</strong>
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        <button style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
-                          onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.max(1, a[p.resource] - 1) }))}>−</button>
-                        <span style={{ minWidth: '24px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>{amounts[p.resource]}</span>
-                        <button style={{ ...s.btnSecondary, padding: '0.3rem 0.6rem' }}
-                          onClick={() => setAmounts(a => ({ ...a, [p.resource]: Math.min(Math.max(1, cargoFreeSpace), a[p.resource] + 1) }))}>+</button>
-                        <button style={s.btnPrimary}
-                          onClick={() => handleBuy(p.resource as ResourceType, p.buy_price, amounts[p.resource])}>
-                          Kaufen
-                        </button>
-                        <button style={{ ...s.btnSecondary, opacity: cargo[p.resource as ResourceType] > 0 ? 1 : 0.4 }}
-                          onClick={() => handleSell(p.resource as ResourceType, p.sell_price, amounts[p.resource])}>
-                          Verk.
-                        </button>
-                      </div>
-                    </div>
+                    <BuyRow key={p.id} p={p} last={i === currentPrices.length - 1}
+                      cargoFree={cargoFreeSpace} owned={cargo[p.resource as ResourceType]}
+                      onBuy={(amt) => handleBuy(p.resource, p.buy_price, amt)}
+                      onSell={(amt) => handleSell(p.resource, p.sell_price, amt)} T={T} />
                   ))}
                 </div>
               </div>
 
-              {/*
-                ── FLOTTENKONTROLLE → ShipyardCard ─────────────────────────
-                ShipyardCard zeigt:
-                  - Draufsicht des Schiffs (public/images/ships/freighter_topdown.png)
-                  - Laderaum-Balken (cargoUsed / cargoMax)
-                  - Reisezeiten je nach Schiffstyp
-                  - Werft-Kaufoptionen NUR wenn location === 'moon' && has_shipyard
-                  - Außerhalb des Monds: Hinweis "Fliege nach Shackleton"
-                Fliegen-Buttons bleiben separat unten in diesem Block.
-              */}
               <div>
-                <span style={s.label}>Flottenkontrolle</span>
+                <SectionHead title="Flotte"
+                  action={location === 'moon' ? <button style={{ ...btnGhost, padding: '0.45rem 0.85rem', fontSize: '0.74rem' }} onClick={() => setShipyardOpen(true)}>{Icon.ship(T.blue)} Werft</button> : undefined} />
                 <ShipyardCard
                   shipType={(shipTypeId ?? 'freighter_mk1') as any}
                   location={location as 'moon' | 'mars' | 'phobos'}
-                  cargoUsed={used}
-                  cargoMax={cargoMax}
-                  credits={credits}
+                  cargoUsed={used} cargoMax={cargoMax} credits={credits}
                   hasShipyard={locations.find((l: any) => l.slug === 'moon')?.has_shipyard ?? false}
                   onBuyShip={async (type) => {
                     const token = await getToken()
-                    const res = await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, {
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    })
+                    const res = await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { 'Authorization': `Bearer ${token}` } })
                     const data = await res.json()
-                    if (data.ok) {
-                      showToast(`${type} gekauft!`, true)
-                      await loadFromServer()
-                    } else {
-                      showToast(data.error ?? 'Kauf fehlgeschlagen', false)
-                    }
+                    if (data.ok) { showToast(`${type} gekauft!`, true); await loadFromServer() }
+                    else showToast(data.error ?? 'Kauf fehlgeschlagen', false)
                   }}
                 />
-
-                {/* Fliegen-Buttons – bleiben direkt unter der ShipyardCard */}
-                <div style={{ marginTop: '0.75rem' }}>
-                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>Fliegen nach</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ ...metricLabel, marginBottom: '0.6rem' }}>Fliegen nach</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {otherLocations.map((loc: any) => (
-                      <button key={loc.id}
-                        style={{ ...s.btnSecondary, width: '100%', padding: '0.6rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: inTransit ? 0.5 : 1 }}
-                        disabled={inTransit}
+                      <button key={loc.id} disabled={inTransit}
+                        style={{ ...btnGhost, width: '100%', justifyContent: 'space-between', opacity: inTransit ? 0.5 : 1 }}
                         onClick={() => handleTravel(loc.slug as LocationSlug)}>
                         <span>{LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}</span>
-                        <span style={{ color: '#94a3b8', fontSize: '0.65rem' }}>Sofortflug →</span>
+                        <span style={{ color: T.inkFaint, fontSize: '0.66rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Sofortflug {Icon.arrow(T.inkFaint)}</span>
                       </button>
                     ))}
                   </div>
@@ -635,6 +544,26 @@ export default function DashboardClient({
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Handelszeile (Kauf/Verkauf einer Ressource) ─────────────────────────────
+function BuyRow({ p, last, cargoFree, owned, onBuy, onSell, T }: any) {
+  const [amount, setAmount] = useState(1)
+  const stepBtn: React.CSSProperties = { width: '26px', height: '26px', borderRadius: '7px', border: `1px solid ${T.line}`, background: T.bg, color: T.blue, cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 230px', alignItems: 'center', padding: '0.9rem 1.35rem', borderBottom: last ? 'none' : `1px solid ${T.lineSoft}` }}>
+      <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{RESOURCE_ICON[p.resource]} {RESOURCE_LABEL[p.resource]}</span>
+      <span style={{ fontSize: '0.78rem', color: T.inkSoft }}>Kauf <strong style={{ color: T.red }}>{p.buy_price}</strong></span>
+      <span style={{ fontSize: '0.78rem', color: T.inkSoft }}>Verk <strong style={{ color: T.green }}>{p.sell_price}</strong></span>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button style={stepBtn} onClick={() => setAmount((a: number) => Math.max(1, a - 1))}>−</button>
+        <span style={{ minWidth: '24px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>{amount}</span>
+        <button style={stepBtn} onClick={() => setAmount((a: number) => Math.min(Math.max(1, cargoFree), a + 1))}>+</button>
+        <button style={{ background: T.blue, color: '#fff', border: 'none', padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: 'pointer' }} onClick={() => onBuy(amount)}>Kaufen</button>
+        <button style={{ background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: 'pointer', opacity: owned > 0 ? 1 : 0.4 }} onClick={() => onSell(amount)}>Verk.</button>
       </div>
     </div>
   )
