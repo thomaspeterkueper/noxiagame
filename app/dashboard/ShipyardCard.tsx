@@ -2,16 +2,19 @@
 
 // ─────────────────────────────────────────────
 //  ShipyardCard.tsx
-//  Einbindung: in ShipyardPanel.tsx oder als
-//  eigene Sektion im Dashboard (Flottenübersicht)
+//  Aktualisiert: 01.06.2026
+//
+//  Reine FLOTTENÜBERSICHT: Schiffsbild (Draufsicht), Laderaum-Balken,
+//  Reisezeiten. Die Schiffskauf-/Werft-Funktion lebt jetzt ausschließlich
+//  im ShipyardOverlay (geöffnet über den "Werft"-Button im Dashboard).
+//  → Kauf-Sektion, Werft-Badge und onBuyShip/credits-Props wurden entfernt,
+//    um die zuvor doppelte Werft-Anzeige zu beseitigen.
 //
 //  <ShipyardCard
 //    shipType="freighter_mk1"
 //    location="moon"
 //    cargoUsed={1}
 //    cargoMax={100}
-//    credits={2470}
-//    hasShipyard={true}
 //  />
 // ─────────────────────────────────────────────
 
@@ -25,7 +28,8 @@ interface ShipyardCardProps {
   location: LocationSlug
   cargoUsed: number
   cargoMax: number
-  credits: number
+  // Optional/ungenutzt – nur belassen, damit bestehende Aufrufe nicht brechen.
+  credits?: number
   hasShipyard?: boolean
   onBuyShip?: (type: ShipType) => void
 }
@@ -64,16 +68,10 @@ const SHIP_DATA: Record<ShipType, {
   },
 }
 
-const UPGRADES: Exclude<ShipType, 'freighter_mk1'>[] = ['fast_courier', 'heavy_hauler']
-
 export default function ShipyardCard({
   shipType,
-  location,
   cargoUsed,
   cargoMax,
-  credits,
-  hasShipyard = false,
-  onBuyShip,
 }: ShipyardCardProps) {
   const ship = SHIP_DATA[shipType]
   const cargoPercent = cargoMax > 0 ? (cargoUsed / cargoMax) * 100 : 0
@@ -111,19 +109,6 @@ export default function ShipyardCard({
         }}>
           Flottenübersicht
         </span>
-        {location === 'moon' && hasShipyard && (
-          <span style={{
-            fontSize: 8,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            background: 'rgba(201,169,97,0.12)',
-            border: '1px solid rgba(201,169,97,0.25)',
-            color: '#c9a961',
-            padding: '2px 7px',
-          }}>
-            ⬡ Werft · Shackleton
-          </span>
-        )}
       </div>
 
       {/* Main content */}
@@ -274,112 +259,6 @@ export default function ShipyardCard({
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Upgrade section – contextual */}
-      <div style={{
-        borderTop: '1px solid rgba(42,78,122,0.2)',
-        padding: '10px 14px',
-      }}>
-        {hasShipyard && location === 'moon' ? (
-          // ── AT SHIPYARD: show buy options ──
-          <>
-            <div style={{
-              fontSize: 9,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'rgba(201,169,97,0.6)',
-              marginBottom: 8,
-            }}>
-              Werft · Shackleton Station
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {UPGRADES.map(type => {
-                const s = SHIP_DATA[type]
-                const canAfford = credits >= s.cost
-                const isOwned = shipType === type
-                return (
-                  <button
-                    key={type}
-                    disabled={!canAfford || isOwned}
-                    onClick={() => onBuyShip?.(type)}
-                    style={{
-                      flex: 1,
-                      fontFamily: "'Courier Prime', monospace",
-                      fontSize: 9,
-                      letterSpacing: '0.06em',
-                      padding: '7px 8px',
-                      border: isOwned
-                        ? '1px solid rgba(74,170,106,0.4)'
-                        : canAfford
-                          ? '1px solid rgba(42,78,122,0.5)'
-                          : '1px solid rgba(42,78,122,0.15)',
-                      background: isOwned
-                        ? 'rgba(74,170,106,0.08)'
-                        : canAfford
-                          ? 'rgba(42,78,122,0.06)'
-                          : 'transparent',
-                      color: isOwned
-                        ? '#4aaa6a'
-                        : canAfford
-                          ? '#6b9aba'
-                          : 'rgba(107,126,147,0.3)',
-                      cursor: canAfford && !isOwned ? 'pointer' : 'not-allowed',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ marginBottom: 3 }}>{s.label}</div>
-                    <div style={{ fontSize: 8, opacity: 0.75 }}>
-                      {isOwned
-                        ? '✓ Im Besitz'
-                        : canAfford
-                          ? `${s.cost.toLocaleString('de')} Cr`
-                          : `${s.cost.toLocaleString('de')} Cr · zu wenig`}
-                    </div>
-                    <div style={{ fontSize: 7.5, opacity: 0.5, marginTop: 2 }}>
-                      {s.cargo}t · {s.speed}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </>
-        ) : (
-          // ── NOT AT SHIPYARD: hint only ──
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <div style={{
-              width: 28, height: 28, flexShrink: 0,
-              borderRadius: '50%',
-              border: '1px solid rgba(42,78,122,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, color: 'rgba(42,78,122,0.4)',
-            }}>
-              ⬡
-            </div>
-            <div>
-              <div style={{
-                fontSize: 9,
-                color: 'rgba(107,126,147,0.6)',
-                letterSpacing: '0.06em',
-                marginBottom: 2,
-              }}>
-                Werft nicht verfügbar
-              </div>
-              <div style={{
-                fontSize: 8.5,
-                color: 'rgba(107,126,147,0.4)',
-                fontStyle: 'italic',
-                fontFamily: "'Playfair Display', serif",
-              }}>
-                Fliege nach Mond / Shackleton Station um ein neues Schiff zu kaufen.
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
