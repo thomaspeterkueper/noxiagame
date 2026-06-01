@@ -36,7 +36,7 @@ export const STOCK_HIGH_THRESHOLD = 400   // über 400 → Preis sinkt
 
 // Preisgrenzen (verhindert extreme Ausschläge)
 export const PRICE_MIN = 10
-export const PRICE_MAX = 50
+export const PRICE_MAX = 500
 
 // Auftrags-Generator
 export const ORDER_MIN_AMOUNT  = 10
@@ -82,3 +82,31 @@ export const BUILDABLE_ITEMS: Record<string, {
     description: '+100 max. Bevölkerung',
   },
 }
+// Maximaler Verhandlungsaufschlag über die Basis-Belohnung.
+export const ORDER_BONUS_MAX = 0.5   // bis zu +50%
+ 
+// Berechnet die maximale Belohnung eines Auftrags aus seiner Dringlichkeit.
+//   reward    – Basis-Belohnung (trade_orders.reward)
+//   expiresAt – ISO-String oder null (trade_orders.expires_at)
+//   stock     – aktueller Lagerstand der Zielkolonie für diese Ressource (oder null)
+//
+// Dringlichkeit steigt bei wenig Restlaufzeit und knappem Lager.
+// Ergebnis ist eine ganze Zahl (gerundet).
+export function orderMaxReward(
+  reward: number,
+  expiresAt: string | null,
+  stock: number | null,
+): number {
+  let urgency = 0.25 // Grunddringlichkeit
+ 
+  if (expiresAt) {
+    const hoursLeft = (new Date(expiresAt).getTime() - Date.now()) / 3.6e6
+    if (hoursLeft < 6) urgency += 0.15
+    if (hoursLeft < 2) urgency += 0.10
+  }
+ 
+  if (stock != null && stock < 30) urgency += 0.15
+ 
+  return Math.round(reward * (1 + Math.min(ORDER_BONUS_MAX, urgency)))
+}
+ 
