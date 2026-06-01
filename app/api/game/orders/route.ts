@@ -1,8 +1,17 @@
 // app/api/game/orders/route.ts
-// Erstellt: 30.05.2026
+// Erstellt:     30.05.2026
+// Aktualisiert: 01.06.2026
+// Version:      0.2.0
+//
+// v0.2.0: fulfill akzeptiert optionalen &agreedReward (ausgehandelter Bonus).
+// Der Server berechnet das legitime Maximum SELBST (orderMaxReward, dieselbe
+// Formel wie der Client) und DECKELT still darauf. Ein manipulierter Client
+// kann sich so nicht über das dringlichkeits-basierte Maximum hinaus bereichern.
+// Ohne agreedReward bleibt das Verhalten wie bisher (fester order.reward).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { orderMaxReward } from '@/lib/game/config'   // ← NEU: geteilte Formel
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +27,7 @@ async function getUserFromRequest(req: NextRequest) {
 }
 
 // GET – Offene Aufträge laden
-// GET ?action=fulfill&orderId=xxx – Auftrag erfüllen
+// GET ?action=fulfill&orderId=xxx[&agreedReward=NNN] – Auftrag erfüllen
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -42,6 +51,12 @@ export async function GET(req: NextRequest) {
   if (action === 'fulfill') {
     const orderId = searchParams.get('orderId')
     if (!orderId) return NextResponse.json({ error: 'Fehlende Order ID' }, { status: 400 })
+
+    // ── NEU: gewünschter Bonus aus Query (optional) ───────────────────────────
+    // Der Client schickt seinen ausgehandelten Wunschbetrag. Wir vertrauen ihm
+    // NICHT, sondern deckeln ihn unten gegen unser selbst berechnetes Maximum.
+    const agreedRewardRaw = searchParams.get('agreedReward')
+    const agreedReward = agreedRewardRaw != null ? parseInt(agreedRewardRaw, 10) : null
 
     // Auftrag laden
     const { data: order } = await serviceClient
@@ -95,8 +110,32 @@ export async function GET(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // ── NEU: tatsächlichen Reward bestimmen (mit Deckelung) ────────────────────
+    // Lagerstand der Zielkolonie für diese Ressource holen (für die Dringlichkeit).
+    const { data: locRes } = await serviceClient
+      .from('location_resources')
+      .select('stock')
+      .eq('location_id', order.location_id)
+      .eq('resource', order.resource)
+      .single()
+
+    const serverMax = orderMaxReward(
+      order.reward,
+      order.expires_at ?? null,
+      locRes?.stock ?? null,
+    )
+
+    // Basis = order.reward. Wenn ein gültiger Bonus übergeben wurde, clampen
+    // wir ihn auf [order.reward, serverMax]. Ungültige/zu hohe Werte werden
+    // still gedeckelt; fehlende oder kaputte Werte fallen auf order.reward zurück.
+    let finalReward = order.reward
+    if (agreedReward != null && Number.isFinite(agreedReward)) {
+      finalReward = Math.min(Math.max(agreedReward, order.reward), serverMax)
+    }
+    // ───────────────────────────────────────────────────────────────────────────
+
     // Auftrag erfüllen
-    const newCredits = profile.credits + order.reward
+    const newCredits = profile.credits + finalReward   // ← finalReward statt order.reward
     const newCargoAmount = cargoAmount - order.amount
 
     // Credits aktualisieren
@@ -122,12 +161,12 @@ export async function GET(req: NextRequest) {
       .update({ status: 'fulfilled', fulfilled_by: user.id })
       .eq('id', orderId)
 
-   // Lagerbestand der Kolonie erhöhen
-await serviceClient.rpc('add_to_stock', {
-  location_id:   order.location_id,
-  resource_type: order.resource,
-  amount:        order.amount,
-})
+    // Lagerbestand der Kolonie erhöhen
+    await serviceClient.rpc('add_to_stock', {
+      location_id:   order.location_id,
+      resource_type: order.resource,
+      amount:        order.amount,
+    })
 
     // Transaktion speichern
     await serviceClient.from('trade_transactions').insert({
@@ -136,13 +175,14 @@ await serviceClient.rpc('add_to_stock', {
       to_location:   order.locations?.slug,
       resource:      order.resource,
       amount:        order.amount,
-      profit:        order.reward,
+      profit:        finalReward,   // ← finalReward statt order.reward
       order_id:      orderId,
     })
 
     return NextResponse.json({
       ok:         true,
-      reward:     order.reward,
+      reward:     finalReward,      // ← der WIRKLICH gebuchte Betrag (Client zeigt diesen an)
+      baseReward: order.reward,     // ← zur Info: Basiswert ohne Bonus
       newCredits,
       newCargo:   { ...cargoMap, [order.resource]: newCargoAmount },
     })
