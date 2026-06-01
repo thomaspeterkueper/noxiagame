@@ -23,6 +23,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { orderMaxReward } from '@/lib/game/config'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
@@ -41,30 +42,22 @@ interface OrderData {
   stock?: number          // optional: Lagerstand der Kolonie für Dringlichkeit
 }
 
-// Maximaler Verhandlungsbonus: bis +50% über Basis, je nach Dringlichkeit.
-function maxBonus(order: OrderData): number {
-  let urgency = 0.25 // Grunddringlichkeit
-  // Restlaufzeit < 6h → dringender
-  if (order.expires_at) {
-    const hoursLeft = (new Date(order.expires_at).getTime() - Date.now()) / 3.6e6
-    if (hoursLeft < 6) urgency += 0.15
-    if (hoursLeft < 2) urgency += 0.10
-  }
-  // Lager sehr knapp → dringender
-  if (order.stock != null && order.stock < 30) urgency += 0.15
-  return Math.round(order.reward * (1 + Math.min(0.5, urgency)))
+// Maximaler Reward kommt aus der geteilten Formel orderMaxReward (lib/game/config),
+// damit Client und Server (api/game/orders) exakt dieselbe Dringlichkeit rechnen.
+function maxForOrder(order: OrderData): number {
+  return orderMaxReward(order.reward, order.expires_at ?? null, order.stock ?? null)
 }
 
 export default function OrderNegotiation({
   order,
   onClose,
-  onAccept,        // (orderId) => Promise<boolean> — ruft fulfill auf
+  onAccept,        // (orderId, agreedReward) => Promise<boolean> — ruft fulfill auf
   canFulfill,      // bool: ist Spieler am Ort + hat genug Cargo (Vorabprüfung im Parent)
   fulfillHint,     // string: Hinweis falls nicht erfüllbar (z.B. "Falscher Standort")
 }: {
   order: OrderData | null
   onClose: () => void
-  onAccept: (orderId: string) => Promise<boolean>
+  onAccept: (orderId: string, agreedReward: number) => Promise<boolean>
   canFulfill: boolean
   fulfillHint?: string
 }) {
@@ -88,7 +81,7 @@ export default function OrderNegotiation({
 
   useEffect(() => {
     if (!order || !running) return
-    const max = maxBonus(order)
+    const max = maxForOrder(order)
     const iv = setInterval(() => {
       if (doneRef.current) return
       // Gebot pendelt langsam Richtung Max, fällt gelegentlich zurück
@@ -107,7 +100,7 @@ export default function OrderNegotiation({
 
   if (!order) return null
 
-  const max = maxBonus(order)
+  const max = maxForOrder(order)
   const slug = order.locations?.slug ?? 'moon'
   const fillPct = max > order.reward ? ((offer - order.reward) / (max - order.reward)) * 100 : 0
 
@@ -116,7 +109,7 @@ export default function OrderNegotiation({
     if (!canFulfill) { setLog({ text: fulfillHint ?? 'Auftrag aktuell nicht erfüllbar.', ok: false }); return }
     doneRef.current = true
     setRunning(false)
-    const ok = await onAccept(order.id)
+    const ok = await onAccept(order.id, offer)
     setLog({ text: ok ? `✓ Auftrag erfüllt · +${offer.toLocaleString('de')} Cr` : 'Erfüllung fehlgeschlagen.', ok })
     if (ok) setTimeout(onClose, 1400)
     else doneRef.current = false
