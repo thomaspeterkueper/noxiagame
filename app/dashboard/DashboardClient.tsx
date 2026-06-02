@@ -128,6 +128,7 @@ export default function DashboardClient({
 
   // Overlay-State
   const [auctionOpen, setAuctionOpen]       = useState(false)
+  const [auctionConfig, setAuctionConfig]   = useState<{ resource: ResourceType; mode: 'buy' | 'sell'; qty: number }>({ resource: 'water', mode: 'buy', qty: 10 })
   const [negotiateOrder, setNegotiateOrder] = useState<any>(null)
   const [detailColony, setDetailColony]     = useState<any>(null)
   const [shipyardOpen, setShipyardOpen]     = useState(false)
@@ -188,6 +189,13 @@ export default function DashboardClient({
     }
     if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[resource]} verkauft · +${sold * price} Cr`, true)
   }
+
+  // Öffnet die Auktion mit Ressource, Rolle (Kauf/Verkauf) und Menge aus der Handelszentrale.
+  function openAuction(resource: ResourceType, mode: 'buy' | 'sell', qty: number) {
+    setAuctionConfig({ resource, mode, qty: Math.max(1, qty) })
+    setAuctionOpen(true)
+  }
+
   async function handleTravel(dest: LocationSlug) { if (!inTransit) await travel(dest) }
 
   async function handleLogout() {
@@ -251,6 +259,9 @@ export default function DashboardClient({
           stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100,
         }))}
         credits={credits} cargo={cargo} cargoMax={cargoMax}
+        initialResource={auctionConfig.resource}
+        initialMode={auctionConfig.mode}
+        initialQty={auctionConfig.qty}
         onTrade={async (resource, m, amount, price) => {
           if (m === 'buy') await handleBuy(resource, price, amount)
           else await handleSell(resource, price, amount)
@@ -501,14 +512,13 @@ export default function DashboardClient({
             {/* Handel + Flotte */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
               <div>
-                <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`}
-                  action={<button style={{ ...btnPrimary, padding: '0.45rem 0.85rem', fontSize: '0.74rem' }} onClick={() => setAuctionOpen(true)}>{Icon.bolt('#fff')} Live-Auktion</button>} />
+                <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`} />
                 <div style={card}>
                   {currentPrices.map((p: any, i: number) => (
                     <BuyRow key={p.id} p={p} last={i === currentPrices.length - 1}
                       cargoFree={cargoFreeSpace} owned={cargo[p.resource as ResourceType]}
-                      onBuy={(amt) => handleBuy(p.resource, p.buy_price, amt)}
-                      onSell={(amt) => handleSell(p.resource, p.sell_price, amt)} T={T} />
+                      onBuy={(amt) => openAuction(p.resource, 'buy', amt)}
+                      onSell={(amt) => openAuction(p.resource, 'sell', amt)} T={T} />
                   ))}
                 </div>
               </div>
