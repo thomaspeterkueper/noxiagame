@@ -101,6 +101,9 @@ export default function MarketAuction({
   cargo,
   cargoMax,
   onTrade,
+  initialResource,
+  initialMode,
+  initialQty,
 }: {
   open: boolean
   onClose: () => void
@@ -111,11 +114,15 @@ export default function MarketAuction({
   cargo: Record<ResourceType, number>
   cargoMax: number
   onTrade: (resource: ResourceType, mode: Mode, amount: number, price: number) => Promise<boolean>
+  // Startwerte aus der Handelszentrale: bestimmen Ressource, Rolle und Menge.
+  initialResource: ResourceType
+  initialMode: Mode
+  initialQty: number
 }) {
-  const [mode, setMode] = useState<Mode>('buy')
-  const [resource, setResource] = useState<ResourceType>('water')
-  const [playerQty, setPlayerQty] = useState(20)   // Wunschmenge des Spielers
-  const [started, setStarted] = useState(false)    // Auktion läuft (nach "Auktion starten")
+  // Modus/Ressource/Menge kommen jetzt von außen (Handelszentrale).
+  const mode = initialMode
+  const resource = initialResource
+  const playerQty = initialQty
   const [running, setRunning] = useState(true)
   const [log, setLog] = useState<{ text: string; ok: boolean } | null>(null)
 
@@ -134,8 +141,11 @@ export default function MarketAuction({
   // Maximale Spielermenge je nach Rolle
   const playerMaxQty = (() => {
     if (!row) return 0
-    if (mode === 'buy') return Math.min(cargoMax, row.stock)            // begrenzt durch Laderaum & Vorrat
-    return cargo[resource] ?? 0                                        // beim Verkauf: was an Bord ist
+    if (mode === 'buy') {
+      const free = cargoMax - (cargo.water + cargo.energy + cargo.metal)  // freier Laderaum
+      return Math.max(0, Math.min(free, row.stock))                       // begrenzt durch frei + Kolonievorrat
+    }
+    return cargo[resource] ?? 0                                          // beim Verkauf: was an Bord ist
   })()
 
   // ── Auktion initialisieren ───────────────────────────────────────────────
@@ -190,16 +200,18 @@ export default function MarketAuction({
     }
     buyersRef.current = buyers
     setView({ sellerPrice: sellerPriceRef.current, sellerStock: sellerStockRef.current, buyers: buyers.map(b => ({ ...b })) })
-    setStarted(true)
     setRunning(true)
   }, [row, mode, playerQty, playerMaxQty])
 
-  // Bei Wechsel von Ressource/Modus zurück in den Vorbereitungs-Screen
-  useEffect(() => { setStarted(false); endedRef.current = true }, [mode, resource, open])
+  // Auktion startet automatisch beim Öffnen (Handelszentrale hat alles festgelegt).
+  useEffect(() => {
+    if (open && row) startAuction()
+    else endedRef.current = true
+  }, [open, startAuction, row])
 
   // ── Auktions-Loop ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!open || !started || !running || !row) return
+    if (!open || !running || !row) return
     const floor = sellerFloor(row)
 
     const iv = setInterval(() => {
@@ -258,7 +270,7 @@ export default function MarketAuction({
 
     return () => clearInterval(iv)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, started, running, row, mode])
+  }, [open, running, row, mode])
 
   // Spieler war KÄUFER und hat einen Deal getroffen
   async function settlePlayer(qty: number, price: number) {
@@ -297,10 +309,6 @@ export default function MarketAuction({
     background: '#020408', border: '1px solid rgba(201,169,97,0.35)', borderRadius: '12px',
     width: '100%', maxWidth: '820px', padding: '1.5rem', color: '#e8e6df', fontFamily: 'system-ui, sans-serif',
   }
-  const tagBtn = (active: boolean): React.CSSProperties => ({
-    background: active ? '#15233a' : '#0a1420', border: `0.5px solid ${active ? '#c9a961' : '#1f3650'}`,
-    color: active ? '#c9a961' : '#9fb4cf', borderRadius: '7px', padding: '5px 12px', cursor: 'pointer', fontSize: '0.75rem',
-  })
 
   return (
     <div style={overlay} onClick={onClose}>
@@ -315,53 +323,19 @@ export default function MarketAuction({
           <button onClick={onClose} style={{ background: 'transparent', border: '0.5px solid #2a4e7a', color: '#cfe0f5', borderRadius: '7px', padding: '6px 12px', cursor: 'pointer', fontSize: '0.75rem' }}>Schließen ✕</button>
         </div>
 
-        {/* Steuerung */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.72rem', color: '#7d93b0' }}>Ressource:</span>
-          {(['water', 'energy', 'metal'] as ResourceType[]).map(r => (
-            <button key={r} style={tagBtn(resource === r)} onClick={() => setResource(r)}>{RESOURCE_ICON[r]} {RESOURCE_LABEL[r]}</button>
-          ))}
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: '0.72rem', color: '#7d93b0' }}>Modus:</span>
-          <button
-            style={{ ...tagBtn(true), borderColor: mode === 'buy' ? '#1d9e75' : '#c9a961', color: mode === 'buy' ? '#5dcaa5' : '#e0c486' }}
-            onClick={() => setMode(m => m === 'buy' ? 'sell' : 'buy')}
-          >{mode === 'buy' ? 'Kaufen' : 'Verkaufen'}</button>
+        {/* Auktions-Info (Ressource, Rolle, Menge – von Handelszentrale gesetzt) */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px', fontSize: '0.78rem' }}>
+          <span style={{ color: '#cfe0f5', fontWeight: 600 }}>{RESOURCE_ICON[resource]} {RESOURCE_LABEL[resource]}</span>
+          <span style={{ background: mode === 'buy' ? 'rgba(29,158,117,0.15)' : 'rgba(201,169,97,0.15)', border: `0.5px solid ${mode === 'buy' ? '#1d9e75' : '#c9a961'}`, color: mode === 'buy' ? '#5dcaa5' : '#e0c486', borderRadius: '6px', padding: '2px 10px', fontSize: '0.72rem' }}>
+            {mode === 'buy' ? 'Du kaufst' : 'Du verkaufst'}
+          </span>
+          <span style={{ color: '#7d93b0', fontSize: '0.72rem' }}>
+            Menge: <strong style={{ color: '#c9a961' }}>{Math.min(playerQty, playerMaxQty)}t</strong>
+          </span>
         </div>
 
-        {/* Vorbereitung ODER Auktion */}
-        {!started ? (
-          <div style={{ background: '#0a1420', border: '0.5px solid #1f3650', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.85rem', color: '#cfe0f5', marginBottom: '4px' }}>
-              {mode === 'buy'
-                ? `Du bietest als Käufer auf ${RESOURCE_LABEL[resource]} mit.`
-                : `Du verkaufst ${RESOURCE_LABEL[resource]} an die Bieter.`}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: '#7d93b0', marginBottom: '16px' }}>
-              {mode === 'buy'
-                ? `Verkäufer (Kolonie) hat ${row.stock}t vorrätig.`
-                : `An Bord: ${cargo[resource] ?? 0}t · Laderaum dieser Ressource bestimmt dein Maximum.`}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '18px' }}>
-              <span style={{ fontSize: '0.72rem', color: '#7d93b0' }}>
-                {mode === 'buy' ? 'Wunschmenge' : 'Verkaufsmenge'}
-              </span>
-              <button onClick={() => setPlayerQty(q => Math.max(1, q - 5))} style={{ ...tagBtn(false), padding: '3px 11px' }}>−</button>
-              <span style={{ minWidth: '60px', textAlign: 'center', fontWeight: 600, fontSize: '1rem', color: '#c9a961' }}>{Math.min(playerQty, playerMaxQty)}t</span>
-              <button onClick={() => setPlayerQty(q => Math.min(playerMaxQty, q + 5))} style={{ ...tagBtn(false), padding: '3px 11px' }}>+</button>
-              <span style={{ fontSize: '0.66rem', color: '#5f7596' }}>max {playerMaxQty}t</span>
-            </div>
-
-            <button
-              onClick={startAuction}
-              disabled={playerMaxQty <= 0}
-              style={{ padding: '12px 32px', fontSize: '0.95rem', borderRadius: '9px', border: '1px solid #c9a961', background: playerMaxQty > 0 ? '#15233a' : 'transparent', color: playerMaxQty > 0 ? '#c9a961' : '#5f7596', cursor: playerMaxQty > 0 ? 'pointer' : 'default', fontWeight: 600 }}
-            >
-              {playerMaxQty > 0 ? 'Auktion starten' : (mode === 'sell' ? 'Keine Ware an Bord' : 'Kein Vorrat verfügbar')}
-            </button>
-          </div>
-        ) : (
+        {/* Auktion */}
+        {(
           <>
             {/* Preis-Skala-Beschriftung */}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#5f7596', margin: '0 70px 6px 90px' }}>
@@ -424,8 +398,8 @@ export default function MarketAuction({
               <button onClick={() => setRunning(r => !r)} style={{ flex: 1, padding: '10px 0', borderRadius: '9px', border: '0.5px solid #2a4e7a', background: 'transparent', color: '#cfe0f5', cursor: 'pointer', fontSize: '0.82rem' }}>
                 {running ? 'Pause' : 'Weiter'}
               </button>
-              <button onClick={() => { endedRef.current = true; setStarted(false) }} style={{ flex: 1, padding: '10px 0', borderRadius: '9px', border: '0.5px solid #1f3650', background: 'transparent', color: '#9fb4cf', cursor: 'pointer', fontSize: '0.82rem' }}>
-                Zurück
+              <button onClick={() => { endedRef.current = true; onClose() }} style={{ flex: 1, padding: '10px 0', borderRadius: '9px', border: '0.5px solid #1f3650', background: 'transparent', color: '#9fb4cf', cursor: 'pointer', fontSize: '0.82rem' }}>
+                Schließen
               </button>
             </div>
           </>
@@ -434,9 +408,7 @@ export default function MarketAuction({
         {/* Log */}
         <div style={{ marginTop: '12px', fontSize: '0.72rem', minHeight: '20px', fontFamily: 'monospace', color: log ? (log.ok ? '#5dcaa5' : '#e0846a') : '#9fb4cf' }}>
           {log ? log.text
-            : started
-              ? (mode === 'buy' ? 'Dein Gebot steigt automatisch. Triffst du den Verkäufer zuerst, bekommst du deine Menge.' : 'Die Käufer steigen Richtung deines Preises. Wer trifft, kauft.')
-              : 'Lege deine Menge fest und starte die Auktion.'}
+            : (mode === 'buy' ? 'Dein Gebot steigt automatisch. Triffst du den Verkäufer zuerst, bekommst du deine Menge.' : 'Die Käufer steigen Richtung deines Preises. Wer trifft, kauft.')}
         </div>
       </div>
     </div>
