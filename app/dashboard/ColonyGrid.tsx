@@ -1,13 +1,14 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt: 31.05.2026
-// Aktualisiert: 31.05.2026 – SVG-Kacheln statt CSS-Verläufe
-// 
+// Aktualisiert: 07.06.2026 – tile_entities als Bestandsquelle,
+//                            Eigentums-Markierung, Gebäude-Verkauf (SellPanel)
+//
 // Kachelgrid pro Kolonie (12×8):
-// - Terrain wird seed-basiert deterministisch generiert
-// - Gebäude aus DB werden auf gespeicherten Positionen angezeigt
-// - SVG-Kacheln aus lib/grid/TileSVG.tsx (kein externes Bild nötig)
-// - Klick auf bebaubare Kachel öffnet Build-Popup
-// - Hover zeigt Kachelinfo an
+// - Terrain seed-basiert deterministisch
+// - Bestand aus tile_entities (mit id + profile_id → Eigentum + Verkauf)
+// - Laufende Vorgänge aus player_builds (Baustelle / „wird verkauft")
+// - Klick auf bebaubare Kachel → Build-Popup
+// - Klick auf eigenes Gebäude → SellPanel mit Marktbewertung
 
 'use client'
 
@@ -15,6 +16,7 @@ import { useState, useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDABLE_ITEMS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
+import SellPanel from './SellPanel'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
@@ -39,23 +41,43 @@ const COLS = 12
 const ROWS = 8
 const TILE_SIZE = 44
 
-// Kacheltypen die bebaubar sind
 function isBuildable(tileType: string): boolean {
   return tileType === 'tile_surface' || tileType === 'tile_metal'
 }
 
-// Seed-basierter Zufallsgenerator – deterministisch pro Kolonie
 function seededRandom(seed: number, i: number): number {
   const x = Math.sin(seed + i) * 10000
   return x - Math.floor(x)
 }
 
-// Generiert das Terrain-Grid basierend auf Kolonie und Bevölkerung
+// ── Typen für Bestand + Vorgänge ──────────────────────────────
+
+// Eine Zeile aus tile_entities (eigene UND fremde Gebäude)
+export interface TileEntity {
+  id:          string
+  profile_id:  string
+  entity_type: string   // 'building' | 'vehicle' | 'specialist' | 'ship'
+  entity_id:   string   // 'mine' | 'solar' | 'habitat' | ...
+  tile_level:  number
+  tile_row:    number
+  tile_col:    number
+  username?:   string   // optional, falls profiles gejoint wird
+}
+
+// Laufender Vorgang aus player_builds
+export interface PendingBuild {
+  buildable_id: string
+  tile_row:     number
+  tile_col:     number
+  status:       string  // 'building' | 'selling'
+}
+
+// Generiert das Terrain-Grid
 function generateGrid(
   slug:          string,
   population:    number,
-  populationMax: number,
-  buildings:     { type: string; row: number; col: number; status: string }[],
+  entities:      TileEntity[],
+  pending:       PendingBuild[],
   cols:          number,
   rows:          number
 ): string[][] {
@@ -64,7 +86,7 @@ function generateGrid(
   const centerR = Math.floor(rows / 2)
   const centerC = Math.floor(cols / 2)
 
-  // 1. Terrain generieren (deterministisch durch Seed)
+  // 1. Terrain (deterministisch durch Seed)
   for (let r = 0; r < rows; r++) {
     const row: string[] = []
     for (let c = 0; c < cols; c++) {
@@ -80,35 +102,47 @@ function generateGrid(
     grid.push(row)
   }
 
-  // 2. Flache Positionen für Habitate und Gebäude sammeln
+  // 2. Flache Positionen für NPC-Habitate sammeln
+  //    Spieler-Kacheln (Bestand + Vorgänge) sind dafür tabu.
+  const occupied = new Set<string>()
+  for (const e of entities) occupied.add(`${e.tile_row}-${e.tile_col}`)
+  for (const p of pending)  occupied.add(`${p.tile_row}-${p.tile_col}`)
+
   const flatPositions: [number, number][] = []
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++)
-      if (isBuildable(grid[r][c])) flatPositions.push([r, c])
+      if (isBuildable(grid[r][c]) && !occupied.has(`${r}-${c}`))
+        flatPositions.push([r, c])
 
-  // 3. Nach Entfernung zum Zentrum sortieren (Gebäude wachsen von Mitte nach außen)
   flatPositions.sort((a, b) =>
     (Math.abs(a[0] - centerR) + Math.abs(a[1] - centerC)) -
     (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
   )
 
-  // 4. Habitate basierend auf Bevölkerung platzieren
+  // 3. NPC-Habitate basierend auf Bevölkerung
   const habitatCount = Math.min(Math.floor(population / 150), Math.floor(flatPositions.length * 0.5))
   for (let i = 0; i < habitatCount; i++) {
     const [r, c] = flatPositions[i]
     grid[r][c] = 'building_habitat'
   }
 
-  // 5. Spieler-Gebäude aus DB platzieren
-  for (const b of buildings) {
-    if (b.row >= 0 && b.row < rows && b.col >= 0 && b.col < cols) {
-      grid[b.row][b.col] = b.status === 'building'
-        ? 'building_construction'
-        : `building_${b.type}`
+  // 4. Bestand aus tile_entities platzieren
+  for (const e of entities) {
+    if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
+      grid[e.tile_row][e.tile_col] = `building_${e.entity_id}`
     }
   }
 
-  // 6. Straßen durch Zentrum wenn genug Bevölkerung
+  // 5. Laufende Vorgänge: Baustelle bzw. „wird verkauft"
+  for (const p of pending) {
+    if (p.tile_row >= 0 && p.tile_row < rows && p.tile_col >= 0 && p.tile_col < cols) {
+      grid[p.tile_row][p.tile_col] = p.status === 'building'
+        ? 'building_construction'
+        : `building_${p.buildable_id}`   // selling: Gebäude noch sichtbar, gedimmt (s. Render)
+    }
+  }
+
+  // 6. Straßen durch Zentrum
   if (population > 200) {
     for (let c = 0; c < cols; c++)
       if (isBuildable(grid[centerR][c])) grid[centerR][c] = 'road'
@@ -119,7 +153,7 @@ function generateGrid(
   return grid
 }
 
-// ── Build-Popup ───────────────────────────────────────────────
+// ── Build-Popup (unverändert) ─────────────────────────────────
 
 function BuildPopup({
   tileRow, tileCol, locationSlug, onClose, onBuildStarted
@@ -234,28 +268,45 @@ function BuildPopup({
 
 // ── Hauptkomponente ───────────────────────────────────────────
 
+const BUILDING_NAMES: Record<string, string> = {
+  mine: 'Mine', solar: 'Solarfeld', habitat: 'Habitat',
+}
+
 interface ColonyGridProps {
   slug:          string
   name:          string
   population:    number
   populationMax: number
   isSupplied:    boolean
-  buildings?:    { type: string; row: number; col: number; status: string }[]
+  userId:        string              // NEU: eigene profile_id für Eigentums-Check
+  entities?:     TileEntity[]        // NEU: Bestand aus tile_entities
+  pending?:      PendingBuild[]      // Laufende Vorgänge (building/selling)
 }
 
 export default function ColonyGrid({
-  slug, name, population, populationMax, isSupplied, buildings = [],
+  slug, name, population, populationMax, isSupplied,
+  userId, entities = [], pending = [],
 }: ColonyGridProps) {
   const { loadFromServer } = useGameStore()
-  const [grid, setGrid]               = useState<string[][]>([])
+  const [grid, setGrid] = useState<string[][]>([])
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
   const popPercent = Math.round((population / populationMax) * 100)
 
-  // Grid neu generieren wenn Bevölkerung oder Gebäude sich ändern
   useEffect(() => {
-    setGrid(generateGrid(slug, population, populationMax, buildings, COLS, ROWS))
-  }, [slug, population, populationMax, buildings])
+    setGrid(generateGrid(slug, population, entities, pending, COLS, ROWS))
+  }, [slug, population, populationMax, entities, pending])
+
+  // Entität auf einer Kachel finden (Oberfläche, Gebäude)
+  function entityAt(r: number, c: number): TileEntity | undefined {
+    return entities.find(e =>
+      e.tile_row === r && e.tile_col === c && e.entity_type === 'building'
+    )
+  }
+
+  function sellingAt(r: number, c: number): boolean {
+    return pending.some(p => p.tile_row === r && p.tile_col === c && p.status === 'selling')
+  }
 
   function handleTileClick(r: number, c: number, tileType: string) {
     setSelectedTile({ r, c, type: tileType })
@@ -263,6 +314,9 @@ export default function ColonyGrid({
   }
 
   if (grid.length === 0) return null
+
+  const selectedEntity = selectedTile ? entityAt(selectedTile.r, selectedTile.c) : undefined
+  const ownSelected = selectedEntity && selectedEntity.profile_id === userId
 
   return (
     <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
@@ -300,7 +354,7 @@ export default function ColonyGrid({
         </div>
       </div>
 
-      {/* Kachelgrid – SVG-Kacheln ohne externe Dateien */}
+      {/* Kachelgrid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${COLS}, ${TILE_SIZE}px)`,
@@ -312,23 +366,36 @@ export default function ColonyGrid({
       }}>
         {grid.flatMap((row, r) =>
           row.map((tileType, c) => {
-            const isSelected  = selectedTile?.r === r && selectedTile?.c === c
-            const canBuild    = isBuildable(tileType)
-            const isBuilding  = tileType.startsWith('building_')
+            const isSelected = selectedTile?.r === r && selectedTile?.c === c
+            const canBuild   = isBuildable(tileType)
+            const entity     = entityAt(r, c)
+            const isOwn      = entity?.profile_id === userId
+            const isSelling  = sellingAt(r, c)
+
+            // Eigentums-Rand: eigene Gebäude Gold, fremde grau
+            let ownerOutline = 'none'
+            if (entity) ownerOutline = isOwn ? '1px solid #c9a961' : '1px solid #5a6878'
+            if (isSelected) ownerOutline = '2px solid #c9a961'
 
             return (
               <div
                 key={`${r}-${c}`}
-                title={tileType.replace(/_/g, ' ')}
+                title={
+                  entity
+                    ? `${BUILDING_NAMES[entity.entity_id] ?? entity.entity_id}${isOwn ? ' (deins)' : entity.username ? ` (${entity.username})` : ''}`
+                    : tileType.replace(/_/g, ' ')
+                }
                 onClick={() => handleTileClick(r, c, tileType)}
                 style={{
                   width:   TILE_SIZE,
                   height:  TILE_SIZE,
-                  cursor:  canBuild ? 'pointer' : 'default',
-                  outline: isSelected ? '2px solid #c9a961' : 'none',
+                  cursor:  canBuild || entity ? 'pointer' : 'default',
+                  outline: ownerOutline,
                   outlineOffset: '-2px',
                   boxSizing: 'border-box',
                   flexShrink: 0,
+                  opacity: isSelling ? 0.45 : 1,        // „wird verkauft": gedimmt
+                  filter:  isSelling ? 'grayscale(0.7)' : 'none',
                 }}
               >
                 <TileDisplay tileType={tileType} slug={slug} />
@@ -343,33 +410,50 @@ export default function ColonyGrid({
         <div style={{
           marginTop: '0.75rem', padding: '0.6rem 1rem',
           background: 'rgba(0,0,0,0.3)', borderRadius: '6px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           fontSize: '0.75rem',
         }}>
-          <div>
-            <span style={{ color: '#b99b6b', fontWeight: 700 }}>
-              {selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </span>
-            <span style={{ color: '#8a9ab0', marginLeft: '0.75rem' }}>
-              {isBuildable(selectedTile.type) ? 'Bebaubar' : 'Nicht bebaubar'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {isBuildable(selectedTile.type) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ color: '#b99b6b', fontWeight: 700 }}>
+                {selectedEntity
+                  ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
+                  : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </span>
+              <span style={{ color: '#8a9ab0', marginLeft: '0.75rem' }}>
+                {selectedEntity
+                  ? (ownSelected ? 'Eigentum: Du' : `Eigentum: ${selectedEntity.username ?? 'Anderer Pilot'}`)
+                  : sellingAt(selectedTile.r, selectedTile.c)
+                    ? 'Wird verkauft …'
+                    : isBuildable(selectedTile.type) ? 'Bebaubar' : 'Nicht bebaubar'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {isBuildable(selectedTile.type) && (
+                <button
+                  onClick={() => setShowBuildPopup(true)}
+                  style={{ background: '#2a4e7a', color: '#fff', border: 'none', padding: '0.3rem 0.75rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  🏗️ Bauen
+                </button>
+              )}
               <button
-                onClick={() => setShowBuildPopup(true)}
-                style={{ background: '#2a4e7a', color: '#fff', border: 'none', padding: '0.3rem 0.75rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
+                onClick={() => setSelectedTile(null)}
+                style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
               >
-                🏗️ Bauen
+                ✕
               </button>
-            )}
-            <button
-              onClick={() => setSelectedTile(null)}
-              style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
-            >
-              ✕
-            </button>
+            </div>
           </div>
+
+          {/* ── HIER: Verkaufs-UI für eigene Gebäude ── */}
+          {ownSelected && (
+            <SellPanel
+              key={selectedEntity!.id}
+              entityId={selectedEntity!.id}
+              entityName={BUILDING_NAMES[selectedEntity!.entity_id] ?? selectedEntity!.entity_id}
+              onSold={async () => { await loadFromServer() }}
+            />
+          )}
         </div>
       )}
 
