@@ -1,13 +1,16 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 01.06.2026
-// Version:      0.2.0
+// Aktualisiert: 07.06.2026
+// Version:      0.3.0
 //
 // Haupt-Client-Komponente des Dashboards. Drei Tabs:
 //   1. Übersicht   – Standort, Kolonien, Welt, Handel, Aufträge (verschlankt)
 //   2. Statistiken – Handelshistorie, Wochenchart, Erfolge
 //   3. Kolonien    – Kachelgrid pro Kolonie mit Bausystem
 //
+// v0.3.0: Cargo-Loop-Fix – handleBuy/handleSell buchen die ganze Menge in
+// EINEM API-Call (Store: buy/sell mit amount-Parameter, Route bucht atomar
+// mit Teilbuchung). Die 1t-for-Schleife ist entfernt.
 // v0.2.0: Visuell verfeinert (hell, mehr Raum, klarere Typo). Schwere Inline-Blöcke
 // in vier Aufruf-Overlays ausgelagert:
 //   - MarketAuction     (Live-Auktion, ⚡-Button in der Handelszentrale)
@@ -151,25 +154,24 @@ export default function DashboardClient({
     return () => clearInterval(interval)
   }, [])
 
-  // ── Spieler-Builds laden ────────────────────────────────────────────────────
   // ── Spieler-Builds + Bestand laden ─────────────────────────────────────────
-async function fetchBuilds() {
-  try {
-    const { createBrowserClient } = await import('@supabase/ssr')
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    const { data: { session } } = await supabase.auth.getSession()
-    setUserId(session?.user?.id ?? '')
+  async function fetchBuilds() {
+    try {
+      const { createBrowserClient } = await import('@supabase/ssr')
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { data: { session } } = await supabase.auth.getSession()
+      setUserId(session?.user?.id ?? '')
 
-    const token = session?.access_token ?? null
-    const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
-    const data  = await res.json()
-    setPlayerBuilds(data.builds ?? [])
-    setTileEntities(data.entities ?? [])
-  } catch (err) { console.error('build fetch error:', err) }
-}
+      const token = session?.access_token ?? null
+      const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
+      const data  = await res.json()
+      setPlayerBuilds(data.builds ?? [])
+      setTileEntities(data.entities ?? [])
+    } catch (err) { console.error('build fetch error:', err) }
+  }
   useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [activeTab])
 
   // ── Abgeleitete Daten ───────────────────────────────────────────────────────
@@ -183,23 +185,15 @@ async function fetchBuilds() {
   }
 
   // ── Handel ──────────────────────────────────────────────────────────────────
+  // v0.3.0: ganze Menge in EINEM API-Call (Cargo-Loop-Fix). Der Server bucht
+  // atomar und ggf. eine Teilmenge; result.msg enthält die korrekte Anzeige.
   async function handleBuy(resource: ResourceType, price: number, amount: number) {
-    let bought = 0
-    for (let j = 0; j < amount; j++) {
-      const result = await buy(resource, price)
-      if (!result.ok) { showToast(result.msg, false); break }
-      bought++
-    }
-    if (bought > 0) showToast(`${bought}t ${RESOURCE_LABEL[resource]} gekauft · ${bought * price} Cr`, true)
+    const result = await buy(resource, price, amount)
+    showToast(result.msg, result.ok)
   }
   async function handleSell(resource: ResourceType, price: number, amount: number) {
-    let sold = 0
-    for (let j = 0; j < amount; j++) {
-      const result = await sell(resource, price)
-      if (!result.ok) { showToast(result.msg, false); break }
-      sold++
-    }
-    if (sold > 0) showToast(`${sold}t ${RESOURCE_LABEL[resource]} verkauft · +${sold * price} Cr`, true)
+    const result = await sell(resource, price, amount)
+    showToast(result.msg, result.ok)
   }
 
   // Öffnet die Auktion mit Ressource, Rolle (Kauf/Verkauf) und Menge aus der Handelszentrale.
@@ -370,19 +364,19 @@ async function fetchBuilds() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
               {locations.map((loc: any) => (
                 <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
-  population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
-  userId={userId}
-  entities={tileEntities.filter((e: any) => e.locations?.slug === loc.slug)}
-  pending={playerBuilds
-    .filter((b: any) => b.locations?.slug === loc.slug)
-    .map((b: any) => ({
-      buildable_id: b.buildable_id,
-      tile_row:     b.tile_row,
-      tile_col:     b.tile_col,
-      status:       b.status,
-    }))}
-  onChanged={fetchBuilds}
-/>
+                  population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
+                  userId={userId}
+                  entities={tileEntities.filter((e: any) => e.locations?.slug === loc.slug)}
+                  pending={playerBuilds
+                    .filter((b: any) => b.locations?.slug === loc.slug)
+                    .map((b: any) => ({
+                      buildable_id: b.buildable_id,
+                      tile_row:     b.tile_row,
+                      tile_col:     b.tile_col,
+                      status:       b.status,
+                    }))}
+                  onChanged={fetchBuilds}
+                />
               ))}
             </div>
           </div>
