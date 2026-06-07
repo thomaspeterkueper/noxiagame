@@ -35,12 +35,14 @@ import MarketAuction from './MarketAuction'
 import OrderNegotiation from './OrderNegotiation'
 import ColonyDetail from './ColonyDetail'
 import ShipyardOverlay from './ShipyardOverlay'
+import WelcomeSetup from './WelcomeSetup'
 
 // ─── Konstanten ────────────────────────────────────────────────────────────────
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
 const LOC_ICON:       Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨' }
 const LOC_NAME:       Record<string, string> = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
+const [profile, setProfile] = useState<any>(null)
 
 // ─── Design-Tokens ───────────────────────────────────────────────────────────
 // Zentralisierte Farben/Maße für konsistente, verfeinerte Optik.
@@ -174,6 +176,17 @@ export default function DashboardClient({
   }
   useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [activeTab])
 
+async function fetchProfile() {
+  try {
+    const token = await getToken()
+    const res = await fetch('/api/game/profile', { headers: { 'Authorization': `Bearer ${token}` } })
+    const data = await res.json()
+    setProfile(data.profile)
+  } catch (err) { console.error('profile fetch error:', err) }
+}
+useEffect(() => { fetchProfile() }, [])
+
+  
   // ── Abgeleitete Daten ───────────────────────────────────────────────────────
   const locations    = worldData?.locations ?? initialLocations
   const news         = worldData?.news ?? []
@@ -254,6 +267,11 @@ export default function DashboardClient({
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
 
+
+{profile && !profile.onboarded && (
+  <WelcomeSetup onDone={() => { fetchProfile(); window.location.reload() }} />
+)}
+      
       {/* Overlays */}
       <MarketAuction
         open={auctionOpen}
@@ -320,6 +338,10 @@ export default function DashboardClient({
               <div style={{ fontWeight: 700, color: c as string, fontSize: '0.92rem', marginTop: '2px' }}>{v}</div>
             </div>
           ))}
+         {profile?.avatar && (
+  <img src={`/images/avatars/${profile.avatar}.png`} alt=""
+    style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${T.gold}` }} />
+)}
           <button style={btnGhost} onClick={handleLogout}>{Icon.logout(T.blue)} Abmelden</button>
         </div>
       </header>
