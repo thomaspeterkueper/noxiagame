@@ -355,16 +355,20 @@ export default function ColonyGrid({
         </div>
       </div>
 
-      {/* Kachelgrid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${COLS}, ${TILE_SIZE}px)`,
-        gap: 0,
-        border: '2px solid #2a4e7a',
-        borderRadius: '6px',
-        overflow: 'hidden',
-        width: `${COLS * TILE_SIZE}px`,
-      }}>
+      {/* Grid links · Info-Sidebar rechts */}
+      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+
+        {/* Kachelgrid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${COLS}, ${TILE_SIZE}px)`,
+          gap: 0,
+          border: '2px solid #2a4e7a',
+          borderRadius: '6px',
+          overflow: 'hidden',
+          width: `${COLS * TILE_SIZE}px`,
+          flexShrink: 0,
+        }}>
         {grid.flatMap((row, r) =>
           row.map((tileType, c) => {
             const isSelected = selectedTile?.r === r && selectedTile?.c === c
@@ -404,59 +408,67 @@ export default function ColonyGrid({
             )
           })
         )}
-      </div>
+        </div>
 
-      {/* Info-Panel für ausgewählte Kachel */}
-      {selectedTile && !showBuildPopup && (
+        {/* Info-Sidebar rechts neben dem Grid */}
         <div style={{
-          marginTop: '0.75rem', padding: '0.6rem 1rem',
+          flex: 1, minWidth: '240px', alignSelf: 'stretch',
+          padding: '0.85rem 1rem',
           background: 'rgba(0,0,0,0.3)', borderRadius: '6px',
           fontSize: '0.75rem',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ color: '#b99b6b', fontWeight: 700 }}>
-                {selectedEntity
-                  ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
-                  : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </span>
-              <span style={{ color: '#8a9ab0', marginLeft: '0.75rem' }}>
-                {selectedEntity
-                  ? (ownSelected ? 'Eigentum: Du' : `Eigentum: ${selectedEntity.username ?? 'Anderer Pilot'}`)
-                  : sellingAt(selectedTile.r, selectedTile.c)
-                    ? 'Wird verkauft …'
-                    : isBuildable(selectedTile.type) ? 'Bebaubar' : 'Nicht bebaubar'}
-              </span>
+          {!selectedTile || showBuildPopup ? (
+            <div style={{ color: '#5a6878', fontSize: '0.7rem', lineHeight: 1.6 }}>
+              Kachel anklicken für Details.<br />
+              Eigene Gebäude (Goldrand) lassen sich hier bewerten und verkaufen.
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>
+                    {selectedEntity
+                      ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
+                      : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </div>
+                  <div style={{ color: '#8a9ab0', marginTop: '0.25rem' }}>
+                    {selectedEntity
+                      ? (ownSelected ? 'Eigentum: Du' : `Eigentum: ${selectedEntity.username ?? 'Anderer Pilot'}`)
+                      : sellingAt(selectedTile.r, selectedTile.c)
+                        ? 'Wird verkauft …'
+                        : isBuildable(selectedTile.type) ? 'Bebaubar' : 'Nicht bebaubar'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedTile(null)}
+                  style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
+                >
+                  ✕
+                </button>
+              </div>
+
               {isBuildable(selectedTile.type) && (
                 <button
                   onClick={() => setShowBuildPopup(true)}
-                  style={{ background: '#2a4e7a', color: '#fff', border: 'none', padding: '0.3rem 0.75rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ marginTop: '0.75rem', width: '100%', background: '#2a4e7a', color: '#fff', border: 'none', padding: '0.45rem 0.75rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   🏗️ Bauen
                 </button>
               )}
-              <button
-                onClick={() => setSelectedTile(null)}
-                style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
 
-          {/* ── HIER: Verkaufs-UI für eigene Gebäude ── */}
-          {ownSelected && (
-            <SellPanel
-              key={selectedEntity!.id}
-              entityId={selectedEntity!.id}
-              entityName={BUILDING_NAMES[selectedEntity!.entity_id] ?? selectedEntity!.entity_id}
-              onSold={async () => { await loadFromServer(); onChanged?.() }}
-            />
+              {/* Verkaufs-UI für eigene Gebäude */}
+              {ownSelected && (
+                <SellPanel
+                  key={selectedEntity!.id}
+                  entityId={selectedEntity!.id}
+                  entityName={BUILDING_NAMES[selectedEntity!.entity_id] ?? selectedEntity!.entity_id}
+                  onSold={async () => { await loadFromServer(); onChanged?.() }}
+                />
+              )}
+            </>
           )}
         </div>
-      )}
+      </div>
 
       {/* Bevölkerungsbalken */}
       <div style={{ marginTop: '0.6rem', background: '#0a1a2a', height: '4px', borderRadius: '3px', overflow: 'hidden' }}>
