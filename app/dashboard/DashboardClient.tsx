@@ -132,7 +132,8 @@ export default function DashboardClient({
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
   const [tileEntities, setTileEntities] = useState<any[]>([])
   const [userId, setUserId] = useState<string>('')
-
+  const [profile, setProfile] = useState<any>(null)
+  
   // Overlay-State
   const [auctionOpen, setAuctionOpen]       = useState(false)
   const [auctionConfig, setAuctionConfig]   = useState<{ resource: ResourceType; mode: 'buy' | 'sell'; qty: number }>({ resource: 'water', mode: 'buy', qty: 10 })
