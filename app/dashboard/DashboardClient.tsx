@@ -125,6 +125,8 @@ export default function DashboardClient({
   const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'colonies'>('dashboard')
   const [worldData, setWorldData] = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
+  const [tileEntities, setTileEntities] = useState<any[]>([])
+  const [userId, setUserId] = useState<string>('')
 
   // Overlay-State
   const [auctionOpen, setAuctionOpen]       = useState(false)
@@ -150,14 +152,24 @@ export default function DashboardClient({
   }, [])
 
   // ── Spieler-Builds laden ────────────────────────────────────────────────────
-  async function fetchBuilds() {
-    try {
-      const token = await getToken()
-      const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
-      const data  = await res.json()
-      setPlayerBuilds(data.builds ?? [])
-    } catch (err) { console.error('build fetch error:', err) }
-  }
+  // ── Spieler-Builds + Bestand laden ─────────────────────────────────────────
+async function fetchBuilds() {
+  try {
+    const { createBrowserClient } = await import('@supabase/ssr')
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    const { data: { session } } = await supabase.auth.getSession()
+    setUserId(session?.user?.id ?? '')
+
+    const token = session?.access_token ?? null
+    const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
+    const data  = await res.json()
+    setPlayerBuilds(data.builds ?? [])
+    setTileEntities(data.entities ?? [])
+  } catch (err) { console.error('build fetch error:', err) }
+}
   useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [activeTab])
 
   // ── Abgeleitete Daten ───────────────────────────────────────────────────────
@@ -358,9 +370,19 @@ export default function DashboardClient({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
               {locations.map((loc: any) => (
                 <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
-                  population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
-                  buildings={playerBuilds.filter((b: any) => b.locations?.slug === loc.slug).map((b: any) => ({ type: b.buildable_id, row: b.tile_row, col: b.tile_col, status: b.status }))}
-                />
+  population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
+  userId={userId}
+  entities={tileEntities.filter((e: any) => e.locations?.slug === loc.slug)}
+  pending={playerBuilds
+    .filter((b: any) => b.locations?.slug === loc.slug)
+    .map((b: any) => ({
+      buildable_id: b.buildable_id,
+      tile_row:     b.tile_row,
+      tile_col:     b.tile_col,
+      status:       b.status,
+    }))}
+  onChanged={fetchBuilds}
+/>
               ))}
             </div>
           </div>
