@@ -124,6 +124,11 @@ export async function GET(req: NextRequest) {
     if (tileLevel < -3 || tileLevel > 0) {
       return NextResponse.json({ error: 'Ungültige Ebene' }, { status: 400 })
     }
+    // Grid: 10 Spalten (0–9) × 9 Zeilen (0–8)
+    if (tileRow < 0 || tileRow > 8 || tileCol < 0 || tileCol > 9 ||
+        Number.isNaN(tileRow) || Number.isNaN(tileCol)) {
+      return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
+    }
 
     const buildable = BUILDABLE_ITEMS[buildableId]
     if (!buildable) {
