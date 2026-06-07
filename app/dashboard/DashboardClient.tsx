@@ -42,7 +42,7 @@ const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energ
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
 const LOC_ICON:       Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨' }
 const LOC_NAME:       Record<string, string> = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
-const [profile, setProfile] = useState<any>(null)
+
 
 // ─── Design-Tokens ───────────────────────────────────────────────────────────
 // Zentralisierte Farben/Maße für konsistente, verfeinerte Optik.
