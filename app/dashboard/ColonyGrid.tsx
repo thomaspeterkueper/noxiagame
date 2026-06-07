@@ -281,11 +281,12 @@ interface ColonyGridProps {
   userId:        string              // NEU: eigene profile_id für Eigentums-Check
   entities?:     TileEntity[]        // NEU: Bestand aus tile_entities
   pending?:      PendingBuild[]      // Laufende Vorgänge (building/selling)
+  onChanged?:    () => void          // Bestand/Builds neu laden (nach Bau/Verkauf)
 }
 
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
-  userId, entities = [], pending = [],
+  userId, entities = [], pending = [], onChanged,
 }: ColonyGridProps) {
   const { loadFromServer } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
@@ -328,7 +329,7 @@ export default function ColonyGrid({
           tileCol={selectedTile.c}
           locationSlug={slug}
           onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }}
-          onBuildStarted={async () => { await loadFromServer() }}
+          onBuildStarted={async () => { await loadFromServer(); onChanged?.() }}
         />
       )}
 
@@ -451,7 +452,7 @@ export default function ColonyGrid({
               key={selectedEntity!.id}
               entityId={selectedEntity!.id}
               entityName={BUILDING_NAMES[selectedEntity!.entity_id] ?? selectedEntity!.entity_id}
-              onSold={async () => { await loadFromServer() }}
+              onSold={async () => { await loadFromServer(); onChanged?.() }}
             />
           )}
         </div>
