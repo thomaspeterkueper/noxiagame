@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
+import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
 const LOC_NAME:  Record<string, string> = { moon: 'Mond',       mars: 'Mars',  phobos: 'Phobos'  }
 const LOC_SUB:   Record<string, string> = { moon: 'Shackleton', mars: 'Tharsis Hub', phobos: 'Freihafen' }
@@ -183,23 +184,17 @@ export default function TransitPanel({ onArrival }: { onArrival: (dest: string) 
                 marginLeft: -50, // zentriert auf progress-punkt
               }}>
                 {/* Schiffsbild */}
-                <img
-                  src={shipSrc}
-                  alt="Frachter"
-                  style={{
-                    width: 100, height: 50,
-                    objectFit: 'contain',
-                    filter: 'drop-shadow(0 0 10px rgba(42,78,122,0.7))',
-                    display: 'block',
-                  }}
-                  onError={(e) => {
-                    // Fallback: Emoji wenn Bild fehlt
-                    const el = e.target as HTMLImageElement
-                    el.style.display = 'none'
-                    const fb = el.nextSibling as HTMLElement
-                    if (fb) fb.style.display = 'block'
-                  }}
-                />
+                <ShipSpriteStyles />
+                <div style={{
+                  filter: 'drop-shadow(0 0 10px rgba(42,78,122,0.7))',
+                  display: 'block',
+                }}>
+                  <ShipSVG
+                    frame={(shipTypeId ?? 'freighter_mk1') as 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'}
+                    flying
+                    size={50}
+                  />
+                </div>
                 {/* Emoji-Fallback – versteckt wenn Bild lädt */}
                 <div style={{
                   display: 'none',
