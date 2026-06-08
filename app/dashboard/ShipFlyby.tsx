@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from 'react'
+import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
 type LocationSlug = 'moon' | 'mars' | 'phobos'
 type ShipType = 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'
@@ -140,22 +141,13 @@ export default function ShipFlyby({
         }} />
 
         {/* Ship image */}
-        <img
-          src={SHIP_SIDE_IMG[shipType]}
-          alt={SHIP_LABELS[shipType]}
-          style={{
-            width: 260,
-            height: 130,
-            objectFit: 'contain',
-            objectPosition: 'center',
-            filter: 'drop-shadow(0 0 14px rgba(42,78,122,0.6))',
-            display: 'block',
-          }}
-          onError={(e) => {
-            // Fallback: hide broken img
-            (e.target as HTMLImageElement).style.display = 'none'
-          }}
-        />
+        <ShipSpriteStyles />
+        <div style={{
+          filter: 'drop-shadow(0 0 14px rgba(42,78,122,0.6))',
+          display: 'block',
+        }}>
+          <ShipSVG frame={shipType} flying size={130} />
+        </div>
 
         {/* Engine glow */}
         <div style={{
