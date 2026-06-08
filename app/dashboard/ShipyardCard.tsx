@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────
 
 import { useEffect, useState } from 'react'
+import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
 type LocationSlug = 'moon' | 'mars' | 'phobos'
 type ShipType = 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'
@@ -153,20 +154,14 @@ export default function ShipyardCard({
             background: 'rgba(42,78,122,0.1)',
           }} />
 
-          <img
-            src="/images/ships/freighter_topdown.png"
-            alt="Draufsicht"
-            style={{
-              width: 80, height: 80,
-              objectFit: 'contain',
-              animation: 'shipBob 3s ease-in-out infinite',
-              filter: 'drop-shadow(0 0 8px rgba(42,78,122,0.4))',
-              zIndex: 2,
-            }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none'
-            }}
-          />
+          <ShipSpriteStyles />
+          <div style={{
+            animation: 'shipBob 3s ease-in-out infinite',
+            filter: 'drop-shadow(0 0 8px rgba(42,78,122,0.4))',
+            zIndex: 2,
+          }}>
+            <ShipSVG frame={shipType} view="topdown" size={80} />
+          </div>
           <style>{`
             @keyframes shipBob {
               0%,100% { transform: translateY(0px) rotate(0deg); }
