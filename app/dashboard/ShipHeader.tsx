@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────
 
 import { useEffect, useState } from 'react'
+import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
 type LocationSlug = 'moon' | 'mars' | 'phobos'
 type ShipType = 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'
@@ -152,18 +153,13 @@ export default function ShipHeader({
           }
         `}</style>
 
-        <img
-          src="/images/ships/freighter_side.png"
-          alt={SHIP_LABELS[shipType]}
-          style={{
-            width: 220,
-            height: 110,
-            objectFit: 'contain',
-            filter: `drop-shadow(0 0 16px ${cfg.glow}) drop-shadow(0 4px 8px rgba(0,0,0,0.6))`,
-            display: 'block',
-          }}
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-        />
+        <ShipSpriteStyles />
+        <div style={{
+          filter: `drop-shadow(0 0 16px ${cfg.glow}) drop-shadow(0 4px 8px rgba(0,0,0,0.6))`,
+          display: 'block',
+        }}>
+          <ShipSVG frame={shipType} flying={inTransit} size={110} />
+        </div>
 
         {/* Engine idle glow */}
         {!inTransit && (
