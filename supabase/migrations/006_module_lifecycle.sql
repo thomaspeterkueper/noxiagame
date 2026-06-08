@@ -2,7 +2,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- NOXIA — Modul-Lebenszyklus im Auftragsbuch  (angepasst an den ECHTEN Stand)
 --
--- player_builds (real, aus 002 in Supabase) HAT bereits:
+-- player_builds (real: Basis aus 001c, 002 ergänzt sale_payout + tile_level) HAT bereits:
 --   profile_id, buildable_id, target_type ('building'|'ship'|'module'),
 --   location_id, tile_level, tile_row, tile_col, status, completes_at, sale_payout.
 -- → target_type unterscheidet schon building/ship/MODULE. Es fehlt nur die
@@ -17,9 +17,11 @@ alter table public.player_builds
   add column if not exists entity_ref uuid;      -- betroffene tile_entities-Zeile (remove/sell)
 -- sale_payout (Bestand) wird wiederverwendet: Bergungs-/Verkaufswert, beim Start fixiert.
 
--- 2) Status-Set erweitern. ⚠ Falls 002 einen CHECK auf status angelegt hat,
---    echten Namen nachsehen und ersetzen; bestehende Werte MÜSSEN erhalten bleiben.
--- alter table public.player_builds drop constraint if exists <name_aus_002>;
+-- 2) Status-Set erweitern. 001c bestätigt: status ist eine freie TEXT-Spalte OHNE
+--    CHECK. Die neuen Werte installing/installed/removing/removed funktionieren
+--    daher ohne jede DDL. → Nichts zu tun.
+--    Optional, falls du status später hart validieren willst (ALLE bestehenden
+--    Werte müssen dann in der Liste stehen, sonst scheitert das ADD):
 -- alter table public.player_builds add constraint player_builds_status_check
 --   check (status in (
 --     'building','complete','cancelled',   -- Gebäudebau (Bestand)
@@ -27,7 +29,6 @@ alter table public.player_builds
 --     'installing','installed',            -- Modul einbauen (neu)
 --     'removing','removed'                 -- Modul ausbauen (neu)
 --   ));
--- (Ist status eine TEXT-Spalte ohne CHECK, genügen die neuen Werte ohne DDL.)
 
 -- 3) Indizes
 create index if not exists pb_parent_idx on public.player_builds (parent_id);
