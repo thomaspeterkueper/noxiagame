@@ -1,15 +1,16 @@
 // lib/ships/ShipSVG.tsx
-// Animierte Schiff-Sprites (Seitenansicht) — ersetzt die <img src="freighter_side.png">
-// in ShipHeader / ShipyardCard / TransitPanel / ShipFlyby. Rahmen + Module
-// datengesteuert: Cargo = Kiste, Tank = Zylinder, Habitat = Ring (benachbarte
-// Ringe drehen gegenläufig → Passagier-/Kolonieschiff), Equipment = Pod.
-// Dunkler Hintergrund-tauglich (transparent), passt zu den dunklen Bannern.
+// Animierte Schiff-Sprites — ersetzt die <img>-Tags in ShipHeader / ShipyardCard /
+// TransitPanel / ShipFlyby. Zwei Ansichten:
+//   view="side"    (Standard) – Banner, Transit, Flyby
+//   view="topdown"           – Werft-Karte (ShipyardCard)
+// Rahmen + Module datengesteuert: Cargo = Kiste, Tank = Zylinder,
+// Habitat = Ring (benachbarte Ringe gegenläufig → Passagier-/Kolonieschiff),
+// Equipment = Pod. Transparent, dunkler Hintergrund-tauglich.
 //
-// Drop-in-Ersatz:
 //   import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
-//   // einmal: <ShipSpriteStyles />
-//   // statt <img src="/images/ships/freighter_side.png"/>:
-//   <ShipSVG frame={shipType} flying={status === 'transit'} />
+//   <ShipSpriteStyles />  // einmal mounten
+//   <ShipSVG frame={shipType} flying={inTransit} />            // Seite
+//   <ShipSVG frame={shipType} view="topdown" size={80} />      // Draufsicht
 
 import React from 'react'
 
@@ -35,11 +36,13 @@ export interface ShipSVGProps {
   frame?: FrameId | ShipAlias
   modules?: ShipModuleView[]   // default: Rahmen voll Cargo (= klassischer Frachter)
   flying?: boolean             // Triebwerksflamme an
-  size?: number                // Höhe px, default 90
+  size?: number                // Höhe px, default 90 (side) / wird bei topdown genutzt
+  view?: 'side' | 'topdown'
 }
 
 const SLOT_W = 26, GAP = 4, X0 = 52, CY = 60
 
+// ── Seitenansicht ────────────────────────────────────────────────────────────
 function Engine({ big }: { big: boolean }) {
   const w = big ? 22 : 16
   const nozzles = big ? [44, 76] : [52, 68]
@@ -83,7 +86,6 @@ function ModuleGlyph({ m, x, i }: { m: ShipModuleView; x: number; i: number }) {
       </>
     )
   } else {
-    // habitat → Ring; benachbarte Ringe gegenläufig (i gerade/ungerade)
     const cx = x + SLOT_W / 2, r = 18
     const dir = i % 2 === 0 ? 's-ring-cw' : 's-ring-ccw'
     const pods = Array.from({ length: 8 }, (_, k) => {
@@ -114,45 +116,114 @@ function ModuleGlyph({ m, x, i }: { m: ShipModuleView; x: number; i: number }) {
   )
 }
 
-export function ShipSVG({ frame = 'mk1', modules, flying = false, size = 90 }: ShipSVGProps) {
-  const frameId: FrameId = (ALIAS as Record<string, FrameId>)[frame] ?? (frame as FrameId)
-  const def = FRAME[frameId] ?? FRAME.mk1
-  const loadout: ShipModuleView[] = modules ?? Array.from({ length: def.slots }, () => ({ type: 'cargo' as ModuleType }))
+function renderSide(def: typeof FRAME[FrameId], loadout: ShipModuleView[], flying: boolean, size: number) {
   const n = def.slots
   const spineEnd = X0 + n * (SLOT_W + GAP)
   const cockX = spineEnd + 4
   const W = cockX + 50
   const struts = Math.floor((spineEnd - 40) / 22)
-
   return (
-    <svg width={(W / 120) * size} height={size} viewBox={`0 0 ${W} 120`}
-         style={{ display: 'block', overflow: 'visible' }}>
-      <g className={flying ? '' : 's-noflame'}>
-        <Engine big={def.bigEngine} />
-      </g>
-      {/* Spine-Truss */}
+    <svg width={(W / 120) * size} height={size} viewBox={`0 0 ${W} 120`} style={{ display: 'block', overflow: 'visible' }}>
+      <g className={flying ? '' : 's-noflame'}><Engine big={def.bigEngine} /></g>
       <line x1={40} y1={CY - 8} x2={spineEnd} y2={CY - 8} stroke={STEEL} strokeWidth={2} />
       <line x1={40} y1={CY + 8} x2={spineEnd} y2={CY + 8} stroke={STEEL} strokeWidth={2} />
       {Array.from({ length: struts }, (_, i) => (
-        <line key={i} x1={40 + 11 + i * 22} y1={CY - 8} x2={40 + 22 + i * 22} y2={CY + 8}
-              stroke={STEEL} strokeWidth={1} opacity={0.5} />
+        <line key={i} x1={40 + 11 + i * 22} y1={CY - 8} x2={40 + 22 + i * 22} y2={CY + 8} stroke={STEEL} strokeWidth={1} opacity={0.5} />
       ))}
-      {/* Module bzw. leere Slots */}
       {Array.from({ length: n }, (_, i) => {
         const x = X0 + i * (SLOT_W + GAP)
         const m = loadout[i]
         return m
           ? <ModuleGlyph key={i} m={m} x={x} i={i} />
-          : <rect key={i} x={x} y={40} width={SLOT_W} height={40} rx={2} fill="none"
-                  stroke={STEEL} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
+          : <rect key={i} x={x} y={40} width={SLOT_W} height={40} rx={2} fill="none" stroke={STEEL} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
       })}
-      {/* Cockpit */}
-      <polygon points={`${cockX},46 ${cockX + 30},52 ${cockX + 38},60 ${cockX + 30},68 ${cockX},74`}
-               fill={HULL} stroke={STEEL} strokeWidth={1.5} />
+      <polygon points={`${cockX},46 ${cockX + 30},52 ${cockX + 38},60 ${cockX + 30},68 ${cockX},74`} fill={HULL} stroke={STEEL} strokeWidth={1.5} />
       <circle cx={cockX + 22} cy={60} r={5} fill={PRIM} stroke={GOLD} strokeWidth={1} />
       <circle className="s-blink" cx={cockX + 33} cy={60} r={1.6} fill={GOLD} />
     </svg>
   )
+}
+
+// ── Draufsicht (Nase oben, Triebwerke unten) ─────────────────────────────────
+function renderTopDown(def: typeof FRAME[FrameId], loadout: ShipModuleView[], flying: boolean, size: number) {
+  const n = def.slots
+  const hw = def.bigEngine ? 9 : (n >= 8 ? 14 : 11)   // halbe Rumpfbreite
+  const cx = 60
+  const y0 = 40, y1 = 116, slotH = (y1 - y0) / n
+  const noz = def.bigEngine ? [cx - 9, cx + 9] : [cx - 6, cx + 6]
+
+  const moduleTop = (m: ShipModuleView, i: number) => {
+    const cy = y0 + (i + 0.5) * slotH
+    const broken = m.status && m.status !== 'active'
+    let g: React.ReactNode
+    if (m.type === 'habitat') {
+      const r = hw + 9
+      const dir = i % 2 === 0 ? 's-ring-cw' : 's-ring-ccw'
+      const pods = Array.from({ length: 8 }, (_, k) => {
+        const a = (k / 8) * Math.PI * 2
+        const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r
+        const off = k % 4 === 3
+        return <rect key={k} x={px - 2} y={py - 2} width={4} height={4} rx={1}
+                     className={off ? '' : `s-pulse s-d${k % 3}`} fill={GOLD} opacity={off ? 0.13 : undefined} />
+      })
+      g = (
+        <>
+          <g className={dir} style={{ transformBox: 'fill-box', transformOrigin: 'center' }}>
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke={HULL} strokeWidth={4} />
+            {pods}
+          </g>
+        </>
+      )
+    } else if (m.type === 'tank') {
+      g = <rect x={cx - hw - 5} y={cy - slotH / 2 + 1.5} width={2 * hw + 10} height={slotH - 3} rx={(slotH - 3) / 2} fill={HULL2} stroke={STEEL} strokeWidth={1} />
+    } else if (m.type === 'equipment') {
+      g = <>
+        <rect x={cx - hw} y={cy - slotH / 2 + 2} width={2 * hw} height={slotH - 4} rx={2} fill={HULL} stroke={STEEL} strokeWidth={1} />
+        <circle className="s-blink" cx={cx} cy={cy} r={2} fill={GOLD} />
+      </>
+    } else { // cargo
+      g = <>
+        <rect x={cx - hw - 6} y={cy - slotH / 2 + 1.5} width={2 * hw + 12} height={slotH - 3} rx={2} fill={HULL} stroke={STEEL} strokeWidth={1.1} />
+        <rect x={cx - hw - 4} y={cy - slotH / 2 + 3} width={2 * hw + 8} height={Math.max(3, slotH / 3)} rx={1} fill={i % 2 ? GOLD : PRIM} opacity={0.7} />
+      </>
+    }
+    return <g key={i} opacity={broken ? 0.4 : 1} className={broken ? 's-paused' : undefined}>{g}</g>
+  }
+
+  const W = 120, H = 140
+  return (
+    <svg width={(W / H) * size} height={size} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', overflow: 'visible' }}>
+      {/* Rumpf */}
+      <rect x={cx - hw} y={28} width={2 * hw} height={92} rx={hw} fill={HULL} stroke={STEEL} strokeWidth={1.5} />
+      {/* Nase */}
+      <polygon points={`${cx},6 ${cx - hw - 4},32 ${cx + hw + 4},32`} fill={HULL} stroke={STEEL} strokeWidth={1.5} />
+      <circle cx={cx} cy={22} r={4} fill={PRIM} stroke={GOLD} strokeWidth={1} />
+      {/* Module */}
+      {Array.from({ length: n }, (_, i) => loadout[i]
+        ? moduleTop(loadout[i], i)
+        : <rect key={i} x={cx - hw} y={y0 + i * slotH + 1.5} width={2 * hw} height={slotH - 3} rx={2}
+                fill="none" stroke={STEEL} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />)}
+      {/* Triebwerke unten */}
+      <rect x={cx - hw - 4} y={118} width={2 * hw + 8} height={10} rx={3} fill={HULL2} stroke={STEEL} strokeWidth={1.2} />
+      <g className={flying ? '' : 's-noflame'}>
+        {noz.map((ex) => (
+          <g key={ex}>
+            <rect x={ex - 4} y={126} width={8} height={6} rx={2} fill="#0a0c10" stroke={STEEL} strokeWidth={1} />
+            <polygon className="s-flame-d" points={`${ex - 4},132 ${ex},${H} ${ex + 4},132`} fill={FLAME} />
+          </g>
+        ))}
+      </g>
+    </svg>
+  )
+}
+
+export function ShipSVG({ frame = 'mk1', modules, flying = false, size = 90, view = 'side' }: ShipSVGProps) {
+  const frameId: FrameId = (ALIAS as Record<string, FrameId>)[frame] ?? (frame as FrameId)
+  const def = FRAME[frameId] ?? FRAME.mk1
+  const loadout: ShipModuleView[] = modules ?? Array.from({ length: def.slots }, () => ({ type: 'cargo' as ModuleType }))
+  return view === 'topdown'
+    ? renderTopDown(def, loadout, flying, size)
+    : renderSide(def, loadout, flying, size)
 }
 
 // Einmal mounten.
@@ -161,7 +232,9 @@ export function ShipSpriteStyles() {
     <style>{`
       .s-flame{transform-box:fill-box;transform-origin:right center;animation:s-flame .22s ease-in-out infinite alternate}
       @keyframes s-flame{from{transform:scaleX(.6);opacity:.5}to{transform:scaleX(1.2);opacity:1}}
-      .s-noflame .s-flame{display:none}
+      .s-flame-d{transform-box:fill-box;transform-origin:top center;animation:s-flame-d .22s ease-in-out infinite alternate}
+      @keyframes s-flame-d{from{transform:scaleY(.55);opacity:.5}to{transform:scaleY(1.2);opacity:1}}
+      .s-noflame .s-flame,.s-noflame .s-flame-d{display:none}
       .s-ring-cw{transform-box:fill-box;transform-origin:center;animation:s-spin 16s linear infinite}
       .s-ring-ccw{transform-box:fill-box;transform-origin:center;animation:s-spin 12s linear infinite reverse}
       @keyframes s-spin{to{transform:rotate(360deg)}}
