@@ -16,9 +16,12 @@ alter table public.tile_entities
   add column if not exists condition smallint not null default 100,  -- 0..100 (Abnutzung)
   add column if not exists status    text     not null default 'active'; -- active|damaged|disabled
 
--- entity_type hält schon Strings ('building'); 'module' braucht daher KEINE
--- Enum-Änderung. Falls 002 doch einen CHECK/Enum angelegt hat → dort 'module'
--- ergänzen (alter type … add value 'module' bzw. CHECK erweitern).
+-- entity_type ist TEXT (kein Enum) — ABER 002 hat einen CHECK „entity_type_valid",
+-- der nur building/vehicle/specialist/ship erlaubt. 'module' MUSS ergänzt werden,
+-- sonst scheitert jeder Modul-INSERT an diesem Constraint. (idempotent)
+alter table public.tile_entities drop constraint if exists entity_type_valid;
+alter table public.tile_entities add constraint entity_type_valid
+  check (entity_type in ('building','vehicle','specialist','ship','module'));
 
 -- 2) Koordinaten dürfen für Aufsätze (Module) NULL sein
 alter table public.tile_entities alter column tile_row    drop not null;
@@ -26,12 +29,11 @@ alter table public.tile_entities alter column tile_col    drop not null;
 alter table public.tile_entities alter column location_id drop not null;
 
 -- 3) Eindeutigkeit (partielle Indizes)
--- ⚠ Falls 002 einen Unique-Index „ein Gebäude pro Kachel" angelegt hat:
---   echten Namen in Supabase nachsehen und hier droppen.
--- drop index if exists <name_aus_002>;
-create unique index if not exists te_building_per_tile
-  on public.tile_entities (location_id, tile_level, tile_row, tile_col)
-  where entity_type = 'building' and parent_id is null;
+-- „Ein Gebäude pro Kachel" liegt schon als uniq_building_per_tile in 002 und
+-- schließt Module aus (WHERE entity_type='building'). Kein Drop/Neuanlage nötig.
+-- te_building_per_tile war redundant → entfernen (falls aus früherer Fassung da).
+drop index if exists te_building_per_tile;
+-- Neu: höchstens EIN Modul pro (parent, slot).
 create unique index if not exists te_one_per_slot
   on public.tile_entities (parent_id, slot)
   where parent_id is not null;
