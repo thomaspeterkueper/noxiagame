@@ -38,6 +38,23 @@ export const STOCK_HIGH_THRESHOLD = 400   // über 400 → Preis sinkt
 export const PRICE_MIN = 10
 export const PRICE_MAX = 500
 
+// ────────────────────────────────────────────────────────────
+// Transaktionsbasierter Preisimpuls (Spot-Handel, /api/game/trade)
+// ────────────────────────────────────────────────────────────
+// Jede gehandelte Tonne verschiebt den lokalen Preis LINEAR:
+//   Kauf:     buy_price  × (1 + PRICE_IMPULSE_PER_TON × menge)   → teurer
+//   Verkauf:  sell_price × (1 − PRICE_IMPULSE_PER_TON × menge)   → billiger
+// Schließt die Intra-Tick-Arbitrage: die Route entwertet sich beim Befahren.
+// Geclamped auf PRICE_MIN/MAX.
+//
+// Gerichtet (Kauf hebt nur buy, Verkauf senkt nur sell) → die Spanne wächst
+// stets, der Constraint sell_price < buy_price bleibt durch den Impuls allein
+// immer erhalten. Nur der Tick zieht die Preise wieder zusammen.
+//
+// Kalibrierung (linear): 100 t bei 0,003 ⇒ +30 % (Mond-Wasser 120 → 156).
+// Hochdrehen = Route killt sich schneller, runter = Arbitrage hält länger.
+export const PRICE_IMPULSE_PER_TON = 0.003   // 0,3 % je Tonne
+
 // Auftrags-Generator
 export const ORDER_MIN_AMOUNT  = 10
 export const ORDER_MAX_AMOUNT  = 30
@@ -84,7 +101,7 @@ export const BUILDABLE_ITEMS: Record<string, {
 }
 // Maximaler Verhandlungsaufschlag über die Basis-Belohnung.
 export const ORDER_BONUS_MAX = 0.5   // bis zu +50%
- 
+
 // Berechnet die maximale Belohnung eines Auftrags aus seiner Dringlichkeit.
 //   reward    – Basis-Belohnung (trade_orders.reward)
 //   expiresAt – ISO-String oder null (trade_orders.expires_at)
@@ -98,15 +115,14 @@ export function orderMaxReward(
   stock: number | null,
 ): number {
   let urgency = 0.25 // Grunddringlichkeit
- 
+
   if (expiresAt) {
     const hoursLeft = (new Date(expiresAt).getTime() - Date.now()) / 3.6e6
     if (hoursLeft < 6) urgency += 0.15
     if (hoursLeft < 2) urgency += 0.10
   }
- 
+
   if (stock != null && stock < 30) urgency += 0.15
- 
+
   return Math.round(reward * (1 + Math.min(ORDER_BONUS_MAX, urgency)))
 }
- 
