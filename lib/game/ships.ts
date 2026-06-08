@@ -15,7 +15,7 @@
 // SHIP_CARGO_MAX (=100) ist abgeleitet (Mk.I, 5×20 t).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Resource, RESOURCE_PHASE } from './buildings';
+import { Resource, RESOURCE_PHASE } from './resources';
 
 // ── Achsen ───────────────────────────────────────────────────────────────────
 export type ShipyardLocation = 'start' | 'moon' | 'mars' | 'phobos';
