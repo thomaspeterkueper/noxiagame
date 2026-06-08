@@ -1,0 +1,123 @@
+-- supabase/migrations/005_tick_foundation.sql
+-- Daten-Fundament für die Lazy-Tick-Engine (SPEC_balancing_0-1-5, Punkt 0+1)
+--   tick_log      – Ledger der ausgeführten Ticks (Basis für Lazy-Evaluation)
+--   price_history – Preisverlauf je Ort/Ressource/Tick (für Ø-Bewertung, Punkt 4)
+--   events        – generischer Event-Stream (Statistiken, Archiv, Kennzahlen)
+--   claim_due_ticks() – atomares Claiming fälliger Ticks (Advisory Lock)
+
+-- ════════════════════════════════════════════════════════════════
+-- 1) Tick-Ledger
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS tick_log (
+  tick_number bigint PRIMARY KEY,
+  tick_type   text NOT NULL DEFAULT 'full',
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tick_log_created ON tick_log (created_at DESC);
+
+-- ════════════════════════════════════════════════════════════════
+-- 2) Preisverlauf
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS price_history (
+  id          bigserial PRIMARY KEY,
+  location_id uuid NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  resource    text NOT NULL,
+  tick_number bigint NOT NULL,
+  buy_price   integer NOT NULL,
+  sell_price  integer NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_history_lookup
+  ON price_history (location_id, resource, tick_number DESC);
+
+-- ════════════════════════════════════════════════════════════════
+-- 3) Event-Stream (generisch, jsonb-Payload)
+--    Rohdaten für Statistiken-Tab, kontrafaktische Kennzahl, OverTime Archive.
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS events (
+  id          bigserial PRIMARY KEY,
+  profile_id  uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  location_id uuid REFERENCES locations(id) ON DELETE SET NULL,
+  type        text NOT NULL,          -- 'delivery' | 'sale' | 'growth' | 'starvation' | ...
+  payload     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_profile  ON events (profile_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_location ON events (location_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_type     ON events (type, created_at DESC);
+
+-- RLS: Lesen für alle (Welt-Historie ist öffentlich), Schreiben nur Service Role
+ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tick_log      ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS price_history_select ON price_history;
+CREATE POLICY price_history_select ON price_history FOR SELECT USING (true);
+DROP POLICY IF EXISTS events_select ON events;
+CREATE POLICY events_select        ON events        FOR SELECT USING (true);
+DROP POLICY IF EXISTS tick_log_select ON tick_log;
+CREATE POLICY tick_log_select      ON tick_log      FOR SELECT USING (true);
+
+GRANT ALL ON price_history TO service_role;
+GRANT ALL ON events        TO service_role;
+GRANT ALL ON tick_log      TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE price_history_id_seq TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE events_id_seq        TO service_role;
+
+-- ════════════════════════════════════════════════════════════════
+-- 4) Atomares Claiming fälliger Ticks
+--    Transaktionaler Advisory Lock serialisiert gleichzeitige Aufrufer
+--    (world-Route wird alle 30s von jedem Dashboard gepollt).
+--    Gibt zurück: wie viele Ticks gerade beansprucht wurden + die neue
+--    höchste Tick-Nummer. Der Gewinner führt die Ticks sequenziell aus,
+--    spätere Aufrufer im selben Slot bekommen claimed=0.
+-- ════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION claim_due_ticks(p_interval_seconds int, p_max int)
+RETURNS TABLE(claimed int, latest_tick bigint)
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_last_at  timestamptz;
+  v_last_num bigint;
+  v_due      int;
+  i          int;
+BEGIN
+  -- Serialisiert alle Aufrufer bis zum Transaktionsende
+  PERFORM pg_advisory_xact_lock(778899);
+
+  SELECT created_at, tick_number
+    INTO v_last_at, v_last_num
+    FROM tick_log
+    ORDER BY tick_number DESC
+    LIMIT 1;
+
+  -- Allererster Aufruf: Basis-Tick anlegen, nichts nachzurechnen
+  IF v_last_num IS NULL THEN
+    INSERT INTO tick_log(tick_number, tick_type) VALUES (1, 'baseline');
+    claimed := 0; latest_tick := 1;
+    RETURN NEXT; RETURN;
+  END IF;
+
+  v_due := floor(extract(epoch FROM (now() - v_last_at)) / p_interval_seconds)::int;
+  IF v_due < 1 THEN
+    claimed := 0; latest_tick := v_last_num;
+    RETURN NEXT; RETURN;
+  END IF;
+  IF v_due > p_max THEN v_due := p_max; END IF;
+
+  -- Slots beanspruchen (created_at = now() → Folge-Aufrufer sehen nichts fällig)
+  FOR i IN 1..v_due LOOP
+    INSERT INTO tick_log(tick_number, tick_type)
+      VALUES (v_last_num + i, 'full');
+  END LOOP;
+
+  claimed := v_due; latest_tick := v_last_num + v_due;
+  RETURN NEXT;
+END $$;
+
+GRANT EXECUTE ON FUNCTION claim_due_ticks(int, int) TO service_role;
+
+-- Hinweis: simulation_ticks (vom Population-Cron) bleibt bestehen — eigener
+-- Zähler fürs Population-Log. tick_log ist die Quelle für die Lazy-Engine.
