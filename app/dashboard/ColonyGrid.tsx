@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDABLE_ITEMS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
+import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import SellPanel from './SellPanel'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -61,6 +62,8 @@ export interface TileEntity {
   tile_level:  number
   tile_row:    number
   tile_col:    number
+  condition?:  number   // 0..100 (Migration 005) – optional, bis Spalte live ist
+  status?:     string   // 'active' | 'damaged' | 'disabled' (Migration 005)
   username?:   string   // optional, falls profiles gejoint wird
 }
 
@@ -358,6 +361,8 @@ export default function ColonyGrid({
       {/* Grid links · Info-Sidebar rechts */}
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
 
+        <BuildingSpriteStyles />
+
         {/* Kachelgrid */}
         <div style={{
           display: 'grid',
@@ -403,7 +408,15 @@ export default function ColonyGrid({
                   filter:  isSelling ? 'grayscale(0.7)' : 'none',
                 }}
               >
-                <TileDisplay tileType={tileType} slug={slug} />
+                {tileType.startsWith('building_') && tileType !== 'building_construction'
+                  ? <BuildingSVG
+                      entityId={tileType.slice('building_'.length)}
+                      planet={slug as 'moon' | 'mars' | 'phobos'}
+                      condition={entity?.condition}
+                      status={entity?.status as 'active' | 'damaged' | 'disabled' | undefined}
+                      occupancy={popPercent / 100}
+                    />
+                  : <TileDisplay tileType={tileType} slug={slug} />}
               </div>
             )
           })
