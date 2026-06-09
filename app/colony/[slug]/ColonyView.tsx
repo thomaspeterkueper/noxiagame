@@ -125,7 +125,22 @@ export default function ColonyView({ slug, initialLocation, currentUserId, acces
   return (
     <ColonyShell>
       {/* Header */}
-      <header style={styles.header}>
+      <header
+        style={{
+          position: 'relative',
+          marginTop: 24,
+          marginBottom: 4,
+          padding: '128px 20px 20px',
+          borderRadius: 4,
+          border: '1px solid #1a2a3a',
+          backgroundColor: '#0a1420',
+          backgroundImage: `linear-gradient(to bottom, rgba(2,4,8,0.30), rgba(2,4,8,0.82) 78%, #020408), url(/images/locations/${data.location.slug}.png)`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 35%',
+          backgroundRepeat: 'no-repeat',
+          overflow: 'hidden',
+        }}
+      >
         <div style={styles.headerInner}>
           <div>
             <div style={styles.headerEyebrow}>Kolonie</div>
