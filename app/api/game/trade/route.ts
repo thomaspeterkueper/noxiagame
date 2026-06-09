@@ -1,7 +1,15 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
 // Aktualisiert: 08.06.2026
-// Version:      0.3.0
+// Version:      0.4.0
+//
+// v0.4.0 – Transaktionssteuer (colony_settings.tax_transaction):
+//   - Satz der Kolonie serverseitig gelesen; bei buy/sell auf den Bruttowert
+//     (unitPrice × Menge) erhoben, beim Spieler abgezogen und als
+//     'tax_transaction' ins colony_ledger gebucht (tick = höchster
+//     tick_log-Eintrag). Bei buy in die Affordability-Prüfung eingerechnet,
+//     damit die Credits durch die Steuer nicht ins Minus rutschen.
+//     Satz 0 ⇒ keine Buchung. Antwort enthält taxCharged + taxRate.
 //
 // v0.3.0 – Transaktionsbasierter Preisimpuls + Server-Preis (Arbitrage-Fix):
 //   - PREIS-WAHRHEIT serverseitig: buy/sell rechnen NICHT mehr mit dem
@@ -170,6 +178,23 @@ export async function GET(req: NextRequest) {
   const serverBuy  = market.buy_price
   const serverSell = market.sell_price
 
+  // ── TRANSAKTIONSSTEUER: Satz der Kolonie (serverseitig, nie vom Client) ──
+  const { data: settings } = await serviceClient
+    .from('colony_settings')
+    .select('tax_transaction')
+    .eq('location_id', loc.id)
+    .maybeSingle()
+  const taxRate = Number(settings?.tax_transaction ?? 0)   // 0.00–1.00
+
+  // Aktuelle Tick-Nummer für colony_ledger.tick (höchster tick_log-Eintrag).
+  const { data: lastTick } = await serviceClient
+    .from('tick_log')
+    .select('tick_number')
+    .order('tick_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const currentTick = Number(lastTick?.tick_number ?? 0)
+
   const { data: cargoRows } = await serviceClient
     .from('ship_cargo')
     .select('resource, amount')
@@ -185,13 +210,17 @@ export async function GET(req: NextRequest) {
   let profit = 0
   let booked = 0          // tatsächlich gebuchte Menge (Teilbuchung)
   let unitPrice = 0       // verwendeter Server-Preis (für die Antwort)
+  let tax = 0             // erhobene Transaktionssteuer (für Ledger + Antwort)
 
   if (action === 'buy') {
     // Preis-Wahrheit: Kaufpreis aus market_prices, nicht aus dem Client.
     unitPrice = serverBuy
     // ── TEILBUCHUNG: so viel wie Frachtraum UND Credits erlauben ────────────
+    // Steuer in die Affordability einrechnen: effektiv unitPrice × (1 + Satz)
+    // je Tonne, sonst rutschen die Credits durch die Steuer ins Minus.
+    const perTon       = unitPrice * (1 + taxRate)
     const maxByCargo   = Math.max(0, ship.cargo_max - cargoUsed)
-    const maxByCredits = unitPrice > 0 ? Math.floor(profile.credits / unitPrice) : amount
+    const maxByCredits = perTon > 0 ? Math.floor(profile.credits / perTon) : amount
     booked = Math.min(amount, maxByCargo, maxByCredits)
 
     if (booked <= 0) {
@@ -199,10 +228,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: reason }, { status: 400 })
     }
 
-    const totalCost = unitPrice * booked
-    newCredits -= totalCost
+    const goods = unitPrice * booked
+    tax = Math.round(taxRate * goods)
+    newCredits -= (goods + tax)        // Ware + Steuer
     newCargoAmount += booked
-    profit = -totalCost
+    profit = -(goods + tax)
   } else {
     // action === 'sell' – Preis-Wahrheit: Verkaufspreis aus market_prices.
     unitPrice = serverSell
@@ -213,9 +243,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Nicht genug Ware' }, { status: 400 })
     }
 
-    newCredits += unitPrice * booked
+    const goods = unitPrice * booked
+    tax = Math.round(taxRate * goods)
+    newCredits += (goods - tax)        // Erlös abzüglich Steuer
     newCargoAmount -= booked
-    profit = unitPrice * booked
+    profit = goods - tax
   }
 
   await serviceClient
@@ -247,6 +279,19 @@ export async function GET(req: NextRequest) {
     amount: booked,
     profit,
   })
+
+  // ── TRANSAKTIONSSTEUER ins Kassenbuch der Kolonie (nur wenn > 0) ──────────
+  if (tax > 0) {
+    await serviceClient.from('colony_ledger').insert({
+      location_id:   loc.id,
+      tick:          currentTick,
+      entry_type:    'tax_transaction',
+      profile_id:    user.id,
+      resource_type: resource,
+      amount:        tax,
+      note:          `Transaktionssteuer ${action} ${booked}t ${resource}`,
+    })
+  }
 
   // ── PREISIMPULS ───────────────────────────────────────────────────────────
   // Erst nach der Buchung: die ganze Menge lief zum Preis VOR dem Impuls,
@@ -280,6 +325,8 @@ export async function GET(req: NextRequest) {
     bookedAmount: booked,          // ← tatsächlich gebucht
     requestedAmount: amount,       // ← gewünscht (für "7 von 10"-Anzeige)
     unitPrice,                     // ← Server-Preis, zu dem gebucht wurde
+    taxCharged: tax,               // ← erhobene Transaktionssteuer (Cr)
+    taxRate,                       // ← angewandter Satz (0.00–1.00)
     priceUpdate,                   // ← bewegter Preis nach dem Impuls (oder null)
     credits: newCredits,
     location: ship.location ?? 'moon',
