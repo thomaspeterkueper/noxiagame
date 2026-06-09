@@ -1,0 +1,117 @@
+-- Migration 012: Polymorphe actors-Tabelle
+-- Einführung einer einheitlichen Eigentümer-Abstraktion für Spieler-Konzerne,
+-- NPC-Firmen, Kolonien und Institutionen.
+--
+-- DESIGN-PRINZIP:
+--   profile_id bleibt in allen bestehenden Tabellen unverändert (kein Breaking
+--   Change). actors ist eine rein additive Tabelle. Migration 013 fügt actor_id
+--   als nullable FK in trade_transactions, tile_entities und colony_ledger ein,
+--   sobald der erste NPC-Akteur tatsächlich handelt.
+--
+-- SEED:
+--   HeliosCorp ist der erste kanonische Eintrag — npc_firm, founded_by = NULL
+--   (nie einem Spieler zuordenbar). Weitere NPC-Firmen und Spieler-Konzerne
+--   kommen additiv hinzu.
+--
+-- LANGFRISTIG (Alpha 0.5+):
+--   kind = 'player_corp': Spieler kann Konzern gründen (founded_by = profile_id),
+--   andere Spieler einladen, als Konzern auf dem Markt auftreten.
+--   Vollständige Polymorphie (profile_id durch actor_id ersetzen) erst wenn
+--   Fraktionen die RLS-Rewrite rechtfertigen.
+--
+-- Stand: Alpha 0.2 / 09.06.2026
+
+CREATE TABLE IF NOT EXISTS actors (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Typ des Akteurs
+  kind          text        NOT NULL
+                CHECK (kind IN ('player_corp', 'npc_firm', 'colony', 'institution')),
+
+  -- Anzeigename im Spiel (in Transaktionsdaten, Marktübersicht, etc.)
+  display_name  text        NOT NULL,
+
+  -- Gründer (nur bei player_corp gesetzt; NPC-Firmen haben NULL)
+  founded_by    uuid        REFERENCES profiles(id) ON DELETE SET NULL,
+
+  -- Kurzbeschreibung (für UI-Tooltip und KI-Kontext bei NPC-Entscheidungslogik)
+  bio_short     text,
+
+  -- Persönlichkeitsvektor für KI-gestützte Entscheidungslogik (optional)
+  -- Beispiel: { "risikofreudig": 0.8, "ressourcenbewusst": 0.9 }
+  personality   jsonb,
+
+  -- Entscheidungsgewichte für deterministisches Marktverhalten (optional)
+  -- Beispiel: { "buy_threshold": 0.7, "preferred_goods": ["metal"] }
+  decision_weights jsonb,
+
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE actors IS
+  'Polymorphe Eigentümer-Tabelle. Jede Zeile ist ein Akteur der am Markt '
+  'teilnehmen kann: Spieler-Konzern, NPC-Firma, Kolonie oder Institution. '
+  'Spieler selbst sind noch über profile_id abgebildet (Migration 013 führt '
+  'actor_id als FK in Transaktionstabellen ein).';
+
+COMMENT ON COLUMN actors.kind IS
+  'player_corp = von Spieler gegründeter Konzern; '
+  'npc_firm = KI-gesteuerter Wirtschaftsakteur (z.B. HeliosCorp); '
+  'colony = Kolonieverwaltung als Akteur (vorbereitet); '
+  'institution = übergeordnete Körperschaft (SCB, UN, vorbereitet).';
+
+COMMENT ON COLUMN actors.founded_by IS
+  'Nur bei player_corp gesetzt. NULL bedeutet: kein Spieler als Eigentümer — '
+  'der Akteur existiert unabhängig von einzelnen Accounts.';
+
+COMMENT ON COLUMN actors.personality IS
+  'Optionaler Vektor für KI-gestützte Charakterisierung. Wird als Kontext '
+  'an den LLM-Call übergeben wenn ein Spieler mit dem NPC interagiert. '
+  'Steuert NICHT die wirtschaftlichen Entscheidungen (das übernimmt '
+  'decision_weights deterministisch).';
+
+COMMENT ON COLUMN actors.decision_weights IS
+  'Deterministischer Entscheidungsbaum für Marktverhalten. '
+  'Kaufschwellen, bevorzugte Güter, Risikobereitschaft. '
+  'Wird von der Tick-Engine ausgewertet — kein LLM-Call.';
+
+-- Index für founded_by (Spieler findet seine Konzerne)
+CREATE INDEX IF NOT EXISTS actors_founded_by
+  ON actors (founded_by)
+  WHERE founded_by IS NOT NULL;
+
+-- RLS
+ALTER TABLE actors ENABLE ROW LEVEL SECURITY;
+
+-- Lesen für alle (Marktpräsenz ist öffentlich — wer kauft Metall auf Phobos?)
+CREATE POLICY "actors_select_all"
+  ON actors FOR SELECT
+  USING (true);
+
+-- Schreiben nur Service Role
+-- Spieler-Konzern-Gründung läuft über eine API-Route (nicht direkten DB-Zugriff)
+CREATE POLICY "actors_write_service"
+  ON actors FOR ALL
+  USING (false)
+  WITH CHECK (false);
+
+-- ============================================================
+-- SEED: Kanonische NPC-Akteure aus dem Buchuniversum
+-- ============================================================
+
+-- HeliosCorp
+-- Gegründet 2058–2062 als Fusion aus SpaceX-Nachfolger, Deep Space Industrial
+-- Consortium und EU Aerospace Authority. Finanziert ~40% des Mars-Handelsdefizits.
+-- Versprechen: "Eine Zivilisation ohne Erdballast."
+-- Mars-Direktor: Marcus Webb. Sicherheitsdirektor: General Viktor Thorne.
+INSERT INTO actors (kind, display_name, bio_short, personality, decision_weights)
+VALUES (
+  'npc_firm',
+  'HeliosCorp',
+  'Interplanetarer Mega-Konzern, gegründet 2058–2062. Betreibt Frachtrouten, '
+  'Raumhäfen und Energieversorgung im gesamten inneren Sonnensystem. '
+  'Hält 20-Jahres-Verträge mit First-Wave-Kolonisten.',
+  '{"expansiv": 0.9, "ressourcenbewusst": 0.95, "risikofreudig": 0.6, "transparent": 0.2}'::jsonb,
+  '{"preferred_goods": ["metal", "energy"], "buy_threshold": 0.65, "stockpile_factor": 2.5}'::jsonb
+)
+ON CONFLICT DO NOTHING;
