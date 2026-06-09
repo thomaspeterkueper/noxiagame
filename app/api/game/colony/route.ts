@@ -12,7 +12,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { createServerClient } from '@/lib/supabase/server'
+// server.ts exportiert createClient (async, cookie-basiert) — hier als
+// createServerClient aliasiert, damit der Aufrufname sprechend bleibt.
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -130,7 +132,7 @@ export async function GET(req: NextRequest) {
   let isGovernor = false
   let currentUserId: string | null = null
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const { data: { session } } = await supabase.auth.getSession()
     currentUserId = session?.user?.id ?? null
     isGovernor = !!currentUserId && currentUserId === location.governor_profile_id
