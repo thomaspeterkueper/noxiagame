@@ -85,6 +85,10 @@ export default function LoginPage() {
           <Link href="/auth/register" style={{ color: '#2a4e7a', fontWeight: 700, textDecoration: 'none' }}>
             Registrieren
           </Link>
+          {' · '}
+          <Link href="/auth/reset-password" style={{ color: '#94a3b8', textDecoration: 'none' }}>
+            Passwort vergessen
+          </Link>
         </p>
       </div>
     </main>
