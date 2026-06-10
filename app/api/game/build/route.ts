@@ -1,12 +1,16 @@
 // app/api/game/build/route.ts
-// Erstellt: 31.05.2026 · Erweitert: 07.06.2026
-// Bauaufträge + marktwertbasierter Gebäude-Verkauf, auf tile_entities-Basis
+// Erstellt: 31.05.2026
+// Aktualisiert: 10.06.2026 – Default-Response liefert jetzt zusätzlich:
+//   colony_tax: { tax_property, tax_transaction, tax_landing } je location_id
+//   entity_info: { ertragswert, produktion, resourceSellPrice } je entity id
+//   (damit die Sidebar Produktions- und Steuerinfos ohne Extra-Call darstellen kann)
 //
 // Datenmodell:
 //   player_builds  = Auftragsbuch (Vorgänge):
 //                    building → complete | cancelled, selling → sold
 //   tile_entities  = Weltzustand: was steht wo (3D: level/row/col),
 //                    wem gehört es, seit wann (built_at)
+//   colony_settings = Steuer-/Abgabensätze je Kolonie (Governor-gesetzt)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -59,7 +63,7 @@ async function getQuoteForEntity(entity: any) {
     populationMax: location.population_max,
   })
 
-  return { quote, location }
+  return { quote, location, resourceSellPrice }
 }
 
 export async function GET(req: NextRequest) {
@@ -71,6 +75,7 @@ export async function GET(req: NextRequest) {
 
   // ───────────────────────────────────────────────────────────────
   // Laufende Vorgänge + Bestand laden
+  // Liefert zusätzlich colony_tax und entity_info für die Sidebar
   // ───────────────────────────────────────────────────────────────
   if (!action) {
     // Fällige Vorgänge abschließen (Bau UND Verkauf)
@@ -94,15 +99,63 @@ export async function GET(req: NextRequest) {
       .in('status', ['building', 'selling'])
       .order('completes_at')
 
-    // Bestand des Spielers (Grid liest fremden Bestand über world-Route)
+    // Bestand des Spielers
     const { data: entities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .eq('profile_id', user.id)
 
+    // Steuer-Sätze aller betroffenen Kolonien (ein READ, nicht N)
+    const locationIds = [...new Set((entities ?? []).map((e: any) => e.location_id))]
+    let colonyTax: Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }> = {}
+
+    if (locationIds.length > 0) {
+      const { data: settings } = await serviceClient
+        .from('colony_settings')
+        .select('location_id, tax_property, tax_transaction, tax_landing')
+        .in('location_id', locationIds)
+
+      for (const s of settings ?? []) {
+        colonyTax[s.location_id] = {
+          tax_property:    Number(s.tax_property)    ?? 0,
+          tax_transaction: Number(s.tax_transaction) ?? 0,
+          tax_landing:     Number(s.tax_landing)     ?? 0,
+        }
+      }
+    }
+
+    // Ertragswert + Produktionsinfo je Entity (parallel, kein N+1 auf Locations
+    // weil getQuoteForEntity je ein Location-Lookup macht – akzeptabel solange
+    // Bestand klein ist; bei >20 Gebäuden besser als JOIN refaktorieren)
+    const entityInfo: Record<string, {
+      ertragswert: number
+      produktion: number | null
+      ressource: string | null
+      resourceSellPrice: number | null
+    }> = {}
+
+    await Promise.all(
+      (entities ?? []).map(async (e: any) => {
+        const item = BUILDABLE_ITEMS[e.entity_id]
+        if (!item || item.type !== 'building') return
+
+        const result = await getQuoteForEntity(e)
+        if ('error' in result) return
+
+        entityInfo[e.id] = {
+          ertragswert:       result.quote.ertragswert,
+          produktion:        item.produces?.amount ?? null,
+          ressource:         item.produces?.resource ?? null,
+          resourceSellPrice: result.resourceSellPrice,
+        }
+      })
+    )
+
     return NextResponse.json({
-      builds: active ?? [],
-      entities: entities ?? [],
+      builds:     active ?? [],
+      entities:   entities ?? [],
+      colonyTax,
+      entityInfo,
     })
   }
 
@@ -124,7 +177,6 @@ export async function GET(req: NextRequest) {
     if (tileLevel < -3 || tileLevel > 0) {
       return NextResponse.json({ error: 'Ungültige Ebene' }, { status: 400 })
     }
-    // Grid: 12 Spalten (0–11) × 8 Zeilen (0–7)
     if (tileRow < 0 || tileRow > 7 || tileCol < 0 || tileCol > 11 ||
         Number.isNaN(tileRow) || Number.isNaN(tileCol)) {
       return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
@@ -155,8 +207,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Kolonie nicht gefunden' }, { status: 404 })
     }
 
-    // Kachel frei? Bestand prüfen (max. ein Gebäude pro Kachel,
-    // über alle Spieler hinweg)
     const { data: occupied } = await serviceClient
       .from('tile_entities')
       .select('id')
@@ -171,7 +221,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Kachel ist bereits bebaut.' }, { status: 400 })
     }
 
-    // Läuft hier schon ein Vorgang (Bau oder Verkauf)?
     const { data: pending } = await serviceClient
       .from('player_builds')
       .select('id')
@@ -216,7 +265,6 @@ export async function GET(req: NextRequest) {
 
   // ───────────────────────────────────────────────────────────────
   // Laufenden Bau abbrechen (50% Rückerstattung)
-  // Fertige Gebäude → marktwertbasierter Verkauf (action=sell)
   // ───────────────────────────────────────────────────────────────
   if (action === 'cancel') {
     const buildId = searchParams.get('buildId')
@@ -265,8 +313,8 @@ export async function GET(req: NextRequest) {
       .from('tile_entities')
       .select('*')
       .eq('id', entityId)
-      .eq('profile_id', user.id)        // Eigentums-Check
-      .eq('entity_type', 'building')    // vorerst nur Gebäude verkäuflich
+      .eq('profile_id', user.id)
+      .eq('entity_type', 'building')
       .single()
 
     if (!entity) return NextResponse.json({ error: 'Gebäude nicht gefunden oder gehört dir nicht' }, { status: 404 })
@@ -283,8 +331,6 @@ export async function GET(req: NextRequest) {
   // ───────────────────────────────────────────────────────────────
   // Gebäude verkaufen
   // /api/game/build?action=sell&entityId=xxx&mode=normal|instant
-  // normal:  voller Wert, Auszahlung nach VERKAUFSDAUER_TICKS
-  // instant: 15% Abschlag auf Ertragswert, Auszahlung sofort
   // ───────────────────────────────────────────────────────────────
   if (action === 'sell') {
     const entityId = searchParams.get('entityId')
@@ -313,7 +359,6 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Negativer Wert = Entsorgung: Spieler muss zahlen können
     if (payout < 0 && (profile?.credits ?? 0) < Math.abs(payout)) {
       return NextResponse.json(
         { error: `Entsorgung kostet ${Math.abs(payout)} Cr – unzureichende Credits.` },
@@ -321,8 +366,6 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Verkaufs-Vorgang ins Auftragsbuch (Historie! Der ursprüngliche
-    // Bau-Vorgang bleibt unangetastet → Gebäude-Biografie fürs Archiv)
     const completesAt = new Date()
     if (mode === 'normal') {
       completesAt.setHours(completesAt.getHours() + BUILDING_SALE.VERKAUFSDAUER_TICKS * 24)
@@ -341,8 +384,6 @@ export async function GET(req: NextRequest) {
       completes_at: completesAt.toISOString(),
     })
 
-    // Gebäude aus dem Weltzustand entfernen – exakt diese Entität.
-    // Produktion/Boni enden ab dem nächsten Cron-Lauf.
     await serviceClient.from('tile_entities').delete().eq('id', entity.id)
 
     if (mode === 'instant') {
