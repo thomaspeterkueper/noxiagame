@@ -27,6 +27,13 @@ import {
   ORDER_REWARD_MULT,
   ORDER_EXPIRE_HOURS,
 } from './config'
+import { BUILDING_SALE } from './buildingSale'
+
+// Produktion je Gebäudetyp (für die Einkommens-Ausschüttung, Punkt 3)
+const PRODUCES: Record<string, { resource: 'metal' | 'energy'; amount: number }> = {
+  mine:  { resource: 'metal',  amount: 5 },
+  solar: { resource: 'energy', amount: 4 },
+}
 
 export const TICK_INTERVAL_SECONDS = 3600   // 1 Stunde
 export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
@@ -37,7 +44,7 @@ type SB = any  // Supabase Service-Client
 // 1) POPULATION – Verbrauch, Produktion (frisch aus Basis + tile_entities),
 //    Bevölkerung, Kapazität, Überbelegung
 // ─────────────────────────────────────────────────────────────────────
-export async function runPopulationTick(supabase: SB) {
+export async function runPopulationTick(supabase: SB, tickNumber: number) {
   const results: Record<string, unknown>[] = []
   const { data: locations } = await supabase.from('locations').select('*')
 
@@ -53,7 +60,7 @@ export async function runPopulationTick(supabase: SB) {
 
     const { data: buildings } = await supabase
       .from('tile_entities')
-      .select('entity_id')
+      .select('id, entity_id, profile_id')
       .eq('location_id', loc.id)
       .eq('entity_type', 'building')
 
@@ -99,6 +106,83 @@ export async function runPopulationTick(supabase: SB) {
     await supabase.from('locations')
       .update({ population: newPop, population_max: popMax, is_supplied: isSupplied })
       .eq('id', loc.id)
+
+    // ─────────────────────────────────────────────────────────────────
+    // EINKOMMENS-AUSSCHÜTTUNG (Punkt 3, schlank):
+    // Die Kolonie kauft Produktion NUR bei Mangel und zahlt den lokalen
+    // sell_price; Habitate zahlen Miete pro belegtem Platz. Abzüglich
+    // Transaktionssteuer der Kolonie. Geld fließt aus dem colony_ledger
+    // (geschlossener Kreislauf, kein Gelddruck). Überschuss-Produktion
+    // bleibt vorerst ohne Ausschüttung (Eigentümer-Lager = späteres Feature).
+    // ─────────────────────────────────────────────────────────────────
+    if ((buildings ?? []).length > 0) {
+      // Steuersatz der Kolonie (wie in trade/route.ts)
+      const { data: settings } = await supabase
+        .from('colony_settings')
+        .select('tax_transaction')
+        .eq('location_id', loc.id)
+        .maybeSingle()
+      const taxRate = Number(settings?.tax_transaction ?? 0)
+
+      // Marktpreise (sell) der Kolonie einmal laden
+      const { data: priceRows } = await supabase
+        .from('market_prices')
+        .select('resource, sell_price')
+        .eq('location_id', loc.id)
+      const sellPrice: Record<string, number> = {}
+      for (const p of priceRows ?? []) sellPrice[p.resource] = p.sell_price
+
+      // belegte Habitat-Plätze (Auslastung × 100, gedeckelt)
+      const auslastung = popMax > 0 ? Math.min(1, Math.max(0, newPop / popMax)) : 0
+
+      for (const b of buildings ?? []) {
+        let gross = 0   // Brutto-Ausschüttung vor Steuer
+
+        if (b.entity_id === 'habitat') {
+          // Miete: belegte Plätze × Mietwert
+          const belegt = Math.round(100 * auslastung)
+          gross = belegt * BUILDING_SALE.MIETWERT_PRO_PLATZ
+        } else if (PRODUCES[b.entity_id]) {
+          // Mine/Solar: Kolonie kauft nur bei MANGEL der Ressource
+          const { resource, amount } = PRODUCES[b.entity_id]
+          const r = resMap[resource]
+          if (r) {
+            const balance = (r.production ?? 0) - (r.consumption ?? 0)
+            const mangel  = (stock[resource] ?? 0) < STOCK_LOW_THRESHOLD
+                          || (balance < 0 && (stock[resource] ?? 0) < 150)
+            if (mangel) gross = amount * (sellPrice[resource] ?? 0)
+          }
+        }
+
+        if (gross <= 0) continue
+
+        const tax    = Math.round(taxRate * gross)
+        const payout = gross - tax
+
+        // Eigentümer gutschreiben
+        const { data: prof } = await supabase
+          .from('profiles').select('credits').eq('id', b.profile_id).single()
+        if (prof) {
+          await supabase.from('profiles')
+            .update({ credits: prof.credits + payout })
+            .eq('id', b.profile_id)
+        }
+
+        // Kolonie zahlt (negativer Eintrag) + Steuer (positiv) ins Ledger
+        await supabase.from('colony_ledger').insert([
+          {
+            location_id: loc.id, tick: tickNumber, entry_type: 'building_payout',
+            profile_id: b.profile_id, resource_type: null, amount: -payout,
+            note: `Ausschüttung ${b.entity_id}`,
+          },
+          ...(tax > 0 ? [{
+            location_id: loc.id, tick: tickNumber, entry_type: 'tax_payout',
+            profile_id: b.profile_id, resource_type: null, amount: tax,
+            note: `Steuer auf Ausschüttung ${b.entity_id}`,
+          }] : []),
+        ])
+      }
+    }
 
     // Event-Stream: Wachstum / beginnende Not (Rohdaten für Kennzahlen)
     if (!isSupplied && newPop < pop) {
@@ -242,7 +326,7 @@ export async function runOrderTick(supabase: SB) {
 // Ein vollständiger Tick (feste Reihenfolge!)
 // ─────────────────────────────────────────────────────────────────────
 export async function runTick(supabase: SB, tickNumber: number) {
-  const population = await runPopulationTick(supabase)
+  const population = await runPopulationTick(supabase, tickNumber)
   const prices     = await runPriceTick(supabase, tickNumber)
   const orders     = await runOrderTick(supabase)
   return { tickNumber, population, prices, orders }
