@@ -1,14 +1,13 @@
 // lib/store/gameStore.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 07.06.2026 – buy/sell mit Mengen-Parameter (Cargo-Loop-Fix)
-// Version:      0.3.0
+// Aktualisiert: 08.06.2026 – Store-Invalidation (Entkopplung der Module)
+// Version:      0.4.0
 //
-// v0.3.0: buy(resource, price, amount) und sell(resource, price, amount)
-// buchen die ganze Menge in EINEM API-Call (Route bucht atomar, ggf. Teilbuchung).
-// Der optimistische Update gilt für die Wunschmenge; die Server-Antwort
-// (credits/cargo) überschreibt ihn danach mit den echten Werten, sodass sich
-// eine Teilbuchung automatisch korrigiert. amount ist optional (Default 1),
-// bestehende Aufrufe ohne Menge funktionieren unverändert.
+// v0.4.0: invalidations-Zähler + invalidate(key). Komponenten nutzen
+// useGameStore(s => s.invalidations.builds) als useEffect-Dependency und
+// rufen invalidate('builds') nach Aktionen — ersetzt durchgereichte
+// onChanged-Callbacks und entkoppelt Trade/Colony/Fleet voneinander.
+// v0.3.0: buy/sell mit Mengen-Parameter (Cargo-Loop-Fix).
 
 import { create } from 'zustand'
 
@@ -21,7 +20,6 @@ interface Cargo {
   metal:  number
 }
 
-// Handelshistorie für Statistiken
 interface Trade {
   id:            string
   from_location: string
@@ -32,7 +30,6 @@ interface Trade {
   traded_at:     string
 }
 
-// Reisezeiten in Sekunden (Basiswert × speedMult)
 const TRAVEL_TIME: Record<string, Record<string, number>> = {
   moon:   { mars: 30, phobos: 25 },
   mars:   { moon: 30, phobos: 10 },
@@ -40,7 +37,6 @@ const TRAVEL_TIME: Record<string, Record<string, number>> = {
 }
 
 interface GameState {
-  // Spielerzustand
   credits:    number
   cargo:      Cargo
   cargoMax:   number
@@ -50,21 +46,23 @@ interface GameState {
   speedMult:  number
   loaded:     boolean
 
-  // Transit
   inTransit:    boolean
   transitFrom:  LocationSlug | null
   transitTo:    LocationSlug | null
   transitTotal: number
   transitLeft:  number
 
-  // Statistiken
   trades:     Trade[]
 
-  // Berechnungen
+  // Invalidation: Zähler pro Datenbereich. Komponenten lesen den Zähler als
+  // useEffect-Dependency; invalidate('builds') zählt hoch → Re-Fetch ausgelöst.
+  // Ersetzt durchgereichte onChanged-Callbacks und entkoppelt die Module.
+  invalidations: Record<string, number>
+  invalidate: (key: string) => void
+
   cargoUsed: () => number
   cargoFree: () => number
 
-  // Aktionen
   loadFromServer: () => Promise<void>
   loadTrades:     () => Promise<void>
   buy:            (resource: ResourceType, price: number, amount?: number) => Promise<{ ok: boolean; msg: string; booked: number }>
@@ -73,7 +71,6 @@ interface GameState {
   tickTransit:    () => void
 }
 
-// Bearer Token für API-Requests holen
 async function getToken(): Promise<string | null> {
   const { createBrowserClient } = await import('@supabase/ssr')
   const supabase = createBrowserClient(
@@ -84,7 +81,6 @@ async function getToken(): Promise<string | null> {
   return session?.access_token ?? null
 }
 
-// Hilfsfunktion für alle API-Requests mit Bearer Token
 async function tradeRequest(params: Record<string, string | number>) {
   const token = await getToken()
   if (!token) throw new Error('Nicht eingeloggt')
@@ -98,7 +94,6 @@ async function tradeRequest(params: Record<string, string | number>) {
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
-  // Initialwerte
   credits:    5000,
   cargo:      { water: 0, energy: 0, metal: 0 },
   cargoMax:   100,
@@ -116,7 +111,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   trades: [],
 
-  // Berechnungen
+  invalidations: {},
+  invalidate: (key) => set(s => ({
+    invalidations: { ...s.invalidations, [key]: (s.invalidations[key] ?? 0) + 1 },
+  })),
+
   cargoUsed: () => {
     const { cargo } = get()
     return cargo.water + cargo.energy + cargo.metal
@@ -124,7 +123,6 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   cargoFree: () => get().cargoMax - get().cargoUsed(),
 
-  // Spielstand aus DB laden
   loadFromServer: async () => {
     try {
       const data = await tradeRequest({})
@@ -143,7 +141,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // Handelshistorie laden (für Statistiken)
   loadTrades: async () => {
     try {
       const data = await tradeRequest({ action: 'getTrades' })
@@ -153,14 +150,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // Ressourcen kaufen – ganze Menge in einem Call, Server bucht ggf. Teilmenge
   buy: async (resource, price, amount = 1) => {
     const { credits, cargoFree, location, inTransit } = get()
     if (inTransit)             return { ok: false, msg: 'Im Transit – warte auf Landung.', booked: 0 }
     if (credits < price)       return { ok: false, msg: 'Unzureichende Credits.', booked: 0 }
     if (cargoFree() < 1)       return { ok: false, msg: 'Frachtraum voll.', booked: 0 }
 
-    // Optimistic update für die Wunschmenge (Server-Antwort korrigiert ggf.)
     const optimistic = Math.min(amount, cargoFree(), Math.floor(credits / Math.max(1, price)))
     set(s => ({
       credits: s.credits - price * optimistic,
@@ -170,14 +165,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     try {
       const data = await tradeRequest({ action: 'buy', resource, amount, price, location })
       if (!data.ok) {
-        // Rollback bei Fehler
         set(s => ({
           credits: s.credits + price * optimistic,
           cargo:   { ...s.cargo, [resource]: Math.max(0, s.cargo[resource] - optimistic) },
         }))
         return { ok: false, msg: data.error ?? 'Fehler.', booked: 0 }
       }
-      // Server-Werte übernehmen (enthalten die tatsächlich gebuchte Menge)
       set({ credits: data.credits, cargo: data.cargo })
       const booked = data.bookedAmount ?? optimistic
       const msg = booked < amount
@@ -193,13 +186,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // Ressourcen verkaufen – ganze Menge in einem Call
   sell: async (resource, price, amount = 1) => {
     const { cargo, location, inTransit } = get()
     if (inTransit)             return { ok: false, msg: 'Im Transit – warte auf Landung.', booked: 0 }
     if (cargo[resource] < 1)   return { ok: false, msg: 'Keine Ware an Bord.', booked: 0 }
 
-    // Optimistic update für das, was wir wirklich haben
     const optimistic = Math.min(amount, cargo[resource])
     set(s => ({
       credits: s.credits + price * optimistic,
@@ -230,7 +221,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // Reise starten (mit Transit-Animation)
   travel: async (dest) => {
     const { location, inTransit, speedMult } = get()
     if (inTransit) return
@@ -254,7 +244,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // Jede Sekunde aufgerufen – zählt Reisezeit herunter
   tickTransit: () => {
     const { inTransit, transitLeft, transitTo } = get()
     if (!inTransit) return
