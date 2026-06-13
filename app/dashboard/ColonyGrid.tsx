@@ -16,7 +16,6 @@ import { useState, useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDABLE_ITEMS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
-import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import SellPanel from './SellPanel'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -62,8 +61,6 @@ export interface TileEntity {
   tile_level:  number
   tile_row:    number
   tile_col:    number
-  condition?:  number   // 0..100 (Migration 005) – optional, bis Spalte live ist
-  status?:     string   // 'active' | 'damaged' | 'disabled' (Migration 005)
   username?:   string   // optional, falls profiles gejoint wird
 }
 
@@ -284,14 +281,13 @@ interface ColonyGridProps {
   userId:        string              // NEU: eigene profile_id für Eigentums-Check
   entities?:     TileEntity[]        // NEU: Bestand aus tile_entities
   pending?:      PendingBuild[]      // Laufende Vorgänge (building/selling)
-  onChanged?:    () => void          // Bestand/Builds neu laden (nach Bau/Verkauf)
 }
 
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
-  userId, entities = [], pending = [], onChanged,
+  userId, entities = [], pending = [],
 }: ColonyGridProps) {
-  const { loadFromServer } = useGameStore()
+  const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
@@ -332,7 +328,7 @@ export default function ColonyGrid({
           tileCol={selectedTile.c}
           locationSlug={slug}
           onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }}
-          onBuildStarted={async () => { await loadFromServer(); onChanged?.() }}
+          onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }}
         />
       )}
 
@@ -360,8 +356,6 @@ export default function ColonyGrid({
 
       {/* Grid links · Info-Sidebar rechts */}
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-
-        <BuildingSpriteStyles />
 
         {/* Kachelgrid */}
         <div style={{
@@ -408,15 +402,7 @@ export default function ColonyGrid({
                   filter:  isSelling ? 'grayscale(0.7)' : 'none',
                 }}
               >
-                {tileType.startsWith('building_') && tileType !== 'building_construction'
-                  ? <BuildingSVG
-                      entityId={tileType.slice('building_'.length)}
-                      planet={slug as 'moon' | 'mars' | 'phobos'}
-                      condition={entity?.condition}
-                      status={entity?.status as 'active' | 'damaged' | 'disabled' | undefined}
-                      occupancy={popPercent / 100}
-                    />
-                  : <TileDisplay tileType={tileType} slug={slug} />}
+                <TileDisplay tileType={tileType} slug={slug} />
               </div>
             )
           })
@@ -475,7 +461,7 @@ export default function ColonyGrid({
                   key={selectedEntity!.id}
                   entityId={selectedEntity!.id}
                   entityName={BUILDING_NAMES[selectedEntity!.entity_id] ?? selectedEntity!.entity_id}
-                  onSold={async () => { await loadFromServer(); onChanged?.() }}
+                  onSold={async () => { await loadFromServer(); invalidate('builds') }}
                 />
               )}
             </>
