@@ -22,6 +22,7 @@ interface Cargo {
 
 interface Trade {
   id:            string
+  order_id?:     string | null   // gesetzt → erfüllter Auftrag (Versorgung, Punkt 7)
   from_location: string
   to_location:   string
   resource:      string
