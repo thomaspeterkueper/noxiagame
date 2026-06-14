@@ -38,6 +38,13 @@ const PRODUCES: Record<string, { resource: 'metal' | 'energy'; amount: number }>
 export const TICK_INTERVAL_SECONDS = 3600   // 1 Stunde
 export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
 
+// Fenster für den gleitenden Bewertungs-Schnitt (Punkt 4)
+const AVG_WINDOW_TICKS = 7
+// Retention: price_history-Rohdaten älter als dieses Fenster werden gelöscht.
+// Großzügiger als AVG_WINDOW (Puffer für Charts/Archiv), aber gedeckelt,
+// damit die Tabelle nicht unbegrenzt wächst (Skalierung bei vielen Orten).
+const HISTORY_RETENTION_TICKS = 336   // ~14 Tage bei stündlichen Ticks
+
 type SB = any  // Supabase Service-Client
 
 // ─────────────────────────────────────────────────────────────────────
@@ -255,7 +262,36 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
       buy_price: newBuy, sell_price: safeSell,
     })
 
+    // ── Punkt 4: gleitenden Schnitt fortschreiben (für getSaleQuote) ──────────
+    // Letzte AVG_WINDOW_TICKS sell_price-Werte mitteln (inkl. des gerade
+    // geschriebenen). avg_sell_7 wird an market_prices gepflegt → die Bewertung
+    // liest O(1) einen vorberechneten Wert statt die History-Tabelle zu scannen.
+    const { data: recent } = await supabase
+      .from('price_history')
+      .select('sell_price')
+      .eq('location_id', loc.id)
+      .eq('resource', price.resource)
+      .order('tick_number', { ascending: false })
+      .limit(AVG_WINDOW_TICKS)
+
+    if (recent && recent.length > 0) {
+      const avg = Math.round(
+        recent.reduce((s: number, r: any) => s + r.sell_price, 0) / recent.length
+      )
+      await supabase.from('market_prices')
+        .update({ avg_sell_7: avg })
+        .eq('id', price.id)
+    }
+
     results.push({ location: loc.slug, resource: price.resource, buy: newBuy, sell: safeSell })
+  }
+
+  // ── Retention: Rohdaten älter als das Fenster löschen (Skalierung) ──────────
+  // avg_sell_7 ist bereits an market_prices gesichert; ältere price_history-
+  // Zeilen werden nur noch für Charts/Archiv gebraucht und hier gedeckelt.
+  const cutoff = tickNumber - HISTORY_RETENTION_TICKS
+  if (cutoff > 0) {
+    await supabase.from('price_history').delete().lt('tick_number', cutoff)
   }
 
   return results
