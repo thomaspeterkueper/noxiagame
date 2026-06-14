@@ -80,6 +80,7 @@ export default function MarketAuction({
   initialResource,
   initialMode,
   initialQty,
+  playerLimit,
 }: {
   open: boolean
   onClose: () => void
