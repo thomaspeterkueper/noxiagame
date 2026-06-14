@@ -1,16 +1,15 @@
 // app/api/game/build/route.ts
 // Erstellt: 31.05.2026
-// Aktualisiert: 10.06.2026 – Default-Response liefert jetzt zusätzlich:
-//   colony_tax: { tax_property, tax_transaction, tax_landing } je location_id
-//   entity_info: { ertragswert, produktion, resourceSellPrice } je entity id
-//   (damit die Sidebar Produktions- und Steuerinfos ohne Extra-Call darstellen kann)
+// Aktualisiert: 14.06.2026 – Punkt 4: Bewertung über gleitenden 7-Tick-Schnitt
+//   (market_prices.avg_sell_7) statt Spot-sell_price. Manipulationsfest
+//   („Gutachten ≠ Tageskurs"), Fallback auf Spot solange avg_sell_7 NULL.
+//   getSaleQuote bleibt rein — die Route reicht nur den anderen Zahlenwert hinein.
+// 10.06.2026 – Default-Response liefert zusätzlich colony_tax + entity_info.
 //
 // Datenmodell:
-//   player_builds  = Auftragsbuch (Vorgänge):
-//                    building → complete | cancelled, selling → sold
-//   tile_entities  = Weltzustand: was steht wo (3D: level/row/col),
-//                    wem gehört es, seit wann (built_at)
-//   colony_settings = Steuer-/Abgabensätze je Kolonie (Governor-gesetzt)
+//   player_builds   = Auftragsbuch: building → complete|cancelled, selling → sold
+//   tile_entities   = Weltzustand: was steht wo (3D), wem, seit wann
+//   colony_settings = Steuer-/Abgabensätze je Kolonie
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -49,11 +48,12 @@ async function getQuoteForEntity(entity: any) {
   if (producedResource) {
     const { data: price } = await serviceClient
       .from('market_prices')
-      .select('sell_price')
+      .select('sell_price, avg_sell_7')
       .eq('location_id', location.id)
       .eq('resource', producedResource)
       .single()
-    resourceSellPrice = price?.sell_price ?? null
+    // Punkt 4: gleitender 7-Tick-Schnitt (manipulationsfest), Fallback auf Spot.
+    resourceSellPrice = price?.avg_sell_7 ?? price?.sell_price ?? null
   }
 
   const quote = getSaleQuote({
@@ -74,11 +74,9 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get('action')
 
   // ───────────────────────────────────────────────────────────────
-  // Laufende Vorgänge + Bestand laden
-  // Liefert zusätzlich colony_tax und entity_info für die Sidebar
+  // Laufende Vorgänge + Bestand laden (+ colony_tax + entity_info)
   // ───────────────────────────────────────────────────────────────
   if (!action) {
-    // Fällige Vorgänge abschließen (Bau UND Verkauf)
     const { data: due } = await serviceClient
       .from('player_builds')
       .select('*')
@@ -91,7 +89,6 @@ export async function GET(req: NextRequest) {
       if (build.status === 'selling')  await completeSale(build, user.id)
     }
 
-    // Laufende Vorgänge (fürs Grid: Baustellen + „wird verkauft")
     const { data: active } = await serviceClient
       .from('player_builds')
       .select('*, locations(slug, name)')
@@ -99,13 +96,11 @@ export async function GET(req: NextRequest) {
       .in('status', ['building', 'selling'])
       .order('completes_at')
 
-    // Bestand des Spielers
     const { data: entities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .eq('profile_id', user.id)
 
-    // Steuer-Sätze aller betroffenen Kolonien (ein READ, nicht N)
     const locationIds = [...new Set((entities ?? []).map((e: any) => e.location_id))]
     let colonyTax: Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }> = {}
 
@@ -124,9 +119,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Ertragswert + Produktionsinfo je Entity (parallel, kein N+1 auf Locations
-    // weil getQuoteForEntity je ein Location-Lookup macht – akzeptabel solange
-    // Bestand klein ist; bei >20 Gebäuden besser als JOIN refaktorieren)
     const entityInfo: Record<string, {
       ertragswert: number
       produktion: number | null
@@ -161,8 +153,6 @@ export async function GET(req: NextRequest) {
 
   // ───────────────────────────────────────────────────────────────
   // Bauauftrag starten
-  // /api/game/build?action=start&buildableId=mine&location=moon
-  //   &tileRow=3&tileCol=5&tileLevel=-2
   // ───────────────────────────────────────────────────────────────
   if (action === 'start') {
     const buildableId  = searchParams.get('buildableId')
@@ -303,7 +293,6 @@ export async function GET(req: NextRequest) {
 
   // ───────────────────────────────────────────────────────────────
   // Verkaufswert anzeigen (ohne Verkauf)
-  // /api/game/build?action=sellQuote&entityId=xxx
   // ───────────────────────────────────────────────────────────────
   if (action === 'sellQuote') {
     const entityId = searchParams.get('entityId')
@@ -330,7 +319,6 @@ export async function GET(req: NextRequest) {
 
   // ───────────────────────────────────────────────────────────────
   // Gebäude verkaufen
-  // /api/game/build?action=sell&entityId=xxx&mode=normal|instant
   // ───────────────────────────────────────────────────────────────
   if (action === 'sell') {
     const entityId = searchParams.get('entityId')
@@ -407,7 +395,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: 'Ungültige Aktion' }, { status: 400 })
 }
 
-// Fertigen Build aktivieren: Vorgang abschließen + Entität in die Welt setzen
+// Fertigen Build aktivieren
 async function completeBuild(build: any, profileId: string) {
   const buildable = BUILDABLE_ITEMS[build.buildable_id]
   if (!buildable) return
