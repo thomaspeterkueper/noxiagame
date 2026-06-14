@@ -131,6 +131,8 @@ export default function DashboardClient({
   const [worldData, setWorldData] = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
   const [tileEntities, setTileEntities] = useState<any[]>([])
+  const [colonyTax, setColonyTax] = useState<Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }>>({})
+  const [entityInfo, setEntityInfo] = useState<Record<string, { ertragswert: number; produktion: number | null; ressource: string | null; resourceSellPrice: number | null }>>({})
   const [userId, setUserId] = useState<string>('')
   const [profile, setProfile] = useState<any>(null)
 
@@ -174,6 +176,8 @@ export default function DashboardClient({
       const data  = await res.json()
       setPlayerBuilds(data.builds ?? [])
       setTileEntities(data.entities ?? [])
+      setColonyTax(data.colonyTax ?? {})
+      setEntityInfo(data.entityInfo ?? {})
     } catch (err) { console.error('build fetch error:', err) }
   }
   // Builds/Bestand laden: im Kolonien-Tab (Grid) UND im Übersichts-Tab
