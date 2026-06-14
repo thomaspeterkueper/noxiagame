@@ -61,6 +61,15 @@ export const ORDER_MAX_AMOUNT  = 30
 export const ORDER_REWARD_MULT = 1.3   // Belohnung = Marktpreis × 1.3
 export const ORDER_EXPIRE_HOURS = 24
 
+// Punkt 5: Auftragsgröße = Defizit/Tick × Deckungsfenster.
+// Der Auftrag deckt so viele Ticks des tatsächlichen Mangels (consumption −
+// production). Koppelt die Größe ehrlich an den Bedarf der Kolonie: große
+// Kolonien fordern große Lieferungen, kleine kleine. N=4 macht den größten
+// realistischen Auftrag etwa frachtergroß (~100t). ORDER_MIN_AMOUNT bleibt
+// Untergrenze (kleine Defizite lohnen sonst keine Fahrt). Kein Deckel nach
+// oben — wächst eine Kolonie, soll der Auftrag groß sein (Anreiz Schwerfrachter).
+export const ORDER_COVERAGE_TICKS = 4
+
 // Cron Secret Header
 export const CRON_SECRET_HEADER = 'x-cron-secret'
 
