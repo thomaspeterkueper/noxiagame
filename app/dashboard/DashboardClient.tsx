@@ -171,9 +171,11 @@ export default function DashboardClient({
       setEntityInfo(data.entityInfo ?? {})
     } catch (err) { console.error('build fetch error:', err) }
   }
-  useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [activeTab])
+  // Builds/Bestand laden: im Kolonien-Tab (Grid) UND im Übersichts-Tab
+  // (Immobilien-Leiste braucht die tile_entities des Spielers).
+  useEffect(() => { if (activeTab === 'colonies' || activeTab === 'dashboard') fetchBuilds() }, [activeTab])
   // Re-Fetch nach Bau/Verkauf, ausgelöst über den Store statt Callback-Props
-  useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [invalidations.builds])
+  useEffect(() => { if (activeTab === 'colonies' || activeTab === 'dashboard') fetchBuilds() }, [invalidations.builds])
 
   // ── Profil laden ────────────────────────────────────────────────────────────
   async function fetchProfile() {
@@ -236,15 +238,33 @@ export default function DashboardClient({
   const currentLocationData = locations.find((l: any) => l.slug === location)
   const used                = cargoUsed()
   const cargoFreeSpace      = cargoMax - used
-  const suppliedCount       = locations.filter((l: any) => l.is_supplied).length
   const totalPop            = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
 
-  // Aufmerksamkeits-Hinweise (lenkt, löst nicht) + grobe Wachstumsschätzung
+  // Flugzeiten (Basis, GAMEDESIGN). Schicht 2 ersetzt das durch echte
+  // Schiffsreichweite; vorerst nur Anzeige, alle Ziele erreichbar.
+  const FLIGHT_SECONDS: Record<string, Record<string, number>> = {
+    moon:   { mars: 30, phobos: 25 },
+    mars:   { moon: 30, phobos: 10 },
+    phobos: { moon: 25, mars: 10 },
+  }
+  function flightTime(to: string): number | null {
+    return FLIGHT_SECONDS[location]?.[to] ?? null
+  }
+
+  // Immobilien-Orte: Orte mit eigenen tile_entities + IMMER der aktuelle Ort.
+  // Pro Ort die Gebäudezahl. Aktueller Ort wird markiert (auch ohne Gebäude).
+  const propertyByLocation: Record<string, number> = {}
+  for (const e of tileEntities) {
+    const slug = e.locations?.slug
+    if (slug) propertyByLocation[slug] = (propertyByLocation[slug] ?? 0) + 1
+  }
+  const propertySlugs = Array.from(new Set<string>([location, ...Object.keys(propertyByLocation)]))
+  const propertyLocations = propertySlugs
+    .map(slug => locations.find((l: any) => l.slug === slug))
+    .filter(Boolean)
+
+  // Aufmerksamkeits-Hinweise (lenkt, löst nicht)
   const attention = attentionItems(locations)
-  const growthPerTick = locations.reduce((s: number, l: any) => {
-    // nur versorgte Kolonien wachsen (+1%/Tick), grobe Schätzung bis 0.1.5
-    return s + (l.is_supplied ? (l.population ?? 0) * 0.01 : 0)
-  }, 0)
 
   let best: { from: string; to: string; resource: string; profit: number } | null = null
   const byResource: Record<string, any[]> = {}
@@ -410,159 +430,162 @@ export default function DashboardClient({
 
         {activeTab === 'dashboard' && (
           <>
-            {/* ── COMMANDER OVERVIEW ───────────────────────────────────── */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1px',
-              background: T.line, border: `1px solid ${T.line}`, borderRadius: T.radiusLg,
-              overflow: 'hidden', marginBottom: '1.5rem',
-            }}>
-              {[
-                ['Bevölkerung', totalPop.toLocaleString('de'), T.ink],
-                ['Credits', `${credits.toLocaleString('de')}`, T.blue],
-                ['Kolonien', `${suppliedCount}/${locations.length} versorgt`, suppliedCount === locations.length ? T.green : T.red],
-                ['Wachstum', `+${Math.round(growthPerTick)}/Tick`, T.green],
-                ['Standort', LOC_NAME[location], T.gold],
-              ].map(([l, v, c], i) => (
-                <div key={i} style={{ background: T.surface, padding: '0.9rem 1.1rem' }}>
-                  <div style={metricLabel}>{l}</div>
-                  <div style={{ fontWeight: 700, color: c as string, fontSize: '1.1rem', marginTop: '3px', fontFamily: 'Georgia, serif' }}>{v}</div>
-                </div>
-              ))}
-            </div>
+            {/* ════════════════════════════════════════════════════════════
+                ORTSZENTRIERTE ÜBERSICHT (Schicht 1)
+                Hauptview (aktueller Ort) · Reiseziele rechts · Immobilien unten.
+                Reichweite + Stationsbüro-NPC folgen in Schicht 2/3.
+               ════════════════════════════════════════════════════════════ */}
 
-            {/* ── HERO: aktuelle Hauptkolonie ──────────────────────────── */}
-            {currentLocationData && (() => {
-              const worst = worstStatus(currentLocationData)
-              const popPct = Math.round((currentLocationData.population / currentLocationData.population_max) * 100)
-              return (
-                <div style={{
-                  ...card, padding: '1.6rem 1.8rem', marginBottom: '1.5rem',
-                  borderLeft: `4px solid ${worst ? stateColor(worst.state, T) : T.green}`,
-                  display: 'grid', gridTemplateColumns: '1fr auto', gap: '2rem', alignItems: 'center',
-                }}>
-                  <div>
-                    <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>{LOC_ICON[location]} Hauptquartier</div>
-                    <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: T.blueDeep, marginBottom: '0.5rem' }}>
-                      {currentLocationData.name}
-                    </div>
-                    <div style={{ fontSize: '0.9rem', color: T.inkSoft, marginBottom: '0.9rem' }}>
-                      {currentLocationData.population.toLocaleString('de')} Einwohner · {popPct}% Auslastung
-                    </div>
-                    <div style={{ display: 'flex', gap: '1.2rem', flexWrap: 'wrap' }}>
-                      {(currentLocationData.location_resources ?? []).map((r: any) => {
-                        const s = resourceStatus(r)
-                        return (
-                          <div key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                            <span style={{ width: 9, height: 9, borderRadius: '50%', background: stateColor(s.state, T), display: 'inline-block' }} />
-                            <span style={{ color: T.ink }}>{RESOURCE_ICON[r.resource]} {stateLabel(s)}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', minWidth: '180px' }}>
-                    {worst ? (
-                      <>
-                        <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>Größter Engpass</div>
-                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: stateColor(worst.state, T) }}>
-                          {RESOURCE_ICON[worst.resource]} {stateLabel(worst)}
-                        </div>
-                        {worst.ticksLeft !== null && worst.ticksLeft > 0 && (
-                          <div style={{ fontSize: '0.78rem', color: T.inkSoft, marginTop: '0.2rem' }}>
-                            reicht noch ~{worst.ticksLeft} Ticks
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>Status</div>
-                        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: T.green }}>Alles stabil</div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )
-            })()}
+            {/* ── HAUPTRASTER: aktueller Ort (groß) · Reiseziele (rechts) ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', marginBottom: '1.5rem' }}>
 
-            {/* Frachtstatus — immer sichtbar */}
-            <div style={{ ...card, padding: '0.85rem 1.4rem', marginBottom: '1.5rem', display: 'flex', gap: '1.8rem', alignItems: 'center' }}>
-              <span style={metricLabel}>An Bord</span>
-              {used > 0 ? (
-                (Object.entries(cargo) as [ResourceType, number][]).filter(([, v]) => v > 0).map(([res, amt]) => (
-                  <span key={res} style={{ fontSize: '0.88rem', fontWeight: 600, color: T.blue }}>{RESOURCE_ICON[res]} {RESOURCE_LABEL[res]} {amt}t</span>
-                ))
-              ) : (
-                <span style={{ fontSize: '0.82rem', color: T.inkFaint }}>Laderaum leer — kauf etwas in der Handelszentrale.</span>
-              )}
-              <div style={{ marginLeft: 'auto', background: T.bg, borderRadius: '999px', padding: '0.25rem 0.8rem', fontSize: '0.72rem', color: T.inkSoft }}>{cargoFreeSpace}t frei</div>
-            </div>
-
-            {/* ── Hauptraster: Kolonien (breit) · Seitenspalte ─────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', marginBottom: '1.5rem' }}>
-
-              <div>
-                <SectionHead title="Kolonien" />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                  {locations.map((loc: any) => {
-                    const popPct = Math.round((loc.population / loc.population_max) * 100)
-                    const isHere = loc.slug === location
-                    const worst  = worstStatus(loc)
-                    const accent = worst ? stateColor(worst.state, T) : T.green
-                    return (
-                      <div key={loc.id} onClick={() => setDetailColony(loc)}
-                        style={{ ...card, padding: '1.2rem 1.4rem', borderLeft: `4px solid ${accent}`, cursor: 'pointer' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
-                          <div style={{ fontSize: '1rem', fontWeight: 700, color: T.blueDeep, display: 'flex', alignItems: 'center', gap: '7px' }}>
-                            {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
-                            {isHere && <span style={{ fontSize: '0.52rem', background: T.gold, color: '#fff', borderRadius: '4px', padding: '2px 6px', letterSpacing: '0.05em' }}>HIER</span>}
-                          </div>
-                          <div style={{ fontSize: '0.78rem', color: worst ? stateColor(worst.state, T) : T.green, fontWeight: 600 }}>
-                            {worst ? stateLabel(worst) : 'stabil'}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: T.inkFaint, marginBottom: '0.3rem' }}>
-                          <span>{loc.population.toLocaleString('de')} / {loc.population_max.toLocaleString('de')}</span>
-                          <span>{popPct}%</span>
-                        </div>
-                        <div style={{ background: T.lineSoft, height: '6px', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.8rem' }}>
-                          <div style={{ width: `${popPct}%`, height: '100%', background: isHere ? T.gold : T.blue }} />
-                        </div>
-                        <div style={{ display: 'flex', gap: '1.1rem', fontSize: '0.74rem', color: T.inkSoft, flexWrap: 'wrap' }}>
-                          {(loc.location_resources ?? []).map((r: any) => {
-                            const s = resourceStatus(r)
-                            return (
-                              <span key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: stateColor(s.state, T), display: 'inline-block' }} />
-                                {RESOURCE_ICON[r.resource]} {r.stock}t
-                                <span style={{ color: s.netto >= 0 ? T.green : T.red, fontSize: '0.66rem' }}>
-                                  ({s.netto >= 0 ? '+' : ''}{s.netto})
-                                </span>
-                              </span>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
+              {/* ── HAUPTVIEW: der Ort, an dem du gerade bist ───────────── */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-                <div>
-                  <SectionHead title="Braucht Aufmerksamkeit" />
-                  <div style={{ ...card, padding: attention.length ? '0.5rem 0' : '1.2rem' }}>
-                    {attention.length === 0 ? (
-                      <div style={{ fontSize: '0.8rem', color: T.green, padding: '0 1.2rem' }}>Das System läuft stabil.</div>
-                    ) : attention.slice(0, 6).map((a, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '0.55rem 1.2rem', fontSize: '0.8rem', color: T.ink }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: a.level === 'critical' ? T.red : '#d08020' }} />
-                        {a.text}
+                {/* Hero des aktuellen Orts */}
+                {currentLocationData && (() => {
+                  const worst = worstStatus(currentLocationData)
+                  const popPct = Math.round((currentLocationData.population / currentLocationData.population_max) * 100)
+                  return (
+                    <div style={{
+                      ...card, padding: '1.6rem 1.8rem',
+                      borderLeft: `4px solid ${worst ? stateColor(worst.state, T) : T.green}`,
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2rem', alignItems: 'start' }}>
+                        <div>
+                          <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>{LOC_ICON[location]} Du bist hier</div>
+                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: T.blueDeep, marginBottom: '0.5rem' }}>
+                            {currentLocationData.name}
+                          </div>
+                          <div style={{ fontSize: '0.9rem', color: T.inkSoft, marginBottom: '0.9rem' }}>
+                            {currentLocationData.population.toLocaleString('de')} Einwohner · {popPct}% Auslastung
+                          </div>
+                          <div style={{ display: 'flex', gap: '1.2rem', flexWrap: 'wrap' }}>
+                            {(currentLocationData.location_resources ?? []).map((r: any) => {
+                              const s = resourceStatus(r)
+                              return (
+                                <div key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+                                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: stateColor(s.state, T), display: 'inline-block' }} />
+                                  <span style={{ color: T.ink }}>{RESOURCE_ICON[r.resource]} {r.stock}t · {stateLabel(s)}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', minWidth: '160px' }}>
+                          {worst ? (
+                            <>
+                              <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>Größter Engpass</div>
+                              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: stateColor(worst.state, T) }}>
+                                {RESOURCE_ICON[worst.resource]} {stateLabel(worst)}
+                              </div>
+                              {worst.ticksLeft !== null && worst.ticksLeft > 0 && (
+                                <div style={{ fontSize: '0.78rem', color: T.inkSoft, marginTop: '0.2rem' }}>
+                                  reicht noch ~{worst.ticksLeft} Ticks
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>Status</div>
+                              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: T.green }}>Alles stabil</div>
+                            </>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Aktions-Buttons des Orts */}
+                      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.3rem', flexWrap: 'wrap' }}>
+                        <button style={btnPrimary} onClick={() => setDetailColony(currentLocationData)}>
+                          {Icon.globe('#fff')} Kolonie ansehen
+                        </button>
+                        {/* Stationsbüro — Platzhalter (NPC folgt in Schicht 3) */}
+                        <button style={btnGhost} onClick={() => showToast('Das Stationsbüro öffnet bald — der Verwalter ist noch unterwegs.', true)}>
+                          {Icon.alert(T.blue)} Stationsbüro
+                        </button>
+                        {location === 'moon' && (
+                          <button style={btnGhost} onClick={() => setShipyardOpen(true)}>
+                            {Icon.ship(T.blue)} Werft
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Frachtstatus */}
+                <div style={{ ...card, padding: '0.85rem 1.4rem', display: 'flex', gap: '1.8rem', alignItems: 'center' }}>
+                  <span style={metricLabel}>An Bord</span>
+                  {used > 0 ? (
+                    (Object.entries(cargo) as [ResourceType, number][]).filter(([, v]) => v > 0).map(([res, amt]) => (
+                      <span key={res} style={{ fontSize: '0.88rem', fontWeight: 600, color: T.blue }}>{RESOURCE_ICON[res]} {RESOURCE_LABEL[res]} {amt}t</span>
+                    ))
+                  ) : (
+                    <span style={{ fontSize: '0.82rem', color: T.inkFaint }}>Laderaum leer — kauf etwas in der Handelszentrale.</span>
+                  )}
+                  <div style={{ marginLeft: 'auto', background: T.bg, borderRadius: '999px', padding: '0.25rem 0.8rem', fontSize: '0.72rem', color: T.inkSoft }}>{cargoFreeSpace}t frei</div>
+                </div>
+
+                {/* Handelszentrale des aktuellen Orts */}
+                <div>
+                  <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`} />
+                  <div style={card}>
+                    {currentPrices.map((p: any, i: number) => (
+                      <BuyRow key={p.id} p={p} last={i === currentPrices.length - 1}
+                        cargoFree={cargoFreeSpace} owned={cargo[p.resource as ResourceType]}
+                        costBasis={costBasis[p.resource as ResourceType] ?? 0}
+                        onBuy={(amt, limit) => openAuction(p.resource, 'buy', amt, limit)}
+                        onSell={(amt, limit) => openAuction(p.resource, 'sell', amt, limit)} T={T} />
                     ))}
                   </div>
                 </div>
+              </div>
 
+              {/* ── SEITENSPALTE: Reiseziele ────────────────────────────── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+                <div>
+                  <SectionHead title="Reiseziele" />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                    {otherLocations.map((loc: any) => {
+                      const worst = worstStatus(loc)
+                      const secs  = flightTime(loc.slug)
+                      // Schicht 2: hier später Reichweiten-Check. Vorerst alle erreichbar.
+                      const reachable = true
+                      return (
+                        <div key={loc.id}
+                          onClick={() => { if (reachable && !inTransit) handleTravel(loc.slug as LocationSlug) }}
+                          style={{
+                            ...card, padding: '1rem 1.2rem',
+                            borderLeft: `4px solid ${worst ? stateColor(worst.state, T) : T.green}`,
+                            cursor: reachable && !inTransit ? 'pointer' : 'default',
+                            opacity: reachable ? 1 : 0.5,
+                          }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: T.blueDeep }}>
+                              {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: T.inkFaint, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              {secs != null ? `${secs}s` : '—'} {Icon.arrow(T.inkFaint)}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: worst ? stateColor(worst.state, T) : T.green }}>
+                            {worst
+                              ? <>braucht {RESOURCE_ICON[worst.resource]} {RESOURCE_LABEL[worst.resource]} · {stateLabel(worst)}</>
+                              : 'stabil versorgt'}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {inTransit && (
+                      <div style={{ fontSize: '0.74rem', color: T.inkFaint, padding: '0.3rem 0.2rem' }}>
+                        Im Transit — Ziele nach der Landung wieder wählbar.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Beste Route bleibt als nützlicher Hinweis */}
                 <div>
                   <SectionHead title="Beste Route" />
                   {best ? (
@@ -580,27 +603,51 @@ export default function DashboardClient({
                   ) : <div style={{ ...card, padding: '1.4rem', color: T.inkFaint, fontSize: '0.82rem' }}>Keine Arbitrage gefunden.</div>}
                 </div>
 
+                {/* Aufmerksamkeits-Feed */}
                 <div>
-                  <SectionHead title="Letzte Ereignisse" />
-                  <div style={{ ...card, padding: '1rem 1.2rem' }}>
-                    {transactions.slice(0, 3).map((t: any, i: number) => (
-                      <div key={`t${i}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '0.4rem' }}>
-                        <span style={{ color: T.inkSoft }}>{t.profiles?.username ?? 'Pilot'} · {RESOURCE_LABEL[t.resource] ?? t.resource}</span>
-                        <span style={{ color: t.profit > 0 ? T.green : T.red, fontWeight: 600 }}>{t.profit > 0 ? '+' : ''}{t.profit} Cr</span>
+                  <SectionHead title="Braucht Aufmerksamkeit" />
+                  <div style={{ ...card, padding: attention.length ? '0.5rem 0' : '1.2rem' }}>
+                    {attention.length === 0 ? (
+                      <div style={{ fontSize: '0.8rem', color: T.green, padding: '0 1.2rem' }}>Das System läuft stabil.</div>
+                    ) : attention.slice(0, 6).map((a, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '0.55rem 1.2rem', fontSize: '0.8rem', color: T.ink }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: a.level === 'critical' ? T.red : '#d08020' }} />
+                        {a.text}
                       </div>
                     ))}
-                    {news.slice(0, 2).map((n: any, i: number) => (
-                      <div key={`n${i}`} style={{ fontSize: '0.74rem', marginTop: '0.3rem', color: n.type === 'danger' ? T.red : n.type === 'warning' ? '#d08020' : n.type === 'success' ? T.green : T.inkSoft }}>{n.icon} {n.text}</div>
-                    ))}
-                    {transactions.length === 0 && news.length === 0 && (
-                      <div style={{ fontSize: '0.74rem', color: T.inkFaint }}>Noch keine Ereignisse.</div>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* ── Aufträge ─────────────────────────────────────────────── */}
+            {/* ── IMMOBILIEN-LEISTE: Orte mit eigenem Standbein ──────────── */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <SectionHead title="Deine Orte" />
+              <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                {propertyLocations.map((loc: any) => {
+                  const isHere   = loc.slug === location
+                  const gebaeude = propertyByLocation[loc.slug] ?? 0
+                  return (
+                    <div key={loc.id} onClick={() => setDetailColony(loc)}
+                      style={{
+                        ...card, padding: '0.9rem 1.2rem', cursor: 'pointer',
+                        minWidth: '150px', flex: '0 1 auto',
+                        borderLeft: `4px solid ${isHere ? T.gold : T.blue}`,
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontWeight: 700, fontSize: '0.92rem', color: T.blueDeep }}>
+                        {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
+                        {isHere && <span style={{ fontSize: '0.52rem', background: T.gold, color: '#fff', borderRadius: '4px', padding: '2px 6px', letterSpacing: '0.05em' }}>HIER</span>}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: T.inkSoft, marginTop: '0.3rem' }}>
+                        {gebaeude > 0 ? `${gebaeude} Gebäude` : 'kein Gebäude'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ── AUFTRÄGE ──────────────────────────────────────────────── */}
             <div style={{ marginBottom: '1.5rem' }}>
               <SectionHead title="Dringende Aufträge" />
               <div style={card}>
@@ -624,53 +671,6 @@ export default function DashboardClient({
                     </div>
                   )
                 })}
-              </div>
-            </div>
-
-            {/* ── Handel + Flotte ──────────────────────────────────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
-              <div>
-                <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`} />
-                <div style={card}>
-                  {currentPrices.map((p: any, i: number) => (
-                    <BuyRow key={p.id} p={p} last={i === currentPrices.length - 1}
-                      cargoFree={cargoFreeSpace} owned={cargo[p.resource as ResourceType]}
-                      costBasis={costBasis[p.resource as ResourceType] ?? 0}
-                      onBuy={(amt, limit) => openAuction(p.resource, 'buy', amt, limit)}
-                      onSell={(amt, limit) => openAuction(p.resource, 'sell', amt, limit)} T={T} />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <SectionHead title="Flotte"
-                  action={location === 'moon' ? <button style={{ ...btnGhost, padding: '0.45rem 0.85rem', fontSize: '0.74rem' }} onClick={() => setShipyardOpen(true)}>{Icon.ship(T.blue)} Werft</button> : undefined} />
-                <ShipyardCard
-                  shipType={(shipTypeId ?? 'freighter_mk1') as any}
-                  location={location as 'moon' | 'mars' | 'phobos'}
-                  cargoUsed={used} cargoMax={cargoMax} credits={credits}
-                  hasShipyard={locations.find((l: any) => l.slug === 'moon')?.has_shipyard ?? false}
-                  onBuyShip={async (type) => {
-                    const token = await getToken()
-                    const res = await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                    const data = await res.json()
-                    if (data.ok) { showToast(`${type} gekauft!`, true); await loadFromServer() }
-                    else showToast(data.error ?? 'Kauf fehlgeschlagen', false)
-                  }}
-                />
-                <div style={{ marginTop: '1rem' }}>
-                  <div style={{ ...metricLabel, marginBottom: '0.6rem' }}>Fliegen nach</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {otherLocations.map((loc: any) => (
-                      <button key={loc.id} disabled={inTransit}
-                        style={{ ...btnGhost, width: '100%', justifyContent: 'space-between', opacity: inTransit ? 0.5 : 1 }}
-                        onClick={() => handleTravel(loc.slug as LocationSlug)}>
-                        <span>{LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}</span>
-                        <span style={{ color: T.inkFaint, fontSize: '0.66rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Sofortflug {Icon.arrow(T.inkFaint)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           </>
