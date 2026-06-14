@@ -123,6 +123,8 @@ export default function DashboardClient({
   const [worldData, setWorldData] = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
   const [tileEntities, setTileEntities] = useState<any[]>([])
+  const [colonyTax, setColonyTax] = useState<Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }>>({})
+  const [entityInfo, setEntityInfo] = useState<Record<string, { ertragswert: number; produktion: number | null; ressource: string | null; resourceSellPrice: number | null }>>({})
   const [userId, setUserId] = useState<string>('')
   const [profile, setProfile] = useState<any>(null)
 
@@ -165,6 +167,8 @@ export default function DashboardClient({
       const data  = await res.json()
       setPlayerBuilds(data.builds ?? [])
       setTileEntities(data.entities ?? [])
+      setColonyTax(data.colonyTax ?? {})
+      setEntityInfo(data.entityInfo ?? {})
     } catch (err) { console.error('build fetch error:', err) }
   }
   useEffect(() => { if (activeTab === 'colonies') fetchBuilds() }, [activeTab])
@@ -387,6 +391,8 @@ export default function DashboardClient({
                 <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
                   population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
                   userId={userId}
+                  tax={colonyTax[loc.id]}
+                  entityInfo={entityInfo}
                   entities={tileEntities.filter((e: any) => e.locations?.slug === loc.slug)}
                   pending={playerBuilds
                     .filter((b: any) => b.locations?.slug === loc.slug)
