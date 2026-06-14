@@ -1,22 +1,29 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 07.06.2026
-// Version:      0.4.0
+// Aktualisiert: 14.06.2026
+// Version:      0.5.0
 //
-// v0.4.0: Übersichts-Tab neu strukturiert (Feedback 07.06.):
-//   - Commander-Overview-Leiste (Bevölkerung, Credits, Kolonien, Wachstum, Standort)
-//   - Hero-Karte der Hauptkolonie mit Ressourcen-Ampel + größtem Engpass
-//   - Größere Koloniekarten mit Ampelpunkten und Status-Wort
-//   - Aufmerksamkeits-Feed (lenkt, nennt keine Lösungen) via dashboardStatus.ts
-//   - Prominente „Beste Route", „FÜR DICH"-Badge an persönlichen Aufträgen
-//   - Dichter, weniger Weißraum; hell behalten
+// v0.5.0: Übersichts-Tab ortszentriert umgebaut (Schicht 1 des Dashboard-
+//   Redesigns). Der aktuelle Ort ist der Fokus:
+//   - HAUPTVIEW (links): aktueller Ort groß — Hero mit Ressourcen-Ampel +
+//     größtem Engpass, Aktions-Buttons (Kolonie ansehen, Stationsbüro-
+//     Platzhalter, Werft nur Mond), Frachtstatus, Handelszentrale des Orts.
+//   - REISEZIELE (rechts): andere Orte mit größtem Bedarf + Flugzeit. Vorerst
+//     alle erreichbar (reachable=true); Schicht 2 ersetzt das durch echte
+//     Schiffsreichweite. Plus Beste Route + Aufmerksamkeits-Feed.
+//   - DEINE ORTE (Leiste unten): Orte mit eigenen tile_entities + immer der
+//     aktuelle Ort (HIER-Markierung). Skaliert für beliebig viele Orte.
+//   Entfernt: Commander-Statusleiste und große Kolonien-Liste (das „überladen".
+//   Kernzahlen bleiben in der Topbar; Kolonie-Details via ColonyDetail-Overlay).
+//   tileEntities werden jetzt auch im Dashboard-Tab geladen (Immobilien-Leiste).
+// v0.4.0: Commander-Overview, Hero-Karte, Aufmerksamkeits-Feed (ersetzt 0.5.0).
 // v0.3.0: Cargo-Loop-Fix (atomar in einem Call).
 // v0.2.0: Vier Aufruf-Overlays ausgelagert.
 
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
+import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/store/gameStore'
 import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
@@ -114,7 +121,7 @@ export default function DashboardClient({
   const {
     credits, cargo, cargoMax, location, buy, sell, travel,
     cargoUsed, loaded, loadFromServer, inTransit, shipTypeId,
-    invalidate, invalidations, costBasis,
+    invalidate, invalidations, costBasis, shipRange,
   } = useGameStore()
 
   // UI-State
@@ -123,8 +130,6 @@ export default function DashboardClient({
   const [worldData, setWorldData] = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
   const [tileEntities, setTileEntities] = useState<any[]>([])
-  const [colonyTax, setColonyTax] = useState<Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }>>({})
-  const [entityInfo, setEntityInfo] = useState<Record<string, { ertragswert: number; produktion: number | null; ressource: string | null; resourceSellPrice: number | null }>>({})
   const [userId, setUserId] = useState<string>('')
   const [profile, setProfile] = useState<any>(null)
 
@@ -167,8 +172,6 @@ export default function DashboardClient({
       const data  = await res.json()
       setPlayerBuilds(data.builds ?? [])
       setTileEntities(data.entities ?? [])
-      setColonyTax(data.colonyTax ?? {})
-      setEntityInfo(data.entityInfo ?? {})
     } catch (err) { console.error('build fetch error:', err) }
   }
   // Builds/Bestand laden: im Kolonien-Tab (Grid) UND im Übersichts-Tab
@@ -250,6 +253,10 @@ export default function DashboardClient({
   function flightTime(to: string): number | null {
     return FLIGHT_SECONDS[location]?.[to] ?? null
   }
+
+  // Effektive Reichweite: heute = statische shipRange. Die Funktion trägt schon
+  // die Einstiegspunkte für Ladungsgewicht/Module (Post-Alpha-Treibstoffsystem).
+  const reach = effectiveRange(shipRange, used)
 
   // Immobilien-Orte: Orte mit eigenen tile_entities + IMMER der aktuelle Ort.
   // Pro Ort die Gebäudezahl. Aktueller Ort wird markiert (auch ohne Gebäude).
@@ -411,8 +418,6 @@ export default function DashboardClient({
                 <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
                   population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
                   userId={userId}
-                  tax={colonyTax[loc.id]}
-                  entityInfo={entityInfo}
                   entities={tileEntities.filter((e: any) => e.locations?.slug === loc.slug)}
                   pending={playerBuilds
                     .filter((b: any) => b.locations?.slug === loc.slug)
@@ -550,30 +555,38 @@ export default function DashboardClient({
                     {otherLocations.map((loc: any) => {
                       const worst = worstStatus(loc)
                       const secs  = flightTime(loc.slug)
-                      // Schicht 2: hier später Reichweiten-Check. Vorerst alle erreichbar.
-                      const reachable = true
+                      // Schicht 2: Reichweiten-Check. Ziel erreichbar, wenn seine
+                      // Basis-Distanz <= effektive Reichweite des Schiffs.
+                      const reachable = secs != null && secs <= reach
                       return (
                         <div key={loc.id}
                           onClick={() => { if (reachable && !inTransit) handleTravel(loc.slug as LocationSlug) }}
                           style={{
                             ...card, padding: '1rem 1.2rem',
-                            borderLeft: `4px solid ${worst ? stateColor(worst.state, T) : T.green}`,
+                            borderLeft: `4px solid ${reachable ? (worst ? stateColor(worst.state, T) : T.green) : T.line}`,
                             cursor: reachable && !inTransit ? 'pointer' : 'default',
-                            opacity: reachable ? 1 : 0.5,
+                            opacity: reachable ? 1 : 0.55,
                           }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: T.blueDeep }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: reachable ? T.blueDeep : T.inkFaint }}>
                               {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
                             </span>
                             <span style={{ fontSize: '0.7rem', color: T.inkFaint, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              {secs != null ? `${secs}s` : '—'} {Icon.arrow(T.inkFaint)}
+                              {secs != null ? `${secs}s` : '—'} {reachable && Icon.arrow(T.inkFaint)}
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.76rem', color: worst ? stateColor(worst.state, T) : T.green }}>
-                            {worst
-                              ? <>braucht {RESOURCE_ICON[worst.resource]} {RESOURCE_LABEL[worst.resource]} · {stateLabel(worst)}</>
-                              : 'stabil versorgt'}
-                          </div>
+                          {reachable ? (
+                            <div style={{ fontSize: '0.76rem', color: worst ? stateColor(worst.state, T) : T.green }}>
+                              {worst
+                                ? <>braucht {RESOURCE_ICON[worst.resource]} {RESOURCE_LABEL[worst.resource]} · {stateLabel(worst)}</>
+                                : 'stabil versorgt'}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.74rem', color: T.inkFaint, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.inkFaint, display: 'inline-block' }} />
+                              außer Reichweite · stärkeres Schiff nötig
+                            </div>
+                          )}
                         </div>
                       )
                     })}
