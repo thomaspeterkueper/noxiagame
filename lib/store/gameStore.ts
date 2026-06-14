@@ -55,6 +55,11 @@ interface GameState {
 
   trades:     Trade[]
 
+  // Einstandspreis je Ressource (gewichteter Ø-Kaufpreis der Ware an Bord).
+  // Beim Kauf fortgeschrieben, bei Bestand 0 zurückgesetzt. Für die Verkaufs-
+  // Entscheidung in der Auktion („was hab ich bezahlt → lohnt der Mindestpreis").
+  costBasis: Record<ResourceType, number>
+
   // Invalidation: Zähler pro Datenbereich. Komponenten lesen den Zähler als
   // useEffect-Dependency; invalidate('builds') zählt hoch → Re-Fetch ausgelöst.
   // Ersetzt durchgereichte onChanged-Callbacks und entkoppelt die Module.
@@ -111,6 +116,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   transitLeft:  0,
 
   trades: [],
+
+  costBasis: { water: 0, energy: 0, metal: 0 },
 
   invalidations: {},
   invalidate: (key) => set(s => ({
@@ -174,6 +181,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       set({ credits: data.credits, cargo: data.cargo })
       const booked = data.bookedAmount ?? optimistic
+      // Einstandspreis fortschreiben: gewichteter Ø aus altem Bestand×altem Einstand
+      // und neuer Menge×tatsächlichem Kaufpreis (Server-unitPrice, sonst price).
+      const unit = data.unitPrice ?? price
+      set(s => {
+        const prevQty  = Math.max(0, s.cargo[resource] - booked)  // Bestand VOR diesem Kauf
+        const prevCost = s.costBasis[resource] ?? 0
+        const newQty   = s.cargo[resource]                        // Bestand NACH dem Kauf (Server)
+        const avg = newQty > 0
+          ? (prevQty * prevCost + booked * unit) / newQty
+          : unit
+        return { costBasis: { ...s.costBasis, [resource]: Math.round(avg) } }
+      })
       const msg = booked < amount
         ? `${booked} von ${amount}t gekauft (mehr war nicht möglich).`
         : `${booked}t gekauft für ${price * booked} Cr.`
@@ -208,6 +227,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { ok: false, msg: data.error ?? 'Fehler.', booked: 0 }
       }
       set({ credits: data.credits, cargo: data.cargo })
+      // Einstand zurücksetzen, sobald die Ressource vollständig verkauft ist.
+      set(s => s.cargo[resource] <= 0
+        ? { costBasis: { ...s.costBasis, [resource]: 0 } }
+        : {})
       const booked = data.bookedAmount ?? optimistic
       const msg = booked < amount
         ? `${booked} von ${amount}t verkauft (mehr war nicht an Bord).`
