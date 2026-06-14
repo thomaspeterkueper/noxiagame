@@ -14,6 +14,21 @@ import { create } from 'zustand'
 export type ResourceType = 'water' | 'energy' | 'metal'
 export type LocationSlug = 'moon' | 'mars' | 'phobos'
 
+// Effektive Reichweite eines Schiffs (in Basis-Distanz).
+// HEUTE: gibt schlicht baseRange zurück (statische Reichweite aus ship_types).
+// SPÄTER (Treibstoff-/Logistik-System, Post-Alpha): cargoWeight und modifiers
+// fließen in die Formel ein — schwerere Ladung senkt die Reichweite, Module
+// heben/senken sie. Die Signatur trägt die Parameter schon, damit der spätere
+// Umbau additiv ist und KEINE Aufrufstelle geändert werden muss.
+export function effectiveRange(
+  baseRange: number,
+  _cargoWeight?: number,            // reserviert: Ladungsgewicht (mehr Last → weniger weit)
+  _modifiers?: Record<string, number>,  // reserviert: Schiffs-Upgrades/Module
+): number {
+  // Aktuell keine Modifikation. Einstiegspunkt für später.
+  return baseRange
+}
+
 interface Cargo {
   water:  number
   energy: number
@@ -45,6 +60,7 @@ interface GameState {
   shipId:     string | null
   shipTypeId: string
   speedMult:  number
+  shipRange:  number   // statische Reichweite (Basis-Distanz); range_distance aus ship_types
   loaded:     boolean
 
   inTransit:    boolean
@@ -107,6 +123,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   shipId:     null,
   shipTypeId: 'freighter_mk1',
   speedMult:  1.0,
+  shipRange:  28,
   loaded:     false,
 
   inTransit:    false,
@@ -142,6 +159,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         location:   data.location,
         shipId:     data.shipId,
         shipTypeId: data.shipTypeId ?? 'freighter_mk1',
+        speedMult:  data.speedMult ?? 1.0,      // BUGFIX: wurde vorher nie gesetzt
+        shipRange:  data.rangeDistance ?? 28,   // statische Reichweite
         loaded:     true,
       })
     } catch (err) {
