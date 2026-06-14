@@ -26,6 +26,7 @@ import {
   ORDER_MAX_AMOUNT,
   ORDER_REWARD_MULT,
   ORDER_EXPIRE_HOURS,
+  ORDER_COVERAGE_TICKS,
 } from './config'
 import { BUILDING_SALE } from './buildingSale'
 
@@ -343,7 +344,15 @@ export async function runOrderTick(supabase: SB) {
         .single()
       if (!price) continue
 
-      const amount = Math.floor(ORDER_MIN_AMOUNT + Math.random() * (ORDER_MAX_AMOUNT - ORDER_MIN_AMOUNT))
+      // Punkt 5: Größe = tatsächliches Defizit × Deckungsfenster (kein Zufall).
+      // balance ist hier negativ (Defizit), sonst wäre der Auftrag nicht ausgelöst.
+      // Untergrenze ORDER_MIN_AMOUNT, damit kleine Defizite die Fahrt lohnen.
+      // Kein Deckel nach oben — große Kolonien fordern große Lieferungen.
+      const deficitPerTick = Math.max(0, -balance)
+      const amount = Math.max(
+        ORDER_MIN_AMOUNT,
+        Math.round(deficitPerTick * ORDER_COVERAGE_TICKS)
+      )
       const rewardMult = isUrgent ? ORDER_REWARD_MULT * 1.3 : ORDER_REWARD_MULT
       const reward = Math.round(price.buy_price * amount * rewardMult)
       const expiresAt = new Date()
