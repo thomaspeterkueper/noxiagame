@@ -27,6 +27,7 @@ import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/
 import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
+import MiniMap from './MiniMap'
 import ColonyStats from './ColonyStats'
 import ShipyardCard from './ShipyardCard'
 import ShipHeader from './ShipHeader'
@@ -139,6 +140,7 @@ export default function DashboardClient({
   const [negotiateOrder, setNegotiateOrder] = useState<any>(null)
   const [detailColony, setDetailColony]     = useState<any>(null)
   const [shipyardOpen, setShipyardOpen]     = useState(false)
+  const [gridOpen, setGridOpen]             = useState(false)   // Karten-Overlay (volles ColonyGrid)
 
   // ── Spielstand laden ────────────────────────────────────────────────────────
   useEffect(() => { if (!loaded) loadFromServer() }, [])
@@ -350,6 +352,42 @@ export default function DashboardClient({
         }}
       />
 
+      {/* Karten-Overlay: volles ColonyGrid des aktuellen Orts */}
+      {gridOpen && currentLocationData && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(2,4,8,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', overflow: 'auto' }}
+          onClick={() => setGridOpen(false)}
+        >
+          <div style={{ maxWidth: '960px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.6rem' }}>
+              <button
+                onClick={() => setGridOpen(false)}
+                style={{ background: 'transparent', border: '1px solid #2a4e7a', color: '#cfe0f5', borderRadius: '8px', padding: '7px 14px', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                Karte schließen ✕
+              </button>
+            </div>
+            <ColonyGrid
+              slug={currentLocationData.slug} name={currentLocationData.name}
+              population={currentLocationData.population} populationMax={currentLocationData.population_max}
+              isSupplied={currentLocationData.is_supplied}
+              userId={userId}
+              tax={colonyTax[currentLocationData.id]}
+              entityInfo={entityInfo}
+              entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
+              pending={playerBuilds
+                .filter((b: any) => b.locations?.slug === currentLocationData.slug)
+                .map((b: any) => ({
+                  buildable_id: b.buildable_id,
+                  tile_row:     b.tile_row,
+                  tile_col:     b.tile_col,
+                  status:       b.status,
+                }))}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── TOPBAR ─────────────────────────────────────────────────────────── */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2.5rem', height: '66px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.4rem', margin: 0 }}>
@@ -501,8 +539,8 @@ export default function DashboardClient({
 
                       {/* Aktions-Buttons des Orts */}
                       <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.3rem', flexWrap: 'wrap' }}>
-                        <button style={btnPrimary} onClick={() => setDetailColony(currentLocationData)}>
-                          {Icon.globe('#fff')} Kolonie ansehen
+                        <button style={btnPrimary} onClick={() => setGridOpen(true)}>
+                          {Icon.globe('#fff')} Karte & Bauen
                         </button>
                         {/* Stationsbüro — Platzhalter (NPC folgt in Schicht 3) */}
                         <button style={btnGhost} onClick={() => showToast('Das Stationsbüro öffnet bald — der Verwalter ist noch unterwegs.', true)}>
@@ -517,6 +555,16 @@ export default function DashboardClient({
                     </div>
                   )
                 })()}
+
+                {/* Mini-Karte des aktuellen Orts — Klick öffnet volles Grid */}
+                {currentLocationData && (
+                  <MiniMap
+                    slug={location}
+                    userId={userId}
+                    entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+                    onOpen={() => setGridOpen(true)}
+                  />
+                )}
 
                 {/* Frachtstatus */}
                 <div style={{ ...card, padding: '0.85rem 1.4rem', display: 'flex', gap: '1.8rem', alignItems: 'center' }}>
