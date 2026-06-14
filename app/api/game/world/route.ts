@@ -1,27 +1,23 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 01.06.2026
-// Version:      0.2.0
+// Aktualisiert: 14.06.2026
+// Version:      0.3.0
 //
-// v0.2.0: Aufeinanderfolgende 1t-Transaktionen werden zusammengefasst.
-// Grund: Der Kauf-/Verkauf-Loop im Client bucht jede Tonne als eigenen
-// API-Call → ein 4t-Kauf erzeugt vier identische Transaktionszeilen.
-// groupTransactions() fasst Einträge zusammen, die von DEMSELBEN Piloten,
-// für DIESELBE Ressource, mit gleicher Richtung (from/to) und innerhalb
-// eines kurzen Zeitfensters (GROUP_WINDOW_MS) stammen. amount und profit
-// werden summiert. Echte, getrennte Handelsaktionen bleiben getrennt.
+// v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
+// werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
+// serialisiert über Advisory Lock — kein Doppellauf bei parallelen Requests).
+// Außerdem: Tick-Anzeige liest jetzt aus tick_log statt der alten
+// simulation_ticks-Tabelle.
+// v0.2.0: 1t-Transaktionen werden zusammengefasst (groupTransactions).
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { runDueTicks } from '@/lib/game/tick'
 
-// Zeitfenster, innerhalb dessen gleichartige Transaktionen als eine gelten.
 const GROUP_WINDOW_MS = 60_000  // 60 Sekunden
 
-// Fasst aufeinanderfolgende gleichartige Transaktionen zu einer zusammen.
-// Erwartet die Liste in absteigender Zeitsortierung (neueste zuerst).
 function groupTransactions(rows: any[]): any[] {
   const grouped: any[] = []
-
   for (const t of rows) {
     const last = grouped[grouped.length - 1]
     const sameKind =
@@ -30,32 +26,39 @@ function groupTransactions(rows: any[]): any[] {
       last.resource === t.resource &&
       last.from_location === t.from_location &&
       last.to_location === t.to_location &&
-      // Zeitabstand klein genug? (traded_at als ISO-String)
       Math.abs(new Date(last.traded_at).getTime() - new Date(t.traded_at).getTime()) <= GROUP_WINDOW_MS
 
     if (sameKind) {
-      // In bestehende Gruppe einrechnen
       last.amount += t.amount
       last.profit += t.profit
       last._count = (last._count ?? 1) + 1
     } else {
-      // Neue Gruppe (Kopie, damit wir das Original nicht mutieren)
       grouped.push({ ...t, _count: 1 })
     }
   }
-
   return grouped
 }
 
 export async function GET() {
   const supabase = createServiceClient()
 
-  // Letzte 2 Ticks laden
-  const { data: ticks } = await supabase
-    .from('simulation_ticks')
-    .select('*')
+  // ── HERZSCHLAG: fällige Ticks nachrechnen, BEVOR Daten geladen werden ──────
+  // Idempotent & serialisiert (claim_due_ticks via Advisory Lock). Schlägt der
+  // Tick fehl, liefern wir trotzdem die (alten) Weltdaten aus statt 500.
+  try {
+    await runDueTicks(supabase)
+  } catch (err) {
+    console.error('runDueTicks (world heartbeat) error:', err)
+  }
+
+  // Aktuelle Tick-Nummer aus tick_log (nicht mehr simulation_ticks)
+  const { data: lastTickRow } = await supabase
+    .from('tick_log')
+    .select('tick_number')
     .order('tick_number', { ascending: false })
-    .limit(2)
+    .limit(1)
+    .maybeSingle()
+  const tickCount = Number(lastTickRow?.tick_number ?? 0)
 
   // Aktuelle Koloniedaten
   const { data: locations } = await supabase
@@ -63,15 +66,13 @@ export async function GET() {
     .select('*, location_resources(resource, stock, consumption, production)')
     .order('slug')
 
-  // Letzte Transaktionen (Handelsgeschichte)
-  // Mehr Rohzeilen laden, weil das Zusammenfassen die Anzahl reduziert.
+  // Letzte Transaktionen
   const { data: rawTransactions } = await supabase
     .from('trade_transactions')
     .select('*, profiles(username)')
     .order('traded_at', { ascending: false })
     .limit(40)
 
-  // ── NEU: 1t-Loops zu sinnvollen Einträgen zusammenfassen ──────────────────
   const transactions = groupTransactions(rawTransactions ?? [])
 
   // Weltmeldungen generieren
@@ -95,18 +96,12 @@ export async function GET() {
     }
   }
 
-  // Handelsaktivität (nutzt die zusammengefasste Liste)
   if (transactions.length > 0) {
     const lastTrade = transactions[0]
-    const RESOURCE_LABELS: Record<string, string> = {
-      water: 'Wasser',
-      energy: 'Energie',
-      metal: 'Metall',
-    }
+    const RESOURCE_LABELS: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
     const resource = RESOURCE_LABELS[String(lastTrade.resource)] ?? String(lastTrade.resource)
     news.push({
-      type: 'info',
-      icon: '📦',
+      type: 'info', icon: '📦',
       text: `${lastTrade.profiles?.username ?? 'Pilot'} handelte ${lastTrade.amount}t ${resource}`,
     })
   }
@@ -116,21 +111,18 @@ export async function GET() {
     news.push({ type: 'info', icon: '📈', text: 'Handelsvolumen im Sonnensystem steigt' })
   }
 
-  // Weltstatistiken
   const totalPop = (locations ?? []).reduce((s: number, l: any) => s + l.population, 0)
   const suppliedCount = (locations ?? []).filter((l: any) => l.is_supplied).length
-  const lastTick = ticks?.[0]
-  const tickCount = lastTick?.tick_number ?? 0
 
   return NextResponse.json({
     news:         news.slice(0, 5),
     locations:    locations ?? [],
-    transactions: transactions.slice(0, 10),  // nach dem Gruppieren auf 10 kürzen
+    transactions: transactions.slice(0, 10),
     stats: {
-      totalPopulation: totalPop,
+      totalPopulation:  totalPop,
       suppliedColonies: suppliedCount,
-      totalColonies:   (locations ?? []).length,
-      tickNumber:      tickCount,
+      totalColonies:    (locations ?? []).length,
+      tickNumber:       tickCount,
     },
   })
 }
