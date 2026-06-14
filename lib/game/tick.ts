@@ -35,7 +35,10 @@ const PRODUCES: Record<string, { resource: 'metal' | 'energy'; amount: number }>
   solar: { resource: 'energy', amount: 4 },
 }
 
-export const TICK_INTERVAL_SECONDS = 3600   // 1 Stunde
+// HINWEIS: Temporär auf 1 Woche gesetzt, um die Welt fürs Balancing-Testen
+// einzufrieren (kein Tick bei jedem Dashboard-Load). VOR echtem Spielbetrieb
+// zurück auf 3600 (1 Stunde) stellen!
+export const TICK_INTERVAL_SECONDS = 604800  // TESTMODUS: 1 Woche (normal: 3600 = 1h)
 export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
 
 // Fenster für den gleitenden Bewertungs-Schnitt (Punkt 4)
