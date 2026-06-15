@@ -109,12 +109,30 @@ export function generateGrid(
     grid[r][c] = { type, owner: null }
   }
 
-  // 4. Straßen durchs Zentrum (vorerst Mittelkreuz; verzweigt folgt in Etappe D)
+  // 4. Straßennetz: Hauptachse durch die Mitte + Stichwege zu Gebäude-Clustern.
+  //    Erst alle Straßenkacheln als 'road' markieren, dann unten per Auto-Tiling
+  //    in konkrete Segmenttypen (road_<verbindungen>) auflösen.
   if (population > 200) {
+    // Hauptachse: horizontale Mittelstraße
     for (let c = 0; c < cols; c++)
       if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: null }
+
+    // Stichwege: von jeder NPC-/Gebäudekachel ein kurzer Weg Richtung Hauptachse.
+    // Bedeutungsvoll: Straßen erschließen die Bebauung.
+    const built: [number, number][] = []
     for (let r = 0; r < rows; r++)
-      if (isBuildable(grid[r][centerC].type)) grid[r][centerC] = { type: 'road', owner: null }
+      for (let c = 0; c < cols; c++)
+        if (grid[r][c].type.startsWith('npc_') || grid[r][c].type.startsWith('building_'))
+          built.push([r, c])
+
+    for (const [br, bc] of built) {
+      // vertikaler Stich zur Mittelzeile (nur über freie/baubarer Kacheln)
+      const step = br < centerR ? 1 : -1
+      for (let r = br + step; r !== centerR; r += step) {
+        if (r < 0 || r >= rows) break
+        if (isBuildable(grid[r][bc].type)) grid[r][bc] = { type: 'road', owner: null }
+      }
+    }
   }
 
   // 5. Bestand (echte Gebäude) — überschreibt, mit Eigentümer-Markierung
@@ -135,7 +153,31 @@ export function generateGrid(
     }
   }
 
+  // 7. Auto-Tiling: jede 'road'-Kachel in einen konkreten Segmenttyp auflösen.
+  //    Bitmaske der verbundenen Seiten: N=1, O=2, S=4, W=8 → road_<maske>.
+  //    Beide Renderer (TileSVG, MiniMap) zeichnen aus derselben Maske.
+  const isRoad = (r: number, c: number) =>
+    r >= 0 && r < rows && c >= 0 && c < cols && grid[r][c].type.startsWith('road')
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c].type !== 'road') continue
+      let mask = 0
+      if (isRoad(r - 1, c)) mask |= 1   // N
+      if (isRoad(r, c + 1)) mask |= 2   // O
+      if (isRoad(r + 1, c)) mask |= 4   // S
+      if (isRoad(r, c - 1)) mask |= 8   // W
+      grid[r][c] = { type: `road_${mask}`, owner: null }
+    }
+  }
+
   return grid
+}
+
+// Verbundene Seiten einer Straßenkachel aus dem Segmenttyp (road_<maske>).
+// Liefert { n, o, s, w } — fürs Rendern in beiden Grids.
+export function roadSides(type: string): { n: boolean; o: boolean; s: boolean; w: boolean } {
+  const m = type.startsWith('road_') ? parseInt(type.slice(5), 10) || 0 : 0
+  return { n: !!(m & 1), o: !!(m & 2), s: !!(m & 4), w: !!(m & 8) }
 }
 
 // Hilfsform für Konsumenten, die nur Typ-Strings brauchen (ColonyGrid-Altpfad).
