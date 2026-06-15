@@ -10,6 +10,7 @@
 // v0.3.0: buy/sell mit Mengen-Parameter (Cargo-Loop-Fix).
 
 import { create } from 'zustand'
+import { baseTravelSeconds } from '@/lib/game/ships'
 
 export type ResourceType = 'water' | 'energy' | 'metal'
 export type LocationSlug = 'moon' | 'mars' | 'phobos'
@@ -46,11 +47,6 @@ interface Trade {
   traded_at:     string
 }
 
-const TRAVEL_TIME: Record<string, Record<string, number>> = {
-  moon:   { mars: 30, phobos: 25 },
-  mars:   { moon: 30, phobos: 10 },
-  phobos: { moon: 25, mars: 10   },
-}
 
 interface GameState {
   credits:    number
@@ -269,7 +265,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (inTransit) return
     if (location === dest) return
 
-    const baseDuration = TRAVEL_TIME[location]?.[dest] ?? 20
+    const baseDuration = baseTravelSeconds(location, dest) ?? 20
     const duration = Math.round(baseDuration * speedMult)
 
     set({
