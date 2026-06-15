@@ -564,8 +564,17 @@ export default function DashboardClient({
                 {currentLocationData && (
                   <MiniMap
                     slug={location}
+                    population={currentLocationData.population}
                     userId={userId}
                     entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+                    pending={playerBuilds
+                      .filter((b: any) => b.locations?.slug === location)
+                      .map((b: any) => ({
+                        buildable_id: b.buildable_id,
+                        tile_row:     b.tile_row,
+                        tile_col:     b.tile_col,
+                        status:       b.status,
+                      }))}
                     onOpen={() => setGridOpen(true)}
                   />
                 )}
