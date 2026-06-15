@@ -1,26 +1,26 @@
 // app/dashboard/MiniMap.tsx
 // Erstellt:     14.06.2026
-// Aktualisiert: 14.06.2026
-// Version:      0.2.0
+// Aktualisiert: 15.06.2026
+// Version:      0.3.0
 //
 // Schlanke Vorschau-Karte des Koloniegrids für die Dashboard-Hauptview.
-// Reine Farbflächen (kein Bild-Laden, keine Klick-Logik) → leicht & schnell.
 // Die ganze Fläche ist EIN Button, der das volle ColonyGrid im Overlay öffnet.
 //
-// v0.2.0: Nutzt jetzt die VOLLE generateGrid-Logik (Terrain + NPC-Habitate +
-//   eigener/fremder Bestand + laufende Vorgänge) — identisch zu ColonyGrid,
-//   damit die Mini exakt dasselbe zeigt wie das große Grid (vorher zeigte sie
-//   nur Terrain). Farben je Kacheltyp/Gebäude.
+// v0.3.0: Gebäude (echt + NPC) rendern über das animierte BuildingSVG —
+//   dieselben Sprites wie im großen Grid. Terrain/Straßen bleiben schlanke
+//   Farbflächen (kein Bild-Laden). Eigene Gebäude: Goldrahmen. Die früheren
+//   eigenen ICON-Strichzeichnungen sind damit entfallen.
+// v0.2.0: volle generateGrid-Logik (Terrain + NPC + Bestand + Vorgänge).
 //
-// ⚠️ BEWUSSTES DUPLIKAT: generateGrid/seededRandom sind absichtlich aus
-// ColonyGrid.tsx gespiegelt, NICHT geteilt — damit diese Komponente ColonyGrid
-// (Parallel-Session) nicht anfasst. Wird die Terrain-/Platzierungslogik dort
-// geändert, MUSS sie hier nachgezogen werden. Wenn das lästig wird:
-// generateGrid nach lib/grid/ ziehen und beide darauf umstellen.
+// ⚠️ BEWUSSTES DUPLIKAT: generateGrid/seededRandom sind aus ColonyGrid.tsx
+// gespiegelt, NICHT geteilt. Wird die Terrain-/Platzierungslogik dort geändert,
+// hier nachziehen. Geplante Etappe B: generateGrid nach lib/grid/ ziehen und
+// beide darauf umstellen.
 
 'use client'
 
 import React from 'react'
+import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 
 const COLS = 12
 const ROWS = 8
@@ -50,7 +50,6 @@ interface MiniPending {
 }
 
 // Volle Grid-Generierung — gespiegelt aus ColonyGrid.generateGrid.
-// Liefert zusätzlich pro Zelle den Eigentümer (für Goldmarkierung).
 function generateGrid(
   slug: string,
   population: number,
@@ -95,8 +94,7 @@ function generateGrid(
     (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
   )
 
-  // 3. NPC-Bauten nach Bevölkerung. Typ per Seed variiert (nur Optik):
-  //    meist Habitate, vereinzelt Mine/Solar — macht die Karte lebendiger.
+  // 3. NPC-Bauten nach Bevölkerung. Typ per Seed variiert (nur Optik).
   const habitatCount = Math.min(Math.floor(population / 150), Math.floor(flat.length * 0.5))
   for (let i = 0; i < habitatCount; i++) {
     const [r, c] = flat[i]
@@ -113,17 +111,17 @@ function generateGrid(
       if (isBuildable(grid[r][centerC].type)) grid[r][centerC] = { type: 'road', owner: null }
   }
 
-  // 5. Eigener/fremder Bestand (überschreibt alles, mit Eigentümer-Markierung)
+  // 5. Eigener/fremder Bestand (überschreibt alles)
   return grid.map((row, r) => row.map((cell, c) => {
     const e = entities.find(en => en.tile_row === r && en.tile_col === c && en.entity_type === 'building')
-    if (e) return { type: `building_${e.entity_id}`, owner: 'own' as const } // owner wird unten je userId gesetzt
+    if (e) return { type: `building_${e.entity_id}`, owner: 'own' as const }
     const p = pending.find(pn => pn.tile_row === r && pn.tile_col === c)
     if (p) return { type: p.status === 'building' ? 'building_construction' : `building_${p.buildable_id}`, owner: null }
     return cell
   }))
 }
 
-// Farben
+// Terrain-/Straßenfarben (Gebäude rendern über BuildingSVG, nicht hier)
 const TILE_COLOR: Record<string, string> = {
   tile_surface:  '#243446',
   tile_crater:   '#1c2a38',
@@ -133,20 +131,14 @@ const TILE_COLOR: Record<string, string> = {
   tile_metal:    '#3a3a48',
   road:          '#5a6b80',
 }
-const NPC_HABITAT_COLOR = '#46586e'   // NPC-Habitate: gedämpftes Blaugrau
-const CONSTRUCTION_COLOR = '#6b5a2a'  // Baustelle
+const NPC_TILE_BG    = '#1e2a3a'   // dezenter Hintergrund hinter NPC-Sprites
+const CONSTRUCTION_COLOR = '#6b5a2a'
 
-// Gezeichnete SVG-Icons pro Gebäudetyp (geräteunabhängig, kartografischer Stil).
-// `c` = Strichfarbe. Klein gehalten für winzige Mini-Kacheln.
-const ICON: Record<string, (c: string) => React.JSX.Element> = {
-  // Mine — Spitzhacke
-  mine: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7c5-3 13-3 18 0M12 6v14"/></svg>,
-  // Solar — Panel-Raster
-  solar: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="6" width="16" height="11"/><path d="M4 11.5h16M12 6v11"/></svg>,
-  // Habitat — Haus
-  habitat: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6 8 6M6 10v8h12v-8"/></svg>,
-  // Baustelle — Kran/Balken
-  construction: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16M6 20V8l12-3M6 8l9-2"/></svg>,
+// NPC-Bautyp → entity_id fürs BuildingSVG
+const NPC_ENTITY: Record<string, string> = {
+  npc_mine:    'mine',
+  npc_solar:   'solar',
+  npc_habitat: 'habitat',
 }
 
 export default function MiniMap({
@@ -161,30 +153,40 @@ export default function MiniMap({
 }) {
   const grid = generateGrid(slug, population, entities, pending)
   const ownGold = '#c9a961'
-  const otherGray = '#7d8ca0'
+  const otherGray = '#5a6878'
 
-  function cellColor(cell: { type: string; owner: 'own' | 'other' | null }, r: number, c: number): { bg: string; glow: boolean; iconKey: string | null; stroke: string } {
-    // Echtes Gebäude? Eigentümer (Farbe) + Typ (Symbol) bestimmen.
-    // Symbol ist typrichtig UNABHÄNGIG vom Eigentümer; nur bg zeigt den Besitz.
+  // Liefert pro Zelle: was rendern (Terrain-Farbe ODER Gebäude-Sprite) + Rahmen.
+  function cell(cellData: { type: string; owner: 'own' | 'other' | null }, r: number, c: number) {
+    const t = cellData.type
+
+    // Echtes Gebäude aus dem Bestand?
     const ent = entities.find(e => e.tile_row === r && e.tile_col === c && e.entity_type === 'building')
     if (ent) {
       const own = ent.profile_id === userId
       return {
-        bg: own ? ownGold : otherGray,
+        bg: NPC_TILE_BG,
+        outline: own ? ownGold : otherGray,
         glow: own,
-        iconKey: ICON[ent.entity_id] ? ent.entity_id : null,
-        stroke: own ? '#3a2e12' : '#1b2733',   // dunkle Linie auf hellem/grauem Feld
+        entityId: ent.entity_id,   // typrichtiges Sprite, unabhängig vom Eigentümer
       }
     }
-    if (cell.type === 'building_construction') return { bg: CONSTRUCTION_COLOR, glow: false, iconKey: 'construction', stroke: '#e8d9a8' }
-    // NPC-Bauten (kosmetisch, per Seed variiert): typrichtiges Symbol, NPC-Farbe.
-    if (cell.type === 'npc_mine')    return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'mine',    stroke: '#aebbcc' }
-    if (cell.type === 'npc_solar')   return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'solar',   stroke: '#aebbcc' }
-    if (cell.type === 'npc_habitat') return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'habitat', stroke: '#aebbcc' }
-    // Alt-Fallback (echtes building_habitat aus Bestand, falls vorkommt)
-    if (cell.type === 'building_habitat') return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'habitat', stroke: '#aebbcc' }
-    if (cell.type.startsWith('building_')) return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: null, stroke: '#aebbcc' }
-    return { bg: TILE_COLOR[cell.type] ?? '#243446', glow: false, iconKey: null, stroke: '#000' }
+
+    // Baustelle → schlichte Farbe (BuildingSVG hat kein construction-Sprite)
+    if (t === 'building_construction') {
+      return { bg: CONSTRUCTION_COLOR, outline: null, glow: false, entityId: null }
+    }
+
+    // NPC-Bau → BuildingSVG-Sprite (dezenter Hintergrund, kein Rahmen)
+    if (NPC_ENTITY[t]) {
+      return { bg: NPC_TILE_BG, outline: null, glow: false, entityId: NPC_ENTITY[t] }
+    }
+    // Alt-Fallback: building_habitat aus Bestand ohne ent (selten)
+    if (t === 'building_habitat') {
+      return { bg: NPC_TILE_BG, outline: null, glow: false, entityId: 'habitat' }
+    }
+
+    // Terrain / Straße → Farbfläche
+    return { bg: TILE_COLOR[t] ?? '#243446', outline: null, glow: false, entityId: null }
   }
 
   return (
@@ -197,22 +199,35 @@ export default function MiniMap({
         cursor: 'pointer', position: 'relative',
       }}
     >
+      {/* Animations-Keyframes für BuildingSVG (auch nötig, wenn großes Grid zu ist) */}
+      <BuildingSpriteStyles />
+
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${COLS}, 1fr)`,
         gap: '2px', width: '100%', maxWidth: '420px', margin: '0 auto',
       }}>
         {grid.flatMap((row, r) =>
-          row.map((cell, c) => {
-            const { bg, glow, iconKey, stroke } = cellColor(cell, r, c)
+          row.map((cellData, c) => {
+            const { bg, outline, glow, entityId } = cell(cellData, r, c)
             return (
               <div key={`${r}-${c}`} style={{
                 width: '100%', aspectRatio: '1 / 1', borderRadius: '2px', background: bg,
+                outline: outline ? `1px solid ${outline}` : 'none',
+                outlineOffset: '-1px',
                 boxShadow: glow ? `0 0 4px ${ownGold}` : 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '15%', boxSizing: 'border-box', overflow: 'hidden',
+                overflow: 'hidden', boxSizing: 'border-box',
               }}>
-                {iconKey && ICON[iconKey] ? ICON[iconKey](stroke) : null}
+                {entityId && (
+                  <BuildingSVG
+                    entityId={entityId}
+                    planet={slug as 'moon' | 'mars' | 'phobos'}
+                    occupancy={0.6}
+                    owned={false}
+                    size={28}
+                  />
+                )}
               </div>
             )
           })
