@@ -21,18 +21,7 @@
 
 import React from 'react'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
-
-const COLS = 12
-const ROWS = 8
-
-function seededRandom(seed: number, i: number): number {
-  const x = Math.sin(seed + i) * 10000
-  return x - Math.floor(x)
-}
-
-function isBuildable(tileType: string): boolean {
-  return tileType === 'tile_surface' || tileType === 'tile_metal'
-}
+import { generateGrid, NPC_ENTITY, COLS } from '@/lib/grid/generateGrid'
 
 interface MiniEntity {
   entity_id:   string
@@ -49,78 +38,6 @@ interface MiniPending {
   status:       string
 }
 
-// Volle Grid-Generierung — gespiegelt aus ColonyGrid.generateGrid.
-function generateGrid(
-  slug: string,
-  population: number,
-  entities: MiniEntity[],
-  pending: MiniPending[],
-): { type: string; owner: 'own' | 'other' | null }[][] {
-  const grid: { type: string; owner: 'own' | 'other' | null }[][] = []
-  const seed = slug.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  const centerR = Math.floor(ROWS / 2)
-  const centerC = Math.floor(COLS / 2)
-
-  // 1. Terrain
-  for (let r = 0; r < ROWS; r++) {
-    const row: { type: string; owner: 'own' | 'other' | null }[] = []
-    for (let c = 0; c < COLS; c++) {
-      const rand = seededRandom(seed, r * COLS + c)
-      let t: string
-      if (slug === 'moon') {
-        t = rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
-      } else if (slug === 'mars') {
-        t = rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : 'tile_surface'
-      } else {
-        t = rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface'
-      }
-      row.push({ type: t, owner: null })
-    }
-    grid.push(row)
-  }
-
-  // 2. Belegte Positionen (Bestand + Vorgänge) für NPC-Habitate aussparen
-  const occupied = new Set<string>()
-  for (const e of entities) occupied.add(`${e.tile_row}-${e.tile_col}`)
-  for (const p of pending)  occupied.add(`${p.tile_row}-${p.tile_col}`)
-
-  const flat: [number, number][] = []
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++)
-      if (isBuildable(grid[r][c].type) && !occupied.has(`${r}-${c}`))
-        flat.push([r, c])
-  flat.sort((a, b) =>
-    (Math.abs(a[0] - centerR) + Math.abs(a[1] - centerC)) -
-    (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
-  )
-
-  // 3. NPC-Bauten nach Bevölkerung. Typ per Seed variiert (nur Optik).
-  const habitatCount = Math.min(Math.floor(population / 150), Math.floor(flat.length * 0.5))
-  for (let i = 0; i < habitatCount; i++) {
-    const [r, c] = flat[i]
-    const v = seededRandom(seed, 999 + r * COLS + c)
-    const type = v < 0.12 ? 'npc_mine' : v < 0.22 ? 'npc_solar' : 'npc_habitat'
-    grid[r][c] = { type, owner: null }
-  }
-
-  // 4. Straßen durchs Zentrum
-  if (population > 200) {
-    for (let c = 0; c < COLS; c++)
-      if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: null }
-    for (let r = 0; r < ROWS; r++)
-      if (isBuildable(grid[r][centerC].type)) grid[r][centerC] = { type: 'road', owner: null }
-  }
-
-  // 5. Eigener/fremder Bestand (überschreibt alles)
-  return grid.map((row, r) => row.map((cell, c) => {
-    const e = entities.find(en => en.tile_row === r && en.tile_col === c && en.entity_type === 'building')
-    if (e) return { type: `building_${e.entity_id}`, owner: 'own' as const }
-    const p = pending.find(pn => pn.tile_row === r && pn.tile_col === c)
-    if (p) return { type: p.status === 'building' ? 'building_construction' : `building_${p.buildable_id}`, owner: null }
-    return cell
-  }))
-}
-
 // Terrain-/Straßenfarben (Gebäude rendern über BuildingSVG, nicht hier)
 const TILE_COLOR: Record<string, string> = {
   tile_surface:  '#243446',
@@ -133,13 +50,6 @@ const TILE_COLOR: Record<string, string> = {
 }
 const NPC_TILE_BG    = '#1e2a3a'   // dezenter Hintergrund hinter NPC-Sprites
 const CONSTRUCTION_COLOR = '#6b5a2a'
-
-// NPC-Bautyp → entity_id fürs BuildingSVG
-const NPC_ENTITY: Record<string, string> = {
-  npc_mine:    'mine',
-  npc_solar:   'solar',
-  npc_habitat: 'habitat',
-}
 
 export default function MiniMap({
   slug, population = 0, entities = [], pending = [], userId, onOpen,
