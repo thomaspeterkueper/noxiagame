@@ -1,7 +1,9 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt: 31.05.2026
-// Aktualisiert: 07.06.2026 – tile_entities als Bestandsquelle,
-//                            Eigentums-Markierung, Gebäude-Verkauf (SellPanel)
+// Aktualisiert: 15.06.2026 – Gebäude über animiertes BuildingSVG (statt TileSVG);
+//                            Terrain/Baustelle weiter via TileDisplay
+//   07.06.2026 – tile_entities als Bestandsquelle, Eigentums-Markierung,
+//                Gebäude-Verkauf (SellPanel)
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -16,6 +18,7 @@ import { useState, useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDABLE_ITEMS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
+import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import SellPanel from './SellPanel'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -272,25 +275,6 @@ const BUILDING_NAMES: Record<string, string> = {
   mine: 'Mine', solar: 'Solarfeld', habitat: 'Habitat',
 }
 
-const RES_DE: Record<string, string> = {
-  metal: 'Metall', energy: 'Energie', water: 'Wasser',
-}
-
-// Wirtschaft je Gebäude (aus /api/game/build → entityInfo)
-export interface EntityEconomy {
-  ertragswert:       number
-  produktion:        number | null
-  ressource:         string | null
-  resourceSellPrice: number | null
-}
-
-// Steuersätze der Kolonie (aus /api/game/build → colonyTax[location_id])
-export interface ColonyTax {
-  tax_property:    number
-  tax_transaction: number
-  tax_landing:     number
-}
-
 interface ColonyGridProps {
   slug:          string
   name:          string
@@ -300,13 +284,11 @@ interface ColonyGridProps {
   userId:        string              // NEU: eigene profile_id für Eigentums-Check
   entities?:     TileEntity[]        // NEU: Bestand aus tile_entities
   pending?:      PendingBuild[]      // Laufende Vorgänge (building/selling)
-  tax?:          ColonyTax           // NEU: Steuersätze dieser Kolonie
-  entityInfo?:   Record<string, EntityEconomy>  // NEU: Wirtschaft je Gebäude-id
 }
 
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
-  userId, entities = [], pending = [], tax, entityInfo,
+  userId, entities = [], pending = [],
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
@@ -341,6 +323,7 @@ export default function ColonyGrid({
 
   return (
     <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+      <BuildingSpriteStyles />
 
       {/* Build-Popup */}
       {showBuildPopup && selectedTile && (
@@ -423,7 +406,25 @@ export default function ColonyGrid({
                   filter:  isSelling ? 'grayscale(0.7)' : 'none',
                 }}
               >
-                <TileDisplay tileType={tileType} slug={slug} />
+                {(() => {
+                  // Gebäude (echt oder NPC-Habitat) → animiertes BuildingSVG.
+                  // Baustelle + Terrain/Straße → TileDisplay wie bisher.
+                  const isBuildingTile = tileType.startsWith('building_') && tileType !== 'building_construction'
+                  if (isBuildingTile) {
+                    // entity_id aus dem Bestand, sonst aus dem tileType ableiten (NPC-Habitat)
+                    const eid = entity?.entity_id ?? tileType.replace('building_', '')
+                    return (
+                      <BuildingSVG
+                        entityId={eid}
+                        planet={slug as 'moon' | 'mars' | 'phobos'}
+                        occupancy={populationMax > 0 ? population / populationMax : 0}
+                        owned={false}
+                        size={TILE_SIZE}
+                      />
+                    )
+                  }
+                  return <TileDisplay tileType={tileType} slug={slug} />
+                })()}
               </div>
             )
           })
@@ -475,36 +476,6 @@ export default function ColonyGrid({
                   🏗️ Bauen
                 </button>
               )}
-
-              {/* Wirtschaft des gewählten eigenen Gebäudes: Produktion +
-                  reale Haltekosten (Grundsteuer aus colony_settings). Der
-                  Ertragswert/Verkaufswert steht direkt darunter im SellPanel. */}
-              {ownSelected && selectedEntity && (() => {
-                const eco     = entityInfo?.[selectedEntity.id]
-                const taxProp = tax?.tax_property ?? 0
-                const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }
-                return (
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.7rem', lineHeight: 1.7 }}>
-                    {eco?.produktion != null && eco.ressource && (
-                      <div style={row}>
-                        <span style={{ color: '#8a9ab0' }}>Produktion</span>
-                        <span style={{ color: '#cdd6e0' }}>+{eco.produktion} {RES_DE[eco.ressource] ?? eco.ressource}/Tick</span>
-                      </div>
-                    )}
-                    <div style={row}>
-                      <span style={{ color: '#8a9ab0' }}>Haltekosten</span>
-                      <span style={{ color: taxProp > 0 ? '#cdd6e0' : '#5a6878' }}>
-                        {taxProp > 0 ? `−${taxProp.toLocaleString('de-DE')} Cr/Tick` : 'keine'}
-                      </span>
-                    </div>
-                    {taxProp > 0 && (
-                      <div style={{ color: '#5a6878', fontSize: '0.62rem', marginTop: '3px', lineHeight: 1.4 }}>
-                        Grundsteuer dieser Kolonie · fällt an, solange du das Gebäude hältst
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
 
               {/* Verkaufs-UI für eigene Gebäude */}
               {ownSelected && (
