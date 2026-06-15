@@ -19,6 +19,7 @@ import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDABLE_ITEMS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
+import { generateGrid, gridTypes, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -40,18 +41,7 @@ function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   )
 }
 
-const COLS = 12
-const ROWS = 8
 const TILE_SIZE = 44
-
-function isBuildable(tileType: string): boolean {
-  return tileType === 'tile_surface' || tileType === 'tile_metal'
-}
-
-function seededRandom(seed: number, i: number): number {
-  const x = Math.sin(seed + i) * 10000
-  return x - Math.floor(x)
-}
 
 // ── Typen für Bestand + Vorgänge ──────────────────────────────
 
@@ -73,87 +63,6 @@ export interface PendingBuild {
   tile_row:     number
   tile_col:     number
   status:       string  // 'building' | 'selling'
-}
-
-// Generiert das Terrain-Grid
-function generateGrid(
-  slug:          string,
-  population:    number,
-  entities:      TileEntity[],
-  pending:       PendingBuild[],
-  cols:          number,
-  rows:          number
-): string[][] {
-  const grid: string[][] = []
-  const seed = slug.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  const centerR = Math.floor(rows / 2)
-  const centerC = Math.floor(cols / 2)
-
-  // 1. Terrain (deterministisch durch Seed)
-  for (let r = 0; r < rows; r++) {
-    const row: string[] = []
-    for (let c = 0; c < cols; c++) {
-      const rand = seededRandom(seed, r * cols + c)
-      if (slug === 'moon') {
-        row.push(rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface')
-      } else if (slug === 'mars') {
-        row.push(rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : 'tile_surface')
-      } else {
-        row.push(rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface')
-      }
-    }
-    grid.push(row)
-  }
-
-  // 2. Flache Positionen für NPC-Habitate sammeln
-  //    Spieler-Kacheln (Bestand + Vorgänge) sind dafür tabu.
-  const occupied = new Set<string>()
-  for (const e of entities) occupied.add(`${e.tile_row}-${e.tile_col}`)
-  for (const p of pending)  occupied.add(`${p.tile_row}-${p.tile_col}`)
-
-  const flatPositions: [number, number][] = []
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++)
-      if (isBuildable(grid[r][c]) && !occupied.has(`${r}-${c}`))
-        flatPositions.push([r, c])
-
-  flatPositions.sort((a, b) =>
-    (Math.abs(a[0] - centerR) + Math.abs(a[1] - centerC)) -
-    (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
-  )
-
-  // 3. NPC-Habitate basierend auf Bevölkerung
-  const habitatCount = Math.min(Math.floor(population / 150), Math.floor(flatPositions.length * 0.5))
-  for (let i = 0; i < habitatCount; i++) {
-    const [r, c] = flatPositions[i]
-    grid[r][c] = 'building_habitat'
-  }
-
-  // 4. Bestand aus tile_entities platzieren
-  for (const e of entities) {
-    if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
-      grid[e.tile_row][e.tile_col] = `building_${e.entity_id}`
-    }
-  }
-
-  // 5. Laufende Vorgänge: Baustelle bzw. „wird verkauft"
-  for (const p of pending) {
-    if (p.tile_row >= 0 && p.tile_row < rows && p.tile_col >= 0 && p.tile_col < cols) {
-      grid[p.tile_row][p.tile_col] = p.status === 'building'
-        ? 'building_construction'
-        : `building_${p.buildable_id}`   // selling: Gebäude noch sichtbar, gedimmt (s. Render)
-    }
-  }
-
-  // 6. Straßen durch Zentrum
-  if (population > 200) {
-    for (let c = 0; c < cols; c++)
-      if (isBuildable(grid[centerR][c])) grid[centerR][c] = 'road'
-    for (let r = 0; r < rows; r++)
-      if (isBuildable(grid[r][centerC])) grid[r][centerC] = 'road'
-  }
-
-  return grid
 }
 
 // ── Build-Popup ───────────────────────────────────────────────
@@ -318,7 +227,7 @@ export default function ColonyGrid({
   const popPercent = Math.round((population / populationMax) * 100)
 
   useEffect(() => {
-    setGrid(generateGrid(slug, population, entities, pending, COLS, ROWS))
+    setGrid(gridTypes(generateGrid(slug, population, entities, pending, userId)))
   }, [slug, population, populationMax, entities, pending])
 
   // Entität auf einer Kachel finden (Oberfläche, Gebäude)
@@ -428,12 +337,14 @@ export default function ColonyGrid({
                 }}
               >
                 {(() => {
-                  // Gebäude (echt oder NPC-Habitat) → animiertes BuildingSVG.
+                  // Gebäude (echt, NPC oder building_habitat) → animiertes BuildingSVG.
                   // Baustelle + Terrain/Straße → TileDisplay wie bisher.
-                  const isBuildingTile = tileType.startsWith('building_') && tileType !== 'building_construction'
+                  const npcEid = NPC_ENTITY[tileType]   // npc_mine → 'mine' etc.
+                  const isBuildingTile =
+                    npcEid !== undefined ||
+                    (tileType.startsWith('building_') && tileType !== 'building_construction')
                   if (isBuildingTile) {
-                    // entity_id aus dem Bestand, sonst aus dem tileType ableiten (NPC-Habitat)
-                    const eid = entity?.entity_id ?? tileType.replace('building_', '')
+                    const eid = entity?.entity_id ?? npcEid ?? tileType.replace('building_', '')
                     return (
                       <BuildingSVG
                         entityId={eid}
