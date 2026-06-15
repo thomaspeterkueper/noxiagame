@@ -95,11 +95,14 @@ function generateGrid(
     (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
   )
 
-  // 3. NPC-Habitate nach Bevölkerung
+  // 3. NPC-Bauten nach Bevölkerung. Typ per Seed variiert (nur Optik):
+  //    meist Habitate, vereinzelt Mine/Solar — macht die Karte lebendiger.
   const habitatCount = Math.min(Math.floor(population / 150), Math.floor(flat.length * 0.5))
   for (let i = 0; i < habitatCount; i++) {
     const [r, c] = flat[i]
-    grid[r][c] = { type: 'building_habitat', owner: null }
+    const v = seededRandom(seed, 999 + r * COLS + c)
+    const type = v < 0.12 ? 'npc_mine' : v < 0.22 ? 'npc_solar' : 'npc_habitat'
+    grid[r][c] = { type, owner: null }
   }
 
   // 4. Straßen durchs Zentrum
@@ -144,8 +147,6 @@ const ICON: Record<string, (c: string) => React.JSX.Element> = {
   habitat: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6 8 6M6 10v8h12v-8"/></svg>,
   // Baustelle — Kran/Balken
   construction: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16M6 20V8l12-3M6 8l9-2"/></svg>,
-  // NPC-Habitat — kleines Haus (dezent)
-  npc: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l7-5 7 5M7 11v6h10v-6"/></svg>,
 }
 
 export default function MiniMap({
@@ -176,8 +177,13 @@ export default function MiniMap({
       }
     }
     if (cell.type === 'building_construction') return { bg: CONSTRUCTION_COLOR, glow: false, iconKey: 'construction', stroke: '#e8d9a8' }
-    if (cell.type === 'building_habitat')      return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'npc', stroke: '#aebbcc' }
-    if (cell.type.startsWith('building_'))      return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: null, stroke: '#aebbcc' }
+    // NPC-Bauten (kosmetisch, per Seed variiert): typrichtiges Symbol, NPC-Farbe.
+    if (cell.type === 'npc_mine')    return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'mine',    stroke: '#aebbcc' }
+    if (cell.type === 'npc_solar')   return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'solar',   stroke: '#aebbcc' }
+    if (cell.type === 'npc_habitat') return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'habitat', stroke: '#aebbcc' }
+    // Alt-Fallback (echtes building_habitat aus Bestand, falls vorkommt)
+    if (cell.type === 'building_habitat') return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'habitat', stroke: '#aebbcc' }
+    if (cell.type.startsWith('building_')) return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: null, stroke: '#aebbcc' }
     return { bg: TILE_COLOR[cell.type] ?? '#243446', glow: false, iconKey: null, stroke: '#000' }
   }
 
