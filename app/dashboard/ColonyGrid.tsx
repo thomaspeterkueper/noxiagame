@@ -338,7 +338,8 @@ export default function ColonyGrid({
               >
                 {(() => {
                   // Gebäude (echt, NPC oder building_habitat) → animiertes BuildingSVG.
-                  // Baustelle + Terrain/Straße → TileDisplay wie bisher.
+                  // Straßen → direkt TileSVG (maskenbasiert, kein Bild-404).
+                  // Baustelle + Terrain → TileDisplay wie bisher.
                   const npcEid = NPC_ENTITY[tileType]   // npc_mine → 'mine' etc.
                   const isBuildingTile =
                     npcEid !== undefined ||
@@ -354,6 +355,9 @@ export default function ColonyGrid({
                         size={TILE_SIZE}
                       />
                     )
+                  }
+                  if (tileType.startsWith('road')) {
+                    return <TileSVG type={tileType} planet={slug as 'moon' | 'mars' | 'phobos'} />
                   }
                   return <TileDisplay tileType={tileType} slug={slug} />
                 })()}
