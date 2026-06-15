@@ -13,6 +13,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getToken } from '@/lib/supabase/auth'
 
 // ── Styling-Konstanten (Dark-Grid-Ästhetik) ──
 const C = {
@@ -41,16 +42,6 @@ interface SellPanelProps {
   entityId: string
   entityName: string          // z.B. "Solarfeld"
   onSold?: () => void         // Bestand + Credits neu laden
-}
-
-async function getToken(): Promise<string | null> {
-  const { createBrowserClient } = await import('@supabase/ssr')
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token ?? null
 }
 
 export default function SellPanel({ entityId, entityName, onSold }: SellPanelProps) {
