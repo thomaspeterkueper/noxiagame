@@ -20,6 +20,8 @@
 
 'use client'
 
+import React from 'react'
+
 const COLS = 12
 const ROWS = 8
 
@@ -131,11 +133,19 @@ const TILE_COLOR: Record<string, string> = {
 const NPC_HABITAT_COLOR = '#46586e'   // NPC-Habitate: gedämpftes Blaugrau
 const CONSTRUCTION_COLOR = '#6b5a2a'  // Baustelle
 
-// Symbole pro Gebäudetyp (eigene + fremde echte Gebäude)
-const BUILDING_ICON: Record<string, string> = {
-  mine:    '⛏️',
-  solar:   '⚡',
-  habitat: '🏘️',
+// Gezeichnete SVG-Icons pro Gebäudetyp (geräteunabhängig, kartografischer Stil).
+// `c` = Strichfarbe. Klein gehalten für winzige Mini-Kacheln.
+const ICON: Record<string, (c: string) => React.JSX.Element> = {
+  // Mine — Spitzhacke
+  mine: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7c5-3 13-3 18 0M12 6v14"/></svg>,
+  // Solar — Panel-Raster
+  solar: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="6" width="16" height="11"/><path d="M4 11.5h16M12 6v11"/></svg>,
+  // Habitat — Haus
+  habitat: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6 8 6M6 10v8h12v-8"/></svg>,
+  // Baustelle — Kran/Balken
+  construction: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16M6 20V8l12-3M6 8l9-2"/></svg>,
+  // NPC-Habitat — kleines Haus (dezent)
+  npc: (c) => <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l7-5 7 5M7 11v6h10v-6"/></svg>,
 }
 
 export default function MiniMap({
@@ -152,17 +162,23 @@ export default function MiniMap({
   const ownGold = '#c9a961'
   const otherGray = '#7d8ca0'
 
-  function cellColor(cell: { type: string; owner: 'own' | 'other' | null }, r: number, c: number): { bg: string; glow: boolean; icon: string } {
-    // Echtes Gebäude? Eigentümer + Typ bestimmen.
+  function cellColor(cell: { type: string; owner: 'own' | 'other' | null }, r: number, c: number): { bg: string; glow: boolean; iconKey: string | null; stroke: string } {
+    // Echtes Gebäude? Eigentümer (Farbe) + Typ (Symbol) bestimmen.
+    // Symbol ist typrichtig UNABHÄNGIG vom Eigentümer; nur bg zeigt den Besitz.
     const ent = entities.find(e => e.tile_row === r && e.tile_col === c && e.entity_type === 'building')
     if (ent) {
       const own = ent.profile_id === userId
-      return { bg: own ? ownGold : otherGray, glow: own, icon: BUILDING_ICON[ent.entity_id] ?? '▪' }
+      return {
+        bg: own ? ownGold : otherGray,
+        glow: own,
+        iconKey: ICON[ent.entity_id] ? ent.entity_id : null,
+        stroke: own ? '#3a2e12' : '#1b2733',   // dunkle Linie auf hellem/grauem Feld
+      }
     }
-    if (cell.type === 'building_construction') return { bg: CONSTRUCTION_COLOR, glow: false, icon: '🏗️' }
-    if (cell.type === 'building_habitat')      return { bg: NPC_HABITAT_COLOR, glow: false, icon: '🏠' }
-    if (cell.type.startsWith('building_'))      return { bg: NPC_HABITAT_COLOR, glow: false, icon: '' }
-    return { bg: TILE_COLOR[cell.type] ?? '#243446', glow: false, icon: '' }
+    if (cell.type === 'building_construction') return { bg: CONSTRUCTION_COLOR, glow: false, iconKey: 'construction', stroke: '#e8d9a8' }
+    if (cell.type === 'building_habitat')      return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: 'npc', stroke: '#aebbcc' }
+    if (cell.type.startsWith('building_'))      return { bg: NPC_HABITAT_COLOR, glow: false, iconKey: null, stroke: '#aebbcc' }
+    return { bg: TILE_COLOR[cell.type] ?? '#243446', glow: false, iconKey: null, stroke: '#000' }
   }
 
   return (
@@ -178,19 +194,19 @@ export default function MiniMap({
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-        gap: '2px', width: '100%',
+        gap: '2px', width: '100%', maxWidth: '420px', margin: '0 auto',
       }}>
         {grid.flatMap((row, r) =>
           row.map((cell, c) => {
-            const { bg, glow, icon } = cellColor(cell, r, c)
+            const { bg, glow, iconKey, stroke } = cellColor(cell, r, c)
             return (
               <div key={`${r}-${c}`} style={{
                 width: '100%', aspectRatio: '1 / 1', borderRadius: '2px', background: bg,
                 boxShadow: glow ? `0 0 4px ${ownGold}` : 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.6rem', lineHeight: 1, overflow: 'hidden',
+                padding: '15%', boxSizing: 'border-box', overflow: 'hidden',
               }}>
-                {icon}
+                {iconKey && ICON[iconKey] ? ICON[iconKey](stroke) : null}
               </div>
             )
           })
