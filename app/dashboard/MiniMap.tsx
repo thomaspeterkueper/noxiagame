@@ -131,7 +131,7 @@ const TILE_COLOR: Record<string, string> = {
   tile_canyon:   '#3a2a2a',
   tile_shaft:    '#1a2230',
   tile_metal:    '#3a3a48',
-  road:          '#33445a',
+  road:          '#5a6b80',
 }
 const NPC_HABITAT_COLOR = '#46586e'   // NPC-Habitate: gedämpftes Blaugrau
 const CONSTRUCTION_COLOR = '#6b5a2a'  // Baustelle
