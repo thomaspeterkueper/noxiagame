@@ -24,6 +24,7 @@
 
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/store/gameStore'
+import { baseTravelSeconds } from '@/lib/game/ships'
 import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
@@ -174,15 +175,10 @@ export default function DashboardClient({
   const cargoFreeSpace      = cargoMax - used
   const totalPop            = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
 
-  // Flugzeiten (Basis, GAMEDESIGN). Schicht 2 ersetzt das durch echte
-  // Schiffsreichweite; vorerst nur Anzeige, alle Ziele erreichbar.
-  const FLIGHT_SECONDS: Record<string, Record<string, number>> = {
-    moon:   { mars: 30, phobos: 25 },
-    mars:   { moon: 30, phobos: 10 },
-    phobos: { moon: 25, mars: 10 },
-  }
+  // Flugzeit zum Ziel — aus der EINEN Quelle (ships.baseTravelSeconds) statt
+  // einer lokalen Kopie. `tick` ist dort reserviert für die Orbital-Schicht.
   function flightTime(to: string): number | null {
-    return FLIGHT_SECONDS[location]?.[to] ?? null
+    return baseTravelSeconds(location, to as LocationSlug)
   }
 
   // Effektive Reichweite: heute = statische shipRange. Die Funktion trägt schon
