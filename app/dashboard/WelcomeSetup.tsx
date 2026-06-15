@@ -11,6 +11,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getToken } from '@/lib/supabase/auth'
 
 const C = {
   bg:    '#020408',
@@ -31,16 +32,6 @@ const CARDS = [
   { icon: '🔴', title: 'Flieg zum Mars', text: 'Dort ist Wasser knapp — und Knappheit hat ihren Preis.' },
   { icon: '📈', title: 'Verkauf mit Gewinn', text: 'Und sieh zu, wie die Kolonie wächst. Sie wird sich erinnern.' },
 ]
-
-async function getToken(): Promise<string | null> {
-  const { createBrowserClient } = await import('@supabase/ssr')
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token ?? null
-}
 
 export default function WelcomeSetup({ onDone }: { onDone: () => void }) {
   const [step, setStep]       = useState<'setup' | 'cards'>('setup')
