@@ -58,6 +58,18 @@ export const ROUTE_TIMES_SEC: Record<string, number> = {
   [routeKey('moon', 'mars')]: 30, [routeKey('moon', 'phobos')]: 25, [routeKey('mars', 'phobos')]: 10,
 };
 
+// ── Schicht-0-Naht: die EINE Quelle der Basis-Reisezeit ──────────────────────
+// Basiszeit in Sekunden (Tempo 1.0, vor Schiffsfaktoren) zwischen zwei Orten.
+// Heute ein statischer Lookup; `tick` ist RESERVIERT: sobald die Orbital-Schicht
+// (Schicht 2) steht, liefert diese Funktion distanz(from,to,tick)/v statt der
+// Tabelle — OHNE dass ein Aufrufer sich ändert. Store, DashboardClient und
+// travelTime() rufen ausschließlich das hier, statt eigene Tabellen zu halten.
+// Generisch über Orts-IDs gehalten (Raumstationen/Planeten/Belt/andere Systeme
+// betreffen später nur die Innereien, nie die Signatur). null = keine Route.
+export function baseTravelSeconds(from: LocationSlug, to: LocationSlug, _tick?: number): number | null {
+  return ROUTE_TIMES_SEC[routeKey(from, to)] ?? null
+}
+
 // ── Bauplan vs. lebende Instanz ──────────────────────────────────────────────
 export interface ShipLoadout { frameId: string; modules: string[]; }      // Bauplan
 
@@ -135,7 +147,7 @@ export function effectiveSpeed(s: ShipLoadout | ShipInstance, opts: { massPenalt
   return f.baseSpeed / (1 + k * (load / ref));
 }
 export function travelTime(from: LocationSlug, to: LocationSlug, s: ShipLoadout | ShipInstance, opts?: { massPenalty?: boolean }): number {
-  const base = ROUTE_TIMES_SEC[routeKey(from, to)];
+  const base = baseTravelSeconds(from, to);
   if (base == null) return Infinity;
   let speed = effectiveSpeed(s, opts);
   if (shipFunctions(s).includes('boosted_drive')) speed *= 1.15;
