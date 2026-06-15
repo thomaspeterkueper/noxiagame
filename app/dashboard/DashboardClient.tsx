@@ -24,6 +24,7 @@
 
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/store/gameStore'
+import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
@@ -74,17 +75,6 @@ const Icon = {
   arrow: (c = 'currentColor') => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>,
   logout:(c = 'currentColor') => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
   alert: (c = 'currentColor') => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>,
-}
-
-// ─── Bearer Token ───────────────────────────────────────────────────────────
-async function getToken(): Promise<string | null> {
-  const { createBrowserClient } = await import('@supabase/ssr')
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token ?? null
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -163,15 +153,8 @@ export default function DashboardClient({
   // ── Spieler-Builds + Bestand laden ─────────────────────────────────────────
   async function fetchBuilds() {
     try {
-      const { createBrowserClient } = await import('@supabase/ssr')
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data: { session } } = await supabase.auth.getSession()
-      setUserId(session?.user?.id ?? '')
-
-      const token = session?.access_token ?? null
+      const { token, userId } = await getSessionInfo()
+      setUserId(userId)
       const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
       const data  = await res.json()
       setPlayerBuilds(data.builds ?? [])
