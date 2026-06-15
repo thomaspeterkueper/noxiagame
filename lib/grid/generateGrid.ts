@@ -109,28 +109,25 @@ export function generateGrid(
     grid[r][c] = { type, owner: null }
   }
 
-  // 4. Straßennetz: Hauptachse durch die Mitte + Stichwege zu Gebäude-Clustern.
-  //    Erst alle Straßenkacheln als 'road' markieren, dann unten per Auto-Tiling
-  //    in konkrete Segmenttypen (road_<verbindungen>) auflösen.
+  // 4. Straßennetz: ruhiges Raster einer geplanten Kolonie.
+  //    Eine horizontale Hauptachse (Mittelzeile) + wenige vertikale
+  //    Querstraßen in festen Abständen — unabhängig von NPC-Positionen,
+  //    damit das Netz lesbar bleibt (kein Stichweg-Kabelsalat).
+  //    Auto-Tiling unten löst die Segmente auf.
   if (population > 200) {
-    // Hauptachse: horizontale Mittelstraße
+    // Hauptachse
     for (let c = 0; c < cols; c++)
       if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: null }
 
-    // Stichwege: von jeder NPC-/Gebäudekachel ein kurzer Weg Richtung Hauptachse.
-    // Bedeutungsvoll: Straßen erschließen die Bebauung.
-    const built: [number, number][] = []
-    for (let r = 0; r < rows; r++)
-      for (let c = 0; c < cols; c++)
-        if (grid[r][c].type.startsWith('npc_') || grid[r][c].type.startsWith('building_'))
-          built.push([r, c])
-
-    for (const [br, bc] of built) {
-      // vertikaler Stich zur Mittelzeile (nur über freie/baubarer Kacheln)
-      const step = br < centerR ? 1 : -1
-      for (let r = br + step; r !== centerR; r += step) {
-        if (r < 0 || r >= rows) break
-        if (isBuildable(grid[r][bc].type)) grid[r][bc] = { type: 'road', owner: null }
+    // Querstraßen alle 4 Spalten (feste Abstände → Rasteroptik)
+    const span = Math.min(Math.floor(population / 400) + 1, 3)  // 1–3 Querstraßen je nach Größe
+    for (let q = 1; q <= span; q++) {
+      const qc = Math.round((cols * q) / (span + 1))
+      // Querstraße läuft nur ein Stück nach oben/unten von der Hauptachse (kompakt)
+      const reach = 2 + Math.floor(population / 600)
+      for (let r = centerR - reach; r <= centerR + reach; r++) {
+        if (r < 0 || r >= rows) continue
+        if (isBuildable(grid[r][qc].type)) grid[r][qc] = { type: 'road', owner: null }
       }
     }
   }
