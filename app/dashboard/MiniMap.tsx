@@ -131,6 +131,13 @@ const TILE_COLOR: Record<string, string> = {
 const NPC_HABITAT_COLOR = '#46586e'   // NPC-Habitate: gedämpftes Blaugrau
 const CONSTRUCTION_COLOR = '#6b5a2a'  // Baustelle
 
+// Symbole pro Gebäudetyp (eigene + fremde echte Gebäude)
+const BUILDING_ICON: Record<string, string> = {
+  mine:    '⛏️',
+  solar:   '⚡',
+  habitat: '🏘️',
+}
+
 export default function MiniMap({
   slug, population = 0, entities = [], pending = [], userId, onOpen,
 }: {
@@ -145,17 +152,17 @@ export default function MiniMap({
   const ownGold = '#c9a961'
   const otherGray = '#7d8ca0'
 
-  function cellColor(cell: { type: string; owner: 'own' | 'other' | null }, r: number, c: number): { bg: string; glow: boolean } {
-    // Echtes Gebäude? Eigentümer anhand userId bestimmen.
+  function cellColor(cell: { type: string; owner: 'own' | 'other' | null }, r: number, c: number): { bg: string; glow: boolean; icon: string } {
+    // Echtes Gebäude? Eigentümer + Typ bestimmen.
     const ent = entities.find(e => e.tile_row === r && e.tile_col === c && e.entity_type === 'building')
     if (ent) {
       const own = ent.profile_id === userId
-      return { bg: own ? ownGold : otherGray, glow: own }
+      return { bg: own ? ownGold : otherGray, glow: own, icon: BUILDING_ICON[ent.entity_id] ?? '▪' }
     }
-    if (cell.type === 'building_construction') return { bg: CONSTRUCTION_COLOR, glow: false }
-    if (cell.type === 'building_habitat')      return { bg: NPC_HABITAT_COLOR, glow: false }
-    if (cell.type.startsWith('building_'))      return { bg: NPC_HABITAT_COLOR, glow: false }
-    return { bg: TILE_COLOR[cell.type] ?? '#243446', glow: false }
+    if (cell.type === 'building_construction') return { bg: CONSTRUCTION_COLOR, glow: false, icon: '🏗️' }
+    if (cell.type === 'building_habitat')      return { bg: NPC_HABITAT_COLOR, glow: false, icon: '🏠' }
+    if (cell.type.startsWith('building_'))      return { bg: NPC_HABITAT_COLOR, glow: false, icon: '' }
+    return { bg: TILE_COLOR[cell.type] ?? '#243446', glow: false, icon: '' }
   }
 
   return (
@@ -175,12 +182,16 @@ export default function MiniMap({
       }}>
         {grid.flatMap((row, r) =>
           row.map((cell, c) => {
-            const { bg, glow } = cellColor(cell, r, c)
+            const { bg, glow, icon } = cellColor(cell, r, c)
             return (
               <div key={`${r}-${c}`} style={{
-                width: '100%', height: '22px', borderRadius: '2px', background: bg,
+                width: '100%', aspectRatio: '1 / 1', borderRadius: '2px', background: bg,
                 boxShadow: glow ? `0 0 4px ${ownGold}` : 'none',
-              }} />
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.6rem', lineHeight: 1, overflow: 'hidden',
+              }}>
+                {icon}
+              </div>
             )
           })
         )}
