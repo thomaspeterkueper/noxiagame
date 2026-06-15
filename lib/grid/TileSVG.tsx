@@ -1,7 +1,11 @@
 // lib/grid/TileSVG.tsx
 // Erstellt: 31.05.2026
+// Aktualisiert: 15.06.2026 – Straßen maskenbasiert (road_<maske>): zeichnet
+//                            Striche zu allen verbundenen Seiten → Geraden,
+//                            Kurven, T-Stücke, Kreuzungen automatisch.
 // SVG-Kacheln für das ColonyGrid – Mond, Mars, Phobos
-// Keine externen Dateien nötig – alles als React-Komponenten
+
+import { roadSides } from './generateGrid'
 
 interface TileColors {
   base:         string
@@ -113,34 +117,30 @@ function Canyon({ c }: { c: TileColors }) {
   )
 }
 
-function RoadH({ c }: { c: TileColors }) {
+// Maskenbasierte Straße: zeichnet einen Belag von der Mitte zu jeder
+// verbundenen Seite. Geraden/Kurven/T/Kreuzung ergeben sich automatisch.
+// Eine isolierte Straße (keine Nachbarn) zeigt einen Stummel.
+function Road({ c, type }: { c: TileColors; type: string }) {
+  const { n, o, s, w } = roadSides(type)
+  const W = 10            // Straßenbreite
+  const half = 24         // Mitte
+  const lw = 5            // helle Mittellinie
+  const isolated = !n && !o && !s && !w
   return (
     <svg width="48" height="48" viewBox="0 0 48 48">
       <rect width="48" height="48" fill={c.base}/>
-      <rect x="0" y="20" width="48" height="8" fill={c.road}/>
-      <rect x="0" y="22" width="48" height="4" fill={c.roadLight}/>
-    </svg>
-  )
-}
-
-function RoadV({ c }: { c: TileColors }) {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48">
-      <rect width="48" height="48" fill={c.base}/>
-      <rect x="20" y="0" width="8" height="48" fill={c.road}/>
-      <rect x="22" y="0" width="4" height="48" fill={c.roadLight}/>
-    </svg>
-  )
-}
-
-function RoadCross({ c }: { c: TileColors }) {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48">
-      <rect width="48" height="48" fill={c.base}/>
-      <rect x="0" y="20" width="48" height="8" fill={c.road}/>
-      <rect x="20" y="0" width="8" height="48" fill={c.road}/>
-      <rect x="0" y="22" width="48" height="4" fill={c.roadLight}/>
-      <rect x="22" y="0" width="4" height="48" fill={c.roadLight}/>
+      {/* Belag-Arme zu verbundenen Seiten */}
+      <rect x={half - W/2} y={half - W/2} width={W} height={W} fill={c.road}/>
+      {n && <rect x={half - W/2} y={0}        width={W}        height={half}     fill={c.road}/>}
+      {s && <rect x={half - W/2} y={half}     width={W}        height={half}     fill={c.road}/>}
+      {w && <rect x={0}         y={half - W/2} width={half}     height={W}        fill={c.road}/>}
+      {o && <rect x={half}      y={half - W/2} width={half}     height={W}        fill={c.road}/>}
+      {/* helle Mittellinien */}
+      {n && <rect x={half - lw/2} y={0}        width={lw}       height={half}     fill={c.roadLight}/>}
+      {s && <rect x={half - lw/2} y={half}     width={lw}       height={half}     fill={c.roadLight}/>}
+      {w && <rect x={0}          y={half - lw/2} width={half}    height={lw}       fill={c.roadLight}/>}
+      {o && <rect x={half}       y={half - lw/2} width={half}    height={lw}       fill={c.roadLight}/>}
+      {isolated && <rect x={half - W/2} y={half - W/2} width={W} height={W} fill={c.road}/>}
     </svg>
   )
 }
@@ -215,6 +215,15 @@ function Construction({ c }: { c: TileColors }) {
 export function TileSVG({ type, planet }: { type: string; planet: string }) {
   const c = COLORS[planet] ?? COLORS.moon
 
+  // Straßen: alle road* (maskenbasiert) + Alt-Aliase
+  if (type.startsWith('road')) {
+    // Alt-Aliase auf Maske abbilden (Abwärtskompatibilität)
+    if (type === 'road' || type === 'road_cross') return <Road c={c} type="road_15" />
+    if (type === 'road_h') return <Road c={c} type="road_10" />  // O+W
+    if (type === 'road_v') return <Road c={c} type="road_5" />   // N+S
+    return <Road c={c} type={type} />
+  }
+
   switch (type) {
     case 'tile_surface':          return <Surface c={c}/>
     case 'tile_crater':           return <Crater c={c}/>
@@ -222,10 +231,6 @@ export function TileSVG({ type, planet }: { type: string; planet: string }) {
     case 'tile_metal':            return <MetalVein c={c}/>
     case 'tile_canyon':           return <Canyon c={c}/>
     case 'tile_shaft':            return <Shaft c={c}/>
-    case 'road':
-    case 'road_h':                return <RoadH c={c}/>
-    case 'road_v':                return <RoadV c={c}/>
-    case 'road_cross':            return <RoadCross c={c}/>
     case 'building_habitat':      return <Habitat c={c}/>
     case 'building_solar':        return <Solar c={c}/>
     case 'building_mine':         return <Mine c={c}/>
