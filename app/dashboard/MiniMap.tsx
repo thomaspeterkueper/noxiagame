@@ -21,7 +21,7 @@
 
 import React from 'react'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
-import { generateGrid, NPC_ENTITY, COLS } from '@/lib/grid/generateGrid'
+import { generateGrid, NPC_ENTITY, roadSides, COLS } from '@/lib/grid/generateGrid'
 
 interface MiniEntity {
   entity_id:   string
@@ -50,6 +50,7 @@ const TILE_COLOR: Record<string, string> = {
 }
 const NPC_TILE_BG    = '#1e2a3a'   // dezenter Hintergrund hinter NPC-Sprites
 const CONSTRUCTION_COLOR = '#6b5a2a'
+const ROAD_LINE      = '#8595a8'   // helle Straßenstriche in der Mini
 
 export default function MiniMap({
   slug, population = 0, entities = [], pending = [], userId, onOpen,
@@ -78,25 +79,31 @@ export default function MiniMap({
         outline: own ? ownGold : otherGray,
         glow: own,
         entityId: ent.entity_id,   // typrichtiges Sprite, unabhängig vom Eigentümer
+        road: null,
       }
     }
 
     // Baustelle → schlichte Farbe (BuildingSVG hat kein construction-Sprite)
     if (t === 'building_construction') {
-      return { bg: CONSTRUCTION_COLOR, outline: null, glow: false, entityId: null }
+      return { bg: CONSTRUCTION_COLOR, outline: null, glow: false, entityId: null, road: null }
     }
 
     // NPC-Bau → BuildingSVG-Sprite (dezenter Hintergrund, kein Rahmen)
     if (NPC_ENTITY[t]) {
-      return { bg: NPC_TILE_BG, outline: null, glow: false, entityId: NPC_ENTITY[t] }
+      return { bg: NPC_TILE_BG, outline: null, glow: false, entityId: NPC_ENTITY[t], road: null }
     }
     // Alt-Fallback: building_habitat aus Bestand ohne ent (selten)
     if (t === 'building_habitat') {
-      return { bg: NPC_TILE_BG, outline: null, glow: false, entityId: 'habitat' }
+      return { bg: NPC_TILE_BG, outline: null, glow: false, entityId: 'habitat', road: null }
     }
 
-    // Terrain / Straße → Farbfläche
-    return { bg: TILE_COLOR[t] ?? '#243446', outline: null, glow: false, entityId: null }
+    // Straße → maskenbasierte Striche (verbundene Seiten)
+    if (t.startsWith('road')) {
+      return { bg: TILE_COLOR.road ?? '#2a3a4e', outline: null, glow: false, entityId: null, road: roadSides(t) }
+    }
+
+    // Terrain → Farbfläche
+    return { bg: TILE_COLOR[t] ?? '#243446', outline: null, glow: false, entityId: null, road: null }
   }
 
   return (
@@ -119,7 +126,7 @@ export default function MiniMap({
       }}>
         {grid.flatMap((row, r) =>
           row.map((cellData, c) => {
-            const { bg, outline, glow, entityId } = cell(cellData, r, c)
+            const { bg, outline, glow, entityId, road } = cell(cellData, r, c)
             return (
               <div key={`${r}-${c}`} style={{
                 width: '100%', aspectRatio: '1 / 1', borderRadius: '2px', background: bg,
@@ -128,6 +135,7 @@ export default function MiniMap({
                 boxShadow: glow ? `0 0 4px ${ownGold}` : 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden', boxSizing: 'border-box',
+                position: 'relative',
               }}>
                 {entityId && (
                   <BuildingSVG
@@ -137,6 +145,16 @@ export default function MiniMap({
                     owned={false}
                     size={28}
                   />
+                )}
+                {road && (
+                  <svg viewBox="0 0 10 10" width="100%" height="100%" style={{ position: 'absolute', inset: 0 }}>
+                    {/* Belag-Striche von der Mitte zu verbundenen Seiten */}
+                    {road.n && <rect x={3.5} y={0}   width={3} height={5} fill={ROAD_LINE} />}
+                    {road.s && <rect x={3.5} y={5}   width={3} height={5} fill={ROAD_LINE} />}
+                    {road.w && <rect x={0}   y={3.5} width={5} height={3} fill={ROAD_LINE} />}
+                    {road.o && <rect x={5}   y={3.5} width={5} height={3} fill={ROAD_LINE} />}
+                    <rect x={3.5} y={3.5} width={3} height={3} fill={ROAD_LINE} />
+                  </svg>
                 )}
               </div>
             )
