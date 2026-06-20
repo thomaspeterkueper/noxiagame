@@ -76,6 +76,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Speichern fehlgeschlagen.' }, { status: 500 })
     }
 
+    // ── Startpunkt Erde + Startenergie (20t Subvention) ──────────────────────
+    const { data: playerShip } = await serviceClient
+      .from('ships')
+      .select('id')
+      .eq('profile_id', user.id)
+      .single()
+
+    if (playerShip) {
+      // Schiff auf Erde setzen
+      await serviceClient
+        .from('ships')
+        .update({ location: 'earth' })
+        .eq('id', playerShip.id)
+
+      // 20t Startenergie (Erdsubvention für ersten Flug Erde→Mond)
+      await serviceClient.rpc('grant_starting_energy', { p_ship_id: playerShip.id })
+    }
+
     // ── Erstauftrag erzeugen (genau einmal) ──
     // 20t Wasser nach Phobos. Mit Startkapital (5.000 Cr) sicher machbar:
     // Einkauf Mond ~90 Cr × 20t = 1.800 Cr. Belohnung: Phobos-Verkaufspreis × 1.3.
