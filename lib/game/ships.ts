@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Resource, RESOURCE_PHASE } from './resources';
+import { orbitalBaseSeconds, ORBITS } from './orbits';
 
 // ── Achsen ───────────────────────────────────────────────────────────────────
 export type ShipyardLocation = 'start' | 'moon' | 'mars' | 'phobos';
@@ -52,22 +53,16 @@ export const SHIP_MODULES: Record<string, ShipModule> = {
   drive_booster:{ id: 'drive_booster', name: 'Schubverstärker', type: 'equipment', capacity: 0,             mass: 2,   cost: 3000, provides: ['boosted_drive'],   unlocked: false },
 };
 
-// ── Reisezeiten (Basis bei Tempo 1.0, Sekunden) ──────────────────────────────
-function routeKey(a: LocationSlug, b: LocationSlug): string { return [a, b].sort().join('-'); }
-export const ROUTE_TIMES_SEC: Record<string, number> = {
-  [routeKey('moon', 'mars')]: 30, [routeKey('moon', 'phobos')]: 25, [routeKey('mars', 'phobos')]: 10,
-};
-
 // ── Schicht-0-Naht: die EINE Quelle der Basis-Reisezeit ──────────────────────
 // Basiszeit in Sekunden (Tempo 1.0, vor Schiffsfaktoren) zwischen zwei Orten.
-// Heute ein statischer Lookup; `tick` ist RESERVIERT: sobald die Orbital-Schicht
-// (Schicht 2) steht, liefert diese Funktion distanz(from,to,tick)/v statt der
-// Tabelle — OHNE dass ein Aufrufer sich ändert. Store, DashboardClient und
-// travelTime() rufen ausschließlich das hier, statt eigene Tabellen zu halten.
-// Generisch über Orts-IDs gehalten (Raumstationen/Planeten/Belt/andere Systeme
-// betreffen später nur die Innereien, nie die Signatur). null = keine Route.
-export function baseTravelSeconds(from: LocationSlug, to: LocationSlug, _tick?: number): number | null {
-  return ROUTE_TIMES_SEC[routeKey(from, to)] ?? null
+// Seit Schicht 2 aus der Orbital-Engine berechnet: distanz(from,to,tick) ×
+// SEC_PER_UNIT, geclampt — Mond↔Mars schwankt damit ~25–50s über den Zyklus.
+// `tick` = aktueller Spiel-Tick (Abflug-Snapshot). Ohne Tick → Tick 0.
+// Generisch über Orts-IDs (Stationen/Planeten/Belt/andere Systeme = nur Daten).
+// null = keine bekannte Bahn für from/to → keine Route.
+export function baseTravelSeconds(from: LocationSlug, to: LocationSlug, tick = 0): number | null {
+  if (!ORBITS[from] || !ORBITS[to]) return null
+  return orbitalBaseSeconds(from, to, tick)
 }
 
 // ── Bauplan vs. lebende Instanz ──────────────────────────────────────────────
