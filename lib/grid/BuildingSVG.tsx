@@ -265,8 +265,8 @@ const SPRITES: Record<string, SpriteFn> = {
       <circle className="b-pulse" cx={24} cy={24} r={2} fill={c.accent} />
     </>
   ),
-}
-// Scanner — Radarschüssel mit rotierendem Sweep (Anomalie-Entdeckung)
+
+  // Scanner — Radarschüssel mit rotierendem Sweep (Anomalie-Entdeckung)
   scanner: (c) => (
     <>
       <rect x={8} y={8} width={32} height={32} rx={3} fill={c.bodyDark} stroke={INK} strokeWidth={1} />
