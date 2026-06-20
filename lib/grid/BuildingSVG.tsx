@@ -4,11 +4,13 @@
 
 import React from 'react'
 
-type Planet = 'moon' | 'mars' | 'phobos'
+type Planet = 'moon' | 'mars' | 'phobos' | 'earth' | 'prometheus'
 type Status = 'active' | 'damaged' | 'disabled'
 
+type PalEntry = { body: string; bodyDark: string; bodyLight: string; accent: string; accentDim: string }
+
 // Erweiterte Farbpalette
-const PAL: Record<Planet, { body: string; bodyDark: string; bodyLight: string; accent: string; accentDim: string }> = {
+const PAL: Record<Planet, PalEntry> = {
   moon:   { 
     body: '#4a7ba3', 
     bodyDark: '#3a6a8a', 
@@ -30,6 +32,24 @@ const PAL: Record<Planet, { body: string; bodyDark: string; bodyLight: string; a
     accent: '#f5d742', 
     accentDim: '#c4a832' 
   },
+  earth: {
+    body: '#3a6a9a',
+    bodyDark: '#2a5a8a',
+    bodyLight: '#5a8aba',
+    accent: '#7fd9b0',
+    accentDim: '#4aaa80',
+  },
+  prometheus: {
+    body: '#5a4a2a',
+    bodyDark: '#4a3a1a',
+    bodyLight: '#7a6a3a',
+    accent: '#c9a961',
+    accentDim: '#a08030',
+  },
+}
+// Sicherer Zugriff — unbekannte Slugs fallen auf moon-Palette zurück.
+function pal(planet: string): PalEntry {
+  return (PAL as Record<string, PalEntry>)[planet] ?? PAL.moon
 }
 
 // Material-Farben
@@ -56,7 +76,7 @@ const PURPLE_GLOW = 'rgba(180, 140, 232, 0.3)'
 
 export interface BuildingSVGProps {
   entityId: string
-  planet?: Planet
+  planet?: string   // string statt Planet-Union — pal() fällt auf moon-Palette zurück
   status?: Status
   condition?: number
   occupancy?: number
@@ -1055,14 +1075,14 @@ const SPRITES: Record<string, SpriteFn> = {
 
 export function BuildingSVG({
   entityId,
-  planet = 'moon',
+  planet = 'moon' as string,
   status = 'active',
   condition = 100,
   occupancy = 0,
   owned = false,
   size = 44,
 }: BuildingSVGProps) {
-  const c = PAL[planet]
+  const c = pal(planet)
   const sprite = SPRITES[entityId]
   const broken = status !== 'active' || condition < 40
   const dim = broken ? 0.4 : condition < 100 ? 0.5 + (condition / 100) * 0.5 : 1
