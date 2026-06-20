@@ -19,8 +19,8 @@ import { Resource, RESOURCE_PHASE } from './resources';
 import { orbitalBaseSeconds, ORBITS } from './orbits';
 
 // ── Achsen ───────────────────────────────────────────────────────────────────
-export type ShipyardLocation = 'start' | 'moon' | 'mars' | 'phobos';
-export type LocationSlug = 'moon' | 'mars' | 'phobos';
+export type ShipyardLocation = 'start' | 'earth' | 'moon' | 'mars' | 'phobos';
+export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos';
 export type ModuleType = 'cargo' | 'tank' | 'habitat' | 'equipment';
 export type ModuleStatus = 'active' | 'damaged' | 'disabled';
 
@@ -63,6 +63,30 @@ export const SHIP_MODULES: Record<string, ShipModule> = {
 export function baseTravelSeconds(from: LocationSlug, to: LocationSlug, tick = 0): number | null {
   if (!ORBITS[from] || !ORBITS[to]) return null
   return orbitalBaseSeconds(from, to, tick)
+}
+
+// ── Energie-Flugkosten (Treibstoff aus Laderaum) ─────────────────────────────
+// Asymmetrisch: Aufstieg aus Gravitationsfeld kostet mehr als Abstieg.
+// Erde→Mond teuer (Erd-Escape 11.2 km/s), Mond→Erde günstig.
+// Erde startet neuer Spieler mit 20t Energie im Schiff (Erdsubvention).
+export const FLIGHT_ENERGY: Partial<Record<string, Partial<Record<string, number>>>> = {
+  earth:  { moon: 20, mars: 35, phobos: 38 },
+  moon:   { earth: 8, mars: 12, phobos: 10 },
+  mars:   { earth: 30, moon: 12, phobos: 4 },
+  phobos: { earth: 32, moon: 10, mars: 6 },
+}
+
+// Energie-Kosten für einen Flug (t). 0 = kein Antrieb nötig (Orbit-Korrektur).
+export function flightEnergyCost(from: string, to: string): number {
+  return FLIGHT_ENERGY[from]?.[to] ?? 10  // Fallback 10t für unbekannte Routen
+}
+
+// Schwerkraft-Faktor je Standort (für spätere Lander-Mechanik)
+export const GRAVITY_MS2: Record<string, number> = {
+  earth:  9.81,
+  moon:   1.62,
+  mars:   3.72,
+  phobos: 0.0057,
 }
 
 // ── Bauplan vs. lebende Instanz ──────────────────────────────────────────────
