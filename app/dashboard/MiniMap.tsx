@@ -26,11 +26,12 @@ import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { generateGrid, NPC_ENTITY, roadSides, COLS } from '@/lib/grid/generateGrid'
 
 interface MiniEntity {
-  entity_id:   string
-  profile_id:  string
-  entity_type: string
-  tile_row:    number
-  tile_col:    number
+  entity_id:      string
+  profile_id:     string | null
+  is_state_owned?: boolean
+  entity_type:    string
+  tile_row:       number
+  tile_col:       number
 }
 
 interface MiniPending {
