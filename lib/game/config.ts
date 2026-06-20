@@ -138,7 +138,7 @@ export const PLANNED_BUILDINGS: { id: string; name: string; hint: string }[] = [
   // water_plant → standortspezifisch: ice_drill (Mond), water_recycler (Mars)
   { id: 'smelter',         name: 'Schmelze',      hint: 'Metall → Bauteile' },
   { id: 'admin',           name: 'Verwaltung',    hint: 'Kolonieverwaltung' },
-  { id: 'school',          name: 'Akademie',      hint: 'Bildung & Erkenntnis' },
+  // school → jetzt baubar (BUILDABLE_ITEMS)
   { id: 'bar',             name: 'Bar',           hint: 'Zufriedenheit' },
 ]
 
