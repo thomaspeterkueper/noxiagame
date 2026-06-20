@@ -80,7 +80,10 @@ export function generateGrid(
     for (let c = 0; c < cols; c++) {
       const rand = seededRandom(seed, r * cols + c)
       let t: string
-      if (slug === 'moon') {
+      if (slug === 'earth') {
+        // LEO-Terminal: gepflastert, kaum Hindernisse — urbane Raumstation
+        t = rand < 0.03 ? 'tile_crater' : 'tile_surface'
+      } else if (slug === 'moon') {
         t = rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
       } else if (slug === 'mars') {
         t = rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : 'tile_surface'
