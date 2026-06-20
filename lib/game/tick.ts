@@ -60,7 +60,12 @@ type SB = any  // Supabase Service-Client
 // ─────────────────────────────────────────────────────────────────────
 export async function runPopulationTick(supabase: SB, tickNumber: number) {
   const results: Record<string, unknown>[] = []
-  const { data: locations } = await supabase.from('locations').select('*')
+  // simulate_tick = false → passiver Ort (Erde, Prometheus): kein Bevölkerungs-
+  // oder Verbrauchs-Tick. Marktpreise laufen separat (runPriceTick filtert nicht).
+  const { data: locations } = await supabase
+    .from('locations')
+    .select('*')
+    .eq('simulate_tick', true)
 
   for (const loc of locations ?? []) {
     const { data: resources } = await supabase
@@ -317,8 +322,11 @@ export async function runOrderTick(supabase: SB) {
     .eq('status', 'open')
     .lt('expires_at', new Date().toISOString())
 
+  // Nur simulierte Kolonien erhalten Aufträge — Erde/Prometheus nicht.
   const { data: locations } = await supabase
-    .from('locations').select('id, slug, population, is_supplied')
+    .from('locations')
+    .select('id, slug, population, is_supplied')
+    .eq('simulate_tick', true)
 
   for (const loc of locations ?? []) {
     const { data: resources } = await supabase
