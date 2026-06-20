@@ -1,0 +1,21 @@
+-- supabase/migrations/018b_range_distance_fix.sql
+-- Erstellt:     20.06.2026
+-- Aktualisiert: 20.06.2026
+--
+-- Korrigiert range_distance in ship_types nach der neuen Orbital-Hierarchie
+-- (orbits.ts, Schicht 2). Die maximale Distanz im Spiel ist jetzt ~196 Einheiten
+-- (Erde/Mond ↔ Mars auf weitem Bogen). Der alte Wert ~28 blockierte diese Route.
+--
+-- Neue Werte:
+--   freighter_mk1  → 250  (Startschiff: alle aktuellen Routen + Puffer)
+--   fast_courier   → 250  (Schnellfrachter: gleiche Reichweite, höheres Tempo)
+--   heavy_freighter→ 300  (Schwerfrachter: Belt-Stationen vorbereitet)
+--
+-- Idempotent: UPDATE ist wiederholbar ohne Seiteneffekte.
+
+UPDATE ship_types SET range_distance = 250 WHERE id = 'freighter_mk1';
+UPDATE ship_types SET range_distance = 250 WHERE id = 'fast_courier';
+UPDATE ship_types SET range_distance = 300 WHERE id = 'heavy_freighter';
+
+-- Kontrolle:
+SELECT id, name, range_distance, speed_mult, cargo_max FROM ship_types ORDER BY cost_credits;
