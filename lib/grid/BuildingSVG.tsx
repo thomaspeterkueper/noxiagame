@@ -266,7 +266,6 @@ const SPRITES: Record<string, SpriteFn> = {
     </>
   ),
 }
-
 // Scanner — Radarschüssel mit rotierendem Sweep (Anomalie-Entdeckung)
   scanner: (c) => (
     <>
@@ -283,6 +282,7 @@ const SPRITES: Record<string, SpriteFn> = {
       <circle className="b-pulse" cx={24} cy={24} r={2.4} fill="#b48ce8" />
     </>
   ),
+}
 
 export function BuildingSVG({
   entityId, planet = 'moon', status = 'active', condition = 100,
