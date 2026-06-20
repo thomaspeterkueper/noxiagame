@@ -140,6 +140,31 @@ const SPRITES: Record<string, SpriteFn> = {
     </>
   ),
 
+  // Wasserrecycler — Mars: Atmosphären-Kondensation (+2 Wasser/Tick)
+  // Trommelförmiger Kondensator mit tropfenden Wassermolekülen
+  water_recycler: (c) => (
+    <>
+      <rect x={8} y={8} width={32} height={32} rx={3} fill={c.bodyDark} stroke={INK} strokeWidth={1} />
+      {/* Kondensator-Trommel */}
+      <rect x={14} y={12} width={20} height={14} rx={4} fill="#0e1f30" stroke={WATER} strokeWidth={1.2} />
+      {/* Kühlrippen */}
+      <line x1={18} y1={12} x2={18} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <line x1={22} y1={12} x2={22} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <line x1={26} y1={12} x2={26} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <line x1={30} y1={12} x2={30} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      {/* Wasserpuls im Inneren */}
+      <rect className="b-pulse" x={15} y={13} width={18} height={12} rx={3} fill={WATER} opacity={0.2} />
+      {/* Ablaufrohr */}
+      <rect x={21} y={26} width={6} height={4} fill={STEEL} />
+      {/* Auffangbecken */}
+      <rect x={13} y={30} width={22} height={7} rx={2} fill="#0e1f30" stroke={WATER} strokeWidth={1} />
+      {/* Tropfen */}
+      <circle className="b-rise b-d0" cx={20} cy={32} r={1.6} fill={WATER} />
+      <circle className="b-rise b-d2" cx={24} cy={33} r={1.8} fill={WATER} />
+      <circle className="b-rise b-d1" cx={28} cy={32} r={1.4} fill={WATER} />
+    </>
+  ),
+
   // ── Leben & Bevölkerung ──
   habitat: (c, occ) => {
     const lit = Math.round(Math.max(0, Math.min(1, occ)) * 8)
@@ -265,6 +290,10 @@ const SPRITES: Record<string, SpriteFn> = {
       <circle className="b-pulse" cx={24} cy={24} r={2} fill={c.accent} />
     </>
   ),
+
+  // Eisbohrung — Mond: Shackleton-Krater Eisvorkommen (+4 Wasser/Tick)
+  // Alias auf den bestehenden ice-Sprite
+  ice_drill: (c, occ) => SPRITES['ice'](c, occ),
 
   // Scanner — Radarschüssel mit rotierendem Sweep (Anomalie-Entdeckung)
   scanner: (c) => (
