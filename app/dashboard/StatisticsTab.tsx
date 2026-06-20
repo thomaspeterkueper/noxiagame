@@ -46,6 +46,14 @@ export default function StatisticsTab({ locations }: { locations: any[] }) {
   const { credits, trades, loadTrades } = useGameStore()
   const [stats, setStats] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [npcTrades, setNpcTrades] = useState<any[]>([])
+
+  useEffect(() => {
+    fetch('/api/game/npc')
+      .then(r => (r.ok ? r.json() : { trades: [] }))
+      .then(d => setNpcTrades(d.trades ?? []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -169,6 +177,29 @@ export default function StatisticsTab({ locations }: { locations: any[] }) {
           {stats.totalTrades} Transaktionen · {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toLocaleString('de')} Cr Gesamtgewinn
         </div>
       </div>
+
+      {/* ── Marktteilnehmer: andere Akteure am Markt (entdeckbar, nicht aufgedrängt) ── */}
+      {npcTrades.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e2ddd4', borderRadius: '8px', padding: '1.25rem' }}>
+          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '3px', color: '#b99b6b', fontWeight: 700, marginBottom: '1rem' }}>
+            Marktteilnehmer
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {npcTrades.map((t, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', fontSize: '0.82rem', padding: '0.4rem 0.6rem', background: '#f4f2ed', borderRadius: '6px' }}>
+                <span style={{ color: '#2a4e7a', fontWeight: 600, whiteSpace: 'nowrap' }}>{t.actor}</span>
+                <span style={{ color: '#4a5568', flex: 1 }}>
+                  kaufte {t.amount}t {RESOURCE_ICON[t.resource]} {RESOURCE_LABEL[t.resource] ?? t.resource} @ {LOC_ICON[t.location]} {LOC_NAME[t.location] ?? t.location}
+                </span>
+                <span style={{ color: '#94a3b8', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{t.price} Cr/t · T{t.tick}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.75rem' }}>
+            Käufe anderer Akteure am Markt — wer die Muster liest, erkennt ihre Strategie.
+          </div>
+        </div>
+      )}
 
       {/* ── Versorgungs-Banner (Punkt 7): der Impact, ehrlich ─────────────── */}
       <div style={{
