@@ -1,9 +1,10 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.2.0
+// Version:  0.3.0
 //
-// v0.2.0: Anomalie-Andeutung (Schritt 8) — eine seed-bestimmte Terrain-Kachel
-//   trägt ein kosmetisches anomaly-Flag (USP-Neugierhaken, kein System).
+// v0.3.0: Anomalie nur sichtbar, wenn ein fertiger Scanner (entity_id
+//   'scanner') in der Kolonie steht — Entdeckung als Investition.
+// v0.2.0: Anomalie-Andeutung (Schritt 8) — seed-bestimmtes anomaly-Flag.
 // v0.1.0: Geteilte Grid-Generierung für ColonyGrid + MiniMap.
 //
 // Geteilte Grid-Generierung für ColonyGrid (großes Grid) UND MiniMap.
@@ -172,20 +173,23 @@ export function generateGrid(
     }
   }
 
-  // 8. Anomalie (USP-Andeutung, rein kosmetisch): eine seed-bestimmte freie
-  //    Terrain-Kachel trägt eine „Anomalie". Erzeugt Neugier, ohne System.
-  //    Nur auf unbebautem, nicht-Straßen-Terrain; deterministisch pro Ort.
-  const terrainCells: [number, number][] = []
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) {
-      const t = grid[r][c].type
-      if (!t.startsWith('building_') && !t.startsWith('npc_') && !t.startsWith('road'))
-        terrainCells.push([r, c])
+  // 8. Anomalie (USP-Andeutung): nur sichtbar, wenn ein Scanner FERTIG in der
+  //    Kolonie steht (entity_id 'scanner' im Bestand). Ohne Scanner verborgen.
+  //    Eine seed-bestimmte freie Terrain-Kachel trägt die Anomalie.
+  const hasScanner = entities.some(e => e.entity_type === 'building' && e.entity_id === 'scanner')
+  if (hasScanner) {
+    const terrainCells: [number, number][] = []
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) {
+        const t = grid[r][c].type
+        if (!t.startsWith('building_') && !t.startsWith('npc_') && !t.startsWith('road'))
+          terrainCells.push([r, c])
+      }
+    if (terrainCells.length > 0) {
+      const pick = Math.floor(seededRandom(seed, 7777) * terrainCells.length)
+      const [ar, ac] = terrainCells[pick]
+      grid[ar][ac] = { ...grid[ar][ac], anomaly: true }
     }
-  if (terrainCells.length > 0) {
-    const pick = Math.floor(seededRandom(seed, 7777) * terrainCells.length)
-    const [ar, ac] = terrainCells[pick]
-    grid[ar][ac] = { ...grid[ar][ac], anomaly: true }
   }
 
   return grid
@@ -201,4 +205,13 @@ export function roadSides(type: string): { n: boolean; o: boolean; s: boolean; w
 // Hilfsform für Konsumenten, die nur Typ-Strings brauchen (ColonyGrid-Altpfad).
 export function gridTypes(grid: Cell[][]): string[][] {
   return grid.map(row => row.map(cell => cell.type))
+}
+
+// Anomalie-Koordinate aus dem Cell[][] ziehen (oder null). Für Konsumenten,
+// die mit der reduzierten string[][]-Form arbeiten (ColonyGrid).
+export function anomalyAt(grid: Cell[][]): { r: number; c: number } | null {
+  for (let r = 0; r < grid.length; r++)
+    for (let c = 0; c < grid[r].length; c++)
+      if (grid[r][c].anomaly) return { r, c }
+  return null
 }
