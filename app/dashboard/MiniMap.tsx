@@ -1,11 +1,13 @@
 // app/dashboard/MiniMap.tsx
 // Erstellt:     14.06.2026
 // Aktualisiert: 15.06.2026
-// Version:      0.3.0
+// Version:      0.4.0
 //
 // Schlanke Vorschau-Karte des Koloniegrids für die Dashboard-Hauptview.
 // Die ganze Fläche ist EIN Button, der das volle ColonyGrid im Overlay öffnet.
 //
+// v0.4.0: Anomalie-Marker — pulsierender Punkt auf der Anomalie-Kachel (aus
+//   generateGrid). USP-Neugierhaken, rein kosmetisch.
 // v0.3.0: Gebäude (echt + NPC) rendern über das animierte BuildingSVG —
 //   dieselben Sprites wie im großen Grid. Terrain/Straßen bleiben schlanke
 //   Farbflächen (kein Bild-Laden). Eigene Gebäude: Goldrahmen. Die früheren
@@ -118,6 +120,7 @@ export default function MiniMap({
     >
       {/* Animations-Keyframes für BuildingSVG (auch nötig, wenn großes Grid zu ist) */}
       <BuildingSpriteStyles />
+      <style>{`@keyframes noxia-anomaly{0%,100%{opacity:.45;transform:scale(0.85)}50%{opacity:1;transform:scale(1.1)}}`}</style>
 
       <div style={{
         display: 'grid',
@@ -155,6 +158,22 @@ export default function MiniMap({
                     {road.o && <rect x={5}   y={3.5} width={5} height={3} fill={ROAD_LINE} />}
                     <rect x={3.5} y={3.5} width={3} height={3} fill={ROAD_LINE} />
                   </svg>
+                )}
+                {cellData.anomaly && (
+                  <span
+                    title="Anomalie entdeckt."
+                    style={{
+                      position: 'absolute', inset: 0, display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{
+                      width: '38%', height: '38%', borderRadius: '50%',
+                      background: 'radial-gradient(circle, #b48ce8 0%, #7d5bb0 60%, transparent 75%)',
+                      boxShadow: '0 0 5px #b48ce8',
+                      animation: 'noxia-anomaly 2.6s ease-in-out infinite',
+                    }} />
+                  </span>
                 )}
               </div>
             )
