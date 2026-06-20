@@ -19,8 +19,8 @@ import { Resource, RESOURCE_PHASE } from './resources';
 import { orbitalBaseSeconds, ORBITS } from './orbits';
 
 // ── Achsen ───────────────────────────────────────────────────────────────────
-export type ShipyardLocation = 'start' | 'earth' | 'moon' | 'mars' | 'phobos';
-export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos';
+export type ShipyardLocation = 'start' | 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus';
+export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus';
 export type ModuleType = 'cargo' | 'tank' | 'habitat' | 'equipment';
 export type ModuleStatus = 'active' | 'damaged' | 'disabled';
 
@@ -69,11 +69,15 @@ export function baseTravelSeconds(from: LocationSlug, to: LocationSlug, tick = 0
 // Asymmetrisch: Aufstieg aus Gravitationsfeld kostet mehr als Abstieg.
 // Erde→Mond teuer (Erd-Escape 11.2 km/s), Mond→Erde günstig.
 // Erde startet neuer Spieler mit 20t Energie im Schiff (Erdsubvention).
+//
+// Prometheus (L5-Lagrange): kein nennenswertes Gravitationsfeld — nur Bahnkorrektur.
+// Alle Flüge zu/von Prometheus sind günstig (5t). Anreiz: Energie dort tanken.
 export const FLIGHT_ENERGY: Partial<Record<string, Partial<Record<string, number>>>> = {
-  earth:  { moon: 20, mars: 35, phobos: 38 },
-  moon:   { earth: 8, mars: 12, phobos: 10 },
-  mars:   { earth: 30, moon: 12, phobos: 4 },
-  phobos: { earth: 32, moon: 10, mars: 6 },
+  earth:      { moon: 20, mars: 35, phobos: 38, prometheus: 5  },
+  moon:       { earth: 8, mars: 12, phobos: 10, prometheus: 5  },
+  mars:       { earth: 30, moon: 12, phobos: 4, prometheus: 30 },
+  phobos:     { earth: 32, moon: 10, mars: 6,   prometheus: 30 },
+  prometheus: { earth: 5,  moon: 5,  mars: 30,  phobos: 30     },
 }
 
 // Energie-Kosten für einen Flug (t). 0 = kein Antrieb nötig (Orbit-Korrektur).
@@ -83,10 +87,11 @@ export function flightEnergyCost(from: string, to: string): number {
 
 // Schwerkraft-Faktor je Standort (für spätere Lander-Mechanik)
 export const GRAVITY_MS2: Record<string, number> = {
-  earth:  9.81,
-  moon:   1.62,
-  mars:   3.72,
-  phobos: 0.0057,
+  earth:      9.81,
+  moon:       1.62,
+  mars:       3.72,
+  phobos:     0.0057,
+  prometheus: 0.0,    // Lagrange-Punkt: keine Eigengravitation
 }
 
 // ── Bauplan vs. lebende Instanz ──────────────────────────────────────────────
