@@ -481,11 +481,16 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
     // ── Eigene Gebäude laden (für produce) ───────────────────────────────────
     const { data: gebRows } = await supabase
       .from('tile_entities')
-      .select('entity_id, location_id, locations(slug)')
+      .select('entity_id, location_id, tile_col, locations(slug)')
       .eq('actor_id', actor.id)
       .eq('entity_type', 'building')
     const gebaeude = ((gebRows ?? []) as any[])
-      .map(g => ({ entity_id: g.entity_id, location_id: g.location_id, location: g.locations?.slug ?? '' }))
+      .map(g => ({
+        entity_id:   g.entity_id,
+        location_id: g.location_id,
+        location:    g.locations?.slug ?? '',
+        tile_col:    Number(g.tile_col ?? 0),
+      }))
       .filter(g => g.location)
 
     // ── Stock je Markt auffrischen (Mehr-NPC-fest) ───────────────────────────
@@ -507,16 +512,18 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
 
         const erloes = a.menge * (sellPriceMap.get(`${locId}|${a.resource}`) ?? 0)
 
-        // Idempotenter Ledger-Eintrag (unique: actor, tick, kind, resource, ref='')
+        // Idempotenter Ledger-Eintrag. ref = "slug:tile_col" → eindeutig je Gebäude,
+        // damit zwei Minen desselben NPCs am gleichen Ort beide ihren Eintrag bekommen.
         const { data: ins } = await supabase.from('npc_ledger').upsert(
           {
             actor_id:    actor.id,
             tick:        tickNumber,
             kind:        'produce',
             resource:    a.resource,
-            goods_delta: a.menge,   // positiv: Gut ins Lager
-            credit_delta: erloes,   // Kolonie zahlt sell_price
+            goods_delta: a.menge,
+            credit_delta: erloes,
             location_id: locId,
+            ref:         a.ref,    // z.B. "moon:11", "moon:10"
           },
           { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
         ).select('id')
