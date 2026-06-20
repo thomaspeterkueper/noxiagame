@@ -300,6 +300,8 @@ export default function DashboardClient({
               userId={userId}
               tax={colonyTax[currentLocationData.id]}
               entityInfo={entityInfo}
+              locationResources={currentLocationData.location_resources ?? []}
+              credits={credits}
               entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
               pending={playerBuilds
                 .filter((b: any) => b.locations?.slug === currentLocationData.slug)
