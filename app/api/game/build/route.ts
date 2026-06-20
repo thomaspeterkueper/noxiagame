@@ -186,6 +186,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unbekannter Bautyp' }, { status: 400 })
     }
 
+    // Standort-Check: manche Gebäude nur an bestimmten Orten baubar
+    if (buildable.allowedLocations && !buildable.allowedLocations.includes(locationSlug)) {
+      return NextResponse.json({
+        error: `${buildable.name} kann hier nicht gebaut werden.`
+      }, { status: 400 })
+    }
+
     const { data: profile } = await serviceClient
       .from('profiles')
       .select('credits')
