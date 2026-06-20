@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRICE_MIN, PRICE_MAX, PRICE_IMPULSE_PER_TON } from '@/lib/game/config'
+import { flightEnergyCost } from '@/lib/game/ships'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -98,14 +99,60 @@ export async function GET(req: NextRequest) {
   const amount = parseInt(searchParams.get('amount') ?? '1', 10)
   const location = searchParams.get('location') as string
 
-  // Travel braucht keine Menge/Preis – VOR der Mengen-Validierung behandeln.
+  // Travel — Energie aus Laderaum entnehmen (Treibstoff-Mechanik)
   if (action === 'travel') {
+    const dest = resource  // resource-Parameter = Zielort beim Travel
+
+    // Schiff + aktueller Standort
+    const { data: travelShip } = await serviceClient
+      .from('ships')
+      .select('id, location, cargo_max')
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!travelShip) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
+
+    const energyNeeded = flightEnergyCost(travelShip.location, dest)
+
+    // Energie im Laderaum prüfen
+    const { data: energyCargo } = await serviceClient
+      .from('ship_cargo')
+      .select('amount')
+      .eq('ship_id', travelShip.id)
+      .eq('resource', 'energy')
+      .maybeSingle()
+
+    const energyOnBoard = Number(energyCargo?.amount ?? 0)
+
+    if (energyOnBoard < energyNeeded) {
+      return NextResponse.json({
+        error: `Nicht genug Energie. Benötigt: ${energyNeeded}t, an Bord: ${energyOnBoard}t`,
+        energyNeeded,
+        energyOnBoard,
+      }, { status: 400 })
+    }
+
+    // Energie verbrauchen
+    const energyLeft = energyOnBoard - energyNeeded
+    if (energyLeft > 0) {
+      await serviceClient.from('ship_cargo')
+        .update({ amount: energyLeft })
+        .eq('ship_id', travelShip.id)
+        .eq('resource', 'energy')
+    } else {
+      await serviceClient.from('ship_cargo')
+        .delete()
+        .eq('ship_id', travelShip.id)
+        .eq('resource', 'energy')
+    }
+
+    // Schiff bewegen
     await serviceClient
       .from('ships')
-      .update({ location: resource })
+      .update({ location: dest })
       .eq('profile_id', user.id)
 
-    return NextResponse.json({ ok: true, location: resource })
+    return NextResponse.json({ ok: true, location: dest, energyUsed: energyNeeded })
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
