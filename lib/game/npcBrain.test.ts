@@ -150,7 +150,7 @@ const GOIBNIU = {
     GOIBNIU,
     { metal: 50 },
     5000,
-    [{ entity_id: 'mine', location_id: 'loc-moon', location: 'moon' }],
+    [{ entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 11 }],
   )
   const w: NpcWelt = { tick: 7, preise: [
     { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
@@ -159,6 +159,7 @@ const GOIBNIU = {
   pruefe(a.some(x => x.typ === 'produce' && x.resource === 'metal' && x.location === 'moon'), 'produce metal @ moon')
   const prod = a.find(x => x.typ === 'produce') as any
   pruefe(prod?.menge === 5, 'Mine produziert 5t/Tick')
+  pruefe(prod?.ref === 'moon:11', 'ref = "moon:11" (Ledger-Schlüssel)')
 }
 
 // 8) Sell — Überschuss über reserve (40t) verkaufen, wenn Preis ≥ sell_floor (25)
@@ -209,7 +210,7 @@ const GOIBNIU = {
     GOIBNIU,
     { metal: 90 },
     10000,
-    [{ entity_id: 'mine', location_id: 'loc-moon', location: 'moon' }],
+    [{ entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 11 }],
   )
   const w: NpcWelt = { tick: 12, preise: [
     { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
@@ -218,12 +219,32 @@ const GOIBNIU = {
   pruefe(a.some(x => x.typ === 'produce'), 'produce vorhanden')
   pruefe(a.some(x => x.typ === 'sell'),    'sell vorhanden')
   pruefe(a.some(x => x.typ === 'build'),   'build vorhanden')
-  // Reihenfolge: produce vor sell vor build vor buy
   const typen = a.map(x => x.typ)
   const pIdx = typen.indexOf('produce')
   const sIdx = typen.indexOf('sell')
   const bIdx = typen.indexOf('build')
   pruefe(pIdx < sIdx && sIdx < bIdx, 'Reihenfolge: produce < sell < build')
+}
+
+// 13) Zwei Minen — beide produzieren, zwei verschiedene refs
+{
+  const k = ctx(
+    GOIBNIU,
+    { metal: 40 },
+    5000,
+    [
+      { entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 11 },
+      { entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 10 },
+    ],
+  )
+  const w: NpcWelt = { tick: 13, preise: [
+    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
+  ]}
+  const a = zeige('13) Zwei Minen – beide produzieren', k, w)
+  const produces = a.filter(x => x.typ === 'produce')
+  pruefe(produces.length === 2, 'zwei produce-Aktionen')
+  const refs = produces.map(x => (x as any).ref)
+  pruefe(refs.includes('moon:11') && refs.includes('moon:10'), 'refs eindeutig: moon:11 + moon:10')
 }
 
 console.log(`\n${fails === 0 ? '✓ alle Invarianten erfüllt' : `✘ ${fails} Fehlschläge`}`)
