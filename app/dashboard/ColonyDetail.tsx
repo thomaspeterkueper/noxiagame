@@ -19,11 +19,11 @@
 'use client'
 
 import { ResourceType, LocationSlug, useGameStore, effectiveRange } from '@/lib/store/gameStore'
-import { baseTravelSeconds } from '@/lib/game/ships'
+import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
-const LOC_ICON:       Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨' }
+const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨' }
 
 interface ResRow { resource: string; stock: number; production: number; consumption: number }
 interface Colony {
@@ -63,8 +63,11 @@ export default function ColonyDetail({
   // Step B wieder steht, fließt hier derselbe Tick ein wie in der TravelList.
   const used      = Object.values(cargo).reduce((a, b) => a + b, 0)
   const reach     = effectiveRange(shipRange, used)
-  const travelSec = baseTravelSeconds(location, colony.slug as LocationSlug)
-  const reachable = travelSec != null && travelSec <= reach
+  const travelSec  = baseTravelSeconds(location, colony.slug as LocationSlug)
+  const reachable  = travelSec != null && travelSec <= reach
+  const energyCost = flightEnergyCost(location, colony.slug)
+  const energyOnBoard = cargo['energy'] ?? 0
+  const hasEnergy  = energyOnBoard >= energyCost
 
   const popPct = Math.round((colony.population / colony.population_max) * 100)
 
@@ -137,12 +140,24 @@ export default function ColonyDetail({
             {Object.values(cargo).some(v => v > 0) && ' Ladung an Bord bereit.'}
           </div>
         ) : reachable ? (
-          <button
-            onClick={() => { onTravel(colony.slug as LocationSlug); onClose() }}
-            style={{ width: '100%', padding: '12px 0', fontSize: '0.95rem', borderRadius: '9px', border: '1px solid #c9a961', background: '#15233a', color: '#c9a961', cursor: 'pointer', fontWeight: 600 }}
-          >
-            {LOC_ICON[colony.slug]} Nach {colony.name} fliegen{travelSec != null ? ` · ${travelSec}s` : ''}
-          </button>
+          <div>
+            <button
+              onClick={() => { onTravel(colony.slug as LocationSlug); onClose() }}
+              disabled={!hasEnergy}
+              style={{ width: '100%', padding: '12px 0', fontSize: '0.95rem', borderRadius: '9px', border: `1px solid ${hasEnergy ? '#c9a961' : '#3a4759'}`, background: hasEnergy ? '#15233a' : '#0f1722', color: hasEnergy ? '#c9a961' : '#7d93b0', cursor: hasEnergy ? 'pointer' : 'not-allowed', fontWeight: 600 }}
+            >
+              {LOC_ICON[colony.slug]} Nach {colony.name} fliegen{travelSec != null ? ` · ${travelSec}s` : ''}
+            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginTop: '6px', padding: '0 4px' }}>
+              <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>
+                ⚡ Treibstoff: {energyCost}t
+              </span>
+              <span style={{ color: energyOnBoard >= energyCost ? '#5dcaa5' : '#e0846a' }}>
+                An Bord: {energyOnBoard}t
+                {!hasEnergy && ` · fehlt ${energyCost - energyOnBoard}t`}
+              </span>
+            </div>
+          </div>
         ) : (
           <div
             title="Ziel außerhalb der Reichweite deines Schiffs"
