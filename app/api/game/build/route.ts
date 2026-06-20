@@ -96,10 +96,19 @@ export async function GET(req: NextRequest) {
       .in('status', ['building', 'selling'])
       .order('completes_at')
 
-    const { data: entities } = await serviceClient
+    // Eigene Gebäude + staatliche Gebäude (profile_id IS NULL, is_state_owned = true)
+    const { data: ownEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .eq('profile_id', user.id)
+
+    const { data: stateEntities } = await serviceClient
+      .from('tile_entities')
+      .select('*, locations(slug, name)')
+      .is('profile_id', null)
+      .eq('is_state_owned', true)
+
+    const entities = [...(ownEntities ?? []), ...(stateEntities ?? [])]
 
     const locationIds = [...new Set((entities ?? []).map((e: any) => e.location_id))]
     let colonyTax: Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }> = {}
