@@ -1,6 +1,6 @@
 // lib/game/orbits.ts
 // Erstellt:     15.06.2026
-// Aktualisiert: 15.06.2026
+// Aktualisiert: 20.06.2026
 //
 // Orbital-Schicht (Schicht 2) — REINE FUNKTIONEN, kein DB-Zugriff, kein Zufall,
 // kein Date.now. Position eines Orts ist eine deterministische Funktion der
@@ -13,10 +13,19 @@
 //
 // Skala ist BEWUSST arcadig: Spieleinheiten, keine km. Nur die VERHÄLTNISSE
 // zählen. SEC_PER_UNIT + MIN/MAX halten die Reisezeiten kurz (15-Minuten-Regel):
-// Mond↔Mars schwankt ~25–50s, kurze Hops (Mars↔Phobos) liegen auf der Untergrenze.
+// Mond↔Mars schwankt ~25–50s, kurze Hops (Mars↔Phobos, Erde↔Prometheus) liegen
+// nahe der Untergrenze.
 //
 // Generisch über String-Slugs gehalten (nicht die geschlossene LocationSlug-
 // Union), damit spätere Stationen/Planeten/Belt nur Daten hinzufügen.
+//
+// Lagrange-Physik:
+//   L4/L5 eines Zweikörpersystems (Sonne + Planet) liegen exakt 60° vor bzw.
+//   hinter dem Planeten auf derselben Bahn. Für das arcadige Modell: gleicher
+//   Radius und gleiche Periode wie die Erde, phase = ±π/3.
+//   L5 (60° HINTER Erde): phase_erde − π/3. Da earth.phase = 0: phase = −π/3.
+//   Prometheus bleibt damit immer ~45 Einheiten von der Erde entfernt (konstant!),
+//   weil der Erde-L5-Abstand = Bahnradius × 1 (gleichseitiges Dreieck Sonne-Erde-L5).
 
 export interface Vec3 { x: number; y: number; z: number }
 
@@ -24,27 +33,31 @@ export interface OrbitParams {
   parent: string | null   // null = heliozentrisch (umkreist den Ursprung)
   radius: number          // Bahnradius in Spieleinheiten
   period: number          // Umlaufzeit in TICKS
-  phase:  number          // Phase bei Tick 0 (Radiant)
+  phase:  number          // Phase bei Tick 0 (Radiant). 0 = positive x-Achse.
   incl?:  number          // Bahnneigung (Radiant). Default 0 = koplanar → z=0 (2D)
   node?:  number          // aufsteigender Knoten (Radiant). Default 0
 }
 
-// ── Bahnen (Physik-Konstanten, hierarchisch) ─────────────────────────────────
-// Mond ≈ Erdbahn (der Erde-Mond-Abstand ist interplanetar vernachlässigbar).
-// Phobos umkreist Mars (parent) mit winzigem Radius — er „reitet" also mit Mars
-// mit; der Mars↔Phobos-Hop landet über die MIN-Grenze bei ~10s.
-// Radien so gewählt, dass Mond↔Mars zwischen nah=|150−50|=100 und fern=150+50=200
-// schwankt → mit SEC_PER_UNIT=0.25 ergibt das ~25s (nah) bis ~50s (fern).
+// ── Bahnen (Physik-Konstanten, hierarchisch) ──────────────────────────────────
+// Alle heliozentrischen Bahnen (parent: null) umkreisen den Ursprung (Sonne).
+// Hierarchische Bahnen (parent: slug) addieren zur Elternposition.
+//
+// Radien so gewählt, dass Mond↔Mars zwischen |150−45|=105 und 150+45=195
+// schwankt → mit SEC_PER_UNIT=0.25: ~26s (nah) bis ~49s (fern, geclampt 50s).
+//
+// Prometheus (L5 Erde): gleicher Radius+Periode wie Erde, phase = −π/3 (60° zurück).
+// Erde↔Prometheus: konstant 45 Einheiten → immer ~11s. Physikalisch korrekt.
 export const ORBITS: Record<string, OrbitParams> = {
-  earth:  { parent: null,   radius: 45,  period: 88,  phase: 20 }, // ~0.88 × Mondperiode, leicht versetzt
-  moon:   { parent: 'earth',radius: 3,   period: 2,   phase: 0  }, // Mond umkreist Erde (wie Phobos→Mars)
-  mars:   { parent: null,   radius: 150, period: 188, phase: 0  }, // 188/100 ≈ reales 1.88
-  phobos: { parent: 'mars', radius: 3,   period: 2,   phase: 0  },
+  earth:      { parent: null,    radius: 45,  period: 88,  phase: 0              },
+  moon:       { parent: 'earth', radius: 3,   period: 2,   phase: 0              },
+  prometheus: { parent: null,    radius: 45,  period: 88,  phase: -Math.PI / 3   },  // L5, 60° hinter Erde
+  mars:       { parent: null,    radius: 150, period: 188, phase: 0              },  // 188/88 ≈ reales 1.88
+  phobos:     { parent: 'mars',  radius: 3,   period: 2,   phase: 0              },
 }
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 export const SEC_PER_UNIT = 0.25   // Distanz (Einheiten) → Sekunden
-export const MIN_SECONDS   = 10    // Untergrenze: kürzester Hop (z.B. Mars↔Phobos)
+export const MIN_SECONDS   = 10    // Untergrenze: kürzester Hop
 export const MAX_SECONDS   = 50    // Obergrenze: hält's arcadig
 
 const TWO_PI = Math.PI * 2
