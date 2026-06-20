@@ -29,6 +29,7 @@ import {
   ORDER_COVERAGE_TICKS,
 } from './config'
 import { BUILDING_SALE } from './buildingSale'
+import { entscheideNpc } from './npcBrain'
 
 // Produktion je Gebäudetyp (für die Einkommens-Ausschüttung, Punkt 3)
 const PRODUCES: Record<string, { resource: 'metal' | 'energy'; amount: number }> = {
@@ -39,7 +40,7 @@ const PRODUCES: Record<string, { resource: 'metal' | 'energy'; amount: number }>
 // HINWEIS: Temporär auf 1 Woche gesetzt, um die Welt fürs Balancing-Testen
 // einzufrieren (kein Tick bei jedem Dashboard-Load). VOR echtem Spielbetrieb
 // zurück auf 3600 (1 Stunde) stellen!
-export const TICK_INTERVAL_SECONDS = 3600  // TESTMODUS: 1 Woche (normal: 3600 = 1h)
+export const TICK_INTERVAL_SECONDS = 604800  // TESTMODUS: 1 Woche (normal: 3600 = 1h)
 export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
 
 // Fenster für den gleitenden Bewertungs-Schnitt (Punkt 4)
@@ -373,11 +374,87 @@ export async function runOrderTick(supabase: SB) {
 // ─────────────────────────────────────────────────────────────────────
 // Ein vollständiger Tick (feste Reihenfolge!)
 // ─────────────────────────────────────────────────────────────────────
+// ── NPC-Tick (Phase B v1) ─────────────────────────────────────────────────────
+// Deterministischer Marktteilnehmer. Lädt NPC-Firmen + decision_weights, baut die
+// Welt (Marktpreise + Stock), ruft den REINEN Brain (entscheideNpc) und verbucht
+// die Käufe ins append-only npc_trades-Ledger. Bestand = Summe des Ledgers
+// (Weltzustand = Summe des Event-Logs). Idempotent: ein Kauf je (actor, tick,
+// resource) → ein doppelt laufender Tick ist ein No-op. Greift NICHT ins
+// Preismodell ein (ein Kauf senkt keinen Stock) — der NPC ist sichtbar, nicht
+// preiswirksam; Nachfrage-Wirkung auf Preise wäre eine bewusste spätere Stufe.
+export async function runNpcTick(supabase: SB, tickNumber: number) {
+  const { data: actors } = await supabase
+    .from('actors')
+    .select('id, decision_weights')
+    .eq('kind', 'npc_firm')
+  if (!actors?.length) return { actors: 0, trades: 0 }
+
+  // Marktpreise (buy_price je Gut/Ort) + Stock → NpcWelt.
+  const { data: priceRows } = await supabase
+    .from('market_prices')
+    .select('resource, buy_price, sell_price, location_id, locations(slug)')
+  const { data: stockRows } = await supabase
+    .from('location_resources')
+    .select('location_id, resource, stock')
+
+  const stockMap = new Map<string, number>()
+  for (const s of (stockRows ?? []) as any[]) stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
+
+  const slugToId = new Map<string, string>()
+  const preise = ((priceRows ?? []) as any[]).map((p) => {
+    const slug = p.locations?.slug
+    if (slug) slugToId.set(slug, p.location_id)
+    return {
+      resource:   p.resource,
+      location:   slug,
+      buy_price:  p.buy_price,
+      sell_price: p.sell_price,
+      stock:      stockMap.get(`${p.location_id}|${p.resource}`),
+    }
+  }).filter((p) => p.location)
+
+  let trades = 0
+  for (const actor of actors as any[]) {
+    // Bestand frisch aus dem Ledger summieren — keine veränderliche Lagerspalte.
+    const { data: led } = await supabase
+      .from('npc_trades')
+      .select('resource, amount')
+      .eq('actor_id', actor.id)
+    const bestand: Record<string, number> = {}
+    for (const r of (led ?? []) as any[]) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.amount)
+
+    const aktionen = entscheideNpc(
+      { actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand },
+      { tick: tickNumber, preise },
+    )
+
+    for (const a of aktionen) {
+      if (a.typ !== 'buy') continue
+      const locId = slugToId.get(a.location)
+      if (!locId) continue
+      const { error } = await supabase.from('npc_trades').upsert(
+        {
+          actor_id:    actor.id,
+          tick:        tickNumber,
+          resource:    a.resource,
+          amount:      a.menge,
+          unit_price:  a.maxPreis,
+          location_id: locId,
+        },
+        { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true },
+      )
+      if (!error) trades++
+    }
+  }
+  return { actors: actors.length, trades }
+}
+
 export async function runTick(supabase: SB, tickNumber: number) {
   const population = await runPopulationTick(supabase, tickNumber)
   const prices     = await runPriceTick(supabase, tickNumber)
+  const npc        = await runNpcTick(supabase, tickNumber)
   const orders     = await runOrderTick(supabase)
-  return { tickNumber, population, prices, orders }
+  return { tickNumber, population, prices, npc, orders }
 }
 
 // ─────────────────────────────────────────────────────────────────────
