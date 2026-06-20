@@ -379,9 +379,13 @@ export async function runOrderTick(supabase: SB) {
 // Welt (Marktpreise + Stock), ruft den REINEN Brain (entscheideNpc) und verbucht
 // die Käufe ins append-only npc_trades-Ledger. Bestand = Summe des Ledgers
 // (Weltzustand = Summe des Event-Logs). Idempotent: ein Kauf je (actor, tick,
-// resource) → ein doppelt laufender Tick ist ein No-op. Greift NICHT ins
-// Preismodell ein (ein Kauf senkt keinen Stock) — der NPC ist sichtbar, nicht
-// preiswirksam; Nachfrage-Wirkung auf Preise wäre eine bewusste spätere Stufe.
+// resource) → ein doppelt laufender Tick ist ein No-op.
+//
+// Variante B: Nachfrage ist KAUSAL. Ein Kauf entnimmt dem Ort denselben Term wie
+// Verbrauch (location_resources.stock -= menge); der Preis-Tick reagiert im
+// SELBEN Tick, weil runNpcTick vor runPriceTick läuft. Die Stock-Senkung hängt
+// am echten Insert (.select() liefert bei Re-Run leer) → idempotent. Der Brain
+// deckelt menge bereits an markt.stock → Stock bleibt ≥ 0.
 export async function runNpcTick(supabase: SB, tickNumber: number) {
   const { data: actors } = await supabase
     .from('actors')
@@ -423,6 +427,10 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
     const bestand: Record<string, number> = {}
     for (const r of (led ?? []) as any[]) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.amount)
 
+    // Stock je Markt aus der laufenden Karte auffrischen — so sieht ein zweiter
+    // Akteur, was ein erster im selben Tick schon entnommen hat (Mehr-NPC-fest).
+    for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
+
     const aktionen = entscheideNpc(
       { actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand },
       { tick: tickNumber, preise },
@@ -432,7 +440,10 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
       if (a.typ !== 'buy') continue
       const locId = slugToId.get(a.location)
       if (!locId) continue
-      const { error } = await supabase.from('npc_trades').upsert(
+
+      // Idempotenter Kauf ins Ledger. .select() liefert die Zeile NUR bei echtem
+      // Insert (bei Konflikt/Re-Run: leer) — daran hängt die Stock-Senkung.
+      const { data: eingefuegt } = await supabase.from('npc_trades').upsert(
         {
           actor_id:    actor.id,
           tick:        tickNumber,
@@ -442,8 +453,21 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
           location_id: locId,
         },
         { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true },
-      )
-      if (!error) trades++
+      ).select('id')
+
+      if (!eingefuegt?.length) continue   // Konflikt → Tick lief schon → No-op
+
+      // Variante B: Nachfrage senkt den Stock (kausal). Menge ist im Brain durch
+      // markt.stock gedeckelt → Stock ≥ 0. stockMap mitführen, damit weitere
+      // Akteure im selben Tick den entnommenen Bestand sehen.
+      const key = `${locId}|${a.resource}`
+      const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge)
+      await supabase.from('location_resources')
+        .update({ stock: neuerStock })
+        .eq('location_id', locId)
+        .eq('resource', a.resource)
+      stockMap.set(key, neuerStock)
+      trades++
     }
   }
   return { actors: actors.length, trades }
@@ -451,8 +475,8 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
 
 export async function runTick(supabase: SB, tickNumber: number) {
   const population = await runPopulationTick(supabase, tickNumber)
-  const prices     = await runPriceTick(supabase, tickNumber)
-  const npc        = await runNpcTick(supabase, tickNumber)
+  const npc        = await runNpcTick(supabase, tickNumber)    // Nachfrage VOR den Preisen: senkt Stock
+  const prices     = await runPriceTick(supabase, tickNumber)  // reagiert auf den gesenkten Stock (gleicher Tick)
   const orders     = await runOrderTick(supabase)
   return { tickNumber, population, prices, npc, orders }
 }
