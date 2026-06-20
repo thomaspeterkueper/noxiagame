@@ -295,6 +295,47 @@ const SPRITES: Record<string, SpriteFn> = {
   // Alias auf den bestehenden ice-Sprite
   ice_drill: (c, occ) => SPRITES['ice'](c, occ),
 
+  // Wasserrecycler — Mars: Atmosphären-Kondensation (+2 Wasser/Tick)
+  water_recycler: (c) => (
+    <>
+      <rect x={8} y={8} width={32} height={32} rx={3} fill={c.bodyDark} stroke={INK} strokeWidth={1} />
+      <rect x={14} y={12} width={20} height={14} rx={4} fill="#0e1f30" stroke={WATER} strokeWidth={1.2} />
+      <line x1={18} y1={12} x2={18} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <line x1={22} y1={12} x2={22} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <line x1={26} y1={12} x2={26} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <line x1={30} y1={12} x2={30} y2={26} stroke={STEEL} strokeWidth={0.8} opacity={0.6} />
+      <rect className="b-pulse" x={15} y={13} width={18} height={12} rx={3} fill={WATER} opacity={0.2} />
+      <rect x={21} y={26} width={6} height={4} fill={STEEL} />
+      <rect x={13} y={30} width={22} height={7} rx={2} fill="#0e1f30" stroke={WATER} strokeWidth={1} />
+      <circle className="b-rise b-d0" cx={20} cy={32} r={1.6} fill={WATER} />
+      <circle className="b-rise b-d2" cx={24} cy={33} r={1.8} fill={WATER} />
+      <circle className="b-rise b-d1" cx={28} cy={32} r={1.4} fill={WATER} />
+    </>
+  ),
+
+  // Eisbohrung — Mond: Shackleton-Eis (+4 Wasser/Tick). Alias auf ice-Sprite.
+  ice_drill: (c, occ) => SPRITES['ice'](c, occ),
+
+  // Akademie/Schule — Wissens-Terminal
+  school: (c) => (
+    <>
+      <rect x={7} y={9} width={34} height={30} rx={3} fill={c.bodyDark} stroke={INK} strokeWidth={1} />
+      {/* Dach / Giebel */}
+      <polygon points="6,9 24,2 42,9" fill={c.body} stroke={INK} strokeWidth={1} />
+      {/* Säulen */}
+      <rect x={12} y={18} width={3} height={21} rx={1} fill={STEEL} opacity={0.7} />
+      <rect x={33} y={18} width={3} height={21} rx={1} fill={STEEL} opacity={0.7} />
+      {/* Tür */}
+      <rect x={20} y={26} width={8} height={13} rx={1} fill="#0e151d" />
+      {/* Fenster mit Lichtpuls */}
+      <rect className="b-pulse b-d0" x={13} y={20} width={5} height={4} rx={1} fill={c.accent} opacity={0.5} />
+      <rect className="b-pulse b-d2" x={30} y={20} width={5} height={4} rx={1} fill={c.accent} opacity={0.5} />
+      {/* Wissenssymbol — Buch */}
+      <rect x={20} y={13} width={8} height={6} rx={1} fill={c.accent} opacity={0.8} />
+      <line x1={24} y1={13} x2={24} y2={19} stroke={c.bodyDark} strokeWidth={0.8} />
+    </>
+  ),
+
   // Scanner — Radarschüssel mit rotierendem Sweep (Anomalie-Entdeckung)
   scanner: (c) => (
     <>
