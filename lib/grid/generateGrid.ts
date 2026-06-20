@@ -1,6 +1,10 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.1.0
+// Version:  0.2.0
+//
+// v0.2.0: Anomalie-Andeutung (Schritt 8) — eine seed-bestimmte Terrain-Kachel
+//   trägt ein kosmetisches anomaly-Flag (USP-Neugierhaken, kein System).
+// v0.1.0: Geteilte Grid-Generierung für ColonyGrid + MiniMap.
 //
 // Geteilte Grid-Generierung für ColonyGrid (großes Grid) UND MiniMap.
 // Vorher war die Logik in beiden Dateien dupliziert und driftete auseinander.
@@ -18,8 +22,9 @@ export const ROWS = 8
 export type CellOwner = 'own' | 'other' | null
 
 export interface Cell {
-  type:  string
-  owner: CellOwner
+  type:     string
+  owner:    CellOwner
+  anomaly?: boolean   // seed-bestimmte Anomalie auf Terrain (kosmetische USP-Andeutung)
 }
 
 export interface GridEntity {
@@ -165,6 +170,22 @@ export function generateGrid(
       if (isRoad(r, c - 1)) mask |= 8   // W
       grid[r][c] = { type: `road_${mask}`, owner: null }
     }
+  }
+
+  // 8. Anomalie (USP-Andeutung, rein kosmetisch): eine seed-bestimmte freie
+  //    Terrain-Kachel trägt eine „Anomalie". Erzeugt Neugier, ohne System.
+  //    Nur auf unbebautem, nicht-Straßen-Terrain; deterministisch pro Ort.
+  const terrainCells: [number, number][] = []
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const t = grid[r][c].type
+      if (!t.startsWith('building_') && !t.startsWith('npc_') && !t.startsWith('road'))
+        terrainCells.push([r, c])
+    }
+  if (terrainCells.length > 0) {
+    const pick = Math.floor(seededRandom(seed, 7777) * terrainCells.length)
+    const [ar, ac] = terrainCells[pick]
+    grid[ar][ac] = { ...grid[ar][ac], anomaly: true }
   }
 
   return grid
