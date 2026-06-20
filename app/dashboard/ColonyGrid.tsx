@@ -111,6 +111,11 @@ function BuildPopup({
   }
 
   const buildItems = Object.entries(BUILDABLE_ITEMS).filter(([, b]) => b.type === 'building')
+  // Standortfremde Gebäude: sichtbar aber disabled mit Hinweis
+  const isAllowedHere = (id: string) => {
+    const b = BUILDABLE_ITEMS[id]
+    return !b?.allowedLocations || b.allowedLocations.includes(locationSlug)
+  }
 
   return (
     <div
@@ -135,31 +140,39 @@ function BuildPopup({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {buildItems.map(([id, item]) => {
-            const canAfford = credits >= item.cost
+            const canAfford  = credits >= item.cost
+            const locAllowed = isAllowedHere(id)
+            const canBuild   = canAfford && locAllowed
             return (
               <div key={id} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '0.75rem', borderRadius: '6px',
-                background: canAfford ? '#2a3a4a' : '#1a2530',
-                border: '1px solid #2a4e7a', opacity: canAfford ? 1 : 0.6,
+                background: canBuild ? '#2a3a4a' : '#1a2530',
+                border: `1px solid ${locAllowed ? '#2a4e7a' : '#3a3a2a'}`,
+                opacity: locAllowed ? (canAfford ? 1 : 0.6) : 0.45,
               }}>
                 <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: locAllowed ? '#fff' : '#8a8a6a' }}>
                     {item.name}
                   </div>
                   <div style={{ fontSize: '0.65rem', color: '#8a9ab0', marginTop: '0.2rem' }}>
                     {item.description} · {item.buildTimeTicks} Tick{item.buildTimeTicks > 1 ? 's' : ''} Bauzeit
                   </div>
+                  {!locAllowed && (
+                    <div style={{ fontSize: '0.6rem', color: '#8a7a4a', marginTop: '0.2rem' }}>
+                      ⚠ Nur auf {item.allowedLocations?.join(', ')}
+                    </div>
+                  )}
                 </div>
                 <button
-                  disabled={!canAfford || loading}
+                  disabled={!canBuild || loading}
                   onClick={() => handleBuild(id)}
                   style={{
-                    background: canAfford ? '#2a4e7a' : '#2a3a4a',
+                    background: canBuild ? '#2a4e7a' : '#2a3a4a',
                     color: '#fff', border: 'none',
                     padding: '0.4rem 0.8rem', borderRadius: '4px',
                     fontSize: '0.7rem', fontWeight: 700,
-                    cursor: canAfford ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap',
+                    cursor: canBuild ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap',
                   }}
                 >
                   {item.cost.toLocaleString('de')} Cr
