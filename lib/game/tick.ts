@@ -32,15 +32,17 @@ import { BUILDING_SALE } from './buildingSale'
 import { entscheideNpc } from './npcBrain'
 
 // Produktion je Gebäudetyp (für die Einkommens-Ausschüttung, Punkt 3)
-const PRODUCES: Record<string, { resource: 'metal' | 'energy'; amount: number }> = {
-  mine:  { resource: 'metal',  amount: 5 },
-  solar: { resource: 'energy', amount: 4 },
+const PRODUCES: Record<string, { resource: 'metal' | 'energy' | 'water'; amount: number }> = {
+  mine:           { resource: 'metal',  amount: 5 },
+  solar:          { resource: 'energy', amount: 4 },
+  ice_drill:      { resource: 'water',  amount: 4 },
+  water_recycler: { resource: 'water',  amount: 2 },
 }
 
 // HINWEIS: Temporär auf 1 Woche gesetzt, um die Welt fürs Balancing-Testen
 // einzufrieren (kein Tick bei jedem Dashboard-Load). VOR echtem Spielbetrieb
 // zurück auf 3600 (1 Stunde) stellen!
-export const TICK_INTERVAL_SECONDS = 604800  // TESTMODUS: 1 Woche (normal: 3600 = 1h)
+export const TICK_INTERVAL_SECONDS = 3600    // 1 Stunde pro Tick
 export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
 
 // Fenster für den gleitenden Bewertungs-Schnitt (Punkt 4)
@@ -95,9 +97,11 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
 
     for (const res of ['water', 'energy', 'metal'] as const) {
       const r = resMap[res]; if (!r) continue
-      const mineBonus  = res === 'metal'  ? (counts['mine']  ?? 0) * 5 : 0
-      const solarBonus = res === 'energy' ? (counts['solar'] ?? 0) * 4 : 0
-      const totalProd  = (r.base_production ?? r.production) + mineBonus + solarBonus
+      const mineBonus        = res === 'metal'  ? (counts['mine']           ?? 0) * 5 : 0
+      const solarBonus       = res === 'energy' ? (counts['solar']          ?? 0) * 4 : 0
+      const iceDrillBonus    = res === 'water'  ? (counts['ice_drill']      ?? 0) * 4 : 0
+      const recyclerBonus    = res === 'water'  ? (counts['water_recycler'] ?? 0) * 2 : 0
+      const totalProd  = (r.base_production ?? r.production) + mineBonus + solarBonus + iceDrillBonus + recyclerBonus
       const newStock   = Math.max(0, r.stock + totalProd - consumed[res])
 
       await supabase.from('location_resources')
