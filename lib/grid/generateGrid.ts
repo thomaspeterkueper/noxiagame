@@ -20,7 +20,7 @@
 export const COLS = 12
 export const ROWS = 8
 
-export type CellOwner = 'own' | 'other' | null
+export type CellOwner = 'own' | 'other' | 'state' | null
 
 export interface Cell {
   type:     string
@@ -29,11 +29,12 @@ export interface Cell {
 }
 
 export interface GridEntity {
-  entity_id:   string
-  profile_id:  string
-  entity_type: string
-  tile_row:    number
-  tile_col:    number
+  entity_id:     string
+  profile_id:    string | null | null
+  is_state_owned?: boolean
+  entity_type:   string
+  tile_row:      number
+  tile_col:      number
 }
 
 export interface GridPending {
@@ -141,7 +142,13 @@ export function generateGrid(
   // 5. Bestand (echte Gebäude) — überschreibt, mit Eigentümer-Markierung
   for (const e of entities) {
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
-      const owner: CellOwner = userId ? (e.profile_id === userId ? 'own' : 'other') : null
+      const owner: CellOwner = !userId
+        ? null
+        : e.is_state_owned || e.profile_id === null
+        ? 'state'
+        : e.profile_id === userId
+        ? 'own'
+        : 'other'
       grid[e.tile_row][e.tile_col] = { type: `building_${e.entity_id}`, owner }
     }
   }
