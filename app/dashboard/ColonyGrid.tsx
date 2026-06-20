@@ -22,6 +22,7 @@ import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
 import AdminOverlay from './AdminOverlay'
+import SchoolOverlay from './SchoolOverlay'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
@@ -217,6 +218,7 @@ function BuildPopup({
 const BUILDING_NAMES: Record<string, string> = {
   mine: 'Mine', solar: 'Solarfeld', habitat: 'Habitat',
   scanner: 'Scanner', admin: 'Verwaltung',
+  school: 'Akademie', ice_drill: 'Eisbohrung', water_recycler: 'Wasserrecycler',
 }
 
 const RES_DE: Record<string, string> = {
@@ -261,6 +263,7 @@ export default function ColonyGrid({
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
   const [showAdmin, setShowAdmin]         = useState(false)
+  const [showSchool, setShowSchool]       = useState(false)
   const popPercent = Math.round((population / populationMax) * 100)
 
   useEffect(() => {
@@ -287,6 +290,10 @@ export default function ColonyGrid({
       setShowAdmin(true)
       return
     }
+    if (ent?.entity_id === 'school') {
+      setShowSchool(true)
+      return
+    }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }
 
@@ -299,6 +306,24 @@ export default function ColonyGrid({
     <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
       <BuildingSpriteStyles />
       <style>{`@keyframes noxia-anomaly{0%,100%{opacity:.45;transform:scale(0.85)}50%{opacity:1;transform:scale(1.1)}}`}</style>
+
+      {/* Schul-Overlay */}
+      {showSchool && (
+        <SchoolOverlay
+          locationSlug={slug}
+          colonyContext={{
+            locationName: name,
+            population,
+            waterStock:   entities ? 0 : 0,  // ColonyGrid hat keinen Stock — wird aus props geholt
+            waterCons:    Math.ceil(population / 100),
+            credits:      0,
+          }}
+          onClose={() => { setShowSchool(false); setSelectedTile(null) }}
+          onKnowledgeEarned={(pts, total) => {
+            console.log(`+${pts} Wissenspunkte → ${total} gesamt`)
+          }}
+        />
+      )}
 
       {/* Admin-Overlay */}
       {showAdmin && (
