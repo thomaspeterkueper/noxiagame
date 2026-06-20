@@ -36,9 +36,10 @@ export interface OrbitParams {
 // Radien so gewählt, dass Mond↔Mars zwischen nah=|150−50|=100 und fern=150+50=200
 // schwankt → mit SEC_PER_UNIT=0.25 ergibt das ~25s (nah) bis ~50s (fern).
 export const ORBITS: Record<string, OrbitParams> = {
-  moon:   { parent: null,   radius: 50,  period: 100, phase: 0 },
-  mars:   { parent: null,   radius: 150, period: 188, phase: 0 },  // 188/100 ≈ reales 1.88
-  phobos: { parent: 'mars', radius: 3,   period: 2,   phase: 0 },
+  earth:  { parent: null,   radius: 45,  period: 88,  phase: 20 }, // ~0.88 × Mondperiode, leicht versetzt
+  moon:   { parent: 'earth',radius: 3,   period: 2,   phase: 0  }, // Mond umkreist Erde (wie Phobos→Mars)
+  mars:   { parent: null,   radius: 150, period: 188, phase: 0  }, // 188/100 ≈ reales 1.88
+  phobos: { parent: 'mars', radius: 3,   period: 2,   phase: 0  },
 }
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
