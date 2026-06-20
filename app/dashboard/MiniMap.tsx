@@ -65,11 +65,12 @@ export default function MiniMap({
   onOpen: () => void
 }) {
   const grid = generateGrid(slug, population, entities, pending)
-  const ownGold = '#c9a961'
-  const otherGray = '#5a6878'
+  const ownGold   = '#c9a961'
+  const stateBlue = '#2a6ab5'
+  const otherRed  = '#c94040'
 
   // Liefert pro Zelle: was rendern (Terrain-Farbe ODER Gebäude-Sprite) + Rahmen.
-  function cell(cellData: { type: string; owner: 'own' | 'other' | null }, r: number, c: number) {
+  function cell(cellData: { type: string; owner: 'own' | 'other' | 'state' | null }, r: number, c: number) {
     const t = cellData.type
 
     // Echtes Gebäude aus dem Bestand?
@@ -78,7 +79,7 @@ export default function MiniMap({
       const own = ent.profile_id === userId
       return {
         bg: NPC_TILE_BG,
-        outline: own ? ownGold : otherGray,
+        outline: own ? ownGold : (ent.is_state_owned || ent.profile_id === null) ? stateBlue : otherRed,
         glow: own,
         entityId: ent.entity_id,   // typrichtiges Sprite, unabhängig vom Eigentümer
         road: null,
