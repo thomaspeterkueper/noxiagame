@@ -1,0 +1,40 @@
+-- Migration 019: Staatliche Startgebäude auf der Erde (LEO-Terminal)
+-- Stand: 20.06.2026
+--
+-- Erde = Ausgangsbasis neuer Spieler. Staatliche Startausstattung:
+--
+--   (3,4) landing_pad  — Abflug/Ankunft, links von Mitte
+--   (3,5) admin        — Verwaltung, Mitte (Standard für alle Stationen)
+--   (3,6) school       — Akademie, rechts von Admin
+--   (2,5) warehouse    — Handelszentrale (Kauf/Verkauf), über Admin
+--
+-- Alle is_state_owned = true. ON CONFLICT DO NOTHING → idempotent.
+
+INSERT INTO tile_entities
+  (profile_id, location_id, tile_level, tile_row, tile_col,
+   entity_type, entity_id, is_state_owned, built_at)
+SELECT
+  NULL, l.id, 0, s.row, s.col, 'building', s.entity_id, true, now()
+FROM locations l,
+(VALUES
+  (3, 4, 'landing_pad'),
+  (3, 5, 'admin'),
+  (3, 6, 'school'),
+  (2, 5, 'warehouse')
+) AS s(row, col, entity_id)
+WHERE l.slug = 'earth'
+AND NOT EXISTS (
+  SELECT 1 FROM tile_entities t
+  WHERE t.location_id = l.id
+    AND t.tile_level  = 0
+    AND t.tile_row    = s.row
+    AND t.tile_col    = s.col
+    AND t.entity_type = 'building'
+);
+
+-- Kontrolle:
+SELECT te.entity_id, te.tile_row, te.tile_col, te.is_state_owned
+FROM tile_entities te
+JOIN locations l ON l.id = te.location_id
+WHERE l.slug = 'earth'
+ORDER BY te.tile_row, te.tile_col;
