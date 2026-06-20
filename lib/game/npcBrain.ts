@@ -52,6 +52,7 @@ export interface NpcGebaeude {
   entity_id:   string  // 'mine' | 'solar' | 'ice_drill' | ...
   location_id: string
   location:    string  // Slug
+  tile_col:    number  // Kachel-Spalte — eindeutiger Ledger-Schlüssel (ref = "slug:col")
 }
 
 export interface NpcKontext {
@@ -88,6 +89,7 @@ export type NpcAktion =
       resource:  string
       location:  string   // wo das Gebäude steht
       menge:     number   // Output pro Tick (aus BUILDABLE_ITEMS)
+      ref:       string   // "${location}:${tile_col}" — Ledger-Idempotenz-Schlüssel
       grund:     string
     }
   | {
@@ -133,7 +135,8 @@ export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
       resource,
       location: geb.location,
       menge:    amount,
-      grund:    `${geb.entity_id} @ ${geb.location} produziert ${amount} ${resource}/Tick`,
+      ref:      `${geb.location}:${geb.tile_col}`,  // eindeutig je Gebäude
+      grund:    `${geb.entity_id}@[col ${geb.tile_col}] @ ${geb.location} produziert ${amount} ${resource}/Tick`,
     })
   }
 
