@@ -1,9 +1,9 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt: 31.05.2026
-// Aktualisiert: 15.06.2026 – Gebäude über animiertes BuildingSVG (statt TileSVG);
-//                            Terrain/Baustelle weiter via TileDisplay
-//   07.06.2026 – tile_entities als Bestandsquelle, Eigentums-Markierung,
-//                Gebäude-Verkauf (SellPanel), Steuer-/Wirtschafts-Sidebar
+// Aktualisiert: 15.06.2026 – Anomalie-Marker (Klick → „Anomalie entdeckt." in
+//                            Sidebar); geplante Gebäude ausgegraut im Bau-Dialog
+//   15.06.2026 – Gebäude über animiertes BuildingSVG; Straßen via TileSVG
+//   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -16,10 +16,10 @@
 
 import { useState, useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
-import { BUILDABLE_ITEMS } from '@/lib/game/config'
+import { BUILDABLE_ITEMS, PLANNED_BUILDINGS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
-import { generateGrid, gridTypes, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
+import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -167,12 +167,31 @@ function BuildPopup({
           })}
         </div>
 
-        <button
-          onClick={onClose}
-          style={{ marginTop: '1rem', width: '100%', background: 'transparent', color: '#64748b', border: '1px solid #2a3a4a', borderRadius: '4px', padding: '0.4rem', fontSize: '0.7rem', cursor: 'pointer' }}
-        >
-          Abbrechen
-        </button>
+        {/* Geplante Gebäude — ausgegraut, noch nicht baubar (Roadmap-Sicht) */}
+        {PLANNED_BUILDINGS.length > 0 && (
+          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #2a3a4a' }}>
+            <div style={{ fontSize: '0.6rem', color: '#5a6878', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>
+              In Planung
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {PLANNED_BUILDINGS.map(p => (
+                <div key={p.id}
+                  title={p.hint}
+                  style={{
+                    fontSize: '0.62rem', color: '#5a6878',
+                    background: '#16202c', border: '1px solid #243240',
+                    borderRadius: '4px', padding: '0.25rem 0.5rem',
+                    cursor: 'default', opacity: 0.7,
+                  }}>
+                  {p.name}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.58rem', color: '#465668', marginTop: '0.5rem', lineHeight: 1.4 }}>
+              Diese Gebäude sind in Vorbereitung und bald verfügbar.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -222,12 +241,15 @@ export default function ColonyGrid({
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
+  const [anomaly, setAnomaly] = useState<{ r: number; c: number } | null>(null)
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
   const popPercent = Math.round((population / populationMax) * 100)
 
   useEffect(() => {
-    setGrid(gridTypes(generateGrid(slug, population, entities, pending, userId)))
+    const cellGrid = generateGrid(slug, population, entities, pending, userId)
+    setGrid(gridTypes(cellGrid))
+    setAnomaly(anomalyAt(cellGrid))
   }, [slug, population, populationMax, entities, pending])
 
   // Entität auf einer Kachel finden (Oberfläche, Gebäude)
@@ -254,6 +276,7 @@ export default function ColonyGrid({
   return (
     <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
       <BuildingSpriteStyles />
+      <style>{`@keyframes noxia-anomaly{0%,100%{opacity:.45;transform:scale(0.85)}50%{opacity:1;transform:scale(1.1)}}`}</style>
 
       {/* Build-Popup */}
       {showBuildPopup && selectedTile && (
@@ -309,6 +332,7 @@ export default function ColonyGrid({
             const entity     = entityAt(r, c)
             const isOwn      = entity?.profile_id === userId
             const isSelling  = sellingAt(r, c)
+            const isAnomaly  = anomaly?.r === r && anomaly?.c === c
 
             // Eigentums-Rand: eigene Gebäude Gold, fremde grau
             let ownerOutline = 'none'
@@ -319,15 +343,18 @@ export default function ColonyGrid({
               <div
                 key={`${r}-${c}`}
                 title={
-                  entity
+                  isAnomaly
+                    ? 'Anomalie entdeckt.'
+                    : entity
                     ? `${BUILDING_NAMES[entity.entity_id] ?? entity.entity_id}${isOwn ? ' (deins)' : entity.username ? ` (${entity.username})` : ''}`
                     : tileType.replace(/_/g, ' ')
                 }
                 onClick={() => handleTileClick(r, c, tileType)}
                 style={{
+                  position: 'relative',
                   width:   TILE_SIZE,
                   height:  TILE_SIZE,
-                  cursor:  canBuild || entity ? 'pointer' : 'default',
+                  cursor:  canBuild || entity || isAnomaly ? 'pointer' : 'default',
                   outline: ownerOutline,
                   outlineOffset: '-2px',
                   boxSizing: 'border-box',
@@ -361,6 +388,19 @@ export default function ColonyGrid({
                   }
                   return <TileDisplay tileType={tileType} slug={slug} />
                 })()}
+                {isAnomaly && (
+                  <span style={{
+                    position: 'absolute', inset: 0, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+                  }}>
+                    <span style={{
+                      width: '46%', height: '46%', borderRadius: '50%',
+                      background: 'radial-gradient(circle, #c9a0f0 0%, #8a5bc0 55%, transparent 72%)',
+                      boxShadow: '0 0 8px #b48ce8',
+                      animation: 'noxia-anomaly 2.6s ease-in-out infinite',
+                    }} />
+                  </span>
+                )}
               </div>
             )
           })
@@ -384,12 +424,16 @@ export default function ColonyGrid({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>
-                    {selectedEntity
+                    {anomaly && selectedTile.r === anomaly.r && selectedTile.c === anomaly.c
+                      ? 'Anomalie'
+                      : selectedEntity
                       ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
                       : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </div>
                   <div style={{ color: '#8a9ab0', marginTop: '0.25rem' }}>
-                    {selectedEntity
+                    {anomaly && selectedTile.r === anomaly.r && selectedTile.c === anomaly.c
+                      ? 'Anomalie entdeckt.'
+                      : selectedEntity
                       ? (ownSelected ? 'Eigentum: Du' : `Eigentum: ${selectedEntity.username ?? 'Anderer Pilot'}`)
                       : sellingAt(selectedTile.r, selectedTile.c)
                         ? 'Wird verkauft …'
