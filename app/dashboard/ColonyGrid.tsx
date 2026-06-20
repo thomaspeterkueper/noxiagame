@@ -21,6 +21,7 @@ import { TileSVG } from '@/lib/grid/TileSVG'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
+import AdminOverlay from './AdminOverlay'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
@@ -201,6 +202,7 @@ function BuildPopup({
 
 const BUILDING_NAMES: Record<string, string> = {
   mine: 'Mine', solar: 'Solarfeld', habitat: 'Habitat',
+  scanner: 'Scanner', admin: 'Verwaltung',
 }
 
 const RES_DE: Record<string, string> = {
@@ -244,6 +246,7 @@ export default function ColonyGrid({
   const [anomaly, setAnomaly] = useState<{ r: number; c: number } | null>(null)
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
+  const [showAdmin, setShowAdmin]         = useState(false)
   const popPercent = Math.round((population / populationMax) * 100)
 
   useEffect(() => {
@@ -265,6 +268,11 @@ export default function ColonyGrid({
 
   function handleTileClick(r: number, c: number, tileType: string) {
     setSelectedTile({ r, c, type: tileType })
+    const ent = entityAt(r, c)
+    if (ent?.entity_id === 'admin') {
+      setShowAdmin(true)
+      return
+    }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }
 
@@ -277,6 +285,14 @@ export default function ColonyGrid({
     <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
       <BuildingSpriteStyles />
       <style>{`@keyframes noxia-anomaly{0%,100%{opacity:.45;transform:scale(0.85)}50%{opacity:1;transform:scale(1.1)}}`}</style>
+
+      {/* Admin-Overlay */}
+      {showAdmin && (
+        <AdminOverlay
+          locationSlug={slug}
+          onClose={() => { setShowAdmin(false); setSelectedTile(null) }}
+        />
+      )}
 
       {/* Build-Popup */}
       {showBuildPopup && selectedTile && (
@@ -334,10 +350,22 @@ export default function ColonyGrid({
             const isSelling  = sellingAt(r, c)
             const isAnomaly  = anomaly?.r === r && anomaly?.c === c
 
-            // Eigentums-Rand: eigene Gebäude Gold, fremde grau
+            // Eigentums-Rand: Admin=Blau, eigenes=Gold, fremder Spieler=Rot
             let ownerOutline = 'none'
-            if (entity) ownerOutline = isOwn ? '1px solid #c9a961' : '1px solid #5a6878'
-            if (isSelected) ownerOutline = '2px solid #c9a961'
+            if (entity) {
+              if (entity.entity_id === 'admin' && !entity.profile_id) {
+                ownerOutline = '2px solid #2a6ab5'    // öffentlich/staatlich
+              } else if (entity.entity_id === 'admin' && isOwn) {
+                ownerOutline = '2px solid #c9a961'    // eigenes Admin
+              } else if (entity.entity_id === 'admin') {
+                ownerOutline = '2px solid #c94040'    // fremdes Admin
+              } else if (isOwn) {
+                ownerOutline = '1px solid #c9a961'    // eigenes Gebäude
+              } else {
+                ownerOutline = '1px solid #c94040'    // fremder Spieler
+              }
+            }
+            if (isSelected && entity?.entity_id !== 'admin') ownerOutline = '2px solid #c9a961'
 
             return (
               <div
