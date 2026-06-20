@@ -241,21 +241,24 @@ export interface ColonyTax {
 }
 
 interface ColonyGridProps {
-  slug:          string
-  name:          string
-  population:    number
-  populationMax: number
-  isSupplied:    boolean
-  userId:        string              // eigene profile_id für Eigentums-Check
-  entities?:     TileEntity[]        // Bestand aus tile_entities
-  pending?:      PendingBuild[]      // Laufende Vorgänge (building/selling)
-  tax?:          ColonyTax           // Steuersätze dieser Kolonie
-  entityInfo?:   Record<string, EntityEconomy>  // Wirtschaft je Gebäude-id
+  slug:              string
+  name:              string
+  population:        number
+  populationMax:     number
+  isSupplied:        boolean
+  userId:            string
+  entities?:         TileEntity[]
+  pending?:          PendingBuild[]
+  tax?:              ColonyTax
+  entityInfo?:       Record<string, EntityEconomy>
+  locationResources?: { resource: string; stock: number; consumption: number }[]
+  credits?:          number
 }
 
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
   userId, entities = [], pending = [], tax, entityInfo,
+  locationResources = [], credits = 0,
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
@@ -314,9 +317,9 @@ export default function ColonyGrid({
           colonyContext={{
             locationName: name,
             population,
-            waterStock:   entities ? 0 : 0,  // ColonyGrid hat keinen Stock — wird aus props geholt
-            waterCons:    Math.ceil(population / 100),
-            credits:      0,
+            waterStock:   (locationResources.find(r => r.resource === 'water')?.stock ?? 0),
+            waterCons:    (locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100)),
+            credits,
           }}
           onClose={() => { setShowSchool(false); setSelectedTile(null) }}
           onKnowledgeEarned={(pts, total) => {
