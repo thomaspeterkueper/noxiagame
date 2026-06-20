@@ -18,7 +18,8 @@
 
 'use client'
 
-import { ResourceType, LocationSlug } from '@/lib/store/gameStore'
+import { ResourceType, LocationSlug, useGameStore, effectiveRange } from '@/lib/store/gameStore'
+import { baseTravelSeconds } from '@/lib/game/ships'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
@@ -54,7 +55,16 @@ export default function ColonyDetail({
   onClose: () => void
   onTravel: (dest: LocationSlug) => void
 }) {
+  const { location, shipRange } = useGameStore()
   if (!colony) return null
+
+  // Erreichbarkeit wie in der TravelList: außer Reichweite → kein Flug, kein
+  // Umgehen mehr über die Detailansicht. Reisezeit ist aktuell statisch; sobald
+  // Step B wieder steht, fließt hier derselbe Tick ein wie in der TravelList.
+  const used      = Object.values(cargo).reduce((a, b) => a + b, 0)
+  const reach     = effectiveRange(shipRange, used)
+  const travelSec = baseTravelSeconds(location, colony.slug as LocationSlug)
+  const reachable = travelSec != null && travelSec <= reach
 
   const popPct = Math.round((colony.population / colony.population_max) * 100)
 
@@ -126,13 +136,20 @@ export default function ColonyDetail({
             Du bist hier — liefere über die Handelszentrale.
             {Object.values(cargo).some(v => v > 0) && ' Ladung an Bord bereit.'}
           </div>
-        ) : (
+        ) : reachable ? (
           <button
             onClick={() => { onTravel(colony.slug as LocationSlug); onClose() }}
             style={{ width: '100%', padding: '12px 0', fontSize: '0.95rem', borderRadius: '9px', border: '1px solid #c9a961', background: '#15233a', color: '#c9a961', cursor: 'pointer', fontWeight: 600 }}
           >
-            {LOC_ICON[colony.slug]} Nach {colony.name} fliegen
+            {LOC_ICON[colony.slug]} Nach {colony.name} fliegen{travelSec != null ? ` · ${travelSec}s` : ''}
           </button>
+        ) : (
+          <div
+            title="Ziel außerhalb der Reichweite deines Schiffs"
+            style={{ width: '100%', padding: '12px 0', fontSize: '0.9rem', borderRadius: '9px', border: '1px solid #3a4759', background: '#0f1722', color: '#7d93b0', textAlign: 'center', fontWeight: 600 }}
+          >
+            {LOC_ICON[colony.slug]} {colony.name} außer Reichweite{travelSec != null ? ` · ${travelSec}s` : ''}
+          </div>
         )}
       </div>
     </div>
