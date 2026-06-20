@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
       .in('status', ['building', 'selling'])
       .order('completes_at')
 
-    // Eigene Gebäude + staatliche Gebäude (profile_id IS NULL, is_state_owned = true)
+    // Eigene Gebäude + staatliche + NPC-Gebäude
     const { data: ownEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
@@ -108,7 +108,20 @@ export async function GET(req: NextRequest) {
       .is('profile_id', null)
       .eq('is_state_owned', true)
 
-    const entities = [...(ownEntities ?? []), ...(stateEntities ?? [])]
+    // NPC-Gebäude: actor_id gesetzt, mit display_name als username
+    const { data: npcEntities } = await serviceClient
+      .from('tile_entities')
+      .select('*, locations(slug, name), actors(display_name)')
+      .not('actor_id', 'is', null)
+
+    // display_name → username normalisieren (NPCs erscheinen wie Spieler)
+    const npcNormalized = (npcEntities ?? []).map((e: any) => ({
+      ...e,
+      username: e.actors?.display_name ?? null,
+      actors: undefined,
+    }))
+
+    const entities = [...(ownEntities ?? []), ...(stateEntities ?? []), ...npcNormalized]
 
     const locationIds = [...new Set((entities ?? []).map((e: any) => e.location_id))]
     let colonyTax: Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }> = {}
