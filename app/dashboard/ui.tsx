@@ -16,8 +16,8 @@
 // ─── Display-Maps ─────────────────────────────────────────────────────────
 export const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
 export const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
-export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨' }
-export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
+export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨', prometheus: '🛸' }
+export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', prometheus: 'Prometheus' }
 
 // ─── Design-Tokens ───────────────────────────────────────────────────────────
 export const T = {
