@@ -30,6 +30,7 @@ import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
 import MiniMap from './MiniMap'
+import SolarSystem from './SolarSystem'
 import ColonyStats from './ColonyStats'
 import ShipyardCard from './ShipyardCard'
 import ShipHeader from './ShipHeader'
@@ -60,7 +61,7 @@ export default function DashboardClient({
 
   // UI-State
   const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'colonies'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'colonies' | 'system'>('dashboard')
   const [worldData, setWorldData] = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
   const [tileEntities, setTileEntities] = useState<any[]>([])
@@ -148,7 +149,7 @@ export default function DashboardClient({
     setAuctionOpen(true)
   }
 
-  async function handleTravel(dest: LocationSlug) { if (!inTransit) await travel(dest) }
+  async function handleTravel(dest: LocationSlug) { if (!inTransit) await travel(dest, stats?.tickNumber ?? 0) }
 
   async function handleLogout() {
     const { createClient } = await import('@/lib/supabase/client')
@@ -176,9 +177,9 @@ export default function DashboardClient({
   const totalPop            = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
 
   // Flugzeit zum Ziel — aus der EINEN Quelle (ships.baseTravelSeconds) statt
-  // einer lokalen Kopie. `tick` ist dort reserviert für die Orbital-Schicht.
+  // einer lokalen Kopie. Mit dem aktuellen Tick variiert sie orbital (25–50s).
   function flightTime(to: string): number | null {
-    return baseTravelSeconds(location, to as LocationSlug)
+    return baseTravelSeconds(location, to as LocationSlug, stats?.tickNumber ?? 0)
   }
 
   // Effektive Reichweite: heute = statische shipRange. Die Funktion trägt schon
@@ -355,6 +356,7 @@ export default function DashboardClient({
             { id: 'dashboard',  label: 'Übersicht',   icon: Icon.trade },
             { id: 'statistics', label: 'Statistiken', icon: Icon.chart },
             { id: 'colonies',   label: 'Kolonien',    icon: Icon.globe },
+            { id: 'system',     label: 'System',      icon: Icon.orbit },
           ].map(tab => {
             const on = activeTab === tab.id
             return (
@@ -372,6 +374,8 @@ export default function DashboardClient({
       <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '2rem 1.5rem 3rem' }}>
 
         {activeTab === 'statistics' && <StatisticsTab locations={locations} />}
+
+        {activeTab === 'system' && <SolarSystem currentTick={stats?.tickNumber ?? 0} shipRange={shipRange} />}
 
         {activeTab === 'colonies' && (
           <div>
