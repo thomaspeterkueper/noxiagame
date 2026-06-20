@@ -48,14 +48,15 @@ const TILE_SIZE = 44
 
 // Eine Zeile aus tile_entities (eigene UND fremde Gebäude)
 export interface TileEntity {
-  id:          string
-  profile_id:  string
-  entity_type: string   // 'building' | 'vehicle' | 'specialist' | 'ship'
-  entity_id:   string   // 'mine' | 'solar' | 'habitat' | ...
-  tile_level:  number
-  tile_row:    number
-  tile_col:    number
-  username?:   string   // optional, falls profiles gejoint wird
+  id:             string
+  profile_id:     string | null
+  is_state_owned?: boolean
+  entity_type:    string   // 'building' | 'vehicle' | 'specialist' | 'ship'
+  entity_id:      string   // 'mine' | 'solar' | 'habitat' | 'admin' | ...
+  tile_level:     number
+  tile_row:       number
+  tile_col:       number
+  username?:      string   // optional, falls profiles gejoint wird
 }
 
 // Laufender Vorgang aus player_builds
@@ -346,26 +347,26 @@ export default function ColonyGrid({
             const isSelected = selectedTile?.r === r && selectedTile?.c === c
             const canBuild   = isBuildable(tileType)
             const entity     = entityAt(r, c)
-            const isOwn      = entity?.profile_id === userId
+            const isOwn      = entity?.profile_id !== null && entity?.profile_id === userId
             const isSelling  = sellingAt(r, c)
             const isAnomaly  = anomaly?.r === r && anomaly?.c === c
 
-            // Eigentums-Rand: Admin=Blau, eigenes=Gold, fremder Spieler=Rot
+            // Eigentums-Rand:
+            //   Blau (#2a6ab5)  = staatliches Gebäude (profile_id null / is_state_owned)
+            //   Gold (#c9a961)  = eigenes Gebäude
+            //   Rot  (#c94040)  = fremder Spieler
+            const isState = entity?.is_state_owned || entity?.profile_id === null
             let ownerOutline = 'none'
             if (entity) {
-              if (entity.entity_id === 'admin' && !entity.profile_id) {
-                ownerOutline = '2px solid #2a6ab5'    // öffentlich/staatlich
-              } else if (entity.entity_id === 'admin' && isOwn) {
-                ownerOutline = '2px solid #c9a961'    // eigenes Admin
-              } else if (entity.entity_id === 'admin') {
-                ownerOutline = '2px solid #c94040'    // fremdes Admin
+              if (isState) {
+                ownerOutline = '2px solid #2a6ab5'
               } else if (isOwn) {
-                ownerOutline = '1px solid #c9a961'    // eigenes Gebäude
+                ownerOutline = '1px solid #c9a961'
               } else {
-                ownerOutline = '1px solid #c94040'    // fremder Spieler
+                ownerOutline = '1px solid #c94040'
               }
             }
-            if (isSelected && entity?.entity_id !== 'admin') ownerOutline = '2px solid #c9a961'
+            if (isSelected && !isState) ownerOutline = '2px solid #c9a961'
 
             return (
               <div
