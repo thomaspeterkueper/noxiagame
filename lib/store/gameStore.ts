@@ -13,7 +13,7 @@ import { create } from 'zustand'
 import { baseTravelSeconds } from '@/lib/game/ships'
 
 export type ResourceType = 'water' | 'energy' | 'metal'
-export type LocationSlug = 'moon' | 'mars' | 'phobos'
+export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus'
 
 // Effektive Reichweite eines Schiffs (in Basis-Distanz).
 // HEUTE: gibt schlicht baseRange zurück (statische Reichweite aus ship_types).
@@ -115,7 +115,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   credits:    5000,
   cargo:      { water: 0, energy: 0, metal: 0 },
   cargoMax:   100,
-  location:   'moon',
+  location:   'earth',
   shipId:     null,
   shipTypeId: 'freighter_mk1',
   speedMult:  1.0,
