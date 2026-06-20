@@ -356,24 +356,20 @@ export default function ColonyGrid({
             //   Gold (#c9a961)  = eigenes Gebäude
             //   Rot  (#c94040)  = fremder Spieler
             const isState = entity?.is_state_owned || entity?.profile_id === null
-            // Border statt Outline — sichtbarer auf kleinen Kacheln
-            let ownerBorder = 'none'
+            // inset box-shadow: kein Platzverlust, überlagert SVG nicht
+            // Staatlich: helles Cyan-Blau (#5aaeff) — deutlich vom dunklen Kachel-BG
             let ownerShadow = 'none'
             if (entity) {
               if (isState) {
-                ownerBorder = '3px solid #2a6ab5'
-                ownerShadow = '0 0 6px #2a6ab5'
+                ownerShadow = 'inset 0 0 0 3px #5aaeff, 0 0 7px #5aaeff'
               } else if (isOwn) {
-                ownerBorder = '3px solid #c9a961'
-                ownerShadow = '0 0 6px rgba(201,169,97,0.6)'
+                ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 7px rgba(201,169,97,0.7)'
               } else {
-                ownerBorder = '2px solid #c94040'
-                ownerShadow = '0 0 5px rgba(201,64,64,0.5)'
+                ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 5px rgba(224,80,80,0.5)'
               }
             }
             if (isSelected && !isState) {
-              ownerBorder = '3px solid #c9a961'
-              ownerShadow = '0 0 10px #c9a961'
+              ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 12px #c9a961'
             }
 
             return (
@@ -392,7 +388,6 @@ export default function ColonyGrid({
                   width:   TILE_SIZE,
                   height:  TILE_SIZE,
                   cursor:  canBuild || entity || isAnomaly ? 'pointer' : 'default',
-                  border: ownerBorder,
                   boxShadow: ownerShadow,
                   boxSizing: 'border-box',
                   flexShrink: 0,
