@@ -377,7 +377,7 @@ export default function DashboardClient({
 
         {activeTab === 'statistics' && <StatisticsTab locations={locations} />}
 
-        {activeTab === 'system' && <SolarSystem currentTick={stats?.tickNumber ?? 0} shipRange={shipRange} />}
+        {activeTab === 'system' && <SolarSystem currentTick={stats?.tickNumber ?? 0} shipRange={shipRange} currentLocation={location} />}
 
         {activeTab === 'colonies' && (
           <div>
