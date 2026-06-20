@@ -107,7 +107,27 @@ export const BUILDABLE_ITEMS: Record<string, {
     populationBonus: 100,
     description: '+100 max. Bevölkerung',
   },
+  scanner: {
+    type: 'building', name: 'Scanner',
+    cost: 1800, buildTimeTicks: 2,
+    description: 'Macht Anomalien der Kolonie sichtbar',
+  },
 }
+// Vorbereitete Gebäude — im Bau-Dialog ausgegraut sichtbar, noch nicht baubar.
+// Sobald ein Typ eine echte Funktion bekommt, wandert er nach BUILDABLE_ITEMS.
+// Siehe SPEC_gebaeude_katalog.md.
+export const PLANNED_BUILDINGS: { id: string; name: string; hint: string }[] = [
+  { id: 'warehouse',       name: 'Warenhaus',     hint: 'Lagerkapazität' },
+  { id: 'tank',            name: 'Silo',          hint: 'Flüssigkeits-/Gasspeicher' },
+  { id: 'oxygen_recycler', name: 'O₂-Recycler',   hint: 'Lebenserhaltung' },
+  { id: 'water_plant',     name: 'Wasserwerk',    hint: 'Wasseraufbereitung' },
+  { id: 'smelter',         name: 'Schmelze',      hint: 'Metall → Bauteile' },
+  { id: 'admin',           name: 'Verwaltung',    hint: 'Kolonieverwaltung' },
+  { id: 'school',          name: 'Akademie',      hint: 'Bildung & Erkenntnis' },
+  { id: 'bar',             name: 'Bar',           hint: 'Zufriedenheit' },
+]
+
+
 // Maximaler Verhandlungsaufschlag über die Basis-Belohnung.
 export const ORDER_BONUS_MAX = 0.5   // bis zu +50%
 
