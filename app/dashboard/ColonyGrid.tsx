@@ -28,7 +28,7 @@ function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
   const [useSVG, setUseSVG] = useState(false)
 
-  if (useSVG) return <TileSVG type={tileType} planet={slug as 'moon' | 'mars' | 'phobos'} />
+  if (useSVG) return <TileSVG type={tileType} planet={slug} />
 
   return (
     <img
@@ -449,7 +449,7 @@ export default function ColonyGrid({
                     return (
                       <BuildingSVG
                         entityId={eid}
-                        planet={slug as 'moon' | 'mars' | 'phobos'}
+                        planet={slug}
                         occupancy={populationMax > 0 ? population / populationMax : 0}
                         owned={false}
                         size={TILE_SIZE}
@@ -457,7 +457,7 @@ export default function ColonyGrid({
                     )
                   }
                   if (tileType.startsWith('road')) {
-                    return <TileSVG type={tileType} planet={slug as 'moon' | 'mars' | 'phobos'} />
+                    return <TileSVG type={tileType} planet={slug} />
                   }
                   return <TileDisplay tileType={tileType} slug={slug} />
                 })()}
