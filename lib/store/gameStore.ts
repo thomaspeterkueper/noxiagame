@@ -85,7 +85,7 @@ interface GameState {
   loadTrades:     () => Promise<void>
   buy:            (resource: ResourceType, price: number, amount?: number) => Promise<{ ok: boolean; msg: string; booked: number }>
   sell:           (resource: ResourceType, price: number, amount?: number) => Promise<{ ok: boolean; msg: string; booked: number }>
-  travel:         (dest: LocationSlug) => Promise<void>
+  travel:         (dest: LocationSlug, atTick?: number) => Promise<void>
   tickTransit:    () => void
 }
 
@@ -260,12 +260,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  travel: async (dest) => {
+  travel: async (dest, atTick = 0) => {
     const { location, inTransit, speedMult } = get()
     if (inTransit) return
     if (location === dest) return
 
-    const baseDuration = baseTravelSeconds(location, dest) ?? 20
+    const baseDuration = baseTravelSeconds(location, dest, atTick) ?? 20
     const duration = Math.round(baseDuration * speedMult)
 
     set({
