@@ -356,17 +356,25 @@ export default function ColonyGrid({
             //   Gold (#c9a961)  = eigenes Gebäude
             //   Rot  (#c94040)  = fremder Spieler
             const isState = entity?.is_state_owned || entity?.profile_id === null
-            let ownerOutline = 'none'
+            // Border statt Outline — sichtbarer auf kleinen Kacheln
+            let ownerBorder = 'none'
+            let ownerShadow = 'none'
             if (entity) {
               if (isState) {
-                ownerOutline = '2px solid #2a6ab5'
+                ownerBorder = '3px solid #2a6ab5'
+                ownerShadow = '0 0 6px #2a6ab5'
               } else if (isOwn) {
-                ownerOutline = '1px solid #c9a961'
+                ownerBorder = '3px solid #c9a961'
+                ownerShadow = '0 0 6px rgba(201,169,97,0.6)'
               } else {
-                ownerOutline = '1px solid #c94040'
+                ownerBorder = '2px solid #c94040'
+                ownerShadow = '0 0 5px rgba(201,64,64,0.5)'
               }
             }
-            if (isSelected && !isState) ownerOutline = '2px solid #c9a961'
+            if (isSelected && !isState) {
+              ownerBorder = '3px solid #c9a961'
+              ownerShadow = '0 0 10px #c9a961'
+            }
 
             return (
               <div
@@ -384,8 +392,8 @@ export default function ColonyGrid({
                   width:   TILE_SIZE,
                   height:  TILE_SIZE,
                   cursor:  canBuild || entity || isAnomaly ? 'pointer' : 'default',
-                  outline: ownerOutline,
-                  outlineOffset: '-2px',
+                  border: ownerBorder,
+                  boxShadow: ownerShadow,
                   boxSizing: 'border-box',
                   flexShrink: 0,
                   opacity: isSelling ? 0.45 : 1,        // „wird verkauft": gedimmt
