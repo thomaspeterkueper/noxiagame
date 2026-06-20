@@ -267,6 +267,23 @@ const SPRITES: Record<string, SpriteFn> = {
   ),
 }
 
+// Scanner — Radarschüssel mit rotierendem Sweep (Anomalie-Entdeckung)
+  scanner: (c) => (
+    <>
+      <rect x={8} y={8} width={32} height={32} rx={3} fill={c.bodyDark} stroke={INK} strokeWidth={1} />
+      <circle cx={24} cy={24} r={13} fill="#0e1922" stroke={STEEL} strokeWidth={1} />
+      <circle cx={24} cy={24} r={9} fill="none" stroke={c.body} strokeWidth={1} opacity={0.5} />
+      <circle cx={24} cy={24} r={5} fill="none" stroke={c.body} strokeWidth={1} opacity={0.5} />
+      {/* rotierender Sweep-Keil */}
+      <g className="b-spin b-fast" style={spinC}>
+        <circle cx={24} cy={24} r={13} fill="none" />
+        <path d="M24,24 L24,11 A13,13 0 0,1 35,18 Z" fill="#b48ce8" opacity={0.35} />
+        <line x1={24} y1={24} x2={24} y2={11} stroke="#b48ce8" strokeWidth={1.4} />
+      </g>
+      <circle className="b-pulse" cx={24} cy={24} r={2.4} fill="#b48ce8" />
+    </>
+  ),
+
 export function BuildingSVG({
   entityId, planet = 'moon', status = 'active', condition = 100,
   occupancy = 0, owned = false, size = 44,
