@@ -113,7 +113,7 @@ export function generateGrid(
     const [r, c] = flat[i]
     const v = seededRandom(seed, 999 + r * cols + c)
     const type = v < 0.12 ? 'npc_mine' : v < 0.22 ? 'npc_solar' : 'npc_habitat'
-    grid[r][c] = { type, owner: null }
+    grid[r][c] = { type, owner: userId ? 'state' : null }
   }
 
   // 4. Straßennetz: ruhiges Raster einer geplanten Kolonie.
@@ -124,7 +124,7 @@ export function generateGrid(
   if (population > 200) {
     // Hauptachse
     for (let c = 0; c < cols; c++)
-      if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: null }
+      if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: userId ? 'state' : null }
 
     // Querstraßen alle 4 Spalten (feste Abstände → Rasteroptik)
     const span = Math.min(Math.floor(population / 400) + 1, 3)  // 1–3 Querstraßen je nach Größe
@@ -134,7 +134,7 @@ export function generateGrid(
       const reach = 2 + Math.floor(population / 600)
       for (let r = centerR - reach; r <= centerR + reach; r++) {
         if (r < 0 || r >= rows) continue
-        if (isBuildable(grid[r][qc].type)) grid[r][qc] = { type: 'road', owner: null }
+        if (isBuildable(grid[r][qc].type)) grid[r][qc] = { type: 'road', owner: userId ? 'state' : null }
       }
     }
   }
