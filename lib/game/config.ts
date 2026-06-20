@@ -85,9 +85,10 @@ export const BUILDABLE_ITEMS: Record<string, {
   name:             string
   cost:             number
   buildTimeTicks:   number   // Bauzeit in Ticks (1 Tick = 1 Cron-Durchlauf)
-  produces?:        { resource: string; amount: number }
-  populationBonus?: number
-  description:      string
+  produces?:         { resource: string; amount: number }
+  populationBonus?:  number
+  allowedLocations?: string[]  // undefined = überall baubar
+  description:       string
 }> = {
   mine: {
     type: 'building', name: 'Mine',
@@ -112,6 +113,20 @@ export const BUILDABLE_ITEMS: Record<string, {
     cost: 1800, buildTimeTicks: 2,
     description: 'Macht Anomalien der Kolonie sichtbar',
   },
+  ice_drill: {
+    type: 'building', name: 'Eisbohrung',
+    cost: 2500, buildTimeTicks: 3,
+    produces: { resource: 'water', amount: 4 },
+    allowedLocations: ['moon'],
+    description: '+4 Wasser/Tick — Shackleton-Eis',
+  },
+  water_recycler: {
+    type: 'building', name: 'Wasserrecycler',
+    cost: 2000, buildTimeTicks: 2,
+    produces: { resource: 'water', amount: 2 },
+    allowedLocations: ['mars'],
+    description: '+2 Wasser/Tick — Atmosphären-Kondensation',
+  },
 }
 // Vorbereitete Gebäude — im Bau-Dialog ausgegraut sichtbar, noch nicht baubar.
 // Sobald ein Typ eine echte Funktion bekommt, wandert er nach BUILDABLE_ITEMS.
@@ -120,7 +135,7 @@ export const PLANNED_BUILDINGS: { id: string; name: string; hint: string }[] = [
   { id: 'warehouse',       name: 'Warenhaus',     hint: 'Lagerkapazität' },
   { id: 'tank',            name: 'Silo',          hint: 'Flüssigkeits-/Gasspeicher' },
   { id: 'oxygen_recycler', name: 'O₂-Recycler',   hint: 'Lebenserhaltung' },
-  { id: 'water_plant',     name: 'Wasserwerk',    hint: 'Wasseraufbereitung' },
+  // water_plant → standortspezifisch: ice_drill (Mond), water_recycler (Mars)
   { id: 'smelter',         name: 'Schmelze',      hint: 'Metall → Bauteile' },
   { id: 'admin',           name: 'Verwaltung',    hint: 'Kolonieverwaltung' },
   { id: 'school',          name: 'Akademie',      hint: 'Bildung & Erkenntnis' },
