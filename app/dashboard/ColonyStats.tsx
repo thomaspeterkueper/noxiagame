@@ -6,8 +6,8 @@
 'use client'
 
 // Konstanten für Icons und Namen
-const LOC_ICON: Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨' }
-const LOC_NAME: Record<string, string> = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos' }
+const LOC_ICON: Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨', earth: '🌍', prometheus: '🛸' }
+const LOC_NAME: Record<string, string> = { moon: 'Mond', mars: 'Mars', phobos: 'Phobos', earth: 'Erde', prometheus: 'Prometheus' }
 
 export default function ColonyStats({ locations }: { locations: any[] }) {
   return (
@@ -17,7 +17,7 @@ export default function ColonyStats({ locations }: { locations: any[] }) {
       gap: '1rem',
       marginBottom: '1.5rem',
     }}>
-      {locations.map((loc: any) => {
+      {locations.filter((loc: any) => loc.location_type === 'colony' || !loc.location_type).map((loc: any) => {
         // Wasserressource für Anzeige
         const water  = loc.location_resources?.find((r: any) => r.resource === 'water')
         const popPct = (loc.population / loc.population_max) * 100
