@@ -117,7 +117,7 @@ export const BUILDABLE_ITEMS: Record<string, {
     type: 'building', name: 'Eisbohrung',
     cost: 2500, buildTimeTicks: 3,
     produces: { resource: 'water', amount: 4 },
-    allowedLocations: ['moon'],
+    allowedLocations: ['moon', 'mars'],
     description: '+4 Wasser/Tick — Shackleton-Eis',
   },
   water_recycler: {
