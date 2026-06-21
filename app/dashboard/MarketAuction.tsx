@@ -244,10 +244,13 @@ export default function MarketAuction({
         }
       }
 
-      // Spieler-Käufer am Limit, aber Verkäufer bleibt darüber → leer ausgegangen.
+      // Spieler-Käufer am Limit, Verkäufer hat seinen Floor erreicht aber noch drüber → kein Zuschlag.
+      // Wichtig: erst beenden wenn Verkäufer tatsächlich auf Floor gefallen ist
+      // (nicht schon wenn Verkäufer noch auf dem Weg nach unten ist).
       if (mode === 'buy') {
         const player = buyersRef.current.find(b => b.isPlayer)
-        if (player && !player.done && player.price >= limit - 0.5 && sp > limit + 0.5) {
+        const atFloor = Math.abs(sellerPriceRef.current - sellerFloor(row)) < 1.5
+        if (player && !player.done && player.price >= limit - 0.5 && sp > limit + 0.5 && atFloor) {
           player.done = true
           playerDoneRef.current = true
           endedRef.current = true
@@ -256,6 +259,8 @@ export default function MarketAuction({
         }
       }
 
+      // Auktion endet wenn: Stock leer ODER alle Käufer done
+      // (inkl. Spieler — NPCs-done allein reicht nicht, Spieler muss noch Chance haben)
       const allDone = buyersRef.current.every(b => b.done)
       if (sellerStockRef.current <= 0 || allDone) {
         endedRef.current = true
