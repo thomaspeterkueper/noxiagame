@@ -406,7 +406,7 @@ export default function DashboardClient({
           <div>
             <ColonyStats locations={locations} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
-              {locations.map((loc: any) => (
+              {locations.filter((loc: any) => loc.location_type === 'colony' || !loc.location_type).map((loc: any) => (
                 <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
                   population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
                   userId={userId}
