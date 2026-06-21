@@ -22,7 +22,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/store/gameStore'
 import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
 import { getToken, getSessionInfo } from '@/lib/supabase/auth'
@@ -82,6 +82,15 @@ export default function DashboardClient({
 
   // ── Spielstand laden ────────────────────────────────────────────────────────
   useEffect(() => { if (!loaded) loadFromServer() }, [])
+  // Nach Transit-Ende: World-Daten neu laden damit locations aktuell ist
+  const prevLocationRef = React.useRef(location)
+  useEffect(() => {
+    if (prevLocationRef.current !== location) {
+      prevLocationRef.current = location
+      // World-Daten neu holen damit currentLocationData verfügbar ist
+      fetch('/api/game/world').catch(() => {})
+    }
+  }, [location])
 
   // ── Weltdaten alle 30s ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -301,14 +310,14 @@ export default function DashboardClient({
                 Karte schließen ✕
               </button>
             </div>
-            {currentLocationData.location_type === 'station' ? (
+            {currentLocationData?.location_type === 'station' ? (
               <StationOverlay
-                slug={currentLocationData.slug}
-                name={currentLocationData.name}
-                population={currentLocationData.population}
-                populationMax={currentLocationData.population_max}
+                slug={currentLocationData?.slug ?? location}
+                name={currentLocationData?.name ?? location}
+                population={currentLocationData?.population ?? 0}
+                populationMax={currentLocationData?.population_max ?? 1}
                 userId={userId}
-                locationId={currentLocationData.id}
+                locationId={currentLocationData?.id ?? ""}
                 locationResources={currentLocationData.location_resources ?? []}
                 credits={credits}
                 entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
@@ -318,9 +327,9 @@ export default function DashboardClient({
               <ColonyGrid
                 slug={currentLocationData.slug} name={currentLocationData.name}
                 population={currentLocationData.population} populationMax={currentLocationData.population_max}
-                isSupplied={currentLocationData.is_supplied}
+                isSupplied={currentLocationData?.is_supplied ?? false}
                 userId={userId}
-                tax={colonyTax[currentLocationData.id]}
+                tax={colonyTax[currentLocationData?.id ?? ""]}
                 entityInfo={entityInfo}
                 locationResources={currentLocationData.location_resources ?? []}
                 credits={credits}
