@@ -275,12 +275,12 @@ export default function MarketAuction({
   async function settlePlayer(qty: number, price: number) {
     if (!row) return
     if (qty <= 0) { setLog({ text: 'Kein Zuschlag – Vorrat war erschöpft.', ok: false }); return }
-    const free = cargoMax - (cargo.water + cargo.energy + cargo.metal)
-    const affordable = Math.floor(credits / price)
-    const finalQty = Math.min(qty, free, affordable)
-    if (finalQty <= 0) { setLog({ text: free <= 0 ? 'Laderaum voll.' : 'Nicht genug Credits.', ok: false }); return }
-    const ok = await onTrade(resource, 'buy', finalQty, price)
-    setLog({ text: ok ? `✓ Gekauft: ${finalQty}t ${RESOURCE_LABEL[resource]} zu ${price} Cr.` : 'Kauf fehlgeschlagen.', ok })
+    // Server deckt Credits- und Cargo-Check ab (maxByCredits, maxByCargo in trade/route.ts).
+    // Client-seitige affordable-Prüfung führt zu Fehlanzeigen wenn Credits zwischen
+    // Auktionsstart und Abschluss verändert wurden. Wir senden qty und lassen den
+    // Server die tatsächlich gebuchte Menge bestimmen.
+    const ok = await onTrade(resource, 'buy', qty, price)
+    setLog({ text: ok ? `✓ Gekauft: ${qty}t ${RESOURCE_LABEL[resource]} zu ${price} Cr.` : 'Kauf fehlgeschlagen – prüfe Credits und Laderaum.', ok })
   }
 
   async function settleSellerPlayer() {
