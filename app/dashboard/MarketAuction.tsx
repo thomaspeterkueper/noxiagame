@@ -138,11 +138,14 @@ export default function MarketAuction({
     const floor = sellerFloor(row)
     const ceil = buyerCeiling(row)
 
-    sellerPriceRef.current = clampPrice(ceil + 10)
-
     if (mode === 'buy') {
+      // Kauf: Spieler ist Käufer, Markt ist Verkäufer — startet über buy_price
+      sellerPriceRef.current = clampPrice(ceil + 10)
       sellerStockRef.current = row.stock
     } else {
+      // Verkauf: Spieler ist Verkäufer — sein Startpreis = sein Mindestlimit
+      // NPC-Käufer steigen von unten auf. Spieler-Preis fällt bis auf limit.
+      sellerPriceRef.current = clampPrice(limit)
       sellerStockRef.current = Math.min(playerQty, frozenMaxRef.current)
     }
 
@@ -163,13 +166,14 @@ export default function MarketAuction({
         })
       }
     } else {
+      // Verkauf: NPC-Käufer steigen von niedrigen Preisen auf
       const nNpc = 3 + Math.floor(Math.random() * 3)
       for (let i = 0; i < nNpc; i++) {
         buyers.push({
           id: 'npc' + i, name: NPC_POOL[i].name, color: NPC_POOL[i].color, isPlayer: false,
-          price: clampPrice(floor - 8 - Math.random() * 20),
-          aggr: 0.4 + Math.random() * 0.6,
-          want: 10 + Math.floor(Math.random() * 25), got: 0, done: false,
+          price: clampPrice(floor - 15 - Math.random() * 25),
+          aggr: 0.5 + Math.random() * 0.5,
+          want: 10 + Math.floor(Math.random() * 30), got: 0, done: false,
         })
       }
     }
