@@ -539,21 +539,40 @@ export default function DashboardClient({
 
                 {/* Mini-Karte des aktuellen Orts — Klick öffnet volles Grid */}
                 {currentLocationData && (
-                  <MiniMap
-                    slug={location}
-                    population={currentLocationData.population}
-                    userId={userId}
-                    entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
-                    pending={playerBuilds
-                      .filter((b: any) => b.locations?.slug === location)
-                      .map((b: any) => ({
-                        buildable_id: b.buildable_id,
-                        tile_row:     b.tile_row,
-                        tile_col:     b.tile_col,
-                        status:       b.status,
-                      }))}
-                    onOpen={() => setGridOpen(true)}
-                  />
+                  currentLocationData.location_type === 'station' ? (
+                    /* Station: Mini-Ring statt Kachelgrid */
+                    <div
+                      onClick={() => setGridOpen(true)}
+                      style={{ ...card, padding: '1rem', cursor: 'pointer', background: '#07101a', border: '1px solid #1a2a3a', position: 'relative', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}
+                    >
+                      {tileEntities.filter((e: any) => e.locations?.slug === location && e.entity_type === 'module').map((m: any) => {
+                        const icons: Record<string, string> = { command_center: '🎯', solar_array: '☀️', docking_bay: '🚀', habitat_module: '🏠', research_lab: '🔬', water_recycler: '💧', storage_bay: '📦', observatory: '🔭', reactor: '⚛️' }
+                        return (
+                          <div key={m.id} style={{ textAlign: 'center', opacity: m.status === 'active' ? 1 : 0.4 }}>
+                            <div style={{ fontSize: '1.5rem' }}>{icons[m.entity_id] ?? '⬡'}</div>
+                            <div style={{ fontSize: '0.5rem', color: '#5a7a9a', marginTop: 2 }}>{m.entity_id.replace('_', ' ')}</div>
+                          </div>
+                        )
+                      })}
+                      <div style={{ position: 'absolute', bottom: '0.5rem', right: '0.75rem', fontSize: '0.65rem', color: '#3a5a7a' }}>Karte öffnen →</div>
+                    </div>
+                  ) : (
+                    <MiniMap
+                      slug={location}
+                      population={currentLocationData.population}
+                      userId={userId}
+                      entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+                      pending={playerBuilds
+                        .filter((b: any) => b.locations?.slug === location)
+                        .map((b: any) => ({
+                          buildable_id: b.buildable_id,
+                          tile_row:     b.tile_row,
+                          tile_col:     b.tile_col,
+                          status:       b.status,
+                        }))}
+                      onOpen={() => setGridOpen(true)}
+                    />
+                  )
                 )}
 
                 {/* Frachtstatus */}
