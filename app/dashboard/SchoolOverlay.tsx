@@ -286,6 +286,29 @@ export default function SchoolOverlay({
                         onChange={e => setAnswer(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && checkAnswer()}
                         style={{ width: '100%', background: '#0a1520', border: '2px solid #2a4e7a', borderRadius: '8px', padding: '0.65rem 0.9rem', color: '#cdd6e0', fontSize: '1.1rem', fontFamily: "'Courier Prime', monospace", outline: 'none', boxSizing: 'border-box' as const }} />
+                      {/* Taschenrechner */}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <button onClick={() => setShowCalc(c => !c)}
+                          style={{ background: 'transparent', border: 'none', color: '#5a7a9a', fontSize: '0.65rem', cursor: 'pointer', padding: '2px 0' }}>
+                          {showCalc ? 'Taschenrechner ausblenden' : '🧮 Taschenrechner'}
+                        </button>
+                        {showCalc && (
+                          <div style={{ marginTop: '0.4rem', background: '#0a1520', border: '1px solid #2a4e7a', borderRadius: '8px', padding: '0.6rem' }}>
+                            <input type="text" placeholder="z.B. 80 * 60" value={calcVal}
+                              onChange={e => setCalcVal(e.target.value)}
+                              style={{ width: '100%', background: '#0d1a26', border: '1px solid #2a4e7a', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#cdd6e0', fontSize: '0.8rem', fontFamily: "'Courier Prime', monospace", outline: 'none', boxSizing: 'border-box' as const }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#c9a961', fontWeight: 700 }}>
+                                {(() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; return isFinite(r) ? '= ' + r.toLocaleString('de') : '' } catch { return '' } })()}
+                              </span>
+                              <button onClick={() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; if (isFinite(r)) setAnswer(String(Math.round(r))) } catch {} }}
+                                style={{ background: '#2a4e7a', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: '0.65rem', cursor: 'pointer' }}>
+                                Antwort
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <button onClick={() => checkAnswer()} disabled={!userAnswer.trim()}
                         style={{ width: '100%', marginTop: '0.75rem', padding: '0.7rem', background: userAnswer.trim() ? '#2a4e7a' : '#1a2a3a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: userAnswer.trim() ? 'pointer' : 'not-allowed' }}>
                         Prüfen →
