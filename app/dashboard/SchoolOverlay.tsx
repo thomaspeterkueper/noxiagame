@@ -132,39 +132,18 @@ export default function SchoolOverlay({
   async function generateTask() {
     setLoading(true); setResult(null); setAnswer(''); setOpt(null); setEarned(null); setTask(null)
 
-    // Abwechselnd Rechnen und Quiz (zufällig 40/60)
-    const doQuiz = Math.random() < 0.45
-
     try {
-      const prompt = doQuiz
-        ? `Du bist Aufgabengenerator für das Weltraum-Handelsspiel Noxia.
-Erstelle eine Wissensfrage über das Sonnensystem, Physik oder Spielmechaniken.
-Themen: Sonnensystem (Planeten, Monde, Asteroiden), Physik (Schwerkraft, Energie, Orbits),
-Ressourcen (warum braucht Mars Wasser-Import?), Navigation (warum Erde→Mond teurer?).
-Niveau: interessant für alle Altersgruppen, nicht zu schwer, nicht trivial.
-
-Antworte NUR mit JSON (kein Markdown):
-{"kind":"quiz","question":"[Frage]","options":["[A]","[B]","[C]","[D]"],"correct":[0-3],"explanation":"[1 Satz Erklärung]","points":[15-25],"topic":"[Sonnensystem|Physik|Ressourcen|Navigation]"}`
-        : `Du bist Aufgabengenerator für das Weltraum-Handelsspiel Noxia.
-Erstelle eine Rechenaufgabe. Schwierigkeit: maximal 8. Schuljahr.
-Erlaubt: Addition, Subtraktion, Multiplikation, Division, Prozentrechnung, Proportionen.
-NICHT erlaubt: Algebra, Gleichungen, Wurzeln, Potenzen. Antwort = ganze Zahl.
-
-Kontext (für Zahlen, nicht im Output):
-Station: ${colonyContext.locationName} · Bevölkerung: ${colonyContext.population}
-Wasserlager: ${colonyContext.waterStock}t · Verbrauch: ${colonyContext.waterCons}t/h
-Credits: ${colonyContext.credits} Cr
-WICHTIG: Der Frachter fasst max. 100 Tonnen. Mengen in Aufgaben IMMER ≤ 100t.
-
-Themen: Ressourcen, Handel, Navigation, Bevölkerung, Energie.
-Antworte NUR mit JSON (kein Markdown):
-{"kind":"calc","question":"[1-3 Sätze]","answer":[Zahl],"explanation":"[1 Satz]","points":[10-25],"topic":"[Thema]"}`
-
       const currentLevel = levelInfo?.level ?? 1
+      const seed = Math.random().toString(36).slice(2, 8)
       const response = await fetch('/api/game/school', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, level: currentLevel, isDaily: showDaily }),
+        body: JSON.stringify({
+          level:         currentLevel,
+          isDaily:       showDaily,
+          seed,
+          colonyContext, // Server baut den Prompt mit Caching
+        }),
       })
       const data = await response.json()
       if (!data.task) throw new Error(data.error ?? `HTTP ${response.status}`)
