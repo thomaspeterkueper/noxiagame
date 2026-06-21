@@ -146,7 +146,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   loadFromServer: async () => {
     try {
-      const data = await tradeRequest({})
+      const data = await tradeRequest({ location: get().location })
       if (data.error) return
       set({
         credits:    data.credits,
@@ -287,7 +287,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }))
 
     try {
-      const data = await tradeRequest({ action: 'travel', resource: dest, amount: 0, price: 0, location: dest })
+      const data = await tradeRequest({ action: 'travel', resource: dest, amount: 0, price: 0, location: location })
       if (data.error || !data.ok) {
         // Server hat abgelehnt → Rollback
         set(s => ({
