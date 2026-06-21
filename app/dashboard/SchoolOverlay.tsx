@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 — Stufen, Fortschrittsbalken, Tagesaufgabe, Schwierigkeit
+// Aktualisiert: 21.06.2026 — Hintergrundbild je Location (ACADEMY_BG), Breite 560px
 // Version:      3.2.0
 'use client'
 
@@ -50,6 +50,13 @@ const TOPIC_COLOR: Record<string, string> = {
   'Energie':      '#ffd700',
   'Sonnensystem': '#e8702a',
   'Physik':       '#3fb0c9',
+}
+
+const ACADEMY_BG: Record<string, { src: string; label: string }> = {
+  earth:       { src: '/images/building-backgrounds/school-back-earth.png',       label: 'Erde · Universität' },
+  mars:        { src: '/images/building-backgrounds/school-back-mars.png',        label: 'Mars · Tharsis Hub' },
+  prometheus:  { src: '/images/building-backgrounds/school-back-prometheus.png',  label: 'Prometheus Station · L5' },
+  ship:        { src: '/images/building-backgrounds/school-back-ship.png',        label: 'Raumschiff · Unterwegs' },
 }
 
 const MONO = "'Courier Prime', monospace"
@@ -193,7 +200,27 @@ export default function SchoolOverlay({
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.85)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#0d1a26', border: '1px solid #2a4e7a', borderRadius: '14px', width: 'min(500px, 95vw)', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 48px rgba(0,0,0,0.7)', fontFamily: "'Courier Prime', monospace", color: '#cdd6e0', overflow: 'hidden' }}>
+      <div style={{ background: '#0d1a26', border: '1px solid #2a4e7a', borderRadius: '14px', width: 'min(560px, 95vw)', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 48px rgba(0,0,0,0.7)', fontFamily: "'Courier Prime', monospace", color: '#cdd6e0', overflow: 'hidden' }}>
+
+        {/* Akademie-Hintergrundbild */}
+        {(() => {
+          const bg = ACADEMY_BG[locationSlug]
+          if (!bg) return null
+          return (
+            <div style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0 }}>
+              <img
+                src={bg.src}
+                alt={bg.label}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%', display: 'block' }}
+                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(2,4,8,0.0) 0%, rgba(2,4,8,0.05) 55%, rgba(13,26,38,0.97) 100%)' }} />
+              <div style={{ position: 'absolute', bottom: '10px', left: '14px', fontSize: '0.55rem', letterSpacing: '3px', textTransform: 'uppercase' as const, color: 'rgba(201,169,97,0.85)', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                {bg.label}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Header */}
         <div style={{ padding: '1rem 1.25rem', background: '#0a1520', borderBottom: '1px solid rgba(42,78,122,0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
