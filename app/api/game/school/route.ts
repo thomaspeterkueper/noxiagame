@@ -1,7 +1,7 @@
 // app/api/game/school/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 21.06.2026 — temperature=1.0 für Aufgaben-Variation
-// Version:      2.2.0
+// Aktualisiert: 21.06.2026 21:20 — Prompt-Fix: Energie ≠ Wasser
+// Version:      2.3.0
 //
 // Prompt Caching: statischer System-Prompt (Spielregeln, JSON-Format) wird
 // gecacht. Nur der variable Teil (Kolonie-Kontext, Schwierigkeit, Seed)
@@ -24,8 +24,9 @@ const SYSTEM_PROMPT = `Du bist Aufgabengenerator für das Weltraum-Handelsspiel 
 SPIELKONTEXT:
 - Spieler handeln Ressourcen (Wasser, Energie, Metall) zwischen Stationen im Sonnensystem
 - Stationen: Erde (Startpunkt, günstig), Mond (Metall-Produzent), Mars (Wasser-Defizit), Phobos (Konsument)
-- Frachter fasst max. 100 Tonnen Nutzlast
+- Frachter fasst max. 100 Tonnen Nutzlast (Wasser + Energie + Metall sind separate Ressourcen)
 - Flüge kosten Energie aus dem Laderaum (Erde→Mond: 20t, Mond→Mars: 12t, Mars→Phobos: 4t)
+- KRITISCH: Energie-Verbrauch beim Flug reduziert NUR die Energie an Bord, NIEMALS Wasser oder Metall. Wasser bleibt beim Flug völlig unverändert. Erstelle KEINE Aufgaben die Energie und Wasser verwechseln oder subtrahieren.
 - Beispielpreise: Wasser Mond 130/95 Cr, Mars 200/155 Cr · Metall Mond 35/25 Cr, Mars 75/58 Cr
 
 AUFGABEN-REGELN:
