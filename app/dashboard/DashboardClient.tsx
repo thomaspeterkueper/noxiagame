@@ -539,7 +539,7 @@ export default function DashboardClient({
 
                 {/* Mini-Karte des aktuellen Orts — Klick öffnet volles Grid */}
                 {currentLocationData && (
-                  currentLocationData?.location_type === 'station' ? (
+                  (currentLocationData?.location_type === 'station' || location === 'prometheus') ? (
                     /* Station: Mini-Ring statt Kachelgrid */
                     <div
                       onClick={() => setGridOpen(true)}
@@ -561,7 +561,7 @@ export default function DashboardClient({
                       slug={location}
                       population={currentLocationData.population}
                       userId={userId}
-                      entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+                      entities={tileEntities.filter((e: any) => e.locations?.slug === location && e.tile_row != null)}
                       pending={playerBuilds
                         .filter((b: any) => b.locations?.slug === location)
                         .map((b: any) => ({
