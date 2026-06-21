@@ -120,9 +120,14 @@ Antworte NUR mit JSON (kein Markdown):
       const text = data.content?.[0]?.text ?? ''
       setTask(JSON.parse(text.replace(/```json|```/g, '').trim()))
     } catch {
-      // Fallback: einfache Rechenaufgabe
-      const h = Math.floor(colonyContext.waterStock / Math.max(1, colonyContext.waterCons))
-      setTask({ kind: 'calc', question: `Das Wasserlager auf ${colonyContext.locationName} hat ${colonyContext.waterStock}t. Verbrauch: ${colonyContext.waterCons}t/h. Wie viele Stunden reicht der Vorrat?`, answer: h, explanation: `${colonyContext.waterStock} ÷ ${colonyContext.waterCons} = ${h}`, points: 15, topic: 'Ressourcen' })
+      // Fallback: statische Fragen (kein Kolonie-Kontext nötig)
+      const fallbacks: Task[] = [
+        { kind: 'calc', question: 'Ein Frachter kauft 80 Tonnen Wasser für 95 Cr/t und verkauft sie für 155 Cr/t. Wie viel Gewinn macht er insgesamt?', answer: 4800, explanation: '80 × (155 − 95) = 80 × 60 = 4.800 Cr', points: 15, topic: 'Handel' },
+        { kind: 'quiz', question: 'Warum kostet der Flug von der Erde zum Mond mehr Energie als der Rückweg?', options: ['Der Mond ist weiter entfernt', 'Man muss das Erdgravitationsfeld überwinden', 'Das Schiff ist schwerer beim Hinflug', 'Der Mond hat eine stärkere Anziehungskraft'], correct: 1, explanation: 'Die Erde hat eine viel stärkere Schwerkraft (9.8 m/s²) — für den Aufstieg braucht man mehr Energie als für die Landung.', points: 20, topic: 'Physik' },
+        { kind: 'calc', question: 'Eine Kolonie mit 500 Einwohnern verbraucht 1 Tonne Wasser pro 100 Einwohner pro Stunde. Wie viel Wasser braucht sie in 24 Stunden?', answer: 120, explanation: '500 ÷ 100 × 1 × 24 = 120 Tonnen', points: 15, topic: 'Ressourcen' },
+        { kind: 'quiz', question: 'Welche Station im Sonnensystem ist ein reiner Konsument — sie produziert kaum eigene Ressourcen?', options: ['Mond', 'Mars', 'Phobos', 'Erde'], correct: 2, explanation: 'Phobos ist ein kleiner Mond ohne nennenswerte Eigenproduktion — vollständig abhängig von Lieferungen.', points: 20, topic: 'Sonnensystem' },
+      ]
+      setTask(fallbacks[Math.floor(Math.random() * fallbacks.length)])
     }
     setLoading(false)
   }
