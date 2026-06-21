@@ -1,11 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 21.06.2026 21:05
-//                            Ladestate, Koordinatenanzeige, Sidebar EmptyState,
-//                            Bauen-Button mit Hover-Feedback
-//   15.06.2026 – Anomalie-Marker; geplante Gebäude ausgegraut im Bau-Dialog
-//   15.06.2026 – Gebäude über animiertes BuildingSVG; Straßen via TileSVG
+// Aktualisiert: 21.06.2026 — TileTooltip: Hover-Info (Name, Eigentümer, Produktion)
+//   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
+//   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
+// Version:      3.4.0
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -16,7 +15,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDABLE_ITEMS, PLANNED_BUILDINGS } from '@/lib/game/config'
 import { TileSVG } from '@/lib/grid/TileSVG'
@@ -181,6 +180,104 @@ const RES_DE: Record<string, string> = {
   metal: 'Metall', energy: 'Energie', water: 'Wasser',
 }
 
+// ── TileTooltip ──────────────────────────────────────────────────────────────
+interface TooltipInfo {
+  r: number; c: number
+  x: number; y: number   // px relativ zum Grid-Container
+  entity?:    TileEntity
+  isOwn:      boolean
+  isState:    boolean
+  isSelling:  boolean
+  tileType:   string
+  eco?:       EntityEconomy
+}
+
+function TileTooltip({ info, COLS }: { info: TooltipInfo; COLS: number }) {
+  const name = info.entity
+    ? (BUILDING_NAMES[info.entity.entity_id] ?? info.entity.entity_id)
+    : info.tileType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+
+  const flipX = info.c >= COLS - 3
+  const flipY = info.r >= 6
+
+  const borderColor = info.isOwn
+    ? 'rgba(201,169,97,0.65)'
+    : info.isState
+      ? 'rgba(90,174,255,0.5)'
+      : info.entity
+        ? 'rgba(224,80,80,0.45)'
+        : 'rgba(42,78,122,0.35)'
+
+  const nameColor = info.isOwn
+    ? '#c9a961'
+    : info.isState ? '#5aaeff'
+    : info.entity  ? '#e8a0a0'
+    : '#8ab0d0'
+
+  return (
+    <div style={{
+      position:      'absolute',
+      left:          flipX ? undefined : info.x + 50,
+      right:         flipX ? (COLS * 44 - info.x - 4) : undefined,
+      top:           flipY ? undefined : info.y,
+      bottom:        flipY ? (8 * 44 - info.y + 4) : undefined,
+      zIndex:        100,
+      background:    'rgba(6,14,24,0.97)',
+      border:        `1px solid ${borderColor}`,
+      borderRadius:  '7px',
+      padding:       '8px 11px',
+      minWidth:      '150px',
+      maxWidth:      '210px',
+      boxShadow:     '0 4px 20px rgba(0,0,0,0.7)',
+      pointerEvents: 'none',
+      fontFamily:    "'Courier Prime', monospace",
+    }}>
+      {/* Name */}
+      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: nameColor, marginBottom: '4px' }}>
+        {name}
+      </div>
+
+      {/* Eigentümer */}
+      {info.entity && (
+        <div style={{ fontSize: '0.65rem', color: '#7a8a9a', marginBottom: info.isOwn ? '5px' : '0' }}>
+          {info.isOwn
+            ? '🔑 Dein Gebäude'
+            : info.isState
+              ? '🏛 Staatlich'
+              : `👤 ${info.entity.username ?? 'Anderer Pilot'}`}
+          {info.isSelling && <span style={{ color: '#e8702a', marginLeft: '6px' }}>· wird verkauft</span>}
+        </div>
+      )}
+
+      {/* Eigene: Produktion */}
+      {info.isOwn && info.eco?.produktion != null && info.eco.ressource && (
+        <>
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '5px 0' }} />
+          <div style={{ fontSize: '0.68rem', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#5a7a8a' }}>Produktion</span>
+            <span style={{ color: '#6fcf97' }}>+{info.eco.produktion} {RES_DE[info.eco.ressource] ?? info.eco.ressource}/Tick</span>
+          </div>
+        </>
+      )}
+
+      {/* Leere Kachel */}
+      {!info.entity && (
+        <div style={{ fontSize: '0.65rem', color: '#3a5a6a', marginTop: '2px' }}>
+          {isBuildable(info.tileType) ? '✅ Bebaubar' : info.tileType.replace(/_/g, ' ')}
+        </div>
+      )}
+
+      {/* Hinweis */}
+      {info.entity && (
+        <div style={{ fontSize: '0.58rem', color: '#3a5a7a', marginTop: '5px' }}>
+          {info.isOwn ? 'Klicken für Details & Verkauf' : info.isState ? 'Staatliches Gebäude' : 'Fremdes Gebäude'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 export interface EntityEconomy {
   ertragswert:       number
   produktion:        number | null
@@ -233,6 +330,8 @@ export default function ColonyGrid({
   const [showSchool, setShowSchool]         = useState(false)
   const [showLanding, setShowLanding]       = useState(false)
   const [buildHover, setBuildHover]         = useState(false)
+  const [hoveredTile, setHoveredTile]       = useState<TooltipInfo | null>(null)
+  const hoverTimer                          = useRef<ReturnType<typeof setTimeout> | null>(null)
   const popPercent = Math.round((population / Math.max(1, populationMax)) * 100)
   const popColor = popPercent > 80
     ? 'linear-gradient(90deg, #e8702a, #e74c3c)'
@@ -374,16 +473,17 @@ export default function ColonyGrid({
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
 
         {/* Kachelgrid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${COLS}, ${TILE_SIZE}px)`,
-          gap: 0,
-          border: '2px solid #2a4e7a',
-          borderRadius: '6px',
-          overflow: 'hidden',
-          width: `${COLS * TILE_SIZE}px`,
-          flexShrink: 0,
-        }}>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {hoveredTile && <TileTooltip info={hoveredTile} COLS={COLS} />}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${COLS}, ${TILE_SIZE}px)`,
+            gap: 0,
+            border: '2px solid #2a4e7a',
+            borderRadius: '6px',
+            overflow: 'hidden',
+            width: `${COLS * TILE_SIZE}px`,
+          }}>
         {grid.flatMap((row, r) =>
           row.map((tileType, c) => {
             const isSelected = selectedTile?.r === r && selectedTile?.c === c
@@ -409,23 +509,34 @@ export default function ColonyGrid({
             return (
               <div
                 key={`${r}-${c}`}
-                title={
-                  isAnom
-                    ? 'Anomalie entdeckt.'
-                    : entity
-                    ? `${BUILDING_NAMES[entity.entity_id] ?? entity.entity_id}${isOwn ? ' (deins)' : entity.username ? ` (${entity.username})` : ''}`
-                    : tileType.replace(/_/g, ' ')
-                }
                 onClick={() => handleTileClick(r, c, tileType)}
                 onMouseEnter={e => {
                   if (interactive) {
                     e.currentTarget.style.transform = 'scale(1.08)'
                     e.currentTarget.style.zIndex = '10'
                   }
+                  if (hoverTimer.current) clearTimeout(hoverTimer.current)
+                  hoverTimer.current = setTimeout(() => {
+                    const gridEl = e.currentTarget.parentElement?.parentElement
+                    const rect   = gridEl?.getBoundingClientRect()
+                    const tRect  = e.currentTarget.getBoundingClientRect()
+                    const x = rect ? tRect.left - rect.left : c * 44
+                    const y = rect ? tRect.top  - rect.top  : r * 44
+                    setHoveredTile({
+                      r, c, x, y,
+                      entity:    entity ?? undefined,
+                      isOwn, isState,
+                      isSelling: sellingAt(r, c),
+                      tileType,
+                      eco:       entity ? entityInfo?.[entity.id] : undefined,
+                    })
+                  }, 280)
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = 'scale(1)'
                   e.currentTarget.style.zIndex = '1'
+                  if (hoverTimer.current) clearTimeout(hoverTimer.current)
+                  setHoveredTile(null)
                 }}
                 style={{
                   position: 'relative',
@@ -477,6 +588,7 @@ export default function ColonyGrid({
             )
           })
         )}
+          </div>
         </div>
 
         {/* Info-Sidebar rechts neben dem Grid */}
