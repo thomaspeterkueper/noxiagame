@@ -1,6 +1,6 @@
 // lib/store/gameStore.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 08.06.2026 – Store-Invalidation (Entkopplung der Module)
+// Aktualisiert: 21.06.2026 19:10
 // Version:      0.4.0
 //
 // v0.4.0: invalidations-Zähler + invalidate(key). Komponenten nutzen
@@ -146,7 +146,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   loadFromServer: async () => {
     try {
-      const data = await tradeRequest({ location: get().location })
+      const data = await tradeRequest({})  // kein location-Filter — is_active bestimmt das Schiff
       if (data.error) return
       set({
         credits:    data.credits,
