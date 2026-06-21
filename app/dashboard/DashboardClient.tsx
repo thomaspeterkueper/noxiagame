@@ -42,6 +42,7 @@ import WelcomeSetup from './WelcomeSetup'
 import { worstStatus, resourceStatus, stateColor, stateLabel, attentionItems } from './dashboardStatus'
 import { T, Icon, Toast, SectionHead, RESOURCE_LABEL, RESOURCE_ICON, LOC_ICON, LOC_NAME } from './ui'
 import BuyRow from './BuyRow'
+import { TipBanner, TipDef } from './TipSystem'
 
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 export default function DashboardClient({
@@ -415,6 +416,24 @@ export default function DashboardClient({
                 Hauptview (aktueller Ort) · Reiseziele rechts · Immobilien unten.
                 Reichweite + Stationsbüro-NPC folgen in Schicht 2/3.
                ════════════════════════════════════════════════════════════ */}
+
+            {/* ── TIPPS ─────────────────────────────────────────────── */}
+            {(() => {
+              const localEntities = tileEntities.filter((e: any) => e.locations?.slug === location)
+              const hasSchool  = localEntities.some((e: any) => e.entity_id === 'school')
+              const hasAdmin   = localEntities.some((e: any) => e.entity_id === 'admin')
+              const ownBuilds  = tileEntities.filter((e: any) => e.profile_id === userId).length
+              const tips: TipDef[] = [
+                { id: 'tip_energy_needed',  icon: '⚡', condition: cargo.energy === 0 && !inTransit,                                    text: 'Du hast keine Energie an Bord. Kaufe Energie in der Handelszentrale — ohne sie kannst du nicht fliegen.' },
+                { id: 'tip_cargo_empty',    icon: '📦', condition: cargo.water === 0 && cargo.metal === 0 && cargo.energy < 10 && !inTransit, text: 'Dein Laderaum ist fast leer. Kaufe Waren hier und liefere sie an Kolonien mit Knappheit — das ist dein Kerngeschäft.' },
+                { id: 'tip_school_click',   icon: '🎓', condition: hasSchool,                                                            text: 'Klicke auf die Akademie im Grid um Aufgaben zu lösen, Wissenspunkte zu sammeln — und das Spielhandbuch zu lesen.' },
+                { id: 'tip_admin_click',    icon: '🏛️', condition: hasAdmin,                                                             text: 'Klicke auf das Verwaltungsgebäude im Grid um Koloniedetails und Steuersätze einzusehen.' },
+                { id: 'tip_werft_click',    icon: '⚓', condition: location === 'moon',                                                  text: 'Auf dem Mond gibt es eine Werft. Klicke auf das Werft-Gebäude im Grid um Schiffe zu kaufen.' },
+                { id: 'tip_build_first',    icon: '🏗️', condition: ownBuilds === 0,                                                     text: 'Du hast noch keine Gebäude. Klicke auf eine freie Kachel im Grid um dein erstes Gebäude zu bauen.' },
+                { id: 'tip_prometheus',     icon: '🛸', condition: location === 'earth',                                                 text: 'Prometheus (L5) ist von der Erde nur 11s entfernt und hat günstige Energie. Ideal als erste Zwischenstation.' },
+              ]
+              return <TipBanner tips={tips} />
+            })()}
 
             {/* ── HAUPTRASTER: aktueller Ort (groß) · Reiseziele (rechts) ── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', marginBottom: '1.5rem' }}>
