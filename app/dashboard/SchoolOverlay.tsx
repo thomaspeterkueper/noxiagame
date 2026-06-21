@@ -113,9 +113,10 @@ Antworte NUR mit JSON (kein Markdown):
         body: JSON.stringify({ prompt }),
       })
       const data = await response.json()
-      if (!response.ok || !data.task) throw new Error(data.error ?? 'Fehler')
+      if (!data.task) throw new Error(data.error ?? `HTTP ${response.status}`)
       setTask(data.task)
-    } catch {
+    } catch (e: any) {
+      console.error('School task error:', e?.message ?? e)
       // Fallback: statische Fragen (kein Kolonie-Kontext nötig)
       const fallbacks: Task[] = [
         { kind: 'calc', question: 'Ein Frachter kauft 80 Tonnen Wasser für 95 Cr/t und verkauft sie für 155 Cr/t. Wie viel Gewinn macht er insgesamt?', answer: 4800, explanation: '80 × (155 − 95) = 80 × 60 = 4.800 Cr', points: 15, topic: 'Handel' },
