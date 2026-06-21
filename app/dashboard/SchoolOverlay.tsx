@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 — Vollbild-Layout, helles Creme-Panel (semitransparent), Auth-Fix Bearer Token
-// Version:      3.4.1
+// Aktualisiert: 21.06.2026 21:50 — Werkzeuge-Tab, Daily-Fix, Layout-Fix
+// Version:      3.5.0
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -130,6 +130,39 @@ function ManualTab({ onClose }: { onClose: () => void }) {
   )
 }
 
+function extractYouTubeId(input: string): string {
+  const match = input.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([a-zA-Z0-9_-]{11})/)
+  return match ? match[1] : input.trim()
+}
+
+function TradeSimulator() {
+  const [buyPrice,  setBuy]  = React.useState(95)
+  const [sellPrice, setSell] = React.useState(155)
+  const [amount,    setAmt]  = React.useState(80)
+  const profit = (sellPrice - buyPrice) * amount
+  const margin = buyPrice > 0 ? ((sellPrice - buyPrice) / buyPrice * 100).toFixed(1) : '0'
+  const inp = (val: number, set: (v: number) => void, label: string) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+      <span style={{ fontSize: '0.7rem', color: '#8a8a8a', minWidth: 90 }}>{label}</span>
+      <input type="number" value={val} onChange={e => set(+e.target.value)}
+        style={{ width: 80, background: '#fff', border: '1px solid #d4c9b0', borderRadius: '4px', padding: '3px 6px', fontSize: '0.8rem', fontFamily: 'monospace', outline: 'none' }} />
+    </div>
+  )
+  return (
+    <div style={{ background: '#f0ece3', border: '1px solid #d4c9b0', borderRadius: '8px', padding: '0.75rem' }}>
+      {inp(buyPrice, setBuy, 'Kaufpreis')}
+      {inp(sellPrice, setSell, 'Verkaufspreis')}
+      {inp(amount, setAmt, 'Menge (t)')}
+      <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: profit >= 0 ? '#e8f5e9' : '#fce4e4', borderRadius: '6px', border: `1px solid ${profit >= 0 ? '#6fcf97' : '#e74c3c'}` }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: profit >= 0 ? '#2e7d32' : '#c62828' }}>
+          {profit >= 0 ? '📈' : '📉'} {profit.toLocaleString('de')} Cr Gewinn
+        </div>
+        <div style={{ fontSize: '0.65rem', color: '#8a8a8a', marginTop: '2px' }}>Marge: {margin}% · {amount}t × {(sellPrice - buyPrice)} Cr/t</div>
+      </div>
+    </div>
+  )
+}
+
 export default function SchoolOverlay({
   locationSlug, colonyContext, onClose, onKnowledgeEarned
 }: SchoolOverlayProps) {
@@ -144,7 +177,9 @@ export default function SchoolOverlay({
   const inputRef                   = useRef<HTMLInputElement>(null)
   const [calcVal, setCalcVal]      = useState('')
   const [showCalc, setShowCalc]    = useState(false)
-  const [tab, setTab]              = useState<'akademie' | 'handbuch'>('akademie')
+  const [tab, setTab]              = useState<'akademie' | 'handbuch' | 'werkzeuge'>('akademie')
+  const [videoUrl, setVideoUrl]    = useState('')
+  const [videoInput, setVideoInput] = useState('')
   const [levelInfo, setLevel]      = useState<any>(null)
   const [dailyInfo, setDaily]      = useState<any>(null)
   const [showDaily, setShowDaily]  = useState(false)
@@ -226,6 +261,7 @@ export default function SchoolOverlay({
         })
         const d = await r.json()
         if (d.knowledge_points != null) { setTotal(d.knowledge_points); onKnowledgeEarned(bonus, d.knowledge_points) }
+        if (showDaily) { setDaily({ available: false, completed: true, pointsEarned: bonus }); setShowDaily(false) }
       } catch {}
     } else { setStreak(0) }
   }
@@ -265,7 +301,7 @@ export default function SchoolOverlay({
       )}
 
       {/* Helles Panel — untere 58% */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '58%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Weicher Übergang oben */}
         <div style={{ position: 'absolute', top: '-40px', left: 0, right: 0, height: '40px', background: `linear-gradient(to bottom, transparent, ${C.bg})`, pointerEvents: 'none' }} />
@@ -273,12 +309,12 @@ export default function SchoolOverlay({
         {/* Panel-Header mit Tabs */}
         <div style={{ padding: '0.9rem 1.5rem 0', background: C.bg, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: '0', marginBottom: '-1px', alignItems: 'flex-end' }}>
-            {(['akademie', 'handbuch'] as const).map(t => (
+            {(['akademie', 'handbuch', 'werkzeuge'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
-                {t === 'akademie' ? 'Akademie' : 'Handbuch'}
+                {t === 'akademie' ? 'Akademie' : t === 'handbuch' ? 'Handbuch' : '🔧 Werkzeuge'}
               </button>
             ))}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.5rem' }}>
@@ -304,9 +340,59 @@ export default function SchoolOverlay({
         {/* Handbuch */}
         {tab === 'handbuch' && <ManualTab onClose={onClose} />}
 
+        {tab === 'werkzeuge' && (
+          <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+            {/* YouTube-Player */}
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#e8702a', letterSpacing: '2px', textTransform: 'uppercase' as const, marginBottom: '0.5rem' }}>📹 Video</div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input type="text" placeholder="YouTube-URL oder Video-ID …" value={videoInput}
+                  onChange={e => setVideoInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && setVideoUrl(videoInput)}
+                  style={{ flex: 1, background: '#f8f5ee', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.4rem 0.7rem', color: '#2a3a2a', fontSize: '0.8rem', outline: 'none' }} />
+                <button onClick={() => setVideoUrl(videoInput)}
+                  style={{ background: '#c9a961', border: 'none', color: '#fff', borderRadius: '6px', padding: '0.4rem 0.9rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}>Laden</button>
+                {videoUrl && <button onClick={() => { setVideoUrl(''); setVideoInput('') }}
+                  style={{ background: 'transparent', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.4rem 0.7rem', fontSize: '0.75rem', cursor: 'pointer', color: '#8a8a8a' }}>✕</button>}
+              </div>
+              {videoUrl ? (
+                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: '8px', overflow: 'hidden' }}>
+                  <iframe src={`https://www.youtube.com/embed/${extractYouTubeId(videoUrl)}?autoplay=1`}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                </div>
+              ) : (
+                <div style={{ background: '#f0ece3', border: '1px dashed #d4c9b0', borderRadius: '8px', padding: '1.5rem', textAlign: 'center', color: '#8a8a8a', fontSize: '0.75rem' }}>
+                  YouTube-URL eingeben · Empfehlung: NASA, ESA, Kurzgesagt
+                </div>
+              )}
+            </div>
+
+            {/* Taschenrechner */}
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c9a961', letterSpacing: '2px', textTransform: 'uppercase' as const, marginBottom: '0.5rem' }}>🧮 Taschenrechner</div>
+              <div style={{ background: '#f0ece3', border: '1px solid #d4c9b0', borderRadius: '8px', padding: '0.75rem' }}>
+                <input type="text" placeholder="z.B. 80 * 155 - 80 * 95" value={calcVal}
+                  onChange={e => setCalcVal(e.target.value)}
+                  style={{ width: '100%', background: '#fff', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.5rem 0.7rem', fontSize: '0.9rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' as const }} />
+                <div style={{ marginTop: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#c9a961', textAlign: 'right', minHeight: '1.5rem' }}>
+                  {(() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; return isFinite(r) ? `= ${r.toLocaleString('de')}` : '' } catch { return '' } })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Handelsmarge-Experiment */}
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#6fcf97', letterSpacing: '2px', textTransform: 'uppercase' as const, marginBottom: '0.5rem' }}>🔬 Experiment: Handelsmarge</div>
+              <TradeSimulator />
+            </div>
+          </div>
+        )}
+
         {/* Akademie */}
         {tab === 'akademie' && (
-          <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1.25rem 1.5rem 1.5rem' }}>
+          <div style={{ flex: 1, overflowY: 'visible' as const, padding: '1rem 1.5rem 1.25rem' }}>
 
             {levelInfo && (
               <div style={{ marginBottom: '1rem' }}>
