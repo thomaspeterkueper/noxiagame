@@ -1,4 +1,7 @@
 // lib/game/tick.ts
+// Erstellt:     01.06.2026
+// Aktualisiert: 21.06.2026 20:50
+// Version:      2.1.0 — FK-Joins durch separate Queries ersetzt (PostgREST Schema-Cache)
 // Herz der Lazy-Tick-Engine (SPEC_balancing_0-1-5, Punkt 0+1).
 //
 // Ein "Tick" = ein vollständiger Simulationsschritt in fester Reihenfolge:
