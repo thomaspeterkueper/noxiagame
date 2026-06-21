@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 14.06.2026
-// Version:      0.5.0
+// Aktualisiert: 21.06.2026 — LandingOverlay Props an ColonyGrid
+// Version:      0.6.0
 //
 // v0.5.0: Übersichts-Tab ortszentriert umgebaut (Schicht 1 des Dashboard-
 //   Redesigns). Der aktuelle Ort ist der Fokus:
@@ -320,6 +320,12 @@ export default function DashboardClient({
                 locationId={currentLocationData?.id ?? ""}
                 locationResources={currentLocationData.location_resources ?? []}
                 credits={credits}
+                allLocations={locations.filter((l: any) => l.slug !== location)}
+                cargo={cargo}
+                shipRange={shipRange}
+                currentTick={stats?.tickNumber ?? 0}
+                inTransit={inTransit}
+                onTravel={(dest) => handleTravel(dest)}
                 entities={tileEntities.filter((e: any) => e.locations?.slug === (currentLocationData?.slug ?? location))}
                 onChanged={async () => { await loadFromServer(); invalidate('builds') }}
               />
