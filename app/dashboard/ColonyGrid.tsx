@@ -1,6 +1,6 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 21.06.2026 — TileTooltip: Hover-Info (Name, Eigentümer, Produktion)
+// Aktualisiert: 21.06.2026 — TileTooltip: Hover-Info, position:fixed (overflow-safe)
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
@@ -183,7 +183,7 @@ const RES_DE: Record<string, string> = {
 // ── TileTooltip ──────────────────────────────────────────────────────────────
 interface TooltipInfo {
   r: number; c: number
-  x: number; y: number   // px relativ zum Grid-Container
+  x: number; y: number   // viewport-Koordinaten (fixed positioning)
   entity?:    TileEntity
   isOwn:      boolean
   isState:    boolean
@@ -199,6 +199,7 @@ function TileTooltip({ info, COLS }: { info: TooltipInfo; COLS: number }) {
 
   const flipX = info.c >= COLS - 3
   const flipY = info.r >= 6
+  // info.x = viewport right edge of tile, info.y = viewport top of tile
 
   const borderColor = info.isOwn
     ? 'rgba(201,169,97,0.65)'
@@ -216,12 +217,12 @@ function TileTooltip({ info, COLS }: { info: TooltipInfo; COLS: number }) {
 
   return (
     <div style={{
-      position:      'absolute',
-      left:          flipX ? undefined : info.x + 50,
-      right:         flipX ? (COLS * 44 - info.x - 4) : undefined,
+      position:      'fixed',
+      left:          flipX ? undefined : info.x + 6,
+      right:         flipX ? `calc(100vw - ${info.x}px + 50px)` : undefined,
       top:           flipY ? undefined : info.y,
-      bottom:        flipY ? (8 * 44 - info.y + 4) : undefined,
-      zIndex:        100,
+      bottom:        flipY ? `calc(100vh - ${info.y}px)` : undefined,
+      zIndex:        9999,
       background:    'rgba(6,14,24,0.97)',
       border:        `1px solid ${borderColor}`,
       borderRadius:  '7px',
@@ -517,13 +518,11 @@ export default function ColonyGrid({
                   }
                   if (hoverTimer.current) clearTimeout(hoverTimer.current)
                   hoverTimer.current = setTimeout(() => {
-                    const gridEl = e.currentTarget.parentElement?.parentElement
-                    const rect   = gridEl?.getBoundingClientRect()
-                    const tRect  = e.currentTarget.getBoundingClientRect()
-                    const x = rect ? tRect.left - rect.left : c * 44
-                    const y = rect ? tRect.top  - rect.top  : r * 44
+                    const tRect = e.currentTarget.getBoundingClientRect()
                     setHoveredTile({
-                      r, c, x, y,
+                      r, c,
+                      x: tRect.right,   // viewport-right der Kachel
+                      y: tRect.top,     // viewport-top der Kachel
                       entity:    entity ?? undefined,
                       isOwn, isState,
                       isSelling: sellingAt(r, c),
