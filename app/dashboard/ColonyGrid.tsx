@@ -265,6 +265,7 @@ export default function ColonyGrid({
     if (ent?.entity_id === 'school')      { setShowSchool(true);   return }
     if (ent?.entity_id === 'landing_pad') { setShowLanding(true);  return }
     if (ent?.entity_id === 'shipyard')    { onOpenShipyard?.();    return }
+    if (ent?.entity_id === 'warehouse')   { onOpenWarehouse?.();   return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }
 
