@@ -1,0 +1,70 @@
+-- Migration 020: Wissens-Stufen + Tagesaufgabe
+-- Stand: 21.06.2026 · Alpha 0.1.5
+--
+-- STUFEN (knowledge_points → Titel):
+--   0–99:    Lehrling
+--   100–499: Händler
+--   500–1999: Navigator
+--   2000–4999: Ingenieur
+--   5000–9999: Wissenschaftler
+--   10000+:  Pionier
+--
+-- TAGESAUFGABE:
+--   Eine besondere Aufgabe pro Spieler pro Tag, 2× Punkte.
+--   daily_tasks: id, profile_id, date, completed, points_earned
+
+-- ── 1) Stufen-Tabelle (Referenz) ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS knowledge_levels (
+  level       integer PRIMARY KEY,
+  title       text    NOT NULL,
+  min_points  integer NOT NULL,
+  max_points  integer,           -- null = unbegrenzt (höchste Stufe)
+  color       text    NOT NULL,  -- CSS-Farbe für UI
+  description text
+);
+
+INSERT INTO knowledge_levels (level, title, min_points, max_points, color, description)
+VALUES
+  (1, 'Lehrling',       0,     99,    '#7c8590', 'Du hast gerade angefangen — die Akademie wartet auf dich.'),
+  (2, 'Händler',        100,   499,   '#c9a961', 'Du kennst die Grundlagen des Sonnensystem-Handels.'),
+  (3, 'Navigator',      500,   1999,  '#2f86c9', 'Du findest dich im Sonnensystem zurecht.'),
+  (4, 'Ingenieur',      2000,  4999,  '#6fcf97', 'Du verstehst die technischen Zusammenhänge der Kolonien.'),
+  (5, 'Wissenschaftler',5000,  9999,  '#b48ce8', 'Dein Wissen prägt die Entwicklung der Stationen.'),
+  (6, 'Pionier',        10000, null,  '#e8702a', 'Du gehörst zu den Wenigen, die das Sonnensystem wirklich verstehen.')
+ON CONFLICT (level) DO NOTHING;
+
+-- ── 2) Tagesaufgaben-Tabelle ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS daily_tasks (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id    uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  task_date     date        NOT NULL DEFAULT CURRENT_DATE,
+  completed     boolean     NOT NULL DEFAULT false,
+  points_earned integer,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (profile_id, task_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_tasks_profile
+  ON daily_tasks (profile_id, task_date DESC);
+
+ALTER TABLE daily_tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Eigene Tagesaufgaben lesen"
+  ON daily_tasks FOR SELECT
+  USING (profile_id = auth.uid());
+
+CREATE POLICY "Service kann schreiben"
+  ON daily_tasks FOR ALL
+  USING (true) WITH CHECK (true);
+
+-- ── 3) Hilfsfunktion: aktuellen Level ermitteln ───────────────────────────────
+CREATE OR REPLACE FUNCTION get_knowledge_level(p_points integer)
+RETURNS knowledge_levels LANGUAGE sql STABLE AS $$
+  SELECT * FROM knowledge_levels
+  WHERE min_points <= p_points
+    AND (max_points IS NULL OR max_points >= p_points)
+  LIMIT 1;
+$$;
+
+-- ── Kontrolle ─────────────────────────────────────────────────────────────────
+SELECT level, title, min_points, max_points, color FROM knowledge_levels ORDER BY level;
