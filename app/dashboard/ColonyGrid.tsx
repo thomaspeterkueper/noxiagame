@@ -517,12 +517,13 @@ export default function ColonyGrid({
                     e.currentTarget.style.zIndex = '10'
                   }
                   if (hoverTimer.current) clearTimeout(hoverTimer.current)
+                  // getBoundingClientRect SOFORT lesen — currentTarget ist nach setTimeout null
+                  const tRect = e.currentTarget.getBoundingClientRect()
                   hoverTimer.current = setTimeout(() => {
-                    const tRect = e.currentTarget.getBoundingClientRect()
                     setHoveredTile({
                       r, c,
-                      x: tRect.right,   // viewport-right der Kachel
-                      y: tRect.top,     // viewport-top der Kachel
+                      x: tRect.right,
+                      y: tRect.top,
                       entity:    entity ?? undefined,
                       isOwn, isState,
                       isSelling: sellingAt(r, c),
