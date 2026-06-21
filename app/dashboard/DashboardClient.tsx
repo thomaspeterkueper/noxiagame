@@ -30,7 +30,6 @@ import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
 import StationOverlay from './StationOverlay'
-import MiniMap from './MiniMap'
 import SolarSystem from './SolarSystem'
 import ColonyStats from './ColonyStats'
 import ShipyardCard from './ShipyardCard'
@@ -77,8 +76,8 @@ export default function DashboardClient({
   const [auctionConfig, setAuctionConfig]   = useState<{ resource: ResourceType; mode: 'buy' | 'sell'; qty: number; limit: number }>({ resource: 'water', mode: 'buy', qty: 10, limit: 0 })
   const [negotiateOrder, setNegotiateOrder] = useState<any>(null)
   const [detailColony, setDetailColony]     = useState<any>(null)
-  const [shipyardOpen, setShipyardOpen]     = useState(false)
-  const [gridOpen, setGridOpen]             = useState(false)   // Karten-Overlay (volles ColonyGrid)
+  const [shipyardOpen, setShipyardOpen]       = useState(false)
+  const [warehouseOpen, setWarehouseOpen]     = useState(false)
 
   // ── Spielstand laden ────────────────────────────────────────────────────────
   useEffect(() => { loadFromServer() }, [])  // immer beim Mount — kein !loaded-Guard
@@ -242,8 +241,8 @@ export default function DashboardClient({
 
       {/* Overlays */}
       <MarketAuction
-        open={auctionOpen}
-        onClose={() => setAuctionOpen(false)}
+        open={auctionOpen || warehouseOpen}
+        onClose={() => { setAuctionOpen(false); setWarehouseOpen(false) }}
         location={location as any}
         locationName={currentLocationData?.name ?? LOC_NAME[location]}
         rows={currentPrices.map((p: any) => ({
@@ -295,63 +294,6 @@ export default function DashboardClient({
         }}
       />
 
-      {/* Karten-Overlay: volles ColonyGrid des aktuellen Orts */}
-      {gridOpen && currentLocationData && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(2,4,8,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', overflow: 'auto' }}
-          onClick={() => setGridOpen(false)}
-        >
-          <div style={{ maxWidth: '960px', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.6rem' }}>
-              <button
-                onClick={() => setGridOpen(false)}
-                style={{ background: 'transparent', border: '1px solid #2a4e7a', color: '#cfe0f5', borderRadius: '8px', padding: '7px 14px', cursor: 'pointer', fontSize: '0.8rem' }}
-              >
-                Karte schließen ✕
-              </button>
-            </div>
-            {currentLocationData?.location_type === 'station' ? (
-              <StationOverlay
-                slug={currentLocationData?.slug ?? location}
-                name={currentLocationData?.name ?? location}
-                population={currentLocationData?.population ?? 0}
-                populationMax={currentLocationData?.population_max ?? 1}
-                userId={userId}
-                locationId={currentLocationData?.id ?? ""}
-                locationResources={currentLocationData.location_resources ?? []}
-                credits={credits}
-                allLocations={locations.filter((l: any) => l.slug !== location)}
-                cargo={cargo}
-                shipRange={shipRange}
-                currentTick={stats?.tickNumber ?? 0}
-                inTransit={inTransit}
-                onTravel={(dest) => handleTravel(dest)}
-                entities={tileEntities.filter((e: any) => e.locations?.slug === (currentLocationData?.slug ?? location))}
-                onChanged={async () => { await loadFromServer(); invalidate('builds') }}
-              />
-            ) : (
-              <ColonyGrid
-                slug={currentLocationData.slug} name={currentLocationData.name}
-                population={currentLocationData.population} populationMax={currentLocationData.population_max}
-                isSupplied={currentLocationData?.is_supplied ?? false}
-                userId={userId}
-                tax={colonyTax[currentLocationData?.id ?? ""]}
-                entityInfo={entityInfo}
-                locationResources={currentLocationData.location_resources ?? []}
-                credits={credits}
-                entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
-                pending={playerBuilds
-                  .filter((b: any) => b.locations?.slug === currentLocationData.slug)
-                  .map((b: any) => ({
-                    buildable_id: b.buildable_id,
-                    tile_row:     b.tile_row,
-                    tile_col:     b.tile_col,
-                    status:       b.status,
-                  }))}
-              />
-            )}
-          </div>
-        </div>
       )}
 
       {/* ── TOPBAR ─────────────────────────────────────────────────────────── */}
@@ -524,33 +466,16 @@ export default function DashboardClient({
                         </div>
                       </div>
 
-                      {/* Aktions-Buttons des Orts */}
-                      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.3rem', flexWrap: 'wrap' }}>
-                        <button style={btnPrimary} onClick={() => setGridOpen(true)}>
-                          {Icon.globe('#fff')} Karte & Bauen
-                        </button>
-                        {/* Stationsbüro — Platzhalter (NPC folgt in Schicht 3) */}
-                        <button style={btnGhost} onClick={() => showToast('Das Stationsbüro öffnet bald — der Verwalter ist noch unterwegs.', true)}>
-                          {Icon.alert(T.blue)} Stationsbüro
-                        </button>
-                        {location === 'moon' && (
-                          <button style={btnGhost} onClick={() => setShipyardOpen(true)}>
-                            {Icon.ship(T.blue)} Werft
-                          </button>
-                        )}
-                      </div>
+
                     </div>
                   )
                 })()}
 
-                {/* Mini-Karte des aktuellen Orts — Klick öffnet volles Grid */}
+                {/* Kolonie-Grid direkt im Dashboard */}
                 {currentLocationData && (
                   (currentLocationData?.location_type === 'station' || location === 'prometheus') ? (
-                    /* Station: Mini-Ring statt Kachelgrid */
-                    <div
-                      onClick={() => setGridOpen(true)}
-                      style={{ ...card, padding: '1rem', cursor: 'pointer', background: '#07101a', border: '1px solid #1a2a3a', position: 'relative', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}
-                    >
+                    /* Station (Prometheus etc.): Modul-Übersicht */
+                    <div style={{ ...card, padding: '1rem', background: '#07101a', border: '1px solid #1a2a3a', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                       {tileEntities.filter((e: any) => e.locations?.slug === location && e.entity_type === 'module').map((m: any) => {
                         const icons: Record<string, string> = { command_center: '🎯', solar_array: '☀️', docking_bay: '🚀', habitat_module: '🏠', research_lab: '🔬', water_recycler: '💧', storage_bay: '📦', observatory: '🔭', reactor: '⚛️' }
                         return (
@@ -560,28 +485,42 @@ export default function DashboardClient({
                           </div>
                         )
                       })}
-                      <div style={{ position: 'absolute', bottom: '0.5rem', right: '0.75rem', fontSize: '0.65rem', color: '#3a5a7a' }}>Karte öffnen →</div>
                     </div>
                   ) : (
-                    <MiniMap
-                      slug={location}
+                    <ColonyGrid
+                      slug={currentLocationData.slug}
+                      name={currentLocationData.name}
                       population={currentLocationData.population}
+                      populationMax={currentLocationData.population_max}
+                      isSupplied={currentLocationData?.is_supplied ?? false}
                       userId={userId}
-                      entities={tileEntities.filter((e: any) => e.locations?.slug === location && e.tile_row != null)}
+                      tax={colonyTax[currentLocationData?.id ?? ""]}
+                      entityInfo={entityInfo}
+                      locationResources={currentLocationData.location_resources ?? []}
+                      credits={credits}
+                      allLocations={locations.filter((l: any) => l.slug !== location)}
+                      cargo={cargo}
+                      shipRange={shipRange}
+                      currentTick={stats?.tickNumber ?? 0}
+                      inTransit={inTransit}
+                      onTravel={(dest) => handleTravel(dest)}
+                      onOpenShipyard={() => setShipyardOpen(true)}
+                      onOpenWarehouse={() => setWarehouseOpen(true)}
+                      entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug && e.tile_row != null)}
                       pending={playerBuilds
-                        .filter((b: any) => b.locations?.slug === location)
+                        .filter((b: any) => b.locations?.slug === currentLocationData.slug)
                         .map((b: any) => ({
                           buildable_id: b.buildable_id,
                           tile_row:     b.tile_row,
                           tile_col:     b.tile_col,
                           status:       b.status,
                         }))}
-                      onOpen={() => setGridOpen(true)}
+                      onChanged={async () => { await loadFromServer(); invalidate('builds') }}
                     />
                   )
                 )}
 
-                {/* Frachtstatus */}
+                                {/* Frachtstatus */}
                 <div style={{ ...card, padding: '0.85rem 1.4rem', display: 'flex', gap: '1.8rem', alignItems: 'center' }}>
                   <span style={metricLabel}>An Bord</span>
                   {used > 0 ? (
