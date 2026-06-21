@@ -1,7 +1,9 @@
 // app/dashboard/ColonyGrid.tsx
-// Erstellt: 31.05.2026
-// Aktualisiert: 15.06.2026 – Anomalie-Marker (Klick → „Anomalie entdeckt." in
-//                            Sidebar); geplante Gebäude ausgegraut im Bau-Dialog
+// Erstellt:     31.05.2026
+// Aktualisiert: 20.06.2026 – Hover-Effekte auf Kacheln, verbesserter Pop-Balken,
+//                            Ladestate, Koordinatenanzeige, Sidebar EmptyState,
+//                            Bauen-Button mit Hover-Feedback
+//   15.06.2026 – Anomalie-Marker; geplante Gebäude ausgegraut im Bau-Dialog
 //   15.06.2026 – Gebäude über animiertes BuildingSVG; Straßen via TileSVG
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
 //
@@ -47,25 +49,23 @@ const TILE_SIZE = 44
 
 // ── Typen für Bestand + Vorgänge ──────────────────────────────
 
-// Eine Zeile aus tile_entities (eigene UND fremde Gebäude)
 export interface TileEntity {
   id:             string
   profile_id:     string | null
   is_state_owned?: boolean
-  entity_type:    string   // 'building' | 'vehicle' | 'specialist' | 'ship'
-  entity_id:      string   // 'mine' | 'solar' | 'habitat' | 'admin' | ...
+  entity_type:    string
+  entity_id:      string
   tile_level:     number
   tile_row:       number
   tile_col:       number
-  username?:      string   // optional, falls profiles gejoint wird
+  username?:      string
 }
 
-// Laufender Vorgang aus player_builds
 export interface PendingBuild {
   buildable_id: string
   tile_row:     number
   tile_col:     number
-  status:       string  // 'building' | 'selling'
+  status:       string
 }
 
 // ── Build-Popup ───────────────────────────────────────────────
@@ -80,135 +80,89 @@ function BuildPopup({
   onBuildStarted: (newCredits: number) => void
 }) {
   const { credits } = useGameStore()
-  const [loading, setLoading] = useState(false)
-  const [msg, setMsg]         = useState<string | null>(null)
+  const [building, setBuilding] = useState(false)
+  const [msg, setMsg]           = useState<string | null>(null)
 
-  async function getToken() {
-    const { createBrowserClient } = await import('@supabase/ssr')
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token ?? null
-  }
+  const items = Object.entries(BUILDABLE_ITEMS)
 
-  async function handleBuild(buildableId: string) {
-    setLoading(true)
-    const token = await getToken()
+  async function startBuild(buildableId: string) {
+    setBuilding(true); setMsg(null)
+    const token = (await import('@/lib/supabase/client')).createClient()
+    const { data: { session } } = await token.auth.getSession()
+    const jwt = session?.access_token ?? ''
     const res = await fetch(
-      `/api/game/build?action=start&buildableId=${buildableId}&location=${locationSlug}&tileRow=${tileRow}&tileCol=${tileCol}`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      `/api/game/build?action=start&buildableId=${buildableId}&location=${locationSlug}&tileRow=${tileRow}&tileCol=${tileCol}&tileLevel=0`,
+      { headers: { Authorization: `Bearer ${jwt}` } }
     )
     const data = await res.json()
-    setLoading(false)
-    if (data.ok) {
-      setMsg(`✓ Baubeginn: ${data.buildable}`)
-      onBuildStarted(data.newCredits)
-      setTimeout(onClose, 1500)
-    } else {
-      setMsg(`✗ ${data.error}`)
-    }
-  }
-
-  const buildItems = Object.entries(BUILDABLE_ITEMS).filter(([, b]) => b.type === 'building')
-  // Standortfremde Gebäude: sichtbar aber disabled mit Hinweis
-  const isAllowedHere = (id: string) => {
-    const b = BUILDABLE_ITEMS[id]
-    return !b?.allowedLocations || b.allowedLocations.includes(locationSlug)
+    setBuilding(false)
+    if (data.error) { setMsg(data.error); return }
+    onBuildStarted(data.credits ?? credits)
+    onClose()
   }
 
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: '#1a2a3a', border: '1px solid #2a4e7a', borderRadius: '12px', padding: '1.5rem', minWidth: '320px', fontFamily: 'system-ui, sans-serif' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ fontSize: '0.65rem', color: '#b99b6b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '1rem' }}>
-          🏗️ Gebäude bauen – Kachel ({tileRow},{tileCol})
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 50,
+      background: 'rgba(10,20,32,0.97)',
+      borderRadius: '10px',
+      display: 'flex', flexDirection: 'column',
+      padding: '1rem',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>
+          🏗️ Gebäude bauen — Kachel ({tileRow}, {tileCol})
         </div>
-
-        {msg && (
-          <div style={{ padding: '0.5rem', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.8rem',
-            background: msg.startsWith('✓') ? '#1a3a2a' : '#3a1a1a',
-            color: msg.startsWith('✓') ? '#6fcf97' : '#e74c3c' }}>
-            {msg}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {buildItems.map(([id, item]) => {
-            const canAfford  = credits >= item.cost
-            const locAllowed = isAllowedHere(id)
-            const canBuild   = canAfford && locAllowed
-            return (
-              <div key={id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.75rem', borderRadius: '6px',
-                background: canBuild ? '#2a3a4a' : '#1a2530',
-                border: `1px solid ${locAllowed ? '#2a4e7a' : '#3a3a2a'}`,
-                opacity: locAllowed ? (canAfford ? 1 : 0.6) : 0.45,
-              }}>
-                <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: locAllowed ? '#fff' : '#8a8a6a' }}>
-                    {item.name}
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: '#8a9ab0', marginTop: '0.2rem' }}>
-                    {item.description} · {item.buildTimeTicks} Tick{item.buildTimeTicks > 1 ? 's' : ''} Bauzeit
-                  </div>
-                  {!locAllowed && (
-                    <div style={{ fontSize: '0.6rem', color: '#8a7a4a', marginTop: '0.2rem' }}>
-                      ⚠ Nur auf {item.allowedLocations?.join(', ')}
-                    </div>
-                  )}
-                </div>
-                <button
-                  disabled={!canBuild || loading}
-                  onClick={() => handleBuild(id)}
-                  style={{
-                    background: canBuild ? '#2a4e7a' : '#2a3a4a',
-                    color: '#fff', border: 'none',
-                    padding: '0.4rem 0.8rem', borderRadius: '4px',
-                    fontSize: '0.7rem', fontWeight: 700,
-                    cursor: canBuild ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap',
-                  }}
-                >
-                  {item.cost.toLocaleString('de')} Cr
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Geplante Gebäude — ausgegraut, noch nicht baubar (Roadmap-Sicht) */}
-        {PLANNED_BUILDINGS.length > 0 && (
-          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #2a3a4a' }}>
-            <div style={{ fontSize: '0.6rem', color: '#5a6878', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>
-              In Planung
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {PLANNED_BUILDINGS.map(p => (
-                <div key={p.id}
-                  title={p.hint}
-                  style={{
-                    fontSize: '0.62rem', color: '#5a6878',
-                    background: '#16202c', border: '1px solid #243240',
-                    borderRadius: '4px', padding: '0.25rem 0.5rem',
-                    cursor: 'default', opacity: 0.7,
-                  }}>
-                  {p.name}
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '0.58rem', color: '#465668', marginTop: '0.5rem', lineHeight: 1.4 }}>
-              Diese Gebäude sind in Vorbereitung und bald verfügbar.
-            </div>
-          </div>
-        )}
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
       </div>
+      {msg && <div style={{ color: '#e05050', fontSize: '0.7rem', marginBottom: '0.5rem' }}>{msg}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
+        {items.map(([id, item]) => {
+          const canAfford = credits >= item.cost
+          return (
+            <button key={id} disabled={building || !canAfford}
+              onClick={() => startBuild(id)}
+              style={{
+                background: canAfford ? 'rgba(42,78,122,0.5)' : 'rgba(30,40,55,0.5)',
+                border: `1px solid ${canAfford ? '#2a4e7a' : '#2a3a4a'}`,
+                borderRadius: '6px', padding: '0.6rem 0.75rem',
+                color: canAfford ? '#cdd6e0' : '#4a5a6a',
+                cursor: canAfford ? 'pointer' : 'not-allowed',
+                textAlign: 'left', fontSize: '0.75rem',
+              }}>
+              <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
+              <div style={{ fontSize: '0.65rem', color: canAfford ? '#8a9ab0' : '#3a4a5a' }}>
+                {item.cost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
+                {item.produces && ` · +${item.produces.amount} ${item.produces.resource}/Tick`}
+                {item.populationBonus && ` · +${item.populationBonus} Kapazität`}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {PLANNED_BUILDINGS.length > 0 && (
+        <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize: '0.6rem', color: '#5a6878', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            In Entwicklung
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+            {PLANNED_BUILDINGS.map(p => (
+              <div key={p.id} style={{
+                fontSize: '0.6rem', background: 'rgba(255,255,255,0.03)',
+                border: '1px solid #2a3a4a', borderRadius: '4px',
+                padding: '0.15rem 0.4rem', color: '#4a5a6a',
+                cursor: 'default', opacity: 0.7,
+              }}>
+                {p.name}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '0.58rem', color: '#465668', marginTop: '0.5rem', lineHeight: 1.4 }}>
+            Diese Gebäude sind in Vorbereitung und bald verfügbar.
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -225,7 +179,6 @@ const RES_DE: Record<string, string> = {
   metal: 'Metall', energy: 'Energie', water: 'Wasser',
 }
 
-// Wirtschaft je Gebäude (aus /api/game/build → entityInfo)
 export interface EntityEconomy {
   ertragswert:       number
   produktion:        number | null
@@ -233,7 +186,6 @@ export interface EntityEconomy {
   resourceSellPrice: number | null
 }
 
-// Steuersätze der Kolonie (aus /api/game/build → colonyTax[location_id])
 export interface ColonyTax {
   tax_property:    number
   tax_transaction: number
@@ -261,13 +213,21 @@ export default function ColonyGrid({
   locationResources = [], credits = 0,
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
-  const [grid, setGrid] = useState<string[][]>([])
-  const [anomaly, setAnomaly] = useState<{ r: number; c: number } | null>(null)
+  const [grid, setGrid]               = useState<string[][]>([])
+  const [anomaly, setAnomaly]         = useState<{ r: number; c: number } | null>(null)
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
   const [showBuildPopup, setShowBuildPopup] = useState(false)
-  const [showAdmin, setShowAdmin]         = useState(false)
-  const [showSchool, setShowSchool]       = useState(false)
-  const popPercent = Math.round((population / populationMax) * 100)
+  const [showAdmin, setShowAdmin]           = useState(false)
+  const [showSchool, setShowSchool]         = useState(false)
+  const [buildHover, setBuildHover]         = useState(false)
+  const popPercent = Math.round((population / Math.max(1, populationMax)) * 100)
+  const popColor = popPercent > 80
+    ? 'linear-gradient(90deg, #e8702a, #e74c3c)'
+    : popPercent > 60
+      ? 'linear-gradient(90deg, #f5d742, #e8702a)'
+      : isSupplied
+        ? 'linear-gradient(90deg, #6fcf97, #27ae60)'
+        : 'linear-gradient(90deg, #e74c3c, #c0392b)'
 
   useEffect(() => {
     const cellGrid = generateGrid(slug, population, entities, pending, userId)
@@ -275,7 +235,6 @@ export default function ColonyGrid({
     setAnomaly(anomalyAt(cellGrid))
   }, [slug, population, populationMax, entities, pending])
 
-  // Entität auf einer Kachel finden (Oberfläche, Gebäude)
   function entityAt(r: number, c: number): TileEntity | undefined {
     return entities.find(e =>
       e.tile_row === r && e.tile_col === c && e.entity_type === 'building'
@@ -289,26 +248,39 @@ export default function ColonyGrid({
   function handleTileClick(r: number, c: number, tileType: string) {
     setSelectedTile({ r, c, type: tileType })
     const ent = entityAt(r, c)
-    if (ent?.entity_id === 'admin') {
-      setShowAdmin(true)
-      return
-    }
-    if (ent?.entity_id === 'school') {
-      setShowSchool(true)
-      return
-    }
+    if (ent?.entity_id === 'admin')  { setShowAdmin(true);  return }
+    if (ent?.entity_id === 'school') { setShowSchool(true); return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }
 
-  if (grid.length === 0) return null
+  // Ladezustand
+  if (grid.length === 0) return (
+    <div style={{
+      background: '#1a2a3a', borderRadius: '12px', padding: '2rem',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px',
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: '#5a6878' }}>
+        <div style={{
+          width: '36px', height: '36px',
+          border: '3px solid #2a4e7a', borderTopColor: '#b99b6b',
+          borderRadius: '50%', animation: 'noxia-spin 1s linear infinite',
+        }} />
+        <div style={{ fontSize: '0.8rem' }}>Lade Kolonie …</div>
+      </div>
+    </div>
+  )
 
   const selectedEntity = selectedTile ? entityAt(selectedTile.r, selectedTile.c) : undefined
-  const ownSelected = selectedEntity && selectedEntity.profile_id === userId
+  const ownSelected    = selectedEntity && selectedEntity.profile_id === userId
+  const isAnomaly      = anomaly && selectedTile?.r === anomaly.r && selectedTile?.c === anomaly.c
 
   return (
     <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
       <BuildingSpriteStyles />
-      <style>{`@keyframes noxia-anomaly{0%,100%{opacity:.45;transform:scale(0.85)}50%{opacity:1;transform:scale(1.1)}}`}</style>
+      <style>{`
+        @keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} }
+        @keyframes noxia-spin    { to { transform: rotate(360deg) } }
+      `}</style>
 
       {/* Schul-Overlay */}
       {showSchool && (
@@ -359,8 +331,8 @@ export default function ColonyGrid({
             <div style={{ color: '#fff', fontWeight: 700 }}>{population.toLocaleString('de')}</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#8a9ab0', fontSize: '0.5rem' }}>CAP</div>
-            <div style={{ color: '#fff', fontWeight: 700 }}>{popPercent}%</div>
+            <div style={{ color: '#8a9ab0', fontSize: '0.5rem' }}>AUSLASTUNG</div>
+            <div style={{ color: popPercent > 80 ? '#e8702a' : '#6fcf97', fontWeight: 700 }}>{popPercent}%</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ color: '#8a9ab0', fontSize: '0.5rem' }}>STATUS</div>
@@ -390,57 +362,57 @@ export default function ColonyGrid({
             const entity     = entityAt(r, c)
             const isOwn      = entity?.profile_id !== null && entity?.profile_id === userId
             const isSelling  = sellingAt(r, c)
-            const isAnomaly  = anomaly?.r === r && anomaly?.c === c
+            const isAnom     = anomaly?.r === r && anomaly?.c === c
+            const isState    = entity?.is_state_owned || entity?.profile_id === null
 
-            // Eigentums-Rand:
-            //   Blau (#2a6ab5)  = staatliches Gebäude (profile_id null / is_state_owned)
-            //   Gold (#c9a961)  = eigenes Gebäude
-            //   Rot  (#c94040)  = fremder Spieler
-            const isState = entity?.is_state_owned || entity?.profile_id === null
-            // inset box-shadow: kein Platzverlust, überlagert SVG nicht
-            // Staatlich: helles Cyan-Blau (#5aaeff) — deutlich vom dunklen Kachel-BG
             let ownerShadow = 'none'
             if (entity) {
-              if (isState) {
-                ownerShadow = 'inset 0 0 0 3px #5aaeff, 0 0 7px #5aaeff'
-              } else if (isOwn) {
-                ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 7px rgba(201,169,97,0.7)'
-              } else {
-                ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 5px rgba(224,80,80,0.5)'
-              }
+              if (isState)      ownerShadow = 'inset 0 0 0 3px #5aaeff, 0 0 7px #5aaeff'
+              else if (isOwn)   ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 7px rgba(201,169,97,0.7)'
+              else              ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 5px rgba(224,80,80,0.5)'
             }
             if (isSelected && !isState) {
               ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 12px #c9a961'
             }
 
+            const interactive = canBuild || !!entity || isAnom
+
             return (
               <div
                 key={`${r}-${c}`}
                 title={
-                  isAnomaly
+                  isAnom
                     ? 'Anomalie entdeckt.'
                     : entity
                     ? `${BUILDING_NAMES[entity.entity_id] ?? entity.entity_id}${isOwn ? ' (deins)' : entity.username ? ` (${entity.username})` : ''}`
                     : tileType.replace(/_/g, ' ')
                 }
                 onClick={() => handleTileClick(r, c, tileType)}
+                onMouseEnter={e => {
+                  if (interactive) {
+                    e.currentTarget.style.transform = 'scale(1.08)'
+                    e.currentTarget.style.zIndex = '10'
+                  }
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'scale(1)'
+                  e.currentTarget.style.zIndex = '1'
+                }}
                 style={{
                   position: 'relative',
-                  width:   TILE_SIZE,
-                  height:  TILE_SIZE,
-                  cursor:  canBuild || entity || isAnomaly ? 'pointer' : 'default',
+                  width:    TILE_SIZE,
+                  height:   TILE_SIZE,
+                  cursor:   interactive ? 'pointer' : 'default',
                   boxShadow: ownerShadow,
                   boxSizing: 'border-box',
                   flexShrink: 0,
-                  opacity: isSelling ? 0.45 : 1,        // „wird verkauft": gedimmt
-                  filter:  isSelling ? 'grayscale(0.7)' : 'none',
+                  opacity:  isSelling ? 0.45 : 1,
+                  filter:   isSelling ? 'grayscale(0.7)' : 'none',
+                  transition: 'transform 0.15s ease, z-index 0s',
                 }}
               >
                 {(() => {
-                  // Gebäude (echt, NPC oder building_habitat) → animiertes BuildingSVG.
-                  // Straßen → direkt TileSVG (maskenbasiert, kein Bild-404).
-                  // Baustelle + Terrain → TileDisplay wie bisher.
-                  const npcEid = NPC_ENTITY[tileType]   // npc_mine → 'mine' etc.
+                  const npcEid = NPC_ENTITY[tileType]
                   const isBuildingTile =
                     npcEid !== undefined ||
                     (tileType.startsWith('building_') && tileType !== 'building_construction')
@@ -456,12 +428,10 @@ export default function ColonyGrid({
                       />
                     )
                   }
-                  if (tileType.startsWith('road')) {
-                    return <TileSVG type={tileType} planet={slug} />
-                  }
+                  if (tileType.startsWith('road')) return <TileSVG type={tileType} planet={slug} />
                   return <TileDisplay tileType={tileType} slug={slug} />
                 })()}
-                {isAnomaly && (
+                {isAnom && (
                   <span style={{
                     position: 'absolute', inset: 0, display: 'flex',
                     alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
@@ -488,71 +458,106 @@ export default function ColonyGrid({
           fontSize: '0.75rem',
         }}>
           {!selectedTile || showBuildPopup ? (
-            <div style={{ color: '#5a6878', fontSize: '0.7rem', lineHeight: 1.6 }}>
-              Kachel anklicken für Details.<br />
-              Eigene Gebäude (Goldrand) lassen sich hier bewerten und verkaufen.
+            /* EmptyState */
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              height: '100%', minHeight: '180px',
+              color: '#5a6878', textAlign: 'center', gap: '0.5rem',
+            }}>
+              <div style={{ fontSize: '2rem', opacity: 0.25 }}>🏗️</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 500 }}>Kachel anklicken</div>
+              <div style={{ fontSize: '0.6rem', maxWidth: '180px', lineHeight: 1.6, opacity: 0.7 }}>
+                Eigene Gebäude (Goldrand) lassen sich hier bewerten und verkaufen.
+              </div>
             </div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              {/* Titel + Close */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <div>
-                  <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>
-                    {anomaly && selectedTile.r === anomaly.r && selectedTile.c === anomaly.c
-                      ? 'Anomalie'
+                  <div style={{ color: isAnomaly ? '#b48ce8' : '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>
+                    {isAnomaly
+                      ? '✨ Anomalie'
                       : selectedEntity
-                      ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
-                      : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
+                        : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </div>
-                  <div style={{ color: '#8a9ab0', marginTop: '0.25rem' }}>
-                    {anomaly && selectedTile.r === anomaly.r && selectedTile.c === anomaly.c
-                      ? 'Anomalie entdeckt.'
+                  <div style={{ color: '#8a9ab0', marginTop: '0.2rem', fontSize: '0.68rem' }}>
+                    {isAnomaly
+                      ? 'Unbekanntes Phänomen'
                       : selectedEntity
-                      ? (ownSelected ? 'Eigentum: Du' : `Eigentum: ${selectedEntity.username ?? 'Anderer Pilot'}`)
-                      : sellingAt(selectedTile.r, selectedTile.c)
-                        ? 'Wird verkauft …'
-                        : isBuildable(selectedTile.type) ? 'Bebaubar' : 'Nicht bebaubar'}
+                        ? (ownSelected ? '🔑 Dein Gebäude' : `👤 ${selectedEntity.username ?? 'Anderer Pilot'}`)
+                        : sellingAt(selectedTile.r, selectedTile.c)
+                          ? '💰 Wird verkauft …'
+                          : isBuildable(selectedTile.type) ? '✅ Bebaubar' : '🚫 Nicht bebaubar'}
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedTile(null)}
-                  style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
-                >
-                  ✕
-                </button>
+                  style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', flexShrink: 0 }}
+                >✕</button>
               </div>
 
-              {isBuildable(selectedTile.type) && (
+              {/* Koordinaten */}
+              <div style={{
+                fontSize: '0.58rem', color: '#5a6878',
+                background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.5rem',
+                borderRadius: '4px', display: 'inline-block', marginBottom: '0.6rem',
+              }}>
+                📍 Kachel ({selectedTile.r}, {selectedTile.c})
+              </div>
+
+              {/* Bauen-Button */}
+              {isBuildable(selectedTile.type) && !selectedEntity && (
                 <button
                   onClick={() => setShowBuildPopup(true)}
-                  style={{ marginTop: '0.75rem', width: '100%', background: '#2a4e7a', color: '#fff', border: 'none', padding: '0.45rem 0.75rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                  onMouseEnter={() => setBuildHover(true)}
+                  onMouseLeave={() => setBuildHover(false)}
+                  style={{
+                    marginTop: '0.25rem', marginBottom: '0.5rem',
+                    width: '100%',
+                    background: buildHover
+                      ? 'linear-gradient(135deg, #3a5e8a, #2a4a6a)'
+                      : 'linear-gradient(135deg, #2a4e7a, #1a3a5a)',
+                    color: '#fff', border: 'none',
+                    padding: '0.6rem 0.75rem', borderRadius: '6px',
+                    fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
+                    boxShadow: buildHover
+                      ? '0 4px 12px rgba(42,78,122,0.45)'
+                      : '0 2px 8px rgba(42,78,122,0.3)',
+                    transform: buildHover ? 'translateY(-1px)' : 'none',
+                    transition: 'all 0.2s ease',
+                  }}
                 >
-                  🏗️ Bauen
+                  🏗️ Gebäude bauen
                 </button>
               )}
 
-              {/* Wirtschaft des gewählten eigenen Gebäudes: Produktion +
-                  reale Haltekosten (Grundsteuer aus colony_settings). Der
-                  Ertragswert/Verkaufswert steht direkt darunter im SellPanel. */}
+              {/* Wirtschaftsdaten eigenes Gebäude */}
               {ownSelected && selectedEntity && (() => {
                 const eco     = entityInfo?.[selectedEntity.id]
                 const taxProp = tax?.tax_property ?? 0
-                const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }
+                const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0.35rem', borderRadius: '4px', marginBottom: '2px' }
                 return (
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.7rem', lineHeight: 1.7 }}>
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.7rem', lineHeight: 1.7 }}>
+                    <div style={{ fontSize: '0.58rem', color: '#5a6878', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.4rem' }}>
+                      📊 Wirtschaft
+                    </div>
                     {eco?.produktion != null && eco.ressource && (
-                      <div style={row}>
+                      <div style={{ ...row, background: 'rgba(47,158,68,0.06)' }}>
                         <span style={{ color: '#8a9ab0' }}>Produktion</span>
-                        <span style={{ color: '#cdd6e0' }}>+{eco.produktion} {RES_DE[eco.ressource] ?? eco.ressource}/Tick</span>
+                        <span style={{ color: '#6fcf97', fontWeight: 500 }}>+{eco.produktion} {RES_DE[eco.ressource] ?? eco.ressource}/Tick</span>
                       </div>
                     )}
-                    <div style={row}>
+                    <div style={{ ...row, background: taxProp > 0 ? 'rgba(232,112,42,0.06)' : 'transparent' }}>
                       <span style={{ color: '#8a9ab0' }}>Haltekosten</span>
-                      <span style={{ color: taxProp > 0 ? '#cdd6e0' : '#5a6878' }}>
+                      <span style={{ color: taxProp > 0 ? '#e8702a' : '#5a6878', fontWeight: taxProp > 0 ? 500 : 400 }}>
                         {taxProp > 0 ? `−${taxProp.toLocaleString('de-DE')} Cr/Tick` : 'keine'}
                       </span>
                     </div>
                     {taxProp > 0 && (
-                      <div style={{ color: '#5a6878', fontSize: '0.62rem', marginTop: '3px', lineHeight: 1.4 }}>
+                      <div style={{ color: '#5a6878', fontSize: '0.58rem', marginTop: '3px', lineHeight: 1.4, padding: '0.15rem 0.35rem' }}>
                         Grundsteuer dieser Kolonie · fällt an, solange du das Gebäude hältst
                       </div>
                     )}
@@ -575,12 +580,19 @@ export default function ColonyGrid({
       </div>
 
       {/* Bevölkerungsbalken */}
-      <div style={{ marginTop: '0.6rem', background: '#0a1a2a', height: '4px', borderRadius: '3px', overflow: 'hidden' }}>
-        <div style={{
-          width: `${popPercent}%`, height: '100%',
-          background: isSupplied ? 'linear-gradient(90deg, #6fcf97, #27ae60)' : 'linear-gradient(90deg, #e74c3c, #c0392b)',
-          transition: 'width 0.5s',
-        }} />
+      <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', color: '#5a6878', marginBottom: '0.3rem' }}>
+          <span>Bevölkerung</span>
+          <span>{population.toLocaleString('de')} / {populationMax.toLocaleString('de')} · {popPercent}% Auslastung</span>
+        </div>
+        <div style={{ background: 'rgba(0,0,0,0.35)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+          <div style={{
+            width: `${popPercent}%`, height: '100%',
+            background: popColor,
+            transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+            borderRadius: '3px',
+          }} />
+        </div>
       </div>
     </div>
   )
