@@ -1,6 +1,6 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 18:45
+// Aktualisiert: 21.06.2026 18:50
 // Version:      0.5.0
 //
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
@@ -61,26 +61,22 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Aktives Schiff via profiles.active_ship_id — eindeutig, kein Multi-Schiff-Problem.
-    const { data: profileForShip } = await serviceClient
+    // Aktives Schiff: profile + ships in einem JOIN
+    const { data: profileWithShip } = await serviceClient
       .from('profiles')
-      .select('active_ship_id')
+      .select('active_ship_id, ships!profiles_active_ship_id_fkey(id, location, cargo_max, ship_type_id, ship_types(speed_mult, range_distance))')
       .eq('id', user.id)
       .single()
-    const activeShipId = profileForShip?.active_ship_id
-    const { data: ship } = activeShipId
-      ? await serviceClient
-          .from('ships')
-          .select('id, location, cargo_max, ship_type_id, ship_types(speed_mult, range_distance)')
-          .eq('id', activeShipId)
-          .single()
-      : await serviceClient
+    // Fallback: erstes Schiff der profile_id wenn active_ship_id nicht gesetzt
+    const ship: any = (profileWithShip as any)?.ships
+      ?? await serviceClient
           .from('ships')
           .select('id, location, cargo_max, ship_type_id, ship_types(speed_mult, range_distance)')
           .eq('profile_id', user.id)
           .order('id')
           .limit(1)
           .single()
+          .then(r => r.data)
 
     const { data: cargo } = ship
       ? await serviceClient
@@ -121,23 +117,18 @@ export async function GET(req: NextRequest) {
     // Aktives Schiff für Travel
     const { data: profileForTravel } = await serviceClient
       .from('profiles')
-      .select('active_ship_id')
+      .select('active_ship_id, ships!profiles_active_ship_id_fkey(id, location, cargo_max)')
       .eq('id', user.id)
       .single()
-    const activeShipIdTravel = profileForTravel?.active_ship_id
-    const { data: travelShip } = activeShipIdTravel
-      ? await serviceClient
-          .from('ships')
-          .select('id, location, cargo_max')
-          .eq('id', activeShipIdTravel)
-          .single()
-      : await serviceClient
+    const travelShip: any = (profileForTravel as any)?.ships
+      ?? await serviceClient
           .from('ships')
           .select('id, location, cargo_max')
           .eq('profile_id', user.id)
           .order('id')
           .limit(1)
           .single()
+          .then(r => r.data)
 
     if (!travelShip) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
 
@@ -205,25 +196,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
   }
 
-  // Aktives Schiff für buy/sell via active_ship_id
-  const { data: profileActive } = await serviceClient
+  // Aktives Schiff für buy/sell
+  const { data: profileActive2 } = await serviceClient
     .from('profiles')
-    .select('active_ship_id')
+    .select('active_ship_id, ships!profiles_active_ship_id_fkey(id, location, cargo_max, ship_type_id)')
     .eq('id', user.id)
     .single()
-  const { data: ship } = profileActive?.active_ship_id
-    ? await serviceClient
-        .from('ships')
-        .select('id, location, cargo_max, ship_type_id')
-        .eq('id', profileActive.active_ship_id)
-        .single()
-    : await serviceClient
+  const ship: any = (profileActive2 as any)?.ships
+    ?? await serviceClient
         .from('ships')
         .select('id, location, cargo_max, ship_type_id')
         .eq('profile_id', user.id)
         .order('id')
         .limit(1)
         .single()
+        .then(r => r.data)
 
   if (!ship) {
     return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
