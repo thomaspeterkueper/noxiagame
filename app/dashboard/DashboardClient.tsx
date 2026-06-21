@@ -1,703 +1,716 @@
-// app/dashboard/DashboardClient.tsx
-// Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 19:25
-// Version:      0.6.0
+// lib/game/tick.ts
+// Erstellt:     01.06.2026
+// Aktualisiert: 21.06.2026 20:50
+// Version:      2.1.0 — FK-Joins durch separate Queries ersetzt (PostgREST Schema-Cache)
+// Herz der Lazy-Tick-Engine (SPEC_balancing_0-1-5, Punkt 0+1).
 //
-// v0.5.0: Übersichts-Tab ortszentriert umgebaut (Schicht 1 des Dashboard-
-//   Redesigns). Der aktuelle Ort ist der Fokus:
-//   - HAUPTVIEW (links): aktueller Ort groß — Hero mit Ressourcen-Ampel +
-//     größtem Engpass, Aktions-Buttons (Kolonie ansehen, Stationsbüro-
-//     Platzhalter, Werft nur Mond), Frachtstatus, Handelszentrale des Orts.
-//   - REISEZIELE (rechts): andere Orte mit größtem Bedarf + Flugzeit. Vorerst
-//     alle erreichbar (reachable=true); Schicht 2 ersetzt das durch echte
-//     Schiffsreichweite. Plus Beste Route + Aufmerksamkeits-Feed.
-//   - DEINE ORTE (Leiste unten): Orte mit eigenen tile_entities + immer der
-//     aktuelle Ort (HIER-Markierung). Skaliert für beliebig viele Orte.
-//   Entfernt: Commander-Statusleiste und große Kolonien-Liste (das „überladen".
-//   Kernzahlen bleiben in der Topbar; Kolonie-Details via ColonyDetail-Overlay).
-//   tileEntities werden jetzt auch im Dashboard-Tab geladen (Immobilien-Leiste).
-// v0.4.0: Commander-Overview, Hero-Karte, Aufmerksamkeits-Feed (ersetzt 0.5.0).
-// v0.3.0: Cargo-Loop-Fix (atomar in einem Call).
-// v0.2.0: Vier Aufruf-Overlays ausgelagert.
+// Ein "Tick" = ein vollständiger Simulationsschritt in fester Reihenfolge:
+//   1. Population  (setzt consumption/production/stock, Bevölkerung, Kapazität)
+//   2. Prices      (liest stock/balance → passt Marktpreise an, schreibt price_history)
+//   3. Orders      (liest stock/balance → generiert/expired Aufträge)
+// Die Reihenfolge ist zwingend: Prices/Orders lesen, was Population schreibt.
+//
+// runTick(supabase, tickNumber)  – führt EINEN vollständigen Tick aus
+// runDueTicks(supabase)          – holt via claim_due_ticks() fällige Ticks nach
+//
+// Wird aufgerufen von: den Crons (Fallback) und der world-Route (Herzschlag).
 
-'use client'
+import {
+  CONSUMPTION_PER_100,
+  GROWTH_RATE,
+  DECLINE_RATE,
+  PRICE_PRESSURE_HIGH,
+  PRICE_PRESSURE_LOW,
+  STOCK_LOW_THRESHOLD,
+  STOCK_HIGH_THRESHOLD,
+  PRICE_MIN,
+  PRICE_MAX,
+  ORDER_MIN_AMOUNT,
+  ORDER_MAX_AMOUNT,
+  ORDER_REWARD_MULT,
+  ORDER_EXPIRE_HOURS,
+  ORDER_COVERAGE_TICKS,
+} from './config'
+import { BUILDING_SALE } from './buildingSale'
+import { entscheideNpc } from './npcBrain'
 
-import React, { useState, useEffect } from 'react'
-import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/store/gameStore'
-import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
-import { getToken, getSessionInfo } from '@/lib/supabase/auth'
-import TransitPanel from './TransitPanel'
-import StatisticsTab from './StatisticsTab'
-import ColonyGrid from './ColonyGrid'
-import StationOverlay from './StationOverlay'
-import SolarSystem from './SolarSystem'
-import ColonyStats from './ColonyStats'
-import ShipyardCard from './ShipyardCard'
-import ShipHeader from './ShipHeader'
-import MarketAuction from './MarketAuction'
-import OrderNegotiation from './OrderNegotiation'
-import ColonyDetail from './ColonyDetail'
-import ShipyardOverlay from './ShipyardOverlay'
-import WelcomeSetup from './WelcomeSetup'
-import { worstStatus, resourceStatus, stateColor, stateLabel, attentionItems } from './dashboardStatus'
-import { T, Icon, Toast, SectionHead, RESOURCE_LABEL, RESOURCE_ICON, LOC_ICON, LOC_NAME } from './ui'
-import BuyRow from './BuyRow'
-import { TipBanner, TipDef } from './TipSystem'
+// Produktion je Gebäudetyp (für die Einkommens-Ausschüttung, Punkt 3)
+const PRODUCES: Record<string, { resource: 'metal' | 'energy' | 'water'; amount: number }> = {
+  mine:           { resource: 'metal',  amount: 5 },
+  solar:          { resource: 'energy', amount: 4 },
+  ice_drill:      { resource: 'water',  amount: 4 },
+  water_recycler: { resource: 'water',  amount: 2 },
+}
 
-// ─── Haupt-Komponente ─────────────────────────────────────────────────────────
-export default function DashboardClient({
-  locations: initialLocations,
-  prices,
-  orders: initialOrders,
-}: {
-  locations: any[]
-  prices:    any[]
-  orders:    any[]
-}) {
-  const {
-    credits, cargo, cargoMax, location, buy, sell, travel,
-    cargoUsed, loaded, loadFromServer, inTransit, shipTypeId,
-    invalidate, invalidations, costBasis, shipRange,
-  } = useGameStore()
+// HINWEIS: Temporär auf 1 Woche gesetzt, um die Welt fürs Balancing-Testen
+// einzufrieren (kein Tick bei jedem Dashboard-Load). VOR echtem Spielbetrieb
+// zurück auf 3600 (1 Stunde) stellen!
+export const TICK_INTERVAL_SECONDS = 3600    // 1 Stunde pro Tick
+export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
 
-  // UI-State
-  const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'colonies' | 'system'>('dashboard')
-  const [worldData, setWorldData] = useState<any>(null)
-  const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
-  const [tileEntities, setTileEntities] = useState<any[]>([])
-  const [colonyTax, setColonyTax] = useState<Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }>>({})
-  const [entityInfo, setEntityInfo] = useState<Record<string, { ertragswert: number; produktion: number | null; ressource: string | null; resourceSellPrice: number | null }>>({})
-  const [userId, setUserId] = useState<string>('')
-  const [profile, setProfile] = useState<any>(null)
+// Fenster für den gleitenden Bewertungs-Schnitt (Punkt 4)
+const AVG_WINDOW_TICKS = 7
+// Retention: price_history-Rohdaten älter als dieses Fenster werden gelöscht.
+// Großzügiger als AVG_WINDOW (Puffer für Charts/Archiv), aber gedeckelt,
+// damit die Tabelle nicht unbegrenzt wächst (Skalierung bei vielen Orten).
+const HISTORY_RETENTION_TICKS = 336   // ~14 Tage bei stündlichen Ticks
 
-  // Overlay-State
-  const [auctionOpen, setAuctionOpen]       = useState(false)
-  const [auctionConfig, setAuctionConfig]   = useState<{ resource: ResourceType; mode: 'buy' | 'sell'; qty: number; limit: number }>({ resource: 'water', mode: 'buy', qty: 10, limit: 0 })
-  const [negotiateOrder, setNegotiateOrder] = useState<any>(null)
-  const [detailColony, setDetailColony]     = useState<any>(null)
-  const [shipyardOpen, setShipyardOpen]       = useState(false)
-  const [warehouseOpen, setWarehouseOpen]     = useState(false)
+type SB = any  // Supabase Service-Client
 
-  // ── Spielstand laden ────────────────────────────────────────────────────────
-  useEffect(() => { loadFromServer() }, [])  // immer beim Mount — kein !loaded-Guard
-  // Nach Transit-Ende: Store + World-Daten neu laden
-  const prevLocationRef = React.useRef(location)
-  useEffect(() => {
-    if (prevLocationRef.current !== location) {
-      prevLocationRef.current = location
-      // cargoMax, speedMult etc. neu laden (Schiffsdaten können sich geändert haben)
-      loadFromServer()
+// ─────────────────────────────────────────────────────────────────────
+// 1) POPULATION – Verbrauch, Produktion (frisch aus Basis + tile_entities),
+//    Bevölkerung, Kapazität, Überbelegung
+// ─────────────────────────────────────────────────────────────────────
+export async function runPopulationTick(supabase: SB, tickNumber: number) {
+  const results: Record<string, unknown>[] = []
+  // simulate_tick = false → passiver Ort (Erde, Prometheus): kein Bevölkerungs-
+  // oder Verbrauchs-Tick. Marktpreise laufen separat (runPriceTick filtert nicht).
+  const { data: locations } = await supabase
+    .from('locations')
+    .select('*')
+    .eq('simulate_tick', true)
+
+  for (const loc of locations ?? []) {
+    const { data: resources } = await supabase
+      .from('location_resources')
+      .select('*')
+      .eq('location_id', loc.id)
+
+    const stock: Record<string, number> = {}
+    const resMap: Record<string, any> = {}
+    for (const r of resources ?? []) { stock[r.resource] = r.stock; resMap[r.resource] = r }
+
+    const { data: buildings } = await supabase
+      .from('tile_entities')
+      .select('id, entity_id, profile_id')
+      .eq('location_id', loc.id)
+      .eq('entity_type', 'building')
+
+    const counts: Record<string, number> = {}
+    for (const b of buildings ?? []) counts[b.entity_id] = (counts[b.entity_id] ?? 0) + 1
+
+    const pop = loc.population
+    const popMax = (loc.base_population_max ?? loc.population_max) + (counts['habitat'] ?? 0) * 100
+
+    const consumed = {
+      water:  Math.ceil((pop / 100) * CONSUMPTION_PER_100.water),
+      energy: Math.ceil((pop / 100) * CONSUMPTION_PER_100.energy),
+      metal:  Math.ceil((pop / 100) * CONSUMPTION_PER_100.metal),
     }
-  }, [location])
 
-  // ── Weltdaten alle 30s ──────────────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchWorld() {
-      try {
-        const res  = await fetch('/api/game/world')
-        setWorldData(await res.json())
-      } catch (err) { console.error('world fetch error:', err) }
+    const isSupplied =
+      (stock['water']  ?? 0) >= consumed.water &&
+      (stock['energy'] ?? 0) >= consumed.energy &&
+      (stock['metal']  ?? 0) >= consumed.metal
+
+    for (const res of ['water', 'energy', 'metal'] as const) {
+      const r = resMap[res]; if (!r) continue
+      const mineBonus        = res === 'metal'  ? (counts['mine']           ?? 0) * 5 : 0
+      const solarBonus       = res === 'energy' ? (counts['solar']          ?? 0) * 4 : 0
+      const iceDrillBonus    = res === 'water'  ? (counts['ice_drill']      ?? 0) * 4 : 0
+      const recyclerBonus    = res === 'water'  ? (counts['water_recycler'] ?? 0) * 2 : 0
+      const totalProd  = (r.base_production ?? r.production) + mineBonus + solarBonus + iceDrillBonus + recyclerBonus
+      const newStock   = Math.max(0, r.stock + totalProd - consumed[res])
+
+      await supabase.from('location_resources')
+        .update({ stock: newStock, production: totalProd, consumption: consumed[res] })
+        .eq('id', r.id)
+      stock[res] = newStock
     }
-    fetchWorld()
-    const interval = setInterval(fetchWorld, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
-  // ── Spieler-Builds + Bestand laden ─────────────────────────────────────────
-  async function fetchBuilds() {
-    try {
-      const { token, userId } = await getSessionInfo()
-      setUserId(userId)
-      const res   = await fetch('/api/game/build', { headers: { 'Authorization': `Bearer ${token}` } })
-      const data  = await res.json()
-      setPlayerBuilds(data.builds ?? [])
-      setTileEntities(data.entities ?? [])
-      setColonyTax(data.colonyTax ?? {})
-      setEntityInfo(data.entityInfo ?? {})
-    } catch (err) { console.error('build fetch error:', err) }
-  }
-  // Builds/Bestand laden: im Kolonien-Tab (Grid) UND im Übersichts-Tab
-  // (Immobilien-Leiste braucht die tile_entities des Spielers).
-  useEffect(() => { if (activeTab === 'colonies' || activeTab === 'dashboard') fetchBuilds() }, [activeTab])
-  // Re-Fetch nach Bau/Verkauf, ausgelöst über den Store statt Callback-Props
-  useEffect(() => { if (activeTab === 'colonies' || activeTab === 'dashboard') fetchBuilds() }, [invalidations.builds])
-
-  // ── Profil laden ────────────────────────────────────────────────────────────
-  async function fetchProfile() {
-    try {
-      const token = await getToken()
-      const res = await fetch('/api/game/profile', { headers: { 'Authorization': `Bearer ${token}` } })
-      const data = await res.json()
-      setProfile(data.profile)
-    } catch (err) { console.error('profile fetch error:', err) }
-  }
-  useEffect(() => { fetchProfile() }, [])
-
-  // ── Abgeleitete Daten ───────────────────────────────────────────────────────
-  const locations    = worldData?.locations ?? initialLocations
-  const news         = worldData?.news ?? []
-  const stats        = worldData?.stats
-  const transactions = worldData?.transactions ?? []
-
-  function showToast(msg: string, ok: boolean) {
-    setToast({ msg, ok }); setTimeout(() => setToast(null), 2500)
-  }
-
-  // ── Handel (v0.3.0: atomar in einem Call) ────────────────────────────────────
-  async function handleBuy(resource: ResourceType, price: number, amount: number) {
-    const result = await buy(resource, price, amount)
-    showToast(result.msg, result.ok)
-  }
-  async function handleSell(resource: ResourceType, price: number, amount: number) {
-    const result = await sell(resource, price, amount)
-    showToast(result.msg, result.ok)
-  }
-
-  function openAuction(resource: ResourceType, mode: 'buy' | 'sell', qty: number, limit: number) {
-    setAuctionConfig({ resource, mode, qty: Math.max(1, qty), limit })
-    setAuctionOpen(true)
-  }
-
-  async function handleTravel(dest: string) { if (!inTransit) await travel(dest as any, stats?.tickNumber ?? 0) }
-
-  async function handleLogout() {
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = '/auth/login'
-  }
-
-  async function handleFulfillOrder(orderId: string, agreedReward?: number) {
-    const token = await getToken()
-    const url   = `/api/game/orders?action=fulfill&orderId=${orderId}` +
-      (agreedReward != null ? `&agreedReward=${Math.round(agreedReward)}` : '')
-    const res   = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
-    const data  = await res.json()
-    if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward.toLocaleString('de')} Cr`, true); await loadFromServer() }
-    else showToast(data.error, false)
-  }
-
-  // ── Berechnungen ──────────────────────────────────────────────────────────
-  const currentPrices       = prices.filter((p: any) => p.locations?.slug === location)
-  const otherLocations      = locations.filter((l: any) => l.slug !== location)
-  const currentLocationData = locations.find((l: any) => l.slug === location)
-  const used                = cargoUsed()
-  const cargoFreeSpace      = cargoMax - used
-  const totalPop            = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
-
-  // Flugzeit zum Ziel — aus der EINEN Quelle (ships.baseTravelSeconds) statt
-  // einer lokalen Kopie. Mit dem aktuellen Tick variiert sie orbital (25–50s).
-  function flightTime(to: string): number | null {
-    return baseTravelSeconds(location as any, to as any, stats?.tickNumber ?? 0)
-  }
-
-  // Effektive Reichweite: heute = statische shipRange. Die Funktion trägt schon
-  // die Einstiegspunkte für Ladungsgewicht/Module (Post-Alpha-Treibstoffsystem).
-  const reach = effectiveRange(shipRange, used)
-
-  // Immobilien-Orte: Orte mit eigenen tile_entities + IMMER der aktuelle Ort.
-  // Pro Ort die Gebäudezahl. Aktueller Ort wird markiert (auch ohne Gebäude).
-  const propertyByLocation: Record<string, number> = {}
-  for (const e of tileEntities) {
-    const slug = e.locations?.slug
-    if (slug) propertyByLocation[slug] = (propertyByLocation[slug] ?? 0) + 1
-  }
-  const propertySlugs = Array.from(new Set<string>([location, ...Object.keys(propertyByLocation)]))
-  const propertyLocations = propertySlugs
-    .map(slug => locations.find((l: any) => l.slug === slug))
-    .filter(Boolean)
-
-  // Aufmerksamkeits-Hinweise (lenkt, löst nicht)
-  const attention = attentionItems(locations)
-
-  let best: { from: string; to: string; resource: string; profit: number } | null = null
-  const byResource: Record<string, any[]> = {}
-  for (const p of prices) { (byResource[p.resource] ??= []).push(p) }
-  for (const [, locs] of Object.entries(byResource)) {
-    for (const a of locs) for (const b of locs) {
-      if (a.locations?.slug === b.locations?.slug) continue
-      const profit = b.sell_price - a.buy_price
-      if (profit > (best?.profit ?? 0)) best = { from: a.locations?.slug, to: b.locations?.slug, resource: a.resource, profit }
+    let newPop: number, overcrowded = false
+    if (pop > popMax) {
+      overcrowded = true
+      newPop = Math.max(popMax, pop - Math.ceil(pop * DECLINE_RATE))
+    } else {
+      const rate = isSupplied ? GROWTH_RATE : -DECLINE_RATE
+      newPop = Math.round(Math.max(0, Math.min(popMax, pop * (1 + rate))))
     }
-  }
 
-  // ── Wiederverwendbare Styles ────────────────────────────────────────────────
-  const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
-  const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '6px', background: T.blue, color: '#fff', border: 'none', padding: '0.5rem 0.95rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: T.radius, cursor: 'pointer' }
-  const btnGhost: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.5rem 0.95rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: T.radius, cursor: 'pointer' }
-  const metricLabel: React.CSSProperties = { fontSize: '0.6rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }
+    await supabase.from('locations')
+      .update({ population: newPop, population_max: popMax, is_supplied: isSupplied })
+      .eq('id', loc.id)
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-  return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    // ─────────────────────────────────────────────────────────────────
+    // EINKOMMENS-AUSSCHÜTTUNG (Punkt 3, schlank):
+    // Die Kolonie kauft Produktion NUR bei Mangel und zahlt den lokalen
+    // sell_price; Habitate zahlen Miete pro belegtem Platz. Abzüglich
+    // Transaktionssteuer der Kolonie. Geld fließt aus dem colony_ledger
+    // (geschlossener Kreislauf, kein Gelddruck). Überschuss-Produktion
+    // bleibt vorerst ohne Ausschüttung (Eigentümer-Lager = späteres Feature).
+    // ─────────────────────────────────────────────────────────────────
+    if ((buildings ?? []).length > 0) {
+      // Steuersatz der Kolonie (wie in trade/route.ts)
+      const { data: settings } = await supabase
+        .from('colony_settings')
+        .select('tax_transaction')
+        .eq('location_id', loc.id)
+        .maybeSingle()
+      const taxRate = Number(settings?.tax_transaction ?? 0)
 
-      {toast && <Toast msg={toast.msg} ok={toast.ok} />}
-      <TransitPanel onArrival={() => {}} />
+      // Marktpreise (sell) der Kolonie einmal laden
+      const { data: priceRows } = await supabase
+        .from('market_prices')
+        .select('resource, sell_price')
+        .eq('location_id', loc.id)
+      const sellPrice: Record<string, number> = {}
+      for (const p of priceRows ?? []) sellPrice[p.resource] = p.sell_price
 
-      {profile && !profile.onboarded && (
-        <WelcomeSetup onDone={() => { fetchProfile(); window.location.reload() }} />
-      )}
+      // belegte Habitat-Plätze (Auslastung × 100, gedeckelt)
+      const auslastung = popMax > 0 ? Math.min(1, Math.max(0, newPop / popMax)) : 0
 
-      {/* Overlays */}
-      <MarketAuction
-        open={auctionOpen || warehouseOpen}
-        onClose={() => { setAuctionOpen(false); setWarehouseOpen(false) }}
-        location={location as any}
-        locationName={currentLocationData?.name ?? LOC_NAME[location]}
-        rows={currentPrices.map((p: any) => ({
-          resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price,
-          stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100,
-        }))}
-        credits={credits} cargo={cargo} cargoMax={cargoMax}
-        initialResource={auctionConfig.resource}
-        initialMode={auctionConfig.mode}
-        initialQty={auctionConfig.qty}
-        playerLimit={auctionConfig.limit}
-        onTrade={async (resource, m, amount, price) => {
-          if (m === 'buy') {
-            const result = await buy(resource, price, amount)
-            showToast(result.msg, result.ok)
-            return result.ok
-          } else {
-            const result = await sell(resource, price, amount)
-            showToast(result.msg, result.ok)
-            return result.ok
+      for (const b of buildings ?? []) {
+        let gross = 0   // Brutto-Ausschüttung vor Steuer
+
+        if (b.entity_id === 'habitat') {
+          // Miete: belegte Plätze × Mietwert
+          const belegt = Math.round(100 * auslastung)
+          gross = belegt * BUILDING_SALE.MIETWERT_PRO_PLATZ
+        } else if (PRODUCES[b.entity_id]) {
+          // Mine/Solar: Kolonie kauft nur bei MANGEL der Ressource
+          const { resource, amount } = PRODUCES[b.entity_id]
+          const r = resMap[resource]
+          if (r) {
+            const balance = (r.production ?? 0) - (r.consumption ?? 0)
+            const mangel  = (stock[resource] ?? 0) < STOCK_LOW_THRESHOLD
+                          || (balance < 0 && (stock[resource] ?? 0) < 150)
+            if (mangel) gross = amount * (sellPrice[resource] ?? 0)
           }
-        }}
-      />
-      <OrderNegotiation
-        order={negotiateOrder ? { ...negotiateOrder, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === negotiateOrder.resource)?.stock } : null}
-        onClose={() => setNegotiateOrder(null)}
-        canFulfill={negotiateOrder?.locations?.slug === location && cargo[negotiateOrder?.resource as ResourceType] >= negotiateOrder?.amount}
-        fulfillHint={negotiateOrder?.locations?.slug !== location ? 'Falscher Standort — hierhin fliegen.' : 'Nicht genug Ladung an Bord.'}
-        onAccept={async (id, bonus) => { await handleFulfillOrder(id, bonus); return true }}
-      />
-      <ColonyDetail
-        colony={detailColony}
-        isHere={detailColony?.slug === location}
-        cargo={cargo}
-        onClose={() => setDetailColony(null)}
-        onTravel={(dest) => handleTravel(dest)}
-      />
-      <ShipyardOverlay
-        open={shipyardOpen}
-        onClose={() => setShipyardOpen(false)}
-        currentShipTypeId={shipTypeId ?? 'freighter_mk1'}
-        credits={credits}
-        onBuyShip={async (type) => {
-          const token = await getToken()
-          const res = await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { 'Authorization': `Bearer ${token}` } })
-          const data = await res.json()
-          if (data.ok) { showToast(`${type} gekauft!`, true); await loadFromServer(); setShipyardOpen(false) }
-          else showToast(data.error ?? 'Kauf fehlgeschlagen', false)
-        }}
-      />
+        }
 
-      )}
+        if (gross <= 0) continue
 
-      {/* ── TOPBAR ─────────────────────────────────────────────────────────── */}
-      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2.5rem', height: '66px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.4rem', margin: 0 }}>
-          noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
-          <span style={{ fontSize: '0.5rem', letterSpacing: '0.3em', color: T.gold, marginLeft: '1rem', verticalAlign: 'middle', textTransform: 'uppercase' }}>Alpha 0.1</span>
-        </h1>
-        <div style={{ display: 'flex', gap: '2.2rem', alignItems: 'center' }}>
-          {[
-            ['Credits', `${credits.toLocaleString('de')} Cr`, T.blue],
-            ['Frachter', `${used} / ${cargoMax} t`, used > 0 ? T.blue : T.inkFaint],
-            ['Standort', `${LOC_ICON[location]} ${LOC_NAME[location]}`, T.blue],
-            ['Bevölkerung', totalPop.toLocaleString('de'), T.blue],
-          ].map(([l, v, c], i) => (
-            <div key={i}>
-              <div style={metricLabel}>{l}</div>
-              <div style={{ fontWeight: 700, color: c as string, fontSize: '0.92rem', marginTop: '2px' }}>{v}</div>
-            </div>
-          ))}
-          {profile?.avatar && (
-            <img src={`/images/avatars/${profile.avatar}.png`} alt=""
-              style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${T.gold}` }} />
-          )}
-          <button style={btnGhost} onClick={handleLogout}>{Icon.logout(T.blue)} Abmelden</button>
-        </div>
-      </header>
+        const tax    = Math.round(taxRate * gross)
+        const payout = gross - tax
 
-      {/* ── TICKER ─────────────────────────────────────────────────────────── */}
-      <div style={{ background: T.blue, color: '#fff', padding: '0.55rem 2.5rem' }}>
-        <div style={{ maxWidth: '1140px', margin: '0 auto', display: 'flex', gap: '2.5rem', fontSize: '0.76rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {news.length > 0
-            ? news.map((n: any, i: number) => <span key={i} style={{ opacity: i === 0 ? 1 : 0.7 }}>{n.icon} {n.text}</span>)
-            : <span style={{ opacity: 0.85 }}>🟢 Sonnensystem stabil</span>}
-        </div>
-      </div>
+        // Eigentümer gutschreiben
+        const { data: prof } = await supabase
+          .from('profiles').select('credits').eq('id', b.profile_id).single()
+        if (prof) {
+          await supabase.from('profiles')
+            .update({ credits: prof.credits + payout })
+            .eq('id', b.profile_id)
+        }
 
-      {/* ── TABS ───────────────────────────────────────────────────────────── */}
-      <div style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2.5rem' }}>
-        <div style={{ maxWidth: '1140px', margin: '0 auto', display: 'flex', gap: '0.5rem' }}>
-          {[
-            { id: 'dashboard',  label: 'Übersicht',   icon: Icon.trade },
-            { id: 'statistics', label: 'Statistiken', icon: Icon.chart },
-            { id: 'colonies',   label: 'Kolonien',    icon: Icon.globe },
-            { id: 'system',     label: 'System',      icon: Icon.orbit },
-          ].map(tab => {
-            const on = activeTab === tab.id
-            return (
-              <button key={tab.id}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '0.9rem 1.1rem', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: on ? 700 : 500, color: on ? T.blue : T.inkFaint, borderBottom: on ? `2px solid ${T.gold}` : '2px solid transparent', cursor: 'pointer', marginBottom: '-1px' }}
-                onClick={() => setActiveTab(tab.id as any)}>
-                {tab.icon(on ? T.blue : T.inkFaint)} {tab.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+        // Kolonie zahlt (negativer Eintrag) + Steuer (positiv) ins Ledger
+        await supabase.from('colony_ledger').insert([
+          {
+            location_id: loc.id, tick: tickNumber, entry_type: 'building_payout',
+            profile_id: b.profile_id, resource_type: null, amount: -payout,
+            note: `Ausschüttung ${b.entity_id}`,
+          },
+          ...(tax > 0 ? [{
+            location_id: loc.id, tick: tickNumber, entry_type: 'tax_payout',
+            profile_id: b.profile_id, resource_type: null, amount: tax,
+            note: `Steuer auf Ausschüttung ${b.entity_id}`,
+          }] : []),
+        ])
+      }
+    }
 
-      {/* ── INHALT ─────────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '2rem 1.5rem 3rem' }}>
+    // Event-Stream: Wachstum / beginnende Not (Rohdaten für Kennzahlen)
+    if (!isSupplied && newPop < pop) {
+      await supabase.from('events').insert({
+        location_id: loc.id, type: 'starvation',
+        payload: { lost: pop - newPop, resource_gap: consumed, stock },
+      })
+    }
 
-        {activeTab === 'statistics' && <StatisticsTab locations={locations} />}
+    results.push({ location: loc.slug, population: { before: pop, after: newPop, max: popMax }, isSupplied, overcrowded })
+  }
 
-        {activeTab === 'system' && <SolarSystem currentTick={stats?.tickNumber ?? 0} shipRange={shipRange} currentLocation={location} />}
+  return results
+}
 
-        {activeTab === 'colonies' && (
-          <div>
-            <ColonyStats locations={locations} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
-              {locations.filter((loc: any) => loc.location_type === 'colony' || !loc.location_type).map((loc: any) => (
-                <ColonyGrid key={loc.id} slug={loc.slug} name={loc.name}
-                  population={loc.population} populationMax={loc.population_max} isSupplied={loc.is_supplied}
-                  userId={userId}
-                  entities={tileEntities.filter((e: any) => e.locations?.slug === loc.slug)}
-                  pending={playerBuilds
-                    .filter((b: any) => b.locations?.slug === loc.slug)
-                    .map((b: any) => ({
-                      buildable_id: b.buildable_id,
-                      tile_row:     b.tile_row,
-                      tile_col:     b.tile_col,
-                      status:       b.status,
-                    }))}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+// ─────────────────────────────────────────────────────────────────────
+// 2) PRICES – Lager-/Bilanz-/Versorgungsdruck, schreibt price_history
+// ─────────────────────────────────────────────────────────────────────
+export async function runPriceTick(supabase: SB, tickNumber: number) {
+  const results: Record<string, unknown>[] = []
+  // locations separat (kein FK-Join)
+  const { data: priceLocRows } = await supabase.from('locations').select('id, slug, population, population_max, is_supplied')
+  const priceLocMap = new Map<string, any>()
+  for (const l of (priceLocRows ?? []) as any[]) priceLocMap.set(l.id, l)
 
-        {activeTab === 'dashboard' && (
-          <>
-            {/* ════════════════════════════════════════════════════════════
-                ORTSZENTRIERTE ÜBERSICHT (Schicht 1)
-                Hauptview (aktueller Ort) · Reiseziele rechts · Immobilien unten.
-                Reichweite + Stationsbüro-NPC folgen in Schicht 2/3.
-               ════════════════════════════════════════════════════════════ */}
+  const { data: prices } = await supabase
+    .from('market_prices')
+    .select('*')
 
-            {/* ── TIPPS ─────────────────────────────────────────────── */}
-            {(() => {
-              const localEntities = tileEntities.filter((e: any) => e.locations?.slug === location)
-              const hasSchool  = localEntities.some((e: any) => e.entity_id === 'school')
-              const hasAdmin   = localEntities.some((e: any) => e.entity_id === 'admin')
-              const ownBuilds  = tileEntities.filter((e: any) => e.profile_id === userId).length
-              const tips: TipDef[] = [
-                { id: 'tip_energy_needed',  icon: '⚡', condition: cargo.energy === 0 && !inTransit,                                    text: 'Du hast keine Energie an Bord. Kaufe Energie in der Handelszentrale — ohne sie kannst du nicht fliegen.' },
-                { id: 'tip_cargo_empty',    icon: '📦', condition: cargo.water === 0 && cargo.metal === 0 && cargo.energy < 10 && !inTransit, text: 'Dein Laderaum ist fast leer. Kaufe Waren hier und liefere sie an Kolonien mit Knappheit — das ist dein Kerngeschäft.' },
-                { id: 'tip_school_click',   icon: '🎓', condition: hasSchool,                                                            text: 'Klicke auf die Akademie im Grid um Aufgaben zu lösen, Wissenspunkte zu sammeln — und das Spielhandbuch zu lesen.' },
-                { id: 'tip_admin_click',    icon: '🏛️', condition: hasAdmin,                                                             text: 'Klicke auf das Verwaltungsgebäude im Grid um Koloniedetails und Steuersätze einzusehen.' },
-                { id: 'tip_werft_click',    icon: '⚓', condition: location === 'moon',                                                  text: 'Auf dem Mond gibt es eine Werft. Klicke auf das Werft-Gebäude im Grid um Schiffe zu kaufen.' },
-                { id: 'tip_build_first',    icon: '🏗️', condition: ownBuilds === 0,                                                     text: 'Du hast noch keine Gebäude. Klicke auf eine freie Kachel im Grid um dein erstes Gebäude zu bauen.' },
-                { id: 'tip_prometheus',     icon: '🛸', condition: location === 'earth',                                                 text: 'Prometheus (L5) ist von der Erde nur 11s entfernt und hat günstige Energie. Ideal als erste Zwischenstation.' },
-              ]
-              return <TipBanner tips={tips} />
-            })()}
+  for (const price of prices ?? []) {
+    const loc = priceLocMap.get(price.location_id)
+    if (!loc) continue
 
-            {/* ── HAUPTRASTER: aktueller Ort (groß) · Reiseziele (rechts) ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', marginBottom: '1.5rem' }}>
+    const { data: res } = await supabase
+      .from('location_resources')
+      .select('stock, consumption, production')
+      .eq('location_id', loc.id)
+      .eq('resource', price.resource)
+      .single()
+    if (!res) continue
 
-              {/* ── HAUPTVIEW: der Ort, an dem du gerade bist ───────────── */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    const stock = res.stock ?? 0
+    const balance = (res.production ?? 0) - (res.consumption ?? 0)
 
-                {/* Hero des aktuellen Orts */}
-                {currentLocationData && (() => {
-                  const worst = worstStatus(currentLocationData)
-                  const popPct = Math.round((currentLocationData.population / currentLocationData.population_max) * 100)
-                  return (
-                    <div style={{
-                      ...card, padding: '1.6rem 1.8rem',
-                      borderLeft: `4px solid ${worst ? stateColor(worst.state, T) : T.green}`,
-                    }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2rem', alignItems: 'start' }}>
-                        <div>
-                          <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>{LOC_ICON[location]} Du bist hier</div>
-                          <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: T.blueDeep, marginBottom: '0.5rem' }}>
-                            {currentLocationData.name}
-                          </div>
-                          <div style={{ fontSize: '0.9rem', color: T.inkSoft, marginBottom: '0.9rem' }}>
-                            {currentLocationData.population.toLocaleString('de')} Einwohner · {popPct}% Auslastung
-                          </div>
-                          <div style={{ display: 'flex', gap: '1.2rem', flexWrap: 'wrap' }}>
-                            {(currentLocationData.location_resources ?? []).map((r: any) => {
-                              const s = resourceStatus(r)
-                              return (
-                                <div key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: stateColor(s.state, T), display: 'inline-block' }} />
-                                  <span style={{ color: T.ink }}>{RESOURCE_ICON[r.resource]} {r.stock}t · {stateLabel(s)}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right', minWidth: '160px' }}>
-                          {worst ? (
-                            <>
-                              <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>Größter Engpass</div>
-                              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: stateColor(worst.state, T) }}>
-                                {RESOURCE_ICON[worst.resource]} {stateLabel(worst)}
-                              </div>
-                              {worst.ticksLeft !== null && worst.ticksLeft > 0 && (
-                                <div style={{ fontSize: '0.78rem', color: T.inkSoft, marginTop: '0.2rem' }}>
-                                  reicht noch ~{worst.ticksLeft} Ticks
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div style={{ ...metricLabel, marginBottom: '0.3rem' }}>Status</div>
-                              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: T.green }}>Alles stabil</div>
-                            </>
-                          )}
-                        </div>
-                      </div>
+    let multiplier = 1.0
+    if (stock < STOCK_LOW_THRESHOLD)      multiplier = PRICE_PRESSURE_HIGH
+    else if (stock > STOCK_HIGH_THRESHOLD) multiplier = PRICE_PRESSURE_LOW
 
+    if (balance < -5 && stock < 200)       multiplier = Math.max(multiplier, 1.03)
+    else if (balance > 5 && stock > 300)   multiplier = Math.min(multiplier, 0.98)
 
-                    </div>
-                  )
-                })()}
+    if (!loc.is_supplied && price.resource === 'water') multiplier = Math.max(multiplier, 1.08)
 
-                {/* Kolonie-Grid direkt im Dashboard */}
-                {currentLocationData && (
-                  (currentLocationData?.location_type === 'station' || location === 'prometheus') ? (
-                    /* Station (Prometheus etc.): Modul-Übersicht */
-                    <div style={{ ...card, padding: '1rem', background: '#07101a', border: '1px solid #1a2a3a', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                      {tileEntities.filter((e: any) => e.locations?.slug === location && e.entity_type === 'module').map((m: any) => {
-                        const icons: Record<string, string> = { command_center: '🎯', solar_array: '☀️', docking_bay: '🚀', habitat_module: '🏠', research_lab: '🔬', water_recycler: '💧', storage_bay: '📦', observatory: '🔭', reactor: '⚛️' }
-                        return (
-                          <div key={m.id} style={{ textAlign: 'center', opacity: m.status === 'active' ? 1 : 0.4 }}>
-                            <div style={{ fontSize: '1.5rem' }}>{icons[m.entity_id] ?? '⬡'}</div>
-                            <div style={{ fontSize: '0.5rem', color: '#5a7a9a', marginTop: 2 }}>{m.entity_id.replace('_', ' ')}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <ColonyGrid
-                      slug={currentLocationData.slug}
-                      name={currentLocationData.name}
-                      population={currentLocationData.population}
-                      populationMax={currentLocationData.population_max}
-                      isSupplied={currentLocationData?.is_supplied ?? false}
-                      userId={userId}
-                      tax={colonyTax[currentLocationData?.id ?? ""]}
-                      entityInfo={entityInfo}
-                      locationResources={currentLocationData.location_resources ?? []}
-                      credits={credits}
-                      allLocations={locations.filter((l: any) => l.slug !== location)}
-                      cargo={cargo}
-                      shipRange={shipRange}
-                      currentTick={stats?.tickNumber ?? 0}
-                      inTransit={inTransit}
-                      onTravel={(dest) => handleTravel(dest)}
-                      onOpenShipyard={() => setShipyardOpen(true)}
-                      onOpenWarehouse={() => setWarehouseOpen(true)}
-                      entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug && e.tile_row != null)}
-                      pending={playerBuilds
-                        .filter((b: any) => b.locations?.slug === currentLocationData.slug)
-                        .map((b: any) => ({
-                          buildable_id: b.buildable_id,
-                          tile_row:     b.tile_row,
-                          tile_col:     b.tile_col,
-                          status:       b.status,
-                        }))}
-                      onChanged={async () => { await loadFromServer(); invalidate('builds') }}
-                    />
-                  )
-                )}
+    const popPct = loc.population / loc.population_max
+    if (popPct > 0.7 && price.resource === 'water') multiplier = Math.max(multiplier, 1.02)
 
-                                {/* Frachtstatus */}
-                <div style={{ ...card, padding: '0.85rem 1.4rem', display: 'flex', gap: '1.8rem', alignItems: 'center' }}>
-                  <span style={metricLabel}>An Bord</span>
-                  {used > 0 ? (
-                    (Object.entries(cargo) as [ResourceType, number][]).filter(([, v]) => v > 0).map(([res, amt]) => (
-                      <span key={res} style={{ fontSize: '0.88rem', fontWeight: 600, color: T.blue }}>{RESOURCE_ICON[res]} {RESOURCE_LABEL[res]} {amt}t</span>
-                    ))
-                  ) : (
-                    <span style={{ fontSize: '0.82rem', color: T.inkFaint }}>Laderaum leer — kauf etwas in der Handelszentrale.</span>
-                  )}
-                  <div style={{ marginLeft: 'auto', background: T.bg, borderRadius: '999px', padding: '0.25rem 0.8rem', fontSize: '0.72rem', color: T.inkSoft }}>{cargoFreeSpace}t frei</div>
-                </div>
+    if (multiplier === 1.0) {
+      if (price.buy_price > 200)     multiplier = 0.99
+      else if (price.buy_price < 30) multiplier = 1.01
+    }
 
-                {/* Handelszentrale des aktuellen Orts */}
-                <div>
-                  <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`} />
-                  <div style={card}>
-                    {currentPrices.map((p: any, i: number) => {
-                      const stock = currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100
-                      return <BuyRow key={p.id} p={{ ...p, stock }} last={i === currentPrices.length - 1}
-                        cargoFree={cargoFreeSpace} owned={cargo[p.resource as ResourceType]}
-                        costBasis={costBasis[p.resource as ResourceType] ?? 0}
-                        onBuy={(amt, limit) => openAuction(p.resource, 'buy', amt, limit)}
-                        onSell={(amt, limit) => openAuction(p.resource, 'sell', amt, limit)} />
-                    })}
-                  </div>
-                </div>
-              </div>
+    const newBuy  = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX, price.buy_price * multiplier)))
+    const newSell = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX - 1, price.sell_price * multiplier)))
+    const safeSell = Math.min(newSell, newBuy - 5)
 
-              {/* ── SEITENSPALTE: Reiseziele ────────────────────────────── */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    if (!(newBuy === price.buy_price && safeSell === price.sell_price)) {
+      await supabase.from('market_prices')
+        .update({ buy_price: newBuy, sell_price: safeSell })
+        .eq('id', price.id)
+    }
 
-                <div>
-                  <SectionHead title="Reiseziele" />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-                    {otherLocations.map((loc: any) => {
-                      const worst = worstStatus(loc)
-                      const secs  = flightTime(loc.slug)
-                      // Schicht 2: Reichweiten-Check. Ziel erreichbar, wenn seine
-                      // Basis-Distanz <= effektive Reichweite des Schiffs.
-                      const reachable = secs != null && secs <= reach
-                      const energyCost = flightEnergyCost(location, loc.slug)
-                      const hasEnergy  = cargo.energy >= energyCost
-                      return (
-                        <div key={loc.id}
-                          onClick={() => { if (reachable && hasEnergy && !inTransit) handleTravel(loc.slug) }}
-                          style={{
-                            ...card, padding: '1rem 1.2rem',
-                            borderLeft: `4px solid ${reachable && hasEnergy ? (worst ? stateColor(worst.state, T) : T.green) : T.line}`,
-                            cursor: reachable && hasEnergy && !inTransit ? 'pointer' : 'default',
-                            opacity: reachable && hasEnergy ? 1 : 0.55,
-                          }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: reachable ? T.blueDeep : T.inkFaint }}>
-                              {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
-                            </span>
-                            <span style={{ fontSize: '0.7rem', color: T.inkFaint, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              {secs != null ? `${secs}s` : '—'}&nbsp;·&nbsp;
-                              <span style={{ color: hasEnergy ? T.inkFaint : T.red, fontWeight: hasEnergy ? 400 : 600 }}>
-                                ⚡ {energyCost}t
-                              </span>
-                              {reachable && hasEnergy && Icon.arrow(T.inkFaint)}
-                            </span>
-                          </div>
-                          {reachable ? (
-                            <div style={{ fontSize: '0.76rem', color: worst ? stateColor(worst.state, T) : T.green }}>
-                              {worst
-                                ? <>braucht {RESOURCE_ICON[worst.resource]} {RESOURCE_LABEL[worst.resource]} · {stateLabel(worst)}</>
-                                : 'stabil versorgt'}
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: '0.74rem', color: T.inkFaint, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.inkFaint, display: 'inline-block' }} />
-                              außer Reichweite · stärkeres Schiff nötig
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                    {inTransit && (
-                      <div style={{ fontSize: '0.74rem', color: T.inkFaint, padding: '0.3rem 0.2rem' }}>
-                        Im Transit — Ziele nach der Landung wieder wählbar.
-                      </div>
-                    )}
-                  </div>
-                </div>
+    // Preisverlauf schreiben (immer, auch unverändert → lückenlose Ø-Basis)
+    await supabase.from('price_history').insert({
+      location_id: loc.id, resource: price.resource, tick_number: tickNumber,
+      buy_price: newBuy, sell_price: safeSell,
+    })
 
-                {/* Beste Route bleibt als nützlicher Hinweis */}
-                <div>
-                  <SectionHead title="Beste Route" />
-                  {best ? (
-                    <div style={{ ...card, padding: '1.4rem', borderTop: `3px solid ${T.gold}` }}>
-                      <div style={{ fontSize: '0.85rem', color: T.inkSoft, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {LOC_ICON[best.from]} {LOC_NAME[best.from]} {Icon.arrow(T.inkFaint)} {LOC_ICON[best.to]} {LOC_NAME[best.to]}
-                      </div>
-                      <div style={{ fontSize: '1rem', fontWeight: 700, color: T.blueDeep, marginBottom: '0.6rem' }}>
-                        {RESOURCE_ICON[best.resource]} {RESOURCE_LABEL[best.resource]}
-                      </div>
-                      <div style={{ fontSize: '2rem', fontWeight: 700, color: T.green, fontFamily: 'Georgia, serif' }}>
-                        +{best.profit}<span style={{ fontSize: '0.8rem', color: T.inkFaint, fontFamily: 'system-ui' }}> Cr/t</span>
-                      </div>
-                    </div>
-                  ) : <div style={{ ...card, padding: '1.4rem', color: T.inkFaint, fontSize: '0.82rem' }}>Keine Arbitrage gefunden.</div>}
-                </div>
+    // ── Punkt 4: gleitenden Schnitt fortschreiben (für getSaleQuote) ──────────
+    // Letzte AVG_WINDOW_TICKS sell_price-Werte mitteln (inkl. des gerade
+    // geschriebenen). avg_sell_7 wird an market_prices gepflegt → die Bewertung
+    // liest O(1) einen vorberechneten Wert statt die History-Tabelle zu scannen.
+    const { data: recent } = await supabase
+      .from('price_history')
+      .select('sell_price')
+      .eq('location_id', loc.id)
+      .eq('resource', price.resource)
+      .order('tick_number', { ascending: false })
+      .limit(AVG_WINDOW_TICKS)
 
-                {/* Aufmerksamkeits-Feed */}
-                <div>
-                  <SectionHead title="Braucht Aufmerksamkeit" />
-                  <div style={{ ...card, padding: attention.length ? '0.5rem 0' : '1.2rem' }}>
-                    {attention.length === 0 ? (
-                      <div style={{ fontSize: '0.8rem', color: T.green, padding: '0 1.2rem' }}>Das System läuft stabil.</div>
-                    ) : attention.slice(0, 6).map((a, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '0.55rem 1.2rem', fontSize: '0.8rem', color: T.ink }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: a.level === 'critical' ? T.red : '#d08020' }} />
-                        {a.text}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+    if (recent && recent.length > 0) {
+      const avg = Math.round(
+        recent.reduce((s: number, r: any) => s + r.sell_price, 0) / recent.length
+      )
+      await supabase.from('market_prices')
+        .update({ avg_sell_7: avg })
+        .eq('id', price.id)
+    }
 
-            {/* ── IMMOBILIEN-LEISTE: Orte mit eigenem Standbein ──────────── */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <SectionHead title="Deine Orte" />
-              <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-                {propertyLocations.map((loc: any) => {
-                  const isHere   = loc.slug === location
-                  const gebaeude = propertyByLocation[loc.slug] ?? 0
-                  return (
-                    <div key={loc.id} onClick={() => setDetailColony(loc)}
-                      style={{
-                        ...card, padding: '0.9rem 1.2rem', cursor: 'pointer',
-                        minWidth: '150px', flex: '0 1 auto',
-                        borderLeft: `4px solid ${isHere ? T.gold : T.blue}`,
-                      }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontWeight: 700, fontSize: '0.92rem', color: T.blueDeep }}>
-                        {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
-                        {isHere && <span style={{ fontSize: '0.52rem', background: T.gold, color: '#fff', borderRadius: '4px', padding: '2px 6px', letterSpacing: '0.05em' }}>HIER</span>}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: T.inkSoft, marginTop: '0.3rem' }}>
-                        {gebaeude > 0 ? `${gebaeude} Gebäude` : 'kein Gebäude'}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+    results.push({ location: loc.slug, resource: price.resource, buy: newBuy, sell: safeSell })
+  }
 
-            {/* ── AUFTRÄGE ──────────────────────────────────────────────── */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <SectionHead title="Dringende Aufträge" />
-              <div style={card}>
-                {initialOrders.length === 0 ? (
-                  <div style={{ padding: '1.5rem', color: T.inkFaint, fontSize: '0.82rem', textAlign: 'center' }}>Keine offenen Aufträge.</div>
-                ) : initialOrders.map((o: any, i: number) => {
-                  const personal = o.for_profile_id != null
-                  return (
-                    <div key={o.id} style={{ padding: '1.1rem 1.35rem', borderBottom: i < initialOrders.length - 1 ? `1px solid ${T.lineSoft}` : 'none' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: T.blueDeep, display: 'flex', alignItems: 'center', gap: '7px' }}>
-                            {LOC_ICON[o.locations?.slug]} {o.locations?.name}
-                            {personal && <span style={{ fontSize: '0.5rem', background: T.gold, color: '#fff', borderRadius: '4px', padding: '2px 6px', letterSpacing: '0.05em' }}>FÜR DICH</span>}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: T.inkSoft }}>{o.amount}t {RESOURCE_LABEL[o.resource]}</div>
-                        </div>
-                        <div style={{ fontWeight: 700, color: T.gold, fontSize: '1.05rem', fontFamily: 'Georgia, serif' }}>+{o.reward.toLocaleString('de')} Cr</div>
-                      </div>
-                      <button style={{ ...btnGhost, width: '100%', justifyContent: 'center' }} onClick={() => setNegotiateOrder(o)}>{Icon.trade(T.blue)} Verhandeln</button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
+  // ── Retention: Rohdaten älter als das Fenster löschen (Skalierung) ──────────
+  // avg_sell_7 ist bereits an market_prices gesichert; ältere price_history-
+  // Zeilen werden nur noch für Charts/Archiv gebraucht und hier gedeckelt.
+  const cutoff = tickNumber - HISTORY_RETENTION_TICKS
+  if (cutoff > 0) {
+    await supabase.from('price_history').delete().lt('tick_number', cutoff)
+  }
+
+  return results
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 3) ORDERS – abgelaufene schließen, neue bei Knappheit generieren
+// ─────────────────────────────────────────────────────────────────────
+export async function runOrderTick(supabase: SB) {
+  const created: Record<string, unknown>[] = []
+
+  await supabase.from('trade_orders')
+    .update({ status: 'expired' })
+    .eq('status', 'open')
+    .lt('expires_at', new Date().toISOString())
+
+  // Nur simulierte Kolonien erhalten Aufträge — Erde/Prometheus nicht.
+  const { data: locations } = await supabase
+    .from('locations')
+    .select('id, slug, population, is_supplied')
+    .eq('simulate_tick', true)
+
+  for (const loc of locations ?? []) {
+    const { data: resources } = await supabase
+      .from('location_resources')
+      .select('resource, stock, consumption, production')
+      .eq('location_id', loc.id)
+
+    for (const res of resources ?? []) {
+      const balance = res.production - res.consumption
+      const isUrgent  = res.stock < STOCK_LOW_THRESHOLD
+      const isSinking = balance < 0 && res.stock < 150
+      if (!isUrgent && !isSinking) continue
+
+      const { data: existing } = await supabase
+        .from('trade_orders')
+        .select('id')
+        .eq('location_id', loc.id)
+        .eq('resource', res.resource)
+        .eq('status', 'open')
+        .limit(1)
+      if (existing && existing.length > 0) continue
+
+      const { data: price } = await supabase
+        .from('market_prices')
+        .select('buy_price')
+        .eq('location_id', loc.id)
+        .eq('resource', res.resource)
+        .single()
+      if (!price) continue
+
+      // Punkt 5: Größe = tatsächliches Defizit × Deckungsfenster (kein Zufall).
+      // balance ist hier negativ (Defizit), sonst wäre der Auftrag nicht ausgelöst.
+      // Untergrenze ORDER_MIN_AMOUNT, damit kleine Defizite die Fahrt lohnen.
+      // Kein Deckel nach oben — große Kolonien fordern große Lieferungen.
+      const deficitPerTick = Math.max(0, -balance)
+      const amount = Math.max(
+        ORDER_MIN_AMOUNT,
+        Math.round(deficitPerTick * ORDER_COVERAGE_TICKS)
+      )
+      const rewardMult = isUrgent ? ORDER_REWARD_MULT * 1.3 : ORDER_REWARD_MULT
+      const reward = Math.round(price.buy_price * amount * rewardMult)
+      const expiresAt = new Date()
+      expiresAt.setHours(expiresAt.getHours() + ORDER_EXPIRE_HOURS)
+
+      await supabase.from('trade_orders').insert({
+        location_id: loc.id, resource: res.resource, amount, reward,
+        status: 'open', expires_at: expiresAt.toISOString(),
+        // for_profile_id bleibt NULL → öffentlicher Auftrag
+      })
+      created.push({ location: loc.slug, resource: res.resource, amount, reward, urgent: isUrgent })
+    }
+  }
+
+  return created
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Ein vollständiger Tick (feste Reihenfolge!)
+// ─────────────────────────────────────────────────────────────────────
+// ── NPC-Tick (Phase C) ───────────────────────────────────────────────────────
+//
+// Aktionsreihenfolge: produce → sell → build → buy
+//
+// produce:  Gebäude-Output wird in den Marktstock eingespeist UND im
+//           npc_ledger verbucht (goods_delta + credit_delta = Erlös).
+//           Immer, unabhängig vom Preis. Idempotent über uniq_npc_ledger_event.
+//
+// sell:     Überschuss über reserve wird verkauft, wenn sell_price ≥ sell_floor.
+//           Erhöht den Marktstock (günstiger als bei Spielerlieferung — NPCs
+//           stören keine Aufträge, sie ergänzen den Hintergrundmarkt).
+//           Idempotent über uniq_npc_ledger_event (kind='sell', resource, tick).
+//
+// build:    Wenn Treasury ≥ treasury_min: Insert in tile_entities.
+//           Kein Bauzeit-Tick (NPCs bauen sofort). Kosten ins Ledger.
+//           Idempotent über uniq_npc_ledger_event (kind='build', ref=location).
+//           Hier kein Tile-Conflict-Check — NPCs landen auf Eck-Kacheln, die
+//           der Seed-Reset schon reserviert hat. Kollisionen löst notfalls das
+//           DB-Unique-Constraint (tile_entities hat keinen NPC-Guard).
+//
+// buy:      Phase B v1-Logik unverändert (schreibt weiter in npc_trades).
+//           npc_trades bleibt das Kaufledger; npc_ledger ist das Produktions-/
+//           Verkaufs-/Bau-Ledger. Beide summiert = Gesamtbestand.
+//
+// Bestandsberechnung: Σ npc_trades.amount (Käufe) + Σ npc_ledger.goods_delta
+// (Produktion − Verkäufe) = echter Netto-Bestand. Das erlaubt, die bestehende
+// npc_trades-Tabelle unangetastet zu lassen und trotzdem den vollen Bestand
+// zu kennen.
+//
+// ACHTUNG: produce MUSS vor sell laufen, damit der produce-Ledger-Eintrag
+// beim Bestandssummieren in sell schon zählt. Die Summe passiert einmal pro
+// Akteur (oben), DANACH werden Aktionen abgearbeitet — der Brain sieht den
+// Stand von BEGINN des Ticks (kein Mid-Tick-Drift). Das ist deterministisch.
+export async function runNpcTick(supabase: SB, tickNumber: number) {
+  const { data: actors } = await supabase
+    .from('actors')
+    .select('id, decision_weights')
+    .eq('kind', 'npc_firm')
+  if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
+
+  // ── Marktpreise + Stock einmal für alle Akteure laden ────────────────────
+  // locations separat laden (kein FK-Join — Beziehung nicht im Schema-Cache)
+  const { data: locRows } = await supabase
+    .from('locations')
+    .select('id, slug')
+  const locIdToSlug = new Map<string, string>()
+  for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
+
+  const { data: priceRows } = await supabase
+    .from('market_prices')
+    .select('resource, buy_price, sell_price, location_id')
+  const { data: stockRows } = await supabase
+    .from('location_resources')
+    .select('location_id, resource, stock')
+
+  const stockMap = new Map<string, number>()
+  for (const s of (stockRows ?? []) as any[]) {
+    stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
+  }
+  // sell_price je Ort/Gut (für Erlösberechnung bei produce/sell)
+  const sellPriceMap = new Map<string, number>()
+  const slugToId     = new Map<string, string>()
+
+  const preise = ((priceRows ?? []) as any[]).map((p) => {
+    const slug = locIdToSlug.get(p.location_id) ?? ''
+    if (slug) {
+      slugToId.set(slug, p.location_id)
+      sellPriceMap.set(`${p.location_id}|${p.resource}`, Number(p.sell_price ?? 0))
+    }
+    return {
+      resource:   p.resource,
+      location:   slug,
+      buy_price:  p.buy_price,
+      sell_price: p.sell_price,
+      stock:      stockMap.get(`${p.location_id}|${p.resource}`),
+    }
+  }).filter((p) => p.location)
+
+  let trades = 0, produces = 0, sells = 0, builds = 0
+
+  for (const actor of actors as any[]) {
+    // ── Bestand: Σ npc_trades (Käufe) + Σ npc_ledger.goods_delta (Prod−Verkauf) ──
+    const { data: buyLed } = await supabase
+      .from('npc_trades')
+      .select('resource, amount')
+      .eq('actor_id', actor.id)
+    const bestand: Record<string, number> = {}
+    for (const r of (buyLed ?? []) as any[]) {
+      bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.amount)
+    }
+
+    const { data: prodLed } = await supabase
+      .from('npc_ledger')
+      .select('resource, goods_delta')
+      .eq('actor_id', actor.id)
+      .not('resource', 'is', null)
+    for (const r of (prodLed ?? []) as any[]) {
+      if (r.resource) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.goods_delta ?? 0)
+    }
+
+    // ── Treasury: Σ npc_ledger.credit_delta ──────────────────────────────────
+    const { data: ledSum } = await supabase
+      .from('npc_ledger')
+      .select('credit_delta')
+      .eq('actor_id', actor.id)
+    const treasury = (ledSum ?? []).reduce((s: number, r: any) => s + Number(r.credit_delta ?? 0), 0)
+
+    // ── Eigene Gebäude laden (für produce) ───────────────────────────────────
+    const { data: gebRows } = await supabase
+      .from('tile_entities')
+      .select('entity_id, location_id, tile_col')
+      .eq('actor_id', actor.id)
+      .eq('entity_type', 'building')
+    const gebaeude = ((gebRows ?? []) as any[])
+      .map(g => ({
+        entity_id:   g.entity_id,
+        location_id: g.location_id,
+        location:    locIdToSlug.get(g.location_id) ?? '',
+        tile_col:    Number(g.tile_col ?? 0),
+      }))
+      .filter(g => g.location)
+
+    // ── Stock je Markt auffrischen (Mehr-NPC-fest) ───────────────────────────
+    for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
+
+    // ── Brain ─────────────────────────────────────────────────────────────────
+    const aktionen = entscheideNpc(
+      { actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, treasury, gebaeude },
+      { tick: tickNumber, preise },
+    )
+
+    // ── Aktionen ausführen ────────────────────────────────────────────────────
+    for (const a of aktionen) {
+
+      // ── PRODUCE ─────────────────────────────────────────────────────────────
+      if (a.typ === 'produce') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+
+        const erloes = a.menge * (sellPriceMap.get(`${locId}|${a.resource}`) ?? 0)
+
+        // Idempotenter Ledger-Eintrag. ref = "slug:tile_col" → eindeutig je Gebäude,
+        // damit zwei Minen desselben NPCs am gleichen Ort beide ihren Eintrag bekommen.
+        const { data: ins } = await supabase.from('npc_ledger').upsert(
+          {
+            actor_id:    actor.id,
+            tick:        tickNumber,
+            kind:        'produce',
+            resource:    a.resource,
+            goods_delta: a.menge,
+            credit_delta: erloes,
+            location_id: locId,
+            ref:         a.ref,    // z.B. "moon:11", "moon:10"
+          },
+          { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
+        ).select('id')
+
+        if (!ins?.length) continue   // bereits gelaufen → No-op
+
+        // Stock der Kolonie erhöhen (NPC speist ein)
+        const key = `${locId}|${a.resource}`
+        const neuerStock = (stockMap.get(key) ?? 0) + a.menge
+        await supabase.from('location_resources')
+          .update({ stock: neuerStock })
+          .eq('location_id', locId)
+          .eq('resource', a.resource)
+        stockMap.set(key, neuerStock)
+        produces++
+      }
+
+      // ── SELL ────────────────────────────────────────────────────────────────
+      else if (a.typ === 'sell') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+
+        const aktuellerSellPrice = sellPriceMap.get(`${locId}|${a.resource}`) ?? 0
+        if (aktuellerSellPrice < a.minPreis) continue  // Markt unter sell_floor gefallen
+
+        const erloes = a.menge * aktuellerSellPrice
+
+        const { data: ins } = await supabase.from('npc_ledger').upsert(
+          {
+            actor_id:     actor.id,
+            tick:         tickNumber,
+            kind:         'sell',
+            resource:     a.resource,
+            goods_delta:  -a.menge,  // negativ: Gut verlässt NPC-Lager
+            credit_delta:  erloes,
+            location_id:  locId,
+          },
+          { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
+        ).select('id')
+
+        if (!ins?.length) continue
+
+        // Stock erhöhen (NPC verkauft an Kolonielager)
+        const key = `${locId}|${a.resource}`
+        const neuerStock = (stockMap.get(key) ?? 0) + a.menge
+        await supabase.from('location_resources')
+          .update({ stock: neuerStock })
+          .eq('location_id', locId)
+          .eq('resource', a.resource)
+        stockMap.set(key, neuerStock)
+        sells++
+      }
+
+      // ── BUILD ────────────────────────────────────────────────────────────────
+      else if (a.typ === 'build') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+
+        // Idempotenz: ref = location-Slug, damit pro Ort+Tick genau ein Bau-Event
+        const { data: ins } = await supabase.from('npc_ledger').upsert(
+          {
+            actor_id:     actor.id,
+            tick:         tickNumber,
+            kind:         'build',
+            resource:     null,
+            goods_delta:  0,
+            credit_delta: -a.cost,  // Kosten abziehen
+            location_id:  locId,
+            ref:          a.location,
+          },
+          { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
+        ).select('id')
+
+        if (!ins?.length) continue   // bereits gebaut diesen Tick
+
+        // Gebäude in tile_entities einfügen — nächste freie Eck-Kachel (row 7)
+        // NPCs bauen immer oben rechts und rücken col nach links (6, 5, 4 …).
+        // Einfacher Heuristic: count bestehender NPC-Gebäude dieses Typs am Ort
+        const { data: vorhandene } = await supabase
+          .from('tile_entities')
+          .select('tile_col')
+          .eq('actor_id', actor.id)
+          .eq('location_id', locId)
+          .eq('entity_id', a.building)
+          .order('tile_col', { ascending: false })
+
+        const naechsteCol = vorhandene?.length
+          ? Math.max(0, (vorhandene[0].tile_col ?? 11) - 1)
+          : 11
+
+        await supabase.from('tile_entities').insert({
+          actor_id:    actor.id,
+          location_id: locId,
+          tile_level:  0,
+          tile_row:    7,
+          tile_col:    naechsteCol,
+          entity_type: 'building',
+          entity_id:   a.building,
+        })
+        builds++
+      }
+
+      // ── BUY (Phase B, unverändert → npc_trades) ─────────────────────────────
+      else if (a.typ === 'buy') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+
+        const { data: eingefuegt } = await supabase.from('npc_trades').upsert(
+          {
+            actor_id:    actor.id,
+            tick:        tickNumber,
+            resource:    a.resource,
+            amount:      a.menge,
+            unit_price:  a.maxPreis,
+            location_id: locId,
+          },
+          { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true },
+        ).select('id')
+
+        if (!eingefuegt?.length) continue
+
+        const key = `${locId}|${a.resource}`
+        const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge)
+        await supabase.from('location_resources')
+          .update({ stock: neuerStock })
+          .eq('location_id', locId)
+          .eq('resource', a.resource)
+        stockMap.set(key, neuerStock)
+        trades++
+      }
+    }
+  }
+
+  return { actors: actors.length, trades, produces, sells, builds }
+}
+
+export async function runTick(supabase: SB, tickNumber: number) {
+  const population = await runPopulationTick(supabase, tickNumber)
+  const npc        = await runNpcTick(supabase, tickNumber)    // Nachfrage VOR den Preisen: senkt Stock
+  const prices     = await runPriceTick(supabase, tickNumber)  // reagiert auf den gesenkten Stock (gleicher Tick)
+  const orders     = await runOrderTick(supabase)
+  return { tickNumber, population, prices, npc, orders }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Lazy-Evaluation: fällige Ticks atomar beanspruchen und nachrechnen.
+// claim_due_ticks() serialisiert via Advisory Lock; nur der Gewinner
+// führt die beanspruchten Ticks sequenziell aus.
+// ─────────────────────────────────────────────────────────────────────
+export async function runDueTicks(supabase: SB) {
+  const { data, error } = await supabase.rpc('claim_due_ticks', {
+    p_interval_seconds: TICK_INTERVAL_SECONDS,
+    p_max: TICK_MAX_CATCHUP,
+  })
+  if (error) { console.error('claim_due_ticks error:', error); return { ran: 0 } }
+
+  const row = Array.isArray(data) ? data[0] : data
+  const claimed = row?.claimed ?? 0
+  const latest  = Number(row?.latest_tick ?? 0)
+  if (claimed < 1) return { ran: 0 }
+
+  // Tick-Nummern: latest-claimed+1 .. latest, sequenziell ausführen
+  for (let n = latest - claimed + 1; n <= latest; n++) {
+    await runTick(supabase, n)
+  }
+  return { ran: claimed, latest }
 }
