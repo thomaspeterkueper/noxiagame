@@ -224,12 +224,17 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
 // ─────────────────────────────────────────────────────────────────────
 export async function runPriceTick(supabase: SB, tickNumber: number) {
   const results: Record<string, unknown>[] = []
+  // locations separat (kein FK-Join)
+  const { data: priceLocRows } = await supabase.from('locations').select('id, slug, population, population_max, is_supplied')
+  const priceLocMap = new Map<string, any>()
+  for (const l of (priceLocRows ?? []) as any[]) priceLocMap.set(l.id, l)
+
   const { data: prices } = await supabase
     .from('market_prices')
-    .select('*, locations(id, slug, population, population_max, is_supplied)')
+    .select('*')
 
   for (const price of prices ?? []) {
-    const loc = price.locations
+    const loc = priceLocMap.get(price.location_id)
     if (!loc) continue
 
     const { data: res } = await supabase
@@ -427,9 +432,16 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
   if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
 
   // ── Marktpreise + Stock einmal für alle Akteure laden ────────────────────
+  // locations separat laden (kein FK-Join — Beziehung nicht im Schema-Cache)
+  const { data: locRows } = await supabase
+    .from('locations')
+    .select('id, slug')
+  const locIdToSlug = new Map<string, string>()
+  for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
+
   const { data: priceRows } = await supabase
     .from('market_prices')
-    .select('resource, buy_price, sell_price, location_id, locations(slug)')
+    .select('resource, buy_price, sell_price, location_id')
   const { data: stockRows } = await supabase
     .from('location_resources')
     .select('location_id, resource, stock')
@@ -443,7 +455,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
   const slugToId     = new Map<string, string>()
 
   const preise = ((priceRows ?? []) as any[]).map((p) => {
-    const slug = p.locations?.slug
+    const slug = locIdToSlug.get(p.location_id) ?? ''
     if (slug) {
       slugToId.set(slug, p.location_id)
       sellPriceMap.set(`${p.location_id}|${p.resource}`, Number(p.sell_price ?? 0))
@@ -489,14 +501,14 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
     // ── Eigene Gebäude laden (für produce) ───────────────────────────────────
     const { data: gebRows } = await supabase
       .from('tile_entities')
-      .select('entity_id, location_id, tile_col, locations(slug)')
+      .select('entity_id, location_id, tile_col')
       .eq('actor_id', actor.id)
       .eq('entity_type', 'building')
     const gebaeude = ((gebRows ?? []) as any[])
       .map(g => ({
         entity_id:   g.entity_id,
         location_id: g.location_id,
-        location:    g.locations?.slug ?? '',
+        location:    locIdToSlug.get(g.location_id) ?? '',
         tile_col:    Number(g.tile_col ?? 0),
       }))
       .filter(g => g.location)
