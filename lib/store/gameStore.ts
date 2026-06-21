@@ -1,6 +1,6 @@
 // lib/store/gameStore.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 19:10
+// Aktualisiert: 21.06.2026 19:20
 // Version:      0.4.0
 //
 // v0.4.0: invalidations-Zähler + invalidate(key). Komponenten nutzen
@@ -298,7 +298,10 @@ export const useGameStore = create<GameState>((set, get) => ({
           transitLeft:  0,
           cargo:       { ...s.cargo, energy: s.cargo.energy + energyNeeded },
         }))
-        console.error('travel server error:', data.error)
+        // Fehlermeldung im UI sichtbar machen
+        const msg = data.error ?? `Flug abgelehnt (ok=${data.ok})`
+        alert(`Flug-Fehler: ${msg}\nEnergie benötigt: ${data.energyNeeded ?? '?'}t\nAn Bord (Server): ${data.energyOnBoard ?? '?'}t\nSchiff-Standort (Server): ${data.shipLocation ?? '?'}`)
+        console.error('travel server error:', data)
         return
       }
       // Bei Erfolg: kein weiterer State-Update nötig — Transit läuft weiter.
