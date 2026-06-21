@@ -82,13 +82,13 @@ export default function DashboardClient({
 
   // ── Spielstand laden ────────────────────────────────────────────────────────
   useEffect(() => { if (!loaded) loadFromServer() }, [])
-  // Nach Transit-Ende: World-Daten neu laden damit locations aktuell ist
+  // Nach Transit-Ende: Store + World-Daten neu laden
   const prevLocationRef = React.useRef(location)
   useEffect(() => {
     if (prevLocationRef.current !== location) {
       prevLocationRef.current = location
-      // World-Daten neu holen damit currentLocationData verfügbar ist
-      fetch('/api/game/world').catch(() => {})
+      // cargoMax, speedMult etc. neu laden (Schiffsdaten können sich geändert haben)
+      loadFromServer()
     }
   }, [location])
 
