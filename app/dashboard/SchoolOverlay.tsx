@@ -62,6 +62,8 @@ export default function SchoolOverlay({
   const [streak, setStreak]        = useState(0)
   const [earned, setEarned]        = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [calcVal, setCalcVal] = useState('')
+  const [showCalc, setShowCalc] = useState(false)
 
   useEffect(() => { loadKnowledge(); generateTask() }, [])
   useEffect(() => {
@@ -102,6 +104,7 @@ Kontext (für Zahlen, nicht im Output):
 Station: ${colonyContext.locationName} · Bevölkerung: ${colonyContext.population}
 Wasserlager: ${colonyContext.waterStock}t · Verbrauch: ${colonyContext.waterCons}t/h
 Credits: ${colonyContext.credits} Cr
+WICHTIG: Der Frachter fasst max. 100 Tonnen. Mengen in Aufgaben IMMER ≤ 100t.
 
 Themen: Ressourcen, Handel, Navigation, Bevölkerung, Energie.
 Antworte NUR mit JSON (kein Markdown):
