@@ -1,6 +1,6 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.06.2026 – Hover-Effekte auf Kacheln, verbesserter Pop-Balken,
+// Aktualisiert: 21.06.2026 21:05
 //                            Ladestate, Koordinatenanzeige, Sidebar EmptyState,
 //                            Bauen-Button mit Hover-Feedback
 //   15.06.2026 – Anomalie-Marker; geplante Gebäude ausgegraut im Bau-Dialog
@@ -213,13 +213,16 @@ interface ColonyGridProps {
   currentTick?:      number
   inTransit?:        boolean
   onTravel?:         (dest: string) => void
+  onOpenShipyard?:   () => void
+  onOpenWarehouse?:  () => void
+  onChanged?:        () => void
 }
 
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
   userId, entities = [], pending = [], tax, entityInfo,
   locationResources = [], credits = 0,
-  allLocations = [], cargo = {}, shipRange = 55, currentTick = 0, inTransit = false, onTravel,
+  allLocations = [], cargo = {}, shipRange = 55, currentTick = 0, inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged,
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid]               = useState<string[][]>([])
@@ -258,8 +261,10 @@ export default function ColonyGrid({
   function handleTileClick(r: number, c: number, tileType: string) {
     setSelectedTile({ r, c, type: tileType })
     const ent = entityAt(r, c)
-    if (ent?.entity_id === 'admin')  { setShowAdmin(true);  return }
-    if (ent?.entity_id === 'school') { setShowSchool(true); return }
+    if (ent?.entity_id === 'admin')       { setShowAdmin(true);    return }
+    if (ent?.entity_id === 'school')      { setShowSchool(true);   return }
+    if (ent?.entity_id === 'landing_pad') { setShowLanding(true);  return }
+    if (ent?.entity_id === 'shipyard')    { onOpenShipyard?.();    return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }
 
