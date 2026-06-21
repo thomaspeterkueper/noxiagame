@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 20.06.2026 — Handbuch-Tab (Betriebsanweisung) hinzugefügt
-// Version: 3.1.0 — Zwei Tabs: Akademie (Aufgaben) + Handbuch (Betriebsanweisung)
+// Aktualisiert: 21.06.2026 — Stufen, Fortschrittsbalken, Tagesaufgabe, Schwierigkeit
+// Version:      3.2.0
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -108,7 +108,10 @@ export default function SchoolOverlay({
   const inputRef = useRef<HTMLInputElement>(null)
   const [calcVal, setCalcVal] = useState('')
   const [showCalc, setShowCalc] = useState(false)
-  const [tab, setTab] = useState<'akademie' | 'handbuch'>('akademie')
+  const [tab, setTab]            = useState<'akademie' | 'handbuch'>('akademie')
+  const [levelInfo, setLevel]    = useState<any>(null)
+  const [dailyInfo, setDaily]    = useState<any>(null)
+  const [showDaily, setShowDaily] = useState(false)
 
   useEffect(() => { loadKnowledge(); generateTask() }, [])
   useEffect(() => {
@@ -121,6 +124,8 @@ export default function SchoolOverlay({
       const r = await fetch('/api/game/knowledge')
       const d = await r.json()
       setTotal(d.knowledge_points ?? 0)
+      if (d.level)  setLevel(d.level)
+      if (d.daily)  setDaily(d.daily)
     } catch {}
   }
 
@@ -155,10 +160,11 @@ Themen: Ressourcen, Handel, Navigation, Bevölkerung, Energie.
 Antworte NUR mit JSON (kein Markdown):
 {"kind":"calc","question":"[1-3 Sätze]","answer":[Zahl],"explanation":"[1 Satz]","points":[10-25],"topic":"[Thema]"}`
 
+      const currentLevel = levelInfo?.level ?? 1
       const response = await fetch('/api/game/school', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, level: currentLevel, isDaily: showDaily }),
       })
       const data = await response.json()
       if (!data.task) throw new Error(data.error ?? `HTTP ${response.status}`)
@@ -191,10 +197,12 @@ Antworte NUR mit JSON (kein Markdown):
 
     setResult(correct ? 'correct' : 'wrong')
     if (correct) {
-      const bonus = streak >= 2 ? Math.floor(task.points * 1.5) : task.points
+      const dailyMult = showDaily ? 2 : 1
+      const bonus = streak >= 2 ? Math.floor(task.points * 1.5 * dailyMult) : Math.floor(task.points * dailyMult)
       setEarned(bonus); setStreak(s => s + 1)
       try {
-        const r = await fetch(`/api/game/knowledge?action=award&points=${bonus}&reason=school_task&location=${locationSlug}`)
+        const dailyParam = showDaily ? '&daily=true' : ''
+        const r = await fetch(`/api/game/knowledge?action=award&points=${bonus}&reason=school_task&location=${locationSlug}${dailyParam}`)
         const d = await r.json()
         if (d.knowledge_points != null) { setTotal(d.knowledge_points); onKnowledgeEarned(bonus, d.knowledge_points) }
       } catch {}
@@ -217,6 +225,7 @@ Antworte NUR mit JSON (kein Markdown):
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div style={{ fontSize: '0.7rem', padding: '3px 10px', borderRadius: '20px', background: 'rgba(201,169,97,0.15)', color: '#c9a961', fontWeight: 700 }}>🧠 {totalKnowledge ?? '…'}</div>
             {streak >= 2 && <div style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '20px', background: 'rgba(111,207,151,0.15)', color: '#6fcf97' }}>🔥 ×{streak}</div>}
+            {levelInfo && <div style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '20px', background: `${levelInfo.color}20`, color: levelInfo.color, fontWeight: 700 }}>{levelInfo.title}</div>}
             <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#5a7a9a', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
           </div>
         </div>
@@ -234,6 +243,38 @@ Antworte NUR mit JSON (kein Markdown):
         {tab === 'handbuch' && <ManualTab onClose={onClose} />}
 
         {/* Akademie-Body */}
+        {/* Fortschrittsbalken */}
+        {tab === 'akademie' && levelInfo && (
+          <div style={{ padding: '0.6rem 1.25rem 0', background: '#0a1520' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: '#5a7a9a', marginBottom: '4px' }}>
+              <span style={{ color: levelInfo.color }}>{levelInfo.title}</span>
+              <span>{levelInfo.pointsToNext != null ? `${levelInfo.pointsToNext} bis ${levelInfo.level < 6 ? ['','Händler','Navigator','Ingenieur','Wissenschaftler','Pionier'][levelInfo.level] : 'Max'}` : '🏆 Maximalstufe'}</span>
+            </div>
+            <div style={{ height: '4px', background: '#1a2a3a', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${levelInfo.progress}%`, background: levelInfo.color, borderRadius: '2px', transition: 'width 0.5s ease' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Tagesaufgabe Banner */}
+        {tab === 'akademie' && dailyInfo?.available && !showDaily && (
+          <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.6rem 0.9rem', background: 'rgba(232,112,42,0.12)', border: '1px solid rgba(232,112,42,0.4)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '0.65rem', color: '#e8702a', fontWeight: 700 }}>⭐ Tagesaufgabe verfügbar</div>
+              <div style={{ fontSize: '0.58rem', color: '#8a6a4a' }}>Doppelte Punkte · einmal pro Tag</div>
+            </div>
+            <button onClick={() => { setShowDaily(true); generateTask() }}
+              style={{ background: '#e8702a', border: 'none', color: '#fff', borderRadius: '6px', padding: '4px 12px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}>
+              Starten →
+            </button>
+          </div>
+        )}
+        {tab === 'akademie' && showDaily && (
+          <div style={{ margin: '0.75rem 1.25rem 0', padding: '4px 10px', background: 'rgba(232,112,42,0.1)', border: '1px solid rgba(232,112,42,0.3)', borderRadius: '6px', fontSize: '0.6rem', color: '#e8702a' }}>
+            ⭐ Tagesaufgabe — 2× Punkte
+          </div>
+        )}
+
         {tab === 'akademie' && <div style={{ padding: '1.5rem 1.25rem' }}>
           {loading && (
             <div style={{ color: '#5a7a9a', textAlign: 'center', padding: '2.5rem', fontSize: '0.8rem' }}>
