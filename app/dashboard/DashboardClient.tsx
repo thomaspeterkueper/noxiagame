@@ -1,6 +1,6 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 — LandingOverlay Props an ColonyGrid
+// Aktualisiert: 21.06.2026 19:25
 // Version:      0.6.0
 //
 // v0.5.0: Übersichts-Tab ortszentriert umgebaut (Schicht 1 des Dashboard-
@@ -81,7 +81,7 @@ export default function DashboardClient({
   const [gridOpen, setGridOpen]             = useState(false)   // Karten-Overlay (volles ColonyGrid)
 
   // ── Spielstand laden ────────────────────────────────────────────────────────
-  useEffect(() => { if (!loaded) loadFromServer() }, [])
+  useEffect(() => { loadFromServer() }, [])  // immer beim Mount — kein !loaded-Guard
   // Nach Transit-Ende: Store + World-Daten neu laden
   const prevLocationRef = React.useRef(location)
   useEffect(() => {
