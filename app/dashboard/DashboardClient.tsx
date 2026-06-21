@@ -24,7 +24,7 @@
 
 import { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/store/gameStore'
-import { baseTravelSeconds } from '@/lib/game/ships'
+import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
 import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
@@ -553,21 +553,27 @@ export default function DashboardClient({
                       // Schicht 2: Reichweiten-Check. Ziel erreichbar, wenn seine
                       // Basis-Distanz <= effektive Reichweite des Schiffs.
                       const reachable = secs != null && secs <= reach
+                      const energyCost = flightEnergyCost(location, loc.slug)
+                      const hasEnergy  = cargo.energy >= energyCost
                       return (
                         <div key={loc.id}
-                          onClick={() => { if (reachable && !inTransit) handleTravel(loc.slug) }}
+                          onClick={() => { if (reachable && hasEnergy && !inTransit) handleTravel(loc.slug) }}
                           style={{
                             ...card, padding: '1rem 1.2rem',
-                            borderLeft: `4px solid ${reachable ? (worst ? stateColor(worst.state, T) : T.green) : T.line}`,
-                            cursor: reachable && !inTransit ? 'pointer' : 'default',
-                            opacity: reachable ? 1 : 0.55,
+                            borderLeft: `4px solid ${reachable && hasEnergy ? (worst ? stateColor(worst.state, T) : T.green) : T.line}`,
+                            cursor: reachable && hasEnergy && !inTransit ? 'pointer' : 'default',
+                            opacity: reachable && hasEnergy ? 1 : 0.55,
                           }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                             <span style={{ fontWeight: 700, fontSize: '0.95rem', color: reachable ? T.blueDeep : T.inkFaint }}>
                               {LOC_ICON[loc.slug]} {LOC_NAME[loc.slug]}
                             </span>
                             <span style={{ fontSize: '0.7rem', color: T.inkFaint, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              {secs != null ? `${secs}s` : '—'} {reachable && Icon.arrow(T.inkFaint)}
+                              {secs != null ? `${secs}s` : '—'}&nbsp;·&nbsp;
+                              <span style={{ color: hasEnergy ? T.inkFaint : T.red, fontWeight: hasEnergy ? 400 : 600 }}>
+                                ⚡ {energyCost}t
+                              </span>
+                              {reachable && hasEnergy && Icon.arrow(T.inkFaint)}
                             </span>
                           </div>
                           {reachable ? (
