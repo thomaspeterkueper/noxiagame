@@ -523,13 +523,14 @@ export default function DashboardClient({
                 <div>
                   <SectionHead title={`Handelszentrale · ${LOC_NAME[location]}`} />
                   <div style={card}>
-                    {currentPrices.map((p: any, i: number) => (
-                      <BuyRow key={p.id} p={p} last={i === currentPrices.length - 1}
+                    {currentPrices.map((p: any, i: number) => {
+                      const stock = currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100
+                      return <BuyRow key={p.id} p={{ ...p, stock }} last={i === currentPrices.length - 1}
                         cargoFree={cargoFreeSpace} owned={cargo[p.resource as ResourceType]}
                         costBasis={costBasis[p.resource as ResourceType] ?? 0}
                         onBuy={(amt, limit) => openAuction(p.resource, 'buy', amt, limit)}
                         onSell={(amt, limit) => openAuction(p.resource, 'sell', amt, limit)} />
-                    ))}
+                    })}
                   </div>
                 </div>
               </div>
