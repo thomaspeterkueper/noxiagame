@@ -74,6 +74,13 @@ interface StationOverlayProps {
   credits:           number
   entities:          StationModule[]
   onChanged:         () => void
+  // Optionale Props von DashboardClient (werden akzeptiert aber noch nicht verwendet)
+  allLocations?:     any[]
+  cargo?:            any
+  shipRange?:        number
+  currentTick?:      number
+  inTransit?:        boolean
+  onTravel?:         (dest: string) => void
 }
 
 // ── Hilfen ────────────────────────────────────────────────────────────────────
