@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
       .select('*, locations(slug, name)')
       .is('profile_id', null)
       .eq('is_state_owned', true)
-      .eq('entity_type', 'building')   // Stationsmodule (entity_type='module') ausschließen
+      .in('entity_type', ['building', 'module'])  // Gebäude + Stationsmodule
 
     // NPC-Gebäude: actor_id gesetzt, mit display_name als username
     const { data: npcEntities } = await serviceClient
@@ -196,6 +196,66 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
     }
 
+    // ── Stationsmodul-Bau ────────────────────────────────────────────────────
+    // Stationsmodule (entity_type='module') haben eigene Kosten und kein
+    // tile_row/tile_col. Sie werden direkt in tile_entities als 'module' eingetragen.
+    const MODULE_COSTS: Record<string, { cost: number; buildTicks: number }> = {
+      solar_array:    { cost: 1800, buildTicks: 2 },
+      docking_bay:    { cost: 2200, buildTicks: 3 },
+      habitat_module: { cost: 2000, buildTicks: 3 },
+      research_lab:   { cost: 3000, buildTicks: 4 },
+      water_recycler: { cost: 2500, buildTicks: 3 },
+      storage_bay:    { cost: 1500, buildTicks: 2 },
+      observatory:    { cost: 2800, buildTicks: 4 },
+      reactor:        { cost: 8000, buildTicks: 6 },
+    }
+    const moduleDef = MODULE_COSTS[buildableId]
+    if (moduleDef) {
+      // Stationsmodul-Pfad
+      const { data: locationForModule } = await serviceClient
+        .from('locations')
+        .select('id, location_type')
+        .eq('slug', locationSlug)
+        .single()
+      if (!locationForModule || locationForModule.location_type !== 'station') {
+        return NextResponse.json({ error: 'Module können nur auf Stationen gebaut werden.' }, { status: 400 })
+      }
+      const { data: profileM } = await serviceClient
+        .from('profiles').select('credits').eq('id', user.id).single()
+      if (!profileM || profileM.credits < moduleDef.cost) {
+        return NextResponse.json({ error: 'Unzureichende Credits.' }, { status: 400 })
+      }
+      // Nächsten freien Slot finden
+      const { data: existingModules } = await serviceClient
+        .from('tile_entities')
+        .select('slot')
+        .eq('location_id', locationForModule.id)
+        .eq('entity_type', 'module')
+        .order('slot', { ascending: false })
+        .limit(1)
+      const nextSlot = existingModules?.length ? (existingModules[0].slot ?? 0) + 1 : 0
+      // Credits abziehen
+      await serviceClient.from('profiles')
+        .update({ credits: profileM.credits - moduleDef.cost })
+        .eq('id', user.id)
+      // Modul einfügen
+      await serviceClient.from('tile_entities').insert({
+        profile_id:    user.id,
+        location_id:   locationForModule.id,
+        entity_type:   'module',
+        entity_id:     buildableId,
+        tile_level:    0,
+        tile_row:      null,
+        tile_col:      null,
+        slot:          nextSlot,
+        is_state_owned: false,
+        condition:     100,
+        status:        'active',
+      })
+      return NextResponse.json({ ok: true, credits: profileM.credits - moduleDef.cost })
+    }
+
+    // ── Standard-Gebäude-Bau ─────────────────────────────────────────────────
     const buildable = BUILDABLE_ITEMS[buildableId]
     if (!buildable) {
       return NextResponse.json({ error: 'Unbekannter Bautyp' }, { status: 400 })
