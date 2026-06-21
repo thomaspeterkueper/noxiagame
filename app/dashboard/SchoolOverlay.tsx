@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 — Hintergrundbild je Location (ACADEMY_BG), Breite 560px
-// Version:      3.3.0
+// Aktualisiert: 21.06.2026 — Vollbild-Layout, helles Creme-Panel, schwarze Schrift
+// Version:      3.4.0
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -26,8 +26,8 @@ interface CalcTask {
 interface QuizTask {
   kind:        'quiz'
   question:    string
-  options:     string[]   // 4 Antworten
-  correct:     number     // Index 0-3
+  options:     string[]
+  correct:     number
   explanation: string
   points:      number
   topic:       string
@@ -43,13 +43,23 @@ interface SchoolOverlayProps {
 }
 
 const TOPIC_COLOR: Record<string, string> = {
-  'Ressourcen':   '#2f86c9',
-  'Handel':       '#c9a961',
-  'Navigation':   '#6fcf97',
-  'Bevölkerung':  '#b48ce8',
-  'Energie':      '#ffd700',
-  'Sonnensystem': '#e8702a',
-  'Physik':       '#3fb0c9',
+  'Ressourcen':   '#1a6fa8',
+  'Handel':       '#8a6a00',
+  'Navigation':   '#1a7a4a',
+  'Bevölkerung':  '#6a3ab0',
+  'Energie':      '#9a7000',
+  'Sonnensystem': '#b54a00',
+  'Physik':       '#0a7090',
+}
+
+const TOPIC_BG: Record<string, string> = {
+  'Ressourcen':   '#e8f2fa',
+  'Handel':       '#faf3e0',
+  'Navigation':   '#e8f7ef',
+  'Bevölkerung':  '#f3eefa',
+  'Energie':      '#faf6e0',
+  'Sonnensystem': '#faeee8',
+  'Physik':       '#e8f5fa',
 }
 
 const ACADEMY_BG: Record<string, { src: string; label: string }> = {
@@ -61,41 +71,60 @@ const ACADEMY_BG: Record<string, { src: string; label: string }> = {
 
 const MONO = "'Courier Prime', monospace"
 
-// ── Handbuch-Inhalt ──────────────────────────────────────────────────────────
+const C = {
+  bg:          '#f8f5ee',
+  bgAlt:       '#f2ede4',
+  border:      '#ddd6c8',
+  text:        '#1a1a18',
+  textMuted:   '#6b6357',
+  textFaint:   '#9e9485',
+  accent:      '#2a4e7a',
+  accentLight: '#e8eef6',
+  gold:        '#8a6a00',
+  goldLight:   '#faf3e0',
+  green:       '#1a7a4a',
+  greenLight:  '#e8f7ef',
+  red:         '#b52a2a',
+  redLight:    '#faeaea',
+  orange:      '#b54a00',
+  orangeLight: '#faeee8',
+}
 
 const MANUAL_SECTIONS = [
-  { id: 'ziel',       icon: '🌌', title: 'Dein Ziel',             content: `Du bist Pilot und Händler im Sonnensystem des Jahres 2100. Kolonien auf Mond, Mars und Phobos brauchen Wasser, Energie und Metall — und du lieferst sie. Kaufe günstig, verkaufe teuer, baue Gebäude, wachse.\n\nDie Kernfrage: Kann diese Kolonie in einer Woche sagen, dass sie nur existiert, weil du sie versorgt hast?` },
-  { id: 'handel',     icon: '⚖️', title: 'Handel & Auktion',      content: `Jeder Kauf und Verkauf läuft als Live-Auktion. Du bietest gegen NPC-Händler.\n\nBeim Kauf: Du und andere Händler bieten auf einen Verkäufer. Setze dein Maximalgebot — wer den Verkäufer zuerst erreicht, bekommt die Ware.\n\nBeim Verkauf: Du bist der Verkäufer. Setze deinen Mindestpreis. NPC-Käufer steigen von unten auf.\n\nPreise reagieren auf Angebot und Nachfrage: Knapper Stock → höhere Preise.` },
-  { id: 'fliegen',    icon: '🚀', title: 'Fliegen & Energie',     content: `Jeder Flug kostet Energie aus deinem Laderaum. Asymmetrisch: Erde → Mond kostet 20t (Erdgravitation), Mond → Erde nur 8t.\n\nPrometheus (L5) hat kein Gravitationsfeld — alle Flüge dorthin kosten nur 5t.\n\nOhne ausreichend Energie sind Reiseziele rot markiert und gesperrt.` },
-  { id: 'bauen',      icon: '🏗️', title: 'Bauen & Gebäude',       content: `Klicke auf eine freie Kachel im Koloniegrid um zu bauen. Gebäude wirken ab dem nächsten Tick.\n\nMine (+5 Metall/Tick) · Solarfeld (+4 Energie/Tick) · Habitat (+100 max. Bevölkerung)\nEisbohrung (+4 Wasser/Tick, nur Mond) · Wasserrecycler (+2 Wasser/Tick, nur Mars)\n\nGebäude können zum Ertragswert verkauft werden — nicht zum Kaufpreis. Stranded Assets kosten Geld.` },
-  { id: 'schiffe',    icon: '🛸', title: 'Schiffe & Werft',        content: `Du startest mit dem Frachter Mk.I (100t). Auf der Werft (Mond) kannst du aufrüsten:\n\nSchnellfrachter (60t, 1.7× schneller) — ideal für knappe Güter.\nSchwerfrachter (200t, 0.77× langsamer) — ideal für Massenlieferungen.\n\nKlicke auf das Werft-Gebäude im Grid.` },
-  { id: 'bev',        icon: '👥', title: 'Bevölkerung',            content: `Jede Kolonie braucht Wasser, Energie und Metall pro 100 Einwohner/Tick. Fällt der Stock auf null, schrumpft die Bevölkerung.\n\nDer \"Braucht Aufmerksamkeit\"-Panel zeigt Engpässe. Rote Einträge sind dringlich.` },
-  { id: 'klicken',   icon: '🖱️', title: 'Gebäude anklicken',     content: `🎓 Akademie → Aufgaben + dieses Handbuch\n🏛️ Verwaltung → Koloniedetails, Steuersätze\n⚓ Werft → Schiffe kaufen (nur Mond)\n⚙️ Eigene Gebäude → Bewertung + Verkauf\n\nStaatliche Gebäude (blauer Rand) können nicht verkauft werden.` },
-  { id: 'preise',     icon: '📈', title: 'Preise & Arbitrage',     content: `Klassische Route: Wasser auf Mond kaufen (günstig) → Mars verkaufen (teuer).\n\nDer Preis-Ticker läuft einmal täglich. \"2 Ticks Bauzeit\" = 2 Tage real.\n\nBeste Route wird dir im Dashboard angezeigt.` },
+  { id: 'ziel',     title: 'Dein Ziel',           content: `Du bist Pilot und Händler im Sonnensystem des Jahres 2100. Kolonien auf Mond, Mars und Phobos brauchen Wasser, Energie und Metall — und du lieferst sie. Kaufe günstig, verkaufe teuer, baue Gebäude, wachse.\n\nDie Kernfrage: Kann diese Kolonie in einer Woche sagen, dass sie nur existiert, weil du sie versorgt hast?` },
+  { id: 'handel',   title: 'Handel & Auktion',     content: `Jeder Kauf und Verkauf läuft als Live-Auktion. Du bietest gegen NPC-Händler.\n\nBeim Kauf: Du und andere Händler bieten auf einen Verkäufer. Setze dein Maximalgebot — wer den Verkäufer zuerst erreicht, bekommt die Ware.\n\nBeim Verkauf: Du bist der Verkäufer. Setze deinen Mindestpreis. NPC-Käufer steigen von unten auf.\n\nPreise reagieren auf Angebot und Nachfrage: Knapper Stock → höhere Preise.` },
+  { id: 'fliegen',  title: 'Fliegen & Energie',    content: `Jeder Flug kostet Energie aus deinem Laderaum. Asymmetrisch: Erde → Mond kostet 20t (Erdgravitation), Mond → Erde nur 8t.\n\nPrometheus (L5) hat kein Gravitationsfeld — alle Flüge dorthin kosten nur 5t.\n\nOhne ausreichend Energie sind Reiseziele rot markiert und gesperrt.` },
+  { id: 'bauen',    title: 'Bauen & Gebäude',      content: `Klicke auf eine freie Kachel im Koloniegrid um zu bauen. Gebäude wirken ab dem nächsten Tick.\n\nMine (+5 Metall/Tick) · Solarfeld (+4 Energie/Tick) · Habitat (+100 max. Bevölkerung)\nEisbohrung (+4 Wasser/Tick, nur Mond) · Wasserrecycler (+2 Wasser/Tick, nur Mars)\n\nGebäude können zum Ertragswert verkauft werden — nicht zum Kaufpreis. Stranded Assets kosten Geld.` },
+  { id: 'schiffe',  title: 'Schiffe & Werft',       content: `Du startest mit dem Frachter Mk.I (100t). Auf der Werft (Mond) kannst du aufrüsten:\n\nSchnellfrachter (60t, 1.7x schneller) — ideal für knappe Güter.\nSchwerfrachter (200t, 0.77x langsamer) — ideal für Massenlieferungen.\n\nKlicke auf das Werft-Gebäude im Grid.` },
+  { id: 'bev',      title: 'Bevölkerung',           content: `Jede Kolonie braucht Wasser, Energie und Metall pro 100 Einwohner/Tick. Fällt der Stock auf null, schrumpft die Bevölkerung.\n\nDer "Braucht Aufmerksamkeit"-Panel zeigt Engpässe. Rote Einträge sind dringlich.` },
+  { id: 'klicken', title: 'Gebäude anklicken',     content: `Akademie → Aufgaben + dieses Handbuch\nVerwaltung → Koloniedetails, Steuersätze\nWerft → Schiffe kaufen (nur Mond)\nEigene Gebäude → Bewertung + Verkauf\n\nStaatliche Gebäude (blauer Rand) können nicht verkauft werden.` },
+  { id: 'preise',   title: 'Preise & Arbitrage',    content: `Klassische Route: Wasser auf Mond kaufen (günstig) → Mars verkaufen (teuer).\n\nDer Preis-Ticker läuft einmal täglich. "2 Ticks Bauzeit" = 2 Tage real.\n\nBeste Route wird dir im Dashboard angezeigt.` },
 ]
 
 function ManualTab({ onClose }: { onClose: () => void }) {
   const [open, setOpen] = React.useState<string | null>('ziel')
   return (
-    <div style={{ padding: '1rem 1.25rem', overflowY: 'auto' as const, maxHeight: '60vh' }}>
-      <div style={{ fontSize: '0.6rem', color: '#3a5a7a', marginBottom: '0.75rem' }}>Tippe auf einen Abschnitt.</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+    <div style={{ padding: '1.5rem', overflowY: 'auto' as const, flex: 1 }}>
+      <div style={{ fontSize: '0.72rem', color: C.textFaint, marginBottom: '1rem', fontFamily: MONO }}>Tippe auf einen Abschnitt.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         {MANUAL_SECTIONS.map(s => (
-          <div key={s.id} style={{ border: '1px solid #1a2a3a', borderRadius: '8px', overflow: 'hidden' }}>
-            <button onClick={() => setOpen(open === s.id ? null : s.id)} style={{ width: '100%', textAlign: 'left', background: open === s.id ? 'rgba(42,78,122,0.25)' : 'rgba(42,78,122,0.08)', border: 'none', padding: '0.6rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.6rem', color: open === s.id ? '#c9a961' : '#8ab0d0', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700 }}>
-              <span>{s.icon}</span>{s.title}
-              <span style={{ marginLeft: 'auto', color: '#3a5a7a', fontSize: '0.65rem' }}>{open === s.id ? '▲' : '▼'}</span>
+          <div key={s.id} style={{ border: `1px solid ${C.border}`, borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              onClick={() => setOpen(open === s.id ? null : s.id)}
+              style={{ width: '100%', textAlign: 'left', background: open === s.id ? C.accentLight : C.bgAlt, border: 'none', padding: '0.65rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: open === s.id ? C.accent : C.text, fontFamily: MONO, fontSize: '0.82rem', fontWeight: 700 }}>
+              {s.title}
+              <span style={{ color: C.textFaint, fontSize: '0.65rem', fontWeight: 400 }}>{open === s.id ? '▲' : '▼'}</span>
             </button>
             {open === s.id && (
-              <div style={{ padding: '0.7rem 1rem 0.8rem', background: 'rgba(0,0,0,0.2)', fontSize: '0.76rem', lineHeight: 1.7, color: '#a0b8d0', whiteSpace: 'pre-line' as const, borderTop: '1px solid rgba(42,78,122,0.2)' }}>
+              <div style={{ padding: '0.8rem 1rem', background: '#fff', fontSize: '0.82rem', lineHeight: 1.75, color: C.text, whiteSpace: 'pre-line' as const, borderTop: `1px solid ${C.border}` }}>
                 {s.content}
               </div>
             )}
           </div>
         ))}
       </div>
-      <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
-        <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #2a4e7a', color: '#5a7a9a', padding: '0.45rem 1.25rem', borderRadius: '8px', fontSize: '0.73rem', cursor: 'pointer', fontFamily: MONO }}>Schließen</button>
+      <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
+        <button onClick={onClose} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '0.5rem 1.5rem', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: MONO }}>Schließen</button>
       </div>
     </div>
   )
@@ -112,13 +141,13 @@ export default function SchoolOverlay({
   const [totalKnowledge, setTotal] = useState<number | null>(null)
   const [streak, setStreak]        = useState(0)
   const [earned, setEarned]        = useState<number | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [calcVal, setCalcVal] = useState('')
-  const [showCalc, setShowCalc] = useState(false)
-  const [tab, setTab]            = useState<'akademie' | 'handbuch'>('akademie')
-  const [levelInfo, setLevel]    = useState<any>(null)
-  const [dailyInfo, setDaily]    = useState<any>(null)
-  const [showDaily, setShowDaily] = useState(false)
+  const inputRef                   = useRef<HTMLInputElement>(null)
+  const [calcVal, setCalcVal]      = useState('')
+  const [showCalc, setShowCalc]    = useState(false)
+  const [tab, setTab]              = useState<'akademie' | 'handbuch'>('akademie')
+  const [levelInfo, setLevel]      = useState<any>(null)
+  const [dailyInfo, setDaily]      = useState<any>(null)
+  const [showDaily, setShowDaily]  = useState(false)
 
   useEffect(() => { loadKnowledge(); generateTask() }, [])
   useEffect(() => {
@@ -131,37 +160,30 @@ export default function SchoolOverlay({
       const r = await fetch('/api/game/knowledge')
       const d = await r.json()
       setTotal(d.knowledge_points ?? 0)
-      if (d.level)  setLevel(d.level)
-      if (d.daily)  setDaily(d.daily)
+      if (d.level) setLevel(d.level)
+      if (d.daily) setDaily(d.daily)
     } catch {}
   }
 
   async function generateTask() {
     setLoading(true); setResult(null); setAnswer(''); setOpt(null); setEarned(null); setTask(null)
-
     try {
       const currentLevel = levelInfo?.level ?? 1
       const seed = Math.random().toString(36).slice(2, 8)
       const response = await fetch('/api/game/school', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          level:         currentLevel,
-          isDaily:       showDaily,
-          seed,
-          colonyContext, // Server baut den Prompt mit Caching
-        }),
+        body: JSON.stringify({ level: currentLevel, isDaily: showDaily, seed, colonyContext }),
       })
       const data = await response.json()
       if (!data.task) throw new Error(data.error ?? `HTTP ${response.status}`)
       setTask(data.task)
     } catch (e: any) {
       console.error('School task error:', e?.message ?? e)
-      // Fallback: statische Fragen (kein Kolonie-Kontext nötig)
       const fallbacks: Task[] = [
-        { kind: 'calc', question: 'Ein Frachter kauft 80 Tonnen Wasser für 95 Cr/t und verkauft sie für 155 Cr/t. Wie viel Gewinn macht er insgesamt?', answer: 4800, explanation: '80 × (155 − 95) = 80 × 60 = 4.800 Cr', points: 15, topic: 'Handel' },
+        { kind: 'calc', question: 'Ein Frachter kauft 80 Tonnen Wasser für 95 Cr/t und verkauft sie für 155 Cr/t. Wie viel Gewinn macht er insgesamt?', answer: 4800, explanation: '80 x (155 - 95) = 80 x 60 = 4.800 Cr', points: 15, topic: 'Handel' },
         { kind: 'quiz', question: 'Warum kostet der Flug von der Erde zum Mond mehr Energie als der Rückweg?', options: ['Der Mond ist weiter entfernt', 'Man muss das Erdgravitationsfeld überwinden', 'Das Schiff ist schwerer beim Hinflug', 'Der Mond hat eine stärkere Anziehungskraft'], correct: 1, explanation: 'Die Erde hat eine viel stärkere Schwerkraft (9.8 m/s²) — für den Aufstieg braucht man mehr Energie als für die Landung.', points: 20, topic: 'Physik' },
-        { kind: 'calc', question: 'Eine Kolonie mit 500 Einwohnern verbraucht 1 Tonne Wasser pro 100 Einwohner pro Stunde. Wie viel Wasser braucht sie in 24 Stunden?', answer: 120, explanation: '500 ÷ 100 × 1 × 24 = 120 Tonnen', points: 15, topic: 'Ressourcen' },
+        { kind: 'calc', question: 'Eine Kolonie mit 500 Einwohnern verbraucht 1 Tonne Wasser pro 100 Einwohner pro Stunde. Wie viel Wasser braucht sie in 24 Stunden?', answer: 120, explanation: '500 / 100 x 1 x 24 = 120 Tonnen', points: 15, topic: 'Ressourcen' },
         { kind: 'quiz', question: 'Welche Station im Sonnensystem ist ein reiner Konsument — sie produziert kaum eigene Ressourcen?', options: ['Mond', 'Mars', 'Phobos', 'Erde'], correct: 2, explanation: 'Phobos ist ein kleiner Mond ohne nennenswerte Eigenproduktion — vollständig abhängig von Lieferungen.', points: 20, topic: 'Sonnensystem' },
       ]
       setTask(fallbacks[Math.floor(Math.random() * fallbacks.length)])
@@ -180,7 +202,6 @@ export default function SchoolOverlay({
       setOpt(optIdx)
       correct = optIdx === task.correct
     }
-
     setResult(correct ? 'correct' : 'wrong')
     if (correct) {
       const dailyMult = showDaily ? 2 : 1
@@ -195,214 +216,251 @@ export default function SchoolOverlay({
     } else { setStreak(0) }
   }
 
-  const tc = task ? (TOPIC_COLOR[task.topic] ?? '#8ab0d0') : '#8ab0d0'
+  const bg   = ACADEMY_BG[locationSlug]
+  const tc   = task ? (TOPIC_COLOR[task.topic] ?? C.accent) : C.accent
+  const tcBg = task ? (TOPIC_BG[task.topic]    ?? C.accentLight) : C.accentLight
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.85)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#0d1a26', border: '1px solid #2a4e7a', borderRadius: '14px', width: 'min(560px, 95vw)', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 48px rgba(0,0,0,0.7)', fontFamily: "'Courier Prime', monospace", color: '#cdd6e0', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
 
-        {/* Akademie-Hintergrundbild */}
-        {(() => {
-          const bg = ACADEMY_BG[locationSlug]
-          if (!bg) return null
-          return (
-            <div style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0 }}>
-              <img
-                src={bg.src}
-                alt={bg.label}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%', display: 'block' }}
-                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-              />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(2,4,8,0.0) 0%, rgba(2,4,8,0.05) 55%, rgba(13,26,38,0.97) 100%)' }} />
-              <div style={{ position: 'absolute', bottom: '10px', left: '14px', fontSize: '0.55rem', letterSpacing: '3px', textTransform: 'uppercase' as const, color: 'rgba(201,169,97,0.85)', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
-                {bg.label}
-              </div>
+      {/* Hintergrundbild — volle Fläche */}
+      {bg && (
+        <img
+          src={bg.src}
+          alt={bg.label}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%' }}
+          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+        />
+      )}
+
+      {/* Abdunkelung */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,18,28,0.52)' }} />
+
+      {/* Schließen-Button */}
+      <button
+        onClick={onClose}
+        style={{ position: 'absolute', top: '1.25rem', right: '1.5rem', zIndex: 10, background: 'rgba(248,245,238,0.92)', border: `1px solid ${C.border}`, borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1rem', color: C.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO }}>
+        ✕
+      </button>
+
+      {/* Ortsbezeichnung */}
+      {bg && (
+        <div style={{ position: 'absolute', top: '1.25rem', left: '1.5rem', zIndex: 10, fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: 'rgba(248,245,238,0.85)', fontFamily: MONO, textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}>
+          {bg.label}
+        </div>
+      )}
+
+      {/* Helles Panel — untere 58% */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '58%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Weicher Übergang oben */}
+        <div style={{ position: 'absolute', top: '-40px', left: 0, right: 0, height: '40px', background: `linear-gradient(to bottom, transparent, ${C.bg})`, pointerEvents: 'none' }} />
+
+        {/* Panel-Header mit Tabs */}
+        <div style={{ padding: '0.9rem 1.5rem 0', background: C.bg, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '0', marginBottom: '-1px', alignItems: 'flex-end' }}>
+            {(['akademie', 'handbuch'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
+                {t === 'akademie' ? 'Akademie' : 'Handbuch'}
+              </button>
+            ))}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.5rem' }}>
+              {totalKnowledge !== null && (
+                <span style={{ fontSize: '0.72rem', padding: '2px 10px', borderRadius: '20px', background: C.goldLight, color: C.gold, fontWeight: 700, fontFamily: MONO, border: '1px solid #e8d8a0' }}>
+                  {totalKnowledge} Pkt.
+                </span>
+              )}
+              {streak >= 2 && (
+                <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', background: C.greenLight, color: C.green, fontFamily: MONO, border: '1px solid #a8dcc0' }}>
+                  Serie x{streak}
+                </span>
+              )}
+              {levelInfo && (
+                <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', background: C.accentLight, color: C.accent, fontWeight: 700, fontFamily: MONO, border: '1px solid #b8cce8' }}>
+                  {levelInfo.title}
+                </span>
+              )}
             </div>
-          )
-        })()}
-
-        {/* Header */}
-        <div style={{ padding: '1rem 1.25rem', background: '#0a1520', borderBottom: '1px solid rgba(42,78,122,0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '0.55rem', color: '#2a6ab5', fontWeight: 700, letterSpacing: '4px', textTransform: 'uppercase' }}>🎓 Akademie · {colonyContext.locationName}</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#cdd6e0', marginTop: '2px' }}>Wissens-Terminal</div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.7rem', padding: '3px 10px', borderRadius: '20px', background: 'rgba(201,169,97,0.15)', color: '#c9a961', fontWeight: 700 }}>🧠 {totalKnowledge ?? '…'}</div>
-            {streak >= 2 && <div style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '20px', background: 'rgba(111,207,151,0.15)', color: '#6fcf97' }}>🔥 ×{streak}</div>}
-            {levelInfo && <div style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '20px', background: `${levelInfo.color}20`, color: levelInfo.color, fontWeight: 700 }}>{levelInfo.title}</div>}
-            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#5a7a9a', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(42,78,122,0.3)', background: '#0a1520' }}>
-          {(['akademie', 'handbuch'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ padding: '0.45rem 1rem', border: 'none', cursor: 'pointer', fontFamily: MONO, fontSize: '0.73rem', fontWeight: 700, background: tab === t ? 'rgba(42,78,122,0.4)' : 'transparent', color: tab === t ? '#c9a961' : '#5a7a9a', borderBottom: tab === t ? '2px solid #c9a961' : '2px solid transparent' }}>
-              {t === 'akademie' ? '📚 Akademie' : '📖 Handbuch'}
-            </button>
-          ))}
-        </div>
-
-        {/* Handbuch-Tab */}
+        {/* Handbuch */}
         {tab === 'handbuch' && <ManualTab onClose={onClose} />}
 
-        {/* Akademie-Body */}
-        {/* Fortschrittsbalken */}
-        {tab === 'akademie' && levelInfo && (
-          <div style={{ padding: '0.6rem 1.25rem 0', background: '#0a1520' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: '#5a7a9a', marginBottom: '4px' }}>
-              <span style={{ color: levelInfo.color }}>{levelInfo.title}</span>
-              <span>{levelInfo.pointsToNext != null ? `${levelInfo.pointsToNext} bis ${levelInfo.level < 6 ? ['','Händler','Navigator','Ingenieur','Wissenschaftler','Pionier'][levelInfo.level] : 'Max'}` : '🏆 Maximalstufe'}</span>
-            </div>
-            <div style={{ height: '4px', background: '#1a2a3a', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${levelInfo.progress}%`, background: levelInfo.color, borderRadius: '2px', transition: 'width 0.5s ease' }} />
-            </div>
-          </div>
-        )}
+        {/* Akademie */}
+        {tab === 'akademie' && (
+          <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1.25rem 1.5rem 1.5rem' }}>
 
-        {/* Tagesaufgabe Banner */}
-        {tab === 'akademie' && dailyInfo?.available && !showDaily && (
-          <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.6rem 0.9rem', background: 'rgba(232,112,42,0.12)', border: '1px solid rgba(232,112,42,0.4)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: '0.65rem', color: '#e8702a', fontWeight: 700 }}>⭐ Tagesaufgabe verfügbar</div>
-              <div style={{ fontSize: '0.58rem', color: '#8a6a4a' }}>Doppelte Punkte · einmal pro Tag</div>
-            </div>
-            <button onClick={() => { setShowDaily(true); generateTask() }}
-              style={{ background: '#e8702a', border: 'none', color: '#fff', borderRadius: '6px', padding: '4px 12px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}>
-              Starten →
-            </button>
-          </div>
-        )}
-        {tab === 'akademie' && showDaily && (
-          <div style={{ margin: '0.75rem 1.25rem 0', padding: '4px 10px', background: 'rgba(232,112,42,0.1)', border: '1px solid rgba(232,112,42,0.3)', borderRadius: '6px', fontSize: '0.6rem', color: '#e8702a' }}>
-            ⭐ Tagesaufgabe — 2× Punkte
-          </div>
-        )}
-
-        {tab === 'akademie' && <div style={{ padding: '1.5rem 1.25rem' }}>
-          {loading && (
-            <div style={{ color: '#5a7a9a', textAlign: 'center', padding: '2.5rem', fontSize: '0.8rem' }}>
-              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏳</div>
-              Aufgabe wird generiert …
-            </div>
-          )}
-
-          {!loading && task && (
-            <>
-              {/* Thema + Typ */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.6rem', padding: '3px 10px', borderRadius: '20px', background: `${tc}20`, color: tc, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase' as const }}>{task.topic}</span>
-                <span style={{ fontSize: '0.6rem', padding: '3px 8px', borderRadius: '20px', background: 'rgba(42,78,122,0.2)', color: '#5a7a9a' }}>
-                  {task.kind === 'quiz' ? '❓ Wissensfrage' : '🔢 Rechenaufgabe'}
-                </span>
+            {levelInfo && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: C.textMuted, marginBottom: '5px', fontFamily: MONO }}>
+                  <span style={{ color: C.accent, fontWeight: 700 }}>{levelInfo.title}</span>
+                  <span>{levelInfo.pointsToNext != null ? `${levelInfo.pointsToNext} Pkt. bis ${levelInfo.level < 6 ? ['','Händler','Navigator','Ingenieur','Wissenschaftler','Pionier'][levelInfo.level] : 'Max'}` : 'Maximalstufe erreicht'}</span>
+                </div>
+                <div style={{ height: '5px', background: C.border, borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${levelInfo.progress}%`, background: C.accent, borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                </div>
               </div>
+            )}
 
-              {/* Frage */}
-              <div style={{ background: 'rgba(42,78,122,0.15)', border: `1px solid ${tc}40`, borderRadius: '10px', padding: '1.1rem 1.25rem', marginBottom: '1.25rem', fontSize: '0.9rem', lineHeight: 1.65, color: '#e8f0f8' }}>
-                {task.question}
-              </div>
-
-              {/* Antwort-Interface */}
-              {result === null && (
-                <>
-                  {task.kind === 'calc' ? (
-                    <>
-                      <input ref={inputRef} type="number" placeholder="Deine Antwort …" value={userAnswer}
-                        onChange={e => setAnswer(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && checkAnswer()}
-                        style={{ width: '100%', background: '#0a1520', border: '2px solid #2a4e7a', borderRadius: '8px', padding: '0.65rem 0.9rem', color: '#cdd6e0', fontSize: '1.1rem', fontFamily: "'Courier Prime', monospace", outline: 'none', boxSizing: 'border-box' as const }} />
-                      {/* Taschenrechner */}
-                      <div style={{ marginTop: '0.5rem' }}>
-                        <button onClick={() => setShowCalc(c => !c)}
-                          style={{ background: 'transparent', border: 'none', color: '#5a7a9a', fontSize: '0.65rem', cursor: 'pointer', padding: '2px 0' }}>
-                          {showCalc ? 'Taschenrechner ausblenden' : '🧮 Taschenrechner'}
-                        </button>
-                        {showCalc && (
-                          <div style={{ marginTop: '0.4rem', background: '#0a1520', border: '1px solid #2a4e7a', borderRadius: '8px', padding: '0.6rem' }}>
-                            <input type="text" placeholder="z.B. 80 * 60" value={calcVal}
-                              onChange={e => setCalcVal(e.target.value)}
-                              style={{ width: '100%', background: '#0d1a26', border: '1px solid #2a4e7a', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#cdd6e0', fontSize: '0.8rem', fontFamily: "'Courier Prime', monospace", outline: 'none', boxSizing: 'border-box' as const }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
-                              <span style={{ fontSize: '0.75rem', color: '#c9a961', fontWeight: 700 }}>
-                                {(() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; return isFinite(r) ? '= ' + r.toLocaleString('de') : '' } catch { return '' } })()}
-                              </span>
-                              <button onClick={() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; if (isFinite(r)) setAnswer(String(Math.round(r))) } catch {} }}
-                                style={{ background: '#2a4e7a', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: '0.65rem', cursor: 'pointer' }}>
-                                Antwort
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <button onClick={() => checkAnswer()} disabled={!userAnswer.trim()}
-                        style={{ width: '100%', marginTop: '0.75rem', padding: '0.7rem', background: userAnswer.trim() ? '#2a4e7a' : '#1a2a3a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: userAnswer.trim() ? 'pointer' : 'not-allowed' }}>
-                        Prüfen →
-                      </button>
-                    </>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {task.options.map((opt, i) => (
-                        <button key={i} onClick={() => checkAnswer(i)}
-                          style={{ padding: '0.75rem 1rem', background: 'rgba(42,78,122,0.15)', border: '1px solid #2a4e7a', borderRadius: '8px', color: '#cdd6e0', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' as const, transition: 'background 0.15s' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(42,78,122,0.35)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(42,78,122,0.15)')}>
-                          <span style={{ color: '#5a7a9a', marginRight: '0.75rem' }}>{['A','B','C','D'][i]}</span>
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ fontSize: '0.6rem', color: '#3a5a7a', textAlign: 'center', marginTop: '0.5rem' }}>
-                    {task.points} Punkte{streak >= 2 ? ` · Serie-Bonus: ${Math.floor(task.points * 1.5)}` : ''}
-                  </div>
-                </>
-              )}
-
-              {/* Ergebnis */}
-              {result !== null && task.kind === 'quiz' && selectedOption !== null && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                  {task.options.map((opt, i) => {
-                    const isCorrect = i === task.correct
-                    const isSelected = i === selectedOption
-                    const bg = isCorrect ? 'rgba(111,207,151,0.15)' : isSelected ? 'rgba(231,76,60,0.1)' : 'rgba(42,78,122,0.1)'
-                    const border = isCorrect ? '1px solid #6fcf97' : isSelected ? '1px solid #e74c3c' : '1px solid #1a2a3a'
-                    return (
-                      <div key={i} style={{ padding: '0.6rem 1rem', background: bg, border, borderRadius: '8px', fontSize: '0.82rem', color: isCorrect ? '#6fcf97' : isSelected ? '#e74c3c' : '#5a7a9a' }}>
-                        <span style={{ marginRight: '0.75rem' }}>{isCorrect ? '✓' : isSelected ? '✗' : ' '}</span>
-                        {['A','B','C','D'][i]} · {opt}
-                      </div>
-                    )
-                  })}
+            {dailyInfo?.available && !showDaily && (
+              <div style={{ marginBottom: '1rem', padding: '0.65rem 1rem', background: C.orangeLight, border: '1px solid #e8b890', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: C.orange, fontWeight: 700, fontFamily: MONO }}>Tagesaufgabe verfügbar</div>
+                  <div style={{ fontSize: '0.68rem', color: '#9a6040' }}>Doppelte Punkte · einmal pro Tag</div>
                 </div>
-              )}
-
-              {result === 'correct' && (
-                <div style={{ background: 'rgba(111,207,151,0.12)', border: '1px solid #6fcf97', borderRadius: '10px', padding: '0.85rem 1.1rem' }}>
-                  <div style={{ color: '#6fcf97', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>✓ Richtig! {earned != null && <span style={{ color: '#c9a961' }}>+{earned} 🧠</span>}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#8ab0d0' }}>{task.explanation}</div>
-                </div>
-              )}
-              {result === 'wrong' && (
-                <div style={{ background: 'rgba(231,76,60,0.1)', border: '1px solid #e74c3c', borderRadius: '10px', padding: '0.85rem 1.1rem' }}>
-                  <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>✗ Nicht ganz.</div>
-                  <div style={{ fontSize: '0.75rem', color: '#8ab0d0' }}>{task.explanation}</div>
-                </div>
-              )}
-
-              {result !== null && (
-                <button onClick={generateTask}
-                  style={{ width: '100%', marginTop: '1rem', padding: '0.65rem', background: 'transparent', border: '1px solid #2a4e7a', color: '#8ab0d0', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer' }}>
-                  Nächste Aufgabe →
+                <button
+                  onClick={() => { setShowDaily(true); generateTask() }}
+                  style={{ background: C.orange, border: 'none', color: '#fff', borderRadius: '6px', padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>
+                  Starten →
                 </button>
-              )}
-            </>
-          )}
-        </div>}
+              </div>
+            )}
+            {showDaily && (
+              <div style={{ marginBottom: '0.75rem', padding: '4px 12px', background: C.orangeLight, border: '1px solid #e8b890', borderRadius: '6px', fontSize: '0.68rem', color: C.orange, fontFamily: MONO }}>
+                Tagesaufgabe — 2x Punkte
+              </div>
+            )}
 
-        {/* Footer */}
-        <div style={{ padding: '0.6rem 1.25rem', borderTop: '1px solid rgba(42,78,122,0.3)', fontSize: '0.58rem', color: '#2a4e7a', textAlign: 'center' }}>
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '2.5rem', color: C.textMuted, fontSize: '0.85rem', fontFamily: MONO }}>
+                Aufgabe wird generiert …
+              </div>
+            )}
+
+            {!loading && task && (
+              <>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: '20px', background: tcBg, color: tc, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, fontFamily: MONO, border: `1px solid ${tc}40` }}>
+                    {task.topic}
+                  </span>
+                  <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: '20px', background: C.bgAlt, color: C.textMuted, fontFamily: MONO, border: `1px solid ${C.border}` }}>
+                    {task.kind === 'quiz' ? 'Wissensfrage' : 'Rechenaufgabe'}
+                  </span>
+                </div>
+
+                <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderLeft: `3px solid ${tc}`, borderRadius: '0 8px 8px 0', padding: '1rem 1.25rem', marginBottom: '1.25rem', fontSize: '0.92rem', lineHeight: 1.7, color: C.text }}>
+                  {task.question}
+                </div>
+
+                {result === null && (
+                  <>
+                    {task.kind === 'calc' ? (
+                      <>
+                        <input
+                          ref={inputRef}
+                          type="number"
+                          placeholder="Deine Antwort …"
+                          value={userAnswer}
+                          onChange={e => setAnswer(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && checkAnswer()}
+                          style={{ width: '100%', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: C.text, fontSize: '1.05rem', fontFamily: MONO, outline: 'none', boxSizing: 'border-box' as const }}
+                        />
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <button
+                            onClick={() => setShowCalc(c => !c)}
+                            style={{ background: 'transparent', border: 'none', color: C.textFaint, fontSize: '0.7rem', cursor: 'pointer', padding: '2px 0', fontFamily: MONO }}>
+                            {showCalc ? 'Taschenrechner ausblenden' : 'Taschenrechner'}
+                          </button>
+                          {showCalc && (
+                            <div style={{ marginTop: '0.4rem', background: '#fff', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.65rem' }}>
+                              <input
+                                type="text"
+                                placeholder="z.B. 80 * 60"
+                                value={calcVal}
+                                onChange={e => setCalcVal(e.target.value)}
+                                style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.4rem 0.6rem', color: C.text, fontSize: '0.85rem', fontFamily: MONO, outline: 'none', boxSizing: 'border-box' as const }}
+                              />
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
+                                <span style={{ fontSize: '0.8rem', color: C.accent, fontWeight: 700, fontFamily: MONO }}>
+                                  {(() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; return isFinite(r) ? '= ' + r.toLocaleString('de') : '' } catch { return '' } })()}
+                                </span>
+                                <button
+                                  onClick={() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; if (isFinite(r)) setAnswer(String(Math.round(r))) } catch {} }}
+                                  style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: '4px', padding: '3px 10px', fontSize: '0.7rem', cursor: 'pointer', fontFamily: MONO }}>
+                                  Übernehmen
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => checkAnswer()}
+                          disabled={!userAnswer.trim()}
+                          style={{ width: '100%', marginTop: '0.85rem', padding: '0.7rem', background: userAnswer.trim() ? C.accent : C.border, color: userAnswer.trim() ? '#fff' : C.textFaint, border: 'none', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 700, cursor: userAnswer.trim() ? 'pointer' : 'not-allowed', fontFamily: MONO }}>
+                          Prüfen →
+                        </button>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {task.options.map((opt, i) => (
+                          <button
+                            key={i}
+                            onClick={() => checkAnswer(i)}
+                            style={{ padding: '0.75rem 1rem', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: '8px', color: C.text, fontSize: '0.88rem', cursor: 'pointer', textAlign: 'left' as const, fontFamily: MONO }}
+                            onMouseEnter={e => (e.currentTarget.style.borderColor = C.accent)}
+                            onMouseLeave={e => (e.currentTarget.style.borderColor = C.border)}>
+                            <span style={{ color: C.textFaint, marginRight: '0.75rem', fontWeight: 700 }}>{['A','B','C','D'][i]}</span>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.65rem', color: C.textFaint, textAlign: 'center', marginTop: '0.6rem', fontFamily: MONO }}>
+                      {task.points} Punkte{streak >= 2 ? ` · Serie-Bonus: ${Math.floor(task.points * 1.5)}` : ''}
+                    </div>
+                  </>
+                )}
+
+                {result !== null && task.kind === 'quiz' && selectedOption !== null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
+                    {task.options.map((opt, i) => {
+                      const isCorrect  = i === task.correct
+                      const isSelected = i === selectedOption
+                      const bg2  = isCorrect ? C.greenLight  : isSelected ? C.redLight   : C.bgAlt
+                      const bord = isCorrect ? '#a0dcb8'     : isSelected ? '#f0a0a0'    : C.border
+                      const col  = isCorrect ? C.green       : isSelected ? C.red        : C.textMuted
+                      return (
+                        <div key={i} style={{ padding: '0.65rem 1rem', background: bg2, border: `1.5px solid ${bord}`, borderRadius: '8px', fontSize: '0.85rem', color: col, fontFamily: MONO }}>
+                          <span style={{ marginRight: '0.75rem', fontWeight: 700 }}>{isCorrect ? '✓' : isSelected ? '✗' : ['A','B','C','D'][i]}</span>
+                          {opt}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {result === 'correct' && (
+                  <div style={{ background: C.greenLight, border: '1px solid #a0dcb8', borderRadius: '8px', padding: '0.85rem 1.1rem' }}>
+                    <div style={{ color: C.green, fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.4rem', fontFamily: MONO }}>
+                      Richtig! {earned != null && <span style={{ color: C.gold }}>+{earned} Punkte</span>}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: C.text, lineHeight: 1.65 }}>{task.explanation}</div>
+                  </div>
+                )}
+                {result === 'wrong' && (
+                  <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: '8px', padding: '0.85rem 1.1rem' }}>
+                    <div style={{ color: C.red, fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.4rem', fontFamily: MONO }}>Nicht ganz.</div>
+                    <div style={{ fontSize: '0.82rem', color: C.text, lineHeight: 1.65 }}>{task.explanation}</div>
+                  </div>
+                )}
+
+                {result !== null && (
+                  <button
+                    onClick={generateTask}
+                    style={{ width: '100%', marginTop: '1rem', padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', fontFamily: MONO, fontWeight: 700 }}>
+                    Nächste Aufgabe →
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{ padding: '0.5rem 1.5rem', borderTop: `1px solid ${C.border}`, fontSize: '0.62rem', color: C.textFaint, fontFamily: MONO, background: C.bgAlt, flexShrink: 0 }}>
           Wissen wirkt dort, wo du eine Akademie gebaut hast · max. 10 Aufgaben/Stunde
         </div>
       </div>
