@@ -1,6 +1,6 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 18:35
+// Aktualisiert: 21.06.2026 18:45
 // Version:      0.5.0
 //
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
@@ -205,13 +205,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
   }
 
-  const { data: ship } = await serviceClient
-    .from('ships')
-    .select('id, location, cargo_max, ship_type_id')
-    .eq('profile_id', user.id)
-    .order('id')
-    .limit(1)
+  // Aktives Schiff für buy/sell via active_ship_id
+  const { data: profileActive } = await serviceClient
+    .from('profiles')
+    .select('active_ship_id')
+    .eq('id', user.id)
     .single()
+  const { data: ship } = profileActive?.active_ship_id
+    ? await serviceClient
+        .from('ships')
+        .select('id, location, cargo_max, ship_type_id')
+        .eq('id', profileActive.active_ship_id)
+        .single()
+    : await serviceClient
+        .from('ships')
+        .select('id, location, cargo_max, ship_type_id')
+        .eq('profile_id', user.id)
+        .order('id')
+        .limit(1)
+        .single()
 
   if (!ship) {
     return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
