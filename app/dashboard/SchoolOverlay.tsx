@@ -107,18 +107,14 @@ Themen: Ressourcen, Handel, Navigation, Bevölkerung, Energie.
 Antworte NUR mit JSON (kein Markdown):
 {"kind":"calc","question":"[1-3 Sätze]","answer":[Zahl],"explanation":"[1 Satz]","points":[10-25],"topic":"[Thema]"}`
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/game/school', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }],
-        }),
+        body: JSON.stringify({ prompt }),
       })
       const data = await response.json()
-      const text = data.content?.[0]?.text ?? ''
-      setTask(JSON.parse(text.replace(/```json|```/g, '').trim()))
+      if (!response.ok || !data.task) throw new Error(data.error ?? 'Fehler')
+      setTask(data.task)
     } catch {
       // Fallback: statische Fragen (kein Kolonie-Kontext nötig)
       const fallbacks: Task[] = [
