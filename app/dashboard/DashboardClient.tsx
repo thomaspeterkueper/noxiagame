@@ -1,6 +1,6 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 21:03 — Werft+Warenhaus via Grid, MiniGrid entfernt
+// Aktualisiert: 21.06.2026 20:55
 // Version:      0.8.0
 //
 // v0.5.0: Übersichts-Tab ortszentriert umgebaut (Schicht 1 des Dashboard-
@@ -294,8 +294,6 @@ export default function DashboardClient({
         }}
       />
 
-      )}
-
       {/* ── TOPBAR ─────────────────────────────────────────────────────────── */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2.5rem', height: '66px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.4rem', margin: 0 }}>
@@ -499,7 +497,7 @@ export default function DashboardClient({
                       locationResources={currentLocationData.location_resources ?? []}
                       credits={credits}
                       allLocations={locations.filter((l: any) => l.slug !== location)}
-                      cargo={cargo}
+                      cargo={cargo as unknown as Record<string, number>}
                       shipRange={shipRange}
                       currentTick={stats?.tickNumber ?? 0}
                       inTransit={inTransit}
