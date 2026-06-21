@@ -10,7 +10,7 @@
 // v0.3.0: buy/sell mit Mengen-Parameter (Cargo-Loop-Fix).
 
 import { create } from 'zustand'
-import { baseTravelSeconds } from '@/lib/game/ships'
+import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
 
 export type ResourceType = 'water' | 'energy' | 'metal'
 export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus'
@@ -261,24 +261,57 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   travel: async (dest, atTick = 0) => {
-    const { location, inTransit, speedMult } = get()
+    const { location, inTransit, speedMult, cargo } = get()
     if (inTransit) return
     if (location === dest) return
+
+    // Energie-Check VOR dem Flug (server macht dasselbe — Client-Check verhindert
+    // den optimistischen Transit-State wenn Energie fehlt)
+    const energyNeeded = flightEnergyCost(location, dest)
+    if (cargo.energy < energyNeeded) {
+      console.warn(`Nicht genug Energie: braucht ${energyNeeded}t, an Bord ${cargo.energy}t`)
+      return
+    }
 
     const baseDuration = baseTravelSeconds(location, dest, atTick) ?? 20
     const duration = Math.round(baseDuration * speedMult)
 
-    set({
+    // Optimistisch: Energie abziehen + Transit starten
+    set(s => ({
       inTransit:    true,
       transitFrom:  location,
       transitTo:    dest,
       transitTotal: duration,
       transitLeft:  duration,
-    })
+      cargo:        { ...s.cargo, energy: s.cargo.energy - energyNeeded },
+    }))
 
     try {
-      await tradeRequest({ action: 'travel', resource: dest, amount: 0, price: 0, location: dest })
+      const data = await tradeRequest({ action: 'travel', resource: dest, amount: 0, price: 0, location: dest })
+      if (!data.ok) {
+        // Server hat abgelehnt → Rollback
+        set(s => ({
+          inTransit:   false,
+          transitFrom: null,
+          transitTo:   null,
+          transitTotal: 0,
+          transitLeft:  0,
+          cargo:       { ...s.cargo, energy: s.cargo.energy + energyNeeded },
+        }))
+        console.error('travel server error:', data.error)
+      }
+      // Bei Erfolg: Server-State holen (echte Energie nach Abzug)
+      // Volle Synchronisation beim nächsten fetchGameState-Aufruf
     } catch (err) {
+      // Netzwerkfehler → Rollback
+      set(s => ({
+        inTransit:   false,
+        transitFrom: null,
+        transitTo:   null,
+        transitTotal: 0,
+        transitLeft:  0,
+        cargo:       { ...s.cargo, energy: s.cargo.energy + energyNeeded },
+      }))
       console.error('travel error:', err)
     }
   },
