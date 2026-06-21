@@ -19,11 +19,10 @@
 import { useEffect, useState } from 'react'
 import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
-type LocationSlug = 'moon' | 'mars' | 'phobos'
 type ShipType = 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'
 
 interface ShipHeaderProps {
-  location: LocationSlug
+  location: string
   locationName: string
   locationDesc: string
   shipType?: ShipType
@@ -31,12 +30,9 @@ interface ShipHeaderProps {
   inTransit?: boolean
 }
 
-const LOCATION_CONFIG: Record<LocationSlug, {
-  color: string
-  glow: string
-  planet: string
-  dot: string
-}> = {
+type LocCfg = { color: string; glow: string; planet: string; dot: string }
+
+const LOCATION_CONFIG: Record<string, LocCfg> = {
   moon: {
     color: '#b8b0a2',
     glow: 'rgba(184,176,162,0.15)',
@@ -55,12 +51,29 @@ const LOCATION_CONFIG: Record<LocationSlug, {
     planet: 'radial-gradient(circle at 35% 35%, #8a8278 0%, #5a5248 50%, #2a2820 100%)',
     dot: '#9a9288',
   },
+  earth: {
+    color: '#3a7abf',
+    glow: 'rgba(58,122,191,0.2)',
+    planet: 'radial-gradient(circle at 35% 35%, #5a9adf 0%, #2a5a9f 50%, #0a1a4f 100%)',
+    dot: '#3a7abf',
+  },
+  prometheus: {
+    color: '#c9a961',
+    glow: 'rgba(201,169,97,0.2)',
+    planet: 'radial-gradient(circle at 35% 35%, #e0c070 0%, #a07830 50%, #503800 100%)',
+    dot: '#c9a961',
+  },
 }
+const DEFAULT_LOC_CFG: LocCfg = {
+  color: '#8a8278', glow: 'rgba(138,130,120,0.15)',
+  planet: 'radial-gradient(circle at 35% 35%, #8a8278 0%, #5a5248 50%, #2a2820 100%)',
+  dot: '#9a9288',
+}
+function locCfg(slug: string): LocCfg { return LOCATION_CONFIG[slug] ?? DEFAULT_LOC_CFG }
 
-const LOCATION_LABELS: Record<LocationSlug, string> = {
-  moon: '⬡ Mond',
-  mars: '● Mars',
-  phobos: '□ Phobos',
+const LOCATION_LABELS: Record<string, string> = {
+  moon: '⬡ Mond', mars: '● Mars', phobos: '□ Phobos',
+  earth: '🌍 Erde', prometheus: '🛸 Prometheus',
 }
 
 const SHIP_LABELS: Record<ShipType, string> = {
@@ -77,7 +90,7 @@ export default function ShipHeader({
   credits,
   inTransit = false,
 }: ShipHeaderProps) {
-  const cfg = LOCATION_CONFIG[location]
+  const cfg = locCfg(location)
   const [glowScale, setGlowScale] = useState(1)
   const [shipX, setShipX] = useState(-200)
 
