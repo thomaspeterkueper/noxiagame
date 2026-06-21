@@ -125,11 +125,14 @@ export async function GET(req: NextRequest) {
 
     const energyOnBoard = Number(energyCargo?.amount ?? 0)
 
+    console.log(`travel: ${travelShip.location} → ${dest}, energyNeeded=${energyNeeded}, onBoard=${energyOnBoard}`)
+
     if (energyOnBoard < energyNeeded) {
       return NextResponse.json({
         error: `Nicht genug Energie. Benötigt: ${energyNeeded}t, an Bord: ${energyOnBoard}t`,
         energyNeeded,
         energyOnBoard,
+        shipLocation: travelShip.location,
       }, { status: 400 })
     }
 
