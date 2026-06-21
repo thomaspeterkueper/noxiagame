@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
 // Aktualisiert: 21.06.2026 — Hintergrundbild je Location (ACADEMY_BG), Breite 560px
-// Version:      3.2.0
+// Version:      3.3.0
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
