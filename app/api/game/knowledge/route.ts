@@ -1,9 +1,7 @@
 // app/api/game/knowledge/route.ts
-// Erstellt: 20.06.2026
-//
-// GET /api/game/knowledge              → knowledge_points des Spielers
-// GET /api/game/knowledge?action=award&points=15&reason=school_task&location=moon
-//                                      → Punkte gutschreiben
+// Erstellt:     20.06.2026
+// Aktualisiert: 21.06.2026 — daily task + level info
+// Version:      2.0.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -16,6 +14,20 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 
+// Stufen-Definition (spiegelt Migration 020)
+const LEVELS = [
+  { level: 1, title: 'Lehrling',        min: 0,     max: 99,    color: '#7c8590' },
+  { level: 2, title: 'Händler',         min: 100,   max: 499,   color: '#c9a961' },
+  { level: 3, title: 'Navigator',       min: 500,   max: 1999,  color: '#2f86c9' },
+  { level: 4, title: 'Ingenieur',       min: 2000,  max: 4999,  color: '#6fcf97' },
+  { level: 5, title: 'Wissenschaftler', min: 5000,  max: 9999,  color: '#b48ce8' },
+  { level: 6, title: 'Pionier',         min: 10000, max: null,  color: '#e8702a' },
+]
+
+function getLevel(points: number) {
+  return LEVELS.find(l => points >= l.min && (l.max === null || points <= l.max)) ?? LEVELS[0]
+}
+
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -24,50 +36,107 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action')
 
-  // ── Punkte lesen ─────────────────────────────────────────────────
+  // ── Punkte + Level + Daily-Status laden ───────────────────────────────────
   if (!action) {
-    const { data } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('knowledge_points')
       .eq('id', user.id)
       .single()
 
-    return NextResponse.json({ knowledge_points: data?.knowledge_points ?? 0 })
+    const points = profile?.knowledge_points ?? 0
+    const level  = getLevel(points)
+    const next   = LEVELS.find(l => l.level === level.level + 1) ?? null
+
+    // Tagesaufgabe Status
+    const today = new Date().toISOString().split('T')[0]
+    const { data: daily } = await supabase
+      .from('daily_tasks')
+      .select('completed, points_earned')
+      .eq('profile_id', user.id)
+      .eq('task_date', today)
+      .maybeSingle()
+
+    return NextResponse.json({
+      knowledge_points: points,
+      level: {
+        ...level,
+        pointsToNext: next ? next.min - points : null,
+        progress: next
+          ? Math.round(((points - level.min) / (next.min - level.min)) * 100)
+          : 100,
+      },
+      daily: {
+        completed:    daily?.completed ?? false,
+        pointsEarned: daily?.points_earned ?? null,
+        available:    !daily?.completed,
+      },
+    })
   }
 
-  // ── Punkte vergeben ───────────────────────────────────────────────
+  // ── Punkte vergeben ───────────────────────────────────────────────────────
   if (action === 'award') {
     const points   = parseInt(searchParams.get('points') ?? '0', 10)
     const reason   = searchParams.get('reason') ?? 'school_task'
-    const location = searchParams.get('location') ?? null
+    const isDaily  = searchParams.get('daily') === 'true'
 
-    if (points <= 0 || points > 100) {
+    if (points <= 0 || points > 200) {
       return NextResponse.json({ error: 'Ungültige Punktzahl' }, { status: 400 })
     }
 
-    // Rate-Limit: max 10 Aufgaben pro Stunde pro Spieler
-    const { count } = await supabase
-      .from('knowledge_transactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('profile_id', user.id)
-      .eq('reason', 'school_task')
-      .gte('created_at', new Date(Date.now() - 3600_000).toISOString())
+    // Rate-Limit: max 10 normale Aufgaben/Stunde
+    if (!isDaily) {
+      const { count } = await supabase
+        .from('knowledge_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', user.id)
+        .eq('reason', 'school_task')
+        .gte('created_at', new Date(Date.now() - 3600_000).toISOString())
 
-    if ((count ?? 0) >= 10) {
-      return NextResponse.json({
-        error: 'Stundenlimit erreicht — komm später wieder.',
-        knowledge_points: null,
-      }, { status: 429 })
+      if ((count ?? 0) >= 10) {
+        return NextResponse.json({
+          error: 'Stundenlimit erreicht — komm später wieder.',
+        }, { status: 429 })
+      }
     }
 
-    const { data } = await supabase.rpc('award_knowledge', {
+    // Tagesaufgabe: prüfen ob heute schon erledigt
+    if (isDaily) {
+      const today = new Date().toISOString().split('T')[0]
+      const { data: existing } = await supabase
+        .from('daily_tasks')
+        .select('completed')
+        .eq('profile_id', user.id)
+        .eq('task_date', today)
+        .maybeSingle()
+
+      if (existing?.completed) {
+        return NextResponse.json({ error: 'Tagesaufgabe bereits erledigt.' }, { status: 400 })
+      }
+
+      // Tagesaufgabe als erledigt markieren
+      await supabase.from('daily_tasks').upsert({
+        profile_id:    user.id,
+        task_date:     today,
+        completed:     true,
+        points_earned: points,
+      }, { onConflict: 'profile_id,task_date' })
+    }
+
+    const { data: newTotal } = await supabase.rpc('award_knowledge', {
       p_profile_id: user.id,
       p_amount:     points,
       p_reason:     reason,
-      p_task_id:    location,
+      p_task_id:    null,
     })
 
-    return NextResponse.json({ knowledge_points: data ?? 0, awarded: points })
+    const level = getLevel(newTotal ?? 0)
+
+    return NextResponse.json({
+      knowledge_points: newTotal ?? 0,
+      awarded: points,
+      level,
+    })
   }
 
   return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
