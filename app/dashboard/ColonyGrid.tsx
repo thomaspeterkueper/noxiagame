@@ -228,6 +228,7 @@ export default function ColonyGrid({
   const [showBuildPopup, setShowBuildPopup] = useState(false)
   const [showAdmin, setShowAdmin]           = useState(false)
   const [showSchool, setShowSchool]         = useState(false)
+  const [showLanding, setShowLanding]       = useState(false)
   const [buildHover, setBuildHover]         = useState(false)
   const popPercent = Math.round((population / Math.max(1, populationMax)) * 100)
   const popColor = popPercent > 80
