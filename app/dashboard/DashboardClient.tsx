@@ -320,7 +320,7 @@ export default function DashboardClient({
                 locationId={currentLocationData?.id ?? ""}
                 locationResources={currentLocationData.location_resources ?? []}
                 credits={credits}
-                entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
+                entities={tileEntities.filter((e: any) => e.locations?.slug === (currentLocationData?.slug ?? location))}
                 onChanged={async () => { await loadFromServer(); invalidate('builds') }}
               />
             ) : (
@@ -539,7 +539,7 @@ export default function DashboardClient({
 
                 {/* Mini-Karte des aktuellen Orts — Klick öffnet volles Grid */}
                 {currentLocationData && (
-                  currentLocationData.location_type === 'station' ? (
+                  currentLocationData?.location_type === 'station' ? (
                     /* Station: Mini-Ring statt Kachelgrid */
                     <div
                       onClick={() => setGridOpen(true)}
