@@ -288,7 +288,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     try {
       const data = await tradeRequest({ action: 'travel', resource: dest, amount: 0, price: 0, location: dest })
-      if (!data.ok) {
+      if (data.error || !data.ok) {
         // Server hat abgelehnt → Rollback
         set(s => ({
           inTransit:   false,
@@ -299,9 +299,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           cargo:       { ...s.cargo, energy: s.cargo.energy + energyNeeded },
         }))
         console.error('travel server error:', data.error)
+        return
       }
-      // Bei Erfolg: Server-State holen (echte Energie nach Abzug)
-      // Volle Synchronisation beim nächsten fetchGameState-Aufruf
+      // Bei Erfolg: kein weiterer State-Update nötig — Transit läuft weiter.
+      // loadFromServer() wird nach Transit-Ende (location-change) aufgerufen.
+      // Server hat Energie korrekt abgezogen; optimistischer State ist korrekt.
     } catch (err) {
       // Netzwerkfehler → Rollback
       set(s => ({
