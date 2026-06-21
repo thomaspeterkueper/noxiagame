@@ -1,7 +1,7 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 19:00
-// Version:      0.5.0
+// Aktualisiert: 21.06.2026 19:50
+// Version:      0.5.1
 //
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
 //   ship_types und liefert speedMult + rangeDistance.
@@ -69,6 +69,8 @@ export async function GET(req: NextRequest) {
     const ship: any = (shipRows as any[])?.find((s: any) => s.is_active)
       ?? (shipRows as any[])?.[0]
       ?? null
+
+    console.log(`getTrades: user=${user.id} ships=${JSON.stringify((shipRows as any[])?.map((s:any)=>({id:s.id,loc:s.location,active:s.is_active})))} → ship=${ship?.id} loc=${ship?.location}`)
 
     const { data: cargo } = ship
       ? await serviceClient
