@@ -27,7 +27,10 @@ export default function BuyRow({ p, last, cargoFree, owned, costBasis, onBuy, on
   const [limit, setLimit] = useState(0)
 
   const stepBtn: React.CSSProperties = { width: '26px', height: '26px', borderRadius: '7px', border: `1px solid ${T.line}`, background: T.bg, color: T.blue, cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }
-  const cap = Math.max(1, cargoFree)
+  // cap: Kauf = freier Frachtraum, Verkauf = eigener Warenbestand
+  const cap = prep === 'sell'
+    ? Math.max(1, owned)
+    : Math.max(1, cargoFree)
   function setFromInput(raw: string) {
     const n = parseInt(raw.replace(/\D/g, ''), 10)
     if (Number.isNaN(n)) { setAmount(1); return }
