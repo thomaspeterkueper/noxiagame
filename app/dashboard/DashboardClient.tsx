@@ -29,6 +29,7 @@ import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel from './TransitPanel'
 import StatisticsTab from './StatisticsTab'
 import ColonyGrid from './ColonyGrid'
+import StationOverlay from './StationOverlay'
 import MiniMap from './MiniMap'
 import SolarSystem from './SolarSystem'
 import ColonyStats from './ColonyStats'
@@ -300,25 +301,40 @@ export default function DashboardClient({
                 Karte schließen ✕
               </button>
             </div>
-            <ColonyGrid
-              slug={currentLocationData.slug} name={currentLocationData.name}
-              population={currentLocationData.population} populationMax={currentLocationData.population_max}
-              isSupplied={currentLocationData.is_supplied}
-              userId={userId}
-              tax={colonyTax[currentLocationData.id]}
-              entityInfo={entityInfo}
-              locationResources={currentLocationData.location_resources ?? []}
-              credits={credits}
-              entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
-              pending={playerBuilds
-                .filter((b: any) => b.locations?.slug === currentLocationData.slug)
-                .map((b: any) => ({
-                  buildable_id: b.buildable_id,
-                  tile_row:     b.tile_row,
-                  tile_col:     b.tile_col,
-                  status:       b.status,
-                }))}
-            />
+            {currentLocationData.location_type === 'station' ? (
+              <StationOverlay
+                slug={currentLocationData.slug}
+                name={currentLocationData.name}
+                population={currentLocationData.population}
+                populationMax={currentLocationData.population_max}
+                userId={userId}
+                locationId={currentLocationData.id}
+                locationResources={currentLocationData.location_resources ?? []}
+                credits={credits}
+                entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
+                onChanged={async () => { await loadFromServer(); invalidate('builds') }}
+              />
+            ) : (
+              <ColonyGrid
+                slug={currentLocationData.slug} name={currentLocationData.name}
+                population={currentLocationData.population} populationMax={currentLocationData.population_max}
+                isSupplied={currentLocationData.is_supplied}
+                userId={userId}
+                tax={colonyTax[currentLocationData.id]}
+                entityInfo={entityInfo}
+                locationResources={currentLocationData.location_resources ?? []}
+                credits={credits}
+                entities={tileEntities.filter((e: any) => e.locations?.slug === currentLocationData.slug)}
+                pending={playerBuilds
+                  .filter((b: any) => b.locations?.slug === currentLocationData.slug)
+                  .map((b: any) => ({
+                    buildable_id: b.buildable_id,
+                    tile_row:     b.tile_row,
+                    tile_col:     b.tile_col,
+                    status:       b.status,
+                  }))}
+              />
+            )}
           </div>
         </div>
       )}
