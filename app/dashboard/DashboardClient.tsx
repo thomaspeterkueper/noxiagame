@@ -149,7 +149,7 @@ export default function DashboardClient({
     setAuctionOpen(true)
   }
 
-  async function handleTravel(dest: LocationSlug) { if (!inTransit) await travel(dest, stats?.tickNumber ?? 0) }
+  async function handleTravel(dest: string) { if (!inTransit) await travel(dest as any, stats?.tickNumber ?? 0) }
 
   async function handleLogout() {
     const { createClient } = await import('@/lib/supabase/client')
@@ -179,7 +179,7 @@ export default function DashboardClient({
   // Flugzeit zum Ziel — aus der EINEN Quelle (ships.baseTravelSeconds) statt
   // einer lokalen Kopie. Mit dem aktuellen Tick variiert sie orbital (25–50s).
   function flightTime(to: string): number | null {
-    return baseTravelSeconds(location, to as LocationSlug, stats?.tickNumber ?? 0)
+    return baseTravelSeconds(location as any, to as any, stats?.tickNumber ?? 0)
   }
 
   // Effektive Reichweite: heute = statische shipRange. Die Funktion trägt schon
@@ -233,7 +233,7 @@ export default function DashboardClient({
       <MarketAuction
         open={auctionOpen}
         onClose={() => setAuctionOpen(false)}
-        location={location as LocationSlug}
+        location={location as any}
         locationName={currentLocationData?.name ?? LOC_NAME[location]}
         rows={currentPrices.map((p: any) => ({
           resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price,
@@ -548,7 +548,7 @@ export default function DashboardClient({
                       const reachable = secs != null && secs <= reach
                       return (
                         <div key={loc.id}
-                          onClick={() => { if (reachable && !inTransit) handleTravel(loc.slug as LocationSlug) }}
+                          onClick={() => { if (reachable && !inTransit) handleTravel(loc.slug) }}
                           style={{
                             ...card, padding: '1rem 1.2rem',
                             borderLeft: `4px solid ${reachable ? (worst ? stateColor(worst.state, T) : T.green) : T.line}`,
