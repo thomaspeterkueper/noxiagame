@@ -98,6 +98,7 @@ export async function GET(req: NextRequest) {
   const resource = searchParams.get('resource') as string
   const amount = parseInt(searchParams.get('amount') ?? '1', 10)
   const location = searchParams.get('location') as string
+  const clientPrice = parseInt(searchParams.get('price') ?? '0', 10)
 
   // Travel — Energie aus Laderaum entnehmen (Treibstoff-Mechanik)
   if (action === 'travel') {
@@ -242,7 +243,9 @@ export async function GET(req: NextRequest) {
   let tax = 0
 
   if (action === 'buy') {
-    unitPrice = serverBuy
+    // Auktionspreis: Client sendet ausgehandelten Preis. Server prüft Plausibilität
+    // (clientPrice > 0 und ≤ serverBuy). Sonst Fallback auf serverBuy.
+    unitPrice = (clientPrice > 0 && clientPrice <= serverBuy) ? clientPrice : serverBuy
     const perTon       = unitPrice * (1 + taxRate)
     const maxByCargo   = Math.max(0, ship.cargo_max - cargoUsed)
     const maxByCredits = perTon > 0 ? Math.floor(profile.credits / perTon) : amount
@@ -259,7 +262,8 @@ export async function GET(req: NextRequest) {
     newCargoAmount += booked
     profit = -(goods + tax)
   } else {
-    unitPrice = serverSell
+    // Auktionspreis: Client sendet ausgehandelten Preis. Server prüft (≥ serverSell).
+    unitPrice = (clientPrice > 0 && clientPrice >= serverSell) ? clientPrice : serverSell
     booked = Math.min(amount, newCargoAmount)
 
     if (booked <= 0) {
