@@ -145,7 +145,7 @@ export default function MiniMap({
                 {entityId && (
                   <BuildingSVG
                     entityId={entityId}
-                    planet={slug as 'moon' | 'mars' | 'phobos'}
+                    planet={slug}
                     occupancy={0.6}
                     owned={false}
                     size={28}
