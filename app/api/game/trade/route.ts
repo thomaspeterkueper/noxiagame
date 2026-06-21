@@ -1,7 +1,7 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 20:35
-// Version:      0.5.2
+// Aktualisiert: 21.06.2026 20:40
+// Version:      0.5.3
 //
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
 //   ship_types und liefert speedMult + rangeDistance.
@@ -61,16 +61,25 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Aktives Schiff via is_active flag — kein profiles-Zugriff nötig
-    const { data: shipRows, error: shipErr } = await serviceClient
+    // Aktives Schiff — ship_types separat (kein FK-Join da Beziehung nicht im Cache)
+    const { data: shipRows } = await serviceClient
       .from('ships')
-      .select('id, location, cargo_max, ship_type_id, is_active, ship_types(speed_mult, range_distance)')
+      .select('id, location, cargo_max, ship_type_id, is_active')
       .eq('profile_id', user.id)
     const ship: any = (shipRows as any[])?.find((s: any) => s.is_active)
       ?? (shipRows as any[])?.[0]
       ?? null
 
-    console.log(`getTrades: user=${user.id} shipErr=${JSON.stringify(shipErr)} ships=${JSON.stringify((shipRows as any[])?.map((s:any)=>({id:s.id,loc:s.location,active:s.is_active})))} → ship=${ship?.id} loc=${ship?.location}`)
+    // ship_types separat laden
+    const { data: shipType } = ship?.ship_type_id
+      ? await serviceClient
+          .from('ship_types')
+          .select('speed_mult, range_distance')
+          .eq('id', ship.ship_type_id)
+          .single()
+      : { data: null }
+
+    console.log(`getTrades v0.5.3: user=${user.id} ship=${ship?.id} loc=${ship?.location} active=${ship?.is_active}`)
 
     const { data: cargo } = ship
       ? await serviceClient
@@ -82,10 +91,7 @@ export async function GET(req: NextRequest) {
     const cargoMap: Record<string, number> = { water: 0, energy: 0, metal: 0 }
     for (const c of cargo ?? []) cargoMap[c.resource] = c.amount
 
-    // ship_types kommt als verschachteltes Objekt (oder Array, je nach Join).
-    const st: any = Array.isArray((ship as any)?.ship_types)
-      ? (ship as any)?.ship_types?.[0]
-      : (ship as any)?.ship_types
+    const st: any = shipType
 
     return NextResponse.json({
       credits: profile?.credits ?? 5000,
@@ -108,10 +114,10 @@ export async function GET(req: NextRequest) {
   if (action === 'travel') {
     const dest = resource  // resource-Parameter = Zielort beim Travel
 
-    // Aktives Schiff für Travel via is_active
+    // Aktives Schiff für Travel
     const { data: shipRowsT } = await serviceClient
       .from('ships')
-      .select('id, location, cargo_max, is_active')
+      .select('id, location, cargo_max, ship_type_id, is_active')
       .eq('profile_id', user.id)
     const travelShip: any = (shipRowsT as any[])?.find((s: any) => s.is_active)
       ?? (shipRowsT as any[])?.[0]
