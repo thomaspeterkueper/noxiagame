@@ -1,7 +1,7 @@
 // app/api/game/school/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 21.06.2026 21:20 — Prompt-Fix: Energie ≠ Wasser
-// Version:      2.3.0
+// Aktualisiert: 21.06.2026 21:45 — Selbstprüfung Rechenergebnis
+// Version:      2.5.0
 //
 // Prompt Caching: statischer System-Prompt (Spielregeln, JSON-Format) wird
 // gecacht. Nur der variable Teil (Kolonie-Kontext, Schwierigkeit, Seed)
@@ -24,9 +24,8 @@ const SYSTEM_PROMPT = `Du bist Aufgabengenerator für das Weltraum-Handelsspiel 
 SPIELKONTEXT:
 - Spieler handeln Ressourcen (Wasser, Energie, Metall) zwischen Stationen im Sonnensystem
 - Stationen: Erde (Startpunkt, günstig), Mond (Metall-Produzent), Mars (Wasser-Defizit), Phobos (Konsument)
-- Frachter fasst max. 100 Tonnen Nutzlast (Wasser + Energie + Metall sind separate Ressourcen)
+- Frachter fasst max. 100 Tonnen Nutzlast
 - Flüge kosten Energie aus dem Laderaum (Erde→Mond: 20t, Mond→Mars: 12t, Mars→Phobos: 4t)
-- KRITISCH: Energie-Verbrauch beim Flug reduziert NUR die Energie an Bord, NIEMALS Wasser oder Metall. Wasser bleibt beim Flug völlig unverändert. Erstelle KEINE Aufgaben die Energie und Wasser verwechseln oder subtrahieren.
 - Beispielpreise: Wasser Mond 130/95 Cr, Mars 200/155 Cr · Metall Mond 35/25 Cr, Mars 75/58 Cr
 
 AUFGABEN-REGELN:
@@ -36,6 +35,7 @@ AUFGABEN-REGELN:
 - Keine Algebra, Gleichungen, Wurzeln oder Potenzen
 
 JSON-FORMAT für Rechenaufgabe:
+WICHTIG: Rechne das Ergebnis selbst nach bevor du antwortest!
 {"kind":"calc","question":"[1-3 Sätze Deutsch]","answer":[ganze Zahl],"explanation":"[1 Satz Lösung]","points":[10-25],"topic":"[Ressourcen|Handel|Navigation|Bevölkerung|Energie]"}
 
 JSON-FORMAT für Wissensfrage:
@@ -50,15 +50,20 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: 'API-Key fehlt' }, { status: 500 })
 
     const difficulty = DIFFICULTY[Math.min(6, Math.max(1, level))] ?? DIFFICULTY[1]
-    const doQuiz     = Math.random() < 0.45
+    const doQuiz     = Math.random() < 0.60  // 60% Wissensfragen, 40% Rechenaufgaben
     const dailyHint  = isDaily ? '\nDies ist die TAGESAUFGABE — besonders interessant.' : ''
     const seedHint   = seed ? `\nZufalls-ID: ${seed} (andere Aufgabe als letzte generieren)` : ''
 
     // Varibler User-Prompt (nicht gecacht)
     const userPrompt = doQuiz
-      ? `Erstelle eine Wissensfrage über Sonnensystem, Physik oder Spielmechaniken.
-Schwierigkeit: ${difficulty}.
-Wähle ein Thema: Sonnensystem, Physik, Ressourcen, Navigation.${dailyHint}${seedHint}`
+      ? `Erstelle eine abwechslungsreiche Wissensfrage. Wähle ZUFÄLLIG eines dieser Themen:
+- Sonnensystem: Planeten, Monde, Abstände, Orbits, Gravitationsfelder
+- Physik: Escape-Velocity, Treibstoffverbrauch, Trägheit, Strahlung im Weltall
+- Geschichte: Raumfahrtmeilensteine, Missionen, Astronauten, Raumstationen
+- Biologie: Leben im Weltall, Strahlung, Knochenschwund, Psychologie
+- Wirtschaft: Handelsrouten, Arbitrage, Angebot/Nachfrage, Preisentstehung
+- Navigation: Lagrange-Punkte, Hohmann-Transfer, Rendezvous, Docking
+Schwierigkeit: ${difficulty}. Frage soll überraschend und lehrreich sein.${dailyHint}${seedHint}`
       : `Erstelle eine Rechenaufgabe. Schwierigkeit: ${difficulty}.
 Kolonie-Kontext (verwende diese Zahlen, zeige sie nicht als Label):
 Station: ${colonyContext?.locationName ?? 'unbekannt'} · Bevölkerung: ${colonyContext?.population ?? 0}
