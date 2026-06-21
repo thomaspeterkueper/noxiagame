@@ -1,7 +1,7 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 19:50
-// Version:      0.5.1
+// Aktualisiert: 21.06.2026 20:35
+// Version:      0.5.2
 //
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
 //   ship_types und liefert speedMult + rangeDistance.
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       .single()
 
     // Aktives Schiff via is_active flag — kein profiles-Zugriff nötig
-    const { data: shipRows } = await serviceClient
+    const { data: shipRows, error: shipErr } = await serviceClient
       .from('ships')
       .select('id, location, cargo_max, ship_type_id, is_active, ship_types(speed_mult, range_distance)')
       .eq('profile_id', user.id)
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       ?? (shipRows as any[])?.[0]
       ?? null
 
-    console.log(`getTrades: user=${user.id} ships=${JSON.stringify((shipRows as any[])?.map((s:any)=>({id:s.id,loc:s.location,active:s.is_active})))} → ship=${ship?.id} loc=${ship?.location}`)
+    console.log(`getTrades: user=${user.id} shipErr=${JSON.stringify(shipErr)} ships=${JSON.stringify((shipRows as any[])?.map((s:any)=>({id:s.id,loc:s.location,active:s.is_active})))} → ship=${ship?.id} loc=${ship?.location}`)
 
     const { data: cargo } = ship
       ? await serviceClient
