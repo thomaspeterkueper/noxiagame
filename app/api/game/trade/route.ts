@@ -1,6 +1,6 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 18:30
+// Aktualisiert: 21.06.2026 18:35
 // Version:      0.5.0
 //
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
@@ -61,16 +61,26 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // ship_types gejoint: liefert speed_mult + range_distance mit.
-    // Bei mehreren Schiffen: das am aktuellen Standort nehmen (via location-Param).
-    const locationFilter = searchParams.get('location')
-    let shipQueryBuilder = serviceClient
-      .from('ships')
-      .select('id, location, cargo_max, ship_type_id, ship_types(speed_mult, range_distance)')
-      .eq('profile_id', user.id)
-    if (locationFilter) shipQueryBuilder = shipQueryBuilder.eq('location', locationFilter) as any
-    const { data: shipRows } = await shipQueryBuilder
-    const ship = (shipRows as any[])?.[0] ?? null
+    // Aktives Schiff via profiles.active_ship_id — eindeutig, kein Multi-Schiff-Problem.
+    const { data: profileForShip } = await serviceClient
+      .from('profiles')
+      .select('active_ship_id')
+      .eq('id', user.id)
+      .single()
+    const activeShipId = profileForShip?.active_ship_id
+    const { data: ship } = activeShipId
+      ? await serviceClient
+          .from('ships')
+          .select('id, location, cargo_max, ship_type_id, ship_types(speed_mult, range_distance)')
+          .eq('id', activeShipId)
+          .single()
+      : await serviceClient
+          .from('ships')
+          .select('id, location, cargo_max, ship_type_id, ship_types(speed_mult, range_distance)')
+          .eq('profile_id', user.id)
+          .order('id')
+          .limit(1)
+          .single()
 
     const { data: cargo } = ship
       ? await serviceClient
@@ -108,18 +118,26 @@ export async function GET(req: NextRequest) {
   if (action === 'travel') {
     const dest = resource  // resource-Parameter = Zielort beim Travel
 
-    // Schiff + aktueller Standort
-    // Bei mehreren Schiffen: das am Abflugort nehmen.
-    // Client sendet location=Abflugort explizit mit.
-    const fromLocation = searchParams.get('location') ?? dest
-    const { data: allShips } = await serviceClient
-      .from('ships')
-      .select('id, location, cargo_max')
-      .eq('profile_id', user.id)
-    // Erst: Schiff am Abflugort. Fallback: irgendein Schiff.
-    const travelShip = (allShips as any[])?.find((s: any) => s.location === fromLocation)
-      ?? (allShips as any[])?.[0]
-      ?? null
+    // Aktives Schiff für Travel
+    const { data: profileForTravel } = await serviceClient
+      .from('profiles')
+      .select('active_ship_id')
+      .eq('id', user.id)
+      .single()
+    const activeShipIdTravel = profileForTravel?.active_ship_id
+    const { data: travelShip } = activeShipIdTravel
+      ? await serviceClient
+          .from('ships')
+          .select('id, location, cargo_max')
+          .eq('id', activeShipIdTravel)
+          .single()
+      : await serviceClient
+          .from('ships')
+          .select('id, location, cargo_max')
+          .eq('profile_id', user.id)
+          .order('id')
+          .limit(1)
+          .single()
 
     if (!travelShip) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
 
@@ -191,6 +209,8 @@ export async function GET(req: NextRequest) {
     .from('ships')
     .select('id, location, cargo_max, ship_type_id')
     .eq('profile_id', user.id)
+    .order('id')
+    .limit(1)
     .single()
 
   if (!ship) {
