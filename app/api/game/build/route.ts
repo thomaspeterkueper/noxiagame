@@ -101,12 +101,14 @@ export async function GET(req: NextRequest) {
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .eq('profile_id', user.id)
+      .in('entity_type', ['building', 'module'])  // building + eigene module
 
     const { data: stateEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .is('profile_id', null)
       .eq('is_state_owned', true)
+      .eq('entity_type', 'building')   // Stationsmodule (entity_type='module') ausschließen
 
     // NPC-Gebäude: actor_id gesetzt, mit display_name als username
     const { data: npcEntities } = await serviceClient
