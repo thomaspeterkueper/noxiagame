@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react'
 import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
-type LocationSlug = 'moon' | 'mars' | 'phobos'
+type LocationSlug = string
 type ShipType = 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'
 
 interface ShipyardCardProps {
