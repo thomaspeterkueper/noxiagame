@@ -9,7 +9,7 @@
 
 // ─── Gemeinsame Grundtypen ────────────────────────────────────────────────
 export type ResourceType = 'water' | 'energy' | 'metal'
-export type LocationSlug  = 'moon' | 'mars' | 'phobos'
+export type LocationSlug  = string
 
 export type EntityType = 'building' | 'vehicle' | 'specialist' | 'ship'
 export type BuildableId = 'mine' | 'solar' | 'habitat'
