@@ -1,8 +1,10 @@
-'use client'
 // app/dashboard/SchoolOverlay.tsx
-// Version: 3.0.0 — Zwei Aufgabentypen: Rechnen + Wissensfragen (Multiple Choice)
+// Erstellt:     15.06.2026
+// Aktualisiert: 20.06.2026 — Handbuch-Tab (Betriebsanweisung) hinzugefügt
+// Version: 3.1.0 — Zwei Tabs: Akademie (Aufgaben) + Handbuch (Betriebsanweisung)
+'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 
 interface ColonyContext {
   locationName: string
@@ -50,6 +52,48 @@ const TOPIC_COLOR: Record<string, string> = {
   'Physik':       '#3fb0c9',
 }
 
+const MONO = "'Courier Prime', monospace"
+
+// ── Handbuch-Inhalt ──────────────────────────────────────────────────────────
+
+const MANUAL_SECTIONS = [
+  { id: 'ziel',       icon: '🌌', title: 'Dein Ziel',             content: `Du bist Pilot und Händler im Sonnensystem des Jahres 2100. Kolonien auf Mond, Mars und Phobos brauchen Wasser, Energie und Metall — und du lieferst sie. Kaufe günstig, verkaufe teuer, baue Gebäude, wachse.\n\nDie Kernfrage: Kann diese Kolonie in einer Woche sagen, dass sie nur existiert, weil du sie versorgt hast?` },
+  { id: 'handel',     icon: '⚖️', title: 'Handel & Auktion',      content: `Jeder Kauf und Verkauf läuft als Live-Auktion. Du bietest gegen NPC-Händler.\n\nBeim Kauf: Du und andere Händler bieten auf einen Verkäufer. Setze dein Maximalgebot — wer den Verkäufer zuerst erreicht, bekommt die Ware.\n\nBeim Verkauf: Du bist der Verkäufer. Setze deinen Mindestpreis. NPC-Käufer steigen von unten auf.\n\nPreise reagieren auf Angebot und Nachfrage: Knapper Stock → höhere Preise.` },
+  { id: 'fliegen',    icon: '🚀', title: 'Fliegen & Energie',     content: `Jeder Flug kostet Energie aus deinem Laderaum. Asymmetrisch: Erde → Mond kostet 20t (Erdgravitation), Mond → Erde nur 8t.\n\nPrometheus (L5) hat kein Gravitationsfeld — alle Flüge dorthin kosten nur 5t.\n\nOhne ausreichend Energie sind Reiseziele rot markiert und gesperrt.` },
+  { id: 'bauen',      icon: '🏗️', title: 'Bauen & Gebäude',       content: `Klicke auf eine freie Kachel im Koloniegrid um zu bauen. Gebäude wirken ab dem nächsten Tick.\n\nMine (+5 Metall/Tick) · Solarfeld (+4 Energie/Tick) · Habitat (+100 max. Bevölkerung)\nEisbohrung (+4 Wasser/Tick, nur Mond) · Wasserrecycler (+2 Wasser/Tick, nur Mars)\n\nGebäude können zum Ertragswert verkauft werden — nicht zum Kaufpreis. Stranded Assets kosten Geld.` },
+  { id: 'schiffe',    icon: '🛸', title: 'Schiffe & Werft',        content: `Du startest mit dem Frachter Mk.I (100t). Auf der Werft (Mond) kannst du aufrüsten:\n\nSchnellfrachter (60t, 1.7× schneller) — ideal für knappe Güter.\nSchwerfrachter (200t, 0.77× langsamer) — ideal für Massenlieferungen.\n\nKlicke auf das Werft-Gebäude im Grid.` },
+  { id: 'bev',        icon: '👥', title: 'Bevölkerung',            content: `Jede Kolonie braucht Wasser, Energie und Metall pro 100 Einwohner/Tick. Fällt der Stock auf null, schrumpft die Bevölkerung.\n\nDer \"Braucht Aufmerksamkeit\"-Panel zeigt Engpässe. Rote Einträge sind dringlich.` },
+  { id: 'klicken',   icon: '🖱️', title: 'Gebäude anklicken',     content: `🎓 Akademie → Aufgaben + dieses Handbuch\n🏛️ Verwaltung → Koloniedetails, Steuersätze\n⚓ Werft → Schiffe kaufen (nur Mond)\n⚙️ Eigene Gebäude → Bewertung + Verkauf\n\nStaatliche Gebäude (blauer Rand) können nicht verkauft werden.` },
+  { id: 'preise',     icon: '📈', title: 'Preise & Arbitrage',     content: `Klassische Route: Wasser auf Mond kaufen (günstig) → Mars verkaufen (teuer).\n\nDer Preis-Ticker läuft einmal täglich. \"2 Ticks Bauzeit\" = 2 Tage real.\n\nBeste Route wird dir im Dashboard angezeigt.` },
+]
+
+function ManualTab({ onClose }: { onClose: () => void }) {
+  const [open, setOpen] = React.useState<string | null>('ziel')
+  return (
+    <div style={{ padding: '1rem 1.25rem', overflowY: 'auto' as const, maxHeight: '60vh' }}>
+      <div style={{ fontSize: '0.6rem', color: '#3a5a7a', marginBottom: '0.75rem' }}>Tippe auf einen Abschnitt.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {MANUAL_SECTIONS.map(s => (
+          <div key={s.id} style={{ border: '1px solid #1a2a3a', borderRadius: '8px', overflow: 'hidden' }}>
+            <button onClick={() => setOpen(open === s.id ? null : s.id)} style={{ width: '100%', textAlign: 'left', background: open === s.id ? 'rgba(42,78,122,0.25)' : 'rgba(42,78,122,0.08)', border: 'none', padding: '0.6rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.6rem', color: open === s.id ? '#c9a961' : '#8ab0d0', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700 }}>
+              <span>{s.icon}</span>{s.title}
+              <span style={{ marginLeft: 'auto', color: '#3a5a7a', fontSize: '0.65rem' }}>{open === s.id ? '▲' : '▼'}</span>
+            </button>
+            {open === s.id && (
+              <div style={{ padding: '0.7rem 1rem 0.8rem', background: 'rgba(0,0,0,0.2)', fontSize: '0.76rem', lineHeight: 1.7, color: '#a0b8d0', whiteSpace: 'pre-line' as const, borderTop: '1px solid rgba(42,78,122,0.2)' }}>
+                {s.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
+        <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #2a4e7a', color: '#5a7a9a', padding: '0.45rem 1.25rem', borderRadius: '8px', fontSize: '0.73rem', cursor: 'pointer', fontFamily: MONO }}>Schließen</button>
+      </div>
+    </div>
+  )
+}
+
 export default function SchoolOverlay({
   locationSlug, colonyContext, onClose, onKnowledgeEarned
 }: SchoolOverlayProps) {
@@ -64,6 +108,7 @@ export default function SchoolOverlay({
   const inputRef = useRef<HTMLInputElement>(null)
   const [calcVal, setCalcVal] = useState('')
   const [showCalc, setShowCalc] = useState(false)
+  const [tab, setTab] = useState<'akademie' | 'handbuch'>('akademie')
 
   useEffect(() => { loadKnowledge(); generateTask() }, [])
   useEffect(() => {
@@ -176,8 +221,20 @@ Antworte NUR mit JSON (kein Markdown):
           </div>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: '1.5rem 1.25rem' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(42,78,122,0.3)', background: '#0a1520' }}>
+          {(['akademie', 'handbuch'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: '0.45rem 1rem', border: 'none', cursor: 'pointer', fontFamily: MONO, fontSize: '0.73rem', fontWeight: 700, background: tab === t ? 'rgba(42,78,122,0.4)' : 'transparent', color: tab === t ? '#c9a961' : '#5a7a9a', borderBottom: tab === t ? '2px solid #c9a961' : '2px solid transparent' }}>
+              {t === 'akademie' ? '📚 Akademie' : '📖 Handbuch'}
+            </button>
+          ))}
+        </div>
+
+        {/* Handbuch-Tab */}
+        {tab === 'handbuch' && <ManualTab onClose={onClose} />}
+
+        {/* Akademie-Body */}
+        {tab === 'akademie' && <div style={{ padding: '1.5rem 1.25rem' }}>
           {loading && (
             <div style={{ color: '#5a7a9a', textAlign: 'center', padding: '2.5rem', fontSize: '0.8rem' }}>
               <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏳</div>
@@ -272,7 +329,7 @@ Antworte NUR mit JSON (kein Markdown):
               )}
             </>
           )}
-        </div>
+        </div>}
 
         {/* Footer */}
         <div style={{ padding: '0.6rem 1.25rem', borderTop: '1px solid rgba(42,78,122,0.3)', fontSize: '0.58rem', color: '#2a4e7a', textAlign: 'center' }}>
