@@ -1,7 +1,7 @@
 // app/api/game/school/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 21.06.2026 — Prompt Caching für statischen System-Prompt
-// Version:      2.1.0
+// Aktualisiert: 21.06.2026 — temperature=1.0 für Aufgaben-Variation
+// Version:      2.2.0
 //
 // Prompt Caching: statischer System-Prompt (Spielregeln, JSON-Format) wird
 // gecacht. Nur der variable Teil (Kolonie-Kontext, Schwierigkeit, Seed)
