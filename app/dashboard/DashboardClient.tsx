@@ -245,9 +245,15 @@ export default function DashboardClient({
         initialQty={auctionConfig.qty}
         playerLimit={auctionConfig.limit}
         onTrade={async (resource, m, amount, price) => {
-          if (m === 'buy') await handleBuy(resource, price, amount)
-          else await handleSell(resource, price, amount)
-          return true
+          if (m === 'buy') {
+            const result = await buy(resource, price, amount)
+            showToast(result.msg, result.ok)
+            return result.ok
+          } else {
+            const result = await sell(resource, price, amount)
+            showToast(result.msg, result.ok)
+            return result.ok
+          }
         }}
       />
       <OrderNegotiation
