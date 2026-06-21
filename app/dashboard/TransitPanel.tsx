@@ -15,14 +15,16 @@ import { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
-const LOC_NAME:  Record<string, string> = { moon: 'Mond',       mars: 'Mars',  phobos: 'Phobos'  }
-const LOC_SUB:   Record<string, string> = { moon: 'Shackleton', mars: 'Tharsis Hub', phobos: 'Freihafen' }
-const LOC_ICON:  Record<string, string> = { moon: '⬡',          mars: '●',     phobos: '□'        }
-const LOC_COLOR: Record<string, string> = { moon: '#b8b0a2',    mars: '#d0784a', phobos: '#8a8278' }
+const LOC_NAME:  Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', prometheus: 'Prometheus' }
+const LOC_SUB:   Record<string, string> = { earth: 'LEO-Terminal', moon: 'Shackleton', mars: 'Tharsis Hub', phobos: 'Freihafen', prometheus: 'L5-Lagrange' }
+const LOC_ICON:  Record<string, string> = { earth: '🌍', moon: '⬡', mars: '●', phobos: '□', prometheus: '🛸' }
+const LOC_COLOR: Record<string, string> = { earth: '#3a7abf', moon: '#b8b0a2', mars: '#d0784a', phobos: '#8a8278', prometheus: '#c9a961' }
 const LOC_GLOW:  Record<string, string> = {
-  moon:   'radial-gradient(circle at 35% 35%, #d0c8bc 0%, #8a8278 55%, transparent 75%)',
-  mars:   'radial-gradient(circle at 35% 35%, #e08858 0%, #a04828 55%, transparent 75%)',
-  phobos: 'radial-gradient(circle at 35% 35%, #8a8278 0%, #4a4238 55%, transparent 75%)',
+  earth:      'radial-gradient(circle at 35% 35%, #5a9adf 0%, #2a5a9f 55%, transparent 75%)',
+  moon:       'radial-gradient(circle at 35% 35%, #d0c8bc 0%, #8a8278 55%, transparent 75%)',
+  mars:       'radial-gradient(circle at 35% 35%, #e08858 0%, #a04828 55%, transparent 75%)',
+  phobos:     'radial-gradient(circle at 35% 35%, #8a8278 0%, #4a4238 55%, transparent 75%)',
+  prometheus: 'radial-gradient(circle at 35% 35%, #e0c070 0%, #a07830 55%, transparent 75%)',
 }
 
 const SHIP_IMG: Record<string, string> = {
