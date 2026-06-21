@@ -1,6 +1,6 @@
 // lib/store/gameStore.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 19:20
+// Aktualisiert: 21.06.2026 19:35
 // Version:      0.4.0
 //
 // v0.4.0: invalidations-Zähler + invalidate(key). Komponenten nutzen
@@ -148,6 +148,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     try {
       const data = await tradeRequest({})  // kein location-Filter — is_active bestimmt das Schiff
       if (data.error) return
+      const { transitTo, inTransit } = get()
+      // Transit-State resetten wenn Server-Standort = Zielort oder kein Transit mehr nötig
+      const transitDone = inTransit && transitTo === data.location
       set({
         credits:    data.credits,
         cargo:      data.cargo,
@@ -155,9 +158,25 @@ export const useGameStore = create<GameState>((set, get) => ({
         location:   data.location,
         shipId:     data.shipId,
         shipTypeId: data.shipTypeId ?? 'freighter_mk1',
-        speedMult:  data.speedMult ?? 1.0,      // BUGFIX: wurde vorher nie gesetzt
-        shipRange:  data.rangeDistance ?? 28,   // statische Reichweite
+        speedMult:  data.speedMult ?? 1.0,
+        shipRange:  data.rangeDistance ?? 28,
         loaded:     true,
+        // Transit-State resetten wenn Schiff bereits am Zielort angekommen ist
+        ...(transitDone ? {
+          inTransit:    false,
+          transitFrom:  null,
+          transitTo:    null,
+          transitTotal: 0,
+          transitLeft:  0,
+        } : {}),
+        // Alten hängenden Transit-State resetten wenn location nicht mehr passt
+        ...(inTransit && !transitDone && data.location !== get().location ? {
+          inTransit:    false,
+          transitFrom:  null,
+          transitTo:    null,
+          transitTotal: 0,
+          transitLeft:  0,
+        } : {}),
       })
     } catch (err) {
       console.error('loadFromServer error:', err)
