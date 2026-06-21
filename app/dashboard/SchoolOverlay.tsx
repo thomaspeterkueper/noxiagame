@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 — Vollbild-Layout, helles Creme-Panel, schwarze Schrift
-// Version:      3.4.0
+// Aktualisiert: 21.06.2026 — Vollbild-Layout, helles Creme-Panel (semitransparent), Auth-Fix Bearer Token
+// Version:      3.4.1
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -72,8 +72,8 @@ const ACADEMY_BG: Record<string, { src: string; label: string }> = {
 const MONO = "'Courier Prime', monospace"
 
 const C = {
-  bg:          '#f8f5ee',
-  bgAlt:       '#f2ede4',
+  bg:          'rgba(248,245,238,0.93)',
+  bgAlt:       'rgba(242,237,228,0.95)',
   border:      '#ddd6c8',
   text:        '#1a1a18',
   textMuted:   '#6b6357',
@@ -155,9 +155,20 @@ export default function SchoolOverlay({
       setTimeout(() => inputRef.current?.focus(), 100)
   }, [loading, task, result])
 
+  async function getJwt(): Promise<string> {
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const { data: { session } } = await createClient().auth.getSession()
+      return session?.access_token ?? ''
+    } catch { return '' }
+  }
+
   async function loadKnowledge() {
     try {
-      const r = await fetch('/api/game/knowledge')
+      const jwt = await getJwt()
+      const r = await fetch('/api/game/knowledge', {
+        headers: { Authorization: `Bearer ${jwt}` },
+      })
       const d = await r.json()
       setTotal(d.knowledge_points ?? 0)
       if (d.level) setLevel(d.level)
@@ -209,7 +220,10 @@ export default function SchoolOverlay({
       setEarned(bonus); setStreak(s => s + 1)
       try {
         const dailyParam = showDaily ? '&daily=true' : ''
-        const r = await fetch(`/api/game/knowledge?action=award&points=${bonus}&reason=school_task&location=${locationSlug}${dailyParam}`)
+        const jwt = await getJwt()
+        const r = await fetch(`/api/game/knowledge?action=award&points=${bonus}&reason=school_task&location=${locationSlug}${dailyParam}`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        })
         const d = await r.json()
         if (d.knowledge_points != null) { setTotal(d.knowledge_points); onKnowledgeEarned(bonus, d.knowledge_points) }
       } catch {}
