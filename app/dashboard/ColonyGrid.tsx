@@ -24,6 +24,7 @@ import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
 import AdminOverlay from './AdminOverlay'
+import LandingOverlay from './LandingOverlay'
 import SchoolOverlay from './SchoolOverlay'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -173,6 +174,7 @@ const BUILDING_NAMES: Record<string, string> = {
   mine: 'Mine', solar: 'Solarfeld', habitat: 'Habitat',
   scanner: 'Scanner', admin: 'Verwaltung',
   school: 'Akademie', ice_drill: 'Eisbohrung', water_recycler: 'Wasserrecycler',
+  landing_pad: 'Landeplatz', shipyard: 'Werft',
 }
 
 const RES_DE: Record<string, string> = {
@@ -205,12 +207,19 @@ interface ColonyGridProps {
   entityInfo?:       Record<string, EntityEconomy>
   locationResources?: { resource: string; stock: number; consumption: number }[]
   credits?:          number
+  allLocations?:     { slug: string; name: string; population: number }[]
+  cargo?:            Record<string, number>
+  shipRange?:        number
+  currentTick?:      number
+  inTransit?:        boolean
+  onTravel?:         (dest: string) => void
 }
 
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
   userId, entities = [], pending = [], tax, entityInfo,
   locationResources = [], credits = 0,
+  allLocations = [], cargo = {}, shipRange = 55, currentTick = 0, inTransit = false, onTravel,
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid]               = useState<string[][]>([])
@@ -281,6 +290,20 @@ export default function ColonyGrid({
         @keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} }
         @keyframes noxia-spin    { to { transform: rotate(360deg) } }
       `}</style>
+
+      {/* Landing-Overlay */}
+      {showLanding && (
+        <LandingOverlay
+          currentLocation={slug}
+          locations={allLocations}
+          cargo={cargo}
+          shipRange={shipRange}
+          currentTick={currentTick}
+          inTransit={inTransit}
+          onTravel={(dest) => { onTravel?.(dest) }}
+          onClose={() => { setShowLanding(false); setSelectedTile(null) }}
+        />
+      )}
 
       {/* Schul-Overlay */}
       {showSchool && (
