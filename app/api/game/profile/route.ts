@@ -1,5 +1,6 @@
 // app/api/game/profile/route.ts
-// Erstellt: 07.06.2026
+// Erstellt:     07.06.2026
+// Aktualisiert: 21.06.2026 19:10
 // Profil laden + Onboarding-Setup (Name, Avatar) + Erstauftrag erzeugen
 // Pattern wie alle Game-Routes: GET mit Query-Parametern, Bearer-Auth.
 
@@ -84,11 +85,17 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (playerShip) {
-      // Schiff auf Erde setzen
+      // Schiff auf Erde setzen + als aktives Schiff markieren
       await serviceClient
         .from('ships')
-        .update({ location: 'earth' })
+        .update({ location: 'earth', is_active: true })
         .eq('id', playerShip.id)
+
+      // active_ship_id in profiles setzen
+      await serviceClient
+        .from('profiles')
+        .update({ active_ship_id: playerShip.id })
+        .eq('id', user.id)
 
       // 20t Startenergie (Erdsubvention für ersten Flug Erde→Mond)
       await serviceClient.rpc('grant_starting_energy', { p_ship_id: playerShip.id })
