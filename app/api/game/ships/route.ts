@@ -113,6 +113,12 @@ export async function GET(req: NextRequest) {
       })
       .eq('id', ship.id)
 
+    // Gekauftes Schiff als aktiv setzen
+    await serviceClient
+      .from('profiles')
+      .update({ active_ship_id: ship.id })
+      .eq('id', user.id)
+
     // Cargo leeren (Schiffswechsel)
     await serviceClient
       .from('ship_cargo')
