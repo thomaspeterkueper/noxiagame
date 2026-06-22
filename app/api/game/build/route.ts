@@ -1,10 +1,9 @@
 // app/api/game/build/route.ts
 // Erstellt: 31.05.2026
-// Aktualisiert: 14.06.2026 – Punkt 4: Bewertung über gleitenden 7-Tick-Schnitt
-//   (market_prices.avg_sell_7) statt Spot-sell_price. Manipulationsfest
-//   („Gutachten ≠ Tageskurs"), Fallback auf Spot solange avg_sell_7 NULL.
-//   getSaleQuote bleibt rein — die Route reicht nur den anderen Zahlenwert hinein.
-// 10.06.2026 – Default-Response liefert zusätzlich colony_tax + entity_info.
+// Aktualisiert: 22.06.2026 — Fremde Spieler-Gebäude (otherEntities) in entities-Response
+//   14.06.2026 – Bewertung über gleitenden 7-Tick-Schnitt (avg_sell_7)
+//   10.06.2026 – Default-Response liefert colony_tax + entity_info
+// Version:      0.6.0
 //
 // Datenmodell:
 //   player_builds   = Auftragsbuch: building → complete|cancelled, selling → sold
@@ -123,7 +122,32 @@ export async function GET(req: NextRequest) {
       actors: undefined,
     }))
 
-    const entities = [...(ownEntities ?? []), ...(stateEntities ?? []), ...npcNormalized]
+    // Alle Location-IDs der eigenen Gebäude ermitteln (wo ist der Spieler präsent?)
+    const ownLocationIds = [...new Set([
+      ...(ownEntities ?? []).map((e: any) => e.location_id),
+      ...(stateEntities ?? []).map((e: any) => e.location_id),
+    ])].filter(Boolean)
+
+    // Fremde Spieler-Gebäude an denselben Locations (für Multiplayer-Sichtbarkeit)
+    const { data: otherEntities } = ownLocationIds.length > 0
+      ? await serviceClient
+          .from('tile_entities')
+          .select('*, locations(slug, name), profiles(username)')
+          .neq('profile_id', user.id)
+          .is('actor_id', null)
+          .eq('is_state_owned', false)
+          .in('location_id', ownLocationIds)
+          .in('entity_type', ['building'])
+      : { data: [] }
+
+    // username aus profiles-Join normalisieren
+    const otherNormalized = (otherEntities ?? []).map((e: any) => ({
+      ...e,
+      username: e.profiles?.username ?? 'Unbekannter Pilot',
+      profiles: undefined,
+    }))
+
+    const entities = [...(ownEntities ?? []), ...(stateEntities ?? []), ...npcNormalized, ...otherNormalized]
 
     const locationIds = [...new Set((entities ?? []).map((e: any) => e.location_id))]
     let colonyTax: Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }> = {}
