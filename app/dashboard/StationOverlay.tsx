@@ -1,6 +1,6 @@
 // app/dashboard/StationOverlay.tsx
 // Erstellt:     21.06.2026
-// Aktualisiert: 21.06.2026
+// Aktualisiert: 22.06.2026 08:50
 //
 // Raumstations-Ansicht für L4/L5-Stationen und Orbit-Stationen.
 // Ersetzt das ColonyGrid für Orte mit location_type='station'.
@@ -74,6 +74,7 @@ interface StationOverlayProps {
   credits:           number
   entities:          StationModule[]
   onChanged:         () => void
+  onOpenWarehouse?:  () => void
   // Optionale Props von DashboardClient (werden akzeptiert aber noch nicht verwendet)
   allLocations?:     any[]
   cargo?:            any
@@ -101,12 +102,13 @@ function stockColor(stock: number, consumption: number): string {
 // ── Modul-SVG-Ring ────────────────────────────────────────────────────────────
 
 function ModuleRing({
-  modules, selected, onSelect, userId
+  modules, selected, onSelect, userId, onOpenWarehouse
 }: {
-  modules:  StationModule[]
-  selected: string | null
-  onSelect: (id: string) => void
-  userId:   string
+  modules:          StationModule[]
+  selected:         string | null
+  onSelect:         (id: string) => void
+  userId:           string
+  onOpenWarehouse?: () => void
 }) {
   const W = 440, H = 380
   const CX = W / 2, CY = H / 2
@@ -154,7 +156,7 @@ function ModuleRing({
         const inactive = m.status !== 'active' || m.condition < 20
 
         return (
-          <g key={m.id} onClick={() => onSelect(m.id)} style={{ cursor: 'pointer' }}>
+          <g key={m.id} onClick={() => { if (m.entity_id === 'warehouse') { onOpenWarehouse?.(); return } onSelect(m.id) }} style={{ cursor: 'pointer' }}>
             {/* Glow */}
             {isSelected && <circle cx={mx} cy={my} r="26" fill={color} opacity="0.12" />}
             {/* Ring */}
@@ -334,7 +336,7 @@ function BuildModulePopup({
 
 export default function StationOverlay({
   slug, name, population, populationMax, userId,
-  locationId, locationResources, credits, entities, onChanged,
+  locationId, locationResources, credits, entities, onChanged, onOpenWarehouse,
 }: StationOverlayProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [selected, setSelected]     = useState<string | null>(null)
@@ -400,7 +402,7 @@ export default function StationOverlay({
               Keine Module vorhanden
             </div>
           ) : (
-            <ModuleRing modules={modules} selected={selected} onSelect={setSelected} userId={userId} />
+            <ModuleRing modules={modules} selected={selected} onSelect={setSelected} userId={userId} onOpenWarehouse={onOpenWarehouse} />
           )}
 
           {/* Bau-Button */}
