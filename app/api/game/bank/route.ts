@@ -1,27 +1,18 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Initiale Version: Einlagen, Kredite, Kontostand
-// Version:      0.1.0
+// Aktualisiert: 22.06.2026 — Schulungsnachweis, Sicherheitenwert (Gebäude+Schiffe), Zinseszins-Preview
+// Version:      0.2.0
 //
-// Aktionen (GET mit ?action=...):
-//   status   – Kontostand + Kreditlimit + Transaktionshistorie
-//   deposit  – Einzahlung (Credits → Bankkonto)
-//   withdraw – Auszahlung (Bankkonto → Credits)
-//   loan     – Kredit aufnehmen
-//   repay    – Kredit tilgen
+// v0.2.0:
+//   - Kredit-Voraussetzung: academy_completions.module_id = 'finanzgrundlagen'
+//   - Kreditlimit = Sicherheitenwert × 0.7 (Gebäude-Ertragswert + Schiff-Restwert)
+//   - action=collateral: Sicherheitenübersicht für BankOverlay
+//   - action=compound_preview: Zinseszins-Tabelle für N Ticks
 //
-// Zinsmechanik (wird vom Tick berechnet, nicht hier):
-//   Einlagen:  +0.5%/Tick
-//   Kredit:    -2.0%/Tick (Zinseszins)
+// v0.1.0 – Initiale Version: deposit, withdraw, loan, repay, status
 //
-// Kreditlimit:
-//   Basis: 2.000 Cr
-//   +1 Cr je gehandelter Tonne in den letzten 30 Ticks (Handelsvolumen-Bonus)
-//   Max: 50.000 Cr
-//
-// Tabellen (Migration 027_bank.sql erforderlich):
-//   bank_accounts  – ein Konto pro Spieler pro Location
-//   bank_ledger    – append-only Buchungshistorie
+// Tabellen: bank_accounts, bank_ledger (Migration 027)
+//           academy_completions        (Migration 028)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -31,14 +22,17 @@ const serviceClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Zinssätze
-const DEPOSIT_RATE     = 0.005   // +0.5% Einlagen-Zinsen pro Tick
-const LOAN_RATE        = 0.020   // -2.0% Kredit-Zinsen pro Tick
-const BASE_CREDIT_LIMIT = 2000   // Cr — Startlimit für neue Spieler
-const MAX_CREDIT_LIMIT  = 50000  // Cr — absolutes Maximum
-const MIN_LOAN          = 100    // Cr — Mindestkreditbetrag
-const MIN_DEPOSIT       = 10     // Cr — Mindesteinlage
+// ── Konstanten ────────────────────────────────────────────────────────────────
+const DEPOSIT_RATE        = 0.005   // +0.5%/Tick Einlagen-Zinsen
+const LOAN_RATE           = 0.020   // -2.0%/Tick Kredit-Zinsen (Zinseszins)
+const COLLATERAL_RATIO    = 0.70    // max. 70% des Sicherheitenwerts als Kredit
+const SHIP_RESIDUAL_RATIO = 0.60    // Schiff: 60% des Kaufpreises als Restwert
+const MAX_CREDIT_LIMIT    = 50_000  // absolutes Maximum
+const MIN_LOAN            = 100
+const MIN_DEPOSIT         = 10
+const CREDIT_MODULE_ID    = 'finanzgrundlagen'  // Pflicht-Modul für Kredit
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -47,19 +41,7 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 
-// Kreditlimit aus Handelsvolumen berechnen
-async function calcCreditLimit(userId: string): Promise<number> {
-  const { data } = await serviceClient
-    .from('trade_transactions')
-    .select('amount')
-    .eq('profile_id', userId)
-    .gte('traded_at', new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
-
-  const totalVolume = (data ?? []).reduce((s: number, t: any) => s + (t.amount ?? 0), 0)
-  return Math.min(MAX_CREDIT_LIMIT, BASE_CREDIT_LIMIT + totalVolume)
-}
-
-// Konto für Spieler+Location holen oder anlegen
+// ── Konto holen oder anlegen ──────────────────────────────────────────────────
 async function getOrCreateAccount(userId: string, locationId: string) {
   const { data: existing } = await serviceClient
     .from('bank_accounts')
@@ -67,47 +49,132 @@ async function getOrCreateAccount(userId: string, locationId: string) {
     .eq('profile_id', userId)
     .eq('location_id', locationId)
     .maybeSingle()
-
   if (existing) return existing
 
   const { data: created } = await serviceClient
     .from('bank_accounts')
-    .insert({
-      profile_id:   userId,
-      location_id:  locationId,
-      deposit:      0,
-      loan:         0,
-    })
+    .insert({ profile_id: userId, location_id: locationId, deposit: 0, loan: 0 })
     .select()
     .single()
-
   return created
 }
 
+// ── Schulungsnachweis prüfen ──────────────────────────────────────────────────
+async function hasCreditClearance(userId: string): Promise<boolean> {
+  const { data } = await serviceClient
+    .from('academy_completions')
+    .select('id')
+    .eq('profile_id', userId)
+    .eq('module_id', CREDIT_MODULE_ID)
+    .maybeSingle()
+  return !!data
+}
+
+// ── Sicherheitenwert berechnen ────────────────────────────────────────────────
+async function calcCollateral(userId: string): Promise<{
+  total:     number
+  buildings: { id: string; name: string; locationName: string; ertragswert: number }[]
+  ships:     { id: string; name: string; shipTypeId: string; restwert: number }[]
+}> {
+  // Gebäude: Ertragswert aus market_prices
+  const { data: entities } = await serviceClient
+    .from('tile_entities')
+    .select('id, entity_id, location_id, locations(name)')
+    .eq('profile_id', userId)
+    .eq('entity_type', 'building')
+
+  const buildings: { id: string; name: string; locationName: string; ertragswert: number }[] = []
+
+  for (const e of entities ?? []) {
+    // Produktion aus config (hardcoded Referenzwerte für Sicherheitenbewertung)
+    const PRODUCTION: Record<string, { resource: string; amount: number }> = {
+      mine:           { resource: 'metal',  amount: 5 },
+      solar:          { resource: 'energy', amount: 4 },
+      ice_drill:      { resource: 'water',  amount: 4 },
+      water_recycler: { resource: 'water',  amount: 2 },
+    }
+    const prod = PRODUCTION[e.entity_id]
+    if (!prod) continue  // Habitate, Akademien etc. — kein Ertragswert
+
+    const { data: mp } = await serviceClient
+      .from('market_prices')
+      .select('sell_price')
+      .eq('location_id', e.location_id)
+      .eq('resource', prod.resource)
+      .maybeSingle()
+
+    const sellPrice  = Number(mp?.sell_price ?? 30)
+    const ertragswert = prod.amount * sellPrice * 20  // FAKTOR 20 wie buildingSale.ts
+
+    buildings.push({
+      id:           e.id,
+      name:         e.entity_id,
+      locationName: (e as any).locations?.name ?? '',
+      ertragswert,
+    })
+  }
+
+  // Schiffe: Restwert = cost_credits × SHIP_RESIDUAL_RATIO
+  const { data: ships } = await serviceClient
+    .from('ships')
+    .select('id, ship_type_id, ship_types(name, cost_credits)')
+    .eq('profile_id', userId)
+
+  const shipCollateral: { id: string; name: string; shipTypeId: string; restwert: number }[] = []
+  for (const s of ships ?? []) {
+    const cost    = Number((s as any).ship_types?.cost_credits ?? 0)
+    const restwert = Math.round(cost * SHIP_RESIDUAL_RATIO)
+    if (restwert <= 0) continue
+    shipCollateral.push({
+      id:        s.id,
+      name:      (s as any).ship_types?.name ?? s.ship_type_id,
+      shipTypeId: s.ship_type_id,
+      restwert,
+    })
+  }
+
+  const totalBuildings = buildings.reduce((s, b) => s + b.ertragswert, 0)
+  const totalShips     = shipCollateral.reduce((s, sh) => s + sh.restwert, 0)
+
+  return {
+    total:     totalBuildings + totalShips,
+    buildings,
+    ships:     shipCollateral,
+  }
+}
+
+// ── Zinseszins-Preview ────────────────────────────────────────────────────────
+function compoundPreview(principal: number, rate: number, ticks: number): { tick: number; balance: number }[] {
+  const result = []
+  let balance = principal
+  for (let t = 1; t <= ticks; t++) {
+    balance = Math.round(balance * (1 + rate))
+    result.push({ tick: t, balance })
+  }
+  return result
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const action     = searchParams.get('action') ?? 'status'
+  const action       = searchParams.get('action') ?? 'status'
   const locationSlug = searchParams.get('location')
-  const amountRaw  = searchParams.get('amount')
-  const amount     = amountRaw ? parseInt(amountRaw, 10) : 0
+  const amount       = parseInt(searchParams.get('amount') ?? '0', 10)
 
-  // Location-ID aus Slug auflösen
-  if (!locationSlug) {
-    return NextResponse.json({ error: 'location fehlt' }, { status: 400 })
-  }
+  if (!locationSlug) return NextResponse.json({ error: 'location fehlt' }, { status: 400 })
 
+  // Location auflösen
   const { data: loc } = await serviceClient
     .from('locations')
     .select('id, slug, name')
     .eq('slug', locationSlug)
     .single()
-
   if (!loc) return NextResponse.json({ error: 'Location nicht gefunden' }, { status: 404 })
 
-  // Prüfen ob Bank-Gebäude an dieser Location existiert
+  // Bank-Gebäude prüfen
   const { data: bankBuilding } = await serviceClient
     .from('tile_entities')
     .select('id')
@@ -115,11 +182,8 @@ export async function GET(req: NextRequest) {
     .eq('entity_id', 'bank')
     .eq('entity_type', 'building')
     .maybeSingle()
-
   if (!bankBuilding) {
-    return NextResponse.json({
-      error: 'Keine Bank an diesem Standort. Baue zuerst eine Bank.',
-    }, { status: 403 })
+    return NextResponse.json({ error: 'Keine Bank an diesem Standort.' }, { status: 403 })
   }
 
   // Spielerprofil
@@ -128,16 +192,43 @@ export async function GET(req: NextRequest) {
     .select('id, credits')
     .eq('id', user.id)
     .single()
-
   if (!profile) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
 
-  const account      = await getOrCreateAccount(user.id, loc.id)
-  const creditLimit  = await calcCreditLimit(user.id)
-  const deposit      = Number(account.deposit ?? 0)
-  const loan         = Number(account.loan    ?? 0)
+  const account  = await getOrCreateAccount(user.id, loc.id)
+  const deposit  = Number(account.deposit ?? 0)
+  const loan     = Number(account.loan    ?? 0)
+
+  // ── SICHERHEITEN-ÜBERSICHT ─────────────────────────────────────────────────
+  if (action === 'collateral') {
+    const collateral  = await calcCollateral(user.id)
+    const creditLimit = Math.min(MAX_CREDIT_LIMIT, Math.round(collateral.total * COLLATERAL_RATIO))
+    const hasModule   = await hasCreditClearance(user.id)
+    return NextResponse.json({
+      collateral,
+      creditLimit,
+      collateralRatio: COLLATERAL_RATIO,
+      hasModule,
+      moduleId: CREDIT_MODULE_ID,
+    })
+  }
+
+  // ── ZINSESZINS-PREVIEW ─────────────────────────────────────────────────────
+  if (action === 'compound_preview') {
+    const principal = amount > 0 ? amount : 1000
+    return NextResponse.json({
+      loan:    compoundPreview(principal, LOAN_RATE,    20),
+      deposit: compoundPreview(principal, DEPOSIT_RATE, 20),
+      loanRate:    LOAN_RATE,
+      depositRate: DEPOSIT_RATE,
+    })
+  }
+
+  // Kreditlimit (Sicherheitenwert-basiert)
+  const collateral  = await calcCollateral(user.id)
+  const creditLimit = Math.min(MAX_CREDIT_LIMIT, Math.round(collateral.total * COLLATERAL_RATIO))
   const availableLoan = Math.max(0, creditLimit - loan)
 
-  // ── STATUS ────────────────────────────────────────────────────────────────
+  // ── STATUS ─────────────────────────────────────────────────────────────────
   if (action === 'status') {
     const { data: ledger } = await serviceClient
       .from('bank_ledger')
@@ -147,187 +238,133 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(20)
 
+    const hasModule = await hasCreditClearance(user.id)
+
     return NextResponse.json({
-      location:      loc.slug,
-      locationName:  loc.name,
-      credits:       profile.credits,
+      location:     loc.slug,
+      locationName: loc.name,
+      credits:      profile.credits,
       deposit,
       loan,
       creditLimit,
       availableLoan,
-      depositRate:   DEPOSIT_RATE,
-      loanRate:      LOAN_RATE,
-      ledger:        ledger ?? [],
+      depositRate:  DEPOSIT_RATE,
+      loanRate:     LOAN_RATE,
+      hasModule,
+      moduleId:     CREDIT_MODULE_ID,
+      collateralTotal: collateral.total,
+      ledger:       ledger ?? [],
     })
   }
 
-  // ── EINZAHLEN ─────────────────────────────────────────────────────────────
+  // ── EINZAHLEN ──────────────────────────────────────────────────────────────
   if (action === 'deposit') {
-    if (!Number.isFinite(amount) || amount < MIN_DEPOSIT) {
+    if (!Number.isFinite(amount) || amount < MIN_DEPOSIT)
       return NextResponse.json({ error: `Mindesteinlage: ${MIN_DEPOSIT} Cr` }, { status: 400 })
-    }
-    if (amount > profile.credits) {
+    if (amount > profile.credits)
       return NextResponse.json({ error: 'Nicht genug Credits' }, { status: 400 })
-    }
 
     const newCredits = profile.credits - amount
     const newDeposit = deposit + amount
 
-    await serviceClient.from('profiles')
-      .update({ credits: newCredits })
-      .eq('id', user.id)
-
-    await serviceClient.from('bank_accounts')
-      .update({ deposit: newDeposit })
-      .eq('id', account.id)
-
+    await serviceClient.from('profiles').update({ credits: newCredits }).eq('id', user.id)
+    await serviceClient.from('bank_accounts').update({ deposit: newDeposit }).eq('id', account.id)
     await serviceClient.from('bank_ledger').insert({
-      profile_id:    user.id,
-      location_id:   loc.id,
-      entry_type:    'deposit',
-      amount,
-      balance_after: newDeposit,
-      note:          `Einzahlung ${amount} Cr`,
+      profile_id: user.id, location_id: loc.id,
+      entry_type: 'deposit', amount, balance_after: newDeposit,
+      note: `Einzahlung ${amount} Cr`,
     })
 
-    return NextResponse.json({
-      ok:      true,
-      credits: newCredits,
-      deposit: newDeposit,
-      loan,
-      msg:     `${amount} Cr eingezahlt. Einlage: ${newDeposit} Cr`,
-    })
+    return NextResponse.json({ ok: true, credits: newCredits, deposit: newDeposit, loan,
+      msg: `${amount} Cr eingezahlt. Einlage: ${newDeposit} Cr` })
   }
 
-  // ── AUSZAHLEN ─────────────────────────────────────────────────────────────
+  // ── AUSZAHLEN ──────────────────────────────────────────────────────────────
   if (action === 'withdraw') {
-    if (!Number.isFinite(amount) || amount < 1) {
+    if (!Number.isFinite(amount) || amount < 1)
       return NextResponse.json({ error: 'Ungültiger Betrag' }, { status: 400 })
-    }
-    if (amount > deposit) {
-      return NextResponse.json({
-        error: `Nicht genug Guthaben. Verfügbar: ${deposit} Cr`,
-      }, { status: 400 })
-    }
+    if (amount > deposit)
+      return NextResponse.json({ error: `Nicht genug Guthaben. Verfügbar: ${deposit} Cr` }, { status: 400 })
 
     const newCredits = profile.credits + amount
     const newDeposit = deposit - amount
 
-    await serviceClient.from('profiles')
-      .update({ credits: newCredits })
-      .eq('id', user.id)
-
-    await serviceClient.from('bank_accounts')
-      .update({ deposit: newDeposit })
-      .eq('id', account.id)
-
+    await serviceClient.from('profiles').update({ credits: newCredits }).eq('id', user.id)
+    await serviceClient.from('bank_accounts').update({ deposit: newDeposit }).eq('id', account.id)
     await serviceClient.from('bank_ledger').insert({
-      profile_id:    user.id,
-      location_id:   loc.id,
-      entry_type:    'withdrawal',
-      amount,
-      balance_after: newDeposit,
-      note:          `Auszahlung ${amount} Cr`,
+      profile_id: user.id, location_id: loc.id,
+      entry_type: 'withdrawal', amount, balance_after: newDeposit,
+      note: `Auszahlung ${amount} Cr`,
     })
 
-    return NextResponse.json({
-      ok:      true,
-      credits: newCredits,
-      deposit: newDeposit,
-      loan,
-      msg:     `${amount} Cr ausgezahlt`,
-    })
+    return NextResponse.json({ ok: true, credits: newCredits, deposit: newDeposit, loan,
+      msg: `${amount} Cr ausgezahlt` })
   }
 
-  // ── KREDIT AUFNEHMEN ──────────────────────────────────────────────────────
+  // ── KREDIT AUFNEHMEN ───────────────────────────────────────────────────────
   if (action === 'loan') {
-    if (!Number.isFinite(amount) || amount < MIN_LOAN) {
-      return NextResponse.json({ error: `Mindestkreditbetrag: ${MIN_LOAN} Cr` }, { status: 400 })
+    // Schulungsnachweis prüfen
+    const hasModule = await hasCreditClearance(user.id)
+    if (!hasModule) {
+      return NextResponse.json({
+        error:    'Schulungsnachweis fehlt',
+        moduleId: CREDIT_MODULE_ID,
+        hint:     'Schließe das Modul "Finanzgrundlagen" in der Akademie ab um Kredite aufnehmen zu können.',
+      }, { status: 403 })
     }
-    if (amount > availableLoan) {
+
+    if (!Number.isFinite(amount) || amount < MIN_LOAN)
+      return NextResponse.json({ error: `Mindestkreditbetrag: ${MIN_LOAN} Cr` }, { status: 400 })
+    if (amount > availableLoan)
       return NextResponse.json({
         error: `Kreditlimit überschritten. Verfügbar: ${availableLoan} Cr`,
-        creditLimit,
-        currentLoan: loan,
-        availableLoan,
+        creditLimit, currentLoan: loan, availableLoan,
       }, { status: 400 })
-    }
 
     const newCredits = profile.credits + amount
     const newLoan    = loan + amount
 
-    await serviceClient.from('profiles')
-      .update({ credits: newCredits })
-      .eq('id', user.id)
-
-    await serviceClient.from('bank_accounts')
-      .update({ loan: newLoan })
-      .eq('id', account.id)
-
+    await serviceClient.from('profiles').update({ credits: newCredits }).eq('id', user.id)
+    await serviceClient.from('bank_accounts').update({ loan: newLoan }).eq('id', account.id)
     await serviceClient.from('bank_ledger').insert({
-      profile_id:    user.id,
-      location_id:   loc.id,
-      entry_type:    'loan_taken',
-      amount,
-      balance_after: newLoan,
-      note:          `Kredit aufgenommen: ${amount} Cr (Schulden gesamt: ${newLoan} Cr)`,
+      profile_id: user.id, location_id: loc.id,
+      entry_type: 'loan_taken', amount, balance_after: newLoan,
+      note: `Kredit aufgenommen: ${amount} Cr (Schulden gesamt: ${newLoan} Cr)`,
     })
 
     return NextResponse.json({
-      ok:           true,
-      credits:      newCredits,
-      deposit,
-      loan:         newLoan,
+      ok: true, credits: newCredits, deposit, loan: newLoan,
       availableLoan: Math.max(0, creditLimit - newLoan),
-      msg:          `${amount} Cr Kredit aufgenommen. Zinsen: ${(LOAN_RATE * 100).toFixed(1)}%/Tick`,
+      msg: `${amount} Cr Kredit aufgenommen. Zinssatz: ${(LOAN_RATE * 100).toFixed(1)}%/Tick`,
     })
   }
 
-  // ── KREDIT TILGEN ─────────────────────────────────────────────────────────
+  // ── KREDIT TILGEN ──────────────────────────────────────────────────────────
   if (action === 'repay') {
-    if (!Number.isFinite(amount) || amount < 1) {
+    if (!Number.isFinite(amount) || amount < 1)
       return NextResponse.json({ error: 'Ungültiger Betrag' }, { status: 400 })
-    }
-    if (loan <= 0) {
+    if (loan <= 0)
       return NextResponse.json({ error: 'Kein ausstehender Kredit' }, { status: 400 })
-    }
 
-    const repayAmount = Math.min(amount, loan)  // max: offene Schulden tilgen
-    if (repayAmount > profile.credits) {
-      return NextResponse.json({
-        error: `Nicht genug Credits. Benötigt: ${repayAmount} Cr`,
-      }, { status: 400 })
-    }
+    const repayAmount = Math.min(amount, loan)
+    if (repayAmount > profile.credits)
+      return NextResponse.json({ error: `Nicht genug Credits. Benötigt: ${repayAmount} Cr` }, { status: 400 })
 
     const newCredits = profile.credits - repayAmount
     const newLoan    = loan - repayAmount
 
-    await serviceClient.from('profiles')
-      .update({ credits: newCredits })
-      .eq('id', user.id)
-
-    await serviceClient.from('bank_accounts')
-      .update({ loan: newLoan })
-      .eq('id', account.id)
-
+    await serviceClient.from('profiles').update({ credits: newCredits }).eq('id', user.id)
+    await serviceClient.from('bank_accounts').update({ loan: newLoan }).eq('id', account.id)
     await serviceClient.from('bank_ledger').insert({
-      profile_id:    user.id,
-      location_id:   loc.id,
-      entry_type:    'loan_repaid',
-      amount:        repayAmount,
-      balance_after: newLoan,
-      note:          `Kredit getilgt: ${repayAmount} Cr (Restschuld: ${newLoan} Cr)`,
+      profile_id: user.id, location_id: loc.id,
+      entry_type: 'loan_repaid', amount: repayAmount, balance_after: newLoan,
+      note: `Kredit getilgt: ${repayAmount} Cr (Restschuld: ${newLoan} Cr)`,
     })
 
     return NextResponse.json({
-      ok:           true,
-      credits:      newCredits,
-      deposit,
-      loan:         newLoan,
+      ok: true, credits: newCredits, deposit, loan: newLoan,
       availableLoan: Math.max(0, creditLimit - newLoan),
-      msg:          newLoan === 0
-        ? 'Kredit vollständig getilgt!'
-        : `${repayAmount} Cr getilgt. Restschuld: ${newLoan} Cr`,
+      msg: newLoan === 0 ? 'Kredit vollständig getilgt!' : `${repayAmount} Cr getilgt. Restschuld: ${newLoan} Cr`,
     })
   }
 
