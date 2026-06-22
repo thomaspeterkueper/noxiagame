@@ -1,6 +1,7 @@
 // app/dashboard/TipSystem.tsx
+// Version:      1.1.0
 // Erstellt:     20.06.2026
-// Aktualisiert: 20.06.2026
+// Aktualisiert: 22.06.2026 09:00 — Dunklere Tipp-Schrift (#3a4a5a)
 //
 // Kontextsensitives Tipp-System.
 // Tipps werden priorisiert — immer nur der dringendste wird gezeigt.
@@ -67,7 +68,7 @@ export function TipBanner({ tips }: TipBannerProps) {
       marginBottom: '1rem',
       fontSize: '0.78rem',
       lineHeight: 1.55,
-      color: '#a0b0c0',
+      color: '#3a4a5a',
     }}>
       <span style={{ fontSize: '1.1rem', flexShrink: 0, marginTop: '1px' }}>{tip.icon}</span>
       <span style={{ flex: 1 }}>{tip.text}</span>
@@ -76,7 +77,7 @@ export function TipBanner({ tips }: TipBannerProps) {
         title="Diesen Tipp nicht mehr anzeigen"
         style={{
           background: 'none', border: 'none', cursor: 'pointer',
-          color: '#5a6878', fontSize: '0.65rem', flexShrink: 0,
+          color: '#4a5a6a', fontSize: '0.65rem', flexShrink: 0,
           padding: '2px 4px', borderRadius: '4px',
           whiteSpace: 'nowrap' as const,
           lineHeight: 1.4,
