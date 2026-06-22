@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 21:50 — Werkzeuge-Tab, Daily-Fix, Layout-Fix
-// Version:      3.5.0
+// Aktualisiert: 21.06.2026 22:50 — Split 40/60, kontextuelles Lernmaterial, scrollbar
+// Version:      3.8.0
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -125,6 +125,131 @@ function ManualTab({ onClose }: { onClose: () => void }) {
       </div>
       <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
         <button onClick={onClose} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, padding: '0.5rem 1.5rem', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: MONO }}>Schließen</button>
+      </div>
+    </div>
+  )
+}
+
+
+function OrbitCalculator() {
+  const ENERGY: Record<string, Record<string, number>> = {
+    earth:  { moon: 20, mars: 35, phobos: 38 },
+    moon:   { earth: 8, mars: 12, phobos: 10 },
+    mars:   { earth: 30, moon: 12, phobos: 4 },
+    phobos: { earth: 32, moon: 10, mars: 6 },
+  }
+  const NAMES: Record<string, string> = { earth: '🌍 Erde', moon: '🌙 Mond', mars: '🔴 Mars', phobos: '🪨 Phobos' }
+  const [from, setFrom] = React.useState('earth')
+  const [to,   setTo]   = React.useState('moon')
+  const energy = ENERGY[from]?.[to] ?? '?'
+  return (
+    <div style={{ background: '#f8f5ee', border: '1px solid #e0d8c8', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column' as const, gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <select value={from} onChange={e => setFrom(e.target.value)} style={{ flex: 1, background: '#fff', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.3rem', fontSize: '0.75rem', outline: 'none' }}>
+          {Object.entries(NAMES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <span style={{ color: '#8a8a8a' }}>→</span>
+        <select value={to} onChange={e => setTo(e.target.value)} style={{ flex: 1, background: '#fff', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.3rem', fontSize: '0.75rem', outline: 'none' }}>
+          {Object.entries(NAMES).filter(([k]) => k !== from).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </div>
+      <div style={{ padding: '0.5rem', background: '#fff', borderRadius: '6px', textAlign: 'center' as const, fontWeight: 700, color: '#2a4e7a', fontSize: '0.85rem' }}>
+        ⚡ {energy}t Energie
+      </div>
+    </div>
+  )
+}
+
+function ContextPanel({ topic, colonyContext }: { topic: string | null, colonyContext: any }) {
+  if (!topic) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#b0b0a0', fontSize: '0.8rem', textAlign: 'center' as const, padding: '2rem' }}>
+      <div><div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.3 }}>📖</div>Lernmaterial erscheint<br/>passend zur Aufgabe</div>
+    </div>
+  )
+
+  const SECTION_STYLE = { background: '#f8f5ee', border: '1px solid #e0d8c8', borderRadius: '8px', padding: '0.75rem', fontSize: '0.7rem', color: '#4a4a3a', lineHeight: 1.7 }
+  const HEAD_STYLE = { fontSize: '0.7rem', fontWeight: 700 as const, marginBottom: '0.5rem', color: '#3a3a2a' }
+  const C_TOPIC: Record<string, string> = { 'Ressourcen': '#1a6fa8', 'Handel': '#8a6a00', 'Navigation': '#1a7a4a', 'Bevölkerung': '#6a3ab0', 'Energie': '#9a7000', 'Sonnensystem': '#c05a00', 'Physik': '#2a7a8a', 'Geschichte': '#6a4a20' }
+  const color = C_TOPIC[topic] ?? '#5a7a9a'
+
+  return (
+    <div style={{ padding: '1.25rem', overflowY: 'auto' as const, height: '100%', boxSizing: 'border-box' as const }}>
+      <div style={{ fontSize: '0.58rem', fontWeight: 700, color, letterSpacing: '3px', textTransform: 'uppercase' as const, marginBottom: '1rem', fontFamily: 'monospace' }}>
+        📚 {topic}
+      </div>
+
+      {(topic === 'Handel') && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={HEAD_STYLE}>Handelsmarge-Rechner</div>
+          <TradeSimulator />
+          <p style={{ fontSize: '0.68rem', color: '#6a6a5a', marginTop: '0.6rem', lineHeight: 1.6 }}>
+            <strong>Arbitrage:</strong> Kaufe günstig, verkaufe teuer. Preisimpulse (0,3%/t) erschöpfen Routen kausal.
+          </p>
+        </div>
+      )}
+
+      {topic === 'Navigation' && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={HEAD_STYLE}>Orbit-Rechner</div>
+          <OrbitCalculator />
+          <p style={{ fontSize: '0.68rem', color: '#6a6a5a', marginTop: '0.6rem', lineHeight: 1.6 }}>
+            <strong>Asymmetrie:</strong> Erde→Mond 20t (Schwerkraft), Mond→Erde nur 8t. Tiefere Gravitationsbrunnen = mehr Treibstoff.
+          </p>
+        </div>
+      )}
+
+      {topic === 'Energie' && (
+        <div style={SECTION_STYLE}>
+          <div style={HEAD_STYLE}>⚡ Energieflüsse</div>
+          <div>Solarfeld: <strong>+4/Tick</strong></div>
+          <div>Erde→Mond: <strong>−20t</strong> · Mond→Mars: <strong>−12t</strong></div>
+          <div>Mars→Phobos: <strong>−4t</strong></div>
+          <div style={{ marginTop: '0.5rem', color: '#7a7a6a' }}>Energie ist Treibstoff UND Handelsware.</div>
+        </div>
+      )}
+
+      {topic === 'Ressourcen' && (
+        <div style={SECTION_STYLE}>
+          <div style={HEAD_STYLE}>📦 Ressourcen-Profil</div>
+          <div>💧 Wasser: <strong>Kritisch Mars</strong> (deficit ~7/Tick)</div>
+          <div>⚡ Energie: <strong>Ausgeglichen</strong> Mond</div>
+          <div>⛏️ Metall: <strong>Überschuss</strong> Mond (+12 base)</div>
+          <div>🪨 Phobos: <strong>alles importiert</strong></div>
+        </div>
+      )}
+
+      {topic === 'Bevölkerung' && (
+        <div style={SECTION_STYLE}>
+          <div style={HEAD_STYLE}>👥 Wachstums-Formel</div>
+          <div>✅ Versorgt: <strong>+1%/Tick</strong></div>
+          <div>❌ Unterversorgt: <strong>−2%/Tick</strong></div>
+          <div>🏠 Habitat: <strong>+100 Kapazität</strong></div>
+          <div style={{ marginTop: '0.4rem' }}>Aktuell: <strong>{Math.ceil((colonyContext?.population ?? 1000)/100)}t Wasser/Tick</strong></div>
+        </div>
+      )}
+
+      {topic === 'Sonnensystem' && (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '0.4rem' }}>
+          {[['🌍','Erde','Startpunkt, Werft, günstige Ressourcen'],['🌙','Mond','Metall-Produzent, Eisvorkommen'],['🔴','Mars','Größte Kolonie, Wasser-Defizit'],['🪨','Phobos','Freihafen, reiner Konsument']].map(([icon,name,desc]) => (
+            <div key={name} style={{ ...SECTION_STYLE, padding: '0.5rem 0.75rem' }}>
+              <div style={{ fontWeight: 700 }}>{icon} {name}</div>
+              <div style={{ color: '#7a7a6a', fontSize: '0.65rem' }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(topic === 'Physik' || topic === 'Geschichte') && (
+        <div style={SECTION_STYLE}>
+          <div style={HEAD_STYLE}>{topic === 'Physik' ? '🔭 Physik' : '🚀 Geschichte'}</div>
+          {topic === 'Physik'
+            ? 'Escape Velocity Erde: 11,2 km/s · Mond: 2,4 km/s. Tieferer Gravitationsbrunnnen = mehr Treibstoff für den Aufstieg.'
+            : 'Sputnik 1957 · Apollo 1969 · ISS 1998 · SpaceX 2020. Jede Epoche baute auf der vorherigen auf.'}
+        </div>
+      )}
+
+      <div style={{ marginTop: '1rem', padding: '0.5rem 0.75rem', background: '#f0ece3', border: '1px dashed #c8b890', borderRadius: '6px', fontSize: '0.6rem', color: '#9a8a6a', fontFamily: 'monospace' }}>
+        📋 Foundation-Dokument folgt · Solar Academy 0.3
       </div>
     </div>
   )
@@ -301,10 +426,13 @@ export default function SchoolOverlay({
       )}
 
       {/* Helles Panel — untere 58% */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: C.bg, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
 
         {/* Weicher Übergang oben */}
-        <div style={{ position: 'absolute', top: '-40px', left: 0, right: 0, height: '40px', background: `linear-gradient(to bottom, transparent, ${C.bg})`, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-40px', left: 0, right: 0, height: '40px', background: `linear-gradient(to bottom, transparent, ${C.bg})`, pointerEvents: 'none', zIndex: 1 }} />
+
+        {/* LINKE SEITE — 40% Aufgaben */}
+        <div style={{ width: '40%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, flexShrink: 0 }}>
 
         {/* Panel-Header mit Tabs */}
         <div style={{ padding: '0.9rem 1.5rem 0', background: C.bg, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
@@ -392,7 +520,7 @@ export default function SchoolOverlay({
 
         {/* Akademie */}
         {tab === 'akademie' && (
-          <div style={{ flex: 1, overflowY: 'visible' as const, padding: '1rem 1.5rem 1.25rem' }}>
+          <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
 
             {levelInfo && (
               <div style={{ marginBottom: '1rem' }}>
@@ -560,9 +688,17 @@ export default function SchoolOverlay({
           </div>
         )}
 
-        <div style={{ padding: '0.5rem 1.5rem', borderTop: `1px solid ${C.border}`, fontSize: '0.62rem', color: C.textFaint, fontFamily: MONO, background: C.bgAlt, flexShrink: 0 }}>
-          Wissen wirkt dort, wo du eine Akademie gebaut hast · max. 10 Aufgaben/Stunde
+        <div style={{ padding: '0.5rem 1rem', borderTop: `1px solid ${C.border}`, fontSize: '0.6rem', color: C.textFaint, fontFamily: MONO, background: C.bgAlt, flexShrink: 0 }}>
+          max. 10 Aufgaben/Stunde
         </div>
+
+        </div>{/* end linke seite */}
+
+        {/* RECHTE SEITE — 60% Lernmaterial */}
+        <div style={{ flex: 1, overflow: 'hidden', background: '#faf7f0', borderLeft: `1px solid ${C.border}` }}>
+          <ContextPanel topic={task?.topic ?? null} colonyContext={colonyContext} />
+        </div>
+
       </div>
     </div>
   )
