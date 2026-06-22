@@ -127,6 +127,11 @@ export const BUILDABLE_ITEMS: Record<string, {
     allowedLocations: ['mars'],
     description: '+2 Wasser/Tick — Atmosphären-Kondensation',
   },
+  bank: {
+    type: 'building', name: 'Bank',
+    cost: 3000, buildTimeTicks: 2,
+    description: 'Einlagen (+0.5%/Tick) · Kredite bis 50.000 Cr · Kreditlimit wächst mit Handelsvolumen',
+  },
 }
 // Vorbereitete Gebäude — im Bau-Dialog ausgegraut sichtbar, noch nicht baubar.
 // Sobald ein Typ eine echte Funktion bekommt, wandert er nach BUILDABLE_ITEMS.
@@ -140,6 +145,7 @@ export const PLANNED_BUILDINGS: { id: string; name: string; hint: string }[] = [
   { id: 'admin',           name: 'Verwaltung',    hint: 'Kolonieverwaltung' },
   // school → jetzt baubar (BUILDABLE_ITEMS)
   { id: 'bar',             name: 'Bar',           hint: 'Zufriedenheit' },
+  // bank → jetzt baubar (BUILDABLE_ITEMS)
 ]
 
 
