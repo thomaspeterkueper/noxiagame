@@ -1,10 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 21.06.2026 — TileTooltip: Hover-Info, position:fixed (overflow-safe)
+// Aktualisiert: 22.06.2026 09:00 — Heller Hintergrund (#f4f2ed), Tile-Grid auf cremeweiß
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
-// Version:      3.4.0
+// Version:      3.5.0
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -371,7 +371,7 @@ export default function ColonyGrid({
   // Ladezustand
   if (grid.length === 0) return (
     <div style={{
-      background: '#1a2a3a', borderRadius: '12px', padding: '2rem',
+      background: '#f4f2ed', borderRadius: '12px', padding: '2rem',
       display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px',
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: '#5a6878' }}>
@@ -390,7 +390,7 @@ export default function ColonyGrid({
   const isAnomaly      = anomaly && selectedTile?.r === anomaly.r && selectedTile?.c === anomaly.c
 
   return (
-    <div style={{ background: '#1a2a3a', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+    <div style={{ background: '#f4f2ed', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 8px rgba(0,0,0,0.08)' }}>
       <BuildingSpriteStyles />
       <style>{`
         @keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} }
