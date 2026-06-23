@@ -1,7 +1,7 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — hasCreditClearance defensiv (try/catch), ships is_active filter
-// Version:      0.3.1
+// Aktualisiert: 22.06.2026 — calcCollateral: ship_types als separate Query (PostgREST FK-Fix), try/catch
+// Version:      0.3.2
 //
 // v0.3.0:
 //   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
@@ -85,6 +85,7 @@ async function calcCollateral(userId: string): Promise<{
   buildings: { id: string; name: string; locationName: string; ertragswert: number }[]
   ships:     { id: string; name: string; shipTypeId: string; restwert: number }[]
 }> {
+  try {
   // Gebäude: Ertragswert aus market_prices
   const { data: entities } = await serviceClient
     .from('tile_entities')
@@ -124,23 +125,36 @@ async function calcCollateral(userId: string): Promise<{
   }
 
   // Schiffe: Restwert = cost_credits × SHIP_RESIDUAL_RATIO
+  // ACHTUNG: ship_types FK ist nicht im PostgREST-Schema-Cache → separate Query
   const { data: ships } = await serviceClient
     .from('ships')
-    .select('id, ship_type_id, ship_types(name, cost_credits)')
+    .select('id, ship_type_id')
     .eq('profile_id', userId)
     .eq('is_active', true)
 
   const shipCollateral: { id: string; name: string; shipTypeId: string; restwert: number }[] = []
-  for (const s of ships ?? []) {
-    const cost    = Number((s as any).ship_types?.cost_credits ?? 0)
-    const restwert = Math.round(cost * SHIP_RESIDUAL_RATIO)
-    if (restwert <= 0) continue
-    shipCollateral.push({
-      id:        s.id,
-      name:      (s as any).ship_types?.name ?? s.ship_type_id,
-      shipTypeId: s.ship_type_id,
-      restwert,
-    })
+
+  if ((ships ?? []).length > 0) {
+    const typeIds = [...new Set((ships ?? []).map((s: any) => s.ship_type_id))]
+    const { data: shipTypes } = await serviceClient
+      .from('ship_types')
+      .select('id, name, cost_credits')
+      .in('id', typeIds)
+
+    const typeMap = new Map((shipTypes ?? []).map((t: any) => [t.id, t]))
+
+    for (const s of (ships ?? []) as any[]) {
+      const st      = typeMap.get(s.ship_type_id)
+      const cost    = Number((st as any)?.cost_credits ?? 0)
+      const restwert = Math.round(cost * SHIP_RESIDUAL_RATIO)
+      if (restwert <= 0) continue
+      shipCollateral.push({
+        id:         s.id,
+        name:       (st as any)?.name ?? s.ship_type_id,
+        shipTypeId: s.ship_type_id,
+        restwert,
+      })
+    }
   }
 
   const totalBuildings = buildings.reduce((s, b) => s + b.ertragswert, 0)
@@ -150,6 +164,10 @@ async function calcCollateral(userId: string): Promise<{
     total:     totalBuildings + totalShips,
     buildings,
     ships:     shipCollateral,
+  }
+  } catch (err) {
+    console.error('calcCollateral error:', err)
+    return { total: 0, buildings: [], ships: [] }
   }
 }
 
