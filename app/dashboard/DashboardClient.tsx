@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 14:20 — StationTravelDock eingebunden
-// Version:      2.5.1
+// Aktualisiert: 23.06.2026 14:30 — flights aus profile.flight_count statt trade_transactions
+// Version:      2.5.2
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
@@ -122,7 +122,7 @@ export default function DashboardClient({
         const td = await tR.json(); const sd = await sR.json()
         setProfile(pd.profile)
         const trades = td.trades ?? []
-        setPlayerStats({ trades: trades.length, flights: trades.filter((t: any) => t.from_location !== t.to_location).length, knowledge: kd.knowledge_points ?? 0 })
+        setPlayerStats({ trades: trades.length, flights: pd.profile?.flight_count ?? 0, knowledge: kd.knowledge_points ?? 0 })
         if (sd.ships) setShips(sd.ships)
       } catch {}
     }
