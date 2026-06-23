@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 11:15
-// Version:      4.0.0
+// Aktualisiert: 23.06.2026 11:30 — ResizeObserver: initiale Größe + parent-basierte Messung
+// Version:      4.0.1
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -275,14 +275,18 @@ export default function ColonyGrid({
     setAnomaly(anomalyAt(cellGrid))
   }, [slug, population, populationMax, entities, pending])
 
-  // ResizeObserver auf Mess-div — kein inline-block stört die Messung
+  // ResizeObserver: Wrapper-div misst verfügbare Breite
+  // Initiale Größe sofort beim Mount berechnen (nicht erst wenn Observer feuert)
   useEffect(() => {
-    if (!measureRef.current) return
-    const obs = new ResizeObserver(entries => {
-      const w = entries[0].contentRect.width
+    const el = measureRef.current
+    if (!el) return
+    // Sofortige Berechnung beim Mount
+    const calcSize = (w: number) => {
       if (w > 0) setTileSize(Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, Math.floor(w / COLS))))
-    })
-    obs.observe(measureRef.current)
+    }
+    calcSize(el.offsetWidth)
+    const obs = new ResizeObserver(entries => calcSize(entries[0].contentRect.width))
+    obs.observe(el)
     return () => obs.disconnect()
   }, [])
 
@@ -400,8 +404,8 @@ export default function ColonyGrid({
       {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} />}
       {showBuildPopup && selectedTile && <BuildPopup tileRow={selectedTile.r} tileCol={selectedTile.c} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
 
-      {/* Mess-div: volle Breite, unsichtbar, ResizeObserver misst hier */}
-      <div ref={measureRef} style={{ width: '100%', height: 0, overflow: 'hidden' }} />
+      {/* Mess-div: volle Breite, 1px hoch damit offsetWidth korrekt ist */}
+      <div ref={measureRef} style={{ width: '100%', height: '1px', marginBottom: '-1px', visibility: 'hidden' }} />
 
       {/* Grid */}
       <div style={{ position: 'relative', display: 'inline-block' }}>
