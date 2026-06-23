@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 11:55 — tileSize aus measureRef.offsetWidth, feste px statt aspect-ratio
-// Version:      4.2.0
+// Aktualisiert: 23.06.2026 11:58 — useLayoutEffect für sofortige Breitenmessung
+// Version:      4.2.1
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -12,7 +12,7 @@
 
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDINGS } from '@/lib/game/buildings/index'
 import { TileSVG } from '@/lib/grid/TileSVG'
@@ -275,15 +275,12 @@ export default function ColonyGrid({
     setAnomaly(anomalyAt(cellGrid))
   }, [slug, population, populationMax, entities, pending])
 
-  // ResizeObserver: Wrapper-div misst verfügbare Breite
-  // Initiale Größe sofort beim Mount berechnen (nicht erst wenn Observer feuert)
-  useEffect(() => {
+  // useLayoutEffect: synchron nach DOM-Update → offsetWidth garantiert korrekt
+  useLayoutEffect(() => {
     const el = measureRef.current
     if (!el) return
-    // Sofortige Berechnung beim Mount
     const calcSize = (w: number) => {
       if (w > 0) setTileSize(Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, Math.floor(w / COLS))))
-      // tileSize direkt aus offsetWidth (kein padding-Abzug — measureRef ist im Inhalt-Bereich)
     }
     calcSize(el.offsetWidth)
     const obs = new ResizeObserver(entries => calcSize(entries[0].contentRect.width))
