@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 12:55 — TILE_SIZE_MAX erhöht auf 120
-// Version:      2.3.2
+// Aktualisiert: 23.06.2026 13:10 — GRID_TILE_SIZE 96px
+// Version:      2.4.1
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
