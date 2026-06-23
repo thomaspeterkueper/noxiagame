@@ -1,10 +1,264 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 23.06.2026 — Verwaisten Taschenrechner/TradeSimulator-Block entfernt (Syntax-Fix)
-// Version:      3.8.2
+// Aktualisiert: 22.06.2026 — KursPdfViewer rechts: react-pdf + dynamischer Context-Banner
+// Version:      3.9.0
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
+
+// react-pdf: SSR deaktiviert, Worker via CDN (kein webpack-Worker-Bug in Next.js App Router)
+// npm install react-pdf  — muss einmalig im Repo hinzugefügt werden
+const PdfDocument = dynamic(
+  () => import('react-pdf').then(m => {
+    // pdfjs-dist Worker-URL — CDN-Version muss mit react-pdf peerDependency übereinstimmen
+    m.pdfjs.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs'
+    return m.Document
+  }),
+  { ssr: false, loading: () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9e9485', fontSize: '0.78rem', fontFamily: "'Courier Prime', monospace" }}>
+      Dokument wird geladen …
+    </div>
+  )}
+)
+const PdfPage = dynamic(
+  () => import('react-pdf').then(m => m.Page),
+  { ssr: false }
+)
+
+// Mapping: Aufgaben-Topic → Kurs-PDF in Supabase Storage
+// URL-Schema: /api/game/akademie?kurs=XX  (leitet zu Supabase Storage URL weiter, kein CORS-Problem)
+// Fallback auf direkte Storage-URL bis Route existiert
+const TOPIC_TO_PDF: Record<string, { kursId: string; titel: string; kursnr: string }> = {
+  'Handel':       { kursId: 'kurs_02_angebot_nachfrage', titel: 'Angebot & Nachfrage',      kursnr: '02' },
+  'Ressourcen':   { kursId: 'kurs_02_angebot_nachfrage', titel: 'Angebot & Nachfrage',      kursnr: '02' },
+  'Energie':      { kursId: 'kurs_03_energie_arbeit',    titel: 'Energie & Arbeit',          kursnr: '03' },
+  'Physik':       { kursId: 'kurs_04_kraefte_bewegung',  titel: 'Kräfte & Bewegung',         kursnr: '04' },
+  'Navigation':   { kursId: 'kurs_04_kraefte_bewegung',  titel: 'Kräfte & Bewegung',         kursnr: '04' },
+  'Bevölkerung':  { kursId: 'kurs_01_prozentrechnung',   titel: 'Prozentrechnung',           kursnr: '01' },
+  'Sonnensystem': { kursId: 'kurs_04_kraefte_bewegung',  titel: 'Kräfte & Bewegung',         kursnr: '04' },
+}
+
+// Dynamischer Context-Banner: wird über einer bestimmten Folie eingeblendet
+// folie = 1-basiert (Foliennummer im PDF)
+interface ContextBanner {
+  folie: number
+  text: string
+  color: string
+}
+
+function buildContextBanners(topic: string | null, colonyContext: ColonyContext): ContextBanner[] {
+  if (!topic || !colonyContext) return []
+  const credits = colonyContext.credits ?? 0
+  const banners: ContextBanner[] = []
+
+  if (topic === 'Handel' || topic === 'Ressourcen') {
+    // Folie 2 (Warum wichtig): Live-Koloniekontext
+    banners.push({
+      folie: 2,
+      text: `${colonyContext.locationName}: Wasser-Lager ${colonyContext.waterStock}t · Verbrauch ${colonyContext.waterCons}t/Tick`,
+      color: '#1a6fa8',
+    })
+  }
+
+  if (topic === 'Energie' || topic === 'Physik' || topic === 'Navigation') {
+    banners.push({
+      folie: 4,
+      text: `Dein Kapital: ${credits.toLocaleString('de')} Cr · Solarfeld-Ertrag bei aktuellem Energiepreis in 20 Ticks: ${Math.round(credits * 0.08).toLocaleString('de')} Cr`,
+      color: '#1a7a4a',
+    })
+  }
+
+  if (topic === 'Bevölkerung') {
+    const proj5 = Math.round(credits * Math.pow(1.08, 5))
+    banners.push({
+      folie: 4,
+      text: `Dein Kapital ${credits.toLocaleString('de')} Cr bei 8% p.a. → nach 5 Jahren: ${proj5.toLocaleString('de')} Cr`,
+      color: '#8a6a00',
+    })
+    banners.push({
+      folie: 5,
+      text: `Kolonie ${colonyContext.locationName}: ${colonyContext.population} Einwohner · max. Wachstum mit Habitat: ${colonyContext.population + 100}`,
+      color: '#6a3ab0',
+    })
+  }
+
+  return banners
+}
+
+// ─── KursPdfViewer ────────────────────────────────────────────────────────────
+function KursPdfViewer({
+  topic,
+  colonyContext,
+}: {
+  topic: string | null
+  colonyContext: ColonyContext
+}) {
+  const kursInfo = topic ? TOPIC_TO_PDF[topic] : null
+  const [numPages, setNumPages]     = useState<number | null>(null)
+  const [currentPage, setPage]      = useState(1)
+  const [containerW, setContainerW] = useState(0)
+  const [pdfError, setPdfError]     = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const banners = buildContextBanners(topic, colonyContext)
+  const activeBanner = banners.find(b => b.folie === currentPage) ?? null
+
+  // Container-Breite messen für responsive PDF-Skalierung
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver(entries => {
+      setContainerW(entries[0].contentRect.width)
+    })
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
+
+  // Bei Topic-Wechsel: zurück auf Seite 1
+  useEffect(() => { setPage(1); setNumPages(null); setPdfError(false) }, [topic])
+
+  if (!kursInfo) {
+    // Kein Kurs für dieses Topic — Fallback auf alten ContextPanel
+    return (
+      <ContextPanel topic={topic} colonyContext={colonyContext} />
+    )
+  }
+
+  // PDF-URL: Supabase Storage public bucket "akademie"
+  // Dateiname-Konvention: SSF_Kurs_01_Prozentrechnung.pdf usw.
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  const pdfUrl = `${SUPABASE_URL}/storage/v1/object/public/akademie/${kursInfo.kursId}.pdf`
+  // Download-URL für PPTX
+  const pptxUrl = `${SUPABASE_URL}/storage/v1/object/public/akademie/${kursInfo.kursId}.pptx`
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#faf7f0' }}>
+
+      {/* Kurs-Header */}
+      <div style={{ padding: '0.6rem 1rem', borderBottom: `1px solid ${C.border}`, background: C.bg, display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: '10px', background: C.accentLight, color: C.accent, fontFamily: MONO, fontWeight: 700, letterSpacing: '0.1em' }}>
+          KURS {kursInfo.kursnr}
+        </span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: C.text, fontFamily: MONO, flex: 1 }}>
+          {kursInfo.titel}
+        </span>
+        {/* Seitennavigation */}
+        {numPages && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '4px', width: '22px', height: '22px', cursor: currentPage > 1 ? 'pointer' : 'not-allowed', color: C.textMuted, fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              ‹
+            </button>
+            <span style={{ fontSize: '0.65rem', color: C.textMuted, fontFamily: MONO, minWidth: '40px', textAlign: 'center' }}>
+              {currentPage}/{numPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(numPages, p + 1))}
+              disabled={currentPage >= numPages}
+              style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '4px', width: '22px', height: '22px', cursor: currentPage < numPages ? 'pointer' : 'not-allowed', color: C.textMuted, fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              ›
+            </button>
+          </div>
+        )}
+        {/* PPTX-Download */}
+        <a
+          href={pptxUrl}
+          download
+          style={{ fontSize: '0.6rem', color: C.textFaint, textDecoration: 'none', border: `1px solid ${C.border}`, borderRadius: '4px', padding: '2px 8px', fontFamily: MONO, background: C.bgAlt }}
+          title="Präsentation herunterladen">
+          ↓ .pptx
+        </a>
+      </div>
+
+      {/* PDF-Viewer — relativ positioniert für Banner-Overlay */}
+      <div ref={containerRef} style={{ flex: 1, overflow: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0' }}>
+
+        {pdfError ? (
+          // Fallback wenn PDF noch nicht in Storage
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '0.75rem', color: C.textMuted, padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', opacity: 0.3 }}>📄</div>
+            <div style={{ fontSize: '0.78rem', fontFamily: MONO }}>PDF noch nicht verfügbar</div>
+            <div style={{ fontSize: '0.68rem', color: C.textFaint }}>
+              Lade <code style={{ background: C.bgAlt, padding: '1px 4px', borderRadius: '3px' }}>{kursInfo.kursId}.pdf</code> in den Supabase-Bucket <code style={{ background: C.bgAlt, padding: '1px 4px', borderRadius: '3px' }}>akademie</code> hoch.
+            </div>
+            <ContextPanel topic={topic} colonyContext={colonyContext} />
+          </div>
+        ) : (
+          <div style={{ position: 'relative', width: containerW > 0 ? containerW - 16 : '100%' }}>
+            {/* react-pdf Document + Page */}
+            <PdfDocument
+              file={pdfUrl}
+              onLoadSuccess={({ numPages: n }) => setNumPages(n)}
+              onLoadError={() => setPdfError(true)}
+              loading=""
+            >
+              <PdfPage
+                pageNumber={currentPage}
+                width={containerW > 0 ? containerW - 16 : undefined}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+              />
+            </PdfDocument>
+
+            {/* Dynamischer Context-Banner — liegt über dem PDF */}
+            {activeBanner && (
+              <div style={{
+                position: 'absolute',
+                bottom: '12px',
+                left: '8px',
+                right: '8px',
+                background: `${activeBanner.color}ee`,
+                color: '#fff',
+                padding: '0.4rem 0.75rem',
+                borderRadius: '6px',
+                fontSize: '0.72rem',
+                fontFamily: MONO,
+                lineHeight: 1.5,
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                <span style={{ opacity: 0.8, fontSize: '0.65rem' }}>▶</span>
+                {activeBanner.text}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Seitensprung-Übersicht (Thumbnails) — nur wenn geladen */}
+      {numPages && numPages > 1 && (
+        <div style={{ padding: '0.4rem 0.75rem', borderTop: `1px solid ${C.border}`, display: 'flex', gap: '4px', overflowX: 'auto', background: C.bgAlt, flexShrink: 0 }}>
+          {Array.from({ length: numPages }, (_, i) => i + 1).map(n => (
+            <button
+              key={n}
+              onClick={() => setPage(n)}
+              style={{
+                minWidth: '22px', height: '22px',
+                background: n === currentPage ? C.accent : C.bg,
+                color: n === currentPage ? '#fff' : C.textMuted,
+                border: `1px solid ${n === currentPage ? C.accent : C.border}`,
+                borderRadius: '4px',
+                fontSize: '0.6rem',
+                cursor: 'pointer',
+                fontFamily: MONO,
+                fontWeight: n === currentPage ? 700 : 400,
+                // Banner-Indikator: goldener Punkt wenn für diese Seite ein Banner existiert
+                ...(banners.some(b => b.folie === n) ? { outline: '2px solid #c9a96180', outlineOffset: '1px' } : {}),
+              }}>
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface ColonyContext {
   locationName: string
@@ -468,7 +722,6 @@ export default function SchoolOverlay({
         {/* Handbuch */}
         {tab === 'handbuch' && <ManualTab onClose={onClose} />}
 
-
         {/* Akademie */}
         {tab === 'akademie' && (
           <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
@@ -645,9 +898,9 @@ export default function SchoolOverlay({
 
         </div>{/* end linke seite */}
 
-        {/* RECHTE SEITE — 60% Lernmaterial */}
+        {/* RECHTE SEITE — 60% Kursmaterial mit PDF-Viewer */}
         <div style={{ flex: 1, overflow: 'hidden', background: '#faf7f0', borderLeft: `1px solid ${C.border}` }}>
-          <ContextPanel topic={task?.topic ?? null} colonyContext={colonyContext} />
+          <KursPdfViewer topic={task?.topic ?? null} colonyContext={colonyContext} />
         </div>
 
       </div>
