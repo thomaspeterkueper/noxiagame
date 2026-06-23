@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 14:00 — Kolonieinfo aus Sidebar, GRID_TILE_SIZE 64px
-// Version:      2.5.0
+// Aktualisiert: 23.06.2026 14:20 — StationTravelDock eingebunden
+// Version:      2.5.1
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
@@ -12,7 +12,8 @@ import { useGameStore, ResourceType, LocationSlug, effectiveRange } from '@/lib/
 import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel     from './TransitPanel'
 import ColonyGrid       from './ColonyGrid'
-import StationOverlay   from './StationOverlay'
+import StationOverlay      from './StationOverlay'
+import StationTravelDock   from './StationTravelDock'
 import ShipyardOverlay  from './ShipyardOverlay'
 import WarehouseOverlay from './WarehouseOverlay'
 import ProfileOverlay   from './ProfileOverlay'
@@ -291,15 +292,26 @@ export default function DashboardClient({
           })()}
 
           {currentLocationData?.location_type === 'station' || location === 'prometheus' ? (
-            <StationOverlay
-              slug={location} name={currentLocationData?.name ?? 'Station'}
-              population={currentLocationData?.population ?? 0} populationMax={currentLocationData?.population_max ?? 1}
-              userId={userId} locationId={currentLocationData?.id ?? ''}
-              locationResources={currentLocationData?.location_resources ?? []}
-              credits={credits} entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
-              onChanged={async () => { await loadFromServer(); invalidate('builds') }}
-              onOpenWarehouse={() => setWarehouseOpen(true)}
-            />
+            <>
+              <StationTravelDock
+                currentLocation={location}
+                locations={locations.filter((l: any) => l.slug !== location)}
+                cargo={cargo as unknown as Record<string, number>}
+                shipRange={shipRange}
+                currentTick={stats?.tickNumber ?? 0}
+                inTransit={inTransit}
+                onTravel={handleTravel}
+              />
+              <StationOverlay
+                slug={location} name={currentLocationData?.name ?? 'Station'}
+                population={currentLocationData?.population ?? 0} populationMax={currentLocationData?.population_max ?? 1}
+                userId={userId} locationId={currentLocationData?.id ?? ''}
+                locationResources={currentLocationData?.location_resources ?? []}
+                credits={credits} entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+                onChanged={async () => { await loadFromServer(); invalidate('builds') }}
+                onOpenWarehouse={() => setWarehouseOpen(true)}
+              />
+            </>
           ) : (
             <ColonyGrid
               slug={location} name={currentLocationData?.name ?? location}
