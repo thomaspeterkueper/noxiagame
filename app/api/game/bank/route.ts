@@ -1,13 +1,17 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Schulungsnachweis, Sicherheitenwert (Gebäude+Schiffe), Zinseszins-Preview
-// Version:      0.2.0
+// Aktualisiert: 22.06.2026 — Promise.all Batch-Queries, Sicherheiten-Warnung bei Unterdeckung
+// Version:      0.3.0
+//
+// v0.3.0:
+//   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
+//   - loan/repay: Sicherheiten-Warnung wenn Kredit > Limit nach Portfolioänderung
+//   - action=collateral: gibt jetzt auch collateralWarning zurück
 //
 // v0.2.0:
 //   - Kredit-Voraussetzung: academy_completions.module_id = 'finanzgrundlagen'
 //   - Kreditlimit = Sicherheitenwert × 0.7 (Gebäude-Ertragswert + Schiff-Restwert)
-//   - action=collateral: Sicherheitenübersicht für BankOverlay
-//   - action=compound_preview: Zinseszins-Tabelle für N Ticks
+//   - action=collateral, action=compound_preview
 //
 // v0.1.0 – Initiale Version: deposit, withdraw, loan, repay, status
 //
@@ -203,12 +207,17 @@ export async function GET(req: NextRequest) {
     const collateral  = await calcCollateral(user.id)
     const creditLimit = Math.min(MAX_CREDIT_LIMIT, Math.round(collateral.total * COLLATERAL_RATIO))
     const hasModule   = await hasCreditClearance(user.id)
+    const collateralWarning = loan > creditLimit && loan > 0
+      ? { overLimit: loan - creditLimit, message: `Kredit übersteigt Sicherheitenwert um ${(loan - creditLimit).toLocaleString('de')} Cr.` }
+      : null
+
     return NextResponse.json({
       collateral,
       creditLimit,
-      collateralRatio: COLLATERAL_RATIO,
+      collateralRatio:  COLLATERAL_RATIO,
       hasModule,
-      moduleId: CREDIT_MODULE_ID,
+      moduleId:         CREDIT_MODULE_ID,
+      collateralWarning,
     })
   }
 
@@ -230,30 +239,42 @@ export async function GET(req: NextRequest) {
 
   // ── STATUS ─────────────────────────────────────────────────────────────────
   if (action === 'status') {
-    const { data: ledger } = await serviceClient
-      .from('bank_ledger')
-      .select('*')
-      .eq('profile_id', user.id)
-      .eq('location_id', loc.id)
-      .order('created_at', { ascending: false })
-      .limit(20)
+    // Parallele Queries — kein sequenzielles Warten
+    const [ledgerResult, hasModule] = await Promise.all([
+      serviceClient
+        .from('bank_ledger')
+        .select('*')
+        .eq('profile_id', user.id)
+        .eq('location_id', loc.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      hasCreditClearance(user.id),
+    ])
 
-    const hasModule = await hasCreditClearance(user.id)
+    // Sicherheiten-Warnung: Kredit > aktuelles Limit?
+    const collateralWarning = loan > creditLimit && loan > 0
+      ? {
+          overLimit:        loan - creditLimit,
+          requiredRepayment: Math.ceil(loan - creditLimit),
+          message:          `Kredit übersteigt Sicherheitenwert um ${(loan - creditLimit).toLocaleString('de')} Cr. Bitte tilgen oder Sicherheiten erhöhen.`,
+        }
+      : null
 
     return NextResponse.json({
-      location:     loc.slug,
-      locationName: loc.name,
-      credits:      profile.credits,
+      location:        loc.slug,
+      locationName:    loc.name,
+      credits:         profile.credits,
       deposit,
       loan,
       creditLimit,
       availableLoan,
-      depositRate:  DEPOSIT_RATE,
-      loanRate:     LOAN_RATE,
+      depositRate:     DEPOSIT_RATE,
+      loanRate:        LOAN_RATE,
       hasModule,
-      moduleId:     CREDIT_MODULE_ID,
+      moduleId:        CREDIT_MODULE_ID,
       collateralTotal: collateral.total,
-      ledger:       ledger ?? [],
+      collateralWarning,
+      ledger:          ledgerResult.data ?? [],
     })
   }
 
@@ -332,9 +353,15 @@ export async function GET(req: NextRequest) {
       note: `Kredit aufgenommen: ${amount} Cr (Schulden gesamt: ${newLoan} Cr)`,
     })
 
+    const newAvailable = Math.max(0, creditLimit - newLoan)
+    const loanWarning  = newLoan > creditLimit
+      ? { overLimit: newLoan - creditLimit, message: `Kredit übersteigt Sicherheitenwert. Bitte ${Math.ceil(newLoan - creditLimit).toLocaleString('de')} Cr tilgen.` }
+      : null
+
     return NextResponse.json({
       ok: true, credits: newCredits, deposit, loan: newLoan,
-      availableLoan: Math.max(0, creditLimit - newLoan),
+      availableLoan: newAvailable,
+      collateralWarning: loanWarning,
       msg: `${amount} Cr Kredit aufgenommen. Zinssatz: ${(LOAN_RATE * 100).toFixed(1)}%/Tick`,
     })
   }
