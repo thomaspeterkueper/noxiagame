@@ -1,10 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 22.06.2026 — BUILDINGS aus index.ts, BankOverlay-Dispatch, BUILDING_NAMES entfernt
+// Aktualisiert: 22.06.2026 09:30 — Header/Balken/Sidebar entfernt, Grid volle Breite
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
-// Version:      3.6.0
+// Version:      3.7.0
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -456,29 +456,7 @@ export default function ColonyGrid({
         />
       )}
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
-        <div>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#b99b6b', textTransform: 'uppercase', letterSpacing: '3px' }}>{name}</div>
-          <div style={{ fontSize: '0.55rem', color: '#8a9ab0', marginTop: '2px' }}>{slug.toUpperCase()} SECTOR</div>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', background: 'rgba(0,0,0,0.3)', padding: '0.4rem 0.8rem', borderRadius: '20px', fontSize: '0.65rem' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#8a9ab0', fontSize: '0.5rem' }}>POP</div>
-            <div style={{ color: '#fff', fontWeight: 700 }}>{population.toLocaleString('de')}</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#8a9ab0', fontSize: '0.5rem' }}>AUSLASTUNG</div>
-            <div style={{ color: popPercent > 80 ? '#e8702a' : '#6fcf97', fontWeight: 700 }}>{popPercent}%</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#8a9ab0', fontSize: '0.5rem' }}>STATUS</div>
-            <div style={{ color: isSupplied ? '#6fcf97' : '#e74c3c', fontWeight: 700 }}>{isSupplied ? '🟢' : '🔴'}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Grid links · Info-Sidebar rechts */}
+      {/* Grid */}
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
 
         {/* Kachelgrid */}
@@ -599,150 +577,10 @@ export default function ColonyGrid({
           </div>
         </div>
 
-        {/* Info-Sidebar rechts neben dem Grid */}
-        <div style={{
-          flex: 1, minWidth: '240px', alignSelf: 'stretch',
-          padding: '0.85rem 1rem',
-          background: 'rgba(0,0,0,0.3)', borderRadius: '6px',
-          fontSize: '0.75rem',
-        }}>
-          {!selectedTile || showBuildPopup ? (
-            /* EmptyState */
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              height: '100%', minHeight: '180px',
-              color: '#5a6878', textAlign: 'center', gap: '0.5rem',
-            }}>
-              <div style={{ fontSize: '2rem', opacity: 0.25 }}>🏗️</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 500 }}>Kachel anklicken</div>
-              <div style={{ fontSize: '0.6rem', maxWidth: '180px', lineHeight: 1.6, opacity: 0.7 }}>
-                Eigene Gebäude (Goldrand) lassen sich hier bewerten und verkaufen.
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Titel + Close */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div>
-                  <div style={{ color: isAnomaly ? '#b48ce8' : '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>
-                    {isAnomaly
-                      ? '✨ Anomalie'
-                      : selectedEntity
-                        ? (BUILDINGS[selectedEntity.entity_id]?.name ?? selectedEntity.entity_id)
-                        : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </div>
-                  <div style={{ color: '#8a9ab0', marginTop: '0.2rem', fontSize: '0.68rem' }}>
-                    {isAnomaly
-                      ? 'Unbekanntes Phänomen'
-                      : selectedEntity
-                        ? (ownSelected ? '🔑 Dein Gebäude' : `👤 ${selectedEntity.username ?? 'Anderer Pilot'}`)
-                        : sellingAt(selectedTile.r, selectedTile.c)
-                          ? '💰 Wird verkauft …'
-                          : isBuildable(selectedTile.type) ? '✅ Bebaubar' : '🚫 Nicht bebaubar'}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedTile(null)}
-                  style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', flexShrink: 0 }}
-                >✕</button>
-              </div>
 
-              {/* Koordinaten */}
-              <div style={{
-                fontSize: '0.58rem', color: '#5a6878',
-                background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.5rem',
-                borderRadius: '4px', display: 'inline-block', marginBottom: '0.6rem',
-              }}>
-                📍 Kachel ({selectedTile.r}, {selectedTile.c})
-              </div>
-
-              {/* Bauen-Button */}
-              {isBuildable(selectedTile.type) && !selectedEntity && (
-                <button
-                  onClick={() => setShowBuildPopup(true)}
-                  onMouseEnter={() => setBuildHover(true)}
-                  onMouseLeave={() => setBuildHover(false)}
-                  style={{
-                    marginTop: '0.25rem', marginBottom: '0.5rem',
-                    width: '100%',
-                    background: buildHover
-                      ? 'linear-gradient(135deg, #3a5e8a, #2a4a6a)'
-                      : 'linear-gradient(135deg, #2a4e7a, #1a3a5a)',
-                    color: '#fff', border: 'none',
-                    padding: '0.6rem 0.75rem', borderRadius: '6px',
-                    fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
-                    boxShadow: buildHover
-                      ? '0 4px 12px rgba(42,78,122,0.45)'
-                      : '0 2px 8px rgba(42,78,122,0.3)',
-                    transform: buildHover ? 'translateY(-1px)' : 'none',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  🏗️ Gebäude bauen
-                </button>
-              )}
-
-              {/* Wirtschaftsdaten eigenes Gebäude */}
-              {ownSelected && selectedEntity && (() => {
-                const eco     = entityInfo?.[selectedEntity.id]
-                const taxProp = tax?.tax_property ?? 0
-                const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0.35rem', borderRadius: '4px', marginBottom: '2px' }
-                return (
-                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.7rem', lineHeight: 1.7 }}>
-                    <div style={{ fontSize: '0.58rem', color: '#5a6878', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.4rem' }}>
-                      📊 Wirtschaft
-                    </div>
-                    {eco?.produktion != null && eco.ressource && (
-                      <div style={{ ...row, background: 'rgba(47,158,68,0.06)' }}>
-                        <span style={{ color: '#8a9ab0' }}>Produktion</span>
-                        <span style={{ color: '#6fcf97', fontWeight: 500 }}>+{eco.produktion} {RES_DE[eco.ressource] ?? eco.ressource}/Tick</span>
-                      </div>
-                    )}
-                    <div style={{ ...row, background: taxProp > 0 ? 'rgba(232,112,42,0.06)' : 'transparent' }}>
-                      <span style={{ color: '#8a9ab0' }}>Haltekosten</span>
-                      <span style={{ color: taxProp > 0 ? '#e8702a' : '#5a6878', fontWeight: taxProp > 0 ? 500 : 400 }}>
-                        {taxProp > 0 ? `−${taxProp.toLocaleString('de-DE')} Cr/Tick` : 'keine'}
-                      </span>
-                    </div>
-                    {taxProp > 0 && (
-                      <div style={{ color: '#5a6878', fontSize: '0.58rem', marginTop: '3px', lineHeight: 1.4, padding: '0.15rem 0.35rem' }}>
-                        Grundsteuer dieser Kolonie · fällt an, solange du das Gebäude hältst
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-
-              {/* Verkaufs-UI für eigene Gebäude */}
-              {ownSelected && (
-                <SellPanel
-                  key={selectedEntity!.id}
-                  entityId={selectedEntity!.id}
-                  entityName={BUILDINGS[selectedEntity!.entity_id]?.name ?? selectedEntity!.entity_id}
-                  onSold={async () => { await loadFromServer(); invalidate('builds') }}
-                />
-              )}
-            </>
-          )}
-        </div>
       </div>
 
-      {/* Bevölkerungsbalken */}
-      <div style={{ marginTop: '0.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', color: '#5a6878', marginBottom: '0.3rem' }}>
-          <span>Bevölkerung</span>
-          <span>{population.toLocaleString('de')} / {populationMax.toLocaleString('de')} · {popPercent}% Auslastung</span>
-        </div>
-        <div style={{ background: 'rgba(0,0,0,0.35)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{
-            width: `${popPercent}%`, height: '100%',
-            background: popColor,
-            transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-            borderRadius: '3px',
-          }} />
-        </div>
-      </div>
+
     </div>
   )
 }
