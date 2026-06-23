@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 13:20 — GRID_TILE_SIZE 96px fest, kein ResizeObserver
-// Version:      2.4.1
+// Aktualisiert: 23.06.2026 14:00 — Kolonieinfo aus Sidebar, GRID_TILE_SIZE 64px
+// Version:      2.5.0
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
@@ -64,7 +64,7 @@ export default function DashboardClient({
   const [ships, setShips]               = useState<any[]>([])
   const [playerStats, setPlayerStats]   = useState({ trades: 0, flights: 0, knowledge: 0 })
   const gridColRef                          = React.useRef<HTMLDivElement>(null)
-  const GRID_TILE_SIZE = 96
+  const GRID_TILE_SIZE = 64
 
   const [shipyardOpen,   setShipyardOpen]   = useState(false)
   const [warehouseOpen,  setWarehouseOpen]  = useState(false)
@@ -385,26 +385,7 @@ export default function DashboardClient({
             <div style={{ fontSize: '0.58rem', color: T.inkFaint, marginTop: '0.4rem', textAlign: 'center' }}>Klick für Vollprofil & Kompetenzen</div>
           </div>
 
-          {/* KOLONIEINFO */}
-          {currentLocationData && (() => {
-            const worst  = worstStatus(currentLocationData)
-            const popPct = Math.round((currentLocationData.population / Math.max(1, currentLocationData.population_max)) * 100)
-            return (
-              <div style={{ ...card, padding: '0.85rem 1rem', borderLeft: `3px solid ${worst ? stateColor(worst.state, T) : T.green}`, flexShrink: 0 }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.95rem', color: T.blueDeep, marginBottom: '0.3rem' }}>{LOC_ICON[location] ?? '🪐'} {currentLocationData.name}</div>
-                <div style={{ fontSize: '0.68rem', color: T.inkSoft, marginBottom: '0.45rem' }}>{currentLocationData.population.toLocaleString('de')} Einwohner · {popPct}% Auslastung</div>
-                {(currentLocationData.location_resources ?? []).map((r: any) => {
-                  const s = resourceStatus(r)
-                  return (
-                    <div key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.73rem', marginBottom: '2px' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor(s.state, T), flexShrink: 0 }} />
-                      <span>{RESOURCE_ICON[r.resource]} {r.stock}t · {stateLabel(s)}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
+          {/* Kolonieinfo jetzt im ColonyGrid Info-Panel */}
 
           {/* AN BORD */}
           <div style={{ ...card, padding: '0.85rem 1rem', flexShrink: 0 }}>
