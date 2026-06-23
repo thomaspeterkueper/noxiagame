@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 12:50 — NPC-Gebäude: entity_id aus DB hat Vorrang vor tileType
-// Version:      4.3.2
+// Aktualisiert: 23.06.2026 12:55 — TILE_SIZE_MAX 120, Straßen baubar, Habitat-Sprites
+// Version:      4.4.0
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -40,7 +40,7 @@ function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
 }
 
 const TILE_SIZE_MIN = 44
-const TILE_SIZE_MAX = 80
+const TILE_SIZE_MAX = 120
 const RES_DE: Record<string, string> = { metal: 'Metall', energy: 'Energie', water: 'Wasser' }
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
