@@ -1,10 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 22.06.2026 09:30 — Header/Balken/Sidebar entfernt, Grid volle Breite
+// Aktualisiert: 22.06.2026 09:30 → 23.06.2026 09:45 — Responsives Grid: TILE_SIZE passt sich an verfügbare Breite an
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
-// Version:      3.7.0
+// Version:      3.8.0
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -46,7 +46,8 @@ function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   )
 }
 
-const TILE_SIZE = 44
+const TILE_SIZE_MIN = 44
+const TILE_SIZE_MAX = 80
 
 // ── Typen für Bestand + Vorgänge ──────────────────────────────
 
@@ -318,6 +319,20 @@ export default function ColonyGrid({
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0, inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged,
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
+
+  // Responsives Grid: Kachelgröße an Container anpassen
+  React.useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver(entries => {
+      const w = entries[0].contentRect.width
+      if (w > 0) {
+        const size = Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, Math.floor(w / COLS)))
+        setTileSize(size)
+      }
+    })
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
   const [grid, setGrid]               = useState<string[][]>([])
   const [anomaly, setAnomaly]         = useState<{ r: number; c: number } | null>(null)
   const [selectedTile, setSelectedTile] = useState<{ r: number; c: number; type: string } | null>(null)
@@ -325,6 +340,8 @@ export default function ColonyGrid({
   const [showAdmin, setShowAdmin]           = useState(false)
   const [showSchool, setShowSchool]         = useState(false)
   const [showLanding, setShowLanding]       = useState(false)
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const [tileSize, setTileSize]             = useState(TILE_SIZE_MIN)
   const [showBank, setShowBank]             = useState(false)
   const [buildHover, setBuildHover]         = useState(false)
   const [hoveredTile, setHoveredTile]       = useState<TooltipInfo | null>(null)
@@ -457,19 +474,19 @@ export default function ColonyGrid({
       )}
 
       {/* Grid */}
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+      <div ref={containerRef} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', width: '100%' }}>
 
         {/* Kachelgrid */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           {hoveredTile && <TileTooltip info={hoveredTile} COLS={COLS} />}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${COLS}, ${TILE_SIZE}px)`,
+            gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
             gap: 0,
             border: '2px solid #2a4e7a',
             borderRadius: '6px',
             overflow: 'hidden',
-            width: `${COLS * TILE_SIZE}px`,
+            width: `${COLS * tileSize}px`,
           }}>
         {grid.flatMap((row, r) =>
           row.map((tileType, c) => {
@@ -526,8 +543,8 @@ export default function ColonyGrid({
                 }}
                 style={{
                   position: 'relative',
-                  width:    TILE_SIZE,
-                  height:   TILE_SIZE,
+                  width:    tileSize,
+                  height:   tileSize,
                   cursor:   interactive ? 'pointer' : 'default',
                   boxShadow: ownerShadow,
                   boxSizing: 'border-box',
@@ -550,7 +567,7 @@ export default function ColonyGrid({
                         planet={slug}
                         occupancy={populationMax > 0 ? population / populationMax : 0}
                         owned={false}
-                        size={TILE_SIZE}
+                        size={tileSize}
                       />
                     )
                   }
