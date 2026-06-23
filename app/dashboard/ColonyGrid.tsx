@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 11:58 — useLayoutEffect für sofortige Breitenmessung
-// Version:      4.2.1
+// Aktualisiert: 23.06.2026 11:20 — tileSize als externe Prop vom DashboardClient
+// Version:      4.3.0
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -70,6 +70,7 @@ interface ColonyGridProps {
   cargo?: Record<string, number>; shipRange?: number; currentTick?: number
   inTransit?: boolean; onTravel?: (dest: string) => void
   onOpenShipyard?: () => void; onOpenWarehouse?: () => void; onChanged?: () => void
+  tileSize?: number  // extern vom DashboardClient gemessen — überschreibt internen Observer
 }
 interface TooltipInfo {
   r: number; c: number; x: number; y: number
@@ -252,7 +253,7 @@ export default function ColonyGrid({
   userId, entities = [], pending = [], tax, entityInfo,
   locationResources = [], credits = 0,
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0,
-  inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged,
+  inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize,
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid]     = useState<string[][]>([])
@@ -264,7 +265,8 @@ export default function ColonyGrid({
   const [showLanding, setShowLanding] = useState(false)
   const [showBank, setShowBank]     = useState(false)
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
-  const [tileSize, setTileSize]     = useState(TILE_SIZE_MIN)
+  const [internalTileSize, setTileSize] = useState(TILE_SIZE_MIN)
+  const tileSize = externalTileSize ?? internalTileSize
   const measureRef = useRef<HTMLDivElement>(null)   // Mess-div: volle Breite, height 0
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
