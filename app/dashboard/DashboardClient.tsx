@@ -1,14 +1,9 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 10:00
-// Version:      2.0.0
+// Aktualisiert: 23.06.2026 10:20
+// Version:      2.1.0
 //
-// Finales Layout:
-// - FullHD-optimiert (maxWidth 1600px, kein maxWidth auf Grid)
-// - Sidebar: Spielerprofil (RPG-Style) → Kolonieinfo → Schiff+Cargo → Feed
-// - Unten: Deine Orte + Deine Schiffe
-// - "Kachel anklicken" Feld entfernt
-// - Drei Infofelder zu einem Feed zusammengeführt
+// v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
 'use client'
 
@@ -29,19 +24,17 @@ import { TipBanner, TipDef } from './TipSystem'
 import { worstStatus, resourceStatus, stateColor, stateLabel, attentionItems } from './dashboardStatus'
 import { T, Icon, Toast, RESOURCE_LABEL, RESOURCE_ICON, LOC_ICON, LOC_NAME } from './ui'
 
-// ── Schiffsnamen ──────────────────────────────────────────────────────────────
 const SHIP_LABEL: Record<string, string> = {
   freighter_mk1: 'Frachter Mk.I',
   fast_courier:  'Schnellfrachter',
   heavy_hauler:  'Schwerfrachter',
 }
 
-// ── Kompetenz-Balken (kompakt, RPG-Style) ────────────────────────────────────
 function KompetenzBar({ icon, wert, max, farbe }: { icon: string; wert: number; max: number; farbe: string }) {
   const pct = Math.min(100, Math.round((wert / max) * 100))
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
-      <span style={{ fontSize: '0.8rem' }}>{icon}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <span style={{ fontSize: '0.8rem', width: '1.2rem' }}>{icon}</span>
       <div style={{ flex: 1, background: '#e8e4dc', height: '5px', borderRadius: '3px', overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: farbe, borderRadius: '3px', transition: 'width 0.5s' }} />
       </div>
@@ -50,13 +43,9 @@ function KompetenzBar({ icon, wert, max, farbe }: { icon: string; wert: number; 
 }
 
 export default function DashboardClient({
-  locations: initialLocations,
-  prices,
-  orders: initialOrders,
+  locations: initialLocations, prices, orders: initialOrders,
 }: {
-  locations: any[]
-  prices:    any[]
-  orders:    any[]
+  locations: any[]; prices: any[]; orders: any[]
 }) {
   const {
     credits, cargo, cargoMax, location, buy, sell, travel,
@@ -64,7 +53,6 @@ export default function DashboardClient({
     invalidate, invalidations, shipRange,
   } = useGameStore()
 
-  // ── State ───────────────────────────────────────────────────────────────────
   const [toast, setToast]               = useState<{ msg: string; ok: boolean } | null>(null)
   const [worldData, setWorldData]       = useState<any>(null)
   const [playerBuilds, setPlayerBuilds] = useState<any[]>([])
@@ -74,9 +62,7 @@ export default function DashboardClient({
   const [userId, setUserId]             = useState('')
   const [profile, setProfile]           = useState<any>(null)
   const [ships, setShips]               = useState<any[]>([])
-  const [playerStats, setPlayerStats]   = useState<{ trades: number; flights: number; knowledge: number }>({ trades: 0, flights: 0, knowledge: 0 })
-
-  // Overlays
+  const [playerStats, setPlayerStats]   = useState({ trades: 0, flights: 0, knowledge: 0 })
   const [shipyardOpen,   setShipyardOpen]   = useState(false)
   const [warehouseOpen,  setWarehouseOpen]  = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
@@ -87,21 +73,15 @@ export default function DashboardClient({
     resource: ResourceType; mode: 'buy' | 'sell'; qty: number; limit: number
   }>({ resource: 'water', mode: 'buy', qty: 10, limit: 0 })
 
-  // ── Laden ───────────────────────────────────────────────────────────────────
   useEffect(() => { loadFromServer() }, [])
-
   const prevLocationRef = React.useRef(location)
   useEffect(() => {
-    if (prevLocationRef.current !== location) {
-      prevLocationRef.current = location
-      loadFromServer()
-    }
+    if (prevLocationRef.current !== location) { prevLocationRef.current = location; loadFromServer() }
   }, [location])
 
   useEffect(() => {
     async function fetchWorld() {
-      try { setWorldData(await (await fetch('/api/game/world')).json()) }
-      catch {}
+      try { setWorldData(await (await fetch('/api/game/world')).json()) } catch {}
     }
     fetchWorld()
     const iv = setInterval(fetchWorld, 30000)
@@ -123,38 +103,26 @@ export default function DashboardClient({
   useEffect(() => { fetchBuilds() }, [invalidations.builds])
 
   useEffect(() => {
-    async function fetchProfile() {
+    async function fetchAll() {
       try {
         const token = await getToken()
-        const [profileRes, knowledgeRes, tradesRes] = await Promise.all([
-          fetch('/api/game/profile',                        { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/game/knowledge',                      { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/game/trade?action=getTrades',         { headers: { Authorization: `Bearer ${token}` } }),
+        const [pR, kR, tR, sR] = await Promise.all([
+          fetch('/api/game/profile',                { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/game/knowledge',              { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/game/trade?action=getTrades', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/game/ships?action=list',      { headers: { Authorization: `Bearer ${token}` } }),
         ])
-        const profileData   = await profileRes.json()
-        const knowledgeData = await knowledgeRes.json()
-        const tradesData    = await tradesRes.json()
-        setProfile(profileData.profile)
-        const trades  = tradesData.trades ?? []
-        const flights = trades.filter((t: any) => t.from_location !== t.to_location).length
-        setPlayerStats({ trades: trades.length, flights, knowledge: knowledgeData.knowledge_points ?? 0 })
+        const pd = await pR.json(); const kd = await kR.json()
+        const td = await tR.json(); const sd = await sR.json()
+        setProfile(pd.profile)
+        const trades = td.trades ?? []
+        setPlayerStats({ trades: trades.length, flights: trades.filter((t: any) => t.from_location !== t.to_location).length, knowledge: kd.knowledge_points ?? 0 })
+        if (sd.ships) setShips(sd.ships)
       } catch {}
     }
-    fetchProfile()
+    fetchAll()
   }, [])
 
-  useEffect(() => {
-    async function fetchShips() {
-      try {
-        const token = await getToken()
-        const data = await (await fetch('/api/game/ships?action=list', { headers: { Authorization: `Bearer ${token}` } })).json()
-        if (data.ships) setShips(data.ships)
-      } catch {}
-    }
-    fetchShips()
-  }, [])
-
-  // ── Abgeleitete Daten ───────────────────────────────────────────────────────
   const locations           = worldData?.locations ?? initialLocations
   const news                = worldData?.news ?? []
   const stats               = worldData?.stats
@@ -173,7 +141,6 @@ export default function DashboardClient({
   const propertySlugs     = Array.from(new Set<string>([location, ...Object.keys(propertyByLocation)]))
   const propertyLocations = propertySlugs.map(s => locations.find((l: any) => l.slug === s)).filter(Boolean)
 
-  // Feed: Aufmerksamkeit + beste Route + Nachrichten kombiniert
   let best: { from: string; to: string; resource: string; profit: number } | null = null
   const byResource: Record<string, any[]> = {}
   for (const p of prices) { (byResource[p.resource] ??= []).push(p) }
@@ -192,78 +159,54 @@ export default function DashboardClient({
     ...news.slice(0, 3).map((n: any) => ({ type: 'news' as const, icon: n.icon ?? '📰', text: n.text })),
   ]
 
-  // ── Handler ─────────────────────────────────────────────────────────────────
-  function showToast(msg: string, ok: boolean) {
-    setToast({ msg, ok }); setTimeout(() => setToast(null), 2500)
-  }
-
-  async function handleTravel(dest: string) {
-    if (!inTransit) await travel(dest as LocationSlug, stats?.tickNumber ?? 0)
-  }
-
+  function showToast(msg: string, ok: boolean) { setToast({ msg, ok }); setTimeout(() => setToast(null), 2500) }
+  async function handleTravel(dest: string) { if (!inTransit) await travel(dest as LocationSlug, stats?.tickNumber ?? 0) }
   async function handleLogout() {
     const { createClient } = await import('@/lib/supabase/client')
     await createClient().auth.signOut()
     window.location.href = '/auth/login'
   }
 
-  const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
+  const card: React.CSSProperties        = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
   const sectionLabel: React.CSSProperties = { fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 700, marginBottom: '0.4rem' }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
 
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
+      {profile && !profile.onboarded && <WelcomeSetup onDone={() => window.location.reload()} />}
 
-      {profile && !profile.onboarded && (
-        <WelcomeSetup onDone={() => { window.location.reload() }} />
-      )}
-
-      {/* ── OVERLAYS ────────────────────────────────────────────────────────── */}
+      {/* OVERLAYS */}
       {auctionOpen && (
         <MarketAuction
-          open={auctionOpen}
-          onClose={() => setAuctionOpen(false)}
+          open={auctionOpen} onClose={() => setAuctionOpen(false)}
           location={location as LocationSlug}
           locationName={currentLocationData?.name ?? LOC_NAME[location]}
-          rows={currentPrices.map((p: any) => ({
-            resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price,
-            stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100,
-          }))}
+          rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))}
           credits={credits} cargo={cargo} cargoMax={cargoMax}
-          initialResource={auctionConfig.resource}
-          initialMode={auctionConfig.mode}
-          initialQty={auctionConfig.qty}
-          playerLimit={auctionConfig.limit}
+          initialResource={auctionConfig.resource} initialMode={auctionConfig.mode}
+          initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit}
           onTrade={async (resource, mode, amount, price) => {
             const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount)
-            showToast(result.msg, result.ok)
-            return result.ok
+            showToast(result.msg, result.ok); return result.ok
           }}
         />
       )}
-
       {warehouseOpen && (
         <WarehouseOverlay
           locationSlug={location as LocationSlug}
           locationName={currentLocationData?.name ?? LOC_NAME[location]}
-          prices={prices}
-          resources={currentLocationData?.location_resources ?? []}
+          prices={prices} resources={currentLocationData?.location_resources ?? []}
           orders={initialOrders.filter((o: any) => o.locations?.slug === location)}
-          cargo={cargo}
-          cargoMax={cargoMax}
-          credits={credits}
+          cargo={cargo} cargoMax={cargoMax} credits={credits}
           onTrade={async (resource, mode, amount, price) => {
             const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount)
-            showToast(result.msg, result.ok)
-            return result.ok
+            showToast(result.msg, result.ok); return result.ok
           }}
           onFulfillOrder={async (orderId, agreedReward) => {
             const token = await getToken()
-            const res = await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })
-            const data = await res.json()
+            const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })).json()
             if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() }
             else showToast(data.error, false)
             return data.ok
@@ -271,29 +214,11 @@ export default function DashboardClient({
           onClose={() => setWarehouseOpen(false)}
         />
       )}
-
-      {profileOpen && profile && (
-        <ProfileOverlay
-          username={profile.username ?? '?'}
-          avatar={profile.avatar ?? 'pilot_01'}
-          credits={credits}
-          onClose={() => setProfileOpen(false)}
-        />
-      )}
-
-      <ColonyDetail
-        colony={detailColony}
-        isHere={detailColony?.slug === location}
-        cargo={cargo}
-        onClose={() => setDetailColony(null)}
-        onTravel={handleTravel}
-      />
-
+      {profileOpen && profile && <ProfileOverlay username={profile.username ?? '?'} avatar={profile.avatar ?? 'pilot_01'} credits={credits} onClose={() => setProfileOpen(false)} />}
+      <ColonyDetail colony={detailColony} isHere={detailColony?.slug === location} cargo={cargo} onClose={() => setDetailColony(null)} onTravel={handleTravel} />
       <ShipyardOverlay
-        open={shipyardOpen}
-        onClose={() => setShipyardOpen(false)}
-        currentShipTypeId={shipTypeId ?? 'freighter_mk1'}
-        credits={credits}
+        open={shipyardOpen} onClose={() => setShipyardOpen(false)}
+        currentShipTypeId={shipTypeId ?? 'freighter_mk1'} credits={credits}
         onBuyShip={async (type) => {
           const token = await getToken()
           const data = await (await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { Authorization: `Bearer ${token}` } })).json()
@@ -301,7 +226,6 @@ export default function DashboardClient({
           else showToast(data.error ?? 'Kauf fehlgeschlagen', false)
         }}
       />
-
       <OrderNegotiation
         order={negotiateOrder ? { ...negotiateOrder, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === negotiateOrder.resource)?.stock } : null}
         onClose={() => setNegotiateOrder(null)}
@@ -311,41 +235,27 @@ export default function DashboardClient({
           const token = await getToken()
           const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${id}&agreedReward=${Math.round(bonus)}`, { headers: { Authorization: `Bearer ${token}` } })).json()
           if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() }
-          else showToast(data.error, false)
-          return data.ok
+          else showToast(data.error, false); return data.ok
         }}
       />
 
-      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-      <header style={{
-        background: T.surface, borderBottom: `1px solid ${T.line}`,
-        padding: '0 2rem', height: '60px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 100,
-      }}>
+      {/* HEADER */}
+      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, flexShrink: 0 }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.3rem', margin: 0 }}>
           noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
           <span style={{ fontSize: '0.5rem', letterSpacing: '0.3em', color: T.gold, marginLeft: '1rem', verticalAlign: 'middle', textTransform: 'uppercase' }}>Alpha 0.1</span>
         </h1>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          {([
-            ['Credits',     `${credits.toLocaleString('de')} Cr`],
-            ['Frachter',    `${used} / ${cargoMax} t`],
-            ['Standort',    `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`],
-            ['Bevölkerung', totalPop.toLocaleString('de')],
-          ] as [string, string][]).map(([l, v], i) => (
+          {([['Credits', `${credits.toLocaleString('de')} Cr`], ['Frachter', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => (
             <div key={i}>
               <div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div>
               <div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div>
             </div>
           ))}
-          <button onClick={() => setProfileOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} title="Profil öffnen">
-            {profile?.avatar
-              ? <img src={`/images/avatars/${profile.avatar}.png`} alt="" style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${T.gold}`, objectFit: 'cover' }} />
-              : <div style={{ width: 36, height: 36, borderRadius: '50%', background: T.blue, border: `2px solid ${T.gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem' }}>
-                  {profile?.username?.[0]?.toUpperCase() ?? '?'}
-                </div>
-            }
+          <button onClick={() => setProfileOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: T.blue, border: `2px solid ${T.gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem', overflow: 'hidden' }}>
+              {profile?.avatar ? <img src={`/images/avatars/${profile.avatar}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (profile?.username?.[0]?.toUpperCase() ?? '?')}
+            </div>
           </button>
           <button onClick={handleLogout} style={{ background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: T.radius, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             {Icon.logout(T.blue)} Abmelden
@@ -353,78 +263,60 @@ export default function DashboardClient({
         </div>
       </header>
 
-      {/* ── HAUPTINHALT ─────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.25rem 1.5rem 2rem', display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
+      {/* HAUPTINHALT */}
+      <div style={{ flex: 1, maxWidth: '1800px', width: '100%', margin: '0 auto', padding: '1.25rem 1.5rem 0', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'start' }}>
 
-        {/* ── LINKE SPALTE ──────────────────────────────────────────────────── */}
+        {/* LINKE SPALTE */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-
-          {/* Tipps */}
           {(() => {
             const localEntities = tileEntities.filter((e: any) => e.locations?.slug === location)
             const hasSchool = localEntities.some((e: any) => e.entity_id === 'school')
             const hasAdmin  = localEntities.some((e: any) => e.entity_id === 'admin')
             const ownBuilds = tileEntities.filter((e: any) => e.profile_id === userId).length
             const tips: TipDef[] = [
-              { id: 'tip_energy',     icon: '⚡', condition: cargo.energy === 0 && !inTransit,  text: 'Keine Energie an Bord. Klicke auf das Warenhaus im Grid um Energie zu kaufen.' },
-              { id: 'tip_school',     icon: '🎓', condition: hasSchool,                          text: 'Klicke auf die Akademie im Grid um Aufgaben zu lösen und das Handbuch zu lesen.' },
-              { id: 'tip_admin',      icon: '🏛️', condition: hasAdmin,                           text: 'Klicke auf die Verwaltung im Grid für Koloniedetails und Aufträge.' },
-              { id: 'tip_build',      icon: '🏗️', condition: ownBuilds === 0,                    text: 'Noch keine Gebäude. Klicke auf eine freie Kachel im Grid um zu bauen.' },
-              { id: 'tip_prometheus', icon: '🛸', condition: location === 'earth',               text: 'Prometheus (L5) ist nur 11s entfernt — ideal als erste Zwischenstation.' },
+              { id: 'tip_energy',     icon: '⚡', condition: cargo.energy === 0 && !inTransit, text: 'Keine Energie an Bord. Klicke auf das Warenhaus im Grid um Energie zu kaufen.' },
+              { id: 'tip_school',     icon: '🎓', condition: hasSchool,                         text: 'Klicke auf die Akademie im Grid um Aufgaben zu lösen und das Handbuch zu lesen.' },
+              { id: 'tip_admin',      icon: '🏛️', condition: hasAdmin,                          text: 'Klicke auf die Verwaltung im Grid für Koloniedetails und Aufträge.' },
+              { id: 'tip_build',      icon: '🏗️', condition: ownBuilds === 0,                   text: 'Noch keine Gebäude. Klicke auf eine freie Kachel im Grid um zu bauen.' },
+              { id: 'tip_prometheus', icon: '🛸', condition: location === 'earth',              text: 'Prometheus (L5) ist nur 11s entfernt — ideal als erste Zwischenstation.' },
             ]
             return <TipBanner tips={tips} />
           })()}
 
-          {/* Grid oder Station */}
           {currentLocationData?.location_type === 'station' || location === 'prometheus' ? (
             <StationOverlay
-              slug={location}
-              name={currentLocationData?.name ?? 'Station'}
-              population={currentLocationData?.population ?? 0}
-              populationMax={currentLocationData?.population_max ?? 1}
-              userId={userId}
-              locationId={currentLocationData?.id ?? ''}
+              slug={location} name={currentLocationData?.name ?? 'Station'}
+              population={currentLocationData?.population ?? 0} populationMax={currentLocationData?.population_max ?? 1}
+              userId={userId} locationId={currentLocationData?.id ?? ''}
               locationResources={currentLocationData?.location_resources ?? []}
-              credits={credits}
-              entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+              credits={credits} entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
               onChanged={async () => { await loadFromServer(); invalidate('builds') }}
               onOpenWarehouse={() => setWarehouseOpen(true)}
             />
           ) : (
             <ColonyGrid
-              slug={location}
-              name={currentLocationData?.name ?? location}
-              population={currentLocationData?.population ?? 0}
-              populationMax={currentLocationData?.population_max ?? 1}
+              slug={location} name={currentLocationData?.name ?? location}
+              population={currentLocationData?.population ?? 0} populationMax={currentLocationData?.population_max ?? 1}
               isSupplied={currentLocationData?.is_supplied ?? false}
-              userId={userId}
-              tax={colonyTax[currentLocationData?.id ?? '']}
-              entityInfo={entityInfo}
+              userId={userId} tax={colonyTax[currentLocationData?.id ?? '']} entityInfo={entityInfo}
               locationResources={currentLocationData?.location_resources ?? []}
-              credits={credits}
-              allLocations={locations.filter((l: any) => l.slug !== location)}
+              credits={credits} allLocations={locations.filter((l: any) => l.slug !== location)}
               cargo={cargo as unknown as Record<string, number>}
-              shipRange={shipRange}
-              currentTick={stats?.tickNumber ?? 0}
-              inTransit={inTransit}
-              onTravel={handleTravel}
-              onOpenShipyard={() => setShipyardOpen(true)}
+              shipRange={shipRange} currentTick={stats?.tickNumber ?? 0} inTransit={inTransit}
+              onTravel={handleTravel} onOpenShipyard={() => setShipyardOpen(true)}
               onOpenWarehouse={() => setWarehouseOpen(true)}
               onChanged={async () => { await loadFromServer(); invalidate('builds') }}
               entities={tileEntities.filter((e: any) => e.locations?.slug === location && e.tile_row != null)}
-              pending={playerBuilds
-                .filter((b: any) => b.locations?.slug === location)
-                .map((b: any) => ({ buildable_id: b.buildable_id, tile_row: b.tile_row, tile_col: b.tile_col, status: b.status }))}
+              pending={playerBuilds.filter((b: any) => b.locations?.slug === location).map((b: any) => ({ buildable_id: b.buildable_id, tile_row: b.tile_row, tile_col: b.tile_col, status: b.status }))}
             />
           )}
 
-          {/* ── DEINE ORTE ──────────────────────────────────────────────────── */}
+          {/* DEINE ORTE */}
           <div>
             <div style={sectionLabel}>Deine Orte</div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {propertyLocations.map((loc: any) => {
-                const isHere   = loc.slug === location
-                const gebaeude = propertyByLocation[loc.slug] ?? 0
+                const isHere = loc.slug === location
                 return (
                   <div key={loc.id} onClick={() => setDetailColony(loc)}
                     style={{ ...card, padding: '0.55rem 0.9rem', cursor: 'pointer', borderLeft: `3px solid ${isHere ? T.gold : T.blue}`, minWidth: '110px' }}>
@@ -432,21 +324,20 @@ export default function DashboardClient({
                       {LOC_ICON[loc.slug] ?? '🪐'} {LOC_NAME[loc.slug] ?? loc.slug}
                       {isHere && <span style={{ fontSize: '0.46rem', background: T.gold, color: '#fff', borderRadius: '3px', padding: '1px 4px' }}>HIER</span>}
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: T.inkFaint, marginTop: '2px' }}>{gebaeude > 0 ? `${gebaeude} Gebäude` : 'kein Gebäude'}</div>
+                    <div style={{ fontSize: '0.65rem', color: T.inkFaint, marginTop: '2px' }}>{(propertyByLocation[loc.slug] ?? 0) > 0 ? `${propertyByLocation[loc.slug]} Gebäude` : 'kein Gebäude'}</div>
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* ── DEINE SCHIFFE ───────────────────────────────────────────────── */}
+          {/* DEINE SCHIFFE */}
           {ships.length > 0 && (
             <div>
               <div style={sectionLabel}>Deine Schiffe</div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {ships.map((s: any) => (
-                  <div key={s.id}
-                    onClick={() => setShipyardOpen(true)}
+                  <div key={s.id} onClick={() => setShipyardOpen(true)}
                     style={{ ...card, padding: '0.55rem 0.9rem', cursor: 'pointer', borderLeft: `3px solid ${s.is_active ? T.gold : T.line}`, minWidth: '150px' }}>
                     <div style={{ fontWeight: 700, fontSize: '0.8rem', color: T.blueDeep, display: 'flex', alignItems: 'center', gap: '4px' }}>
                       🚀 {SHIP_LABEL[s.ship_type_id] ?? s.ship_type_id}
@@ -462,52 +353,37 @@ export default function DashboardClient({
           )}
         </div>
 
-        {/* ── RECHTE SIDEBAR ──────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', position: 'sticky', top: '76px', maxHeight: 'calc(100vh - 90px)', overflowY: 'auto' }}>
+        {/* RECHTE SIDEBAR */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', position: 'sticky', top: '76px', height: 'calc(100vh - 90px)' }}>
 
-          {/* ── SPIELERPROFIL (RPG-Style) ──────────────────────────────────── */}
-          <div style={{ ...card, padding: '0.9rem 1rem', cursor: 'pointer' }} onClick={() => setProfileOpen(true)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.65rem' }}>
-              {/* Avatar */}
+          {/* SPIELERPROFIL */}
+          <div style={{ ...card, padding: '0.9rem 1rem', cursor: 'pointer', flexShrink: 0 }} onClick={() => setProfileOpen(true)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', border: `2px solid ${T.gold}`, overflow: 'hidden', flexShrink: 0, background: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {profile?.avatar
-                  ? <img src={`/images/avatars/${profile.avatar}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1rem' }}>{profile?.username?.[0]?.toUpperCase() ?? '?'}</span>
-                }
+                {profile?.avatar ? <img src={`/images/avatars/${profile.avatar}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1rem' }}>{profile?.username?.[0]?.toUpperCase() ?? '?'}</span>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: T.blueDeep, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                  {profile?.username ?? '…'}
-                </div>
-                <div style={{ fontSize: '0.62rem', color: T.inkFaint, marginTop: '1px' }}>
-                  {credits.toLocaleString('de')} Cr · 🧠 {playerStats.knowledge} Wissen
-                </div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: T.blueDeep, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{profile?.username ?? '…'}</div>
+                <div style={{ fontSize: '0.62rem', color: T.inkFaint, marginTop: '1px' }}>{credits.toLocaleString('de')} Cr · 🧠 {playerStats.knowledge} Wissen</div>
               </div>
               <span style={{ fontSize: '0.65rem', color: T.inkFaint }}>→</span>
             </div>
-            {/* Kompetenz-Balken */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <KompetenzBar icon="⚖️" wert={playerStats.trades}   max={200}  farbe={T.gold} />
               <KompetenzBar icon="🚀" wert={playerStats.flights}  max={75}   farbe="#5aaeff" />
               <KompetenzBar icon="🧠" wert={playerStats.knowledge} max={2000} farbe="#b48ce8" />
             </div>
-            <div style={{ fontSize: '0.58rem', color: T.inkFaint, marginTop: '0.4rem', textAlign: 'center' }}>
-              Klick für Vollprofil & Kompetenzen
-            </div>
+            <div style={{ fontSize: '0.58rem', color: T.inkFaint, marginTop: '0.4rem', textAlign: 'center' }}>Klick für Vollprofil & Kompetenzen</div>
           </div>
 
-          {/* ── KOLONIEINFO ────────────────────────────────────────────────── */}
+          {/* KOLONIEINFO */}
           {currentLocationData && (() => {
             const worst  = worstStatus(currentLocationData)
             const popPct = Math.round((currentLocationData.population / Math.max(1, currentLocationData.population_max)) * 100)
             return (
-              <div style={{ ...card, padding: '0.85rem 1rem', borderLeft: `3px solid ${worst ? stateColor(worst.state, T) : T.green}` }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.95rem', color: T.blueDeep, marginBottom: '0.3rem' }}>
-                  {LOC_ICON[location] ?? '🪐'} {currentLocationData.name}
-                </div>
-                <div style={{ fontSize: '0.68rem', color: T.inkSoft, marginBottom: '0.45rem' }}>
-                  {currentLocationData.population.toLocaleString('de')} Einwohner · {popPct}% Auslastung
-                </div>
+              <div style={{ ...card, padding: '0.85rem 1rem', borderLeft: `3px solid ${worst ? stateColor(worst.state, T) : T.green}`, flexShrink: 0 }}>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.95rem', color: T.blueDeep, marginBottom: '0.3rem' }}>{LOC_ICON[location] ?? '🪐'} {currentLocationData.name}</div>
+                <div style={{ fontSize: '0.68rem', color: T.inkSoft, marginBottom: '0.45rem' }}>{currentLocationData.population.toLocaleString('de')} Einwohner · {popPct}% Auslastung</div>
                 {(currentLocationData.location_resources ?? []).map((r: any) => {
                   const s = resourceStatus(r)
                   return (
@@ -521,8 +397,8 @@ export default function DashboardClient({
             )
           })()}
 
-          {/* ── AKTIVES SCHIFF + CARGO ─────────────────────────────────────── */}
-          <div style={{ ...card, padding: '0.85rem 1rem' }}>
+          {/* AN BORD */}
+          <div style={{ ...card, padding: '0.85rem 1rem', flexShrink: 0 }}>
             <div style={sectionLabel}>An Bord · {SHIP_LABEL[shipTypeId ?? ''] ?? shipTypeId ?? 'Schiff'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '0.4rem' }}>
               {used > 0
@@ -536,18 +412,18 @@ export default function DashboardClient({
               }
             </div>
             <div style={{ marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: `1px solid ${T.lineSoft}`, fontSize: '0.65rem', color: T.inkFaint, display: 'flex', justifyContent: 'space-between' }}>
-              <span>Frei</span>
-              <span style={{ fontWeight: 600 }}>{cargoFree}t / {cargoMax}t</span>
+              <span>Frei</span><span style={{ fontWeight: 600 }}>{cargoFree}t / {cargoMax}t</span>
             </div>
           </div>
 
-          {/* ── FEED (Aufmerksamkeit + Route + Nachrichten) ────────────────── */}
+          {/* FEED — füllt restliche Höhe */}
           {feed.length > 0 && (
-            <div style={{ ...card, padding: '0.85rem 1rem' }}>
+            <div style={{ ...card, padding: '0.85rem 1rem', flex: 1, overflowY: 'auto', minHeight: 0 }}>
               <div style={sectionLabel}>Feed</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '0.35rem' }}>
                 {feed.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start', fontSize: '0.72rem',
+                  <div key={i} style={{
+                    display: 'flex', gap: '7px', alignItems: 'flex-start', fontSize: '0.72rem',
                     color: item.type === 'critical' ? T.red : item.type === 'warning' ? '#c07020' : T.inkSoft,
                     paddingBottom: i < feed.length - 1 ? '5px' : 0,
                     borderBottom: i < feed.length - 1 ? `1px solid ${T.lineSoft}` : 'none',
@@ -561,6 +437,14 @@ export default function DashboardClient({
           )}
         </div>
       </div>
+
+      {/* FOOTER */}
+      <footer style={{ borderTop: `1px solid ${T.line}`, marginTop: '2rem', padding: '0.65rem 2rem', display: 'flex', justifyContent: 'center', gap: '2rem', alignItems: 'center', background: T.surface, flexShrink: 0 }}>
+        {([['Impressum', '/impressum'], ['Datenschutz', '/datenschutz'], ['Nutzungsbedingungen', '/nutzungsbedingungen'], ['Kontakt', 'mailto:info@noxiagame.com']] as [string,string][]).map(([label, href]) => (
+          <a key={label} href={href} style={{ fontSize: '0.62rem', color: T.inkFaint, textDecoration: 'none' }}>{label}</a>
+        ))}
+        <span style={{ fontSize: '0.62rem', color: T.inkFaint }}>· © 2026 Thomas Küper · noχ¹ᐃ Alpha 0.1</span>
+      </footer>
     </div>
   )
 }
