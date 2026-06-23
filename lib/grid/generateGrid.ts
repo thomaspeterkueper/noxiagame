@@ -1,7 +1,9 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.3.0
+// Version:  0.4.0
 //
+// v0.4.0: Earth-Terrain sichtbar unterscheidbar: grass / forest / river /
+//   urban statt grauer Platzhalterfläche. Ziel: Erde liest sich sofort als Erde.
 // v0.3.0: Anomalie nur sichtbar, wenn ein fertiger Scanner (entity_id
 //   'scanner') in der Kolonie steht — Entdeckung als Investition.
 // v0.2.0: Anomalie-Andeutung (Schritt 8) — seed-bestimmtes anomaly-Flag.
@@ -50,10 +52,12 @@ export function seededRandom(seed: number, i: number): number {
 }
 
 export function isBuildable(tileType: string): boolean {
-  // Bebaubare Terrains: Oberfläche, Metall, Krater, Schächte
-  // Nicht bebaubar: Berge, Canyons, bestehende Straßen, NPC-Gebäude
+  // Bebaubare Terrains: Oberfläche, Gras, urbane Fläche, Metall, Krater, Schächte
+  // Nicht bebaubar: Wald, Fluss, Berge, Canyons, NPC-Gebäude
   return (
     tileType === 'tile_surface' ||
+    tileType === 'tile_grass'   ||
+    tileType === 'tile_urban'   ||
     tileType === 'tile_metal'   ||
     tileType === 'tile_crater'  ||
     tileType === 'tile_shaft'   ||
@@ -87,10 +91,17 @@ export function generateGrid(
     const row: Cell[] = []
     for (let c = 0; c < cols; c++) {
       const rand = seededRandom(seed, r * cols + c)
+      const riverBand = Math.abs(c - (Math.floor(cols * 0.18) + Math.round(Math.sin((r + seed) * 0.8) * 1.5))) <= 0
       let t: string
       if (slug === 'earth') {
-        // LEO-Terminal: gepflastert, kaum Hindernisse — urbane Raumstation
-        t = rand < 0.03 ? 'tile_crater' : 'tile_surface'
+        // LEO-Terminal/Erde: grüne Grundflächen, Waldgruppen, ein schmaler Fluss
+        // und urbane Terminal-/Bauflächen. Dadurch liest sich die Erde nicht mehr
+        // wie Mond-Regolith mit Gebäuden.
+        if (riverBand && r > 0 && r < rows - 1) t = 'tile_river'
+        else if (rand < 0.24) t = 'tile_forest'
+        else if (rand < 0.34) t = 'tile_urban'
+        else if (rand < 0.40) t = 'tile_surface'
+        else t = 'tile_grass'
       } else if (slug === 'moon') {
         t = rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
       } else if (slug === 'mars') {
