@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 14:10 — Minimap im Info-Panel statisch, kein absolute
-// Version:      5.2.1
+// Aktualisiert: 23.06.2026 16:00 — BuildPopup als Viewport-Modal
+// Version:      5.2.2
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -209,11 +209,15 @@ function BuildPopup({ tileRow, tileCol, locationSlug, onClose, onBuildStarted }:
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(10,20,32,0.97)', borderRadius: '10px', display: 'flex', flexDirection: 'column', padding: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>🏗️ Gebäude bauen — Kachel ({tileRow}, {tileCol})</div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-      </div>
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, zIndex: 2200, background: 'rgba(2,4,8,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+    >
+      <div style={{ width: 'min(700px, 95vw)', maxHeight: '88vh', background: 'rgba(10,20,32,0.98)', border: '1px solid rgba(42,78,122,0.75)', borderRadius: '12px', boxShadow: '0 12px 48px rgba(0,0,0,0.72)', display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>🏗️ Gebäude bauen — Kachel ({tileRow}, {tileCol})</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+        </div>
       {msg && <div style={{ color: '#e05050', fontSize: '0.7rem', marginBottom: '0.5rem' }}>{msg}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
         {items.map(([id, item]) => {
@@ -237,15 +241,16 @@ function BuildPopup({ tileRow, tileCol, locationSlug, onClose, onBuildStarted }:
         })}
       </div>
       {Object.values(BUILDINGS).filter(b => b.planned).length > 0 && (
-        <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: '0.6rem', color: '#5a6878', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '1px' }}>In Entwicklung</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-            {Object.values(BUILDINGS).filter(b => b.planned).map(p => (
-              <div key={p.id} style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid #2a3a4a', borderRadius: '4px', padding: '0.15rem 0.4rem', color: '#4a5a6a', opacity: 0.7 }}>{p.name}</div>
-            ))}
+          <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.6rem', color: '#5a6878', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '1px' }}>In Entwicklung</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+              {Object.values(BUILDINGS).filter(b => b.planned).map(p => (
+                <div key={p.id} style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid #2a3a4a', borderRadius: '4px', padding: '0.15rem 0.4rem', color: '#4a5a6a', opacity: 0.7 }}>{p.name}</div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
