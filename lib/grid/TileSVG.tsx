@@ -1,9 +1,7 @@
 // lib/grid/TileSVG.tsx
 // Erstellt: 31.05.2026
-// Aktualisiert: 15.06.2026 – Straßen maskenbasiert (road_<maske>): zeichnet
-//                            Striche zu allen verbundenen Seiten → Geraden,
-//                            Kurven, T-Stücke, Kreuzungen automatisch.
-// SVG-Kacheln für das ColonyGrid – Mond, Mars, Phobos
+// Aktualisiert: 23.06.2026 – einfache Earth-Terrain-Tiles
+// SVG-Kacheln für das ColonyGrid – Mond, Mars, Phobos, Erde
 
 import { roadSides } from './generateGrid'
 
@@ -19,6 +17,16 @@ interface TileColors {
 }
 
 const COLORS: Record<string, TileColors> = {
+  earth: {
+    base:         '#8fbf7a',
+    dark:         '#5f8f57',
+    darker:       '#3f6f3f',
+    building:     '#5f83a6',
+    buildingDark: '#3d5e7d',
+    accent:       '#d7b45a',
+    road:         '#767b7e',
+    roadLight:    '#b7c0c5',
+  },
   moon: {
     base:         '#b8b0a0',
     dark:         '#a09888',
@@ -58,6 +66,52 @@ function Surface({ c }: { c: TileColors }) {
       <circle cx="12" cy="12" r="3" fill={c.dark} opacity="0.3"/>
       <circle cx="36" cy="36" r="4" fill={c.dark} opacity="0.2"/>
       <circle cx="24" cy="18" r="2" fill={c.darker} opacity="0.25"/>
+    </svg>
+  )
+}
+
+function Grass() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48">
+      <rect width="48" height="48" fill="#8fbd73"/>
+      <circle cx="9" cy="12" r="2" fill="#6f9f5b" opacity="0.45"/>
+      <circle cx="30" cy="18" r="2" fill="#6f9f5b" opacity="0.35"/>
+      <circle cx="39" cy="37" r="3" fill="#6f9f5b" opacity="0.35"/>
+    </svg>
+  )
+}
+
+function Forest() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48">
+      <rect width="48" height="48" fill="#7fb66b"/>
+      <circle cx="12" cy="20" r="9" fill="#356f3c"/>
+      <circle cx="25" cy="17" r="10" fill="#2f6536"/>
+      <circle cx="37" cy="25" r="9" fill="#3a7440"/>
+      <circle cx="18" cy="35" r="7" fill="#315f36"/>
+      <rect x="23" y="22" width="3" height="12" fill="#5b4937" opacity="0.75"/>
+    </svg>
+  )
+}
+
+function River() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48">
+      <rect width="48" height="48" fill="#87b875"/>
+      <path d="M18 0 C10 10 28 16 20 26 C14 34 26 40 20 48 L34 48 C42 38 29 32 36 21 C42 12 25 6 32 0 Z" fill="#5da9c8"/>
+      <path d="M25 0 C18 8 34 13 27 23 C22 31 32 36 27 48" fill="none" stroke="#b9e2ed" strokeWidth="2" opacity="0.55"/>
+    </svg>
+  )
+}
+
+function Urban() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48">
+      <rect width="48" height="48" fill="#a8aaa0"/>
+      <rect x="0" y="22" width="48" height="5" fill="#7d8384" opacity="0.65"/>
+      <rect x="22" y="0" width="5" height="48" fill="#7d8384" opacity="0.65"/>
+      <rect x="8" y="9" width="12" height="9" fill="#8b9188" rx="1"/>
+      <rect x="29" y="30" width="12" height="9" fill="#8b9188" rx="1"/>
     </svg>
   )
 }
@@ -117,30 +171,25 @@ function Canyon({ c }: { c: TileColors }) {
   )
 }
 
-// Maskenbasierte Straße: zeichnet einen Belag von der Mitte zu jeder
-// verbundenen Seite. Geraden/Kurven/T/Kreuzung ergeben sich automatisch.
-// Eine isolierte Straße (keine Nachbarn) zeigt einen Stummel.
 function Road({ c, type }: { c: TileColors; type: string }) {
   const { n, o, s, w } = roadSides(type)
-  const W = 10            // Straßenbreite
-  const half = 24         // Mitte
-  const lw = 5            // helle Mittellinie
+  const W = 10
+  const half = 24
+  const lw = 5
   const isolated = !n && !o && !s && !w
   return (
     <svg width="48" height="48" viewBox="0 0 48 48">
       <rect width="48" height="48" fill={c.base}/>
-      {/* Belag-Arme zu verbundenen Seiten */}
       <rect x={half - W/2} y={half - W/2} width={W} height={W} fill={c.road}/>
-      {n && <rect x={half - W/2} y={0}        width={W}        height={half}     fill={c.road}/>}
-      {s && <rect x={half - W/2} y={half}     width={W}        height={half}     fill={c.road}/>}
-      {w && <rect x={0}         y={half - W/2} width={half}     height={W}        fill={c.road}/>}
-      {o && <rect x={half}      y={half - W/2} width={half}     height={W}        fill={c.road}/>}
-      {/* helle Mittellinien */}
-      {n && <rect x={half - lw/2} y={0}        width={lw}       height={half}     fill={c.roadLight}/>}
-      {s && <rect x={half - lw/2} y={half}     width={lw}       height={half}     fill={c.roadLight}/>}
-      {w && <rect x={0}          y={half - lw/2} width={half}    height={lw}       fill={c.roadLight}/>}
-      {o && <rect x={half}       y={half - lw/2} width={half}    height={lw}       fill={c.roadLight}/>}
-      {isolated && <rect x={half - W/2} y={half - W/2} width={W} height={W} fill={c.road}/>}
+      {n && <rect x={half - W/2} y={0} width={W} height={half} fill={c.road}/>} 
+      {s && <rect x={half - W/2} y={half} width={W} height={half} fill={c.road}/>} 
+      {w && <rect x={0} y={half - W/2} width={half} height={W} fill={c.road}/>} 
+      {o && <rect x={half} y={half - W/2} width={half} height={W} fill={c.road}/>} 
+      {n && <rect x={half - lw/2} y={0} width={lw} height={half} fill={c.roadLight}/>} 
+      {s && <rect x={half - lw/2} y={half} width={lw} height={half} fill={c.roadLight}/>} 
+      {w && <rect x={0} y={half - lw/2} width={half} height={lw} fill={c.roadLight}/>} 
+      {o && <rect x={half} y={half - lw/2} width={half} height={lw} fill={c.roadLight}/>} 
+      {isolated && <rect x={half - W/2} y={half - W/2} width={W} height={W} fill={c.road}/>} 
     </svg>
   )
 }
@@ -211,20 +260,21 @@ function Construction({ c }: { c: TileColors }) {
   )
 }
 
-// Hauptkomponente – wählt die richtige SVG basierend auf Kacheltyp und Planet
 export function TileSVG({ type, planet }: { type: string; planet: string }) {
   const c = COLORS[planet] ?? COLORS.moon
 
-  // Straßen: alle road* (maskenbasiert) + Alt-Aliase
   if (type.startsWith('road')) {
-    // Alt-Aliase auf Maske abbilden (Abwärtskompatibilität)
     if (type === 'road' || type === 'road_cross') return <Road c={c} type="road_15" />
-    if (type === 'road_h') return <Road c={c} type="road_10" />  // O+W
-    if (type === 'road_v') return <Road c={c} type="road_5" />   // N+S
+    if (type === 'road_h') return <Road c={c} type="road_10" />
+    if (type === 'road_v') return <Road c={c} type="road_5" />
     return <Road c={c} type={type} />
   }
 
   switch (type) {
+    case 'tile_grass':            return <Grass/>
+    case 'tile_forest':           return <Forest/>
+    case 'tile_river':            return <River/>
+    case 'tile_urban':            return <Urban/>
     case 'tile_surface':          return <Surface c={c}/>
     case 'tile_crater':           return <Crater c={c}/>
     case 'tile_mountain':         return <Mountain c={c}/>
