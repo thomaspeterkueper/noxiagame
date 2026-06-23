@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 11:30 — ResizeObserver: initiale Größe + parent-basierte Messung
-// Version:      4.0.1
+// Aktualisiert: 23.06.2026 12:15 — CSS 1fr+aspect-ratio, O(1) Maps, useMemo, useCallback
+// Version:      4.1.1
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -291,13 +291,26 @@ export default function ColonyGrid({
   }, [])
 
   // ── Helpers (useCallback) ─────────────────────────────────────────────────
-  const entityAt = useCallback((r: number, c: number) =>
-    entities.find(e => e.tile_row === r && e.tile_col === c && e.entity_type === 'building'),
-  [entities])
+  const entityMap = useMemo(() => {
+    const map = new Map<string, TileEntity>()
+    entities.forEach(e => {
+      if (e.tile_row != null && e.tile_col != null && e.entity_type === 'building')
+        map.set(`${e.tile_row},${e.tile_col}`, e)
+    })
+    return map
+  }, [entities])
 
-  const sellingAt = useCallback((r: number, c: number) =>
-    pending.some(p => p.tile_row === r && p.tile_col === c && p.status === 'selling'),
-  [pending])
+  const sellingMap = useMemo(() => {
+    const map = new Map<string, boolean>()
+    pending.forEach(p => {
+      if (p.tile_row != null && p.tile_col != null && p.status === 'selling')
+        map.set(`${p.tile_row},${p.tile_col}`, true)
+    })
+    return map
+  }, [pending])
+
+  const entityAt  = useCallback((r: number, c: number) => entityMap.get(`${r},${c}`),             [entityMap])
+  const sellingAt = useCallback((r: number, c: number) => sellingMap.get(`${r},${c}`) ?? false,   [sellingMap])
 
   const handleTileClick = useCallback((r: number, c: number, tileType: string) => {
     setSelectedTile({ r, c, type: tileType })
@@ -351,7 +364,7 @@ export default function ColonyGrid({
               setHoveredTile(null)
             }}
             style={{
-              position: 'relative', width: tileSize, height: tileSize,
+              position: 'relative', aspectRatio: '1 / 1', width: '100%',
               cursor: interactive ? 'pointer' : 'default',
               boxShadow: ownerShadow, boxSizing: 'border-box', flexShrink: 0,
               opacity: isSelling ? 0.45 : 1, filter: isSelling ? 'grayscale(0.7)' : 'none',
@@ -377,7 +390,7 @@ export default function ColonyGrid({
         )
       })
     )
-  }, [grid, selectedTile, tileSize, entities, pending, anomaly, userId, entityInfo, handleTileClick, entityAt, sellingAt, slug, population, populationMax])
+  }, [grid, selectedTile, entities, pending, anomaly, userId, entityInfo, handleTileClick, entityAt, sellingAt, slug, population, populationMax])
 
   // Ladezustand
   if (grid.length === 0) return (
@@ -408,14 +421,14 @@ export default function ColonyGrid({
       <div ref={measureRef} style={{ width: '100%', height: '1px', marginBottom: '-1px', visibility: 'hidden' }} />
 
       {/* Grid */}
-      <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div style={{ position: 'relative', width: '100%' }}>
         {hoveredTile && <TileTooltip info={hoveredTile} />}
         <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
+          gridTemplateColumns: `repeat(${COLS}, 1fr)`,
           gap: 0, border: '2px solid #2a4e7a', borderRadius: '6px',
-          overflow: 'hidden', width: `${COLS * tileSize}px`,
+          overflow: 'hidden', width: '100%',
         }}>
           {gridElements}
         </div>
