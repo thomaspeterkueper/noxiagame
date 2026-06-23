@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 22:50 — Split 40/60, kontextuelles Lernmaterial, scrollbar
-// Version:      3.8.0
+// Aktualisiert: 21.06.2026 23:05 — Werkzeuge-Tab entfernt, nur 40/60 Split
+// Version:      3.8.1
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -302,7 +302,7 @@ export default function SchoolOverlay({
   const inputRef                   = useRef<HTMLInputElement>(null)
   const [calcVal, setCalcVal]      = useState('')
   const [showCalc, setShowCalc]    = useState(false)
-  const [tab, setTab]              = useState<'akademie' | 'handbuch' | 'werkzeuge'>('akademie')
+  const [tab, setTab]              = useState<'akademie' | 'handbuch'>('akademie')
   const [videoUrl, setVideoUrl]    = useState('')
   const [videoInput, setVideoInput] = useState('')
   const [levelInfo, setLevel]      = useState<any>(null)
@@ -437,12 +437,12 @@ export default function SchoolOverlay({
         {/* Panel-Header mit Tabs */}
         <div style={{ padding: '0.9rem 1.5rem 0', background: C.bg, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: '0', marginBottom: '-1px', alignItems: 'flex-end' }}>
-            {(['akademie', 'handbuch', 'werkzeuge'] as const).map(t => (
+            {(['akademie', 'handbuch'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
-                {t === 'akademie' ? 'Akademie' : t === 'handbuch' ? 'Handbuch' : '🔧 Werkzeuge'}
+                {t === 'akademie' ? 'Akademie' : 'Handbuch'}
               </button>
             ))}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.5rem' }}>
@@ -468,33 +468,6 @@ export default function SchoolOverlay({
         {/* Handbuch */}
         {tab === 'handbuch' && <ManualTab onClose={onClose} />}
 
-        {tab === 'werkzeuge' && (
-          <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-            {/* YouTube-Player */}
-            <div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#e8702a', letterSpacing: '2px', textTransform: 'uppercase' as const, marginBottom: '0.5rem' }}>📹 Video</div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <input type="text" placeholder="YouTube-URL oder Video-ID …" value={videoInput}
-                  onChange={e => setVideoInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && setVideoUrl(videoInput)}
-                  style={{ flex: 1, background: '#f8f5ee', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.4rem 0.7rem', color: '#2a3a2a', fontSize: '0.8rem', outline: 'none' }} />
-                <button onClick={() => setVideoUrl(videoInput)}
-                  style={{ background: '#c9a961', border: 'none', color: '#fff', borderRadius: '6px', padding: '0.4rem 0.9rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}>Laden</button>
-                {videoUrl && <button onClick={() => { setVideoUrl(''); setVideoInput('') }}
-                  style={{ background: 'transparent', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.4rem 0.7rem', fontSize: '0.75rem', cursor: 'pointer', color: '#8a8a8a' }}>✕</button>}
-              </div>
-              {videoUrl ? (
-                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: '8px', overflow: 'hidden' }}>
-                  <iframe src={`https://www.youtube.com/embed/${extractYouTubeId(videoUrl)}?autoplay=1`}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                </div>
-              ) : (
-                <div style={{ background: '#f0ece3', border: '1px dashed #d4c9b0', borderRadius: '8px', padding: '1.5rem', textAlign: 'center', color: '#8a8a8a', fontSize: '0.75rem' }}>
-                  YouTube-URL eingeben · Empfehlung: NASA, ESA, Kurzgesagt
-                </div>
-              )}
             </div>
 
             {/* Taschenrechner */}
