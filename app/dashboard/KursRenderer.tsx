@@ -1,6 +1,7 @@
 // app/dashboard/KursRenderer.tsx
 // Erstellt:     23.06.2026
-// Version:      1.0.0
+// Aktualisiert: 23.06.2026
+// Version:      1.1.0 — Token-Fix (createClient statt window.__supabase)
 //
 // Rendert Foundation-Kurse dynamisch aus DB-Daten.
 // Folientypen: titel, text, tabelle, zwei_spalten, formel, animation, quiz, video
@@ -9,6 +10,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Folie {
   id:       string
@@ -273,7 +275,8 @@ export default function KursRenderer({ kursId, onComplete, onClose }: KursRender
   async function loadKurs() {
     setLoading(true)
     try {
-      const token = (await (window as any).__supabase?.auth?.getSession())?.data?.session?.access_token ?? ''
+      const { data: { session } } = await createClient().auth.getSession()
+      const token = session?.access_token ?? ''
       const r = await fetch(`/api/game/kurse?id=${kursId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       })
@@ -289,7 +292,8 @@ export default function KursRenderer({ kursId, onComplete, onClose }: KursRender
   async function complete() {
     if (!kurs) return
     try {
-      const token = (await (window as any).__supabase?.auth?.getSession())?.data?.session?.access_token ?? ''
+      const { data: { session: s2 } } = await createClient().auth.getSession()
+      const token = s2?.access_token ?? ''
       await fetch(`/api/game/kurse?action=complete&kurs_db_id=${kurs.id}&punkte=${kurs.punkte}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       })
