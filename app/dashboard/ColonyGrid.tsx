@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 13:10 — TILE_SIZE_DEFAULT 96px
-// Version:      5.0.1
+// Aktualisiert: 23.06.2026 13:20 — 24×16 scrollbar, feste 96px Kacheln, kein ResizeObserver
+// Version:      5.0.2
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -12,12 +12,12 @@
 
 'use client'
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDINGS } from '@/lib/game/buildings/index'
 import { TileSVG } from '@/lib/grid/TileSVG'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
-import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
+import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
 import AdminOverlay from './AdminOverlay'
 import LandingOverlay from './LandingOverlay'
@@ -39,8 +39,11 @@ function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   )
 }
 
-const TILE_SIZE_MIN = 44
-const TILE_SIZE_MAX = 120
+const WORLD_COLS     = 24   // Weltgrid-Breite (scrollbar)
+const WORLD_ROWS     = 16   // Weltgrid-Höhe  (scrollbar)
+const COLS           = WORLD_COLS
+const ROWS           = WORLD_ROWS
+const TILE_SIZE      = 96   // Feste Kachelgröße in px
 const RES_DE: Record<string, string> = { metal: 'Metall', energy: 'Energie', water: 'Wasser' }
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
@@ -267,30 +270,18 @@ export default function ColonyGrid({
   const [showSellPanel, setShowSellPanel] = useState(false)
   const [showBank, setShowBank]     = useState(false)
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
-  const [internalTileSize, setTileSize] = useState(TILE_SIZE_MIN)
-  const tileSize = externalTileSize ?? internalTileSize
-  const measureRef = useRef<HTMLDivElement>(null)   // Mess-div: volle Breite, height 0
+  const tileSize = externalTileSize ?? TILE_SIZE
+
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Grid generieren
   useEffect(() => {
-    const cellGrid = generateGrid(slug, population, entities, pending, userId)
+    const cellGrid = generateGrid(slug, population, entities, pending, userId, WORLD_COLS, WORLD_ROWS)
     setGrid(gridTypes(cellGrid))
     setAnomaly(anomalyAt(cellGrid))
   }, [slug, population, populationMax, entities, pending])
 
-  // useLayoutEffect: synchron nach DOM-Update → offsetWidth garantiert korrekt
-  useLayoutEffect(() => {
-    const el = measureRef.current
-    if (!el) return
-    const calcSize = (w: number) => {
-      if (w > 0) setTileSize(Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, Math.floor(w / COLS))))
-    }
-    calcSize(el.offsetWidth)
-    const obs = new ResizeObserver(entries => calcSize(entries[0].contentRect.width))
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
+
 
   // ── Helpers (useCallback) ─────────────────────────────────────────────────
   const entityMap = useMemo(() => {
@@ -441,21 +432,24 @@ export default function ColonyGrid({
       })()}
       {showBuildPopup && selectedTile && <BuildPopup tileRow={selectedTile.r} tileCol={selectedTile.c} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
 
-      {/* Mess-div: volle Breite, 1px hoch damit offsetWidth korrekt ist */}
-      <div ref={measureRef} style={{ width: '100%', height: '1px', marginBottom: '-1px', visibility: 'hidden' }} />
-
-      {/* Grid */}
-      <div style={{ position: 'relative', width: '100%' }}>
+      {/* Scrollbares Grid */}
+      <div style={{ position: 'relative' }}>
         {hoveredTile && <TileTooltip info={hoveredTile} />}
         <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
-          gridAutoRows: `${tileSize}px`,
-          gap: 0, border: '2px solid #2a4e7a', borderRadius: '6px',
-          overflow: 'hidden',
+          overflowX: 'auto', overflowY: 'auto',
+          maxHeight: 'calc(100vh - 240px)',
+          border: '2px solid #2a4e7a', borderRadius: '6px',
         }}>
-          {gridElements}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
+            gridAutoRows: `${tileSize}px`,
+            gap: 0,
+            width: `${COLS * tileSize}px`,
+          }}>
+            {gridElements}
+          </div>
         </div>
       </div>
     </div>
