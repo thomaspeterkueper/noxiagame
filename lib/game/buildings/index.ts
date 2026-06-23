@@ -1,7 +1,7 @@
 // lib/game/buildings/index.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Initiale Version: alle Gebäude-Definitionen
-// Version:      1.0.0
+// Aktualisiert: 23.06.2026 12:55 — Straße als baubare Infrastruktur
+// Version:      1.1.0
 //
 // Zentrale Registry aller Gebäude. Neue Gebäude = neuer Eintrag hier.
 // Kein Eingriff in bestehende Dateien nötig.
@@ -54,6 +54,14 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     description: '+100 max. Bevölkerung',
     cost: 2000, buildTimeTicks: 3,
     populationBonus: 100,
+  },
+
+  // ── Infrastruktur (baubar) ────────────────────────────────────────────────
+
+  road: {
+    id: 'road', name: 'Straße', category: 'infrastructure',
+    description: 'Erschließt benachbarte Kacheln · Voraussetzung für Habitate',
+    cost: 300, buildTimeTicks: 1,
   },
 
   // ── Service ────────────────────────────────────────────────────────────────
