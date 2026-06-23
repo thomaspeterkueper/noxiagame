@@ -1,10 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 22.06.2026 09:00 — Heller Hintergrund (#f4f2ed), Tile-Grid auf cremeweiß
+// Aktualisiert: 22.06.2026 — BUILDINGS aus index.ts, BankOverlay-Dispatch, BUILDING_NAMES entfernt
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
-// Version:      3.5.0
+// Version:      3.6.0
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
-import { BUILDABLE_ITEMS, PLANNED_BUILDINGS } from '@/lib/game/config'
+import { BUILDINGS } from '@/lib/game/buildings/index'
 import { TileSVG } from '@/lib/grid/TileSVG'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY, COLS, ROWS } from '@/lib/grid/generateGrid'
@@ -25,6 +25,7 @@ import SellPanel from './SellPanel'
 import AdminOverlay from './AdminOverlay'
 import LandingOverlay from './LandingOverlay'
 import SchoolOverlay from './SchoolOverlay'
+import BankOverlay from './BankOverlay'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
@@ -83,7 +84,7 @@ function BuildPopup({
   const [building, setBuilding] = useState(false)
   const [msg, setMsg]           = useState<string | null>(null)
 
-  const items = Object.entries(BUILDABLE_ITEMS)
+  const items = Object.entries(BUILDINGS).filter(([, b]) => !b.planned)
 
   async function startBuild(buildableId: string) {
     setBuilding(true); setMsg(null)
@@ -141,13 +142,13 @@ function BuildPopup({
         })}
       </div>
 
-      {PLANNED_BUILDINGS.length > 0 && (
+      {Object.values(BUILDINGS).filter(b => b.planned).length > 0 && (
         <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ fontSize: '0.6rem', color: '#5a6878', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
             In Entwicklung
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-            {PLANNED_BUILDINGS.map(p => (
+            {Object.values(BUILDINGS).filter(b => b.planned).map(p => (
               <div key={p.id} style={{
                 fontSize: '0.6rem', background: 'rgba(255,255,255,0.03)',
                 border: '1px solid #2a3a4a', borderRadius: '4px',
@@ -169,12 +170,6 @@ function BuildPopup({
 
 // ── Hauptkomponente ───────────────────────────────────────────
 
-const BUILDING_NAMES: Record<string, string> = {
-  mine: 'Mine', solar: 'Solarfeld', habitat: 'Habitat',
-  scanner: 'Scanner', admin: 'Verwaltung',
-  school: 'Akademie', ice_drill: 'Eisbohrung', water_recycler: 'Wasserrecycler',
-  landing_pad: 'Landeplatz', shipyard: 'Werft',
-}
 
 const RES_DE: Record<string, string> = {
   metal: 'Metall', energy: 'Energie', water: 'Wasser',
@@ -194,7 +189,7 @@ interface TooltipInfo {
 
 function TileTooltip({ info, COLS }: { info: TooltipInfo; COLS: number }) {
   const name = info.entity
-    ? (BUILDING_NAMES[info.entity.entity_id] ?? info.entity.entity_id)
+    ? (BUILDINGS[info.entity.entity_id]?.name ?? info.entity.entity_id)
     : info.tileType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
   const flipX = info.c >= COLS - 3
@@ -330,6 +325,7 @@ export default function ColonyGrid({
   const [showAdmin, setShowAdmin]           = useState(false)
   const [showSchool, setShowSchool]         = useState(false)
   const [showLanding, setShowLanding]       = useState(false)
+  const [showBank, setShowBank]             = useState(false)
   const [buildHover, setBuildHover]         = useState(false)
   const [hoveredTile, setHoveredTile]       = useState<TooltipInfo | null>(null)
   const hoverTimer                          = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -363,6 +359,7 @@ export default function ColonyGrid({
     const ent = entityAt(r, c)
     if (ent?.entity_id === 'admin')       { setShowAdmin(true);    return }
     if (ent?.entity_id === 'school')      { setShowSchool(true);   return }
+    if (ent?.entity_id === 'bank')        { setShowBank(true);     return }
     if (ent?.entity_id === 'landing_pad') { setShowLanding(true);  return }
     if (ent?.entity_id === 'shipyard')    { onOpenShipyard?.();    return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
@@ -426,6 +423,17 @@ export default function ColonyGrid({
           onKnowledgeEarned={(pts, total) => {
             console.log(`+${pts} Wissenspunkte → ${total} gesamt`)
           }}
+        />
+      )}
+
+      {/* Bank-Overlay */}
+      {showBank && (
+        <BankOverlay
+          locationSlug={slug}
+          locationName={name}
+          credits={credits}
+          onClose={() => { setShowBank(false); setSelectedTile(null) }}
+          onCreditsChanged={() => { onChanged?.() }}
         />
       )}
 
@@ -621,7 +629,7 @@ export default function ColonyGrid({
                     {isAnomaly
                       ? '✨ Anomalie'
                       : selectedEntity
-                        ? (BUILDING_NAMES[selectedEntity.entity_id] ?? selectedEntity.entity_id)
+                        ? (BUILDINGS[selectedEntity.entity_id]?.name ?? selectedEntity.entity_id)
                         : selectedTile.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </div>
                   <div style={{ color: '#8a9ab0', marginTop: '0.2rem', fontSize: '0.68rem' }}>
@@ -711,7 +719,7 @@ export default function ColonyGrid({
                 <SellPanel
                   key={selectedEntity!.id}
                   entityId={selectedEntity!.id}
-                  entityName={BUILDING_NAMES[selectedEntity!.entity_id] ?? selectedEntity!.entity_id}
+                  entityName={BUILDINGS[selectedEntity!.entity_id]?.name ?? selectedEntity!.entity_id}
                   onSold={async () => { await loadFromServer(); invalidate('builds') }}
                 />
               )}
