@@ -1,10 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 22.06.2026 09:30 → 23.06.2026 09:45 — Responsives Grid: TILE_SIZE passt sich an verfügbare Breite an
+// Aktualisiert: 23.06.2026 10:45 — GridMinimap rechts unten im Grid
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
-// Version:      3.8.0
+// Version:      3.9.1
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -312,6 +312,76 @@ interface ColonyGridProps {
   onChanged?:        () => void
 }
 
+
+// ── GridMinimap ──────────────────────────────────────────────────────────────
+// Leichte SVG-Übersicht: Gebäude als farbige Punkte, kein generateGrid nötig.
+// Sitzt als position:absolute rechts unten im Grid.
+function GridMinimap({
+  COLS, ROWS, tileSize, entities, pending, userId, slug,
+}: {
+  COLS: number; ROWS: number; tileSize: number
+  entities: any[]; pending: any[]; userId: string; slug: string
+}) {
+  const W = 120; const H = Math.round(W * ROWS / COLS)
+  const tw = W / COLS; const th = H / ROWS
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 8, right: 8,
+      background: 'rgba(2,4,8,0.72)', borderRadius: '6px',
+      border: '1px solid rgba(42,78,122,0.6)',
+      padding: '4px', pointerEvents: 'none',
+    }}>
+      <svg width={W} height={H} style={{ display: 'block' }}>
+        {/* Raster andeuten */}
+        {Array.from({ length: ROWS }).map((_, r) =>
+          Array.from({ length: COLS }).map((__, c) => (
+            <rect key={`${r}-${c}`}
+              x={c * tw} y={r * th} width={tw - 0.5} height={th - 0.5}
+              fill="rgba(255,255,255,0.02)" rx={0.5}
+            />
+          ))
+        )}
+        {/* Eigene Gebäude: Gold */}
+        {entities.filter(e => e.profile_id === userId && e.tile_row != null).map(e => (
+          <rect key={e.id}
+            x={e.tile_col * tw + 1} y={e.tile_row * th + 1}
+            width={tw - 2} height={th - 2}
+            fill="#c9a961" rx={1}
+          />
+        ))}
+        {/* Staatliche Gebäude: Blau */}
+        {entities.filter(e => e.is_state_owned && e.tile_row != null).map(e => (
+          <rect key={e.id}
+            x={e.tile_col * tw + 1} y={e.tile_row * th + 1}
+            width={tw - 2} height={th - 2}
+            fill="#2a6ab5" rx={1}
+          />
+        ))}
+        {/* Fremde Gebäude: Grau */}
+        {entities.filter(e => !e.is_state_owned && e.profile_id && e.profile_id !== userId && e.tile_row != null).map(e => (
+          <rect key={e.id}
+            x={e.tile_col * tw + 1} y={e.tile_row * th + 1}
+            width={tw - 2} height={th - 2}
+            fill="#5a7a9a" rx={1}
+          />
+        ))}
+        {/* Baustellen: Orange */}
+        {pending.filter(p => p.tile_row != null).map((p, i) => (
+          <rect key={i}
+            x={p.tile_col * tw + 1} y={p.tile_row * th + 1}
+            width={tw - 2} height={th - 2}
+            fill="#d08020" rx={1}
+          />
+        ))}
+      </svg>
+      <div style={{ fontSize: '0.45rem', color: '#5a7a9a', textAlign: 'center', marginTop: '2px', letterSpacing: '0.5px' }}>
+        🟡 eigen &nbsp; 🔵 staat &nbsp; 🟠 bau
+      </div>
+    </div>
+  )
+}
+
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
   userId, entities = [], pending = [], tax, entityInfo,
@@ -479,6 +549,11 @@ export default function ColonyGrid({
         {/* Kachelgrid */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           {hoveredTile && <TileTooltip info={hoveredTile} COLS={COLS} />}
+          <GridMinimap
+            COLS={COLS} ROWS={ROWS} tileSize={tileSize}
+            entities={entities} pending={pending ?? []}
+            userId={userId} slug={slug}
+          />
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
