@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 13:20 — 24×16 scrollbar, feste 96px Kacheln, kein ResizeObserver
-// Version:      5.0.2
+// Aktualisiert: 23.06.2026 14:00 — 32×24 Welt, 64px, Info-Panel rechts, Minimap+Legende
+// Version:      5.2.0
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -39,11 +39,11 @@ function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   )
 }
 
-const WORLD_COLS     = 24   // Weltgrid-Breite (scrollbar)
-const WORLD_ROWS     = 16   // Weltgrid-Höhe  (scrollbar)
+const WORLD_COLS     = 32   // Weltgrid — scrollbar, beliebig erweiterbar
+const WORLD_ROWS     = 24
 const COLS           = WORLD_COLS
 const ROWS           = WORLD_ROWS
-const TILE_SIZE      = 96   // Feste Kachelgröße in px
+const TILE_SIZE      = 64   // Kachelgröße px — Viewport zeigt ~16×10 Kacheln
 const RES_DE: Record<string, string> = { metal: 'Metall', energy: 'Energie', water: 'Wasser' }
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
@@ -432,23 +432,70 @@ export default function ColonyGrid({
       })()}
       {showBuildPopup && selectedTile && <BuildPopup tileRow={selectedTile.r} tileCol={selectedTile.c} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
 
-      {/* Scrollbares Grid */}
-      <div style={{ position: 'relative' }}>
-        {hoveredTile && <TileTooltip info={hoveredTile} />}
-        <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
-        <div style={{
-          overflowX: 'auto', overflowY: 'auto',
-          maxHeight: 'calc(100vh - 240px)',
-          border: '2px solid #2a4e7a', borderRadius: '6px',
-        }}>
+      {/* Zwei-Spalten: Weltgrid (scrollbar) + Info-Panel */}
+      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+
+        {/* Grid-Viewport — flex:1, scrollbar in beide Richtungen */}
+        <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
+          {hoveredTile && <TileTooltip info={hoveredTile} />}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
-            gridAutoRows: `${tileSize}px`,
-            gap: 0,
-            width: `${COLS * tileSize}px`,
+            overflow: 'auto',
+            maxHeight: 'calc(100vh - 280px)',
+            border: '2px solid #2a4e7a', borderRadius: '6px',
+            background: '#f4f2ed',
           }}>
-            {gridElements}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
+              gridAutoRows: `${tileSize}px`,
+              gap: 0,
+              width: `${COLS * tileSize}px`,
+            }}>
+              {gridElements}
+            </div>
+          </div>
+        </div>
+
+        {/* Info-Panel rechts — 190px fest */}
+        <div style={{
+          width: '190px', flexShrink: 0,
+          display: 'flex', flexDirection: 'column', gap: '0.5rem',
+          maxHeight: 'calc(100vh - 280px)', overflowY: 'auto',
+        }}>
+          {/* Kolonieinfo */}
+          <div style={{ background: '#fff', border: '1px solid #e0ddd6', borderRadius: '8px', padding: '0.7rem 0.85rem' }}>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.82rem', color: '#1a3a5a', fontWeight: 600, marginBottom: '0.25rem' }}>{name}</div>
+            <div style={{ fontSize: '0.62rem', color: '#6a7a8a', marginBottom: '0.4rem' }}>
+              {population.toLocaleString('de')} / {populationMax.toLocaleString('de')} Einw.
+            </div>
+            <div style={{ background: '#e8e4dc', height: '4px', borderRadius: '2px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+              <div style={{ width: `${Math.min(100, Math.round(population / Math.max(1, populationMax) * 100))}%`, height: '100%', borderRadius: '2px',
+                background: population / Math.max(1, populationMax) > 0.8 ? '#e74c3c' : isSupplied ? '#6fcf97' : '#e8702a' }} />
+            </div>
+            {locationResources.map(r => {
+              const icon = r.resource === 'water' ? '💧' : r.resource === 'energy' ? '⚡' : '⛏️'
+              const isLow = r.stock < 50; const isHigh = r.stock > 400
+              return (
+                <div key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.66rem', marginBottom: '2px' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: isLow ? '#e74c3c' : isHigh ? '#6fcf97' : '#f5a623' }} />
+                  <span style={{ color: '#4a5a6a' }}>{icon} {r.stock.toLocaleString('de')}t</span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Minimap */}
+          <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
+
+          {/* Legende */}
+          <div style={{ background: '#fff', border: '1px solid #e0ddd6', borderRadius: '8px', padding: '0.55rem 0.85rem' }}>
+            <div style={{ fontSize: '0.56rem', color: '#8a9ab0', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Legende</div>
+            {([['#c9a961','Dein Gebäude'],['#5aaeff','Staatlich'],['#e05050','NPC / Fremd'],['#d08020','Im Bau']] as [string,string][]).map(([color, label]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.6rem', color: '#4a5a6a', marginBottom: '2px' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '2px', background: color, flexShrink: 0 }} />
+                {label}
+              </div>
+            ))}
           </div>
         </div>
       </div>
