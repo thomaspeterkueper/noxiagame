@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 10:20
-// Version:      2.1.0
+// Aktualisiert: 23.06.2026 12:30
+// Version:      2.2.0
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
@@ -141,23 +141,25 @@ export default function DashboardClient({
   const propertySlugs     = Array.from(new Set<string>([location, ...Object.keys(propertyByLocation)]))
   const propertyLocations = propertySlugs.map(s => locations.find((l: any) => l.slug === s)).filter(Boolean)
 
-  let best: { from: string; to: string; resource: string; profit: number } | null = null
-  const byResource: Record<string, any[]> = {}
-  for (const p of prices) { (byResource[p.resource] ??= []).push(p) }
-  for (const [, locs] of Object.entries(byResource)) {
-    for (const a of locs) for (const b of locs) {
-      if (a.locations?.slug === b.locations?.slug) continue
-      const profit = b.sell_price - a.buy_price
-      if (profit > (best?.profit ?? 0)) best = { from: a.locations?.slug, to: b.locations?.slug, resource: a.resource, profit }
-    }
-  }
+  const best = React.useMemo(() => {
+    let r: { from: string; to: string; resource: string; profit: number } | null = null
+    const by: Record<string, any[]> = {}
+    for (const p of prices) { (by[p.resource] ??= []).push(p) }
+    for (const [, ls] of Object.entries(by))
+      for (const a of ls) for (const b of ls) {
+        if (a.locations?.slug === b.locations?.slug) continue
+        const profit = b.sell_price - a.buy_price
+        if (profit > (r?.profit ?? 0)) r = { from: a.locations?.slug, to: b.locations?.slug, resource: a.resource, profit }
+      }
+    return r
+  }, [prices])
 
   type FeedItem = { type: 'critical' | 'warning' | 'route' | 'news'; icon: string; text: string }
-  const feed: FeedItem[] = [
+  const feed = React.useMemo((): FeedItem[] => [
     ...attention.map(a => ({ type: a.level === 'critical' ? 'critical' as const : 'warning' as const, icon: a.level === 'critical' ? '🔴' : '🟡', text: a.text })),
     ...(best ? [{ type: 'route' as const, icon: '⚡', text: `Beste Route: ${LOC_NAME[best.from]} → ${LOC_NAME[best.to]} · ${RESOURCE_LABEL[best.resource]} +${best.profit} Cr/t` }] : []),
     ...news.slice(0, 3).map((n: any) => ({ type: 'news' as const, icon: n.icon ?? '📰', text: n.text })),
-  ]
+  ], [attention, best, news])
 
   function showToast(msg: string, ok: boolean) { setToast({ msg, ok }); setTimeout(() => setToast(null), 2500) }
   async function handleTravel(dest: string) { if (!inTransit) await travel(dest as LocationSlug, stats?.tickNumber ?? 0) }
@@ -264,7 +266,7 @@ export default function DashboardClient({
       </header>
 
       {/* HAUPTINHALT */}
-      <div style={{ flex: 1, maxWidth: '1800px', width: '100%', margin: '0 auto', padding: '1.25rem 1.5rem 0', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'start' }}>
+      <div style={{ flex: 1, maxWidth: '1800px', width: '100%', margin: '0 auto', padding: '1.25rem 1.5rem 0', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'stretch' }}>
 
         {/* LINKE SPALTE */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -335,16 +337,17 @@ export default function DashboardClient({
           {ships.length > 0 && (
             <div>
               <div style={sectionLabel}>Deine Schiffe</div>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 {ships.map((s: any) => (
                   <div key={s.id} onClick={() => setShipyardOpen(true)}
-                    style={{ ...card, padding: '0.55rem 0.9rem', cursor: 'pointer', borderLeft: `3px solid ${s.is_active ? T.gold : T.line}`, minWidth: '150px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.8rem', color: T.blueDeep, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      🚀 {SHIP_LABEL[s.ship_type_id] ?? s.ship_type_id}
-                      {s.is_active && <span style={{ fontSize: '0.46rem', background: T.gold, color: '#fff', borderRadius: '3px', padding: '1px 4px' }}>AKTIV</span>}
+                    style={{ ...card, padding: '0.55rem 0.9rem', cursor: 'pointer', borderLeft: `3px solid ${s.is_active ? T.gold : T.line}` }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.blueDeep, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>🚀 {SHIP_LABEL[s.ship_type_id] ?? s.ship_type_id}</span>
+                      {s.is_active && <span style={{ fontSize: '0.4rem', background: T.gold, color: '#fff', borderRadius: '3px', padding: '1px 4px', whiteSpace: 'nowrap' as const }}>AKTIV</span>}
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: T.inkFaint, marginTop: '2px' }}>
-                      {LOC_ICON[s.location] ?? '🪐'} {LOC_NAME[s.location] ?? s.location} · {s.cargo_max}t
+                    <div style={{ fontSize: '0.6rem', color: T.inkFaint, marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{LOC_ICON[s.location] ?? '🪐'} {LOC_NAME[s.location] ?? s.location}</span>
+                      <span>{s.cargo_max}t</span>
                     </div>
                   </div>
                 ))}
@@ -417,10 +420,14 @@ export default function DashboardClient({
           </div>
 
           {/* FEED — füllt restliche Höhe */}
-          {feed.length > 0 && (
-            <div style={{ ...card, padding: '0.85rem 1rem', flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <div style={sectionLabel}>Feed</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '0.35rem' }}>
+          <div style={{ ...card, padding: '0.85rem 1rem', flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <div style={sectionLabel}>Feed</div>
+            {feed.length === 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '4rem' }}>
+                <span style={{ fontSize: '0.65rem', color: T.inkFaint }}>Die Kolonie ist ruhig.</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '0.35rem' }}>
                 {feed.map((item, i) => (
                   <div key={i} style={{
                     display: 'flex', gap: '7px', alignItems: 'flex-start', fontSize: '0.72rem',
@@ -432,9 +439,8 @@ export default function DashboardClient({
                     <span style={{ lineHeight: 1.4 }}>{item.text}</span>
                   </div>
                 ))}
-              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
