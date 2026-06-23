@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 14:00 — 32×24 Welt, 64px, Info-Panel rechts, Minimap+Legende
-// Version:      5.2.0
+// Aktualisiert: 23.06.2026 14:10 — Minimap im Info-Panel statisch, kein absolute
+// Version:      5.2.1
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -152,9 +152,8 @@ const GridMinimap = React.memo(function GridMinimap({
   const tw = W / COLS; const th = H / ROWS
   return (
     <div style={{
-      position: 'absolute', bottom: 8, right: 8,
-      background: 'rgba(2,4,8,0.72)', borderRadius: '6px',
-      border: '1px solid rgba(42,78,122,0.6)', padding: '4px', pointerEvents: 'none',
+      background: 'rgba(2,4,8,0.72)', borderRadius: '8px',
+      border: '1px solid rgba(42,78,122,0.6)', padding: '6px', pointerEvents: 'none',
     }}>
       <svg width={W} height={H} style={{ display: 'block' }}>
         {Array.from({ length: ROWS }).flatMap((_, r) =>
