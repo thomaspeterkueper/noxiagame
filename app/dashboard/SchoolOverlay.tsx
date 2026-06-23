@@ -1,31 +1,11 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 22.06.2026 — KursPdfViewer rechts: react-pdf + dynamischer Context-Banner
-// Version:      3.9.0
+// Aktualisiert: 22.06.2026 09:10 — react-pdf → iframe (kein package nötig), warehouse-Klick
+// Version:      3.9.1
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import dynamic from 'next/dynamic'
-
-// react-pdf: SSR deaktiviert, Worker via CDN (kein webpack-Worker-Bug in Next.js App Router)
-// npm install react-pdf  — muss einmalig im Repo hinzugefügt werden
-const PdfDocument = dynamic(
-  () => import('react-pdf').then(m => {
-    // pdfjs-dist Worker-URL — CDN-Version muss mit react-pdf peerDependency übereinstimmen
-    m.pdfjs.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs'
-    return m.Document
-  }),
-  { ssr: false, loading: () => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9e9485', fontSize: '0.78rem', fontFamily: "'Courier Prime', monospace" }}>
-      Dokument wird geladen …
-    </div>
-  )}
-)
-const PdfPage = dynamic(
-  () => import('react-pdf').then(m => m.Page),
-  { ssr: false }
-)
+// react-pdf ersetzt durch nativen iframe (kein package-install nötig)
 
 // Mapping: Aufgaben-Topic → Kurs-PDF in Supabase Storage
 // URL-Schema: /api/game/akademie?kurs=XX  (leitet zu Supabase Storage URL weiter, kein CORS-Problem)
@@ -187,20 +167,14 @@ function KursPdfViewer({
           </div>
         ) : (
           <div style={{ position: 'relative', width: containerW > 0 ? containerW - 16 : '100%' }}>
-            {/* react-pdf Document + Page */}
-            <PdfDocument
-              file={pdfUrl}
-              onLoadSuccess={({ numPages: n }) => setNumPages(n)}
-              onLoadError={() => setPdfError(true)}
-              loading=""
-            >
-              <PdfPage
-                pageNumber={currentPage}
-                width={containerW > 0 ? containerW - 16 : undefined}
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
-              />
-            </PdfDocument>
+            {/* PDF via iframe — kein react-pdf nötig */}
+            <iframe
+              src={`${pdfUrl}#page=${currentPage}`}
+              style={{ width: '100%', height: 520, border: 'none', borderRadius: '6px', background: '#fff' }}
+              onLoad={() => { if (!numPages) setNumPages(10) }}
+              onError={() => setPdfError(true)}
+              title="Kursmaterial"
+            />
 
             {/* Dynamischer Context-Banner — liegt über dem PDF */}
             {activeBanner && (
