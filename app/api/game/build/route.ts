@@ -1,24 +1,34 @@
 // app/api/game/build/route.ts
 // Erstellt: 31.05.2026
-// Aktualisiert: 22.06.2026 — Fremde Spieler-Gebäude (otherEntities) in entities-Response
-//   14.06.2026 – Bewertung über gleitenden 7-Tick-Schnitt (avg_sell_7)
-//   10.06.2026 – Default-Response liefert colony_tax + entity_info
-// Version:      0.6.0
+// Aktualisiert: 22.06.2026 — BUILDABLE_ITEMS durch building_definitions DB-Lookup ersetzt
+// Version:      0.7.0
 //
 // Datenmodell:
-//   player_builds   = Auftragsbuch: building → complete|cancelled, selling → sold
-//   tile_entities   = Weltzustand: was steht wo (3D), wem, seit wann
-//   colony_settings = Steuer-/Abgabensätze je Kolonie
+//   player_builds        = Auftragsbuch: building → complete|cancelled, selling → sold
+//   tile_entities        = Weltzustand: was steht wo (3D), wem, seit wann
+//   building_definitions = Gebäude-Registry: alle Typen, Kosten, Produktion
+//   colony_settings      = Steuer-/Abgabensätze je Kolonie
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { BUILDABLE_ITEMS } from '@/lib/game/config'
-import { getSaleQuote, BUILDING_SALE, type BuildableId, type SaleMode } from '@/lib/game/buildingSale'
+import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// Stationsmodule haben eigene Kosten, kein tile_row/tile_col
+const MODULE_COSTS: Record<string, { cost: number; buildTicks: number }> = {
+  solar_array:    { cost: 1800, buildTicks: 2 },
+  docking_bay:    { cost: 2200, buildTicks: 3 },
+  habitat_module: { cost: 2000, buildTicks: 3 },
+  research_lab:   { cost: 3000, buildTicks: 4 },
+  water_recycler: { cost: 2500, buildTicks: 3 },
+  storage_bay:    { cost: 1500, buildTicks: 2 },
+  observatory:    { cost: 2800, buildTicks: 4 },
+  reactor:        { cost: 8000, buildTicks: 6 },
+}
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -28,8 +38,48 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 
+// Lädt eine einzelne aktive building_definition aus der DB
+async function loadBuildingDef(key: string): Promise<DBBuildingDef | null> {
+  const { data } = await serviceClient
+    .from('building_definitions')
+    .select('key, cost_credits, population_bonus, production, consumption, allowed_locations, build_time_ticks, name')
+    .eq('key', key)
+    .eq('is_active', true)
+    .single()
+
+  if (!data) return null
+  return {
+    cost_credits:     data.cost_credits ?? 0,
+    population_bonus: data.population_bonus ?? 0,
+    production:       Array.isArray(data.production) ? data.production : [],
+    consumption:      Array.isArray(data.consumption) ? data.consumption : [],
+  }
+}
+
+// Alle aktiven Definitionen laden (für Default-Response entityInfo)
+async function loadAllBuildingDefs(): Promise<Map<string, DBBuildingDef & { name: string; allowed_locations: string[] | null }>> {
+  const { data } = await serviceClient
+    .from('building_definitions')
+    .select('key, name, cost_credits, population_bonus, production, consumption, allowed_locations, build_time_ticks')
+    .eq('is_active', true)
+
+  const map = new Map()
+  for (const row of data ?? []) {
+    map.set(row.key, {
+      name:             row.name,
+      cost_credits:     row.cost_credits ?? 0,
+      population_bonus: row.population_bonus ?? 0,
+      production:       Array.isArray(row.production) ? row.production : [],
+      consumption:      Array.isArray(row.consumption) ? row.consumption : [],
+      allowed_locations: row.allowed_locations ?? null,
+      build_time_ticks: row.build_time_ticks ?? 1,
+    })
+  }
+  return map
+}
+
 // Verkaufswert für eine Bestands-Entität berechnen
-async function getQuoteForEntity(entity: any) {
+async function getQuoteForEntity(entity: any, def: DBBuildingDef) {
   const { data: location } = await serviceClient
     .from('locations')
     .select('id, slug, name, population, population_max')
@@ -39,27 +89,25 @@ async function getQuoteForEntity(entity: any) {
   if (!location) return { error: 'Standort nicht gefunden' as const }
 
   let resourceSellPrice: number | null = null
-  const producedResource =
-    entity.entity_id === 'mine'  ? 'metal'
-    : entity.entity_id === 'solar' ? 'energy'
-    : null
+  const hauptprod = def.production[0] ?? null
 
-  if (producedResource) {
+  if (hauptprod) {
     const { data: price } = await serviceClient
       .from('market_prices')
       .select('sell_price, avg_sell_7')
       .eq('location_id', location.id)
-      .eq('resource', producedResource)
+      .eq('resource', hauptprod.resource)
       .single()
-    // Punkt 4: gleitender 7-Tick-Schnitt (manipulationsfest), Fallback auf Spot.
+    // Gleitender 7-Tick-Schnitt (manipulationsfest), Fallback auf Spot
     resourceSellPrice = price?.avg_sell_7 ?? price?.sell_price ?? null
   }
 
   const quote = getSaleQuote({
-    buildableId: entity.entity_id as BuildableId,
+    buildableId:       entity.entity_id,
+    def,
     resourceSellPrice,
-    population: location.population,
-    populationMax: location.population_max,
+    population:        location.population,
+    populationMax:     location.population_max,
   })
 
   return { quote, location, resourceSellPrice }
@@ -72,9 +120,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action')
 
-  // ───────────────────────────────────────────────────────────────
-  // Laufende Vorgänge + Bestand laden (+ colony_tax + entity_info)
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
+  // Default: Laufende Vorgänge + Bestand laden
+  // ─────────────────────────────────────────────────────────────────────
   if (!action) {
     const { data: due } = await serviceClient
       .from('player_builds')
@@ -95,40 +143,35 @@ export async function GET(req: NextRequest) {
       .in('status', ['building', 'selling'])
       .order('completes_at')
 
-    // Eigene Gebäude + staatliche + NPC-Gebäude
     const { data: ownEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .eq('profile_id', user.id)
-      .in('entity_type', ['building', 'module'])  // building + eigene module
+      .in('entity_type', ['building', 'module'])
 
     const { data: stateEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
       .is('profile_id', null)
       .eq('is_state_owned', true)
-      .in('entity_type', ['building', 'module'])  // Gebäude + Stationsmodule
+      .in('entity_type', ['building', 'module'])
 
-    // NPC-Gebäude: actor_id gesetzt, mit display_name als username
     const { data: npcEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name), actors(display_name)')
       .not('actor_id', 'is', null)
 
-    // display_name → username normalisieren (NPCs erscheinen wie Spieler)
     const npcNormalized = (npcEntities ?? []).map((e: any) => ({
       ...e,
       username: e.actors?.display_name ?? null,
       actors: undefined,
     }))
 
-    // Alle Location-IDs der eigenen Gebäude ermitteln (wo ist der Spieler präsent?)
     const ownLocationIds = [...new Set([
       ...(ownEntities ?? []).map((e: any) => e.location_id),
       ...(stateEntities ?? []).map((e: any) => e.location_id),
     ])].filter(Boolean)
 
-    // Fremde Spieler-Gebäude an denselben Locations (für Multiplayer-Sichtbarkeit)
     const { data: otherEntities } = ownLocationIds.length > 0
       ? await serviceClient
           .from('tile_entities')
@@ -140,16 +183,21 @@ export async function GET(req: NextRequest) {
           .in('entity_type', ['building'])
       : { data: [] }
 
-    // username aus profiles-Join normalisieren
     const otherNormalized = (otherEntities ?? []).map((e: any) => ({
       ...e,
       username: e.profiles?.username ?? 'Unbekannter Pilot',
       profiles: undefined,
     }))
 
-    const entities = [...(ownEntities ?? []), ...(stateEntities ?? []), ...npcNormalized, ...otherNormalized]
+    const entities = [
+      ...(ownEntities ?? []),
+      ...(stateEntities ?? []),
+      ...npcNormalized,
+      ...otherNormalized,
+    ]
 
-    const locationIds = [...new Set((entities ?? []).map((e: any) => e.location_id))]
+    // Colony-Steuer
+    const locationIds = [...new Set(entities.map((e: any) => e.location_id))]
     let colonyTax: Record<string, { tax_property: number; tax_transaction: number; tax_landing: number }> = {}
 
     if (locationIds.length > 0) {
@@ -167,41 +215,45 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // entityInfo: Ertragswert + Produktions-Meta je Gebäude
+    const allDefs = await loadAllBuildingDefs()
+
     const entityInfo: Record<string, {
-      ertragswert: number
-      produktion: number | null
-      ressource: string | null
+      ertragswert:       number
+      produktion:        number | null
+      ressource:         string | null
       resourceSellPrice: number | null
     }> = {}
 
     await Promise.all(
-      (entities ?? []).map(async (e: any) => {
-        const item = BUILDABLE_ITEMS[e.entity_id]
-        if (!item || item.type !== 'building') return
+      entities.map(async (e: any) => {
+        if (e.entity_type !== 'building') return
+        const def = allDefs.get(e.entity_id)
+        if (!def) return
 
-        const result = await getQuoteForEntity(e)
+        const result = await getQuoteForEntity(e, def)
         if ('error' in result) return
 
         entityInfo[e.id] = {
           ertragswert:       result.quote.ertragswert,
-          produktion:        item.produces?.amount ?? null,
-          ressource:         item.produces?.resource ?? null,
+          produktion:        def.production[0]?.amount ?? null,
+          ressource:         def.production[0]?.resource ?? null,
           resourceSellPrice: result.resourceSellPrice,
         }
       })
     )
 
     return NextResponse.json({
-      builds:     active ?? [],
-      entities:   entities ?? [],
+      builds:    active ?? [],
+      entities:  entities ?? [],
       colonyTax,
       entityInfo,
     })
   }
 
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   // Bauauftrag starten
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   if (action === 'start') {
     const buildableId  = searchParams.get('buildableId')
     const locationSlug = searchParams.get('location')
@@ -220,22 +272,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
     }
 
-    // ── Stationsmodul-Bau ────────────────────────────────────────────────────
-    // Stationsmodule (entity_type='module') haben eigene Kosten und kein
-    // tile_row/tile_col. Sie werden direkt in tile_entities als 'module' eingetragen.
-    const MODULE_COSTS: Record<string, { cost: number; buildTicks: number }> = {
-      solar_array:    { cost: 1800, buildTicks: 2 },
-      docking_bay:    { cost: 2200, buildTicks: 3 },
-      habitat_module: { cost: 2000, buildTicks: 3 },
-      research_lab:   { cost: 3000, buildTicks: 4 },
-      water_recycler: { cost: 2500, buildTicks: 3 },
-      storage_bay:    { cost: 1500, buildTicks: 2 },
-      observatory:    { cost: 2800, buildTicks: 4 },
-      reactor:        { cost: 8000, buildTicks: 6 },
-    }
+    // ── Stationsmodul? ────────────────────────────────────────────────────────
     const moduleDef = MODULE_COSTS[buildableId]
     if (moduleDef) {
-      // Stationsmodul-Pfad
       const { data: locationForModule } = await serviceClient
         .from('locations')
         .select('id, location_type')
@@ -249,7 +288,6 @@ export async function GET(req: NextRequest) {
       if (!profileM || profileM.credits < moduleDef.cost) {
         return NextResponse.json({ error: 'Unzureichende Credits.' }, { status: 400 })
       }
-      // Nächsten freien Slot finden
       const { data: existingModules } = await serviceClient
         .from('tile_entities')
         .select('slot')
@@ -258,11 +296,9 @@ export async function GET(req: NextRequest) {
         .order('slot', { ascending: false })
         .limit(1)
       const nextSlot = existingModules?.length ? (existingModules[0].slot ?? 0) + 1 : 0
-      // Credits abziehen
       await serviceClient.from('profiles')
         .update({ credits: profileM.credits - moduleDef.cost })
         .eq('id', user.id)
-      // Modul einfügen
       await serviceClient.from('tile_entities').insert({
         profile_id:    user.id,
         location_id:   locationForModule.id,
@@ -279,16 +315,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, credits: profileM.credits - moduleDef.cost })
     }
 
-    // ── Standard-Gebäude-Bau ─────────────────────────────────────────────────
-    const buildable = BUILDABLE_ITEMS[buildableId]
-    if (!buildable) {
-      return NextResponse.json({ error: 'Unbekannter Bautyp' }, { status: 400 })
+    // ── Standard-Gebäude aus building_definitions ─────────────────────────────
+    const buildingDef: DBBuildingDef | null = await loadBuildingDef(buildableId)
+    if (!buildingDef) {
+      return NextResponse.json({ error: 'Unbekannter oder inaktiver Bautyp' }, { status: 400 })
     }
 
-    // Standort-Check: manche Gebäude nur an bestimmten Orten baubar
-    if (buildable.allowedLocations && !buildable.allowedLocations.includes(locationSlug)) {
+    // Geografisches Gating: allowed_locations aus DB
+    const { data: rawDef } = await serviceClient
+      .from('building_definitions')
+      .select('allowed_locations, name, build_time_ticks')
+      .eq('key', buildableId)
+      .single()
+
+    if (rawDef?.allowed_locations && !rawDef.allowed_locations.includes(locationSlug)) {
       return NextResponse.json({
-        error: `${buildable.name} kann hier nicht gebaut werden.`
+        error: `${rawDef.name} kann hier nicht gebaut werden.`
       }, { status: 400 })
     }
 
@@ -298,7 +340,7 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.credits < buildable.cost) {
+    if (!profile || profile.credits < buildingDef.cost_credits) {
       return NextResponse.json({ error: 'Unzureichende Credits.' }, { status: 400 })
     }
 
@@ -340,13 +382,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Auf dieser Kachel läuft bereits ein Vorgang.' }, { status: 400 })
     }
 
+    const buildTimeTicks = rawDef?.build_time_ticks ?? 1
     const completesAt = new Date()
-    completesAt.setHours(completesAt.getHours() + buildable.buildTimeTicks * 24)
+    completesAt.setHours(completesAt.getHours() + buildTimeTicks * 24)
 
     await serviceClient.from('player_builds').insert({
       profile_id:   user.id,
       buildable_id: buildableId,
-      target_type:  buildable.type,
+      target_type:  'building',
       location_id:  location.id,
       tile_level:   tileLevel,
       tile_row:     tileRow,
@@ -357,20 +400,20 @@ export async function GET(req: NextRequest) {
 
     await serviceClient
       .from('profiles')
-      .update({ credits: profile.credits - buildable.cost })
+      .update({ credits: profile.credits - buildingDef.cost_credits })
       .eq('id', user.id)
 
     return NextResponse.json({
       ok:          true,
-      newCredits:  profile.credits - buildable.cost,
-      buildable:   buildable.name,
+      newCredits:  profile.credits - buildingDef.cost_credits,
+      buildable:   rawDef?.name ?? buildableId,
       completesAt: completesAt.toISOString(),
     })
   }
 
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   // Laufenden Bau abbrechen (50% Rückerstattung)
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   if (action === 'cancel') {
     const buildId = searchParams.get('buildId')
     if (!buildId) return NextResponse.json({ error: 'Fehlende Build ID' }, { status: 400 })
@@ -385,8 +428,14 @@ export async function GET(req: NextRequest) {
 
     if (!build) return NextResponse.json({ error: 'Bauauftrag nicht gefunden' }, { status: 404 })
 
-    const buildable = BUILDABLE_ITEMS[build.buildable_id]
-    const refund = Math.floor((buildable?.cost ?? 0) * 0.5)
+    // Kosten aus DB holen (Fallback: 0)
+    const { data: defForCancel } = await serviceClient
+      .from('building_definitions')
+      .select('cost_credits')
+      .eq('key', build.buildable_id)
+      .single()
+
+    const refund = Math.floor((defForCancel?.cost_credits ?? 0) * 0.5)
 
     await serviceClient
       .from('player_builds')
@@ -406,9 +455,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, refund })
   }
 
-  // ───────────────────────────────────────────────────────────────
-  // Verkaufswert anzeigen (ohne Verkauf)
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
+  // Verkaufswert anzeigen
+  // ─────────────────────────────────────────────────────────────────────
   if (action === 'sellQuote') {
     const entityId = searchParams.get('entityId')
     if (!entityId) return NextResponse.json({ error: 'Fehlende Entity ID' }, { status: 400 })
@@ -423,18 +472,21 @@ export async function GET(req: NextRequest) {
 
     if (!entity) return NextResponse.json({ error: 'Gebäude nicht gefunden oder gehört dir nicht' }, { status: 404 })
 
-    const result = await getQuoteForEntity(entity)
+    const def = await loadBuildingDef(entity.entity_id)
+    if (!def) return NextResponse.json({ error: 'Gebäude-Definition nicht gefunden' }, { status: 400 })
+
+    const result = await getQuoteForEntity(entity, def)
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 400 })
 
     return NextResponse.json({
-      quote: result.quote,
+      quote:         result.quote,
       durationTicks: BUILDING_SALE.VERKAUFSDAUER_TICKS,
     })
   }
 
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   // Gebäude verkaufen
-  // ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   if (action === 'sell') {
     const entityId = searchParams.get('entityId')
     const mode = (searchParams.get('mode') ?? 'normal') as SaleMode
@@ -450,7 +502,10 @@ export async function GET(req: NextRequest) {
 
     if (!entity) return NextResponse.json({ error: 'Gebäude nicht gefunden oder gehört dir nicht' }, { status: 404 })
 
-    const result = await getQuoteForEntity(entity)
+    const def = await loadBuildingDef(entity.entity_id)
+    if (!def) return NextResponse.json({ error: 'Gebäude-Definition nicht gefunden' }, { status: 400 })
+
+    const result = await getQuoteForEntity(entity, def)
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 400 })
     const { quote } = result
 
@@ -499,8 +554,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      ok: true,
-      selling: true,
+      ok:          true,
+      selling:     true,
       payout,
       completesAt: completesAt.toISOString(),
       mode,
@@ -510,30 +565,39 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: 'Ungültige Aktion' }, { status: 400 })
 }
 
+// ─────────────────────────────────────────────────────────────────────
 // Fertigen Build aktivieren
+// ─────────────────────────────────────────────────────────────────────
 async function completeBuild(build: any, profileId: string) {
-  const buildable = BUILDABLE_ITEMS[build.buildable_id]
-  if (!buildable) return
+  // Typ aus DB prüfen (building vs. andere)
+  const { data: def } = await serviceClient
+    .from('building_definitions')
+    .select('key')
+    .eq('key', build.buildable_id)
+    .single()
+
+  // Wenn keine Definition: nichts tun (Modul oder unbekannt)
+  if (!def) return
 
   await serviceClient
     .from('player_builds')
     .update({ status: 'complete' })
     .eq('id', build.id)
 
-  if (buildable.type === 'building') {
-    await serviceClient.from('tile_entities').insert({
-      profile_id:  profileId,
-      location_id: build.location_id,
-      tile_level:  build.tile_level ?? 0,
-      tile_row:    build.tile_row,
-      tile_col:    build.tile_col,
-      entity_type: 'building',
-      entity_id:   build.buildable_id,
-    })
-  }
+  await serviceClient.from('tile_entities').insert({
+    profile_id:  profileId,
+    location_id: build.location_id,
+    tile_level:  build.tile_level ?? 0,
+    tile_row:    build.tile_row,
+    tile_col:    build.tile_col,
+    entity_type: 'building',
+    entity_id:   build.buildable_id,
+  })
 }
 
+// ─────────────────────────────────────────────────────────────────────
 // Fälligen Verkauf abschließen → Auszahlung
+// ─────────────────────────────────────────────────────────────────────
 async function completeSale(build: any, profileId: string) {
   await serviceClient
     .from('player_builds')
