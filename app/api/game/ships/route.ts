@@ -1,5 +1,6 @@
 // app/api/game/ships/route.ts
-// Erstellt: 31.05.2026
+// Erstellt:     31.05.2026
+// Aktualisiert: 23.06.2026 09:50 — action=list: alle Schiffe des Spielers
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -47,6 +48,16 @@ export async function GET(req: NextRequest) {
   }
 
   // Schiff kaufen
+  // Liste aller Schiffe des Spielers
+  if (action === 'list') {
+    const { data: ships } = await serviceClient
+      .from('ships')
+      .select('id, ship_type_id, location, cargo_max, is_active')
+      .eq('profile_id', user.id)
+      .order('is_active', { ascending: false })
+    return NextResponse.json({ ships: ships ?? [] })
+  }
+
   if (action === 'buy') {
     const shipTypeId = searchParams.get('shipTypeId')
     if (!shipTypeId) return NextResponse.json({ error: 'Fehlende Ship Type ID' }, { status: 400 })
