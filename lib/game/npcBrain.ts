@@ -1,6 +1,8 @@
 // lib/game/npcBrain.ts
 // Erstellt:     14.06.2026
-// Aktualisiert: 20.06.2026
+// Aktualisiert: 23.06.2026 — BUILDABLE_ITEMS durch BUILDINGS aus buildings/index ersetzt
+//
+// Version:      1.1.0
 //
 // Deterministischer NPC-Brain (Phase A → C).
 //
@@ -17,7 +19,8 @@
 // Aktionsreihenfolge: produce → sell → build → buy
 // Der Brain entscheidet NUR. Persistenz ist Aufgabe von runNpcTick.
 
-import { PRICE_MAX, BUILDABLE_ITEMS } from './config'
+import { PRICE_MAX } from './config'
+import { BUILDINGS } from './buildings/index'
 import { MARKET_RESOURCES } from './resources'
 
 // ── NPC-spezifische Stellschrauben ───────────────────────────────────────────
@@ -127,7 +130,7 @@ export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
   // Preis. Der Output landet im Marktstock des jeweiligen Ortes (runNpcTick
   // schreibt in location_resources.stock und ins npc_ledger).
   for (const geb of kontext.gebaeude) {
-    const def = BUILDABLE_ITEMS[geb.entity_id]
+    const def = BUILDINGS[geb.entity_id]
     if (!def?.produces) continue
     const { resource, amount } = def.produces
     aktionen.push({
