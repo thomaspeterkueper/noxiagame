@@ -1,7 +1,7 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — calcCollateral: ship_types als separate Query (PostgREST FK-Fix), try/catch
-// Version:      0.3.2
+// Aktualisiert: 22.06.2026 — getOrCreateAccount defensiv (try/catch + Fallback), Fehler-Logging
+// Version:      0.3.3
 //
 // v0.3.0:
 //   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
@@ -46,21 +46,33 @@ async function getUserFromRequest(req: NextRequest) {
 }
 
 // ── Konto holen oder anlegen ──────────────────────────────────────────────────
-async function getOrCreateAccount(userId: string, locationId: string) {
-  const { data: existing } = await serviceClient
-    .from('bank_accounts')
-    .select('*')
-    .eq('profile_id', userId)
-    .eq('location_id', locationId)
-    .maybeSingle()
-  if (existing) return existing
+const EMPTY_ACCOUNT = { id: null, deposit: 0, loan: 0 }
 
-  const { data: created } = await serviceClient
-    .from('bank_accounts')
-    .insert({ profile_id: userId, location_id: locationId, deposit: 0, loan: 0 })
-    .select()
-    .single()
-  return created
+async function getOrCreateAccount(userId: string, locationId: string) {
+  try {
+    const { data: existing } = await serviceClient
+      .from('bank_accounts')
+      .select('*')
+      .eq('profile_id', userId)
+      .eq('location_id', locationId)
+      .maybeSingle()
+    if (existing) return existing
+
+    const { data: created, error } = await serviceClient
+      .from('bank_accounts')
+      .insert({ profile_id: userId, location_id: locationId, deposit: 0, loan: 0 })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('getOrCreateAccount insert error:', error.message, error.code)
+      return EMPTY_ACCOUNT
+    }
+    return created ?? EMPTY_ACCOUNT
+  } catch (err) {
+    console.error('getOrCreateAccount error:', err)
+    return EMPTY_ACCOUNT
+  }
 }
 
 // ── Schulungsnachweis prüfen ──────────────────────────────────────────────────
@@ -200,7 +212,10 @@ export async function GET(req: NextRequest) {
     .select('id, slug, name')
     .eq('slug', locationSlug)
     .single()
-  if (!loc) return NextResponse.json({ error: 'Location nicht gefunden' }, { status: 404 })
+  if (!loc) {
+    console.error('bank/route: location not found for slug:', locationSlug)
+    return NextResponse.json({ error: 'Location nicht gefunden' }, { status: 404 })
+  }
 
   // Bank-Gebäude prüfen
   const { data: bankBuilding } = await serviceClient
@@ -211,6 +226,7 @@ export async function GET(req: NextRequest) {
     .eq('entity_type', 'building')
     .maybeSingle()
   if (!bankBuilding) {
+    console.error('bank/route: no bank building at location:', loc.slug, '(id:', loc.id, ')')
     return NextResponse.json({ error: 'Keine Bank an diesem Standort.' }, { status: 403 })
   }
 
@@ -220,7 +236,10 @@ export async function GET(req: NextRequest) {
     .select('id, credits')
     .eq('id', user.id)
     .single()
-  if (!profile) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
+  if (!profile) {
+    console.error('bank/route: profile not found for user:', user.id)
+    return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
+  }
 
   const account  = await getOrCreateAccount(user.id, loc.id)
   const deposit  = Number(account.deposit ?? 0)
