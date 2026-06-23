@@ -1,16 +1,12 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 22.06.2026 — Fehlende Interfaces (ColonyContext, ContextBanner, SchoolOverlayProps) wiederhergestellt
-// Version:      4.0.1
+// Aktualisiert: 23.06.2026 — Storage-Kommentare entfernt
+// Version:      4.0.2
 'use client'
 import KursRenderer from './KursRenderer'
 
 import React, { useState, useEffect, useRef } from 'react'
-// react-pdf ersetzt durch nativen iframe (kein package-install nötig)
-
-// Mapping: Aufgaben-Topic → Kurs-PDF in Supabase Storage
-// URL-Schema: /api/game/akademie?kurs=XX  (leitet zu Supabase Storage URL weiter, kein CORS-Problem)
-// Fallback auf direkte Storage-URL bis Route existiert
+// Rechte Seite: KursRenderer lädt Folien dynamisch aus DB (foundation_folien)
 
 
 interface ColonyContext {
