@@ -1,6 +1,6 @@
 // app/api/game/profile/route.ts
 // Erstellt:     07.06.2026
-// Aktualisiert: 21.06.2026 19:10
+// Aktualisiert: 23.06.2026 17:05 — flight_count im Profil ausgeben
 // Profil laden + Onboarding-Setup (Name, Avatar) + Erstauftrag erzeugen
 // Pattern wie alle Game-Routes: GET mit Query-Parametern, Bearer-Auth.
 
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   if (!action) {
     const { data: profile } = await serviceClient
       .from('profiles')
-      .select('id, username, avatar, onboarded, credits')
+      .select('id, username, avatar, onboarded, credits, flight_count')
       .eq('id', user.id)
       .single()
 
