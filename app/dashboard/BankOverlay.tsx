@@ -1,7 +1,7 @@
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Schulungsnachweis, Sicherheiten-Panel, Zinseszins-Visualisierung
-// Version:      1.1.0
+// Aktualisiert: 22.06.2026 — Sicherheiten-Warnung (collateralWarning) im Konto-Tab
+// Version:      1.2.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -47,18 +47,25 @@ const C = {
 
 type Tab = 'konto' | 'einlage' | 'kredit' | 'sicherheiten'
 
+interface CollateralWarning {
+  overLimit:        number
+  requiredRepayment?: number
+  message:          string
+}
+
 interface BankStatus {
-  credits:         number
-  deposit:         number
-  loan:            number
-  creditLimit:     number
-  availableLoan:   number
-  depositRate:     number
-  loanRate:        number
-  hasModule:       boolean
-  moduleId:        string
-  collateralTotal: number
-  ledger:          LedgerEntry[]
+  credits:           number
+  deposit:           number
+  loan:              number
+  creditLimit:       number
+  availableLoan:     number
+  depositRate:       number
+  loanRate:          number
+  hasModule:         boolean
+  moduleId:          string
+  collateralTotal:   number
+  collateralWarning: CollateralWarning | null
+  ledger:            LedgerEntry[]
 }
 
 interface LedgerEntry {
@@ -250,6 +257,19 @@ export default function BankOverlay({
                   </div>
                 ))}
               </div>
+
+              {/* Sicherheiten-Warnung */}
+              {status.collateralWarning && (
+                <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: C.redLight, border: '1px solid #f0a0a0', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.red, fontFamily: MONO, marginBottom: '3px' }}>⚠ Unterdeckung</div>
+                  <div style={{ fontSize: '0.78rem', color: C.text, lineHeight: 1.6 }}>{status.collateralWarning.message}</div>
+                  {status.collateralWarning.requiredRepayment && (
+                    <div style={{ fontSize: '0.68rem', color: C.red, fontFamily: MONO, marginTop: '4px' }}>
+                      Sofort tilgen: {status.collateralWarning.requiredRepayment.toLocaleString('de')} Cr
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ fontSize: '0.62rem', color: C.textFaint, letterSpacing: '0.12em', textTransform: 'uppercase' as const, fontFamily: MONO, marginBottom: '0.6rem' }}>Letzte Buchungen</div>
               {status.ledger.length === 0 ? (
