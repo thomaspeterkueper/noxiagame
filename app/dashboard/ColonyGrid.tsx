@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 12:15 — CSS 1fr+aspect-ratio, O(1) Maps, useMemo, useCallback
-// Version:      4.1.1
+// Aktualisiert: 23.06.2026 11:55 — tileSize aus measureRef.offsetWidth, feste px statt aspect-ratio
+// Version:      4.2.0
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -283,6 +283,7 @@ export default function ColonyGrid({
     // Sofortige Berechnung beim Mount
     const calcSize = (w: number) => {
       if (w > 0) setTileSize(Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, Math.floor(w / COLS))))
+      // tileSize direkt aus offsetWidth (kein padding-Abzug — measureRef ist im Inhalt-Bereich)
     }
     calcSize(el.offsetWidth)
     const obs = new ResizeObserver(entries => calcSize(entries[0].contentRect.width))
@@ -364,7 +365,7 @@ export default function ColonyGrid({
               setHoveredTile(null)
             }}
             style={{
-              position: 'relative', aspectRatio: '1 / 1', width: '100%',
+              position: 'relative', width: tileSize, height: tileSize,
               cursor: interactive ? 'pointer' : 'default',
               boxShadow: ownerShadow, boxSizing: 'border-box', flexShrink: 0,
               opacity: isSelling ? 0.45 : 1, filter: isSelling ? 'grayscale(0.7)' : 'none',
@@ -426,9 +427,10 @@ export default function ColonyGrid({
         <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+          gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`,
+          gridAutoRows: `${tileSize}px`,
           gap: 0, border: '2px solid #2a4e7a', borderRadius: '6px',
-          overflow: 'hidden', width: '100%',
+          overflow: 'hidden',
         }}>
           {gridElements}
         </div>
