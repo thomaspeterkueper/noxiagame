@@ -1,19 +1,20 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 21.06.2026 20:50
-// Version:      2.1.0 — FK-Joins durch separate Queries ersetzt (PostgREST Schema-Cache)
-// Herz der Lazy-Tick-Engine (SPEC_balancing_0-1-5, Punkt 0+1).
+// Aktualisiert: 22.06.2026 — Generischer Produktions-Loop aus building_definitions
+// Version:      3.0.0
+//
+// Herz der Lazy-Tick-Engine.
 //
 // Ein "Tick" = ein vollständiger Simulationsschritt in fester Reihenfolge:
 //   1. Population  (setzt consumption/production/stock, Bevölkerung, Kapazität)
-//   2. Prices      (liest stock/balance → passt Marktpreise an, schreibt price_history)
-//   3. Orders      (liest stock/balance → generiert/expired Aufträge)
-// Die Reihenfolge ist zwingend: Prices/Orders lesen, was Population schreibt.
+//   2. NPC         (produce → sell → build → buy)
+//   3. Prices      (liest stock/balance → passt Marktpreise an)
+//   4. Orders      (liest stock/balance → generiert/expired Aufträge)
 //
-// runTick(supabase, tickNumber)  – führt EINEN vollständigen Tick aus
-// runDueTicks(supabase)          – holt via claim_due_ticks() fällige Ticks nach
-//
-// Wird aufgerufen von: den Crons (Fallback) und der world-Route (Herzschlag).
+// v3.0.0: PRODUCES und die hartkodierte Bonus-Berechnung sind entfernt.
+//   Der Tick lädt building_definitions einmal pro Lauf und berechnet
+//   Produktion generisch über alle Gebäudetypen. Neue Gebäude werden
+//   nur noch in der DB-Tabelle eingetragen — kein Programmiereingriff.
 
 import {
   CONSUMPTION_PER_100,
@@ -26,7 +27,6 @@ import {
   PRICE_MIN,
   PRICE_MAX,
   ORDER_MIN_AMOUNT,
-  ORDER_MAX_AMOUNT,
   ORDER_REWARD_MULT,
   ORDER_EXPIRE_HOURS,
   ORDER_COVERAGE_TICKS,
@@ -34,37 +34,61 @@ import {
 import { BUILDING_SALE } from './buildingSale'
 import { entscheideNpc } from './npcBrain'
 
-// Produktion je Gebäudetyp (für die Einkommens-Ausschüttung, Punkt 3)
-const PRODUCES: Record<string, { resource: 'metal' | 'energy' | 'water'; amount: number }> = {
-  mine:           { resource: 'metal',  amount: 5 },
-  solar:          { resource: 'energy', amount: 4 },
-  ice_drill:      { resource: 'water',  amount: 4 },
-  water_recycler: { resource: 'water',  amount: 2 },
+export const TICK_INTERVAL_SECONDS = 3600
+export const TICK_MAX_CATCHUP      = 48
+
+const AVG_WINDOW_TICKS      = 7
+const HISTORY_RETENTION_TICKS = 336
+
+type SB = any
+
+// ─────────────────────────────────────────────────────────────────────
+// DBBuildingDef — minimales Profil aus building_definitions (DB-Spaltenname-Konvention)
+// ─────────────────────────────────────────────────────────────────────
+interface DBBuildingDef {
+  key:              string
+  cost_credits:     number
+  population_bonus: number
+  production:       { resource: string; amount: number }[]
+  consumption:      { resource: string; amount: number }[]
 }
 
-// HINWEIS: Temporär auf 1 Woche gesetzt, um die Welt fürs Balancing-Testen
-// einzufrieren (kein Tick bei jedem Dashboard-Load). VOR echtem Spielbetrieb
-// zurück auf 3600 (1 Stunde) stellen!
-export const TICK_INTERVAL_SECONDS = 3600    // 1 Stunde pro Tick
-export const TICK_MAX_CATCHUP      = 48      // höchstens 48 Ticks (2 Tage) nachrechnen
+// Lädt alle aktiven building_definitions einmal und gibt eine Map zurück.
+// Wird pro runTick() einmal aufgerufen — kein N+1.
+async function loadBuildingDefs(supabase: SB): Promise<Map<string, DBBuildingDef>> {
+  const { data, error } = await supabase
+    .from('building_definitions')
+    .select('key, cost_credits, population_bonus, production, consumption')
+    .eq('is_active', true)
 
-// Fenster für den gleitenden Bewertungs-Schnitt (Punkt 4)
-const AVG_WINDOW_TICKS = 7
-// Retention: price_history-Rohdaten älter als dieses Fenster werden gelöscht.
-// Großzügiger als AVG_WINDOW (Puffer für Charts/Archiv), aber gedeckelt,
-// damit die Tabelle nicht unbegrenzt wächst (Skalierung bei vielen Orten).
-const HISTORY_RETENTION_TICKS = 336   // ~14 Tage bei stündlichen Ticks
+  if (error) {
+    console.error('loadBuildingDefs error:', error)
+    return new Map()
+  }
 
-type SB = any  // Supabase Service-Client
+  const map = new Map<string, DBBuildingDef>()
+  for (const row of data ?? []) {
+    map.set(row.key, {
+      key:              row.key,
+      cost_credits:     row.cost_credits ?? 0,
+      population_bonus: row.population_bonus ?? 0,
+      production:       Array.isArray(row.production) ? row.production : [],
+      consumption:      Array.isArray(row.consumption) ? row.consumption : [],
+    })
+  }
+  return map
+}
 
 // ─────────────────────────────────────────────────────────────────────
-// 1) POPULATION – Verbrauch, Produktion (frisch aus Basis + tile_entities),
-//    Bevölkerung, Kapazität, Überbelegung
+// 1) POPULATION
 // ─────────────────────────────────────────────────────────────────────
-export async function runPopulationTick(supabase: SB, tickNumber: number) {
+export async function runPopulationTick(
+  supabase: SB,
+  tickNumber: number,
+  defs: Map<string, DBBuildingDef>,
+) {
   const results: Record<string, unknown>[] = []
-  // simulate_tick = false → passiver Ort (Erde, Prometheus): kein Bevölkerungs-
-  // oder Verbrauchs-Tick. Marktpreise laufen separat (runPriceTick filtert nicht).
+
   const { data: locations } = await supabase
     .from('locations')
     .select('*')
@@ -78,19 +102,35 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
 
     const stock: Record<string, number> = {}
     const resMap: Record<string, any> = {}
-    for (const r of resources ?? []) { stock[r.resource] = r.stock; resMap[r.resource] = r }
+    for (const r of resources ?? []) {
+      stock[r.resource] = r.stock
+      resMap[r.resource] = r
+    }
 
+    // Alle Gebäude dieser Kolonie laden
     const { data: buildings } = await supabase
       .from('tile_entities')
-      .select('id, entity_id, profile_id')
+      .select('id, entity_id, profile_id, actor_id')
       .eq('location_id', loc.id)
       .eq('entity_type', 'building')
 
+    // Zählen: wie viele Gebäude je Typ
     const counts: Record<string, number> = {}
-    for (const b of buildings ?? []) counts[b.entity_id] = (counts[b.entity_id] ?? 0) + 1
+    for (const b of buildings ?? []) {
+      counts[b.entity_id] = (counts[b.entity_id] ?? 0) + 1
+    }
 
     const pop = loc.population
-    const popMax = (loc.base_population_max ?? loc.population_max) + (counts['habitat'] ?? 0) * 100
+
+    // Bevölkerungskapazität: Basiswert + Summe aller population_bonus
+    let popBonus = 0
+    for (const [entityId, count] of Object.entries(counts)) {
+      const def = defs.get(entityId)
+      if (def && def.population_bonus > 0) {
+        popBonus += def.population_bonus * count
+      }
+    }
+    const popMax = (loc.base_population_max ?? loc.population_max) + popBonus
 
     const consumed = {
       water:  Math.ceil((pop / 100) * CONSUMPTION_PER_100.water),
@@ -103,14 +143,25 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
       (stock['energy'] ?? 0) >= consumed.energy &&
       (stock['metal']  ?? 0) >= consumed.metal
 
+    // Produktion je Ressource generisch aus building_definitions berechnen
     for (const res of ['water', 'energy', 'metal'] as const) {
-      const r = resMap[res]; if (!r) continue
-      const mineBonus        = res === 'metal'  ? (counts['mine']           ?? 0) * 5 : 0
-      const solarBonus       = res === 'energy' ? (counts['solar']          ?? 0) * 4 : 0
-      const iceDrillBonus    = res === 'water'  ? (counts['ice_drill']      ?? 0) * 4 : 0
-      const recyclerBonus    = res === 'water'  ? (counts['water_recycler'] ?? 0) * 2 : 0
-      const totalProd  = (r.base_production ?? r.production) + mineBonus + solarBonus + iceDrillBonus + recyclerBonus
-      const newStock   = Math.max(0, r.stock + totalProd - consumed[res])
+      const r = resMap[res]
+      if (!r) continue
+
+      // Summe aller Gebäude-Produktionen für diese Ressource
+      let totalBuildingProduction = 0
+      for (const [entityId, count] of Object.entries(counts)) {
+        const def = defs.get(entityId)
+        if (!def) continue
+        for (const prod of def.production) {
+          if (prod.resource === res) {
+            totalBuildingProduction += prod.amount * count
+          }
+        }
+      }
+
+      const totalProd = (r.base_production ?? r.production ?? 0) + totalBuildingProduction
+      const newStock  = Math.max(0, r.stock + totalProd - consumed[res])
 
       await supabase.from('location_resources')
         .update({ stock: newStock, production: totalProd, consumption: consumed[res] })
@@ -118,7 +169,9 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
       stock[res] = newStock
     }
 
-    let newPop: number, overcrowded = false
+    // Bevölkerungsentwicklung
+    let newPop: number
+    let overcrowded = false
     if (pop > popMax) {
       overcrowded = true
       newPop = Math.max(popMax, pop - Math.ceil(pop * DECLINE_RATE))
@@ -131,16 +184,8 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
       .update({ population: newPop, population_max: popMax, is_supplied: isSupplied })
       .eq('id', loc.id)
 
-    // ─────────────────────────────────────────────────────────────────
-    // EINKOMMENS-AUSSCHÜTTUNG (Punkt 3, schlank):
-    // Die Kolonie kauft Produktion NUR bei Mangel und zahlt den lokalen
-    // sell_price; Habitate zahlen Miete pro belegtem Platz. Abzüglich
-    // Transaktionssteuer der Kolonie. Geld fließt aus dem colony_ledger
-    // (geschlossener Kreislauf, kein Gelddruck). Überschuss-Produktion
-    // bleibt vorerst ohne Ausschüttung (Eigentümer-Lager = späteres Feature).
-    // ─────────────────────────────────────────────────────────────────
+    // ── Einkommens-Ausschüttung ──────────────────────────────────────────────
     if ((buildings ?? []).length > 0) {
-      // Steuersatz der Kolonie (wie in trade/route.ts)
       const { data: settings } = await supabase
         .from('colony_settings')
         .select('tax_transaction')
@@ -148,7 +193,6 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
         .maybeSingle()
       const taxRate = Number(settings?.tax_transaction ?? 0)
 
-      // Marktpreise (sell) der Kolonie einmal laden
       const { data: priceRows } = await supabase
         .from('market_prices')
         .select('resource, sell_price')
@@ -156,25 +200,30 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
       const sellPrice: Record<string, number> = {}
       for (const p of priceRows ?? []) sellPrice[p.resource] = p.sell_price
 
-      // belegte Habitat-Plätze (Auslastung × 100, gedeckelt)
       const auslastung = popMax > 0 ? Math.min(1, Math.max(0, newPop / popMax)) : 0
 
       for (const b of buildings ?? []) {
-        let gross = 0   // Brutto-Ausschüttung vor Steuer
+        // NPC-Gebäude überspringen (kein profile_id → kein Ausschüttungsempfänger)
+        if (!b.profile_id) continue
 
-        if (b.entity_id === 'habitat') {
-          // Miete: belegte Plätze × Mietwert
-          const belegt = Math.round(100 * auslastung)
+        const def = defs.get(b.entity_id)
+        if (!def) continue
+
+        let gross = 0
+
+        if (def.population_bonus > 0) {
+          // Habitat: Miete auf belegte Plätze
+          const belegt = Math.round(def.population_bonus * auslastung)
           gross = belegt * BUILDING_SALE.MIETWERT_PRO_PLATZ
-        } else if (PRODUCES[b.entity_id]) {
-          // Mine/Solar: Kolonie kauft nur bei MANGEL der Ressource
-          const { resource, amount } = PRODUCES[b.entity_id]
-          const r = resMap[resource]
+        } else if (def.production.length > 0) {
+          // Produktionsgebäude: Kolonie kauft bei Mangel
+          const hauptprod = def.production[0]
+          const r = resMap[hauptprod.resource]
           if (r) {
             const balance = (r.production ?? 0) - (r.consumption ?? 0)
-            const mangel  = (stock[resource] ?? 0) < STOCK_LOW_THRESHOLD
-                          || (balance < 0 && (stock[resource] ?? 0) < 150)
-            if (mangel) gross = amount * (sellPrice[resource] ?? 0)
+            const mangel  = (stock[hauptprod.resource] ?? 0) < STOCK_LOW_THRESHOLD
+                          || (balance < 0 && (stock[hauptprod.resource] ?? 0) < 150)
+            if (mangel) gross = hauptprod.amount * (sellPrice[hauptprod.resource] ?? 0)
           }
         }
 
@@ -183,7 +232,6 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
         const tax    = Math.round(taxRate * gross)
         const payout = gross - tax
 
-        // Eigentümer gutschreiben
         const { data: prof } = await supabase
           .from('profiles').select('credits').eq('id', b.profile_id).single()
         if (prof) {
@@ -192,7 +240,6 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
             .eq('id', b.profile_id)
         }
 
-        // Kolonie zahlt (negativer Eintrag) + Steuer (positiv) ins Ledger
         await supabase.from('colony_ledger').insert([
           {
             location_id: loc.id, tick: tickNumber, entry_type: 'building_payout',
@@ -208,7 +255,7 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
       }
     }
 
-    // Event-Stream: Wachstum / beginnende Not (Rohdaten für Kennzahlen)
+    // Event-Stream
     if (!isSupplied && newPop < pop) {
       await supabase.from('events').insert({
         location_id: loc.id, type: 'starvation',
@@ -216,25 +263,30 @@ export async function runPopulationTick(supabase: SB, tickNumber: number) {
       })
     }
 
-    results.push({ location: loc.slug, population: { before: pop, after: newPop, max: popMax }, isSupplied, overcrowded })
+    results.push({
+      location: loc.slug,
+      population: { before: pop, after: newPop, max: popMax },
+      isSupplied,
+      overcrowded,
+    })
   }
 
   return results
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 2) PRICES – Lager-/Bilanz-/Versorgungsdruck, schreibt price_history
+// 2) PRICES
 // ─────────────────────────────────────────────────────────────────────
 export async function runPriceTick(supabase: SB, tickNumber: number) {
   const results: Record<string, unknown>[] = []
-  // locations separat (kein FK-Join)
-  const { data: priceLocRows } = await supabase.from('locations').select('id, slug, population, population_max, is_supplied')
+
+  const { data: priceLocRows } = await supabase
+    .from('locations')
+    .select('id, slug, population, population_max, is_supplied')
   const priceLocMap = new Map<string, any>()
   for (const l of (priceLocRows ?? []) as any[]) priceLocMap.set(l.id, l)
 
-  const { data: prices } = await supabase
-    .from('market_prices')
-    .select('*')
+  const { data: prices } = await supabase.from('market_prices').select('*')
 
   for (const price of prices ?? []) {
     const loc = priceLocMap.get(price.location_id)
@@ -248,11 +300,11 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
       .single()
     if (!res) continue
 
-    const stock = res.stock ?? 0
+    const stock   = res.stock ?? 0
     const balance = (res.production ?? 0) - (res.consumption ?? 0)
 
     let multiplier = 1.0
-    if (stock < STOCK_LOW_THRESHOLD)      multiplier = PRICE_PRESSURE_HIGH
+    if (stock < STOCK_LOW_THRESHOLD)       multiplier = PRICE_PRESSURE_HIGH
     else if (stock > STOCK_HIGH_THRESHOLD) multiplier = PRICE_PRESSURE_LOW
 
     if (balance < -5 && stock < 200)       multiplier = Math.max(multiplier, 1.03)
@@ -268,8 +320,8 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
       else if (price.buy_price < 30) multiplier = 1.01
     }
 
-    const newBuy  = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX, price.buy_price * multiplier)))
-    const newSell = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX - 1, price.sell_price * multiplier)))
+    const newBuy   = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX, price.buy_price * multiplier)))
+    const newSell  = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX - 1, price.sell_price * multiplier)))
     const safeSell = Math.min(newSell, newBuy - 5)
 
     if (!(newBuy === price.buy_price && safeSell === price.sell_price)) {
@@ -278,16 +330,11 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
         .eq('id', price.id)
     }
 
-    // Preisverlauf schreiben (immer, auch unverändert → lückenlose Ø-Basis)
     await supabase.from('price_history').insert({
       location_id: loc.id, resource: price.resource, tick_number: tickNumber,
       buy_price: newBuy, sell_price: safeSell,
     })
 
-    // ── Punkt 4: gleitenden Schnitt fortschreiben (für getSaleQuote) ──────────
-    // Letzte AVG_WINDOW_TICKS sell_price-Werte mitteln (inkl. des gerade
-    // geschriebenen). avg_sell_7 wird an market_prices gepflegt → die Bewertung
-    // liest O(1) einen vorberechneten Wert statt die History-Tabelle zu scannen.
     const { data: recent } = await supabase
       .from('price_history')
       .select('sell_price')
@@ -308,9 +355,6 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
     results.push({ location: loc.slug, resource: price.resource, buy: newBuy, sell: safeSell })
   }
 
-  // ── Retention: Rohdaten älter als das Fenster löschen (Skalierung) ──────────
-  // avg_sell_7 ist bereits an market_prices gesichert; ältere price_history-
-  // Zeilen werden nur noch für Charts/Archiv gebraucht und hier gedeckelt.
   const cutoff = tickNumber - HISTORY_RETENTION_TICKS
   if (cutoff > 0) {
     await supabase.from('price_history').delete().lt('tick_number', cutoff)
@@ -320,7 +364,7 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 3) ORDERS – abgelaufene schließen, neue bei Knappheit generieren
+// 3) ORDERS
 // ─────────────────────────────────────────────────────────────────────
 export async function runOrderTick(supabase: SB) {
   const created: Record<string, unknown>[] = []
@@ -330,7 +374,6 @@ export async function runOrderTick(supabase: SB) {
     .eq('status', 'open')
     .lt('expires_at', new Date().toISOString())
 
-  // Nur simulierte Kolonien erhalten Aufträge — Erde/Prometheus nicht.
   const { data: locations } = await supabase
     .from('locations')
     .select('id, slug, population, is_supplied')
@@ -343,8 +386,8 @@ export async function runOrderTick(supabase: SB) {
       .eq('location_id', loc.id)
 
     for (const res of resources ?? []) {
-      const balance = res.production - res.consumption
-      const isUrgent  = res.stock < STOCK_LOW_THRESHOLD
+      const balance  = res.production - res.consumption
+      const isUrgent = res.stock < STOCK_LOW_THRESHOLD
       const isSinking = balance < 0 && res.stock < 150
       if (!isUrgent && !isSinking) continue
 
@@ -365,24 +408,19 @@ export async function runOrderTick(supabase: SB) {
         .single()
       if (!price) continue
 
-      // Punkt 5: Größe = tatsächliches Defizit × Deckungsfenster (kein Zufall).
-      // balance ist hier negativ (Defizit), sonst wäre der Auftrag nicht ausgelöst.
-      // Untergrenze ORDER_MIN_AMOUNT, damit kleine Defizite die Fahrt lohnen.
-      // Kein Deckel nach oben — große Kolonien fordern große Lieferungen.
       const deficitPerTick = Math.max(0, -balance)
       const amount = Math.max(
         ORDER_MIN_AMOUNT,
         Math.round(deficitPerTick * ORDER_COVERAGE_TICKS)
       )
       const rewardMult = isUrgent ? ORDER_REWARD_MULT * 1.3 : ORDER_REWARD_MULT
-      const reward = Math.round(price.buy_price * amount * rewardMult)
-      const expiresAt = new Date()
+      const reward     = Math.round(price.buy_price * amount * rewardMult)
+      const expiresAt  = new Date()
       expiresAt.setHours(expiresAt.getHours() + ORDER_EXPIRE_HOURS)
 
       await supabase.from('trade_orders').insert({
         location_id: loc.id, resource: res.resource, amount, reward,
         status: 'open', expires_at: expiresAt.toISOString(),
-        // for_profile_id bleibt NULL → öffentlicher Auftrag
       })
       created.push({ location: loc.slug, resource: res.resource, amount, reward, urgent: isUrgent })
     }
@@ -392,41 +430,8 @@ export async function runOrderTick(supabase: SB) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Ein vollständiger Tick (feste Reihenfolge!)
+// NPC-Tick (Phase C) — unverändert
 // ─────────────────────────────────────────────────────────────────────
-// ── NPC-Tick (Phase C) ───────────────────────────────────────────────────────
-//
-// Aktionsreihenfolge: produce → sell → build → buy
-//
-// produce:  Gebäude-Output wird in den Marktstock eingespeist UND im
-//           npc_ledger verbucht (goods_delta + credit_delta = Erlös).
-//           Immer, unabhängig vom Preis. Idempotent über uniq_npc_ledger_event.
-//
-// sell:     Überschuss über reserve wird verkauft, wenn sell_price ≥ sell_floor.
-//           Erhöht den Marktstock (günstiger als bei Spielerlieferung — NPCs
-//           stören keine Aufträge, sie ergänzen den Hintergrundmarkt).
-//           Idempotent über uniq_npc_ledger_event (kind='sell', resource, tick).
-//
-// build:    Wenn Treasury ≥ treasury_min: Insert in tile_entities.
-//           Kein Bauzeit-Tick (NPCs bauen sofort). Kosten ins Ledger.
-//           Idempotent über uniq_npc_ledger_event (kind='build', ref=location).
-//           Hier kein Tile-Conflict-Check — NPCs landen auf Eck-Kacheln, die
-//           der Seed-Reset schon reserviert hat. Kollisionen löst notfalls das
-//           DB-Unique-Constraint (tile_entities hat keinen NPC-Guard).
-//
-// buy:      Phase B v1-Logik unverändert (schreibt weiter in npc_trades).
-//           npc_trades bleibt das Kaufledger; npc_ledger ist das Produktions-/
-//           Verkaufs-/Bau-Ledger. Beide summiert = Gesamtbestand.
-//
-// Bestandsberechnung: Σ npc_trades.amount (Käufe) + Σ npc_ledger.goods_delta
-// (Produktion − Verkäufe) = echter Netto-Bestand. Das erlaubt, die bestehende
-// npc_trades-Tabelle unangetastet zu lassen und trotzdem den vollen Bestand
-// zu kennen.
-//
-// ACHTUNG: produce MUSS vor sell laufen, damit der produce-Ledger-Eintrag
-// beim Bestandssummieren in sell schon zählt. Die Summe passiert einmal pro
-// Akteur (oben), DANACH werden Aktionen abgearbeitet — der Brain sieht den
-// Stand von BEGINN des Ticks (kein Mid-Tick-Drift). Das ist deterministisch.
 export async function runNpcTick(supabase: SB, tickNumber: number) {
   const { data: actors } = await supabase
     .from('actors')
@@ -434,11 +439,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
     .eq('kind', 'npc_firm')
   if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
 
-  // ── Marktpreise + Stock einmal für alle Akteure laden ────────────────────
-  // locations separat laden (kein FK-Join — Beziehung nicht im Schema-Cache)
-  const { data: locRows } = await supabase
-    .from('locations')
-    .select('id, slug')
+  const { data: locRows } = await supabase.from('locations').select('id, slug')
   const locIdToSlug = new Map<string, string>()
   for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
 
@@ -453,7 +454,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
   for (const s of (stockRows ?? []) as any[]) {
     stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
   }
-  // sell_price je Ort/Gut (für Erlösberechnung bei produce/sell)
+
   const sellPriceMap = new Map<string, number>()
   const slugToId     = new Map<string, string>()
 
@@ -475,7 +476,6 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
   let trades = 0, produces = 0, sells = 0, builds = 0
 
   for (const actor of actors as any[]) {
-    // ── Bestand: Σ npc_trades (Käufe) + Σ npc_ledger.goods_delta (Prod−Verkauf) ──
     const { data: buyLed } = await supabase
       .from('npc_trades')
       .select('resource, amount')
@@ -494,14 +494,12 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
       if (r.resource) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.goods_delta ?? 0)
     }
 
-    // ── Treasury: Σ npc_ledger.credit_delta ──────────────────────────────────
     const { data: ledSum } = await supabase
       .from('npc_ledger')
       .select('credit_delta')
       .eq('actor_id', actor.id)
     const treasury = (ledSum ?? []).reduce((s: number, r: any) => s + Number(r.credit_delta ?? 0), 0)
 
-    // ── Eigene Gebäude laden (für produce) ───────────────────────────────────
     const { data: gebRows } = await supabase
       .from('tile_entities')
       .select('entity_id, location_id, tile_col')
@@ -516,115 +514,73 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
       }))
       .filter(g => g.location)
 
-    // ── Stock je Markt auffrischen (Mehr-NPC-fest) ───────────────────────────
     for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
 
-    // ── Brain ─────────────────────────────────────────────────────────────────
     const aktionen = entscheideNpc(
       { actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, treasury, gebaeude },
       { tick: tickNumber, preise },
     )
 
-    // ── Aktionen ausführen ────────────────────────────────────────────────────
     for (const a of aktionen) {
 
-      // ── PRODUCE ─────────────────────────────────────────────────────────────
       if (a.typ === 'produce') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
-
         const erloes = a.menge * (sellPriceMap.get(`${locId}|${a.resource}`) ?? 0)
-
-        // Idempotenter Ledger-Eintrag. ref = "slug:tile_col" → eindeutig je Gebäude,
-        // damit zwei Minen desselben NPCs am gleichen Ort beide ihren Eintrag bekommen.
         const { data: ins } = await supabase.from('npc_ledger').upsert(
           {
-            actor_id:    actor.id,
-            tick:        tickNumber,
-            kind:        'produce',
-            resource:    a.resource,
-            goods_delta: a.menge,
-            credit_delta: erloes,
-            location_id: locId,
-            ref:         a.ref,    // z.B. "moon:11", "moon:10"
+            actor_id: actor.id, tick: tickNumber, kind: 'produce',
+            resource: a.resource, goods_delta: a.menge, credit_delta: erloes,
+            location_id: locId, ref: a.ref,
           },
           { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
         ).select('id')
-
-        if (!ins?.length) continue   // bereits gelaufen → No-op
-
-        // Stock der Kolonie erhöhen (NPC speist ein)
+        if (!ins?.length) continue
         const key = `${locId}|${a.resource}`
         const neuerStock = (stockMap.get(key) ?? 0) + a.menge
         await supabase.from('location_resources')
           .update({ stock: neuerStock })
-          .eq('location_id', locId)
-          .eq('resource', a.resource)
+          .eq('location_id', locId).eq('resource', a.resource)
         stockMap.set(key, neuerStock)
         produces++
       }
 
-      // ── SELL ────────────────────────────────────────────────────────────────
       else if (a.typ === 'sell') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
-
         const aktuellerSellPrice = sellPriceMap.get(`${locId}|${a.resource}`) ?? 0
-        if (aktuellerSellPrice < a.minPreis) continue  // Markt unter sell_floor gefallen
-
+        if (aktuellerSellPrice < a.minPreis) continue
         const erloes = a.menge * aktuellerSellPrice
-
         const { data: ins } = await supabase.from('npc_ledger').upsert(
           {
-            actor_id:     actor.id,
-            tick:         tickNumber,
-            kind:         'sell',
-            resource:     a.resource,
-            goods_delta:  -a.menge,  // negativ: Gut verlässt NPC-Lager
-            credit_delta:  erloes,
-            location_id:  locId,
+            actor_id: actor.id, tick: tickNumber, kind: 'sell',
+            resource: a.resource, goods_delta: -a.menge, credit_delta: erloes,
+            location_id: locId,
           },
           { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
         ).select('id')
-
         if (!ins?.length) continue
-
-        // Stock erhöhen (NPC verkauft an Kolonielager)
         const key = `${locId}|${a.resource}`
         const neuerStock = (stockMap.get(key) ?? 0) + a.menge
         await supabase.from('location_resources')
           .update({ stock: neuerStock })
-          .eq('location_id', locId)
-          .eq('resource', a.resource)
+          .eq('location_id', locId).eq('resource', a.resource)
         stockMap.set(key, neuerStock)
         sells++
       }
 
-      // ── BUILD ────────────────────────────────────────────────────────────────
       else if (a.typ === 'build') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
-
-        // Idempotenz: ref = location-Slug, damit pro Ort+Tick genau ein Bau-Event
         const { data: ins } = await supabase.from('npc_ledger').upsert(
           {
-            actor_id:     actor.id,
-            tick:         tickNumber,
-            kind:         'build',
-            resource:     null,
-            goods_delta:  0,
-            credit_delta: -a.cost,  // Kosten abziehen
-            location_id:  locId,
-            ref:          a.location,
+            actor_id: actor.id, tick: tickNumber, kind: 'build',
+            resource: null, goods_delta: 0, credit_delta: -a.cost,
+            location_id: locId, ref: a.location,
           },
           { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true },
         ).select('id')
-
-        if (!ins?.length) continue   // bereits gebaut diesen Tick
-
-        // Gebäude in tile_entities einfügen — nächste freie Eck-Kachel (row 7)
-        // NPCs bauen immer oben rechts und rücken col nach links (6, 5, 4 …).
-        // Einfacher Heuristic: count bestehender NPC-Gebäude dieses Typs am Ort
+        if (!ins?.length) continue
         const { data: vorhandene } = await supabase
           .from('tile_entities')
           .select('tile_col')
@@ -632,48 +588,33 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
           .eq('location_id', locId)
           .eq('entity_id', a.building)
           .order('tile_col', { ascending: false })
-
         const naechsteCol = vorhandene?.length
           ? Math.max(0, (vorhandene[0].tile_col ?? 11) - 1)
           : 11
-
         await supabase.from('tile_entities').insert({
-          actor_id:    actor.id,
-          location_id: locId,
-          tile_level:  0,
-          tile_row:    7,
-          tile_col:    naechsteCol,
-          entity_type: 'building',
-          entity_id:   a.building,
+          actor_id: actor.id, location_id: locId,
+          tile_level: 0, tile_row: 7, tile_col: naechsteCol,
+          entity_type: 'building', entity_id: a.building,
         })
         builds++
       }
 
-      // ── BUY (Phase B, unverändert → npc_trades) ─────────────────────────────
       else if (a.typ === 'buy') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
-
         const { data: eingefuegt } = await supabase.from('npc_trades').upsert(
           {
-            actor_id:    actor.id,
-            tick:        tickNumber,
-            resource:    a.resource,
-            amount:      a.menge,
-            unit_price:  a.maxPreis,
-            location_id: locId,
+            actor_id: actor.id, tick: tickNumber, resource: a.resource,
+            amount: a.menge, unit_price: a.maxPreis, location_id: locId,
           },
           { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true },
         ).select('id')
-
         if (!eingefuegt?.length) continue
-
         const key = `${locId}|${a.resource}`
         const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge)
         await supabase.from('location_resources')
           .update({ stock: neuerStock })
-          .eq('location_id', locId)
-          .eq('resource', a.resource)
+          .eq('location_id', locId).eq('resource', a.resource)
         stockMap.set(key, neuerStock)
         trades++
       }
@@ -683,18 +624,22 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
   return { actors: actors.length, trades, produces, sells, builds }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Ein vollständiger Tick
+// ─────────────────────────────────────────────────────────────────────
 export async function runTick(supabase: SB, tickNumber: number) {
-  const population = await runPopulationTick(supabase, tickNumber)
-  const npc        = await runNpcTick(supabase, tickNumber)    // Nachfrage VOR den Preisen: senkt Stock
-  const prices     = await runPriceTick(supabase, tickNumber)  // reagiert auf den gesenkten Stock (gleicher Tick)
+  // building_definitions einmal laden — alle Funktionen teilen sich diese Map
+  const defs = await loadBuildingDefs(supabase)
+
+  const population = await runPopulationTick(supabase, tickNumber, defs)
+  const npc        = await runNpcTick(supabase, tickNumber)
+  const prices     = await runPriceTick(supabase, tickNumber)
   const orders     = await runOrderTick(supabase)
   return { tickNumber, population, prices, npc, orders }
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Lazy-Evaluation: fällige Ticks atomar beanspruchen und nachrechnen.
-// claim_due_ticks() serialisiert via Advisory Lock; nur der Gewinner
-// führt die beanspruchten Ticks sequenziell aus.
+// Lazy-Evaluation
 // ─────────────────────────────────────────────────────────────────────
 export async function runDueTicks(supabase: SB) {
   const { data, error } = await supabase.rpc('claim_due_ticks', {
@@ -703,12 +648,11 @@ export async function runDueTicks(supabase: SB) {
   })
   if (error) { console.error('claim_due_ticks error:', error); return { ran: 0 } }
 
-  const row = Array.isArray(data) ? data[0] : data
+  const row     = Array.isArray(data) ? data[0] : data
   const claimed = row?.claimed ?? 0
   const latest  = Number(row?.latest_tick ?? 0)
   if (claimed < 1) return { ran: 0 }
 
-  // Tick-Nummern: latest-claimed+1 .. latest, sequenziell ausführen
   for (let n = latest - claimed + 1; n <= latest; n++) {
     await runTick(supabase, n)
   }
