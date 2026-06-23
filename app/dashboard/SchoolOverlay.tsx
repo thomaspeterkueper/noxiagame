@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 21.06.2026 23:05 — Werkzeuge-Tab entfernt, nur 40/60 Split
-// Version:      3.8.1
+// Aktualisiert: 23.06.2026 — Verwaisten Taschenrechner/TradeSimulator-Block entfernt (Syntax-Fix)
+// Version:      3.8.2
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -468,28 +468,6 @@ export default function SchoolOverlay({
         {/* Handbuch */}
         {tab === 'handbuch' && <ManualTab onClose={onClose} />}
 
-            </div>
-
-            {/* Taschenrechner */}
-            <div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c9a961', letterSpacing: '2px', textTransform: 'uppercase' as const, marginBottom: '0.5rem' }}>🧮 Taschenrechner</div>
-              <div style={{ background: '#f0ece3', border: '1px solid #d4c9b0', borderRadius: '8px', padding: '0.75rem' }}>
-                <input type="text" placeholder="z.B. 80 * 155 - 80 * 95" value={calcVal}
-                  onChange={e => setCalcVal(e.target.value)}
-                  style={{ width: '100%', background: '#fff', border: '1px solid #d4c9b0', borderRadius: '6px', padding: '0.5rem 0.7rem', fontSize: '0.9rem', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' as const }} />
-                <div style={{ marginTop: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#c9a961', textAlign: 'right', minHeight: '1.5rem' }}>
-                  {(() => { try { const r = Math.round(Function('"use strict"; return (' + calcVal.replace(/[^0-9+\-*/().\s]/g, '') + ')')() * 100) / 100; return isFinite(r) ? `= ${r.toLocaleString('de')}` : '' } catch { return '' } })()}
-                </div>
-              </div>
-            </div>
-
-            {/* Handelsmarge-Experiment */}
-            <div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#6fcf97', letterSpacing: '2px', textTransform: 'uppercase' as const, marginBottom: '0.5rem' }}>🔬 Experiment: Handelsmarge</div>
-              <TradeSimulator />
-            </div>
-          </div>
-        )}
 
         {/* Akademie */}
         {tab === 'akademie' && (
