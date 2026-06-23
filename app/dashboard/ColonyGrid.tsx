@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 12:55 — TILE_SIZE_MAX 120, Straßen baubar, Habitat-Sprites
-// Version:      4.4.0
+// Aktualisiert: 23.06.2026 13:10 — TILE_SIZE_DEFAULT 96px
+// Version:      5.0.1
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
