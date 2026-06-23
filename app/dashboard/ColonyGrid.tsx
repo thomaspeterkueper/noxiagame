@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 11:20 — tileSize als externe Prop vom DashboardClient
-// Version:      4.3.0
+// Aktualisiert: 23.06.2026 12:50 — NPC-Gebäude: entity_id aus DB hat Vorrang vor tileType
+// Version:      4.3.2
 //
 // v4.0.0 — Performance + ResizeObserver-Fix:
 //   - useMemo für Grid-Rendering (kein Re-Render bei Hover)
@@ -46,6 +46,7 @@ const RES_DE: Record<string, string> = { metal: 'Metall', energy: 'Energie', wat
 // ── Typen ─────────────────────────────────────────────────────────────────────
 export interface TileEntity {
   id: string; profile_id: string | null; is_state_owned?: boolean
+  actor_id?: string | null
   entity_type: string; entity_id: string; tile_level: number
   tile_row: number; tile_col: number; username?: string
 }
@@ -262,7 +263,8 @@ export default function ColonyGrid({
   const [showBuildPopup, setShowBuildPopup] = useState(false)
   const [showAdmin, setShowAdmin]   = useState(false)
   const [showSchool, setShowSchool] = useState(false)
-  const [showLanding, setShowLanding] = useState(false)
+  const [showLanding, setShowLanding]   = useState(false)
+  const [showSellPanel, setShowSellPanel] = useState(false)
   const [showBank, setShowBank]     = useState(false)
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
   const [internalTileSize, setTileSize] = useState(TILE_SIZE_MIN)
@@ -322,6 +324,8 @@ export default function ColonyGrid({
     if (ent?.entity_id === 'shipyard')    { onOpenShipyard?.();    return }
     if (ent?.entity_id === 'warehouse')   { onOpenWarehouse?.();   return }
     if (ent?.entity_id === 'market')      { onOpenWarehouse?.();   return }
+    // Eigene Gebäude → SellPanel (Marktbewertung + Verkauf)
+    if (ent && ent.profile_id === userId)  { setShowSellPanel(true); return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }, [entityAt, onOpenShipyard, onOpenWarehouse])
 
@@ -333,16 +337,18 @@ export default function ColonyGrid({
         const isSelected = selectedTile?.r === r && selectedTile?.c === c
         const canBuild   = isBuildable(tileType)
         const entity     = entityAt(r, c)
-        const isOwn      = entity?.profile_id !== null && entity?.profile_id === userId
+        const isOwn      = !!entity?.profile_id && entity.profile_id === userId
         const isSelling  = sellingAt(r, c)
         const isAnom     = anomaly?.r === r && anomaly?.c === c
-        const isState    = entity?.is_state_owned || entity?.profile_id === null
+        const isNPC      = !!entity?.actor_id  // NPC-Firma besitzt das Gebäude
+        const isState    = !isNPC && (entity?.is_state_owned === true || (entity?.profile_id === null && !entity?.actor_id))
         const interactive = canBuild || !!entity || isAnom
 
         let ownerShadow = 'none'
         if (entity) {
           if (isState)    ownerShadow = 'inset 0 0 0 3px #5aaeff, 0 0 7px #5aaeff'
           else if (isOwn) ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 7px rgba(201,169,97,0.7)'
+          else if (isNPC) ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 5px rgba(224,80,80,0.5)'
           else            ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 5px rgba(224,80,80,0.5)'
         }
         if (isSelected && !isState) ownerShadow = 'inset 0 0 0 3px #c9a961, 0 0 12px #c9a961'
@@ -372,11 +378,16 @@ export default function ColonyGrid({
             }}
           >
             {(() => {
+              // Echtes Gebäude aus tile_entities hat immer Vorrang
+              if (entity?.entity_id) {
+                return <BuildingSVG entityId={entity.entity_id} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={isOwn} size={tileSize} />
+              }
               const npcEid = NPC_ENTITY[tileType]
-              const isBuildingTile = npcEid !== undefined || (tileType.startsWith('building_') && tileType !== 'building_construction')
-              if (isBuildingTile) {
-                const eid = entity?.entity_id ?? npcEid ?? tileType.replace('building_', '')
-                return <BuildingSVG entityId={eid} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
+              if (npcEid) {
+                return <BuildingSVG entityId={npcEid} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
+              }
+              if (tileType.startsWith('building_') && tileType !== 'building_construction') {
+                return <BuildingSVG entityId={tileType.replace('building_', '')} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
               }
               if (tileType.startsWith('road')) return <TileSVG type={tileType} planet={slug} />
               return <TileDisplay tileType={tileType} slug={slug} />
@@ -415,6 +426,19 @@ export default function ColonyGrid({
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts, total) => console.log(`+${pts} Wissenspunkte → ${total}`)} />}
       {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} />}
       {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} />}
+
+      {showSellPanel && selectedTile && (() => {
+        const ent = entityAt(selectedTile.r, selectedTile.c)
+        if (!ent) return null
+        const entName = BUILDINGS[ent.entity_id]?.name ?? ent.entity_id
+        return (
+          <SellPanel
+            entityId={ent.id}
+            entityName={entName}
+            onSold={async () => { setShowSellPanel(false); setSelectedTile(null); await onChanged?.() }}
+          />
+        )
+      })()}
       {showBuildPopup && selectedTile && <BuildPopup tileRow={selectedTile.r} tileCol={selectedTile.c} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
 
       {/* Mess-div: volle Breite, 1px hoch damit offsetWidth korrekt ist */}
