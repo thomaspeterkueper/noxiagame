@@ -1,7 +1,7 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Promise.all Batch-Queries, Sicherheiten-Warnung bei Unterdeckung
-// Version:      0.3.0
+// Aktualisiert: 22.06.2026 — hasCreditClearance defensiv (try/catch), ships is_active filter
+// Version:      0.3.1
 //
 // v0.3.0:
 //   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
@@ -65,13 +65,18 @@ async function getOrCreateAccount(userId: string, locationId: string) {
 
 // ── Schulungsnachweis prüfen ──────────────────────────────────────────────────
 async function hasCreditClearance(userId: string): Promise<boolean> {
-  const { data } = await serviceClient
-    .from('academy_completions')
-    .select('id')
-    .eq('profile_id', userId)
-    .eq('module_id', CREDIT_MODULE_ID)
-    .maybeSingle()
-  return !!data
+  try {
+    const { data, error } = await serviceClient
+      .from('academy_completions')
+      .select('id')
+      .eq('profile_id', userId)
+      .eq('module_id', CREDIT_MODULE_ID)
+      .maybeSingle()
+    if (error) return false  // Tabelle fehlt oder anderer DB-Fehler
+    return !!data
+  } catch {
+    return false
+  }
 }
 
 // ── Sicherheitenwert berechnen ────────────────────────────────────────────────
@@ -123,6 +128,7 @@ async function calcCollateral(userId: string): Promise<{
     .from('ships')
     .select('id, ship_type_id, ship_types(name, cost_credits)')
     .eq('profile_id', userId)
+    .eq('is_active', true)
 
   const shipCollateral: { id: string; name: string; shipTypeId: string; restwert: number }[] = []
   for (const s of ships ?? []) {
