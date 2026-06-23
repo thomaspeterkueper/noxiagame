@@ -1,6 +1,6 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 13:10 — GRID_TILE_SIZE 96px
+// Aktualisiert: 23.06.2026 13:20 — GRID_TILE_SIZE 96px fest, kein ResizeObserver
 // Version:      2.4.1
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
@@ -64,7 +64,7 @@ export default function DashboardClient({
   const [ships, setShips]               = useState<any[]>([])
   const [playerStats, setPlayerStats]   = useState({ trades: 0, flights: 0, knowledge: 0 })
   const gridColRef                          = React.useRef<HTMLDivElement>(null)
-  const [gridTileSize, setGridTileSize]     = useState(44)
+  const GRID_TILE_SIZE = 96
 
   const [shipyardOpen,   setShipyardOpen]   = useState(false)
   const [warehouseOpen,  setWarehouseOpen]  = useState(false)
@@ -78,24 +78,7 @@ export default function DashboardClient({
 
   useEffect(() => { loadFromServer() }, [])
 
-  // Linke Spalte messen → tileSize für ColonyGrid
-  React.useLayoutEffect(() => {
-    const el = gridColRef.current
-    if (!el) return
-    const COLS = 12; const ROWS = 8; const MIN = 44; const MAX = 120
-    const calc = (w: number) => {
-      if (w <= 30) return
-      const fromWidth  = Math.floor((w - 32) / COLS)
-      // Höhe: Viewport - Header(60) - Tipp(52) - Padding(40) - Orte+Schiffe(160) - Rand(20)
-      const fromHeight = Math.floor((window.innerHeight - 332) / ROWS)
-      setGridTileSize(Math.min(MAX, Math.max(MIN, Math.min(fromWidth, fromHeight))))
-    }
-    // Sofort + bei Resize
-    calc(el.offsetWidth)
-    const obs = new ResizeObserver(e => calc(e[0].contentRect.width))
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
+
   const prevLocationRef = React.useRef(location)
   useEffect(() => {
     if (prevLocationRef.current !== location) { prevLocationRef.current = location; loadFromServer() }
@@ -330,7 +313,7 @@ export default function DashboardClient({
               onTravel={handleTravel} onOpenShipyard={() => setShipyardOpen(true)}
               onOpenWarehouse={() => setWarehouseOpen(true)}
               onChanged={async () => { await loadFromServer(); invalidate('builds') }}
-              tileSize={gridTileSize}
+              tileSize={GRID_TILE_SIZE}
               entities={tileEntities.filter((e: any) => e.locations?.slug === location && e.tile_row != null)}
               pending={playerBuilds.filter((b: any) => b.locations?.slug === location).map((b: any) => ({ buildable_id: b.buildable_id, tile_row: b.tile_row, tile_col: b.tile_col, status: b.status }))}
             />
