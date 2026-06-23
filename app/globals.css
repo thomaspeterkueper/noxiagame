@@ -24,3 +24,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* NOXIA Alpha UI quick fix — ColonyGrid readability
+   Ziel: Info-Spalte breiter, schwarze Minimap entfernen.
+   Dieser Override ist bewusst klein gehalten, bis ColonyGrid ein eigenes UI-Primitive bekommt. */
+[style*="width: 190px"][style*="flex-direction: column"] {
+  width: 300px !important;
+}
+
+/* Die aktuelle GridMinimap wirkt wie ein schwarzer Fremdkörper und wurde von Testern nicht verstanden. */
+div:has(> svg[width="120"][height]) {
+  display: none !important;
+}
+
+[style*="width: 300px"][style*="flex-direction: column"] [style*="font-size: 0.82rem"] {
+  font-size: 1rem !important;
+}
+
+[style*="width: 300px"][style*="flex-direction: column"] [style*="font-size: 0.62rem"],
+[style*="width: 300px"][style*="flex-direction: column"] [style*="font-size: 0.66rem"],
+[style*="width: 300px"][style*="flex-direction: column"] [style*="font-size: 0.6rem"] {
+  font-size: 0.76rem !important;
+}
