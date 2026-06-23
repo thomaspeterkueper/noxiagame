@@ -1,22 +1,21 @@
 // app/api/cron/builds/route.ts
 // Erstellt: 31.05.2026
+// Aktualisiert: 23.06.2026 — BUILDABLE_ITEMS durch BUILDINGS aus buildings/index ersetzt
+// Version:      1.1.0
 //
 // Cron-Job: Prüft fertige Bauaufträge und aktiviert sie.
 // Läuft täglich um 11:00 UTC (vercel.json).
 //
-// Was passiert:
-// 1. Alle player_builds mit status='building' und completes_at <= NOW() laden
-// 2. Status auf 'complete' setzen
-// 3. Gebäude in player_buildings eintragen (für Cron-Produktionsberechnung)
-// 4. Bei Habitat: population_max der Kolonie erhöhen
-// 5. Tick in simulation_ticks protokollieren
+// Hinweis: completeBuild in build/route.ts erledigt dasselbe on-demand beim
+// nächsten Dashboard-Load. Dieser Cron ist der Fallback für Spieler die
+// mehrere Tage nicht einloggen.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { BUILDABLE_ITEMS, CRON_SECRET_HEADER } from '@/lib/game/config'
+import { CRON_SECRET_HEADER } from '@/lib/game/config'
+import { BUILDINGS } from '@/lib/game/buildings/index'
 
 export async function GET(req: NextRequest) {
-  // Cron-Secret prüfen
   const secret = req.headers.get(CRON_SECRET_HEADER)
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,7 +26,6 @@ export async function GET(req: NextRequest) {
   const failed:    string[] = []
 
   try {
-    // Alle fertigen Bauaufträge laden
     const { data: readyBuilds, error: fetchError } = await supabase
       .from('player_builds')
       .select('*, locations(id, slug, population_max)')
@@ -38,13 +36,13 @@ export async function GET(req: NextRequest) {
 
     for (const build of readyBuilds ?? []) {
       try {
-        const buildable = BUILDABLE_ITEMS[build.buildable_id]
+        const buildable = BUILDINGS[build.buildable_id]
         if (!buildable) {
           failed.push(`Unbekannter buildable_id: ${build.buildable_id}`)
           continue
         }
 
-        // 1. Build-Status auf 'complete' setzen
+        // Build-Status auf 'complete' setzen
         const { error: updateError } = await supabase
           .from('player_builds')
           .update({ status: 'complete' })
@@ -52,38 +50,30 @@ export async function GET(req: NextRequest) {
 
         if (updateError) throw updateError
 
-        // 2. Gebäude in player_buildings eintragen (wird vom Population-Cron genutzt)
-        if (buildable.type === 'building') {
-          const { error: buildingError } = await supabase
-            .from('player_buildings')
+        // Gebäude in tile_entities eintragen (Weltzustand)
+        if (!buildable.planned) {
+          const { error: entityError } = await supabase
+            .from('tile_entities')
             .insert({
               profile_id:  build.profile_id,
               location_id: build.location_id,
-              building:    build.buildable_id,
+              tile_level:  build.tile_level ?? 0,
+              tile_row:    build.tile_row,
+              tile_col:    build.tile_col,
+              entity_type: 'building',
+              entity_id:   build.buildable_id,
             })
 
-          if (buildingError) throw buildingError
-        }
-
-        // 3. Habitat-Bonus: population_max der Kolonie erhöhen
-        if (build.buildable_id === 'habitat' && build.locations?.id) {
-          const { error: popError } = await supabase
-            .from('locations')
-            .update({
-              population_max: (build.locations.population_max ?? 1000) + 100
-            })
-            .eq('id', build.location_id)
-
-          if (popError) throw popError
+          if (entityError) throw entityError
         }
 
         completed.push({
-          buildId:    build.id,
-          profileId:  build.profile_id,
-          buildable:  buildable.name,
-          location:   build.locations?.slug,
-          tileRow:    build.tile_row,
-          tileCol:    build.tile_col,
+          buildId:   build.id,
+          profileId: build.profile_id,
+          buildable: buildable.name,
+          location:  build.locations?.slug,
+          tileRow:   build.tile_row,
+          tileCol:   build.tile_col,
         })
 
       } catch (buildErr) {
@@ -91,24 +81,6 @@ export async function GET(req: NextRequest) {
         failed.push(build.id)
       }
     }
-
-    // Tick protokollieren
-    const { data: lastTick } = await supabase
-      .from('simulation_ticks')
-      .select('tick_number')
-      .order('tick_number', { ascending: false })
-      .limit(1)
-      .single()
-
-    await supabase.from('simulation_ticks').insert({
-      tick_number: (lastTick?.tick_number ?? 0) + 1,
-      finished_at: new Date().toISOString(),
-      summary: {
-        tick_type:  'builds',
-        completed:  completed.length,
-        failed:     failed.length,
-      },
-    })
 
     return NextResponse.json({
       ok:        true,
