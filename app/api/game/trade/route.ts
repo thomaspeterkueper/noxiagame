@@ -1,8 +1,10 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 21.06.2026 20:40
-// Version:      0.5.3
+// Aktualisiert: 23.06.2026 17:00 — successful travel increments profiles.flight_count
+// Version:      0.5.4
 //
+// v0.5.4 – Pilot-Kompetenz: erfolgreiche Reisen zählen serverseitig auf
+//   profiles.flight_count. Das Dashboard soll nur den fertigen Wert lesen.
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
 //   ship_types und liefert speedMult + rangeDistance.
 //   - BUGFIX: speed_mult kam nie im Client an (ship_types nicht gejoint) →
@@ -30,6 +32,23 @@ async function getUserFromRequest(req: NextRequest) {
   const token = authHeader.split(' ')[1]
   const { data: { user } } = await serviceClient.auth.getUser(token)
   return user
+}
+
+async function incrementFlightCount(profileId: string): Promise<number> {
+  const { data: profile } = await serviceClient
+    .from('profiles')
+    .select('flight_count')
+    .eq('id', profileId)
+    .single()
+
+  const next = Number(profile?.flight_count ?? 0) + 1
+
+  await serviceClient
+    .from('profiles')
+    .update({ flight_count: next })
+    .eq('id', profileId)
+
+  return next
 }
 
 export async function GET(req: NextRequest) {
@@ -79,7 +98,7 @@ export async function GET(req: NextRequest) {
           .single()
       : { data: null }
 
-    console.log(`getTrades v0.5.3: user=${user.id} ship=${ship?.id} loc=${ship?.location} active=${ship?.is_active}`)
+    console.log(`getTrades v0.5.4: user=${user.id} ship=${ship?.id} loc=${ship?.location} active=${ship?.is_active}`)
 
     const { data: cargo } = ship
       ? await serviceClient
@@ -125,7 +144,8 @@ export async function GET(req: NextRequest) {
 
     if (!travelShip) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
 
-    const energyNeeded = flightEnergyCost(travelShip.location, dest)
+    const fromLocation = travelShip.location
+    const energyNeeded = flightEnergyCost(fromLocation, dest)
 
     // Energie im Laderaum prüfen
     const { data: energyCargo } = await serviceClient
@@ -137,14 +157,14 @@ export async function GET(req: NextRequest) {
 
     const energyOnBoard = Number(energyCargo?.amount ?? 0)
 
-    console.log(`travel: ${travelShip.location} → ${dest}, energyNeeded=${energyNeeded}, onBoard=${energyOnBoard}`)
+    console.log(`travel: ${fromLocation} → ${dest}, energyNeeded=${energyNeeded}, onBoard=${energyOnBoard}`)
 
     if (energyOnBoard < energyNeeded) {
       return NextResponse.json({
         error: `Nicht genug Energie. Benötigt: ${energyNeeded}t, an Bord: ${energyOnBoard}t`,
         energyNeeded,
         energyOnBoard,
-        shipLocation: travelShip.location,
+        shipLocation: fromLocation,
       }, { status: 400 })
     }
 
@@ -168,7 +188,11 @@ export async function GET(req: NextRequest) {
       .update({ location: dest })
       .eq('id', travelShip.id)
 
-    return NextResponse.json({ ok: true, location: dest, energyUsed: energyNeeded })
+    const flightCount = fromLocation !== dest
+      ? await incrementFlightCount(user.id)
+      : Number.NaN
+
+    return NextResponse.json({ ok: true, location: dest, energyUsed: energyNeeded, flightCount })
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
