@@ -50,7 +50,15 @@ export function seededRandom(seed: number, i: number): number {
 }
 
 export function isBuildable(tileType: string): boolean {
-  return tileType === 'tile_surface' || tileType === 'tile_metal'
+  // Bebaubare Terrains: Oberfläche, Metall, Krater, Schächte
+  // Nicht bebaubar: Berge, Canyons, bestehende Straßen, NPC-Gebäude
+  return (
+    tileType === 'tile_surface' ||
+    tileType === 'tile_metal'   ||
+    tileType === 'tile_crater'  ||
+    tileType === 'tile_shaft'   ||
+    tileType.startsWith('road_')  // Straße AUF Straße = Erweiterung
+  )
 }
 
 // NPC-Bautyp → entity_id (fürs Sprite-Rendering in beiden Grids)
