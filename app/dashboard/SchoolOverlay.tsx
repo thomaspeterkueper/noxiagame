@@ -1,7 +1,7 @@
 // app/dashboard/SchoolOverlay.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 23.06.2026 — KursRenderer statt PDF-Viewer
-// Version:      4.0.0
+// Aktualisiert: 22.06.2026 — Fehlende Interfaces (ColonyContext, ContextBanner, SchoolOverlayProps) wiederhergestellt
+// Version:      4.0.1
 'use client'
 import KursRenderer from './KursRenderer'
 
@@ -12,6 +12,97 @@ import React, { useState, useEffect, useRef } from 'react'
 // URL-Schema: /api/game/akademie?kurs=XX  (leitet zu Supabase Storage URL weiter, kein CORS-Problem)
 // Fallback auf direkte Storage-URL bis Route existiert
 
+
+interface ColonyContext {
+  locationName: string
+  population:   number
+  waterStock:   number
+  waterCons:    number
+  credits:      number
+}
+
+interface ContextBanner {
+  folie: number
+  text:  string
+  color: string
+}
+
+interface SchoolOverlayProps {
+  locationSlug:      string
+  colonyContext:     ColonyContext
+  onClose:           () => void
+  onKnowledgeEarned: (pts: number, newTotal: number) => void
+}
+
+// ── Konstanten ───────────────────────────────────────────────────────────────
+
+const MONO = "'Courier Prime', monospace"
+
+const C = {
+  bg:          'rgba(248,245,238,0.93)',
+  bgAlt:       'rgba(242,237,228,0.95)',
+  border:      '#ddd6c8',
+  text:        '#1a1a18',
+  textMuted:   '#6b6357',
+  textFaint:   '#9e9485',
+  accent:      '#2a4e7a',
+  accentLight: '#e8eef6',
+  gold:        '#8a6a00',
+  goldLight:   '#faf3e0',
+  green:       '#1a7a4a',
+  greenLight:  '#e8f7ef',
+  red:         '#b52a2a',
+  redLight:    '#faeaea',
+  orange:      '#b54a00',
+  orangeLight: '#faeee8',
+  white:       '#ffffff',
+}
+
+const TOPIC_COLOR: Record<string, string> = {
+  'Ressourcen':   '#1a6fa8',
+  'Handel':       '#8a6a00',
+  'Navigation':   '#1a7a4a',
+  'Bevölkerung':  '#6a3ab0',
+  'Energie':      '#9a7000',
+  'Sonnensystem': '#b54a00',
+  'Physik':       '#0a7090',
+}
+
+const TOPIC_BG: Record<string, string> = {
+  'Ressourcen':   '#e8f2fa',
+  'Handel':       '#faf3e0',
+  'Navigation':   '#e8f7ef',
+  'Bevölkerung':  '#f3eefa',
+  'Energie':      '#faf6e0',
+  'Sonnensystem': '#faeee8',
+  'Physik':       '#e8f5fa',
+}
+
+const ACADEMY_BG: Record<string, { src: string; label: string }> = {
+  earth:       { src: '/images/building-backgrounds/school-back-earth.png',       label: 'Erde · Universität' },
+  mars:        { src: '/images/building-backgrounds/school-back-mars.png',        label: 'Mars · Tharsis Hub' },
+  prometheus:  { src: '/images/building-backgrounds/school-back-prometheus.png',  label: 'Prometheus Station · L5' },
+  ship:        { src: '/images/building-backgrounds/school-back-ship.png',        label: 'Raumschiff · Unterwegs' },
+}
+
+const MANUAL_SECTIONS = [
+  { id: 'ziel',     title: 'Dein Ziel',         content: 'Du bist Pilot und Händler im Sonnensystem des Jahres 2100. Kolonien auf Mond, Mars und Phobos brauchen Wasser, Energie und Metall — und du lieferst sie.' },
+  { id: 'handel',   title: 'Handel & Auktion',   content: 'Jeder Kauf und Verkauf läuft als Live-Auktion. Beim Kauf: du bietest gegen NPC-Händler. Beim Verkauf: du bist der Verkäufer, NPC-Käufer steigen von unten auf.' },
+  { id: 'fliegen',  title: 'Fliegen & Energie',  content: 'Jeder Flug kostet Energie aus deinem Laderaum. Asymmetrisch: Erde→Mond kostet 20t (Erdgravitation), Mond→Erde nur 8t.' },
+  { id: 'bauen',    title: 'Bauen & Gebäude',    content: 'Klicke auf eine freie Kachel im Koloniegrid um zu bauen. Mine (+5 Metall/Tick) · Solarfeld (+4 Energie/Tick) · Habitat (+100 max. Bevölkerung)' },
+  { id: 'schiffe',  title: 'Schiffe & Werft',    content: 'Du startest mit dem Frachter Mk.I (100t). Auf der Werft (Mond) kannst du aufrüsten: Schnellfrachter (60t, 1.7×) oder Schwerfrachter (200t, 0.77×).' },
+  { id: 'bev',      title: 'Bevölkerung',        content: 'Jede Kolonie braucht Wasser, Energie und Metall pro 100 Einwohner/Tick. Fällt der Stock auf null, schrumpft die Bevölkerung.' },
+  { id: 'preise',   title: 'Preise & Arbitrage', content: 'Klassische Route: Wasser auf Mond kaufen (günstig) → Mars verkaufen (teuer). Der Preis-Ticker läuft einmal täglich.' },
+]
+
+// Task-Typen
+interface CalcTask {
+  kind: 'calc'; question: string; answer: number; explanation: string; points: number; topic: string
+}
+interface QuizTask {
+  kind: 'quiz'; question: string; options: string[]; correct: number; explanation: string; points: number; topic: string
+}
+type Task = CalcTask | QuizTask
 
 function buildContextBanners(topic: string | null, colonyContext: ColonyContext): ContextBanner[] {
   if (!topic || !colonyContext) return []
