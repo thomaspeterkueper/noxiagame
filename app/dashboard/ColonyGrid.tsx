@@ -1,10 +1,10 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 23.06.2026 10:45 — GridMinimap rechts unten im Grid
+// Aktualisiert: 23.06.2026 10:55 — ResizeObserver Fix + warehouse/market Klick
 //   21.06.2026 – showLanding State, onOpenShipyard/Warehouse/onChanged Props
 //   15.06.2026 – Anomalie-Marker, BuildingSVG, Straßen
 //   07.06.2026 – tile_entities, Eigentum, Gebäude-Verkauf, Steuer-Sidebar
-// Version:      3.9.1
+// Version:      3.9.2
 //
 // Kachelgrid pro Kolonie (12×8):
 // - Terrain seed-basiert deterministisch
@@ -449,6 +449,8 @@ export default function ColonyGrid({
     if (ent?.entity_id === 'bank')        { setShowBank(true);     return }
     if (ent?.entity_id === 'landing_pad') { setShowLanding(true);  return }
     if (ent?.entity_id === 'shipyard')    { onOpenShipyard?.();    return }
+    if (ent?.entity_id === 'warehouse')   { onOpenWarehouse?.();   return }
+    if (ent?.entity_id === 'market')      { onOpenWarehouse?.();   return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }
 
@@ -544,10 +546,9 @@ export default function ColonyGrid({
       )}
 
       {/* Grid */}
-      <div ref={containerRef} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', width: '100%' }}>
-
-        {/* Kachelgrid */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
+      {/* Outer wrapper: containerRef misst die volle verfügbare Breite */}
+      <div ref={containerRef} style={{ width: '100%' }}>
+        <div style={{ position: 'relative', display: 'inline-block' }}>
           {hoveredTile && <TileTooltip info={hoveredTile} COLS={COLS} />}
           <GridMinimap
             COLS={COLS} ROWS={ROWS} tileSize={tileSize}
