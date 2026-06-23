@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 12:30
-// Version:      2.2.0
+// Aktualisiert: 23.06.2026 11:20 — gridColRef misst linke Spalte, tileSize als Prop
+// Version:      2.3.0
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
@@ -63,6 +63,9 @@ export default function DashboardClient({
   const [profile, setProfile]           = useState<any>(null)
   const [ships, setShips]               = useState<any[]>([])
   const [playerStats, setPlayerStats]   = useState({ trades: 0, flights: 0, knowledge: 0 })
+  const gridColRef                          = React.useRef<HTMLDivElement>(null)
+  const [gridTileSize, setGridTileSize]     = useState(44)
+
   const [shipyardOpen,   setShipyardOpen]   = useState(false)
   const [warehouseOpen,  setWarehouseOpen]  = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
@@ -74,6 +77,21 @@ export default function DashboardClient({
   }>({ resource: 'water', mode: 'buy', qty: 10, limit: 0 })
 
   useEffect(() => { loadFromServer() }, [])
+
+  // Linke Spalte messen → tileSize für ColonyGrid
+  React.useLayoutEffect(() => {
+    const el = gridColRef.current
+    if (!el) return
+    const COLS = 12; const MIN = 44; const MAX = 80
+    const calc = (w: number) => {
+      if (w > 30) setGridTileSize(Math.min(MAX, Math.max(MIN, Math.floor((w - 32) / COLS))))
+    }
+    // Sofort + bei Resize
+    calc(el.offsetWidth)
+    const obs = new ResizeObserver(e => calc(e[0].contentRect.width))
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
   const prevLocationRef = React.useRef(location)
   useEffect(() => {
     if (prevLocationRef.current !== location) { prevLocationRef.current = location; loadFromServer() }
@@ -269,7 +287,7 @@ export default function DashboardClient({
       <div style={{ flex: 1, maxWidth: '1800px', width: '100%', margin: '0 auto', padding: '1.25rem 1.5rem 0', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'stretch' }}>
 
         {/* LINKE SPALTE */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div ref={gridColRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {(() => {
             const localEntities = tileEntities.filter((e: any) => e.locations?.slug === location)
             const hasSchool = localEntities.some((e: any) => e.entity_id === 'school')
@@ -308,6 +326,7 @@ export default function DashboardClient({
               onTravel={handleTravel} onOpenShipyard={() => setShipyardOpen(true)}
               onOpenWarehouse={() => setWarehouseOpen(true)}
               onChanged={async () => { await loadFromServer(); invalidate('builds') }}
+              tileSize={gridTileSize}
               entities={tileEntities.filter((e: any) => e.locations?.slug === location && e.tile_row != null)}
               pending={playerBuilds.filter((b: any) => b.locations?.slug === location).map((b: any) => ({ buildable_id: b.buildable_id, tile_row: b.tile_row, tile_col: b.tile_col, status: b.status }))}
             />
