@@ -1,250 +1,235 @@
-// lib/game/npcBrain.test.ts
+// lib/game/npcBrain.ts
 // Erstellt:     14.06.2026
-// Aktualisiert: 20.06.2026
+// Aktualisiert: 23.06.2026 — BUILDABLE_ITEMS durch BUILDINGS aus buildings/index ersetzt
 //
-// Lokaler Demo-/Test-Runner für den deterministischen NPC-Brain (Phase A → C).
-// Kein Test-Framework nötig — npx tsx lib/game/npcBrain.test.ts
+// Version:      1.1.0
 //
-// Abdeckung:
-//   Phase A: buy (Akkumulator, Preisdeckel, Tiebreak, Stock-Limit)
-//   Phase C: produce (Gebäude), sell (Überschuss, sell_floor), build (Treasury)
+// Deterministischer NPC-Brain (Phase A → C).
+//
+// REINE FUNKTION: gleiche Eingaben → gleiche Ausgaben. Kein Math.random,
+// kein Date.now, kein DB-Zugriff, kein Schreiben. Der Brain liest NUR
+// decision_weights — NICHT personality. personality bleibt strikt der
+// Dialog-/KI-Schicht vorbehalten; so bleibt die Wirtschaft auditierbar.
+//
+// Phase C ergänzt 'produce', 'sell', 'build':
+//   produce  – Gebäude-Output pro Tick (immer, unabhängig vom Preis)
+//   sell     – Überschuss über reserve verkaufen (nur wenn Preis ≥ sell_floor)
+//   build    – Expansion wenn Treasury ≥ treasury_min
+//
+// Aktionsreihenfolge: produce → sell → build → buy
+// Der Brain entscheidet NUR. Persistenz ist Aufgabe von runNpcTick.
 
-import { entscheideNpc, NpcKontext, NpcWelt } from './npcBrain'
+import { PRICE_MAX } from './config'
+import { BUILDINGS } from './buildings/index'
+import { MARKET_RESOURCES } from './resources'
+
+// ── NPC-spezifische Stellschrauben ───────────────────────────────────────────
+export const NPC_BASIS_LAGER   = 100  // t — Basis-Zielbestand je Gut, skaliert mit stockpile_factor
+export const NPC_KAUF_PRO_TICK = 20   // t — Kaufdeckel je Gut und Tick
+
+const MARKT_GUETER = new Set<string>(MARKET_RESOURCES)
+
+// ── Schnittstellen ────────────────────────────────────────────────────────────
+
+export interface NpcDecisionWeights {
+  // Phase A (Akkumulator-Käufer, HeliosCorp-Modus)
+  preferred_goods?:  string[]
+  buy_threshold?:    number    // 0..1 → Preisobergrenze als Anteil von PRICE_MAX
+  stockpile_factor?: number    // Zielbestand = NPC_BASIS_LAGER × stockpile_factor
+
+  // Phase C (Produzent-Modus: Goibniu / Belenus / Boann)
+  role?:           'producer' | 'trader'
+  sells?:          string[]     // Güter die dieser NPC aktiv verkauft
+  sell_floor?:     number       // Mindestpreis (absolute Credits) unter dem nicht verkauft wird
+  reserve?:        number       // t — Pflichtreserve, nicht verkaufen
+  sell_per_tick?:  number       // t — Verkaufsdeckel je Gut und Tick
+  expand?: {
+    building:     string        // BUILDABLE_ITEMS-Schlüssel
+    location:     string        // Ort-Slug
+    cost:         number        // Credits (aus decision_weights, nicht config — NPC kann anders kalkulieren)
+    treasury_min: number        // ab dieser Kasse wird expandiert
+  }
+}
+
+export interface NpcGebaeude {
+  entity_id:   string  // 'mine' | 'solar' | 'ice_drill' | ...
+  location_id: string
+  location:    string  // Slug
+  tile_col:    number  // Kachel-Spalte — eindeutiger Ledger-Schlüssel (ref = "slug:col")
+}
+
+export interface NpcKontext {
+  actor:    { id: string; decision_weights: NpcDecisionWeights | null }
+  bestand:  Record<string, number>  // Netto-Lagerstand (Käufe + Produktion − Verkäufe)
+  treasury: number                  // Σ credit_delta aus npc_ledger
+  gebaeude: NpcGebaeude[]           // eigene tile_entities
+}
+
+export interface MarktPreis {
+  resource:   string
+  location:   string
+  buy_price:  number
+  sell_price: number
+  stock?:     number
+}
+
+export interface NpcWelt {
+  tick:   number
+  preise: MarktPreis[]
+}
+
+export type NpcAktion =
+  | {
+      typ:       'buy'
+      resource:  string
+      location:  string
+      menge:     number
+      maxPreis:  number
+      grund:     string
+    }
+  | {
+      typ:       'produce'
+      resource:  string
+      location:  string   // wo das Gebäude steht
+      menge:     number   // Output pro Tick (aus BUILDABLE_ITEMS)
+      ref:       string   // "${location}:${tile_col}" — Ledger-Idempotenz-Schlüssel
+      grund:     string
+    }
+  | {
+      typ:        'sell'
+      resource:   string
+      location:   string
+      menge:      number
+      minPreis:   number  // sell_floor — Ausführung prüft lokalen sell_price ≥ minPreis
+      grund:      string
+    }
+  | {
+      typ:      'build'
+      building: string   // BUILDABLE_ITEMS-Schlüssel
+      location: string   // Slug
+      cost:     number
+      grund:    string
+    }
 
 // ── Hilfen ────────────────────────────────────────────────────────────────────
-function ctx(
-  actor: NpcKontext['actor'],
-  bestand: Record<string, number>,
-  treasury = 0,
-  gebaeude: NpcKontext['gebaeude'] = [],
-): NpcKontext {
-  return { actor, bestand, treasury, gebaeude }
+function clamp01(x: number): number {
+  if (Number.isNaN(x)) return 0
+  return x < 0 ? 0 : x > 1 ? 1 : x
+}
+function cmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
 }
 
-function zeige(titel: string, kontext: NpcKontext, welt: NpcWelt) {
-  const aktionen = entscheideNpc(kontext, welt)
-  console.log(`\n── ${titel} ─────────────────────────────────────`)
-  console.log(`   Bestand: ${JSON.stringify(kontext.bestand)}  Treasury: ${kontext.treasury}`)
-  console.log(`   Gebäude: ${kontext.gebaeude.map(g => `${g.entity_id}@${g.location}`).join(', ') || '–'}`)
-  if (aktionen.length === 0) {
-    console.log('   → keine Aktion')
-  } else {
-    for (const a of aktionen) {
-      if (a.typ === 'buy')     console.log(`   → BUY     ${a.menge}t ${a.resource} @ ${a.location} (max ${a.maxPreis})`)
-      if (a.typ === 'produce') console.log(`   → PRODUCE ${a.menge}t ${a.resource} @ ${a.location}`)
-      if (a.typ === 'sell')    console.log(`   → SELL    ${a.menge}t ${a.resource} @ ${a.location} (min ${a.minPreis})`)
-      if (a.typ === 'build')   console.log(`   → BUILD   ${a.building} @ ${a.location} (Kosten ${a.cost})`)
-      console.log(`      ${a.grund}`)
+// ── Der Brain ─────────────────────────────────────────────────────────────────
+export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
+  const w = kontext.actor.decision_weights ?? {}
+  const aktionen: NpcAktion[] = []
+
+  // ── 1) PRODUCE ──────────────────────────────────────────────────────────────
+  // Jedes Gebäude dieses NPCs erzeugt seinen Output — immer, unabhängig vom
+  // Preis. Der Output landet im Marktstock des jeweiligen Ortes (runNpcTick
+  // schreibt in location_resources.stock und ins npc_ledger).
+  for (const geb of kontext.gebaeude) {
+    const def = BUILDINGS[geb.entity_id]
+    if (!def?.produces) continue
+    const { resource, amount } = def.produces
+    aktionen.push({
+      typ:      'produce',
+      resource,
+      location: geb.location,
+      menge:    amount,
+      ref:      `${geb.location}:${geb.tile_col}`,  // eindeutig je Gebäude
+      grund:    `${geb.entity_id}@[col ${geb.tile_col}] @ ${geb.location} produziert ${amount} ${resource}/Tick`,
+    })
+  }
+
+  // ── 2) SELL ─────────────────────────────────────────────────────────────────
+  // Nur für Produzenten-NPCs (role = 'producer'). Verkauft Überschuss über
+  // reserve in den Marktstock, wenn der lokale sell_price ≥ sell_floor.
+  // Die Entscheidung ist preissensibel (nicht unter sell_floor), aber der
+  // Markt reagiert trotzdem auf den zusätzlichen Stock — causal bleibt es.
+  if (w.role === 'producer' && Array.isArray(w.sells)) {
+    const sellFloor    = typeof w.sell_floor    === 'number' ? w.sell_floor    : 0
+    const reserve      = typeof w.reserve       === 'number' ? w.reserve       : 0
+    const sellPerTick  = typeof w.sell_per_tick === 'number' ? w.sell_per_tick : 20
+
+    for (const gut of w.sells) {
+      if (!MARKT_GUETER.has(gut)) continue
+      const bestand = kontext.bestand[gut] ?? 0
+      const ueberschuss = bestand - reserve
+      if (ueberschuss <= 0) continue
+
+      // Besten Markt finden: sell_price ≥ sell_floor, höchster Preis zuerst.
+      // Nur Orte, wo der NPC ein passendes Gebäude hat, ODER alle Orte wenn
+      // kein Gebäude-Constraint gesetzt (flexibler Händler).
+      const markt = welt.preise
+        .filter(p => p.resource === gut && p.sell_price >= sellFloor)
+        .sort((a, b) => (b.sell_price - a.sell_price) || cmp(a.location, b.location))[0]
+
+      if (!markt) continue  // kein Markt über dem Boden → warten
+
+      const menge = Math.floor(Math.min(ueberschuss, sellPerTick))
+      if (menge <= 0) continue
+
+      aktionen.push({
+        typ:      'sell',
+        resource: gut,
+        location: markt.location,
+        menge,
+        minPreis: sellFloor,
+        grund:    `Bestand ${bestand} − Reserve ${reserve} = ${ueberschuss} Überschuss; sell_price ${markt.sell_price} ≥ Boden ${sellFloor} @ ${markt.location}`,
+      })
     }
   }
+
+  // ── 3) BUILD (Expansion) ─────────────────────────────────────────────────────
+  // Wenn Treasury ≥ treasury_min: einmalig ein Gebäude bauen. NPCs bauen sofort
+  // (keine Bauzeit-Ticks), Kosten werden aus der Treasury gebucht. Die Idempotenz
+  // hängt am uniq_npc_ledger_event-Index in der DB (kind='build', ref=location).
+  // Genau eine build-Aktion pro Tick (nicht mehrere Gebäude auf einmal).
+  if (w.expand && kontext.treasury >= w.expand.treasury_min) {
+    aktionen.push({
+      typ:      'build',
+      building: w.expand.building,
+      location: w.expand.location,
+      cost:     w.expand.cost,
+      grund:    `Treasury ${kontext.treasury} ≥ Schwelle ${w.expand.treasury_min}; baue ${w.expand.building} @ ${w.expand.location}`,
+    })
+  }
+
+  // ── 4) BUY (Akkumulator, Phase A-Logik unverändert) ─────────────────────────
+  const preferred = (w.preferred_goods ?? []).filter(g => MARKT_GUETER.has(g))
+  if (preferred.length > 0) {
+    const stockpileFactor = typeof w.stockpile_factor === 'number' ? w.stockpile_factor : 1
+    const threshold       = clamp01(typeof w.buy_threshold === 'number' ? w.buy_threshold : 0)
+    const preisDeckel     = threshold * PRICE_MAX
+
+    for (const gut of preferred) {
+      const zielbestand = NPC_BASIS_LAGER * stockpileFactor
+      const bestand     = kontext.bestand[gut] ?? 0
+      const fehlmenge   = zielbestand - bestand
+      if (fehlmenge <= 0) continue
+
+      const markt = welt.preise
+        .filter(p => p.resource === gut && p.buy_price <= preisDeckel)
+        .sort((a, b) => (a.buy_price - b.buy_price) || cmp(a.location, b.location))[0]
+
+      if (!markt) continue
+
+      const verfuegbar = typeof markt.stock === 'number' ? markt.stock : Infinity
+      const menge = Math.floor(Math.min(fehlmenge, NPC_KAUF_PRO_TICK, verfuegbar))
+      if (menge <= 0) continue
+
+      aktionen.push({
+        typ:      'buy',
+        resource: gut,
+        location: markt.location,
+        menge,
+        maxPreis: markt.buy_price,
+        grund: `Bestand ${bestand}/${zielbestand} ${gut}; Preis ${markt.buy_price} ≤ Deckel ${preisDeckel} @ ${markt.location}`,
+      })
+    }
+  }
+
   return aktionen
 }
-
-let fails = 0
-function pruefe(bedingung: boolean, was: string) {
-  if (!bedingung) { fails++; console.log(`   ✘ FAIL: ${was}`) }
-}
-
-// HeliosCorp (Phase A — reiner Akkumulator, keine Gebäude, kein produce/sell/build)
-const HELIOS = {
-  id: 'helios',
-  decision_weights: {
-    preferred_goods: ['metal', 'energy'],
-    buy_threshold:   0.65,
-    stockpile_factor: 2.5,
-  },
-}
-
-// Goibniu (Phase C — Produzent)
-const GOIBNIU = {
-  id: 'a0000000-0000-4000-8000-000000000001',
-  decision_weights: {
-    role:          'producer' as const,
-    sells:         ['metal'],
-    sell_floor:    25,
-    reserve:       40,
-    sell_per_tick: 20,
-    expand: { building: 'mine', location: 'moon', cost: 1500, treasury_min: 8000 },
-  },
-}
-
-// ── Phase A: Akkumulator (HeliosCorp) ────────────────────────────────────────
-
-// 1) Kauft beide Güter, Mengendeckel 20t
-{
-  const k = ctx(HELIOS, { metal: 120, energy: 0 })
-  const w: NpcWelt = { tick: 1, preise: [
-    { resource: 'metal',  location: 'phobos', buy_price: 280, sell_price: 240 },
-    { resource: 'metal',  location: 'mars',   buy_price: 400, sell_price: 360 },
-    { resource: 'energy', location: 'moon',   buy_price: 200, sell_price: 160 },
-  ]}
-  const a = zeige('1) Buy – Akkumulation', k, w)
-  pruefe(a.some(x => x.typ === 'buy' && x.resource === 'metal'  && x.location === 'phobos'), 'Metall @ phobos')
-  pruefe(a.some(x => x.typ === 'buy' && x.resource === 'energy' && x.location === 'moon'),   'Energie @ moon')
-}
-
-// 2) Preisdeckel hält
-{
-  const k = ctx(HELIOS, { metal: 120, energy: 0 })
-  const w: NpcWelt = { tick: 2, preise: [
-    { resource: 'metal',  location: 'phobos', buy_price: 350, sell_price: 300 },
-    { resource: 'metal',  location: 'mars',   buy_price: 400, sell_price: 360 },
-    { resource: 'energy', location: 'moon',   buy_price: 200, sell_price: 160 },
-  ]}
-  const a = zeige('2) Buy – Preisdeckel hält', k, w)
-  pruefe(!a.some(x => x.typ === 'buy' && x.resource === 'metal'), 'kein Metall-Kauf über Deckel')
-  pruefe( a.some(x => x.typ === 'buy' && x.resource === 'energy'), 'Energie wird trotzdem gekauft')
-}
-
-// 3) Zielbestand erreicht → keine Buy-Aktion
-{
-  const k = ctx(HELIOS, { metal: 250, energy: 250 })
-  const w: NpcWelt = { tick: 3, preise: [
-    { resource: 'metal',  location: 'phobos', buy_price: 100, sell_price: 80 },
-    { resource: 'energy', location: 'moon',   buy_price: 100, sell_price: 80 },
-  ]}
-  const a = zeige('3) Buy – Zielbestand erreicht', k, w)
-  pruefe(a.filter(x => x.typ === 'buy').length === 0, 'keine Buy-Aktion bei vollem Lager')
-}
-
-// 4) Tiebreak deterministisch (mars < phobos alphabetisch)
-{
-  const k = ctx(HELIOS, { metal: 0 })
-  const w: NpcWelt = { tick: 4, preise: [
-    { resource: 'metal', location: 'phobos', buy_price: 300, sell_price: 260 },
-    { resource: 'metal', location: 'mars',   buy_price: 300, sell_price: 260 },
-  ]}
-  const a = zeige('4) Buy – Tiebreak', k, w)
-  const buyMetal = a.find(x => x.typ === 'buy' && x.resource === 'metal')
-  pruefe(buyMetal?.location === 'mars', 'Gleichstand → alphabetisch mars vor phobos')
-  const b = entscheideNpc(k, w)
-  pruefe(JSON.stringify(a) === JSON.stringify(b), 'Determinismus: zweimal identisch')
-}
-
-// 5) Stock-Limit deckelt unter NPC_KAUF_PRO_TICK
-{
-  const k = ctx(HELIOS, { metal: 0 })
-  const w: NpcWelt = { tick: 5, preise: [
-    { resource: 'metal', location: 'phobos', buy_price: 280, sell_price: 240, stock: 8 },
-  ]}
-  const a = zeige('5) Buy – Stock-Limit', k, w)
-  const buy = a.find(x => x.typ === 'buy' && x.resource === 'metal')
-  pruefe((buy as any)?.menge === 8, 'Menge = Stock (8t), nicht 20t')
-}
-
-// 6) Kein decision_weights → leer
-{
-  const k = ctx({ id: 'leer', decision_weights: null }, {})
-  const w: NpcWelt = { tick: 6, preise: [
-    { resource: 'metal', location: 'phobos', buy_price: 50, sell_price: 40 },
-  ]}
-  const a = zeige('6) Buy – ohne Gewichte', k, w)
-  pruefe(a.length === 0, 'keine Aktion ohne decision_weights')
-}
-
-// ── Phase C: Produzent (Goibniu) ─────────────────────────────────────────────
-
-// 7) Produce — Mine auf dem Mond erzeugt 5t Metall
-{
-  const k = ctx(
-    GOIBNIU,
-    { metal: 50 },
-    5000,
-    [{ entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 11 }],
-  )
-  const w: NpcWelt = { tick: 7, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
-  ]}
-  const a = zeige('7) Produce – Mine@moon', k, w)
-  pruefe(a.some(x => x.typ === 'produce' && x.resource === 'metal' && x.location === 'moon'), 'produce metal @ moon')
-  const prod = a.find(x => x.typ === 'produce') as any
-  pruefe(prod?.menge === 5, 'Mine produziert 5t/Tick')
-  pruefe(prod?.ref === 'moon:11', 'ref = "moon:11" (Ledger-Schlüssel)')
-}
-
-// 8) Sell — Überschuss über reserve (40t) verkaufen, wenn Preis ≥ sell_floor (25)
-{
-  const k = ctx(GOIBNIU, { metal: 90 }, 5000)  // 90 − 40 reserve = 50 Überschuss
-  const w: NpcWelt = { tick: 8, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
-  ]}
-  const a = zeige('8) Sell – Überschuss', k, w)
-  pruefe(a.some(x => x.typ === 'sell' && x.resource === 'metal'), 'sell metal')
-  const sell = a.find(x => x.typ === 'sell') as any
-  pruefe(sell?.menge === 20, 'Verkaufsdeckel 20t (sell_per_tick)')
-}
-
-// 9) Sell — kein Verkauf wenn Preis unter sell_floor (25)
-{
-  const k = ctx(GOIBNIU, { metal: 90 }, 5000)
-  const w: NpcWelt = { tick: 9, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 30, sell_price: 20 },  // sell_price 20 < floor 25
-  ]}
-  const a = zeige('9) Sell – Preis unter sell_floor', k, w)
-  pruefe(!a.some(x => x.typ === 'sell'), 'kein Verkauf unter sell_floor')
-}
-
-// 10) Build — Treasury ≥ treasury_min (8000) → expand
-{
-  const k = ctx(GOIBNIU, { metal: 40 }, 10000)  // 10000 ≥ 8000
-  const w: NpcWelt = { tick: 10, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
-  ]}
-  const a = zeige('10) Build – Treasury ausreichend', k, w)
-  pruefe(a.some(x => x.typ === 'build' && x.building === 'mine'), 'build mine')
-}
-
-// 11) Build — Treasury < treasury_min → kein Build
-{
-  const k = ctx(GOIBNIU, { metal: 40 }, 3000)  // 3000 < 8000
-  const w: NpcWelt = { tick: 11, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
-  ]}
-  const a = zeige('11) Build – Treasury zu niedrig', k, w)
-  pruefe(!a.some(x => x.typ === 'build'), 'kein Build wenn Treasury zu niedrig')
-}
-
-// 12) Kombiniert — produce + sell + build gleichzeitig
-{
-  const k = ctx(
-    GOIBNIU,
-    { metal: 90 },
-    10000,
-    [{ entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 11 }],
-  )
-  const w: NpcWelt = { tick: 12, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
-  ]}
-  const a = zeige('12) Kombiniert – produce + sell + build', k, w)
-  pruefe(a.some(x => x.typ === 'produce'), 'produce vorhanden')
-  pruefe(a.some(x => x.typ === 'sell'),    'sell vorhanden')
-  pruefe(a.some(x => x.typ === 'build'),   'build vorhanden')
-  const typen = a.map(x => x.typ)
-  const pIdx = typen.indexOf('produce')
-  const sIdx = typen.indexOf('sell')
-  const bIdx = typen.indexOf('build')
-  pruefe(pIdx < sIdx && sIdx < bIdx, 'Reihenfolge: produce < sell < build')
-}
-
-// 13) Zwei Minen — beide produzieren, zwei verschiedene refs
-{
-  const k = ctx(
-    GOIBNIU,
-    { metal: 40 },
-    5000,
-    [
-      { entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 11 },
-      { entity_id: 'mine', location_id: 'loc-moon', location: 'moon', tile_col: 10 },
-    ],
-  )
-  const w: NpcWelt = { tick: 13, preise: [
-    { resource: 'metal', location: 'moon', buy_price: 60, sell_price: 40 },
-  ]}
-  const a = zeige('13) Zwei Minen – beide produzieren', k, w)
-  const produces = a.filter(x => x.typ === 'produce')
-  pruefe(produces.length === 2, 'zwei produce-Aktionen')
-  const refs = produces.map(x => (x as any).ref)
-  pruefe(refs.includes('moon:11') && refs.includes('moon:10'), 'refs eindeutig: moon:11 + moon:10')
-}
-
-console.log(`\n${fails === 0 ? '✓ alle Invarianten erfüllt' : `✘ ${fails} Fehlschläge`}`)
