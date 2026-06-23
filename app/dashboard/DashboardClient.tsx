@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 11:35 — tileSize begrenzt durch Viewport-Höhe
-// Version:      2.3.1
+// Aktualisiert: 23.06.2026 12:55 — TILE_SIZE_MAX erhöht auf 120
+// Version:      2.3.2
 //
 // v2.1.0 — maxWidth 1800px, Grid füllt Spalte, Footer, Feed flex-grow
 
@@ -82,7 +82,7 @@ export default function DashboardClient({
   React.useLayoutEffect(() => {
     const el = gridColRef.current
     if (!el) return
-    const COLS = 12; const ROWS = 8; const MIN = 44; const MAX = 80
+    const COLS = 12; const ROWS = 8; const MIN = 44; const MAX = 120
     const calc = (w: number) => {
       if (w <= 30) return
       const fromWidth  = Math.floor((w - 32) / COLS)
