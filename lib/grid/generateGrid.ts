@@ -1,7 +1,9 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.6.3
+// Version:  0.6.4
 //
+// v0.6.4: Mond-Ressourcentiles ice/helium3/titanium als bebaubar
+//   freigeschaltet, damit Shackleton nach Moon Terrain v3 wieder nutzbar ist.
 // v0.6.3: Neue spezialisierte Terrain-Tiles als bebaubar/straßenfähig
 //   freigeschaltet: farmland/city/spaceport, mare/highland/research,
 //   dust/plateau/habitat/industry.
@@ -57,6 +59,9 @@ export function isBuildable(tileType: string): boolean {
     tileType === 'tile_mare'      ||
     tileType === 'tile_highland'  ||
     tileType === 'tile_research'  ||
+    tileType === 'tile_ice'       ||
+    tileType === 'tile_helium3'   ||
+    tileType === 'tile_titanium'  ||
     tileType === 'tile_dust'      ||
     tileType === 'tile_plateau'   ||
     tileType === 'tile_habitat'   ||
