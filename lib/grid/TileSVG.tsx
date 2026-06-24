@@ -127,6 +127,38 @@ function Research() {
   return <svg width="48" height="48" viewBox="0 0 48 48"><rect width="48" height="48" fill="#b7b2a8"/><circle cx="24" cy="25" r="13" fill="#dce8ef"/><rect x="11" y="25" width="26" height="12" fill="#8c9aa2"/><path d="M24 12 L34 4" stroke="#eef7fb" strokeWidth="3"/><circle cx="35" cy="4" r="3" fill="#eef7fb"/></svg>
 }
 
+function IceField() {
+  return <svg width="48" height="48" viewBox="0 0 48 48">
+    <rect width="48" height="48" fill="#bfc8c9"/>
+    <path d="M0 16 C12 12 22 18 34 12 C40 9 44 10 48 12" stroke="#d9f0f4" strokeWidth="5" opacity="0.55" fill="none"/>
+    <path d="M0 34 C14 28 25 38 48 30" stroke="#8fc3d8" strokeWidth="4" opacity="0.45" fill="none"/>
+    <polygon points="17,12 22,22 15,21" fill="#e7fbff" opacity="0.75"/>
+    <polygon points="31,26 37,37 28,35" fill="#e7fbff" opacity="0.6"/>
+    <circle cx="10" cy="38" r="2" fill="#6fa8bd" opacity="0.35"/>
+  </svg>
+}
+
+function HeliumField() {
+  return <svg width="48" height="48" viewBox="0 0 48 48">
+    <rect width="48" height="48" fill="#b8b0a0"/>
+    <ellipse cx="24" cy="25" rx="17" ry="9" fill="#9b9384" opacity="0.8"/>
+    <circle cx="16" cy="23" r="2" fill="#f5d742" opacity="0.75"/>
+    <circle cx="25" cy="27" r="2.5" fill="#f5d742" opacity="0.65"/>
+    <circle cx="34" cy="22" r="1.8" fill="#f5d742" opacity="0.55"/>
+    <path d="M12 34 C22 30 32 36 42 31" stroke="#d5c273" strokeWidth="2" opacity="0.45" fill="none"/>
+  </svg>
+}
+
+function TitaniumField() {
+  return <svg width="48" height="48" viewBox="0 0 48 48">
+    <rect width="48" height="48" fill="#aaa69d"/>
+    <path d="M4 34 L17 19 L27 25 L42 10" stroke="#59636b" strokeWidth="5" opacity="0.65" fill="none"/>
+    <path d="M8 39 L20 25 L31 30 L45 17" stroke="#d0d3d2" strokeWidth="2" opacity="0.5" fill="none"/>
+    <circle cx="14" cy="24" r="2" fill="#40484f" opacity="0.6"/>
+    <circle cx="35" cy="18" r="2" fill="#40484f" opacity="0.55"/>
+  </svg>
+}
+
 function Dust() {
   return <svg width="48" height="48" viewBox="0 0 48 48"><rect width="48" height="48" fill="#c8603a"/><path d="M0 15 C14 10 30 21 48 14" stroke="#dc7a4e" strokeWidth="4" opacity="0.45" fill="none"/><path d="M0 34 C16 28 28 38 48 32" stroke="#9f3f24" strokeWidth="3" opacity="0.35" fill="none"/></svg>
 }
@@ -213,6 +245,9 @@ export function TileSVG({ type, planet }: { type: string; planet: string }) {
     case 'tile_mare':             return <Mare/>
     case 'tile_highland':         return <Highland/>
     case 'tile_research':         return <Research/>
+    case 'tile_ice':              return <IceField/>
+    case 'tile_helium3':          return <HeliumField/>
+    case 'tile_titanium':         return <TitaniumField/>
     case 'tile_dust':             return <Dust/>
     case 'tile_plateau':          return <Plateau/>
     case 'tile_habitat':          return <MarsHabitat/>
