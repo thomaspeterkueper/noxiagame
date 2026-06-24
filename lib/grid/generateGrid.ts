@@ -1,7 +1,9 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.6.1
+// Version:  0.6.2
 //
+// v0.6.2: Platzhalter-NPC-Bauten deaktiviert. Fremde Gebäude sollen erst
+//   wieder erscheinen, wenn sie echten Akteuren/Fraktionen gehören.
 // v0.6.1: Straßennetz wird vor NPC-Bauten gelegt; NPCs dürfen dadurch keine
 //   Straßen mehr unterbrechen. Terrain-Layer bleibt fest aus locationMaps.ts.
 // v0.6.0: Terrain-Layer kommt zuerst aus festen Location-Maps
@@ -51,10 +53,6 @@ export function isBuildable(tileType: string): boolean {
     tileType === 'tile_shaft'   ||
     tileType.startsWith('road_')
   )
-}
-
-function isNpcBuildable(tileType: string): boolean {
-  return isBuildable(tileType) && !tileType.startsWith('road')
 }
 
 export const NPC_ENTITY: Record<string, string> = {
@@ -144,8 +142,6 @@ export function generateGrid(
 ): Cell[][] {
   const grid: Cell[][] = []
   const seed = slug.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  const centerR = Math.floor(rows / 2)
-  const centerC = Math.floor(cols / 2)
 
   // 1. Terrain-Layer: feste Karten haben Vorrang, Fallback bleibt prozedural.
   for (let r = 0; r < rows; r++) {
@@ -161,36 +157,15 @@ export function generateGrid(
   // 2. Terrain-Netzwerke maskieren. Der Rohcode 'river' kommt aus locationMaps.
   autotilePrefix(grid, 'river', 'river_')
 
-  // 3. Straßennetz als Infrastruktur-Layer vor NPCs. So kann die automatische
-  //    Siedlungsfüllung keine öffentlichen Straßen mehr zerreißen.
+  // 3. Straßennetz als öffentliche Infrastruktur.
   addRoadNetwork(grid, population, userId, rows, cols)
   autotileRoads(grid, rows, cols)
 
-  // 4. Belegte Positionen aussparen
-  const occupied = new Set<string>()
-  for (const e of entities) occupied.add(`${e.tile_row}-${e.tile_col}`)
-  for (const p of pending)  occupied.add(`${p.tile_row}-${p.tile_col}`)
+  // 4. Automatische Platzhalter-NPCs sind vorläufig deaktiviert.
+  //    Echte Fremdgebäude sollen später aus DB-Entities mit realer profile_id /
+  //    actor_id kommen, nicht aus dem Terrain-Generator.
 
-  const flat: [number, number][] = []
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++)
-      if (isNpcBuildable(grid[r][c].type) && !occupied.has(`${r}-${c}`))
-        flat.push([r, c])
-  flat.sort((a, b) =>
-    (Math.abs(a[0] - centerR) + Math.abs(a[1] - centerC)) -
-    (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
-  )
-
-  // 5. NPC-Bauten
-  const npcCount = Math.min(Math.floor(population / 150), Math.floor(flat.length * 0.5))
-  for (let i = 0; i < npcCount; i++) {
-    const [r, c] = flat[i]
-    const v = seededRandom(seed, 999 + r * cols + c)
-    const type = v < 0.12 ? 'npc_mine' : v < 0.22 ? 'npc_solar' : 'npc_habitat'
-    grid[r][c] = { type, owner: userId ? 'state' : null }
-  }
-
-  // 6. Bestand überschreibt den sichtbaren Layer, aber nicht die feste Karte.
+  // 5. Bestand überschreibt den sichtbaren Layer, aber nicht die feste Karte.
   for (const e of entities) {
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
       const owner: CellOwner = !userId
@@ -204,7 +179,7 @@ export function generateGrid(
     }
   }
 
-  // 7. Vorgänge
+  // 6. Vorgänge
   for (const p of pending) {
     if (p.tile_row >= 0 && p.tile_row < rows && p.tile_col >= 0 && p.tile_col < cols) {
       grid[p.tile_row][p.tile_col] = {
@@ -214,7 +189,7 @@ export function generateGrid(
     }
   }
 
-  // 8. Anomalie
+  // 7. Anomalie
   const hasScanner = entities.some(e => e.entity_type === 'building' && e.entity_id === 'scanner')
   if (hasScanner) {
     const terrainCells: [number, number][] = []
