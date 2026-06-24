@@ -19,10 +19,44 @@
   }
 }
 
+html,
+body {
+  min-width: 1240px;
+  overflow-x: auto;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* NOXIA Alpha UI quick fix — Dashboard layout stability
+   Das Spiel darf nicht auf Miniaturgröße zusammengedrückt werden. Bei kleinen
+   Fenstern scrollt die Seite horizontal, statt Grid und Sidebar unlesbar zu machen. */
+header[style*="position: sticky"] {
+  min-width: 1240px !important;
+}
+
+/* Hauptlayout: stabile Spielspalte + feste Sidebar. */
+div[style*="max-width: 1800px"][style*="grid-template-columns"] {
+  width: max(1240px, calc(100vw - 48px)) !important;
+  max-width: none !important;
+  min-width: 1240px !important;
+  grid-template-columns: minmax(840px, 1fr) 360px !important;
+  align-items: start !important;
+}
+
+/* Linke Spalte darf nicht unter spielbare Breite schrumpfen. */
+div[style*="max-width: 1800px"][style*="grid-template-columns"] > div:first-child {
+  min-width: 840px !important;
+}
+
+/* Rechte Sidebar bleibt lesbar und wird nicht zu einer schmalen Spalte. */
+div[style*="max-width: 1800px"][style*="grid-template-columns"] > div:last-child {
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
 }
 
 /* NOXIA Alpha UI quick fix — ColonyGrid readability
@@ -45,6 +79,11 @@ div:has(> svg[width="120"][height]) {
 [style*="width: 300px"][style*="flex-direction: column"] [style*="font-size: 0.66rem"],
 [style*="width: 300px"][style*="flex-direction: column"] [style*="font-size: 0.6rem"] {
   font-size: 0.76rem !important;
+}
+
+/* ColonyGrid: der Spielbereich behält Mindestbreite; kleiner Browser -> Scrollbar. */
+[style*="background: rgb(244, 242, 237)"][style*="border-radius: 12px"] {
+  min-width: 820px !important;
 }
 
 /* NOXIA Alpha UI quick fix — ColonyGrid tile footprint
