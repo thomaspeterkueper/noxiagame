@@ -1,6 +1,6 @@
 // lib/grid/locationMaps.ts
 // Erstellt: 24.06.2026
-// Version: 0.1.0
+// Version: 0.2.0
 //
 // Feste Terrain-Layer pro Standort. Das ist der Zwischenschritt zwischen
 // prozeduralem generateGrid() und späterer Supabase-Tabelle location_tiles.
@@ -12,31 +12,34 @@
 export type TerrainCode = string
 
 export const LOCATION_MAPS: Record<string, string[]> = {
+  // Erde ist bewusst so angelegt, dass der Fluss bereits im linken/sichtbaren
+  // Kartenausschnitt liegt. Bei kleineren Gridgrößen darf er nicht außerhalb
+  // der ersten Spalten verschwinden.
   earth: [
-    'ggFggguugggFggggrgggFggguugggggg',
-    'gffggguuggFgggggrgggffgguugggFgg',
-    'ggggggggggggFgggrggggggggggggggg',
-    'uugggfgggguuggggrggggFgggguugggg',
-    'uuggggggFgggggggrgguuggggggggggg',
-    'ggggFggggggFggggrggggggFgggguugg',
-    'ggfgggguugggggggrggggggggFgggggg',
-    'FgggggguugggFgggrgggguuggggggggg',
-    'ggggggggggggggggrgggguuggggggFgg',
-    'ggFgggggguugggggrggggggggggggggg',
-    'ggggFgggggggggggrggggFgggguugggg',
-    'uugggggggggFggggrggggggggguugggg',
-    'uugggFggggggggggrggggFgggggggggg',
-    'gggggggguuggggggrggggggggggFgggg',
-    'ggFggggguugggFgggrgggguugggggggg',
-    'ggggggggggggggggrggggggggggggggg',
-    'FgggguugggggggggrggggFgggggguugg',
-    'ggggguugggFgggggrggggggggggguugg',
-    'ggFgggggggggggggrggggggFgggggggg',
-    'ggggggFgggguuggggrggggggggggFggg',
-    'uuggggggggguuggggrggggFggggggggg',
-    'uuggFggggggggggggrgggggggguugggg',
-    'ggggggggFgggggggrgggguuggggggggg',
-    'ggFggggggggggFgggrggggggggggggFgg',
+    'ggFggggrrggguugggFggggggggggggg',
+    'gffggggrrggguuggggggffggggggFgg',
+    'gggggggrrggggggFgggggggguuggggg',
+    'uugggfgrrgguuggggggFgggguuggggg',
+    'uugggggrrggggFggggggggggggggggg',
+    'ggggFgggrrggggggFggggggFgggguugg',
+    'ggfgggggrrguugggggggggggggFggggg',
+    'FgggggggrrggggFgggggguuggggggggg',
+    'ggggggggrrgggggggggggguuggggFggg',
+    'ggFgggggrrgguugggggggggggggggggg',
+    'ggggFgggrrggggggggggFgggguuggggg',
+    'uuggggggrrggggFgggggggggguuggggg',
+    'uugggFgggrrgggggggggFggggggggggg',
+    'ggggggggrrgguugggggggggggggFgggg',
+    'ggFgggggrrgguugggFgggguugggggggg',
+    'ggggggggrrgggggggggggggggggggggg',
+    'FgggguugrrggggggggggFgggggguugg',
+    'ggggguugrrggggFgggggggggggguugg',
+    'ggFgggggrrggggggggggggFgggggggg',
+    'ggggggFgrrgguugggggggggggggFggg',
+    'uuggggggrrgguuggggggFgggggggggg',
+    'uuggFgggrrgggggggggggggguuggggg',
+    'ggggggggrrggggggFgggguugggggggg',
+    'ggFgggggrrggggFggggggggggggggFgg',
   ],
   moon: [
     'ssscssssssssssssssmsssssssssssss',
