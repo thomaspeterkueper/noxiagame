@@ -63,3 +63,26 @@ div:has(> svg[width="120"][height]) {
   height: 100% !important;
   display: block !important;
 }
+
+/* Besitzrahmen: Die Kachel selbst wird zur Informationseinheit.
+   ColonyGrid setzt bereits ownerShadow je Zelle. Diese Regeln machen daraus
+   klare, gleichmäßige Rahmen: neutral grau, eigen gold, öffentlich blau, fremd rot. */
+[style*="grid-template-columns"] > div {
+  box-shadow: inset 0 0 0 1px rgba(95, 105, 112, 0.60) !important;
+}
+
+[style*="grid-template-columns"] > div[style*="#c9a961"] {
+  box-shadow: inset 0 0 0 2px #d6a72f, 0 0 0 1px rgba(214, 167, 47, 0.32) !important;
+}
+
+[style*="grid-template-columns"] > div[style*="#5aaeff"] {
+  box-shadow: inset 0 0 0 2px #4b9bea, 0 0 0 1px rgba(75, 155, 234, 0.28) !important;
+}
+
+[style*="grid-template-columns"] > div[style*="#e05050"] {
+  box-shadow: inset 0 0 0 2px #e24b4b, 0 0 0 1px rgba(226, 75, 75, 0.30) !important;
+}
+
+[style*="grid-template-columns"] > div[style*="grayscale"] {
+  box-shadow: inset 0 0 0 2px #d08020, 0 0 0 1px rgba(208, 128, 32, 0.30) !important;
+}
