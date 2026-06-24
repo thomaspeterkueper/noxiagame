@@ -1,17 +1,15 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.5.1
+// Version:  0.6.0
 //
+// v0.6.0: Terrain-Layer kommt zuerst aus festen Location-Maps
+//   (lib/grid/locationMaps.ts). Flüsse/Wälder/Berge bleiben dadurch stabil.
 // v0.5.1: Earth-Fluss als wirklich zusammenhängender Pfad: vertikale Schritte
 //   plus horizontale Connector-Zellen, keine diagonalen Lücken mehr.
 // v0.5.0: River-Auto-Tiling (river_<maske>) analog zu Straßen; Wald bekommt
 //   einfache Varianten (forest_dense / forest_edge), damit Erde zusammenhängender wirkt.
-// v0.4.0: Earth-Terrain sichtbar unterscheidbar: grass / forest / river /
-//   urban statt grauer Platzhalterfläche. Ziel: Erde liest sich sofort als Erde.
-// v0.3.0: Anomalie nur sichtbar, wenn ein fertiger Scanner (entity_id
-//   'scanner') in der Kolonie steht — Entdeckung als Investition.
-// v0.2.0: Anomalie-Andeutung (Schritt 8) — seed-bestimmtes anomaly-Flag.
-// v0.1.0: Geteilte Grid-Generierung für ColonyGrid + MiniMap.
+
+import { getFixedTerrain } from './locationMaps'
 
 export const COLS = 12
 export const ROWS = 8
@@ -83,27 +81,18 @@ function autotilePrefix(grid: Cell[][], prefix: string, outPrefix: string): void
   }
 }
 
-function carveEarthRiver(grid: Cell[][], seed: number, cols: number, rows: number): void {
-  let col = Math.max(1, Math.min(cols - 2, Math.floor(cols * 0.32)))
-  for (let r = 0; r < rows; r++) {
-    const driftRoll = seededRandom(seed, 5000 + r)
-    const drift = driftRoll < 0.30 ? -1 : driftRoll > 0.70 ? 1 : 0
-    const nextCol = Math.max(1, Math.min(cols - 2, col + drift))
-
-    // Hauptzelle dieser Zeile
-    grid[r][col] = { type: 'river', owner: null }
-
-    // Wenn der Fluss seitlich wandert, wird in derselben Zeile ein horizontaler
-    // Anschluss gesetzt. Dadurch entsteht eine orthogonale Verbindung statt
-    // eines diagonalen Sprungs.
-    if (nextCol !== col) {
-      const from = Math.min(col, nextCol)
-      const to = Math.max(col, nextCol)
-      for (let cc = from; cc <= to; cc++) grid[r][cc] = { type: 'river', owner: null }
-    }
-
-    col = nextCol
+function fallbackTerrain(slug: string, seed: number, r: number, c: number, cols: number): string {
+  const rand = seededRandom(seed, r * cols + c)
+  if (slug === 'earth') {
+    if (rand < 0.16) return 'tile_forest_dense'
+    if (rand < 0.31) return 'tile_forest_edge'
+    if (rand < 0.40) return 'tile_urban'
+    if (rand < 0.45) return 'tile_surface'
+    return 'tile_grass'
   }
+  if (slug === 'moon') return rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
+  if (slug === 'mars') return rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : 'tile_surface'
+  return rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface'
 }
 
 export function generateGrid(
@@ -120,35 +109,19 @@ export function generateGrid(
   const centerR = Math.floor(rows / 2)
   const centerC = Math.floor(cols / 2)
 
-  // 1. Terrain-Grundfläche
+  // 1. Terrain-Layer: feste Karten haben Vorrang, Fallback bleibt prozedural.
   for (let r = 0; r < rows; r++) {
     const row: Cell[] = []
     for (let c = 0; c < cols; c++) {
-      const rand = seededRandom(seed, r * cols + c)
-      let t: string
-      if (slug === 'earth') {
-        if (rand < 0.16) t = 'tile_forest_dense'
-        else if (rand < 0.31) t = 'tile_forest_edge'
-        else if (rand < 0.40) t = 'tile_urban'
-        else if (rand < 0.45) t = 'tile_surface'
-        else t = 'tile_grass'
-      } else if (slug === 'moon') {
-        t = rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
-      } else if (slug === 'mars') {
-        t = rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : 'tile_surface'
-      } else {
-        t = rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface'
-      }
-      row.push({ type: t, owner: null })
+      const fixed = getFixedTerrain(slug, r, c)
+      const type = fixed ?? fallbackTerrain(slug, seed, r, c, cols)
+      row.push({ type, owner: null })
     }
     grid.push(row)
   }
 
-  // Erde: Fluss als eigener zusammenhängender Pfad, danach maskieren.
-  if (slug === 'earth') {
-    carveEarthRiver(grid, seed, cols, rows)
-    autotilePrefix(grid, 'river', 'river_')
-  }
+  // Terrain-Netzwerke maskieren. Der Rohcode 'river' kommt aus locationMaps.
+  autotilePrefix(grid, 'river', 'river_')
 
   // 2. Belegte Positionen aussparen
   const occupied = new Set<string>()
@@ -174,7 +147,7 @@ export function generateGrid(
     grid[r][c] = { type, owner: userId ? 'state' : null }
   }
 
-  // 4. Straßennetz
+  // 4. Straßennetz als Infrastruktur-Layer über Terrain.
   if (population > 200) {
     for (let c = 0; c < cols; c++)
       if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: userId ? 'state' : null }
