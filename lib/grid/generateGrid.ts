@@ -1,7 +1,9 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.5.0
+// Version:  0.5.1
 //
+// v0.5.1: Earth-Fluss als wirklich zusammenhängender Pfad: vertikale Schritte
+//   plus horizontale Connector-Zellen, keine diagonalen Lücken mehr.
 // v0.5.0: River-Auto-Tiling (river_<maske>) analog zu Straßen; Wald bekommt
 //   einfache Varianten (forest_dense / forest_edge), damit Erde zusammenhängender wirkt.
 // v0.4.0: Earth-Terrain sichtbar unterscheidbar: grass / forest / river /
@@ -81,6 +83,29 @@ function autotilePrefix(grid: Cell[][], prefix: string, outPrefix: string): void
   }
 }
 
+function carveEarthRiver(grid: Cell[][], seed: number, cols: number, rows: number): void {
+  let col = Math.max(1, Math.min(cols - 2, Math.floor(cols * 0.32)))
+  for (let r = 0; r < rows; r++) {
+    const driftRoll = seededRandom(seed, 5000 + r)
+    const drift = driftRoll < 0.30 ? -1 : driftRoll > 0.70 ? 1 : 0
+    const nextCol = Math.max(1, Math.min(cols - 2, col + drift))
+
+    // Hauptzelle dieser Zeile
+    grid[r][col] = { type: 'river', owner: null }
+
+    // Wenn der Fluss seitlich wandert, wird in derselben Zeile ein horizontaler
+    // Anschluss gesetzt. Dadurch entsteht eine orthogonale Verbindung statt
+    // eines diagonalen Sprungs.
+    if (nextCol !== col) {
+      const from = Math.min(col, nextCol)
+      const to = Math.max(col, nextCol)
+      for (let cc = from; cc <= to; cc++) grid[r][cc] = { type: 'river', owner: null }
+    }
+
+    col = nextCol
+  }
+}
+
 export function generateGrid(
   slug:       string,
   population: number,
@@ -95,17 +120,14 @@ export function generateGrid(
   const centerR = Math.floor(rows / 2)
   const centerC = Math.floor(cols / 2)
 
-  // 1. Terrain
+  // 1. Terrain-Grundfläche
   for (let r = 0; r < rows; r++) {
     const row: Cell[] = []
     for (let c = 0; c < cols; c++) {
       const rand = seededRandom(seed, r * cols + c)
-      const riverCore = Math.floor(cols * 0.22) + Math.round(Math.sin((r + seed) * 0.72) * 1.6)
-      const riverBand = c === Math.max(1, Math.min(cols - 2, riverCore))
       let t: string
       if (slug === 'earth') {
-        if (riverBand && r > 0 && r < rows - 1) t = 'river'
-        else if (rand < 0.16) t = 'tile_forest_dense'
+        if (rand < 0.16) t = 'tile_forest_dense'
         else if (rand < 0.31) t = 'tile_forest_edge'
         else if (rand < 0.40) t = 'tile_urban'
         else if (rand < 0.45) t = 'tile_surface'
@@ -122,8 +144,11 @@ export function generateGrid(
     grid.push(row)
   }
 
-  // Earth-Fluss vor Straßen maskieren, damit die Darstellung zusammenhängend wird.
-  if (slug === 'earth') autotilePrefix(grid, 'river', 'river_')
+  // Erde: Fluss als eigener zusammenhängender Pfad, danach maskieren.
+  if (slug === 'earth') {
+    carveEarthRiver(grid, seed, cols, rows)
+    autotilePrefix(grid, 'river', 'river_')
+  }
 
   // 2. Belegte Positionen aussparen
   const occupied = new Set<string>()
