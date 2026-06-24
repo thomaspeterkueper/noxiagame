@@ -1,23 +1,15 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.4.0
+// Version:  0.5.0
 //
+// v0.5.0: River-Auto-Tiling (river_<maske>) analog zu Straßen; Wald bekommt
+//   einfache Varianten (forest_dense / forest_edge), damit Erde zusammenhängender wirkt.
 // v0.4.0: Earth-Terrain sichtbar unterscheidbar: grass / forest / river /
 //   urban statt grauer Platzhalterfläche. Ziel: Erde liest sich sofort als Erde.
 // v0.3.0: Anomalie nur sichtbar, wenn ein fertiger Scanner (entity_id
 //   'scanner') in der Kolonie steht — Entdeckung als Investition.
 // v0.2.0: Anomalie-Andeutung (Schritt 8) — seed-bestimmtes anomaly-Flag.
 // v0.1.0: Geteilte Grid-Generierung für ColonyGrid + MiniMap.
-//
-// Geteilte Grid-Generierung für ColonyGrid (großes Grid) UND MiniMap.
-// Vorher war die Logik in beiden Dateien dupliziert und driftete auseinander.
-// Eine Quelle, beide importieren sie.
-//
-// Rückgabe: Cell[][] mit { type, owner }. ColonyGrid kann via gridTypes()
-// auf reine Typ-Strings reduzieren, wenn es die einfache Form braucht.
-//
-// NPC-Bauten werden per Seed variiert (npc_mine / npc_solar / npc_habitat) —
-// nur Optik, deterministisch. Beide Grids zeigen damit dasselbe Bild.
 
 export const COLS = 12
 export const ROWS = 8
@@ -27,7 +19,7 @@ export type CellOwner = 'own' | 'other' | 'state' | null
 export interface Cell {
   type:     string
   owner:    CellOwner
-  anomaly?: boolean   // seed-bestimmte Anomalie auf Terrain (kosmetische USP-Andeutung)
+  anomaly?: boolean
 }
 
 export interface GridEntity {
@@ -43,7 +35,7 @@ export interface GridPending {
   buildable_id: string
   tile_row:     number
   tile_col:     number
-  status:       string   // 'building' | 'selling'
+  status:       string
 }
 
 export function seededRandom(seed: number, i: number): number {
@@ -52,8 +44,6 @@ export function seededRandom(seed: number, i: number): number {
 }
 
 export function isBuildable(tileType: string): boolean {
-  // Bebaubare Terrains: Oberfläche, Gras, urbane Fläche, Metall, Krater, Schächte
-  // Nicht bebaubar: Wald, Fluss, Berge, Canyons, NPC-Gebäude
   return (
     tileType === 'tile_surface' ||
     tileType === 'tile_grass'   ||
@@ -61,15 +51,34 @@ export function isBuildable(tileType: string): boolean {
     tileType === 'tile_metal'   ||
     tileType === 'tile_crater'  ||
     tileType === 'tile_shaft'   ||
-    tileType.startsWith('road_')  // Straße AUF Straße = Erweiterung
+    tileType.startsWith('road_')
   )
 }
 
-// NPC-Bautyp → entity_id (fürs Sprite-Rendering in beiden Grids)
 export const NPC_ENTITY: Record<string, string> = {
   npc_mine:    'mine',
   npc_solar:   'solar',
   npc_habitat: 'habitat',
+}
+
+function terrainIs(grid: Cell[][], r: number, c: number, prefix: string): boolean {
+  return r >= 0 && r < grid.length && c >= 0 && c < grid[r].length && grid[r][c].type.startsWith(prefix)
+}
+
+function autotilePrefix(grid: Cell[][], prefix: string, outPrefix: string): void {
+  const rows = grid.length
+  const cols = grid[0]?.length ?? 0
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c].type !== prefix) continue
+      let mask = 0
+      if (terrainIs(grid, r - 1, c, prefix) || terrainIs(grid, r - 1, c, outPrefix)) mask |= 1
+      if (terrainIs(grid, r, c + 1, prefix) || terrainIs(grid, r, c + 1, outPrefix)) mask |= 2
+      if (terrainIs(grid, r + 1, c, prefix) || terrainIs(grid, r + 1, c, outPrefix)) mask |= 4
+      if (terrainIs(grid, r, c - 1, prefix) || terrainIs(grid, r, c - 1, outPrefix)) mask |= 8
+      grid[r][c] = { ...grid[r][c], type: `${outPrefix}${mask}` }
+    }
+  }
 }
 
 export function generateGrid(
@@ -77,7 +86,7 @@ export function generateGrid(
   population: number,
   entities:   GridEntity[],
   pending:    GridPending[],
-  userId?:    string,            // optional: setzt owner 'own'/'other' für Bestand
+  userId?:    string,
   cols:       number = COLS,
   rows:       number = ROWS,
 ): Cell[][] {
@@ -86,21 +95,20 @@ export function generateGrid(
   const centerR = Math.floor(rows / 2)
   const centerC = Math.floor(cols / 2)
 
-  // 1. Terrain (deterministisch)
+  // 1. Terrain
   for (let r = 0; r < rows; r++) {
     const row: Cell[] = []
     for (let c = 0; c < cols; c++) {
       const rand = seededRandom(seed, r * cols + c)
-      const riverBand = Math.abs(c - (Math.floor(cols * 0.18) + Math.round(Math.sin((r + seed) * 0.8) * 1.5))) <= 0
+      const riverCore = Math.floor(cols * 0.22) + Math.round(Math.sin((r + seed) * 0.72) * 1.6)
+      const riverBand = c === Math.max(1, Math.min(cols - 2, riverCore))
       let t: string
       if (slug === 'earth') {
-        // LEO-Terminal/Erde: grüne Grundflächen, Waldgruppen, ein schmaler Fluss
-        // und urbane Terminal-/Bauflächen. Dadurch liest sich die Erde nicht mehr
-        // wie Mond-Regolith mit Gebäuden.
-        if (riverBand && r > 0 && r < rows - 1) t = 'tile_river'
-        else if (rand < 0.24) t = 'tile_forest'
-        else if (rand < 0.34) t = 'tile_urban'
-        else if (rand < 0.40) t = 'tile_surface'
+        if (riverBand && r > 0 && r < rows - 1) t = 'river'
+        else if (rand < 0.16) t = 'tile_forest_dense'
+        else if (rand < 0.31) t = 'tile_forest_edge'
+        else if (rand < 0.40) t = 'tile_urban'
+        else if (rand < 0.45) t = 'tile_surface'
         else t = 'tile_grass'
       } else if (slug === 'moon') {
         t = rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
@@ -114,7 +122,10 @@ export function generateGrid(
     grid.push(row)
   }
 
-  // 2. Belegte Positionen (Bestand + Vorgänge) aussparen
+  // Earth-Fluss vor Straßen maskieren, damit die Darstellung zusammenhängend wird.
+  if (slug === 'earth') autotilePrefix(grid, 'river', 'river_')
+
+  // 2. Belegte Positionen aussparen
   const occupied = new Set<string>()
   for (const e of entities) occupied.add(`${e.tile_row}-${e.tile_col}`)
   for (const p of pending)  occupied.add(`${p.tile_row}-${p.tile_col}`)
@@ -129,7 +140,7 @@ export function generateGrid(
     (Math.abs(b[0] - centerR) + Math.abs(b[1] - centerC))
   )
 
-  // 3. NPC-Bauten nach Bevölkerung, Typ per Seed variiert (Optik)
+  // 3. NPC-Bauten
   const npcCount = Math.min(Math.floor(population / 150), Math.floor(flat.length * 0.5))
   for (let i = 0; i < npcCount; i++) {
     const [r, c] = flat[i]
@@ -138,21 +149,14 @@ export function generateGrid(
     grid[r][c] = { type, owner: userId ? 'state' : null }
   }
 
-  // 4. Straßennetz: ruhiges Raster einer geplanten Kolonie.
-  //    Eine horizontale Hauptachse (Mittelzeile) + wenige vertikale
-  //    Querstraßen in festen Abständen — unabhängig von NPC-Positionen,
-  //    damit das Netz lesbar bleibt (kein Stichweg-Kabelsalat).
-  //    Auto-Tiling unten löst die Segmente auf.
+  // 4. Straßennetz
   if (population > 200) {
-    // Hauptachse
     for (let c = 0; c < cols; c++)
       if (isBuildable(grid[centerR][c].type)) grid[centerR][c] = { type: 'road', owner: userId ? 'state' : null }
 
-    // Querstraßen alle 4 Spalten (feste Abstände → Rasteroptik)
-    const span = Math.min(Math.floor(population / 400) + 1, 3)  // 1–3 Querstraßen je nach Größe
+    const span = Math.min(Math.floor(population / 400) + 1, 3)
     for (let q = 1; q <= span; q++) {
       const qc = Math.round((cols * q) / (span + 1))
-      // Querstraße läuft nur ein Stück nach oben/unten von der Hauptachse (kompakt)
       const reach = 2 + Math.floor(population / 600)
       for (let r = centerR - reach; r <= centerR + reach; r++) {
         if (r < 0 || r >= rows) continue
@@ -161,7 +165,7 @@ export function generateGrid(
     }
   }
 
-  // 5. Bestand (echte Gebäude) — überschreibt, mit Eigentümer-Markierung
+  // 5. Bestand
   for (const e of entities) {
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
       const owner: CellOwner = !userId
@@ -175,7 +179,7 @@ export function generateGrid(
     }
   }
 
-  // 6. Laufende Vorgänge: Baustelle / „wird verkauft"
+  // 6. Vorgänge
   for (const p of pending) {
     if (p.tile_row >= 0 && p.tile_row < rows && p.tile_col >= 0 && p.tile_col < cols) {
       grid[p.tile_row][p.tile_col] = {
@@ -185,26 +189,22 @@ export function generateGrid(
     }
   }
 
-  // 7. Auto-Tiling: jede 'road'-Kachel in einen konkreten Segmenttyp auflösen.
-  //    Bitmaske der verbundenen Seiten: N=1, O=2, S=4, W=8 → road_<maske>.
-  //    Beide Renderer (TileSVG, MiniMap) zeichnen aus derselben Maske.
+  // 7. Straßen-Auto-Tiling
   const isRoad = (r: number, c: number) =>
     r >= 0 && r < rows && c >= 0 && c < cols && grid[r][c].type.startsWith('road')
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (grid[r][c].type !== 'road') continue
       let mask = 0
-      if (isRoad(r - 1, c)) mask |= 1   // N
-      if (isRoad(r, c + 1)) mask |= 2   // O
-      if (isRoad(r + 1, c)) mask |= 4   // S
-      if (isRoad(r, c - 1)) mask |= 8   // W
+      if (isRoad(r - 1, c)) mask |= 1
+      if (isRoad(r, c + 1)) mask |= 2
+      if (isRoad(r + 1, c)) mask |= 4
+      if (isRoad(r, c - 1)) mask |= 8
       grid[r][c] = { type: `road_${mask}`, owner: null }
     }
   }
 
-  // 8. Anomalie (USP-Andeutung): nur sichtbar, wenn ein Scanner FERTIG in der
-  //    Kolonie steht (entity_id 'scanner' im Bestand). Ohne Scanner verborgen.
-  //    Eine seed-bestimmte freie Terrain-Kachel trägt die Anomalie.
+  // 8. Anomalie
   const hasScanner = entities.some(e => e.entity_type === 'building' && e.entity_id === 'scanner')
   if (hasScanner) {
     const terrainCells: [number, number][] = []
@@ -224,20 +224,23 @@ export function generateGrid(
   return grid
 }
 
-// Verbundene Seiten einer Straßenkachel aus dem Segmenttyp (road_<maske>).
-// Liefert { n, o, s, w } — fürs Rendern in beiden Grids.
-export function roadSides(type: string): { n: boolean; o: boolean; s: boolean; w: boolean } {
-  const m = type.startsWith('road_') ? parseInt(type.slice(5), 10) || 0 : 0
+function sides(type: string, prefix: string): { n: boolean; o: boolean; s: boolean; w: boolean } {
+  const m = type.startsWith(prefix) ? parseInt(type.slice(prefix.length), 10) || 0 : 0
   return { n: !!(m & 1), o: !!(m & 2), s: !!(m & 4), w: !!(m & 8) }
 }
 
-// Hilfsform für Konsumenten, die nur Typ-Strings brauchen (ColonyGrid-Altpfad).
+export function roadSides(type: string): { n: boolean; o: boolean; s: boolean; w: boolean } {
+  return sides(type, 'road_')
+}
+
+export function riverSides(type: string): { n: boolean; o: boolean; s: boolean; w: boolean } {
+  return sides(type, 'river_')
+}
+
 export function gridTypes(grid: Cell[][]): string[][] {
   return grid.map(row => row.map(cell => cell.type))
 }
 
-// Anomalie-Koordinate aus dem Cell[][] ziehen (oder null). Für Konsumenten,
-// die mit der reduzierten string[][]-Form arbeiten (ColonyGrid).
 export function anomalyAt(grid: Cell[][]): { r: number; c: number } | null {
   for (let r = 0; r < grid.length; r++)
     for (let c = 0; c < grid[r].length; c++)
