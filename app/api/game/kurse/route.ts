@@ -1,6 +1,7 @@
 // app/api/game/kurse/route.ts
 // Erstellt:     23.06.2026
-// Version:      1.0.0
+// Aktualisiert: 23.06.2026
+// Version:      1.2.0 — Kurse public lesbar, Auth nur für Abschluss
 //
 // GET /api/game/kurse                    → alle publizierten Kurse + Fortschritt
 // GET /api/game/kurse?id=kurs_01_...     → Kurs mit Folien
@@ -18,16 +19,17 @@ async function getUser(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  // Kurse sind public lesbar — Auth nur für Fortschritt + Abschluss nötig
   const user = await getUser(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const id     = searchParams.get('id')
   const action = searchParams.get('action')
 
-  // ── Kurs abschliessen ─────────────────────────────────────────────────────
+  // ── Kurs abschliessen (Auth required) ──────────────────────────────────────
   if (action === 'complete') {
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const kursDbId = searchParams.get('kurs_db_id')
     const punkte   = parseInt(searchParams.get('punkte') ?? '0', 10)
     if (!kursDbId) return NextResponse.json({ error: 'kurs_db_id fehlt' }, { status: 400 })
@@ -62,19 +64,23 @@ export async function GET(req: NextRequest) {
 
     if (!kurs) return NextResponse.json({ error: 'Kurs nicht gefunden' }, { status: 404 })
 
-    // Fortschritt laden
-    const { data: fortschritt } = await supabase
-      .from('kurs_fortschritt')
-      .select('*')
-      .eq('profile_id', user.id)
-      .eq('kurs_id', kurs.id)
-      .maybeSingle()
+    // Fortschritt laden (nur wenn eingeloggt)
+    let fortschritt = null
+    if (user) {
+      const { data: f } = await supabase
+        .from('kurs_fortschritt')
+        .select('*')
+        .eq('profile_id', user.id)
+        .eq('kurs_id', kurs.id)
+        .maybeSingle()
+      fortschritt = f
+    }
 
     // Folien sortieren
     const folien = (kurs.foundation_folien ?? [])
       .sort((a: any, b: any) => a.position - b.position)
 
-    return NextResponse.json({ kurs: { ...kurs, foundation_folien: folien }, fortschritt })
+    return NextResponse.json({ kurs: { ...kurs, foundation_folien: folien }, fortschritt: fortschritt ?? null })
   }
 
   // ── Alle Kurse + Fortschritt + Voraussetzungen ────────────────────────────
@@ -87,10 +93,14 @@ export async function GET(req: NextRequest) {
   if (!kurse) return NextResponse.json({ kurse: [] })
 
   // Fortschritt für alle Kurse
-  const { data: fortschritte } = await supabase
-    .from('kurs_fortschritt')
-    .select('kurs_id, abgeschlossen_at, letzte_folie, quiz_bestanden')
-    .eq('profile_id', user.id)
+  let fortschritte: any[] = []
+  if (user) {
+    const { data: fs } = await supabase
+      .from('kurs_fortschritt')
+      .select('kurs_id, abgeschlossen_at, letzte_folie, quiz_bestanden')
+      .eq('profile_id', user.id)
+    fortschritte = fs ?? []
+  }
 
   // Voraussetzungen
   const { data: voraussetzungen } = await supabase
