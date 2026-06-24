@@ -1,7 +1,10 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.6.2
+// Version:  0.6.3
 //
+// v0.6.3: Neue spezialisierte Terrain-Tiles als bebaubar/straßenfähig
+//   freigeschaltet: farmland/city/spaceport, mare/highland/research,
+//   dust/plateau/habitat/industry.
 // v0.6.2: Platzhalter-NPC-Bauten deaktiviert. Fremde Gebäude sollen erst
 //   wieder erscheinen, wenn sie echten Akteuren/Fraktionen gehören.
 // v0.6.1: Straßennetz wird vor NPC-Bauten gelegt; NPCs dürfen dadurch keine
@@ -45,12 +48,22 @@ export function seededRandom(seed: number, i: number): number {
 
 export function isBuildable(tileType: string): boolean {
   return (
-    tileType === 'tile_surface' ||
-    tileType === 'tile_grass'   ||
-    tileType === 'tile_urban'   ||
-    tileType === 'tile_metal'   ||
-    tileType === 'tile_crater'  ||
-    tileType === 'tile_shaft'   ||
+    tileType === 'tile_surface'   ||
+    tileType === 'tile_grass'     ||
+    tileType === 'tile_urban'     ||
+    tileType === 'tile_farmland'  ||
+    tileType === 'tile_city'      ||
+    tileType === 'tile_spaceport' ||
+    tileType === 'tile_mare'      ||
+    tileType === 'tile_highland'  ||
+    tileType === 'tile_research'  ||
+    tileType === 'tile_dust'      ||
+    tileType === 'tile_plateau'   ||
+    tileType === 'tile_habitat'   ||
+    tileType === 'tile_industry'  ||
+    tileType === 'tile_metal'     ||
+    tileType === 'tile_crater'    ||
+    tileType === 'tile_shaft'     ||
     tileType.startsWith('road_')
   )
 }
@@ -86,12 +99,12 @@ function fallbackTerrain(slug: string, seed: number, r: number, c: number, cols:
   if (slug === 'earth') {
     if (rand < 0.16) return 'tile_forest_dense'
     if (rand < 0.31) return 'tile_forest_edge'
-    if (rand < 0.40) return 'tile_urban'
-    if (rand < 0.45) return 'tile_surface'
+    if (rand < 0.40) return 'tile_city'
+    if (rand < 0.45) return 'tile_farmland'
     return 'tile_grass'
   }
-  if (slug === 'moon') return rand < 0.06 ? 'tile_crater' : rand < 0.10 ? 'tile_mountain' : 'tile_surface'
-  if (slug === 'mars') return rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : 'tile_surface'
+  if (slug === 'moon') return rand < 0.06 ? 'tile_crater' : rand < 0.18 ? 'tile_highland' : 'tile_surface'
+  if (slug === 'mars') return rand < 0.08 ? 'tile_crater' : rand < 0.13 ? 'tile_canyon' : rand < 0.30 ? 'tile_dust' : 'tile_surface'
   return rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface'
 }
 
