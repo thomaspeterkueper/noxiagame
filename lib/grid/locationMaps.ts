@@ -1,6 +1,6 @@
 // lib/grid/locationMaps.ts
 // Erstellt: 24.06.2026
-// Version: 0.6.0
+// Version: 0.7.0
 //
 // Feste Terrain-Layer pro Standort. Das ist der Zwischenschritt zwischen
 // prozeduralem generateGrid() und späterer Supabase-Tabelle location_tiles.
@@ -77,33 +77,35 @@ export const LOCATION_MAPS: Record<string, string[]> = {
     'qqqqqqqqqqqccccqqqqqqqqqqqqqqqqq',
     'qqqqqqqqqqqccccqqqqqqqqqqqqqqqqq',
   ],
-  // Mars Terrain v2:
-  // - Staub, Plateau, Habitat und Industrie sind eigene Tile-Klassen
-  // - Canyon/Krater bleiben geologische Extremzonen
+  // Mars Terrain v3:
+  // - klarer Valles-Marineris-Zug statt Einheitsstaub
+  // - Kraterfelder im Westen, Plateau im Norden/Osten
+  // - Habitat-/Industriecluster als sichtbare Expansionszonen
+  // - freie Staubebenen bleiben als Bau- und Wachstumsraum
   mars: [
-    'ccccddddddddpppppppppppppppppppp',
-    'ccccddddddddpppppppppppppppppppp',
-    'ccccddddddaaaaaaappppppppppppppp',
-    'ccccddddddaaaaaaappppppppppppppp',
-    'ddddddddddaaaaaaapppppHHHHHIIppp',
-    'ddddddddddaaaaaaapppppHHHHHIIppp',
-    'ddddddddddddddddddHHHHHIIIIIIppp',
-    'ddddddddddddddddddHHHHHIIIIIIppp',
+    'ccccddddddpppppppppppppppppppppp',
+    'cccccddddppppppppppppppppppppppp',
+    'ccccdddddaaaaaaaappppppppppppppp',
+    'cccddddddaaaaaaaaapppppppppppppp',
+    'ccdddddddaaaaaaaaapppppHHHHHppp',
+    'dddddddddaaaaaaaaapppppHHHHHIIp',
+    'ddddddddddaaaaaaaaapppppHHHHHIIp',
+    'ddddddddddaaaaaaaappppppIIIIIIpp',
+    'dddddddddddsssssddppppppIIIIIIpp',
+    'ddddddddssssssssdddppppppppppppp',
+    'ddddddssssssssssssdddpppccccpppp',
+    'ddddddssssHHHssssdddpppccccpppp',
+    'ddddddssssHHHssssddddppcccccppp',
+    'ddddddddssHHHssdddddddppccccppp',
+    'pppddddddddddddddddddddppppppppp',
+    'ppppdddddddddddddddddddddppppppp',
+    'pppppdddddddddddHHHHHddddpppppp',
+    'pppppdddddddddddHHHHHIIIddppppp',
+    'ppppppddddddddddHHHHHIIIddppppp',
+    'ppppppddddddddddddddIIIIIddpppp',
     'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
-    'dddddddddddddddddddddddddddddddd',
+    'ddddddddddccccdddddddddddddddddd',
+    'ddddddddddccccdddddddddddddddddd',
     'dddddddddddddddddddddddddddddddd',
   ],
   phobos: [
