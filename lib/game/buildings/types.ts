@@ -1,61 +1,82 @@
 // lib/game/buildings/types.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Initiale Version: zentrales BuildingDef-Schema
-// Version:      1.0.0
+// Aktualisiert: 25.06.2026 — OverlayDef und BuildingContext ergänzt
+// Version:      1.1.0
 //
 // Single Source of Truth für alle Gebäude-Metadaten.
-// Ersetzt schrittweise:
-//   - BUILDABLE_ITEMS in config.ts      (Kosten, Produktion)
-//   - BUILDING_NAMES in ColonyGrid.tsx  (Anzeigenamen)
-//   - PRODUCES in tick.ts               (Ressourcenproduktion, dupliziert)
-//   - BuildableId in buildingSale.ts    (hartcodierte Union)
-//   - PLANNED_BUILDINGS in config.ts    (geplante Gebäude)
-//
-// Migration: Bestehende Importe zeigen weiter auf config.ts bis alle
-// Aufrufer migriert sind. buildings/index.ts re-exportiert kompatible
-// Formen für den Übergang.
 
-export type ResourceType   = 'water' | 'energy' | 'metal'
-export type LocationSlug   = string
-export type OverlayId      = 'BankOverlay' | 'SchoolOverlay' | 'ShipyardOverlay' | 'AdminOverlay' | null
+export type ResourceType = 'water' | 'energy' | 'metal'
+export type LocationSlug = string
+export type OverlayId = 'BankOverlay' | 'SchoolOverlay' | 'ShipyardOverlay' | 'AdminOverlay' | null
 
 export type BuildingCategory =
-  | 'production'    // Mine, Solar, Eisbohrung, Wasserrecycler
-  | 'housing'       // Habitat
-  | 'service'       // Bank, Akademie, Verwaltung
-  | 'infrastructure'// Werft, Warenhaus, Scanner
-  | 'special'       // NPCs, Events, einmalig
+  | 'production'
+  | 'housing'
+  | 'service'
+  | 'infrastructure'
+  | 'special'
 
 export interface BuildingDef {
-  // ── Identität ───────────────────────────────────────────────────────────
-  id:          string               // entity_id in DB, z.B. 'mine'
-  name:        string               // Anzeigename, z.B. 'Mine'
-  category:    BuildingCategory
-  description: string               // Kurzbeschreibung für Tooltip + BauDialog
-
-  // ── Ökonomie ────────────────────────────────────────────────────────────
-  cost:          number             // Baukosten in Cr
-  buildTimeTicks: number            // Bauzeit in Ticks (1 Tick = 1 Cron-Lauf)
-
-  // ── Produktion (optional) ───────────────────────────────────────────────
+  id: string
+  name: string
+  category: BuildingCategory
+  description: string
+  cost: number
+  buildTimeTicks: number
   produces?: {
     resource: ResourceType
-    amount:   number                // Einheiten pro Tick
+    amount: number
   }
-  populationBonus?: number          // +N max. Bevölkerung (Habitat)
+  populationBonus?: number
+  allowedLocations?: LocationSlug[]
+  blockedLocations?: LocationSlug[]
+  overlay?: OverlayId
+  planned?: boolean
+  planHint?: string
+  svgVariants?: Partial<Record<LocationSlug, string>>
+  tileAsset?: string
+}
 
-  // ── Geo-Gating ──────────────────────────────────────────────────────────
-  allowedLocations?: LocationSlug[] // undefined = überall baubar
-  blockedLocations?: LocationSlug[] // Ausschlussliste (alternativ)
+export interface BuildingContext {
+  locationSlug: string
+  locationName: string
+  isOwn: boolean
+  production: Record<string, number>
+  consumption: Record<string, number>
+  stocks: Record<string, number>
+  population?: number
+  populationMax?: number
+  credits?: number
+}
 
-  // ── UI ──────────────────────────────────────────────────────────────────
-  overlay?:  OverlayId              // welches Overlay öffnet Klick auf dieses Gebäude?
-  planned?:  boolean                // true = im Bau-Dialog sichtbar aber nicht baubar
-  planHint?: string                 // Hinweis für geplante Gebäude
+export type OverlayTrend = 'up' | 'down' | 'stable' | 'critical'
+export type OverlaySeverity = 'info' | 'success' | 'warning' | 'critical'
 
-  // ── Visuals (zukunftssicher) ─────────────────────────────────────────────
-  // Aktuell: BuildingSVG.tsx rendert nach entity_id.
-  // Später: SVG-String oder Asset-Pfad direkt hier.
-  svgVariants?: Partial<Record<LocationSlug, string>>  // location-spezifische SVG-Overrides
-  tileAsset?:  string               // Pfad unter /public/images/grid/{slug}/{id}.png
+export interface OverlayMetric {
+  id: string
+  label: string
+  value: number | string
+  unit?: string
+  trend?: OverlayTrend
+}
+
+export interface OverlayAlert {
+  id: string
+  severity: OverlaySeverity
+  text: string
+}
+
+export interface OverlayAction {
+  id: string
+  label: string
+  disabled?: boolean
+}
+
+export interface OverlayDef {
+  id: string
+  title: string
+  subtitle?: string
+  metrics: OverlayMetric[]
+  alerts: OverlayAlert[]
+  actions: OverlayAction[]
 }
