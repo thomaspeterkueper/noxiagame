@@ -1,14 +1,17 @@
-// lib/game/buildings/overlays/index.ts
+// lib/game/buildings/overlays/overlay_index.ts
 // Erstellt:     24.06.2026
-// Aktualisiert: 24.06.2026 — Saubere Re-Export-Struktur
-// Version:      2.0.0
-//
-// Zentrale Exportstelle — enthält keine Logik.
-// Struktur:
-//   types.ts        → OverlayDef, Metric, Alert, Action, BuildingContext
-//   mineOverlay.ts  → Mine als Referenz-Implementierung
-//   overlayBuilder.ts → buildOverlayForBuilding (alle Gebäude)
+// Aktualisiert: 25.06.2026 — Kompatibilitäts-Reexport auf aktuelle Overlay-Struktur
+// Version:      2.0.1
 
-export * from './types'
-export * from './mineOverlay'
-export * from './overlayBuilder'
+export type {
+  OverlayDef,
+  BuildingContext,
+  OverlayMetric,
+  OverlayAlert,
+  OverlayAction,
+  OverlayTrend,
+  OverlaySeverity,
+} from '../types'
+
+export * from './mine'
+export * from './index'
