@@ -4,3 +4,4 @@ export * from './progress';
 export * from './source';
 export * from './remote';
 export * from './service';
+export * from './buildingMap';
