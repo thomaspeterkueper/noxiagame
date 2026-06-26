@@ -7,15 +7,21 @@ import {
   learningModules,
   completeLearningModule,
 } from '@/lib/knowledge';
+import type { LearningModuleId } from '@/lib/knowledge';
 
-const demoProgress = [
+const completedDemoModules: LearningModuleId[] = [
   'LRN:SSF:MAT-1001',
   'LRN:SSF:MAT-1002',
   'LRN:SSF:PHY-1201',
   'LRN:SSF:PHY-1101',
-].reduce(completeLearningModule, initialKnowledgeProgress);
+];
 
-const tree = [
+const demoProgress = completedDemoModules.reduce(
+  (progress, moduleId) => completeLearningModule(progress, moduleId),
+  initialKnowledgeProgress,
+);
+
+const tree: { title: string; modules: LearningModuleId[] }[] = [
   { title: 'Mathematik', modules: ['LRN:SSF:MAT-1001', 'LRN:SSF:MAT-1002', 'LRN:SSF:MAT-1201'] },
   { title: 'Physik', modules: ['LRN:SSF:PHY-1101', 'LRN:SSF:PHY-1201', 'LRN:SSF:PHY-1301', 'LRN:SSF:PHY-1302'] },
   { title: 'Astronomie', modules: ['LRN:SSF:AST-2101', 'LRN:SSF:AST-1201'] },
@@ -52,7 +58,7 @@ export default function KnowledgePage() {
               <strong>{branch.title}</strong>
               {branch.modules.map((id) => {
                 const module = moduleById.get(id);
-                const done = demoProgress.completedModules.includes(id as never);
+                const done = demoProgress.completedModules.includes(id);
                 const available = availableModules.some((candidate) => candidate.id === id);
                 return (
                   <div key={id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
