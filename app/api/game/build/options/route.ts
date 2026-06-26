@@ -1,16 +1,12 @@
 // app/api/game/build/options/route.ts
 // Erstellt: 25.06.2026
-// Version: 0.1.0
-//
-// Liefert die gültigen Bauoptionen für einen Standort.
-// Ziel: Der Client soll nicht mehr blind lokale BUILDINGS anzeigen, sondern
-// nur noch Bautypen, die serverseitig aktiv und am aktuellen Ort erlaubt sind.
-//
-// Nächster Schritt: Tile-Suitability/Feldbeschreibung einbeziehen
-// (z.B. Kohle, Eis, Sumpf, Fundament-Eignung, Ertragsmultiplikator).
+// Aktualisiert: 26.06.2026 — Bauoptionen erhalten Knowledge-Status
+// Version: 0.2.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
+import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,18 +82,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Bauoptionen konnten nicht geladen werden.' }, { status: 500 })
   }
 
+  const knowledge = await getNoxiaKnowledgeState(user.id)
+  const progress = { completedModules: knowledge.completedModules, unlocked: knowledge.unlocked }
+
   const rows = (data ?? []) as BuildingRow[]
   const buildable = rows
     .filter(row => isAllowedAtLocation(row, location.slug))
-    .map(row => ({
-      key: row.key,
-      name: row.name,
-      cost: row.cost_credits ?? 0,
-      buildTimeTicks: row.build_time_ticks ?? 1,
-      populationBonus: row.population_bonus ?? 0,
-      production: normalizeProduction(row.production),
-      allowedLocations: row.allowed_locations ?? null,
-    }))
+    .map(row => {
+      const req = getBuildRequirements(row.key, progress)
+      return {
+        key: row.key,
+        name: req.ok ? row.name : `🔒 ${row.name}`,
+        cost: row.cost_credits ?? 0,
+        buildTimeTicks: row.build_time_ticks ?? 1,
+        populationBonus: row.population_bonus ?? 0,
+        production: normalizeProduction(row.production),
+        allowedLocations: row.allowed_locations ?? null,
+        knowledgeLocked: !req.ok,
+        knowledgeBuildingId: req.id,
+        requiredUnlock: req.requiredUnlock,
+      }
+    })
 
   return NextResponse.json({
     location: {
@@ -109,6 +114,11 @@ export async function GET(req: NextRequest) {
       row: Number.isNaN(tileRow) ? null : tileRow,
       col: Number.isNaN(tileCol) ? null : tileCol,
       type: tileType,
+    },
+    knowledge: {
+      source: knowledge.source ?? 'local',
+      completedModules: knowledge.completedModules,
+      unlocked: knowledge.unlocked,
     },
     buildable,
   })
