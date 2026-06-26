@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import DashboardClient from './DashboardClient'
+import DashboardGate from './DashboardGate'
 
 export const revalidate = 30
 
@@ -15,5 +15,5 @@ async function getGameData() {
 
 export default async function Dashboard() {
   const { locations, prices, orders } = await getGameData()
-  return <DashboardClient locations={locations} prices={prices} orders={orders} />
+  return <DashboardGate locations={locations} prices={prices} orders={orders} />
 }
