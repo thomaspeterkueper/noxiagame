@@ -1,7 +1,7 @@
 // app/api/game/build/options/route.ts
 // Erstellt: 25.06.2026
 // Aktualisiert: 26.06.2026 — Bauoptionen erhalten Knowledge-Status
-// Version: 0.2.0
+// Version: 0.2.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -90,15 +90,18 @@ export async function GET(req: NextRequest) {
     .filter(row => isAllowedAtLocation(row, location.slug))
     .map(row => {
       const req = getBuildRequirements(row.key, progress)
+      const locked = !req.ok
+      const realCost = row.cost_credits ?? 0
       return {
         key: row.key,
-        name: req.ok ? row.name : `🔒 ${row.name}`,
-        cost: row.cost_credits ?? 0,
+        name: locked ? `🔒 ${row.name}` : row.name,
+        cost: locked ? 999999999 : realCost,
+        displayCost: realCost,
         buildTimeTicks: row.build_time_ticks ?? 1,
         populationBonus: row.population_bonus ?? 0,
         production: normalizeProduction(row.production),
         allowedLocations: row.allowed_locations ?? null,
-        knowledgeLocked: !req.ok,
+        knowledgeLocked: locked,
         knowledgeBuildingId: req.id,
         requiredUnlock: req.requiredUnlock,
       }
