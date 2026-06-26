@@ -10,11 +10,7 @@ const demoCompletedModules: LearningModuleId[] = [
   'LRN:SSF:PHY-1101',
 ];
 
-export async function getNoxiaKnowledgeState(userId = 'demo'): Promise<NoxiaUnlockPayload> {
-  if (getKnowledgeSourceMode() === 'ssf') {
-    return fetchNoxiaUnlocks(userId);
-  }
-
+function getLocalKnowledgeState(userId: string): NoxiaUnlockPayload {
   const progress = demoCompletedModules.reduce(
     (currentProgress, moduleId) => completeLearningModule(currentProgress, moduleId),
     initialKnowledgeProgress,
@@ -27,4 +23,23 @@ export async function getNoxiaKnowledgeState(userId = 'demo'): Promise<NoxiaUnlo
     unlocked: progress.unlocked,
     buildings: getUnlockedBuildings(progress).map((building) => building.id),
   };
+}
+
+export async function getNoxiaKnowledgeState(userId = 'demo'): Promise<NoxiaUnlockPayload> {
+  if (getKnowledgeSourceMode() === 'ssf') {
+    try {
+      const remote = await fetchNoxiaUnlocks(userId);
+      return {
+        source: remote.source ?? 'ssf',
+        userId: remote.userId ?? userId,
+        completedModules: remote.completedModules ?? [],
+        unlocked: remote.unlocked ?? [],
+        buildings: remote.buildings ?? [],
+      };
+    } catch {
+      return getLocalKnowledgeState(userId);
+    }
+  }
+
+  return getLocalKnowledgeState(userId);
 }
