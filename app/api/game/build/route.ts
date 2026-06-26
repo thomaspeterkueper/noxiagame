@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
+import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
+import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 
 const WORLD_COLS = 32
 const WORLD_ROWS = 24
@@ -205,6 +207,10 @@ export async function GET(req: NextRequest) {
       await serviceClient.from('tile_entities').insert({ profile_id: user.id, location_id: locationForModule.id, entity_type: 'module', entity_id: buildableId, tile_level: 0, tile_row: null, tile_col: null, slot: nextSlot, is_state_owned: false, condition: 100, status: 'active' })
       return NextResponse.json({ ok: true, credits: profileM.credits - moduleDef.cost })
     }
+
+    const knowledge = await getNoxiaKnowledgeState(user.id)
+    const gate = getBuildRequirements(buildableId, { completedModules: knowledge.completedModules, unlocked: knowledge.unlocked })
+    if (!gate.ok) return NextResponse.json({ error: `Wissen fehlt: ${gate.requiredUnlock}` }, { status: 403 })
 
     const buildingDef = await loadBuildingDef(buildableId)
     if (!buildingDef) return NextResponse.json({ error: 'Unbekannter oder inaktiver Bautyp' }, { status: 400 })
