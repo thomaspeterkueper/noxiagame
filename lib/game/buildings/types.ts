@@ -1,11 +1,9 @@
 // lib/game/buildings/types.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 25.06.2026 — OverlayDef und BuildingContext ergänzt
-// Version:      1.1.0
-//
-// Single Source of Truth für alle Gebäude-Metadaten.
+// Aktualisiert: 27.06.2026 — components/Bauteile ergänzt
+// Version:      1.2.0
 
-export type ResourceType = 'water' | 'energy' | 'metal'
+export type ResourceType = 'water' | 'energy' | 'metal' | 'components'
 export type LocationSlug = string
 export type OverlayId = 'BankOverlay' | 'SchoolOverlay' | 'ShipyardOverlay' | 'AdminOverlay' | null
 
@@ -24,6 +22,10 @@ export interface BuildingDef {
   cost: number
   buildTimeTicks: number
   produces?: {
+    resource: ResourceType
+    amount: number
+  }
+  consumes?: {
     resource: ResourceType
     amount: number
   }
