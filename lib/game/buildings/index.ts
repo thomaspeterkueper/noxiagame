@@ -1,21 +1,11 @@
 // lib/game/buildings/index.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 23.06.2026 12:55 — Straße als baubare Infrastruktur
-// Version:      1.1.0
-//
-// Zentrale Registry aller Gebäude. Neue Gebäude = neuer Eintrag hier.
-// Kein Eingriff in bestehende Dateien nötig.
-//
-// Kompatibilitäts-Exports am Ende dieser Datei ersetzen schrittweise
-// die verstreuten Konstanten in config.ts, ColonyGrid.tsx, tick.ts.
+// Aktualisiert: 27.06.2026 — Erde: Wohnblock, Labor, Fabrik ergänzt
+// Version:      1.2.0
 
 import type { BuildingDef } from './types'
 
-// ── Registry ──────────────────────────────────────────────────────────────────
-
 export const BUILDINGS: Record<string, BuildingDef> = {
-
-  // ── Produktion ─────────────────────────────────────────────────────────────
 
   mine: {
     id: 'mine', name: 'Mine', category: 'production',
@@ -29,6 +19,20 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     description: '+4 Energie/Tick',
     cost: 1200, buildTimeTicks: 1,
     produces: { resource: 'energy', amount: 4 },
+  },
+
+  factory: {
+    id: 'factory', name: 'Fabrik', category: 'production',
+    description: 'Industrieproduktion · erste Produktionsketten',
+    cost: 4500, buildTimeTicks: 4,
+    allowedLocations: ['earth', 'mars'],
+  },
+
+  laboratory: {
+    id: 'laboratory', name: 'Labor', category: 'service',
+    description: 'Forschung · Analyse · technische Entwicklung',
+    cost: 3800, buildTimeTicks: 3,
+    allowedLocations: ['earth', 'moon', 'mars', 'prometheus'],
   },
 
   ice_drill: {
@@ -47,24 +51,26 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     allowedLocations: ['mars'],
   },
 
-  // ── Wohnen ─────────────────────────────────────────────────────────────────
-
   habitat: {
     id: 'habitat', name: 'Habitat', category: 'housing',
-    description: '+100 max. Bevölkerung',
+    description: '+25 max. Bevölkerung',
     cost: 2000, buildTimeTicks: 3,
-    populationBonus: 100,
+    populationBonus: 25,
   },
 
-  // ── Infrastruktur (baubar) ────────────────────────────────────────────────
+  residential_block: {
+    id: 'residential_block', name: 'Wohnblock', category: 'housing',
+    description: '+75 max. Bevölkerung',
+    cost: 3500, buildTimeTicks: 4,
+    populationBonus: 75,
+    allowedLocations: ['earth', 'mars'],
+  },
 
   road: {
     id: 'road', name: 'Straße', category: 'infrastructure',
     description: 'Erschließt benachbarte Kacheln · Voraussetzung für Habitate',
     cost: 300, buildTimeTicks: 1,
   },
-
-  // ── Service ────────────────────────────────────────────────────────────────
 
   school: {
     id: 'school', name: 'Akademie', category: 'service',
@@ -80,15 +86,11 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     overlay: 'BankOverlay',
   },
 
-  // ── Infrastruktur ───────────────────────────────────────────────────────────
-
   scanner: {
     id: 'scanner', name: 'Scanner', category: 'infrastructure',
     description: 'Macht Anomalien der Kolonie sichtbar',
     cost: 1800, buildTimeTicks: 2,
   },
-
-  // ── Geplant (noch nicht baubar) ────────────────────────────────────────────
 
   warehouse: {
     id: 'warehouse', name: 'Warenhaus', category: 'infrastructure',
@@ -125,25 +127,16 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     cost: 3000, buildTimeTicks: 3,
     planned: true, planHint: 'Lebenserhaltung — Alpha 0.4',
   },
-
 }
 
-// ── Abgeleitete Collections ────────────────────────────────────────────────────
-
-/** Alle baubare Gebäude (nicht geplant) */
 export const BUILDABLE = Object.fromEntries(
   Object.entries(BUILDINGS).filter(([, b]) => !b.planned)
 )
 
-/** Alle geplanten Gebäude (für Bau-Dialog: ausgegraut) */
 export const PLANNED = Object.fromEntries(
   Object.entries(BUILDINGS).filter(([, b]) => b.planned)
 )
 
-// ── Kompatibilitäts-Exports ───────────────────────────────────────────────────
-// Bestehende Importe brechen nicht. Schrittweise migrieren.
-
-/** @deprecated Verwende BUILDABLE aus buildings/index.ts */
 export const BUILDABLE_ITEMS_COMPAT = Object.fromEntries(
   Object.entries(BUILDABLE).map(([id, b]) => [id, {
     type:              'building' as const,
@@ -157,19 +150,16 @@ export const BUILDABLE_ITEMS_COMPAT = Object.fromEntries(
   }])
 )
 
-/** @deprecated Verwende BUILDINGS[id].name */
 export const BUILDING_NAMES_COMPAT: Record<string, string> = Object.fromEntries(
   Object.entries(BUILDINGS).map(([id, b]) => [id, b.name])
 )
 
-/** @deprecated Verwende BUILDINGS[id].produces */
 export const PRODUCES_COMPAT: Record<string, { resource: 'metal' | 'energy' | 'water'; amount: number }> = Object.fromEntries(
   Object.entries(BUILDINGS)
     .filter(([, b]) => b.produces)
     .map(([id, b]) => [id, b.produces!])
 )
 
-/** @deprecated Verwende PLANNED */
 export const PLANNED_BUILDINGS_COMPAT = Object.values(PLANNED).map(b => ({
   id:   b.id,
   name: b.name,
