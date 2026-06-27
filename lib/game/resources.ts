@@ -1,17 +1,17 @@
 // lib/game/resources.ts
-// Ressourcen-Grundtypen, entkoppelt von der (noch nicht adoptierten) buildings.ts,
-// damit ships.ts/condition.ts ohne sie kompilieren. buildings.ts kann später von
-// hier re-exportieren. Heute handelbar (resource_type enum): water/energy/metal.
+// Ressourcen-Grundtypen.
+// Aktualisiert: 27.06.2026 — components/Bauteile als erste Industrieware.
+
 export type Resource =
-  | 'water' | 'energy' | 'metal'
+  | 'water' | 'energy' | 'metal' | 'components'
   | 'ice' | 'aluminium' | 'oxygen' | 'hydrogen' | 'food' | 'parts';
 
 export const RESOURCES: Resource[] =
-  ['water','energy','metal','ice','aluminium','oxygen','hydrogen','food','parts'];
+  ['water','energy','metal','components','ice','aluminium','oxygen','hydrogen','food','parts'];
 
-export const MARKET_RESOURCES: Resource[] = ['water','energy','metal'];
+export const MARKET_RESOURCES: Resource[] = ['water','energy','metal','components'];
 
 export const RESOURCE_PHASE: Record<Resource,'fluid'|'solid'> = {
   water:'fluid', energy:'fluid', oxygen:'fluid', hydrogen:'fluid',
-  metal:'solid', ice:'solid', aluminium:'solid', food:'solid', parts:'solid',
+  metal:'solid', components:'solid', ice:'solid', aluminium:'solid', food:'solid', parts:'solid',
 };
