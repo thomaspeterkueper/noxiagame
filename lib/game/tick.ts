@@ -1,7 +1,7 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
 // Aktualisiert: 27.06.2026 — components/Bauteile im Produktionsloop
-// Version:      3.1.0
+// Version:      3.1.1
 
 import {
   CONSUMPTION_PER_100,
@@ -103,9 +103,7 @@ export async function runPopulationTick(
     let popBonus = 0
     for (const [entityId, count] of Object.entries(counts)) {
       const def = defs.get(entityId)
-      if (def && def.population_bonus > 0) {
-        popBonus += def.population_bonus * count
-      }
+      if (def && def.population_bonus > 0) popBonus += def.population_bonus * count
     }
     const popMax = (loc.base_population_max ?? loc.population_max) + popBonus
 
@@ -131,13 +129,8 @@ export async function runPopulationTick(
       for (const [entityId, count] of Object.entries(counts)) {
         const def = defs.get(entityId)
         if (!def) continue
-
-        for (const prod of def.production) {
-          if (prod.resource === res) totalBuildingProduction += prod.amount * count
-        }
-        for (const cons of def.consumption) {
-          if (cons.resource === res) totalBuildingConsumption += cons.amount * count
-        }
+        for (const prod of def.production) if (prod.resource === res) totalBuildingProduction += prod.amount * count
+        for (const cons of def.consumption) if (cons.resource === res) totalBuildingConsumption += cons.amount * count
       }
 
       const totalProd = (r.base_production ?? r.production ?? 0) + totalBuildingProduction
@@ -204,6 +197,7 @@ export async function runPopulationTick(
         if (gross <= 0) continue
         const tax    = Math.round(taxRate * gross)
         const payout = gross - tax
+
         const { data: prof } = await supabase
           .from('profiles').select('credits').eq('id', b.profile_id).single()
         if (prof) {
@@ -232,4 +226,173 @@ export async function runPopulationTick(
   return results
 }
 
-// Rest der Tick-Datei bleibt unverändert ab Price/NPC/Orders.
+export async function runPriceTick(supabase: SB, tickNumber: number) {
+  const results: Record<string, unknown>[] = []
+  const { data: priceLocRows } = await supabase.from('locations').select('id, slug, population, population_max, is_supplied')
+  const priceLocMap = new Map<string, any>()
+  for (const l of (priceLocRows ?? []) as any[]) priceLocMap.set(l.id, l)
+  const { data: prices } = await supabase.from('market_prices').select('*')
+
+  for (const price of prices ?? []) {
+    const loc = priceLocMap.get(price.location_id)
+    if (!loc) continue
+    const { data: res } = await supabase.from('location_resources').select('stock, consumption, production').eq('location_id', loc.id).eq('resource', price.resource).single()
+    if (!res) continue
+    const stock = res.stock ?? 0
+    const balance = (res.production ?? 0) - (res.consumption ?? 0)
+    let multiplier = 1.0
+    if (stock < STOCK_LOW_THRESHOLD) multiplier = PRICE_PRESSURE_HIGH
+    else if (stock > STOCK_HIGH_THRESHOLD) multiplier = PRICE_PRESSURE_LOW
+    if (balance < -5 && stock < 200) multiplier = Math.max(multiplier, 1.03)
+    else if (balance > 5 && stock > 300) multiplier = Math.min(multiplier, 0.98)
+    if (!loc.is_supplied && price.resource === 'water') multiplier = Math.max(multiplier, 1.08)
+    const popPct = loc.population / loc.population_max
+    if (popPct > 0.7 && price.resource === 'water') multiplier = Math.max(multiplier, 1.02)
+    if (multiplier === 1.0) {
+      if (price.buy_price > 200) multiplier = 0.99
+      else if (price.buy_price < 30) multiplier = 1.01
+    }
+    const newBuy = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX, price.buy_price * multiplier)))
+    const newSell = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX - 1, price.sell_price * multiplier)))
+    const safeSell = Math.min(newSell, newBuy - 5)
+    if (!(newBuy === price.buy_price && safeSell === price.sell_price)) await supabase.from('market_prices').update({ buy_price: newBuy, sell_price: safeSell }).eq('id', price.id)
+    await supabase.from('price_history').insert({ location_id: loc.id, resource: price.resource, tick_number: tickNumber, buy_price: newBuy, sell_price: safeSell })
+    const { data: recent } = await supabase.from('price_history').select('sell_price').eq('location_id', loc.id).eq('resource', price.resource).order('tick_number', { ascending: false }).limit(AVG_WINDOW_TICKS)
+    if (recent && recent.length > 0) {
+      const avg = Math.round(recent.reduce((s: number, r: any) => s + r.sell_price, 0) / recent.length)
+      await supabase.from('market_prices').update({ avg_sell_7: avg }).eq('id', price.id)
+    }
+    results.push({ location: loc.slug, resource: price.resource, buy: newBuy, sell: safeSell })
+  }
+  const cutoff = tickNumber - HISTORY_RETENTION_TICKS
+  if (cutoff > 0) await supabase.from('price_history').delete().lt('tick_number', cutoff)
+  return results
+}
+
+export async function runOrderTick(supabase: SB) {
+  const created: Record<string, unknown>[] = []
+  await supabase.from('trade_orders').update({ status: 'expired' }).eq('status', 'open').lt('expires_at', new Date().toISOString())
+  const { data: locations } = await supabase.from('locations').select('id, slug, population, is_supplied').eq('simulate_tick', true)
+  for (const loc of locations ?? []) {
+    const { data: resources } = await supabase.from('location_resources').select('resource, stock, consumption, production').eq('location_id', loc.id)
+    for (const res of resources ?? []) {
+      const balance = res.production - res.consumption
+      const isUrgent = res.stock < STOCK_LOW_THRESHOLD
+      const isSinking = balance < 0 && res.stock < 150
+      if (!isUrgent && !isSinking) continue
+      const { data: existing } = await supabase.from('trade_orders').select('id').eq('location_id', loc.id).eq('resource', res.resource).eq('status', 'open').limit(1)
+      if (existing && existing.length > 0) continue
+      const { data: price } = await supabase.from('market_prices').select('buy_price').eq('location_id', loc.id).eq('resource', res.resource).single()
+      if (!price) continue
+      const deficitPerTick = Math.max(0, -balance)
+      const amount = Math.max(ORDER_MIN_AMOUNT, Math.round(deficitPerTick * ORDER_COVERAGE_TICKS))
+      const rewardMult = isUrgent ? ORDER_REWARD_MULT * 1.3 : ORDER_REWARD_MULT
+      const reward = Math.round(price.buy_price * amount * rewardMult)
+      const expiresAt = new Date()
+      expiresAt.setHours(expiresAt.getHours() + ORDER_EXPIRE_HOURS)
+      await supabase.from('trade_orders').insert({ location_id: loc.id, resource: res.resource, amount, reward, status: 'open', expires_at: expiresAt.toISOString() })
+      created.push({ location: loc.slug, resource: res.resource, amount, reward, urgent: isUrgent })
+    }
+  }
+  return created
+}
+
+export async function runNpcTick(supabase: SB, tickNumber: number) {
+  const { data: actors } = await supabase.from('actors').select('id, decision_weights').eq('kind', 'npc_firm')
+  if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
+  const { data: locRows } = await supabase.from('locations').select('id, slug')
+  const locIdToSlug = new Map<string, string>()
+  for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
+  const { data: priceRows } = await supabase.from('market_prices').select('resource, buy_price, sell_price, location_id')
+  const { data: stockRows } = await supabase.from('location_resources').select('location_id, resource, stock')
+  const stockMap = new Map<string, number>()
+  for (const s of (stockRows ?? []) as any[]) stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
+  const sellPriceMap = new Map<string, number>()
+  const slugToId = new Map<string, string>()
+  const preise = ((priceRows ?? []) as any[]).map((p) => {
+    const slug = locIdToSlug.get(p.location_id) ?? ''
+    if (slug) { slugToId.set(slug, p.location_id); sellPriceMap.set(`${p.location_id}|${p.resource}`, Number(p.sell_price ?? 0)) }
+    return { resource: p.resource, location: slug, buy_price: p.buy_price, sell_price: p.sell_price, stock: stockMap.get(`${p.location_id}|${p.resource}`) }
+  }).filter((p) => p.location)
+  let trades = 0, produces = 0, sells = 0, builds = 0
+  for (const actor of actors as any[]) {
+    const { data: buyLed } = await supabase.from('npc_trades').select('resource, amount').eq('actor_id', actor.id)
+    const bestand: Record<string, number> = {}
+    for (const r of (buyLed ?? []) as any[]) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.amount)
+    const { data: prodLed } = await supabase.from('npc_ledger').select('resource, goods_delta').eq('actor_id', actor.id).not('resource', 'is', null)
+    for (const r of (prodLed ?? []) as any[]) if (r.resource) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.goods_delta ?? 0)
+    const { data: ledSum } = await supabase.from('npc_ledger').select('credit_delta').eq('actor_id', actor.id)
+    const treasury = (ledSum ?? []).reduce((s: number, r: any) => s + Number(r.credit_delta ?? 0), 0)
+    const { data: gebRows } = await supabase.from('tile_entities').select('entity_id, location_id, tile_col').eq('actor_id', actor.id).eq('entity_type', 'building')
+    const gebaeude = ((gebRows ?? []) as any[]).map(g => ({ entity_id: g.entity_id, location_id: g.location_id, location: locIdToSlug.get(g.location_id) ?? '', tile_col: Number(g.tile_col ?? 0) })).filter(g => g.location)
+    for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
+    const aktionen = entscheideNpc({ actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, treasury, gebaeude }, { tick: tickNumber, preise })
+    for (const a of aktionen) {
+      if (a.typ === 'produce') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+        const erloes = a.menge * (sellPriceMap.get(`${locId}|${a.resource}`) ?? 0)
+        const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'produce', resource: a.resource, goods_delta: a.menge, credit_delta: erloes, location_id: locId, ref: a.ref }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
+        if (!ins?.length) continue
+        const key = `${locId}|${a.resource}`
+        const neuerStock = (stockMap.get(key) ?? 0) + a.menge
+        await supabase.from('location_resources').update({ stock: neuerStock }).eq('location_id', locId).eq('resource', a.resource)
+        stockMap.set(key, neuerStock)
+        produces++
+      } else if (a.typ === 'sell') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+        const aktuellerSellPrice = sellPriceMap.get(`${locId}|${a.resource}`) ?? 0
+        if (aktuellerSellPrice < a.minPreis) continue
+        const erloes = a.menge * aktuellerSellPrice
+        const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'sell', resource: a.resource, goods_delta: -a.menge, credit_delta: erloes, location_id: locId }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
+        if (!ins?.length) continue
+        const key = `${locId}|${a.resource}`
+        const neuerStock = (stockMap.get(key) ?? 0) + a.menge
+        await supabase.from('location_resources').update({ stock: neuerStock }).eq('location_id', locId).eq('resource', a.resource)
+        stockMap.set(key, neuerStock)
+        sells++
+      } else if (a.typ === 'build') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+        const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'build', resource: null, goods_delta: 0, credit_delta: -a.cost, location_id: locId, ref: a.location }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
+        if (!ins?.length) continue
+        const { data: vorhandene } = await supabase.from('tile_entities').select('tile_col').eq('actor_id', actor.id).eq('location_id', locId).eq('entity_id', a.building).order('tile_col', { ascending: false })
+        const naechsteCol = vorhandene?.length ? Math.max(0, (vorhandene[0].tile_col ?? 11) - 1) : 11
+        await supabase.from('tile_entities').insert({ actor_id: actor.id, location_id: locId, tile_level: 0, tile_row: 7, tile_col: naechsteCol, entity_type: 'building', entity_id: a.building })
+        builds++
+      } else if (a.typ === 'buy') {
+        const locId = slugToId.get(a.location)
+        if (!locId) continue
+        const { data: eingefuegt } = await supabase.from('npc_trades').upsert({ actor_id: actor.id, tick: tickNumber, resource: a.resource, amount: a.menge, unit_price: a.maxPreis, location_id: locId }, { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true }).select('id')
+        if (!eingefuegt?.length) continue
+        const key = `${locId}|${a.resource}`
+        const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge)
+        await supabase.from('location_resources').update({ stock: neuerStock }).eq('location_id', locId).eq('resource', a.resource)
+        stockMap.set(key, neuerStock)
+        trades++
+      }
+    }
+  }
+  return { actors: actors.length, trades, produces, sells, builds }
+}
+
+export async function runTick(supabase: SB, tickNumber: number) {
+  const defs = await loadBuildingDefs(supabase)
+  const population = await runPopulationTick(supabase, tickNumber, defs)
+  const npc = await runNpcTick(supabase, tickNumber)
+  const prices = await runPriceTick(supabase, tickNumber)
+  const orders = await runOrderTick(supabase)
+  return { tickNumber, population, prices, npc, orders }
+}
+
+export async function runDueTicks(supabase: SB) {
+  const { data, error } = await supabase.rpc('claim_due_ticks', { p_interval_seconds: TICK_INTERVAL_SECONDS, p_max: TICK_MAX_CATCHUP })
+  if (error) { console.error('claim_due_ticks error:', error); return { ran: 0 } }
+  const row = Array.isArray(data) ? data[0] : data
+  const claimed = row?.claimed ?? 0
+  const latest = Number(row?.latest_tick ?? 0)
+  if (claimed < 1) return { ran: 0 }
+  for (let n = latest - claimed + 1; n <= latest; n++) await runTick(supabase, n)
+  return { ran: claimed, latest }
+}
