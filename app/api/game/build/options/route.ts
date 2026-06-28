@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BUILDABLE } from '@/lib/game/buildings'
+import { getResourceCosts } from '@/lib/game/buildCosts'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
       const req = getBuildRequirements(building.id, progress)
       const locked = !req.ok
       const production = building.produces ? [{ resource: building.produces.resource, amount: building.produces.amount }] : []
+      const resourceCosts = getResourceCosts(building.id)
       const hint = locked && req.requiredUnlock ? ` · benötigt ${req.requiredUnlock}` : ''
 
       return {
@@ -32,6 +34,7 @@ export async function GET(req: NextRequest) {
         name: locked ? `🔒 ${building.name}${hint}` : building.name,
         cost: locked ? 999999999 : building.cost,
         displayCost: building.cost,
+        resourceCosts,
         buildTimeTicks: building.buildTimeTicks,
         populationBonus: building.populationBonus ?? 0,
         production,
