@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { fetchSsfKnowledgeModules } from '@/lib/ssfKnowledge'
 
@@ -38,6 +39,6 @@ export default async function Page() {
   )
 }
 
-function Panel({ children }: { children: React.ReactNode }) {
+function Panel({ children }: { children: ReactNode }) {
   return <article style={{ border: '1px solid rgba(120,150,180,0.2)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,0.035)', display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</article>
 }
