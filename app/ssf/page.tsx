@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { fetchSsfKnowledgeModules } from '@/lib/ssfKnowledge'
+import SsfModuleActions from './SsfModuleActions'
 
 export const revalidate = 300
 
@@ -14,7 +15,7 @@ export default async function Page() {
         <p style={{ color: '#8a6d2b', letterSpacing: 3, textTransform: 'uppercase', marginTop: 32 }}>Solar Science Foundation</p>
         <h1 style={{ fontSize: '2.4rem', marginBottom: 12 }}>SSF Wissensmodule in NOXIA</h1>
         <p style={{ color: '#9fb3c8', maxWidth: 780, lineHeight: 1.6 }}>
-          NOXIA liest diese Module direkt aus der Solar Science Foundation. Lernfortschritt aus SSF kann spaeter Spiel-Freischaltungen ausloesen.
+          NOXIA liest diese Module direkt aus der Solar Science Foundation. Lernfortschritt aus SSF wird als Modulfortschritt gespeichert und kann spaeter Spiel-Freischaltungen ausloesen.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginTop: 32 }}>
@@ -31,6 +32,7 @@ export default async function Page() {
               <p style={{ color: '#9fb3c8', lineHeight: 1.5 }}>{module.summary}</p>
               {module.unlocks.length > 0 && <small>Unlock: {module.unlocks.join(', ')}</small>}
               <a href={module.ssfUrl} target="_blank" rel="noreferrer" style={{ color: '#c9a961', textDecoration: 'none', fontWeight: 700 }}>In SSF lernen</a>
+              <SsfModuleActions moduleId={module.id} />
             </Panel>
           ))}
         </div>
