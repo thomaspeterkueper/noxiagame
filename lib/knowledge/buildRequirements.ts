@@ -9,9 +9,17 @@ const REQUIRED_UNLOCK: Record<string, string> = {
   'BLD:NOX:schmelze-1': 'UNL:NOX:smelting',
 };
 
+const UNLOCK_LABEL: Record<string, string> = {
+  'UNL:NOX:resource-extraction': 'Rohstoffgewinnung I',
+  'UNL:NOX:power-generation': 'Energieerzeugung I',
+  'UNL:NOX:water-processing': 'Wasseraufbereitung I',
+  'UNL:NOX:mars-habitat': 'Marskolonisation I',
+  'UNL:NOX:smelting': 'Metallurgie I',
+};
+
 export function getBuildRequirements(buildableId: string, progress: KnowledgeProgress) {
   const id = getKnowledgeBuildingId(buildableId);
   const requiredUnlock = id ? REQUIRED_UNLOCK[id] : null;
   const ok = !requiredUnlock || progress.unlocked.includes(requiredUnlock as any);
-  return { id, ok, requiredUnlock };
+  return { id, ok, requiredUnlock, requiredLabel: requiredUnlock ? (UNLOCK_LABEL[requiredUnlock] ?? requiredUnlock) : null };
 }
