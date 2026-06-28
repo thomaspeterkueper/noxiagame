@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       const locked = !req.ok
       const production = building.produces ? [{ resource: building.produces.resource, amount: building.produces.amount }] : []
       const resourceCosts = getResourceCosts(building.id)
-      const hint = locked && req.requiredUnlock ? ` · benötigt ${req.requiredUnlock}` : ''
+      const hint = locked && req.requiredLabel ? ` · benötigt ${req.requiredLabel}` : ''
 
       return {
         key: building.id,
@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
         knowledgeLocked: locked,
         knowledgeBuildingId: req.id,
         requiredUnlock: req.requiredUnlock,
+        requiredLabel: req.requiredLabel,
+        unlockSource: req.requiredUnlock ? 'Solar Science Foundation' : null,
       }
     })
 
