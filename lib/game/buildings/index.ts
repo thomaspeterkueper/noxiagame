@@ -1,9 +1,9 @@
 // lib/game/buildings/index.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 27.06.2026 — Erde: Wohnblock, Labor, Fabrik ergänzt
-// Version:      1.2.0
+// Aktualisiert: 28.06.2026 — PRODUCES_COMPAT nutzt ResourceType statt alter 3er-Union
+// Version:      1.2.1
 
-import type { BuildingDef } from './types'
+import type { BuildingDef, ResourceType } from './types'
 
 export const BUILDINGS: Record<string, BuildingDef> = {
 
@@ -154,7 +154,7 @@ export const BUILDING_NAMES_COMPAT: Record<string, string> = Object.fromEntries(
   Object.entries(BUILDINGS).map(([id, b]) => [id, b.name])
 )
 
-export const PRODUCES_COMPAT: Record<string, { resource: 'metal' | 'energy' | 'water'; amount: number }> = Object.fromEntries(
+export const PRODUCES_COMPAT: Record<string, { resource: ResourceType; amount: number }> = Object.fromEntries(
   Object.entries(BUILDINGS)
     .filter(([, b]) => b.produces)
     .map(([id, b]) => [id, b.produces!])
