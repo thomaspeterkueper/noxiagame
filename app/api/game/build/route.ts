@@ -76,7 +76,7 @@ async function loadRawBuildingDef(key: string) {
 async function loadAllBuildingDefs(): Promise<Map<string, DBBuildingDef & { name: string; allowed_locations: string[] | null }>> {
   const { data } = await serviceClient
     .from('building_definitions')
-    .select('key, name, cost_credits, population_bonus, production, consumption, allowed_locations, build_time_ticks')
+    .select('key, name, cost_credits, population_bonus, production, consumption, allowed_locations')
     .eq('is_active', true)
 
   const map = new Map<string, DBBuildingDef & { name: string; allowed_locations: string[] | null }>()
@@ -88,7 +88,6 @@ async function loadAllBuildingDefs(): Promise<Map<string, DBBuildingDef & { name
       production: Array.isArray(row.production) ? row.production : [],
       consumption: Array.isArray(row.consumption) ? row.consumption : [],
       allowed_locations: row.allowed_locations ?? null,
-      build_time_ticks: row.build_time_ticks ?? 1,
     })
   }
 
