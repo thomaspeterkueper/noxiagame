@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
+import { BUILDINGS } from '@/lib/game/buildings'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 
@@ -31,14 +32,29 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 
+function localBuildingDef(key: string): (DBBuildingDef & { name: string; allowed_locations: string[] | null; build_time_ticks: number }) | null {
+  const def = BUILDINGS[key]
+  if (!def || def.planned) return null
+  return {
+    name: def.name,
+    cost_credits: def.cost,
+    population_bonus: def.populationBonus ?? 0,
+    production: def.produces ? [{ resource: def.produces.resource, amount: def.produces.amount }] : [],
+    consumption: def.consumes ? [{ resource: def.consumes.resource, amount: def.consumes.amount }] : [],
+    allowed_locations: def.allowedLocations ?? null,
+    build_time_ticks: def.buildTimeTicks,
+  }
+}
+
 async function loadBuildingDef(key: string): Promise<DBBuildingDef | null> {
   const { data } = await serviceClient
     .from('building_definitions')
     .select('key, cost_credits, population_bonus, production, consumption, allowed_locations, build_time_ticks, name')
     .eq('key', key)
     .eq('is_active', true)
-    .single()
-  if (!data) return null
+    .maybeSingle()
+
+  if (!data) return localBuildingDef(key)
   return {
     cost_credits: data.cost_credits ?? 0,
     population_bonus: data.population_bonus ?? 0,
@@ -47,12 +63,23 @@ async function loadBuildingDef(key: string): Promise<DBBuildingDef | null> {
   }
 }
 
+async function loadRawBuildingDef(key: string) {
+  const { data } = await serviceClient
+    .from('building_definitions')
+    .select('allowed_locations, name, build_time_ticks')
+    .eq('key', key)
+    .maybeSingle()
+
+  return data ?? localBuildingDef(key)
+}
+
 async function loadAllBuildingDefs(): Promise<Map<string, DBBuildingDef & { name: string; allowed_locations: string[] | null }>> {
   const { data } = await serviceClient
     .from('building_definitions')
     .select('key, name, cost_credits, population_bonus, production, consumption, allowed_locations, build_time_ticks')
     .eq('is_active', true)
-  const map = new Map()
+
+  const map = new Map<string, DBBuildingDef & { name: string; allowed_locations: string[] | null }>()
   for (const row of data ?? []) {
     map.set(row.key, {
       name: row.name,
@@ -64,6 +91,14 @@ async function loadAllBuildingDefs(): Promise<Map<string, DBBuildingDef & { name
       build_time_ticks: row.build_time_ticks ?? 1,
     })
   }
+
+  for (const [key, def] of Object.entries(BUILDINGS)) {
+    if (!map.has(key) && !def.planned) {
+      const local = localBuildingDef(key)
+      if (local) map.set(key, local)
+    }
+  }
+
   return map
 }
 
@@ -73,6 +108,7 @@ async function getQuoteForEntity(entity: any, def: DBBuildingDef) {
     .select('id, slug, name, population, population_max')
     .eq('id', entity.location_id)
     .single()
+
   if (!location) return { error: 'Standort nicht gefunden' as const }
 
   const hauptprod = def.production[0] ?? null
@@ -83,7 +119,7 @@ async function getQuoteForEntity(entity: any, def: DBBuildingDef) {
       .select('sell_price, avg_sell_7')
       .eq('location_id', location.id)
       .eq('resource', hauptprod.resource)
-      .single()
+      .maybeSingle()
     resourceSellPrice = price?.avg_sell_7 ?? price?.sell_price ?? null
   }
 
@@ -213,9 +249,9 @@ export async function GET(req: NextRequest) {
     if (!gate.ok) return NextResponse.json({ error: `Wissen fehlt: ${gate.requiredUnlock}` }, { status: 403 })
 
     const buildingDef = await loadBuildingDef(buildableId)
-    if (!buildingDef) return NextResponse.json({ error: 'Unbekannter oder inaktiver Bautyp' }, { status: 400 })
+    if (!buildingDef) return NextResponse.json({ error: 'Unbekannter oder inaktiver Bautyp', buildableId }, { status: 400 })
 
-    const { data: rawDef } = await serviceClient.from('building_definitions').select('allowed_locations, name, build_time_ticks').eq('key', buildableId).single()
+    const rawDef = await loadRawBuildingDef(buildableId)
     if (rawDef?.allowed_locations?.length && !rawDef.allowed_locations.includes(locationSlug)) {
       return NextResponse.json({ error: `${rawDef.name} kann hier nicht gebaut werden.` }, { status: 400 })
     }
@@ -247,8 +283,9 @@ export async function GET(req: NextRequest) {
     if (!buildId) return NextResponse.json({ error: 'Fehlende Build ID' }, { status: 400 })
     const { data: build } = await serviceClient.from('player_builds').select('*').eq('id', buildId).eq('profile_id', user.id).eq('status', 'building').single()
     if (!build) return NextResponse.json({ error: 'Bauauftrag nicht gefunden' }, { status: 404 })
-    const { data: defForCancel } = await serviceClient.from('building_definitions').select('cost_credits').eq('key', build.buildable_id).single()
-    const refund = Math.floor((defForCancel?.cost_credits ?? 0) * 0.5)
+    const { data: defForCancel } = await serviceClient.from('building_definitions').select('cost_credits').eq('key', build.buildable_id).maybeSingle()
+    const local = localBuildingDef(build.buildable_id)
+    const refund = Math.floor(((defForCancel?.cost_credits ?? local?.cost_credits) ?? 0) * 0.5)
     await serviceClient.from('player_builds').update({ status: 'cancelled' }).eq('id', buildId)
     const { data: profile } = await serviceClient.from('profiles').select('credits').eq('id', user.id).single()
     if (profile) await serviceClient.from('profiles').update({ credits: profile.credits + refund }).eq('id', user.id)
@@ -295,7 +332,7 @@ export async function GET(req: NextRequest) {
 }
 
 async function completeBuild(build: any, profileId: string) {
-  const { data: def } = await serviceClient.from('building_definitions').select('key').eq('key', build.buildable_id).single()
+  const def = await loadBuildingDef(build.buildable_id)
   if (!def) return
   await serviceClient.from('player_builds').update({ status: 'complete' }).eq('id', build.id)
   await serviceClient.from('tile_entities').insert({ profile_id: profileId, location_id: build.location_id, tile_level: build.tile_level ?? 0, tile_row: build.tile_row, tile_col: build.tile_col, entity_type: 'building', entity_id: build.buildable_id })
