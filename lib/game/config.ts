@@ -1,8 +1,8 @@
 // ============================================================
 // NOXIA – Spielkonfiguration
 // Erstellt: 31.05.2026
-// Aktualisiert: 22.06.2026 — BUILDABLE_ITEMS in DB migriert (building_definitions)
-// Version:      2.0.0
+// Aktualisiert: 29.06.2026 — Marktpreis-Cap auf spielbaren Bereich gesenkt
+// Version:      2.0.1
 // ============================================================
 //
 // Diese Datei enthält ausschließlich Spielkonstanten.
@@ -28,8 +28,10 @@ export const STOCK_LOW_THRESHOLD  = 50
 export const STOCK_HIGH_THRESHOLD = 400
 
 // Preisgrenzen
+// Wichtig: Muss im handelbaren UI-Bereich bleiben, sonst entstehen Preise,
+// die Spieler nicht mehr sinnvoll verhandeln/einstellen können.
 export const PRICE_MIN = 10
-export const PRICE_MAX = 500
+export const PRICE_MAX = 200
 
 // Transaktionsbasierter Preisimpuls (Spot-Handel)
 // Kauf:    buy_price  × (1 + PRICE_IMPULSE_PER_TON × menge)
