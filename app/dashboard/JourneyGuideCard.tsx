@@ -1,7 +1,7 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 01.07.2026 — aktive Wege zeigen Schritt-Checkliste
-// Version: 0.2.0
+// Aktualisiert: 01.07.2026 — Aktionsbuttons für aktuelle Journey-Schritte ergänzt
+// Version: 0.3.0
 
 'use client'
 
@@ -40,6 +40,15 @@ type JourneyStep = {
   optional?: boolean
 }
 
+type JourneyGuideCardProps = {
+  currentLocation?: string
+  onOpenShipyard?: () => void
+  onOpenWarehouse?: () => void
+  onOpenTravel?: () => void
+  onFocusGrid?: () => void
+  onOpenAcademyHint?: () => void
+}
+
 const JOURNEYS: JourneyDef[] = [
   { key: 'moon_colony', icon: '🚀', title: 'Mondbasis gründen', subtitle: 'Raumfahrt, Landung und Versorgung lernen', goal: 'Errichten Sie eine dauerhafte Basis auf dem Mond.', firstStep: 'Kaufen Sie ein geeignetes Schiff und fliegen Sie zum Mond.' },
   { key: 'merchant', icon: '📦', title: 'Handel & Logistik', subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen', goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.', firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.' },
@@ -52,7 +61,35 @@ function pct(j: PlayerJourney) {
   return Math.max(0, Math.min(100, Math.round((j.progress / Math.max(1, j.progress_max)) * 100)))
 }
 
-export default function JourneyGuideCard() {
+function actionForStep(journeyKey: JourneyKey, step: JourneyStep | undefined, actions: JourneyGuideCardProps) {
+  if (!step) return null
+  const base = { fontSize: '0.61rem', fontWeight: 800, borderRadius: 5, padding: '0.35rem 0.55rem', cursor: 'pointer' as const }
+
+  if (journeyKey === 'moon_colony') {
+    if (step.step_order === 1) return { label: 'Werft öffnen', onClick: actions.onOpenShipyard, style: base }
+    if (step.step_order === 2) return { label: 'Reise / Standort öffnen', onClick: actions.onOpenTravel, style: base }
+    if (step.step_order === 3 || step.step_order === 4) return { label: 'Baufelder ansehen', onClick: actions.onFocusGrid, style: base }
+  }
+
+  if (journeyKey === 'merchant') {
+    if (step.step_order === 1) return { label: 'Schiffe ansehen', onClick: actions.onOpenShipyard, style: base }
+    if (step.step_order === 2 || step.step_order === 4) return { label: 'Warenhaus öffnen', onClick: actions.onOpenWarehouse, style: base }
+    if (step.step_order === 3) return { label: 'Reise / Standort öffnen', onClick: actions.onOpenTravel, style: base }
+  }
+
+  if (journeyKey === 'research') {
+    if (step.step_order === 1 || step.step_order === 2) return { label: 'Akademie suchen', onClick: actions.onOpenAcademyHint ?? actions.onFocusGrid, style: base }
+    if (step.step_order === 3) return { label: 'Baufelder ansehen', onClick: actions.onFocusGrid, style: base }
+  }
+
+  if (journeyKey === 'industry') {
+    return { label: 'Baufelder ansehen', onClick: actions.onFocusGrid, style: base }
+  }
+
+  return null
+}
+
+export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   const [journeys, setJourneys] = useState<PlayerJourney[]>([])
   const [steps, setSteps] = useState<JourneyStep[]>([])
   const [loading, setLoading] = useState(true)
@@ -133,6 +170,7 @@ export default function JourneyGuideCard() {
               const completed = new Set(j?.completed_step_ids ?? [])
               const ownSteps = steps.filter(s => s.journey_key === def.key).sort((a, b) => a.step_order - b.step_order)
               const firstOpen = ownSteps.find(s => !completed.has(s.id))
+              const action = actionForStep(def.key, firstOpen, props)
               return (
                 <div key={def.key} style={{ background: '#fbfaf7', border: `1px solid ${T.lineSoft}`, borderRadius: T.radius, padding: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
@@ -142,6 +180,12 @@ export default function JourneyGuideCard() {
                   <div style={{ margin: '0.45rem 0 0.55rem', height: 5, background: '#e8e4dc', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ width: `${p}%`, height: '100%', background: T.gold }} />
                   </div>
+
+                  {firstOpen && action?.onClick && (
+                    <button onClick={action.onClick} style={{ ...action.style, marginBottom: '0.5rem', border: `1px solid ${T.gold}`, background: '#fff7df', color: T.blueDeep }}>
+                      {action.label} →
+                    </button>
+                  )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {ownSteps.length === 0 && <div style={{ fontSize: '0.66rem', color: T.inkSoft, lineHeight: 1.45 }}><strong>Nächster Schritt:</strong> {def.firstStep}</div>}
