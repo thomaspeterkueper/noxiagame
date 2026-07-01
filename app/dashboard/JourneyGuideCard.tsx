@@ -1,0 +1,195 @@
+// app/dashboard/JourneyGuideCard.tsx
+// Erstellt: 01.07.2026
+// Version: 0.1.0
+
+'use client'
+
+import React, { useEffect, useMemo, useState } from 'react'
+import { getToken } from '@/lib/supabase/auth'
+import { T } from './ui'
+
+type JourneyKey = 'moon_colony' | 'merchant' | 'research' | 'industry'
+
+type JourneyDef = {
+  key: JourneyKey
+  icon: string
+  title: string
+  subtitle: string
+  goal: string
+  firstStep: string
+}
+
+type PlayerJourney = {
+  id: string
+  journey_key: JourneyKey
+  title: string
+  status: string
+  progress: number
+  progress_max: number
+}
+
+type JourneyStep = {
+  id: string
+  journey_key: JourneyKey
+  step_order: number
+  title: string
+  description?: string | null
+  optional?: boolean
+}
+
+const JOURNEYS: JourneyDef[] = [
+  {
+    key: 'moon_colony',
+    icon: '🚀',
+    title: 'Mondbasis gründen',
+    subtitle: 'Raumfahrt, Landung und Versorgung lernen',
+    goal: 'Errichten Sie eine dauerhafte Basis auf dem Mond.',
+    firstStep: 'Kaufen Sie ein geeignetes Schiff und fliegen Sie zum Mond.',
+  },
+  {
+    key: 'merchant',
+    icon: '📦',
+    title: 'Handel & Logistik',
+    subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen',
+    goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.',
+    firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.',
+  },
+  {
+    key: 'research',
+    icon: '🔬',
+    title: 'Forschung aufbauen',
+    subtitle: 'Wissen, Akademie und Technologien erschließen',
+    goal: 'Entwickeln Sie wissenschaftliche Kompetenz als Motor des Fortschritts.',
+    firstStep: 'Suchen Sie eine Akademie oder bauen Sie Forschungskapazität auf.',
+  },
+  {
+    key: 'industry',
+    icon: '🏭',
+    title: 'Industrie errichten',
+    subtitle: 'Energie, Rohstoffe und Produktion sichern',
+    goal: 'Versorgen Sie Kolonien mit Energie, Metall und Infrastruktur.',
+    firstStep: 'Errichten Sie Energie- oder Rohstoffproduktion an einem passenden Standort.',
+  },
+]
+
+function pct(j: PlayerJourney) {
+  return Math.max(0, Math.min(100, Math.round((j.progress / Math.max(1, j.progress_max)) * 100)))
+}
+
+export default function JourneyGuideCard() {
+  const [journeys, setJourneys] = useState<PlayerJourney[]>([])
+  const [steps, setSteps] = useState<JourneyStep[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  async function loadJourneys() {
+    try {
+      setLoading(true)
+      const token = await getToken()
+      const res = await fetch('/api/game/journeys', { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setMsg(data.detail ? `${data.error} ${data.detail}` : data.error ?? 'Wege konnten nicht geladen werden.')
+        return
+      }
+      setJourneys(Array.isArray(data.journeys) ? data.journeys : [])
+      setSteps(Array.isArray(data.steps) ? data.steps : [])
+    } catch {
+      setMsg('Wege konnten nicht geladen werden.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadJourneys() }, [])
+
+  async function startJourney(key: JourneyKey) {
+    try {
+      setBusy(key)
+      setMsg(null)
+      const token = await getToken()
+      const res = await fetch('/api/game/journeys', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ journeyKey: key }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setMsg(data.detail ? `${data.error} ${data.detail}` : data.error ?? 'Weg konnte nicht gestartet werden.')
+        return
+      }
+      await loadJourneys()
+    } catch {
+      setMsg('Weg konnte nicht gestartet werden.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const activeKeys = useMemo(() => new Set(journeys.map(j => j.journey_key)), [journeys])
+  const activeDefs = JOURNEYS.filter(j => activeKeys.has(j.key))
+  const inactiveDefs = JOURNEYS.filter(j => !activeKeys.has(j.key))
+  const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
+
+  return (
+    <div style={{ ...card, padding: '1rem 1.15rem', borderLeft: `4px solid ${T.gold}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+        <div>
+          <div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 700, marginBottom: '0.25rem' }}>Spielerführung</div>
+          <div style={{ fontFamily: 'Georgia, serif', color: T.blueDeep, fontSize: '1.15rem', fontWeight: 600 }}>🎯 Ihr Weg ins Sonnensystem</div>
+          <div style={{ fontSize: '0.74rem', color: T.inkSoft, marginTop: '0.2rem', lineHeight: 1.45 }}>
+            Wählen Sie, womit Sie beginnen möchten. Sie können jederzeit mehrere Wege parallel verfolgen oder später wechseln.
+          </div>
+        </div>
+        {loading && <div style={{ fontSize: '0.65rem', color: T.inkFaint }}>Lade …</div>}
+      </div>
+
+      {msg && <div style={{ color: T.red, fontSize: '0.68rem', marginBottom: '0.6rem' }}>{msg}</div>}
+
+      {activeDefs.length > 0 && (
+        <div style={{ marginBottom: '0.85rem' }}>
+          <div style={{ fontSize: '0.62rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: '0.35rem' }}>Aktive Wege</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}>
+            {activeDefs.map(def => {
+              const j = journeys.find(x => x.journey_key === def.key)
+              const p = j ? pct(j) : 0
+              const ownSteps = steps.filter(s => s.journey_key === def.key)
+              const nextStep = ownSteps[0]?.title ?? def.firstStep
+              return (
+                <div key={def.key} style={{ background: '#fbfaf7', border: `1px solid ${T.lineSoft}`, borderRadius: T.radius, padding: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800, color: T.blueDeep, fontSize: '0.82rem' }}>{def.icon} {def.title}</div>
+                    <div style={{ fontSize: '0.6rem', color: T.gold, fontWeight: 800 }}>{p}%</div>
+                  </div>
+                  <div style={{ margin: '0.45rem 0', height: 5, background: '#e8e4dc', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${p}%`, height: '100%', background: T.gold }} />
+                  </div>
+                  <div style={{ fontSize: '0.66rem', color: T.inkSoft, lineHeight: 1.45 }}><strong>Nächster Schritt:</strong> {nextStep}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {inactiveDefs.length > 0 && (
+        <div>
+          <div style={{ fontSize: '0.62rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: '0.35rem' }}>Beginnen mit</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.5rem' }}>
+            {inactiveDefs.map(def => (
+              <button key={def.key} disabled={busy !== null} onClick={() => startJourney(def.key)} style={{
+                textAlign: 'left', border: `1px solid ${T.line}`, background: '#fff', borderRadius: T.radius,
+                padding: '0.75rem', cursor: busy ? 'wait' : 'pointer', color: T.ink,
+              }}>
+                <div style={{ fontWeight: 800, color: T.blueDeep, fontSize: '0.78rem', marginBottom: '0.2rem' }}>{def.icon} {def.title}</div>
+                <div style={{ fontSize: '0.64rem', color: T.inkSoft, lineHeight: 1.35 }}>{def.subtitle}</div>
+                <div style={{ fontSize: '0.6rem', color: T.gold, marginTop: '0.45rem', fontWeight: 700 }}>{busy === def.key ? 'Starte …' : 'Weg starten →'}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
