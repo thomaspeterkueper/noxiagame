@@ -1,6 +1,7 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Version: 0.1.0
+// Aktualisiert: 01.07.2026 — aktive Wege zeigen Schritt-Checkliste
+// Version: 0.2.0
 
 'use client'
 
@@ -26,6 +27,8 @@ type PlayerJourney = {
   status: string
   progress: number
   progress_max: number
+  progress_percent?: number
+  completed_step_ids?: string[]
 }
 
 type JourneyStep = {
@@ -38,41 +41,14 @@ type JourneyStep = {
 }
 
 const JOURNEYS: JourneyDef[] = [
-  {
-    key: 'moon_colony',
-    icon: '🚀',
-    title: 'Mondbasis gründen',
-    subtitle: 'Raumfahrt, Landung und Versorgung lernen',
-    goal: 'Errichten Sie eine dauerhafte Basis auf dem Mond.',
-    firstStep: 'Kaufen Sie ein geeignetes Schiff und fliegen Sie zum Mond.',
-  },
-  {
-    key: 'merchant',
-    icon: '📦',
-    title: 'Handel & Logistik',
-    subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen',
-    goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.',
-    firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.',
-  },
-  {
-    key: 'research',
-    icon: '🔬',
-    title: 'Forschung aufbauen',
-    subtitle: 'Wissen, Akademie und Technologien erschließen',
-    goal: 'Entwickeln Sie wissenschaftliche Kompetenz als Motor des Fortschritts.',
-    firstStep: 'Suchen Sie eine Akademie oder bauen Sie Forschungskapazität auf.',
-  },
-  {
-    key: 'industry',
-    icon: '🏭',
-    title: 'Industrie errichten',
-    subtitle: 'Energie, Rohstoffe und Produktion sichern',
-    goal: 'Versorgen Sie Kolonien mit Energie, Metall und Infrastruktur.',
-    firstStep: 'Errichten Sie Energie- oder Rohstoffproduktion an einem passenden Standort.',
-  },
+  { key: 'moon_colony', icon: '🚀', title: 'Mondbasis gründen', subtitle: 'Raumfahrt, Landung und Versorgung lernen', goal: 'Errichten Sie eine dauerhafte Basis auf dem Mond.', firstStep: 'Kaufen Sie ein geeignetes Schiff und fliegen Sie zum Mond.' },
+  { key: 'merchant', icon: '📦', title: 'Handel & Logistik', subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen', goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.', firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.' },
+  { key: 'research', icon: '🔬', title: 'Forschung aufbauen', subtitle: 'Wissen, Akademie und Technologien erschließen', goal: 'Entwickeln Sie wissenschaftliche Kompetenz als Motor des Fortschritts.', firstStep: 'Suchen Sie eine Akademie oder bauen Sie Forschungskapazität auf.' },
+  { key: 'industry', icon: '🏭', title: 'Industrie errichten', subtitle: 'Energie, Rohstoffe und Produktion sichern', goal: 'Versorgen Sie Kolonien mit Energie, Metall und Infrastruktur.', firstStep: 'Errichten Sie Energie- oder Rohstoffproduktion an einem passenden Standort.' },
 ]
 
 function pct(j: PlayerJourney) {
+  if (typeof j.progress_percent === 'number') return Math.max(0, Math.min(100, j.progress_percent))
   return Math.max(0, Math.min(100, Math.round((j.progress / Math.max(1, j.progress_max)) * 100)))
 }
 
@@ -150,22 +126,53 @@ export default function JourneyGuideCard() {
       {activeDefs.length > 0 && (
         <div style={{ marginBottom: '0.85rem' }}>
           <div style={{ fontSize: '0.62rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: '0.35rem' }}>Aktive Wege</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.65rem' }}>
             {activeDefs.map(def => {
               const j = journeys.find(x => x.journey_key === def.key)
               const p = j ? pct(j) : 0
-              const ownSteps = steps.filter(s => s.journey_key === def.key)
-              const nextStep = ownSteps[0]?.title ?? def.firstStep
+              const completed = new Set(j?.completed_step_ids ?? [])
+              const ownSteps = steps.filter(s => s.journey_key === def.key).sort((a, b) => a.step_order - b.step_order)
+              const firstOpen = ownSteps.find(s => !completed.has(s.id))
               return (
                 <div key={def.key} style={{ background: '#fbfaf7', border: `1px solid ${T.lineSoft}`, borderRadius: T.radius, padding: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800, color: T.blueDeep, fontSize: '0.82rem' }}>{def.icon} {def.title}</div>
-                    <div style={{ fontSize: '0.6rem', color: T.gold, fontWeight: 800 }}>{p}%</div>
+                    <div style={{ fontSize: '0.6rem', color: T.gold, fontWeight: 800 }}>{j?.progress ?? 0}/{j?.progress_max ?? ownSteps.length || 1}</div>
                   </div>
-                  <div style={{ margin: '0.45rem 0', height: 5, background: '#e8e4dc', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ margin: '0.45rem 0 0.55rem', height: 5, background: '#e8e4dc', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ width: `${p}%`, height: '100%', background: T.gold }} />
                   </div>
-                  <div style={{ fontSize: '0.66rem', color: T.inkSoft, lineHeight: 1.45 }}><strong>Nächster Schritt:</strong> {nextStep}</div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {ownSteps.length === 0 && <div style={{ fontSize: '0.66rem', color: T.inkSoft, lineHeight: 1.45 }}><strong>Nächster Schritt:</strong> {def.firstStep}</div>}
+                    {ownSteps.map(step => {
+                      const done = completed.has(step.id)
+                      const current = firstOpen?.id === step.id
+                      return (
+                        <div key={step.id} style={{
+                          display: 'grid', gridTemplateColumns: '18px 1fr', gap: '0.45rem', alignItems: 'start',
+                          padding: current ? '0.4rem 0.45rem' : '0.15rem 0',
+                          borderRadius: T.radius,
+                          background: current ? 'rgba(201,169,97,0.12)' : 'transparent',
+                        }}>
+                          <span style={{
+                            width: 16, height: 16, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.58rem', marginTop: '1px',
+                            background: done ? T.gold : current ? '#fff7df' : '#ece8df',
+                            color: done ? '#fff' : current ? T.gold : T.inkFaint,
+                            border: `1px solid ${done ? T.gold : current ? T.gold : T.line}`,
+                          }}>{done ? '✓' : step.step_order}</span>
+                          <div>
+                            <div style={{ fontSize: '0.66rem', fontWeight: current ? 800 : 650, color: done ? T.inkFaint : current ? T.blueDeep : T.inkSoft, textDecoration: done ? 'line-through' : 'none' }}>
+                              {step.title}{step.optional && <span style={{ color: T.inkFaint, fontWeight: 500 }}> · optional</span>}
+                            </div>
+                            {current && step.description && <div style={{ fontSize: '0.6rem', color: T.inkSoft, lineHeight: 1.35, marginTop: '0.12rem' }}>{step.description}</div>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {ownSteps.length > 0 && !firstOpen && <div style={{ fontSize: '0.64rem', color: T.gold, fontWeight: 800, marginTop: '0.2rem' }}>Weg abgeschlossen. Sie können weitere Wege parallel starten.</div>}
+                  </div>
                 </div>
               )
             })}
@@ -178,10 +185,7 @@ export default function JourneyGuideCard() {
           <div style={{ fontSize: '0.62rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: '0.35rem' }}>Beginnen mit</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.5rem' }}>
             {inactiveDefs.map(def => (
-              <button key={def.key} disabled={busy !== null} onClick={() => startJourney(def.key)} style={{
-                textAlign: 'left', border: `1px solid ${T.line}`, background: '#fff', borderRadius: T.radius,
-                padding: '0.75rem', cursor: busy ? 'wait' : 'pointer', color: T.ink,
-              }}>
+              <button key={def.key} disabled={busy !== null} onClick={() => startJourney(def.key)} style={{ textAlign: 'left', border: `1px solid ${T.line}`, background: '#fff', borderRadius: T.radius, padding: '0.75rem', cursor: busy ? 'wait' : 'pointer', color: T.ink }}>
                 <div style={{ fontWeight: 800, color: T.blueDeep, fontSize: '0.78rem', marginBottom: '0.2rem' }}>{def.icon} {def.title}</div>
                 <div style={{ fontSize: '0.64rem', color: T.inkSoft, lineHeight: 1.35 }}>{def.subtitle}</div>
                 <div style={{ fontSize: '0.6rem', color: T.gold, marginTop: '0.45rem', fontWeight: 700 }}>{busy === def.key ? 'Starte …' : 'Weg starten →'}</div>
