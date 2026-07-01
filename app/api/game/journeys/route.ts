@@ -1,7 +1,7 @@
 // app/api/game/journeys/route.ts
 // Erstellt: 01.07.2026
-// Aktualisiert: 01.07.2026 — Default-Schritte und einfache Fortschrittsberechnung ergänzt
-// Version: 0.2.0
+// Aktualisiert: 01.07.2026 — completed_step_ids für Checklisten ergänzt
+// Version: 0.3.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -54,7 +54,6 @@ function fallbackStepsFor(keys: string[], dbSteps: any[]) {
     arr.push(step)
     byKey.set(step.journey_key, arr)
   }
-
   return keys.flatMap(key => {
     const existing = byKey.get(key)
     if (existing?.length) return existing
@@ -62,37 +61,47 @@ function fallbackStepsFor(keys: string[], dbSteps: any[]) {
   }).sort((a, b) => a.journey_key.localeCompare(b.journey_key) || a.step_order - b.step_order)
 }
 
-function progressFor(journeyKey: string, steps: any[], ctx: { ships: any[]; entities: any[]; trades: any[]; knowledge: number; currentLocation?: string }) {
-  const total = Math.max(1, steps.filter(s => !s.optional).length)
-  let done = 0
+function completedStepIds(journeyKey: string, ownSteps: any[], ctx: { ships: any[]; entities: any[]; trades: any[]; knowledge: number; currentLocation?: string }) {
+  const ids = new Set<string>()
+  const byOrder = new Map<number, string>()
+  ownSteps.forEach(s => byOrder.set(s.step_order, s.id))
+  const mark = (order: number, condition: boolean) => { const id = byOrder.get(order); if (id && condition) ids.add(id) }
 
   if (journeyKey === 'moon_colony') {
-    if (ctx.ships.length > 0) done++
-    if (ctx.currentLocation === 'moon' || ctx.entities.some(e => e.locations?.slug === 'moon')) done++
-    if (ctx.entities.some(e => e.locations?.slug === 'moon' && ['solar', 'solar_field', 'power_plant'].includes(e.entity_id))) done++
-    if (ctx.entities.some(e => e.locations?.slug === 'moon' && ['ice_drill', 'water_extractor'].includes(e.entity_id))) done++
+    mark(1, ctx.ships.length > 0)
+    mark(2, ctx.currentLocation === 'moon' || ctx.entities.some(e => e.locations?.slug === 'moon'))
+    mark(3, ctx.entities.some(e => e.locations?.slug === 'moon' && ['solar', 'solar_field', 'power_plant'].includes(e.entity_id)))
+    mark(4, ctx.entities.some(e => e.locations?.slug === 'moon' && ['ice_drill', 'water_extractor'].includes(e.entity_id)))
   }
 
   if (journeyKey === 'merchant') {
-    if (ctx.ships.length > 0) done++
-    if (ctx.ships.some(s => (s.cargo_max ?? 0) > 0)) done++
-    if ((ctx.trades?.length ?? 0) > 0) done += 2
+    mark(1, ctx.ships.length > 0)
+    mark(2, ctx.ships.some(s => (s.cargo_max ?? 0) > 0))
+    mark(3, (ctx.trades?.length ?? 0) > 0)
+    mark(4, (ctx.trades?.length ?? 0) > 0)
   }
 
   if (journeyKey === 'research') {
-    if (ctx.entities.some(e => e.entity_id === 'school' || e.entity_id === 'academy' || e.entity_id === 'research_lab')) done++
-    if (ctx.knowledge > 0) done++
-    if (ctx.entities.some(e => e.profile_id && (e.entity_id === 'school' || e.entity_id === 'academy' || e.entity_id === 'research_lab'))) done++
+    mark(1, ctx.entities.some(e => e.entity_id === 'school' || e.entity_id === 'academy' || e.entity_id === 'research_lab'))
+    mark(2, ctx.knowledge > 0)
+    mark(3, ctx.entities.some(e => e.profile_id && (e.entity_id === 'school' || e.entity_id === 'academy' || e.entity_id === 'research_lab')))
   }
 
   if (journeyKey === 'industry') {
-    if (ctx.entities.length > 0) done++
-    if (ctx.entities.some(e => ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'].includes(e.entity_id))) done++
-    if (ctx.entities.filter(e => ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'].includes(e.entity_id)).length >= 2) done++
+    mark(1, ctx.entities.length > 0)
+    mark(2, ctx.entities.some(e => ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'].includes(e.entity_id)))
+    mark(3, ctx.entities.filter(e => ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'].includes(e.entity_id)).length >= 2)
   }
 
-  done = Math.min(done, total)
-  return { progress: done, progress_max: total, progress_percent: Math.round((done / total) * 100) }
+  return Array.from(ids)
+}
+
+function progressFor(journeyKey: string, steps: any[], ctx: { ships: any[]; entities: any[]; trades: any[]; knowledge: number; currentLocation?: string }) {
+  const requiredSteps = steps.filter(s => !s.optional)
+  const total = Math.max(1, requiredSteps.length)
+  const completed = completedStepIds(journeyKey, steps, ctx)
+  const requiredCompleted = requiredSteps.filter(s => completed.includes(s.id)).length
+  return { progress: requiredCompleted, progress_max: total, progress_percent: Math.round((requiredCompleted / total) * 100), completed_step_ids: completed }
 }
 
 export async function GET(req: NextRequest) {
@@ -113,11 +122,7 @@ export async function GET(req: NextRequest) {
 
   const keys = (journeys ?? []).map(j => j.journey_key)
   const { data: dbSteps } = keys.length > 0
-    ? await serviceClient
-        .from('journey_steps')
-        .select('*')
-        .in('journey_key', keys)
-        .order('step_order', { ascending: true })
+    ? await serviceClient.from('journey_steps').select('*').in('journey_key', keys).order('step_order', { ascending: true })
     : { data: [] }
 
   const [shipsR, entitiesR, tradesR, profileR, knowledgeR] = await Promise.all([
@@ -154,9 +159,7 @@ export async function POST(req: NextRequest) {
   const journeyKey = String(body.journeyKey ?? '')
   const title = JOURNEY_TITLES[journeyKey]
 
-  if (!title) {
-    return NextResponse.json({ error: 'Unbekannter Weg.' }, { status: 400 })
-  }
+  if (!title) return NextResponse.json({ error: 'Unbekannter Weg.' }, { status: 400 })
 
   const serviceClient = createServiceClient()
   const { data, error } = await serviceClient
@@ -174,9 +177,6 @@ export async function POST(req: NextRequest) {
     .select('*')
     .single()
 
-  if (error) {
-    return NextResponse.json({ error: 'Weg konnte nicht gestartet werden.', detail: error.message }, { status: 500 })
-  }
-
+  if (error) return NextResponse.json({ error: 'Weg konnte nicht gestartet werden.', detail: error.message }, { status: 500 })
   return NextResponse.json({ ok: true, journey: data })
 }
