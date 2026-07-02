@@ -1,24 +1,14 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 01.07.2026 — Aktionsbuttons für aktuelle Journey-Schritte ergänzt
-// Version: 0.3.0
+// Aktualisiert: 02.07.2026 — Journey-Vorschläge an gemeinsamen Journey-Catalog angebunden
+// Version: 0.4.0
 
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import { JOURNEY_DEFS, JourneyKey } from '@/lib/game/journeys'
 import { T } from './ui'
-
-type JourneyKey = 'moon_colony' | 'merchant' | 'research' | 'industry'
-
-type JourneyDef = {
-  key: JourneyKey
-  icon: string
-  title: string
-  subtitle: string
-  goal: string
-  firstStep: string
-}
 
 type PlayerJourney = {
   id: string
@@ -48,13 +38,6 @@ type JourneyGuideCardProps = {
   onFocusGrid?: () => void
   onOpenAcademyHint?: () => void
 }
-
-const JOURNEYS: JourneyDef[] = [
-  { key: 'moon_colony', icon: '🚀', title: 'Mondbasis gründen', subtitle: 'Raumfahrt, Landung und Versorgung lernen', goal: 'Errichten Sie eine dauerhafte Basis auf dem Mond.', firstStep: 'Kaufen Sie ein geeignetes Schiff und fliegen Sie zum Mond.' },
-  { key: 'merchant', icon: '📦', title: 'Handel & Logistik', subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen', goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.', firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.' },
-  { key: 'research', icon: '🔬', title: 'Forschung aufbauen', subtitle: 'Wissen, Akademie und Technologien erschließen', goal: 'Entwickeln Sie wissenschaftliche Kompetenz als Motor des Fortschritts.', firstStep: 'Suchen Sie eine Akademie oder bauen Sie Forschungskapazität auf.' },
-  { key: 'industry', icon: '🏭', title: 'Industrie errichten', subtitle: 'Energie, Rohstoffe und Produktion sichern', goal: 'Versorgen Sie Kolonien mit Energie, Metall und Infrastruktur.', firstStep: 'Errichten Sie Energie- oder Rohstoffproduktion an einem passenden Standort.' },
-]
 
 function pct(j: PlayerJourney) {
   if (typeof j.progress_percent === 'number') return Math.max(0, Math.min(100, j.progress_percent))
@@ -141,8 +124,8 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   }
 
   const activeKeys = useMemo(() => new Set(journeys.map(j => j.journey_key)), [journeys])
-  const activeDefs = JOURNEYS.filter(j => activeKeys.has(j.key))
-  const inactiveDefs = JOURNEYS.filter(j => !activeKeys.has(j.key))
+  const activeDefs = JOURNEY_DEFS.filter(j => activeKeys.has(j.key))
+  const inactiveDefs = JOURNEY_DEFS.filter(j => !activeKeys.has(j.key))
   const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
 
   return (
