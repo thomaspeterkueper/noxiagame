@@ -1,6 +1,7 @@
 // app/api/game/missions/route.ts
 // Erstellt: 02.07.2026
-// Version: 0.1.0
+// Aktualisiert: 02.07.2026 — echte Tabellen ships/trade_transactions/ship_cargo verwendet
+// Version: 0.1.1
 //
 // Liefert wenige klare Startmissionen, damit neue Spieler das Spielprinzip
 // schnell verstehen: Raumfahrt, Handel, Forschung, Industrie und Mondbasis.
@@ -135,9 +136,9 @@ export async function GET(req: NextRequest) {
   const serviceClient = createServiceClient()
 
   const [shipsR, entitiesR, tradesR, profileR, knowledgeR] = await Promise.all([
-    serviceClient.from('player_ships').select('*').eq('profile_id', user.id),
+    serviceClient.from('ships').select('*').eq('profile_id', user.id),
     serviceClient.from('tile_entities').select('*, locations(slug)').eq('profile_id', user.id),
-    serviceClient.from('player_trades').select('id').eq('profile_id', user.id).limit(50),
+    serviceClient.from('trade_transactions').select('id').eq('profile_id', user.id).limit(50),
     serviceClient.from('profiles').select('current_location, flight_count').eq('id', user.id).single(),
     serviceClient.from('player_knowledge').select('knowledge_points').eq('profile_id', user.id).single(),
   ])
@@ -147,7 +148,12 @@ export async function GET(req: NextRequest) {
   const trades = tradesR.data ?? []
   const profile = profileR.data ?? {}
   const knowledge = knowledgeR.data?.knowledge_points ?? 0
-  const cargoUsed = ships.reduce((sum, s) => sum + Number(s.cargo_used ?? 0), 0)
+
+  const activeShip = ships.find((ship: any) => ship.is_active) ?? ships[0]
+  const { data: cargoRows } = activeShip?.id
+    ? await serviceClient.from('ship_cargo').select('amount').eq('ship_id', activeShip.id)
+    : { data: [] }
+  const cargoUsed = (cargoRows ?? []).reduce((sum: number, row: any) => sum + Number(row.amount ?? 0), 0)
 
   const ctx = { ships, entities, trades, profile, knowledge, cargoUsed }
 
