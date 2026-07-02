@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 01.07.2026 — Journey-Aktionen mit Dashboard-Overlays verbunden
-// Version:      2.6.1
+// Aktualisiert: 02.07.2026 — StarterMissionsCard ergänzt
+// Version:      2.7.0
 
 'use client'
 
@@ -21,6 +21,7 @@ import MarketAuction from './MarketAuction'
 import WelcomeSetup from './WelcomeSetup'
 import SsfStatusCard from './SsfStatusCard'
 import JourneyGuideCard from './JourneyGuideCard'
+import StarterMissionsCard from './StarterMissionsCard'
 import { TipBanner, TipDef } from './TipSystem'
 import { worstStatus, resourceStatus, stateColor, stateLabel, attentionItems } from './dashboardStatus'
 import { T, Icon, Toast, RESOURCE_LABEL, RESOURCE_ICON, LOC_ICON, LOC_NAME } from './ui'
@@ -117,6 +118,14 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
   const sectionLabel: React.CSSProperties = { fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 700, marginBottom: '0.4rem' }
 
+  const guideActions = {
+    onOpenShipyard: () => setShipyardOpen(true),
+    onOpenWarehouse: () => setWarehouseOpen(true),
+    onOpenTravel: () => gridColRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    onFocusGrid: () => gridColRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    onOpenAcademyHint: () => showToast('Klicke auf die Akademie im Grid, um Wissen zu sammeln.', true),
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
@@ -140,7 +149,8 @@ export default function DashboardClient({ locations: initialLocations, prices, o
 
       <div style={{ flex: 1, maxWidth: '1800px', width: '100%', margin: '0 auto', padding: '1.25rem 1.5rem 0', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'stretch' }}>
         <div ref={gridColRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <JourneyGuideCard currentLocation={location} onOpenShipyard={() => setShipyardOpen(true)} onOpenWarehouse={() => setWarehouseOpen(true)} onOpenTravel={() => gridColRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} onFocusGrid={() => gridColRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })} onOpenAcademyHint={() => showToast('Klicke auf die Akademie im Grid, um Wissen zu sammeln.', true)} />
+          <JourneyGuideCard currentLocation={location} {...guideActions} />
+          <StarterMissionsCard {...guideActions} />
           {(() => { const localEntities = tileEntities.filter((e: any) => e.locations?.slug === location); const hasSchool = localEntities.some((e: any) => e.entity_id === 'school'); const hasAdmin = localEntities.some((e: any) => e.entity_id === 'admin'); const ownBuilds = tileEntities.filter((e: any) => e.profile_id === userId).length; const tips: TipDef[] = [{ id: 'tip_energy', icon: '⚡', condition: cargo.energy === 0 && !inTransit, text: 'Keine Energie an Bord. Klicke auf das Warenhaus im Grid um Energie zu kaufen.' }, { id: 'tip_school', icon: '🎓', condition: hasSchool, text: 'Klicke auf die Akademie im Grid um Aufgaben zu lösen und das Handbuch zu lesen.' }, { id: 'tip_admin', icon: '🏛️', condition: hasAdmin, text: 'Klicke auf die Verwaltung im Grid für Koloniedetails und Aufträge.' }, { id: 'tip_build', icon: '🏗️', condition: ownBuilds === 0, text: 'Noch keine Gebäude. Klicke auf eine freie Kachel im Grid um zu bauen.' }, { id: 'tip_prometheus', icon: '🛸', condition: location === 'earth', text: 'Prometheus (L5) ist nur 11s entfernt — ideal als erste Zwischenstation.' }]; return <TipBanner tips={tips} /> })()}
           {currentLocationData?.location_type === 'station' || location === 'prometheus' ? <><StationTravelDock currentLocation={location} locations={locations.filter((l: any) => l.slug !== location)} cargo={cargo as unknown as Record<string, number>} shipRange={shipRange} currentTick={stats?.tickNumber ?? 0} inTransit={inTransit} onTravel={handleTravel} /><StationOverlay slug={location} name={currentLocationData?.name ?? 'Station'} population={currentLocationData?.population ?? 0} populationMax={currentLocationData?.population_max ?? 1} userId={userId} locationId={currentLocationData?.id ?? ''} locationResources={currentLocationData?.location_resources ?? []} credits={credits} entities={tileEntities.filter((e: any) => e.locations?.slug === location)} onChanged={async () => { await loadFromServer(); invalidate('builds') }} onOpenWarehouse={() => setWarehouseOpen(true)} /></> : <ColonyGrid slug={location} name={currentLocationData?.name ?? location} population={currentLocationData?.population ?? 0} populationMax={currentLocationData?.population_max ?? 1} isSupplied={currentLocationData?.is_supplied ?? false} userId={userId} tax={colonyTax[currentLocationData?.id ?? '']} entityInfo={entityInfo} locationResources={currentLocationData?.location_resources ?? []} credits={credits} allLocations={locations.filter((l: any) => l.slug !== location)} cargo={cargo as unknown as Record<string, number>} shipRange={shipRange} currentTick={stats?.tickNumber ?? 0} inTransit={inTransit} onTravel={handleTravel} onOpenShipyard={() => setShipyardOpen(true)} onOpenWarehouse={() => setWarehouseOpen(true)} onChanged={async () => { await loadFromServer(); invalidate('builds') }} tileSize={GRID_TILE_SIZE} entities={tileEntities.filter((e: any) => e.locations?.slug === location && e.tile_row != null)} pending={playerBuilds.filter((b: any) => b.locations?.slug === location).map((b: any) => ({ buildable_id: b.buildable_id, tile_row: b.tile_row, tile_col: b.tile_col, status: b.status }))} />}
           <div><div style={sectionLabel}>Deine Orte</div><div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>{propertyLocations.map((loc: any) => { const isHere = loc.slug === location; return <div key={loc.id} onClick={() => setDetailColony(loc)} style={{ ...card, padding: '0.55rem 0.9rem', cursor: 'pointer', borderLeft: `3px solid ${isHere ? T.gold : T.blue}`, minWidth: '110px' }}><div style={{ fontWeight: 700, fontSize: '0.8rem', color: T.blueDeep, display: 'flex', alignItems: 'center', gap: '4px' }}>{LOC_ICON[loc.slug] ?? '🪐'} {LOC_NAME[loc.slug] ?? loc.slug}{isHere && <span style={{ fontSize: '0.46rem', background: T.gold, color: '#fff', borderRadius: '3px', padding: '1px 4px' }}>HIER</span>}</div><div style={{ fontSize: '0.65rem', color: T.inkFaint, marginTop: '2px' }}>{(propertyByLocation[loc.slug] ?? 0) > 0 ? `${propertyByLocation[loc.slug]} Gebäude` : 'kein Gebäude'}</div></div> })}</div></div>
