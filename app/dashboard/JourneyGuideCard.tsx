@@ -1,7 +1,7 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 02.07.2026 — Journey-Vorschläge an gemeinsamen Journey-Catalog angebunden
-// Version: 0.4.0
+// Aktualisiert: 02.07.2026 — Build-Fix: Fallback-Ausdruck für Journey-Fortschritt geklammert
+// Version: 0.4.1
 
 'use client'
 
@@ -154,11 +154,12 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
               const ownSteps = steps.filter(s => s.journey_key === def.key).sort((a, b) => a.step_order - b.step_order)
               const firstOpen = ownSteps.find(s => !completed.has(s.id))
               const action = actionForStep(def.key, firstOpen, props)
+              const progressMax = j?.progress_max ?? (ownSteps.length || 1)
               return (
                 <div key={def.key} style={{ background: '#fbfaf7', border: `1px solid ${T.lineSoft}`, borderRadius: T.radius, padding: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800, color: T.blueDeep, fontSize: '0.82rem' }}>{def.icon} {def.title}</div>
-                    <div style={{ fontSize: '0.6rem', color: T.gold, fontWeight: 800 }}>{j?.progress ?? 0}/{j?.progress_max ?? ownSteps.length || 1}</div>
+                    <div style={{ fontSize: '0.6rem', color: T.gold, fontWeight: 800 }}>{j?.progress ?? 0}/{progressMax}</div>
                   </div>
                   <div style={{ margin: '0.45rem 0 0.55rem', height: 5, background: '#e8e4dc', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ width: `${p}%`, height: '100%', background: T.gold }} />
