@@ -1,7 +1,7 @@
 // app/api/game/journeys/route.ts
 // Erstellt: 01.07.2026
-// Aktualisiert: 02.07.2026 — Journey-Fortschritt über Trigger-Engine berechnet
-// Version: 0.5.0
+// Aktualisiert: 02.07.2026 — echte Tabellen ships/trade_transactions statt veralteter Namen
+// Version: 0.5.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -54,9 +54,9 @@ export async function GET(req: NextRequest) {
     : { data: [] }
 
   const [shipsR, entitiesR, tradesR, profileR, knowledgeR] = await Promise.all([
-    serviceClient.from('player_ships').select('*').eq('profile_id', user.id),
+    serviceClient.from('ships').select('*').eq('profile_id', user.id),
     serviceClient.from('tile_entities').select('*, locations(slug)').eq('profile_id', user.id),
-    serviceClient.from('player_trades').select('id').eq('profile_id', user.id).limit(20),
+    serviceClient.from('trade_transactions').select('id').eq('profile_id', user.id).limit(20),
     serviceClient.from('profiles').select('current_location').eq('id', user.id).single(),
     serviceClient.from('player_knowledge').select('knowledge_points').eq('profile_id', user.id).single(),
   ])
