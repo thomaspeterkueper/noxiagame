@@ -9,6 +9,15 @@ export type JourneyGuideDef = {
   firstStep: string
 }
 
+export type JourneyStepTrigger =
+  | { type: 'ship_count'; min: number }
+  | { type: 'current_location'; value: string }
+  | { type: 'entity_at_location'; location: string; entityIds: string[] }
+  | { type: 'entity_owned_any'; entityIds: string[] }
+  | { type: 'entity_owned_count'; entityIds: string[]; min: number }
+  | { type: 'trade_count'; min: number }
+  | { type: 'knowledge_points'; min: number }
+
 export type JourneyCatalogStep = {
   id: string
   journey_key: JourneyKey
@@ -16,6 +25,7 @@ export type JourneyCatalogStep = {
   title: string
   description: string
   optional: boolean
+  trigger?: JourneyStepTrigger
 }
 
 export const JOURNEY_DEFS: JourneyGuideDef[] = [
@@ -60,26 +70,138 @@ export const JOURNEY_TITLES: Record<JourneyKey, string> = JOURNEY_DEFS.reduce(
 
 export const DEFAULT_JOURNEY_STEPS: Record<JourneyKey, JourneyCatalogStep[]> = {
   moon_colony: [
-    { id: 'moon-1', journey_key: 'moon_colony', step_order: 1, title: 'Ein geeignetes Schiff besitzen', description: 'Kaufen oder aktivieren Sie ein Schiff, mit dem Sie andere Standorte erreichen können.', optional: false },
-    { id: 'moon-2', journey_key: 'moon_colony', step_order: 2, title: 'Zum Mond reisen', description: 'Öffnen Sie den Reisedialog und fliegen Sie zur Mondkolonie.', optional: false },
-    { id: 'moon-3', journey_key: 'moon_colony', step_order: 3, title: 'Energieversorgung sichern', description: 'Errichten oder nutzen Sie Energieproduktion auf dem Mond.', optional: false },
-    { id: 'moon-4', journey_key: 'moon_colony', step_order: 4, title: 'Wasser oder Eis erschließen', description: 'Sichern Sie Wasser als Grundlage jeder dauerhaften Mondbasis.', optional: false },
+    {
+      id: 'moon-1',
+      journey_key: 'moon_colony',
+      step_order: 1,
+      title: 'Ein geeignetes Schiff besitzen',
+      description: 'Kaufen oder aktivieren Sie ein Schiff, mit dem Sie andere Standorte erreichen können.',
+      optional: false,
+      trigger: { type: 'ship_count', min: 1 },
+    },
+    {
+      id: 'moon-2',
+      journey_key: 'moon_colony',
+      step_order: 2,
+      title: 'Zum Mond reisen',
+      description: 'Öffnen Sie den Reisedialog und fliegen Sie zur Mondkolonie.',
+      optional: false,
+      trigger: { type: 'current_location', value: 'moon' },
+    },
+    {
+      id: 'moon-3',
+      journey_key: 'moon_colony',
+      step_order: 3,
+      title: 'Energieversorgung sichern',
+      description: 'Errichten oder nutzen Sie Energieproduktion auf dem Mond.',
+      optional: false,
+      trigger: { type: 'entity_at_location', location: 'moon', entityIds: ['solar', 'solar_field', 'power_plant'] },
+    },
+    {
+      id: 'moon-4',
+      journey_key: 'moon_colony',
+      step_order: 4,
+      title: 'Wasser oder Eis erschließen',
+      description: 'Sichern Sie Wasser als Grundlage jeder dauerhaften Mondbasis.',
+      optional: false,
+      trigger: { type: 'entity_at_location', location: 'moon', entityIds: ['ice_drill', 'water_extractor'] },
+    },
   ],
   merchant: [
-    { id: 'merchant-1', journey_key: 'merchant', step_order: 1, title: 'Laderaum prüfen', description: 'Prüfen Sie Ihr aktives Schiff und den freien Laderaum.', optional: false },
-    { id: 'merchant-2', journey_key: 'merchant', step_order: 2, title: 'Ware kaufen', description: 'Kaufen Sie Wasser, Energie oder Metall an einem Standort mit gutem Preis.', optional: false },
-    { id: 'merchant-3', journey_key: 'merchant', step_order: 3, title: 'Zu einem anderen Markt reisen', description: 'Transportieren Sie die Ware zu einem Standort mit besserem Verkaufspreis.', optional: false },
-    { id: 'merchant-4', journey_key: 'merchant', step_order: 4, title: 'Ware verkaufen oder Auftrag erfüllen', description: 'Verkaufen Sie profitabel oder erfüllen Sie einen offenen Auftrag.', optional: false },
+    {
+      id: 'merchant-1',
+      journey_key: 'merchant',
+      step_order: 1,
+      title: 'Laderaum prüfen',
+      description: 'Prüfen Sie Ihr aktives Schiff und den freien Laderaum.',
+      optional: false,
+      trigger: { type: 'ship_count', min: 1 },
+    },
+    {
+      id: 'merchant-2',
+      journey_key: 'merchant',
+      step_order: 2,
+      title: 'Ware kaufen',
+      description: 'Kaufen Sie Wasser, Energie oder Metall an einem Standort mit gutem Preis.',
+      optional: false,
+      trigger: { type: 'ship_count', min: 1 },
+    },
+    {
+      id: 'merchant-3',
+      journey_key: 'merchant',
+      step_order: 3,
+      title: 'Zu einem anderen Markt reisen',
+      description: 'Transportieren Sie die Ware zu einem Standort mit besserem Verkaufspreis.',
+      optional: false,
+      trigger: { type: 'trade_count', min: 1 },
+    },
+    {
+      id: 'merchant-4',
+      journey_key: 'merchant',
+      step_order: 4,
+      title: 'Ware verkaufen oder Auftrag erfüllen',
+      description: 'Verkaufen Sie profitabel oder erfüllen Sie einen offenen Auftrag.',
+      optional: false,
+      trigger: { type: 'trade_count', min: 1 },
+    },
   ],
   research: [
-    { id: 'research-1', journey_key: 'research', step_order: 1, title: 'Akademie finden', description: 'Suchen Sie einen Standort mit Akademie oder Forschungseinrichtung.', optional: false },
-    { id: 'research-2', journey_key: 'research', step_order: 2, title: 'Erste Wissenspunkte sammeln', description: 'Nutzen Sie Akademie-Aufgaben, um Wissen zu gewinnen.', optional: false },
-    { id: 'research-3', journey_key: 'research', step_order: 3, title: 'Forschungsinfrastruktur aufbauen', description: 'Bereiten Sie eigene Forschungsgebäude oder Forschungskapazität vor.', optional: false },
+    {
+      id: 'research-1',
+      journey_key: 'research',
+      step_order: 1,
+      title: 'Akademie finden',
+      description: 'Suchen Sie einen Standort mit Akademie oder Forschungseinrichtung.',
+      optional: false,
+      trigger: { type: 'entity_owned_any', entityIds: ['school', 'academy', 'research_lab'] },
+    },
+    {
+      id: 'research-2',
+      journey_key: 'research',
+      step_order: 2,
+      title: 'Erste Wissenspunkte sammeln',
+      description: 'Nutzen Sie Akademie-Aufgaben, um Wissen zu gewinnen.',
+      optional: false,
+      trigger: { type: 'knowledge_points', min: 1 },
+    },
+    {
+      id: 'research-3',
+      journey_key: 'research',
+      step_order: 3,
+      title: 'Forschungsinfrastruktur aufbauen',
+      description: 'Bereiten Sie eigene Forschungsgebäude oder Forschungskapazität vor.',
+      optional: false,
+      trigger: { type: 'entity_owned_any', entityIds: ['school', 'academy', 'research_lab'] },
+    },
   ],
   industry: [
-    { id: 'industry-1', journey_key: 'industry', step_order: 1, title: 'Produktionsstandort wählen', description: 'Suchen Sie einen Standort mit freier Fläche und passenden Ressourcen.', optional: false },
-    { id: 'industry-2', journey_key: 'industry', step_order: 2, title: 'Erstes Produktionsgebäude bauen', description: 'Bauen Sie Energie- oder Rohstoffproduktion.', optional: false },
-    { id: 'industry-3', journey_key: 'industry', step_order: 3, title: 'Überschuss erzeugen', description: 'Produzieren Sie mehr, als der Standort verbraucht.', optional: false },
+    {
+      id: 'industry-1',
+      journey_key: 'industry',
+      step_order: 1,
+      title: 'Produktionsstandort wählen',
+      description: 'Suchen Sie einen Standort mit freier Fläche und passenden Ressourcen.',
+      optional: false,
+      trigger: { type: 'entity_owned_count', entityIds: ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'], min: 1 },
+    },
+    {
+      id: 'industry-2',
+      journey_key: 'industry',
+      step_order: 2,
+      title: 'Erstes Produktionsgebäude bauen',
+      description: 'Bauen Sie Energie- oder Rohstoffproduktion.',
+      optional: false,
+      trigger: { type: 'entity_owned_count', entityIds: ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'], min: 1 },
+    },
+    {
+      id: 'industry-3',
+      journey_key: 'industry',
+      step_order: 3,
+      title: 'Überschuss erzeugen',
+      description: 'Produzieren Sie mehr, als der Standort verbraucht.',
+      optional: false,
+      trigger: { type: 'entity_owned_count', entityIds: ['solar', 'solar_field', 'mine', 'ice_drill', 'water_extractor'], min: 2 },
+    },
   ],
 }
 
