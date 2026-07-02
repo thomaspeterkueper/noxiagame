@@ -1,0 +1,92 @@
+export type JourneyKey = 'moon_colony' | 'merchant' | 'research' | 'industry'
+
+export type JourneyGuideDef = {
+  key: JourneyKey
+  icon: string
+  title: string
+  subtitle: string
+  goal: string
+  firstStep: string
+}
+
+export type JourneyCatalogStep = {
+  id: string
+  journey_key: JourneyKey
+  step_order: number
+  title: string
+  description: string
+  optional: boolean
+}
+
+export const JOURNEY_DEFS: JourneyGuideDef[] = [
+  {
+    key: 'moon_colony',
+    icon: '🚀',
+    title: 'Mondbasis gründen',
+    subtitle: 'Raumfahrt, Landung und Versorgung lernen',
+    goal: 'Errichten Sie eine dauerhafte Basis auf dem Mond.',
+    firstStep: 'Kaufen Sie ein geeignetes Schiff und fliegen Sie zum Mond.',
+  },
+  {
+    key: 'merchant',
+    icon: '📦',
+    title: 'Handel & Logistik',
+    subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen',
+    goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.',
+    firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.',
+  },
+  {
+    key: 'research',
+    icon: '🔬',
+    title: 'Forschung aufbauen',
+    subtitle: 'Wissen, Akademie und Technologien erschließen',
+    goal: 'Entwickeln Sie wissenschaftliche Kompetenz als Motor des Fortschritts.',
+    firstStep: 'Suchen Sie eine Akademie oder bauen Sie Forschungskapazität auf.',
+  },
+  {
+    key: 'industry',
+    icon: '🏭',
+    title: 'Industrie errichten',
+    subtitle: 'Energie, Rohstoffe und Produktion sichern',
+    goal: 'Versorgen Sie Kolonien mit Energie, Metall und Infrastruktur.',
+    firstStep: 'Errichten Sie Energie- oder Rohstoffproduktion an einem passenden Standort.',
+  },
+]
+
+export const JOURNEY_TITLES: Record<JourneyKey, string> = JOURNEY_DEFS.reduce(
+  (acc, journey) => ({ ...acc, [journey.key]: journey.title }),
+  {} as Record<JourneyKey, string>
+)
+
+export const DEFAULT_JOURNEY_STEPS: Record<JourneyKey, JourneyCatalogStep[]> = {
+  moon_colony: [
+    { id: 'moon-1', journey_key: 'moon_colony', step_order: 1, title: 'Ein geeignetes Schiff besitzen', description: 'Kaufen oder aktivieren Sie ein Schiff, mit dem Sie andere Standorte erreichen können.', optional: false },
+    { id: 'moon-2', journey_key: 'moon_colony', step_order: 2, title: 'Zum Mond reisen', description: 'Öffnen Sie den Reisedialog und fliegen Sie zur Mondkolonie.', optional: false },
+    { id: 'moon-3', journey_key: 'moon_colony', step_order: 3, title: 'Energieversorgung sichern', description: 'Errichten oder nutzen Sie Energieproduktion auf dem Mond.', optional: false },
+    { id: 'moon-4', journey_key: 'moon_colony', step_order: 4, title: 'Wasser oder Eis erschließen', description: 'Sichern Sie Wasser als Grundlage jeder dauerhaften Mondbasis.', optional: false },
+  ],
+  merchant: [
+    { id: 'merchant-1', journey_key: 'merchant', step_order: 1, title: 'Laderaum prüfen', description: 'Prüfen Sie Ihr aktives Schiff und den freien Laderaum.', optional: false },
+    { id: 'merchant-2', journey_key: 'merchant', step_order: 2, title: 'Ware kaufen', description: 'Kaufen Sie Wasser, Energie oder Metall an einem Standort mit gutem Preis.', optional: false },
+    { id: 'merchant-3', journey_key: 'merchant', step_order: 3, title: 'Zu einem anderen Markt reisen', description: 'Transportieren Sie die Ware zu einem Standort mit besserem Verkaufspreis.', optional: false },
+    { id: 'merchant-4', journey_key: 'merchant', step_order: 4, title: 'Ware verkaufen oder Auftrag erfüllen', description: 'Verkaufen Sie profitabel oder erfüllen Sie einen offenen Auftrag.', optional: false },
+  ],
+  research: [
+    { id: 'research-1', journey_key: 'research', step_order: 1, title: 'Akademie finden', description: 'Suchen Sie einen Standort mit Akademie oder Forschungseinrichtung.', optional: false },
+    { id: 'research-2', journey_key: 'research', step_order: 2, title: 'Erste Wissenspunkte sammeln', description: 'Nutzen Sie Akademie-Aufgaben, um Wissen zu gewinnen.', optional: false },
+    { id: 'research-3', journey_key: 'research', step_order: 3, title: 'Forschungsinfrastruktur aufbauen', description: 'Bereiten Sie eigene Forschungsgebäude oder Forschungskapazität vor.', optional: false },
+  ],
+  industry: [
+    { id: 'industry-1', journey_key: 'industry', step_order: 1, title: 'Produktionsstandort wählen', description: 'Suchen Sie einen Standort mit freier Fläche und passenden Ressourcen.', optional: false },
+    { id: 'industry-2', journey_key: 'industry', step_order: 2, title: 'Erstes Produktionsgebäude bauen', description: 'Bauen Sie Energie- oder Rohstoffproduktion.', optional: false },
+    { id: 'industry-3', journey_key: 'industry', step_order: 3, title: 'Überschuss erzeugen', description: 'Produzieren Sie mehr, als der Standort verbraucht.', optional: false },
+  ],
+}
+
+export function isJourneyKey(value: string): value is JourneyKey {
+  return value in DEFAULT_JOURNEY_STEPS
+}
+
+export function getJourneyTitle(key: string) {
+  return isJourneyKey(key) ? JOURNEY_TITLES[key] : undefined
+}
