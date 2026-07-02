@@ -1,7 +1,7 @@
 // lib/game/buildings/types.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 27.06.2026 — components/Bauteile ergänzt
-// Version:      1.2.0
+// Aktualisiert: 02.07.2026 — Overlay insight/hints/actions ergänzt
+// Version:      1.3.0
 
 export type ResourceType = 'water' | 'energy' | 'metal' | 'components'
 export type LocationSlug = string
@@ -21,14 +21,8 @@ export interface BuildingDef {
   description: string
   cost: number
   buildTimeTicks: number
-  produces?: {
-    resource: ResourceType
-    amount: number
-  }
-  consumes?: {
-    resource: ResourceType
-    amount: number
-  }
+  produces?: { resource: ResourceType; amount: number }
+  consumes?: { resource: ResourceType; amount: number }
   populationBonus?: number
   allowedLocations?: LocationSlug[]
   blockedLocations?: LocationSlug[]
@@ -60,6 +54,7 @@ export interface OverlayMetric {
   value: number | string
   unit?: string
   trend?: OverlayTrend
+  hint?: string
 }
 
 export interface OverlayAlert {
@@ -72,6 +67,7 @@ export interface OverlayAction {
   id: string
   label: string
   disabled?: boolean
+  primary?: boolean
 }
 
 export interface OverlayDef {
@@ -81,4 +77,5 @@ export interface OverlayDef {
   metrics: OverlayMetric[]
   alerts: OverlayAlert[]
   actions: OverlayAction[]
+  insight?: string
 }
