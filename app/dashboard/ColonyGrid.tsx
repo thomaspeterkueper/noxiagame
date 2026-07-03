@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 25.06.2026 — BuildPopup nutzt serverseitige Bauoptionen
-// Version:      5.3.0
+// Aktualisiert: 03.07.2026 — BuildingOverlay für Mine/Solar/Habitat/Produktion
+// Version:      5.4.0
 
 'use client'
 
@@ -12,6 +12,9 @@ import { TileSVG } from '@/lib/grid/TileSVG'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { generateGrid, gridTypes, anomalyAt, isBuildable, NPC_ENTITY } from '@/lib/grid/generateGrid'
 import SellPanel from './SellPanel'
+import BuildingOverlay from '@/components/game/BuildingOverlay'
+import { buildOverlayForBuilding } from '@/lib/game/buildings/overlays'
+import type { BuildingContext } from '@/lib/game/buildings/types'
 import AdminOverlay from './AdminOverlay'
 import LandingOverlay from './LandingOverlay'
 import SchoolOverlay from './SchoolOverlay'
@@ -287,6 +290,7 @@ export default function ColonyGrid({
   const [showSchool, setShowSchool] = useState(false)
   const [showLanding, setShowLanding] = useState(false)
   const [showSellPanel, setShowSellPanel] = useState(false)
+  const [showBuildingOverlay, setShowBuildingOverlay] = useState(false)
   const [showBank, setShowBank] = useState(false)
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
   const tileSize = externalTileSize ?? TILE_SIZE
@@ -327,6 +331,8 @@ export default function ColonyGrid({
     if (ent?.entity_id === 'shipyard') { onOpenShipyard?.(); return }
     if (ent?.entity_id === 'warehouse') { onOpenWarehouse?.(); return }
     if (ent?.entity_id === 'market') { onOpenWarehouse?.(); return }
+    const overlayBuildings = ['mine', 'solar', 'habitat', 'ice_drill', 'water_recycler', 'scanner']
+    if (ent && overlayBuildings.includes(ent.entity_id)) { setShowBuildingOverlay(true); return }
     if (ent && ent.profile_id === userId) { setShowSellPanel(true); return }
     if (isBuildable(tileType)) setShowBuildPopup(true)
   }, [entityAt, onOpenShipyard, onOpenWarehouse, userId])
@@ -405,6 +411,39 @@ export default function ColonyGrid({
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} />}
       {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} />}
       {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} />}
+
+      {showBuildingOverlay && selectedTile && (() => {
+        const ent = entityAt(selectedTile.r, selectedTile.c)
+        if (!ent) return null
+        const eco = entityInfo?.[ent.id]
+        const stocks: Record<string, number> = {}
+        const consumption: Record<string, number> = {}
+        for (const r of locationResources ?? []) {
+          stocks[r.resource] = r.stock
+          consumption[r.resource] = r.consumption
+        }
+        const production: Record<string, number> = {}
+        if (eco?.ressource && eco.produktion) production[eco.ressource] = eco.produktion
+        const ctx: BuildingContext = {
+          locationSlug: slug,
+          locationName: name,
+          isOwn: ent.profile_id === userId,
+          production,
+          consumption,
+          stocks,
+          population,
+          populationMax,
+          credits,
+        }
+        const overlay = buildOverlayForBuilding(ent.entity_id, ctx)
+        const handleAction = (actionId: string) => {
+          if (actionId === 'sell_building') {
+            setShowBuildingOverlay(false)
+            setShowSellPanel(true)
+          }
+        }
+        return <BuildingOverlay overlay={overlay} onClose={() => { setShowBuildingOverlay(false); setSelectedTile(null) }} onAction={handleAction} />
+      })()}
 
       {showSellPanel && selectedTile && (() => {
         const ent = entityAt(selectedTile.r, selectedTile.c)
