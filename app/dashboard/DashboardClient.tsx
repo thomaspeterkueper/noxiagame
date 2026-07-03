@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 03.07.2026 — Dashboard entlastet: Wege/Missionen aus Operationsansicht entfernt
-// Version:      2.8.0
+// Aktualisiert: 03.07.2026 — Journey als Drawer, Header dauerhaft sichtbar
+// Version:      2.9.0
 
 'use client'
 
@@ -20,6 +20,7 @@ import OrderNegotiation from './OrderNegotiation'
 import MarketAuction from './MarketAuction'
 import WelcomeSetup from './WelcomeSetup'
 import SsfStatusCard from './SsfStatusCard'
+import JourneyDrawer from './JourneyDrawer'
 import { TipBanner, TipDef } from './TipSystem'
 import { attentionItems } from './dashboardStatus'
 import { T, Icon, Toast, RESOURCE_LABEL, RESOURCE_ICON, LOC_ICON, LOC_NAME } from './ui'
@@ -54,6 +55,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [profile, setProfile] = useState<any>(null)
   const [ships, setShips] = useState<any[]>([])
   const [playerStats, setPlayerStats] = useState({ trades: 0, flights: 0, knowledge: 0 })
+  const [journeyOpen, setJourneyOpen] = useState(false)
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
@@ -116,11 +118,19 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   async function handleLogout() { const { createClient } = await import('@/lib/supabase/client'); await createClient().auth.signOut(); window.location.href = '/auth/login' }
   const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
   const sectionLabel: React.CSSProperties = { fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 700, marginBottom: '0.4rem' }
+  const journeyActions = {
+    onOpenShipyard: () => { setJourneyOpen(false); setShipyardOpen(true) },
+    onOpenWarehouse: () => { setJourneyOpen(false); setWarehouseOpen(true) },
+    onOpenTravel: () => { setJourneyOpen(false); window.scrollTo({ top: 70, behavior: 'smooth' }) },
+    onFocusGrid: () => { setJourneyOpen(false); window.scrollTo({ top: 120, behavior: 'smooth' }) },
+    onOpenAcademyHint: () => { setJourneyOpen(false); showToast('Klicke auf die Akademie im Grid, um Wissen zu sammeln.', true) },
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
+      <JourneyDrawer open={journeyOpen} currentLocation={location} onClose={() => setJourneyOpen(false)} {...journeyActions} />
       {profile && !profile.onboarded && <WelcomeSetup onDone={() => window.location.reload()} />}
       {auctionOpen && <MarketAuction open={auctionOpen} onClose={() => setAuctionOpen(false)} location={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))} credits={credits} cargo={cargo} cargoMax={cargoMax} initialResource={auctionConfig.resource} initialMode={auctionConfig.mode} initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} />}
       {warehouseOpen && <WarehouseOverlay locationSlug={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} prices={prices} resources={currentLocationData?.location_resources ?? []} orders={initialOrders.filter((o: any) => o.locations?.slug === location)} cargo={cargo} cargoMax={cargoMax} credits={credits} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} onFulfillOrder={async (orderId, agreedReward) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} onClose={() => setWarehouseOpen(false)} />}
@@ -129,8 +139,11 @@ export default function DashboardClient({ locations: initialLocations, prices, o
       <ShipyardOverlay open={shipyardOpen} onClose={() => setShipyardOpen(false)} currentShipTypeId={shipTypeId ?? 'freighter_mk1'} credits={credits} onBuyShip={async (type) => { const token = await getToken(); const data = await (await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`${type} gekauft!`, true); await loadFromServer(); setShipyardOpen(false) } else showToast(data.error ?? 'Kauf fehlgeschlagen', false) }} />
       <OrderNegotiation order={negotiateOrder ? { ...negotiateOrder, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === negotiateOrder.resource)?.stock } : null} onClose={() => setNegotiateOrder(null)} canFulfill={negotiateOrder?.locations?.slug === location && (cargo[negotiateOrder?.resource as ResourceType] ?? 0) >= negotiateOrder?.amount} fulfillHint={negotiateOrder?.locations?.slug !== location ? 'Falscher Standort.' : 'Nicht genug Ladung.'} onAccept={async (id, bonus) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${id}&agreedReward=${Math.round(bonus)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} />
 
-      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, flexShrink: 0 }}>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.3rem', margin: 0 }}>noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ<span style={{ fontSize: '0.5rem', letterSpacing: '0.3em', color: T.gold, marginLeft: '1rem', verticalAlign: 'middle', textTransform: 'uppercase' }}>Alpha 0.1</span></h1>
+      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 1200, flexShrink: 0, boxShadow: '0 1px 8px rgba(27,39,51,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.14em', color: T.blue, fontSize: '1.3rem', margin: 0 }}>noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ<span style={{ fontSize: '0.5rem', letterSpacing: '0.3em', color: T.gold, marginLeft: '1rem', verticalAlign: 'middle', textTransform: 'uppercase' }}>Alpha 0.1</span></h1>
+          <button onClick={() => setJourneyOpen(true)} style={{ background: T.blue, color: '#fff', border: 'none', borderRadius: T.radius, padding: '0.48rem 0.8rem', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', letterSpacing: '0.02em' }}>☰ Journey</button>
+        </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
           {([['Credits', `${credits.toLocaleString('de')} Cr`], ['Frachter', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
           <button onClick={() => setProfileOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><div style={{ width: 36, height: 36, borderRadius: '50%', background: T.blue, border: `2px solid ${T.gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem', overflow: 'hidden' }}>{profile?.avatar ? <img src={`/images/avatars/${profile.avatar}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (profile?.username?.[0]?.toUpperCase() ?? '?')}</div></button>
