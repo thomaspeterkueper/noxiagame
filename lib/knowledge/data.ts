@@ -1,3 +1,6 @@
+// data.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Wissensmodul-Stammdaten
+// Version:      0.1.0
 import type { KnowledgeBuilding, KnowledgeLearningModule, KnowledgeUnlock } from './types';
 
 export const learningModules: KnowledgeLearningModule[] = [
