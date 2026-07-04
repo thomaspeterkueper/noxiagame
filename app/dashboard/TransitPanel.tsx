@@ -1,3 +1,6 @@
+// TransitPanel.tsx
+// Aktualisiert: 31.05.2026 — Transit-Panel
+// Version:      0.2.0
 // app/dashboard/TransitPanel.tsx
 // Erstellt: 30.05.2026
 // Aktualisiert: 31.05.2026
