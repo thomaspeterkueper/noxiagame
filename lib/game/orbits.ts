@@ -1,3 +1,6 @@
+// orbits.ts
+// Aktualisiert: 20.06.2026 — Orbital-Schicht deterministisch
+// Version:      0.2.0
 // lib/game/orbits.ts
 // Erstellt:     15.06.2026
 // Aktualisiert: 20.06.2026
