@@ -1,3 +1,6 @@
+// ShipyardPanel.tsx
+// Aktualisiert: 31.05.2026 — Werft-Panel
+// Version:      0.1.0
 // app/dashboard/ShipyardPanel.tsx
 // Erstellt: 31.05.2026
 
