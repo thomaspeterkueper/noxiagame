@@ -1,3 +1,6 @@
+// buildRequirements.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Wissensvoraussetzungen
+// Version:      0.1.0
 import { getKnowledgeBuildingId } from './buildingMap';
 import type { KnowledgeProgress } from './types';
 
