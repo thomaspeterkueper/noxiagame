@@ -1,3 +1,6 @@
+// buildingMap.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Building-ID → Modul-Mapping
+// Version:      0.1.0
 import type { BuildingId } from './types';
 
 const NOXIA_BUILDING_IDS: Record<string, BuildingId> = {
