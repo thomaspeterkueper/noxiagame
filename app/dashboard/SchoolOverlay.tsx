@@ -1,3 +1,6 @@
+// SchoolOverlay.tsx
+// Aktualisiert: 28.06.2026 — SSF direkt in Akademie integriert
+// Version:      4.1.0
 // app/dashboard/SchoolOverlay.tsx
 // Aktualisiert: 28.06.2026 — SSF direkt in Akademie integriert
 'use client'
