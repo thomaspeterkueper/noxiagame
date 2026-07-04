@@ -1,3 +1,6 @@
+// ColonyStats.tsx
+// Aktualisiert: 31.05.2026 — Kolonieübersicht-Minicard
+// Version:      0.1.0
 // app/dashboard/ColonyStats.tsx
 // Erstellt: 31.05.2026
 // Mini-Übersicht aller Kolonien als Karten-Grid
