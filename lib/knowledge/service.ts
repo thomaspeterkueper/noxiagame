@@ -1,3 +1,6 @@
+// service.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; getNoxiaKnowledgeState
+// Version:      0.2.0
 import { completeLearningModule, getUnlockedBuildings, initialKnowledgeProgress } from './progress';
 import { fetchNoxiaUnlocks, type NoxiaUnlockPayload } from './remote';
 import { getKnowledgeSourceMode } from './source';
