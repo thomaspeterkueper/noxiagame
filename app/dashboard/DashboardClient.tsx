@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 03.07.2026 — Journey als Drawer, Header dauerhaft sichtbar
-// Version:      2.9.0
+// Aktualisiert: 04.07.2026 — Abmelden leitet auf / statt /auth/login
+// Version:      2.9.1
 
 'use client'
 
@@ -115,7 +115,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
 
   function showToast(msg: string, ok: boolean) { setToast({ msg, ok }); setTimeout(() => setToast(null), 2500) }
   async function handleTravel(dest: string) { if (!inTransit) await travel(dest as LocationSlug, stats?.tickNumber ?? 0) }
-  async function handleLogout() { const { createClient } = await import('@/lib/supabase/client'); await createClient().auth.signOut(); window.location.href = '/auth/login' }
+  async function handleLogout() { const { createClient } = await import('@/lib/supabase/client'); await createClient().auth.signOut(); window.location.href = '/' }
   const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
   const sectionLabel: React.CSSProperties = { fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 700, marginBottom: '0.4rem' }
   const journeyActions = {
