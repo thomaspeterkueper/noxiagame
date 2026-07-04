@@ -1,3 +1,6 @@
+// middleware.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Auth-Middleware reaktiviert
+// Version:      1.0.0
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
