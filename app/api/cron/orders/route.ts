@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 30.05.2026 — Auftragslogik mit Dringlichkeit
+// Version:      0.2.0
 // app/api/cron/orders/route.ts
 // Erstellt: 30.05.2026
 // Aktualisiert: 30.05.2026 – Bessere Auftragslogik mit Dringlichkeit
