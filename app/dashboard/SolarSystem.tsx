@@ -1,3 +1,6 @@
+// SolarSystem.tsx
+// Aktualisiert: 20.06.2026 — Solarsystem-Visualisierung
+// Version:      0.2.0
 // app/dashboard/SolarSystem.tsx
 // Erstellt:     15.06.2026
 // Aktualisiert: 20.06.2026
