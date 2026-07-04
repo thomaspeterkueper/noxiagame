@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 30.05.2026 — Bevölkerungsbasierte Preisanpassung
+// Version:      0.2.0
 // app/api/cron/prices/route.ts
 // Erstellt: 30.05.2026
 // Aktualisiert: 30.05.2026 – Bevölkerungsbasierte Preisanpassung
