@@ -1,3 +1,6 @@
+// ssfKnowledge.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; SSF-Modul-Fetch
+// Version:      0.2.0
 export type SsfKnowledgeModule = {
   id: string
   title: string
