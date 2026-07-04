@@ -1,3 +1,6 @@
+// condition.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Zustand/Abnutzung/Reparatur
+// Version:      0.1.0
 // lib/game/condition.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // NOXIA — Zustand · Abnutzung · Reparatur · Wertminderung
