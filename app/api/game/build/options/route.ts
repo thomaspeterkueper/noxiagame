@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Bauoptionen nach Location
+// Version:      0.1.0
 import { NextRequest, NextResponse } from 'next/server'
 import { BUILDABLE } from '@/lib/game/buildings'
 import { getResourceCosts } from '@/lib/game/buildCosts'
