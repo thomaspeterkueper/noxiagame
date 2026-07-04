@@ -1,3 +1,6 @@
+// resources.ts
+// Aktualisiert: 27.06.2026 — Bauteile als erste Industrieware
+// Version:      0.2.0
 // lib/game/resources.ts
 // Ressourcen-Grundtypen.
 // Aktualisiert: 27.06.2026 — components/Bauteile als erste Industrieware.
