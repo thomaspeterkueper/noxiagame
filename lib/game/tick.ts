@@ -1,7 +1,7 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 27.06.2026 — components/Bauteile im Produktionsloop
-// Version:      3.1.1
+// Aktualisiert: 26.06.2026 — runBankInterestTick: Zinsen auf Einlagen und Kredite
+// Version:      3.2.0
 
 import {
   CONSUMPTION_PER_100,
@@ -23,6 +23,10 @@ import { entscheideNpc } from './npcBrain'
 
 export const TICK_INTERVAL_SECONDS = 3600
 export const TICK_MAX_CATCHUP      = 48
+
+// ── Bank-Zinssätze (müssen identisch zu bank/route.ts sein) ─────────────────
+const BANK_DEPOSIT_RATE = 0.005   // +0.5%/Tick auf Einlagen
+const BANK_LOAN_RATE    = 0.020   // −2.0%/Tick auf Kredite (Zinseszins)
 
 const AVG_WINDOW_TICKS      = 7
 const HISTORY_RETENTION_TICKS = 336
@@ -377,13 +381,87 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
   return { actors: actors.length, trades, produces, sells, builds }
 }
 
+// ── Bank-Zinsen ───────────────────────────────────────────────────────────────
+// Läuft einmal pro Tick für alle Konten mit Einlage oder Kredit.
+// Zinsen werden als Ledger-Einträge gebucht — append-only, vollständig auditierbar.
+
+async function runBankInterestTick(supabase: SB, tickNumber: number) {
+  const { data: accounts, error } = await supabase
+    .from('bank_accounts')
+    .select('id, profile_id, location_id, deposit, loan')
+    .or('deposit.gt.0,loan.gt.0')
+
+  if (error) {
+    console.error('runBankInterestTick: load error', error)
+    return { processed: 0 }
+  }
+
+  let processed = 0
+
+  for (const acc of accounts ?? []) {
+    const deposit = Number(acc.deposit ?? 0)
+    const loan    = Number(acc.loan    ?? 0)
+    const ledgerEntries = []
+    const updates: Record<string, number> = {}
+
+    // Zinsgutschrift auf Einlage
+    if (deposit > 0) {
+      const interest = Math.floor(deposit * BANK_DEPOSIT_RATE)
+      if (interest > 0) {
+        updates.deposit = deposit + interest
+        ledgerEntries.push({
+          profile_id:    acc.profile_id,
+          location_id:   acc.location_id,
+          entry_type:    'interest_deposit',
+          amount:        interest,
+          balance_after: updates.deposit,
+          note:          `Zinsgutschrift +${(BANK_DEPOSIT_RATE * 100).toFixed(1)}% (Tick ${tickNumber})`,
+          tick:          tickNumber,
+        })
+      }
+    }
+
+    // Zinslast auf Kredit (Zinseszins)
+    if (loan > 0) {
+      const interest = Math.ceil(loan * BANK_LOAN_RATE)
+      updates.loan = loan + interest
+      ledgerEntries.push({
+        profile_id:    acc.profile_id,
+        location_id:   acc.location_id,
+        entry_type:    'interest_loan',
+        amount:        interest,
+        balance_after: updates.loan,
+        note:          `Kreditzinsen −${(BANK_LOAN_RATE * 100).toFixed(1)}% Zinseszins (Tick ${tickNumber})`,
+        tick:          tickNumber,
+      })
+    }
+
+    // Atomarer Update + Ledger-Einträge
+    if (Object.keys(updates).length > 0) {
+      const { error: updateErr } = await supabase
+        .from('bank_accounts')
+        .update(updates)
+        .eq('id', acc.id)
+
+      if (!updateErr && ledgerEntries.length > 0) {
+        await supabase.from('bank_ledger').insert(ledgerEntries)
+      }
+
+      if (!updateErr) processed++
+    }
+  }
+
+  return { processed }
+}
+
 export async function runTick(supabase: SB, tickNumber: number) {
   const defs = await loadBuildingDefs(supabase)
   const population = await runPopulationTick(supabase, tickNumber, defs)
   const npc = await runNpcTick(supabase, tickNumber)
   const prices = await runPriceTick(supabase, tickNumber)
-  const orders = await runOrderTick(supabase)
-  return { tickNumber, population, prices, npc, orders }
+  const orders  = await runOrderTick(supabase)
+  const bank    = await runBankInterestTick(supabase, tickNumber)
+  return { tickNumber, population, prices, npc, orders, bank }
 }
 
 export async function runDueTicks(supabase: SB) {
