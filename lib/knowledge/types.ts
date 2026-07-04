@@ -1,3 +1,6 @@
+// types.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Knowledge-Typen
+// Version:      0.1.0
 export type LearningModuleId = `LRN:${string}`;
 export type UnlockId = `UNL:${string}`;
 export type BuildingId = `BLD:${string}`;
