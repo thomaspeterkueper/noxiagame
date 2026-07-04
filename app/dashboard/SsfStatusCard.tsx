@@ -1,3 +1,6 @@
+// SsfStatusCard.tsx
+// Aktualisiert: 04.07.2026 — Header ergänzt; SSF-Status-Card
+// Version:      0.1.0
 'use client'
 
 import React, { useEffect, useState } from 'react'
