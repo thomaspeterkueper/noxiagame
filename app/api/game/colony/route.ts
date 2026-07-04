@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 08.06.2026 — Schema-Fix resource/resource_type
+// Version:      0.3.0
 // app/api/game/colony/route.ts
 // Colony View API — vollständig autark, kein DashboardClient-Kontext
 // GET: öffentliche Kolonie-Daten + Governor-Daten wenn berechtigt
