@@ -1,3 +1,6 @@
+// SellPanel.tsx
+// Aktualisiert: 04.07.2026 — Header ergänzt; Verkaufs-UI
+// Version:      1.0.0
 // app/dashboard/SellPanel.tsx
 // Verkaufs-UI für die ColonyGrid-Sidebar.
 // Zeigt den marktwertbasierten Quote und die zwei Verkaufswege:
