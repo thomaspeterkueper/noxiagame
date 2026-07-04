@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 23.06.2026 — action=list alle Schiffe des Spielers
+// Version:      0.3.0
 // app/api/game/ships/route.ts
 // Erstellt:     31.05.2026
 // Aktualisiert: 23.06.2026 09:50 — action=list: alle Schiffe des Spielers
