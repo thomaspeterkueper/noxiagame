@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Lazy-Tick-Fallback
+// Version:      0.3.0
 // app/api/cron/population/route.ts
 // Fallback-Herzschlag der Lazy-Tick-Engine.
 //
