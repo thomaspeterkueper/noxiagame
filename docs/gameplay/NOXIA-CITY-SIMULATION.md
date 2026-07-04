@@ -345,14 +345,58 @@ Der Spieler baut die Rahmenbedingungen. Die Stadt entwickelt sich innerhalb dies
 
 ---
 
-### F4 — Wie präsent ist HeliosCorp von Anfang an?
-**Status: Offen**
+### F4 — HeliosCorp: Subtil präsent, kein Antagonist
+**Status: Accepted**
 
-| Option | Beschreibung | Konsequenz |
-|--------|-------------|------------|
-| Stark präsent | Gebäude sichtbar, Einfluss spürbar | Frühe Konflikte, klare Antagonistin |
-| Subtil präsent | Im Hintergrund, entdeckbar | Realistischer, mehr Entdeckungsmoment |
-| Abwesend bis Tier 2 | Erst bei Wachstum sichtbar | Einstieg einfacher |
+**Kernprinzip:**
+
+```
+HeliosCorp existiert von Spielbeginn an.
+Ihr Einfluss wirkt über Eigentum, Verträge,
+Marktpositionen und Infrastruktur.
+Der Einfluss wird nicht explizit als Spielwert angezeigt.
+Aufmerksame Spieler können ihn durch Beobachtung der Welt erkennen.
+```
+
+**HeliosCorp ist kein Antagonist:**
+
+```
+HeliosCorp verfolgt eigene Interessen.
+Diese können mit denen des Spielers, der Bevölkerung
+oder des Staates übereinstimmen oder kollidieren.
+```
+
+**Was HeliosCorp von Spielbeginn an besitzt:**
+- Einige strategische Grundstücke (Raumhafennähe, Ressourcenlagen)
+- Handelsverträge mit Lieferketten
+- Logistikzentren und Förderrechte
+- Aber: keine dominierende Kontrolle
+
+**Wie der Einfluss erfahrbar wird — nicht erklärt:**
+
+| Was der Spieler sieht | Was er nicht sofort sieht |
+|----------------------|--------------------------|
+| Preisschwankungen | HeliosCorp kontrolliert Silizium-Lieferkette |
+| Grundstücke gehören unbekannten Firmen | Alle laufen auf dieselbe Holding hinaus |
+| Raumhafenflächen immer schon vergeben | Systematische Landstrategie seit Tick 1 |
+| Neue Infrastruktur ohne staatlichen Auftrag | HeliosCorp baut strategisch vor |
+
+**Der angestrebte Spielermoment:**
+> *"Moment mal... warum gehören die wichtigsten Raumhafenflächen immer denselben Firmen?"*
+
+Kein Pop-up. Keine Warnung. Nur Beobachtung.
+
+**HeliosCorp als rationaler Akteur:**
+
+| Situation | HeliosCorp-Reaktion | Wirkung |
+|-----------|---------------------|---------|
+| Neue Kolonie, kein Kapital | Baut Raumhafen | Gut für Kolonie |
+| Monopol erreicht | Gebühren steigen | Schlecht für Kolonie |
+| Spieler expandiert | Kauft Nachbarfelder auf | Neutral / blockierend |
+| Ressourcenknappheit | Erhöht Förderrechte | Ambivalent |
+
+**Mechanische Konsequenz:**
+`CORPORATION`-Akteure haben eine eigene KI-Strategie (`npcBrain.ts`-Erweiterung) die langfristig plant — nicht reaktiv wie `NPC`-Bürger, sondern prospektiv.
 
 ---
 
