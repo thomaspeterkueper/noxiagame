@@ -1,3 +1,6 @@
+// remote.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; fetchNoxiaUnlocks
+// Version:      0.1.0
 import type { BuildingId, KnowledgeProgress } from './types';
 import { getSolarScienceFoundationBaseUrl } from './source';
 
