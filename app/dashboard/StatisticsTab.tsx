@@ -1,3 +1,6 @@
+// StatisticsTab.tsx
+// Aktualisiert: 14.06.2026 — ehrliche Versorgungs-Kennzahl
+// Version:      0.3.0
 // app/dashboard/StatisticsTab.tsx
 // Erstellt:     31.05.2026
 // Aktualisiert: 14.06.2026 – Punkt 7: ehrliche Versorgungs-Kennzahl.
