@@ -236,17 +236,70 @@ Dasselbe Feld in einer Pionierkolonie ist fast wertlos.
 
 ---
 
-## 10. Offen — Entscheidungen die noch ausstehen
+## 10. Offene Entscheidungen
 
-Diese Fragen müssen beantwortet werden bevor `GDD-BUILDINGS.md` geschrieben wird:
+Diese Fragen müssen beantwortet werden bevor `GDD-BUILDINGS.md` geschrieben wird.
 
-| Frage | Optionen | Auswirkung |
-|-------|----------|------------|
-| Kann Land verpachtet werden? | Ja / Nein | Mietsystem, passive Einkommen |
-| Gibt es Grundsteuer? | Ja / Nein | Staatsfinanzierung, Anreize |
-| Können Bürger Land besitzen ohne Spieleraktion? | Ja / Nein | Emergenz-Level der Stadt |
-| Wie weit ist HeliosCorp von Anfang an präsent? | Stark / Subtil | Spielbalance, Entdeckbarkeit |
-| Gibt es Zonierung (Industrie / Wohnen / Mischung)? | Ja / Nein | Stadtplanung als Mechanik |
+---
+
+### F1 — Kann Land verpachtet werden?
+**Status: Accepted**
+
+Landbesitz und Landnutzung werden getrennt. Ein Tile hat drei Eigentums-Felder:
+
+```
+owner_id      // wem gehört das Grundstück
+occupant_id   // wer nutzt oder bebaut es aktuell
+lease_id      // optionaler Pachtvertrag (nullable)
+```
+
+**Alpha 0.1/0.2:** Eigentum und Nutzung existieren im Datenmodell. Pachtmechanik inaktiv. Standardfall: `owner_id = occupant_id`.
+
+**Alpha 0.3+:** Pachtverträge, Laufzeiten, Gebühren, Kündigungsrechte, NPC-Pacht, HeliosCorp-Landstrategie über langfristige Pacht.
+
+---
+
+### F2 — Gibt es Grundsteuer?
+**Status: Offen**
+
+| Option | Beschreibung | Konsequenz |
+|--------|-------------|------------|
+| Ja, immer | Alle Landbesitzer zahlen | Staatsfinanzierung, Anreiz gegen Spekulation |
+| Ja, optional | Abhängig von Regierungsform | Politische Entscheidung, Emergenz |
+| Nein | Kein Steuersystem | Einfacher, weniger Tiefe |
+
+---
+
+### F3 — Können Bürger Land besitzen ohne Spieleraktion?
+**Status: Offen**
+
+| Option | Beschreibung | Konsequenz |
+|--------|-------------|------------|
+| Ja, vollständig | NPCs kaufen/bauen autonom | Maximale Lebendigkeit, hohe Komplexität |
+| Ja, begrenzt | NPCs nutzen unbebautes Land | Mittlere Komplexität |
+| Nein | Nur Spieler + Staat | Einfach, wenig emergent |
+
+---
+
+### F4 — Wie präsent ist HeliosCorp von Anfang an?
+**Status: Offen**
+
+| Option | Beschreibung | Konsequenz |
+|--------|-------------|------------|
+| Stark präsent | Gebäude sichtbar, Einfluss spürbar | Frühe Konflikte, klare Antagonistin |
+| Subtil präsent | Im Hintergrund, entdeckbar | Realistischer, mehr Entdeckungsmoment |
+| Abwesend bis Tier 2 | Erst bei Wachstum sichtbar | Einstieg einfacher |
+
+---
+
+### F5 — Gibt es Zonierung?
+**Status: Offen**
+
+| Option | Beschreibung | Konsequenz |
+|--------|-------------|------------|
+| Explizit (SimCity) | Spieler weist Zonen zu | Stadtplanung als aktive Mechanik |
+| Emergent (Anno) | Zonen entstehen aus Nutzung | Natürlicherer Stadtbau |
+| Keine | Alles gemischt | Einfach, wenig Tiefe |
 
 ---
 
@@ -352,4 +405,5 @@ Das ist realistisch — und spielmechanisch interessant, weil es Expansion erzwi
 > `docs/gameplay/GDD-BUILDINGS.md`  
 > Abgeleitet aus diesem Dokument.  
 > Beschreibt Typ A, B und C konkret mit Modulen, Kosten, Voraussetzungen.
+
 
