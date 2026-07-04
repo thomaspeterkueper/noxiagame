@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 23.06.2026 — flight_count im Profil ausgeben
+// Version:      0.3.0
 // app/api/game/profile/route.ts
 // Erstellt:     07.06.2026
 // Aktualisiert: 23.06.2026 17:05 — flight_count im Profil ausgeben
