@@ -1,3 +1,6 @@
+// source.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; KNOWLEDGE_SOURCE-Env-Switch
+// Version:      0.1.0
 export type KnowledgeSourceMode = 'local' | 'ssf';
 
 export function getKnowledgeSourceMode(): KnowledgeSourceMode {
