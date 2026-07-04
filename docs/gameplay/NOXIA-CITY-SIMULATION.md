@@ -3,6 +3,7 @@
 
 **Status:** Proposed  
 **Erstellt:** 04.07.2026  
+**Aktualisiert:** 04.07.2026 — Ressourcen-Invariante: Lokale Endlichkeit + globale Frontier  
 **Autor:** Thomas Peter Küper  
 **Verhältnis zu anderen Dokumenten:**  
 Dieses Dokument beschreibt die Regeln der Welt — nicht Code, nicht Tabellen, nicht UI.  
@@ -249,8 +250,106 @@ Diese Fragen müssen beantwortet werden bevor `GDD-BUILDINGS.md` geschrieben wir
 
 ---
 
+## 11. Ressourcen-Invariante
+
+### Entscheidung: Lokale Endlichkeit — globale Frontier
+
+> **Ressourcenvorkommen sind endlich. Die Frontier ist es nicht.**
+
+Das sind zwei völlig verschiedene Aussagen:
+
+```
+Lokale Ebene:    Vorkommen erschöpfbar
+System-Ebene:    Neue Vorkommen erschließbar
+```
+
+**Was das bedeutet:**  
+Wenn ein Marsfeld leergebaut ist, gibt es keine Ressourcen mehr — aber es gibt weitere Vorkommen auf anderen Asteroiden, Monden, Planeten.  
+Knappheit entsteht durch Exploration, Transport, Infrastruktur, Zugang und Wissen — nicht durch ein endliches Universum.
+
+---
+
+### Ebene A — Geologische Vorkommen (endlich)
+
+Jedes Vorkommen besitzt:
+
+| Eigenschaft | Bedeutung |
+|-------------|-----------|
+| Menge | Wie viel ist vorhanden |
+| Reinheit | Aufbereitungsaufwand |
+| Tiefe | Abbaukosten |
+| Begleitstoffe | Nebenprodukte / Komplikationen |
+| Erschöpfungszustand | 0–100% |
+
+**Beispiele nach Planetenklasse:**
+
+| Planet | Typische Vorkommen |
+|--------|--------------------|
+| Mond | Wassereis, Ilmenit, Helium-3, Titanerz |
+| Mars | Hämatit, Magnetit, Phosphate, Schwefel, Olivin |
+| Asteroiden | Platinmetalle, Nickel-Eisen, Seltene Erden, Lithium |
+| Tiefer Raum | Thorium, Uran, exotische Materialien |
+
+---
+
+### Ebene B — Produktionsketten (erschließbar)
+
+Wenn Vorkommen bekannt und erschlossen sind, entstehen Ketten:
+
+**Dünger:**
+```
+Phosphat + Stickstoff + Kalium → Düngemittel
+```
+
+**Batterien:**
+```
+Lithium + Nickel + Graphit + Kupfer → Energiespeicher
+```
+
+**Solarpanels:**
+```
+Silizium + Silber + Aluminium → Photovoltaik
+```
+
+Spieler lernen dabei Chemie, Geologie und Materialwissenschaft — direkt aus dem Spielverlauf.  
+Das ist der Brückenpunkt zwischen NOXIA und SSF.
+
+---
+
+### Entwicklungsbogen
+
+| Phase | Ressourcen | Transportproblem |
+|-------|-----------|-----------------|
+| Frühes Spiel | Eisenerz, Wassereis, Energie | lokal lösbar |
+| Mittleres Spiel | Phosphat, Lithium, Seltene Erden | Interkolonial |
+| Spätes Spiel | Helium-3, Platinmetalle, Exotika | Interplanetarisch |
+
+Je später die Phase, desto wichtiger wird Transport, Infrastruktur und Logistik.  
+Das letzte große Phosphatvorkommen 800 Millionen Kilometer entfernt erzeugt keinen Krieg — es erzeugt ein Logistikproblem.  
+Und genau dort wird NOXIA interessant.
+
+---
+
+### Auswirkungen auf bestehende Systeme
+
+**Scanner-Gebäude:**  
+Nicht nur Anomalie-Detektor — primär Prospektionsinstrument.  
+Findet versteckte Vorkommen, bestimmt Tiefe und Reinheit, schätzt Abbaukosten.
+
+**Grundbesitz:**  
+Ein Feld mit bekanntem Lithiumvorkommen ist fundamental anders wert als ein leeres Feld.  
+Bodenwert = Lage × Nutzung × Nachfrage **× Ressourcenpotenzial**.
+
+**Kolonien sterben:**  
+Wenn alle erschließbaren Vorkommen einer Kolonie erschöpft sind und keine neue Frontier erreichbar ist, schrumpft die Kolonie.  
+Das ist realistisch — und spielmechanisch interessant, weil es Expansion erzwingt.
+
+
+---
+
 ## Nächster Schritt
 
 > `docs/gameplay/GDD-BUILDINGS.md`  
 > Abgeleitet aus diesem Dokument.  
 > Beschreibt Typ A, B und C konkret mit Modulen, Kosten, Voraussetzungen.
+
