@@ -1,3 +1,6 @@
+// StationTravelDock.tsx
+// Aktualisiert: 23.06.2026 — Abflug-/Docking-Block für Stationen
+// Version:      0.1.0
 // app/dashboard/StationTravelDock.tsx
 // Erstellt:     23.06.2026
 // Version:      0.1.0
