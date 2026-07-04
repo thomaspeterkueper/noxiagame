@@ -259,14 +259,45 @@ lease_id      // optionaler Pachtvertrag (nullable)
 
 ---
 
-### F2 — Gibt es Grundsteuer?
-**Status: Offen**
+### F2 — Grundsteuer als Governance-Instrument
+**Status: Accepted**
 
-| Option | Beschreibung | Konsequenz |
-|--------|-------------|------------|
-| Ja, immer | Alle Landbesitzer zahlen | Staatsfinanzierung, Anreiz gegen Spekulation |
-| Ja, optional | Abhängig von Regierungsform | Politische Entscheidung, Emergenz |
-| Nein | Kein Steuersystem | Einfacher, weniger Tiefe |
+Grundsteuer ist kein universelles Spielgesetz. Sie ist ein Governance-Instrument das je nach Regierungsform und lokaler Politik aktiviert und parametrisiert werden kann.
+
+**Modell: Landwertsteuer (Henry George)**
+
+```
+Steuer = land_value × Steuersatz
+```
+
+Nicht pauschale Flächensteuer, sondern wertbasiert:
+- Feld neben kleinem Habitat → niedriger Wert → geringe Steuer
+- Feld am Haupt-Raumhafen → hoher Wert → hohe Steuer
+
+Dadurch wird Spekulation teuer, produktive Nutzung aber nicht bestraft.
+
+**Phasenmodell:**
+
+| Phase | Einwohner | Grundsteuer |
+|-------|-----------|-------------|
+| Pionier | < 1.000 | 0 — keine funktionierende Verwaltung |
+| Kolonie | 1.000–100.000 | gering — Infrastrukturfinanzierung |
+| Metropole | > 100.000 | variabel — aktives Steuerungsinstrument |
+
+**Verbindung zu F1 (Pacht):**
+Eigentümer zahlt die Steuer — nicht der Pächter.  
+Der Eigentümer kalkuliert sie in den Pachtpreis ein.  
+Das entspricht realen Märkten und erzeugt natürliche Preisbildung.
+
+**Datenmodell-Anforderung:**
+`land_value` wird von Anfang an im Schema unterstützt — auch wenn zunächst keine Steuer erhoben wird. `land_value` ist keine Steuerhilfsvariable, sondern eine zentrale Wirtschaftsgröße für:
+
+- Kaufpreise
+- Enteignungsentschädigungen
+- Pachtpreise
+- Immobilienmärkte
+- Standortbewertungen
+- Grundsteuerberechnung
 
 ---
 
