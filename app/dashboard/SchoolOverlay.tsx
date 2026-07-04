@@ -1,8 +1,6 @@
-// SchoolOverlay.tsx
-// Aktualisiert: 28.06.2026 — SSF direkt in Akademie integriert
-// Version:      4.1.0
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 28.06.2026 — SSF direkt in Akademie integriert
+// Aktualisiert: 04.07.2026 — Split 40/60 wiederhergestellt, SSF-Material rechts
+// Version:      4.2.0
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -31,11 +29,14 @@ type SsfModule = {
   title?: string
   name?: string
   description?: string
+  summary?: string        // Fix: war in Interface nicht deklariert
   subject?: string
+  domain?: string         // Fix: war in Interface nicht deklariert
   durationMinutes?: number
   difficulty?: number
   reward?: string
   unlocks?: string[]
+  ssfUrl?: string         // Fix: war in Interface nicht deklariert
 }
 
 const MONO = "'Courier Prime', monospace"
@@ -80,10 +81,10 @@ function fallbackTask(): Task {
 function ManualTab({ onClose }: { onClose: () => void }) {
   const [open, setOpen] = useState('ziel')
   return (
-    <div style={{ padding: '1.4rem', overflowY: 'auto', flex: 1 }}>
+    <div style={{ padding: '1.4rem', overflowY: 'auto' as const, flex: 1 }}>
       {MANUAL_SECTIONS.map(s => (
         <div key={s.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
-          <button onClick={() => setOpen(open === s.id ? '' : s.id)} style={{ width: '100%', textAlign: 'left', background: open === s.id ? '#e8eef6' : C.bgAlt, border: 'none', padding: '0.7rem 1rem', cursor: 'pointer', color: open === s.id ? C.accent : C.text, fontFamily: MONO, fontWeight: 700 }}>
+          <button onClick={() => setOpen(open === s.id ? '' : s.id)} style={{ width: '100%', textAlign: 'left' as const, background: open === s.id ? '#e8eef6' : C.bgAlt, border: 'none', padding: '0.7rem 1rem', cursor: 'pointer', color: open === s.id ? C.accent : C.text, fontFamily: MONO, fontWeight: 700 }}>
             {s.title}
           </button>
           {open === s.id && <div style={{ padding: '0.85rem 1rem', background: '#fff', fontSize: '0.84rem', lineHeight: 1.7, color: C.text }}>{s.content}</div>}
@@ -118,30 +119,78 @@ function SsfTab() {
   }, [])
 
   return (
-    <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1 }}>
+    <div style={{ padding: '1.25rem', overflowY: 'auto' as const, flex: 1 }}>
       <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '1rem', marginBottom: '1rem' }}>
-        <div style={{ fontSize: '0.62rem', color: C.gold, letterSpacing: '0.18em', textTransform: 'uppercase', fontFamily: MONO, fontWeight: 700 }}>Solar Science Foundation</div>
+        <div style={{ fontSize: '0.62rem', color: C.gold, letterSpacing: '0.18em', textTransform: 'uppercase' as const, fontFamily: MONO, fontWeight: 700 }}>Solar Science Foundation</div>
         <h3 style={{ margin: '0.35rem 0 0.4rem', color: C.accent, fontSize: '1.05rem' }}>SSF-Lernmodule</h3>
         <p style={{ margin: 0, color: C.textMuted, fontSize: '0.82rem', lineHeight: 1.6 }}>Lerne Grundlagen und schalte später NOXIA-Technologien frei.</p>
         <a href="/ssf" style={{ display: 'inline-block', marginTop: '0.75rem', color: C.gold, fontWeight: 700, textDecoration: 'none', fontSize: '0.8rem' }}>Große SSF-Ansicht öffnen →</a>
       </div>
-
       {loading && <div style={{ color: C.textMuted, fontFamily: MONO }}>Lade Module …</div>}
       {error && <div style={{ color: C.red, fontFamily: MONO }}>{error}</div>}
       {!loading && !error && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 10 }}>
-          {modules.map(m => {
-            const title = m.title ?? m.name ?? m.id
-            const unlock = m.reward ?? m.unlocks?.[0]
-            return (
-              <div key={m.id} style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '0.85rem 0.95rem' }}>
-                <div style={{ fontWeight: 800, color: C.text, fontSize: '0.82rem' }}>{title}</div>
-                <div style={{ color: C.textFaint, fontSize: '0.65rem', marginTop: 4, fontFamily: MONO }}>{m.id}</div>
-                <div style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: 7, lineHeight: 1.5 }}>{m.description ?? 'SSF-Grundlagenmodul.'}</div>
-                {unlock && <div style={{ marginTop: 8, color: C.gold, fontSize: '0.68rem', fontWeight: 700 }}>Unlock: {unlock}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+          {modules.map(m => (
+            <a key={m.id} href={m.ssfUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+              style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.75rem 0.9rem', textDecoration: 'none', display: 'block' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ fontWeight: 700, color: C.text, fontSize: '0.85rem' }}>{m.title ?? m.name ?? m.id}</div>
+                <span style={{ fontSize: '0.6rem', color: C.textFaint, fontFamily: MONO, marginLeft: 8, flexShrink: 0 }}>↗</span>
               </div>
-            )
-          })}
+              <div style={{ color: C.textFaint, fontSize: '0.62rem', marginTop: 3, fontFamily: MONO }}>{m.domain ?? ''} · Schwierigkeit {m.difficulty ?? '?'}</div>
+              <div style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: 6, lineHeight: 1.5 }}>{m.summary ?? m.description ?? 'SSF-Grundlagenmodul.'}</div>
+              {(m.unlocks?.length ?? 0) > 0 && <div style={{ marginTop: 6, color: C.gold, fontSize: '0.68rem', fontWeight: 700 }}>🔓 Freischaltet: {m.unlocks![0]}</div>}
+            </a>
+          ))}
+          {modules.length === 0 && <div style={{ color: C.textMuted, fontSize: '0.8rem', fontFamily: MONO }}>Keine Module verfügbar.</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RightPanel({ topic, modules }: { topic: string | null; modules: SsfModule[] }) {
+  const TOPIC_DOMAIN: Record<string, string> = {
+    'Handel': 'economics', 'Ressourcen': 'economics',
+    'Navigation': 'physics', 'Physik': 'physics', 'Sonnensystem': 'physics',
+    'Energie': 'physics', 'Bevölkerung': 'biology', 'Geschichte': 'history',
+  }
+  const domain = topic ? TOPIC_DOMAIN[topic] : null
+  const relevant = domain
+    ? modules.filter(m => (m.domain ?? '').toLowerCase().includes(domain))
+    : modules.slice(0, 3)
+
+  if (!topic) return (
+    <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', height: '100%', color: C.textFaint, textAlign: 'center' as const, padding: '2rem' }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.75rem', opacity: 0.35 }}>📖</div>
+      <div style={{ fontFamily: MONO, fontSize: '0.75rem' }}>Lernmaterial erscheint<br/>passend zur Aufgabe</div>
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '1rem', overflowY: 'auto' as const, height: '100%', boxSizing: 'border-box' as const }}>
+      <div style={{ fontSize: '0.58rem', fontWeight: 700, color: C.gold, letterSpacing: '3px', textTransform: 'uppercase' as const, marginBottom: '0.75rem', fontFamily: MONO }}>
+        📚 {topic} · SSF-Material
+      </div>
+      {relevant.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+          {relevant.map(m => (
+            <a key={m.id} href={m.ssfUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+              style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.7rem 0.85rem', textDecoration: 'none', display: 'block' }}>
+              <div style={{ fontWeight: 700, color: C.accent, fontSize: '0.82rem' }}>{m.title ?? m.name ?? m.id}</div>
+              <div style={{ color: C.textFaint, fontSize: '0.62rem', marginTop: 2, fontFamily: MONO }}>{m.domain ?? ''} · {m.durationMinutes ?? '?'} Min.</div>
+              <div style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: 5, lineHeight: 1.5 }}>{m.summary ?? m.description ?? ''}</div>
+              {(m.unlocks?.length ?? 0) > 0 && <div style={{ marginTop: 5, color: C.gold, fontSize: '0.65rem', fontWeight: 700 }}>🔓 {m.unlocks![0]}</div>}
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: C.textMuted, fontSize: '0.8rem', fontFamily: MONO }}>
+          Kein passendes SSF-Modul gefunden.
+          <a href="https://solarsciencefoundation.vercel.app" target="_blank" rel="noopener noreferrer"
+            style={{ display: 'block', marginTop: 8, color: C.gold, fontWeight: 700, textDecoration: 'none', fontSize: '0.75rem' }}>
+            SSF öffnen →
+          </a>
         </div>
       )}
     </div>
@@ -150,6 +199,7 @@ function SsfTab() {
 
 export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned }: SchoolOverlayProps) {
   const [tab, setTab] = useState<'akademie' | 'ssf' | 'handbuch'>('akademie')
+  const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(false)
   const [answer, setAnswer] = useState('')
@@ -159,8 +209,19 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const inputRef = useRef<HTMLInputElement>(null)
   const bg = ACADEMY_BG[locationSlug]
 
-  useEffect(() => { loadKnowledge(); generateTask() }, [])
-  useEffect(() => { if (task?.kind === 'calc' && !loading && result === null) setTimeout(() => inputRef.current?.focus(), 80) }, [task, loading, result])
+  useEffect(() => {
+    loadKnowledge()
+    generateTask()
+    fetch('/api/ssf/modules').then(r => r.json()).then((d: unknown) => {
+      const list = Array.isArray(d) ? d : ((d as Record<string,unknown>).modules ?? [])
+      setSsfModules(list as SsfModule[])
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (task?.kind === 'calc' && !loading && result === null)
+      setTimeout(() => inputRef.current?.focus(), 80)
+  }, [task, loading, result])
 
   async function jwt() {
     try {
@@ -173,8 +234,8 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   async function loadKnowledge() {
     try {
       const token = await jwt()
-      const data = await (await fetch('/api/game/knowledge', { headers: { Authorization: `Bearer ${token}` } })).json()
-      setTotal(data.knowledge_points ?? 0)
+      const data = await (await fetch('/api/game/knowledge', { headers: { Authorization: `Bearer ${token}` } })).json() as Record<string,unknown>
+      setTotal((data.knowledge_points as number) ?? 0)
     } catch {}
   }
 
@@ -182,8 +243,8 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     setLoading(true); setResult(null); setAnswer(''); setSelected(null)
     try {
       const res = await fetch('/api/game/school', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: 1, colonyContext }) })
-      const data = await res.json()
-      setTask(data.task ?? fallbackTask())
+      const data = await res.json() as Record<string,unknown>
+      setTask((data.task as Task) ?? fallbackTask())
     } catch { setTask(fallbackTask()) }
     setLoading(false)
   }
@@ -197,42 +258,84 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     if (ok) {
       try {
         const token = await jwt()
-        const data = await (await fetch(`/api/game/knowledge?action=award&points=${task.points}&reason=school_task&location=${locationSlug}`, { headers: { Authorization: `Bearer ${token}` } })).json()
-        if (data.knowledge_points != null) { setTotal(data.knowledge_points); onKnowledgeEarned(task.points, data.knowledge_points) }
+        const data = await (await fetch(`/api/game/knowledge?action=award&points=${task.points}&reason=school_task&location=${locationSlug}`, { headers: { Authorization: `Bearer ${token}` } })).json() as Record<string,unknown>
+        if (data.knowledge_points != null) {
+          setTotal(data.knowledge_points as number)
+          onKnowledgeEarned(task.points, data.knowledge_points as number)
+        }
       } catch {}
     }
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
-      {bg && <img src={bg.src} alt={bg.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%' }} onError={e => { e.currentTarget.style.display = 'none' }} />}
+      {bg && <img src={bg.src} alt={bg.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,18,28,0.52)' }} />
       <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.5rem', zIndex: 10, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', color: C.textMuted }}>✕</button>
-      {bg && <div style={{ position: 'absolute', top: '1.25rem', left: '1.5rem', zIndex: 10, fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(248,245,238,0.85)', fontFamily: MONO }}>{bg.label}</div>}
+      {bg && <div style={{ position: 'absolute', top: '1.25rem', left: '1.5rem', zIndex: 10, fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: 'rgba(248,245,238,0.85)', fontFamily: MONO }}>{bg.label}</div>}
 
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end' }}>
-            {(['akademie','ssf','handbuch'] as const).map(t => <button key={t} onClick={() => setTab(t)} style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>{t === 'akademie' ? 'Akademie' : t === 'ssf' ? 'SSF' : 'Handbuch'}</button>)}
-            <div style={{ marginLeft: 'auto', paddingBottom: '0.5rem' }}>{total !== null && <span style={{ fontSize: '0.72rem', padding: '2px 10px', borderRadius: 20, background: C.goldLight, color: C.gold, fontWeight: 700, fontFamily: MONO }}>{total} Pkt.</span>}</div>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: C.bg, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+
+        {/* LINKE SEITE — 40% Aufgaben */}
+        <div style={{ width: '40%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end' }}>
+              {(['akademie', 'ssf', 'handbuch'] as const).map(t => (
+                <button key={t} onClick={() => setTab(t)} style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
+                  {t === 'akademie' ? 'Akademie' : t === 'ssf' ? 'SSF' : 'Handbuch'}
+                </button>
+              ))}
+              <div style={{ marginLeft: 'auto', paddingBottom: '0.5rem' }}>
+                {total !== null && <span style={{ fontSize: '0.72rem', padding: '2px 10px', borderRadius: 20, background: C.goldLight, color: C.gold, fontWeight: 700, fontFamily: MONO }}>{total} Pkt.</span>}
+              </div>
+            </div>
           </div>
+
+          {tab === 'handbuch' && <ManualTab onClose={onClose} />}
+          {tab === 'ssf' && <SsfTab />}
+          {tab === 'akademie' && (
+            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
+              {loading && <div style={{ textAlign: 'center' as const, padding: '2.5rem', color: C.textMuted, fontFamily: MONO }}>Aufgabe wird generiert …</div>}
+              {!loading && task && (
+                <>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: 20, background: '#e8eef6', color: C.accent, fontWeight: 700, fontFamily: MONO }}>{task.topic}</span>
+                    <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: 20, background: C.bgAlt, color: C.textMuted, fontFamily: MONO }}>{task.kind === 'quiz' ? 'Wissensfrage' : 'Rechenaufgabe'}</span>
+                  </div>
+                  <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.accent}`, borderRadius: '0 8px 8px 0', padding: '1rem 1.25rem', marginBottom: '1rem', fontSize: '0.95rem', lineHeight: 1.7 }}>{task.question}</div>
+                  {result === null && task.kind === 'calc' && (
+                    <>
+                      <input ref={inputRef} type="number" placeholder="Deine Antwort …" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} style={{ width: '100%', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '0.65rem 0.9rem', fontSize: '1rem', fontFamily: MONO, boxSizing: 'border-box' as const }} />
+                      <button onClick={() => check()} disabled={!answer.trim()} style={{ width: '100%', marginTop: 12, padding: '0.7rem', background: answer.trim() ? C.accent : C.border, color: answer.trim() ? '#fff' : C.textFaint, border: 'none', borderRadius: 8, fontWeight: 700, cursor: answer.trim() ? 'pointer' : 'not-allowed', fontFamily: MONO }}>Prüfen →</button>
+                    </>
+                  )}
+                  {result === null && task.kind === 'quiz' && (
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                      {task.options.map((o, i) => (
+                        <button key={i} onClick={() => check(i)} style={{ padding: '0.75rem 1rem', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, textAlign: 'left' as const, cursor: 'pointer', fontFamily: MONO }}>
+                          <strong style={{ color: C.textFaint, marginRight: 10 }}>{['A','B','C','D'][i]}</strong>{o}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {result === 'correct' && <div style={{ background: C.greenLight, border: '1px solid #a0dcb8', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.green, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Richtig! +{task.points} Punkte</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
+                  {result === 'wrong' && <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.red, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Nicht ganz.</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
+                  {result !== null && <button onClick={generateTask} style={{ width: '100%', marginTop: 12, padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: 'pointer' }}>Nächste Aufgabe →</button>}
+                  <div style={{ fontSize: '0.65rem', color: C.textFaint, textAlign: 'center' as const, marginTop: 10, fontFamily: MONO }}>{task.points} Punkte</div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        {tab === 'handbuch' && <ManualTab onClose={onClose} />}
-        {tab === 'ssf' && <SsfTab />}
-        {tab === 'akademie' && <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.25rem 1.25rem' }}>
-          {loading && <div style={{ textAlign: 'center', padding: '2.5rem', color: C.textMuted, fontFamily: MONO }}>Aufgabe wird generiert …</div>}
-          {!loading && task && <>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}><span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: 20, background: '#e8eef6', color: C.accent, fontWeight: 700, fontFamily: MONO }}>{task.topic}</span><span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: 20, background: C.bgAlt, color: C.textMuted, fontFamily: MONO }}>{task.kind === 'quiz' ? 'Wissensfrage' : 'Rechenaufgabe'}</span></div>
-            <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.accent}`, borderRadius: '0 8px 8px 0', padding: '1rem 1.25rem', marginBottom: '1rem', fontSize: '0.95rem', lineHeight: 1.7 }}>{task.question}</div>
-            {result === null && task.kind === 'calc' && <><input ref={inputRef} type="number" placeholder="Deine Antwort …" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} style={{ width: '100%', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '0.65rem 0.9rem', fontSize: '1rem', fontFamily: MONO }} /><button onClick={() => check()} disabled={!answer.trim()} style={{ width: '100%', marginTop: 12, padding: '0.7rem', background: answer.trim() ? C.accent : C.border, color: answer.trim() ? '#fff' : C.textFaint, border: 'none', borderRadius: 8, fontWeight: 700, cursor: answer.trim() ? 'pointer' : 'not-allowed', fontFamily: MONO }}>Prüfen →</button></>}
-            {result === null && task.kind === 'quiz' && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{task.options.map((o, i) => <button key={i} onClick={() => check(i)} style={{ padding: '0.75rem 1rem', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, textAlign: 'left', cursor: 'pointer', fontFamily: MONO }}><strong style={{ color: C.textFaint, marginRight: 10 }}>{['A','B','C','D'][i]}</strong>{o}</button>)}</div>}
-            {result === 'correct' && <div style={{ background: C.greenLight, border: '1px solid #a0dcb8', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.green, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Richtig! +{task.points} Punkte</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
-            {result === 'wrong' && <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.red, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Nicht ganz.</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
-            {result !== null && <button onClick={generateTask} style={{ width: '100%', marginTop: 12, padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: 'pointer' }}>Nächste Aufgabe →</button>}
-            <div style={{ fontSize: '0.65rem', color: C.textFaint, textAlign: 'center', marginTop: 10, fontFamily: MONO }}>{task.points} Punkte</div>
-          </>}
-        </div>}
+        {/* RECHTE SEITE — 60% SSF-Lernmaterial */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#faf7f0', overflow: 'hidden' }}>
+          {tab === 'ssf'
+            ? <SsfTab />
+            : <RightPanel topic={task?.topic ?? null} modules={ssfModules} />
+          }
+        </div>
+
       </div>
     </div>
   )
