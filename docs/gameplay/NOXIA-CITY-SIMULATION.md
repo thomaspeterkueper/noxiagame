@@ -400,14 +400,41 @@ Kein Pop-up. Keine Warnung. Nur Beobachtung.
 
 ---
 
-### F5 — Gibt es Zonierung?
-**Status: Offen**
+### F5 — Zonierung: Emergent
+**Status: Accepted — Implementierung abhängig von RESOURCE-0001**
 
-| Option | Beschreibung | Konsequenz |
-|--------|-------------|------------|
-| Explizit (SimCity) | Spieler weist Zonen zu | Stadtplanung als aktive Mechanik |
-| Emergent (Anno) | Zonen entstehen aus Nutzung | Natürlicherer Stadtbau |
-| Keine | Alles gemischt | Einfach, wenig Tiefe |
+**Entscheidung: Emergente Zonierung**
+
+Zonen werden nicht vom Spieler gezeichnet. Sie entstehen aus der Nutzung.
+
+```
+Wo Minen und Fabriken stehen     → Industriezone (emergent)
+Wo Habitate und Läden stehen     → Wohnzone (emergent)
+Wo Raumhafen und Logistik stehen → Hafenzone (emergent)
+```
+
+**Mechanisch:** Jede Kachel bekommt einen berechneten `district_type` der aus der Umgebung abgeleitet wird — nicht vorab festgelegt. NPCs und CORPORATION-Akteure nutzen diesen Kontext für ihre Entscheidungen (F3, F4).
+
+**Warum nicht explizit (SimCity):**
+Explizite Zonierung erzeugt Verwaltungsaufwand bevor der Spieler die Stadt überhaupt versteht. Emergente Zonierung entsteht als natürliche Konsequenz von Entscheidungen die der Spieler bereits trifft.
+
+**Abhängigkeit:**
+Volle Implementierung setzt RESOURCE-0001 voraus — weil Nutzungstypen aus dem Ressourcenmodell (Material / Deposit / Handelsgut / Produkt) abgeleitet werden. Ein Tile mit einem Wolfram-Deposit hat einen anderen Nutzungskontext als ein Tile mit einem Habitat.
+
+---
+
+## Zusammenfassung: Alle Entscheidungen
+
+| Frage | Entscheidung |
+|-------|-------------|
+| F1 — Landverpachtung | `owner_id ≠ occupant_id` — im Schema von Anfang an, spielbar ab Alpha 0.3 |
+| F2 — Grundsteuer | Landwertsteuer (Henry George) — Governance-Instrument, `land_value` zentrale Größe |
+| F3 — NPC-Autonomie | Begrenzt autonom — vier Klassen: PLAYER / STATE / NPC / CORPORATION |
+| F4 — HeliosCorp | Subtil präsent — rationaler Akteur, nie explizit, entdeckbar |
+| F5 — Zonierung | Emergent — aus Nutzung abgeleitet, nicht vorab festgelegt |
+
+**Nächstes Dokument vor GDD-BUILDINGS:**
+`docs/gameplay/NOXIA-RESOURCE-0001.md` — Ressourcenmodell (Material / Deposit / Handelsgut / Produkt)
 
 ---
 
