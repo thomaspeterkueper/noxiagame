@@ -1,3 +1,6 @@
+// types.ts
+// Aktualisiert: 08.06.2026 — API-Vertrag aller Game-Routen
+// Version:      0.2.0
 // lib/game/types.ts
 // Erstellt: 08.06.2026
 // API-Vertrag: Response-Shapes aller Game-Routen an EINER Stelle.
