@@ -1,3 +1,6 @@
+// dashboardStatus.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Dashboard-Statushilfen
+// Version:      0.1.0
 // app/dashboard/dashboardStatus.ts
 // Reine Ableitungen für das Übersichts-Layout.
 // Nur aus resource / stock / production / consumption — keine anderen Felder.
