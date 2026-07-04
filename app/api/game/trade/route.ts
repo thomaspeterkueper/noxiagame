@@ -1,7 +1,7 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 23.06.2026 17:00 — successful travel increments profiles.flight_count
-// Version:      0.5.4
+// Aktualisiert: 26.06.2026 — Ruf-Inkrementierung: location_reputation bei buy/sell
+// Version:      0.6.0
 //
 // v0.5.4 – Pilot-Kompetenz: erfolgreiche Reisen zählen serverseitig auf
 //   profiles.flight_count. Das Dashboard soll nur den fertigen Wert lesen.
@@ -347,6 +347,22 @@ export async function GET(req: NextRequest) {
     amount: booked,
     profit,
   })
+
+  // ── RUF-INKREMENTIERUNG ───────────────────────────────────────────────────
+  // Verkäufe (Lieferungen) erhöhen den Ruf an dieser Location.
+  // INSERT ... ON CONFLICT DO UPDATE summiert atomar — kein Race-Condition-Problem.
+  if (action === 'sell') {
+    try {
+      await serviceClient.rpc('upsert_location_reputation', {
+        p_profile_id:  user.id,
+        p_location_id: loc.id,
+        p_deliveries:  1,
+        p_volume:      booked,
+      })
+    } catch {
+      // Ruf ist nicht geschäftskritisch — Fehler werden ignoriert
+    }
+  }
 
   if (tax > 0) {
     await serviceClient.from('colony_ledger').insert({
