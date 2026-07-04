@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 20.06.2026 — NPC-Route
+// Version:      0.2.0
 // app/api/game/npc/route.ts
 // Erstellt:     15.06.2026
 // Aktualisiert: 20.06.2026
