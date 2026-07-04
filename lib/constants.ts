@@ -1,3 +1,6 @@
+// constants.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Shared-Konstanten
+// Version:      0.1.0
 // lib/constants.ts
 
 export const RESOURCE_LABEL: Record<string, string> = {
