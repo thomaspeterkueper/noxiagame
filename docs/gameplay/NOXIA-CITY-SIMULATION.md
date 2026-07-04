@@ -301,14 +301,47 @@ Das entspricht realen Märkten und erzeugt natürliche Preisbildung.
 
 ---
 
-### F3 — Können Bürger Land besitzen ohne Spieleraktion?
-**Status: Offen**
+### F3 — Wer ist primärer Stadtentwickler?
+**Status: Accepted**
 
-| Option | Beschreibung | Konsequenz |
-|--------|-------------|------------|
-| Ja, vollständig | NPCs kaufen/bauen autonom | Maximale Lebendigkeit, hohe Komplexität |
-| Ja, begrenzt | NPCs nutzen unbebautes Land | Mittlere Komplexität |
-| Nein | Nur Spieler + Staat | Einfach, wenig emergent |
+```
+Primärer Entwickler  = Spieler
+Sekundärer Entwickler = NPCs
+```
+
+**Vier Eigentümerklassen:**
+
+| Klasse | Bedeutung |
+|--------|-----------|
+| `PLAYER` | Menschlicher Spieler |
+| `STATE` | Staatliche Instanz der Kolonie |
+| `NPC` | Einzelne Bürger, lokale Unternehmer |
+| `CORPORATION` | HeliosCorp und andere Firmen mit eigener Strategie |
+
+Später möglich: `COOPERATIVE` für Genossenschaften.
+
+**Vier Regeln:**
+
+**Regel 1 — NPCs dürfen Land besitzen und erwerben.**  
+Aber nicht beliebig — nur freies Land oder vom Staat freigegebenes Land.
+
+**Regel 2 — Spielerland ist geschützt.**  
+Kein NPC-Akteur übernimmt automatisch Land mit `owner_id = PLAYER`.
+
+**Regel 3 — NPCs reagieren auf Nachfrage.**
+
+| Bedingung | NPC-Reaktion |
+|-----------|-------------|
+| Bevölkerungsdruck ↑ | Wohnungsbaugesellschaft entsteht |
+| Kaufkraft ↑ | Geschäfte und Märkte entstehen |
+| Universitätsnähe | Studentenwohnungen, Cafés |
+| Raumhafen ↑ | Hotels, Logistik, Restaurants |
+
+**Regel 4 — Spieler lenkt, NPCs füllen Lücken.**  
+Der Spieler baut die Rahmenbedingungen. Die Stadt entwickelt sich innerhalb dieser Bedingungen selbst.
+
+**Abgrenzung CORPORATION vs. NPC:**  
+`CORPORATION` (HeliosCorp) hat eine eigene langfristige Strategie und kann systematisch freie Felder in strategischen Lagen aufkaufen — bevor der Spieler sie braucht. Das ist entdeckbar, nicht zufällig.
 
 ---
 
