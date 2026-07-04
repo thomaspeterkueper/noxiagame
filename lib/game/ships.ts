@@ -1,3 +1,6 @@
+// ships.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Schiffs-Spec + Lebenszyklus
+// Version:      0.3.0
 // lib/game/ships.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // NOXIA — Schiffs-Spec + lebende Schicht
