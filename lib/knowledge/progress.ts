@@ -1,3 +1,6 @@
+// progress.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Lernfortschritt-Logik
+// Version:      0.1.0
 import { knowledgeBuildings, knowledgeUnlocks, learningModules } from './data';
 import type { BuildCheck, BuildingId, KnowledgeProgress, LearningModuleId, UnlockId } from './types';
 
