@@ -1,3 +1,6 @@
+// WelcomeSetup.tsx
+// Aktualisiert: 07.06.2026 — Onboarding-Setup
+// Version:      0.1.0
 // app/dashboard/WelcomeSetup.tsx
 // Erstellt: 07.06.2026
 // Erst-Login-Onboarding: Name + Avatar wählen, dann drei Einweisungskarten.
