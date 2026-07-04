@@ -1,3 +1,6 @@
+// ui.tsx
+// Aktualisiert: 27.06.2026 — Bauteile als Ressource ergänzt
+// Version:      0.2.0
 // app/dashboard/ui.tsx
 // Erstellt:     15.06.2026
 // Aktualisiert: 27.06.2026 — Bauteile als Ressource ergänzt
