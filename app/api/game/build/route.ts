@@ -1,3 +1,6 @@
+// route.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Build/Sell-Route
+// Version:      1.0.0
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
