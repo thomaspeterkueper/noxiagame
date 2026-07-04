@@ -1,3 +1,6 @@
+// StationOverlay.tsx
+// Aktualisiert: 22.06.2026 — StationOverlay
+// Version:      0.2.0
 // app/dashboard/StationOverlay.tsx
 // Erstellt:     21.06.2026
 // Aktualisiert: 22.06.2026 08:50
