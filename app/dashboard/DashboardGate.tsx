@@ -1,3 +1,6 @@
+// DashboardGate.tsx
+// Aktualisiert: 04.07.2026 — Header ergänzt; Auth-Gate
+// Version:      0.1.0
 'use client'
 
 import React, { useEffect } from 'react'
