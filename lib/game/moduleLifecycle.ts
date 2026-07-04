@@ -1,3 +1,6 @@
+// moduleLifecycle.ts
+// Aktualisiert: 04.07.2026 — Header ergänzt; Modul-Lebenszyklus
+// Version:      0.1.0
 // lib/game/moduleLifecycle.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // NOXIA — Modul- & Schiffs-Lebenszyklus (reine Logik, ohne DB)
