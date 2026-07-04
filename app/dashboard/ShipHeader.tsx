@@ -1,3 +1,6 @@
+// ShipHeader.tsx
+// Aktualisiert: 04.07.2026 — Header ergänzt; Standort-Banner
+// Version:      1.0.0
 'use client'
 
 // ─────────────────────────────────────────────
