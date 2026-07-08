@@ -1,7 +1,10 @@
 // source.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; KNOWLEDGE_SOURCE-Env-Switch
-// Version:      0.1.0
+// Aktualisiert: 08.07.2026 — SSF_BASE_URL als kanonische SSF-Basis-URL
+// Version:      0.2.0
+
 export type KnowledgeSourceMode = 'local' | 'ssf';
+
+const DEFAULT_SSF_BASE_URL = 'https://solarsciencefoundation.vercel.app';
 
 export function getKnowledgeSourceMode(): KnowledgeSourceMode {
   const mode = process.env.KNOWLEDGE_SOURCE;
@@ -9,7 +12,9 @@ export function getKnowledgeSourceMode(): KnowledgeSourceMode {
 }
 
 export function getSolarScienceFoundationBaseUrl(): string {
-  return process.env.SSF_API_BASE_URL ?? 'https://solarsciencefoundation.org';
+  // SSF_BASE_URL ist kanonisch. SSF_API_BASE_URL bleibt nur als
+  // rückwärtskompatibler Alias erhalten und verwendet denselben Default.
+  return process.env.SSF_BASE_URL ?? process.env.SSF_API_BASE_URL ?? DEFAULT_SSF_BASE_URL;
 }
 
 export function isSsfKnowledgeSourceEnabled(): boolean {
