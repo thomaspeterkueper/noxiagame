@@ -1,7 +1,7 @@
 // app/dashboard/TipSystem.tsx
-// Version:      1.2.0
+// Version:      1.3.0
 // Erstellt:     20.06.2026
-// Aktualisiert: 07.07.2026 — Kompaktes nächstes Missionsziel ergänzt
+// Aktualisiert: 08.07.2026 — Feedback bei Zielwechsel und Missionsabschluss ergänzt
 //
 // Kontextsensitives Tipp-System.
 // Tipps werden priorisiert — immer nur der dringendste wird gezeigt.
@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 
 const STORAGE_KEY = 'noxia_dismissed_tips'
@@ -82,12 +82,28 @@ interface TipBannerProps {
   tips: TipDef[]   // priorisierte Liste — erster zutreffende wird gezeigt
 }
 
+function missionKey(mission: Mission | null) {
+  if (!mission?.nextStep) return null
+  return `${mission.id}:${mission.nextStep.id}`
+}
+
 function NextObjectiveBanner() {
   const [mission, setMission] = useState<Mission | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const previousKey = useRef<string | null>(null)
+  const hadObjective = useRef(false)
 
   useEffect(() => {
     let cancelled = false
+    let feedbackTimer: ReturnType<typeof window.setTimeout> | null = null
+
+    function showFeedback(text: string) {
+      setFeedback(text)
+      if (feedbackTimer) window.clearTimeout(feedbackTimer)
+      feedbackTimer = window.setTimeout(() => setFeedback(null), 4200)
+    }
+
     async function load() {
       try {
         const token = await getToken()
@@ -97,16 +113,51 @@ function NextObjectiveBanner() {
         const active = Array.isArray(data.missions)
           ? data.missions.find((m: Mission) => m.status !== 'completed' && m.nextStep)
           : null
-        if (!cancelled) setMission(active ?? null)
+        if (cancelled) return
+
+        const nextKey = missionKey(active ?? null)
+        const prevKey = previousKey.current
+
+        if (mounted && prevKey && nextKey && prevKey !== nextKey) {
+          showFeedback('✔ Ziel erledigt · nächstes Ziel freigeschaltet')
+        } else if (mounted && prevKey && !nextKey && hadObjective.current) {
+          showFeedback('✔ Alle Startmissionen abgeschlossen')
+        }
+
+        previousKey.current = nextKey
+        hadObjective.current = hadObjective.current || !!nextKey
+        setMission(active ?? null)
       } catch {}
       finally { if (!cancelled) setMounted(true) }
     }
-    load()
-    const iv = window.setInterval(load, 30000)
-    return () => { cancelled = true; window.clearInterval(iv) }
-  }, [])
 
-  if (!mounted || !mission?.nextStep) return null
+    load()
+    const iv = window.setInterval(load, 15000)
+    return () => {
+      cancelled = true
+      window.clearInterval(iv)
+      if (feedbackTimer) window.clearTimeout(feedbackTimer)
+    }
+  }, [mounted])
+
+  if (!mounted) return null
+
+  if (feedback) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.7rem',
+        background: 'linear-gradient(90deg, rgba(201,169,97,0.98), rgba(201,169,97,0.86))',
+        color: '#fff', borderRadius: '8px', padding: '0.65rem 0.85rem',
+        marginBottom: '0.75rem', boxShadow: '0 8px 22px rgba(201,169,97,0.2)',
+        border: '1px solid rgba(255,255,255,0.22)', fontWeight: 900, fontSize: '0.78rem',
+      }}>
+        <span style={{ fontSize: '1rem' }}>✓</span>
+        <span>{feedback}</span>
+      </div>
+    )
+  }
+
+  if (!mission?.nextStep) return null
 
   return (
     <div style={{
