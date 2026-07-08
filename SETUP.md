@@ -1,6 +1,6 @@
 # NOXIA – Technisches Setup (Alpha 0.1)
 
-Stand: Mai 2026  
+Stand: Juli 2026  
 Stack: Next.js 16 · Supabase · Vercel · Ably  
 Kosten: 0 €/Monat im Free Tier  
 Getestet auf: Windows 11, PowerShell
@@ -177,7 +177,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=dein-anon-key
 SUPABASE_SERVICE_ROLE_KEY=dein-service-role-key
 NEXT_PUBLIC_ABLY_API_KEY=
 CRON_SECRET=
+KNOWLEDGE_SOURCE=local
+SSF_BASE_URL=https://solarsciencefoundation.vercel.app
 ```
+
+`SSF_BASE_URL` ist die kanonische Basis-URL für NOXIA→SSF. `SSF_API_BASE_URL` ist veraltet und darf nur noch als rückwärtskompatibler Alias betrachtet werden.
 
 CRON_SECRET generieren:
 ```powershell
@@ -230,6 +234,16 @@ vercel env add CRON_SECRET
 # Sensitive? → Y
 # Wert einfügen
 # Umgebungen → A, Enter
+
+vercel env add KNOWLEDGE_SOURCE
+# Sensitive? → N
+# Wert: local oder ssf
+# Umgebungen → A, Enter
+
+vercel env add SSF_BASE_URL
+# Sensitive? → N
+# Wert: https://solarsciencefoundation.vercel.app
+# Umgebungen → A, Enter
 ```
 
 ### Deployen
@@ -241,7 +255,25 @@ vercel --prod
 
 ---
 
-## 12. Täglicher Workflow
+## 12. Cron-Jobs
+
+`vercel.json` steuert die geplanten Server-Ticks.
+
+Aktuell erwartete Crons:
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/population", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/prices", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/orders", "schedule": "15 * * * *" }
+  ]
+}
+```
+
+---
+
+## 13. Täglicher Workflow
 
 ```powershell
 # Entwickeln
@@ -258,68 +290,3 @@ git push
 ---
 
 ## Projektstruktur (Ziel)
-
-```
-noxia/
-├── app/                        # Next.js App Router
-│   ├── layout.tsx
-│   ├── page.tsx
-│   ├── (game)/                 # Spielbereich (Auth required)
-│   │   ├── dashboard/
-│   │   ├── market/
-│   │   └── colony/[id]/
-│   └── api/
-│       └── cron/               # Hintergrundjobs
-│           ├── population/route.ts
-│           ├── prices/route.ts
-│           └── orders/route.ts
-├── components/
-│   ├── ui/
-│   ├── game/
-│   └── canvas/                 # Orrery, Visualisierungen
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts
-│   │   └── server.ts
-│   ├── game/
-│   │   ├── config.ts
-│   │   ├── economy.ts
-│   │   └── population.ts
-│   └── ably/
-│       └── client.ts
-├── store/
-│   └── gameStore.ts
-├── types/
-│   └── game.ts
-├── .env.local                  # Nie committen!
-├── vercel.json
-└── package.json
-```
-
----
-
-## Nächste Schritte
-
-1. **Datenbankschema** – SQL-Migrations für Supabase
-2. **Spielkonfiguration** – Kolonien, Ressourcen, Gebäude
-3. **Kernkreislauf** – Bevölkerung, Preise, Handel
-4. **Erstes UI** – Dashboard mit Kolonieübersicht
-
----
-
-## Versions-Referenz (getestet Mai 2026)
-
-| Tool | Version |
-|------|---------|
-| Node.js | 24.16.0 (LTS) |
-| npm | 11.13.0 |
-| pnpm | 11.5.0 |
-| Git | 2.53.0 |
-| VS Code | 1.122.1 |
-| Vercel CLI | 54.6.1 |
-| Supabase CLI | 2.102.0 |
-| Next.js | 16.2.6 |
-| @supabase/supabase-js | 2.106.2 |
-| ably | 2.21.0 |
-| zustand | 5.0.14 |
-
