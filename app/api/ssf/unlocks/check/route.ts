@@ -19,7 +19,11 @@ export async function POST(request: Request) {
   try {
     const response = await fetch(`${baseUrl}/api/noxia/unlocks/check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+        ...(process.env.NOXIA_API_KEY ? { 'X-NOXIA-API-KEY': process.env.NOXIA_API_KEY } : {}),
+      },
       body: JSON.stringify({
         completedModules: Array.isArray(body.completedModules) ? body.completedModules : [],
         unlockId: typeof body.unlockId === 'string' ? body.unlockId : null,
