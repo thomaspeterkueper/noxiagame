@@ -1,7 +1,7 @@
 // app/api/game/knowledge/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 21.06.2026 — daily task + level info
-// Version:      2.0.0
+// Aktualisiert: 09.07.2026 — action=complete_module: Modul abschließen und Unlock vergeben
+// Version:      2.1.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -136,6 +136,52 @@ export async function GET(req: NextRequest) {
       knowledge_points: newTotal ?? 0,
       awarded: points,
       level,
+    })
+  }
+
+  // ── Modul abschließen ────────────────────────────────────────────────────
+  // Schreibt academy_completions + vergibt knowledge_points
+  if (action === 'complete_module') {
+    const moduleId = searchParams.get('module_id')
+    if (!moduleId) return NextResponse.json({ error: 'module_id fehlt' }, { status: 400 })
+
+    // Doppelt-Abschluss verhindern
+    const { data: existing } = await supabase
+      .from('academy_completions')
+      .select('id')
+      .eq('profile_id', user.id)
+      .eq('module_id', moduleId)
+      .maybeSingle()
+
+    if (existing) {
+      return NextResponse.json({ ok: true, already_completed: true, module_id: moduleId })
+    }
+
+    // Modul als abgeschlossen markieren
+    await supabase.from('academy_completions').insert({
+      profile_id: user.id,
+      module_id:  moduleId,
+      completed_at: new Date().toISOString(),
+    })
+
+    // Wissenspunkte vergeben (L0=50, L1=100, L2=200)
+    const level = moduleId.includes('-L0-') ? 50
+                : moduleId.includes('-L1-') ? 100
+                : moduleId.includes('-L2-') ? 200
+                : 50
+
+    const { data: newTotal } = await supabase.rpc('award_knowledge', {
+      p_profile_id: user.id,
+      p_amount:     level,
+      p_reason:     `module_complete:${moduleId}`,
+      p_task_id:    null,
+    })
+
+    return NextResponse.json({
+      ok: true,
+      module_id:       moduleId,
+      points_awarded:  level,
+      knowledge_points: newTotal ?? 0,
     })
   }
 
