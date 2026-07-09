@@ -1,7 +1,7 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 26.06.2026 — runBankInterestTick: Zinsen auf Einlagen und Kredite
-// Version:      3.2.0
+// Aktualisiert: 09.07.2026 — NOX-0001: Kommentar, Ledger-Fehlerlog, export
+// Version:      3.2.1
 
 import {
   CONSUMPTION_PER_100,
@@ -385,7 +385,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
 // Läuft einmal pro Tick für alle Konten mit Einlage oder Kredit.
 // Zinsen werden als Ledger-Einträge gebucht — append-only, vollständig auditierbar.
 
-async function runBankInterestTick(supabase: SB, tickNumber: number) {
+export async function runBankInterestTick(supabase: SB, tickNumber: number) {
   const { data: accounts, error } = await supabase
     .from('bank_accounts')
     .select('id, profile_id, location_id, deposit, loan')
@@ -436,7 +436,7 @@ async function runBankInterestTick(supabase: SB, tickNumber: number) {
       })
     }
 
-    // Atomarer Update + Ledger-Einträge
+    // Sequenzieller Update + Ledger-Einträge; nicht transaktional
     if (Object.keys(updates).length > 0) {
       const { error: updateErr } = await supabase
         .from('bank_accounts')
@@ -444,7 +444,8 @@ async function runBankInterestTick(supabase: SB, tickNumber: number) {
         .eq('id', acc.id)
 
       if (!updateErr && ledgerEntries.length > 0) {
-        await supabase.from('bank_ledger').insert(ledgerEntries)
+        const { error: ledgerErr } = await supabase.from('bank_ledger').insert(ledgerEntries)
+        if (ledgerErr) console.error('runBankInterestTick: ledger error', ledgerErr)
       }
 
       if (!updateErr) processed++
