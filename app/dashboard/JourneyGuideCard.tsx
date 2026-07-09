@@ -1,7 +1,7 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 09.07.2026 — Commit B: Schritt-Abschluss-Toast, onStepCompleted
-// Version:      0.5.1
+// Aktualisiert: 09.07.2026 — Commit D: moon_colony Abschluss-Sequenz
+// Version:      0.5.2
 
 'use client'
 
@@ -38,7 +38,8 @@ type JourneyGuideCardProps = {
   onFocusGrid?: () => void
   onOpenAcademyHint?: () => void
   onActiveStepChange?: (stepId: string | null) => void
-  onStepCompleted?: (title: string) => void   // Toast wenn Schritt abgehakt
+  onStepCompleted?: (title: string) => void
+  onJourneyCompleted?: (journeyKey: string) => void   // Abschluss-Sequenz
 }
 
 function pct(j: PlayerJourney) {
@@ -108,6 +109,15 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
           }
         }
         prevCompleted.current = new Set(newJourneys.flatMap((j: any) => j.completed_step_ids ?? []))
+
+      // Journey-Abschluss erkennen
+      if (props.onJourneyCompleted) {
+        for (const j of newJourneys) {
+          if (j.status === 'completed' || (j.progress >= j.progress_max && j.progress_max > 0)) {
+            props.onJourneyCompleted?.(j.journey_key)
+          }
+        }
+      }
       }
     } catch {
       setMsg('Wege konnten nicht geladen werden.')
