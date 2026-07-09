@@ -1,7 +1,7 @@
 // app/api/game/journeys/route.ts
 // Erstellt: 01.07.2026
-// Aktualisiert: 02.07.2026 — echte Tabellen ships/trade_transactions statt veralteter Namen
-// Version: 0.5.1
+// Aktualisiert: 09.07.2026 — Commit E: status=completed wenn alle Steps done, andere Journeys freischalten
+// Version:      0.6.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -82,7 +82,32 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  return NextResponse.json({ journeys: enrichedJourneys, steps })
+  // Abgeschlossene Journeys markieren + andere freischalten
+  const moonDone = enrichedJourneys.some(
+    j => j.journey_key === 'moon_colony' && j.progress >= j.progress_max && j.progress_max > 0
+  )
+
+  // Status auf completed setzen wenn alle Steps done
+  for (const j of enrichedJourneys) {
+    if (j.progress >= j.progress_max && j.progress_max > 0 && j.status !== 'completed') {
+      await serviceClient
+        .from('player_journeys')
+        .update({ status: 'completed' })
+        .eq('id', j.id)
+      j.status = 'completed'
+    }
+  }
+
+  // Nach moon_colony: merchant, research, industry automatisch verfügbar machen
+  if (moonDone) {
+    const existingKeys = new Set(enrichedJourneys.map(j => j.journey_key))
+    const toUnlock = ['merchant', 'research', 'industry'].filter(k => !existingKeys.has(k))
+    // Wir fügen sie nicht automatisch hinzu — JourneyGuideCard zeigt sie als "Beginnen mit"
+    // Das ist die bewusste Entscheidung: Spieler wählt aktiv, wir zeigen nur die Option
+    void toUnlock // acknowledged, intentional
+  }
+
+  return NextResponse.json({ journeys: enrichedJourneys, steps, moonCompleted: moonDone })
 }
 
 export async function POST(req: NextRequest) {
