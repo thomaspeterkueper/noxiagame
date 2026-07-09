@@ -144,6 +144,29 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── moon_colony Journey automatisch starten ──────────────────────────────
+    // Spieler startet immer mit dem vertikalen Pfad Erde → Mond.
+    // Nur wenn noch keine Journey existiert (idempotent).
+    const { data: existingJourney } = await serviceClient
+      .from('player_journeys')
+      .select('id')
+      .eq('profile_id', user.id)
+      .eq('journey_key', 'moon_colony')
+      .limit(1)
+
+    if (!existingJourney || existingJourney.length === 0) {
+      await serviceClient.from('player_journeys').insert({
+        profile_id:  user.id,
+        journey_key: 'moon_colony',
+        title:       'Mondbasis gründen',
+        status:      'active',
+        selected:    true,
+        progress:    0,
+        progress_max: 4,
+        started_at:  new Date().toISOString(),
+      })
+    }
+
     return NextResponse.json({ ok: true, username, avatar })
   }
 
