@@ -1,9 +1,7 @@
-// StationTravelDock.tsx
-// Aktualisiert: 23.06.2026 — Abflug-/Docking-Block für Stationen
-// Version:      0.1.0
 // app/dashboard/StationTravelDock.tsx
 // Erstellt:     23.06.2026
-// Version:      0.1.0
+// Aktualisiert: 09.07.2026 — Commit C: Journey-Ziel hervorheben, Flug-Erklärung
+// Version:      0.2.0
 //
 // Minimaler Alpha-Fix: Stationen bekommen einen sichtbaren Abflug-/Docking-Block,
 // damit Reisen nicht mehr von der Besitzliste „Deine Orte“ abhängt.
@@ -22,6 +20,7 @@ interface StationTravelDockProps {
   currentTick: number
   inTransit: boolean
   onTravel: (dest: string) => void
+  journeyDestination?: string   // hebt dieses Ziel als Journey-Ziel hervor
 }
 
 export default function StationTravelDock({
@@ -32,6 +31,7 @@ export default function StationTravelDock({
   currentTick,
   inTransit,
   onTravel,
+  journeyDestination,
 }: StationTravelDockProps) {
   const energyOnBoard = cargo.energy ?? 0
   const destinations = locations.filter(l => l.slug !== currentLocation)
@@ -73,14 +73,21 @@ export default function StationTravelDock({
           const hasEnergy = energyOnBoard >= energyCost
           const canFly = reachable && hasEnergy && !inTransit
 
+          const isJourneyTarget = journeyDestination === loc.slug
           return (
             <div key={loc.slug} style={{
-              background: canFly ? 'rgba(42,78,122,0.24)' : 'rgba(42,78,122,0.08)',
-              border: `1px solid ${canFly ? 'rgba(90,174,255,0.38)' : 'rgba(42,78,122,0.22)'}`,
+              background: isJourneyTarget ? 'rgba(201,169,97,0.12)' : canFly ? 'rgba(42,78,122,0.24)' : 'rgba(42,78,122,0.08)',
+              border: `1px solid ${isJourneyTarget ? '#c9a961' : canFly ? 'rgba(90,174,255,0.38)' : 'rgba(42,78,122,0.22)'}`,
               borderRadius: '8px',
               padding: '0.65rem 0.75rem',
               opacity: reachable ? 1 : 0.55,
+              boxShadow: isJourneyTarget ? '0 0 12px rgba(201,169,97,0.25)' : 'none',
             }}>
+              {isJourneyTarget && (
+                <div style={{ fontSize: '0.55rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '5px' }}>
+                  ▶ Nächstes Ziel
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '0.76rem', fontWeight: 700, color: canFly ? '#d8e6f4' : '#6f8194', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -112,6 +119,11 @@ export default function StationTravelDock({
               </div>
               {!reachable && <div style={{ marginTop: '5px', fontSize: '0.55rem', color: '#e8702a' }}>Außer Reichweite</div>}
               {reachable && !hasEnergy && <div style={{ marginTop: '5px', fontSize: '0.55rem', color: '#e74c3c' }}>Energie fehlt: {Math.max(0, energyCost - energyOnBoard)}t</div>}
+              {isJourneyTarget && reachable && hasEnergy && currentLocation === 'earth' && (
+                <div style={{ marginTop: '6px', fontSize: '0.54rem', color: '#8ab0d0', lineHeight: 1.45 }}>
+                  Erde → Mond kostet mehr Energie als zurück — Erdgravitation ist tiefer.
+                </div>
+              )}
               {inTransit && <div style={{ marginTop: '5px', fontSize: '0.55rem', color: '#e8702a' }}>Schiff im Transit</div>}
             </div>
           )
