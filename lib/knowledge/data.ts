@@ -1,6 +1,6 @@
 // data.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; Wissensmodul-Stammdaten
-// Version:      0.1.0
+// Aktualisiert: 09.07.2026 — ECO-L0-0001/0002/0003: erste KG-0012-konforme Wirtschaftsmodule
+// Version:      0.2.0
 import type { KnowledgeBuilding, KnowledgeLearningModule, KnowledgeUnlock } from './types';
 
 export const learningModules: KnowledgeLearningModule[] = [
@@ -124,6 +124,49 @@ export const learningModules: KnowledgeLearningModule[] = [
     teaches: ['CON:L1:fertigung'],
     unlocks: ['UNL:NOX:industrial-production'],
   },
+
+  // ── Wirtschaft — KG-0012 konform: ECO-L{LEVEL}-{NNNN} ───────────────────
+  // L0 = kein Vorwissen, Zieldauer 2–4 Minuten, eine Frage pro Modul
+  {
+    id: 'LRN:SSF:ECO-L0-0001',
+    name: 'Was ist Kredit?',
+    domain: 'ECO',
+    requires: [],
+    teaches: ['CON:L0:kredit', 'CON:L0:schulden', 'CON:L0:zinsen'],
+    unlocks: ['UNL:NOX:bank-credit'],
+  },
+  {
+    id: 'LRN:SSF:ECO-L0-0002',
+    name: 'Was ist Zinseszins?',
+    domain: 'ECO',
+    requires: ['LRN:SSF:ECO-L0-0001'],
+    teaches: ['CON:L0:zinseszins', 'CON:L0:wachstum-exponentiell'],
+    unlocks: ['UNL:NOX:bank-compound'],
+  },
+  {
+    id: 'LRN:SSF:ECO-L0-0003',
+    name: 'Was ist ein Sicherheitenwert?',
+    domain: 'ECO',
+    requires: ['LRN:SSF:ECO-L0-0001'],
+    teaches: ['CON:L0:sicherheiten', 'CON:L0:beleihungswert'],
+    unlocks: ['UNL:NOX:bank-collateral'],
+  },
+  {
+    id: 'LRN:SSF:ECO-L1-0001',
+    name: 'Was ist Arbitrage?',
+    domain: 'ECO',
+    requires: ['LRN:SSF:ECO-L0-0001'],
+    teaches: ['CON:L1:arbitrage', 'CON:L1:preisdifferenz'],
+    unlocks: ['UNL:NOX:advanced-trading'],
+  },
+  {
+    id: 'LRN:SSF:ECO-L1-0002',
+    name: 'Was ist Bodenwert?',
+    domain: 'ECO',
+    requires: ['LRN:SSF:ECO-L0-0001'],
+    teaches: ['CON:L1:bodenwert', 'CON:L1:grundsteuer'],
+    unlocks: ['UNL:NOX:land-value'],
+  },
 ];
 
 export const knowledgeUnlocks: KnowledgeUnlock[] = [
@@ -137,6 +180,11 @@ export const knowledgeUnlocks: KnowledgeUnlock[] = [
   { id: 'UNL:NOX:greenhouse-systems', name: 'Gewächshaussysteme', requires: ['LRN:SSF:BIO-1201'], unlocks: ['BLD:NOX:gewaechshaus-1', 'BLD:NOX:nahrungsproduktion-1'] },
   { id: 'UNL:NOX:resource-extraction', name: 'Rohstoffgewinnung', requires: ['LRN:SSF:MAT-1201'], unlocks: ['BLD:NOX:mine-1'] },
   { id: 'UNL:NOX:smelting', name: 'Schmelztechnik', requires: ['LRN:SSF:CHE-1301'], unlocks: ['BLD:NOX:schmelze-1'] },
+  { id: 'UNL:NOX:bank-credit',    name: 'Kredit aufnehmen',    requires: ['LRN:SSF:ECO-L0-0001'], unlocks: ['BLD:NOX:bank-credit-1'] },
+  { id: 'UNL:NOX:bank-compound',  name: 'Zinseszins verstehen', requires: ['LRN:SSF:ECO-L0-0002'], unlocks: ['BLD:NOX:bank-compound-1'] },
+  { id: 'UNL:NOX:bank-collateral',name: 'Sicherheiten hinterlegen', requires: ['LRN:SSF:ECO-L0-0003'], unlocks: ['BLD:NOX:bank-collateral-1'] },
+  { id: 'UNL:NOX:advanced-trading',name: 'Erweiterter Handel', requires: ['LRN:SSF:ECO-L1-0001'], unlocks: ['BLD:NOX:markt-1'] },
+  { id: 'UNL:NOX:land-value',     name: 'Bodenwert',           requires: ['LRN:SSF:ECO-L1-0002'], unlocks: ['BLD:NOX:verwaltung-1'] },
 ];
 
 export const knowledgeBuildings: KnowledgeBuilding[] = [
@@ -150,5 +198,10 @@ export const knowledgeBuildings: KnowledgeBuilding[] = [
   { id: 'BLD:NOX:gewaechshaus-1', name: 'Gewächshaus I', category: 'food', requires: ['UNL:NOX:greenhouse-systems'], effects: ['food_production'] },
   { id: 'BLD:NOX:nahrungsproduktion-1', name: 'Nahrungsproduktion I', category: 'food', requires: ['UNL:NOX:greenhouse-systems'], effects: ['colony_food_supply'] },
   { id: 'BLD:NOX:mine-1', name: 'Mine I', category: 'extraction', requires: ['UNL:NOX:resource-extraction'], effects: ['ore_production'] },
-  { id: 'BLD:NOX:schmelze-1', name: 'Schmelze I', category: 'industry', requires: ['UNL:NOX:smelting'], effects: ['metal_production'] },
+  { id: 'BLD:NOX:schmelze-1',       name: 'Schmelze I',            category: 'industry',  requires: ['UNL:NOX:smelting'],         effects: ['metal_production'] },
+  { id: 'BLD:NOX:bank-credit-1',    name: 'Bank — Kredit',         category: 'finance',   requires: ['UNL:NOX:bank-credit'],      effects: ['loan_access'] },
+  { id: 'BLD:NOX:bank-compound-1',  name: 'Bank — Zinseszins',     category: 'finance',   requires: ['UNL:NOX:bank-compound'],    effects: ['compound_interest'] },
+  { id: 'BLD:NOX:bank-collateral-1',name: 'Bank — Sicherheiten',   category: 'finance',   requires: ['UNL:NOX:bank-collateral'],  effects: ['collateral_limit'] },
+  { id: 'BLD:NOX:markt-1',          name: 'Markt I',               category: 'trade',     requires: ['UNL:NOX:advanced-trading'], effects: ['arbitrage_routes'] },
+  { id: 'BLD:NOX:verwaltung-1',     name: 'Verwaltung I',          category: 'governance',requires: ['UNL:NOX:land-value'],      effects: ['land_tax'] },
 ];
