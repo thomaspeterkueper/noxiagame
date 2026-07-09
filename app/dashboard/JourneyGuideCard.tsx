@@ -1,7 +1,7 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 09.07.2026 — onActiveStepChange: meldet aktiven Schritt an DashboardClient
-// Version:      0.5.0
+// Aktualisiert: 09.07.2026 — Commit B: Schritt-Abschluss-Toast, onStepCompleted
+// Version:      0.5.1
 
 'use client'
 
@@ -38,6 +38,7 @@ type JourneyGuideCardProps = {
   onFocusGrid?: () => void
   onOpenAcademyHint?: () => void
   onActiveStepChange?: (stepId: string | null) => void
+  onStepCompleted?: (title: string) => void   // Toast wenn Schritt abgehakt
 }
 
 function pct(j: PlayerJourney) {
@@ -79,6 +80,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const prevCompleted = React.useRef<Set<string>>(new Set())
 
   async function loadJourneys() {
     try {
@@ -90,8 +92,23 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
         setMsg(data.detail ? `${data.error} ${data.detail}` : data.error ?? 'Wege konnten nicht geladen werden.')
         return
       }
-      setJourneys(Array.isArray(data.journeys) ? data.journeys : [])
-      setSteps(Array.isArray(data.steps) ? data.steps : [])
+      const newJourneys = Array.isArray(data.journeys) ? data.journeys : []
+      const newSteps    = Array.isArray(data.steps)    ? data.steps    : []
+      setJourneys(newJourneys)
+      setSteps(newSteps)
+
+      // Toast bei neu abgeschlossenem Schritt
+      if (props.onStepCompleted) {
+        for (const j of newJourneys) {
+          for (const id of j.completed_step_ids ?? []) {
+            if (!prevCompleted.current.has(id)) {
+              const step = newSteps.find((s: any) => s.id === id)
+              if (step) props.onStepCompleted?.(step.title)
+            }
+          }
+        }
+        prevCompleted.current = new Set(newJourneys.flatMap((j: any) => j.completed_step_ids ?? []))
+      }
     } catch {
       setMsg('Wege konnten nicht geladen werden.')
     } finally {
