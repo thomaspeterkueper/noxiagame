@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 04.07.2026 — Abmelden leitet auf / statt /auth/login
-// Version:      2.9.1
+// Aktualisiert: 09.07.2026 — Commit A: nach Onboarding JourneyDrawer öffnen
+// Version:      2.9.2
 
 'use client'
 
@@ -131,7 +131,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
       <JourneyDrawer open={journeyOpen} currentLocation={location} onClose={() => setJourneyOpen(false)} {...journeyActions} />
-      {profile && !profile.onboarded && <WelcomeSetup onDone={() => window.location.reload()} />}
+      {profile && !profile.onboarded && <WelcomeSetup onDone={(opts) => { if (opts?.openJourney) setJourneyOpen(true); window.location.reload(); }} />}
       {auctionOpen && <MarketAuction open={auctionOpen} onClose={() => setAuctionOpen(false)} location={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))} credits={credits} cargo={cargo} cargoMax={cargoMax} initialResource={auctionConfig.resource} initialMode={auctionConfig.mode} initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} />}
       {warehouseOpen && <WarehouseOverlay locationSlug={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} prices={prices} resources={currentLocationData?.location_resources ?? []} orders={initialOrders.filter((o: any) => o.locations?.slug === location)} cargo={cargo} cargoMax={cargoMax} credits={credits} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} onFulfillOrder={async (orderId, agreedReward) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} onClose={() => setWarehouseOpen(false)} />}
       {profileOpen && profile && <ProfileOverlay username={profile.username ?? '?'} avatar={profile.avatar ?? 'pilot_01'} credits={credits} onClose={() => setProfileOpen(false)} />}
