@@ -178,7 +178,7 @@ const GridMinimap = React.memo(function GridMinimap({
   )
 })
 
-function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuildStarted }: {
+function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuildStarted, journeyBuildHints = [] }: {
   tileRow: number; tileCol: number; tileType: string; locationSlug: string
   onClose: () => void; onBuildStarted: (newCredits?: number) => void
 }) {
@@ -254,12 +254,14 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
               : ''
             return (
               <button key={item.key} disabled={building || !canAfford} onClick={() => startBuild(item.key)} style={{
-                background: canAfford ? 'rgba(42,78,122,0.5)' : 'rgba(30,40,55,0.5)',
-                border: `1px solid ${canAfford ? '#2a4e7a' : '#2a3a4a'}`,
+                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.15)' : canAfford ? 'rgba(42,78,122,0.5)' : 'rgba(30,40,55,0.5)',
+                border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canAfford ? '#2a4e7a' : '#2a3a4a'}`,
                 borderRadius: '6px', padding: '0.6rem 0.75rem',
                 color: canAfford ? '#cdd6e0' : '#4a5a6a',
                 cursor: canAfford ? 'pointer' : 'not-allowed', textAlign: 'left', fontSize: '0.75rem',
+                boxShadow: journeyBuildHints.includes(item.key) ? '0 0 8px rgba(201,169,97,0.3)' : 'none',
               }}>
+                {journeyBuildHints.includes(item.key) && <div style={{ fontSize: '0.52rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', marginBottom: '3px' }}>▶ EMPFOHLEN</div>}
                 <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
                 <div style={{ fontSize: '0.65rem', color: canAfford ? '#8a9ab0' : '#3a4a5a' }}>
                   {item.cost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
@@ -459,7 +461,7 @@ export default function ColonyGrid({
         const entName = BUILDINGS[ent.entity_id]?.name ?? ent.entity_id
         return <SellPanel entityId={ent.id} entityName={entName} onSold={async () => { setShowSellPanel(false); setSelectedTile(null); await onChanged?.() }} />
       })()}
-      {showBuildPopup && selectedTile && <BuildPopup tileRow={selectedTile.r} tileCol={selectedTile.c} tileType={selectedTile.type} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
+      {showBuildPopup && selectedTile && <BuildPopup journeyBuildHints={highlightEntityIds} tileRow={selectedTile.r} tileCol={selectedTile.c} tileType={selectedTile.type} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
 
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
         <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
