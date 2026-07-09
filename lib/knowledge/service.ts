@@ -1,6 +1,7 @@
 // service.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; getNoxiaKnowledgeState
-// Version:      0.2.0
+// Aktualisiert: 09.07.2026 — ungültige Demo-Modul-ID entfernt
+// Version:      0.2.1
+
 import { completeLearningModule, getUnlockedBuildings, initialKnowledgeProgress } from './progress';
 import { fetchNoxiaUnlocks, type NoxiaUnlockPayload } from './remote';
 import { getKnowledgeSourceMode } from './source';
@@ -9,7 +10,6 @@ import type { LearningModuleId } from './types';
 const demoCompletedModules: LearningModuleId[] = [
   'LRN:SSF:MAT-1001',
   'LRN:SSF:MAT-1002',
-  'LRN:SSF:PHY-1201',
   'LRN:SSF:PHY-1101',
 ];
 
