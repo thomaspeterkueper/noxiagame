@@ -1,3 +1,7 @@
+// app/dashboard/JourneyDrawer.tsx
+// Erstellt:     01.07.2026
+// Aktualisiert: 09.07.2026 — Commit E: Callbacks durchleiten, Offen-Welt-Hinweis
+// Version:      0.2.0
 'use client'
 
 import React from 'react'
@@ -14,6 +18,9 @@ type Props = {
   onOpenTravel: () => void
   onFocusGrid: () => void
   onOpenAcademyHint: () => void
+  onActiveStepChange?: (stepId: string | null) => void
+  onStepCompleted?: (title: string) => void
+  onJourneyCompleted?: (journeyKey: string) => void
 }
 
 export default function JourneyDrawer({ open, currentLocation, onClose, ...actions }: Props) {
@@ -33,9 +40,31 @@ export default function JourneyDrawer({ open, currentLocation, onClose, ...actio
           <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${T.line}`, background: T.surface, color: T.inkSoft, cursor: 'pointer' }}>×</button>
         </div>
 
+        {/* Offene-Welt-Hinweis */}
+        <div style={{ background: T.surface, border: `1px solid ${T.lineSoft}`, borderRadius: 8, padding: '0.65rem 0.9rem', marginBottom: '0.85rem', fontSize: '0.68rem', color: T.inkSoft, lineHeight: 1.6 }}>
+          Sie können jederzeit mehrere Wege parallel verfolgen oder später wechseln.
+          Nach dem ersten Weg stehen Handel, Forschung und Industrie offen.
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <JourneyGuideCard currentLocation={currentLocation as any} {...actions} />
-          <StarterMissionsCard {...actions} />
+          <JourneyGuideCard
+            currentLocation={currentLocation as any}
+            onOpenShipyard={actions.onOpenShipyard}
+            onOpenWarehouse={actions.onOpenWarehouse}
+            onOpenTravel={actions.onOpenTravel}
+            onFocusGrid={actions.onFocusGrid}
+            onOpenAcademyHint={actions.onOpenAcademyHint}
+            onActiveStepChange={actions.onActiveStepChange}
+            onStepCompleted={actions.onStepCompleted}
+            onJourneyCompleted={actions.onJourneyCompleted}
+          />
+          <StarterMissionsCard
+            onOpenShipyard={actions.onOpenShipyard}
+            onOpenWarehouse={actions.onOpenWarehouse}
+            onOpenTravel={actions.onOpenTravel}
+            onFocusGrid={actions.onFocusGrid}
+            onOpenAcademyHint={actions.onOpenAcademyHint}
+          />
         </div>
       </aside>
     </div>
