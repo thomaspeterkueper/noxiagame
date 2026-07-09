@@ -1,7 +1,7 @@
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 02.07.2026 — Build-Fix: Fallback-Ausdruck für Journey-Fortschritt geklammert
-// Version: 0.4.1
+// Aktualisiert: 09.07.2026 — onActiveStepChange: meldet aktiven Schritt an DashboardClient
+// Version:      0.5.0
 
 'use client'
 
@@ -37,6 +37,7 @@ type JourneyGuideCardProps = {
   onOpenTravel?: () => void
   onFocusGrid?: () => void
   onOpenAcademyHint?: () => void
+  onActiveStepChange?: (stepId: string | null) => void
 }
 
 function pct(j: PlayerJourney) {
@@ -124,6 +125,22 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   }
 
   const activeKeys = useMemo(() => new Set(journeys.map(j => j.journey_key)), [journeys])
+
+  const firstActiveStepId = useMemo(() => {
+    for (const j of journeys) {
+      const completed = new Set(j.completed_step_ids ?? [])
+      const ownSteps = steps
+        .filter(s => s.journey_key === j.journey_key)
+        .sort((a, b) => a.step_order - b.step_order)
+      const firstOpen = ownSteps.find(s => !completed.has(s.id))
+      if (firstOpen) return firstOpen.id
+    }
+    return null
+  }, [journeys, steps])
+
+  useEffect(() => {
+    props.onActiveStepChange?.(firstActiveStepId)
+  }, [firstActiveStepId])
   const activeDefs = JOURNEY_DEFS.filter(j => activeKeys.has(j.key))
   const inactiveDefs = JOURNEY_DEFS.filter(j => !activeKeys.has(j.key))
   const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
