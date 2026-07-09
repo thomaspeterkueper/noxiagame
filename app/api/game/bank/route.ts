@@ -1,7 +1,7 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — getOrCreateAccount defensiv (try/catch + Fallback), Fehler-Logging
-// Version:      0.3.3
+// Aktualisiert: 09.07.2026 — Bank-Gate migriert auf ECO-L0-0001 (KG-0012)
+// Version:      0.4.0
 //
 // v0.3.0:
 //   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
@@ -34,7 +34,7 @@ const SHIP_RESIDUAL_RATIO = 0.60    // Schiff: 60% des Kaufpreises als Restwert
 const MAX_CREDIT_LIMIT    = 50_000  // absolutes Maximum
 const MIN_LOAN            = 100
 const MIN_DEPOSIT         = 10
-const CREDIT_MODULE_ID    = 'finanzgrundlagen'  // Pflicht-Modul für Kredit
+const CREDIT_MODULE_ID    = 'LRN:SSF:ECO-L0-0001'  // KG-0012: Was ist Kredit?
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 async function getUserFromRequest(req: NextRequest) {
