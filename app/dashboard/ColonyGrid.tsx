@@ -278,7 +278,7 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
 export default function ColonyGrid({
   slug, name, population, populationMax, isSupplied,
   userId, entities = [], pending = [], tax, entityInfo,
-  locationResources = [], credits = 0,
+  locationResources = [], credits = 0, highlightEntityIds = [] as string[],
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0,
   inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize,
 }: ColonyGridProps) {
