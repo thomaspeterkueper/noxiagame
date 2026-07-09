@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 04.07.2026 — Split 40/60 wiederhergestellt, SSF-Material rechts
-// Version:      4.2.0
+// Aktualisiert: 09.07.2026 — Module-Tab: KG-0012-konforme Module abschließbar
+// Version:      4.3.0
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -198,7 +198,9 @@ function RightPanel({ topic, modules }: { topic: string | null; modules: SsfModu
 }
 
 export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned }: SchoolOverlayProps) {
-  const [tab, setTab] = useState<'akademie' | 'ssf' | 'handbuch'>('akademie')
+  const [tab, setTab]               = useState<'akademie' | 'module' | 'ssf' | 'handbuch'>('akademie')
+  const [completedModules, setCompleted] = useState<string[]>([])
+  const [moduleLoading, setModuleLoading] = useState(false)
   const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(false)
@@ -212,6 +214,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   useEffect(() => {
     loadKnowledge()
     generateTask()
+    loadCompletedModules()
     fetch('/api/ssf/modules').then(r => r.json()).then((d: unknown) => {
       const list = Array.isArray(d) ? d : ((d as Record<string,unknown>).modules ?? [])
       setSsfModules(list as SsfModule[])
@@ -231,6 +234,17 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     } catch { return '' }
   }
 
+  async function loadCompletedModules() {
+    try {
+      const token = await jwt()
+      const { createClient } = await import('@/lib/supabase/client')
+      const sb = createClient()
+      const { data } = await sb.from('academy_completions')
+        .select('module_id').eq('profile_id', (await sb.auth.getUser()).data.user?.id ?? '')
+      setCompleted((data ?? []).map((r: any) => r.module_id))
+    } catch {}
+  }
+
   async function loadKnowledge() {
     try {
       const token = await jwt()
@@ -247,6 +261,25 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
       setTask((data.task as Task) ?? fallbackTask())
     } catch { setTask(fallbackTask()) }
     setLoading(false)
+  }
+
+  async function completeModule(moduleId: string) {
+    setModuleLoading(true)
+    try {
+      const token = await jwt()
+      const data = await (await fetch(
+        `/api/game/knowledge?action=complete_module&module_id=${encodeURIComponent(moduleId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )).json() as Record<string, unknown>
+      if (data.ok && !data.already_completed) {
+        setCompleted(prev => [...prev, moduleId])
+        if (data.knowledge_points != null) {
+          setTotal(data.knowledge_points as number)
+          onKnowledgeEarned((data.points_awarded as number) ?? 50, data.knowledge_points as number)
+        }
+      }
+    } catch {}
+    setModuleLoading(false)
   }
 
   async function check(opt?: number) {
@@ -280,9 +313,9 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
         <div style={{ width: '40%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end' }}>
-              {(['akademie', 'ssf', 'handbuch'] as const).map(t => (
+              {(['akademie', 'module', 'ssf', 'handbuch'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
-                  {t === 'akademie' ? 'Akademie' : t === 'ssf' ? 'SSF' : 'Handbuch'}
+                  {t === 'akademie' ? 'Aufgaben' : t === 'module' ? 'Module' : t === 'ssf' ? 'SSF' : 'Handbuch'}
                 </button>
               ))}
               <div style={{ marginLeft: 'auto', paddingBottom: '0.5rem' }}>
@@ -293,6 +326,96 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
 
           {tab === 'handbuch' && <ManualTab onClose={onClose} />}
           {tab === 'ssf' && <SsfTab />}
+          {tab === 'module' && (
+            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
+              <div style={{ fontSize: '0.65rem', color: C.textMuted, lineHeight: 1.7, marginBottom: '1rem' }}>
+                Module sind kurze Lerneinheiten (2–4 Min). Jedes Modul schaltet eine Fähigkeit in NOXIA frei.
+              </div>
+              {[
+                {
+                  id: 'LRN:SSF:ECO-L0-0001',
+                  name: 'Was ist Kredit?',
+                  level: 'L0',
+                  duration: '2–3 Min',
+                  unlocks: 'Bank — Kredit aufnehmen',
+                  content: 'Ein Kredit ist geliehenes Geld das mit Zinsen zurückgezahlt wird. Die Bank leiht Ihnen Ressourcen heute gegen die Zusage, mehr morgen zurückzugeben. Sinnvoll wenn der erwartete Gewinn die Zinslast übersteigt.',
+                  quiz: {
+                    question: 'Was ist der Hauptnachteil eines Kredits?',
+                    options: ['Sofortiger Ressourcenzugang', 'Zinsen erhöhen die Rückzahlungssumme', 'Keine Rückzahlung nötig', 'Zinsen werden dem Kreditnehmer gutgeschrieben'],
+                    correct: 1,
+                    explanation: 'Richtig. Zinsen sind der Preis für geliehenes Kapital — sie erhöhen die zurückzuzahlende Summe über den ursprünglichen Betrag hinaus.',
+                  },
+                },
+                {
+                  id: 'LRN:SSF:ECO-L0-0002',
+                  name: 'Was ist Zinseszins?',
+                  level: 'L0',
+                  duration: '2–3 Min',
+                  unlocks: 'Bank — Zinseszins-Vorschau',
+                  requires: 'LRN:SSF:ECO-L0-0001',
+                  content: 'Beim Zinseszins werden Zinsen auf bereits aufgelaufene Zinsen berechnet. Aus 1.000 Cr mit 2%/Tick werden nach 10 Ticks nicht 1.200 Cr, sondern 1.218 Cr — der Unterschied wächst exponentiell.',
+                  quiz: {
+                    question: 'Warum ist Zinseszins bei Schulden gefährlich?',
+                    options: ['Schulden wachsen linear', 'Schulden wachsen exponentiell', 'Schulden sinken automatisch', 'Zinsen werden nur einmal berechnet'],
+                    correct: 1,
+                    explanation: 'Zinseszins bedeutet: Zinsen auf Zinsen. Das Wachstum beschleunigt sich mit der Zeit — nicht-getilgte Schulden können die ursprüngliche Summe schnell vielfach übersteigen.',
+                  },
+                },
+              ].map(mod => {
+                const done = completedModules.includes(mod.id)
+                const requiresDone = !mod.requires || completedModules.includes(mod.requires)
+                const [showContent, setShowContent] = React.useState(false)
+                const [quizAnswer, setQuizAnswer] = React.useState<number | null>(null)
+                const [quizResult, setQuizResult] = React.useState<boolean | null>(null)
+                return (
+                  <div key={mod.id} style={{ background: done ? C.greenLight : '#fff', border: `1px solid ${done ? '#a0dcb8' : C.border}`, borderRadius: 10, padding: '0.85rem 1rem', marginBottom: '0.6rem', opacity: requiresDone ? 1 : 0.5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: '0.6rem', color: done ? C.green : C.accent, fontWeight: 700, fontFamily: MONO, letterSpacing: '2px', marginBottom: 3 }}>
+                          {mod.level} · {mod.duration} {done ? '✓ Abgeschlossen' : ''}
+                        </div>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: C.text }}>{mod.name}</div>
+                        <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 3 }}>🔓 {mod.unlocks}</div>
+                        {mod.requires && !requiresDone && (
+                          <div style={{ fontSize: '0.62rem', color: C.red, marginTop: 3 }}>Voraussetzung: vorheriges Modul abschließen</div>
+                        )}
+                      </div>
+                      {!done && requiresDone && (
+                        <button onClick={() => setShowContent(v => !v)} style={{ fontSize: '0.7rem', padding: '4px 10px', background: C.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: MONO, flexShrink: 0 }}>
+                          {showContent ? 'Schließen' : 'Lernen →'}
+                        </button>
+                      )}
+                    </div>
+                    {showContent && !done && (
+                      <div style={{ marginTop: '0.75rem', borderTop: `1px solid ${C.border}`, paddingTop: '0.75rem' }}>
+                        <div style={{ fontSize: '0.82rem', lineHeight: 1.75, color: C.text, marginBottom: '1rem' }}>{mod.content}</div>
+                        <div style={{ background: C.bgAlt, borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>{mod.quiz.question}</div>
+                          {mod.quiz.options.map((opt, i) => (
+                            <button key={i} disabled={quizResult !== null} onClick={() => { setQuizAnswer(i); setQuizResult(i === mod.quiz.correct) }}
+                              style={{ display: 'block', width: '100%', textAlign: 'left' as const, padding: '6px 10px', marginBottom: 4, background: quizAnswer === i ? (i === mod.quiz.correct ? C.greenLight : C.redLight) : '#fff', border: `1px solid ${quizAnswer === i ? (i === mod.quiz.correct ? '#a0dcb8' : '#f0a0a0') : C.border}`, borderRadius: 6, cursor: quizResult !== null ? 'default' : 'pointer', fontSize: '0.75rem', fontFamily: MONO }}>
+                              {['A','B','C','D'][i]}. {opt}
+                            </button>
+                          ))}
+                          {quizResult !== null && (
+                            <div style={{ marginTop: 8, fontSize: '0.75rem', color: quizResult ? C.green : C.red, lineHeight: 1.6 }}>
+                              {quizResult ? '✓ Richtig! ' : '✗ Nicht ganz. '}{mod.quiz.explanation}
+                            </div>
+                          )}
+                          {quizResult === true && (
+                            <button disabled={moduleLoading} onClick={() => completeModule(mod.id)}
+                              style={{ width: '100%', marginTop: 10, padding: '0.65rem', background: C.green, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>
+                              {moduleLoading ? '…' : 'Modul abschließen (+50 Pkt.) →'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
           {tab === 'akademie' && (
             <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
               {loading && <div style={{ textAlign: 'center' as const, padding: '2.5rem', color: C.textMuted, fontFamily: MONO }}>Aufgabe wird generiert …</div>}
