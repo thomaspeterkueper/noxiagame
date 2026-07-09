@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.07.2026 — Commit C: journeyDestination für TravelDock
-// Version:      2.9.6
+// Aktualisiert: 09.07.2026 — Commit D: onJourneyCompleted Abschluss-Toast
+// Version:      2.9.7
 
 'use client'
 
@@ -139,6 +139,21 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     'industry-1': ['mine', 'solar'],
   }
 
+  const JOURNEY_COMPLETE_MSGS: Record<string, string> = {
+    'moon_colony': '🌙 Mondbasis gegründet! Energie und Wasser gesichert. Das Sonnensystem öffnet sich.',
+    'merchant':    '📦 Erstes Handelsnetz aufgebaut. Mehr Routen warten auf Sie.',
+    'research':    '🔬 Erste Wissensgrundlage gelegt. Die SSF wartet auf weitere Entdeckungen.',
+    'industry':    '🏭 Erste Produktion läuft. Der Aufbau beginnt.',
+  }
+
+  function handleJourneyCompleted(journeyKey: string) {
+    const msg = JOURNEY_COMPLETE_MSGS[journeyKey]
+    if (msg) showToast(msg, true)
+    // Hints leeren wenn Journey abgeschlossen
+    setJourneyHints([])
+    setJourneyDest(undefined)
+  }
+
   function handleActiveStepChange(stepId: string | null) {
     const hints = stepId ? (JOURNEY_STEP_HINTS[stepId] ?? []) : []
     const dest  = stepId ? JOURNEY_STEP_DESTINATIONS[stepId] : undefined
@@ -154,6 +169,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     onOpenAcademyHint: () => { setJourneyOpen(false); showToast('Klicke auf die Akademie im Grid, um Wissen zu sammeln.', true) },
     onActiveStepChange: handleActiveStepChange,
     onStepCompleted: (title: string) => showToast(`✓ Geschafft: ${title}`, true),
+    onJourneyCompleted: handleJourneyCompleted,
   }
 
   return (
