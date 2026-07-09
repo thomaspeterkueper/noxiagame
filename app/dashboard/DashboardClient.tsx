@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.07.2026 — onActiveStepChange verdrahtet: Journey-Hints im Grid
-// Version:      2.9.4
+// Aktualisiert: 09.07.2026 — Commit B: onStepCompleted Toast verdrahtet
+// Version:      2.9.5
 
 'use client'
 
@@ -144,6 +144,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     onFocusGrid: () => { setJourneyOpen(false); window.scrollTo({ top: 120, behavior: 'smooth' }) },
     onOpenAcademyHint: () => { setJourneyOpen(false); showToast('Klicke auf die Akademie im Grid, um Wissen zu sammeln.', true) },
     onActiveStepChange: handleActiveStepChange,
+    onStepCompleted: (title: string) => showToast(`✓ Geschafft: ${title}`, true),
   }
 
   return (
