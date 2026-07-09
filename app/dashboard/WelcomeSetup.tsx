@@ -1,8 +1,7 @@
-// WelcomeSetup.tsx
-// Aktualisiert: 07.06.2026 — Onboarding-Setup
-// Version:      0.1.0
 // app/dashboard/WelcomeSetup.tsx
-// Erstellt: 07.06.2026
+// Erstellt:     07.06.2026
+// Aktualisiert: 09.07.2026 — onDone mit openJourney-Flag für vertikalen Spielpfad
+// Version:      0.2.0
 // Erst-Login-Onboarding: Name + Avatar wählen, dann drei Einweisungskarten.
 // Erscheint wenn profiles.onboarded = false. Dark-UI-Stil (Transit-Ästhetik).
 //
@@ -36,7 +35,7 @@ const CARDS = [
   { icon: '📈', title: 'Verkauf mit Gewinn', text: 'Und sieh zu, wie die Kolonie wächst. Sie wird sich erinnern.' },
 ]
 
-export default function WelcomeSetup({ onDone }: { onDone: () => void }) {
+export default function WelcomeSetup({ onDone }: { onDone: (opts?: { openJourney?: boolean }) => void }) {
   const [step, setStep]       = useState<'setup' | 'cards'>('setup')
   const [name, setName]       = useState('')
   const [avatar, setAvatar]   = useState<string | null>(null)
@@ -169,14 +168,14 @@ export default function WelcomeSetup({ onDone }: { onDone: () => void }) {
             </div>
 
             <button
-              onClick={() => cardIdx < CARDS.length - 1 ? setCardIdx(cardIdx + 1) : onDone()}
+              onClick={() => cardIdx < CARDS.length - 1 ? setCardIdx(cardIdx + 1) : onDone({ openJourney: true })}
               style={{
                 ...mono, padding: '0.75rem 2.5rem',
                 background: 'transparent', border: `1px solid ${C.gold}`, color: C.gold,
                 fontSize: 13, letterSpacing: '0.1em', cursor: 'pointer',
               }}
             >
-              {cardIdx < CARDS.length - 1 ? 'Weiter' : 'Zum Dock'}
+              {cardIdx < CARDS.length - 1 ? 'Weiter →' : 'Zum Dock — Journey starten'}
             </button>
           </div>
         )}
