@@ -69,6 +69,7 @@ interface ColonyGridProps {
   inTransit?: boolean; onTravel?: (dest: string) => void
   onOpenShipyard?: () => void; onOpenWarehouse?: () => void; onChanged?: () => void
   tileSize?: number
+  highlightEntityIds?: string[]   // entity_ids die mit goldenem Pulsring markiert werden
 }
 interface TooltipInfo {
   r: number; c: number; x: number; y: number
@@ -346,6 +347,7 @@ export default function ColonyGrid({
       const isOwn = !!entity?.profile_id && entity.profile_id === userId
       const isSelling = sellingAt(r, c)
       const isAnom = anomaly?.r === r && anomaly?.c === c
+      const isHint = !!entity && highlightEntityIds.includes(entity.entity_id)
       const isNPC = !!entity?.actor_id
       const isState = !isNPC && (entity?.is_state_owned === true || (entity?.profile_id === null && !entity?.actor_id))
       const interactive = canBuild || !!entity || isAnom
@@ -388,10 +390,16 @@ export default function ColonyGrid({
               <span style={{ width: '46%', height: '46%', borderRadius: '50%', background: 'radial-gradient(circle, #c9a0f0 0%, #8a5bc0 55%, transparent 72%)', boxShadow: '0 0 8px #b48ce8', animation: 'noxia-anomaly 2.6s ease-in-out infinite' }} />
             </span>
           )}
+          {isHint && (
+            <span style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ position: 'absolute', inset: 2, borderRadius: 4, border: '2px solid #c9a961', boxShadow: '0 0 10px rgba(201,169,97,0.8), inset 0 0 6px rgba(201,169,97,0.2)', animation: 'noxia-hint 1.8s ease-in-out infinite' }} />
+              <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#c9a961', background: 'rgba(0,0,0,0.7)', borderRadius: 3, padding: '1px 4px', letterSpacing: '0.05em', lineHeight: 1.2, textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>TAP</span>
+            </span>
+          )}
         </div>
       )
     }))
-  }, [grid, selectedTile, entities, pending, anomaly, userId, entityInfo, handleTileClick, entityAt, sellingAt, slug, population, populationMax, tileSize])
+  }, [grid, selectedTile, entities, pending, anomaly, userId, entityInfo, handleTileClick, entityAt, sellingAt, slug, population, populationMax, tileSize, highlightEntityIds])
 
   if (grid.length === 0) return (
     <div style={{ background: '#f4f2ed', borderRadius: '12px', padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
@@ -405,7 +413,7 @@ export default function ColonyGrid({
   return (
     <div style={{ background: '#f4f2ed', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 8px rgba(0,0,0,0.08)' }}>
       <BuildingSpriteStyles />
-      <style>{`@keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} } @keyframes noxia-spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} } @keyframes noxia-spin { to { transform: rotate(360deg) } } @keyframes noxia-hint { 0%,100%{opacity:.5;box-shadow:0 0 6px rgba(201,169,97,0.5)} 50%{opacity:1;box-shadow:0 0 16px rgba(201,169,97,0.95)} }`}</style>
 
       {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} />}
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} />}
