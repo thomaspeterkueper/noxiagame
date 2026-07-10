@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 10.07.2026 — Tile Analyzer v1 und Gebäude-Eignung ergänzt
-// Version:      0.2.0
+// Aktualisiert: 10.07.2026 — Eignung und erwartete Erträge im bestehenden Bau-Dialog sichtbar
+// Version:      0.3.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { BUILDABLE } from '@/lib/game/buildings'
@@ -11,6 +11,12 @@ import { analyzeTile, evaluateBuildingSuitability } from '@/lib/game/world/analy
 
 function isAllowed(allowed: string[] | undefined, location: string) {
   return !allowed || allowed.length === 0 || allowed.includes(location)
+}
+
+function suitabilityPrefix(state: 'optimal' | 'possible' | 'blocked') {
+  if (state === 'optimal') return '🟢 optimal'
+  if (state === 'possible') return '🟡 möglich'
+  return '🔴 ungeeignet'
 }
 
 export async function GET(req: NextRequest) {
@@ -42,20 +48,28 @@ export async function GET(req: NextRequest) {
       const suitability = evaluateBuildingSuitability(building.id, analysis.tile)
       const siteBlocked = suitability.state === 'blocked'
       const locked = knowledgeLocked || siteBlocked
-      const production = building.produces ? [{ resource: building.produces.resource, amount: building.produces.amount }] : []
+      const effectiveProduction = building.produces
+        ? Number((building.produces.amount * suitability.efficiency).toFixed(1))
+        : null
+      const production = building.produces
+        ? [{ resource: building.produces.resource, amount: effectiveProduction ?? building.produces.amount }]
+        : []
       const resourceCosts = getResourceCosts(building.id)
-      const hint = knowledgeLocked && req.requiredLabel ? ` · benötigt ${req.requiredLabel}` : ''
-      const siteHint = siteBlocked ? ` · Standort ungeeignet` : ''
+      const knowledgeHint = knowledgeLocked && req.requiredLabel ? ` · benötigt ${req.requiredLabel}` : ''
+      const reasonText = suitability.reasons.join(' · ')
+      const efficiencyText = `${Math.round(suitability.efficiency * 100)} %`
+      const siteText = `${suitabilityPrefix(suitability.state)} · Effizienz ${efficiencyText}${reasonText ? ` · ${reasonText}` : ''}`
 
       return {
         key: building.id,
-        name: locked ? `🔒 ${building.name}${hint}${siteHint}` : building.name,
+        name: `${locked ? '🔒 ' : ''}${building.name} — ${siteText}${knowledgeHint}`,
         cost: locked ? 999999999 : building.cost,
         displayCost: building.cost,
         resourceCosts,
         buildTimeTicks: building.buildTimeTicks,
         populationBonus: building.populationBonus ?? 0,
         production,
+        baseProduction: building.produces ? [{ resource: building.produces.resource, amount: building.produces.amount }] : [],
         allowedLocations: building.allowedLocations ?? null,
         knowledgeLocked,
         siteBlocked,
