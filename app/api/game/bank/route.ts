@@ -1,7 +1,7 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 09.07.2026 — Bank-Gate migriert auf ECO-L0-0001 (KG-0012)
-// Version:      0.4.0
+// Aktualisiert: 10.07.2026 — Fix: academy_completions → player_learning_progress
+// Version:      0.4.1
 //
 // v0.3.0:
 //   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
@@ -9,14 +9,14 @@
 //   - action=collateral: gibt jetzt auch collateralWarning zurück
 //
 // v0.2.0:
-//   - Kredit-Voraussetzung: academy_completions.module_id = 'finanzgrundlagen'
+//   - Kredit-Voraussetzung: player_learning_progress.module_id = 'finanzgrundlagen'
 //   - Kreditlimit = Sicherheitenwert × 0.7 (Gebäude-Ertragswert + Schiff-Restwert)
 //   - action=collateral, action=compound_preview
 //
 // v0.1.0 – Initiale Version: deposit, withdraw, loan, repay, status
 //
 // Tabellen: bank_accounts, bank_ledger (Migration 027)
-//           academy_completions        (Migration 028)
+//           player_learning_progress        (Migration 028)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -79,8 +79,8 @@ async function getOrCreateAccount(userId: string, locationId: string) {
 async function hasCreditClearance(userId: string): Promise<boolean> {
   try {
     const { data, error } = await serviceClient
-      .from('academy_completions')
-      .select('id')
+      .from('player_learning_progress')
+      .select('module_id')
       .eq('profile_id', userId)
       .eq('module_id', CREDIT_MODULE_ID)
       .maybeSingle()
