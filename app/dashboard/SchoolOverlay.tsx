@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 10.07.2026 — Fix: academy_completions → player_learning_progress
-// Version:      4.3.1
+// Aktualisiert: 10.07.2026 — Fix: useState aus .map() herausgelöst → ModuleCard-Komponente
+// Version:      4.3.2
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -197,6 +197,86 @@ function RightPanel({ topic, modules }: { topic: string | null; modules: SsfModu
   )
 }
 
+
+// ── ModuleCard — eigene Komponente damit useState legal ist ──────────────────
+type ModuleItem = {
+  id: string
+  name: string
+  level: string
+  duration: string
+  unlocks: string
+  content: string
+  requires?: string
+  quiz: {
+    question: string
+    options: string[]
+    correct: number
+    explanation: string
+  }
+}
+
+function ModuleCard({
+  mod, done, requiresDone, moduleLoading, onComplete
+}: {
+  mod: ModuleItem
+  done: boolean
+  requiresDone: boolean
+  moduleLoading: boolean
+  onComplete: (id: string) => void
+}) {
+  const [showContent, setShowContent] = React.useState(false)
+  const [quizAnswer,  setQuizAnswer]  = React.useState<number | null>(null)
+  const [quizResult,  setQuizResult]  = React.useState<boolean | null>(null)
+
+  return (
+    <div style={{ background: done ? C.greenLight : '#fff', border: `1px solid ${done ? '#a0dcb8' : C.border}`, borderRadius: 10, padding: '0.85rem 1rem', marginBottom: '0.6rem', opacity: requiresDone ? 1 : 0.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: '0.6rem', color: done ? C.green : C.accent, fontWeight: 700, fontFamily: MONO, letterSpacing: '2px', marginBottom: 3 }}>
+            {mod.level} · {mod.duration} {done ? '✓ Abgeschlossen' : ''}
+          </div>
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: C.text }}>{mod.name}</div>
+          <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 3 }}>🔓 {mod.unlocks}</div>
+          {mod.requires && !requiresDone && (
+            <div style={{ fontSize: '0.62rem', color: C.red, marginTop: 3 }}>Voraussetzung: vorheriges Modul abschließen</div>
+          )}
+        </div>
+        {!done && requiresDone && (
+          <button onClick={() => setShowContent(v => !v)} style={{ fontSize: '0.7rem', padding: '4px 10px', background: C.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: MONO, flexShrink: 0 }}>
+            {showContent ? 'Schließen' : 'Lernen →'}
+          </button>
+        )}
+      </div>
+      {showContent && !done && (
+        <div style={{ marginTop: '0.75rem', borderTop: `1px solid ${C.border}`, paddingTop: '0.75rem' }}>
+          <div style={{ fontSize: '0.82rem', lineHeight: 1.75, color: C.text, marginBottom: '1rem' }}>{mod.content}</div>
+          <div style={{ background: C.bgAlt, borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>{mod.quiz.question}</div>
+            {mod.quiz.options.map((opt, i) => (
+              <button key={i} disabled={quizResult !== null}
+                onClick={() => { setQuizAnswer(i); setQuizResult(i === mod.quiz.correct) }}
+                style={{ display: 'block', width: '100%', textAlign: 'left' as const, padding: '6px 10px', marginBottom: 4, background: quizAnswer === i ? (i === mod.quiz.correct ? C.greenLight : C.redLight) : '#fff', border: `1px solid ${quizAnswer === i ? (i === mod.quiz.correct ? '#a0dcb8' : '#f0a0a0') : C.border}`, borderRadius: 6, cursor: quizResult !== null ? 'default' : 'pointer', fontSize: '0.75rem', fontFamily: MONO }}>
+                {['A','B','C','D'][i]}. {opt}
+              </button>
+            ))}
+            {quizResult !== null && (
+              <div style={{ marginTop: 8, fontSize: '0.75rem', color: quizResult ? C.green : C.red, lineHeight: 1.6 }}>
+                {quizResult ? '✓ Richtig! ' : '✗ Nicht ganz. '}{mod.quiz.explanation}
+              </div>
+            )}
+            {quizResult === true && (
+              <button disabled={moduleLoading} onClick={() => onComplete(mod.id)}
+                style={{ width: '100%', marginTop: 10, padding: '0.65rem', background: C.green, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>
+                {moduleLoading ? '…' : 'Modul abschließen (+50 Pkt.) →'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned }: SchoolOverlayProps) {
   const [tab, setTab]               = useState<'akademie' | 'module' | 'ssf' | 'handbuch'>('akademie')
   const [completedModules, setCompleted] = useState<string[]>([])
@@ -331,7 +411,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
               <div style={{ fontSize: '0.65rem', color: C.textMuted, lineHeight: 1.7, marginBottom: '1rem' }}>
                 Module sind kurze Lerneinheiten (2–4 Min). Jedes Modul schaltet eine Fähigkeit in NOXIA frei.
               </div>
-              {[
+              {([
                 {
                   id: 'LRN:SSF:ECO-L0-0001',
                   name: 'Was ist Kredit?',
@@ -361,59 +441,16 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
                     explanation: 'Zinseszins bedeutet: Zinsen auf Zinsen. Das Wachstum beschleunigt sich mit der Zeit — nicht-getilgte Schulden können die ursprüngliche Summe schnell vielfach übersteigen.',
                   },
                 },
-              ].map(mod => {
-                const done = completedModules.includes(mod.id)
-                const requiresDone = !mod.requires || completedModules.includes(mod.requires)
-                const [showContent, setShowContent] = React.useState(false)
-                const [quizAnswer, setQuizAnswer] = React.useState<number | null>(null)
-                const [quizResult, setQuizResult] = React.useState<boolean | null>(null)
-                return (
-                  <div key={mod.id} style={{ background: done ? C.greenLight : '#fff', border: `1px solid ${done ? '#a0dcb8' : C.border}`, borderRadius: 10, padding: '0.85rem 1rem', marginBottom: '0.6rem', opacity: requiresDone ? 1 : 0.5 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: '0.6rem', color: done ? C.green : C.accent, fontWeight: 700, fontFamily: MONO, letterSpacing: '2px', marginBottom: 3 }}>
-                          {mod.level} · {mod.duration} {done ? '✓ Abgeschlossen' : ''}
-                        </div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: C.text }}>{mod.name}</div>
-                        <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 3 }}>🔓 {mod.unlocks}</div>
-                        {mod.requires && !requiresDone && (
-                          <div style={{ fontSize: '0.62rem', color: C.red, marginTop: 3 }}>Voraussetzung: vorheriges Modul abschließen</div>
-                        )}
-                      </div>
-                      {!done && requiresDone && (
-                        <button onClick={() => setShowContent(v => !v)} style={{ fontSize: '0.7rem', padding: '4px 10px', background: C.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: MONO, flexShrink: 0 }}>
-                          {showContent ? 'Schließen' : 'Lernen →'}
-                        </button>
-                      )}
-                    </div>
-                    {showContent && !done && (
-                      <div style={{ marginTop: '0.75rem', borderTop: `1px solid ${C.border}`, paddingTop: '0.75rem' }}>
-                        <div style={{ fontSize: '0.82rem', lineHeight: 1.75, color: C.text, marginBottom: '1rem' }}>{mod.content}</div>
-                        <div style={{ background: C.bgAlt, borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>{mod.quiz.question}</div>
-                          {mod.quiz.options.map((opt, i) => (
-                            <button key={i} disabled={quizResult !== null} onClick={() => { setQuizAnswer(i); setQuizResult(i === mod.quiz.correct) }}
-                              style={{ display: 'block', width: '100%', textAlign: 'left' as const, padding: '6px 10px', marginBottom: 4, background: quizAnswer === i ? (i === mod.quiz.correct ? C.greenLight : C.redLight) : '#fff', border: `1px solid ${quizAnswer === i ? (i === mod.quiz.correct ? '#a0dcb8' : '#f0a0a0') : C.border}`, borderRadius: 6, cursor: quizResult !== null ? 'default' : 'pointer', fontSize: '0.75rem', fontFamily: MONO }}>
-                              {['A','B','C','D'][i]}. {opt}
-                            </button>
-                          ))}
-                          {quizResult !== null && (
-                            <div style={{ marginTop: 8, fontSize: '0.75rem', color: quizResult ? C.green : C.red, lineHeight: 1.6 }}>
-                              {quizResult ? '✓ Richtig! ' : '✗ Nicht ganz. '}{mod.quiz.explanation}
-                            </div>
-                          )}
-                          {quizResult === true && (
-                            <button disabled={moduleLoading} onClick={() => completeModule(mod.id)}
-                              style={{ width: '100%', marginTop: 10, padding: '0.65rem', background: C.green, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>
-                              {moduleLoading ? '…' : 'Modul abschließen (+50 Pkt.) →'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+              ] as ModuleItem[]).map(mod => (
+                <ModuleCard
+                  key={mod.id}
+                  mod={mod}
+                  done={completedModules.includes(mod.id)}
+                  requiresDone={!mod.requires || completedModules.includes(mod.requires)}
+                  moduleLoading={moduleLoading}
+                  onComplete={completeModule}
+                />
+              ))}
             </div>
           )}
           {tab === 'akademie' && (
