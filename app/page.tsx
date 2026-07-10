@@ -121,13 +121,32 @@ export default function Home() {
         <MusicLink />
       </div>
 
-      {/* Dezente Linie unten */}
+      {/* Footer mit Rechtslinks */}
       <div style={{
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
-        height: '1px',
-        background: 'linear-gradient(to right, transparent, rgba(201,169,97,0.3), transparent)',
-      }} />
+        padding: '0.75rem 2rem',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '1.5rem',
+        borderTop: '1px solid rgba(201,169,97,0.12)',
+      }}>
+        {[
+          { href: '/impressum',           label: 'Impressum' },
+          { href: '/datenschutz',         label: 'Datenschutz' },
+          { href: '/nutzungsbedingungen', label: 'Nutzungsbedingungen' },
+        ].map(l => (
+          <a key={l.href} href={l.href} style={{
+            fontSize: '0.65rem',
+            color: 'rgba(201,169,97,0.45)',
+            textDecoration: 'none',
+            letterSpacing: '0.05em',
+            fontFamily: 'Georgia, serif',
+          }}>
+            {l.label}
+          </a>
+        ))}
+      </div>
     </main>
   )
 }
