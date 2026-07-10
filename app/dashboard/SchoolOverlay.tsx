@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 09.07.2026 — Module-Tab: KG-0012-konforme Module abschließbar
-// Version:      4.3.0
+// Aktualisiert: 10.07.2026 — Fix: academy_completions → player_learning_progress
+// Version:      4.3.1
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -239,8 +239,8 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
       const token = await jwt()
       const { createClient } = await import('@/lib/supabase/client')
       const sb = createClient()
-      const { data } = await sb.from('academy_completions')
-        .select('module_id').eq('profile_id', (await sb.auth.getUser()).data.user?.id ?? '')
+      const { data } = await sb.from('player_learning_progress')
+        .select('module_id').eq('profile_id', (await sb.auth.getUser()).data.user?.id ?? '').eq('completed', true)
       setCompleted((data ?? []).map((r: any) => r.module_id))
     } catch {}
   }
