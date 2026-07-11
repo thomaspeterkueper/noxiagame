@@ -16,6 +16,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import { PRICE_MIN, PRICE_MAX, STOCK_LOW_THRESHOLD } from '@/lib/game/config'
