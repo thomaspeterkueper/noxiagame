@@ -1269,7 +1269,7 @@ export function BuildingSVG({
       {/* Gebäude-Sprite */}
       <g className={broken ? 'b-paused' : undefined} opacity={dim}>
         {sprite
-          ? sprite(c, occupancy)
+          ? sprite(c, occupancy, undefined, planet)
           : (
             <rect 
               x={10} 
