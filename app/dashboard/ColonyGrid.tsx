@@ -181,6 +181,7 @@ const GridMinimap = React.memo(function GridMinimap({
 function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuildStarted, journeyBuildHints = [] }: {
   tileRow: number; tileCol: number; tileType: string; locationSlug: string
   onClose: () => void; onBuildStarted: (newCredits?: number) => void
+  journeyBuildHints?: string[]
 }) {
   const { credits } = useGameStore()
   const [building, setBuilding] = useState(false)
