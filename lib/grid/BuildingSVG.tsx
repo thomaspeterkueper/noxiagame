@@ -1,6 +1,6 @@
 // lib/grid/BuildingSVG.tsx
-// Aktualisiert: 11.07.2026 — bank + shipyard Sprites (GDD-BUILDINGS konform)
-// Version:      2.1.0
+// Aktualisiert: 11.07.2026 — habitat_earth: Wohnblock mit Stockwerken
+// Version:      2.2.0
 
 import React from 'react'
 
@@ -76,6 +76,9 @@ const PURPLE_GLOW = 'rgba(180, 140, 232, 0.3)'
 const GOLD = '#c9a961'
 const GOLD_GLOW = 'rgba(201,169,97,0.35)'
 const GOLD_DARK = '#8a6a10'
+const BLDG_GREEN = '#3a6a3a'
+const BLDG_GREEN_DARK = '#2a4a2a'
+const BLDG_GREEN_ACCENT = '#7fd9b0'
 
 export interface BuildingSVGProps {
   entityId: string
@@ -88,7 +91,7 @@ export interface BuildingSVGProps {
   production?: number
 }
 
-type SpriteFn = (c: typeof PAL[Planet], occ: number, prod?: number) => React.ReactNode
+type SpriteFn = (c: typeof PAL[Planet], occ: number, prod?: number, planet?: string) => React.ReactNode
 
 const spinC = { transformBox: 'fill-box' as const, transformOrigin: 'center' as const }
 
@@ -484,35 +487,76 @@ const SPRITES: Record<string, SpriteFn> = {
   // LIFE & POPULATION
   // ═══════════════════════════════════════════════════
 
-  habitat: (c, occ) => {
+  habitat: (c, occ, _prod, planet) => {
     const lit = Math.round(Math.max(0, Math.min(1, occ || 0)) * 12)
-    
+    const occFrac = Math.max(0, Math.min(1, occ || 0))
+
+    // ── Erde: klassischer Wohnblock ──────────────────────────────────────────
+    if (planet === 'earth') return (
+      <>
+        {/* Schatten */}
+        <ellipse cx={24} cy={43} rx={16} ry={2.5} fill="#0a1a0a" opacity={0.2} />
+        {/* Fundament */}
+        <rect x={5} y={36} width={34} height={6} rx={1} fill={BLDG_GREEN_DARK} stroke={INK} strokeWidth={0.8} />
+        {/* Hauptgebäude */}
+        <rect x={7} y={8} width={30} height={28} fill={BLDG_GREEN} stroke={INK} strokeWidth={1} />
+        {/* Stockwerkstreifen */}
+        <line x1={7} y1={15} x2={37} y2={15} stroke={BLDG_GREEN_DARK} strokeWidth={0.6} opacity={0.7} />
+        <line x1={7} y1={22} x2={37} y2={22} stroke={BLDG_GREEN_DARK} strokeWidth={0.6} opacity={0.7} />
+        <line x1={7} y1={29} x2={37} y2={29} stroke={BLDG_GREEN_DARK} strokeWidth={0.6} opacity={0.7} />
+        {/* Dach */}
+        <rect x={5} y={5} width={34} height={4} rx={1} fill="#2a5a2a" stroke={INK} strokeWidth={0.7} />
+        <line x1={6} y1={5} x2={38} y2={5} stroke={BLDG_GREEN_ACCENT} strokeWidth={0.8} opacity={0.6} />
+        {/* Fenster EG (dunkel) */}
+        <rect x={10} y={30} width={5} height={6} rx={0.5} fill={INK} />
+        <rect x={20} y={30} width={6} height={6} rx={0.5} fill={INK} />
+        <rect x={29} y={30} width={5} height={6} rx={0.5} fill={INK} />
+        {/* Eingang */}
+        <rect x={19} y={31} width={7} height={11} rx={1} fill="#0d1a0d" />
+        {/* Fenster 1. OG — warm gold, langsam pulsierend */}
+        <rect className="b-pulse b-d0" x={10} y={23} width={5} height={5} rx={0.5} fill={POWER} opacity={0.7} />
+        <rect className="b-pulse b-d2" x={20} y={23} width={6} height={5} rx={0.5} fill={POWER} opacity={0.55} />
+        <rect className="b-pulse b-d1" x={29} y={23} width={5} height={5} rx={0.5} fill={POWER} opacity={0.65} />
+        {/* Fenster 2. OG */}
+        <rect className="b-pulse b-d3" x={10} y={16} width={5} height={5} rx={0.5} fill={POWER} opacity={0.5} />
+        <rect className="b-pulse b-d1" x={20} y={16} width={6} height={5} rx={0.5} fill={POWER} opacity={0.65} />
+        <rect className="b-pulse b-d2" x={29} y={16} width={5} height={5} rx={0.5} fill={POWER} opacity={0.6} />
+        {/* Dachgeschoss — grünes Akzentlicht */}
+        <rect className="b-pulse b-d0" x={14} y={9} width={5} height={4} rx={0.5} fill={BLDG_GREEN_ACCENT} opacity={0.55} />
+        <rect className="b-pulse b-d2" x={24} y={9} width={5} height={4} rx={0.5} fill={BLDG_GREEN_ACCENT} opacity={0.5} />
+        {/* Belegungsbalken */}
+        <rect x={7} y={40} width={30} height={1.5} rx={0.5} fill={BLDG_GREEN_DARK} opacity={0.5} />
+        <rect x={7} y={40} width={30 * occFrac} height={1.5} rx={0.5} fill={BLDG_GREEN_ACCENT} opacity={0.85} />
+        {/* Herzschlag */}
+        {occFrac > 0.5 && (
+          <path className="b-pulse b-d1"
+            d="M17,43 L19,43 L20,41 L22,45 L23,43 L25,43"
+            fill="none" stroke="#ff6b6b" strokeWidth={0.8}
+          />
+        )}
+      </>
+    )
+
+    // ── Mars / Mond / Phobos: Druckkessel ────────────────────────────────────
     return (
       <>
         {/* Äußere Hülle */}
         <circle cx={24} cy={24} r={20} fill="none" stroke={c.bodyDark} strokeWidth={8} />
         <circle cx={24} cy={24} r={22} fill="none" stroke={STEEL} strokeWidth={0.8} opacity={0.3} />
-        
         {/* Fenster */}
         {circularWindows(12, 16, lit, 24, 24, c.accent, 5)}
-        
         {/* Zentrale Steuerung */}
         <circle cx={24} cy={24} r={7} fill={c.body} stroke={STEEL} strokeWidth={0.8} />
         <circle cx={24} cy={24} r={3} fill={c.accent} />
         <circle cx={24} cy={24} r={4.5} fill="none" stroke={c.accent} strokeWidth={0.5} opacity={0.5} />
-        
         {/* Belegungsbalken */}
         <rect x={16} y={42} width={16} height={2} rx={1} fill={STEEL} opacity={0.3} />
-        <rect x={16} y={42} width={16 * (occ || 0)} height={2} rx={1} fill={c.accent} />
-        
-        {/* Lebenszeichen - Herzschlag */}
-        {occ && occ > 0.5 && (
-          <path 
-            className="b-pulse" 
-            d="M20,38 L22,38 L23,36 L25,40 L26,38 L28,38" 
-            fill="none" 
-            stroke="#ff6b6b" 
-            strokeWidth={0.8}
+        <rect x={16} y={42} width={16 * occFrac} height={2} rx={1} fill={c.accent} />
+        {/* Herzschlag */}
+        {occFrac > 0.5 && (
+          <path className="b-pulse"
+            d="M20,38 L22,38 L23,36 L25,40 L26,38 L28,38"
+            fill="none" stroke="#ff6b6b" strokeWidth={0.8}
           />
         )}
       </>
