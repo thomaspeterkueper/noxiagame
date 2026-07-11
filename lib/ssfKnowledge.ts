@@ -31,7 +31,6 @@ export async function fetchSsfKnowledgeModules(): Promise<SsfKnowledgeModule[]> 
 
   try {
     const response = await fetch(`${baseUrl}/api/noxia/modules`, {
-      next: { revalidate: 300 },
       headers: { accept: 'application/json' }
     })
 
