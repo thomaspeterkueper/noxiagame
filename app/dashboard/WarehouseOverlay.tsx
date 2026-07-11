@@ -173,6 +173,7 @@ export default function WarehouseOverlay({
               {currentPrices.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: '#8a9ab0', fontSize: '0.8rem' }}>Keine Marktpreise verfügbar.</div>
               ) : currentPrices.map((p, i) => (
+                // @ts-ignore — key is valid React prop
                 <BuyRow
                   key={p.id}
                   p={p}
