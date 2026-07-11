@@ -1,6 +1,6 @@
 // lib/grid/BuildingSVG.tsx
-// Animierte Gebäude-Sprites fürs ColonyGrid - Premium Edition
-// Komplett überarbeitet mit mehr Details, besseren Animationen und konsistenter Ästhetik
+// Aktualisiert: 11.07.2026 — bank + shipyard Sprites (GDD-BUILDINGS konform)
+// Version:      2.1.0
 
 import React from 'react'
 
@@ -73,6 +73,9 @@ const POWER = '#ffd700'
 const POWER_GLOW = 'rgba(255, 215, 0, 0.3)'
 const PURPLE = '#b48ce8'
 const PURPLE_GLOW = 'rgba(180, 140, 232, 0.3)'
+const GOLD = '#c9a961'
+const GOLD_GLOW = 'rgba(201,169,97,0.35)'
+const GOLD_DARK = '#8a6a10'
 
 export interface BuildingSVGProps {
   entityId: string
@@ -1038,6 +1041,111 @@ const SPRITES: Record<string, SpriteFn> = {
   // ═══════════════════════════════════════════════════
   // SPECIAL
   // ═══════════════════════════════════════════════════
+
+  // ── BANK (Farbcode: Gold / Wirtschaft — GDD-BUILDINGS) ──────────────────
+  bank: (_c) => (
+    <>
+      {/* Fundament */}
+      <rect x={4} y={36} width={40} height={6} rx={1} fill={GOLD_DARK} stroke={INK} strokeWidth={0.8} />
+      <rect x={4} y={35} width={40} height={2} fill={GOLD} opacity={0.7} />
+
+      {/* Hauptgebäude */}
+      <rect x={7} y={14} width={34} height={22} fill="#2a1a04" stroke={INK} strokeWidth={1} />
+
+      {/* Treppengiebel */}
+      <rect x={5}  y={10} width={38} height={4} fill="#3a2008" stroke={INK} strokeWidth={0.7} />
+      <rect x={9}  y={6}  width={30} height={4} fill="#2a1505" stroke={INK} strokeWidth={0.6} />
+      <rect x={13} y={2}  width={22} height={4} fill="#3a2008" stroke={INK} strokeWidth={0.5} />
+
+      {/* Goldene Dachkante */}
+      <line x1={5}  y1={10} x2={43} y2={10} stroke={GOLD} strokeWidth={1.2} opacity={0.9} />
+      <line x1={9}  y1={6}  x2={39} y2={6}  stroke={GOLD} strokeWidth={0.8} opacity={0.7} />
+
+      {/* Turmspitze */}
+      <polygon points="21,2 24,0 27,2" fill={GOLD} />
+      <circle className="b-pulse b-d1" cx={24} cy={0} r={2} fill={GOLD} opacity={0.9} />
+
+      {/* Säulen (6) */}
+      <rect x={9}  y={14} width={3} height={21} rx={1} fill={GOLD_DARK} />
+      <rect x={14} y={14} width={3} height={21} rx={1} fill={GOLD_DARK} />
+      <rect x={20} y={14} width={3} height={21} rx={1} fill={GOLD_DARK} />
+      <rect x={26} y={14} width={3} height={21} rx={1} fill={GOLD_DARK} />
+      <rect x={32} y={14} width={3} height={21} rx={1} fill={GOLD_DARK} />
+      <rect x={37} y={14} width={3} height={21} rx={1} fill={GOLD_DARK} />
+      {/* Säulenglanz */}
+      <rect x={9}  y={14} width={1} height={21} rx={0.5} fill={GOLD} opacity={0.3} />
+      <rect x={14} y={14} width={1} height={21} rx={0.5} fill={GOLD} opacity={0.3} />
+      <rect x={32} y={14} width={1} height={21} rx={0.5} fill={GOLD} opacity={0.3} />
+      <rect x={37} y={14} width={1} height={21} rx={0.5} fill={GOLD} opacity={0.3} />
+
+      {/* Fenster pulsierend */}
+      <rect className="b-pulse b-d0" x={10} y={16} width={4} height={5} rx={1} fill={POWER} opacity={0.7} />
+      <rect className="b-pulse b-d2" x={16} y={16} width={4} height={5} rx={1} fill={POWER} opacity={0.5} />
+      <rect className="b-pulse b-d1" x={28} y={16} width={4} height={5} rx={1} fill={POWER} opacity={0.5} />
+      <rect className="b-pulse b-d3" x={34} y={16} width={4} height={5} rx={1} fill={POWER} opacity={0.7} />
+
+      {/* Eingang */}
+      <rect x={20} y={24} width={8} height={12} rx={1} fill="#0d0604" stroke={GOLD} strokeWidth={0.4} opacity={0.6} />
+
+      {/* Cr-Leuchtschild */}
+      <circle className="b-pulse b-d2" cx={24} cy={30} r={4} fill={GOLD} opacity={0.12} />
+      <text x={24} y={32} textAnchor="middle" fontSize={4} fontWeight={700} fill={GOLD} opacity={0.95}>Cr</text>
+
+      {/* Goldene Sockelleiste */}
+      <line x1={4} y1={40} x2={44} y2={40} stroke={GOLD} strokeWidth={1} opacity={0.5} />
+    </>
+  ),
+
+  // ── SHIPYARD (Farbcode: Orange / Industrie — GDD-BUILDINGS) ──────────────
+  shipyard: (_c) => (
+    <>
+      {/* Boden / Werkzeugplattform */}
+      <rect x={3} y={35} width={42} height={7} rx={1} fill="#1a0808" stroke={INK} strokeWidth={0.8} />
+      <line x1={3} y1={38} x2={45} y2={38} stroke={HEAT} strokeWidth={0.5} opacity={0.4} />
+
+      {/* Werkzeug-Stationen */}
+      <rect x={5}  y={36} width={6} height={5} rx={1} fill="#240c0c" />
+      <rect x={13} y={36} width={6} height={5} rx={1} fill="#240c0c" />
+      <rect x={27} y={36} width={6} height={5} rx={1} fill="#240c0c" />
+      <rect x={35} y={36} width={6} height={5} rx={1} fill="#240c0c" />
+      <circle className="b-pulse b-d0" cx={8}  cy={38} r={1.5} fill={HEAT} opacity={0.8} />
+      <circle className="b-pulse b-d2" cx={16} cy={38} r={1.5} fill={HEAT} opacity={0.6} />
+      <circle className="b-pulse b-d1" cx={30} cy={38} r={1.5} fill={HEAT} opacity={0.7} />
+      <circle className="b-pulse b-d3" cx={38} cy={38} r={1.5} fill={HEAT} opacity={0.6} />
+
+      {/* Schiffsrumpf im Bau */}
+      <rect x={6} y={25} width={36} height={11} rx={2} fill="#1a0808" stroke={INK} strokeWidth={0.8} />
+      <rect x={6} y={25} width={36} height={2.5} fill={HEAT} opacity={0.75} />
+      {/* Rumpf-Panels (Stahlblau) */}
+      <rect x={8}  y={28} width={8} height={7} rx={1} fill="#1a2a40" stroke={STEEL} strokeWidth={0.4} />
+      <rect x={18} y={28} width={8} height={7} rx={1} fill="#1a2a40" stroke={STEEL} strokeWidth={0.4} />
+      <rect x={28} y={28} width={8} height={7} rx={1} fill="#1a2a40" stroke={STEEL} strokeWidth={0.4} />
+      {/* Schweißfunken aufsteigend */}
+      <circle className="b-pulse b-d0" cx={12} cy={27} r={2} fill="#ff9040" opacity={0.85} />
+      <circle className="b-pulse b-d2" cx={22} cy={27} r={2} fill="#ffb060" opacity={0.85} />
+      <circle className="b-pulse b-d1" cx={32} cy={27} r={2} fill="#ff9040" opacity={0.85} />
+
+      {/* Kranmast (vertikal) */}
+      <rect x={21} y={2} width={3} height={24} fill="#3a1808" stroke={INK} strokeWidth={0.5} />
+      <rect x={21.5} y={2} width={1} height={24} fill={HEAT} opacity={0.4} />
+
+      {/* Kranausleger (horizontal) */}
+      <rect x={5} y={4} width={38} height={4} rx={1} fill="#4a1e0a" stroke={INK} strokeWidth={0.5} />
+      <rect x={5} y={4} width={38} height={1.5} fill={HEAT} opacity={0.55} />
+
+      {/* Kranhaken-Seil */}
+      <line x1={24} y1={8} x2={24} y2={26} stroke={STEEL} strokeWidth={1} opacity={0.7} />
+      <polygon points="21,26 24,30 27,26" fill="#5a2a10" />
+      <polygon points="22,26 24,29 26,26" fill={HEAT} opacity={0.6} />
+
+      {/* Warnlicht oben blinkend */}
+      <circle className="b-pulse b-d3" cx={7}  cy={5} r={2.5} fill="#ff2000" opacity={0.9} />
+      <circle className="b-pulse b-d1" cx={41} cy={5} r={2.5} fill="#ff2000" opacity={0.7} />
+
+      {/* Rote Statuslinie unten */}
+      <line x1={3} y1={42} x2={45} y2={42} stroke={HEAT} strokeWidth={1} opacity={0.55} />
+    </>
+  ),
 
   monument: (c) => (
     <>
