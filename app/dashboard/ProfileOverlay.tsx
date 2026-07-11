@@ -87,7 +87,7 @@ function buildKompetenzen(stats: PlayerStats): Kompetenz[] {
   ]
 }
 
-function KompetenzCard({ k }: { k: Kompetenz }) {
+function KompetenzCard({ k }: { k: Kompetenz; key?: string }) {
   const [open, setOpen] = useState(false)
   const naechste = k.schwellen.find(s => !s.freigeschaltet)
   const pct = naechste ? Math.min(100, Math.round((k.wert / naechste.wert) * 100)) : 100
