@@ -99,6 +99,6 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>{children}</div>;
 }
 
-function Panel({ children }: { children: React.ReactNode }) {
+function Panel({ children }: { children: React.ReactNode; key?: string }) {
   return <div style={{ border: '1px solid rgba(120,150,180,0.2)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,0.035)' }}><div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div></div>;
 }
