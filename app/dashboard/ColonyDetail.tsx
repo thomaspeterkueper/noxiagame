@@ -18,6 +18,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { ResourceType, LocationSlug, useGameStore, effectiveRange } from '@/lib/store/gameStore'
 import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
 
