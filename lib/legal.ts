@@ -31,9 +31,9 @@ function resolveTemplate(text: string, impressum: ImpressumData): string {
 
 export async function fetchLegalContent(): Promise<LegalContent> {
   const [impressumRaw, privacyRaw, termsRaw] = await Promise.all([
-    fetch(`${KG_RAW}/registry/legal/impressum-master.json`, { next: { revalidate: 86400 } }).then(r => r.json()),
-    fetch(`${KG_RAW}/registry/legal/datenschutz.de.md`, { next: { revalidate: 86400 } }).then(r => r.text()),
-    fetch(`${KG_RAW}/registry/legal/terms.de.md`, { next: { revalidate: 86400 } }).then(r => r.text()),
+    fetch(`${KG_RAW}/registry/legal/impressum-master.json`, {}).then(r => r.json()),
+    fetch(`${KG_RAW}/registry/legal/datenschutz.de.md`, {}).then(r => r.text()),
+    fetch(`${KG_RAW}/registry/legal/terms.de.md`, {}).then(r => r.text()),
   ]);
 
   const impressum: ImpressumData = {
