@@ -185,7 +185,7 @@ async function calcCollateral(userId: string): Promise<{
 
 // ── Zinseszins-Preview ────────────────────────────────────────────────────────
 function compoundPreview(principal: number, rate: number, ticks: number): { tick: number; balance: number }[] {
-  const result = []
+  const result: { tick: number; balance: number }[] = []
   let balance = principal
   for (let t = 1; t <= ticks; t++) {
     balance = Math.round(balance * (1 + rate))
