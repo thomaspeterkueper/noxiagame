@@ -118,7 +118,7 @@ function MetricCard({ m }: { m: OverlayMetric }) {
   )
 }
 
-function AlertRow({ a }: { a: OverlayAlert }) {
+function AlertRow({ a }: { a: OverlayAlert; key?: string }) {
   const s = SEVERITY_STYLE[a.severity] ?? SEVERITY_STYLE.info
   return (
     <div style={{
