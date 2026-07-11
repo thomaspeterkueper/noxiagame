@@ -277,7 +277,7 @@ function OverviewTab({ data }: { data: ColonyData }) {
   )
 }
 
-function ResourceRow({ resource: r }: { resource: Resource }) {
+function ResourceRow({ resource: r }: { resource: Resource; key?: string }) {
   const color = RESOURCE_COLORS[r.resource_type] ?? '#c9a961'
   const net   = r.production - r.consumption
   return (
