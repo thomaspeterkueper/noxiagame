@@ -8,6 +8,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
