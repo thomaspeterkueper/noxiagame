@@ -96,7 +96,7 @@ function NextObjectiveBanner() {
 
   useEffect(() => {
     let cancelled = false
-    let feedbackTimer: ReturnType<typeof window.setTimeout> | null = null
+    let feedbackTimer: number | null = null
 
     function showFeedback(text: string) {
       setFeedback(text)
