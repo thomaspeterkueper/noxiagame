@@ -13,6 +13,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 
 const RES_DE: Record<string, string> = {
