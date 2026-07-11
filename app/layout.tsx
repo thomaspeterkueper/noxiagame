@@ -5,6 +5,7 @@ import React from 'react'
 
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Courier_Prime, Playfair_Display } from 'next/font/google'
+// @ts-ignore
 import './globals.css'
 import MusicProvider from './_components/MusicProvider'
 import MusicControls from './_components/MusicControls'
