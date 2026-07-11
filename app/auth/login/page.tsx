@@ -2,6 +2,8 @@
 // Aktualisiert: 04.07.2026 — Hintergrundbild, heller Kasten, Fade-in
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
