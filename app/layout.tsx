@@ -1,3 +1,4 @@
+import React from 'react'
 // app/layout.tsx
 // Aktualisiert: 2026-07-10 — globaler Legal-Footer ergänzt (NOX-0006)
 // Version:      1.1.0
