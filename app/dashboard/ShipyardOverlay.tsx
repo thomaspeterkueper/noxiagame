@@ -18,6 +18,8 @@
 
 'use client'
 
+import React from 'react'
+
 interface ShipType {
   id: string
   name: string
