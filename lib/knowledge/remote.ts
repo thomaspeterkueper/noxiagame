@@ -50,7 +50,6 @@ export async function fetchNoxiaUnlocks(userId = 'demo'): Promise<NoxiaUnlockPay
 
   const response = await fetch(url, {
     headers: { accept: 'application/json' },
-    next: { revalidate: 60 },
   });
 
   if (!response.ok) {
