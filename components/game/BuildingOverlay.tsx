@@ -77,7 +77,7 @@ function SectionLabel({ text }: { text: string }) {
   )
 }
 
-function MetricCard({ m }: { m: OverlayMetric }) {
+function MetricCard({ m }: { m: OverlayMetric; key?: string }) {
   const trendColor = m.trend ? (TREND_COLOR[m.trend] ?? C.accent) : C.accent
   const trendIcon = m.trend ? (TREND_ICON[m.trend] ?? '') : ''
 
@@ -140,7 +140,7 @@ function AlertRow({ a }: { a: OverlayAlert; key?: string }) {
   )
 }
 
-function ActionBtn({ a, onAction }: { a: OverlayAction; onAction?: (id: string) => void }) {
+function ActionBtn({ a, onAction }: { a: OverlayAction; onAction?: (id: string) => void; key?: string }) {
   return (
     <button
       disabled={a.disabled}
