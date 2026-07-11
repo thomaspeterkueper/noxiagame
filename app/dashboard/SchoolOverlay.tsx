@@ -223,6 +223,7 @@ function ModuleCard({
   requiresDone: boolean
   moduleLoading: boolean
   onComplete: (id: string) => void
+  key?: string
 }) {
   const [showContent, setShowContent] = React.useState(false)
   const [quizAnswer,  setQuizAnswer]  = React.useState<number | null>(null)
