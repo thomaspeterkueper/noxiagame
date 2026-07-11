@@ -20,8 +20,8 @@ export default function BuyRow({ p, last, cargoFree, owned, costBasis, onBuy, on
   cargoFree: number
   owned: number
   costBasis: number
-  onBuy: (amt: number, limit: number) => void
-  onSell: (amt: number, limit: number) => void
+  onBuy: (amt: number, limit: number) => unknown
+  onSell: (amt: number, limit: number) => unknown
 }) {
   const [amount, setAmount] = useState(1)
   // Auktions-Vorbereitung: null = zu, sonst 'buy'/'sell' mit Limit-Eingabe offen.
