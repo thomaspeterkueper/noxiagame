@@ -59,7 +59,7 @@ function Engine({ big }: { big: boolean }) {
   )
 }
 
-function ModuleGlyph({ m, x, i }: { m: ShipModuleView; x: number; i: number }) {
+function ModuleGlyph({ m, x, i }: { m: ShipModuleView; x: number; i: number; key?: number }) {
   const broken = m.status && m.status !== 'active'
   const dim = broken ? 0.4 : 1
   let glyph: React.ReactNode
