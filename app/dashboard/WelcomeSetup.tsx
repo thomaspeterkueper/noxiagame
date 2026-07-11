@@ -12,6 +12,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 
