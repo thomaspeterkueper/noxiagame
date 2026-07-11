@@ -38,7 +38,7 @@ export const STATIC_OVERLAYS: Record<string, OverlayDef> = {
 }
 
 function buildGenericOverlay(entityId: string, ctx: BuildingContext): OverlayDef {
-  const metrics = []
+  const metrics: OverlayMetric[] = []
   const produced = Object.entries(ctx.production).filter(([, v]) => v > 0)
 
   for (const [res, amount] of produced) {
