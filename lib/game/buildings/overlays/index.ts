@@ -9,7 +9,7 @@
 // Neue Gebäude: eigene Datei in overlays/ anlegen, hier eintragen.
 // Fallback: generischer Overlay für alle unbekannten Gebäude.
 
-import type { OverlayDef, BuildingContext } from '../types'
+import type { OverlayDef, BuildingContext, OverlayMetric, OverlayAlert } from '../types'
 import { buildMineOverlay, MINE_OVERLAY_STATIC } from './mine'
 import { buildSolarOverlay } from './solar'
 import { buildHabitatOverlay } from './habitat'
