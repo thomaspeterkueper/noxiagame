@@ -71,7 +71,7 @@ export async function GET(req: Request) {
       .select('id, display_name, decision_weights')
       .eq('kind', 'npc_firm')
 
-    const result = []
+    const result: Record<string, unknown>[] = []
     for (const actor of (actors ?? []) as any[]) {
       // Treasury
       const { data: ledSum } = await supabase
