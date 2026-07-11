@@ -4,6 +4,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { createContext, useContext, useRef, useState, useEffect } from 'react'
 
 interface MusicContextType {
