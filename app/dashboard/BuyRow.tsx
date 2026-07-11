@@ -15,6 +15,7 @@ import { useState } from 'react'
 import { T, RESOURCE_ICON, RESOURCE_LABEL } from './ui'
 
 export default function BuyRow({ p, last, cargoFree, owned, costBasis, onBuy, onSell }: {
+  key?: string
   p: any
   last: boolean
   cargoFree: number
