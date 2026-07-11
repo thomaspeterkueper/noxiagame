@@ -1,3 +1,4 @@
+import React from 'react'
 // ui.tsx
 // Aktualisiert: 27.06.2026 — Bauteile als Ressource ergänzt
 // Version:      0.2.0
