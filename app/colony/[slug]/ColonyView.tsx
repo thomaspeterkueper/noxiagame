@@ -1,4 +1,6 @@
 'use client'
+
+import React from 'react'
 // app/colony/[slug]/ColonyView.tsx
 // Autarke Colony View — kein DashboardClient, kein gameStore
 // Tabs: Übersicht · Markt · Treasury (nur Governor) · Einstellungen (nur Governor)
