@@ -401,7 +401,7 @@ export async function runBankInterestTick(supabase: SB, tickNumber: number) {
   for (const acc of accounts ?? []) {
     const deposit = Number(acc.deposit ?? 0)
     const loan    = Number(acc.loan    ?? 0)
-    const ledgerEntries = []
+    const ledgerEntries: { profile_id: string; location_id: string; entry_type: string; amount: number; balance_after: number; note: string; tick: number }[] = []
     const updates: Record<string, number> = {}
 
     // Zinsgutschrift auf Einlage
