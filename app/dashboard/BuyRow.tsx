@@ -9,6 +9,8 @@
 
 'use client'
 
+import React from 'react'
+
 import { useState } from 'react'
 import { T, RESOURCE_ICON, RESOURCE_LABEL } from './ui'
 
