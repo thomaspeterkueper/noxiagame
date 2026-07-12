@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; Build/Sell-Route
-// Version:      1.0.0
+// Aktualisiert: 12.07.2026 — owner_class + owner_id beim Bauen (CITY-SIMULATION F1/F3)
+// Version:      1.1.0
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
@@ -337,7 +337,7 @@ async function completeBuild(build: any, profileId: string) {
   const def = await loadBuildingDef(build.buildable_id)
   if (!def) return
   await serviceClient.from('player_builds').update({ status: 'complete' }).eq('id', build.id)
-  await serviceClient.from('tile_entities').insert({ profile_id: profileId, location_id: build.location_id, tile_level: build.tile_level ?? 0, tile_row: build.tile_row, tile_col: build.tile_col, entity_type: 'building', entity_id: build.buildable_id })
+  await serviceClient.from('tile_entities').insert({ profile_id: profileId, location_id: build.location_id, tile_level: build.tile_level ?? 0, tile_row: build.tile_row, tile_col: build.tile_col, entity_type: 'building', entity_id: build.buildable_id, owner_class: 'PLAYER', owner_id: profileId })
 }
 
 async function completeSale(build: any, profileId: string) {
