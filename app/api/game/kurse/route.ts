@@ -54,13 +54,19 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Einzelner Kurs mit Folien ─────────────────────────────────────────────
+  // Lookup by either the legacy kurs_id slug or the canonical kg_path_id
+  // (PATH:SSF:*/PATH:NOXIA:*) - additive, NOX-0008 follow-up. Callers that
+  // already pass a kurs_id keep working unchanged; anything holding a
+  // canonical id from the Knowledge Graph's records.learning_paths can now
+  // use it directly instead of needing NOXIA's local slug.
   if (id) {
-    const { data: kurs } = await supabase
+    const isCanonical = id.startsWith('PATH:')
+    let query = supabase
       .from('foundation_kurse')
       .select('*, foundation_folien(*)')
-      .eq('kurs_id', id)
       .eq('published', true)
-      .single()
+    query = isCanonical ? query.eq('kg_path_id', id) : query.eq('kurs_id', id)
+    const { data: kurs } = await query.single()
 
     if (!kurs) return NextResponse.json({ error: 'Kurs nicht gefunden' }, { status: 404 })
 
