@@ -1,7 +1,7 @@
 // app/dashboard/KursRenderer.tsx
 // Erstellt:     23.06.2026
-// Aktualisiert: 23.06.2026
-// Version:      1.1.0 — Token-Fix (createClient statt window.__supabase)
+// Aktualisiert: 11.07.2026 — NOX-0008: kg_path_id im Kurs-Interface
+// Version:      1.2.0
 //
 // Rendert Foundation-Kurse dynamisch aus DB-Daten.
 // Folientypen: titel, text, tabelle, zwei_spalten, formel, animation, quiz, video
@@ -23,6 +23,7 @@ interface Folie {
 interface Kurs {
   id:                 string
   kurs_id:            string
+  kg_path_id?:        string   // kanonische KG-Lernpfad-ID (PATH:SSF:*/PATH:NOXIA:*)
   titel:              string
   untertitel?:        string
   niveau:             number
