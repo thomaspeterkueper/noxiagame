@@ -19,7 +19,7 @@
 -- ═══════════════════════════════════════════════════════════════
 
 -- Eigentümer-Klasse: wer besitzt die Kachel?
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS owner_class text NOT NULL DEFAULT 'PLAYER'
   CONSTRAINT owner_class_valid CHECK (
     owner_class IN ('PLAYER', 'STATE', 'NPC', 'CORPORATION')
@@ -27,16 +27,16 @@ ALTER TABLE public.tile_entities
 
 -- Explizite owner_id (nullable: STATE/NPC haben keinen profile_id)
 -- Standardfall Alpha: owner_id = profile_id
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS owner_id uuid;
 
 -- Pächter / Nutzer (F1: Landnutzung ≠ Landbesitz)
 -- nullable: wird erst mit Alpha 0.3 Pachtmechanik befüllt
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS occupant_id uuid;
 
 -- Pachtvertrag-Referenz (F1, Alpha 0.3+)
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS lease_id uuid;
 
 -- ═══════════════════════════════════════════════════════════════
@@ -45,11 +45,11 @@ ALTER TABLE public.tile_entities
 
 -- Berechneter Bodenwert: Lage × Nutzung × Nachfrage × Ressourcenpotenzial
 -- Wird durch Cron oder bei Tick-Berechnung aktualisiert
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS land_value integer NOT NULL DEFAULT 0;
 
 -- Letzter Zeitpunkt der Bodenwert-Berechnung
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS land_value_updated_at timestamptz;
 
 -- ═══════════════════════════════════════════════════════════════
@@ -58,12 +58,12 @@ ALTER TABLE public.tile_entities
 
 -- Referenz auf ein geologisches Deposit (nullable: nicht jede Kachel hat eines)
 -- Wenn gesetzt: diese Kachel liegt über einem Deposit
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS deposit_id uuid;
 
 -- Deposit-Status: entdeckt oder noch unbekannt
 -- Scanner-Gebäude setzt discovered = true
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS deposit_discovered boolean NOT NULL DEFAULT false;
 
 -- ═══════════════════════════════════════════════════════════════
@@ -72,7 +72,7 @@ ALTER TABLE public.tile_entities
 
 -- Wird aus Nutzung der umliegenden Kacheln abgeleitet (nicht vorab festgelegt)
 -- Mögliche Werte: residential | industrial | commercial | mixed | infrastructure | empty
-ALTER TABLE public.tile_entities
+ALTER TABLE tile_entities
   ADD COLUMN IF NOT EXISTS district_type text;
 
 -- ═══════════════════════════════════════════════════════════════
@@ -80,7 +80,7 @@ ALTER TABLE public.tile_entities
 -- ═══════════════════════════════════════════════════════════════
 
 -- owner_id = profile_id (Standardfall Alpha)
-UPDATE public.tile_entities
+UPDATE tile_entities
   SET owner_id = profile_id
   WHERE owner_id IS NULL;
 
@@ -89,18 +89,18 @@ UPDATE public.tile_entities
 -- ═══════════════════════════════════════════════════════════════
 
 CREATE INDEX IF NOT EXISTS idx_tile_entities_owner_class
-  ON public.tile_entities (owner_class);
+  ON tile_entities (owner_class);
 
 CREATE INDEX IF NOT EXISTS idx_tile_entities_owner_id
-  ON public.tile_entities (owner_id)
+  ON tile_entities (owner_id)
   WHERE owner_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_tile_entities_land_value
-  ON public.tile_entities (location_id, land_value DESC)
+  ON tile_entities (location_id, land_value DESC)
   WHERE land_value > 0;
 
 CREATE INDEX IF NOT EXISTS idx_tile_entities_deposit
-  ON public.tile_entities (deposit_id)
+  ON tile_entities (deposit_id)
   WHERE deposit_id IS NOT NULL;
 
 -- ═══════════════════════════════════════════════════════════════
@@ -112,7 +112,7 @@ SELECT
   count(*) AS anzahl,
   count(owner_id) AS mit_owner_id,
   count(deposit_id) AS mit_deposit
-FROM public.tile_entities
+FROM tile_entities
 GROUP BY owner_class
 ORDER BY anzahl DESC;
 
