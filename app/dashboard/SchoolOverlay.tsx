@@ -150,13 +150,18 @@ function SsfTab() {
   )
 }
 
-function RightPanel({ topic, modules }: { topic: string | null; modules: SsfModule[] }) {
+function RightPanel({ topic, kind, modules }: { topic: string | null; kind: Task['kind'] | null; modules: SsfModule[] }) {
   const TOPIC_DOMAIN: Record<string, string> = {
     'Handel': 'economics', 'Ressourcen': 'economics',
     'Navigation': 'physics', 'Physik': 'physics', 'Sonnensystem': 'physics',
     'Energie': 'physics', 'Bevölkerung': 'biology', 'Geschichte': 'history',
   }
-  const domain = topic ? TOPIC_DOMAIN[topic] : null
+  // Calc tasks test arithmetic regardless of their trade-flavoured topic
+  // label ("Handel", "Ressourcen", ...) - route to mathematics first.
+  // See NOX-0007: this used to fall through to TOPIC_DOMAIN, which has no
+  // mathematics entry at all, so a pure addition/subtraction task never
+  // matched any SSF module.
+  const domain = kind === 'calc' ? 'mathematics' : topic ? TOPIC_DOMAIN[topic] : null
   const relevant = domain
     ? modules.filter(m => (m.domain ?? '').toLowerCase().includes(domain))
     : modules.slice(0, 3)
@@ -593,7 +598,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#faf7f0', overflow: 'hidden' }}>
           {tab === 'ssf'
             ? <SsfTab />
-            : <RightPanel topic={task?.topic ?? null} modules={ssfModules} />
+            : <RightPanel topic={task?.topic ?? null} kind={task?.kind ?? null} modules={ssfModules} />
           }
         </div>
 
