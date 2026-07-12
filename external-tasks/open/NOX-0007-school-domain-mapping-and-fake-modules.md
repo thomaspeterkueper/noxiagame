@@ -51,3 +51,21 @@ Open
 
 ## Created
 2026-07-11
+
+## Resolution (partial)
+
+Item 1 (TOPIC_DOMAIN never mapped to mathematics) - fixed 2026-07-12, commit
+f1352e9. `RightPanel` now routes any `kind: 'calc'` task to the mathematics
+domain directly, before consulting `TOPIC_DOMAIN` at all - the topic label
+("Handel", "Ressourcen", ...) no longer determines the domain for calc
+tasks, since the actual skill tested is arithmetic regardless of the task's
+trade framing.
+
+Item 2 (hardcoded `LRN:SSF:ECO-L0-0001`/`0002`) - deliberately not touched.
+`completedModules` is loaded from a persisted source (`data.map(r =>
+r.module_id)`), meaning real players may already have completion records
+keyed to these exact ids. Renaming the id namespace without knowing whether
+that data exists risks silently orphaning real progress. Needs a decision
+with visibility into the actual Supabase table before either renaming or
+submitting these as a real `entity_request` - left open rather than guessed
+at.
