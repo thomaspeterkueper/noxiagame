@@ -1,9 +1,10 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 10.07.2026 — Fix: useState aus .map() herausgelöst → ModuleCard-Komponente
-// Version:      4.3.2
+// Aktualisiert: 11.07.2026 — NOX-0008: Kurse-Tab mit KursRenderer
+// Version:      4.4.0
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import KursRenderer from './KursRenderer'
 
 interface ColonyContext {
   locationName: string
@@ -278,10 +279,92 @@ function ModuleCard({
   )
 }
 
+
+// ── KursListe — zeigt alle verfügbaren Kurse ─────────────────────────────────
+function KursListe({ onSelect, jwt }: { onSelect: (id: string) => void; jwt: () => Promise<string> }) {
+  const [kurse, setKurse] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const token = await jwt()
+        const res = await fetch('/api/game/kurse', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+        const data = await res.json() as Record<string, unknown>
+        setKurse((data.kurse as any[]) ?? [])
+      } catch {}
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  if (loading) return (
+    <div style={{ padding: '2rem', textAlign: 'center' as const, color: C.textMuted, fontFamily: MONO }}>
+      Kurse werden geladen …
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '1rem 1.25rem' }}>
+      <div style={{ fontSize: '0.65rem', color: C.textMuted, lineHeight: 1.7, marginBottom: '1rem' }}>
+        Interaktive Lernkurse mit Folien und Quiz. Jeder abgeschlossene Kurs gibt Wissenspunkte.
+      </div>
+      {kurse.length === 0 && (
+        <div style={{ color: C.textMuted, fontFamily: MONO, fontSize: '0.8rem' }}>
+          Keine Kurse verfügbar.
+        </div>
+      )}
+      {kurse.map((k: any) => (
+        <div key={k.id} style={{
+          background: k.abgeschlossen ? C.greenLight : '#fff',
+          border: `1px solid ${k.abgeschlossen ? '#a0dcb8' : C.border}`,
+          borderLeft: `3px solid ${k.thema_farbe ?? C.accent}`,
+          borderRadius: 8,
+          padding: '0.85rem 1rem',
+          marginBottom: '0.6rem',
+          opacity: k.freigeschaltet === false ? 0.5 : 1,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '0.6rem', color: C.textMuted, fontFamily: MONO, letterSpacing: '2px', marginBottom: 3 }}>
+                {k.thema ?? 'Grundlagen'} · {k.dauer_min ?? '?'} Min · {k.punkte ?? 0} Pkt
+                {k.abgeschlossen ? ' · ✓ Abgeschlossen' : ''}
+              </div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: C.text }}>{k.titel}</div>
+              {k.untertitel && (
+                <div style={{ fontSize: '0.72rem', color: C.textMuted, marginTop: 2 }}>{k.untertitel}</div>
+              )}
+            </div>
+            {(k.freigeschaltet !== false) && !k.abgeschlossen && (
+              <button
+                onClick={() => onSelect(k.kurs_id)}
+                style={{ fontSize: '0.7rem', padding: '4px 10px', background: C.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: MONO, flexShrink: 0, marginLeft: 8 }}
+              >
+                Starten →
+              </button>
+            )}
+            {k.abgeschlossen && (
+              <button
+                onClick={() => onSelect(k.kurs_id)}
+                style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'transparent', color: C.green, border: `1px solid ${C.green}`, borderRadius: 6, cursor: 'pointer', fontFamily: MONO, flexShrink: 0, marginLeft: 8 }}
+              >
+                Wiederholen
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned }: SchoolOverlayProps) {
-  const [tab, setTab]               = useState<'akademie' | 'module' | 'ssf' | 'handbuch'>('akademie')
+  const [tab, setTab]               = useState<'akademie' | 'kurse' | 'module' | 'ssf' | 'handbuch'>('akademie')
   const [completedModules, setCompleted] = useState<string[]>([])
   const [moduleLoading, setModuleLoading] = useState(false)
+  const [activeKursId, setActiveKursId] = useState<string | null>(null)
   const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(false)
@@ -394,9 +477,9 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
         <div style={{ width: '40%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end' }}>
-              {(['akademie', 'module', 'ssf', 'handbuch'] as const).map(t => (
+              {(['akademie', 'kurse', 'module', 'ssf', 'handbuch'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
-                  {t === 'akademie' ? 'Aufgaben' : t === 'module' ? 'Module' : t === 'ssf' ? 'SSF' : 'Handbuch'}
+                  {t === 'akademie' ? 'Aufgaben' : t === 'kurse' ? 'Kurse' : t === 'module' ? 'Module' : t === 'ssf' ? 'SSF' : 'Handbuch'}
                 </button>
               ))}
               <div style={{ marginLeft: 'auto', paddingBottom: '0.5rem' }}>
@@ -405,6 +488,23 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
             </div>
           </div>
 
+          {tab === 'kurse' && (
+            <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const }}>
+              {activeKursId ? (
+                <KursRenderer
+                  kursId={activeKursId}
+                  onComplete={(punkte) => {
+                    setActiveKursId(null)
+                    onKnowledgeEarned(punkte, total ?? 0)
+                    loadKnowledge()
+                  }}
+                  onClose={() => setActiveKursId(null)}
+                />
+              ) : (
+                <KursListe onSelect={setActiveKursId} jwt={jwt} />
+              )}
+            </div>
+          )}
           {tab === 'handbuch' && <ManualTab onClose={onClose} />}
           {tab === 'ssf' && <SsfTab />}
           {tab === 'module' && (
