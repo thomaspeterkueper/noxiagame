@@ -1,7 +1,7 @@
 // app/api/game/kurse/route.ts
 // Erstellt:     23.06.2026
-// Aktualisiert: 23.06.2026
-// Version:      1.2.0 — Kurse public lesbar, Auth nur für Abschluss
+// Aktualisiert: 11.07.2026 — NOX-0008: kg_path_id in response
+// Version:      1.3.0
 //
 // GET /api/game/kurse                    → alle publizierten Kurse + Fortschritt
 // GET /api/game/kurse?id=kurs_01_...     → Kurs mit Folien
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
   // ── Alle Kurse + Fortschritt + Voraussetzungen ────────────────────────────
   const { data: kurse } = await supabase
     .from('foundation_kurse')
-    .select('id, kurs_id, titel, untertitel, niveau, thema, thema_farbe, dauer_min, punkte, sort_order')
+    .select('id, kurs_id, kg_path_id, titel, untertitel, niveau, thema, thema_farbe, dauer_min, punkte, sort_order')
     .eq('published', true)
     .order('sort_order')
 
