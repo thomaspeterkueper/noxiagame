@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 03.07.2026 — BuildingOverlay für Mine/Solar/Habitat/Produktion
-// Version:      5.4.0
+// Aktualisiert: 12.07.2026 — owner_class: STATE=Blau, CORPORATION=Orange, PLAYER=Gold
+// Version:      5.6.0
 
 'use client'
 
@@ -120,7 +120,7 @@ const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInf
       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: nameColor, marginBottom: '4px' }}>{name}</div>
       {info.entity && (
         <div style={{ fontSize: '0.65rem', color: '#7a8a9a', marginBottom: '3px' }}>
-          {info.isOwn ? '🔑 Dein Gebäude' : info.isState ? '🏛 Staatlich' : `👤 ${info.entity.username ?? 'Anderer Pilot'}`}
+          {info.isOwn ? '🔑 Dein Gebäude' : info.isState ? '🏛 Staatlich' : info.isCorp ? '🏢 Corporation' : `👤 ${info.entity.username ?? 'Anderer Pilot'}`}
           {info.isSelling && <span style={{ color: '#e8702a', marginLeft: '6px' }}>· wird verkauft</span>}
         </div>
       )}
@@ -140,7 +140,7 @@ const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInf
       )}
       {info.entity && (
         <div style={{ fontSize: '0.58rem', color: '#3a5a7a', marginTop: '5px' }}>
-          {info.isOwn ? 'Klicken für Details & Verkauf' : info.isState ? 'Staatliches Gebäude' : 'Fremdes Gebäude'}
+          {info.isOwn ? 'Klicken für Details & Verkauf' : info.isState ? 'Staatliches Gebäude' : info.isCorp ? 'Corporation-Gebäude' : 'Fremdes Gebäude'}
         </div>
       )}
     </div>
