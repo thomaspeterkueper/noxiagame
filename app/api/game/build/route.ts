@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 12.07.2026 — owner_class + owner_id beim Bauen (CITY-SIMULATION F1/F3)
-// Version:      1.1.0
+// Aktualisiert: 12.07.2026 — owner_class Queries + STATE/CORPORATION in Response
+// Version:      1.2.0
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
@@ -168,8 +168,7 @@ export async function GET(req: NextRequest) {
     const { data: stateEntities } = await serviceClient
       .from('tile_entities')
       .select('*, locations(slug, name)')
-      .is('profile_id', null)
-      .eq('is_state_owned', true)
+      .in('owner_class', ['STATE', 'CORPORATION'])
       .in('entity_type', ['building', 'module'])
 
     const { data: npcEntities } = await serviceClient
@@ -186,7 +185,7 @@ export async function GET(req: NextRequest) {
           .select('*, locations(slug, name), profiles(username)')
           .neq('profile_id', user.id)
           .is('actor_id', null)
-          .eq('is_state_owned', false)
+          .eq('owner_class', 'PLAYER')
           .in('location_id', ownLocationIds)
           .in('entity_type', ['building'])
       : { data: [] }
