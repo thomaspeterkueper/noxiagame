@@ -1,7 +1,7 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 09.07.2026 — NOX-0001: Kommentar, Ledger-Fehlerlog, export
-// Version:      3.2.1
+// Aktualisiert: 12.07.2026 — runLandValueTick: land_value Berechnung je Tile
+// Version:      3.3.0
 
 import {
   CONSUMPTION_PER_100,
@@ -455,14 +455,66 @@ export async function runBankInterestTick(supabase: SB, tickNumber: number) {
   return { processed }
 }
 
+
+// ── Bodenwert-Berechnung (F2: Henry George Landwertsteuer) ───────────────────
+// Berechnet land_value je Kachel aus:
+//   Basiswert (immer 10)
+//   + Bevölkerungsdruck der Kolonie (× 0.02 pro Einwohner, max 200)
+//   + Gebäudeaktivität auf der Kachel (× 50 wenn bebaut)
+//   + Nähe zum Zentrum (Distanz 0 = +100, Distanz 10+ = 0)
+// Wird einmal pro Tick aufgerufen — nicht geschäftskritisch bei Fehler.
+
+export async function runLandValueTick(supabase: SB) {
+  // Alle besiedelten Kolonien mit Bevölkerung laden
+  const { data: locations, error: locErr } = await supabase
+    .from('locations')
+    .select('id, population, population_max')
+    .gt('population', 0)
+
+  if (locErr || !locations?.length) return { updated: 0 }
+
+  let updated = 0
+
+  for (const loc of locations) {
+    const popFactor = Math.min(200, Math.round((loc.population ?? 0) * 0.02))
+
+    // Alle Kacheln dieser Kolonie
+    const { data: tiles } = await supabase
+      .from('tile_entities')
+      .select('id, tile_row, tile_col, entity_type')
+      .eq('location_id', loc.id)
+      .eq('entity_type', 'building')
+
+    for (const tile of tiles ?? []) {
+      // Nähe zum Zentrum (Grid 10×10, Mitte bei 5,5)
+      const dr = Math.abs((tile.tile_row ?? 5) - 5)
+      const dc = Math.abs((tile.tile_col ?? 5) - 5)
+      const dist = Math.sqrt(dr * dr + dc * dc)
+      const proximityBonus = Math.max(0, Math.round(100 - dist * 10))
+
+      const landValue = 10 + popFactor + 50 + proximityBonus
+
+      await supabase
+        .from('tile_entities')
+        .update({ land_value: landValue, land_value_updated_at: new Date().toISOString() })
+        .eq('id', tile.id)
+
+      updated++
+    }
+  }
+
+  return { updated }
+}
+
 export async function runTick(supabase: SB, tickNumber: number) {
   const defs = await loadBuildingDefs(supabase)
   const population = await runPopulationTick(supabase, tickNumber, defs)
   const npc = await runNpcTick(supabase, tickNumber)
   const prices = await runPriceTick(supabase, tickNumber)
   const orders  = await runOrderTick(supabase)
-  const bank    = await runBankInterestTick(supabase, tickNumber)
-  return { tickNumber, population, prices, npc, orders, bank }
+  const bank      = await runBankInterestTick(supabase, tickNumber)
+  const landValues = await runLandValueTick(supabase)
+  return { tickNumber, population, prices, npc, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
