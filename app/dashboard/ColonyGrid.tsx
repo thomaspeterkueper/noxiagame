@@ -73,7 +73,7 @@ interface ColonyGridProps {
 }
 interface TooltipInfo {
   r: number; c: number; x: number; y: number
-  entity?: TileEntity; isOwn: boolean; isState: boolean
+  entity?: TileEntity; isOwn: boolean; isState: boolean; isCorp: boolean
   isSelling: boolean; tileType: string; eco?: EntityEconomy
 }
 
@@ -351,14 +351,16 @@ export default function ColonyGrid({
       const isSelling = sellingAt(r, c)
       const isAnom = anomaly?.r === r && anomaly?.c === c
       const isHint = !!entity && highlightEntityIds.includes(entity.entity_id)
-      const isNPC = !!entity?.actor_id
-      const isState = !isNPC && (entity?.is_state_owned === true || (entity?.profile_id === null && !entity?.actor_id))
+      const isNPC  = !!entity?.actor_id
+      const isState = !isNPC && entity?.owner_class === 'STATE'
+      const isCorp  = !isNPC && entity?.owner_class === 'CORPORATION'
       const interactive = canBuild || !!entity || isAnom
       let ownerShadow = 'none'
       if (entity) {
-        if (isState) ownerShadow = 'inset 0 0 0 2px #5aaeff, 0 0 5px rgba(90,174,255,0.55)'
-        else if (isOwn) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 5px rgba(201,169,97,0.55)'
-        else ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 4px rgba(224,80,80,0.45)'
+        if (isState)  ownerShadow = 'inset 0 0 0 2px #5aaeff, 0 0 5px rgba(90,174,255,0.55)'   // Blau = Staat
+        else if (isCorp) ownerShadow = 'inset 0 0 0 2px #e08030, 0 0 5px rgba(224,128,48,0.55)'  // Orange = Corporation
+        else if (isOwn) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 5px rgba(201,169,97,0.55)'   // Gold = Spieler
+        else ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 4px rgba(224,80,80,0.45)'               // Rot = anderer Spieler
       }
       if (isSelected && !isState) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 8px #c9a961'
 
@@ -370,7 +372,7 @@ export default function ColonyGrid({
             if (hoverTimer.current) clearTimeout(hoverTimer.current)
             const tRect = e.currentTarget.getBoundingClientRect()
             hoverTimer.current = setTimeout(() => {
-              setHoveredTile({ r, c, x: tRect.right, y: tRect.top, entity: entity ?? undefined, isOwn, isState, isSelling: sellingAt(r, c), tileType, eco: entity ? entityInfo?.[entity.id] : undefined })
+              setHoveredTile({ r, c, x: tRect.right, y: tRect.top, entity: entity ?? undefined, isOwn, isState, isCorp, isSelling: sellingAt(r, c), tileType, eco: entity ? entityInfo?.[entity.id] : undefined })
             }, 280)
           }}
           onMouseLeave={e => {
@@ -438,7 +440,8 @@ export default function ColonyGrid({
         const ctx: BuildingContext = {
           locationSlug: slug,
           locationName: name,
-          isOwn: ent.profile_id === userId,
+          isOwn:  ent.profile_id === userId,
+          isCorp: ent.owner_class === 'CORPORATION',
           production,
           consumption,
           stocks,
