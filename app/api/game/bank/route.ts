@@ -1,7 +1,7 @@
 // app/api/game/bank/route.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 10.07.2026 — Fix: academy_completions → player_learning_progress
-// Version:      0.4.1
+// Aktualisiert: 15.07.2026 — NOX-0007: academy_completions (korrekte Tabelle)
+// Version:      0.4.2
 //
 // v0.3.0:
 //   - status: Promise.all für parallele DB-Queries (Collateral + Clearance gleichzeitig)
@@ -79,7 +79,7 @@ async function getOrCreateAccount(userId: string, locationId: string) {
 async function hasCreditClearance(userId: string): Promise<boolean> {
   try {
     const { data, error } = await serviceClient
-      .from('player_learning_progress')
+      .from('academy_completions')
       .select('module_id')
       .eq('profile_id', userId)
       .eq('module_id', CREDIT_MODULE_ID)
