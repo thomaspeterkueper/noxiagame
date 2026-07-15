@@ -1,7 +1,20 @@
 {
   "crons": [
-    { "path": "/api/cron/population", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/prices", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/orders", "schedule": "15 * * * *" }
+    {
+      "path": "/api/cron/population",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/prices",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/orders",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/retention",
+      "schedule": "0 3 * * *"
+    }
   ]
 }
