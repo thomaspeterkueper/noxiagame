@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 11.07.2026 — NOX-0008: Kurse-Tab mit KursRenderer
-// Version:      4.4.0
+// Aktualisiert: 15.07.2026 — NOX-0007: hardcodierte ECO-Module entfernt, academy_completions
+// Version:      4.4.1
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -408,8 +408,8 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
       const token = await jwt()
       const { createClient } = await import('@/lib/supabase/client')
       const sb = createClient()
-      const { data } = await sb.from('player_learning_progress')
-        .select('module_id').eq('profile_id', (await sb.auth.getUser()).data.user?.id ?? '').eq('completed', true)
+      const { data } = await sb.from('academy_completions')
+        .select('module_id').eq('profile_id', (await sb.auth.getUser()).data.user?.id ?? '')
       setCompleted((data ?? []).map((r: any) => r.module_id))
     } catch {}
   }
@@ -517,46 +517,19 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
               <div style={{ fontSize: '0.65rem', color: C.textMuted, lineHeight: 1.7, marginBottom: '1rem' }}>
                 Module sind kurze Lerneinheiten (2–4 Min). Jedes Modul schaltet eine Fähigkeit in NOXIA frei.
               </div>
-              {([
-                {
-                  id: 'LRN:SSF:ECO-L0-0001',
-                  name: 'Was ist Kredit?',
-                  level: 'L0',
-                  duration: '2–3 Min',
-                  unlocks: 'Bank — Kredit aufnehmen',
-                  content: 'Ein Kredit ist geliehenes Geld das mit Zinsen zurückgezahlt wird. Die Bank leiht Ihnen Ressourcen heute gegen die Zusage, mehr morgen zurückzugeben. Sinnvoll wenn der erwartete Gewinn die Zinslast übersteigt.',
-                  quiz: {
-                    question: 'Was ist der Hauptnachteil eines Kredits?',
-                    options: ['Sofortiger Ressourcenzugang', 'Zinsen erhöhen die Rückzahlungssumme', 'Keine Rückzahlung nötig', 'Zinsen werden dem Kreditnehmer gutgeschrieben'],
-                    correct: 1,
-                    explanation: 'Richtig. Zinsen sind der Preis für geliehenes Kapital — sie erhöhen die zurückzuzahlende Summe über den ursprünglichen Betrag hinaus.',
-                  },
-                },
-                {
-                  id: 'LRN:SSF:ECO-L0-0002',
-                  name: 'Was ist Zinseszins?',
-                  level: 'L0',
-                  duration: '2–3 Min',
-                  unlocks: 'Bank — Zinseszins-Vorschau',
-                  requires: 'LRN:SSF:ECO-L0-0001',
-                  content: 'Beim Zinseszins werden Zinsen auf bereits aufgelaufene Zinsen berechnet. Aus 1.000 Cr mit 2%/Tick werden nach 10 Ticks nicht 1.200 Cr, sondern 1.218 Cr — der Unterschied wächst exponentiell.',
-                  quiz: {
-                    question: 'Warum ist Zinseszins bei Schulden gefährlich?',
-                    options: ['Schulden wachsen linear', 'Schulden wachsen exponentiell', 'Schulden sinken automatisch', 'Zinsen werden nur einmal berechnet'],
-                    correct: 1,
-                    explanation: 'Zinseszins bedeutet: Zinsen auf Zinsen. Das Wachstum beschleunigt sich mit der Zeit — nicht-getilgte Schulden können die ursprüngliche Summe schnell vielfach übersteigen.',
-                  },
-                },
-              ] as ModuleItem[]).map(mod => (
-                <ModuleCard
-                  key={mod.id}
-                  mod={mod}
-                  done={completedModules.includes(mod.id)}
-                  requiresDone={!mod.requires || completedModules.includes(mod.requires)}
-                  moduleLoading={moduleLoading}
-                  onComplete={completeModule}
-                />
-              ))}
+              <div style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: '1rem', color: C.textMuted, fontSize: '0.8rem', lineHeight: 1.7 }}>
+                <div style={{ fontWeight: 700, color: C.accent, marginBottom: '0.5rem', fontFamily: MONO }}>
+                  Module werden über die Solar Science Foundation bereitgestellt
+                </div>
+                <p style={{ margin: 0 }}>
+                  Wirtschaftsmodule (Kredit, Zinseszins, Bodenwert) sind als KB-REQUEST-0003 bei der SSF beantragt.
+                  Sobald sie verfügbar sind, erscheinen sie hier automatisch.
+                </p>
+                <a href="https://solarsciencefoundation.vercel.app" target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-block', marginTop: '0.75rem', color: C.gold, fontWeight: 700, textDecoration: 'none', fontSize: '0.78rem' }}>
+                  SSF öffnen →
+                </a>
+              </div>
             </div>
           )}
           {tab === 'akademie' && (
