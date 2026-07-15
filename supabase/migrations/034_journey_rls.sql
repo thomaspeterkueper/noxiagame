@@ -27,8 +27,9 @@ CREATE POLICY "journeys_update_own"
 
 CREATE POLICY "journeys_service_all"
   ON player_journeys FOR ALL
-  USING (auth.role() = 'service_role')
-  WITH CHECK (auth.role() = 'service_role');
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 -- ── journey_steps ─────────────────────────────────────────────────────────────
 ALTER TABLE journey_steps ENABLE ROW LEVEL SECURITY;
@@ -42,8 +43,9 @@ CREATE POLICY "journey_steps_select_all"
 
 CREATE POLICY "journey_steps_service_all"
   ON journey_steps FOR ALL
-  USING (auth.role() = 'service_role')
-  WITH CHECK (auth.role() = 'service_role');
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 -- Kontrolle
 SELECT tablename, policyname, cmd
