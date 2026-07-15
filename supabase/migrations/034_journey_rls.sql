@@ -52,3 +52,14 @@ SELECT tablename, policyname, cmd
 FROM pg_policies
 WHERE tablename IN ('player_journeys', 'journey_steps')
 ORDER BY tablename, cmd;
+
+-- ═══════════════════════════════════════════════════════════════
+-- GRANT — explizite Berechtigungen (Pflicht bei manuell erstellten Tabellen)
+-- RLS-Policies allein reichen nicht — service_role und authenticated
+-- brauchen explizite GRANTs auf die Tabelle
+-- ═══════════════════════════════════════════════════════════════
+
+GRANT ALL ON public.player_journeys TO service_role;
+GRANT ALL ON public.player_journeys TO authenticated;
+GRANT ALL ON public.journey_steps   TO service_role;
+GRANT ALL ON public.journey_steps   TO authenticated;
