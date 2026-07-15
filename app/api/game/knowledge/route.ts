@@ -1,7 +1,7 @@
 // app/api/game/knowledge/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 10.07.2026 — Fix: academy_completions → player_learning_progress
-// Version:      2.1.1
+// Aktualisiert: 15.07.2026 — NOX-0007: academy_completions (korrekte Tabelle)
+// Version:      2.1.2
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
 
     // Doppelt-Abschluss verhindern
     const { data: existing } = await supabase
-      .from('player_learning_progress')
+      .from('academy_completions')
       .select('profile_id')
       .eq('profile_id', user.id)
       .eq('module_id', moduleId)
@@ -158,16 +158,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Modul als abgeschlossen markieren
-    await supabase.from('player_learning_progress').upsert({
-      profile_id:        user.id,
-      module_id:         moduleId,
-      completed:         true,
-      completed_at:      new Date().toISOString(),
-      progress_percent:  100,
-      knowledge_awarded: 0,  // wird unten über award_knowledge vergeben
-      unlock_awarded:    false,
-      updated_at:        new Date().toISOString(),
-    }, { onConflict: 'profile_id,module_id' })
+    await supabase.from('academy_completions').insert({
+      profile_id:   user.id,
+      module_id:    moduleId,
+      completed_at: new Date().toISOString(),
+    })
 
     // Wissenspunkte vergeben (L0=50, L1=100, L2=200)
     const level = moduleId.includes('-L0-') ? 50
