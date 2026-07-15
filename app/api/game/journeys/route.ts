@@ -37,8 +37,6 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const serviceClient = createServiceClient()
-  // DEBUG: log key prefix to verify service role
-  console.log('[journeys] key prefix:', process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0,20) ?? 'MISSING')
   const { data: journeys, error } = await serviceClient
     .from('player_journeys')
     .select('*')
