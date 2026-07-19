@@ -1,9 +1,12 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Multiplayer: worldEntities aus world-Route in ColonyGrid
-// Version:      2.10.0
+// Aktualisiert: 19.07.2026 — Ably Realtime: Preise, Transaktionen, Builds
+// Version:      2.11.0
 
 'use client'
+
+import { useAblyChannel } from '@/lib/ably/client'
+import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
 import React, { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
@@ -81,6 +84,31 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   }
   useEffect(() => { fetchBuilds() }, [])
   useEffect(() => { fetchBuilds() }, [invalidations.builds])
+
+  // ── Ably Realtime Subscriptions ─────────────────────────────────────────
+  // Preise: neu laden wenn Cron Preise aktualisiert hat
+  useAblyChannel(ABLY_CHANNELS.prices, ABLY_EVENTS.prices.updated, () => {
+    invalidate('prices')
+  })
+
+  // Transaktionen: World-Ticker neu laden
+  useAblyChannel(ABLY_CHANNELS.transactions, ABLY_EVENTS.transaction.new, () => {
+    // WorldData neu holen für Ticker
+    fetch('/api/game/world').then(r => r.json()).then(d => setWorldData(d)).catch(() => {})
+  })
+
+  // Eigene Builds: fertige Bauten / Verkäufe
+  useAblyChannel(
+    userId ? ABLY_CHANNELS.builds(userId) : '',
+    ABLY_EVENTS.build.completed,
+    () => { invalidate('builds'); showToast('🏗️ Bau abgeschlossen!', true) }
+  )
+  useAblyChannel(
+    userId ? ABLY_CHANNELS.builds(userId) : '',
+    ABLY_EVENTS.build.sold,
+    () => { invalidate('builds'); showToast('💰 Verkauf abgeschlossen!', true) }
+  )
+
   useEffect(() => { async function fetchAll() { try {
     const token = await getToken()
     const [pR, kR, tR, sR] = await Promise.all([
