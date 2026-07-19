@@ -102,8 +102,8 @@ const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInf
   const borderColor = info.isOwn ? 'rgba(201,169,97,0.65)'
     : info.isState ? 'rgba(90,174,255,0.5)'
     : info.entity ? 'rgba(224,80,80,0.45)' : 'rgba(42,78,122,0.35)'
-  const nameColor = info.isOwn ? '#c9a961'
-    : info.isState ? '#5aaeff' : info.entity ? '#e8a0a0' : '#8ab0d0'
+  const nameColor = info.isOwn ? '#8a6a00'
+    : info.isState ? '#1a4e8a' : info.entity ? '#b52a2a' : '#2a4e7a'
 
   return (
     <div style={{
@@ -120,7 +120,7 @@ const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInf
     }}>
       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: nameColor, marginBottom: '4px' }}>{name}</div>
       {info.entity && (
-        <div style={{ fontSize: '0.65rem', color: '#7a8a9a', marginBottom: '3px' }}>
+        <div style={{ fontSize: '0.65rem', color: '#5a6a7a', marginBottom: '3px' }}>
           {info.isOwn ? '🔑 Dein Gebäude' : info.isState ? '🏛 Staatlich' : info.isCorp ? '🏢 Corporation' : `👤 ${info.entity.username ?? 'Anderer Pilot'}`}
           {info.isSelling && <span style={{ color: '#e8702a', marginLeft: '6px' }}>· wird verkauft</span>}
         </div>
