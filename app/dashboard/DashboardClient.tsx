@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Schritt 4: player_unlocks + Feature-Gates laden
-// Version:      2.18.0
+// Aktualisiert: 19.07.2026 — gates an BankOverlay übergeben
+// Version:      2.19.0
 
 'use client'
 
