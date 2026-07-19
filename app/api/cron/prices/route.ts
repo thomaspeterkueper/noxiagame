@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 30.05.2026 — Bevölkerungsbasierte Preisanpassung
-// Version:      0.2.0
+// Aktualisiert: 19.07.2026 — Fix: inaktive Ressourcen (prod=0, cons=0) nicht anpassen
+// Version:      0.3.0
 // app/api/cron/prices/route.ts
 // Erstellt: 30.05.2026
 // Aktualisiert: 30.05.2026 – Bevölkerungsbasierte Preisanpassung
@@ -51,6 +51,10 @@ export async function GET(req: NextRequest) {
       const consumption = res.consumption ?? 0
       const production = res.production ?? 0
       const balance = production - consumption
+
+      // Inaktive Ressource: keine Produktion, kein Verbrauch → Preis einfrieren
+      // Verhindert Aufschaukel-Bug bei nicht implementierten Ressourcen (z.B. components)
+      if (production === 0 && consumption === 0) continue
 
       // Preisdruck berechnen
       // 1. Lagerbestand-Druck
