@@ -1,7 +1,7 @@
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 19.07.2026 — Fix: collateral Response korrekt abflachen
-// Version:      1.4.0
+// Aktualisiert: 19.07.2026 — gates prop: Kredit/Sicherheiten nur mit Unlock
+// Version:      1.5.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -15,6 +15,7 @@ interface BankOverlayProps {
   credits:          number
   onClose:          () => void
   onCreditsChanged: (newCredits: number) => void
+  gates?:           Record<string, boolean>  // Feature-Gates aus player_unlocks
 }
 
 const BANK_BG: Record<string, { src: string; label: string }> = {
@@ -101,6 +102,7 @@ const BUILDING_NAMES: Record<string, string> = {
 
 export default function BankOverlay({
   locationSlug, locationName, credits: initialCredits, onClose, onCreditsChanged,
+  gates = {},
 }: BankOverlayProps) {
   const [tab, setTab]               = useState<Tab>('konto')
   const [status, setStatus]         = useState<BankStatus | null>(null)
@@ -224,7 +226,7 @@ export default function BankOverlay({
         {/* Tabs */}
         <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 0, marginBottom: '-1px', alignItems: 'flex-end' }}>
-            {(['konto', 'einlage', 'kredit', 'sicherheiten'] as Tab[]).map(t => (
+            {(['konto', 'einlage', ...(gates.bankCredit || status?.hasModule ? ['kredit', 'sicherheiten'] : [])] as Tab[]).map(t => (
               <button key={t} onClick={() => { setTab(t); setMsg(null); setAmount('') }}
                 style={{ padding: '0.5rem 1rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.75rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
                 {t === 'konto' ? 'Konto' : t === 'einlage' ? 'Einlage' : t === 'kredit' ? 'Kredit' : 'Sicherheiten'}
@@ -338,6 +340,11 @@ export default function BankOverlay({
           )}
 
           {/* ── KREDIT ─────────────────────────────────────────────────────── */}
+          {!loading && tab === 'konto' && !gates.bankCredit && !status?.hasModule && (
+            <div style={{ margin: '0.75rem 1.25rem', padding: '0.75rem 1rem', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 8, fontSize: '0.75rem', color: C.textMuted, lineHeight: 1.7 }}>
+              🔒 <strong style={{ color: C.accent }}>Kredit & Sicherheiten</strong> — schließe Modul <strong>ECO-L0-0001</strong> in der Akademie ab um Kredite freizuschalten.
+            </div>
+          )}
           {!loading && tab === 'kredit' && status && (
             <>
               {/* Schulungsnachweis-Gate */}
