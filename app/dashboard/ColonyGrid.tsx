@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — Fix: alle belegten Kacheln blockieren BuildPopup
-// Version:      5.8.0
+// Aktualisiert: 19.07.2026 — gates prop: an BankOverlay weitergeben
+// Version:      5.9.0
 
 'use client'
 
@@ -284,6 +284,7 @@ export default function ColonyGrid({
   locationResources = [], credits = 0, highlightEntityIds = [] as string[],
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0,
   inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize,
+  gates = {},
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
@@ -425,7 +426,7 @@ export default function ColonyGrid({
 
       {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} />}
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} />}
-      {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} />}
+      {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} gates={gates} />}
       {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} />}
 
       {showBuildingOverlay && selectedTile && (() => {
