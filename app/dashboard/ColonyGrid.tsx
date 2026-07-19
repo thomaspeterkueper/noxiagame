@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 12.07.2026 — owner_class: STATE=Blau, CORPORATION=Orange, PLAYER=Gold
-// Version:      5.6.0
+// Aktualisiert: 19.07.2026 — Fix: besetzte Kacheln nicht bebaubar + Eigentümer-Info
+// Version:      5.7.0
 
 'use client'
 
