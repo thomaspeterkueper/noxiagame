@@ -29,8 +29,8 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- ════════════════════════════════════
 -- SEQUENCES
 -- ════════════════════════════════════
-CREATE SEQUENCE colony_ledger_id_seq;
-CREATE SEQUENCE events_id_seq;
+CREATE SEQUENCE IF NOT EXISTS colony_ledger_id_seq;
+CREATE SEQUENCE IF NOT EXISTS events_id_seq;
 
 -- ════════════════════════════════════
 -- TABLES (aus CSV-Export)
