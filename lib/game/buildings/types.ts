@@ -1,7 +1,7 @@
 // lib/game/buildings/types.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 02.07.2026 — Overlay insight/hints/actions ergänzt
-// Version:      1.3.0
+// Aktualisiert: 19.07.2026 — BuildingContext: isCorp, owner_class
+// Version:      1.4.0
 
 export type ResourceType = 'water' | 'energy' | 'metal' | 'components'
 export type LocationSlug = string
@@ -34,15 +34,17 @@ export interface BuildingDef {
 }
 
 export interface BuildingContext {
-  locationSlug: string
-  locationName: string
-  isOwn: boolean
-  production: Record<string, number>
-  consumption: Record<string, number>
-  stocks: Record<string, number>
-  population?: number
+  locationSlug:  string
+  locationName:  string
+  isOwn:         boolean
+  isCorp?:       boolean
+  owner_class?:  string
+  production:    Record<string, number>
+  consumption:   Record<string, number>
+  stocks:        Record<string, number>
+  population?:   number
   populationMax?: number
-  credits?: number
+  credits?:      number
 }
 
 export type OverlayTrend = 'up' | 'down' | 'stable' | 'critical'
