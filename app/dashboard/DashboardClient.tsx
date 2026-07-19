@@ -236,6 +236,16 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
+      {chatWith && (
+        <ChatOverlay
+          userId={userId ?? ''}
+          username={profile?.username ?? ''}
+          otherId={chatWith.id}
+          otherName={chatWith.username}
+          onClose={() => setChatWith(null)}
+          onUnreadChange={setUnreadDMs}
+        />
+      )}
       <JourneyDrawer open={journeyOpen} currentLocation={location} onClose={() => setJourneyOpen(false)} {...journeyActions} onActiveStepChange={handleActiveStepChange} onStepCompleted={(title) => showToast(`✓ Geschafft: ${title}`, true)} onJourneyCompleted={handleJourneyCompleted} />
       {profile && !profile.onboarded && <WelcomeSetup onDone={(opts) => { if (opts?.openJourney) setJourneyOpen(true); window.location.reload(); }} />}
       {auctionOpen && <MarketAuction open={auctionOpen} onClose={() => setAuctionOpen(false)} location={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))} credits={credits} cargo={cargo} cargoMax={cargoMax} initialResource={auctionConfig.resource} initialMode={auctionConfig.mode} initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} />}
