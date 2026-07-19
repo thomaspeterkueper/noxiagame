@@ -338,11 +338,10 @@ export default function ColonyGrid({
     const overlayBuildings = ['mine', 'solar', 'habitat', 'ice_drill', 'water_recycler', 'scanner']
     if (ent && overlayBuildings.includes(ent.entity_id)) { setShowBuildingOverlay(true); return }
     if (ent && ent.profile_id === userId) { setShowSellPanel(true); return }
+    // Jede andere besetzte Kachel → nur Info in Sidebar, kein Bauen
+    if (ent) return
     // Freie Kachel → Bauen möglich
-    if (!ent && isBuildable(tileType)) { setShowBuildPopup(true); return }
-
-    // Besetzte Kachel mit fremdem/staatlichem Gebäude → nur Info in Sidebar
-    // (kein Bauen, kein Verkaufen — Kachel ist blockiert)
+    if (isBuildable(tileType)) { setShowBuildPopup(true); return }
   }, [entityAt, onOpenShipyard, onOpenWarehouse, userId])
 
   const gridElements = useMemo(() => {
