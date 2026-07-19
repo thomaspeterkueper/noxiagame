@@ -43,7 +43,7 @@ const RES_DE: Record<string, string> = { metal: 'Metall', energy: 'Energie', wat
 
 export interface TileEntity {
   id: string; profile_id: string | null; is_state_owned?: boolean
-  actor_id?: string | null
+  actor_id?: string | null; owner_class?: string; owner_id?: string
   entity_type: string; entity_id: string; tile_level: number
   tile_row: number; tile_col: number; username?: string
 }
