@@ -1,7 +1,7 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 14.06.2026
-// Version:      0.3.0
+// Aktualisiert: 19.07.2026 — Multiplayer: tile_entities aller Spieler in Response
+// Version:      0.4.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -75,6 +75,15 @@ export async function GET() {
 
   const transactions = groupTransactions(rawTransactions ?? [])
 
+  // ── Multiplayer: tile_entities aller Spieler + Staatliche Gebäude ──────────
+  // Liefert Gebäude für alle Kolonien — ColonyGrid kann fremde Gebäude zeigen.
+  // Enthält profile_id, owner_class, entity_id, tile_row, tile_col, location_id.
+  const { data: allEntities } = await supabase
+    .from('tile_entities')
+    .select('id, profile_id, owner_class, owner_id, actor_id, entity_type, entity_id, tile_level, tile_row, tile_col, location_id, built_at, profiles(username)')
+    .eq('entity_type', 'building')
+    .order('built_at', { ascending: true })
+
   // Weltmeldungen generieren
   const news: { type: string; text: string; icon: string }[] = []
   for (const loc of locations ?? []) {
@@ -118,6 +127,7 @@ export async function GET() {
     news:         news.slice(0, 5),
     locations:    locations ?? [],
     transactions: transactions.slice(0, 10),
+    entities:     allEntities ?? [],
     stats: {
       totalPopulation:  totalPop,
       suppliedColonies: suppliedCount,
