@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Ably Realtime: Preise, Transaktionen, Builds
-// Version:      2.11.0
+// Aktualisiert: 19.07.2026 — Ably DM: unread Badge + Toast bei eingehender Nachricht
+// Version:      2.12.0
 
 'use client'
 
@@ -60,6 +60,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [playerStats, setPlayerStats] = useState({ trades: 0, flights: 0, knowledge: 0 })
   const [journeyOpen, setJourneyOpen]           = useState(false)
   const [journeyHints, setJourneyHints]         = useState<string[]>([])
+  const [unreadDMs, setUnreadDMs]               = useState(0)
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
@@ -107,6 +108,16 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     userId ? ABLY_CHANNELS.builds(userId) : '',
     ABLY_EVENTS.build.sold,
     () => { invalidate('builds'); showToast('💰 Verkauf abgeschlossen!', true) }
+  )
+
+  // Eingehende Direktnachricht
+  useAblyChannel(
+    userId ? ABLY_CHANNELS.dm(userId) : '',
+    ABLY_EVENTS.dm.message,
+    (data: any) => {
+      setUnreadDMs(n => n + 1)
+      showToast(`💬 ${data?.senderUsername ?? 'Jemand'}: ${(data?.content ?? '').slice(0, 40)}${(data?.content ?? '').length > 40 ? '…' : ''}`, false)
+    }
   )
 
   useEffect(() => { async function fetchAll() { try {
