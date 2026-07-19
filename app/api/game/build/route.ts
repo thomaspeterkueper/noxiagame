@@ -321,7 +321,6 @@ export async function GET(req: NextRequest) {
     const completesAt = new Date()
     if (mode === 'normal') completesAt.setHours(completesAt.getHours() + BUILDING_SALE.VERKAUFSDAUER_TICKS * 24)
     await serviceClient.from('player_builds').insert({ profile_id: user.id, buildable_id: entity.entity_id, target_type: 'building', location_id: entity.location_id, tile_level: entity.tile_level, tile_row: entity.tile_row, tile_col: entity.tile_col, status: mode === 'instant' ? 'sold' : 'selling', sale_payout: payout, completes_at: completesAt.toISOString() })
-    await serviceClient.from('tile_entities').delete().eq('id', entity.id)
     if (mode === 'instant') {
       await serviceClient.from('profiles').update({ credits: (profile?.credits ?? 0) + payout }).eq('id', user.id)
       return NextResponse.json({ ok: true, sold: true, payout, mode })
