@@ -1,7 +1,7 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Multiplayer: tile_entities aller Spieler in Response
-// Version:      0.4.0
+// Aktualisiert: 19.07.2026 — Fix: locations Join in tile_entities Query
+// Version:      0.5.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -80,7 +80,7 @@ export async function GET() {
   // Enthält profile_id, owner_class, entity_id, tile_row, tile_col, location_id.
   const { data: allEntities } = await supabase
     .from('tile_entities')
-    .select('id, profile_id, owner_class, owner_id, actor_id, entity_type, entity_id, tile_level, tile_row, tile_col, location_id, built_at, profiles(username)')
+    .select('id, profile_id, owner_class, owner_id, actor_id, entity_type, entity_id, tile_level, tile_row, tile_col, location_id, built_at, profiles(username), locations(id, slug, name)')
     .eq('entity_type', 'building')
     .order('built_at', { ascending: true })
 
