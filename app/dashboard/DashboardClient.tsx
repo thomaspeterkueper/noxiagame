@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.07.2026 — Commit E: Journey-Callbacks an JourneyDrawer
-// Version:      2.9.8
+// Aktualisiert: 19.07.2026 — Multiplayer: worldEntities aus world-Route in ColonyGrid
+// Version:      2.10.0
 
 'use client'
 
@@ -98,11 +98,16 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const locations = worldData?.locations ?? initialLocations
   const news = worldData?.news ?? []
   const stats = worldData?.stats
+  const worldEntities = worldData?.entities ?? []
   const currentLocationData = locations.find((l: any) => l.slug === location)
   const currentPrices = prices.filter((p: any) => p.locations?.slug === location)
   const used = cargoUsed(); const cargoFree = cargoMax - used
   const attention = attentionItems(locations)
   const totalPop = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
+  // Merge: worldEntities (alle Spieler, alle Standorte) für ColonyGrid
+  // tileEntities (build/route) bleibt für eigene pending builds
+  const allEntitiesForLocation = worldEntities.filter((e: any) => e.locations?.slug === location || e.location_id === currentLocationData?.id)
+
   const propertyByLocation: Record<string, number> = {}
   for (const e of tileEntities) { const slug = e.locations?.slug; if (slug && e.profile_id === userId) propertyByLocation[slug] = (propertyByLocation[slug] ?? 0) + 1 }
   const propertySlugs = Array.from(new Set<string>([location, ...Object.keys(propertyByLocation)]))
