@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — BuildPopup helles Theme (Document Mode)
-// Version:      5.11.0
+// Aktualisiert: 19.07.2026 — BuildPopup: weiße Karten, schwarze Schrift
+// Version:      5.12.0
 
 'use client'
 
@@ -256,7 +256,7 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
               : ''
             return (
               <button key={item.key} disabled={building || !canAfford} onClick={() => startBuild(item.key)} style={{
-                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.12)' : canAfford ? 'rgba(42,78,122,0.5)' : 'rgba(30,40,55,0.5)',
+                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.12)' : canAfford ? 'rgba(42,78,122,0.5)' : '#f2ede4',
                 border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canAfford ? '#2a4e7a' : '#2a3a4a'}`,
                 borderRadius: '6px', padding: '0.6rem 0.75rem',
                 color: canAfford ? '#1a1a18' : '#9e9485',
@@ -265,7 +265,7 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
               }}>
                 {journeyBuildHints.includes(item.key) && <div style={{ fontSize: '0.52rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', marginBottom: '3px' }}>▶ EMPFOHLEN</div>}
                 <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
-                <div style={{ fontSize: '0.65rem', color: canAfford ? '#6b6357' : '#b0a898' }}>
+                <div style={{ fontSize: '0.65rem', color: canAfford ? '#5a5248' : '#c8c0b8' }}>
                   {item.cost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
                   {prodText && ` · ${prodText}`}
                   {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
