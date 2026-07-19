@@ -1,11 +1,11 @@
 // proxy.ts
 // Erstellt:     04.07.2026
-// Aktualisiert: 12.07.2026 — Umbenannt von middleware.ts (Next.js 16 Deprecation)
-// Version:      1.1.0
+// Aktualisiert: 19.07.2026 — Export middleware → proxy (Next.js 16 Pflicht)
+// Version:      1.2.0
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
