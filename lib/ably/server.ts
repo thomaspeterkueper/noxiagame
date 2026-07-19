@@ -1,7 +1,7 @@
 // lib/ably/server.ts
 // Erstellt:     19.07.2026
 // Aktualisiert: 19.07.2026 — Server-seitiges Ably Publishing
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // Wird in API-Routes und Cron-Jobs importiert.
 // Schlägt lautlos fehl wenn ABLY_API_KEY nicht gesetzt — kein Hard Crash.
@@ -75,6 +75,17 @@ export async function publishBuildSold(userId: string, data: {
     ...data,
     ts: Date.now(),
   })
+}
+
+// ── Direktnachricht ──────────────────────────────────────────────────────
+export async function publishDirectMessage(receiverId: string, msg: {
+  id: string
+  senderId: string
+  senderUsername: string
+  content: string
+  createdAt: string
+}): Promise<void> {
+  await publish(ABLY_CHANNELS.dm(receiverId), ABLY_EVENTS.dm.message, msg)
 }
 
 // ── Weltdaten aktualisiert ────────────────────────────────────────────────
