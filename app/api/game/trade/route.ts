@@ -15,8 +15,10 @@
 // v0.4.0 – Transaktionssteuer (colony_settings.tax_transaction).
 // v0.3.0 – Transaktionsbasierter Preisimpuls + Server-Preis (Arbitrage-Fix).
 // v0.2.0 – Cargo-Loop-Atomicity.
+// v0.3.0 – Ably: publishTransaction nach Kauf/Verkauf.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { publishTransaction } from '@/lib/ably/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRICE_MIN, PRICE_MAX, PRICE_IMPULSE_PER_TON } from '@/lib/game/config'
 import { flightEnergyCost } from '@/lib/game/ships'
@@ -338,6 +340,17 @@ export async function GET(req: NextRequest) {
       .eq('ship_id', ship.id)
       .eq('resource', resource)
   }
+
+  // Ably publish (non-blocking)
+  publishTransaction({
+    profileId: user.id,
+    username: profile?.username,
+    resource,
+    amount:       booked,
+    profit,
+    fromLocation: action === 'buy' ? location : location,
+    toLocation:   location,
+  }).catch(() => {})
 
   await serviceClient.from('trade_transactions').insert({
     profile_id: user.id,
