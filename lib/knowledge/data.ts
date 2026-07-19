@@ -1,6 +1,6 @@
 // data.ts
-// Aktualisiert: 09.07.2026 — ECO-L0-0001/0002/0003: erste KG-0012-konforme Wirtschaftsmodule
-// Version:      0.2.0
+// Aktualisiert: 19.07.2026 — NOX-0001 bis NOX-0008: SSF Unlock-Keys Registry
+// Version:      0.3.0
 import type { KnowledgeBuilding, KnowledgeLearningModule, KnowledgeUnlock } from './types';
 
 export const learningModules: KnowledgeLearningModule[] = [
@@ -205,3 +205,172 @@ export const knowledgeBuildings: KnowledgeBuilding[] = [
   { id: 'BLD:NOX:markt-1',          name: 'Markt I',               category: 'trade',     requires: ['UNL:NOX:advanced-trading'], effects: ['arbitrage_routes'] },
   { id: 'BLD:NOX:verwaltung-1',     name: 'Verwaltung I',          category: 'governance',requires: ['UNL:NOX:land-value'],      effects: ['land_tax'] },
 ];
+
+// ── NOX-0001 bis NOX-0008: SSF-Lernpfad-Unlocks ─────────────────────────────
+// Implementiert: 19.07.2026
+// Source: solarsciencefoundation/external-tasks/open/NOX-0001..0008.md
+// Diese Keys werden durch SSF-Lernpfade freigeschaltet und schalten
+// zukünftige NOXIA-Features frei (Scanner, Labore, Missionen, Sensoren).
+
+// ── NOX-0001: Sensor-Paket ────────────────────────────────────────────────
+export const SENSOR_UNLOCKS = [
+  'UNL:NOX:SENSOR:SPECTRAL',      // Spektralanalyse — PHY-WAVE-SPECTRUM
+  'UNL:NOX:SENSOR:ATMOSPHERE',    // Atmosphärenmessung — PHY-SKY
+  'UNL:NOX:SENSOR:MAGNETIC',      // Magnetfeldsensor — PHY-MAGNETISMUS
+  'UNL:NOX:SENSOR:WAVE',          // Wellenanalyse — PHY-WAVE-SPECTRUM
+  'UNL:NOX:SENSOR:PIEZO',         // Piezoelektrischer Sensor — PHY-PIEZO
+  'UNL:NOX:SENSOR:STRAIN',        // Dehnungsmessung — PHY-PIEZO
+  'UNL:NOX:SENSOR:STRESS',        // Spannungsanalyse — PHY-PIEZO
+  'UNL:NOX:SENSOR:CURRENT',       // Stromsensor — PHY-ELEKTROLYSE
+  'UNL:NOX:SENSOR:GEODESIC',      // Geodätische Messung — MAT-DIFFGEO
+  'UNL:NOX:SENSOR:PRECISION',     // Präzisionsmessung — ENG-EDM
+] as const
+
+// ── NOX-0002: Werkzeug-Paket ──────────────────────────────────────────────
+export const TOOL_UNLOCKS = [
+  'UNL:NOX:TOOL:DESCALER',         // Entkalkung — CHE-REINIGUNG-KALK
+  'UNL:NOX:TOOL:SURFACE-ANALYSIS', // Oberflächenanalyse — PHY-REINIGUNG
+  'UNL:NOX:TOOL:FLOOR-CLEANING',   // Bodenreinigung — CHE-REINIGUNG
+  'UNL:NOX:TOOL:STREAK-FREE',      // Streifenfreie Reinigung
+  'UNL:NOX:TOOL:STAIN-REMOVAL',    // Fleckenentfernung
+  'UNL:NOX:TOOL:EMULSIFICATION',   // Emulgierung — CHE-KUEHE-EMULSION
+  'UNL:NOX:TOOL:KITCHEN-CHEMISTRY',// Küchenchemie
+  'UNL:NOX:TOOL:THERMAL-DESIGN',   // Thermisches Design — PHY-WAERME
+  'UNL:NOX:TOOL:WIRE-EDM',         // Drahterodieren — ENG-EDM
+  'UNL:NOX:TOOL:SINK-EDM',         // Senkerodieren — ENG-EDM
+  'UNL:NOX:TOOL:PUMP',             // Pumpensysteme — PHY-WASSER
+  'UNL:NOX:TOOL:ALTITUDE-COOKING', // Hochaltitudekochen — PHY-WASSER
+  'UNL:NOX:TOOL:FOOD-PRESERVATION',// Lebensmittelkonservierung
+  'UNL:NOX:PRECISION:MIKRON',      // Mikrobearbeitung — ENG-EDM
+  'UNL:NOX:SAFETY:CHEMICAL-MIXING',// Chemische Sicherheit
+] as const
+
+// ── NOX-0003: Fahrzeug- & Antriebspaket ──────────────────────────────────
+export const VEHICLE_UNLOCKS = [
+  'UNL:NOX:TOOL:ENGINE',          // Verbrennungsmotor — PHY-AUTO-MOTOR
+  'UNL:NOX:TOOL:PISTON',          // Kolbenmechanik — PHY-AUTO-KOLBEN
+  'UNL:NOX:TOOL:COMBUSTION',      // Verbrennung — CHE-AUTO-VERBRENNUNG
+  'UNL:NOX:TOOL:BRAKES',          // Bremssysteme — PHY-AUTO-BREMSE
+  'UNL:NOX:TOOL:DIFFERENTIAL',    // Differential — PHY-AUTO-DIFF
+  'UNL:NOX:TOOL:BATTERY',         // Batteriesystem — PHY-AUTO-BATTERIE
+  'UNL:NOX:TOOL:ACCELERATION',    // Beschleunigung — PHY-AUTO-MOTOR
+  'UNL:NOX:SENSE:MECHANICAL',     // Mechanische Wahrnehmung
+  'UNL:NOX:SENSE:THERMAL',        // Thermische Wahrnehmung
+  'UNL:NOX:SENSE:FRICTION',       // Reibungsanalyse
+  'UNL:NOX:SENSE:GRIP',           // Griffigkeitsanalyse
+  'UNL:NOX:SENSE:HYDRAULICS',     // Hydrauliksysteme
+  'UNL:NOX:SENSE:STEERING',       // Lenkungssysteme
+  'UNL:NOX:SENSE:EXHAUST',        // Abgasanalyse
+  'UNL:NOX:SENSE:ENERGY',         // Energieverbrauchsanalyse
+] as const
+
+// ── NOX-0004: Chemie- & Biologie-Paket ───────────────────────────────────
+export const CHEM_BIO_UNLOCKS = [
+  'UNL:NOX:CHEM:WATER-MOLECULE',      // Wasserchemie — PHY-WASSER-MOLEKUEL
+  'UNL:NOX:CHEM:HYDROGEN-BOND',       // Wasserstoffbrücken
+  'UNL:NOX:CHEM:DIPOLE',              // Dipolmoleküle
+  'UNL:NOX:CHEM:HYDRATION',           // Hydratation
+  'UNL:NOX:CHEM:ION-DISSOLUTION',     // Ionenlösung
+  'UNL:NOX:CHEM:ACID-BASE',           // Säure-Base
+  'UNL:NOX:CHEM:PH-SCALE',            // pH-Skala
+  'UNL:NOX:CHEM:OXIDATION',           // Oxidation
+  'UNL:NOX:CHEM:SURFACTANT',          // Tenside — CHE-REINIGUNG
+  'UNL:NOX:CHEM:MICELLE',             // Mizellen
+  'UNL:NOX:CHEM:EMULSION',            // Emulsionen
+  'UNL:NOX:CHEM:SOLUBILITY',          // Löslichkeit
+  'UNL:NOX:CHEM:OSMOSIS',             // Osmose
+  'UNL:NOX:CHEM:DISINFECTION',        // Desinfektion
+  'UNL:NOX:CHEM:MONOSACCHARIDE',      // Monosaccharide
+  'UNL:NOX:CHEM:RIBOSE',              // Ribose
+  'UNL:NOX:CHEM:THERMAL-DECOMP',      // Thermische Zersetzung
+  'UNL:NOX:CHEM:PROTEIN-DENATURATION',// Proteindenaturierung
+  'UNL:NOX:CHEM:ASTROCHEMISTRY',      // Astrochemie
+  'UNL:NOX:CHEM:PREBIOTIC-CHEMISTRY', // Präbiotische Chemie
+  'UNL:NOX:BIO:CELL-MEMBRANE',        // Zellmembran
+  'UNL:NOX:BIO:DNA-BACKBONE',         // DNA-Backbone
+  'UNL:NOX:BIO:ORIGIN-OF-LIFE',       // Ursprung des Lebens
+] as const
+
+// ── NOX-0005: Energie & Rohstoffe ────────────────────────────────────────
+export const ENERGY_UNLOCKS = [
+  'UNL:NOX:PHY:PEM',               // PEM-Elektrolyseur — PHY-ELEKTROLYSE
+  'UNL:NOX:CHEM:ELECTROLYSIS',     // Elektrolyse
+  'UNL:NOX:ENV:GREEN-HYDROGEN',    // Grüner Wasserstoff
+  'UNL:NOX:CHEM:IRIDIUM',          // Iridium-Katalysatoren
+  'UNL:NOX:CHEM:PLATINUM-GROUP',   // Platingruppenmetalle
+  'UNL:NOX:CHEM:ELECTRON-SPIN',    // Elektronenspin
+  'UNL:NOX:PHY:DIPOLE-MOMENT',     // Dipolmoment
+  'UNL:NOX:TOOL:ELECTROMAGNET',    // Elektromagnet
+  'UNL:NOX:TOOL:ENERGY-HARVESTING',// Energiegewinnung
+  'UNL:NOX:ENV:CRITICAL-MATERIALS',// Kritische Rohstoffe
+  'UNL:NOX:ENV:CIRCULAR-ECONOMY',  // Kreislaufwirtschaft
+  'UNL:NOX:KNOW:ENERGY-TRANSITION',// Energiewende-Wissen
+] as const
+
+// ── NOX-0006: Physik & Navigation ────────────────────────────────────────
+export const PHYSICS_NAV_UNLOCKS = [
+  'UNL:NOX:NAV:ORBITAL',           // Umlaufbahnberechnung — PHY-SKY
+  'UNL:NOX:NAV:CURVATURE',         // Geodätische Kurven — MAT-DIFFGEO
+  'UNL:NOX:MATH:LGS',              // Lineare Gleichungssysteme
+  'UNL:NOX:ANALYSIS:MATRIX',       // Matrizenanalyse
+  'UNL:NOX:ANALYSIS:ERROR',        // Fehlerrechnung
+  'UNL:NOX:SIGNAL:FOURIER',        // Fourier-Analyse
+  'UNL:NOX:CIRCUIT:DIODE',         // Diodenschaltkreise
+  'UNL:NOX:CIRCUIT:WHEATSTONE',    // Wheatstone-Brücke
+  'UNL:NOX:CIRCUIT:MOMENT',        // Momentenanalyse
+  'UNL:NOX:MECH:TORQUE',           // Drehmoment
+  'UNL:NOX:MECH:WORK',             // Mechanische Arbeit
+  'UNL:NOX:PHY:SURFACE-TENSION',   // Oberflächenspannung
+  'UNL:NOX:PHY:CAPILLARY-ACTION',  // Kapillareffekt
+  'UNL:NOX:PHY:DENSITY-ANOMALY',   // Dichteanomalie (Eis/Wasser)
+  'UNL:NOX:PHY:ICE-STRUCTURE',     // Eisstruktur
+  'UNL:NOX:PHY:BOILING-POINT',     // Siedepunkt
+  'UNL:NOX:PHY:DEW-POINT',         // Taupunkt
+  'UNL:NOX:PHY:VAPOR-PRESSURE',    // Dampfdruck
+  'UNL:NOX:PHY:LATENT-HEAT',       // Latente Wärme
+  'UNL:NOX:PHY:HEAT-CAPACITY',     // Wärmekapazität
+  'UNL:NOX:PHY:HEAT-TRANSFER',     // Wärmeübertragung
+  'UNL:NOX:PHY:THERMAL-MASS',      // Thermische Masse
+  'UNL:NOX:PHY:PHASE-DIAGRAM',     // Phasendiagramm
+  'UNL:NOX:PHY:TRIPLE-POINT',      // Tripelpunkt
+  'UNL:NOX:PHY:SUBLIMATION',       // Sublimation
+  'UNL:NOX:PHY:SURFACE-AREA',      // Oberfläche/Volumen
+  'UNL:NOX:MAT:HARDNESS-SCALE',    // Härteskala
+  'UNL:NOX:MAT:WOOD-CARE',         // Holzpflege
+  'UNL:NOX:MAT:TILE-CARE',         // Fliesenpflege
+  'UNL:NOX:ENV:OCEAN-CLIMATE',     // Meeresklima
+] as const
+
+// ── NOX-0007: Missionen ───────────────────────────────────────────────────
+export const MISSION_UNLOCKS = [
+  'UNL:NOX:MISSION:LAB-ALPHA',          // Biologie-Labor — BIO-LEBEN-URSPRUNG
+  'UNL:NOX:MISSION:OBSERVATION-DECK',   // Spektroskopie-Station — PHY-WAVE-SPECTRUM
+  'UNL:NOX:MISSION:DEEP-SCAN',          // Tiefenscan (requires NOX-0001)
+  'UNL:NOX:MISSION:ORE-SCAN',           // Erzscan (requires NOX-0001)
+  'UNL:NOX:MISSION:BIOSIGNATURE-SCAN',  // Biosignatur-Scan (requires NOX-0001+0004)
+  'UNL:NOX:MISSION:HYDROGEN-DEPOT',     // Wasserstoffdepot (requires NOX-0005)
+  'UNL:NOX:MISSION:PREBIOTIC-LAB',      // Präbiotisches Labor (requires NOX-0004)
+  'UNL:NOX:MISSION:WATER-PLANT',        // Wasseraufbereitung (requires NOX-0004)
+  'UNL:NOX:MISSION:RESOURCE-LOOP',      // Ressourcenkreislauf (requires NOX-0005)
+] as const
+
+// ── NOX-0008: Wissen-Keys ─────────────────────────────────────────────────
+export const KNOWLEDGE_UNLOCKS = [
+  'UNL:NOX:KNOW:LIFE-ON-EARTH',         // Warum Eis schwimmt — PHY-WASSER-ANOMALIE
+  'UNL:NOX:KNOW:INTERSTELLAR-MEDIUM',   // Interstellare Moleküle — CHE-ZUCKER-WELTALL
+  'UNL:NOX:KNOW:ENERGY-TRANSITION',     // Energiewende — ENV-ROHSTOFFE
+] as const
+
+// Vollständige Liste aller SSF-Unlock-Keys (NOX-0001 bis NOX-0008)
+export const ALL_SSF_UNLOCK_KEYS = [
+  ...SENSOR_UNLOCKS,
+  ...TOOL_UNLOCKS,
+  ...VEHICLE_UNLOCKS,
+  ...CHEM_BIO_UNLOCKS,
+  ...ENERGY_UNLOCKS,
+  ...PHYSICS_NAV_UNLOCKS,
+  ...MISSION_UNLOCKS,
+  ...KNOWLEDGE_UNLOCKS,
+] as const
+
+export type SsfUnlockKey = typeof ALL_SSF_UNLOCK_KEYS[number]
