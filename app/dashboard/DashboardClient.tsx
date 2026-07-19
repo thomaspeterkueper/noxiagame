@@ -1,11 +1,12 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Ably DM: unread Badge + Toast bei eingehender Nachricht
-// Version:      2.12.0
+// Aktualisiert: 19.07.2026 — Chat: ChatOverlay + Freunde verdrahtet
+// Version:      2.13.0
 
 'use client'
 
 import { useAblyChannel } from '@/lib/ably/client'
+import ChatOverlay from './ChatOverlay'
 import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
 import React, { useState, useEffect } from 'react'
@@ -61,6 +62,8 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [journeyOpen, setJourneyOpen]           = useState(false)
   const [journeyHints, setJourneyHints]         = useState<string[]>([])
   const [unreadDMs, setUnreadDMs]               = useState(0)
+  const [chatWith, setChatWith]                 = useState<{ id: string; username: string } | null>(null)
+  const [friends, setFriends]                   = useState<{ id: string; username: string }[]>([])
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
@@ -85,6 +88,19 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   }
   useEffect(() => { fetchBuilds() }, [])
   useEffect(() => { fetchBuilds() }, [invalidations.builds])
+
+  // Freunde laden
+  useEffect(() => {
+    async function loadFriends() {
+      try {
+        const token = await getToken()
+        const res = await fetch('/api/game/friends', { headers: { Authorization: `Bearer ${token}` } })
+        const data = await res.json() as { friends: { id: string; username: string }[] }
+        setFriends(data.friends ?? [])
+      } catch {}
+    }
+    loadFriends()
+  }, [])
 
   // ── Ably Realtime Subscriptions ─────────────────────────────────────────
   // Preise: neu laden wenn Cron Preise aktualisiert hat
