@@ -256,11 +256,11 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
               : ''
             return (
               <button key={item.key} disabled={building || !canAfford} onClick={() => startBuild(item.key)} style={{
-                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.12)' : canAfford ? 'rgba(42,78,122,0.5)' : '#f2ede4',
-                border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canAfford ? '#2a4e7a' : '#2a3a4a'}`,
+                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.08)' : '#ffffff',
+                border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canAfford ? '#ddd6c8' : '#ece8e0'}`,
                 borderRadius: '6px', padding: '0.6rem 0.75rem',
                 color: canAfford ? '#1a1a18' : '#9e9485',
-                cursor: canAfford ? 'pointer' : 'not-allowed', textAlign: 'left', fontSize: '0.75rem',
+                cursor: canAfford ? 'pointer' : 'default', textAlign: 'left' as const, fontSize: '0.75rem', opacity: canAfford ? 1 : 0.55,
                 boxShadow: journeyBuildHints.includes(item.key) ? '0 0 8px rgba(201,169,97,0.3)' : 'none',
               }}>
                 {journeyBuildHints.includes(item.key) && <div style={{ fontSize: '0.52rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', marginBottom: '3px' }}>▶ EMPFOHLEN</div>}
