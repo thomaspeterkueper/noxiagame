@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Fix: entities prop an ColonyGrid übergeben
-// Version:      2.15.0
+// Aktualisiert: 19.07.2026 — Fix: location_id Filter für worldEntities
+// Version:      2.16.0
 
 'use client'
 
@@ -163,7 +163,11 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const totalPop = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
   // Merge: worldEntities (alle Spieler, alle Standorte) für ColonyGrid
   // tileEntities (build/route) bleibt für eigene pending builds
-  const allEntitiesForLocation = worldEntities.filter((e: any) => e.locations?.slug === location || e.location_id === currentLocationData?.id)
+  const currentLocationId = currentLocationData?.id
+  const allEntitiesForLocation = worldEntities.filter((e: any) =>
+    e.locations?.slug === location ||
+    (e.location_id != null && e.location_id === currentLocationId)
+  )
 
   const propertyByLocation: Record<string, number> = {}
   for (const e of tileEntities) { const slug = e.locations?.slug; if (slug && e.profile_id === userId) propertyByLocation[slug] = (propertyByLocation[slug] ?? 0) + 1 }
