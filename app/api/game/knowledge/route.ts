@@ -1,7 +1,7 @@
 // app/api/game/knowledge/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 19.07.2026 — Schritt 3: SSF-Unlocks nach Modul-Abschluss in player_unlocks
-// Version:      2.2.0
+// Aktualisiert: 19.07.2026 — action=sync_from_ssf: SSF-Fortschritt abrufen + Unlocks
+// Version:      2.3.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
