@@ -1,7 +1,7 @@
 // lib/ably/client.ts
 // Erstellt:     19.07.2026
-// Aktualisiert: 19.07.2026 — authCallback mit Supabase JWT, leerer Channel-Guard
-// Version:      1.1.0
+// Aktualisiert: 19.07.2026 — Fix: ErrorInfo string statt Error (TS2345)
+// Version:      1.2.0
 //
 // useAbly() gibt einen Ably Realtime Client zurück.
 // useAblyChannel() subscribed auf einen Channel und feuert einen Callback.
@@ -29,17 +29,17 @@ function getAblyClient(): Ably.Realtime | null {
           const sb = createClient()
           const { data: { session } } = await sb.auth.getSession()
           if (!session?.access_token) {
-            callback(new Error('Keine Session'), null)
+            callback('Keine Session', null)
             return
           }
           const res = await fetch('/api/ably/token', {
             headers: { Authorization: `Bearer ${session.access_token}` }
           })
-          if (!res.ok) { callback(new Error('Token-Fetch fehlgeschlagen'), null); return }
+          if (!res.ok) { callback('Token-Fetch fehlgeschlagen', null); return }
           const tokenRequest = await res.json()
           callback(null, tokenRequest)
         } catch (err) {
-          callback(err instanceof Error ? err : new Error(String(err)), null)
+          callback(String(err), null)
         }
       }
     })
