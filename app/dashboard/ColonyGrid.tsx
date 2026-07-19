@@ -285,7 +285,6 @@ export default function ColonyGrid({
   locationResources = [], credits = 0, highlightEntityIds = [] as string[],
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0,
   inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize, gates = {},
-  gates = {},
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
