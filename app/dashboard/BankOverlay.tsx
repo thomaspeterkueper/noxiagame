@@ -345,11 +345,11 @@ export default function BankOverlay({
                 <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: '10px', padding: '1.1rem 1.25rem', marginBottom: '1.25rem' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: C.red, fontFamily: MONO, marginBottom: '6px' }}>⚠ Schulungsnachweis erforderlich</div>
                   <div style={{ fontSize: '0.8rem', color: C.text, lineHeight: 1.7 }}>
-                    Um Kredite aufzunehmen musst du das Modul <strong>„Finanzgrundlagen"</strong> in der Akademie abschließen.
+                    Um Kredite aufzunehmen musst du das Modul <strong>„ECO-L0-0001"</strong> in der Akademie abschließen.
                     Dort lernst du wie Zinseszins und Kreditrisiko funktionieren — praktisch, nicht theoretisch.
                   </div>
                   <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: C.textMuted, fontFamily: MONO }}>
-                    Akademie → Aufgaben → Finanzgrundlagen
+                    Akademie → Aufgaben → ECO-L0-0001
                   </div>
                 </div>
               ) : (
@@ -508,8 +508,8 @@ export default function BankOverlay({
               {/* Schulungsnachweis-Status */}
               <div style={{ marginTop: '1.25rem', padding: '0.65rem 0.85rem', background: collateral.hasModule ? C.greenLight : C.redLight, border: `1px solid ${collateral.hasModule ? '#a0dcb8' : '#f0a0a0'}`, borderRadius: '7px', fontSize: '0.72rem', color: collateral.hasModule ? C.green : C.red, fontFamily: MONO }}>
                 {collateral.hasModule
-                  ? '✓ Schulungsnachweis „Finanzgrundlagen" vorhanden — Kredite freigeschaltet'
-                  : '✗ Schulungsnachweis fehlt — Akademie · Modul „Finanzgrundlagen" abschließen'}
+                  ? '✓ Schulungsnachweis „ECO-L0-0001" vorhanden — Kredite freigeschaltet'
+                  : '✗ Schulungsnachweis fehlt — Akademie · Modul „ECO-L0-0001" abschließen'}
               </div>
             </>
           )}
