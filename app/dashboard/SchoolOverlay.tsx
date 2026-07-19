@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 19.07.2026 — Module-Tab: SSF-Link + sync_from_ssf statt lokalem Abschließen
-// Version:      4.5.0
+// Aktualisiert: 19.07.2026 — SSF-Link mit uid + ref=noxia Parameter
+// Version:      4.5.1
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -365,6 +365,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [completedModules, setCompleted] = useState<string[]>([])
   const [moduleLoading, setModuleLoading] = useState(false)
   const [activeKursId, setActiveKursId] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId]  = useState<string>('')
   const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(false)
