@@ -1,5 +1,6 @@
 -- supabase/migrations/20260719000000_baseline.sql
 -- NOXIA Datenbank-Baseline — Stand: 19.07.2026
+-- v1.1: alle service_role Policies auf TO service_role USING(true) umgestellt
 -- Quelle: DB-Schema-Export + Migration-Archiv (001a–034)
 --
 -- Ausführen auf LEERER Datenbank.
@@ -687,8 +688,9 @@ DROP POLICY IF EXISTS "actors_write_service" ON actors;
 
 CREATE POLICY "actors_write_service"
   ON actors FOR ALL
-  USING (false)
-  WITH CHECK (false);
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE building_definitions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "building_definitions_select" ON building_definitions;
@@ -714,8 +716,9 @@ DROP POLICY IF EXISTS "colony_ledger_write_service" ON colony_ledger;
 
 CREATE POLICY "colony_ledger_write_service"
   ON colony_ledger FOR ALL
-  USING (false)
-  WITH CHECK (false);
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE colony_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "colony_settings_select_all" ON colony_settings;
@@ -727,8 +730,9 @@ DROP POLICY IF EXISTS "colony_settings_write_service" ON colony_settings;
 
 CREATE POLICY "colony_settings_write_service"
   ON colony_settings FOR ALL
-  USING (false)
-  WITH CHECK (false);
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE colony_tariffs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "colony_tariffs_select_all" ON colony_tariffs;
@@ -740,8 +744,9 @@ DROP POLICY IF EXISTS "colony_tariffs_write_service" ON colony_tariffs;
 
 CREATE POLICY "colony_tariffs_write_service"
   ON colony_tariffs FOR ALL
-  USING (false)
-  WITH CHECK (false);
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE daily_tasks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Eigene Tagesaufgaben lesen" ON daily_tasks;
