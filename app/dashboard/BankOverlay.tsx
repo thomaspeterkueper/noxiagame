@@ -1,7 +1,7 @@
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 19.07.2026 — gates prop: Kredit/Sicherheiten nur mit Unlock
-// Version:      1.5.0
+// Aktualisiert: 19.07.2026 — Tabs immer sichtbar, gesperrt mit Voraussetzung
+// Version:      1.6.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -226,7 +226,7 @@ export default function BankOverlay({
         {/* Tabs */}
         <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 0, marginBottom: '-1px', alignItems: 'flex-end' }}>
-            {(['konto', 'einlage', ...(gates.bankCredit || status?.hasModule ? ['kredit', 'sicherheiten'] : [])] as Tab[]).map(t => (
+            {(['konto', 'einlage', 'kredit', 'sicherheiten'] as Tab[]).map(t => (
               <button key={t} onClick={() => { setTab(t); setMsg(null); setAmount('') }}
                 style={{ padding: '0.5rem 1rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.75rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
                 {t === 'konto' ? 'Konto' : t === 'einlage' ? 'Einlage' : t === 'kredit' ? 'Kredit' : 'Sicherheiten'}
@@ -340,12 +340,19 @@ export default function BankOverlay({
           )}
 
           {/* ── KREDIT ─────────────────────────────────────────────────────── */}
-          {!loading && tab === 'konto' && !gates.bankCredit && !status?.hasModule && (
-            <div style={{ margin: '0.75rem 1.25rem', padding: '0.75rem 1rem', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 8, fontSize: '0.75rem', color: C.textMuted, lineHeight: 1.7 }}>
-              🔒 <strong style={{ color: C.accent }}>Kredit & Sicherheiten</strong> — schließe Modul <strong>ECO-L0-0001</strong> in der Akademie ab um Kredite freizuschalten.
+          {!loading && tab === 'kredit' && !gates.bankCredit && !status?.hasModule && (
+            <div style={{ padding: '2rem 1.5rem', textAlign: 'center' as const, lineHeight: 2 }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔒</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: C.accent, marginBottom: '0.5rem' }}>Kredit nicht freigeschaltet</div>
+              <div style={{ fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.8 }}>
+                Schließe in der <strong>Akademie</strong> das Modul<br />
+                <strong style={{ color: C.accent }}>ECO-L0-0001 — Was ist ein Kredit?</strong><br />
+                ab um Kredite aufnehmen zu können.
+              </div>
+              <div style={{ marginTop: '1rem', fontSize: '0.68rem', color: C.textFaint, fontFamily: MONO }}>→ Dashboard → Akademie → Module</div>
             </div>
           )}
-          {!loading && tab === 'kredit' && status && (
+          {!loading && tab === 'kredit' && (gates.bankCredit || status?.hasModule) && status && (
             <>
               {/* Schulungsnachweis-Gate */}
               {!status.hasModule ? (
@@ -445,10 +452,19 @@ export default function BankOverlay({
           )}
 
           {/* ── SICHERHEITEN ───────────────────────────────────────────────── */}
-          {!loading && tab === 'sicherheiten' && !collateral && (
+          {!loading && tab === 'sicherheiten' && !gates.bankCredit && !status?.hasModule && (
+            <div style={{ padding: '2rem 1.5rem', textAlign: 'center' as const, lineHeight: 2 }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔒</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: C.accent, marginBottom: '0.5rem' }}>Sicherheiten nicht verfügbar</div>
+              <div style={{ fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.8 }}>
+                Wird freigeschaltet mit<br /><strong style={{ color: C.accent }}>ECO-L0-0001 — Was ist ein Kredit?</strong>
+              </div>
+            </div>
+          )}
+          {!loading && tab === 'sicherheiten' && (gates.bankCredit || status?.hasModule) && !collateral && (
             <div style={{ padding: '1.5rem', color: C.textMuted, fontFamily: MONO, fontSize: '0.8rem' }}>Sicherheiten konnten nicht geladen werden.</div>
           )}
-          {!loading && tab === 'sicherheiten' && collateral && (
+          {!loading && tab === 'sicherheiten' && (gates.bankCredit || status?.hasModule) && collateral && (
             <>
               {/* Zusammenfassung */}
               <div style={{ background: C.accentLight, border: '1px solid #b8cce8', borderRadius: '8px', padding: '0.85rem 1.1rem', marginBottom: '1.25rem' }}>
