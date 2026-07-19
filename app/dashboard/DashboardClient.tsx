@@ -1,12 +1,13 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Chat: ChatOverlay + Freunde verdrahtet
-// Version:      2.13.0
+// Aktualisiert: 19.07.2026 — FriendsDrawer: Navbar-Button + Drawer verdrahtet
+// Version:      2.14.0
 
 'use client'
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
+import FriendsDrawer from './FriendsDrawer'
 import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
 import React, { useState, useEffect } from 'react'
@@ -64,6 +65,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [unreadDMs, setUnreadDMs]               = useState(0)
   const [chatWith, setChatWith]                 = useState<{ id: string; username: string } | null>(null)
   const [friends, setFriends]                   = useState<{ id: string; username: string }[]>([])
+  const [friendsOpen, setFriendsOpen]           = useState(false)
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
@@ -236,6 +238,12 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
+      <FriendsDrawer
+        open={friendsOpen}
+        onClose={() => setFriendsOpen(false)}
+        onOpenChat={(f) => { setChatWith(f); setFriendsOpen(false) }}
+        unreadDMs={unreadDMs}
+      />
       {chatWith && (
         <ChatOverlay
           userId={userId ?? ''}
@@ -262,6 +270,10 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
           {([['Credits', `${credits.toLocaleString('de')} Cr`], ['Frachter', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
+          <button onClick={() => setFriendsOpen(true)} style={{ position: 'relative', background: 'none', border: `1px solid ${T.line}`, borderRadius: 8, padding: '0.3rem 0.75rem', cursor: 'pointer', color: T.inkSoft, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            💬 Freunde
+            {unreadDMs > 0 && <span style={{ background: '#e05050', color: '#fff', borderRadius: 10, padding: '1px 5px', fontSize: '0.6rem', fontWeight: 700 }}>{unreadDMs > 9 ? '9+' : unreadDMs}</span>}
+          </button>
           <button onClick={() => setProfileOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><div style={{ width: 36, height: 36, borderRadius: '50%', background: T.blue, border: `2px solid ${T.gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem', overflow: 'hidden' }}>{profile?.avatar ? <img src={`/images/avatars/${profile.avatar}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (profile?.username?.[0]?.toUpperCase() ?? '?')}</div></button>
           <button onClick={handleLogout} style={{ background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: T.radius, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{Icon.logout(T.blue)} Abmelden</button>
         </div>
