@@ -1,11 +1,12 @@
 // route.ts
-// Aktualisiert: 19.07.2026 — Fix: inaktive Ressourcen (prod=0, cons=0) nicht anpassen
-// Version:      0.3.0
+// Aktualisiert: 19.07.2026 — Ably: publishPricesUpdated nach Cron
+// Version:      0.4.0
 // app/api/cron/prices/route.ts
 // Erstellt: 30.05.2026
 // Aktualisiert: 30.05.2026 – Bevölkerungsbasierte Preisanpassung
 
 import { NextRequest, NextResponse } from 'next/server'
+import { publishPricesUpdated } from '@/lib/ably/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import {
   PRICE_PRESSURE_HIGH,
