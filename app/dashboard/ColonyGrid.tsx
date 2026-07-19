@@ -67,6 +67,7 @@ interface ColonyGridProps {
   allLocations?: { slug: string; name: string; population: number }[]
   cargo?: Record<string, number>; shipRange?: number; currentTick?: number
   inTransit?: boolean; onTravel?: (dest: string) => void
+  gates?:           Record<string, boolean>
   onOpenShipyard?: () => void; onOpenWarehouse?: () => void; onChanged?: () => void
   tileSize?: number
   highlightEntityIds?: string[]   // entity_ids die mit goldenem Pulsring markiert werden
@@ -283,7 +284,7 @@ export default function ColonyGrid({
   userId, entities = [], pending = [], tax, entityInfo,
   locationResources = [], credits = 0, highlightEntityIds = [] as string[],
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0,
-  inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize,
+  inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize, gates = {},
   gates = {},
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
