@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — gates prop: an BankOverlay weitergeben
-// Version:      5.9.0
+// Aktualisiert: 19.07.2026 — Hover-Tooltip hell (lesbar), Sidebar-Kontrast
+// Version:      5.10.0
 
 'use client'
 
@@ -112,10 +112,10 @@ const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInf
       right: flipX ? `calc(100vw - ${info.x}px + 6px)` : undefined,
       top: flipY ? undefined : info.y,
       bottom: flipY ? `calc(100vh - ${info.y}px)` : undefined,
-      zIndex: 9999, background: 'rgba(6,14,24,0.97)',
+      zIndex: 9999, background: '#f8f5ee',
       border: `1px solid ${borderColor}`, borderRadius: '7px',
       padding: '8px 11px', minWidth: '150px', maxWidth: `${TW}px`,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.7)', pointerEvents: 'none',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.18)', pointerEvents: 'none',
       fontFamily: "'Courier Prime', monospace",
     }}>
       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: nameColor, marginBottom: '4px' }}>{name}</div>
