@@ -1,7 +1,7 @@
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 22.06.2026 — Sicherheiten-Warnung (collateralWarning) im Konto-Tab
-// Version:      1.2.0
+// Aktualisiert: 15.07.2026 — X-Button im Panel, Sicherheiten-Fallback, Modul-ID fix
+// Version:      1.3.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -203,7 +203,6 @@ export default function BankOverlay({
       )}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(8,16,28,0.55)' }} />
 
-      <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.5rem', zIndex: 10, background: 'rgba(248,245,238,0.92)', border: `1px solid ${C.border}`, borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1rem', color: C.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO }}>✕</button>
 
       {bg && (
         <div style={{ position: 'absolute', top: '1.25rem', left: '1.5rem', zIndex: 10, fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: 'rgba(248,245,238,0.85)', fontFamily: MONO, textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}>
@@ -213,6 +212,13 @@ export default function BankOverlay({
 
       {/* Panel */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header mit X-Button — immer sichtbar, innerhalb des Panels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.25rem 0', flexShrink: 0 }}>
+          <div style={{ fontSize: '0.6rem', color: C.textFaint, fontFamily: MONO, letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+            🏦 {bg?.label ?? locationName}
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', fontSize: '0.9rem', color: C.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
         <div style={{ position: 'absolute', top: '-40px', left: 0, right: 0, height: '40px', background: `linear-gradient(to bottom, transparent, ${C.bg})`, pointerEvents: 'none' }} />
 
         {/* Tabs */}
@@ -432,6 +438,9 @@ export default function BankOverlay({
           )}
 
           {/* ── SICHERHEITEN ───────────────────────────────────────────────── */}
+          {!loading && tab === 'sicherheiten' && !collateral && (
+            <div style={{ padding: '1.5rem', color: C.textMuted, fontFamily: MONO, fontSize: '0.8rem' }}>Sicherheiten konnten nicht geladen werden.</div>
+          )}
           {!loading && tab === 'sicherheiten' && collateral && (
             <>
               {/* Zusammenfassung */}
