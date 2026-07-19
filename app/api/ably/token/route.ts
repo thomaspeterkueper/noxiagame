@@ -1,7 +1,7 @@
 // app/api/ably/token/route.ts
 // Erstellt:     19.07.2026
 // Aktualisiert: 19.07.2026 — Ably Token-Endpoint für Client-Auth
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // Client holt sich hier ein kurzlebiges Ably-Token (TTL: 3600s).
 // Nur für authentifizierte NOXIA-User.
