@@ -64,8 +64,8 @@ export function isBuildable(tileType: string): boolean {
     tileType === 'tile_titanium'  ||
     tileType === 'tile_dust'      ||
     tileType === 'tile_plateau'   ||
-    tileType === 'tile_habitat'   ||
-    tileType === 'tile_industry'  ||
+    // tile_habitat + tile_industry: Terrain-Typen, NICHT bebaubar
+    // (sehen aus wie Gebäude aber haben keine DB-Entity — Terrain-Ebene)
     tileType === 'tile_metal'     ||
     tileType === 'tile_crater'    ||
     tileType === 'tile_shaft'     ||
@@ -188,7 +188,7 @@ export function generateGrid(
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
       const owner: CellOwner = !userId
         ? null
-        : e.is_state_owned || e.profile_id === null
+        : (e as any).owner_class === 'STATE' || (e as any).owner_class === 'CORPORATION' || e.profile_id === null
         ? 'state'
         : e.profile_id === userId
         ? 'own'
