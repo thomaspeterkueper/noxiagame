@@ -657,8 +657,9 @@ DROP POLICY IF EXISTS "academy_completions_service_all" ON academy_completions;
 
 CREATE POLICY "academy_completions_service_all"
   ON academy_completions FOR ALL
-  USING ((auth.role() = 'service_role'::text))
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE academy_modules ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "academy_modules_public_read" ON academy_modules;
@@ -670,8 +671,9 @@ DROP POLICY IF EXISTS "academy_modules_service_all" ON academy_modules;
 
 CREATE POLICY "academy_modules_service_all"
   ON academy_modules FOR ALL
-  USING ((auth.role() = 'service_role'::text))
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE actors ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "actors_read" ON actors;
@@ -798,8 +800,9 @@ DROP POLICY IF EXISTS "friendships_service_all" ON friendships;
 
 CREATE POLICY "friendships_service_all"
   ON friendships FOR ALL
-  USING ((auth.role() = 'service_role'::text))
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE historical_milestones ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Milestones öffentlich lesbar" ON historical_milestones;
@@ -811,7 +814,8 @@ DROP POLICY IF EXISTS "Service Role schreibt Milestones" ON historical_milestone
 
 CREATE POLICY "Service Role schreibt Milestones"
   ON historical_milestones FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 
 ALTER TABLE journey_steps ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "journey_steps_select_all" ON journey_steps;
@@ -823,8 +827,9 @@ DROP POLICY IF EXISTS "journey_steps_service_all" ON journey_steps;
 
 CREATE POLICY "journey_steps_service_all"
   ON journey_steps FOR ALL
-  USING ((auth.role() = 'service_role'::text))
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE knowledge_transactions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Eigene Transaktionen lesen" ON knowledge_transactions;
@@ -868,8 +873,9 @@ DROP POLICY IF EXISTS "reputation_service_all" ON location_reputation;
 
 CREATE POLICY "reputation_service_all"
   ON location_reputation FOR ALL
-  USING ((auth.role() = 'service_role'::text))
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE location_resources ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Location Resources öffentlich lesbar" ON location_resources;
@@ -881,12 +887,14 @@ DROP POLICY IF EXISTS "Service Role schreibt Location Resources" ON location_res
 
 CREATE POLICY "Service Role schreibt Location Resources"
   ON location_resources FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 DROP POLICY IF EXISTS "Service Role updated Location Resources" ON location_resources;
 
 CREATE POLICY "Service Role updated Location Resources"
   ON location_resources FOR UPDATE
-  USING ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true);
 
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Locations öffentlich lesbar" ON locations;
@@ -898,12 +906,14 @@ DROP POLICY IF EXISTS "Service Role schreibt Locations" ON locations;
 
 CREATE POLICY "Service Role schreibt Locations"
   ON locations FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 DROP POLICY IF EXISTS "Service Role updated Locations" ON locations;
 
 CREATE POLICY "Service Role updated Locations"
   ON locations FOR UPDATE
-  USING ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true);
 
 ALTER TABLE market_prices ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Marktpreise öffentlich lesbar" ON market_prices;
@@ -915,12 +925,14 @@ DROP POLICY IF EXISTS "Service Role schreibt Preise" ON market_prices;
 
 CREATE POLICY "Service Role schreibt Preise"
   ON market_prices FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 DROP POLICY IF EXISTS "Service Role updated Preise" ON market_prices;
 
 CREATE POLICY "Service Role updated Preise"
   ON market_prices FOR UPDATE
-  USING ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true);
 
 ALTER TABLE npc_ledger ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "npc_ledger_read" ON npc_ledger;
@@ -1080,12 +1092,14 @@ DROP POLICY IF EXISTS "Service Role schreibt Ticks" ON simulation_ticks;
 
 CREATE POLICY "Service Role schreibt Ticks"
   ON simulation_ticks FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 DROP POLICY IF EXISTS "Service Role updated Ticks" ON simulation_ticks;
 
 CREATE POLICY "Service Role updated Ticks"
   ON simulation_ticks FOR UPDATE
-  USING ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true);
 DROP POLICY IF EXISTS "Ticks öffentlich lesbar" ON simulation_ticks;
 
 CREATE POLICY "Ticks öffentlich lesbar"
@@ -1116,7 +1130,8 @@ DROP POLICY IF EXISTS "Service Role erstellt Aufträge" ON trade_orders;
 
 CREATE POLICY "Service Role erstellt Aufträge"
   ON trade_orders FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 DROP POLICY IF EXISTS "Spieler erfüllt offene Aufträge" ON trade_orders;
 
 CREATE POLICY "Spieler erfüllt offene Aufträge"
@@ -1145,12 +1160,14 @@ DROP POLICY IF EXISTS "Service Role schreibt Events" ON world_events;
 
 CREATE POLICY "Service Role schreibt Events"
   ON world_events FOR INSERT
-  WITH CHECK ((auth.role() = 'service_role'::text));
+  TO service_role
+  WITH CHECK (true);
 DROP POLICY IF EXISTS "Service Role updated Events" ON world_events;
 
 CREATE POLICY "Service Role updated Events"
   ON world_events FOR UPDATE
-  USING ((auth.role() = 'service_role'::text));
+  TO service_role
+  USING (true);
 
 -- ════════════════════════════════════
 -- GRANTS
