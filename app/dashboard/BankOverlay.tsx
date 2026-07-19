@@ -1,7 +1,7 @@
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 15.07.2026 — X-Button im Panel, Sicherheiten-Fallback, Modul-ID fix
-// Version:      1.3.0
+// Aktualisiert: 19.07.2026 — Fix: collateral Response korrekt abflachen
+// Version:      1.4.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -134,7 +134,7 @@ export default function BankOverlay({
       ])
       const [s, c] = await Promise.all([sRes.json(), cRes.json()])
       if (!s.error) { setStatus(s); setCredits(s.credits) }
-      if (!c.error) setCollateral(c)
+      if (!c.error) setCollateral({ ...c.collateral, hasModule: c.hasModule ?? false, creditLimit: c.creditLimit ?? 0 })
       else if (s.error) setMsg({ text: s.error, ok: false })
     } catch {
       setMsg({ text: 'Verbindung zur Bank fehlgeschlagen', ok: false })
