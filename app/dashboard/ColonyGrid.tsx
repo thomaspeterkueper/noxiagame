@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — Hover-Tooltip hell (lesbar), Sidebar-Kontrast
-// Version:      5.10.0
+// Aktualisiert: 19.07.2026 — BuildPopup helles Theme (Document Mode)
+// Version:      5.11.0
 
 'use client'
 
@@ -239,15 +239,15 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
 
   return (
     <div onClick={e => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, zIndex: 2200, background: 'rgba(2,4,8,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ width: 'min(700px, 95vw)', maxHeight: '88vh', background: 'rgba(10,20,32,0.98)', border: '1px solid rgba(42,78,122,0.75)', borderRadius: '12px', boxShadow: '0 12px 48px rgba(0,0,0,0.72)', display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden' }}>
+      <div style={{ width: 'min(700px, 95vw)', maxHeight: '88vh', background: '#f8f5ee', border: '1px solid #ddd6c8', borderRadius: '12px', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <div style={{ color: '#b99b6b', fontWeight: 700, fontSize: '0.85rem' }}>🏗️ Gebäude bauen — Kachel ({tileRow}, {tileCol})</div>
+          <div style={{ color: '#2a4e7a', fontWeight: 700, fontSize: '0.85rem' }}>🏗️ Gebäude bauen — Kachel ({tileRow}, {tileCol})</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
         </div>
-        <div style={{ fontSize: '0.62rem', color: '#64748b', marginBottom: '0.6rem' }}>Standort: {locationSlug} · Feld: {tileType.replace(/_/g, ' ')}</div>
+        <div style={{ fontSize: '0.62rem', color: '#6b6357', marginBottom: '0.6rem' }}>Standort: {locationSlug} · Feld: {tileType.replace(/_/g, ' ')}</div>
         {msg && <div style={{ color: '#e05050', fontSize: '0.7rem', marginBottom: '0.5rem' }}>{msg}</div>}
-        {loading && <div style={{ color: '#8a9ab0', fontSize: '0.72rem', padding: '0.75rem 0' }}>Lade verfügbare Bauoptionen …</div>}
-        {!loading && items.length === 0 && !msg && <div style={{ color: '#8a9ab0', fontSize: '0.72rem', padding: '0.75rem 0' }}>Für dieses Feld sind aktuell keine Bauoptionen verfügbar.</div>}
+        {loading && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Lade verfügbare Bauoptionen …</div>}
+        {!loading && items.length === 0 && !msg && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Für dieses Feld sind aktuell keine Bauoptionen verfügbar.</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
           {items.map(item => {
             const canAfford = credits >= item.cost
@@ -256,16 +256,16 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
               : ''
             return (
               <button key={item.key} disabled={building || !canAfford} onClick={() => startBuild(item.key)} style={{
-                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.15)' : canAfford ? 'rgba(42,78,122,0.5)' : 'rgba(30,40,55,0.5)',
+                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.12)' : canAfford ? 'rgba(42,78,122,0.5)' : 'rgba(30,40,55,0.5)',
                 border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canAfford ? '#2a4e7a' : '#2a3a4a'}`,
                 borderRadius: '6px', padding: '0.6rem 0.75rem',
-                color: canAfford ? '#cdd6e0' : '#4a5a6a',
+                color: canAfford ? '#1a1a18' : '#9e9485',
                 cursor: canAfford ? 'pointer' : 'not-allowed', textAlign: 'left', fontSize: '0.75rem',
                 boxShadow: journeyBuildHints.includes(item.key) ? '0 0 8px rgba(201,169,97,0.3)' : 'none',
               }}>
                 {journeyBuildHints.includes(item.key) && <div style={{ fontSize: '0.52rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', marginBottom: '3px' }}>▶ EMPFOHLEN</div>}
                 <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
-                <div style={{ fontSize: '0.65rem', color: canAfford ? '#8a9ab0' : '#3a4a5a' }}>
+                <div style={{ fontSize: '0.65rem', color: canAfford ? '#6b6357' : '#b0a898' }}>
                   {item.cost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
                   {prodText && ` · ${prodText}`}
                   {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
