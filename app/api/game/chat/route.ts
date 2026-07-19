@@ -10,7 +10,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { getUserFromRequest } from '@/lib/supabase/auth'
+
+async function getUserFromRequest(req: NextRequest) {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.split(' ')[1]
+  const supabase = createServiceClient()
+  const { data: { user } } = await supabase.auth.getUser(token)
+  return user
+}
 import { publishDirectMessage } from '@/lib/ably/server'
 
 export async function GET(req: NextRequest) {
