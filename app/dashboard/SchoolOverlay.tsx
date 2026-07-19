@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 15.07.2026 — NOX-0007: hardcodierte ECO-Module entfernt, academy_completions
-// Version:      4.4.1
+// Aktualisiert: 19.07.2026 — Module-Tab: SSF-Link + sync_from_ssf statt lokalem Abschließen
+// Version:      4.5.0
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -271,12 +271,7 @@ function ModuleCard({
                 {quizResult ? '✓ Richtig! ' : '✗ Nicht ganz. '}{mod.quiz.explanation}
               </div>
             )}
-            {quizResult === true && (
-              <button disabled={moduleLoading} onClick={() => onComplete(mod.id)}
-                style={{ width: '100%', marginTop: 10, padding: '0.65rem', background: C.green, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>
-                {moduleLoading ? '…' : 'Modul abschließen (+50 Pkt.) →'}
-              </button>
-            )}
+
           </div>
         </div>
       )}
