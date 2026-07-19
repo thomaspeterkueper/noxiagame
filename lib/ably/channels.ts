@@ -1,7 +1,7 @@
 // lib/ably/channels.ts
 // Erstellt:     19.07.2026
 // Aktualisiert: 19.07.2026 — Kanonische Ably Channel-Namen für NOXIA
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // Alle Ably-Channels zentral definiert.
 // Server published → Client subscribed.
@@ -17,6 +17,7 @@ export const ABLY_CHANNELS = {
   transactions: 'noxia:transactions',
   world:        'noxia:world',
   builds:       (userId: string) => `noxia:builds:${userId}`,
+  dm:           (userId: string) => `noxia:dm:${userId}`,
 } as const
 
 export const ABLY_EVENTS = {
@@ -24,4 +25,6 @@ export const ABLY_EVENTS = {
   transaction: { new: 'transaction.new' },
   build:       { completed: 'build.completed', sold: 'build.sold' },
   world:       { updated: 'world.updated' },
+  dm:          { message: 'dm.message' },
+  chat:        { read: 'chat.read' },
 } as const
