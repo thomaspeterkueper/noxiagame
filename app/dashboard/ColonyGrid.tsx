@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — BuildPopup: weiße Karten, schwarze Schrift
-// Version:      5.12.0
+// Aktualisiert: 19.07.2026 — BuildPopup: leistbare Gebäude zuerst
+// Version:      5.13.0
 
 'use client'
 
@@ -249,7 +249,16 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
         {loading && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Lade verfügbare Bauoptionen …</div>}
         {!loading && items.length === 0 && !msg && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Für dieses Feld sind aktuell keine Bauoptionen verfügbar.</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
-          {items.map(item => {
+          {[...items].sort((a, b) => {
+            // 1. Journey-Hints zuerst
+            const aHint = journeyBuildHints.includes(a.key) ? 0 : 1
+            const bHint = journeyBuildHints.includes(b.key) ? 0 : 1
+            if (aHint !== bHint) return aHint - bHint
+            // 2. Leistbare Gebäude vor nicht leistbaren
+            const aAfford = credits >= a.cost ? 0 : 1
+            const bAfford = credits >= b.cost ? 0 : 1
+            return aAfford - bAfford
+          }).map(item => {
             const canAfford = credits >= item.cost
             const prodText = item.production?.length
               ? item.production.map(p => `+${p.amount} ${RES_DE[p.resource] ?? p.resource}/Tick`).join(' · ')
