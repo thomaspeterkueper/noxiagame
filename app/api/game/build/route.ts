@@ -318,6 +318,18 @@ export async function GET(req: NextRequest) {
     const payout = mode === 'instant' ? result.quote.valueInstant : result.quote.valueNormal
     const { data: profile } = await serviceClient.from('profiles').select('credits').eq('id', user.id).single()
     if (payout < 0 && (profile?.credits ?? 0) < Math.abs(payout)) return NextResponse.json({ error: `Entsorgung kostet ${Math.abs(payout)} Cr – unzureichende Credits.` }, { status: 400 })
+    // ── Doppel-Verkaufsschutz: atomarer DELETE ───────────────────────────────
+    // Supabase gibt gelöschte Zeilen zurück. Wenn leer → Race Condition → 409.
+    const { data: deleted, error: delErr } = await serviceClient
+      .from('tile_entities')
+      .delete()
+      .eq('id', entity.id)
+      .eq('profile_id', user.id)
+      .select('id')
+    if (delErr || !deleted || deleted.length === 0) {
+      return NextResponse.json({ error: 'Gebäude bereits im Verkauf oder nicht mehr vorhanden.' }, { status: 409 })
+    }
+
     const completesAt = new Date()
     if (mode === 'normal') completesAt.setHours(completesAt.getHours() + BUILDING_SALE.VERKAUFSDAUER_TICKS * 24)
     await serviceClient.from('player_builds').insert({ profile_id: user.id, buildable_id: entity.entity_id, target_type: 'building', location_id: entity.location_id, tile_level: entity.tile_level, tile_row: entity.tile_row, tile_col: entity.tile_col, status: mode === 'instant' ? 'sold' : 'selling', sale_payout: payout, completes_at: completesAt.toISOString() })
