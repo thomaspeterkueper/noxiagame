@@ -1,7 +1,7 @@
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 19.07.2026 — Fix: Merge world+tileEntities, tileEntities als Fallback
-// Version:      2.17.0
+// Aktualisiert: 19.07.2026 — Schritt 4: player_unlocks + Feature-Gates laden
+// Version:      2.18.0
 
 'use client'
 
@@ -63,6 +63,8 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [journeyOpen, setJourneyOpen]           = useState(false)
   const [journeyHints, setJourneyHints]         = useState<string[]>([])
   const [unreadDMs, setUnreadDMs]               = useState(0)
+  const [unlocks, setUnlocks]                   = useState<string[]>([])
+  const [gates, setGates]                       = useState<Record<string, boolean>>({})
   const [chatWith, setChatWith]                 = useState<{ id: string; username: string } | null>(null)
   const [friends, setFriends]                   = useState<{ id: string; username: string }[]>([])
   const [friendsOpen, setFriendsOpen]           = useState(false)
@@ -90,6 +92,20 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   }
   useEffect(() => { fetchBuilds() }, [])
   useEffect(() => { fetchBuilds() }, [invalidations.builds])
+
+  // Unlocks + Feature-Gates laden
+  useEffect(() => {
+    async function loadUnlocks() {
+      try {
+        const token = await getToken()
+        const res = await fetch('/api/game/unlocks', { headers: { Authorization: `Bearer ${token}` } })
+        const data = await res.json() as { unlocks: string[]; gates: Record<string, boolean> }
+        setUnlocks(data.unlocks ?? [])
+        setGates(data.gates ?? {})
+      } catch {}
+    }
+    loadUnlocks()
+  }, [])
 
   // Freunde laden
   useEffect(() => {
@@ -270,6 +286,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
       )}
       <JourneyDrawer open={journeyOpen} currentLocation={location} onClose={() => setJourneyOpen(false)} {...journeyActions} onActiveStepChange={handleActiveStepChange} onStepCompleted={(title) => showToast(`✓ Geschafft: ${title}`, true)} onJourneyCompleted={handleJourneyCompleted} />
       {profile && !profile.onboarded && <WelcomeSetup onDone={(opts) => { if (opts?.openJourney) setJourneyOpen(true); window.location.reload(); }} />}
+      {/* gates verfügbar für: gates.bankCredit, gates.spectralSensor etc. */}
       {auctionOpen && <MarketAuction open={auctionOpen} onClose={() => setAuctionOpen(false)} location={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))} credits={credits} cargo={cargo} cargoMax={cargoMax} initialResource={auctionConfig.resource} initialMode={auctionConfig.mode} initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} />}
       {warehouseOpen && <WarehouseOverlay locationSlug={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} prices={prices} resources={currentLocationData?.location_resources ?? []} orders={initialOrders.filter((o: any) => o.locations?.slug === location)} cargo={cargo} cargoMax={cargoMax} credits={credits} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} onFulfillOrder={async (orderId, agreedReward) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} onClose={() => setWarehouseOpen(false)} />}
       {profileOpen && profile && <ProfileOverlay username={profile.username ?? '?'} avatar={profile.avatar ?? 'pilot_01'} credits={credits} onClose={() => setProfileOpen(false)} />}
