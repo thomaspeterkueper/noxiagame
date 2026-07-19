@@ -1,6 +1,6 @@
 -- supabase/migrations/20260719000000_baseline.sql
 -- NOXIA Datenbank-Baseline — Stand: 19.07.2026
--- v1.1: alle service_role Policies auf TO service_role USING(true) umgestellt
+-- v1.2: CREATE EXTENSION IF NOT EXISTS, alle Indizes IF NOT EXISTS
 -- Quelle: DB-Schema-Export + Migration-Archiv (001a–034)
 --
 -- Ausführen auf LEERER Datenbank.
@@ -12,8 +12,8 @@ SET search_path TO public;
 -- ════════════════════════════════════
 -- EXTENSIONS
 -- ════════════════════════════════════
-CREATE EXTENSION "uuid-ossp";
-CREATE EXTENSION "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ════════════════════════════════════
 -- ENUMS
@@ -447,201 +447,201 @@ CREATE TABLE IF NOT EXISTS player_learning_progress (
 -- INDEXES
 -- ════════════════════════════════════
 
-CREATE UNIQUE INDEX academy_completions_pkey ON public.academy_completions USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS academy_completions_pkey ON public.academy_completions USING btree (id);
 
-CREATE UNIQUE INDEX academy_completions_profile_id_module_id_key ON public.academy_completions USING btree (profile_id, module_id);
+CREATE UNIQUE INDEX IF NOT EXISTS academy_completions_profile_id_module_id_key ON public.academy_completions USING btree (profile_id, module_id);
 
-CREATE INDEX idx_academy_completions_profile ON public.academy_completions USING btree (profile_id, module_id);
+CREATE INDEX IF NOT EXISTS idx_academy_completions_profile ON public.academy_completions USING btree (profile_id, module_id);
 
-CREATE UNIQUE INDEX academy_modules_pkey ON public.academy_modules USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS academy_modules_pkey ON public.academy_modules USING btree (id);
 
-CREATE INDEX actors_founded_by ON public.actors USING btree (founded_by) WHERE (founded_by IS NOT NULL);
+CREATE INDEX IF NOT EXISTS actors_founded_by ON public.actors USING btree (founded_by) WHERE (founded_by IS NOT NULL);
 
-CREATE UNIQUE INDEX actors_pkey ON public.actors USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS actors_pkey ON public.actors USING btree (id);
 
-CREATE UNIQUE INDEX building_definitions_pkey ON public.building_definitions USING btree (key);
+CREATE UNIQUE INDEX IF NOT EXISTS building_definitions_pkey ON public.building_definitions USING btree (key);
 
-CREATE UNIQUE INDEX buildings_pkey ON public.buildings USING btree (type);
+CREATE UNIQUE INDEX IF NOT EXISTS buildings_pkey ON public.buildings USING btree (type);
 
-CREATE INDEX colony_ledger_location_tick ON public.colony_ledger USING btree (location_id, tick DESC);
+CREATE INDEX IF NOT EXISTS colony_ledger_location_tick ON public.colony_ledger USING btree (location_id, tick DESC);
 
-CREATE UNIQUE INDEX colony_ledger_pkey ON public.colony_ledger USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS colony_ledger_pkey ON public.colony_ledger USING btree (id);
 
-CREATE INDEX colony_ledger_profile ON public.colony_ledger USING btree (profile_id) WHERE (profile_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS colony_ledger_profile ON public.colony_ledger USING btree (profile_id) WHERE (profile_id IS NOT NULL);
 
-CREATE UNIQUE INDEX colony_ledger_tax_property_once ON public.colony_ledger USING btree (location_id, profile_id, tick) WHERE (entry_type = 'tax_property'::text);
+CREATE UNIQUE INDEX IF NOT EXISTS colony_ledger_tax_property_once ON public.colony_ledger USING btree (location_id, profile_id, tick) WHERE (entry_type = 'tax_property'::text);
 
-CREATE UNIQUE INDEX colony_settings_pkey ON public.colony_settings USING btree (location_id);
+CREATE UNIQUE INDEX IF NOT EXISTS colony_settings_pkey ON public.colony_settings USING btree (location_id);
 
-CREATE UNIQUE INDEX colony_tariffs_pkey ON public.colony_tariffs USING btree (location_id, resource_type);
+CREATE UNIQUE INDEX IF NOT EXISTS colony_tariffs_pkey ON public.colony_tariffs USING btree (location_id, resource_type);
 
-CREATE UNIQUE INDEX daily_tasks_pkey ON public.daily_tasks USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS daily_tasks_pkey ON public.daily_tasks USING btree (id);
 
-CREATE UNIQUE INDEX daily_tasks_profile_id_task_date_key ON public.daily_tasks USING btree (profile_id, task_date);
+CREATE UNIQUE INDEX IF NOT EXISTS daily_tasks_profile_id_task_date_key ON public.daily_tasks USING btree (profile_id, task_date);
 
-CREATE INDEX idx_daily_tasks_profile ON public.daily_tasks USING btree (profile_id, task_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_tasks_profile ON public.daily_tasks USING btree (profile_id, task_date DESC);
 
-CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS events_pkey ON public.events USING btree (id);
 
-CREATE INDEX idx_events_location ON public.events USING btree (location_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_location ON public.events USING btree (location_id, created_at DESC);
 
-CREATE INDEX idx_events_profile ON public.events USING btree (profile_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_profile ON public.events USING btree (profile_id, created_at DESC);
 
-CREATE INDEX idx_events_type ON public.events USING btree (type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_type ON public.events USING btree (type, created_at DESC);
 
-CREATE UNIQUE INDEX foundation_folien_kurs_id_position_key ON public.foundation_folien USING btree (kurs_id, "position");
+CREATE UNIQUE INDEX IF NOT EXISTS foundation_folien_kurs_id_position_key ON public.foundation_folien USING btree (kurs_id, "position");
 
-CREATE UNIQUE INDEX foundation_folien_pkey ON public.foundation_folien USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS foundation_folien_pkey ON public.foundation_folien USING btree (id);
 
-CREATE INDEX idx_foundation_folien_kurs ON public.foundation_folien USING btree (kurs_id, "position");
+CREATE INDEX IF NOT EXISTS idx_foundation_folien_kurs ON public.foundation_folien USING btree (kurs_id, "position");
 
-CREATE UNIQUE INDEX foundation_kurse_kurs_id_key ON public.foundation_kurse USING btree (kurs_id);
+CREATE UNIQUE INDEX IF NOT EXISTS foundation_kurse_kurs_id_key ON public.foundation_kurse USING btree (kurs_id);
 
-CREATE UNIQUE INDEX foundation_kurse_pkey ON public.foundation_kurse USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS foundation_kurse_pkey ON public.foundation_kurse USING btree (id);
 
-CREATE UNIQUE INDEX friendships_pkey ON public.friendships USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS friendships_pkey ON public.friendships USING btree (id);
 
-CREATE UNIQUE INDEX friendships_profile_id_friend_id_key ON public.friendships USING btree (profile_id, friend_id);
+CREATE UNIQUE INDEX IF NOT EXISTS friendships_profile_id_friend_id_key ON public.friendships USING btree (profile_id, friend_id);
 
-CREATE INDEX idx_friendships_friend ON public.friendships USING btree (friend_id, status);
+CREATE INDEX IF NOT EXISTS idx_friendships_friend ON public.friendships USING btree (friend_id, status);
 
-CREATE INDEX idx_friendships_profile ON public.friendships USING btree (profile_id, status);
+CREATE INDEX IF NOT EXISTS idx_friendships_profile ON public.friendships USING btree (profile_id, status);
 
-CREATE UNIQUE INDEX historical_milestones_pkey ON public.historical_milestones USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS historical_milestones_pkey ON public.historical_milestones USING btree (id);
 
-CREATE UNIQUE INDEX journey_steps_pkey ON public.journey_steps USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS journey_steps_pkey ON public.journey_steps USING btree (id);
 
-CREATE UNIQUE INDEX knowledge_levels_pkey ON public.knowledge_levels USING btree (level);
+CREATE UNIQUE INDEX IF NOT EXISTS knowledge_levels_pkey ON public.knowledge_levels USING btree (level);
 
-CREATE INDEX idx_knowledge_tx_profile ON public.knowledge_transactions USING btree (profile_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_tx_profile ON public.knowledge_transactions USING btree (profile_id, created_at DESC);
 
-CREATE UNIQUE INDEX knowledge_transactions_pkey ON public.knowledge_transactions USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS knowledge_transactions_pkey ON public.knowledge_transactions USING btree (id);
 
-CREATE INDEX idx_kurs_fortschritt_profile ON public.kurs_fortschritt USING btree (profile_id);
+CREATE INDEX IF NOT EXISTS idx_kurs_fortschritt_profile ON public.kurs_fortschritt USING btree (profile_id);
 
-CREATE UNIQUE INDEX kurs_fortschritt_pkey ON public.kurs_fortschritt USING btree (profile_id, kurs_id);
+CREATE UNIQUE INDEX IF NOT EXISTS kurs_fortschritt_pkey ON public.kurs_fortschritt USING btree (profile_id, kurs_id);
 
-CREATE UNIQUE INDEX kurs_voraussetzungen_pkey ON public.kurs_voraussetzungen USING btree (kurs_id, benoetigt_id);
+CREATE UNIQUE INDEX IF NOT EXISTS kurs_voraussetzungen_pkey ON public.kurs_voraussetzungen USING btree (kurs_id, benoetigt_id);
 
-CREATE INDEX idx_location_reputation_profile ON public.location_reputation USING btree (profile_id);
+CREATE INDEX IF NOT EXISTS idx_location_reputation_profile ON public.location_reputation USING btree (profile_id);
 
-CREATE UNIQUE INDEX location_reputation_pkey ON public.location_reputation USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS location_reputation_pkey ON public.location_reputation USING btree (id);
 
-CREATE UNIQUE INDEX location_reputation_profile_id_location_id_key ON public.location_reputation USING btree (profile_id, location_id);
+CREATE UNIQUE INDEX IF NOT EXISTS location_reputation_profile_id_location_id_key ON public.location_reputation USING btree (profile_id, location_id);
 
-CREATE INDEX idx_location_resources_location ON public.location_resources USING btree (location_id);
+CREATE INDEX IF NOT EXISTS idx_location_resources_location ON public.location_resources USING btree (location_id);
 
-CREATE UNIQUE INDEX location_resources_location_id_resource_key ON public.location_resources USING btree (location_id, resource);
+CREATE UNIQUE INDEX IF NOT EXISTS location_resources_location_id_resource_key ON public.location_resources USING btree (location_id, resource);
 
-CREATE UNIQUE INDEX location_resources_pkey ON public.location_resources USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS location_resources_pkey ON public.location_resources USING btree (id);
 
-CREATE UNIQUE INDEX locations_pkey ON public.locations USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS locations_pkey ON public.locations USING btree (id);
 
-CREATE UNIQUE INDEX locations_slug_key ON public.locations USING btree (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS locations_slug_key ON public.locations USING btree (slug);
 
-CREATE INDEX idx_market_prices_location ON public.market_prices USING btree (location_id);
+CREATE INDEX IF NOT EXISTS idx_market_prices_location ON public.market_prices USING btree (location_id);
 
-CREATE UNIQUE INDEX market_prices_location_id_resource_key ON public.market_prices USING btree (location_id, resource);
+CREATE UNIQUE INDEX IF NOT EXISTS market_prices_location_id_resource_key ON public.market_prices USING btree (location_id, resource);
 
-CREATE UNIQUE INDEX market_prices_pkey ON public.market_prices USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS market_prices_pkey ON public.market_prices USING btree (id);
 
-CREATE INDEX idx_npc_ledger_actor ON public.npc_ledger USING btree (actor_id);
+CREATE INDEX IF NOT EXISTS idx_npc_ledger_actor ON public.npc_ledger USING btree (actor_id);
 
-CREATE UNIQUE INDEX npc_ledger_pkey ON public.npc_ledger USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS npc_ledger_pkey ON public.npc_ledger USING btree (id);
 
-CREATE UNIQUE INDEX uniq_npc_ledger_event ON public.npc_ledger USING btree (actor_id, tick, kind, COALESCE(resource, ''::text), COALESCE(ref, ''::text));
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_npc_ledger_event ON public.npc_ledger USING btree (actor_id, tick, kind, COALESCE(resource, ''::text), COALESCE(ref, ''::text));
 
-CREATE UNIQUE INDEX npc_trades_actor_id_tick_resource_key ON public.npc_trades USING btree (actor_id, tick, resource);
+CREATE UNIQUE INDEX IF NOT EXISTS npc_trades_actor_id_tick_resource_key ON public.npc_trades USING btree (actor_id, tick, resource);
 
-CREATE INDEX npc_trades_actor_resource ON public.npc_trades USING btree (actor_id, resource);
+CREATE INDEX IF NOT EXISTS npc_trades_actor_resource ON public.npc_trades USING btree (actor_id, resource);
 
-CREATE UNIQUE INDEX npc_trades_pkey ON public.npc_trades USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS npc_trades_pkey ON public.npc_trades USING btree (id);
 
-CREATE INDEX idx_player_buildings_location ON public.player_buildings USING btree (location_id);
+CREATE INDEX IF NOT EXISTS idx_player_buildings_location ON public.player_buildings USING btree (location_id);
 
-CREATE INDEX idx_player_buildings_profile ON public.player_buildings USING btree (profile_id);
+CREATE INDEX IF NOT EXISTS idx_player_buildings_profile ON public.player_buildings USING btree (profile_id);
 
-CREATE UNIQUE INDEX player_buildings_pkey ON public.player_buildings USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS player_buildings_pkey ON public.player_buildings USING btree (id);
 
-CREATE INDEX pb_open_ops_idx ON public.player_builds USING btree (status) WHERE (status = ANY (ARRAY['building'::text, 'selling'::text, 'installing'::text, 'removing'::text]));
+CREATE INDEX IF NOT EXISTS pb_open_ops_idx ON public.player_builds USING btree (status) WHERE (status = ANY (ARRAY['building'::text, 'selling'::text, 'installing'::text, 'removing'::text]));
 
-CREATE INDEX pb_parent_idx ON public.player_builds USING btree (parent_id);
+CREATE INDEX IF NOT EXISTS pb_parent_idx ON public.player_builds USING btree (parent_id);
 
-CREATE UNIQUE INDEX player_builds_pkey ON public.player_builds USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS player_builds_pkey ON public.player_builds USING btree (id);
 
-CREATE UNIQUE INDEX player_journeys_pkey ON public.player_journeys USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS player_journeys_pkey ON public.player_journeys USING btree (id);
 
-CREATE UNIQUE INDEX player_journeys_profile_id_journey_key_key ON public.player_journeys USING btree (profile_id, journey_key);
+CREATE UNIQUE INDEX IF NOT EXISTS player_journeys_profile_id_journey_key_key ON public.player_journeys USING btree (profile_id, journey_key);
 
-CREATE INDEX idx_price_history_lookup ON public.price_history USING btree (location_id, resource, tick_number DESC);
+CREATE INDEX IF NOT EXISTS idx_price_history_lookup ON public.price_history USING btree (location_id, resource, tick_number DESC);
 
-CREATE UNIQUE INDEX price_history_pkey ON public.price_history USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS price_history_pkey ON public.price_history USING btree (id);
 
-CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_pkey ON public.profiles USING btree (id);
 
-CREATE UNIQUE INDEX profiles_username_key ON public.profiles USING btree (username);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_key ON public.profiles USING btree (username);
 
-CREATE UNIQUE INDEX resources_pkey ON public.resources USING btree (type);
+CREATE UNIQUE INDEX IF NOT EXISTS resources_pkey ON public.resources USING btree (type);
 
-CREATE INDEX idx_ship_cargo_ship ON public.ship_cargo USING btree (ship_id);
+CREATE INDEX IF NOT EXISTS idx_ship_cargo_ship ON public.ship_cargo USING btree (ship_id);
 
-CREATE UNIQUE INDEX ship_cargo_pkey ON public.ship_cargo USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ship_cargo_pkey ON public.ship_cargo USING btree (id);
 
-CREATE UNIQUE INDEX ship_cargo_ship_id_resource_key ON public.ship_cargo USING btree (ship_id, resource);
+CREATE UNIQUE INDEX IF NOT EXISTS ship_cargo_ship_id_resource_key ON public.ship_cargo USING btree (ship_id, resource);
 
-CREATE UNIQUE INDEX ship_types_pkey ON public.ship_types USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ship_types_pkey ON public.ship_types USING btree (id);
 
-CREATE UNIQUE INDEX ships_pkey ON public.ships USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ships_pkey ON public.ships USING btree (id);
 
-CREATE INDEX idx_simulation_ticks_number ON public.simulation_ticks USING btree (tick_number DESC);
+CREATE INDEX IF NOT EXISTS idx_simulation_ticks_number ON public.simulation_ticks USING btree (tick_number DESC);
 
-CREATE UNIQUE INDEX simulation_ticks_pkey ON public.simulation_ticks USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS simulation_ticks_pkey ON public.simulation_ticks USING btree (id);
 
-CREATE INDEX idx_tick_log_created ON public.tick_log USING btree (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tick_log_created ON public.tick_log USING btree (created_at DESC);
 
-CREATE UNIQUE INDEX tick_log_pkey ON public.tick_log USING btree (tick_number);
+CREATE UNIQUE INDEX IF NOT EXISTS tick_log_pkey ON public.tick_log USING btree (tick_number);
 
-CREATE INDEX idx_tile_entities_actor ON public.tile_entities USING btree (actor_id, location_id);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_actor ON public.tile_entities USING btree (actor_id, location_id);
 
-CREATE INDEX idx_tile_entities_deposit ON public.tile_entities USING btree (deposit_id) WHERE (deposit_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_deposit ON public.tile_entities USING btree (deposit_id) WHERE (deposit_id IS NOT NULL);
 
-CREATE INDEX idx_tile_entities_grid ON public.tile_entities USING btree (location_id, tile_level);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_grid ON public.tile_entities USING btree (location_id, tile_level);
 
-CREATE INDEX idx_tile_entities_land_value ON public.tile_entities USING btree (location_id, land_value DESC) WHERE (land_value > 0);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_land_value ON public.tile_entities USING btree (location_id, land_value DESC) WHERE (land_value > 0);
 
-CREATE INDEX idx_tile_entities_owner ON public.tile_entities USING btree (profile_id, location_id);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_owner ON public.tile_entities USING btree (profile_id, location_id);
 
-CREATE INDEX idx_tile_entities_owner_class ON public.tile_entities USING btree (owner_class);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_owner_class ON public.tile_entities USING btree (owner_class);
 
-CREATE INDEX idx_tile_entities_owner_id ON public.tile_entities USING btree (owner_id) WHERE (owner_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_owner_id ON public.tile_entities USING btree (owner_id) WHERE (owner_id IS NOT NULL);
 
-CREATE INDEX idx_tile_entities_state_owned ON public.tile_entities USING btree (location_id, entity_id) WHERE (is_state_owned = true);
+CREATE INDEX IF NOT EXISTS idx_tile_entities_state_owned ON public.tile_entities USING btree (location_id, entity_id) WHERE (is_state_owned = true);
 
-CREATE UNIQUE INDEX te_building_per_tile ON public.tile_entities USING btree (location_id, tile_level, tile_row, tile_col) WHERE ((entity_type = 'building'::text) AND (parent_id IS NULL));
+CREATE UNIQUE INDEX IF NOT EXISTS te_building_per_tile ON public.tile_entities USING btree (location_id, tile_level, tile_row, tile_col) WHERE ((entity_type = 'building'::text) AND (parent_id IS NULL));
 
-CREATE UNIQUE INDEX te_one_per_slot ON public.tile_entities USING btree (parent_id, slot) WHERE (parent_id IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS te_one_per_slot ON public.tile_entities USING btree (parent_id, slot) WHERE (parent_id IS NOT NULL);
 
-CREATE INDEX te_parent_idx ON public.tile_entities USING btree (parent_id);
+CREATE INDEX IF NOT EXISTS te_parent_idx ON public.tile_entities USING btree (parent_id);
 
-CREATE UNIQUE INDEX tile_entities_pkey ON public.tile_entities USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS tile_entities_pkey ON public.tile_entities USING btree (id);
 
-CREATE UNIQUE INDEX uniq_building_per_tile ON public.tile_entities USING btree (location_id, tile_level, tile_row, tile_col) WHERE (entity_type = 'building'::text);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_building_per_tile ON public.tile_entities USING btree (location_id, tile_level, tile_row, tile_col) WHERE (entity_type = 'building'::text);
 
-CREATE INDEX idx_trade_orders_location ON public.trade_orders USING btree (location_id);
+CREATE INDEX IF NOT EXISTS idx_trade_orders_location ON public.trade_orders USING btree (location_id);
 
-CREATE INDEX idx_trade_orders_status ON public.trade_orders USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_trade_orders_status ON public.trade_orders USING btree (status);
 
-CREATE UNIQUE INDEX trade_orders_pkey ON public.trade_orders USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS trade_orders_pkey ON public.trade_orders USING btree (id);
 
-CREATE INDEX idx_trade_transactions_profile ON public.trade_transactions USING btree (profile_id);
+CREATE INDEX IF NOT EXISTS idx_trade_transactions_profile ON public.trade_transactions USING btree (profile_id);
 
-CREATE INDEX idx_trade_transactions_time ON public.trade_transactions USING btree (traded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_trade_transactions_time ON public.trade_transactions USING btree (traded_at DESC);
 
-CREATE UNIQUE INDEX trade_transactions_pkey ON public.trade_transactions USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS trade_transactions_pkey ON public.trade_transactions USING btree (id);
 
-CREATE INDEX idx_world_events_active ON public.world_events USING btree (active);
+CREATE INDEX IF NOT EXISTS idx_world_events_active ON public.world_events USING btree (active);
 
-CREATE UNIQUE INDEX world_events_pkey ON public.world_events USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS world_events_pkey ON public.world_events USING btree (id);
 
 -- ════════════════════════════════════
 -- ROW LEVEL SECURITY
