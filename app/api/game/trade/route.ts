@@ -207,7 +207,7 @@ export async function GET(req: NextRequest) {
 
   const { data: profile } = await serviceClient
     .from('profiles')
-    .select('id, credits')
+    .select('id, credits, username')
     .eq('id', user.id)
     .single()
 
