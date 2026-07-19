@@ -1,10 +1,11 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 19.07.2026 — SSF-Link mit uid + ref=noxia Parameter
-// Version:      4.5.1
+// Aktualisiert: 19.07.2026 — Links auf /learning-paths/ + getSsfPathUrl
+// Version:      4.6.0
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
+import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
 
 interface ColonyContext {
   locationName: string
