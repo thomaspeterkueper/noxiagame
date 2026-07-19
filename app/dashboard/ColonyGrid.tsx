@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — Fix: besetzte Kacheln nicht bebaubar + Eigentümer-Info
-// Version:      5.7.0
+// Aktualisiert: 19.07.2026 — Fix: alle belegten Kacheln blockieren BuildPopup
+// Version:      5.8.0
 
 'use client'
 
