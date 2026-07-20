@@ -1,7 +1,5 @@
 'use client'
-// app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 20.07.2026 — Fix: currentUserId via loadCompletedModules
-// Version:      4.6.2
+
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
 import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
