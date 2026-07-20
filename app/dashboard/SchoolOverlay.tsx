@@ -132,7 +132,7 @@ function SsfTab() {
       {!loading && !error && (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
           {modules.map(m => (
-            <a key={m.id} href={m.ssfUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+            <a key={m.id} href={m.id ? (getSsfPathUrl(m.id, currentUserId || undefined) ?? m.ssfUrl ?? '#') : (m.ssfUrl ?? '#')} target="_blank" rel="noopener noreferrer"
               style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.75rem 0.9rem', textDecoration: 'none', display: 'block' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ fontWeight: 700, color: C.text, fontSize: '0.85rem' }}>{m.title ?? m.name ?? m.id}</div>
@@ -150,7 +150,7 @@ function SsfTab() {
   )
 }
 
-function RightPanel({ topic, kind, modules }: { topic: string | null; kind: Task['kind'] | null; modules: SsfModule[] }) {
+function RightPanel({ topic, kind, modules, currentUserId }: { topic: string | null; kind: Task['kind'] | null; modules: SsfModule[]; currentUserId?: string }) {
   const TOPIC_DOMAIN: Record<string, string> = {
     'Handel': 'economics', 'Ressourcen': 'economics',
     'Navigation': 'physics', 'Physik': 'physics', 'Sonnensystem': 'physics',
@@ -181,7 +181,7 @@ function RightPanel({ topic, kind, modules }: { topic: string | null; kind: Task
       {relevant.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
           {relevant.map(m => (
-            <a key={m.id} href={m.ssfUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+            <a key={m.id} href={m.id ? (getSsfPathUrl(m.id, currentUserId || undefined) ?? m.ssfUrl ?? '#') : (m.ssfUrl ?? '#')} target="_blank" rel="noopener noreferrer"
               style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.7rem 0.85rem', textDecoration: 'none', display: 'block' }}>
               <div style={{ fontWeight: 700, color: C.accent, fontSize: '0.82rem' }}>{m.title ?? m.name ?? m.id}</div>
               <div style={{ color: C.textFaint, fontSize: '0.62rem', marginTop: 2, fontFamily: MONO }}>{m.domain ?? ''} · {m.durationMinutes ?? '?'} Min.</div>
@@ -583,7 +583,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
 
         {/* RECHTE SEITE — 60% SSF-Lernmaterial */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#faf7f0', overflow: 'hidden' }}>
-          <RightPanel topic={task?.topic ?? null} kind={task?.kind ?? null} modules={ssfModules} />
+          <RightPanel topic={task?.topic ?? null} kind={task?.kind ?? null} modules={ssfModules} currentUserId={currentUserId} />
         </div>
 
       </div>
