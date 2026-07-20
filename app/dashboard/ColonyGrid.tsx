@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 19.07.2026 — NOX-0009: asking_price in TileEntity + Kaufen-Button
-// Version:      5.14.0
+// Aktualisiert: 20.07.2026 — C: Konzessions-Button für STATE-Gebäude
+// Version:      5.15.0
 
 'use client'
 
@@ -47,6 +47,8 @@ export interface TileEntity {
   entity_type: string; entity_id: string; tile_level: number
   tile_row: number; tile_col: number; username?: string
   asking_price?: number | null
+  lease_price?:   number | null
+  occupant_id?:   string | null
 }
 export interface PendingBuild {
   buildable_id: string; tile_row: number; tile_col: number; status: string
