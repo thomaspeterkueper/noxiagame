@@ -1,6 +1,6 @@
 // ssfKnowledge.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; SSF-Modul-Fetch
-// Version:      0.2.0
+// Aktualisiert: 2026-07-20 — Bypass-Secret Header für Vercel Protection
+// Version:      0.3.0
 export type SsfKnowledgeModule = {
   id: string
   title: string
@@ -30,8 +30,15 @@ export async function fetchSsfKnowledgeModules(): Promise<SsfKnowledgeModule[]> 
   const baseUrl = getSsfBaseUrl().replace(/\/$/, '')
 
   try {
+    const bypassSecret = process.env.SSF_BYPASS_SECRET ?? process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? ''
     const response = await fetch(`${baseUrl}/api/noxia/modules`, {
-      headers: { accept: 'application/json' }
+      headers: {
+        accept: 'application/json',
+        // Bypass Vercel Deployment Protection if secret is set
+        // Set in NOXIA Vercel: SSF_BYPASS_SECRET=<secret from SSF project>
+        ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+      },
+      // next: { revalidate: 300 } — inherit from page
     })
 
     if (!response.ok) return []
