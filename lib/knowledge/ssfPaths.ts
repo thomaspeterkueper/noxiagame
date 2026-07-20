@@ -1,7 +1,7 @@
 // lib/knowledge/ssfPaths.ts
 // Erstellt:     19.07.2026
-// Aktualisiert: 19.07.2026 — SSF Lernpfad → NOXIA Unlock Mapping
-// Version:      1.0.0
+// Aktualisiert: 20.07.2026 — Übergangslösung: /learn?ref=noxia&module=... bis SSF-0019
+// Version:      1.1.0
 //
 // Kanonische SSF Pfad-IDs (von SSF-0008 bis SSF-0018 geliefert)
 // Mapping: PATH:SSF:* → UNL:NOX:*
@@ -36,9 +36,19 @@ export const MODULE_TO_PATH: Record<string, string> = {
 export const SSF_BASE_URL = 'https://solarsciencefoundation.vercel.app'
 
 export function getSsfPathUrl(moduleId: string, noxiaUid?: string): string | null {
+  if (!moduleId) return null
+  // SSF-0019: Bis Deep-Links verfügbar sind → /learn mit Parametern
+  // Sobald SSF /learning-paths/[id] oder /modules/[id] unterstützt → anpassen
+  const uid = noxiaUid ? `&uid=${encodeURIComponent(noxiaUid)}` : ''
+  return `${SSF_BASE_URL}/learn?ref=noxia&module=${encodeURIComponent(moduleId)}${uid}`
+}
+
+// Vollständiger Lernpfad-Link (wenn SSF-0019 implementiert)
+export function getSsfLearningPathUrl(moduleId: string, noxiaUid?: string): string | null {
   const pathId = MODULE_TO_PATH[moduleId]
-  if (!pathId) return null
-  const encoded = encodeURIComponent(pathId)
-  const uid = noxiaUid ? `&uid=${noxiaUid}` : ''
-  return `${SSF_BASE_URL}/learning-paths/${encoded}?ref=noxia${uid}`
+  if (!pathId) return getSsfPathUrl(moduleId, noxiaUid)
+  const uid = noxiaUid ? `&uid=${encodeURIComponent(noxiaUid)}` : ''
+  // Aktivieren sobald SSF-0019 erledigt:
+  // return `${SSF_BASE_URL}/learning-paths/${encodeURIComponent(pathId)}?ref=noxia${uid}`
+  return `${SSF_BASE_URL}/learn?ref=noxia&module=${encodeURIComponent(moduleId)}${uid}`
 }
