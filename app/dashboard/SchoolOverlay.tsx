@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 20.07.2026 — Sync-Button: SSF-Status + 403-Hinweis
-// Version:      4.6.1
+// Aktualisiert: 20.07.2026 — Fix: currentUserId via loadCompletedModules
+// Version:      4.6.2
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -367,6 +367,18 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [moduleLoading, setModuleLoading] = useState(false)
   const [activeKursId, setActiveKursId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId]  = useState<string>('')
+
+  // UserId einmalig laden
+  useEffect(() => {
+    async function loadUserId() {
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const { data: { user } } = await createClient().auth.getUser()
+        if (user?.id) setCurrentUserId(user.id)
+      } catch {}
+    }
+    loadUserId()
+  }, [])
   const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(false)
