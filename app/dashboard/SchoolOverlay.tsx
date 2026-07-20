@@ -59,8 +59,9 @@ const C = {
 }
 
 const ACADEMY_BG: Record<string, { src: string; label: string }> = {
-  earth: { src: '/images/building-backgrounds/school-back-earth.png', label: 'Erde · Universität' },
-  mars: { src: '/images/building-backgrounds/school-back-mars.png', label: 'Mars · Tharsis Hub' },
+  earth:      { src: '/images/building-backgrounds/school-back-earth.png',      label: 'Erde · Universität' },
+  mars:       { src: '/images/building-backgrounds/school-back-mars.png',       label: 'Mars · Tharsis Hub' },
+  moon:       { src: '/images/building-backgrounds/school-back-mars.png',       label: 'Mond · Akademie' },
   prometheus: { src: '/images/building-backgrounds/school-back-prometheus.png', label: 'Prometheus Station · L5' },
 }
 
@@ -434,7 +435,12 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   async function generateTask() {
     setLoading(true); setResult(null); setAnswer(''); setSelected(null)
     try {
-      const res = await fetch('/api/game/school', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: 1, colonyContext }) })
+      const res = await fetch('/api/game/school', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: 1, colonyContext: colonyContext ?? {} })
+      })
+      if (!res.ok) { setTask(fallbackTask()); setLoading(false); return }
       const data = await res.json() as Record<string,unknown>
       setTask((data.task as Task) ?? fallbackTask())
     } catch { setTask(fallbackTask()) }
@@ -578,10 +584,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
 
         {/* RECHTE SEITE — 60% SSF-Lernmaterial */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#faf7f0', overflow: 'hidden' }}>
-          {tab === 'ssf'
-            ? <SsfTab />
-            : <RightPanel topic={task?.topic ?? null} kind={task?.kind ?? null} modules={ssfModules} />
-          }
+          <RightPanel topic={task?.topic ?? null} kind={task?.kind ?? null} modules={ssfModules} />
         </div>
 
       </div>
