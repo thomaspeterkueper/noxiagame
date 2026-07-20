@@ -63,7 +63,6 @@ const ACADEMY_BG: Record<string, { src: string; label: string }> = {
   mars:       { src: '/images/building-backgrounds/school-back-mars.png',       label: 'Mars · Tharsis Hub' },
   moon:       { src: '/images/building-backgrounds/school-back-mars.png',       label: 'Mond · Akademie' },
   phobos:     { src: '/images/building-backgrounds/school-back-mars.png',       label: 'Phobos · Station' },
-  moon:       { src: '/images/building-backgrounds/school-back-mars.png',       label: 'Mond · Akademie' },
   prometheus: { src: '/images/building-backgrounds/school-back-prometheus.png', label: 'Prometheus Station · L5' },
 }
 
