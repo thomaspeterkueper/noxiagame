@@ -1,7 +1,7 @@
 // app/api/game/knowledge/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 19.07.2026 — sync_from_ssf: neue SSF /api/noxia/completion API
-// Version:      2.4.0
+// Aktualisiert: 20.07.2026 — sync_from_ssf: 403-Fallback + Retry-After Header
+// Version:      2.5.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
