@@ -57,8 +57,26 @@ export default function SellPanel({ entityId, entityName, onSold, currentAskingP
   const [loading, setLoading] = useState(true)
   const [selling, setSelling] = useState(false)
   const [confirm, setConfirm] = useState<'normal' | 'instant' | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [done, setDone]       = useState<string | null>(null)
+  const [priceInput, setPriceInput]     = useState(currentAskingPrice?.toString() ?? '')
+  const [priceLoading, setPriceLoading] = useState(false)
+  const [priceMsg, setPriceMsg]         = useState('')
+
+  const setPrice = async () => {
+    setPriceLoading(true); setPriceMsg('')
+    const p = priceInput.trim() === '' ? 'null' : priceInput
+    try {
+      const { data: { session } } = await createClient().auth.getSession()
+      const res = await fetch(`/api/game/build?action=set_price&entityId=${entityId}&price=${p}`, {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` }
+      })
+      const d = await res.json() as { ok?: boolean; error?: string }
+      setPriceMsg(d.ok ? (p === 'null' ? 'Nicht mehr zum Verkauf' : `Preis gesetzt: ${p} Cr`) : (d.error ?? 'Fehler'))
+      onSold?.()
+    } catch { setPriceMsg('Fehler') }
+    setPriceLoading(false)
+  }
 
   // Quote laden, sobald ein Gebäude ausgewählt ist
   useEffect(() => {
