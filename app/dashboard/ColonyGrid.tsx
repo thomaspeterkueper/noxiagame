@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — Pan: Mausdrag zum Verschieben, keine Scrollbalken
-// Version:      5.17.0
+// Aktualisiert: 20.07.2026 — Pan-Fix: 4px Schwelle, Klicks bleiben erhalten
+// Version:      5.18.0
 
 'use client'
 
@@ -325,25 +325,33 @@ export default function ColonyGrid({
     }
     el.addEventListener('wheel', onWheel, { passive: false })
 
-    // Pan: Mausdrag
+    // Pan: Mausdrag — erst nach 4px Bewegung aktivieren damit Klicks erhalten bleiben
+    let pending = false
     const onMouseDown = (e: MouseEvent) => {
-      // Nur linke Maustaste, nicht auf interaktiven Elementen
       if (e.button !== 0) return
-      if ((e.target as HTMLElement).closest('button,a,input')) return
-      isPanning.current = true
+      if ((e.target as HTMLElement).closest('button,a,input,select')) return
+      pending = true
       panStart.current = { x: e.clientX, y: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop }
-      el.style.cursor = 'grabbing'
-      el.style.userSelect = 'none'
-      e.preventDefault()
     }
     const onMouseMove = (e: MouseEvent) => {
-      if (!isPanning.current) return
+      if (!pending && !isPanning.current) return
       const dx = e.clientX - panStart.current.x
       const dy = e.clientY - panStart.current.y
-      el.scrollLeft = panStart.current.scrollX - dx
-      el.scrollTop  = panStart.current.scrollY - dy
+      // Erst nach 4px Schwelle als Pan erkennen
+      if (pending && Math.abs(dx) + Math.abs(dy) < 4) return
+      if (pending) {
+        pending = false
+        isPanning.current = true
+        el.style.cursor = 'grabbing'
+        el.style.userSelect = 'none'
+      }
+      if (isPanning.current) {
+        el.scrollLeft = panStart.current.scrollX - dx
+        el.scrollTop  = panStart.current.scrollY - dy
+      }
     }
     const onMouseUp = () => {
+      pending = false
       if (!isPanning.current) return
       isPanning.current = false
       el.style.cursor = 'grab'
