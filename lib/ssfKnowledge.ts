@@ -30,13 +30,18 @@ export async function fetchSsfKnowledgeModules(): Promise<SsfKnowledgeModule[]> 
   const baseUrl = getSsfBaseUrl().replace(/\/$/, '')
 
   try {
+    // Option 1: Protection Bypass Secret (set SSF_BYPASS_SECRET in NOXIA Vercel env)
     const bypassSecret = process.env.SSF_BYPASS_SECRET ?? process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? ''
+    // Option 2: Vercel OIDC token (automatic for same-team Trusted Sources)
+    const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? ''
     const response = await fetch(`${baseUrl}/api/noxia/modules`, {
       headers: {
         accept: 'application/json',
-        // Bypass Vercel Deployment Protection if secret is set
-        // Set in NOXIA Vercel: SSF_BYPASS_SECRET=<secret from SSF project>
+        // Bypass Vercel Deployment Protection — three methods in priority order:
+        // 1. Protection Bypass Secret (manual, set in NOXIA env vars)
         ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+        // 2. OIDC Token (automatic for same-team Trusted Sources — noxiagame is listed)
+        ...(oidcToken ? { 'x-vercel-trusted-oidc-idp-token': oidcToken } : {}),
       },
       // next: { revalidate: 300 } — inherit from page
     })
