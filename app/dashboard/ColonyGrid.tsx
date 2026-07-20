@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — Zoom: Scroll-Wheel + Pinch + Buttons
-// Version:      5.16.0
+// Aktualisiert: 20.07.2026 — Pan: Mausdrag zum Verschieben, keine Scrollbalken
+// Version:      5.17.0
 
 'use client'
 
@@ -311,6 +311,8 @@ export default function ColonyGrid({
   const [showBank, setShowBank] = useState(false)
   const [zoom, setZoom]               = useState(1.0)
   const gridScrollRef                 = useRef<HTMLDivElement>(null)
+  const isPanning                     = useRef(false)
+  const panStart                      = useRef({ x: 0, y: 0, scrollX: 0, scrollY: 0 })
 
   // Ctrl+Scroll Zoom
   useEffect(() => {
@@ -322,7 +324,43 @@ export default function ColonyGrid({
       setZoom(z => Math.min(2.0, Math.max(0.3, +(z - e.deltaY * 0.001).toFixed(2))))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+
+    // Pan: Mausdrag
+    const onMouseDown = (e: MouseEvent) => {
+      // Nur linke Maustaste, nicht auf interaktiven Elementen
+      if (e.button !== 0) return
+      if ((e.target as HTMLElement).closest('button,a,input')) return
+      isPanning.current = true
+      panStart.current = { x: e.clientX, y: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop }
+      el.style.cursor = 'grabbing'
+      el.style.userSelect = 'none'
+      e.preventDefault()
+    }
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isPanning.current) return
+      const dx = e.clientX - panStart.current.x
+      const dy = e.clientY - panStart.current.y
+      el.scrollLeft = panStart.current.scrollX - dx
+      el.scrollTop  = panStart.current.scrollY - dy
+    }
+    const onMouseUp = () => {
+      if (!isPanning.current) return
+      isPanning.current = false
+      el.style.cursor = 'grab'
+      el.style.userSelect = ''
+    }
+
+    el.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    el.style.cursor = 'grab'
+
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
   }, [])
 
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
@@ -502,6 +540,7 @@ export default function ColonyGrid({
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
         <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
           {hoveredTile && <TileTooltip info={hoveredTile} />}
+          <style>{'.grid-pan-container::-webkit-scrollbar { display: none }'}</style>
           {/* Zoom-Controls */}
           <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8', borderRadius: 8, padding: '3px 6px', alignItems: 'center' }}>
             <button onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>+</button>
@@ -509,7 +548,16 @@ export default function ColonyGrid({
             <button onClick={() => setZoom(z => Math.max(0.3, z - 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>−</button>
             <button onClick={() => setZoom(1.0)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.6rem', padding: '0 4px', color: '#9e9485' }}>↺</button>
           </div>
-          <div ref={gridScrollRef} style={{ overflow: 'auto', maxHeight: 'calc(100vh - 280px)', border: '2px solid #2a4e7a', borderRadius: '6px', background: '#f4f2ed' }}>
+          <div ref={gridScrollRef} className="grid-pan-container" style={{
+            overflow: 'scroll',
+            maxHeight: 'calc(100vh - 280px)',
+            border: '2px solid #2a4e7a',
+            borderRadius: '6px',
+            background: '#f4f2ed',
+            // Scrollbalken verstecken
+            scrollbarWidth: 'none' as any,
+            msOverflowStyle: 'none' as any,
+          }}>
             <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: `${COLS * tileSize}px`, height: `${ROWS * tileSize}px`, transition: 'transform 0.15s ease' }}>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`, gridAutoRows: `${tileSize}px`, gap: 0, width: `${COLS * tileSize}px` }}>
                 {gridElements}
