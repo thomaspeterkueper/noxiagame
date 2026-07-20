@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/StationTravelDock.tsx
 // Erstellt:     23.06.2026
 // Aktualisiert: 09.07.2026 — Commit C: Journey-Ziel hervorheben, Flug-Erklärung
@@ -5,8 +7,6 @@
 //
 // Minimaler Alpha-Fix: Stationen bekommen einen sichtbaren Abflug-/Docking-Block,
 // damit Reisen nicht mehr von der Besitzliste „Deine Orte“ abhängt.
-
-'use client'
 
 import { flightEnergyCost } from '@/lib/game/ships'
 import { orbitalBaseSeconds } from '@/lib/game/orbits'

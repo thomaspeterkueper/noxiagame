@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
 // Aktualisiert: 19.07.2026 — Tabs immer sichtbar, gesperrt mit Voraussetzung
@@ -5,8 +7,6 @@
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
-'use client'
-
 import React, { useState, useEffect } from 'react'
 
 interface BankOverlayProps {

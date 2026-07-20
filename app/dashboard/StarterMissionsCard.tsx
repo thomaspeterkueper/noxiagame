@@ -1,9 +1,9 @@
+'use client'
+
 // app/dashboard/StarterMissionsCard.tsx
 // Erstellt: 02.07.2026
 // Aktualisiert: 02.07.2026 — aktuelles Missionsziel optisch hervorgehoben
 // Version: 0.2.0
-
-'use client'
 
 import React, { useEffect, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'

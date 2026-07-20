@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/ShipyardOverlay.tsx
 // Erstellt:     01.06.2026
 // Aktualisiert: 01.06.2026
@@ -15,8 +17,6 @@
 // Reine Anzeige + Kauf-Callback. Kein eigener Loop.
 // Die Schiffsdaten sind hier statisch gespiegelt (config.ts / ship_types);
 // für Live-Daten könnt ihr sie alternativ aus /api/game/ships laden.
-
-'use client'
 
 import React from 'react'
 

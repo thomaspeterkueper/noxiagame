@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/OrderNegotiation.tsx
 // Erstellt:     01.06.2026
 // Aktualisiert: 01.06.2026
@@ -19,8 +21,6 @@
 //
 // WICHTIG: Loop client-seitig, useEffect mit clearInterval. Kein Server-State.
 // Voraussetzung Cargo/Standort wird wie bisher serverseitig in fulfill geprüft.
-
-'use client'
 
 import React from 'react'
 

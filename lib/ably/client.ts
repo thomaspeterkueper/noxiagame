@@ -1,3 +1,5 @@
+'use client'
+
 // lib/ably/client.ts
 // Erstellt:     19.07.2026
 // Aktualisiert: 19.07.2026 — Fix: ErrorInfo string statt Error (TS2345)
@@ -8,8 +10,6 @@
 //
 // Graceful Degradation: wenn kein Token-Endpoint erreichbar oder
 // ABLY_API_KEY nicht gesetzt → keine Subscription, kein Crash.
-
-'use client'
 
 import { useEffect, useRef } from 'react'
 import Ably from 'ably'

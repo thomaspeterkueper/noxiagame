@@ -1,7 +1,7 @@
-// app/auth/login/page.tsx
-// Aktualisiert: 04.07.2026 — Hintergrundbild, heller Kasten, Fade-in
 'use client'
 
+// app/auth/login/page.tsx
+// Aktualisiert: 04.07.2026 — Hintergrundbild, heller Kasten, Fade-in
 import React from 'react'
 
 import { useState, useEffect } from 'react'

@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/MiniMap.tsx
 // Erstellt:     14.06.2026
 // Aktualisiert: 15.06.2026
@@ -18,8 +20,6 @@
 // gespiegelt, NICHT geteilt. Wird die Terrain-/Platzierungslogik dort geändert,
 // hier nachziehen. Geplante Etappe B: generateGrid nach lib/grid/ ziehen und
 // beide darauf umstellen.
-
-'use client'
 
 import React from 'react'
 import { BuildingSVG, BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'

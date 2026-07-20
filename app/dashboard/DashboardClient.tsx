@@ -1,9 +1,9 @@
+'use client'
+
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
 // Aktualisiert: 20.07.2026 — Journey→Einweisung, Button-Style, Avatar-Fallback
 // Version:      2.20.0
-
-'use client'
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'

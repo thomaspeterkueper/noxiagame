@@ -1,8 +1,8 @@
+'use client'
+
 // app/_components/MusicProvider.tsx
 // Erstellt: 31.05.2026
 // Globaler Audio-Context – Musik läuft persistent über alle Seiten
-
-'use client'
 
 import React from 'react'
 

@@ -1,9 +1,9 @@
+'use client'
+
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
 // Aktualisiert: 09.07.2026 — Commit D: moon_colony Abschluss-Sequenz
 // Version:      0.5.2
-
-'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'

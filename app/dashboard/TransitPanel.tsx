@@ -1,3 +1,5 @@
+'use client'
+
 // TransitPanel.tsx
 // Aktualisiert: 31.05.2026 — Transit-Panel
 // Version:      0.2.0
@@ -11,8 +13,6 @@
 // Schiffsbild: public/images/ships/freighter_side.png
 // Bei fehlendem Bild: automatischer Fallback auf 🚀-Emoji
 // shipTypeId kommt aus gameStore (wird mit loadFromServer befüllt)
-
-'use client'
 
 import { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'

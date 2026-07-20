@@ -1,3 +1,5 @@
+'use client'
+
 // StatisticsTab.tsx
 // Aktualisiert: 14.06.2026 — ehrliche Versorgungs-Kennzahl
 // Version:      0.3.0
@@ -9,8 +11,6 @@
 //   Handel, keine Versorgung, und zählen nicht mehr mit (vorher: jeder
 //   profit>0 galt als „Lieferung", was Arbitrage als Fürsorge auswies).
 //   Handelsgewinn bleibt separat als eigene Kennzahl sichtbar.
-
-'use client'
 
 import { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'

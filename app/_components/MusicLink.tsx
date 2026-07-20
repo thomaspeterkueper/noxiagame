@@ -1,9 +1,9 @@
+'use client'
+
 // app/_components/MusicLink.tsx
 // Erstellt:     31.05.2026
 // Aktualisiert: 04.07.2026 — Login-Overlay statt Seitennavigation
 // Version:      2.0.0
-'use client'
-
 import React, { useState } from 'react'
 import { useMusicContext } from './MusicProvider'
 import { createClient } from '@/lib/supabase/client'

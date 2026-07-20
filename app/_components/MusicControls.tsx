@@ -1,8 +1,8 @@
+'use client'
+
 // app/_components/MusicControls.tsx
 // Erstellt: 31.05.2026
 // Floating Music-Controller – unten rechts auf allen Seiten
-
-'use client'
 
 import { useState } from 'react'
 import { useMusicContext } from './MusicProvider'

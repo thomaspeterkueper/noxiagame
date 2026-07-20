@@ -1,9 +1,9 @@
+'use client'
+
 // app/dashboard/FriendsDrawer.tsx
 // Erstellt:     19.07.2026
 // Aktualisiert: 19.07.2026 — Freunde-Liste, Suche, Anfragen, Chat öffnen
 // Version:      1.0.0
-
-'use client'
 
 import React, { useEffect, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'

@@ -1,3 +1,5 @@
+'use client'
+
 // components/game/BuildingOverlay.tsx
 // Erstellt:     26.06.2026
 // Aktualisiert: 03.07.2026 — Vollständiges NOXIA-Styling, 5 Sektionen
@@ -10,8 +12,6 @@
 //   3. Was fällt auf? (alerts, sortiert nach severity)
 //   4. Was tun?       (actions, primary hervorgehoben)
 //   5. Warum?         (insight, aufklappbar)
-
-'use client'
 
 import React, { useState } from 'react'
 import type { OverlayDef, OverlayMetric, OverlayAlert, OverlayAction } from '@/lib/game/buildings/types'

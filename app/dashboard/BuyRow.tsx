@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/BuyRow.tsx
 // Erstellt:     15.06.2026
 // Aktualisiert: 15.06.2026
@@ -6,8 +8,6 @@
 // Aus DashboardClient.tsx herausgelöst (Refactor Schritt 2). Bezieht
 // Design-Tokens und Display-Maps aus ./ui statt über Props — der frühere
 // T-Prop entfällt damit.
-
-'use client'
 
 import React from 'react'
 

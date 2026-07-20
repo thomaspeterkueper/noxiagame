@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/KursRenderer.tsx
 // Erstellt:     23.06.2026
 // Aktualisiert: 11.07.2026 — NOX-0008: kg_path_id im Kurs-Interface
@@ -6,8 +8,6 @@
 // Rendert Foundation-Kurse dynamisch aus DB-Daten.
 // Folientypen: titel, text, tabelle, zwei_spalten, formel, animation, quiz, video
 // Animationen: Platzhalter mit animation_id, werden in 0.3 implementiert.
-
-'use client'
 
 'use client'
 

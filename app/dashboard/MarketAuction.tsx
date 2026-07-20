@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/MarketAuction.tsx
 // Erstellt:     01.06.2026
 // Aktualisiert: 14.06.2026
@@ -13,8 +15,6 @@
 // v0.4.0) — der alte „1t pro Call"-Kommentar ist überholt.
 //
 // v0.2.0: Horizontales Mehrbalken-Layout (Käufer vs. gemeinsamer Verkäufer).
-
-'use client'
 
 import React from 'react'
 

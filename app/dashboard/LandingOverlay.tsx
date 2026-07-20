@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/LandingOverlay.tsx
 // Erstellt:     21.06.2026
 // Aktualisiert: 21.06.2026
@@ -6,8 +8,6 @@
 // Landeplatz-Overlay — öffnet sich beim Klick auf landing_pad im Grid.
 // Zeigt Sonnensystem-Karte + Reiseziele mit Energiekosten + Flug-Button.
 // Ersetzt die Fliegen-Buttons im Dashboard-Kolonien-Tab.
-
-'use client'
 
 import { useState } from 'react'
 import { LOC_ICON, LOC_NAME } from './ui'

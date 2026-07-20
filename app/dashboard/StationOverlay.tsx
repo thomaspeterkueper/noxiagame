@@ -1,3 +1,5 @@
+'use client'
+
 // StationOverlay.tsx
 // Aktualisiert: 22.06.2026 — StationOverlay
 // Version:      0.2.0
@@ -13,8 +15,6 @@
 //   - Klick auf Modul → Details in Sidebar
 //   - Bauen: neues Modul hinzufügen (Kosten in Credits)
 //   - Ressourcen-Status (aus location_resources)
-
-'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'

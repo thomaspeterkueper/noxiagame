@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/TipSystem.tsx
 // Version:      1.3.0
 // Erstellt:     20.06.2026
@@ -7,8 +9,6 @@
 // Tipps werden priorisiert — immer nur der dringendste wird gezeigt.
 // "Nicht mehr anzeigen" speichert die Tip-ID in localStorage.
 // Zusätzlich wird das nächste aktive Missionsziel kompakt eingeblendet.
-
-'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getToken } from '@/lib/supabase/auth'

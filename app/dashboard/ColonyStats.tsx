@@ -1,3 +1,5 @@
+'use client'
+
 // ColonyStats.tsx
 // Aktualisiert: 31.05.2026 — Kolonieübersicht-Minicard
 // Version:      0.1.0
@@ -5,8 +7,6 @@
 // Erstellt: 31.05.2026
 // Mini-Übersicht aller Kolonien als Karten-Grid
 // Wird im Kolonien-Tab über den Kachelgrids angezeigt
-
-'use client'
 
 // Konstanten für Icons und Namen
 const LOC_ICON: Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨', earth: '🌍', prometheus: '🛸' }

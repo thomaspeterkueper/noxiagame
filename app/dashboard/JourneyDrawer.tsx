@@ -1,9 +1,9 @@
+'use client'
+
 // app/dashboard/JourneyDrawer.tsx
 // Erstellt:     01.07.2026
 // Aktualisiert: 09.07.2026 — Commit E: Callbacks durchleiten, Offen-Welt-Hinweis
 // Version:      0.2.0
-'use client'
-
 import React from 'react'
 import JourneyGuideCard from './JourneyGuideCard'
 import StarterMissionsCard from './StarterMissionsCard'

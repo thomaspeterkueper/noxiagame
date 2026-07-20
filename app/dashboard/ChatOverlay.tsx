@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/ChatOverlay.tsx
 // Erstellt:     19.07.2026
 // Aktualisiert: 19.07.2026 — Direktnachrichten Overlay
@@ -5,8 +7,6 @@
 //
 // Zeigt Konversation mit einem anderen Spieler.
 // Lädt letzte 50 Nachrichten aus DB + empfängt neue via Ably.
-
-'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useAblyChannel } from '@/lib/ably/client'

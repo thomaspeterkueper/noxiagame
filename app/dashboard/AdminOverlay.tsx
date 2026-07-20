@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/AdminOverlay.tsx
 // Erstellt: 20.06.2026
 // Version:  1.0.0
@@ -10,8 +12,6 @@
 //   Blau  (#2a6ab5) = öffentliches / staatliches Admin-Gebäude
 //   Gold  (#c9a961) = eigenes Gebäude
 //   Rot   (#c94040) = fremder Spieler
-
-'use client'
 
 import React from 'react'
 

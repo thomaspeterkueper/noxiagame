@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/WarehouseOverlay.tsx
 // Erstellt:     21.06.2026 21:20
 // Aktualisiert: 21.06.2026 21:20
@@ -6,8 +8,6 @@
 // Warenhaus-Overlay — öffnet sich beim Klick auf warehouse/market im Grid.
 // Enthält Marktpreise (Kauf/Verkauf-Auktion) und Auftrags-Verhandlung.
 // Ersetzt die inline Handelszentrale im Dashboard-Übersicht-Tab.
-
-'use client'
 
 import { useState } from 'react'
 import BuyRow           from './BuyRow'

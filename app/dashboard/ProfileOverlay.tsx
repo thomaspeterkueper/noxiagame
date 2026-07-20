@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/ProfileOverlay.tsx
 // Erstellt:     21.06.2026
 // Aktualisiert: 04.07.2026 — Einstellungen-Tab: Email ändern, Account löschen
@@ -5,8 +7,6 @@
 //
 // v1.1.0 — Einstellungen-Tab mit Email-Änderung und Account-Löschung
 // v1.0.0 — Kompetenz-System, Statistiken
-
-'use client'
 
 import React from 'react'
 

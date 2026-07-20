@@ -1,3 +1,5 @@
+'use client'
+
 // SellPanel.tsx
 // Aktualisiert: 19.07.2026 — NOX-0009: Zum Verkauf anbieten (asking_price setzen)
 // Version:      1.1.0
@@ -13,7 +15,6 @@
 //   <SellPanel entityId={entity.id} entityName={tileName}
 //              onSold={() => { reloadEntities(); reloadCredits(); }} />
 
-'use client'
 import { createClient } from '@/lib/supabase/client'
 
 import React from 'react'

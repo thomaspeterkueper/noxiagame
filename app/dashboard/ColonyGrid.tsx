@@ -1,9 +1,9 @@
+'use client'
+
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
 // Aktualisiert: 20.07.2026 — Pan: React-Events statt useEffect/addEventListener
 // Version:      5.19.0
-
-'use client'
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'

@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/WelcomeSetup.tsx
 // Erstellt:     07.06.2026
 // Aktualisiert: 09.07.2026 — onDone mit openJourney-Flag für vertikalen Spielpfad
@@ -9,8 +11,6 @@
 //   {profile && !profile.onboarded && (
 //     <WelcomeSetup onDone={() => { reloadProfile(); /* Orders neu laden */ }} />
 //   )}
-
-'use client'
 
 import React from 'react'
 

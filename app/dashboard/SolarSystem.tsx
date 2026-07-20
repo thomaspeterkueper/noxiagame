@@ -1,3 +1,5 @@
+'use client'
+
 // SolarSystem.tsx
 // Aktualisiert: 20.06.2026 — Solarsystem-Visualisierung
 // Version:      0.2.0
@@ -14,8 +16,6 @@
 //
 // Autark: eigener Scrubber-State, kein gameStore, keine Datenholung.
 // Props: currentTick, shipRange, currentLocation.
-
-'use client'
 
 import { useState, type CSSProperties } from 'react'
 import { position, ORBITS, orbitalBaseSeconds } from '@/lib/game/orbits'

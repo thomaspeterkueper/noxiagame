@@ -1,3 +1,5 @@
+'use client'
+
 // app/dashboard/ColonyDetail.tsx
 // Erstellt:     01.06.2026
 // Aktualisiert: 01.06.2026
@@ -15,8 +17,6 @@
 //
 // Reine Anzeige + zwei Callbacks (onTravel, onClose). Kein eigener Loop.
 // Liefern nutzt den bestehenden Trade-Flow im Parent.
-
-'use client'
 
 import React from 'react'
 
