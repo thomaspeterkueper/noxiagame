@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — Pan-Fix: 4px Schwelle, Klicks bleiben erhalten
-// Version:      5.18.0
+// Aktualisiert: 20.07.2026 — Pan: React-Events statt useEffect/addEventListener
+// Version:      5.19.0
 
 'use client'
 
@@ -314,7 +314,7 @@ export default function ColonyGrid({
   const isPanning                     = useRef(false)
   const panStart                      = useRef({ x: 0, y: 0, scrollX: 0, scrollY: 0 })
 
-  // Ctrl+Scroll Zoom
+  // Ctrl+Scroll Zoom — useEffect weil passive:false nötig
   useEffect(() => {
     const el = gridScrollRef.current
     if (!el) return
@@ -324,52 +324,45 @@ export default function ColonyGrid({
       setZoom(z => Math.min(2.0, Math.max(0.3, +(z - e.deltaY * 0.001).toFixed(2))))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
-
-    // Pan: Mausdrag — erst nach 4px Bewegung aktivieren damit Klicks erhalten bleiben
-    let pending = false
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-      if ((e.target as HTMLElement).closest('button,a,input,select')) return
-      pending = true
-      panStart.current = { x: e.clientX, y: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop }
-    }
-    const onMouseMove = (e: MouseEvent) => {
-      if (!pending && !isPanning.current) return
-      const dx = e.clientX - panStart.current.x
-      const dy = e.clientY - panStart.current.y
-      // Erst nach 4px Schwelle als Pan erkennen
-      if (pending && Math.abs(dx) + Math.abs(dy) < 4) return
-      if (pending) {
-        pending = false
-        isPanning.current = true
-        el.style.cursor = 'grabbing'
-        el.style.userSelect = 'none'
-      }
-      if (isPanning.current) {
-        el.scrollLeft = panStart.current.scrollX - dx
-        el.scrollTop  = panStart.current.scrollY - dy
-      }
-    }
-    const onMouseUp = () => {
-      pending = false
-      if (!isPanning.current) return
-      isPanning.current = false
-      el.style.cursor = 'grab'
-      el.style.userSelect = ''
-    }
-
-    el.addEventListener('mousedown', onMouseDown)
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-    el.style.cursor = 'grab'
-
-    return () => {
-      el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('mousedown', onMouseDown)
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
+    return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  // Pan-Handler als React-Callbacks (kein useEffect nötig — ref direkt nutzbar)
+  const handlePanStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    if ((e.target as HTMLElement).closest('button,a,input,select')) return
+    isPanning.current = false
+    panStart.current = {
+      x: e.clientX, y: e.clientY,
+      scrollX: e.currentTarget.scrollLeft,
+      scrollY: e.currentTarget.scrollTop,
+    }
+    e.currentTarget.dataset.panPending = '1'
+  }
+
+  const handlePanMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    if (!el.dataset.panPending && !isPanning.current) return
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    if (el.dataset.panPending && Math.abs(dx) + Math.abs(dy) < 4) return
+    if (el.dataset.panPending) {
+      delete el.dataset.panPending
+      isPanning.current = true
+      el.style.cursor = 'grabbing'
+    }
+    if (isPanning.current) {
+      el.scrollLeft = panStart.current.scrollX - dx
+      el.scrollTop  = panStart.current.scrollY - dy
+    }
+  }
+
+  const handlePanEnd = (e: React.MouseEvent<HTMLDivElement>) => {
+    delete e.currentTarget.dataset.panPending
+    if (!isPanning.current) return
+    isPanning.current = false
+    e.currentTarget.style.cursor = 'grab'
+  }
 
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
   const tileSize = externalTileSize ?? TILE_SIZE
@@ -556,8 +549,16 @@ export default function ColonyGrid({
             <button onClick={() => setZoom(z => Math.max(0.3, z - 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>−</button>
             <button onClick={() => setZoom(1.0)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.6rem', padding: '0 4px', color: '#9e9485' }}>↺</button>
           </div>
-          <div ref={gridScrollRef} className="grid-pan-container" style={{
-            overflow: 'scroll',
+          <div
+            ref={gridScrollRef}
+            className="grid-pan-container"
+            onMouseDown={handlePanStart}
+            onMouseMove={handlePanMove}
+            onMouseUp={handlePanEnd}
+            onMouseLeave={handlePanEnd}
+            style={{
+              cursor: 'grab',
+              overflow: 'scroll',
             maxHeight: 'calc(100vh - 280px)',
             border: '2px solid #2a4e7a',
             borderRadius: '6px',
