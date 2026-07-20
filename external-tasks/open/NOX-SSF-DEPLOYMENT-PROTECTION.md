@@ -49,3 +49,28 @@ curl https://solarsciencefoundation.vercel.app/api/noxia/completion?uid=test \
 - NOXIA Beta-Start
 - SSF-Unlock-Kette end-to-end
 - Alle SSF-0009 bis SSF-0018 Lernpfade nutzbar
+
+## Genaue Schritte im Vercel Dashboard
+
+1. https://vercel.com/dashboard öffnen
+2. Projekt **solarsciencefoundation** auswählen
+3. **Settings** → **Deployment Protection**
+4. Falls "Password Protection" oder "Vercel Authentication" aktiv:
+   - Entweder komplett deaktivieren
+   - Oder "Bypass for Preview Deployments" + Ausnahme für /api/* konfigurieren
+5. Speichern — kein Redeploy nötig
+
+## Test nach Fix
+
+```bash
+curl https://solarsciencefoundation.vercel.app/api/learning-paths
+# Erwartet: HTTP 200 + JSON mit paths-Array
+```
+
+## Alternative: Vercel Protection Bypass Secret
+
+Falls Deployment Protection bleiben soll:
+1. Settings → Deployment Protection → "Protection Bypass for Automation"
+2. Secret generieren, z.B. `SSF_BYPASS_SECRET=xyz123`
+3. NOXIA: Alle Requests an SSF mit Header `x-vercel-protection-bypass: xyz123`
+4. In NOXIA `.env.local`: `SSF_BYPASS_SECRET=xyz123`
