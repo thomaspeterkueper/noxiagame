@@ -97,9 +97,18 @@ function ManualTab({ onClose }: { onClose: () => void }) {
 }
 
 function SsfTab() {
-  const [modules, setModules] = useState<SsfModule[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [modules, setModules]   = useState<SsfModule[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  useEffect(() => {
+    import('@/lib/supabase/client').then(({ createClient }) =>
+      createClient().auth.getUser().then(({ data: { user } }) => {
+        if (user?.id) setCurrentUserId(user.id)
+      }).catch(() => {})
+    )
+  }, [])
 
   useEffect(() => {
     let cancelled = false
