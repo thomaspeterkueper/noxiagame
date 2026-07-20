@@ -1,5 +1,5 @@
 -- supabase/migrations/20260719000000_baseline.sql
--- NOXIA Datenbank-Baseline — Stand: 19.07.2026
+-- NOXIA Datenbank-Baseline — Stand: 19.07.2026 (Updated: 20.07.2026)
 -- v1.2: CREATE EXTENSION IF NOT EXISTS, alle Indizes IF NOT EXISTS
 -- Quelle: DB-Schema-Export + Migration-Archiv (001a–034)
 --
@@ -1244,3 +1244,65 @@ GRANT ALL ON world_events TO service_role;
 GRANT ALL ON world_events TO authenticated;
 
 -- Ende Baseline
+
+-- ════════════════════════════════════
+-- POST-BASELINE ADDITIONS (2026-07-20)
+-- ════════════════════════════════════
+
+-- ssf_completions (NOX-SSF-0008)
+CREATE TABLE IF NOT EXISTS ssf_completions (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  noxia_uid    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  path_id      text        NOT NULL,
+  completed_at timestamptz NOT NULL DEFAULT now(),
+  source       text        NOT NULL DEFAULT 'ssf',
+  UNIQUE(noxia_uid, path_id)
+);
+ALTER TABLE ssf_completions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ssf_completions_select_own" ON ssf_completions;
+CREATE POLICY "ssf_completions_select_own" ON ssf_completions FOR SELECT USING (noxia_uid = auth.uid());
+DROP POLICY IF EXISTS "ssf_completions_service_all" ON ssf_completions;
+CREATE POLICY "ssf_completions_service_all" ON ssf_completions FOR ALL TO service_role USING (true) WITH CHECK (true);
+GRANT ALL ON ssf_completions TO service_role;
+GRANT ALL ON ssf_completions TO authenticated;
+
+-- asking_price auf tile_entities (NOX-0009)
+ALTER TABLE tile_entities ADD COLUMN IF NOT EXISTS asking_price integer;
+
+-- building_trades (NOX-0009)
+CREATE TABLE IF NOT EXISTS building_trades (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_id   uuid        NOT NULL,
+  entity_key  text        NOT NULL,
+  location_id uuid        NOT NULL REFERENCES locations(id),
+  tile_row    smallint    NOT NULL,
+  tile_col    smallint    NOT NULL,
+  seller_id   uuid        NOT NULL REFERENCES profiles(id),
+  buyer_id    uuid        NOT NULL REFERENCES profiles(id),
+  price       integer     NOT NULL,
+  traded_at   timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE building_trades ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "trades_select_own" ON building_trades;
+CREATE POLICY "trades_select_own" ON building_trades FOR SELECT USING (seller_id = auth.uid() OR buyer_id = auth.uid());
+DROP POLICY IF EXISTS "trades_service_all" ON building_trades;
+CREATE POLICY "trades_service_all" ON building_trades FOR ALL TO service_role USING (true) WITH CHECK (true);
+GRANT ALL ON building_trades TO service_role;
+GRANT ALL ON building_trades TO authenticated;
+
+-- player_unlocks (Schritt 2)
+CREATE TABLE IF NOT EXISTS player_unlocks (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id    uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  unlock_id     text        NOT NULL,
+  granted_at    timestamptz NOT NULL DEFAULT now(),
+  source_module text
+);
+CREATE UNIQUE INDEX IF NOT EXISTS player_unlocks_profile_unlock ON player_unlocks (profile_id, unlock_id);
+ALTER TABLE player_unlocks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "unlocks_select_own" ON player_unlocks;
+CREATE POLICY "unlocks_select_own" ON player_unlocks FOR SELECT USING (profile_id = auth.uid());
+DROP POLICY IF EXISTS "unlocks_service_all" ON player_unlocks;
+CREATE POLICY "unlocks_service_all" ON player_unlocks FOR ALL TO service_role USING (true) WITH CHECK (true);
+GRANT ALL ON player_unlocks TO service_role;
+GRANT ALL ON player_unlocks TO authenticated;
