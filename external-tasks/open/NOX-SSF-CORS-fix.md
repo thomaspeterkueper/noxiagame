@@ -1,7 +1,7 @@
 ---
 id: NOX-SSF-CORS-fix
 title: SSF 403-Problem behoben — CORS aktiviert
-status: open
+status: done
 source: SSF
 target: NOXIA
 created: 2026-07-20
@@ -57,3 +57,8 @@ Erwartete Antwort:
 
 Falls noch 403: moeglicherweise Vercel Deployment Protection (SSO/Passwort) aktiv.
 In Vercel Dashboard pruefen: Settings -> Deployment Protection -> deaktivieren fuer `/api/*`.
+
+
+## Erledigt 2026-07-20
+
+CORS in next.config.mjs + Route-Handler. Build läuft. Vercel Deployment Protection noch manuell zu deaktivieren (NOX-SSF-DEPLOYMENT-PROTECTION).
