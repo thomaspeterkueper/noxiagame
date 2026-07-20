@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 19.07.2026 — Doppel-Verkaufsschutz: atomarer DELETE
-// Version:      1.3.0
+// Aktualisiert: 19.07.2026 — NOX-0009: set_price + buy_building
+// Version:      1.4.0
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
