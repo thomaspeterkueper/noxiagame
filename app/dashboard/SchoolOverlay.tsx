@@ -368,6 +368,16 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [currentUserId, setCurrentUserId]  = useState<string>('')
 
   // UserId einmalig laden
+  const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
+  const [task, setTask] = useState<Task | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [answer, setAnswer] = useState('')
+  const [selected, setSelected] = useState<number | null>(null)
+  const [result, setResult] = useState<'correct' | 'wrong' | null>(null)
+  const [total, setTotal] = useState<number | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const bg = ACADEMY_BG[locationSlug]
+
   useEffect(() => {
     async function loadUserId() {
       try {
@@ -378,15 +388,6 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     }
     loadUserId()
   }, [])
-  const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
-  const [task, setTask] = useState<Task | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [answer, setAnswer] = useState('')
-  const [selected, setSelected] = useState<number | null>(null)
-  const [result, setResult] = useState<'correct' | 'wrong' | null>(null)
-  const [total, setTotal] = useState<number | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const bg = ACADEMY_BG[locationSlug]
 
   useEffect(() => {
     loadKnowledge()
