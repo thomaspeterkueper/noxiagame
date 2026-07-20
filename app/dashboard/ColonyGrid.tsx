@@ -1,7 +1,7 @@
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — C: Konzessions-Button für STATE-Gebäude
-// Version:      5.15.0
+// Aktualisiert: 20.07.2026 — Zoom: Scroll-Wheel + Pinch + Buttons
+// Version:      5.16.0
 
 'use client'
 
@@ -486,9 +486,18 @@ export default function ColonyGrid({
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
         <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
           {hoveredTile && <TileTooltip info={hoveredTile} />}
-          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 280px)', border: '2px solid #2a4e7a', borderRadius: '6px', background: '#f4f2ed' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`, gridAutoRows: `${tileSize}px`, gap: 0, width: `${COLS * tileSize}px` }}>
-              {gridElements}
+          {/* Zoom-Controls */}
+          <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8', borderRadius: 8, padding: '3px 6px', alignItems: 'center' }}>
+            <button onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>+</button>
+            <span style={{ fontSize: '0.62rem', color: '#6b6357', fontFamily: 'monospace', minWidth: 32, textAlign: 'center' as const }}>{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(z => Math.max(0.3, z - 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>−</button>
+            <button onClick={() => setZoom(1.0)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.6rem', padding: '0 4px', color: '#9e9485' }}>↺</button>
+          </div>
+          <div ref={gridScrollRef} style={{ overflow: 'auto', maxHeight: 'calc(100vh - 280px)', border: '2px solid #2a4e7a', borderRadius: '6px', background: '#f4f2ed' }}>
+            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: `${COLS * tileSize}px`, height: `${ROWS * tileSize}px`, transition: 'transform 0.15s ease' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`, gridAutoRows: `${tileSize}px`, gap: 0, width: `${COLS * tileSize}px` }}>
+                {gridElements}
+              </div>
             </div>
           </div>
         </div>
