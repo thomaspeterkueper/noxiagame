@@ -1,6 +1,6 @@
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 19.07.2026 — Links auf /learning-paths/ + getSsfPathUrl
-// Version:      4.6.0
+// Aktualisiert: 20.07.2026 — Sync-Button: SSF-Status + 403-Hinweis
+// Version:      4.6.1
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
