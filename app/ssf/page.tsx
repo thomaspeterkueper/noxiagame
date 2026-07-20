@@ -21,8 +21,21 @@ export default async function Page() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginTop: 32 }}>
           {modules.length === 0 ? (
             <Panel>
-              <strong>Keine SSF-Module erreichbar</strong>
-              <small>Pruefe SSF-Deploy und die NOXIA-Variable SSF_BASE_URL.</small>
+              <strong style={{ color: '#ffd6a4' }}>SSF-Module konnten nicht geladen werden</strong>
+              <small style={{ color: '#9fb3c8' }}>
+                Die Solar Science Foundation ist möglicherweise durch Vercel Deployment Protection gesperrt.
+              </small>
+              <small style={{ color: '#9fb3c8' }}>
+                Lösung: Vercel Dashboard → SSF-Projekt → Settings → Deployment Protection → deaktivieren für /api/*.
+              </small>
+              <a
+                href="https://solarsciencefoundation.vercel.app/learning-paths"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#c9a961', textDecoration: 'none', fontWeight: 700 }}
+              >
+                → SSF direkt öffnen
+              </a>
             </Panel>
           ) : modules.map((module) => (
             <Panel key={module.id}>
