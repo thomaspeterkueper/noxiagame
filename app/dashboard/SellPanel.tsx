@@ -1,6 +1,6 @@
 // SellPanel.tsx
-// Aktualisiert: 04.07.2026 — Header ergänzt; Verkaufs-UI
-// Version:      1.0.0
+// Aktualisiert: 19.07.2026 — NOX-0009: Zum Verkauf anbieten (asking_price setzen)
+// Version:      1.1.0
 // app/dashboard/SellPanel.tsx
 // Verkaufs-UI für die ColonyGrid-Sidebar.
 // Zeigt den marktwertbasierten Quote und die zwei Verkaufswege:
@@ -14,6 +14,7 @@
 //              onSold={() => { reloadEntities(); reloadCredits(); }} />
 
 'use client'
+import { createClient } from '@/lib/supabase/client'
 
 import React from 'react'
 
@@ -44,12 +45,13 @@ interface Quote {
 }
 
 interface SellPanelProps {
-  entityId: string
-  entityName: string          // z.B. "Solarfeld"
-  onSold?: () => void         // Bestand + Credits neu laden
+  entityId:            string
+  entityName:          string
+  currentAskingPrice?: number | null
+  onSold?:             () => void
 }
 
-export default function SellPanel({ entityId, entityName, onSold }: SellPanelProps) {
+export default function SellPanel({ entityId, entityName, onSold, currentAskingPrice }: SellPanelProps) {
   const [quote, setQuote] = useState<Quote | null>(null)
   const [durationTicks, setDurationTicks] = useState(2)
   const [loading, setLoading] = useState(true)
@@ -247,6 +249,35 @@ export default function SellPanel({ entityId, entityName, onSold }: SellPanelPro
       {error && (
         <div style={{ fontSize: 10, color: C.red, marginTop: 8 }}>{error}</div>
       )}
+
+      {/* ── Zum Verkauf anbieten (NOX-0009) ─────────────────────────── */}
+      <div style={{ borderTop: '1px solid #e8e0d4', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+        <div style={{ fontSize: '0.6rem', color: '#6b6357', textTransform: 'uppercase' as const, letterSpacing: '0.15em', marginBottom: '0.5rem', fontFamily: 'monospace' }}>
+          Zum Verkauf anbieten
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <input
+            type="number"
+            min="1"
+            placeholder="Preis in Cr"
+            value={priceInput}
+            onChange={e => setPriceInput(e.target.value)}
+            style={{ flex: 1, padding: '0.4rem 0.6rem', border: '1px solid #ddd6c8', borderRadius: 6, fontSize: '0.8rem', background: '#fff', color: '#1a1a18', outline: 'none' }}
+          />
+          <button onClick={setPrice} disabled={priceLoading}
+            style={{ padding: '0.4rem 0.8rem', background: '#2a4e7a', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>
+            {priceLoading ? '…' : 'Setzen'}
+          </button>
+          {priceInput && (
+            <button onClick={() => { setPriceInput(''); setPrice() }} disabled={priceLoading}
+              style={{ padding: '0.4rem 0.6rem', background: 'transparent', color: '#e05050', border: '1px solid rgba(224,80,80,0.3)', borderRadius: 6, fontSize: '0.75rem', cursor: 'pointer' }}>
+              ✕
+            </button>
+          )}
+        </div>
+        {priceMsg && <div style={{ fontSize: '0.68rem', marginTop: 4, color: priceMsg.includes('Fehler') ? '#e05050' : '#2a7a4a' }}>{priceMsg}</div>}
+        {currentAskingPrice && <div style={{ fontSize: '0.65rem', color: '#6b6357', marginTop: 3 }}>Aktuell: {currentAskingPrice.toLocaleString()} Cr</div>}
+      </div>
     </div>
   )
 }
