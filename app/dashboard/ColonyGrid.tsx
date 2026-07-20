@@ -309,6 +309,22 @@ export default function ColonyGrid({
   const [showSellPanel, setShowSellPanel] = useState(false)
   const [showBuildingOverlay, setShowBuildingOverlay] = useState(false)
   const [showBank, setShowBank] = useState(false)
+  const [zoom, setZoom]               = useState(1.0)
+  const gridScrollRef                 = useRef<HTMLDivElement>(null)
+
+  // Ctrl+Scroll Zoom
+  useEffect(() => {
+    const el = gridScrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom(z => Math.min(2.0, Math.max(0.3, +(z - e.deltaY * 0.001).toFixed(2))))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
   const [hoveredTile, setHoveredTile] = useState<TooltipInfo | null>(null)
   const tileSize = externalTileSize ?? TILE_SIZE
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
