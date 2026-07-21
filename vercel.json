@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/retention",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/npc",
+      "schedule": "30 8 * * *"
     }
   ]
 }
