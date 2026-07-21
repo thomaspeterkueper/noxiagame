@@ -74,3 +74,8 @@ Falls Deployment Protection bleiben soll:
 2. Secret generieren, z.B. `SSF_BYPASS_SECRET=xyz123`
 3. NOXIA: Alle Requests an SSF mit Header `x-vercel-protection-bypass: xyz123`
 4. In NOXIA `.env.local`: `SSF_BYPASS_SECRET=xyz123`
+
+
+## Erledigt 2026-07-21
+
+SSF_BYPASS_SECRET in NOXIA Vercel gesetzt. ssfKnowledge.ts sendet Header. Erledigt.
