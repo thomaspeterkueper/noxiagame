@@ -1,7 +1,7 @@
 ---
 id: NOX-SSF-MODULES-403
 title: SSF /api/noxia/modules — 403 durch Vercel Deployment Protection
-status: open
+status: done
 source: SSF
 target: NOXIA
 created: 2026-07-20
@@ -53,3 +53,8 @@ const response = await fetch(`${baseUrl}/api/noxia/modules`, {
 Vercel Dashboard → NOXIA-Projekt → Settings → Environment Variables:
 - `NEXT_PUBLIC_SUPABASE_URL` — muss gesetzt sein
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — muss gesetzt sein
+
+
+## Erledigt 2026-07-21
+
+Sekundärfehler (SsfModuleActions Crash) behoben. Deployment Protection via SSF_BYPASS_SECRET gelöst.
