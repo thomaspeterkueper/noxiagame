@@ -17,7 +17,7 @@ SET search_path TO public;
 INSERT INTO actors (id, kind, display_name, bio_short, decision_weights)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
-  'corporation',
+  'npc_firm',
   'HeliosCorp',
   'Interplanetarer Rohstoffkonzern. Gegründet 2058. Kauft strategische Ressourcen auf Vorrat.',
   '{
@@ -34,7 +34,7 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO actors (id, kind, display_name, bio_short, decision_weights)
 VALUES (
   '00000000-0000-0000-0000-000000000002',
-  'corporation',
+  'npc_firm',
   'Goibniu Co.',
   'Bergbauunternehmen. Betreibt Minen auf dem Mond. Hauptlieferant für Metall im inneren System.',
   '{
@@ -58,7 +58,7 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO actors (id, kind, display_name, bio_short, decision_weights)
 VALUES (
   '00000000-0000-0000-0000-000000000003',
-  'corporation',
+  'npc_firm',
   'Belenus AG',
   'Solarenergie-Konzern. Betreibt Solarfelder auf dem Mars. Versorgt die wachsende Kolonie.',
   '{
