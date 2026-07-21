@@ -1,7 +1,7 @@
 // lib/knowledge/ssfPaths.ts
 // Erstellt:     19.07.2026
-// Aktualisiert: 20.07.2026 — Übergangslösung: /learn?ref=noxia&module=... bis SSF-0019
-// Version:      1.1.0
+// Aktualisiert: 20.07.2026 — SSF-0019 implementiert: /learn?path=...&module=...
+// Version:      1.2.0
 //
 // Kanonische SSF Pfad-IDs (von SSF-0008 bis SSF-0018 geliefert)
 // Mapping: PATH:SSF:* → UNL:NOX:*
@@ -35,20 +35,25 @@ export const MODULE_TO_PATH: Record<string, string> = {
 
 export const SSF_BASE_URL = 'https://solarsciencefoundation.vercel.app'
 
+// SSF-0019 implementiert: /learn?path=...&uid=... → Redirect zu Lernpfad
+// https://solarsciencefoundation.vercel.app/learn?path=PATH:SSF:ECO-KREDIT-NOXIA-0001&ref=noxia&uid={uid}
+
 export function getSsfPathUrl(moduleId: string, noxiaUid?: string): string | null {
   if (!moduleId) return null
-  // SSF-0019: Bis Deep-Links verfügbar sind → /learn mit Parametern
-  // Sobald SSF /learning-paths/[id] oder /modules/[id] unterstützt → anpassen
-  const uid = noxiaUid ? `&uid=${encodeURIComponent(noxiaUid)}` : ''
-  return `${SSF_BASE_URL}/learn?ref=noxia&module=${encodeURIComponent(moduleId)}${uid}`
+  const pathId = MODULE_TO_PATH[moduleId]
+  const uid    = noxiaUid ? `&uid=${encodeURIComponent(noxiaUid)}` : ''
+  if (pathId) {
+    // Option 1: path= Parameter → direkter Redirect zur Lernpfad-Seite
+    return `${SSF_BASE_URL}/learn?path=${encodeURIComponent(pathId)}&ref=noxia${uid}`
+  }
+  // Fallback: module= Parameter
+  return `${SSF_BASE_URL}/learn?module=${encodeURIComponent(moduleId)}&ref=noxia${uid}`
 }
 
-// Vollständiger Lernpfad-Link (wenn SSF-0019 implementiert)
-export function getSsfLearningPathUrl(moduleId: string, noxiaUid?: string): string | null {
+// Redirect-API (Option 2 aus SSF-0019)
+export function getSsfRedirectUrl(moduleId: string, noxiaUid?: string): string | null {
   const pathId = MODULE_TO_PATH[moduleId]
-  if (!pathId) return getSsfPathUrl(moduleId, noxiaUid)
+  if (!pathId) return null
   const uid = noxiaUid ? `&uid=${encodeURIComponent(noxiaUid)}` : ''
-  // Aktivieren sobald SSF-0019 erledigt:
-  // return `${SSF_BASE_URL}/learning-paths/${encodeURIComponent(pathId)}?ref=noxia${uid}`
-  return `${SSF_BASE_URL}/learn?ref=noxia&module=${encodeURIComponent(moduleId)}${uid}`
+  return `${SSF_BASE_URL}/api/noxia/redirect?path=${encodeURIComponent(pathId)}${uid}`
 }
