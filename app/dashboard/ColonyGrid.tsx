@@ -125,7 +125,7 @@ const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInf
       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: nameColor, marginBottom: '4px' }}>{name}</div>
       {info.entity && (
         <div style={{ fontSize: '0.65rem', color: '#5a6a7a', marginBottom: '3px' }}>
-          {info.isOwn ? '🔑 Dein Gebäude' : info.isState ? '🏛 Staatlich' : info.isCorp ? '🏢 Corporation' : `👤 ${info.entity.username ?? 'Anderer Pilot'}`}
+          {info.isOwn ? '🔑 Dein Gebäude' : info.isState ? '🏛 Staatlich' : `👤 ${ (info.entity as any).actor_name ?? info.entity.username ?? 'Anderer Pilot'}`}
           {info.isSelling && <span style={{ color: '#e8702a', marginLeft: '6px' }}>· wird verkauft</span>}
         </div>
       )}
