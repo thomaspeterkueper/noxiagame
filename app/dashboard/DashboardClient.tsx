@@ -171,7 +171,10 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const locations = worldData?.locations ?? initialLocations
   const news = worldData?.news ?? []
   const stats = worldData?.stats
-  const worldEntities = worldData?.entities ?? []
+  const worldEntities = (worldData?.entities ?? []).map((e: any) => ({
+    ...e,
+    actor_name: e.actors?.display_name ?? null,
+  }))
   const currentLocationData = locations.find((l: any) => l.slug === location)
   const currentPrices = prices.filter((p: any) => p.locations?.slug === location)
   const used = cargoUsed(); const cargoFree = cargoMax - used
