@@ -2,8 +2,8 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — Fix: isNPC+isCorp korrekt — NPC-Gebäude sichtbar
-// Version:      5.21.0
+// Aktualisiert: 20.07.2026 — NPCs wie echte Spieler: roter Rahmen, actor_name als username
+// Version:      5.22.0
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -425,12 +425,12 @@ export default function ColonyGrid({
       const isHint = !!entity && highlightEntityIds.includes(entity.entity_id)
       const isNPC   = !!entity?.actor_id
       const isState = entity?.owner_class === 'STATE'
-      const isCorp  = entity?.owner_class === 'CORPORATION'
+      const isCorp  = false  // NPCs = fremde Akteure, gleich wie Spieler
       const interactive = canBuild || !!entity || isAnom
       let ownerShadow = 'none'
       if (entity) {
         if (isState)  ownerShadow = 'inset 0 0 0 2px #5aaeff, 0 0 5px rgba(90,174,255,0.55)'   // Blau = Staat
-        else if (isCorp) ownerShadow = 'inset 0 0 0 2px #e08030, 0 0 6px rgba(224,128,48,0.6)'   // Orange = Corporation/NPC
+        // isCorp = false: NPCs erhalten gleichen Rahmen wie fremde Spieler (unten)
         else if (isOwn) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 5px rgba(201,169,97,0.55)'   // Gold = Spieler
         else ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 4px rgba(224,80,80,0.45)'               // Rot = anderer Spieler
       }
