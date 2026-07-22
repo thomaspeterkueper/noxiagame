@@ -2,8 +2,8 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — Pan: React-Events statt useEffect/addEventListener
-// Version:      5.19.0
+// Aktualisiert: 20.07.2026 — CORPORATION/NPC: oranger Rahmen, actor_name in Tooltip
+// Version:      5.20.0
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -49,6 +49,7 @@ export interface TileEntity {
   asking_price?: number | null
   lease_price?:   number | null
   occupant_id?:   string | null
+  actor_name?:    string | null
 }
 export interface PendingBuild {
   buildable_id: string; tile_row: number; tile_col: number; status: string
@@ -429,7 +430,7 @@ export default function ColonyGrid({
       let ownerShadow = 'none'
       if (entity) {
         if (isState)  ownerShadow = 'inset 0 0 0 2px #5aaeff, 0 0 5px rgba(90,174,255,0.55)'   // Blau = Staat
-        else if (isCorp) ownerShadow = 'inset 0 0 0 2px #e08030, 0 0 5px rgba(224,128,48,0.55)'  // Orange = Corporation
+        else if (isCorp) ownerShadow = 'inset 0 0 0 2px #e08030, 0 0 6px rgba(224,128,48,0.6)'   // Orange = Corporation/NPC
         else if (isOwn) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 5px rgba(201,169,97,0.55)'   // Gold = Spieler
         else ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 4px rgba(224,80,80,0.45)'               // Rot = anderer Spieler
       }
