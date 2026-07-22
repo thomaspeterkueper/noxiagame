@@ -2,8 +2,8 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — CORPORATION/NPC: oranger Rahmen, actor_name in Tooltip
-// Version:      5.20.0
+// Aktualisiert: 20.07.2026 — Fix: isNPC+isCorp korrekt — NPC-Gebäude sichtbar
+// Version:      5.21.0
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -423,9 +423,9 @@ export default function ColonyGrid({
       const isSelling = sellingAt(r, c)
       const isAnom = anomaly?.r === r && anomaly?.c === c
       const isHint = !!entity && highlightEntityIds.includes(entity.entity_id)
-      const isNPC  = !!entity?.actor_id
-      const isState = !isNPC && entity?.owner_class === 'STATE'
-      const isCorp  = !isNPC && entity?.owner_class === 'CORPORATION'
+      const isNPC   = !!entity?.actor_id
+      const isState = entity?.owner_class === 'STATE'
+      const isCorp  = entity?.owner_class === 'CORPORATION'
       const interactive = canBuild || !!entity || isAnom
       let ownerShadow = 'none'
       if (entity) {
