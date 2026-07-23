@@ -76,7 +76,7 @@ function FigureSprite({ x, y }: { x: number; y: number }) {
 function ModuleZone({
   slot, moduleId, condition, status, totalSlots, isSelected, onClick,
 }: {
-  slot: number; moduleId: string; condition: number; status: string
+  slot: number; moduleId: string; condition: number; status: 'active' | 'damaged' | 'disabled'
   totalSlots: number; isSelected: boolean; onClick: () => void
 }) {
   const mod = SHIP_MODULES[moduleId]
@@ -419,8 +419,7 @@ export default function ShipInteriorOverlay({
                       borderBottom: '1px solid #e8e0d4' }}>
                       <span style={{ color: '#6b6357' }}>{k}</span>
                       <span style={{ fontWeight: 600, color: '#1a1a18',
-                        textTransform: selectedModule.status !== 'active' && k === 'Status' ? 'uppercase' : 'none',
-                        color: k === 'Status' && selectedModule.status !== 'active' ? '#b52a2a' : '#1a1a18',
+                        textTransform: selectedModule.status !== 'active' && k === 'Status' ? 'uppercase' as const : 'none' as const,
                       } as any}>{v}</span>
                     </div>
                   ))}
