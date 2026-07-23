@@ -1,8 +1,8 @@
 'use client'
 // app/dashboard/WalkableColony.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — Vertical Slice: Habitat → Straße → Raumhafen → Pad
-// Version:      0.1.0
+// Aktualisiert: 20.07.2026 — Helleres Farbschema, Space/Enter = betreten, ColonyGrid fix
+// Version:      0.2.0
 //
 // Phase B Vertical Slice.
 // Frage: Fühlt sich NOXIA anders an, sobald ich meine Kolonie betreten kann?
@@ -64,22 +64,22 @@ const FIG_H = 20
 
 // ── Farben ────────────────────────────────────────────────────────────────────
 const C = {
-  ground:    '#1a2a1a',   // Gelände
-  road:      '#2a2a2a',   // Straße
-  roadMain:  '#333333',   // Hauptstraße
-  crossing:  '#3a3a3a',   // Kreuzung
-  roadLine:  '#4a4a4a',   // Straßen-Markierung
-  habitat:   '#2a4e3a',   // Habitat-Boden
-  pad:       '#3a3a4e',   // Landing Pad
-  padActive: '#2a3a6a',   // Pad mit Schiff
-  terminal:  '#4e3a2a',   // Terminal
-  state:     '#1a3a4e',   // Staatliche Gebäude
-  corp:      '#3a2a1a',   // Corporation
-  figure:    '#c9a961',   // Spieler-Figur
-  npc:       '#7a9ab0',   // NPC
-  ship:      '#4a6a9a',   // Schiff
-  gridLine:  'rgba(255,255,255,0.04)',
-  text:      '#8a9aaa',
+  ground:    '#3d3428',   // Mond/Mars Regolith — warmes Sandbraun
+  road:      '#5a5040',   // Straße — heller als Gelände
+  roadMain:  '#6a6050',   // Hauptstraße
+  crossing:  '#7a7060',   // Kreuzung
+  roadLine:  '#9a9080',   // Straßen-Markierung
+  habitat:   '#4a6e5a',   // Habitat — gedämpftes Grün
+  pad:       '#4a4a6e',   // Landing Pad — Blaugrau
+  padActive: '#3a5a9a',   // Pad mit Schiff — helles Blau
+  terminal:  '#6e5a3a',   // Terminal — Ocker
+  state:     '#3a5a6e',   // Staatliche Gebäude — Stahlblau
+  corp:      '#6e4a2a',   // Corporation — Rost
+  figure:    '#c9a961',   // Spieler-Figur — Gold
+  npc:       '#9abac0',   // NPC — Hellblau
+  ship:      '#6a9aca',   // Schiff — Blau
+  gridLine:  'rgba(255,255,255,0.08)',
+  text:      '#d4c8b0',   // Text — warmes Creme
 }
 
 // ── Figur zeichnen ────────────────────────────────────────────────────────────
@@ -196,6 +196,7 @@ export default function WalkableColony({
   const [figPos, setFigPos] = useState({ col: 4.5, row: 8.5 })
   const [moving, setMoving] = useState(false)
   const [tooltip, setTooltip] = useState<string | null>(null)
+  const [nearbyEntity, setNearbyEntity] = useState<TileEntity | null>(null)
   const [viewport, setViewport] = useState({ x: 0, y: 0 })
 
   // Aus Weltzustand: Straßen, Gebäude, Schiffe
@@ -234,9 +235,15 @@ export default function WalkableColony({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Hintergrund
-    ctx.fillStyle = C.ground
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    // Hintergrund — Regolith-Textur (deterministisch aus Position)
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        // Leichte Variation im Gelände (Pseudo-Zuffall aus Position)
+        const v = ((c * 7 + r * 13) % 8) * 3
+        ctx.fillStyle = `rgb(${61+v},${52+v},${40+v})`
+        ctx.fillRect(c * TILE_PX, r * TILE_PX, TILE_PX, TILE_PX)
+      }
+    }
 
     // Grid-Linien (sehr dezent)
     ctx.strokeStyle = C.gridLine
@@ -295,6 +302,19 @@ export default function WalkableColony({
         ctx.lineWidth = 2
         ctx.strokeRect(e.tile_col * TILE_PX + 1, e.tile_row * TILE_PX + 1, TILE_PX - 2, TILE_PX - 2)
       }
+      // In Reichweite: weißer Puls-Rand + SPACE-Hinweis
+      const inRange = Math.abs(e.tile_col - figPos.col) < 1.5 && Math.abs(e.tile_row - figPos.row) < 1.5
+      if (inRange) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([3, 2])
+        ctx.strokeRect(e.tile_col * TILE_PX + 2, e.tile_row * TILE_PX + 2, TILE_PX - 4, TILE_PX - 4)
+        ctx.setLineDash([])
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.font = '7px monospace'
+        ctx.textAlign = 'center'
+        ctx.fillText('[SPACE]', e.tile_col * TILE_PX + TILE_PX / 2, e.tile_row * TILE_PX + TILE_PX - 2)
+      }
     }
 
     // Schiff am Landing Pad (Projektion: nur wenn ships vorhanden)
@@ -350,6 +370,19 @@ export default function WalkableColony({
     const STEP = 0.5
     const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return }
+      if (e.key === ' ' || e.key === 'Enter') {
+        // Nächstes Gebäude in Reichweite betreten
+        const near = entities.find(en =>
+          Math.abs(en.tile_col - figPos.col) < 1.5 &&
+          Math.abs(en.tile_row - figPos.row) < 1.5
+        )
+        if (near) {
+          setTooltip(`▶ ${near.entity_id} betreten — ${near.profile_id === userId ? 'Dein Gebäude' : near.owner_class === 'STATE' ? 'Staatlich' : near.actor_name ?? near.username ?? 'Fremd'}`)
+          setTimeout(() => setTooltip(null), 2500)
+        }
+        e.preventDefault()
+        return
+      }
       setFigPos(p => {
         const next = { ...p }
         if (e.key === 'ArrowUp'    || e.key === 'w') next.row = Math.max(0, p.row - STEP)
@@ -385,7 +418,7 @@ export default function WalkableColony({
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span style={{ color: '#3a4e5a', fontSize: '0.62rem', fontFamily: 'monospace' }}>
-            WASD / Pfeiltasten · Klick zum Bewegen · ESC beenden
+            WASD / Pfeiltasten bewegen · SPACE/ENTER betritt Gebäude in Reichweite · ESC beenden
           </span>
           <button onClick={onClose} style={{
             background: 'none', border: '1px solid #1d2a3d',
