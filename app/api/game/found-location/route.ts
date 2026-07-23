@@ -1,7 +1,7 @@
 // app/api/game/found-location/route.ts
 // Erstellt:     20.07.2026
 // Aktualisiert: 20.07.2026 — Kolonie/Station gründen
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // POST — Neue Kolonie oder Station gründen
 // GET  — Verfügbare Himmelskörper + Gründungsvoraussetzungen
@@ -71,6 +71,23 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, celestialBodyId, locationType, surfaceLat, surfaceLon, orbitClass } = body
+
+  // ── Unlock-Check ─────────────────────────────────────────────────────────
+  const { data: playerUnlocks } = await supabase
+    .from('player_unlocks')
+    .select('unlock_id')
+    .eq('profile_id', user.id)
+  const unlockIds = (playerUnlocks ?? []).map((u: any) => u.unlock_id as string)
+
+  const needsColonyUnlock  = ['colony', 'outpost'].includes(body?.locationType ?? locationType ?? '')
+  const needsStationUnlock = ['station', 'relay'].includes(body?.locationType ?? locationType ?? '')
+
+  // Prüfen ob COLONY:FOUND / STATION:FOUND freigeschaltet
+  // Im Alpha: Gates deaktiviert bis SSF-Lernpfade live sind
+  // TODO: Aktivieren sobald SSF-0020/0021 deployed
+  // if (needsColonyUnlock && !unlockIds.includes('UNL:NOX:COLONY:FOUND')) {
+  //   return NextResponse.json({ error: 'Erfordert Unlock: Kolonisierung I (SSF-Modul)' }, { status: 403 })
+  // }
 
   // ── Validierung ───────────────────────────────────────────────────────────
   if (!name?.trim() || name.trim().length < 3) {
