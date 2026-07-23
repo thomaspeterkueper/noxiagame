@@ -1,14 +1,15 @@
 'use client'
 // app/dashboard/ShipWalkable.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — SunDog Phase A: Begehbares Schiff mit Canvas
-// Version:      1.0.0
+// Aktualisiert: 20.07.2026 — First-Person-Raumansicht (Gruds in Space-Stil)
+// Version:      2.0.0
 //
-// Begehbarer Schiffsgrundtriss als Canvas.
-// Figur läuft durch Schiffsbereiche. Module anklicken → Detail-Panel.
-// Grundtriss variiert je Schiffstyp (mk1/fast/heavy/scout/pioneer).
+// Statt Top-Down-Canvas: perspektivische Einzelraum-Ansicht wie klassische
+// 8-Bit-Adventures (Gruds in Space, 1983). Trapezförmige Wände, EXITS oben,
+// Wechsel zwischen Räumen per Richtungstasten/Klick auf Ausgänge.
+// Referenz: Sirius Software, "Gruds in Space" (1983).
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { SHIP_FRAMES, SHIP_MODULES } from '@/lib/game/ships'
 
 interface ShipModule_ {
@@ -24,365 +25,283 @@ interface Props {
   credits:      number
   inTransit?:   boolean
   onClose:      () => void
-  onCockpit?:   () => void   // Cockpit öffnen
+  onCockpit?:   () => void
 }
 
-// Schiffstyp-spezifische Grundtrisse
-const SHIP_LAYOUTS: Record<string, {
-  rooms:  { id: string; label: string; icon: string; x: number; y: number; w: number; h: number; color: string }[]
-  hullPath: (W: number, H: number) => string
-}> = {
-  mk1: {
-    rooms: [
-      { id: 'cockpit',  label: 'Cockpit',     icon: '🛸', x: 140, y: 20,  w: 120, h: 70,  color: '#1a3a6a' },
-      { id: 'cargo1',   label: 'Laderaum A',  icon: '📦', x: 80,  y: 110, w: 100, h: 80,  color: '#1a2a1a' },
-      { id: 'cargo2',   label: 'Laderaum B',  icon: '📦', x: 220, y: 110, w: 100, h: 80,  color: '#1a2a1a' },
-      { id: 'engine',   label: 'Antrieb',     icon: '⚙️', x: 120, y: 210, w: 160, h: 70,  color: '#2a1a0a' },
-    ],
-    hullPath: (W, H) =>
-      `M ${W/2} 10 L ${W/2-80} 60 L ${W/2-100} ${H-30} L ${W/2+100} ${H-30} L ${W/2+80} 60 Z`,
-  },
-  fast: {
-    rooms: [
-      { id: 'cockpit',  label: 'Cockpit',     icon: '🛸', x: 150, y: 15,  w: 100, h: 60,  color: '#1a3a6a' },
-      { id: 'cargo',    label: 'Laderaum',    icon: '📦', x: 120, y: 95,  w: 160, h: 70,  color: '#1a2a1a' },
-      { id: 'engine',   label: 'Turbinen',    icon: '🔥', x: 100, y: 185, w: 200, h: 80,  color: '#2a1a0a' },
-    ],
-    hullPath: (W, H) =>
-      `M ${W/2} 8 L ${W/2-60} 50 L ${W/2-80} ${H-20} L ${W/2+80} ${H-20} L ${W/2+60} 50 Z`,
-  },
-  heavy: {
-    rooms: [
-      { id: 'cockpit',  label: 'Brücke',      icon: '🛸', x: 130, y: 20,  w: 140, h: 70,  color: '#1a3a6a' },
-      { id: 'cargo1',   label: 'Deck A',      icon: '📦', x: 60,  y: 110, w: 120, h: 90,  color: '#1a2a1a' },
-      { id: 'cargo2',   label: 'Deck B',      icon: '📦', x: 220, y: 110, w: 120, h: 90,  color: '#1a2a1a' },
-      { id: 'cargo3',   label: 'Deck C',      icon: '📦', x: 130, y: 110, w: 140, h: 90,  color: '#152515' },
-      { id: 'crew',     label: 'Mannschaft',  icon: '👥', x: 100, y: 220, w: 200, h: 60,  color: '#1a1a3a' },
-      { id: 'engine',   label: 'Triebwerk',   icon: '⚙️', x: 80,  y: 300, w: 240, h: 70,  color: '#2a1a0a' },
-    ],
-    hullPath: (W, H) =>
-      `M ${W/2} 12 L ${W/2-110} 70 L ${W/2-120} ${H-20} L ${W/2+120} ${H-20} L ${W/2+110} 70 Z`,
-  },
-  scout: {
-    rooms: [
-      { id: 'cockpit',  label: 'Cockpit',     icon: '🛸', x: 155, y: 15,  w: 90,  h: 60,  color: '#1a3a6a' },
-      { id: 'scanner',  label: 'Scanner-Bay', icon: '📡', x: 110, y: 95,  w: 180, h: 70,  color: '#0a2a3a' },
-      { id: 'engine',   label: 'Antrieb',     icon: '⚡', x: 130, y: 185, w: 140, h: 60,  color: '#2a1a0a' },
-    ],
-    hullPath: (W, H) =>
-      `M ${W/2} 5 L ${W/2-50} 45 L ${W/2-70} ${H-15} L ${W/2+70} ${H-15} L ${W/2+50} 45 Z`,
-  },
-  pioneer: {
-    rooms: [
-      { id: 'cockpit',  label: 'Brücke',       icon: '🛸', x: 140, y: 15,  w: 120, h: 65,  color: '#1a3a6a' },
-      { id: 'construction', label: 'Bau-Deck', icon: '🔧', x: 70,  y: 100, w: 140, h: 90,  color: '#2a1a0a' },
-      { id: 'colony',   label: 'Kolonisierung',icon: '🏘', x: 220, y: 100, w: 130, h: 90,  color: '#1a2a3a' },
-      { id: 'engine',   label: 'Triebwerk',    icon: '⚙️', x: 100, y: 210, w: 200, h: 70,  color: '#1a0a0a' },
-    ],
-    hullPath: (W, H) =>
-      `M ${W/2} 10 L ${W/2-100} 65 L ${W/2-110} ${H-25} L ${W/2+110} ${H-25} L ${W/2+100} 65 Z`,
-  },
+type Dir = 'N' | 'S' | 'E' | 'W'
+
+interface RoomDef {
+  id:      string
+  label:   string
+  icon:    string
+  wallHue: number     // Grundfarbton für die Wände (HSL)
+  exits:   Partial<Record<Dir, string>>   // Richtung → Ziel-Raum-ID
+  items?:  string[]
 }
 
-const W = 400, H = 400
-
-function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  // Schatten
-  ctx.fillStyle = 'rgba(0,0,0,0.4)'
-  ctx.beginPath(); ctx.ellipse(x, y+12, 7, 3, 0, 0, Math.PI*2); ctx.fill()
-  // Beine
-  ctx.fillStyle = '#1a2a3a'
-  ctx.fillRect(x-4, y+3, 3.5, 7)
-  ctx.fillRect(x+1, y+3, 3.5, 7)
-  // Körper
-  ctx.fillStyle = '#2a4e7a'
-  ctx.fillRect(x-5, y-6, 10, 10)
-  // Helm
-  ctx.fillStyle = '#c9a961'
-  ctx.beginPath(); ctx.arc(x, y-9, 5.5, 0, Math.PI*2); ctx.fill()
-  ctx.fillStyle = '#4a90d0'
-  ctx.globalAlpha = 0.6
-  ctx.beginPath(); ctx.arc(x, y-9, 3.5, 0, Math.PI*2); ctx.fill()
-  ctx.globalAlpha = 1
+// Schiffstyp-spezifische Raum-Layouts (linear verkettet: Cockpit → ... → Triebwerk)
+const SHIP_ROOMS: Record<string, RoomDef[]> = {
+  mk1: [
+    { id: 'cockpit', label: 'Cockpit',      icon: '🛸', wallHue: 220, exits: { S: 'cargo1' } },
+    { id: 'cargo1',  label: 'Laderaum A',   icon: '📦', wallHue: 95,  exits: { N: 'cockpit', S: 'cargo2', E: 'cargo2' }, items: ['Frachtcontainer', 'Ladenetz'] },
+    { id: 'cargo2',  label: 'Laderaum B',   icon: '📦', wallHue: 95,  exits: { N: 'cargo1', S: 'engine' }, items: ['Frachtcontainer'] },
+    { id: 'engine',  label: 'Antrieb',      icon: '⚙️', wallHue: 25,  exits: { N: 'cargo2' }, items: ['Reaktorkern', 'Kühlmittelleitung'] },
+  ],
+  fast: [
+    { id: 'cockpit', label: 'Cockpit',      icon: '🛸', wallHue: 220, exits: { S: 'cargo' } },
+    { id: 'cargo',   label: 'Laderaum',     icon: '📦', wallHue: 95,  exits: { N: 'cockpit', S: 'engine' }, items: ['Schnelltransport-Rack'] },
+    { id: 'engine',  label: 'Turbinen',     icon: '🔥', wallHue: 15,  exits: { N: 'cargo' }, items: ['Hochleistungsturbine'] },
+  ],
+  heavy: [
+    { id: 'cockpit', label: 'Brücke',       icon: '🛸', wallHue: 220, exits: { S: 'crew' } },
+    { id: 'crew',    label: 'Mannschaft',   icon: '👥', wallHue: 235, exits: { N: 'cockpit', S: 'cargo1' }, items: ['Schlafkojen', 'Gemeinschaftstisch'] },
+    { id: 'cargo1',  label: 'Deck A',       icon: '📦', wallHue: 95,  exits: { N: 'crew', S: 'cargo2', E: 'cargo3' }, items: ['Schwerlast-Container'] },
+    { id: 'cargo2',  label: 'Deck B',       icon: '📦', wallHue: 95,  exits: { N: 'cargo1', S: 'engine' }, items: ['Schwerlast-Container'] },
+    { id: 'cargo3',  label: 'Deck C',       icon: '📦', wallHue: 85,  exits: { W: 'cargo1' }, items: ['Kühlcontainer'] },
+    { id: 'engine',  label: 'Triebwerk',    icon: '⚙️', wallHue: 25,  exits: { N: 'cargo2' }, items: ['Vierfach-Reaktor'] },
+  ],
+  scout: [
+    { id: 'cockpit', label: 'Cockpit',      icon: '🛸', wallHue: 220, exits: { S: 'scanner' } },
+    { id: 'scanner', label: 'Scanner-Bay',  icon: '📡', wallHue: 200, exits: { N: 'cockpit', S: 'engine' }, items: ['Tiefen-Scanner', 'Kartierungsdrohne'] },
+    { id: 'engine',  label: 'Antrieb',      icon: '⚡', wallHue: 25,  exits: { N: 'scanner' }, items: ['Leichtreaktor'] },
+  ],
+  pioneer: [
+    { id: 'cockpit', label: 'Brücke',       icon: '🛸', wallHue: 220, exits: { S: 'construction' } },
+    { id: 'construction', label: 'Bau-Deck', icon: '🔧', wallHue: 30, exits: { N: 'cockpit', S: 'engine', E: 'colony' }, items: ['Bau-Ausrüstung', 'Montage-Arm'] },
+    { id: 'colony',  label: 'Kolonisierung',icon: '🏘', wallHue: 210, exits: { W: 'construction' }, items: ['Kolonisierungsmodul', 'Versorgungscontainer'] },
+    { id: 'engine',  label: 'Triebwerk',    icon: '⚙️', wallHue: 15,  exits: { N: 'construction' }, items: ['Schwerlast-Reaktor'] },
+  ],
 }
+
+// ── Trapez-Korridor-Raum (Gruds-in-Space-Stil) ────────────────────────────────
+function RoomScene({
+  room, hasModule, inTransit,
+}: { room: RoomDef; hasModule?: string; inTransit?: boolean }) {
+  const wallColor  = `hsl(${room.wallHue}, 35%, 32%)`
+  const wallLight  = `hsl(${room.wallHue}, 40%, 44%)`
+  const wallDark   = `hsl(${room.wallHue}, 30%, 20%)`
+  const floorColor = `hsl(${room.wallHue}, 20%, 55%)`
+
+  return (
+    <svg viewBox="0 0 400 260" style={{ width: '100%', display: 'block', background: '#05070c' }}>
+      {/* Decke */}
+      <polygon points="0,0 400,0 260,55 140,55" fill={wallDark} />
+      {/* Boden */}
+      <polygon points="0,260 400,260 260,150 140,150" fill={floorColor} opacity={0.85} />
+      {/* Boden-Streifen (Perspektive) */}
+      {[0.35, 0.55, 0.75, 0.92].map((t, i) => {
+        const y = 150 + (260 - 150) * t
+        const xL = 140 + (0 - 140) * t
+        const xR = 260 + (400 - 260) * t
+        return <line key={i} x1={xL} y1={y} x2={xR} y2={y} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
+      })}
+
+      {/* Linke Wand */}
+      <polygon points="0,0 140,55 140,150 0,260" fill={wallColor} />
+      <polygon points="0,0 20,10 20,240 0,260" fill={wallLight} opacity={0.3} />
+      {/* Rechte Wand */}
+      <polygon points="400,0 260,55 260,150 400,260" fill={wallColor} />
+      <polygon points="400,0 380,10 380,240 400,260" fill={wallDark} opacity={0.4} />
+
+      {/* Rückwand (mit Konsole/Panel je nach Raumtyp) */}
+      <polygon points="140,55 260,55 260,150 140,150" fill={wallLight} />
+
+      {/* Konsolen-Details je Raumtyp */}
+      {room.id === 'cockpit' && (
+        <>
+          <rect x={155} y={70} width={90} height={45} rx={2} fill="#0a1520" stroke="#4a90d0" strokeWidth={1.5} />
+          <rect x={162} y={77} width={76} height={28} fill="#1a3a5a" opacity={0.8} />
+          {[168, 185, 202, 219].map((x, i) => (
+            <circle key={i} cx={x} cy={112} r={2.5} fill={i % 2 === 0 ? '#4aff7a' : '#c9a961'} opacity={0.8} />
+          ))}
+          {inTransit && (
+            <text x={200} y={95} textAnchor="middle" fontSize={7} fill="#8abafa" fontFamily="monospace">KURS AKTIV</text>
+          )}
+        </>
+      )}
+      {room.id === 'engine' && (
+        <>
+          <circle cx={200} cy={95} r={26} fill="none" stroke="#ff8a1a" strokeWidth={2} opacity={0.7} />
+          <circle cx={200} cy={95} r={16} fill={inTransit ? '#ff8a1a' : '#5a3a10'} opacity={0.6}>
+            {inTransit && <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.2s" repeatCount="indefinite" />}
+          </circle>
+          <rect x={148} y={130} width={104} height={10} fill="#1a1410" />
+        </>
+      )}
+      {(room.id.includes('cargo') || room.id === 'colony') && (
+        <>
+          <rect x={150} y={75} width={35} height={35} fill="#2a2418" stroke="#5a4a30" strokeWidth={1} />
+          <rect x={190} y={85} width={30} height={25} fill="#241f16" stroke="#5a4a30" strokeWidth={1} />
+          <rect x={225} y={75} width={35} height={35} fill="#2a2418" stroke="#5a4a30" strokeWidth={1} />
+        </>
+      )}
+      {room.id === 'scanner' && (
+        <>
+          <circle cx={200} cy={90} r={20} fill="none" stroke="#4ad0d0" strokeWidth={1.5} opacity={0.6} />
+          <circle cx={200} cy={90} r={12} fill="none" stroke="#4ad0d0" strokeWidth={1} opacity={0.4} />
+          <line x1={180} y1={90} x2={220} y2={90} stroke="#4ad0d0" strokeWidth={0.5} opacity={0.5} />
+          <line x1={200} y1={70} x2={200} y2={110} stroke="#4ad0d0" strokeWidth={0.5} opacity={0.5} />
+        </>
+      )}
+      {room.id === 'crew' && (
+        <>
+          <rect x={148} y={75} width={20} height={40} rx={2} fill="#1a2a3a" stroke="#3a5a7a" strokeWidth={1} />
+          <rect x={175} y={75} width={20} height={40} rx={2} fill="#1a2a3a" stroke="#3a5a7a" strokeWidth={1} />
+          <rect x={205} y={75} width={20} height={40} rx={2} fill="#1a2a3a" stroke="#3a5a7a" strokeWidth={1} />
+          <rect x={232} y={75} width={20} height={40} rx={2} fill="#1a2a3a" stroke="#3a5a7a" strokeWidth={1} />
+        </>
+      )}
+      {room.id === 'construction' && (
+        <>
+          <rect x={160} y={70} width={80} height={12} fill="#3a3020" stroke="#6a5a30" strokeWidth={1} />
+          <line x1={200} y1={82} x2={200} y2={115} stroke="#8a7a50" strokeWidth={3} />
+          <circle cx={200} cy={118} r={6} fill="#c9a961" opacity={0.7} />
+        </>
+      )}
+
+      {/* Türen zu Ausgängen — angedeutet in den Wänden */}
+      {room.exits.N && (
+        <rect x={175} y={30} width={50} height={25} fill="#0a0a0a" stroke="#3a4a5a" strokeWidth={1} opacity={0.7} />
+      )}
+      {room.exits.E && (
+        <polygon points="260,90 300,95 300,140 260,120" fill="#0a0a0a" opacity={0.5} />
+      )}
+      {room.exits.W && (
+        <polygon points="140,90 100,95 100,140 140,120" fill="#0a0a0a" opacity={0.5} />
+      )}
+
+      {/* Icon des Raums (schwebend, Retro-Stil) */}
+      <text x={200} y={200} textAnchor="middle" fontSize={22} opacity={0.85}>{room.icon}</text>
+    </svg>
+  )
+}
+
+const DIR_LABEL: Record<Dir, string> = { N: 'Vorne', S: 'Hinten', E: 'Rechts', W: 'Links' }
+const DIR_ARROW: Record<Dir, string> = { N: '▲', S: '▼', E: '▶', W: '◀' }
 
 export default function ShipWalkable({ frameId, modules, credits, inTransit, onClose, onCockpit }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const frameKey  = frameId.replace('freighter_', '').replace('_hauler', '').replace('_courier', '') as keyof typeof SHIP_LAYOUTS
-  const layout    = SHIP_LAYOUTS[frameKey] ?? SHIP_LAYOUTS.mk1
-  const frame     = SHIP_FRAMES[frameKey] ?? SHIP_FRAMES.mk1
+  const frameKey = (frameId.replace('freighter_', '').replace('_hauler', '').replace('_courier', '')) as keyof typeof SHIP_ROOMS
+  const rooms    = SHIP_ROOMS[frameKey] ?? SHIP_ROOMS.mk1
+  const frame    = SHIP_FRAMES[frameKey] ?? SHIP_FRAMES.mk1
 
-  const [figPos, setFigPos]         = useState({ x: W/2, y: 80 })
-  const [selectedRoom, setSelectedRoom] = useState<string | null>('cockpit')
-  const [viewport, setViewport]     = useState({ x: 0, y: 0 })
+  const [currentRoomId, setCurrentRoomId] = useState('cockpit')
+  const room = rooms.find(r => r.id === currentRoomId) ?? rooms[0]
 
-  // Viewport auf Figur zentrieren
+  const move = (dir: Dir) => {
+    const target = room.exits[dir]
+    if (target) setCurrentRoomId(target)
+  }
+
   useEffect(() => {
-    setViewport({
-      x: Math.max(0, figPos.x - 300),
-      y: Math.max(0, figPos.y - 200),
-    })
-  }, [figPos])
-
-  // Canvas rendern
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    // Weltraum-Hintergrund
-    ctx.fillStyle = '#03060f'
-    ctx.fillRect(0, 0, W, H)
-
-    // Sterne
-    for (let i = 0; i < 30; i++) {
-      const sx = (i * 97 + 13) % W
-      const sy = (i * 137 + 7) % H
-      ctx.fillStyle = `rgba(255,255,255,${0.05 + (i%4)*0.05})`
-      ctx.beginPath(); ctx.arc(sx, sy, 0.7, 0, Math.PI*2); ctx.fill()
-    }
-
-    // Schiffshülle
-    ctx.fillStyle = '#0d1a24'
-    ctx.strokeStyle = '#2a4e7a'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    const hullPath = new Path2D(layout.hullPath(W, H))
-    ctx.fill(hullPath)
-    ctx.stroke(hullPath)
-
-    // Räume
-    for (const room of layout.rooms) {
-      const isSelected = selectedRoom === room.id
-      const isCockpit  = room.id === 'cockpit'
-
-      ctx.fillStyle = isSelected ? room.color.replace('a', 'b') : room.color
-      ctx.strokeStyle = isSelected ? '#c9a961' : (isCockpit ? '#2a6aca' : '#1a3a4a')
-      ctx.lineWidth = isSelected ? 2 : 1
-      ctx.beginPath()
-      ctx.roundRect(room.x, room.y, room.w, room.h, 4)
-      ctx.fill()
-      ctx.stroke()
-
-      // Icon + Label
-      ctx.font = `${Math.min(20, room.h * 0.3)}px serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(room.icon, room.x + room.w/2, room.y + room.h/2 - 8)
-      ctx.font = '8px monospace'
-      ctx.fillStyle = isSelected ? '#c9a961' : '#7a9aaa'
-      ctx.fillText(room.label, room.x + room.w/2, room.y + room.h/2 + 10)
-
-      // In Reichweite: gestrichelter Rand
-      const inRange = figPos.x >= room.x - 15 && figPos.x <= room.x + room.w + 15
-                   && figPos.y >= room.y - 15 && figPos.y <= room.y + room.h + 15
-      if (inRange && !isSelected) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)'
-        ctx.lineWidth = 1
-        ctx.setLineDash([3,2])
-        ctx.stroke()
-        ctx.setLineDash([])
-        ctx.fillStyle = 'rgba(255,255,255,0.7)'
-        ctx.font = '7px monospace'
-        ctx.fillText('[SPACE]', room.x + room.w/2, room.y + room.h - 4)
-      }
-    }
-
-    // Türen zwischen Räumen
-    ctx.strokeStyle = '#3a5a7a'
-    ctx.lineWidth = 3
-    ctx.setLineDash([2,2])
-    const cockpit = layout.rooms.find(r => r.id === 'cockpit')
-    const engine  = layout.rooms.find(r => r.id === 'engine')
-    if (cockpit) {
-      ctx.beginPath()
-      ctx.moveTo(W/2 - 8, cockpit.y + cockpit.h)
-      ctx.lineTo(W/2 + 8, cockpit.y + cockpit.h)
-      ctx.stroke()
-    }
-    if (engine) {
-      ctx.beginPath()
-      ctx.moveTo(W/2 - 8, engine.y)
-      ctx.lineTo(W/2 + 8, engine.y)
-      ctx.stroke()
-    }
-    ctx.setLineDash([])
-
-    // Triebwerk-Glühen (wenn Transit)
-    if (inTransit) {
-      const eng = layout.rooms.find(r => r.id === 'engine')
-      if (eng) {
-        const grad = ctx.createLinearGradient(W/2, eng.y + eng.h, W/2, H)
-        grad.addColorStop(0, 'rgba(255,140,30,0.8)')
-        grad.addColorStop(1, 'rgba(255,140,30,0)')
-        ctx.fillStyle = grad
-        ctx.beginPath()
-        ctx.ellipse(W/2, eng.y + eng.h, 40, 12, 0, 0, Math.PI*2)
-        ctx.fill()
-      }
-    }
-
-    // Spieler-Figur
-    drawFigure(ctx, figPos.x, figPos.y)
-
-  }, [figPos, selectedRoom, layout, inTransit])
-
-  // Klick → bewegen + Raum selektieren
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect()
-    const px = (e.clientX - rect.left) * (W / rect.width)
-    const py = (e.clientY - rect.top)  * (H / rect.height)
-    setFigPos({ x: Math.max(20, Math.min(W-20, px)), y: Math.max(20, Math.min(H-20, py)) })
-
-    // Welcher Raum wurde angeklickt?
-    const hit = layout.rooms.find(r =>
-      px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h
-    )
-    if (hit) {
-      setSelectedRoom(hit.id)
-      if (hit.id === 'cockpit' && onCockpit) onCockpit()
-    }
-  }, [layout, onCockpit])
-
-  // Keyboard
-  useEffect(() => {
-    const STEP = 10
     const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return }
-      if (e.key === ' ' || e.key === 'Enter') {
-        const near = layout.rooms.find(r =>
-          figPos.x >= r.x - 15 && figPos.x <= r.x + r.w + 15 &&
-          figPos.y >= r.y - 15 && figPos.y <= r.y + r.h + 15
-        )
-        if (near) {
-          setSelectedRoom(near.id)
-          if (near.id === 'cockpit' && onCockpit) onCockpit()
-        }
-        e.preventDefault(); return
+      const map: Record<string, Dir> = {
+        ArrowUp: 'N', w: 'N', ArrowDown: 'S', s: 'S',
+        ArrowRight: 'E', d: 'E', ArrowLeft: 'W', a: 'W',
       }
-      setFigPos(p => ({
-        x: e.key === 'ArrowLeft'  || e.key === 'a' ? Math.max(20, p.x-STEP)
-         : e.key === 'ArrowRight' || e.key === 'd' ? Math.min(W-20, p.x+STEP) : p.x,
-        y: e.key === 'ArrowUp'   || e.key === 'w' ? Math.max(20, p.y-STEP)
-         : e.key === 'ArrowDown' || e.key === 's' ? Math.min(H-20, p.y+STEP) : p.y,
-      }))
+      if (map[e.key]) { move(map[e.key]); e.preventDefault() }
+      if (e.key === ' ' || e.key === 'Enter') {
+        if (room.id === 'cockpit' && onCockpit) onCockpit()
+      }
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [figPos, layout, onClose, onCockpit])
+  }, [room, onClose, onCockpit])
 
-  const activeRoom = layout.rooms.find(r => r.id === selectedRoom)
-  const slotCount  = frame.slots
+  const exitList = (Object.keys(room.exits) as Dir[])
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 2000,
-      background: 'rgba(0,0,0,0.9)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem',
+      background: 'rgba(0,0,0,0.92)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.25rem',
+      fontFamily: 'monospace',
     }} onClick={e => e.target === e.currentTarget && onClose()}>
 
-      {/* Grundtriss */}
-      <div style={{ background: '#03060f', border: '1px solid #1d2a3d', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid #1d2a3d',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#c9a961', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700 }}>
-            ◈ {frame.name.toUpperCase()} — INNENANSICHT
-            {inTransit && <span style={{ marginLeft: 8, color: '#ff8a1a', fontSize: '0.65rem' }}>● TRANSIT</span>}
+      {/* Raum-Fenster */}
+      <div style={{ width: 460, background: '#000', border: '2px solid #4a3a1a', borderRadius: 4, overflow: 'hidden', boxShadow: '0 0 40px rgba(201,169,97,0.15)' }}>
+        {/* Kopfzeile — EXITS wie im Original */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '4px 10px', background: '#151510', borderBottom: '1px solid #4a3a1a',
+        }}>
+          <span style={{ color: '#c9d060', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+            {room.label.toUpperCase()}
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {onCockpit && (
-              <button onClick={onCockpit} style={{
-                background: '#1a3a6a', border: '1px solid #2a6aca',
-                color: '#8abafa', borderRadius: 6, padding: '2px 10px',
-                cursor: 'pointer', fontSize: '0.68rem',
-              }}>🛸 Cockpit</button>
-            )}
-            <button onClick={onClose} style={{
-              background: 'none', border: '1px solid #1d2a3d',
-              color: '#5a6b7a', borderRadius: 6, padding: '2px 8px',
-              cursor: 'pointer', fontSize: '0.75rem',
-            }}>ESC ✕</button>
-          </div>
+          <span style={{ color: '#c9d060', fontSize: '0.62rem' }}>
+            EXITS: {exitList.length ? exitList.map(d => DIR_LABEL[d].toUpperCase()).join(' ') : 'KEINE'}
+          </span>
         </div>
-        <canvas ref={canvasRef} width={W} height={H}
-          onClick={handleClick}
-          style={{ display: 'block', cursor: 'crosshair', width: 300, height: 300 }} />
-        <div style={{ padding: '4px 12px', borderTop: '1px solid #0d1a24',
-          fontSize: '0.6rem', color: '#2a4e7a', fontFamily: 'monospace' }}>
-          WASD · Klick bewegt · SPACE betritt · ESC beenden
+
+        <RoomScene room={room} inTransit={inTransit} />
+
+        {/* Beschreibungszeile (wie Adventure-Textzeile) */}
+        <div style={{ padding: '8px 10px', background: '#0a0a08', minHeight: 40 }}>
+          <div style={{ color: '#8fa878', fontSize: '0.68rem', lineHeight: 1.6 }}>
+            {room.items?.length
+              ? <>Du siehst: {room.items.join(', ')}.</>
+              : <>Nichts Besonderes hier.</>}
+          </div>
+          {room.id === 'cockpit' && (
+            <div style={{ color: '#5a8ac0', fontSize: '0.64rem', marginTop: 4 }}>
+              {inTransit ? '● Autopilot aktiv — Kurs gehalten.' : 'Triebwerke bereit.'}
+            </div>
+          )}
+        </div>
+
+        {/* Richtungssteuerung */}
+        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', padding: '8px', background: '#0a0a08', borderTop: '1px solid #2a2418' }}>
+          {(['W','N','S','E'] as Dir[]).map(d => {
+            const active = !!room.exits[d]
+            return (
+              <button key={d} disabled={!active} onClick={() => move(d)}
+                style={{
+                  width: 60, padding: '6px 4px', background: active ? '#1a2a1a' : '#0d0d0a',
+                  border: `1px solid ${active ? '#4a6a3a' : '#2a2418'}`, borderRadius: 4,
+                  color: active ? '#c9d060' : '#3a3a30', cursor: active ? 'pointer' : 'not-allowed',
+                  fontSize: '0.62rem', fontFamily: 'monospace',
+                }}>
+                {DIR_ARROW[d]} {DIR_LABEL[d]}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Raum-Detail Panel */}
-      <div style={{ width: 260, background: '#f8f5ee', border: '1px solid #ddd6c8', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ background: '#2a4e7a', color: '#fff', padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '0.58rem', opacity: 0.7, letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
-            {activeRoom ? 'Bereich' : 'Schiff'}
-          </div>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: 2 }}>
-            {activeRoom ? `${activeRoom.icon} ${activeRoom.label}` : frame.name}
-          </div>
+      {/* Seitenpanel */}
+      <div style={{ width: 240, background: '#f8f5ee', border: '1px solid #ddd6c8', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#2a4e7a', color: '#fff', padding: '0.6rem 0.85rem' }}>
+          <div style={{ fontSize: '0.56rem', opacity: 0.7, letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>Schiff</div>
+          <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{frame.name}</div>
         </div>
-        <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {activeRoom?.id === 'cockpit' && (
-            <div style={{ fontSize: '0.72rem', color: '#2a4e7a', lineHeight: 1.7 }}>
-              {inTransit
-                ? '🛸 Kurs gesetzt. Navigation aktiv. Autopilot hält Trajektorie.'
-                : 'Triebwerke bereit. Navigation kalibriert. Anflugkorridor frei.'}
-              {onCockpit && (
-                <button onClick={onCockpit} style={{
-                  display: 'block', marginTop: 8, padding: '6px 12px',
-                  background: '#1a3a6a', color: '#8abafa',
-                  border: '1px solid #2a6aca', borderRadius: 8,
-                  cursor: 'pointer', fontSize: '0.72rem', width: '100%',
-                }}>🖥 Cockpit-Ansicht öffnen</button>
-              )}
-            </div>
+        <div style={{ padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {room.id === 'cockpit' && onCockpit && (
+            <button onClick={onCockpit} style={{
+              padding: '6px 10px', background: '#1a3a6a', color: '#8abafa',
+              border: '1px solid #2a6aca', borderRadius: 8, cursor: 'pointer', fontSize: '0.7rem',
+            }}>🖥 Cockpit-Ansicht öffnen</button>
           )}
-          {activeRoom?.id === 'engine' && (
-            <div style={{ fontSize: '0.72rem', color: '#6b6357', lineHeight: 1.7 }}>
-              {inTransit
-                ? '🔥 Triebwerke auf 87% Schub. Kühlmittel nominal. Betriebstemperatur: 3400K.'
-                : 'Triebwerke standby. Zündbereit in 3s.'}
-            </div>
-          )}
-          {activeRoom && !['cockpit','engine'].includes(activeRoom.id) && (
-            <div style={{ fontSize: '0.72rem', color: '#6b6357', lineHeight: 1.7 }}>
-              {activeRoom.id.includes('cargo') || activeRoom.id === 'warehouse'
-                ? `Laderaum. Kapazität: ${Math.round(slotCount * 20)}t. Befestigung nominal.`
-                : activeRoom.id === 'scanner' ? 'Scanner-Array aktiv. Auflösung: 0.3m. Empfangsbereit.'
-                : activeRoom.id === 'construction' ? 'Bau-Ausrüstung gesichert. Montage-Arm eingefahren.'
-                : activeRoom.id === 'colony' ? 'Kolonisierungsmodul standby. Versorgungscontainer geladen.'
-                : activeRoom.id === 'crew' ? `Crew-Deck. ${Math.ceil(slotCount/2)} Schlafkabinen. O₂ nominal.`
-                : 'Systeme nominal.'}
-            </div>
-          )}
-
-          {/* Module in diesem Raum */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {modules.slice(0, Math.min(4, modules.length)).map((m, i) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
+            {modules.slice(0, 5).map((m, i) => {
               const def = SHIP_MODULES[m.moduleId]
               return (
                 <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '4px 8px', borderRadius: 6, fontSize: '0.68rem',
-                  background: m.status !== 'active' ? 'rgba(181,42,42,0.06)' : 'rgba(42,78,122,0.06)',
+                  display: 'flex', justifyContent: 'space-between', padding: '3px 7px',
+                  borderRadius: 6, fontSize: '0.65rem',
+                  background: m.status !== 'active' ? 'rgba(181,42,42,0.06)' : 'rgba(42,78,122,0.05)',
                   border: '1px solid #ddd6c8',
                 }}>
-                  <span style={{ color: '#1a1a18', fontWeight: 600 }}>{def?.name ?? m.moduleId}</span>
-                  <span style={{ color: m.condition > 70 ? '#1a7a4a' : '#b52a2a', fontFamily: 'monospace', fontSize: '0.62rem' }}>
-                    {m.condition}%
-                  </span>
+                  <span style={{ color: '#1a1a18' }}>{def?.name ?? m.moduleId}</span>
+                  <span style={{ color: m.condition > 70 ? '#1a7a4a' : '#b52a2a', fontFamily: 'monospace' }}>{m.condition}%</span>
                 </div>
               )
             })}
           </div>
           <button onClick={onClose} style={{
-            marginTop: 4, padding: '6px', background: 'none',
-            border: '1px solid #ddd6c8', borderRadius: 8,
-            cursor: 'pointer', fontSize: '0.72rem', color: '#6b6357',
-          }}>← Schiff verlassen</button>
+            marginTop: 6, padding: '6px', background: 'none',
+            border: '1px solid #ddd6c8', borderRadius: 8, cursor: 'pointer',
+            fontSize: '0.68rem', color: '#6b6357',
+          }}>← Schiff verlassen (ESC)</button>
         </div>
       </div>
     </div>
