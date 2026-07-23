@@ -312,6 +312,8 @@ export default function ColonyGrid({
   const [showSellPanel, setShowSellPanel] = useState(false)
   const [showBuildingOverlay, setShowBuildingOverlay] = useState(false)
   const [showBank, setShowBank] = useState(false)
+  const [showWalking, setShowWalking]     = useState(false)
+  const [interiorEntity, setInteriorEntity] = useState<TileEntity | null>(null)
   const [zoom, setZoom]               = useState(1.0)
   const gridScrollRef                 = useRef<HTMLDivElement>(null)
   const isPanning                     = useRef(false)
