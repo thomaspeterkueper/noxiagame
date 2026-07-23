@@ -309,114 +309,117 @@ export default function WalkableColony({
     })
   }, [figPos])
 
-  // Canvas rendern
+  // Canvas rendern — isometrisch, Painter's Algorithm (hinten nach vorne)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Hintergrund — Regolith-Textur (deterministisch aus Position)
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
+    // Weltraum-Hintergrund
+    ctx.fillStyle = '#0a0e18'
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    // Sterne (dezent)
+    for (let i = 0; i < 40; i++) {
+      const sx = (i * 113) % CANVAS_W
+      const sy = (i * 71) % (CANVAS_H * 0.4)
+      ctx.fillStyle = `rgba(255,255,255,${0.05 + (i%3)*0.05})`
+      ctx.beginPath(); ctx.arc(sx, sy, 0.8, 0, Math.PI*2); ctx.fill()
+    }
+
+    // Icons je Gebäudetyp
+    const icons: Record<string, string> = {
+      habitat: '🏠', mine: '⛏', solar: '☀️',
+      landing_pad: '🛬', docking_bay: '🛬',
+      bank: '🏦', school: '🏫', shipyard: '⚙️',
+      warehouse: '📦', admin: '🏛', command_center: '📡',
+    }
+
+    // Render-Warteschlange: alle Objekte nach (col+row) sortiert — Painter's Algorithm
+    type RenderItem = { depth: number; draw: () => void }
+    const queue: RenderItem[] = []
+
+    // 1. Boden-Rauten (Gelände + Straßen)
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        // Leichte Variation im Gelände (Pseudo-Zuffall aus Position)
-        const v = ((c * 7 + r * 13) % 8) * 3
-        ctx.fillStyle = `rgb(${61+v},${52+v},${40+v})`
-        ctx.fillRect(c * TILE_PX, r * TILE_PX, TILE_PX, TILE_PX)
+        const v = ((c * 7 + r * 13) % 6) * 4
+        const groundColor = `rgb(${61+v},${52+v},${40+v})`
+        const street = streets.find(s => s.col === c && s.row === r)
+        const color = street
+          ? (street.subtype === 'main' ? C.roadMain : street.subtype === 'crossing' ? C.crossing : C.road)
+          : groundColor
+        queue.push({ depth: (c + r) * 2 - 1000, draw: () => drawIsoFloor(ctx, c, r, color) })
       }
     }
 
-    // Grid-Linien (sehr dezent)
-    ctx.strokeStyle = C.gridLine
-    ctx.lineWidth = 0.5
-    for (let c = 0; c <= COLS; c++) {
-      ctx.beginPath(); ctx.moveTo(c * TILE_PX, 0); ctx.lineTo(c * TILE_PX, CANVAS_H); ctx.stroke()
-    }
-    for (let r = 0; r <= ROWS; r++) {
-      ctx.beginPath(); ctx.moveTo(0, r * TILE_PX); ctx.lineTo(CANVAS_W, r * TILE_PX); ctx.stroke()
-    }
-
-    // Straßen (aus Adapter — keine direkte generateGrid-Abhängigkeit)
-    for (const s of streets) {
-      const color = s.subtype === 'main' ? C.roadMain
-                  : s.subtype === 'crossing' ? C.crossing
-                  : C.road
-      drawTile(ctx, s.col, s.row, color)
-      // Straßen-Markierung (Mittellinie)
-      if (s.subtype === 'main') {
-        ctx.strokeStyle = C.roadLine
-        ctx.lineWidth = 1
-        ctx.setLineDash([4, 4])
-        ctx.beginPath()
-        ctx.moveTo(s.col * TILE_PX + TILE_PX / 2, s.row * TILE_PX)
-        ctx.lineTo(s.col * TILE_PX + TILE_PX / 2, s.row * TILE_PX + TILE_PX)
-        ctx.stroke()
-        ctx.setLineDash([])
-      }
-    }
-
-    // Gebäude aus tile_entities (Projektion des Weltzustands)
+    // 2. Gebäude (extrudierte Blöcke)
     for (const e of entities) {
       if (e.entity_type !== 'building') continue
       const isOwn   = e.profile_id === userId
       const isState = e.owner_class === 'STATE'
       const isCorp  = !!e.profile_id && !isOwn
 
-      const color = isState ? C.state
-                  : isOwn   ? C.habitat
-                  : isCorp  ? C.corp
-                  : C.habitat
-
-      const icons: Record<string, string> = {
-        habitat: '🏠', mine: '⛏', solar: '☀️',
-        landing_pad: '🛬', docking_bay: '🛬',
-        bank: '🏦', school: '🏫', shipyard: '⚙️',
-        warehouse: '📦', admin: '🏛', command_center: '📡',
-      }
-
-      drawTile(ctx, e.tile_col, e.tile_row, color,
-        e.entity_id, icons[e.entity_id] ?? '🏗')
-
-      // Eigene Gebäude: goldener Rand
-      if (isOwn) {
-        ctx.strokeStyle = '#c9a961'
-        ctx.lineWidth = 2
-        ctx.strokeRect(e.tile_col * TILE_PX + 1, e.tile_row * TILE_PX + 1, TILE_PX - 2, TILE_PX - 2)
-      }
-      // In Reichweite: weißer Puls-Rand + SPACE-Hinweis
+      const color = isState ? C.state : isOwn ? C.habitat : isCorp ? C.corp : C.habitat
       const inRange = Math.abs(e.tile_col - figPos.col) < 1.5 && Math.abs(e.tile_row - figPos.row) < 1.5
-      if (inRange) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.7)'
-        ctx.lineWidth = 1.5
-        ctx.setLineDash([3, 2])
-        ctx.strokeRect(e.tile_col * TILE_PX + 2, e.tile_row * TILE_PX + 2, TILE_PX - 4, TILE_PX - 4)
-        ctx.setLineDash([])
-        ctx.fillStyle = 'rgba(255,255,255,0.85)'
-        ctx.font = '7px monospace'
-        ctx.textAlign = 'center'
-        ctx.fillText('[SPACE]', e.tile_col * TILE_PX + TILE_PX / 2, e.tile_row * TILE_PX + TILE_PX - 2)
-      }
+
+      queue.push({
+        depth: e.tile_col + e.tile_row,
+        draw: () => {
+          drawIsoBuilding(ctx, e.tile_col, e.tile_row, color, e.entity_id, icons[e.entity_id] ?? '🏗')
+          const { x, y } = isoProject(e.tile_col, e.tile_row)
+          if (isOwn) {
+            ctx.strokeStyle = '#c9a961'
+            ctx.lineWidth = 1.5
+            ctx.beginPath()
+            ctx.moveTo(x, y - BLOCK_H - ISO_H)
+            ctx.lineTo(x + ISO_W, y - BLOCK_H)
+            ctx.lineTo(x, y - BLOCK_H + ISO_H)
+            ctx.lineTo(x - ISO_W, y - BLOCK_H)
+            ctx.closePath()
+            ctx.stroke()
+          }
+          if (inRange) {
+            ctx.fillStyle = 'rgba(255,255,255,0.9)'
+            ctx.font = 'bold 8px monospace'
+            ctx.textAlign = 'center'
+            ctx.fillText('[SPACE]', x, y + ISO_H + 20)
+          }
+        },
+      })
     }
 
-    // Schiff am Landing Pad (Projektion: nur wenn ships vorhanden)
+    // 3. Schiff am Pad
     if (landingPad && hasShipAtLocation) {
-      const cx = (landingPad.tile_col + 0.5) * TILE_PX
-      const cy = (landingPad.tile_row + 0.3) * TILE_PX
-      drawShip(ctx, cx, cy)
+      queue.push({
+        depth: landingPad.tile_col + landingPad.tile_row + 0.5,
+        draw: () => {
+          const { x, y } = isoProject(landingPad.tile_col, landingPad.tile_row)
+          drawShip(ctx, x, y - BLOCK_H - 10)
+        },
+      })
     }
 
-    // Spieler-Figur
-    const fx = (figPos.col) * TILE_PX
-    const fy = (figPos.row) * TILE_PX
-    drawFigure(ctx, fx, fy, C.figure, 'Du')
+    // 4. Spieler-Figur
+    queue.push({
+      depth: figPos.col + figPos.row + 0.3,
+      draw: () => {
+        const { x, y } = isoProject(figPos.col, figPos.row)
+        drawFigure(ctx, x, y, C.figure, 'Du')
+      },
+    })
+
+    // Sortieren und zeichnen (hinten nach vorne)
+    queue.sort((a, b) => a.depth - b.depth)
+    for (const item of queue) item.draw()
 
     // Orientierungs-Kompass
     ctx.fillStyle = 'rgba(0,0,0,0.5)'
-    ctx.fillRect(CANVAS_W - 40, 8, 32, 32)
+    ctx.beginPath(); ctx.arc(CANVAS_W - 30, 30, 16, 0, Math.PI*2); ctx.fill()
     ctx.fillStyle = '#c9a961'
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'
-    ctx.fillText('N', CANVAS_W - 24, 24)
+    ctx.fillText('N', CANVAS_W - 30, 34)
 
   }, [figPos, streets, entities, ships, userId, landingPad, hasShipAtLocation])
 
