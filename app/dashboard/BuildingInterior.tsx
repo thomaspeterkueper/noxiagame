@@ -45,7 +45,7 @@ const INTERIOR: Record<string, {
   icon:   string
   title:  string
   rooms:  string[]
-  desc:   (ctx: { stock?: number; production?: number; isOwn: boolean; population: number }) => string
+  desc:   (ctx: { stock?: number; production?: number; isOwn: boolean; population: number; credits: number }) => string
 }> = {
   habitat: {
     icon:  '🏠',
@@ -162,7 +162,7 @@ export default function BuildingInterior({
 
   const desc = def.desc({
     stock: res?.stock, production: res?.production, isOwn, population, credits,
-  })
+  } as any)
 
   const T = {
     bg:     '#f8f5ee',
