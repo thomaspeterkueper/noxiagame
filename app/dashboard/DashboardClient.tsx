@@ -277,16 +277,16 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
-      {walkingColony && currentLocation && (
+      {walkingColony && (
         <WalkableColony
-          locationSlug={currentLocation}
-          locationName={locationName ?? currentLocation}
-          population={population}
-          entities={tileEntities}
-          pending={pendingBuilds}
+          locationSlug={location}
+          locationName={currentLocationData?.name ?? location}
+          population={currentLocationData?.population ?? 0}
+          entities={tileEntities.filter((e: any) => e.locations?.slug === location)}
+          pending={[]}
           ships={ships}
           locationId={currentLocationId ?? ''}
-          userId={userId ?? ''}
+          userId={userId}
           onClose={() => setWalkingColony(false)}
         />
       )}
