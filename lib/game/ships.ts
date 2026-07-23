@@ -1,6 +1,6 @@
 // ships.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; Schiffs-Spec + Lebenszyklus
-// Version:      0.3.0
+// Aktualisiert: 20.07.2026 — Phase 2: Erkundungs- und Konstruktionsschiff
+// Version:      0.4.0
 // lib/game/ships.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // NOXIA — Schiffs-Spec + lebende Schicht
@@ -28,7 +28,13 @@ export type ModuleType = 'cargo' | 'tank' | 'habitat' | 'equipment';
 export type ModuleStatus = 'active' | 'damaged' | 'disabled';
 
 export type ShipFunction =
-  | 'long_range_scan' | 'boosted_drive' | 'shielding' | 'refrigeration';
+  | 'long_range_scan'   // Terrain + Ressourcen scannen (Erkundung)
+  | 'deep_scan'         // Detaillierte Deposit-Analyse (mit SENSOR:SPECTRAL)
+  | 'construction'      // Basisinfrastruktur errichten (Gründung)
+  | 'colony_supplies'   // Erstversorgung transportieren (Gründung)
+  | 'boosted_drive'     // Schnellerer Antrieb
+  | 'shielding'         // Strahlungsschutz
+  | 'refrigeration';    // Kühltransport
 
 export const MODULE_TONNES = 20;
 
@@ -40,8 +46,22 @@ export interface ShipFrame {
 export const SHIP_FRAMES: Record<string, ShipFrame> = {
   mk1:   { id: 'mk1',   name: 'Frachter Mk.I',   slots: 5,  baseSpeed: 1.0,  cost: 0,     shipyard: 'start', hullMass: 8,  unlocked: true },
   fast:  { id: 'fast',  name: 'Schnellfrachter', slots: 3,  baseSpeed: 1.7,  cost: 8000,  shipyard: 'moon',  hullMass: 5,  unlocked: true },
-  heavy: { id: 'heavy', name: 'Schwerfrachter',  slots: 10, baseSpeed: 0.77, cost: 15000, shipyard: 'moon',  hullMass: 20, unlocked: true },
+  heavy:   { id: 'heavy',   name: 'Schwerfrachter',       slots: 10, baseSpeed: 0.77, cost: 15000,  shipyard: 'moon',  hullMass: 20, unlocked: true },
+  scout:   { id: 'scout',   name: 'Erkundungsschiff',      slots: 4,  baseSpeed: 1.5,  cost: 12000,  shipyard: 'moon',  hullMass: 6,  unlocked: false },
+  pioneer: { id: 'pioneer', name: 'Pionier-Konstrukteur',  slots: 8,  baseSpeed: 0.6,  cost: 35000,  shipyard: 'mars',  hullMass: 30, unlocked: false },
 };
+
+// ── Unlock-Keys für neue Schiffstypen ────────────────────────────────────────
+// Voraussetzungen für Gründung neuer Standorte
+export const SHIP_UNLOCKS = {
+  // Erkundungsschiff
+  scout:             'UNL:NOX:SHIP:SCOUT',        // Scout-Frame kaufen
+  deep_scan:         'UNL:NOX:SENSOR:SPECTRAL',   // Tiefen-Scanner (PHY-L1-000001)
+  // Konstruktionsschiff
+  pioneer:           'UNL:NOX:SHIP:PIONEER',      // Pioneer-Frame kaufen
+  colony_found:      'UNL:NOX:COLONY:FOUND',      // Kolonie gründen dürfen
+  station_found:     'UNL:NOX:STATION:FOUND',     // Station gründen dürfen
+} as const
 
 // ── Module ───────────────────────────────────────────────────────────────────
 export interface ShipModule {
@@ -53,7 +73,13 @@ export const SHIP_MODULES: Record<string, ShipModule> = {
   tank:         { id: 'tank',          name: 'Tankmodul',       type: 'tank',      capacity: 30,            mass: 1.5, cost: 600,  fluidOnly: true, unlocked: false },
   habitat_pod:  { id: 'habitat_pod',   name: 'Wohncontainer',   type: 'habitat',   capacity: 25,            mass: 3,   cost: 1500, unlocked: false },
   scanner:      { id: 'scanner',       name: 'Sensorausleger',  type: 'equipment', capacity: 0,             mass: 2,   cost: 2500, provides: ['long_range_scan'], unlocked: false },
-  drive_booster:{ id: 'drive_booster', name: 'Schubverstärker', type: 'equipment', capacity: 0,             mass: 2,   cost: 3000, provides: ['boosted_drive'],   unlocked: false },
+  drive_booster:  { id: 'drive_booster',  name: 'Schubverstärker',    type: 'equipment', capacity: 0,   mass: 2,   cost: 3000,  provides: ['boosted_drive'],              unlocked: false },
+  // Erkundungs-Module
+  deep_scanner:   { id: 'deep_scanner',  name: 'Tiefen-Scanner',      type: 'equipment', capacity: 0,   mass: 3,   cost: 8000,  provides: ['long_range_scan','deep_scan'], unlocked: false },
+  survey_drone:   { id: 'survey_drone',  name: 'Kartierungsdrohne',    type: 'equipment', capacity: 0,   mass: 1.5, cost: 4000,  provides: ['long_range_scan'],             unlocked: false },
+  // Konstruktions-Module
+  construction_rig: { id: 'construction_rig', name: 'Bau-Ausrüstung', type: 'equipment', capacity: 0,   mass: 8,   cost: 15000, provides: ['construction'],                unlocked: false },
+  colony_pod:     { id: 'colony_pod',    name: 'Kolonisierungsmodul',  type: 'habitat',   capacity: 50,  mass: 5,   cost: 10000, provides: ['colony_supplies'],             unlocked: false },
 };
 
 // ── Schicht-0-Naht: die EINE Quelle der Basis-Reisezeit ──────────────────────
@@ -218,7 +244,24 @@ export function fullCargoLoadout(frameId: string): ShipLoadout {
   return { frameId, modules: Array(f ? f.slots : 0).fill('cargo') };
 }
 export const CLASSIC_SHIPS: Record<string, ShipLoadout> = {
-  mk1: fullCargoLoadout('mk1'), fast: fullCargoLoadout('fast'), heavy: fullCargoLoadout('heavy'),
+  mk1:     fullCargoLoadout('mk1'),
+  fast:    fullCargoLoadout('fast'),
+  heavy:   fullCargoLoadout('heavy'),
+  // Standard-Konfigurationen für neue Typen
+  scout:   { frameId: 'scout',   modules: ['scanner', 'deep_scanner', 'survey_drone', 'tank'] },
+  pioneer: { frameId: 'pioneer', modules: ['construction_rig', 'colony_pod', 'cargo', 'cargo', 'tank', 'tank', 'habitat_pod', 'habitat_pod'] },
 };
+// ── Gründungs-Checks ─────────────────────────────────────────────────────────
+/** Kann dieses Schiff einen Standort erkunden? (Scout + Scanner-Modul) */
+export function canExplore(s: ShipLoadout | ShipInstance): boolean {
+  return shipFunctions(s).includes('long_range_scan')
+}
+
+/** Kann dieses Schiff eine Kolonie/Station gründen? (Pioneer + Bau-Ausrüstung) */
+export function canFoundLocation(s: ShipLoadout | ShipInstance): boolean {
+  return shipFunctions(s).includes('construction')
+    && shipFunctions(s).includes('colony_supplies')
+}
+
 export const FRAME_MENU  = Object.values(SHIP_FRAMES).filter(f => f.unlocked);
 export const MODULE_MENU = Object.values(SHIP_MODULES).filter(m => m.unlocked);
