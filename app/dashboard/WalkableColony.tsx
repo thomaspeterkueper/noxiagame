@@ -244,23 +244,32 @@ function drawIsoBuilding(
 
 // ── Schiff zeichnen ───────────────────────────────────────────────────────────
 function drawShip(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+  // Schatten
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'
+  ctx.beginPath(); ctx.ellipse(cx, cy + 26, 20, 6, 0, 0, Math.PI*2); ctx.fill()
+  // Rumpf (isometrisch angedeutet)
   ctx.fillStyle = C.ship
   ctx.beginPath()
-  ctx.moveTo(cx, cy - 18)
-  ctx.lineTo(cx - 14, cy + 8)
-  ctx.lineTo(cx - 10, cy + 12)
-  ctx.lineTo(cx + 10, cy + 12)
-  ctx.lineTo(cx + 14, cy + 8)
+  ctx.moveTo(cx, cy - 22)
+  ctx.lineTo(cx - 16, cy + 6)
+  ctx.lineTo(cx - 11, cy + 18)
+  ctx.lineTo(cx + 11, cy + 18)
+  ctx.lineTo(cx + 16, cy + 6)
   ctx.closePath()
   ctx.fill()
-  ctx.strokeStyle = '#6a9aca'
+  ctx.strokeStyle = '#8ab8e8'
   ctx.lineWidth = 1
   ctx.stroke()
+  // Highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.beginPath()
+  ctx.moveTo(cx, cy - 22); ctx.lineTo(cx - 8, cy - 2); ctx.lineTo(cx, cy - 2)
+  ctx.closePath(); ctx.fill()
   // Triebwerk-Glühen
   ctx.fillStyle = '#ff8a1a'
-  ctx.globalAlpha = 0.6
+  ctx.globalAlpha = 0.7
   ctx.beginPath()
-  ctx.ellipse(cx, cy + 14, 8, 4, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx, cy + 20, 9, 4, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.globalAlpha = 1
 }
@@ -423,21 +432,31 @@ export default function WalkableColony({
 
   }, [figPos, streets, entities, ships, userId, landingPad, hasShipAtLocation])
 
-  // Klick auf Canvas → Figur bewegen
+  // Inverse Iso-Projektion: Canvas-Pixel → Grid-Koordinaten
+  const isoUnproject = useCallback((px: number, py: number) => {
+    const dx = px - CANVAS_W / 2
+    const dy = py - 60
+    const col = (dx / ISO_W + dy / ISO_H) / 2
+    const row = (dy / ISO_H - dx / ISO_W) / 2
+    return { col, row }
+  }, [])
+
+  // Klick auf Canvas → Figur bewegen (isometrisch entprojiziert)
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return
     const scaleX = CANVAS_W / rect.width
     const scaleY = CANVAS_H / rect.height
-    const px = (e.clientX - rect.left) * scaleX + viewport.x
-    const py = (e.clientY - rect.top)  * scaleY + viewport.y
-    const col = px / TILE_PX
-    const row = py / TILE_PX
-    setFigPos({ col, row })
+    const px = (e.clientX - rect.left) * scaleX
+    const py = (e.clientY - rect.top)  * scaleY
+    const { col, row } = isoUnproject(px, py)
+    const clampedCol = Math.max(0, Math.min(COLS - 1, col))
+    const clampedRow = Math.max(0, Math.min(ROWS - 1, row))
+    setFigPos({ col: clampedCol, row: clampedRow })
 
     // Klick auf Gebäude → betreten
     const hitEntity = entities.find(en =>
-      Math.floor(col) === en.tile_col && Math.floor(row) === en.tile_row
+      Math.abs(en.tile_col - clampedCol) < 0.6 && Math.abs(en.tile_row - clampedRow) < 0.6
     )
     if (hitEntity) {
       if (onEnterBuilding) {
@@ -447,7 +466,7 @@ export default function WalkableColony({
         setTimeout(() => setTooltip(null), 1500)
       }
     }
-  }, [entities, userId, viewport])
+  }, [entities, userId, isoUnproject])
 
   // Keyboard-Navigation
   useEffect(() => {
