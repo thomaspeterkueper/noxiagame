@@ -1,7 +1,7 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 20.07.2026 — actors(display_name) JOIN für NPC-Namen
-// Version:      0.8.0
+// Aktualisiert: 20.07.2026 — celestial_bodies in Response (Phase 1)
+// Version:      0.9.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -75,6 +75,12 @@ export async function GET() {
 
   const transactions = groupTransactions(rawTransactions ?? [])
 
+  // ── celestial_bodies — alle Himmelskörper ────────────────────────────────────
+  const { data: celestialBodies } = await supabase
+    .from('celestial_bodies')
+    .select('*')
+    .order('orbit_radius_au', { ascending: true })
+
   // ── Multiplayer: tile_entities aller Spieler + Staatliche Gebäude ──────────
   // Liefert Gebäude für alle Kolonien — ColonyGrid kann fremde Gebäude zeigen.
   // Enthält profile_id, owner_class, entity_id, tile_row, tile_col, location_id.
@@ -128,6 +134,7 @@ export async function GET() {
     locations:    locations ?? [],
     transactions: transactions.slice(0, 10),
     entities:     allEntities ?? [],
+    celestialBodies: celestialBodies ?? [],
     stats: {
       totalPopulation:  totalPop,
       suppliedColonies: suppliedCount,
