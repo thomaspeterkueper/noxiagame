@@ -18,6 +18,8 @@ import type { BuildingContext } from '@/lib/game/buildings/types'
 import AdminOverlay from './AdminOverlay'
 import LandingOverlay from './LandingOverlay'
 import SchoolOverlay from './SchoolOverlay'
+import WalkableColony from './WalkableColony'
+import BuildingInterior from './BuildingInterior'
 import BankOverlay from './BankOverlay'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
@@ -543,6 +545,32 @@ export default function ColonyGrid({
         <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
           {hoveredTile && <TileTooltip info={hoveredTile} />}
           <style>{'.grid-pan-container::-webkit-scrollbar { display: none }'}</style>
+          {showWalking && (
+            <WalkableColony
+              locationSlug={slug}
+              locationName={name}
+              population={population}
+              entities={entities}
+              pending={pending}
+              ships={[]}
+              locationId={''}
+              userId={userId}
+              onClose={() => setShowWalking(false)}
+              onEnterBuilding={e => { setInteriorEntity(e); setShowWalking(false) }}
+            />
+          )}
+          {/* Betreten-Button */}
+          <button
+            onClick={() => setShowWalking(true)}
+            style={{
+              position: 'absolute', top: 6, left: 6, zIndex: 10,
+              background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8',
+              borderRadius: 8, padding: '3px 10px', cursor: 'pointer',
+              fontSize: '0.68rem', color: '#2a4e7a', fontWeight: 700,
+            }}
+          >
+            🚶 Betreten
+          </button>
           {/* Zoom-Controls */}
           <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8', borderRadius: 8, padding: '3px 6px', alignItems: 'center' }}>
             <button onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>+</button>
