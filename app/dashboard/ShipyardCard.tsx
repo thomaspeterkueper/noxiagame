@@ -25,6 +25,7 @@ type LocationSlug = string
 type ShipType = 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'
 
 interface ShipyardCardProps {
+  onEnterShip?: () => void
   shipType: ShipType
   location: LocationSlug
   cargoUsed: number
@@ -73,6 +74,7 @@ export default function ShipyardCard({
   shipType,
   cargoUsed,
   cargoMax,
+  onEnterShip,
 }: ShipyardCardProps) {
   const ship = SHIP_DATA[shipType]
   const cargoPercent = cargoMax > 0 ? (cargoUsed / cargoMax) * 100 : 0
@@ -83,25 +85,8 @@ export default function ShipyardCard({
     return () => clearInterval(i)
   }, [])
 
-  // Schiffsmodule aus aktiven Schiff mappen
-  const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
-    slotIndex: m.slot ?? i,
-    moduleId:  m.entity_id ?? 'cargo',
-    entityId:  m.id,
-    condition: m.condition ?? 100,
-    status:    (m.status ?? 'active') as 'active' | 'damaged' | 'disabled',
-  }))
 
   return (
-    <>
-    {interior && (
-      <ShipInteriorOverlay
-        frameId={activeShip?.frameId ?? 'mk1'}
-        modules={shipModules}
-        credits={credits}
-        onClose={() => setInterior(false)}
-      />
-    )}
     <div style={{
       fontFamily: "'Courier Prime', monospace",
       background: '#0a0e14',
@@ -274,6 +259,5 @@ export default function ShipyardCard({
         </div>
       </div>
     </div>
-    </>
   )
 }
