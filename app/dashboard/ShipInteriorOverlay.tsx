@@ -280,7 +280,7 @@ export default function ShipInteriorOverlay({
                 condition={mod.condition} status={mod.status}
                 totalSlots={frame.slots}
                 isSelected={selectedSlot === i}
-                onClick={() => handleModuleClick(i)}
+                onClick={() => { handleModuleClick(i) }}
               />
             )
           })}
