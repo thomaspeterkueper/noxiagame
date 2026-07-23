@@ -1,8 +1,8 @@
 'use client'
 // app/dashboard/WalkableColony.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — Helleres Farbschema, Space/Enter = betreten, ColonyGrid fix
-// Version:      0.2.0
+// Aktualisiert: 20.07.2026 — Overlay über Grid (kein fullscreen), Innenraum-Callback
+// Version:      0.3.0
 //
 // Phase B Vertical Slice.
 // Frage: Fühlt sich NOXIA anders an, sobald ich meine Kolonie betreten kann?
@@ -36,15 +36,16 @@ interface Ship {
 }
 
 interface Props {
-  locationSlug:   string
-  locationName:   string
-  population:     number
-  entities:       TileEntity[]
-  pending:        any[]
-  ships:          Ship[]
-  locationId:     string
-  userId:         string
-  onClose:        () => void
+  locationSlug:      string
+  locationName:      string
+  population:        number
+  entities:          TileEntity[]
+  pending:           any[]
+  ships:             Ship[]
+  locationId:        string
+  userId:            string
+  onClose:           () => void
+  onEnterBuilding?:  (entity: TileEntity) => void
 }
 
 // ── Render-Konstanten ─────────────────────────────────────────────────────────
@@ -187,7 +188,7 @@ function drawShip(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
 // ── Haupt-Komponente ──────────────────────────────────────────────────────────
 export default function WalkableColony({
   locationSlug, locationName, population,
-  entities, pending, ships, locationId, userId, onClose,
+  entities, pending, ships, locationId, userId, onClose, onEnterBuilding,
 }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -351,17 +352,17 @@ export default function WalkableColony({
     const row = py / TILE_PX
     setFigPos({ col, row })
 
-    // Tooltip: Was ist hier?
+    // Klick auf Gebäude → betreten
     const hitEntity = entities.find(en =>
       Math.floor(col) === en.tile_col && Math.floor(row) === en.tile_row
     )
     if (hitEntity) {
-      const name = hitEntity.actor_name ?? hitEntity.username ?? 'Unbekannt'
-      const owner = hitEntity.profile_id === userId ? 'Dein Gebäude'
-                  : hitEntity.owner_class === 'STATE' ? 'Staatlich'
-                  : name
-      setTooltip(`${hitEntity.entity_id} — ${owner}`)
-      setTimeout(() => setTooltip(null), 2000)
+      if (onEnterBuilding) {
+        onEnterBuilding(hitEntity)
+      } else {
+        setTooltip(`▶ ${hitEntity.entity_id}`)
+        setTimeout(() => setTooltip(null), 1500)
+      }
     }
   }, [entities, userId, viewport])
 
@@ -371,14 +372,17 @@ export default function WalkableColony({
     const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return }
       if (e.key === ' ' || e.key === 'Enter') {
-        // Nächstes Gebäude in Reichweite betreten
         const near = entities.find(en =>
           Math.abs(en.tile_col - figPos.col) < 1.5 &&
           Math.abs(en.tile_row - figPos.row) < 1.5
         )
         if (near) {
-          setTooltip(`▶ ${near.entity_id} betreten — ${near.profile_id === userId ? 'Dein Gebäude' : near.owner_class === 'STATE' ? 'Staatlich' : near.actor_name ?? near.username ?? 'Fremd'}`)
-          setTimeout(() => setTooltip(null), 2500)
+          if (onEnterBuilding) {
+            onEnterBuilding(near)
+          } else {
+            setTooltip(`▶ ${near.entity_id}`)
+            setTimeout(() => setTooltip(null), 1500)
+          }
         }
         e.preventDefault()
         return
@@ -398,9 +402,10 @@ export default function WalkableColony({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 2000,
-      background: '#000',
+      position: 'absolute', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.92)',
       display: 'flex', flexDirection: 'column',
+      borderRadius: 8,
     }}>
       {/* Header */}
       <div style={{
