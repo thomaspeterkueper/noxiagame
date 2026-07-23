@@ -149,31 +149,96 @@ function drawFigure(
   }
 }
 
-// ── Tile zeichnen ─────────────────────────────────────────────────────────────
-function drawTile(
-  ctx:    CanvasRenderingContext2D,
-  col:    number,
-  row:    number,
-  color:  string,
-  label?: string,
-  icon?:  string,
+// ── Iso-Boden zeichnen (flache Raute) ────────────────────────────────────────
+function drawIsoFloor(
+  ctx:   CanvasRenderingContext2D,
+  col:   number,
+  row:   number,
+  color: string,
 ) {
-  const x = col * TILE_PX
-  const y = row * TILE_PX
+  const { x, y } = isoProject(col, row)
   ctx.fillStyle = color
-  ctx.fillRect(x, y, TILE_PX, TILE_PX)
+  ctx.beginPath()
+  ctx.moveTo(x, y - ISO_H)
+  ctx.lineTo(x + ISO_W, y)
+  ctx.lineTo(x, y + ISO_H)
+  ctx.lineTo(x - ISO_W, y)
+  ctx.closePath()
+  ctx.fill()
+}
+
+// ── Iso-Gebäude zeichnen (extrudierter Block mit Schattenseiten) ────────────
+function drawIsoBuilding(
+  ctx:      CanvasRenderingContext2D,
+  col:      number,
+  row:      number,
+  topColor: string,
+  label?:   string,
+  icon?:    string,
+  height:   number = BLOCK_H,
+) {
+  const { x, y } = isoProject(col, row)
+  const topY = y - height
+
+  // Farb-Varianten für 3D-Schattierung
+  const shade = (hex: string, factor: number) => {
+    const c = hex.replace('#', '')
+    const r = Math.max(0, Math.min(255, parseInt(c.slice(0,2),16) * factor))
+    const g = Math.max(0, Math.min(255, parseInt(c.slice(2,4),16) * factor))
+    const b = Math.max(0, Math.min(255, parseInt(c.slice(4,6),16) * factor))
+    return `rgb(${r|0},${g|0},${b|0})`
+  }
+  const leftColor  = shade(topColor, 0.55)   // dunkler (Schatten)
+  const rightColor = shade(topColor, 0.75)   // mittel
+
+  // Linke Wand (Süd-West-Fläche)
+  ctx.fillStyle = leftColor
+  ctx.beginPath()
+  ctx.moveTo(x - ISO_W, y)
+  ctx.lineTo(x, y + ISO_H)
+  ctx.lineTo(x, y + ISO_H - height)
+  ctx.lineTo(x - ISO_W, y - height)
+  ctx.closePath()
+  ctx.fill()
+
+  // Rechte Wand (Süd-Ost-Fläche)
+  ctx.fillStyle = rightColor
+  ctx.beginPath()
+  ctx.moveTo(x, y + ISO_H)
+  ctx.lineTo(x + ISO_W, y)
+  ctx.lineTo(x + ISO_W, y - height)
+  ctx.lineTo(x, y + ISO_H - height)
+  ctx.closePath()
+  ctx.fill()
+
+  // Dach (Top-Fläche, helle Raute)
+  ctx.fillStyle = topColor
+  ctx.beginPath()
+  ctx.moveTo(x, topY - ISO_H)
+  ctx.lineTo(x + ISO_W, topY)
+  ctx.lineTo(x, topY + ISO_H)
+  ctx.lineTo(x - ISO_W, topY)
+  ctx.closePath()
+  ctx.fill()
+
+  // Kontur
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+  ctx.lineWidth = 0.5
+  ctx.stroke()
+
+  // Icon auf dem Dach
   if (icon) {
-    ctx.font = `${TILE_PX * 0.5}px serif`
+    ctx.font = '14px serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(icon, x + TILE_PX / 2, y + TILE_PX / 2)
+    ctx.fillText(icon, x, topY)
   }
+  // Label unter dem Gebäude
   if (label) {
     ctx.fillStyle = C.text
     ctx.font = '7px monospace'
     ctx.textAlign = 'center'
-    ctx.textBaseline = 'bottom'
-    ctx.fillText(label, x + TILE_PX / 2, y + TILE_PX - 2)
+    ctx.fillText(label, x, y + ISO_H + 10)
   }
 }
 
