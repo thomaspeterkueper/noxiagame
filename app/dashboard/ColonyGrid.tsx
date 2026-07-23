@@ -547,6 +547,24 @@ export default function ColonyGrid({
         <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
           {hoveredTile && <TileTooltip info={hoveredTile} />}
           <style>{'.grid-pan-container::-webkit-scrollbar { display: none }'}</style>
+          {interiorEntity && (
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 200,
+              background: 'rgba(0,0,0,0.85)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} onClick={e => e.target === e.currentTarget && setInteriorEntity(null)}>
+              <div style={{ width: 460 }}>
+                <BuildingInterior
+                  entity={interiorEntity as any}
+                  userId={userId}
+                  locationResources={locationResources as any}
+                  credits={credits}
+                  population={population}
+                  onClose={() => setInteriorEntity(null)}
+                />
+              </div>
+            </div>
+          )}
           {showWalking && (
             <WalkableColony
               locationSlug={slug}
@@ -607,16 +625,6 @@ export default function ColonyGrid({
         </div>
 
         <div style={{ width: '190px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
-          {interiorEntity && (
-            <BuildingInterior
-              entity={interiorEntity as any}
-              userId={userId}
-              locationResources={locationResources as any}
-              credits={credits}
-              population={population}
-              onClose={() => setInteriorEntity(null)}
-            />
-          )}
           <div style={{ background: '#fff', border: '1px solid #e0ddd6', borderRadius: '8px', padding: '0.7rem 0.85rem' }}>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.82rem', color: '#1a3a5a', fontWeight: 600, marginBottom: '0.25rem' }}>{name}</div>
             <div style={{ fontSize: '0.62rem', color: '#6a7a8a', marginBottom: '0.4rem' }}>{population.toLocaleString('de')} / {populationMax.toLocaleString('de')} Einw.</div>
