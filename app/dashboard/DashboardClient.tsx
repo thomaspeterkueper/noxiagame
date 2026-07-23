@@ -9,6 +9,7 @@ import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
 import FriendsDrawer from './FriendsDrawer'
 import FoundLocationOverlay from './FoundLocationOverlay'
+import ShipInteriorOverlay from './ShipInteriorOverlay'
 import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
 import React, { useState, useEffect } from 'react'
@@ -70,6 +71,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [friends, setFriends]                   = useState<{ id: string; username: string }[]>([])
   const [friendsOpen, setFriendsOpen]           = useState(false)
   const [foundingOpen, setFoundingOpen]         = useState(false)
+  const [shipInterior, setShipInterior]         = useState(false)
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
@@ -273,6 +275,24 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
+      {shipInterior && (() => {
+        const activeShip = ships.find((s: any) => s.is_active)
+        const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
+          slotIndex: m.slot ?? i,
+          moduleId:  m.entity_id ?? 'cargo',
+          entityId:  m.id,
+          condition: m.condition ?? 100,
+          status:    (m.status ?? 'active') as 'active' | 'damaged' | 'disabled',
+        }))
+        return (
+          <ShipInteriorOverlay
+            frameId={activeShip?.frameId ?? activeShip?.ship_type ?? 'mk1'}
+            modules={shipModules}
+            credits={credits}
+            onClose={() => setShipInterior(false)}
+          />
+        )
+      })()}
       {foundingOpen && (
         <FoundLocationOverlay
           credits={credits}
