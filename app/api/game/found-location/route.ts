@@ -1,7 +1,7 @@
 // app/api/game/found-location/route.ts
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — Kolonie/Station gründen
-// Version:      1.1.0
+// Aktualisiert: 2026-07-21 — SSF-Gates aktiviert (SSF-0020/21/22 deployed)
+// Version:      1.2.0
 //
 // POST — Neue Kolonie oder Station gründen
 // GET  — Verfügbare Himmelskörper + Gründungsvoraussetzungen
@@ -82,12 +82,24 @@ export async function POST(req: NextRequest) {
   const needsColonyUnlock  = ['colony', 'outpost'].includes(body?.locationType ?? locationType ?? '')
   const needsStationUnlock = ['station', 'relay'].includes(body?.locationType ?? locationType ?? '')
 
-  // Prüfen ob COLONY:FOUND / STATION:FOUND freigeschaltet
-  // Im Alpha: Gates deaktiviert bis SSF-Lernpfade live sind
-  // TODO: Aktivieren sobald SSF-0020/0021 deployed
-  // if (needsColonyUnlock && !unlockIds.includes('UNL:NOX:COLONY:FOUND')) {
-  //   return NextResponse.json({ error: 'Erfordert Unlock: Kolonisierung I (SSF-Modul)' }, { status: 403 })
-  // }
+  // ── SSF-Gate-Check (aktiviert 2026-07-21 nach SSF-0020/0021/0022) ─────
+  // SSF-Lernpfade für Colony/Station/Orbital sind live
+  if (needsColonyUnlock && !unlockIds.includes('UNL:NOX:COLONY:FOUND')) {
+    return NextResponse.json({
+      error: 'Erfordert SSF-Abschluss: Wie gründet man eine Kolonie?',
+      ssfPath: 'PATH:SSF:ENG-COLONY-FOUND-0001',
+      ssfUrl: 'https://solarsciencefoundation.vercel.app/learn?path=PATH:SSF:ENG-COLONY-FOUND-0001&ref=noxia',
+      unlock: 'UNL:NOX:COLONY:FOUND',
+    }, { status: 403 })
+  }
+  if (needsStationUnlock && !unlockIds.includes('UNL:NOX:STATION:FOUND')) {
+    return NextResponse.json({
+      error: 'Erfordert SSF-Abschluss: Raumstationen — Orbit & Andocken',
+      ssfPath: 'PATH:SSF:ENG-STATION-FOUND-0001',
+      ssfUrl: 'https://solarsciencefoundation.vercel.app/learn?path=PATH:SSF:ENG-STATION-FOUND-0001&ref=noxia',
+      unlock: 'UNL:NOX:STATION:FOUND',
+    }, { status: 403 })
+  }
 
   // ── Validierung ───────────────────────────────────────────────────────────
   if (!name?.trim() || name.trim().length < 3) {
