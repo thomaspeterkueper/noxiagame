@@ -11,7 +11,7 @@
 //
 // GATE: Keine direkte Abhängigkeit von generateGrid() in der Mikro-Ebene.
 
-import { generateGrid, type GridCell } from './gridGenerator'
+import { generateGrid } from '@/lib/grid/generateGrid'
 
 export interface StreetTile {
   row:      number
