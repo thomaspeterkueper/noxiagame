@@ -1,6 +1,6 @@
 // data.ts
-// Aktualisiert: 19.07.2026 — NOX-0001 bis NOX-0008: SSF Unlock-Keys Registry
-// Version:      0.3.0
+// Aktualisiert: 20.07.2026 — Neue Unlocks: SHIP:SCOUT, SHIP:PIONEER, COLONY:FOUND
+// Version:      0.4.0
 import type { KnowledgeBuilding, KnowledgeLearningModule, KnowledgeUnlock } from './types';
 
 export const learningModules: KnowledgeLearningModule[] = [
@@ -374,3 +374,14 @@ export const ALL_SSF_UNLOCK_KEYS = [
 ] as const
 
 export type SsfUnlockKey = typeof ALL_SSF_UNLOCK_KEYS[number]
+
+// ── Kolonisierungs-Unlocks ────────────────────────────────────────────────────
+// Voraussetzungen für Gründung neuer Standorte (Phase 2)
+export const COLONIZATION_UNLOCKS = [
+  'UNL:NOX:SHIP:SCOUT',        // Erkundungsschiff kaufen dürfen
+  'UNL:NOX:SHIP:PIONEER',      // Pionier-Konstrukteur kaufen dürfen
+  'UNL:NOX:COLONY:FOUND',      // Kolonie auf Oberfläche gründen dürfen
+  'UNL:NOX:STATION:FOUND',     // Raumstation gründen dürfen
+  'UNL:NOX:COLONY:EXPAND',     // Grid-Radius erweitern
+  'UNL:NOX:NAV:SURFACE',       // Oberflächennavigation (lat/lon)
+] as const
