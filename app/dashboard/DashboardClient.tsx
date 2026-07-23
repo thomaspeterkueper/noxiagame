@@ -9,7 +9,8 @@ import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
 import FriendsDrawer from './FriendsDrawer'
 import FoundLocationOverlay from './FoundLocationOverlay'
-import ShipInteriorOverlay from './ShipInteriorOverlay'
+import ShipWalkable from './ShipWalkable'
+import CockpitView from './CockpitView'
 import WalkableColony from './WalkableColony'
 import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
@@ -73,6 +74,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [friendsOpen, setFriendsOpen]           = useState(false)
   const [foundingOpen, setFoundingOpen]         = useState(false)
   const [shipInterior, setShipInterior]         = useState(false)
+  const [cockpitOpen, setCockpitOpen]           = useState(false)
   const [walkingColony, setWalkingColony]       = useState(false)
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
   const GRID_TILE_SIZE = 64
@@ -295,16 +297,31 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
           slotIndex: m.slot ?? i,
           moduleId:  m.entity_id ?? 'cargo',
-          entityId:  m.id,
           condition: m.condition ?? 100,
           status:    (m.status ?? 'active') as 'active' | 'damaged' | 'disabled',
         }))
         return (
-          <ShipInteriorOverlay
+          <ShipWalkable
             frameId={activeShip?.frameId ?? activeShip?.ship_type ?? 'mk1'}
             modules={shipModules}
             credits={credits}
+            inTransit={inTransit}
             onClose={() => setShipInterior(false)}
+            onCockpit={() => { setShipInterior(false); setCockpitOpen(true) }}
+          />
+        )
+      })()}
+      {cockpitOpen && (() => {
+        const destLoc = locations.find((l: any) => l.slug !== location)
+        return (
+          <CockpitView
+            inTransit={inTransit}
+            progress={0.5}
+            originName={currentLocationData?.name ?? location}
+            destName={destLoc?.name ?? 'Unbekannt'}
+            destType={destLoc?.location_type === 'station' ? 'station' : 'planet'}
+            onClose={() => setCockpitOpen(false)}
+            onOpenShip={() => { setCockpitOpen(false); setShipInterior(true) }}
           />
         )
       })()}
