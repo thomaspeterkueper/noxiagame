@@ -1,7 +1,7 @@
 ---
 id: NOX-SSF-COLONY-STATION-READY
 title: SSF Kolonisierungs- und Stations-Lernpfade bereit
-status: open
+status: done
 source: SSF
 target: NOXIA
 created: 2026-07-21
@@ -30,3 +30,10 @@ priority: high
 
 `found-location/route.ts` — Gate-Pruefung aktivieren wenn SSF-Abschluss
 über `/api/noxia/completion?uid={uid}` bestätigt wird.
+
+
+## Erledigt 2026-07-21
+
+- found-location/route.ts v1.2.0: Gates aktiviert
+- unlocks.ts v1.1.0: canFoundColony/Station/Scout/Pioneer hinzugefügt
+- Bei 403: SSF Deep-Link wird zurückgegeben
