@@ -550,7 +550,7 @@ export default function ColonyGrid({
               locationSlug={slug}
               locationName={name}
               population={population}
-              entities={entities}
+              entities={entities as any}
               pending={pending}
               ships={[]}
               locationId={''}
