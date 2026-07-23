@@ -93,7 +93,7 @@ const C = {
   text:      '#d4c8b0',   // Text — warmes Creme
 }
 
-// ── Figur zeichnen ────────────────────────────────────────────────────────────
+// ── Figur zeichnen (isometrisch, mit Schatten) ───────────────────────────────
 function drawFigure(
   ctx:   CanvasRenderingContext2D,
   x:     number,
@@ -101,46 +101,51 @@ function drawFigure(
   color: string = C.figure,
   label: string = '',
 ) {
-  // Schatten
-  ctx.fillStyle = 'rgba(0,0,0,0.3)'
+  // Schatten (Ellipse auf dem Boden)
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.beginPath()
-  ctx.ellipse(x, y + FIG_H/2 + 2, FIG_W/2, 3, 0, 0, Math.PI * 2)
+  ctx.ellipse(x, y + 3, 9, 4, 0, 0, Math.PI * 2)
   ctx.fill()
+
+  const baseY = y - 4  // Füße stehen auf dem Boden
 
   // Beine
   ctx.fillStyle = '#1a2a3a'
-  ctx.fillRect(x - 4, y + 10, 4, 8)
-  ctx.fillRect(x + 1, y + 10, 4, 8)
+  ctx.fillRect(x - 4, baseY - 8, 3.5, 8)
+  ctx.fillRect(x + 1, baseY - 8, 3.5, 8)
 
   // Körper
   ctx.fillStyle = '#2a4e7a'
-  ctx.fillRect(x - 5, y, 10, 11)
+  ctx.fillRect(x - 5, baseY - 18, 10, 11)
 
   // Arme
   ctx.fillStyle = '#2a4e7a'
-  ctx.fillRect(x - 8, y + 1, 4, 7)
-  ctx.fillRect(x + 5, y + 1, 4, 7)
+  ctx.fillRect(x - 8, baseY - 17, 3.5, 8)
+  ctx.fillRect(x + 5, baseY - 17, 3.5, 8)
 
-  // Helm
+  // Helm (mit Highlight für 3D-Effekt)
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.arc(x, y - 3, 6, 0, Math.PI * 2)
+  ctx.arc(x, baseY - 22, 6, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'
+  ctx.beginPath()
+  ctx.arc(x - 2, baseY - 24, 2.5, 0, Math.PI * 2)
   ctx.fill()
 
   // Visier
   ctx.fillStyle = '#4a90d0'
-  ctx.globalAlpha = 0.6
+  ctx.globalAlpha = 0.7
   ctx.beginPath()
-  ctx.arc(x, y - 3, 4, 0, Math.PI * 2)
+  ctx.arc(x, baseY - 22, 4, 0, Math.PI * 2)
   ctx.fill()
   ctx.globalAlpha = 1
 
-  // Label
   if (label) {
     ctx.fillStyle = C.text
-    ctx.font = '8px monospace'
+    ctx.font = 'bold 8px monospace'
     ctx.textAlign = 'center'
-    ctx.fillText(label, x, y - 12)
+    ctx.fillText(label, x, baseY - 32)
   }
 }
 
