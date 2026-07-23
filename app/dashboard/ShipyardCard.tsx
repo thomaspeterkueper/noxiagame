@@ -80,27 +80,6 @@ export default function ShipyardCard({
   const [rotation, setRotation] = useState(0)
   useEffect(() => {
     const i = setInterval(() => setRotation(r => (r + 0.3) % 360), 30)
-    // Schiffsmodule aus aktiven Schiff mappen
-  const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
-    slotIndex: m.slot ?? i,
-    moduleId:  m.entity_id ?? 'cargo',
-    entityId:  m.id,
-    condition: m.condition ?? 100,
-    status:    (m.status ?? 'active') as 'active' | 'damaged' | 'disabled',
-  }))
-
-  return (
-    <>
-    {interior && (
-      <ShipInteriorOverlay
-        frameId={activeShip?.frameId ?? 'mk1'}
-        modules={shipModules}
-        credits={credits}
-        onClose={() => setInterior(false)}
-      />
-    )}) => clearInterval(i)
-  }, [])
-
   // Schiffsmodule aus aktiven Schiff mappen
   const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
     slotIndex: m.slot ?? i,
