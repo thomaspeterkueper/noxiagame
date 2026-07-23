@@ -1,0 +1,463 @@
+'use client'
+// app/dashboard/WalkableColony.tsx
+// Erstellt:     20.07.2026
+// Aktualisiert: 20.07.2026 — Vertical Slice: Habitat → Straße → Raumhafen → Pad
+// Version:      0.1.0
+//
+// Phase B Vertical Slice.
+// Frage: Fühlt sich NOXIA anders an, sobald ich meine Kolonie betreten kann?
+//
+// Invariante: Die Mikroebene erfindet keinen zweiten Weltzustand.
+//             Alles ist Projektion des bestehenden Weltzustands.
+//
+// Straßen: ausschließlich über getStreetTiles() — kein direktes generateGrid().
+
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { getStreetTiles, isStreet, nearestStreetTile } from '@/lib/game/streetTiles'
+
+// ── Typen ─────────────────────────────────────────────────────────────────────
+interface TileEntity {
+  id:          string
+  entity_id:   string
+  entity_type: string
+  tile_row:    number
+  tile_col:    number
+  profile_id:  string | null
+  owner_class: string
+  actor_name?: string | null
+  username?:   string | null
+}
+
+interface Ship {
+  id:          string
+  ship_type:   string
+  is_active:   boolean
+  location_id: string
+}
+
+interface Props {
+  locationSlug:   string
+  locationName:   string
+  population:     number
+  entities:       TileEntity[]
+  pending:        any[]
+  ships:          Ship[]
+  locationId:     string
+  userId:         string
+  onClose:        () => void
+}
+
+// ── Render-Konstanten ─────────────────────────────────────────────────────────
+const TILE_PX   = 48        // Mikro-Tile Größe in px
+const COLS      = 32
+const ROWS      = 24
+const CANVAS_W  = COLS * TILE_PX
+const CANVAS_H  = ROWS * TILE_PX
+
+// Viewport: was der Spieler sieht (scrollbar)
+const VP_W = 800
+const VP_H = 500
+
+// Figur-Größe
+const FIG_W = 14
+const FIG_H = 20
+
+// ── Farben ────────────────────────────────────────────────────────────────────
+const C = {
+  ground:    '#1a2a1a',   // Gelände
+  road:      '#2a2a2a',   // Straße
+  roadMain:  '#333333',   // Hauptstraße
+  crossing:  '#3a3a3a',   // Kreuzung
+  roadLine:  '#4a4a4a',   // Straßen-Markierung
+  habitat:   '#2a4e3a',   // Habitat-Boden
+  pad:       '#3a3a4e',   // Landing Pad
+  padActive: '#2a3a6a',   // Pad mit Schiff
+  terminal:  '#4e3a2a',   // Terminal
+  state:     '#1a3a4e',   // Staatliche Gebäude
+  corp:      '#3a2a1a',   // Corporation
+  figure:    '#c9a961',   // Spieler-Figur
+  npc:       '#7a9ab0',   // NPC
+  ship:      '#4a6a9a',   // Schiff
+  gridLine:  'rgba(255,255,255,0.04)',
+  text:      '#8a9aaa',
+}
+
+// ── Figur zeichnen ────────────────────────────────────────────────────────────
+function drawFigure(
+  ctx:   CanvasRenderingContext2D,
+  x:     number,
+  y:     number,
+  color: string = C.figure,
+  label: string = '',
+) {
+  // Schatten
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'
+  ctx.beginPath()
+  ctx.ellipse(x, y + FIG_H/2 + 2, FIG_W/2, 3, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Beine
+  ctx.fillStyle = '#1a2a3a'
+  ctx.fillRect(x - 4, y + 10, 4, 8)
+  ctx.fillRect(x + 1, y + 10, 4, 8)
+
+  // Körper
+  ctx.fillStyle = '#2a4e7a'
+  ctx.fillRect(x - 5, y, 10, 11)
+
+  // Arme
+  ctx.fillStyle = '#2a4e7a'
+  ctx.fillRect(x - 8, y + 1, 4, 7)
+  ctx.fillRect(x + 5, y + 1, 4, 7)
+
+  // Helm
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.arc(x, y - 3, 6, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Visier
+  ctx.fillStyle = '#4a90d0'
+  ctx.globalAlpha = 0.6
+  ctx.beginPath()
+  ctx.arc(x, y - 3, 4, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  // Label
+  if (label) {
+    ctx.fillStyle = C.text
+    ctx.font = '8px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText(label, x, y - 12)
+  }
+}
+
+// ── Tile zeichnen ─────────────────────────────────────────────────────────────
+function drawTile(
+  ctx:    CanvasRenderingContext2D,
+  col:    number,
+  row:    number,
+  color:  string,
+  label?: string,
+  icon?:  string,
+) {
+  const x = col * TILE_PX
+  const y = row * TILE_PX
+  ctx.fillStyle = color
+  ctx.fillRect(x, y, TILE_PX, TILE_PX)
+  if (icon) {
+    ctx.font = `${TILE_PX * 0.5}px serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(icon, x + TILE_PX / 2, y + TILE_PX / 2)
+  }
+  if (label) {
+    ctx.fillStyle = C.text
+    ctx.font = '7px monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    ctx.fillText(label, x + TILE_PX / 2, y + TILE_PX - 2)
+  }
+}
+
+// ── Schiff zeichnen ───────────────────────────────────────────────────────────
+function drawShip(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+  ctx.fillStyle = C.ship
+  ctx.beginPath()
+  ctx.moveTo(cx, cy - 18)
+  ctx.lineTo(cx - 14, cy + 8)
+  ctx.lineTo(cx - 10, cy + 12)
+  ctx.lineTo(cx + 10, cy + 12)
+  ctx.lineTo(cx + 14, cy + 8)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = '#6a9aca'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  // Triebwerk-Glühen
+  ctx.fillStyle = '#ff8a1a'
+  ctx.globalAlpha = 0.6
+  ctx.beginPath()
+  ctx.ellipse(cx, cy + 14, 8, 4, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
+}
+
+// ── Haupt-Komponente ──────────────────────────────────────────────────────────
+export default function WalkableColony({
+  locationSlug, locationName, population,
+  entities, pending, ships, locationId, userId, onClose,
+}: Props) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Figur-Position in Tile-Koordinaten (float für Bewegung)
+  const [figPos, setFigPos] = useState({ col: 4.5, row: 8.5 })
+  const [moving, setMoving] = useState(false)
+  const [tooltip, setTooltip] = useState<string | null>(null)
+  const [viewport, setViewport] = useState({ x: 0, y: 0 })
+
+  // Aus Weltzustand: Straßen, Gebäude, Schiffe
+  const streets = getStreetTiles(locationSlug, population, entities, pending, userId, COLS, ROWS)
+
+  // Habitat des Spielers (Startposition)
+  const playerHabitat = entities.find(e =>
+    e.entity_id === 'habitat' && e.profile_id === userId
+  )
+  const landingPad = entities.find(e =>
+    e.entity_id === 'landing_pad' || e.entity_id === 'docking_bay'
+  )
+  const hasShipAtLocation = ships.some(s => s.is_active)
+
+  // Figur beim ersten Render auf Habitat setzen
+  useEffect(() => {
+    if (playerHabitat) {
+      setFigPos({ col: playerHabitat.tile_col + 0.5, row: playerHabitat.tile_row + 0.5 })
+    }
+  }, [])
+
+  // Viewport auf Figur zentrieren
+  useEffect(() => {
+    const fx = figPos.col * TILE_PX
+    const fy = figPos.row * TILE_PX
+    setViewport({
+      x: Math.max(0, Math.min(CANVAS_W - VP_W, fx - VP_W / 2)),
+      y: Math.max(0, Math.min(CANVAS_H - VP_H, fy - VP_H / 2)),
+    })
+  }, [figPos])
+
+  // Canvas rendern
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Hintergrund
+    ctx.fillStyle = C.ground
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+
+    // Grid-Linien (sehr dezent)
+    ctx.strokeStyle = C.gridLine
+    ctx.lineWidth = 0.5
+    for (let c = 0; c <= COLS; c++) {
+      ctx.beginPath(); ctx.moveTo(c * TILE_PX, 0); ctx.lineTo(c * TILE_PX, CANVAS_H); ctx.stroke()
+    }
+    for (let r = 0; r <= ROWS; r++) {
+      ctx.beginPath(); ctx.moveTo(0, r * TILE_PX); ctx.lineTo(CANVAS_W, r * TILE_PX); ctx.stroke()
+    }
+
+    // Straßen (aus Adapter — keine direkte generateGrid-Abhängigkeit)
+    for (const s of streets) {
+      const color = s.subtype === 'main' ? C.roadMain
+                  : s.subtype === 'crossing' ? C.crossing
+                  : C.road
+      drawTile(ctx, s.col, s.row, color)
+      // Straßen-Markierung (Mittellinie)
+      if (s.subtype === 'main') {
+        ctx.strokeStyle = C.roadLine
+        ctx.lineWidth = 1
+        ctx.setLineDash([4, 4])
+        ctx.beginPath()
+        ctx.moveTo(s.col * TILE_PX + TILE_PX / 2, s.row * TILE_PX)
+        ctx.lineTo(s.col * TILE_PX + TILE_PX / 2, s.row * TILE_PX + TILE_PX)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+    }
+
+    // Gebäude aus tile_entities (Projektion des Weltzustands)
+    for (const e of entities) {
+      if (e.entity_type !== 'building') continue
+      const isOwn   = e.profile_id === userId
+      const isState = e.owner_class === 'STATE'
+      const isCorp  = !!e.profile_id && !isOwn
+
+      const color = isState ? C.state
+                  : isOwn   ? C.habitat
+                  : isCorp  ? C.corp
+                  : C.habitat
+
+      const icons: Record<string, string> = {
+        habitat: '🏠', mine: '⛏', solar: '☀️',
+        landing_pad: '🛬', docking_bay: '🛬',
+        bank: '🏦', school: '🏫', shipyard: '⚙️',
+        warehouse: '📦', admin: '🏛', command_center: '📡',
+      }
+
+      drawTile(ctx, e.tile_col, e.tile_row, color,
+        e.entity_id, icons[e.entity_id] ?? '🏗')
+
+      // Eigene Gebäude: goldener Rand
+      if (isOwn) {
+        ctx.strokeStyle = '#c9a961'
+        ctx.lineWidth = 2
+        ctx.strokeRect(e.tile_col * TILE_PX + 1, e.tile_row * TILE_PX + 1, TILE_PX - 2, TILE_PX - 2)
+      }
+    }
+
+    // Schiff am Landing Pad (Projektion: nur wenn ships vorhanden)
+    if (landingPad && hasShipAtLocation) {
+      const cx = (landingPad.tile_col + 0.5) * TILE_PX
+      const cy = (landingPad.tile_row + 0.3) * TILE_PX
+      drawShip(ctx, cx, cy)
+    }
+
+    // Spieler-Figur
+    const fx = (figPos.col) * TILE_PX
+    const fy = (figPos.row) * TILE_PX
+    drawFigure(ctx, fx, fy, C.figure, 'Du')
+
+    // Orientierungs-Kompass
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(CANVAS_W - 40, 8, 32, 32)
+    ctx.fillStyle = '#c9a961'
+    ctx.font = '10px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText('N', CANVAS_W - 24, 24)
+
+  }, [figPos, streets, entities, ships, userId, landingPad, hasShipAtLocation])
+
+  // Klick auf Canvas → Figur bewegen
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const scaleX = CANVAS_W / rect.width
+    const scaleY = CANVAS_H / rect.height
+    const px = (e.clientX - rect.left) * scaleX + viewport.x
+    const py = (e.clientY - rect.top)  * scaleY + viewport.y
+    const col = px / TILE_PX
+    const row = py / TILE_PX
+    setFigPos({ col, row })
+
+    // Tooltip: Was ist hier?
+    const hitEntity = entities.find(en =>
+      Math.floor(col) === en.tile_col && Math.floor(row) === en.tile_row
+    )
+    if (hitEntity) {
+      const name = hitEntity.actor_name ?? hitEntity.username ?? 'Unbekannt'
+      const owner = hitEntity.profile_id === userId ? 'Dein Gebäude'
+                  : hitEntity.owner_class === 'STATE' ? 'Staatlich'
+                  : name
+      setTooltip(`${hitEntity.entity_id} — ${owner}`)
+      setTimeout(() => setTooltip(null), 2000)
+    }
+  }, [entities, userId, viewport])
+
+  // Keyboard-Navigation
+  useEffect(() => {
+    const STEP = 0.5
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return }
+      setFigPos(p => {
+        const next = { ...p }
+        if (e.key === 'ArrowUp'    || e.key === 'w') next.row = Math.max(0, p.row - STEP)
+        if (e.key === 'ArrowDown'  || e.key === 's') next.row = Math.min(ROWS - 1, p.row + STEP)
+        if (e.key === 'ArrowLeft'  || e.key === 'a') next.col = Math.max(0, p.col - STEP)
+        if (e.key === 'ArrowRight' || e.key === 'd') next.col = Math.min(COLS - 1, p.col + STEP)
+        return next
+      })
+    }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [onClose])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 2000,
+      background: '#000',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '0.5rem 1rem', background: '#070b14',
+        borderBottom: '1px solid #1d2a3d', flexShrink: 0,
+      }}>
+        <div>
+          <span style={{ color: '#c9a961', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700 }}>
+            ◈ {locationName.toUpperCase()} — KOLONIEANSICHT
+          </span>
+          <span style={{ color: '#3a4e5a', fontSize: '0.65rem', marginLeft: '1rem', fontFamily: 'monospace' }}>
+            Bevölkerung: {population.toLocaleString()}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span style={{ color: '#3a4e5a', fontSize: '0.62rem', fontFamily: 'monospace' }}>
+            WASD / Pfeiltasten · Klick zum Bewegen · ESC beenden
+          </span>
+          <button onClick={onClose} style={{
+            background: 'none', border: '1px solid #1d2a3d',
+            color: '#5a6b7a', borderRadius: 6, padding: '3px 10px',
+            cursor: 'pointer', fontSize: '0.75rem',
+          }}>ESC</button>
+        </div>
+      </div>
+
+      {/* Canvas-Viewport (scrollt mit Figur) */}
+      <div ref={containerRef} style={{
+        flex: 1, overflow: 'hidden', position: 'relative',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          position: 'relative',
+          width: VP_W, height: VP_H,
+          overflow: 'hidden',
+          border: '1px solid #1d2a3d',
+          boxShadow: '0 0 60px rgba(0,0,0,0.8)',
+        }}>
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_W}
+            height={CANVAS_H}
+            onClick={handleCanvasClick}
+            style={{
+              display: 'block',
+              cursor: 'crosshair',
+              transform: `translate(${-viewport.x}px, ${-viewport.y}px)`,
+              transition: 'transform 0.2s ease',
+            }}
+          />
+          {/* Tooltip */}
+          {tooltip && (
+            <div style={{
+              position: 'absolute', bottom: 16, left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(7,11,20,0.9)', border: '1px solid #1d2a3d',
+              color: '#c9a961', padding: '4px 12px', borderRadius: 8,
+              fontSize: '0.72rem', fontFamily: 'monospace',
+              pointerEvents: 'none',
+            }}>
+              {tooltip}
+            </div>
+          )}
+          {/* Vignette */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.5) 100%)',
+          }} />
+        </div>
+      </div>
+
+      {/* Status-Bar */}
+      <div style={{
+        padding: '0.4rem 1rem', background: '#070b14',
+        borderTop: '1px solid #1d2a3d', flexShrink: 0,
+        display: 'flex', gap: '1.5rem', alignItems: 'center',
+      }}>
+        <span style={{ color: '#3a4e5a', fontFamily: 'monospace', fontSize: '0.62rem' }}>
+          POS {Math.round(figPos.col)},{Math.round(figPos.row)}
+        </span>
+        {landingPad && (
+          <span style={{ color: '#3a4e5a', fontFamily: 'monospace', fontSize: '0.62rem' }}>
+            RAUMHAFEN: {hasShipAtLocation ? '🛸 Schiff angedockt' : 'Leer'}
+          </span>
+        )}
+        <span style={{ color: '#3a4e5a', fontFamily: 'monospace', fontSize: '0.62rem' }}>
+          {streets.length} Straßen-Tiles · {entities.length} Gebäude
+        </span>
+      </div>
+    </div>
+  )
+}
