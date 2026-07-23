@@ -558,7 +558,7 @@ export default function ColonyGrid({
               locationId={''}
               userId={userId}
               onClose={() => setShowWalking(false)}
-              onEnterBuilding={e => { setInteriorEntity(e); setShowWalking(false) }}
+              onEnterBuilding={e => { setInteriorEntity(e as any); setShowWalking(false) }}
             />
           )}
           {/* Betreten-Button */}
@@ -611,7 +611,7 @@ export default function ColonyGrid({
             <BuildingInterior
               entity={interiorEntity as any}
               userId={userId}
-              locationResources={locationResources}
+              locationResources={locationResources as any}
               credits={credits}
               population={population}
               onClose={() => setInteriorEntity(null)}
