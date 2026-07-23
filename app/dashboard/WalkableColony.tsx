@@ -1,8 +1,8 @@
 'use client'
 // app/dashboard/WalkableColony.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — Overlay über Grid (kein fullscreen), Innenraum-Callback
-// Version:      0.3.0
+// Aktualisiert: 20.07.2026 — Isometrische Darstellung (Populous/SimCity2000-Stil)
+// Version:      0.4.0
 //
 // Phase B Vertical Slice.
 // Frage: Fühlt sich NOXIA anders an, sobald ich meine Kolonie betreten kann?
@@ -49,11 +49,21 @@ interface Props {
 }
 
 // ── Render-Konstanten ─────────────────────────────────────────────────────────
-const TILE_PX   = 48        // Mikro-Tile Größe in px
 const COLS      = 32
 const ROWS      = 24
-const CANVAS_W  = COLS * TILE_PX
-const CANVAS_H  = ROWS * TILE_PX
+const ISO_W     = 32        // Halbe Rautenbreite
+const ISO_H     = 16        // Halbe Rautenhöhe
+const BLOCK_H   = 26        // Gebäudehöhe (Extrusion)
+const CANVAS_W  = (COLS + ROWS) * ISO_W + 100
+const CANVAS_H  = (COLS + ROWS) * ISO_H + 200
+
+// Isometrische Projektion: Grid-Koordinaten → Canvas-Pixel
+function isoProject(col: number, row: number): { x: number; y: number } {
+  return {
+    x: (col - row) * ISO_W + CANVAS_W / 2,
+    y: (col + row) * ISO_H + 60,
+  }
+}
 
 // Viewport: was der Spieler sieht (scrollbar)
 const VP_W = 800
