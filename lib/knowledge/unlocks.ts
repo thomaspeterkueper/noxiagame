@@ -1,7 +1,7 @@
 // lib/knowledge/unlocks.ts
 // Erstellt:     19.07.2026
-// Aktualisiert: 19.07.2026 — Schritt 4: Feature-Gates für player_unlocks
-// Version:      1.0.0
+// Aktualisiert: 2026-07-21 — canFoundColony/Station/Scout/Pioneer Gates
+// Version:      1.1.0
 //
 // Lädt player_unlocks aus der DB und prüft Feature-Gates.
 // Verwendet von: BankOverlay, ColonyGrid, SchoolOverlay
@@ -46,6 +46,26 @@ export function canUseOrbitalNav(unlocks: string[]): boolean {
 // Beobachtungsdeck-Mission freigeschalten?
 export function canStartObservationDeck(unlocks: string[]): boolean {
   return hasUnlock(unlocks, 'UNL:NOX:MISSION:OBSERVATION-DECK')
+}
+
+// Kolonie gründen freigeschaltet? (SSF: ENG-COLONY-FOUND-0001)
+export function canFoundColony(unlocks: string[]): boolean {
+  return hasUnlock(unlocks, 'UNL:NOX:COLONY:FOUND')
+}
+
+// Station gründen freigeschaltet? (SSF: ENG-STATION-FOUND-0001)
+export function canFoundStation(unlocks: string[]): boolean {
+  return hasUnlock(unlocks, 'UNL:NOX:STATION:FOUND')
+}
+
+// Scout-Schiff freigeschaltet? (SSF: AST-SONNENSYSTEM-0001)
+export function canBuildScout(unlocks: string[]): boolean {
+  return hasUnlock(unlocks, 'UNL:NOX:SHIP:SCOUT')
+}
+
+// Pioneer-Schiff freigeschaltet? (SSF: ENG-COLONY/STATION-FOUND)
+export function canBuildPioneer(unlocks: string[]): boolean {
+  return hasUnlock(unlocks, 'UNL:NOX:SHIP:PIONEER')
 }
 
 // Alle Gate-Checks als Objekt (für Client-seitige Nutzung)
