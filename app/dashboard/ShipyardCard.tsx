@@ -80,6 +80,9 @@ export default function ShipyardCard({
   const [rotation, setRotation] = useState(0)
   useEffect(() => {
     const i = setInterval(() => setRotation(r => (r + 0.3) % 360), 30)
+    return () => clearInterval(i)
+  }, [])
+
   // Schiffsmodule aus aktiven Schiff mappen
   const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
     slotIndex: m.slot ?? i,
