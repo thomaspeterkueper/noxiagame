@@ -10,6 +10,7 @@ import ChatOverlay from './ChatOverlay'
 import FriendsDrawer from './FriendsDrawer'
 import FoundLocationOverlay from './FoundLocationOverlay'
 import ShipInteriorOverlay from './ShipInteriorOverlay'
+import WalkableColony from './WalkableColony'
 import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
 import React, { useState, useEffect } from 'react'
@@ -72,6 +73,7 @@ export default function DashboardClient({ locations: initialLocations, prices, o
   const [friendsOpen, setFriendsOpen]           = useState(false)
   const [foundingOpen, setFoundingOpen]         = useState(false)
   const [shipInterior, setShipInterior]         = useState(false)
+  const [walkingColony, setWalkingColony]       = useState(false)
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
@@ -275,6 +277,19 @@ export default function DashboardClient({ locations: initialLocations, prices, o
     <div style={{ minHeight: '100vh', background: T.bg, color: T.ink, fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
       <TransitPanel onArrival={() => {}} />
+      {walkingColony && currentLocation && (
+        <WalkableColony
+          locationSlug={currentLocation}
+          locationName={locationName ?? currentLocation}
+          population={population}
+          entities={tileEntities}
+          pending={pendingBuilds}
+          ships={ships}
+          locationId={currentLocationId ?? ''}
+          userId={userId ?? ''}
+          onClose={() => setWalkingColony(false)}
+        />
+      )}
       {shipInterior && (() => {
         const activeShip = ships.find((s: any) => s.is_active)
         const shipModules = (activeShip?.modules ?? []).map((m: any, i: number) => ({
@@ -336,6 +351,9 @@ export default function DashboardClient({ locations: initialLocations, prices, o
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
           {([['Credits', `${credits.toLocaleString('de')} Cr`], ['Frachter', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
+          <button onClick={() => setWalkingColony(true)} style={{ background: 'none', border: `1px solid ${T.line}`, borderRadius: 8, padding: '0.3rem 0.75rem', cursor: 'pointer', color: T.inkSoft, fontSize: '0.78rem' }}>
+            🚶 Betreten
+          </button>
           <button onClick={() => setFoundingOpen(true)} style={{ background: 'none', border: `1px solid ${T.line}`, borderRadius: 8, padding: '0.3rem 0.75rem', cursor: 'pointer', color: T.inkSoft, fontSize: '0.78rem' }}>
             🚀 Gründen
           </button>
