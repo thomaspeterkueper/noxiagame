@@ -275,13 +275,13 @@ export default function ShipInteriorOverlay({
               )
             }
             return (
-              <ModuleZone key={i}
+              <g key={i}><ModuleZone
                 slot={i} moduleId={mod.moduleId}
                 condition={mod.condition} status={mod.status}
                 totalSlots={frame.slots}
                 isSelected={selectedSlot === i}
                 onClick={() => { handleModuleClick(i) }}
-              />
+              /></g>
             )
           })}
 
