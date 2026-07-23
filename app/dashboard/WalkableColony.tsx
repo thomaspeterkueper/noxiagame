@@ -308,10 +308,9 @@ export default function WalkableColony({
     }
   }, [])
 
-  // Viewport auf Figur zentrieren
+  // Viewport auf Figur zentrieren (isometrisch projiziert)
   useEffect(() => {
-    const fx = figPos.col * TILE_PX
-    const fy = figPos.row * TILE_PX
+    const { x: fx, y: fy } = isoProject(figPos.col, figPos.row)
     setViewport({
       x: Math.max(0, Math.min(CANVAS_W - VP_W, fx - VP_W / 2)),
       y: Math.max(0, Math.min(CANVAS_H - VP_H, fy - VP_H / 2)),
