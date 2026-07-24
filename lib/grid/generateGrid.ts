@@ -1,7 +1,10 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.6.4
+// Aktualisiert: 24.07.2026 — Ground Truth von Scanner-Entdeckung getrennt
+// Version:  0.7.0
 //
+// v0.7.0: Anomalien werden nicht mehr durch die Existenz eines Scanners erzeugt.
+//   Sichtbar werden nur bereits gemessene/entdeckte Befunde aus dem Scan-State.
 // v0.6.4: Mond-Ressourcentiles ice/helium3/titanium als bebaubar
 //   freigeschaltet, damit Shackleton nach Moon Terrain v3 wieder nutzbar ist.
 // v0.6.3: Neue spezialisierte Terrain-Tiles als bebaubar/straßenfähig
@@ -15,6 +18,7 @@
 //   (lib/grid/locationMaps.ts). Flüsse/Wälder/Berge bleiben dadurch stabil.
 
 import { getFixedTerrain } from './locationMaps'
+import { loadScanState } from '@/lib/game/scanning'
 
 export const COLS = 12
 export const ROWS = 8
@@ -207,20 +211,12 @@ export function generateGrid(
     }
   }
 
-  // 7. Anomalie
-  const hasScanner = entities.some(e => e.entity_type === 'building' && e.entity_id === 'scanner')
-  if (hasScanner) {
-    const terrainCells: [number, number][] = []
-    for (let r = 0; r < rows; r++)
-      for (let c = 0; c < cols; c++) {
-        const t = grid[r][c].type
-        if (!t.startsWith('building_') && !t.startsWith('npc_') && !t.startsWith('road'))
-          terrainCells.push([r, c])
-      }
-    if (terrainCells.length > 0) {
-      const pick = Math.floor(seededRandom(seed, 7777) * terrainCells.length)
-      const [ar, ac] = terrainCells[pick]
-      grid[ar][ac] = { ...grid[ar][ac], anomaly: true }
+  // 7. Informations-Layer: nur entdeckte Befunde werden sichtbar.
+  // Ground Truth selbst lebt ausserhalb des sichtbaren Grids in scanning.ts.
+  const scanState = loadScanState(slug)
+  for (const discovery of scanState?.discoveries ?? []) {
+    if (discovery.row >= 0 && discovery.row < rows && discovery.col >= 0 && discovery.col < cols) {
+      grid[discovery.row][discovery.col] = { ...grid[discovery.row][discovery.col], anomaly: true }
     }
   }
 
