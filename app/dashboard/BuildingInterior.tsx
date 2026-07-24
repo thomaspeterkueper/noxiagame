@@ -1,8 +1,8 @@
 'use client'
 // app/dashboard/BuildingInterior.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — Raumhafen vollständig: Räume mit echter Funktion (Markt, Werft, Navigation, Schiff, Bar)
-// Version:      3.0.0
+// Aktualisiert: 20.07.2026 — Navigationsraum: echte SolarSystem-Karte eingebettet statt Popup
+// Version:      3.1.0
 //
 // Zeigt den Innenraum eines Gebäudes als perspektivische Einzelraum-Szenen.
 // Räume können eine Aktion öffnen (bestehende NOXIA-Systeme) oder reine
@@ -10,6 +10,7 @@
 // — Werftanschluss erscheint nur, wenn am Ort tatsächlich eine Werft existiert.
 
 import React, { useEffect, useState } from 'react'
+import SolarSystem from './SolarSystem'
 
 interface TileEntity {
   id:          string
@@ -39,6 +40,9 @@ interface Props {
   credits:           number
   population:        number
   hasShipyard:       boolean   // existiert am Ort eine Werft (tile_entities)?
+  currentTick?:      number    // für Navigationsraum: SolarSystem-Live-Ansicht
+  shipRange?:        number
+  currentLocationSlug?: string
   onClose:           () => void
   onAction?:         (kind: ActionKind) => void   // öffnet bestehendes NOXIA-Overlay
 }
@@ -48,7 +52,7 @@ interface RoomDef {
   label:    string
   icon:     string
   wallHue:  number
-  detail:   'console' | 'crates' | 'beds' | 'shelves' | 'reactor' | 'terminal' | 'desk' | 'bar' | 'stars' | 'dock' | 'plain'
+  detail:   'console' | 'crates' | 'beds' | 'shelves' | 'reactor' | 'terminal' | 'desk' | 'bar' | 'stars' | 'dock' | 'live_map' | 'plain'
   action?:  ActionKind
   actionLabel?: string
   visible?: (ctx: RoomCtx) => boolean
@@ -74,9 +78,8 @@ const LANDING_PAD_ROOMS: RoomDef[] = [
   { id: 'parts', label: 'Ersatzteil-Handel', icon: '🔧', wallHue: 25, detail: 'shelves',
     action: 'parts', actionLabel: '🔩 Ersatzteile ansehen',
     items: () => ['Modul-Regale', 'Werkbank'] },
-  { id: 'navroom', label: 'Navigationsraum', icon: '🧭', wallHue: 260, detail: 'stars',
-    action: 'navigation', actionLabel: '🌌 Sonnensystem ansehen',
-    items: () => ['Live-Projektion des Sonnensystems', 'Aktuelle Positionen aller Körper'] },
+  { id: 'navroom', label: 'Navigationsraum', icon: '🧭', wallHue: 260, detail: 'live_map',
+    items: () => ['Live-Projektion — echte Umlaufbahnen und Distanzen'] },
   { id: 'shipyard_link', label: 'Werftanschluss', icon: '⚙️', wallHue: 15, detail: 'reactor',
     action: 'shipyard', actionLabel: '🛠 Werft öffnen',
     visible: ({ hasShipyard }) => hasShipyard,
@@ -92,9 +95,8 @@ const LANDING_PAD_ROOMS: RoomDef[] = [
 const DOCKING_BAY_ROOMS: RoomDef[] = [
   { id: 'airlock', label: 'Luftschleuse', icon: '🚪', wallHue: 210, detail: 'plain',
     items: () => ['Druckausgleich bereit'] },
-  { id: 'navroom', label: 'Navigationsraum', icon: '🧭', wallHue: 260, detail: 'stars',
-    action: 'navigation', actionLabel: '🌌 Sonnensystem ansehen',
-    items: () => ['Live-Projektion des Sonnensystems'] },
+  { id: 'navroom', label: 'Navigationsraum', icon: '🧭', wallHue: 260, detail: 'live_map',
+    items: () => ['Live-Projektion — echte Umlaufbahnen und Distanzen'] },
   { id: 'dock', label: 'Andockbucht', icon: '🛸', wallHue: 220, detail: 'dock',
     action: 'ship', actionLabel: '🛸 Zum Schiff',
     items: () => ['Magnetkupplungen aktiv'] },
@@ -282,7 +284,8 @@ function RoomScene({ room }: { room: RoomDef }) {
 }
 
 export default function BuildingInterior({
-  entity, userId, locationResources, credits, population, hasShipyard, onClose, onAction,
+  entity, userId, locationResources, credits, population, hasShipyard,
+  currentTick, shipRange, currentLocationSlug, onClose, onAction,
 }: Props) {
   const allRooms = BUILDING_ROOMS[entity.entity_id] ?? DEFAULT_ROOMS
   const isOwn   = entity.profile_id === userId
@@ -340,7 +343,17 @@ export default function BuildingInterior({
         </span>
       </div>
 
-      <RoomScene room={room} />
+      {room.detail === 'live_map' ? (
+        <div style={{ background: '#05070c', padding: '0.4rem' }}>
+          <SolarSystem
+            currentTick={currentTick ?? 0}
+            shipRange={shipRange ?? 250}
+            currentLocation={currentLocationSlug ?? entity.entity_id}
+          />
+        </div>
+      ) : (
+        <RoomScene room={room} />
+      )}
 
       <div style={{ padding: '7px 10px', background: '#0a0a08', minHeight: 34 }}>
         <div style={{ color: '#6b6357', fontSize: '0.6rem', marginBottom: 3 }}>{ownerLabel}</div>
