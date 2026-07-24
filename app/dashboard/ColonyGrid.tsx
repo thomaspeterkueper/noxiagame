@@ -75,6 +75,7 @@ interface ColonyGridProps {
   inTransit?: boolean; onTravel?: (dest: string) => void
   gates?:           Record<string, boolean>
   onOpenShipyard?: () => void; onOpenWarehouse?: () => void; onChanged?: () => void
+  onInteriorAction?: (kind: 'market'|'shipyard'|'navigation'|'ship'|'parts'|null) => void
   tileSize?: number
   highlightEntityIds?: string[]   // entity_ids die mit goldenem Pulsring markiert werden
 }
@@ -299,7 +300,7 @@ export default function ColonyGrid({
   userId, entities = [], pending = [], tax, entityInfo,
   locationResources = [], credits = 0, highlightEntityIds = [] as string[],
   allLocations = [], cargo = {}, shipRange = 55, currentTick = 0,
-  inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, tileSize: externalTileSize, gates = {},
+  inTransit = false, onTravel, onOpenShipyard, onOpenWarehouse, onChanged, onInteriorAction, tileSize: externalTileSize, gates = {},
 }: ColonyGridProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [grid, setGrid] = useState<string[][]>([])
@@ -560,7 +561,9 @@ export default function ColonyGrid({
                   locationResources={locationResources as any}
                   credits={credits}
                   population={population}
+                  hasShipyard={entities.some((e: any) => e.entity_id === 'shipyard')}
                   onClose={() => setInteriorEntity(null)}
+                  onAction={kind => { onInteriorAction?.(kind); setInteriorEntity(null) }}
                 />
               </div>
             </div>
