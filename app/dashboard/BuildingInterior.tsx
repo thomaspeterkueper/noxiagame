@@ -1,12 +1,12 @@
 'use client'
 // app/dashboard/BuildingInterior.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 24.07.2026 — Scanner als echte Three.js-MicroScene
-// Version:      4.0.0
+// Aktualisiert: 24.07.2026 — Scanner erhält echte Grid-Position für Radius-Scan
+// Version:      4.1.0
 //
 // Legacy-Innenraeume bleiben vorerst als perspektivische Einzelraum-Szenen.
 // Der Scanner ist der erste echte begehbare Vertical Slice. Die 3D-Schicht
-// rendert ausschliesslich vorhandene NOXIA-Daten und besitzt keine Simulation.
+// rendert vorhandene NOXIA-Daten und loest Messungen der Domaenenlogik aus.
 
 import React, { useEffect, useState } from 'react'
 import SolarSystem from './SolarSystem'
@@ -194,7 +194,20 @@ export default function BuildingInterior({
   }, [entity.entity_id, canNext, canPrev, onClose, room, onAction])
 
   if (entity.entity_id === 'scanner') {
-    return <ScannerMicroScene resources={locationResources} population={population} ownerLabel={ownerLabel} onClose={onClose} />
+    return (
+      <ScannerMicroScene
+        resources={locationResources}
+        population={population}
+        ownerLabel={ownerLabel}
+        locationSlug={currentLocationSlug ?? 'unknown'}
+        scannerEntityId={entity.id}
+        scannerRow={entity.tile_row}
+        scannerCol={entity.tile_col}
+        gridRows={24}
+        gridCols={32}
+        onClose={onClose}
+      />
+    )
   }
 
   const items = room.items(ctx)
