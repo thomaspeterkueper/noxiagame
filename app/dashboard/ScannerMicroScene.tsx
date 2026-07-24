@@ -2,16 +2,22 @@
 
 // app/dashboard/ScannerMicroScene.tsx
 // Erstellt:     24.07.2026
-// Aktualisiert: 24.07.2026 — Three.js fuer den Vertical Slice runtime-only laden
-// Version:      0.2.0
+// Aktualisiert: 24.07.2026 — echter Radius-4-Scan mit Measurement/Discovery
+// Version:      0.3.0
 //
 // Kleiner First-Person-Vertical-Slice fuer NOXIA.
-// Die Szene besitzt keine eigenen Simulationsdaten; sie visualisiert nur den
-// uebergebenen Koloniekontext. Fuer den Prototyp wird Three.js browserseitig
-// als versioniertes ES-Modul geladen, damit package.json/pnpm-lock unangetastet
-// bleiben. Bei erfolgreicher Validierung wird Three regulär vendort/installiert.
+// Die Szene besitzt keine eigene Ground Truth. Sie loest lediglich Messungen
+// der Scanner-Domaenenlogik aus und visualisiert deren Ergebnis.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  SCANNER_BASE_RADIUS,
+  loadScanState,
+  runScannerMeasurement,
+  saveScanState,
+  type ScannerDiscovery,
+  type ScannerMeasurement,
+} from '@/lib/game/scanning'
 
 export interface ScannerResource {
   resource: string
@@ -24,10 +30,21 @@ interface Props {
   resources: ScannerResource[]
   population: number
   ownerLabel: string
+  locationSlug: string
+  scannerEntityId: string
+  scannerRow: number
+  scannerCol: number
+  gridRows?: number
+  gridCols?: number
   onClose: () => void
 }
 
 type InteractionId = 'scanner' | 'analysis' | 'airlock'
+
+type ScanOutcome = {
+  measurement: ScannerMeasurement
+  discoveries: ScannerDiscovery[]
+}
 
 const RESOURCE_LABEL: Record<string, string> = {
   water: 'Wasser',
@@ -37,7 +54,18 @@ const RESOURCE_LABEL: Record<string, string> = {
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js'
 
-export default function ScannerMicroScene({ resources, population, ownerLabel, onClose }: Props) {
+export default function ScannerMicroScene({
+  resources,
+  population,
+  ownerLabel,
+  locationSlug,
+  scannerEntityId,
+  scannerRow,
+  scannerCol,
+  gridRows = 24,
+  gridCols = 32,
+  onClose,
+}: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const interactRef = useRef<InteractionId | null>(null)
   const [locked, setLocked] = useState(false)
@@ -45,10 +73,37 @@ export default function ScannerMicroScene({ resources, population, ownerLabel, o
   const [panel, setPanel] = useState<InteractionId | null>(null)
   const [scanPulse, setScanPulse] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [scanOutcome, setScanOutcome] = useState<ScanOutcome | null>(null)
 
   const stocks = useMemo(() => Object.fromEntries(resources.map(r => [r.resource, r.stock])), [resources])
   const lowResources = useMemo(() => resources.filter(r => r.stock < 30).map(r => RESOURCE_LABEL[r.resource] ?? r.resource), [resources])
   const lowResourcesKey = lowResources.join('|')
+
+  const executeScan = () => {
+    const outcome = runScannerMeasurement({
+      locationSlug,
+      scannerEntityId,
+      origin: { row: scannerRow, col: scannerCol },
+      rows: gridRows,
+      cols: gridCols,
+      radius: SCANNER_BASE_RADIUS,
+    })
+
+    const previous = loadScanState(locationSlug)
+    const merged = new Map<string, ScannerDiscovery>()
+    for (const discovery of previous?.discoveries ?? []) merged.set(discovery.groundTruthId, discovery)
+    for (const discovery of outcome.discoveries) merged.set(discovery.groundTruthId, discovery)
+
+    saveScanState(locationSlug, {
+      latestMeasurement: outcome.measurement,
+      discoveries: Array.from(merged.values()),
+    })
+
+    setScanOutcome(outcome)
+    setPanel('scanner')
+    setScanPulse(true)
+    window.setTimeout(() => setScanPulse(false), 1800)
+  }
 
   useEffect(() => {
     const mount = mountRef.current
@@ -134,9 +189,9 @@ export default function ScannerMicroScene({ resources, population, ownerLabel, o
         box(0, 1.48, -3.76, 2.25, 1.05, 0.08, accentMat)
         const scanTexture = makeCanvasTexture([
           'NOXIA // FIELD SCANNER',
+          `RADIUS ${SCANNER_BASE_RADIUS} GRID`,
           `H2O   ${Math.round(stocks.water ?? 0)} t`,
           `ENERG ${Math.round(stocks.energy ?? 0)} t`,
-          `METAL ${Math.round(stocks.metal ?? 0)} t`,
         ])
         const scanScreen = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.95), new THREE.MeshBasicMaterial({ map: scanTexture }))
         scanScreen.position.set(0, 1.52, -3.805)
@@ -212,13 +267,8 @@ export default function ScannerMicroScene({ resources, population, ownerLabel, o
           if (event.key.toLowerCase() === 'e' && interactRef.current) {
             const id = interactRef.current
             if (id === 'airlock') onClose()
-            else {
-              setPanel(id)
-              if (id === 'scanner') {
-                setScanPulse(true)
-                window.setTimeout(() => setScanPulse(false), 1800)
-              }
-            }
+            else if (id === 'scanner') executeScan()
+            else setPanel(id)
           }
           if (event.key === 'Escape' && document.pointerLockElement !== renderer.domElement) onClose()
         }
@@ -305,12 +355,17 @@ export default function ScannerMicroScene({ resources, population, ownerLabel, o
       disposed = true
       cleanup?.()
     }
-  }, [stocks.water, stocks.energy, stocks.metal, population, lowResourcesKey, onClose])
+  }, [stocks.water, stocks.energy, population, lowResourcesKey, onClose, locationSlug, scannerEntityId, scannerRow, scannerCol, gridRows, gridCols])
 
-  const prompt = near === 'scanner' ? 'E  Scan-Konsole bedienen'
+  const prompt = near === 'scanner' ? `E  Radius-${SCANNER_BASE_RADIUS}-Scan starten`
     : near === 'analysis' ? 'E  Kolonieanalyse ansehen'
     : near === 'airlock' ? 'E  Forschungsstation verlassen'
     : locked ? 'WASD bewegen · Maus umsehen' : 'Klicken, um die Steuerung zu aktivieren'
+
+  const showResultOnMap = () => {
+    onClose()
+    window.setTimeout(() => window.location.reload(), 0)
+  }
 
   return (
     <div style={{ position: 'relative', width: '100%', height: 'min(68vh, 620px)', minHeight: 380, background: '#05090d', overflow: 'hidden', borderRadius: 8 }}>
@@ -320,6 +375,7 @@ export default function ScannerMicroScene({ resources, population, ownerLabel, o
         <div style={{ position: 'absolute', top: 12, left: 14, background: 'rgba(2,8,10,.72)', border: '1px solid rgba(111,231,231,.35)', borderRadius: 6, padding: '7px 9px', fontSize: '0.66rem' }}>
           <div style={{ color: '#6fe7e7', fontWeight: 700 }}>SCANNER // MICRO VIEW</div>
           <div style={{ color: '#8aa4a8', marginTop: 3 }}>{ownerLabel}</div>
+          <div style={{ color: '#8aa4a8', marginTop: 2 }}>Grid {scannerRow},{scannerCol} · Radius {SCANNER_BASE_RADIUS}</div>
         </div>
         <div style={{ position: 'absolute', left: '50%', top: '50%', width: 12, height: 12, marginLeft: -6, marginTop: -6 }}>
           <span style={{ position: 'absolute', left: 5, top: 0, width: 1, height: 12, background: 'rgba(220,245,245,.65)' }} />
@@ -335,8 +391,15 @@ export default function ScannerMicroScene({ resources, population, ownerLabel, o
           {panel === 'scanner' ? (
             <>
               <div style={{ color: '#6fe7e7', fontSize: '0.72rem', fontWeight: 700, marginBottom: 8 }}>FELDSCAN ABGESCHLOSSEN</div>
-              {resources.map(r => <div key={r.resource} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}><span>{RESOURCE_LABEL[r.resource] ?? r.resource}</span><span>{Math.round(r.stock)} t</span></div>)}
-              <div style={{ fontSize: '0.64rem', color: lowResources.length ? '#efb36b' : '#79d89b', marginTop: 9 }}>{lowResources.length ? `Versorgungswarnung: ${lowResources.join(', ')}` : 'Keine kritischen Versorgungswerte erkannt.'}</div>
+              <div style={{ fontSize: '0.66rem', color: '#9eb4b7' }}>Radius: {scanOutcome?.measurement.radius ?? SCANNER_BASE_RADIUS} Felder</div>
+              <div style={{ fontSize: '0.66rem', color: '#9eb4b7', marginTop: 4 }}>Erfasste Felder: {scanOutcome?.measurement.coveredCells.length ?? 0}</div>
+              <div style={{ marginTop: 10, padding: '8px 9px', border: '1px solid rgba(111,231,231,.2)', borderRadius: 5, color: scanOutcome?.discoveries.length ? '#efcf8b' : '#79d89b', fontSize: '0.68rem' }}>
+                {scanOutcome?.discoveries.length
+                  ? `${scanOutcome.discoveries.length} geologische Anomalie erkannt. Ursache noch unbekannt.`
+                  : 'Keine Anomalie innerhalb der aktuellen Sensorreichweite.'}
+              </div>
+              <div style={{ fontSize: '0.58rem', color: '#71888c', marginTop: 8 }}>Messdaten und Interpretation sind getrennt gespeichert. Aktuelle Interpretation: nur Anomalie-Level.</div>
+              <button onClick={showResultOnMap} style={{ width: '100%', marginTop: 10, padding: '7px 8px', background: '#0d383b', border: '1px solid #4ba9ad', borderRadius: 5, color: '#bdebed', cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.66rem' }}>Ergebnis auf Karte anzeigen</button>
             </>
           ) : (
             <>
