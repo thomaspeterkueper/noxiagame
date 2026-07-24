@@ -562,8 +562,11 @@ export default function ColonyGrid({
                   credits={credits}
                   population={population}
                   hasShipyard={entities.some((e: any) => e.entity_id === 'shipyard')}
+                  currentTick={currentTick}
+                  shipRange={shipRange}
+                  currentLocationSlug={slug}
                   onClose={() => setInteriorEntity(null)}
-                  onAction={kind => { onInteriorAction?.(kind); setInteriorEntity(null) }}
+                  onAction={kind => { if (kind && kind !== 'navigation') { onInteriorAction?.(kind); setInteriorEntity(null) } }}
                 />
               </div>
             </div>
