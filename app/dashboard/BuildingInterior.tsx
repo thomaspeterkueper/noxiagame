@@ -1,12 +1,13 @@
 'use client'
 // app/dashboard/BuildingInterior.tsx
 // Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — First-Person-Raumansicht (Gruds-in-Space-Stil, wie ShipWalkable)
-// Version:      2.0.0
+// Aktualisiert: 20.07.2026 — Raumhafen vollständig: Räume mit echter Funktion (Markt, Werft, Navigation, Schiff, Bar)
+// Version:      3.0.0
 //
 // Zeigt den Innenraum eines Gebäudes als perspektivische Einzelraum-Szenen.
-// Inhalt ist Projektion des Weltzustands — keine eigene Logik.
-// Raumkette linear begehbar (VORNE/HINTEN), wie im Schiffsinnenraum.
+// Räume können eine Aktion öffnen (bestehende NOXIA-Systeme) oder reine
+// Atmosphäre sein (Bar). Invariante bleibt: keine Aktion ohne reale Grundlage
+// — Werftanschluss erscheint nur, wenn am Ort tatsächlich eine Werft existiert.
 
 import React, { useEffect, useState } from 'react'
 
@@ -29,22 +30,29 @@ interface LocationResource {
   consumption: number
 }
 
+type ActionKind = 'market' | 'shipyard' | 'navigation' | 'ship' | 'parts' | null
+
 interface Props {
   entity:            TileEntity
   userId:            string
   locationResources: LocationResource[]
   credits:           number
   population:        number
+  hasShipyard:       boolean   // existiert am Ort eine Werft (tile_entities)?
   onClose:           () => void
+  onAction?:         (kind: ActionKind) => void   // öffnet bestehendes NOXIA-Overlay
 }
 
 interface RoomDef {
-  id:      string
-  label:   string
-  icon:    string
-  wallHue: number
-  detail:  'console' | 'crates' | 'beds' | 'shelves' | 'reactor' | 'terminal' | 'desk' | 'plain'
-  items:   (ctx: RoomCtx) => string[]
+  id:       string
+  label:    string
+  icon:     string
+  wallHue:  number
+  detail:   'console' | 'crates' | 'beds' | 'shelves' | 'reactor' | 'terminal' | 'desk' | 'bar' | 'stars' | 'dock' | 'plain'
+  action?:  ActionKind
+  actionLabel?: string
+  visible?: (ctx: RoomCtx) => boolean
+  items:    (ctx: RoomCtx) => string[]
 }
 
 interface RoomCtx {
@@ -53,10 +61,49 @@ interface RoomCtx {
   isOwn:       boolean
   population:  number
   credits:     number
+  hasShipyard: boolean
 }
 
-// Gebäude → Raumkette (linear, wie Schiffs-Layouts)
+// ── Raumhafen: vollständig ausgestaltet ──────────────────────────────────────
+const LANDING_PAD_ROOMS: RoomDef[] = [
+  { id: 'lobby', label: 'Lobby', icon: '🚪', wallHue: 210, detail: 'desk',
+    items: () => ['Ankunftshalle', 'Anzeigetafel mit Abflügen'] },
+  { id: 'cargo_office', label: 'Frachtbüro', icon: '📋', wallHue: 40, detail: 'console',
+    action: 'market', actionLabel: '📈 Markt öffnen',
+    items: () => ['Handelsterminal', 'Preisaushang'] },
+  { id: 'parts', label: 'Ersatzteil-Handel', icon: '🔧', wallHue: 25, detail: 'shelves',
+    action: 'parts', actionLabel: '🔩 Ersatzteile ansehen',
+    items: () => ['Modul-Regale', 'Werkbank'] },
+  { id: 'navroom', label: 'Navigationsraum', icon: '🧭', wallHue: 260, detail: 'stars',
+    action: 'navigation', actionLabel: '🌌 Sonnensystem ansehen',
+    items: () => ['Live-Projektion des Sonnensystems', 'Aktuelle Positionen aller Körper'] },
+  { id: 'shipyard_link', label: 'Werftanschluss', icon: '⚙️', wallHue: 15, detail: 'reactor',
+    action: 'shipyard', actionLabel: '🛠 Werft öffnen',
+    visible: ({ hasShipyard }) => hasShipyard,
+    items: () => ['Direktverbindung zur Werft'] },
+  { id: 'dock', label: 'Landedock', icon: '🛬', wallHue: 200, detail: 'dock',
+    action: 'ship', actionLabel: '🛸 Zum Schiff',
+    items: ({ isOwn }) => [isOwn ? 'Dein Schiff liegt hier' : 'Fremdes Dock'] },
+  { id: 'bar', label: 'Bar', icon: '🍺', wallHue: 30, detail: 'bar',
+    items: () => ['„Hab gehört, Goibniu Co. baut wieder eine Mine…"', 'Ein Pilot nickt dir zu.'] },
+]
+
+// ── Andockbucht (Stationen) — kompakter, gleiche Prinzipien ──────────────────
+const DOCKING_BAY_ROOMS: RoomDef[] = [
+  { id: 'airlock', label: 'Luftschleuse', icon: '🚪', wallHue: 210, detail: 'plain',
+    items: () => ['Druckausgleich bereit'] },
+  { id: 'navroom', label: 'Navigationsraum', icon: '🧭', wallHue: 260, detail: 'stars',
+    action: 'navigation', actionLabel: '🌌 Sonnensystem ansehen',
+    items: () => ['Live-Projektion des Sonnensystems'] },
+  { id: 'dock', label: 'Andockbucht', icon: '🛸', wallHue: 220, detail: 'dock',
+    action: 'ship', actionLabel: '🛸 Zum Schiff',
+    items: () => ['Magnetkupplungen aktiv'] },
+]
+
+// ── Übrige Gebäude: einfacher, ohne Aktionen (noch nicht ausgestaltet) ───────
 const BUILDING_ROOMS: Record<string, RoomDef[]> = {
+  landing_pad:   LANDING_PAD_ROOMS,
+  docking_bay:   DOCKING_BAY_ROOMS,
   habitat: [
     { id: 'entry',   label: 'Eingangsschleuse', icon: '🚪', wallHue: 200, detail: 'plain',
       items: () => ['Druckluftschleuse', 'Stiefelablage'] },
@@ -78,18 +125,6 @@ const BUILDING_ROOMS: Record<string, RoomDef[]> = {
       items: ({ production }) => [`Produktion: ${production ?? 0}t Energie/Tick`, 'Paneele optimal ausgerichtet'] },
     { id: 'buffer',  label: 'Pufferspeicher',   icon: '🔋', wallHue: 200, detail: 'reactor',
       items: () => ['Akku-Bank', 'Ladezustand nominal'] },
-  ],
-  landing_pad: [
-    { id: 'tower',   label: 'Kontrollturm',     icon: '📡', wallHue: 210, detail: 'console',
-      items: ({ isOwn }) => [isOwn ? 'Anflugkorridor frei — dein Pad' : 'Landegebühr fällig'] },
-    { id: 'pad',     label: 'Pad-Fläche',       icon: '🛬', wallHue: 200, detail: 'plain',
-      items: () => ['Landemarkierungen', 'Treibstoffanschluss'] },
-  ],
-  docking_bay: [
-    { id: 'airlock', label: 'Luftschleuse',     icon: '🚪', wallHue: 210, detail: 'plain',
-      items: () => ['Druckausgleich bereit'] },
-    { id: 'dock',    label: 'Andockbucht',      icon: '🛸', wallHue: 220, detail: 'console',
-      items: () => ['Magnetkupplungen aktiv', 'Andockkorridor bereit'] },
   ],
   bank: [
     { id: 'lobby',   label: 'Empfang',          icon: '🏦', wallHue: 45,  detail: 'desk',
@@ -133,8 +168,8 @@ const DEFAULT_ROOMS: RoomDef[] = [
   { id: 'entry', label: 'Eingang', icon: '🏗', wallHue: 90, detail: 'plain', items: () => ['Gebäude in Betrieb.'] },
 ]
 
-// ── Trapez-Korridor-Raum (identischer Stil zu ShipWalkable) ──────────────────
-function RoomScene({ room, ctx }: { room: RoomDef; ctx: RoomCtx }) {
+// ── Trapez-Korridor-Raum ──────────────────────────────────────────────────────
+function RoomScene({ room }: { room: RoomDef }) {
   const wallColor  = `hsl(${room.wallHue}, 30%, 34%)`
   const wallLight  = `hsl(${room.wallHue}, 35%, 46%)`
   const wallDark   = `hsl(${room.wallHue}, 25%, 22%)`
@@ -142,9 +177,7 @@ function RoomScene({ room, ctx }: { room: RoomDef; ctx: RoomCtx }) {
 
   return (
     <svg viewBox="0 0 400 220" style={{ width: '100%', display: 'block', background: '#05070c' }}>
-      {/* Decke */}
       <polygon points="0,0 400,0 260,48 140,48" fill={wallDark} />
-      {/* Boden */}
       <polygon points="0,220 400,220 260,128 140,128" fill={floorColor} opacity={0.85} />
       {[0.35, 0.6, 0.85].map((t, i) => {
         const y = 128 + (220 - 128) * t
@@ -152,15 +185,12 @@ function RoomScene({ room, ctx }: { room: RoomDef; ctx: RoomCtx }) {
         const xR = 260 + (400 - 260) * t
         return <line key={i} x1={xL} y1={y} x2={xR} y2={y} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
       })}
-      {/* Linke/Rechte Wand */}
       <polygon points="0,0 140,48 140,128 0,220" fill={wallColor} />
       <polygon points="0,0 18,8 18,205 0,220" fill={wallLight} opacity={0.3} />
       <polygon points="400,0 260,48 260,128 400,220" fill={wallColor} />
       <polygon points="400,0 382,8 382,205 400,220" fill={wallDark} opacity={0.4} />
-      {/* Rückwand */}
       <polygon points="140,48 260,48 260,128 140,128" fill={wallLight} />
 
-      {/* Detail je Raumtyp */}
       {room.detail === 'console' && (
         <>
           <rect x={155} y={60} width={90} height={40} rx={2} fill="#0a1520" stroke="#4a90d0" strokeWidth={1.5} />
@@ -218,35 +248,65 @@ function RoomScene({ room, ctx }: { room: RoomDef; ctx: RoomCtx }) {
           <circle cx={200} cy={78} r={5} fill="#c9a961" opacity={0.6} />
         </>
       )}
+      {room.detail === 'bar' && (
+        <>
+          <rect x={155} y={90} width={90} height={10} fill="#3a2818" />
+          <rect x={155} y={70} width={12} height={20} fill="#2a1a10" />
+          {[0,1,2].map(i => (
+            <rect key={i} x={165+i*22} y={72} width={6} height={16} rx={1} fill="#8a4a30" opacity={0.8} />
+          ))}
+        </>
+      )}
+      {room.detail === 'stars' && (
+        <>
+          <circle cx={200} cy={85} r={28} fill="none" stroke="#4a90d0" strokeWidth={1} opacity={0.4} />
+          {[...Array(12)].map((_, i) => {
+            const a = (i / 12) * Math.PI * 2
+            const r = 8 + (i % 3) * 6
+            return <circle key={i} cx={200 + Math.cos(a)*r} cy={85 + Math.sin(a)*r*0.6}
+              r={1} fill="#c9d8ff" opacity={0.7} />
+          })}
+          <circle cx={200} cy={85} r={4} fill="#c0563f" />
+        </>
+      )}
+      {room.detail === 'dock' && (
+        <>
+          <rect x={165} y={65} width={70} height={45} rx={2} fill="none" stroke="#4a90d0" strokeWidth={1.5} strokeDasharray="4,2" />
+          <polygon points="200,72 185,95 190,105 210,105 215,95" fill="#3a5a7a" stroke="#6a9aca" strokeWidth={1} />
+        </>
+      )}
 
-      {/* Icon */}
       <text x={200} y={170} textAnchor="middle" fontSize={20} opacity={0.85}>{room.icon}</text>
     </svg>
   )
 }
 
 export default function BuildingInterior({
-  entity, userId, locationResources, credits, population, onClose,
+  entity, userId, locationResources, credits, population, hasShipyard, onClose, onAction,
 }: Props) {
-  const rooms = BUILDING_ROOMS[entity.entity_id] ?? DEFAULT_ROOMS
-  const [roomIdx, setRoomIdx] = useState(0)
-  const room = rooms[Math.min(roomIdx, rooms.length - 1)]
-
+  const allRooms = BUILDING_ROOMS[entity.entity_id] ?? DEFAULT_ROOMS
   const isOwn   = entity.profile_id === userId
   const isState = entity.owner_class === 'STATE'
-  const ownerLabel = isOwn ? '🔑 Dein Gebäude'
-    : isState ? '🏛 Staatlich'
-    : `👤 ${entity.actor_name ?? entity.username ?? 'Fremd'}`
 
+  const ctxBase: RoomCtx = {
+    stock: undefined, production: undefined, isOwn, population, credits, hasShipyard,
+  }
   const res = locationResources.find(r =>
     (entity.entity_id === 'mine'  && r.resource === 'metal') ||
     (entity.entity_id === 'solar' && r.resource === 'energy') ||
     (entity.entity_id === 'warehouse' && r.resource === 'water')
   )
+  const ctx: RoomCtx = { ...ctxBase, stock: res?.stock, production: res?.production }
 
-  const ctx: RoomCtx = { stock: res?.stock, production: res?.production, isOwn, population, credits }
+  const rooms = allRooms.filter(r => !r.visible || r.visible(ctx))
+  const [roomIdx, setRoomIdx] = useState(0)
+  const room = rooms[Math.min(roomIdx, rooms.length - 1)]
+
+  const ownerLabel = isOwn ? '🔑 Dein Gebäude'
+    : isState ? '🏛 Staatlich'
+    : `👤 ${entity.actor_name ?? entity.username ?? 'Fremd'}`
+
   const items = room.items(ctx)
-
   const canPrev = roomIdx > 0
   const canNext = roomIdx < rooms.length - 1
 
@@ -255,17 +315,19 @@ export default function BuildingInterior({
       if (e.key === 'Escape') { onClose(); return }
       if ((e.key === 'ArrowRight' || e.key === 'd') && canNext) setRoomIdx(i => i + 1)
       if ((e.key === 'ArrowLeft'  || e.key === 'a') && canPrev) setRoomIdx(i => i - 1)
+      if ((e.key === ' ' || e.key === 'Enter') && room.action && onAction) {
+        onAction(room.action); e.preventDefault()
+      }
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [canNext, canPrev, onClose])
+  }, [canNext, canPrev, onClose, room, onAction])
 
   return (
     <div style={{
       background: '#000', border: '2px solid #4a3a1a', borderRadius: 4,
       overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontFamily: 'monospace',
     }}>
-      {/* Kopfzeile */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '4px 10px', background: '#151510', borderBottom: '1px solid #4a3a1a',
@@ -278,9 +340,8 @@ export default function BuildingInterior({
         </span>
       </div>
 
-      <RoomScene room={room} ctx={ctx} />
+      <RoomScene room={room} />
 
-      {/* Beschreibung */}
       <div style={{ padding: '7px 10px', background: '#0a0a08', minHeight: 34 }}>
         <div style={{ color: '#6b6357', fontSize: '0.6rem', marginBottom: 3 }}>{ownerLabel}</div>
         <div style={{ color: '#8fa878', fontSize: '0.64rem', lineHeight: 1.5 }}>
@@ -288,7 +349,18 @@ export default function BuildingInterior({
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Aktions-Button — nur wenn Raum eine echte Funktion öffnet */}
+      {room.action && onAction && (
+        <div style={{ padding: '0 10px 8px', background: '#0a0a08' }}>
+          <button onClick={() => onAction(room.action!)} style={{
+            width: '100%', padding: '8px', background: '#1a3a1a',
+            border: '1px solid #4a8a4a', borderRadius: 4,
+            color: '#a0e0a0', cursor: 'pointer', fontSize: '0.68rem',
+            fontFamily: 'monospace', fontWeight: 700,
+          }}>{room.actionLabel ?? 'Öffnen'}</button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 4, justifyContent: 'center', padding: '7px', background: '#0a0a08', borderTop: '1px solid #2a2418' }}>
         <button disabled={!canPrev} onClick={() => setRoomIdx(i => i - 1)}
           style={{
