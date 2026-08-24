@@ -1,6 +1,6 @@
 // lib/game/observation/types.ts
 // Erstellt:     21.08.2026
-// Version:      0.1.0
+// Version:      0.1.1
 //
 // Typen und Konstanten des NOXIA Game-Observation-Producers v0.1.
 // Umsetzung des Protokolls „Game Observation → Task Candidate“ aus
@@ -17,7 +17,6 @@
 // kein IO. Zeit wird als Parameter übergeben.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Observation-Kinds (Protokoll, initiale Liste) ────────────────────────────
 export const OBSERVATION_KINDS = [
   'BUG',
   'DEAD_END',
@@ -33,30 +32,15 @@ export const OBSERVATION_KINDS = [
 
 export type ObservationKind = (typeof OBSERVATION_KINDS)[number]
 
-// ── Gate-Konfiguration v0.1 ──────────────────────────────────────────────────
-// BUG und DEAD_END dürfen nach EINEM hoch-konfidenten, reproduzierbaren
-// Auftreten passieren. Alles andere wird in v0.1 nur aggregiert (spätere
-// Versionen) bzw. geparkt (PROPOSAL — niemals autonom umsetzen).
 export interface GateConfig {
-  /** Kinds, die in v0.1 automatisch zum TaskCandidate aufsteigen dürfen. */
   auto_promotable_kinds: ObservationKind[]
-  /** Kinds, die immer geparkt werden (kein autonomer Implementierungs-Task). */
   parked_kinds: ObservationKind[]
-  /** Mindest-Konfidenz (0..1) für Einzel-Auftreten-Promotion. */
   min_confidence: number
-  /** Mindestanzahl Reproduktionsschritte, sonst gilt die Beobachtung als nicht reproduzierbar. */
   min_reproduction_steps: number
-  /** Cooldown pro Fingerprint zwischen zwei Emissionen (ms). */
-  cooldown_ms: number
-  /** Obergrenze emittierter Kandidaten pro Welt (bounded emissions). */
   max_candidates_per_world: number
-  /** Obergrenze aggregierter Evidence-Refs je Kandidat (bounded provenance). */
   max_evidence_refs: number
-  /** Standard-Ziel-Repo-Code, wenn die Beobachtung kein Ziel vorschlägt. */
   default_target: string
-  /** Routing-Tiefe neuer Envelopes. */
   default_depth: number
-  /** Quelle (Repo-Code) des Producers. */
   source: string
 }
 
@@ -65,7 +49,6 @@ export const DEFAULT_GATE_CONFIG: GateConfig = {
   parked_kinds: ['PROPOSAL'],
   min_confidence: 0.9,
   min_reproduction_steps: 1,
-  cooldown_ms: 6 * 60 * 60 * 1000,   // 6 h pro Fingerprint
   max_candidates_per_world: 5,
   max_evidence_refs: 20,
   default_target: 'NOXIA',
@@ -73,9 +56,6 @@ export const DEFAULT_GATE_CONFIG: GateConfig = {
   source: 'NOXIA',
 }
 
-// ── Kosten-/Prioritäts-Mapping (Protokoll: „Cost policy“) ────────────────────
-// Reproduzierbare, blockierende BUG/DEAD_END → immediate; alles andere (das in
-// v0.1 ohnehin nicht emittiert wird) → prefer_off_peak.
 export const COST_POLICY_BY_KIND: Record<ObservationKind, string> = {
   BUG: 'immediate',
   DEAD_END: 'immediate',
@@ -86,12 +66,12 @@ export const COST_POLICY_BY_KIND: Record<ObservationKind, string> = {
   CONTENT_GAP: 'prefer_off_peak',
   RESOURCE_UNUSED: 'prefer_off_peak',
   AI_BEHAVIOR: 'prefer_off_peak',
-  PROPOSAL: 'off_peak_only',          // nie autonom — wird geparkt
+  PROPOSAL: 'off_peak_only',
 }
 
 export const PRIORITY_BY_KIND: Record<ObservationKind, 'low' | 'medium' | 'high' | 'critical'> = {
   BUG: 'medium',
-  DEAD_END: 'high',                   // blockiert Progression
+  DEAD_END: 'high',
   BALANCE_ANOMALY: 'low',
   UX_FRICTION: 'low',
   SCIENCE_GAP: 'low',
@@ -102,21 +82,14 @@ export const PRIORITY_BY_KIND: Record<ObservationKind, 'low' | 'medium' | 'high'
   PROPOSAL: 'low',
 }
 
-// ── Evidence ─────────────────────────────────────────────────────────────────
-// Evidence bleibt unabhängig von generierter Prosa erhalten (Protokoll:
-// „evidence retained independently of generated prose“). Ein Ref ist ein
-// stabiler Verweis (Zustands-Digest, Log-Referenz, Welt/Tick) — keine
-// Inhaltskopie, damit der Sink klein bleibt.
 export interface EvidenceItem {
   ref: string
-  kind?: string        // z. B. 'state' | 'log' | 'data'
-  digest?: string      // Hash des Beleginhalts (Provenienz ohne Inhalt)
+  kind?: string
+  digest?: string
   note?: string
 }
 
-// ── Observation (Protokoll-Envelope, NOXIA-seitig erweitert) ─────────────────
 export interface Observation {
-  /** Stabil vergebene ID; Default: `<fingerprint>-<laufende Nummer>`. */
   observation_id?: string
   world_id: string
   agent_id: string
@@ -127,21 +100,20 @@ export interface Observation {
   reproduction?: string[]
   expected: string
   actual: string
-  /** 0..1 */
   confidence: number
-  /** RFC3339; Default wird vom Sink aus dem übergebenen now gestempelt. */
   observed_at?: string
-  /** Vorgeschlagenes Ziel (Repo-Code). Das Gate/Routing validiert die Ownership. */
   target?: string
 }
 
-// ── TaskCandidate (Protokoll-Schema) ─────────────────────────────────────────
+export type FindingEvent = 'INITIAL' | 'REGRESSION'
+export type FindingStatus = 'UNEMITTED' | 'OPEN' | 'RESOLVED'
+
 export interface TaskCandidate {
-  /** Stabiler Fingerprint der zugrunde liegenden Bedingung. */
   candidate_id: string
   source: string
   target: string
   type: ObservationKind
+  finding_event: FindingEvent
   title: string
   reason: string
   requested_change: string
@@ -151,7 +123,6 @@ export interface TaskCandidate {
   confidence: number
   cost_policy: string
   estimated_effort: string
-  // Provenienz (Protokoll: world/agent/evidence bleibt an jedem Request erhalten)
   world_id: string
   agent_id: string
   reproduction: string[]
@@ -160,37 +131,32 @@ export interface TaskCandidate {
   observed_at: string
 }
 
-// ── Gate-Entscheidung ────────────────────────────────────────────────────────
 export type GateStatus = 'approved' | 'aggregating' | 'parked' | 'suppressed'
 
 export interface GateDecision {
   status: GateStatus
-  /** Kurzer, deterministischer Grund-Code (testbar). */
   reason: string
   fingerprint: string
   candidate: TaskCandidate | null
 }
 
-// ── KUEPER-Outbox-Envelope ───────────────────────────────────────────────────
-// Kern-Routingfelder (Router-Grenze) plus Protokoll-Provenienz. Der Router
-// validiert Ownership gegen das Ecosystem-Registry; der Producer schlägt nur vor.
 export interface OutboxEnvelope {
-  // Kern-Routingfelder
   target: string
   title: string
   reason: string
   requested_change: string
   expected_result: string
   priority: 'low' | 'medium' | 'high' | 'critical'
-  parent_task: string          // leer bei Game-Ursprung
+  parent_task: string
   depth: number
   affects: string[]
   cost_policy: string
-  // Protokoll-Provenienz
+  estimated_effort: string
   protocol: 'GAME_OBSERVATION_TASK_PROTOCOL'
   protocol_version: 'v0.1'
   candidate_id: string
   type: ObservationKind
+  finding_event: FindingEvent
   world_id: string
   agent_id: string
   occurrences: number
@@ -202,18 +168,16 @@ export interface OutboxEnvelope {
   observed_at: string
 }
 
-// ── Aggregat (interner Sink-Zustand, serialisierbar) ─────────────────────────
 export interface ObservationAggregate {
   fingerprint: string
   kind: ObservationKind
   system: string
   summary: string
   occurrences: number
-  /** Höchste Einzel-Konfidenz aller Vorkommen. */
   max_confidence: number
-  worlds: string[]               // unique, in Reihenfolge des Auftretens
-  agents: string[]               // unique
-  evidence_refs: string[]        // unique, capped
+  worlds: string[]
+  agents: string[]
+  evidence_refs: string[]
   reproduction: string[]
   expected: string
   actual: string
@@ -221,5 +185,8 @@ export interface ObservationAggregate {
   last_observed_at: string
   emissions: number
   last_emitted_at: string | null
+  finding_status: FindingStatus
+  resolved_at: string | null
+  regressions: number
   parked: boolean
 }
