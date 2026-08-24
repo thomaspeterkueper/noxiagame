@@ -2,8 +2,18 @@
 
 // app/dashboard/MarketAuction.tsx
 // Erstellt:     01.06.2026
-// Aktualisiert: 14.06.2026
-// Version:      0.3.0
+// Aktualisiert: 24.08.2026
+// Version:      0.4.0
+//
+// v0.4.0: BUGFIX kein Zuschlag möglich. Resource/Modus/Menge/Preislimit kamen
+// bisher ausschließlich aus initial*-Props, die DashboardClient dauerhaft fix
+// auf { resource:'water', mode:'buy', qty:10, limit:0 } gesetzt hatte — es gab
+// gar kein UI, um sie zu ändern. Mit playerLimit=0 fest verdrahtet konnte das
+// Spieler-Gebot beim Kauf nie über 0 Cr steigen → niemand verkauft für 0 Cr,
+// nie ein Zuschlag. Fix: neuer Konfigurations-Schritt vor Auktionsstart
+// (Ressource, Kaufen/Verkaufen, Menge, Preislimit einstellbar durch den
+// Spieler, mit sinnvollem Preis-Vorschlag aus Marktpreis/Verkäufer-Boden).
+// Auktion startet erst nach expliziter Bestätigung (configured-Gate).
 //
 // v0.3.0: BUGFIX Endlos-Wiederholung. Die Auktion startete nach jeder Buchung
 // neu, weil der Start-useEffect von startAuction → playerMaxQty (Credits/Cargo)
@@ -98,10 +108,16 @@ export default function MarketAuction({
   initialQty: number
   playerLimit: number
 }) {
-  const mode = initialMode
-  const resource = initialResource
-  const playerQty = initialQty
-  const limit = playerLimit
+  // Resource/Modus/Menge/Preislimit sind jetzt einstellbar (v0.4.0) — vorher
+  // waren das fixe Konstanten aus den (nie befüllten) initial*-Props, u.a.
+  // playerLimit=0 fest verdrahtet in DashboardClient → Spieler-Gebot konnte
+  // nie über 0 Cr steigen, kein Zuschlag war je möglich.
+  const [resource, setResource] = useState<ResourceType>(initialResource)
+  const [mode, setMode] = useState<Mode>(initialMode)
+  const [qty, setQty] = useState<number>(initialQty)
+  const [limit, setLimit] = useState<number>(0)
+  const [limitTouched, setLimitTouched] = useState(false)
+  const [configured, setConfigured] = useState(false)
   const [running, setRunning] = useState(true)
   const [log, setLog] = useState<{ text: string; ok: boolean } | null>(null)
 
@@ -130,6 +146,23 @@ export default function MarketAuction({
   })()
   const frozenMaxRef = useRef(0)
 
+  // Sinnvollen Standard-Preis für das Limit vorschlagen, solange der Spieler
+  // ihn nicht selbst angefasst hat. Kauf: Marktpreis (Zuschlag realistisch).
+  // Verkauf: aktueller Verkäufer-Boden (Untergrenze, kein Sofort-Verschenken).
+  useEffect(() => {
+    if (configured || limitTouched || !row) return
+    setLimit(mode === 'buy' ? buyerCeiling(row) : sellerFloor(row))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row, mode, configured])
+
+  // Menge kappen, wenn Ressource/Modus wechselt und die bisherige Menge das
+  // neue Maximum überschreitet.
+  useEffect(() => {
+    if (configured) return
+    setQty(q => Math.max(1, Math.min(q, Math.max(1, playerMaxQty))))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resource, mode, playerMaxQty, configured])
+
   const startAuction = useCallback(() => {
     if (!row) return
     endedRef.current = false
@@ -148,7 +181,7 @@ export default function MarketAuction({
       // Verkauf: Spieler ist Verkäufer — sein Startpreis = sein Mindestlimit
       // NPC-Käufer steigen von unten auf. Spieler-Preis fällt bis auf limit.
       sellerPriceRef.current = clampPrice(limit)
-      sellerStockRef.current = Math.min(playerQty, frozenMaxRef.current)
+      sellerStockRef.current = Math.min(qty, frozenMaxRef.current)
     }
 
     const buyers: Buyer[] = []
@@ -157,7 +190,7 @@ export default function MarketAuction({
       buyers.push({
         id: 'player', name: 'Du', color: '#c9a961', isPlayer: true,
         price: clampPrice(floor - 10), aggr: 0,
-        want: Math.min(playerQty, frozenMaxRef.current), got: 0, done: false,
+        want: Math.min(qty, frozenMaxRef.current), got: 0, done: false,
       })
       for (let i = 0; i < nNpc; i++) {
         buyers.push({
@@ -183,22 +216,24 @@ export default function MarketAuction({
     setView({ sellerPrice: sellerPriceRef.current, sellerStock: sellerStockRef.current, buyers: buyers.map(b => ({ ...b })) })
     setRunning(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row, mode, playerQty])
+  }, [row, mode, qty, limit])
 
   // Start GENAU EINMAL pro Öffnen. Beim Schließen Guard zurücksetzen, damit die
   // nächste Auktion wieder startet. Bewusst NICHT von startAuction/playerMaxQty
   // abhängig — das war die Ursache des Endlos-Neustarts.
   useEffect(() => {
-    if (open && row && !startedRef.current) {
+    if (open && row && configured && !startedRef.current) {
       startedRef.current = true
       startAuction()
     }
     if (!open) {
       startedRef.current = false
       endedRef.current = true
+      setConfigured(false)
+      setLimitTouched(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, row])
+  }, [open, row, configured])
 
   useEffect(() => {
     if (!open || !running || !row) return
@@ -296,7 +331,7 @@ export default function MarketAuction({
 
   async function settleSellerPlayer() {
     if (!row) return
-    const offered = Math.min(playerQty, frozenMaxRef.current)
+    const offered = Math.min(qty, frozenMaxRef.current)
     const soldQty = offered - sellerStockRef.current
     const price = Math.round(sellerPriceRef.current)
     if (soldQty <= 0) { setLog({ text: 'Niemand hat zu deinem Preis gekauft.', ok: false }); return }
@@ -330,13 +365,92 @@ export default function MarketAuction({
           <button onClick={onClose} style={{ background: 'transparent', border: '0.5px solid #2a4e7a', color: '#cfe0f5', borderRadius: '7px', padding: '6px 12px', cursor: 'pointer', fontSize: '0.75rem' }}>Schließen ✕</button>
         </div>
 
+        {!configured ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Ressource */}
+            <div>
+              <div style={{ fontSize: '0.68rem', color: '#7d93b0', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>Ressource</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {rows.map(r => (
+                  <button key={r.resource} onClick={() => setResource(r.resource)}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: '8px',
+                      border: `0.5px solid ${resource === r.resource ? '#c9a961' : '#2a4e7a'}`,
+                      background: resource === r.resource ? 'rgba(201,169,97,0.15)' : 'transparent',
+                      color: resource === r.resource ? '#e0c486' : '#cfe0f5',
+                      cursor: 'pointer', fontSize: '0.78rem',
+                    }}>
+                    {RESOURCE_ICON[r.resource]} {RESOURCE_LABEL[r.resource]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Kaufen / Verkaufen */}
+            <div>
+              <div style={{ fontSize: '0.68rem', color: '#7d93b0', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>Modus</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setMode('buy')}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: '8px', border: `0.5px solid ${mode === 'buy' ? '#1d9e75' : '#2a4e7a'}`, background: mode === 'buy' ? 'rgba(29,158,117,0.15)' : 'transparent', color: mode === 'buy' ? '#5dcaa5' : '#cfe0f5', cursor: 'pointer', fontSize: '0.78rem' }}>
+                  Kaufen
+                </button>
+                <button onClick={() => setMode('sell')} disabled={(cargo[resource] ?? 0) <= 0}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: '8px', border: `0.5px solid ${mode === 'sell' ? '#c9a961' : '#2a4e7a'}`, background: mode === 'sell' ? 'rgba(201,169,97,0.15)' : 'transparent', color: (cargo[resource] ?? 0) <= 0 ? '#3a4a5a' : (mode === 'sell' ? '#e0c486' : '#cfe0f5'), cursor: (cargo[resource] ?? 0) <= 0 ? 'not-allowed' : 'pointer', fontSize: '0.78rem' }}>
+                  Verkaufen
+                </button>
+              </div>
+            </div>
+
+            {/* Menge */}
+            <div>
+              <div style={{ fontSize: '0.68rem', color: '#7d93b0', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                Menge (max. {playerMaxQty}t)
+              </div>
+              <input type="number" min={1} max={Math.max(1, playerMaxQty)} value={qty}
+                onChange={e => setQty(Math.max(1, Math.min(Math.max(1, playerMaxQty), Number(e.target.value) || 1)))}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #2a4e7a', background: '#06101c', color: '#e8e6df', fontSize: '0.82rem', fontFamily: 'monospace' }} />
+            </div>
+
+            {/* Preislimit */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#7d93b0', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                <span>{mode === 'buy' ? 'Maximalpreis (dein Gebotslimit)' : 'Mindestpreis (dein Verkaufslimit)'}</span>
+                <span style={{ color: '#5f7596', textTransform: 'none', letterSpacing: 0 }}>
+                  {mode === 'buy' ? `Marktpreis ${buyerCeiling(row)} Cr` : `Verkäufer-Boden ${sellerFloor(row)} Cr`}
+                </span>
+              </div>
+              <input type="number" min={PRICE_MIN} max={PRICE_MAX} value={limit}
+                onChange={e => { setLimitTouched(true); setLimit(clampPrice(Number(e.target.value) || PRICE_MIN)) }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '0.5px solid #2a4e7a', background: '#06101c', color: '#e8e6df', fontSize: '0.82rem', fontFamily: 'monospace' }} />
+              <div style={{ fontSize: '0.62rem', color: '#5f7596', marginTop: '4px' }}>
+                {mode === 'buy'
+                  ? 'Höheres Limit = schnellerer Zuschlag, aber teurer. Zu niedrig: evtl. kein Zuschlag.'
+                  : 'Niedrigeres Limit = schnellerer Verkauf, aber weniger Erlös. Zu hoch: evtl. kein Käufer.'}
+              </div>
+            </div>
+
+            <button onClick={() => setConfigured(true)} disabled={playerMaxQty <= 0}
+              style={{
+                marginTop: '4px', padding: '11px 0', borderRadius: '9px', border: 'none',
+                background: playerMaxQty > 0 ? 'linear-gradient(135deg, #c9a961, #b3924f)' : '#2a3a4a',
+                color: playerMaxQty > 0 ? '#0d1a26' : '#5a6a7a', fontWeight: 700, fontSize: '0.85rem',
+                cursor: playerMaxQty > 0 ? 'pointer' : 'not-allowed',
+              }}>
+              {playerMaxQty > 0 ? 'Auktion starten' : (mode === 'buy' ? 'Kein Laderaum frei' : 'Nichts zum Verkaufen an Bord')}
+            </button>
+          </div>
+        ) : (
+        <>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px', fontSize: '0.78rem' }}>
           <span style={{ color: '#cfe0f5', fontWeight: 600 }}>{RESOURCE_ICON[resource]} {RESOURCE_LABEL[resource]}</span>
           <span style={{ background: mode === 'buy' ? 'rgba(29,158,117,0.15)' : 'rgba(201,169,97,0.15)', border: `0.5px solid ${mode === 'buy' ? '#1d9e75' : '#c9a961'}`, color: mode === 'buy' ? '#5dcaa5' : '#e0c486', borderRadius: '6px', padding: '2px 10px', fontSize: '0.72rem' }}>
             {mode === 'buy' ? 'Du kaufst' : 'Du verkaufst'}
           </span>
           <span style={{ color: '#7d93b0', fontSize: '0.72rem' }}>
-            Menge: <strong style={{ color: '#c9a961' }}>{Math.min(playerQty, playerMaxQty)}t</strong>
+            Menge: <strong style={{ color: '#c9a961' }}>{Math.min(qty, playerMaxQty)}t</strong>
+          </span>
+          <span style={{ color: '#7d93b0', fontSize: '0.72rem' }}>
+            Limit: <strong style={{ color: '#e0846a' }}>{limit} Cr</strong>
           </span>
         </div>
 
@@ -397,10 +511,12 @@ export default function MarketAuction({
           </div>
         </>
 
-        <div style={{ marginTop: '12px', fontSize: '0.72rem', minHeight: '20px', fontFamily: 'monospace', color: log ? (log.ok ? '#5dcaa5' : '#e0846a') : '#9fb4cf' }}>
-          {log ? log.text
-            : (mode === 'buy' ? 'Dein Gebot steigt automatisch. Triffst du den Verkäufer zuerst, bekommst du deine Menge.' : 'Die Käufer steigen Richtung deines Preises. Wer trifft, kauft.')}
-        </div>
+          <div style={{ marginTop: '12px', fontSize: '0.72rem', minHeight: '20px', fontFamily: 'monospace', color: log ? (log.ok ? '#5dcaa5' : '#e0846a') : '#9fb4cf' }}>
+            {log ? log.text
+              : (mode === 'buy' ? 'Dein Gebot steigt automatisch. Triffst du den Verkäufer zuerst, bekommst du deine Menge.' : 'Die Käufer steigen Richtung deines Preises. Wer trifft, kauft.')}
+          </div>
+        </>
+        )}
       </div>
     </div>
   )
