@@ -2,8 +2,9 @@
 
 // app/dashboard/WarehouseOverlay.tsx
 // Erstellt:     21.06.2026 21:20
-// Aktualisiert: 21.06.2026 21:20
-// Version:      1.0.0
+// Aktualisiert: 24.08.2026 — skipConfig an MarketAuction: BuyRow fragt Menge/Limit
+//               bereits ab, doppelte Abfrage in MarketAuction entfernt
+// Version:      1.1.0
 //
 // Warenhaus-Overlay — öffnet sich beim Klick auf warehouse/market im Grid.
 // Enthält Marktpreise (Kauf/Verkauf-Auktion) und Auftrags-Verhandlung.
@@ -102,6 +103,7 @@ export default function WarehouseOverlay({
           initialMode={auctionConfig.mode}
           initialQty={auctionConfig.qty}
           playerLimit={auctionConfig.limit}
+          skipConfig
         />
       )}
 
