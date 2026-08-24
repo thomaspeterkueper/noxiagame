@@ -1,8 +1,8 @@
 'use client'
 
 // StationOverlay.tsx
-// Aktualisiert: 22.06.2026 — StationOverlay
-// Version:      0.2.0
+// Aktualisiert: 24.08.2026 — Handel-Button (onOpenMarket) ergänzt: Stationen hatten keinen Weg zum Markt
+// Version:      0.3.0
 // app/dashboard/StationOverlay.tsx
 // Erstellt:     21.06.2026
 // Aktualisiert: 22.06.2026 08:50
@@ -78,6 +78,7 @@ interface StationOverlayProps {
   entities:          StationModule[]
   onChanged:         () => void
   onOpenWarehouse?:  () => void
+  onOpenMarket?:     () => void
   // Optionale Props von DashboardClient (werden akzeptiert aber noch nicht verwendet)
   allLocations?:     any[]
   cargo?:            any
@@ -340,6 +341,7 @@ function BuildModulePopup({
 export default function StationOverlay({
   slug, name, population, populationMax, userId,
   locationId, locationResources, credits, entities, onChanged, onOpenWarehouse,
+  onOpenMarket,
 }: StationOverlayProps) {
   const { loadFromServer, invalidate } = useGameStore()
   const [selected, setSelected]     = useState<string | null>(null)
@@ -440,11 +442,26 @@ export default function StationOverlay({
           ) : (
             <>
               {/* Ressourcen-Status */}
-              <div style={{ fontSize: '0.6rem', color: '#3a5a7a', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.6rem' }}>
-                Ressourcen
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                <div style={{ fontSize: '0.6rem', color: '#3a5a7a', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  Ressourcen
+                </div>
+                {onOpenMarket && (
+                  <button onClick={onOpenMarket} title="Markt öffnen"
+                    style={{
+                      background: 'rgba(201,169,97,0.15)', border: '1px solid #c9a961',
+                      borderRadius: '5px', padding: '0.2rem 0.5rem', fontSize: '0.6rem',
+                      color: '#c9a961', cursor: 'pointer', fontFamily: MONO, fontWeight: 700,
+                    }}>
+                    💱 Handel
+                  </button>
+                )}
               </div>
               {locationResources.map(r => (
-                <div key={r.resource} style={{ marginBottom: '0.5rem' }}>
+                <div key={r.resource}
+                  onClick={onOpenMarket}
+                  style={{ marginBottom: '0.5rem', cursor: onOpenMarket ? 'pointer' : 'default' }}
+                  title={onOpenMarket ? `${RES_LABEL[r.resource]} kaufen/verkaufen` : undefined}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', marginBottom: '3px' }}>
                     <span style={{ color: '#8a9ab0' }}>{RES_ICON[r.resource]} {RES_LABEL[r.resource]}</span>
                     <span style={{ color: stockColor(r.stock, r.consumption), fontWeight: 600 }}>{r.stock}t</span>
@@ -455,7 +472,7 @@ export default function StationOverlay({
                 </div>
               ))}
               <div style={{ marginTop: '0.75rem', fontSize: '0.6rem', color: '#3a5a7a', lineHeight: 1.6 }}>
-                Modul anklicken für Details
+                Modul anklicken für Details{onOpenMarket ? ' · Ressource anklicken zum Handeln' : ''}
               </div>
             </>
           )}
