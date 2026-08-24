@@ -14,9 +14,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { observationFingerprint } from './fingerprint.ts'
 import { LocalObservationSink } from './sink.ts'
 import {
   PRIORITY_BY_KIND,
+  TARGET_PATTERN,
+  isValidTarget,
   type EvidenceItem,
   type GateConfig,
   type GateDecision,
@@ -46,6 +49,16 @@ export const PROTOCOL_ID = 'GAME_OBSERVATION_TASK_PROTOCOL'
 export const PROTOCOL_VERSION = 'v0.1'
 
 export function envelopeFilename(candidate: TaskCandidate): string {
+  // Letzte Schreib-Grenze: Nur Registry-Targets (^[A-Z][A-Z0-9-]*$) dürfen in
+  // den Dateinamen — sonst könnte ein Caller-Pfad das Outbox-Verzeichnis
+  // verlassen. Der Sink fällt bei ungültigen Targets bereits auf das
+  // Default-Target zurück; dieser Guard deckt auch direkt konstruierte
+  // Kandidaten und alte Snapshots ab.
+  if (!isValidTarget(candidate.target)) {
+    throw new Error(
+      `Invalid outbox target '${candidate.target}' — expected ${TARGET_PATTERN} per kueper-ecosystem followup-request.schema.json`,
+    )
+  }
   return `${candidate.target}-${candidate.type}-${candidate.candidate_id}.json`
 }
 
@@ -123,12 +136,29 @@ export class ObservationProducer {
   }
 
   ingest(obs: Observation, nowMs: number): IngestResult {
-    const { decision } = this.sink.record(obs, nowMs)
-    if (decision.status === 'approved' && decision.candidate && this.writer) {
-      const { envelope, filename } = emitCandidate(decision.candidate, this.writer, this.depth, this.affects)
-      return { decision, envelope, filename }
+    let envelope: OutboxEnvelope | null = null
+    let filename: string | null = null
+    let decision: GateDecision
+    try {
+      const result = this.sink.record(obs, nowMs, (candidate) => {
+        if (!this.writer) return
+        const emitted = emitCandidate(candidate, this.writer, this.depth, this.affects)
+        envelope = emitted.envelope
+        filename = emitted.filename
+      })
+      decision = result.decision
+    } catch {
+      // Writer-Fehler (Disk full, EACCES, ungültiges Target): Der Sink hat den
+      // Emissions-Zustand noch nicht committet — der Befund bleibt erneut
+      // emittierbar. Nie in Gameplay-Code werfen.
+      decision = {
+        status: 'suppressed',
+        reason: 'outbox_write_failed',
+        fingerprint: observationFingerprint(obs),
+        candidate: null,
+      }
     }
-    return { decision, envelope: null, filename: null }
+    return { decision, envelope, filename }
   }
 }
 

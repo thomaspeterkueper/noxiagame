@@ -15,7 +15,7 @@ import {
   recordAssertion,
   type OutboxWriter,
 } from './producer.ts'
-import type { Observation, OutboxEnvelope } from './types.ts'
+import type { Observation, OutboxEnvelope, TaskCandidate } from './types.ts'
 
 const T0 = Date.parse('2026-08-21T12:00:00.000Z')
 const DAY = 24 * 60 * 60 * 1000
@@ -252,6 +252,83 @@ function bugObs(world: string, summary: string, confidence = 0.95): Observation 
     pruefe(false, '11. Kandidat erwartet')
   }
   rmSync(dir, { recursive: true, force: true })
+}
+
+// 12. Ungültiges Observation.target (Pfad-Traversal) wird auf das Default-Target
+//     zurückgesetzt; der Dateiname kann das Outbox-Verzeichnis nie verlassen.
+{
+  const dir = mkdtempSync(join(tmpdir(), 'noxia-outbox-'))
+  const producer = new ObservationProducer({ writer: createFileOutboxWriter(dir) })
+  const obs = deadEndObs('noxia-010', 'Target escape attempt')
+  obs.target = '../../escaped-target'
+  const r = producer.ingest(obs, T0)
+
+  pruefe(r.decision.status === 'approved', '12. ungültiges target verhindert die Emission nicht')
+  pruefe(r.filename !== null && r.filename.startsWith('NOXIA-'), `12. Dateiname nutzt Default-Target (${r.filename})`)
+  const parsed = JSON.parse(readFileSync(join(dir, r.filename as string), 'utf8')) as OutboxEnvelope
+  pruefe(parsed.target === 'NOXIA', `12. Envelope-Target auf Default zurückgefallen (${parsed.target})`)
+  rmSync(dir, { recursive: true, force: true })
+}
+
+// 12b. envelopeFilename weist ungültige Targets an der Datei-Grenze ab (letzte Verteidigung).
+{
+  let threw = false
+  try {
+    envelopeFilename({ target: '../../x' } as TaskCandidate)
+  } catch {
+    threw = true
+  }
+  pruefe(threw, '12b. envelopeFilename lehnt ungültiges Target ab')
+}
+
+// 13. Writer-Fehler committet keinen Emissions-Zustand; Retry emittiert; kein Throw in Gameplay.
+{
+  const writes: string[] = []
+  let fail = true
+  const writer: OutboxWriter = {
+    write(filename: string): void {
+      if (fail) throw new Error('simulated disk full')
+      writes.push(filename)
+    },
+  }
+  const producer = new ObservationProducer({ writer })
+  const obs = deadEndObs('noxia-011', 'Emission while disk full')
+  const failed = producer.ingest(obs, T0)
+  const agg = producer.sink.aggregate(failed.decision.fingerprint)
+
+  pruefe(failed.decision.status === 'suppressed' && failed.decision.reason === 'outbox_write_failed', '13. Writer-Fehler wird abgefangen, kein Throw in Gameplay')
+  pruefe(agg?.finding_status === 'UNEMITTED' && agg?.emissions === 0, '13. kein Emissions-Commmit nach Writer-Fehler')
+  pruefe(producer.sink.worldEmissionCount('noxia-011') === 0, '13. kein World-Emission-Zähler nach Writer-Fehler')
+
+  fail = false
+  const retry = producer.ingest(obs, T0 + 1)
+  pruefe(retry.decision.status === 'approved', '13. Retry nach Writer-Erholung emittiert')
+  pruefe(writes.length === 1, `13. genau eine erfolgreiche Emission (war ${writes.length})`)
+}
+
+// 14. Regression bei Writer-Fehler: RESOLVED-Status bleibt erhalten, Retry emittiert REGRESSION.
+{
+  const writer = new MemoryWriter()
+  const producer = new ObservationProducer({ writer })
+  const obs = bugObs('noxia-012', 'Regression survives write failure')
+  const first = producer.ingest(obs, T0)
+  const fingerprint = first.decision.fingerprint
+  producer.sink.markResolved(fingerprint, T0 + DAY)
+  const resolvedAt = producer.sink.aggregate(fingerprint)?.resolved_at
+
+  const failingProducer = new ObservationProducer({
+    writer: { write: () => { throw new Error('EACCES') } },
+    sink: producer.sink,
+  })
+  const failed = failingProducer.ingest(obs, T0 + 2 * DAY)
+  const agg = producer.sink.aggregate(fingerprint)
+  pruefe(failed.decision.reason === 'outbox_write_failed', '14. Regression-Write-Fehler abgefangen')
+  pruefe(agg?.finding_status === 'RESOLVED', '14. Status bleibt RESOLVED nach fehlgeschlagenem Write')
+  pruefe(agg?.resolved_at === resolvedAt, '14. resolved_at bleibt erhalten')
+
+  const regression = producer.ingest(obs, T0 + 3 * DAY)
+  pruefe(regression.decision.status === 'approved' && regression.decision.candidate?.finding_event === 'REGRESSION', '14. Retry emittiert REGRESSION')
+  pruefe(writer.writes.length === 2, `14. genau zwei Emissionen insgesamt (war ${writer.writes.length})`)
 }
 
 console.log(`\n${fails === 0 ? '✓ alle Observation-Producer-Tests bestanden' : `✘ ${fails} Fehlschläge`}`)

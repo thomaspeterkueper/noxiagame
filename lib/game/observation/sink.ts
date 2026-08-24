@@ -21,6 +21,7 @@ import { observationFingerprint } from './fingerprint.ts'
 import {
   DEFAULT_GATE_CONFIG,
   COST_POLICY_BY_KIND,
+  isValidTarget,
   type FindingEvent,
   type GateConfig,
   type GateDecision,
@@ -65,7 +66,7 @@ export class LocalObservationSink {
     this.config = { ...DEFAULT_GATE_CONFIG, ...config }
   }
 
-  record(obs: Observation, nowMs: number): RecordResult {
+  record(obs: Observation, nowMs: number, onApproved?: (candidate: TaskCandidate) => void): RecordResult {
     const fingerprint = observationFingerprint(obs)
     const observedAt = obs.observed_at ?? iso(nowMs)
     const agg = this.upsertAggregate(fingerprint, obs, observedAt)
@@ -73,6 +74,11 @@ export class LocalObservationSink {
 
     const decision = this.decide(agg, obs, observedAt)
     if (decision.candidate) {
+      // Schreib-Grenze: Der Producer schreibt die Envelope über den Callback,
+      // BEVOR der Emissions-Zustand committet wird. Wirft der Writer, bleibt
+      // der Befund unverändert und damit erneut emittierbar — kein
+      // finding_still_open-Verlust durch einen fehlgeschlagenen Write.
+      onApproved?.(decision.candidate)
       const isRegression = decision.candidate.finding_event === 'REGRESSION'
       agg.emissions += 1
       agg.last_emitted_at = observedAt
@@ -143,10 +149,14 @@ export class LocalObservationSink {
   ): TaskCandidate {
     const c = this.config
     const prefix = findingEvent === 'REGRESSION' ? 'REGRESSION: ' : ''
+    // Ziel-Targets sind Caller-Eingabe und landen unverändert im Outbox-
+    // Dateinamen. Nur Registry-Kennungen (^[A-Z][A-Z0-9-]*$) passieren;
+    // alles andere fällt auf das Default-Target zurück.
+    const target = obs.target ?? c.default_target
     return {
       candidate_id: agg.fingerprint,
       source: c.source,
-      target: obs.target ?? c.default_target,
+      target: isValidTarget(target) ? target : c.default_target,
       type: agg.kind,
       finding_event: findingEvent,
       title: `${prefix}${agg.kind}: ${agg.summary}`,

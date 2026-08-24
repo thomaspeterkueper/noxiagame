@@ -56,6 +56,17 @@ export const DEFAULT_GATE_CONFIG: GateConfig = {
   source: 'NOXIA',
 }
 
+// KUEPER-Ecosystem-Registry-Muster für Ziel-Targets
+// (kueper-ecosystem followup-request.schema.json): Nur Registry-Kennungen der
+// Form ^[A-Z][A-Z0-9-]*$ — keine Pfade, keine Separatoren. Das Target landet
+// unverändert im Outbox-Dateinamen und darf das `.kueper/outbox`-Verzeichnis
+// nie verlassen können.
+export const TARGET_PATTERN = /^[A-Z][A-Z0-9-]*$/
+
+export function isValidTarget(target: string): boolean {
+  return TARGET_PATTERN.test(target)
+}
+
 export const COST_POLICY_BY_KIND: Record<ObservationKind, string> = {
   BUG: 'immediate',
   DEAD_END: 'immediate',

@@ -46,9 +46,17 @@ Eine Game Action erzeugt NIE direkt einen Implementierungs-Task.
 4. **Emission** — bestandene Kandidaten werden als KUEPER-Outbox-Routing-
    Envelope lokal unter `.kueper/outbox/<target>-<type>-<candidate_id>.json`
    abgelegt. Neben Provenienz bleiben auch `cost_policy`, `estimated_effort`
-   und `finding_event` über die Router-Grenze erhalten.
+   und `finding_event` über die Router-Grenze erhalten. `observation.target`
+   wird vor der Dateiablage gegen das Ecosystem-Registry-Muster
+   (`^[A-Z][A-Z0-9-]*$`) validiert; ungültige Werte fallen auf das
+   Default-Target zurück, sodass ein Dateiname das Outbox-Verzeichnis nie
+   verlassen kann.
 5. **Boundedness** — maximal fünf unterschiedliche Emissionen je Welt; der
    Lifecycle verhindert zusätzlich Request-Stürme für einen bereits offenen Befund.
+6. **Write-Boundary** — der Emissions-Zustand wird erst NACH erfolgreichem
+   Envelope-Write committet. Wirft der Writer (Disk full, EACCES), bleibt der
+   Befund unverändert und damit erneut emittierbar; `ingest` wirft nie in
+   Gameplay-Code, sondern liefert `outbox_write_failed`.
 
 Lifecycle:
 
@@ -100,6 +108,11 @@ sink.markResolved(result.decision.fingerprint, Date.now())
   Beobachtung; PROPOSAL wird nie autonom umgesetzt.
 - Der Sink ist pur und deterministisch; Zeit wird als Parameter übergeben.
 - `producer.ts` importiert `node:fs` und ist nur serverseitig zu verwenden.
+- Ziel-Targets sind Caller-Eingabe, aber keine Pfade: nur Registry-Kennungen
+  `^[A-Z][A-Z0-9-]*$` erreichen den Outbox-Dateinamen, alles andere fällt auf
+  das Default-Target zurück.
+- Writer-Fehler committen keinen Emissions-Zustand und werfen nicht aus
+  `ingest`; ein Befund bleibt nach fehlgeschlagenem Write erneut emittierbar.
 
 ## Tests
 
@@ -114,7 +127,11 @@ Die Regressionstests belegen insbesondere:
 - OPEN/RESOLVED überleben Snapshot/Restore;
 - `estimated_effort`, `cost_policy`, `finding_event` und Provenienz bleiben im Envelope;
 - niedrige Konfidenz, PROPOSAL und UX/BALANCE erzeugen keine autonomen Tasks;
-- Welt-Obergrenze und stabile Fingerprints bleiben erhalten.
+- Welt-Obergrenze und stabile Fingerprints bleiben erhalten;
+- ein ungültiges `target` (Pfad-Traversal) fällt auf das Default-Target zurück
+  und kann den Outbox-Ordner nicht verlassen;
+- ein Writer-Fehler committet keinen Emissions-Zustand; Retry und Regression
+  bleiben emittierbar.
 
 ## Spätere Versionen
 
