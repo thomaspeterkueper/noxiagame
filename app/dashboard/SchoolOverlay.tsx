@@ -1,9 +1,11 @@
 'use client'
 
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 24.08.2026 — generateTask: POST → GET (Turbopack-POST-Bug,
-//               siehe Tech-Setup "Bekannte Probleme #2" — school/route.ts v2.6.0)
-// Version:      1.1.0
+// Aktualisiert: 24.08.2026 — isValidTask() als Client-Absicherung ergänzt
+//               (zweite Prüfung zusätzlich zur Server-Validierung in
+//               school/route.ts v2.7.0) — verhindert Render-Crash bei
+//               falsch geformter KI-Antwort
+// Version:      1.2.0
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
@@ -82,6 +84,27 @@ function fallbackTask(): Task {
     { kind: 'calc', question: 'Eine Mine produziert 5 Metall/Tick. Wie viel Metall entsteht in 6 Ticks?', answer: 30, explanation: '5 × 6 = 30 Metall.', points: 10, topic: 'Ressourcen' },
   ]
   return tasks[Math.floor(Math.random() * tasks.length)]
+}
+
+// Zweite Absicherung zur Server-Validierung (school/route.ts v2.7.0): auch
+// wenn der Server bereits prüft, kann ein älterer gecachter Build oder ein
+// unerwarteter Response-Pfad ein falsch geformtes Objekt liefern. Ohne diese
+// Prüfung crasht das Rendern (z.B. task.options.map auf undefined) die ganze
+// Seite statt nur die Aufgabe zu überspringen.
+function isValidTask(t: any): t is Task {
+  if (!t || typeof t !== 'object') return false
+  if (typeof t.question !== 'string' || !t.question.trim()) return false
+  if (typeof t.explanation !== 'string' || !t.explanation.trim()) return false
+  if (typeof t.points !== 'number' || !Number.isFinite(t.points)) return false
+  if (typeof t.topic !== 'string' || !t.topic.trim()) return false
+  if (t.kind === 'calc') return typeof t.answer === 'number' && Number.isFinite(t.answer)
+  if (t.kind === 'quiz') {
+    return Array.isArray(t.options) && t.options.length >= 2
+      && t.options.every((o: any) => typeof o === 'string')
+      && typeof t.correct === 'number' && Number.isInteger(t.correct)
+      && t.correct >= 0 && t.correct < t.options.length
+  }
+  return false
 }
 
 function ManualTab({ onClose }: { onClose: () => void }) {
@@ -458,7 +481,8 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
       const res = await fetch(`/api/game/school?${params.toString()}`)
       if (!res.ok) { setTask(fallbackTask()); setLoading(false); return }
       const data = await res.json() as Record<string,unknown>
-      setTask((data.task as Task) ?? fallbackTask())
+      const candidate = data.task
+      setTask(isValidTask(candidate) ? candidate : fallbackTask())
     } catch { setTask(fallbackTask()) }
     setLoading(false)
   }
