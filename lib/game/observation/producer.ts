@@ -1,6 +1,6 @@
 // lib/game/observation/producer.ts
 // Erstellt:     21.08.2026
-// Version:      0.1.0
+// Version:      0.1.1
 //
 // Outbox-Producer: wandelt am Gate bestandene TaskCandidates in gültige
 // KUEPER-Outbox-Routing-Envelopes um und legt sie LOKAL unter
@@ -9,10 +9,6 @@
 // Ausdrücklich NICHT hier: GitHub-API, Supabase, Repository-Mutation.
 // Routing/Zustellung bleibt Aufgabe der Ecosystem-Schleife; der Producer
 // schlägt das Ziel nur vor (der Router validiert Ownership).
-//
-// Hinweis: Dieses Modul importiert node:fs und ist NUR serverseitig zu
-// verwenden. Der reine Teil (buildOutboxEnvelope, envelopeFilename) ist
-// ohne IO nutzbar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -29,18 +25,14 @@ import {
   type TaskCandidate,
 } from './types.ts'
 
-// ── IO-Grenze ────────────────────────────────────────────────────────────────
-
 export interface OutboxWriter {
   write(filename: string, content: string): void
 }
 
-/** Standard-Verzeichnis: `<repo>/.kueper/outbox`. */
 export function defaultOutboxDir(): string {
   return join(process.cwd(), '.kueper', 'outbox')
 }
 
-/** Datei-Writer in ein lokales Outbox-Verzeichnis (kein Netz, kein GitHub). */
 export function createFileOutboxWriter(dir: string): OutboxWriter {
   return {
     write(filename: string, content: string): void {
@@ -50,22 +42,13 @@ export function createFileOutboxWriter(dir: string): OutboxWriter {
   }
 }
 
-// ── Envelope-Aufbau (pur) ────────────────────────────────────────────────────
-
 export const PROTOCOL_ID = 'GAME_OBSERVATION_TASK_PROTOCOL'
 export const PROTOCOL_VERSION = 'v0.1'
 
-/** Stabiler, beschreibender Dateiname je Kandidat. */
 export function envelopeFilename(candidate: TaskCandidate): string {
   return `${candidate.target}-${candidate.type}-${candidate.candidate_id}.json`
 }
 
-/**
- * TaskCandidate → KUEPER-Outbox-Routing-Envelope.
- * Kern-Routingfelder plus Protokoll-Provenienz (world/agent/evidence bleibt
- * an jedem Request erhalten). parent_task bleibt leer: Game-Ursprung hat
- * keinen Parent-Task.
- */
 export function buildOutboxEnvelope(
   candidate: TaskCandidate,
   depth: number,
@@ -82,10 +65,12 @@ export function buildOutboxEnvelope(
     depth,
     affects,
     cost_policy: candidate.cost_policy,
+    estimated_effort: candidate.estimated_effort,
     protocol: PROTOCOL_ID,
     protocol_version: PROTOCOL_VERSION,
     candidate_id: candidate.candidate_id,
     type: candidate.type,
+    finding_event: candidate.finding_event,
     world_id: candidate.world_id,
     agent_id: candidate.agent_id,
     occurrences: candidate.occurrences,
@@ -98,7 +83,6 @@ export function buildOutboxEnvelope(
   }
 }
 
-/** Kandidat als Envelope in den Outbox-Writer schreiben. */
 export function emitCandidate(
   candidate: TaskCandidate,
   writer: OutboxWriter,
@@ -111,8 +95,6 @@ export function emitCandidate(
   return { envelope, filename }
 }
 
-// ── Producer (Sink + Gate + Outbox in einer Kette) ───────────────────────────
-
 export interface IngestResult {
   decision: GateDecision
   envelope: OutboxEnvelope | null
@@ -123,18 +105,10 @@ export interface ObservationProducerOptions {
   sink?: LocalObservationSink
   writer?: OutboxWriter
   gateConfig?: Partial<GateConfig>
-  /** Routing-Tiefe neuer Envelopes (Standard 1). */
   depth?: number
   affects?: string[]
 }
 
-/**
- * Bequeme Kette für Tester und Assertions:
- *   Observation -> Sink/Gate -> (approved?) Envelope -> lokaler Outbox-Writer.
- *
- * Der Writer ist injizierbar (Tests: In-Memory; Runtime: Datei-Writer in
- * `.kueper/outbox`). Ohne Writer wird nur gegatet, nie geschrieben.
- */
 export class ObservationProducer {
   readonly sink: LocalObservationSink
   private readonly writer: OutboxWriter | null
@@ -148,7 +122,6 @@ export class ObservationProducer {
     this.affects = options.affects ?? ['game-logic']
   }
 
-  /** Nimmt eine Observation auf; bei 'approved' wird der Envelope geschrieben. */
   ingest(obs: Observation, nowMs: number): IngestResult {
     const { decision } = this.sink.record(obs, nowMs)
     if (decision.status === 'approved' && decision.candidate && this.writer) {
@@ -159,16 +132,6 @@ export class ObservationProducer {
   }
 }
 
-// ── Deterministische Game-Assertion ──────────────────────────────────────────
-/**
- * Brücke für deterministische Game-Assertions: prüft eine Bedingung und
- * meldet einen Fehlschlag als reproduzierbare BUG-Observation durch die
- * Producer-Kette (Sink → Gate → Outbox-Writer).
- *
- * Ein bestandener Check erzeugt KEINE Observation — normale Game-Aktionen
- * dürfen keine Tasks erzeugen. Gibt das Ergebnis des Checks zurück, damit
- * die Assertion wie gewohnt durchgereicht werden kann.
- */
 export function recordAssertion(
   producer: ObservationProducer,
   opts: {
