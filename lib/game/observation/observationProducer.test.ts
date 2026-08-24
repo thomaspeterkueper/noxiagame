@@ -171,7 +171,7 @@ function bugObs(world: string, summary: string, confidence = 0.95): Observation 
   pruefe(env.evidence_refs.length === 1, '6. evidence_refs erhalten')
 }
 
-// 7. Niedrige Konfidenz und nicht-promotable Kinds erzeugen keine Tasks.
+// 7. Niedrige Konfidenz, fehlende Reproduktion und nicht-promotable Kinds erzeugen keine Tasks.
 {
   const writer = new MemoryWriter()
   const producer = new ObservationProducer({ writer })
@@ -186,10 +186,16 @@ function bugObs(world: string, summary: string, confidence = 0.95): Observation 
     summary: 'Button preference', expected: 'x', actual: 'y', confidence: 1,
     reproduction: ['observe'],
   }, T0 + 2)
+  const notReproducible = producer.ingest({
+    world_id: 'noxia-006', agent_id: AGENT, kind: 'BUG', system: 'trade',
+    summary: 'Market glitch without reproduction', expected: 'x', actual: 'y',
+    confidence: 0.95,
+  }, T0 + 3)
 
   pruefe(low.decision.status === 'aggregating', '7. niedrige Konfidenz aggregiert')
   pruefe(proposal.decision.status === 'parked', '7. PROPOSAL geparkt')
   pruefe(ux.decision.status === 'aggregating', '7. UX nur aggregiert')
+  pruefe(notReproducible.decision.status === 'aggregating' && notReproducible.decision.reason === 'not_reproducible', '7. hoch-konfident ohne Reproduction aggregiert (not_reproducible)')
   pruefe(writer.writes.length === 0, '7. keine Outbox-Emission')
 }
 
