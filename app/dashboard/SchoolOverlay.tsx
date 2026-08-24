@@ -1,11 +1,12 @@
 'use client'
 
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 24.08.2026 — isValidTask() als Client-Absicherung ergänzt
-//               (zweite Prüfung zusätzlich zur Server-Validierung in
-//               school/route.ts v2.7.0) — verhindert Render-Crash bei
-//               falsch geformter KI-Antwort
-// Version:      1.2.0
+// Aktualisiert: 24.08.2026 — DEBUG_RAW-Diagnosemodus: Aufgaben-Tab zeigt
+//               rohe Server-Antwort/Fehlertext statt die Aufgabe zu rendern.
+//               Umgeht jeden Rendering-Pfad, der bislang zum Absturz führen
+//               könnte, um die tatsächliche Fehlerursache sichtbar zu machen.
+//               DEBUG_RAW=true → auf false setzen, sobald Ursache gefunden.
+// Version:      1.3.0-debug
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
@@ -404,6 +405,13 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [activeKursId, setActiveKursId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId]  = useState<string>('')
 
+  // DIAGNOSE-MODUS (temporär, 24.08.2026): zeigt die rohe Server-Antwort
+  // bzw. jeden auftretenden Fehler als Text an, statt die Aufgabe zu rendern.
+  // Umgeht damit jeden Rendering-Pfad, der bisher zum Absturz führen könnte.
+  // Auf false setzen (oder Block entfernen), sobald die Ursache gefunden ist.
+  const DEBUG_RAW = true
+  const [debugOutput, setDebugOutput] = useState<string>('(noch keine Anfrage gelaufen)')
+
   // UserId einmalig laden
   const [ssfModules, setSsfModules] = useState<SsfModule[]>([])
   const [task, setTask] = useState<Task | null>(null)
@@ -478,12 +486,47 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
       if (ctx.waterStock   != null) params.set('waterStock',   String(ctx.waterStock))
       if (ctx.waterCons    != null) params.set('waterCons',    String(ctx.waterCons))
       if (ctx.credits      != null) params.set('credits',      String(ctx.credits))
+
+      if (DEBUG_RAW) {
+        // Diagnose-Pfad: rohe Antwort als Text anzeigen, NICHT parsen/rendern.
+        // Zeigt exakt, was ankommt — auch wenn es kein valides JSON ist.
+        const url = `/api/game/school?${params.toString()}`
+        setDebugOutput(`→ Anfrage läuft: ${url}`)
+        try {
+          const res = await fetch(url)
+          const rawText = await res.text()
+          let pretty = rawText
+          try { pretty = JSON.stringify(JSON.parse(rawText), null, 2) } catch { /* bleibt roher Text, falls kein JSON */ }
+          setDebugOutput(
+            `URL: ${url}\n` +
+            `Status: ${res.status} ${res.statusText}\n` +
+            `Content-Type: ${res.headers.get('content-type') ?? '(keiner)'}\n\n` +
+            `── Antwort ──\n${pretty}`
+          )
+        } catch (fetchErr: any) {
+          setDebugOutput(
+            `URL: ${url}\n` +
+            `FETCH-FEHLER (Anfrage kam nicht mal beim Server an, oder Antwort war unlesbar):\n` +
+            `${fetchErr?.name ?? 'Error'}: ${fetchErr?.message ?? String(fetchErr)}\n\n` +
+            `Stack:\n${fetchErr?.stack ?? '(kein Stack verfügbar)'}`
+          )
+        }
+        setLoading(false)
+        return
+      }
+
       const res = await fetch(`/api/game/school?${params.toString()}`)
       if (!res.ok) { setTask(fallbackTask()); setLoading(false); return }
       const data = await res.json() as Record<string,unknown>
       const candidate = data.task
       setTask(isValidTask(candidate) ? candidate : fallbackTask())
-    } catch { setTask(fallbackTask()) }
+    } catch (outerErr: any) {
+      if (DEBUG_RAW) {
+        setDebugOutput(`UNERWARTETER FEHLER (außerhalb des fetch):\n${outerErr?.name ?? 'Error'}: ${outerErr?.message ?? String(outerErr)}\n\nStack:\n${outerErr?.stack ?? '(kein Stack verfügbar)'}`)
+      } else {
+        setTask(fallbackTask())
+      }
+    }
     setLoading(false)
   }
 
@@ -587,7 +630,22 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
               </div>
             </div>
           )}
-          {tab === 'akademie' && (
+          {tab === 'akademie' && DEBUG_RAW && (
+            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
+              <div style={{ fontSize: '0.65rem', color: C.gold, fontWeight: 700, marginBottom: 10, fontFamily: MONO, textTransform: 'uppercase' as const, letterSpacing: '1px' }}>
+                ⚠ Diagnose-Modus — zeigt rohe Server-Antwort statt Aufgabe
+              </div>
+              <button onClick={generateTask} disabled={loading} style={{ marginBottom: 10, padding: '0.5rem 1rem', background: C.accent, color: '#fff', border: 'none', borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+                {loading ? 'Läuft …' : 'Anfrage erneut senden'}
+              </button>
+              <pre style={{
+                background: '#0d1a26', color: '#a8e0c0', padding: '1rem', borderRadius: 8,
+                fontSize: '0.72rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const,
+                wordBreak: 'break-word' as const, fontFamily: MONO, minHeight: '200px',
+              }}>{debugOutput}</pre>
+            </div>
+          )}
+          {tab === 'akademie' && !DEBUG_RAW && (
             <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
               {loading && <div style={{ textAlign: 'center' as const, padding: '2.5rem', color: C.textMuted, fontFamily: MONO }}>Aufgabe wird generiert …</div>}
               {!loading && task && (
