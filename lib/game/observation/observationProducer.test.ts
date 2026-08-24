@@ -116,7 +116,7 @@ function bugObs(world: string, summary: string, confidence = 0.95): Observation 
   pruefe(regression.decision.status === 'approved', '3. Regression approved')
   pruefe(regression.decision.reason === 'regression_after_resolution', '3. Regression-Grund')
   pruefe(regression.decision.candidate?.finding_event === 'REGRESSION', '3. finding_event REGRESSION')
-  pruefe(regression.decision.candidate?.title.startsWith('REGRESSION:'), '3. Regression im Titel sichtbar')
+  pruefe(regression.decision.candidate?.title.startsWith('REGRESSION:') === true, '3. Regression im Titel sichtbar')
   pruefe(agg?.finding_status === 'OPEN', '3. Regression öffnet Finding wieder')
   pruefe(agg?.regressions === 1, `3. Regression counter 1 (war ${agg?.regressions})`)
   pruefe(writer.writes.length === 2, `3. initial + Regression = zwei Emissionen (war ${writer.writes.length})`)
@@ -329,6 +329,27 @@ function bugObs(world: string, summary: string, confidence = 0.95): Observation 
   const regression = producer.ingest(obs, T0 + 3 * DAY)
   pruefe(regression.decision.status === 'approved' && regression.decision.candidate?.finding_event === 'REGRESSION', '14. Retry emittiert REGRESSION')
   pruefe(writer.writes.length === 2, `14. genau zwei Emissionen insgesamt (war ${writer.writes.length})`)
+}
+
+// 15. Writer-lose Konstruktion (docs: `new ObservationProducer()`) fällt auf den
+//     Standard-Datei-Writer `.kueper/outbox` zurück: ein approved Kandidat
+//     erzeugt IMMER eine Envelope, nie ein OPEN-Finding ohne Request.
+{
+  const dir = mkdtempSync(join(tmpdir(), 'noxia-outbox-default-'))
+  const cwd = process.cwd()
+  try {
+    process.chdir(dir)
+    const producer = new ObservationProducer()
+    const r = producer.ingest(deadEndObs('noxia-013', 'Writer-less producer fallback'), T0)
+    pruefe(r.decision.status === 'approved', '15. writer-los: Gate approved')
+    pruefe(r.envelope !== null && r.filename !== null, '15. writer-los: Envelope erzeugt')
+    const parsed = JSON.parse(readFileSync(join(dir, '.kueper', 'outbox', r.filename as string), 'utf8')) as OutboxEnvelope
+    pruefe(parsed.world_id === 'noxia-013' && parsed.finding_event === 'INITIAL', '15. Standard-Writer legt Envelope unter .kueper/outbox ab')
+    pruefe(producer.sink.aggregate(r.decision.fingerprint)?.finding_status === 'OPEN', '15. OPEN erst nach tatsächlicher Emission')
+  } finally {
+    process.chdir(cwd)
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 console.log(`\n${fails === 0 ? '✓ alle Observation-Producer-Tests bestanden' : `✘ ${fails} Fehlschläge`}`)

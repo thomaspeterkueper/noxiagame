@@ -124,13 +124,17 @@ export interface ObservationProducerOptions {
 
 export class ObservationProducer {
   readonly sink: LocalObservationSink
-  private readonly writer: OutboxWriter | null
+  private readonly writer: OutboxWriter
   private readonly depth: number
   private readonly affects: string[]
 
   constructor(options: ObservationProducerOptions = {}) {
     this.sink = options.sink ?? new LocalObservationSink(options.gateConfig)
-    this.writer = options.writer ?? null
+    // Ohne expliziten Writer wird auf die dokumentierte Standard-Schreibgrenze
+    // `.kueper/outbox/` zurückgefallen. Ein approved Kandidat erzeugt damit
+    // IMMER eine Envelope, BEVOR der Sink den Emissions-Zustand committet —
+    // nie ein OPEN-Finding ohne existierenden Request.
+    this.writer = options.writer ?? createFileOutboxWriter(defaultOutboxDir())
     this.depth = options.depth ?? 1
     this.affects = options.affects ?? ['game-logic']
   }
@@ -141,7 +145,6 @@ export class ObservationProducer {
     let decision: GateDecision
     try {
       const result = this.sink.record(obs, nowMs, (candidate) => {
-        if (!this.writer) return
         const emitted = emitCandidate(candidate, this.writer, this.depth, this.affects)
         envelope = emitted.envelope
         filename = emitted.filename

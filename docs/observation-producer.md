@@ -76,6 +76,8 @@ Deterministische Game-Assertion (Fehlschlag → BUG-Request, Erfolg → nichts):
 ```ts
 import { ObservationProducer, recordAssertion } from '@/lib/game/observation/producer'
 
+// Ohne expliziten `writer` fällt der Producer auf die Standard-Schreibgrenze
+// `.kueper/outbox/` zurück — ein approved Kandidat erzeugt immer eine Envelope.
 const producer = new ObservationProducer()
 
 recordAssertion(producer, {
