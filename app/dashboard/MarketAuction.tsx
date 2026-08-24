@@ -3,7 +3,16 @@
 // app/dashboard/MarketAuction.tsx
 // Erstellt:     01.06.2026
 // Aktualisiert: 24.08.2026
-// Version:      0.4.1
+// Version:      0.4.2
+//
+// v0.4.2: Doppelte Abfrage entfernt. WarehouseOverlay/BuyRow fragen Menge und
+// Preislimit bereits VOR dem Öffnen der Auktion ab (eigenes Prep-Panel) —
+// der in v0.4.0 eingeführte Konfigurationsschritt fragte dieselben zwei
+// Werte ein zweites Mal ab. Neues optionales Prop skipConfig: true
+// überspringt den Schritt und übernimmt initialQty/playerLimit direkt.
+// DashboardClients direkter MarketAuction-Aufruf (StationOverlay/ColonyGrid,
+// kein vorgelagerter Picker) lässt skipConfig weg und zeigt den Schritt
+// weiterhin — dort war er nötig.
 //
 // v0.4.1: BUGFIX stale closure. Der Tick-Interval-useEffect startete sofort
 // beim Öffnen des Dialogs (open+running bereits beim ersten Render true —
@@ -103,6 +112,7 @@ export default function MarketAuction({
   initialMode,
   initialQty,
   playerLimit,
+  skipConfig,
 }: {
   open: boolean
   onClose: () => void
@@ -117,6 +127,10 @@ export default function MarketAuction({
   initialMode: Mode
   initialQty: number
   playerLimit: number
+  // true, wenn Menge+Limit bereits von einem vorgelagerten Picker (BuyRow in
+  // WarehouseOverlay) gesetzt wurden — überspringt den Konfigurationsschritt,
+  // damit Menge/Preis nicht doppelt abgefragt werden (v0.4.2).
+  skipConfig?: boolean
 }) {
   // Resource/Modus/Menge/Preislimit sind jetzt einstellbar (v0.4.0) — vorher
   // waren das fixe Konstanten aus den (nie befüllten) initial*-Props, u.a.
@@ -125,9 +139,9 @@ export default function MarketAuction({
   const [resource, setResource] = useState<ResourceType>(initialResource)
   const [mode, setMode] = useState<Mode>(initialMode)
   const [qty, setQty] = useState<number>(initialQty)
-  const [limit, setLimit] = useState<number>(0)
-  const [limitTouched, setLimitTouched] = useState(false)
-  const [configured, setConfigured] = useState(false)
+  const [limit, setLimit] = useState<number>(skipConfig ? playerLimit : 0)
+  const [limitTouched, setLimitTouched] = useState(!!skipConfig)
+  const [configured, setConfigured] = useState(!!skipConfig)
   const [running, setRunning] = useState(true)
   const [log, setLog] = useState<{ text: string; ok: boolean } | null>(null)
 
