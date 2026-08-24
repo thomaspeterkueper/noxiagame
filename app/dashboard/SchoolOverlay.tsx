@@ -1,5 +1,10 @@
 'use client'
 
+// app/dashboard/SchoolOverlay.tsx
+// Aktualisiert: 24.08.2026 — generateTask: POST → GET (Turbopack-POST-Bug,
+//               siehe Tech-Setup "Bekannte Probleme #2" — school/route.ts v2.6.0)
+// Version:      1.1.0
+
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
 import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
@@ -443,11 +448,14 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   async function generateTask() {
     setLoading(true); setResult(null); setAnswer(''); setSelected(null)
     try {
-      const res = await fetch('/api/game/school', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level: 1, colonyContext: colonyContext ?? {} })
-      })
+      const ctx = colonyContext ?? {} as Partial<ColonyContext>
+      const params = new URLSearchParams({ level: '1' })
+      if (ctx.locationName != null) params.set('locationName', String(ctx.locationName))
+      if (ctx.population   != null) params.set('population',   String(ctx.population))
+      if (ctx.waterStock   != null) params.set('waterStock',   String(ctx.waterStock))
+      if (ctx.waterCons    != null) params.set('waterCons',    String(ctx.waterCons))
+      if (ctx.credits      != null) params.set('credits',      String(ctx.credits))
+      const res = await fetch(`/api/game/school?${params.toString()}`)
       if (!res.ok) { setTask(fallbackTask()); setLoading(false); return }
       const data = await res.json() as Record<string,unknown>
       setTask((data.task as Task) ?? fallbackTask())
