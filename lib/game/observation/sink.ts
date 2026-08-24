@@ -1,29 +1,27 @@
 // lib/game/observation/sink.ts
 // Erstellt:     21.08.2026
-// Version:      0.1.0
+// Version:      0.1.1
 //
 // Lokaler Observation-Sink für deterministische Game-Assertions und
 // NOXIA_TESTER_INTELLIGENT_01.
 //
-// Was er tut (und was nicht):
-//   • aufnehmen   — record() aggregiert Vorkommen über stabile Fingerprints
-//   • gaten       — BUG/DEAD_END steigen nach EINEM hoch-konfidenten,
-//                   reproduzierbaren Auftreten auf; PROPOSAL wird geparkt,
-//                   alle übrigen Kinds werden in v0.1 nur aggregiert
-//   • begrenzen   — Cooldown je Fingerprint, Kandidaten-Obergrenze je Welt
-//   • NICHTS schreiben — kein GitHub, kein Supabase, kein Dateisystem.
-//                   Emission ist Sache des Producers (lib/game/observation/producer.ts)
+// Persistente Finding-Semantik:
+//   UNEMITTED -> OPEN -> RESOLVED -> REGRESSION/OPEN
 //
-// Pur und deterministisch: Zeit kommt als nowMs-Parameter, keine Globals,
-// keine Zufallszahlen. Der Sink ist damit direkt in deterministischen
-// Game-Assertions nutzbar (siehe recordAssertion) und serialisierbar
-// (toJSON/fromJSON) für persistente Tester-Zustände.
+// Ein bereits emittierter, weiterhin offener Befund erzeugt unabhängig von
+// verstrichener Zeit keinen zweiten Entwicklungsrequest. Weitere Vorkommen
+// aktualisieren nur occurrences/Evidence. Erst ein explizit RESOLVED gesetzter
+// Befund darf bei erneutem Auftreten als REGRESSION wieder emittieren.
+//
+// Der Sink schreibt nichts nach GitHub/Supabase/Dateisystem. Zeit wird als
+// nowMs-Parameter übergeben; Snapshot/Restore bleibt deterministisch.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { observationFingerprint } from './fingerprint.ts'
 import {
   DEFAULT_GATE_CONFIG,
   COST_POLICY_BY_KIND,
+  type FindingEvent,
   type GateConfig,
   type GateDecision,
   type Observation,
@@ -31,11 +29,9 @@ import {
   type TaskCandidate,
 } from './types.ts'
 
-// ── Grenzen des Sinks (bounded memory) ───────────────────────────────────────
-const MAX_RECORDS    = 100   // Roh-Observations im Ring
-const MAX_CANDIDATES = 50    // Kandidaten-Historie
+const MAX_RECORDS = 100
+const MAX_CANDIDATES = 50
 
-/** RFC3339 aus epoch-ms — deterministisch für festes nowMs. */
 function iso(nowMs: number): string {
   return new Date(nowMs).toISOString()
 }
@@ -51,14 +47,13 @@ export interface RecordResult {
 }
 
 export interface SinkSnapshot {
-  version: 1
+  version: 2
   aggregates: ObservationAggregate[]
   world_emissions: Record<string, number>
   records: Array<{ observation_id: string; fingerprint: string; observed_at: string }>
   candidates: TaskCandidate[]
 }
 
-// ── Sink ─────────────────────────────────────────────────────────────────────
 export class LocalObservationSink {
   private readonly config: GateConfig
   private readonly aggregates = new Map<string, ObservationAggregate>()
@@ -70,23 +65,20 @@ export class LocalObservationSink {
     this.config = { ...DEFAULT_GATE_CONFIG, ...config }
   }
 
-  /**
-   * Nimmt eine Observation auf, aggregiert sie über den Fingerprint und
-   * bewertet sie am Gate. Bei 'approved' wird der TaskCandidate erzeugt,
-   * gezählt und in die Kandidaten-Historie aufgenommen — geschrieben wird
-   * hier NICHTS (Emission übernimmt der Producer).
-   */
   record(obs: Observation, nowMs: number): RecordResult {
     const fingerprint = observationFingerprint(obs)
     const observedAt = obs.observed_at ?? iso(nowMs)
-
     const agg = this.upsertAggregate(fingerprint, obs, observedAt)
     this.pushRecord(fingerprint, observedAt)
 
-    const decision = this.decide(agg, obs, nowMs, observedAt)
+    const decision = this.decide(agg, obs, observedAt)
     if (decision.candidate) {
+      const isRegression = decision.candidate.finding_event === 'REGRESSION'
       agg.emissions += 1
       agg.last_emitted_at = observedAt
+      agg.finding_status = 'OPEN'
+      agg.resolved_at = null
+      if (isRegression) agg.regressions += 1
       this.worldEmissions.set(obs.world_id, (this.worldEmissions.get(obs.world_id) ?? 0) + 1)
       this.candidates.push(decision.candidate)
       if (this.candidates.length > MAX_CANDIDATES) this.candidates.shift()
@@ -94,14 +86,22 @@ export class LocalObservationSink {
     return { observation_id: this.lastObservationId(fingerprint), fingerprint, decision }
   }
 
-  /** Bewertung am Gate — pure Funktion auf dem Aggregat + Config. */
+  /** Expliziter Lifecycle-Übergang. Nur ein bereits emittierter OPEN-Befund kann gelöst werden. */
+  markResolved(fingerprint: string, nowMs: number): boolean {
+    const agg = this.aggregates.get(fingerprint)
+    if (!agg || agg.finding_status !== 'OPEN') return false
+    agg.finding_status = 'RESOLVED'
+    agg.resolved_at = iso(nowMs)
+    return true
+  }
+
   private decide(
     agg: ObservationAggregate,
     obs: Observation,
-    nowMs: number,
     observedAt: string,
   ): GateDecision {
     const c = this.config
+
     if (c.parked_kinds.includes(obs.kind)) {
       agg.parked = true
       return { status: 'parked', reason: 'kind_parked_proposal', fingerprint: agg.fingerprint, candidate: null }
@@ -115,28 +115,47 @@ export class LocalObservationSink {
     if (agg.reproduction.length < c.min_reproduction_steps) {
       return { status: 'aggregating', reason: 'not_reproducible', fingerprint: agg.fingerprint, candidate: null }
     }
-    if (agg.emissions > 0) {
-      const last = agg.last_emitted_at ? Date.parse(agg.last_emitted_at) : 0
-      if (nowMs - last < c.cooldown_ms) {
-        return { status: 'suppressed', reason: 'cooldown_active', fingerprint: agg.fingerprint, candidate: null }
-      }
+
+    // Kerninvariante: Zeit allein darf einen ungelösten Befund nie erneut emittieren.
+    if (agg.finding_status === 'OPEN') {
+      return { status: 'suppressed', reason: 'finding_still_open', fingerprint: agg.fingerprint, candidate: null }
     }
+
     if ((this.worldEmissions.get(obs.world_id) ?? 0) >= c.max_candidates_per_world) {
       return { status: 'suppressed', reason: 'world_emission_cap', fingerprint: agg.fingerprint, candidate: null }
     }
-    return { status: 'approved', reason: 'gate_passed', fingerprint: agg.fingerprint, candidate: this.buildCandidate(agg, obs, observedAt) }
+
+    const event: FindingEvent = agg.finding_status === 'RESOLVED' ? 'REGRESSION' : 'INITIAL'
+    const reason = event === 'REGRESSION' ? 'regression_after_resolution' : 'gate_passed'
+    return {
+      status: 'approved',
+      reason,
+      fingerprint: agg.fingerprint,
+      candidate: this.buildCandidate(agg, obs, observedAt, event),
+    }
   }
 
-  private buildCandidate(agg: ObservationAggregate, obs: Observation, observedAt: string): TaskCandidate {
+  private buildCandidate(
+    agg: ObservationAggregate,
+    obs: Observation,
+    observedAt: string,
+    findingEvent: FindingEvent,
+  ): TaskCandidate {
     const c = this.config
+    const prefix = findingEvent === 'REGRESSION' ? 'REGRESSION: ' : ''
     return {
       candidate_id: agg.fingerprint,
       source: c.source,
       target: obs.target ?? c.default_target,
       type: agg.kind,
-      title: `${agg.kind}: ${agg.summary}`,
-      reason: `Reproducible ${agg.kind} observation (${agg.occurrences}×) in world ${obs.world_id} by ${obs.agent_id}.`,
-      requested_change: 'Investigate and repair the observed condition without bypassing canonical game rules.',
+      finding_event: findingEvent,
+      title: `${prefix}${agg.kind}: ${agg.summary}`,
+      reason: findingEvent === 'REGRESSION'
+        ? `Previously resolved ${agg.kind} recurred (${agg.occurrences} total observations) in world ${obs.world_id} by ${obs.agent_id}.`
+        : `Reproducible ${agg.kind} observation (${agg.occurrences}×) in world ${obs.world_id} by ${obs.agent_id}.`,
+      requested_change: findingEvent === 'REGRESSION'
+        ? 'Investigate the regression and restore the previously resolved behavior without bypassing canonical game rules.'
+        : 'Investigate and repair the observed condition without bypassing canonical game rules.',
       expected_result: agg.expected,
       evidence_refs: [...agg.evidence_refs],
       occurrences: agg.occurrences,
@@ -151,8 +170,6 @@ export class LocalObservationSink {
       observed_at: observedAt,
     }
   }
-
-  // ── Aggregation ────────────────────────────────────────────────────────────
 
   private upsertAggregate(fingerprint: string, obs: Observation, observedAt: string): ObservationAggregate {
     let agg = this.aggregates.get(fingerprint)
@@ -174,6 +191,9 @@ export class LocalObservationSink {
         last_observed_at: observedAt,
         emissions: 0,
         last_emitted_at: null,
+        finding_status: 'UNEMITTED',
+        resolved_at: null,
+        regressions: 0,
         parked: false,
       }
       this.aggregates.set(fingerprint, agg)
@@ -189,11 +209,9 @@ export class LocalObservationSink {
         agg.evidence_refs.length = this.config.max_evidence_refs
       }
     }
-    // Reproduktionsschritte: erste nicht-leere Menge wird repräsentativ.
     if (agg.reproduction.length === 0 && (obs.reproduction?.length ?? 0) > 0) {
       agg.reproduction = [...(obs.reproduction as string[])]
     }
-    // Repräsentative expected/actual/summary: von der höchst-konfidenten Beobachtung.
     if (obs.confidence > agg.max_confidence) {
       agg.max_confidence = obs.confidence
       agg.expected = obs.expected
@@ -216,9 +234,6 @@ export class LocalObservationSink {
     return `${fingerprint}-0001`
   }
 
-  // ── Lesen ──────────────────────────────────────────────────────────────────
-
-  /** Alle Aggregate in Reihenfolge des ersten Auftretens. */
   aggregateList(): ObservationAggregate[] {
     return [...this.aggregates.values()]
   }
@@ -227,22 +242,24 @@ export class LocalObservationSink {
     return this.aggregates.get(fingerprint)
   }
 
-  /** Historie der am Gate bestandenen TaskCandidates. */
   candidateList(): TaskCandidate[] {
     return [...this.candidates]
   }
 
-  /** Anzahl emittierter Kandidaten einer Welt (für Tests/Caps). */
   worldEmissionCount(worldId: string): number {
     return this.worldEmissions.get(worldId) ?? 0
   }
 
-  // ── Persistenz (für den Tester-Zyklus; pur, kein IO) ───────────────────────
-
   toJSON(): SinkSnapshot {
     return {
-      version: 1,
-      aggregates: [...this.aggregates.values()],
+      version: 2,
+      aggregates: [...this.aggregates.values()].map((agg) => ({
+        ...agg,
+        worlds: [...agg.worlds],
+        agents: [...agg.agents],
+        evidence_refs: [...agg.evidence_refs],
+        reproduction: [...agg.reproduction],
+      })),
       world_emissions: Object.fromEntries(this.worldEmissions),
       records: [...this.records],
       candidates: [...this.candidates],
@@ -250,8 +267,18 @@ export class LocalObservationSink {
   }
 
   static fromJSON(snapshot: SinkSnapshot, config: Partial<GateConfig> = {}): LocalObservationSink {
+    if (snapshot.version !== 2) throw new Error(`Unsupported observation sink snapshot version: ${snapshot.version}`)
     const sink = new LocalObservationSink(config)
-    for (const agg of snapshot.aggregates) sink.aggregates.set(agg.fingerprint, agg)
+    for (const source of snapshot.aggregates) {
+      const agg: ObservationAggregate = {
+        ...source,
+        worlds: [...source.worlds],
+        agents: [...source.agents],
+        evidence_refs: [...source.evidence_refs],
+        reproduction: [...source.reproduction],
+      }
+      sink.aggregates.set(agg.fingerprint, agg)
+    }
     for (const [world, n] of Object.entries(snapshot.world_emissions)) sink.worldEmissions.set(world, n)
     sink.records.push(...snapshot.records)
     sink.candidates.push(...snapshot.candidates)
@@ -259,5 +286,4 @@ export class LocalObservationSink {
   }
 }
 
-/** Agenten-ID des ersten NOXIA-Testers (Protokoll-Referenz). */
 export const NOXIA_TESTER_INTELLIGENT_01 = 'NOXIA_TESTER_INTELLIGENT_01'
