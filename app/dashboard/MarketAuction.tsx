@@ -3,7 +3,17 @@
 // app/dashboard/MarketAuction.tsx
 // Erstellt:     01.06.2026
 // Aktualisiert: 24.08.2026
-// Version:      0.4.0
+// Version:      0.4.1
+//
+// v0.4.1: BUGFIX stale closure. Der Tick-Interval-useEffect startete sofort
+// beim Öffnen des Dialogs (open+running bereits beim ersten Render true —
+// noch VOR der Konfiguration durch den Spieler) und fror dabei limit=0 als
+// Closure-Wert ein. Die Dependency-Liste enthielt weder configured noch
+// limit/qty, weshalb der laufende Interval das später vom Spieler gesetzte
+// Limit nie sah — Kopfzeile zeigte korrekt "Limit: 12 Cr", die Log-Meldung
+// beim Nicht-Zuschlag aber weiterhin "Limit (0 Cr)". Fix: Guard `!configured`
+// verhindert den Start vor Bestätigung, configured/limit/qty jetzt in den
+// Dependencies — der Interval wird mit den finalen Werten neu aufgesetzt.
 //
 // v0.4.0: BUGFIX kein Zuschlag möglich. Resource/Modus/Menge/Preislimit kamen
 // bisher ausschließlich aus initial*-Props, die DashboardClient dauerhaft fix
@@ -236,7 +246,7 @@ export default function MarketAuction({
   }, [open, row, configured])
 
   useEffect(() => {
-    if (!open || !running || !row) return
+    if (!open || !running || !row || !configured) return
     const floor = sellerFloor(row)
 
     const iv = setInterval(() => {
@@ -315,7 +325,7 @@ export default function MarketAuction({
 
     return () => clearInterval(iv)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, running, row, mode])
+  }, [open, running, row, mode, configured, limit, qty])
 
   // Spieler war KÄUFER und hat einen Deal getroffen — EIN atomarer Call.
   async function settlePlayer(qty: number, price: number) {
