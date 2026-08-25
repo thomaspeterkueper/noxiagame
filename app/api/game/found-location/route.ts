@@ -1,7 +1,19 @@
 // app/api/game/found-location/route.ts
 // Erstellt:     20.07.2026
-// Aktualisiert: 2026-07-21 — SSF-Gates aktiviert (SSF-0020/21/22 deployed)
-// Version:      1.2.0
+// Aktualisiert: 25.08.2026
+// Version:      1.3.0
+//
+// v1.3.0: Mindestabstand von grobem 5°-Lat/Lon-Kästchen auf echte
+// Großkreis-Distanz (Haversine, in km) umgestellt — der alte Wert (5° auf
+// jeder Achse) entsprach je nach Himmelskörper völlig unterschiedlichen
+// Realdistanzen (auf Mars ~300 km, auf dem viel kleineren Phobos nahezu die
+// gesamte Oberfläche). Neuer Schwellwert: 50 km, überall gleich bedeutsam,
+// da relativ zum tatsächlichen radius_km des Himmelskörpers gerechnet.
+// Grund: Kolonien sollen langfristig über Straßen/Pipelines verbindbar sein
+// — das Grid soll irgendwann den ganzen Himmelskörper abdecken, dafür
+// braucht der Abstandscheck reale, konsistente Distanzen.
+// Bei Gründung wird jetzt zusätzlich zum landing_pad eine Verwaltung
+// angelegt (Gründungsminimum) — Eigentümer ist der Gründer.
 //
 // POST — Neue Kolonie oder Station gründen
 // GET  — Verfügbare Himmelskörper + Gründungsvoraussetzungen
@@ -9,6 +21,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { FOUNDING_COSTS, ORBIT_CLASSES, type OrbitClass } from '@/lib/game/celestialBodies'
+
+const MIN_COLONY_DISTANCE_KM = 50
+
+// Großkreis-Distanz zweier Oberflächenpunkte auf einem Himmelskörper mit
+// gegebenem Radius (Haversine). Liefert die reale Distanz in km — anders als
+// ein simples Lat/Lon-Delta-Kästchen skaliert das korrekt über sehr
+// unterschiedlich große Himmelskörper (Mars vs. Phobos etc.).
+function surfaceDistanceKm(
+  lat1: number, lon1: number, lat2: number, lon2: number, radiusKm: number
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return radiusKm * c
+}
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -134,7 +165,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Kollisions-Check — zu nahe an bestehender Location? ──────────────────
+  // Echte Großkreis-Distanz statt grobem Lat/Lon-Kästchen (v1.3.0).
   if (surfaceLat != null && surfaceLon != null) {
+    const radiusKm = celestialBody.radius_km ?? 3390  // Fallback: Mars-Radius
     const { data: nearby } = await supabase
       .from('locations')
       .select('name, surface_lat, surface_lon')
@@ -143,11 +176,10 @@ export async function POST(req: NextRequest) {
 
     for (const loc of nearby ?? []) {
       if (loc.surface_lat == null || loc.surface_lon == null) continue
-      const dLat = Math.abs(surfaceLat - loc.surface_lat)
-      const dLon = Math.abs(surfaceLon - loc.surface_lon)
-      if (dLat < 5 && dLon < 5) {  // 5° Mindestabstand
+      const distKm = surfaceDistanceKm(surfaceLat, surfaceLon, loc.surface_lat, loc.surface_lon, radiusKm)
+      if (distKm < MIN_COLONY_DISTANCE_KM) {
         return NextResponse.json({
-          error: `Zu nahe an bestehender Siedlung "${loc.name}" (min. 5° Abstand)`,
+          error: `Zu nahe an bestehender Siedlung "${loc.name}" (${Math.round(distKm)} km entfernt, min. ${MIN_COLONY_DISTANCE_KM} km Abstand)`,
         }, { status: 409 })
       }
     }
@@ -193,6 +225,7 @@ export async function POST(req: NextRequest) {
       orbit_inclination: body.orbitInclination ?? 0,
       grid_radius:       locationType === 'station' ? 8 : 16,
       owner_id:          user.id,
+      governor_profile_id: locationType === 'colony' || locationType === 'outpost' ? user.id : null,
       is_public:         true,
       population:        locationType === 'colony' ? 10 : 0,
       population_max:    locationType === 'colony' ? 100 : 0,
@@ -210,8 +243,10 @@ export async function POST(req: NextRequest) {
     .update({ credits: profile.credits - Math.round(cost) })
     .eq('id', user.id)
 
-  // ── Mindest-Infrastruktur anlegen (Landing Pad) ───────────────────────────
-  // Wird bei nächstem Grid-Load automatisch angezeigt
+  // ── Mindest-Infrastruktur anlegen (Landing Pad + Verwaltung) ──────────────
+  // Wird bei nächstem Grid-Load automatisch angezeigt. Landing Pad bleibt
+  // staatlich (Grundversorgung), die Verwaltung gehört dem Gründer — ohne
+  // Verwaltung funktioniert eine Kolonie nicht (Steuern, Grundfunktionen).
   await supabase.from('tile_entities').insert({
     profile_id:   null,
     actor_id:     null,
@@ -224,6 +259,22 @@ export async function POST(req: NextRequest) {
     tile_col:     16,
     built_at:     new Date().toISOString(),
   })
+
+  if (locationType === 'colony' || locationType === 'outpost') {
+    await supabase.from('tile_entities').insert({
+      profile_id:      user.id,
+      actor_id:        null,
+      owner_class:     'PLAYER',
+      is_state_owned:  false,
+      entity_type:     'building',
+      entity_id:       'admin',
+      location_id:     location.id,
+      tile_level:      0,
+      tile_row:        12,
+      tile_col:        17,
+      built_at:        new Date().toISOString(),
+    })
+  }
 
   return NextResponse.json({
     ok:       true,
