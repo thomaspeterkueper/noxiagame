@@ -29,6 +29,8 @@ interface SchoolOverlayProps {
   colonyContext: ColonyContext
   onClose: () => void
   onKnowledgeEarned: (pts: number, newTotal: number) => void
+  canSell?: boolean       // true wenn Spieler Eigentümer & nicht staatlich (25.08.2026)
+  onSellClick?: () => void
 }
 
 type CalcTask = { kind: 'calc'; question: string; answer: number; explanation: string; points: number; topic: string }
@@ -436,7 +438,7 @@ function KursListe({ onSelect, jwt }: { onSelect: (id: string) => void; jwt: () 
   )
 }
 
-export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned }: SchoolOverlayProps) {
+export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned, canSell, onSellClick }: SchoolOverlayProps) {
   const [tab, setTab]               = useState<'akademie' | 'kurse' | 'module' | 'ssf' | 'handbuch'>('akademie')
   const [completedModules, setCompleted] = useState<string[]>([])
   const [moduleLoading, setModuleLoading] = useState(false)
@@ -609,6 +611,11 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
       {bg && <img src={bg.src} alt={bg.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,18,28,0.52)' }} />
+      {canSell && onSellClick && (
+        <button onClick={onSellClick} title="Gebäude verkaufen" style={{ position: 'absolute', top: '1.25rem', right: '4.5rem', zIndex: 10, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '20px', padding: '0 0.85rem', height: 36, cursor: 'pointer', color: C.textMuted, fontSize: '0.72rem', fontFamily: MONO, display: 'flex', alignItems: 'center', gap: '5px' }}>
+          🏷️ Verkaufen
+        </button>
+      )}
       <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.5rem', zIndex: 10, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', color: C.textMuted }}>✕</button>
       {bg && <div style={{ position: 'absolute', top: '1.25rem', left: '1.5rem', zIndex: 10, fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: 'rgba(248,245,238,0.85)', fontFamily: MONO }}>{bg.label}</div>}
 
