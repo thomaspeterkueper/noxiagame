@@ -1,6 +1,29 @@
 // ssfKnowledge.ts
-// Aktualisiert: 2026-07-20 — Bypass-Secret Header für Vercel Protection
-// Version:      0.3.0
+// Aktualisiert: 24.08.2026 — BUGFIX React error #31. Die SSF-Schnittstelle
+// (externes Repo, andere Vercel-Deployment) liefert `unlocks`-Einträge
+// inzwischen z.T. als Objekt { key, condition } statt als reinen String —
+// der statische Typ `string[]` schützte nicht, weil die JSON-Antwort zur
+// Laufzeit nie validiert wurde. SchoolOverlay.tsx rendert m.unlocks![0]
+// direkt als Text → React versuchte ein Objekt zu rendern → Error #31,
+// unabhängig von Location/Account/Plattform, weil die Akademie bei jedem
+// Öffnen /api/ssf/modules lädt. Fix: SsfUnlock-Union-Type + unlockLabel()
+// normalisiert JEDEN Eintrag beim Import auf einen reinen String — kein
+// ungeprüftes externes JSON gelangt mehr bis ins JSX, für alle Consumer.
+// Version:      0.4.0
+
+// Ein SSF-Unlock-Eintrag kann ein reiner String sein (Normalfall) oder ein
+// Objekt mit key/condition (aktuelles Verhalten der SSF-Schnittstelle).
+export type SsfUnlock = string | { key: string; condition?: unknown }
+
+// Extrahiert einen anzeigbaren String aus einem SsfUnlock-Eintrag, egal in
+// welcher Form er ankommt. Einziger Ort, an dem diese Fallunterscheidung
+// nötig ist — alles danach arbeitet garantiert mit string.
+export function unlockLabel(u: SsfUnlock): string {
+  if (typeof u === 'string') return u
+  if (u && typeof u === 'object' && typeof (u as any).key === 'string') return (u as any).key
+  return String(u)
+}
+
 export type SsfKnowledgeModule = {
   id: string
   title: string
@@ -8,7 +31,7 @@ export type SsfKnowledgeModule = {
   difficulty: number
   durationMinutes: number
   summary: string
-  unlocks: string[]
+  unlocks: string[]   // ← nach Normalisierung immer reine Strings, garantiert
   sourceEntityIds: string[]
   ssfUrl: string
 }
@@ -49,7 +72,17 @@ export async function fetchSsfKnowledgeModules(): Promise<SsfKnowledgeModule[]> 
     if (!response.ok) return []
 
     const data = (await response.json()) as SsfModulesPayload
-    return Array.isArray(data.modules) ? data.modules : []
+    const modules = Array.isArray(data.modules) ? data.modules : []
+
+    // Normalisierung: unlocks können roh { key, condition } enthalten (siehe
+    // Kommentar oben) — hier auf reine Strings gebracht, für alle Consumer
+    // im Projekt garantiert sicher.
+    return modules.map(m => ({
+      ...m,
+      unlocks: Array.isArray(m.unlocks)
+        ? (m.unlocks as unknown as SsfUnlock[]).map(unlockLabel)
+        : [],
+    }))
   } catch {
     return []
   }
