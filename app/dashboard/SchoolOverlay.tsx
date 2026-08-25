@@ -1,17 +1,20 @@
 'use client'
 
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 24.08.2026 — DEBUG_RAW bestätigt: rohe Server-Antwort war
-//               stabil (valides quiz-JSON, 4 Optionen), Absturz liegt also im
-//               Rendering-Pfad selbst. DEBUG_RAW zurück auf false, stattdessen
-//               TaskErrorBoundary um den Aufgaben-Render-Block gelegt — fängt
-//               den exakten Fehler samt Stack ab und zeigt ihn als Text an,
-//               statt die ganze Seite abstürzen zu lassen.
-// Version:      1.4.0-debug
+// Aktualisiert: 24.08.2026 — BUGFIX React error #31 (von Thomas lokalisiert):
+//               m.unlocks![0] wurde direkt gerendert, aber SSF liefert
+//               unlocks-Einträge z.T. als { key, condition } statt String.
+//               unlockLabel() aus lib/ssfKnowledge.ts normalisiert jetzt
+//               jeden Eintrag defensiv beim Rendern (zusätzlich zur
+//               Normalisierung an der Quelle in fetchSsfKnowledgeModules).
+//               DEBUG_RAW/TaskErrorBoundary bleiben vorerst als Sicherheits-
+//               netz aktiv, GlobalErrorBoundary in DashboardClient ebenso.
+// Version:      1.5.0
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
 import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
+import { unlockLabel, type SsfUnlock } from '@/lib/ssfKnowledge'
 
 interface ColonyContext {
   locationName: string
@@ -77,7 +80,7 @@ type SsfModule = {
   durationMinutes?: number
   difficulty?: number
   reward?: string
-  unlocks?: string[]
+  unlocks?: SsfUnlock[]   // v0.4.0: kann roh { key, condition } enthalten — s. unlockLabel()
   ssfUrl?: string         // Fix: war in Interface nicht deklariert
 }
 
@@ -213,7 +216,7 @@ function SsfTab() {
               </div>
               <div style={{ color: C.textFaint, fontSize: '0.62rem', marginTop: 3, fontFamily: MONO }}>{m.domain ?? ''} · Schwierigkeit {m.difficulty ?? '?'}</div>
               <div style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: 6, lineHeight: 1.5 }}>{m.summary ?? m.description ?? 'SSF-Grundlagenmodul.'}</div>
-              {(m.unlocks?.length ?? 0) > 0 && <div style={{ marginTop: 6, color: C.gold, fontSize: '0.68rem', fontWeight: 700 }}>🔓 Freischaltet: {m.unlocks![0]}</div>}
+              {(m.unlocks?.length ?? 0) > 0 && <div style={{ marginTop: 6, color: C.gold, fontSize: '0.68rem', fontWeight: 700 }}>🔓 Freischaltet: {unlockLabel(m.unlocks![0])}</div>}
             </a>
           ))}
           {modules.length === 0 && <div style={{ color: C.textMuted, fontSize: '0.8rem', fontFamily: MONO }}>Keine Module verfügbar.</div>}
@@ -259,7 +262,7 @@ function RightPanel({ topic, kind, modules, currentUserId }: { topic: string | n
               <div style={{ fontWeight: 700, color: C.accent, fontSize: '0.82rem' }}>{m.title ?? m.name ?? m.id}</div>
               <div style={{ color: C.textFaint, fontSize: '0.62rem', marginTop: 2, fontFamily: MONO }}>{m.domain ?? ''} · {m.durationMinutes ?? '?'} Min.</div>
               <div style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: 5, lineHeight: 1.5 }}>{m.summary ?? m.description ?? ''}</div>
-              {(m.unlocks?.length ?? 0) > 0 && <div style={{ marginTop: 5, color: C.gold, fontSize: '0.65rem', fontWeight: 700 }}>🔓 {m.unlocks![0]}</div>}
+              {(m.unlocks?.length ?? 0) > 0 && <div style={{ marginTop: 5, color: C.gold, fontSize: '0.65rem', fontWeight: 700 }}>🔓 {unlockLabel(m.unlocks![0])}</div>}
             </a>
           ))}
         </div>
