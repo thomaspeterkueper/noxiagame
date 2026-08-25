@@ -515,7 +515,7 @@ export default function ColonyGrid({
       {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} canSell={canSellSelected} onSellClick={openSellForSelected} />}
       {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} gates={gates} canSell={canSellSelected} onSellClick={openSellForSelected} />}
-      {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
+      {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} userId={userId} canSell={canSellSelected} onSellClick={openSellForSelected} />}
 
       {showBuildingOverlay && selectedTile && (() => {
         const ent = entityAt(selectedTile.r, selectedTile.c)
