@@ -1,9 +1,22 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Version:  0.6.4
+// Aktualisiert: 24.08.2026
+// Version:  0.6.5
+//
+// v0.6.5: BUGFIX Haupt-Thread-Blockade. reach in addRoadNetwork() war nicht
+//   gedeckelt (anders als span). Bei sehr hoher population (z.B. Erde:
+//   999.999.999, siehe Migration 018) ergab reach = 2 + floor(999999999/600)
+//   ≈ 1.666.668 → die innere Schleife lief ~3,3 Mio. Mal pro Straßenzweig und
+//   blockierte den Haupt-Thread bei JEDEM Re-Render (population/entities/
+//   pending-Änderung — Polling, Bau, jede Aktion), bis der Tab-Prozess
+//   irgendwann kollabierte ("This page couldn't load" ohne jeden JS-Fehler —
+//   kein React-Rendering-Fehler, daher von einer Error Boundary nicht
+//   abfangbar). Fix: reach wie span auf sinnvolle Distanz relativ zur
+//   Gridhöhe gedeckelt.
 //
 // v0.6.4: Mond-Ressourcentiles ice/helium3/titanium als bebaubar
 //   freigeschaltet, damit Shackleton nach Moon Terrain v3 wieder nutzbar ist.
+
 // v0.6.3: Neue spezialisierte Terrain-Tiles als bebaubar/straßenfähig
 //   freigeschaltet: farmland/city/spaceport, mare/highland/research,
 //   dust/plateau/habitat/industry.
@@ -124,7 +137,11 @@ function addRoadNetwork(grid: Cell[][], population: number, userId: string | und
   const span = Math.min(Math.floor(population / 400) + 1, 3)
   for (let q = 1; q <= span; q++) {
     const qc = Math.round((cols * q) / (span + 1))
-    const reach = 2 + Math.floor(population / 600)
+    // Gedeckelt wie span (v0.6.5) — ohne Deckel lief die Schleife bei sehr
+    // hoher population (z.B. Erde: 999.999.999) Millionen Male und blockierte
+    // den Haupt-Thread. Das Grid ist ohnehin nur `rows` Zeilen hoch, mehr
+    // reach hat keinen sichtbaren Effekt.
+    const reach = Math.min(2 + Math.floor(population / 600), rows)
     for (let r = centerR - reach; r <= centerR + reach; r++) {
       if (r < 0 || r >= rows) continue
       if (isBuildable(grid[r][qc].type)) grid[r][qc] = { type: 'road', owner: userId ? 'state' : null }
