@@ -2,8 +2,8 @@
 
 // app/dashboard/LandingOverlay.tsx
 // Erstellt:     21.06.2026
-// Aktualisiert: 21.06.2026
-// Version:      1.0.0
+// Aktualisiert: 25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
+// Version:      1.1.0
 //
 // Landeplatz-Overlay — öffnet sich beim Klick auf landing_pad im Grid.
 // Zeigt Sonnensystem-Karte + Reiseziele mit Energiekosten + Flug-Button.
@@ -24,11 +24,13 @@ interface LandingOverlayProps {
   inTransit:       boolean
   onTravel:        (dest: string) => void
   onClose:         () => void
+  canSell?:        boolean  // true wenn Spieler Eigentümer & nicht staatlich (25.08.2026)
+  onSellClick?:    () => void
 }
 
 export default function LandingOverlay({
   currentLocation, locations, cargo, shipRange,
-  currentTick, inTransit, onTravel, onClose,
+  currentTick, inTransit, onTravel, onClose, canSell, onSellClick,
 }: LandingOverlayProps) {
   const [showMap, setShowMap] = useState(false)
 
@@ -70,6 +72,11 @@ export default function LandingOverlay({
             >
               {showMap ? 'Karte ausblenden' : '🌌 Karte'}
             </button>
+            {canSell && onSellClick && (
+              <button onClick={onSellClick} style={{ background: 'transparent', border: '1px solid #2a4e7a', color: '#8ab0d0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.65rem', cursor: 'pointer' }}>
+                🏷️ Verkaufen
+              </button>
+            )}
             <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#5a7a9a', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
           </div>
         </div>
