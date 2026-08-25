@@ -1,7 +1,9 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 26.06.2026 — Ruf-Inkrementierung: location_reputation bei buy/sell
-// Version:      0.6.0
+// Aktualisiert: 25.08.2026 — Landegebühr (colony_settings.tax_landing) bei
+//               travel: flacher Cr-Betrag pro Ankunft, fließt in
+//               colony_ledger des Zielorts (Kolonie-Kasse, NOXIA-ECON-0002)
+// Version:      0.7.0
 //
 // v0.5.4 – Pilot-Kompetenz: erfolgreiche Reisen zählen serverseitig auf
 //   profiles.flight_count. Das Dashboard soll nur den fertigen Wert lesen.
@@ -170,6 +172,63 @@ export async function GET(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // ── LANDEGEBÜHR (25.08.2026) — flacher Cr-Betrag, colony_settings.tax_landing,
+    // fließt in die Kolonie-Kasse (colony_ledger) des Zielorts. Nur bei
+    // tatsächlichem Ortswechsel, nicht bei fromLocation === dest.
+    let landingFee = 0
+    if (fromLocation !== dest) {
+      const { data: destLoc } = await serviceClient
+        .from('locations')
+        .select('id')
+        .eq('slug', dest)
+        .maybeSingle()
+
+      if (destLoc) {
+        const { data: destSettings } = await serviceClient
+          .from('colony_settings')
+          .select('tax_landing')
+          .eq('location_id', destLoc.id)
+          .maybeSingle()
+        landingFee = Math.max(0, Math.round(Number(destSettings?.tax_landing ?? 0)))
+
+        if (landingFee > 0) {
+          const { data: payerProfile } = await serviceClient
+            .from('profiles')
+            .select('credits')
+            .eq('id', user.id)
+            .single()
+
+          if (!payerProfile || payerProfile.credits < landingFee) {
+            return NextResponse.json({
+              error: `Landegebühr ${landingFee} Cr — nicht genug Credits`,
+              landingFee,
+            }, { status: 400 })
+          }
+
+          await serviceClient.from('profiles')
+            .update({ credits: payerProfile.credits - landingFee })
+            .eq('id', user.id)
+
+          const { data: destTick } = await serviceClient
+            .from('tick_log')
+            .select('tick_number')
+            .order('tick_number', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          await serviceClient.from('colony_ledger').insert({
+            location_id:   destLoc.id,
+            tick:          Number(destTick?.tick_number ?? 0),
+            entry_type:    'landing_fee',
+            profile_id:    user.id,
+            resource_type: null,
+            amount:        landingFee,
+            note:          `Landegebühr ${dest}`,
+          })
+        }
+      }
+    }
+
     // Energie verbrauchen
     const energyLeft = energyOnBoard - energyNeeded
     if (energyLeft > 0) {
@@ -194,7 +253,7 @@ export async function GET(req: NextRequest) {
       ? await incrementFlightCount(user.id)
       : Number.NaN
 
-    return NextResponse.json({ ok: true, location: dest, energyUsed: energyNeeded, flightCount })
+    return NextResponse.json({ ok: true, location: dest, energyUsed: energyNeeded, flightCount, landingFee })
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
