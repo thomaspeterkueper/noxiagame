@@ -1,12 +1,13 @@
 'use client'
 
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 24.08.2026 — DEBUG_RAW-Diagnosemodus: Aufgaben-Tab zeigt
-//               rohe Server-Antwort/Fehlertext statt die Aufgabe zu rendern.
-//               Umgeht jeden Rendering-Pfad, der bislang zum Absturz führen
-//               könnte, um die tatsächliche Fehlerursache sichtbar zu machen.
-//               DEBUG_RAW=true → auf false setzen, sobald Ursache gefunden.
-// Version:      1.3.0-debug
+// Aktualisiert: 24.08.2026 — DEBUG_RAW bestätigt: rohe Server-Antwort war
+//               stabil (valides quiz-JSON, 4 Optionen), Absturz liegt also im
+//               Rendering-Pfad selbst. DEBUG_RAW zurück auf false, stattdessen
+//               TaskErrorBoundary um den Aufgaben-Render-Block gelegt — fängt
+//               den exakten Fehler samt Stack ab und zeigt ihn als Text an,
+//               statt die ganze Seite abstürzen zu lassen.
+// Version:      1.4.0-debug
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
@@ -30,6 +31,40 @@ interface SchoolOverlayProps {
 type CalcTask = { kind: 'calc'; question: string; answer: number; explanation: string; points: number; topic: string }
 type QuizTask = { kind: 'quiz'; question: string; options: string[]; correct: number; explanation: string; points: number; topic: string }
 type Task = CalcTask | QuizTask
+
+// Error Boundary für Diagnose (24.08.2026): fängt Render-Fehler im
+// Aufgaben-Block ab und zeigt sie als Text, statt dass die ganze Seite
+// abstürzt. Klassen-Komponente, da React Error Boundaries keine Hooks
+// unterstützen.
+class TaskErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('TaskErrorBoundary caught:', error, info)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <pre style={{
+          background: '#3a0d0d', color: '#ffb3b3', padding: '1rem', borderRadius: 8,
+          fontSize: '0.72rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const,
+          wordBreak: 'break-word' as const, fontFamily: 'monospace',
+        }}>
+          {`RENDER-FEHLER ABGEFANGEN:\n${this.state.error.name}: ${this.state.error.message}\n\nStack:\n${this.state.error.stack ?? '(kein Stack)'}`}
+        </pre>
+      )
+    }
+    return this.props.children
+  }
+}
 
 type SsfModule = {
   id: string
@@ -409,7 +444,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   // bzw. jeden auftretenden Fehler als Text an, statt die Aufgabe zu rendern.
   // Umgeht damit jeden Rendering-Pfad, der bisher zum Absturz führen könnte.
   // Auf false setzen (oder Block entfernen), sobald die Ursache gefunden ist.
-  const DEBUG_RAW = true
+  const DEBUG_RAW = false
   const [debugOutput, setDebugOutput] = useState<string>('(noch keine Anfrage gelaufen)')
 
   // UserId einmalig laden
@@ -649,6 +684,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
             <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
               {loading && <div style={{ textAlign: 'center' as const, padding: '2.5rem', color: C.textMuted, fontFamily: MONO }}>Aufgabe wird generiert …</div>}
               {!loading && task && (
+                <TaskErrorBoundary>
                 <>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                     <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: 20, background: '#e8eef6', color: C.accent, fontWeight: 700, fontFamily: MONO }}>{task.topic}</span>
@@ -675,6 +711,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
                   {result !== null && <button onClick={generateTask} style={{ width: '100%', marginTop: 12, padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: 'pointer' }}>Nächste Aufgabe →</button>}
                   <div style={{ fontSize: '0.65rem', color: C.textFaint, textAlign: 'center' as const, marginTop: 10, fontFamily: MONO }}>{task.points} Punkte</div>
                 </>
+                </TaskErrorBoundary>
               )}
             </div>
           )}
