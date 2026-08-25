@@ -2,8 +2,8 @@
 
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 19.07.2026 — Tabs immer sichtbar, gesperrt mit Voraussetzung
-// Version:      1.6.0
+// Aktualisiert: 25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
+// Version:      1.7.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -16,6 +16,8 @@ interface BankOverlayProps {
   onClose:          () => void
   onCreditsChanged: (newCredits: number) => void
   gates?:           Record<string, boolean>  // Feature-Gates aus player_unlocks
+  canSell?:         boolean  // true wenn Spieler Eigentümer & nicht staatlich (25.08.2026)
+  onSellClick?:     () => void
 }
 
 const BANK_BG: Record<string, { src: string; label: string }> = {
@@ -102,7 +104,7 @@ const BUILDING_NAMES: Record<string, string> = {
 
 export default function BankOverlay({
   locationSlug, locationName, credits: initialCredits, onClose, onCreditsChanged,
-  gates = {},
+  gates = {}, canSell, onSellClick,
 }: BankOverlayProps) {
   const [tab, setTab]               = useState<Tab>('konto')
   const [status, setStatus]         = useState<BankStatus | null>(null)
@@ -219,7 +221,12 @@ export default function BankOverlay({
           <div style={{ fontSize: '0.6rem', color: C.textFaint, fontFamily: MONO, letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
             🏦 {bg?.label ?? locationName}
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', fontSize: '0.9rem', color: C.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {canSell && onSellClick && (
+              <button onClick={onSellClick} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '20px', padding: '0 10px', height: 30, cursor: 'pointer', fontSize: '0.68rem', color: C.textMuted, fontFamily: MONO }}>🏷️ Verkaufen</button>
+            )}
+            <button onClick={onClose} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', fontSize: '0.9rem', color: C.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
         </div>
         <div style={{ position: 'absolute', top: '-40px', left: 0, right: 0, height: '40px', background: `linear-gradient(to bottom, transparent, ${C.bg})`, pointerEvents: 'none' }} />
 
