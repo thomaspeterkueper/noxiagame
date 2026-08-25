@@ -1,7 +1,17 @@
 // app/api/ably/token/route.ts
 // Erstellt:     19.07.2026
-// Aktualisiert: 19.07.2026 — Ably Token-Endpoint für Client-Auth
-// Version:      1.1.0
+// Aktualisiert: 24.08.2026 — BUGFIX: capability fehlte für noxia:dm:{userId}.
+//               DashboardClient abonniert diesen Kanal bei JEDEM Dashboard-
+//               Load (Zeile ~165, für Chat/DMs), aber das Token gewährte nie
+//               Zugriff darauf → Ably lehnte mit 401/40160 ab, Client warf bei
+//               jedem (vermutlich wiederholten) Verbindungsversuch eine nicht
+//               abgefangene Exception (Uncaught in promise, kein React-
+//               Rendering-Fehler, daher unsichtbar für Error Boundaries und
+//               Server-Logs). Dauerlast durch Retry-Schleife führte über Zeit
+//               zum Tab-Absturz — unabhängig von Location/Account/Plattform,
+//               genau wie beobachtet ("This page couldn't load" auch im
+//               Leerlauf). Fix: dm-Kanal in die Capability-Liste aufgenommen.
+// Version:      1.2.0
 //
 // Client holt sich hier ein kurzlebiges Ably-Token (TTL: 3600s).
 // Nur für authentifizierte NOXIA-User.
@@ -45,6 +55,7 @@ export async function GET(req: NextRequest) {
       'noxia:transactions': ['subscribe'],
       'noxia:world':        ['subscribe'],
       [`noxia:builds:${user.id}`]: ['subscribe'],
+      [`noxia:dm:${user.id}`]:     ['subscribe'],
     },
   })
 
