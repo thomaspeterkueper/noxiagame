@@ -2,8 +2,12 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 20.07.2026 — NPCs wie echte Spieler: roter Rahmen, actor_name als username
-// Version:      5.22.0
+// Aktualisiert: 25.08.2026 — Verkaufen-Zugang für Akademie/Verwaltung/Bank/
+//               Landeplatz: diese vier Sonder-Gebäude sprangen bisher immer
+//               direkt in ihre Innenansicht und erreichten nie den
+//               SellPanel-Pfad, selbst im Eigentum des Spielers. Neue
+//               canSell/onSellClick-Props an alle vier durchgereicht.
+// Version:      5.23.0
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -492,15 +496,26 @@ export default function ColonyGrid({
     </div>
   )
 
+  // Verkaufen-Zugang für die vier Sonder-Gebäude (Akademie/Verwaltung/Bank/
+  // Landeplatz), die bisher direkt in ihre Innenansicht springen und nie den
+  // SellPanel-Pfad erreichen (25.08.2026). Nur sichtbar wenn Spieler-Eigentum
+  // & nicht staatlich.
+  const selectedEnt = selectedTile ? entityAt(selectedTile.r, selectedTile.c) : null
+  const canSellSelected = !!selectedEnt && selectedEnt.profile_id === userId && !selectedEnt.is_state_owned
+  const openSellForSelected = () => {
+    setShowLanding(false); setShowSchool(false); setShowBank(false); setShowAdmin(false)
+    setShowSellPanel(true)
+  }
+
   return (
     <div style={{ background: '#f4f2ed', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 8px rgba(0,0,0,0.08)' }}>
       <BuildingSpriteStyles />
       <style>{`@keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} } @keyframes noxia-spin { to { transform: rotate(360deg) } } @keyframes noxia-hint { 0%,100%{opacity:.5;box-shadow:0 0 6px rgba(201,169,97,0.5)} 50%{opacity:1;box-shadow:0 0 16px rgba(201,169,97,0.95)} }`}</style>
 
-      {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} />}
-      {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} />}
-      {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} gates={gates} />}
-      {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} />}
+      {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
+      {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} canSell={canSellSelected} onSellClick={openSellForSelected} />}
+      {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} gates={gates} canSell={canSellSelected} onSellClick={openSellForSelected} />}
+      {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
 
       {showBuildingOverlay && selectedTile && (() => {
         const ent = entityAt(selectedTile.r, selectedTile.c)
