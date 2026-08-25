@@ -2,8 +2,15 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 24.08.2026 — StationOverlay: onOpenMarket verdrahtet (Stationen hatten keinen Handelszugang)
-// Version:      2.21.0
+// Aktualisiert: 24.08.2026 — GlobalErrorBoundary um das ganze Dashboard gelegt
+//               (Diagnose): React-Fehler #31 "object with keys {key,
+//               condition}" trat außerhalb des TaskErrorBoundary-Bereichs
+//               auf (Akademie-Aufgaben-Block) — muss also anderswo im Baum
+//               liegen. Statische Suche nach {key, condition} im Quellcode
+//               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
+//               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
+//               dass die Seite ohne jede Meldung stirbt.
+// Version:      2.22.0-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -52,7 +59,7 @@ function KompetenzBar({ icon, wert, max, farbe }: { icon: string; wert: number; 
   )
 }
 
-export default function DashboardClient({ locations: initialLocations, prices, orders: initialOrders }: { locations: any[]; prices: any[]; orders: any[] }) {
+export default function DashboardClientInner({ locations: initialLocations, prices, orders: initialOrders }: { locations: any[]; prices: any[]; orders: any[] }) {
   const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loadFromServer, inTransit, shipTypeId, invalidate, invalidations, shipRange } = useGameStore()
 
   const handleInteriorAction = (kind: 'market'|'shipyard'|'navigation'|'ship'|'parts'|null) => {
@@ -407,5 +414,62 @@ export default function DashboardClient({ locations: initialLocations, prices, o
       </div>
       <footer style={{ borderTop: `1px solid ${T.line}`, marginTop: '2rem', padding: '0.65rem 2rem', display: 'flex', justifyContent: 'center', gap: '2rem', alignItems: 'center', background: T.surface, flexShrink: 0 }}>{([['Impressum', '/impressum'], ['Datenschutz', '/datenschutz'], ['Nutzungsbedingungen', '/nutzungsbedingungen'], ['Kontakt', 'mailto:info@noxiagame.com']] as [string,string][]).map(([label, href]) => <a key={label} href={href} style={{ fontSize: '0.62rem', color: T.inkFaint, textDecoration: 'none' }}>{label}</a>)}<span style={{ fontSize: '0.62rem', color: T.inkFaint }}>· © 2026 Thomas Küper · noχ¹ᐃ Alpha 0.1</span></footer>
     </div>
+  )
+}
+
+// Globale Error Boundary (24.08.2026, Diagnose): fängt JEDEN Render-Fehler
+// irgendwo im Dashboard ab, statt dass der ganze Tab/die Seite ohne
+// jede Meldung stirbt ("This page couldn't load"). Zeigt Fehlername,
+// Meldung und Stack als Text — das lokalisiert den nächsten Absturz exakt,
+// unabhängig davon in welcher Unterkomponente er auftritt.
+class GlobalErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null; info: string | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { error: null, info: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error, info: null }
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('GlobalErrorBoundary caught:', error, info)
+    this.setState({ info: info.componentStack ?? null })
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999, background: '#1a0505',
+          color: '#ffb3b3', padding: '2rem', overflow: 'auto', fontFamily: 'monospace',
+        }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#ff8080' }}>
+            ⚠ Dashboard-Absturz abgefangen (Diagnose-Modus)
+          </div>
+          <pre style={{ whiteSpace: 'pre-wrap' as const, wordBreak: 'break-word' as const, fontSize: '0.8rem', lineHeight: 1.6 }}>
+{`${this.state.error.name}: ${this.state.error.message}
+
+Stack:
+${this.state.error.stack ?? '(kein Stack)'}
+
+Component-Stack:
+${this.state.info ?? '(kein Component-Stack)'}`}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '1.5rem', padding: '0.6rem 1.2rem', background: '#c9a961', color: '#1a0505', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
+            Neu laden
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+export default function DashboardClient(props: { locations: any[]; prices: any[]; orders: any[] }) {
+  return (
+    <GlobalErrorBoundary>
+      <DashboardClientInner {...props} />
+    </GlobalErrorBoundary>
   )
 }
