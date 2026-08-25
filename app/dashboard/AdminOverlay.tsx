@@ -2,7 +2,8 @@
 
 // app/dashboard/AdminOverlay.tsx
 // Erstellt: 20.06.2026
-// Version:  1.0.0
+// Aktualisiert: 25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
+// Version:  1.1.0
 //
 // Verwaltungs-Overlay — öffnet sich beim Klick auf das Admin-Gebäude.
 // Zeigt: Aufträge, Stationsguthaben, Einnahmen, Ausgaben, Lagerbestand,
@@ -47,9 +48,11 @@ interface AdminData {
 interface AdminOverlayProps {
   locationSlug: string
   onClose: () => void
+  canSell?: boolean        // true wenn Spieler Eigentümer & nicht staatlich (25.08.2026)
+  onSellClick?: () => void
 }
 
-export default function AdminOverlay({ locationSlug, onClose }: AdminOverlayProps) {
+export default function AdminOverlay({ locationSlug, onClose, canSell, onSellClick }: AdminOverlayProps) {
   const [data, setData]     = useState<AdminData | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab]       = useState<'overview' | 'orders' | 'ledger'>('overview')
@@ -152,6 +155,15 @@ export default function AdminOverlay({ locationSlug, onClose }: AdminOverlayProp
               ✕
             </button>
           </div>
+
+          {canSell && onSellClick && (
+            <button
+              onClick={onSellClick}
+              style={{ marginTop: '8px', background: 'transparent', border: '1px solid #3a5a7a', color: '#8ab0d0', borderRadius: '6px', padding: '5px 12px', fontSize: '0.68rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            >
+              🏷️ Verkaufen
+            </button>
+          )}
 
           {/* Status-Badges */}
           {data && (
