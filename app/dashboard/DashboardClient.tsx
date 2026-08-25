@@ -59,7 +59,7 @@ function KompetenzBar({ icon, wert, max, farbe }: { icon: string; wert: number; 
   )
 }
 
-export default function DashboardClientInner({ locations: initialLocations, prices, orders: initialOrders }: { locations: any[]; prices: any[]; orders: any[] }) {
+function DashboardClientInner({ locations: initialLocations, prices, orders: initialOrders }: { locations: any[]; prices: any[]; orders: any[] }) {
   const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loadFromServer, inTransit, shipTypeId, invalidate, invalidations, shipRange } = useGameStore()
 
   const handleInteriorAction = (kind: 'market'|'shipyard'|'navigation'|'ship'|'parts'|null) => {
