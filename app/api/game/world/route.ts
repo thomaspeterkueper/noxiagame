@@ -1,7 +1,7 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 20.07.2026 — celestial_bodies in Response (Phase 1)
-// Version:      0.9.0
+// Aktualisiert: 27.08.2026 — Living Population v0.1 an World-Heartbeat angebunden
+// Version:      0.10.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runDueTicks } from '@/lib/game/tick'
+import { runPopulationTick } from '@/lib/game/population'
 
 const GROUP_WINDOW_MS = 60_000  // 60 Sekunden
 
@@ -59,6 +60,14 @@ export async function GET() {
     .limit(1)
     .maybeSingle()
   const tickCount = Number(lastTickRow?.tick_number ?? 0)
+
+  // Living Population läuft auf demselben Welt-Herzschlag. Ein Fehler darf
+  // niemals den restlichen Dashboard-Load blockieren.
+  try {
+    await runPopulationTick(supabase, tickCount)
+  } catch (err) {
+    console.error('runPopulationTick (world heartbeat) error:', err)
+  }
 
   // Aktuelle Koloniedaten
   const { data: locations } = await supabase
