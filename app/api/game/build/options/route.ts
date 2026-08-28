@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 28.08.2026 — Wissensvoraussetzungen liefern direkten NOXIA-Lernlink
-// Version:      0.4.0
+// Aktualisiert: 28.08.2026 — echte Spieler-Unlocks + direkter NOXIA-Lernlink
+// Version:      0.5.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { BUILDABLE } from '@/lib/game/buildings'
@@ -8,6 +8,7 @@ import { getResourceCosts } from '@/lib/game/buildCosts'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 import { analyzeTile, evaluateBuildingSuitability } from '@/lib/game/world/analyzer'
+import { createServiceClient } from '@/lib/supabase/service'
 
 function isAllowed(allowed: string[] | undefined, location: string) {
   return !allowed || allowed.length === 0 || allowed.includes(location)
@@ -19,6 +20,31 @@ function suitabilityPrefix(state: 'optimal' | 'possible' | 'blocked') {
   return '🔴 ungeeignet'
 }
 
+async function getPlayerKnowledge(req: NextRequest) {
+  const token = req.headers.get('authorization')?.split(' ')[1]
+  if (!token) return getNoxiaKnowledgeState('demo')
+
+  const supabase = createServiceClient()
+  const { data: { user } } = await supabase.auth.getUser(token)
+  if (!user) return getNoxiaKnowledgeState('demo')
+
+  const [{ data: unlockRows }, { data: completionRows }] = await Promise.all([
+    supabase.from('player_unlocks').select('unlock_id').eq('profile_id', user.id),
+    supabase.from('academy_completions').select('module_id').eq('profile_id', user.id),
+  ])
+
+  const unlocked = (unlockRows ?? []).map((r: any) => r.unlock_id).filter(Boolean)
+  const completedModules = (completionRows ?? []).map((r: any) => r.module_id).filter(Boolean)
+
+  return {
+    source: 'noxia-player-progress',
+    userId: user.id,
+    completedModules,
+    unlocked,
+    buildings: [],
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const locationSlug = searchParams.get('location') ?? 'earth'
@@ -28,9 +54,7 @@ export async function GET(req: NextRequest) {
   const tileRow = Number.isNaN(parsedRow) ? -1 : parsedRow
   const tileCol = Number.isNaN(parsedCol) ? -1 : parsedCol
 
-  const authHeader = req.headers.get('authorization')
-  const userId = authHeader ? 'player' : 'demo'
-  const knowledge = await getNoxiaKnowledgeState(userId)
+  const knowledge = await getPlayerKnowledge(req)
   const progress = { completedModules: knowledge.completedModules, unlocked: knowledge.unlocked }
 
   const analysis = analyzeTile({
