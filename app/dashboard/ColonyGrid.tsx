@@ -2,12 +2,8 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 25.08.2026 — Verkaufen-Zugang für Akademie/Verwaltung/Bank/
-//               Landeplatz: diese vier Sonder-Gebäude sprangen bisher immer
-//               direkt in ihre Innenansicht und erreichten nie den
-//               SellPanel-Pfad, selbst im Eigentum des Spielers. Neue
-//               canSell/onSellClick-Props an alle vier durchgereicht.
-// Version:      5.23.0
+// Aktualisiert: 28.08.2026 — Wissensgesperrte Gebäude verlinken direkt auf In-Game-Lernen
+// Version:      5.24.0
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -81,7 +77,7 @@ interface ColonyGridProps {
   onOpenShipyard?: () => void; onOpenWarehouse?: () => void; onChanged?: () => void
   onInteriorAction?: (kind: 'market'|'shipyard'|'navigation'|'ship'|'parts'|null) => void
   tileSize?: number
-  highlightEntityIds?: string[]   // entity_ids die mit goldenem Pulsring markiert werden
+  highlightEntityIds?: string[]
 }
 interface TooltipInfo {
   r: number; c: number; x: number; y: number
@@ -93,10 +89,16 @@ type BuildOption = {
   key: string
   name: string
   cost: number
+  displayCost?: number
   buildTimeTicks: number
   populationBonus?: number
   production?: { resource: string; amount: number }[]
   allowedLocations?: string[] | null
+  knowledgeLocked?: boolean
+  siteBlocked?: boolean
+  requiredUnlock?: string | null
+  requiredLabel?: string | null
+  learningUrl?: string | null
 }
 
 const TileTooltip = React.memo(function TileTooltip({ info }: { info: TooltipInfo }) {
@@ -261,36 +263,53 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
         {!loading && items.length === 0 && !msg && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Für dieses Feld sind aktuell keine Bauoptionen verfügbar.</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
           {[...items].sort((a, b) => {
-            // 1. Journey-Hints zuerst
             const aHint = journeyBuildHints.includes(a.key) ? 0 : 1
             const bHint = journeyBuildHints.includes(b.key) ? 0 : 1
             if (aHint !== bHint) return aHint - bHint
-            // 2. Leistbare Gebäude vor nicht leistbaren
-            const aAfford = credits >= a.cost ? 0 : 1
-            const bAfford = credits >= b.cost ? 0 : 1
+            const aCost = a.displayCost ?? a.cost
+            const bCost = b.displayCost ?? b.cost
+            const aAfford = credits >= aCost ? 0 : 1
+            const bAfford = credits >= bCost ? 0 : 1
             return aAfford - bAfford
           }).map(item => {
-            const canAfford = credits >= item.cost
+            const shownCost = item.displayCost ?? item.cost
+            const knowledgeLocked = !!item.knowledgeLocked
+            const siteBlocked = !!item.siteBlocked
+            const canAfford = credits >= shownCost
+            const canBuildNow = canAfford && !knowledgeLocked && !siteBlocked
             const prodText = item.production?.length
               ? item.production.map(p => `+${p.amount} ${RES_DE[p.resource] ?? p.resource}/Tick`).join(' · ')
               : ''
             return (
-              <button key={item.key} disabled={building || !canAfford} onClick={() => startBuild(item.key)} style={{
+              <div key={item.key} style={{
                 background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.08)' : '#ffffff',
-                border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canAfford ? '#ddd6c8' : '#ece8e0'}`,
+                border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canBuildNow ? '#ddd6c8' : '#ece8e0'}`,
                 borderRadius: '6px', padding: '0.6rem 0.75rem',
-                color: canAfford ? '#1a1a18' : '#9e9485',
-                cursor: canAfford ? 'pointer' : 'default', textAlign: 'left' as const, fontSize: '0.75rem', opacity: canAfford ? 1 : 0.55,
+                opacity: siteBlocked ? 0.6 : 1,
                 boxShadow: journeyBuildHints.includes(item.key) ? '0 0 8px rgba(201,169,97,0.3)' : 'none',
               }}>
                 {journeyBuildHints.includes(item.key) && <div style={{ fontSize: '0.52rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', marginBottom: '3px' }}>▶ EMPFOHLEN</div>}
-                <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
-                <div style={{ fontSize: '0.65rem', color: canAfford ? '#5a5248' : '#c8c0b8' }}>
-                  {item.cost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
-                  {prodText && ` · ${prodText}`}
-                  {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
-                </div>
-              </button>
+                <button disabled={building || !canBuildNow} onClick={() => startBuild(item.key)} style={{
+                  display: 'block', width: '100%', background: 'transparent', border: 'none', padding: 0,
+                  color: canBuildNow ? '#1a1a18' : '#9e9485',
+                  cursor: canBuildNow ? 'pointer' : 'default', textAlign: 'left', fontSize: '0.75rem',
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
+                  <div style={{ fontSize: '0.65rem', color: canBuildNow ? '#5a5248' : '#9e9485' }}>
+                    {shownCost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
+                    {prodText && ` · ${prodText}`}
+                    {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
+                  </div>
+                </button>
+                {knowledgeLocked && item.learningUrl && (
+                  <a href={item.learningUrl} style={{ display: 'inline-block', marginTop: '0.45rem', color: '#8a6a00', fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
+                    Jetzt lernen →
+                  </a>
+                )}
+                {knowledgeLocked && item.requiredLabel && (
+                  <div style={{ marginTop: '0.2rem', color: '#6b6357', fontSize: '0.62rem' }}>Benötigt: {item.requiredLabel}</div>
+                )}
+              </div>
             )
           })}
         </div>
@@ -324,7 +343,6 @@ export default function ColonyGrid({
   const isPanning                     = useRef(false)
   const panStart                      = useRef({ x: 0, y: 0, scrollX: 0, scrollY: 0 })
 
-  // Ctrl+Scroll Zoom — useEffect weil passive:false nötig
   useEffect(() => {
     const el = gridScrollRef.current
     if (!el) return
@@ -337,7 +355,6 @@ export default function ColonyGrid({
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  // Pan-Handler als React-Callbacks (kein useEffect nötig — ref direkt nutzbar)
   const handlePanStart = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
     if ((e.target as HTMLElement).closest('button,a,input,select')) return
@@ -416,9 +433,7 @@ export default function ColonyGrid({
     const overlayBuildings = ['mine', 'solar', 'habitat', 'ice_drill', 'water_recycler', 'scanner']
     if (ent && overlayBuildings.includes(ent.entity_id)) { setShowBuildingOverlay(true); return }
     if (ent && ent.profile_id === userId) { setShowSellPanel(true); return }
-    // Jede andere besetzte Kachel → nur Info in Sidebar, kein Bauen
     if (ent) return
-    // Freie Kachel → Bauen möglich
     if (isBuildable(tileType)) { setShowBuildPopup(true); return }
   }, [entityAt, onOpenShipyard, onOpenWarehouse, userId])
 
@@ -434,14 +449,13 @@ export default function ColonyGrid({
       const isHint = !!entity && highlightEntityIds.includes(entity.entity_id)
       const isNPC   = !!entity?.actor_id
       const isState = entity?.owner_class === 'STATE'
-      const isCorp  = false  // NPCs = fremde Akteure, gleich wie Spieler
+      const isCorp  = false
       const interactive = canBuild || !!entity || isAnom
       let ownerShadow = 'none'
       if (entity) {
-        if (isState)  ownerShadow = 'inset 0 0 0 2px #5aaeff, 0 0 5px rgba(90,174,255,0.55)'   // Blau = Staat
-        // isCorp = false: NPCs erhalten gleichen Rahmen wie fremde Spieler (unten)
-        else if (isOwn) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 5px rgba(201,169,97,0.55)'   // Gold = Spieler
-        else ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 4px rgba(224,80,80,0.45)'               // Rot = anderer Spieler
+        if (isState) ownerShadow = 'inset 0 0 0 2px #5aaeff, 0 0 5px rgba(90,174,255,0.55)'
+        else if (isOwn) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 5px rgba(201,169,97,0.55)'
+        else ownerShadow = 'inset 0 0 0 2px #e05050, 0 0 4px rgba(224,80,80,0.45)'
       }
       if (isSelected && !isState) ownerShadow = 'inset 0 0 0 2px #c9a961, 0 0 8px #c9a961'
 
@@ -496,10 +510,6 @@ export default function ColonyGrid({
     </div>
   )
 
-  // Verkaufen-Zugang für die vier Sonder-Gebäude (Akademie/Verwaltung/Bank/
-  // Landeplatz), die bisher direkt in ihre Innenansicht springen und nie den
-  // SellPanel-Pfad erreichen (25.08.2026). Nur sichtbar wenn Spieler-Eigentum
-  // & nicht staatlich.
   const selectedEnt = selectedTile ? entityAt(selectedTile.r, selectedTile.c) : null
   const canSellSelected = !!selectedEnt && selectedEnt.profile_id === userId && !selectedEnt.is_state_owned
   const openSellForSelected = () => {
@@ -600,7 +610,6 @@ export default function ColonyGrid({
               onEnterBuilding={e => { setInteriorEntity(e as any); setShowWalking(false) }}
             />
           )}
-          {/* Betreten-Button */}
           <button
             onClick={() => setShowWalking(true)}
             style={{
@@ -612,7 +621,6 @@ export default function ColonyGrid({
           >
             🚶 Betreten
           </button>
-          {/* Zoom-Controls */}
           <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8', borderRadius: 8, padding: '3px 6px', alignItems: 'center' }}>
             <button onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>+</button>
             <span style={{ fontSize: '0.62rem', color: '#6b6357', fontFamily: 'monospace', minWidth: 32, textAlign: 'center' as const }}>{Math.round(zoom * 100)}%</span>
@@ -629,14 +637,13 @@ export default function ColonyGrid({
             style={{
               cursor: 'grab',
               overflow: 'scroll',
-            maxHeight: 'calc(100vh - 280px)',
-            border: '2px solid #2a4e7a',
-            borderRadius: '6px',
-            background: '#f4f2ed',
-            // Scrollbalken verstecken
-            scrollbarWidth: 'none' as any,
-            msOverflowStyle: 'none' as any,
-          }}>
+              maxHeight: 'calc(100vh - 280px)',
+              border: '2px solid #2a4e7a',
+              borderRadius: '6px',
+              background: '#f4f2ed',
+              scrollbarWidth: 'none' as any,
+              msOverflowStyle: 'none' as any,
+            }}>
             <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: `${COLS * tileSize}px`, height: `${ROWS * tileSize}px`, transition: 'transform 0.15s ease' }}>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`, gridAutoRows: `${tileSize}px`, gap: 0, width: `${COLS * tileSize}px` }}>
                 {gridElements}
