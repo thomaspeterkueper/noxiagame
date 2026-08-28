@@ -1,7 +1,7 @@
 import React from 'react'
 // app/layout.tsx
-// Aktualisiert: 2026-07-10 — globaler Legal-Footer ergänzt (NOX-0006)
-// Version:      1.1.0
+// Aktualisiert: 2026-08-28 — SSF-Lernlinks bleiben innerhalb von NOXIA
+// Version:      1.2.0
 
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Courier_Prime, Playfair_Display } from 'next/font/google'
@@ -10,6 +10,7 @@ import './globals.css'
 import MusicProvider from './_components/MusicProvider'
 import MusicControls from './_components/MusicControls'
 import SiteFooter from './_components/SiteFooter'
+import LearningLinkInterceptor from './_components/LearningLinkInterceptor'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head />
       <body className="min-h-full flex flex-col">
+        <LearningLinkInterceptor />
         <MusicProvider>
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>{children}</div>
