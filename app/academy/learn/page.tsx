@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import KursRenderer from '@/app/dashboard/KursRenderer'
 import { MODULE_TO_PATH } from '@/lib/knowledge/ssfPaths'
 import { unlockLabel, type SsfKnowledgeModule } from '@/lib/ssfKnowledge'
 
-export default function InGameLearningPage() {
+function InGameLearningContent() {
   const router = useRouter()
   const search = useSearchParams()
   const directPath = search.get('path')
@@ -113,5 +113,13 @@ export default function InGameLearningPage() {
         )}
       </div>
     </main>
+  )
+}
+
+export default function InGameLearningPage() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: '100vh', background: '#f4f2ed', padding: '1rem' }}>Lernpfad wird geladen …</main>}>
+      <InGameLearningContent />
+    </Suspense>
   )
 }
