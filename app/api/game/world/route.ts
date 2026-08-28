@@ -1,7 +1,7 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 27.08.2026 — Living Population v0.1 an World-Heartbeat angebunden
-// Version:      0.10.0
+// Aktualisiert: 28.08.2026 — Referenzorte (z. B. Erde) aus Live-Koloniestatistik entfernt
+// Version:      0.11.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -91,19 +91,21 @@ export async function GET() {
     .order('orbit_radius_au', { ascending: true })
 
   // ── Multiplayer: tile_entities aller Spieler + Staatliche Gebäude ──────────
-  // Liefert Gebäude für alle Kolonien — ColonyGrid kann fremde Gebäude zeigen.
-  // Enthält profile_id, owner_class, entity_id, tile_row, tile_col, location_id.
   const { data: allEntities } = await supabase
     .from('tile_entities')
     .select('id, profile_id, owner_class, owner_id, actor_id, occupant_id, entity_type, entity_id, tile_level, tile_row, tile_col, location_id, built_at, asking_price, lease_price, profiles(username), locations(id, slug, name), actors(display_name)')
     .eq('entity_type', 'building')
     .order('built_at', { ascending: true })
 
-  // Weltmeldungen generieren
+  // Nur tatsächlich simulierte Siedlungen gehören in Live-Statistik und Feed.
+  // Referenzorte wie Erde dürfen weder die Einwohnerzahl verfälschen noch
+  // Versorgungswarnungen erzeugen.
+  const liveLocations = (locations ?? []).filter((loc: any) => loc.simulate_tick !== false)
+
   const news: { type: string; text: string; icon: string }[] = []
-  for (const loc of locations ?? []) {
-    const name = loc.slug === 'moon' ? 'Mond' : loc.slug === 'mars' ? 'Mars' : 'Phobos'
-    const icon = loc.slug === 'moon' ? '🌙' : loc.slug === 'mars' ? '🔴' : '🪨'
+  for (const loc of liveLocations) {
+    const name = loc.name ?? (loc.slug === 'moon' ? 'Mond' : loc.slug === 'mars' ? 'Mars' : loc.slug)
+    const icon = loc.slug === 'moon' ? '🌙' : loc.slug === 'mars' ? '🔴' : loc.slug === 'phobos' ? '🪨' : '🪐'
     if (!loc.is_supplied) {
       news.push({ type: 'danger', icon, text: `${name} meldet Versorgungsengpass` })
     }
@@ -111,7 +113,7 @@ export async function GET() {
     if (water && water.stock < 50) {
       news.push({ type: 'warning', icon: '💧', text: `${name}: Wasserreserven kritisch (${water.stock}t)` })
     }
-    const popPct = Math.round((loc.population / loc.population_max) * 100)
+    const popPct = Math.round((loc.population / Math.max(1, loc.population_max)) * 100)
     if (popPct > 80) {
       news.push({ type: 'warning', icon: '👥', text: `${name} nähert sich Bevölkerungsgrenze (${popPct}%)` })
     }
@@ -135,8 +137,8 @@ export async function GET() {
     news.push({ type: 'info', icon: '📈', text: 'Handelsvolumen im Sonnensystem steigt' })
   }
 
-  const totalPop = (locations ?? []).reduce((s: number, l: any) => s + l.population, 0)
-  const suppliedCount = (locations ?? []).filter((l: any) => l.is_supplied).length
+  const totalPop = liveLocations.reduce((s: number, l: any) => s + Number(l.population ?? 0), 0)
+  const suppliedCount = liveLocations.filter((l: any) => l.is_supplied).length
 
   return NextResponse.json({
     news:         news.slice(0, 5),
@@ -147,7 +149,7 @@ export async function GET() {
     stats: {
       totalPopulation:  totalPop,
       suppliedColonies: suppliedCount,
-      totalColonies:    (locations ?? []).length,
+      totalColonies:    liveLocations.length,
       tickNumber:       tickCount,
     },
   })
