@@ -29,16 +29,19 @@ function findLocationTargets(): LocationTarget[] {
   const leftColumn = document.querySelector('.noxia-dashboard-shell > div > header + div > div:first-child')
   if (!(leftColumn instanceof HTMLElement)) return []
 
-  const candidates = Array.from(leftColumn.querySelectorAll(':scope > div > div:last-child > div'))
-  const seen = new Set<HTMLElement>()
-  const result: LocationTarget[] = []
+  const groups = Array.from(leftColumn.children).filter((node): node is HTMLElement => node instanceof HTMLElement)
+  const locationGroup = groups.find(group => (group.firstElementChild?.textContent ?? '').trim().includes('Deine Orte'))
+  if (!locationGroup) return []
 
-  for (const raw of candidates) {
-    if (!(raw instanceof HTMLElement) || seen.has(raw)) continue
+  const cardsContainer = locationGroup.lastElementChild
+  if (!(cardsContainer instanceof HTMLElement)) return []
+
+  const result: LocationTarget[] = []
+  for (const raw of Array.from(cardsContainer.children)) {
+    if (!(raw instanceof HTMLElement)) continue
     const text = raw.textContent ?? ''
     const name = Object.keys(LOCATION_ASSETS).find(key => text.includes(key))
     if (!name) continue
-    seen.add(raw)
     raw.classList.add('noxia-location-card-with-image')
     result.push({ node: raw, name, src: LOCATION_ASSETS[name] })
   }
