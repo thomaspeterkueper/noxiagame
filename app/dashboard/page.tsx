@@ -28,6 +28,13 @@ export default async function Dashboard() {
         .noxia-dashboard-shell > div > header > div:last-child {
           gap: 1.15rem !important;
         }
+        /* Der bisherige vierte Kennwert war eine globale Summenbevölkerung und
+           wurde als Bevölkerung des aktuellen Standorts gelesen. Lokale Werte
+           stehen direkt am Grid; bis der Header explizit lokal verdrahtet ist,
+           wird der irreführende Aggregatwert nicht angezeigt. */
+        .noxia-dashboard-shell > div > header > div:last-child > div:nth-child(4) {
+          display: none !important;
+        }
         .noxia-dashboard-shell > div > header + div {
           padding: .75rem 1rem 0 !important;
           grid-template-columns: minmax(0, 1fr) 310px !important;
