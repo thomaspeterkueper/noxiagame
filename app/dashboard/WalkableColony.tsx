@@ -59,7 +59,7 @@ const C = {
 }
 
 function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number, color = C.figure, label = '') {
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 3, 9, 4, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 3, 9, 4, 0, 0, Math.PI * 2); ctx.fill()
   const baseY = y - 4
   ctx.fillStyle = '#1a2a3a'; ctx.fillRect(x - 4, baseY - 8, 3.5, 8); ctx.fillRect(x + 1, baseY - 8, 3.5, 8)
   ctx.fillStyle = '#2a4e7a'; ctx.fillRect(x - 5, baseY - 18, 10, 11); ctx.fillRect(x - 8, baseY - 17, 3.5, 8); ctx.fillRect(x + 5, baseY - 17, 3.5, 8)
@@ -83,7 +83,7 @@ function drawIsoBuilding(ctx: CanvasRenderingContext2D, col: number, row: number
 }
 
 function drawShip(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
-  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(cx, cy + 26, 20, 6, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(cx, cy + 26, 20, 6, 0, 0, Math.PI * 2); ctx.fill()
   ctx.fillStyle = C.ship; ctx.beginPath(); ctx.moveTo(cx, cy - 22); ctx.lineTo(cx - 16, cy + 6); ctx.lineTo(cx - 11, cy + 18); ctx.lineTo(cx + 11, cy + 18); ctx.lineTo(cx + 16, cy + 6); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#8ab8e8'; ctx.stroke()
 }
 
