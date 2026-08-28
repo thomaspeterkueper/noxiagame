@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 10.07.2026 — Eignung und erwartete Erträge im bestehenden Bau-Dialog sichtbar
-// Version:      0.3.0
+// Aktualisiert: 28.08.2026 — Wissensvoraussetzungen liefern direkten NOXIA-Lernlink
+// Version:      0.4.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { BUILDABLE } from '@/lib/game/buildings'
@@ -59,6 +59,9 @@ export async function GET(req: NextRequest) {
       const reasonText = suitability.reasons.join(' · ')
       const efficiencyText = `${Math.round(suitability.efficiency * 100)} %`
       const siteText = `${suitabilityPrefix(suitability.state)} · Effizienz ${efficiencyText}${reasonText ? ` · ${reasonText}` : ''}`
+      const learningUrl = req.requiredUnlock
+        ? `/academy/learn?unlock=${encodeURIComponent(req.requiredUnlock)}`
+        : null
 
       return {
         key: building.id,
@@ -77,6 +80,7 @@ export async function GET(req: NextRequest) {
         requiredUnlock: req.requiredUnlock,
         requiredLabel: req.requiredLabel,
         unlockSource: req.requiredUnlock ? 'Solar Science Foundation' : null,
+        learningUrl,
         suitability,
       }
     })
