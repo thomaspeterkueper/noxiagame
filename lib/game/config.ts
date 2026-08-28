@@ -1,8 +1,8 @@
 // ============================================================
 // NOXIA – Spielkonfiguration
 // Erstellt: 31.05.2026
-// Aktualisiert: 29.06.2026 — Marktpreis-Cap auf spielbaren Bereich gesenkt
-// Version:      2.0.1
+// Aktualisiert: 28.08.2026 — Bevölkerungsraten auf Stunden-Ticks neu skaliert
+// Version:      2.1.0
 // ============================================================
 //
 // Diese Datei enthält ausschließlich Spielkonstanten.
@@ -17,9 +17,12 @@ export const CONSUMPTION_PER_100 = {
   metal:  0.2,
 } as const
 
-// Bevölkerungswachstum pro Tick
-export const GROWTH_RATE   = 0.0100  // +1% wenn versorgt
-export const DECLINE_RATE  = 0.0200  // -2% wenn nicht versorgt
+// Bevölkerungsentwicklung pro Stunden-Tick.
+// 1% Wachstum pro Stunde war für persistente Kolonien viel zu hoch
+// (≈ +27%/Tag). 0,02%/h entspricht grob +0,48%/Tag bei stabiler Versorgung.
+// Ein echter Versorgungsbruch bleibt dagegen spürbar und zwingt zum Handeln.
+export const GROWTH_RATE   = 0.0002  // +0,02% wenn versorgt
+export const DECLINE_RATE  = 0.0500  // -5% wenn nicht versorgt / überbelegt
 
 // Preisanpassung pro Tick
 export const PRICE_PRESSURE_HIGH  = 1.05  // +5% wenn stock < LOW_THRESHOLD
