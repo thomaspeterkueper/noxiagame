@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import DashboardGate from './DashboardGate'
+import DashboardQuickChrome from './DashboardQuickChrome'
 
 export const revalidate = 30
 
@@ -18,6 +19,7 @@ export default async function Dashboard() {
   return (
     <div className="noxia-dashboard-shell">
       <DashboardGate locations={locations} prices={prices} orders={orders} />
+      <DashboardQuickChrome />
       <style>{`
         /*
          * Desktop dashboard density v2
@@ -36,6 +38,36 @@ export default async function Dashboard() {
            nicht als lokale Koloniebevölkerung gezeigt. */
         .noxia-dashboard-shell > div > header > div:last-child > div:nth-child(4) {
           display: none !important;
+        }
+
+        /* Persönliche Kompetenzwerte bleiben permanent sichtbar, ohne die alte
+           große Profilkarte zurückzuholen. */
+        .noxia-profile-stats-compact {
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          gap: .55rem;
+          padding: 0 .6rem;
+          border: 1px solid #e0ddd6;
+          border-radius: 8px;
+          background: #faf9f6;
+          color: #2a4e7a;
+          cursor: pointer;
+          font: 700 .68rem/1 system-ui, sans-serif;
+          white-space: nowrap;
+        }
+        .noxia-profile-stats-compact:hover {
+          border-color: #c9a961;
+          background: #fff;
+        }
+        .noxia-profile-stats-compact span {
+          display: inline-flex;
+          align-items: center;
+          gap: .2rem;
+        }
+        .noxia-profile-stats-compact b {
+          font-size: .72rem;
+          font-weight: 400;
         }
 
         /* Hauptfläche: rechte Informationsleiste bewusst schmal. */
@@ -67,9 +99,37 @@ export default async function Dashboard() {
           display: none;
         }
         .noxia-dashboard-shell > div > header + div > div:first-child > div:nth-last-child(2) > div:last-child > div {
-          min-width: 92px !important;
-          padding: .36rem .6rem !important;
+          min-width: 112px !important;
+          min-height: 46px !important;
+          padding: .32rem .55rem .32rem 58px !important;
           border-radius: 7px !important;
+        }
+        .noxia-location-card-with-image {
+          position: relative !important;
+          overflow: hidden !important;
+          isolation: isolate;
+        }
+        .noxia-location-thumb {
+          position: absolute;
+          z-index: -1;
+          inset: 0 auto 0 0;
+          width: 52px;
+          overflow: hidden;
+          border-right: 1px solid rgba(255,255,255,.72);
+          background: #e8e4dc;
+        }
+        .noxia-location-thumb::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, transparent 55%, rgba(255,255,255,.34));
+          pointer-events: none;
+        }
+        .noxia-location-thumb img {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          display: block;
         }
 
         /* "Deine Schiffe" ist im Dashboard redundant: aktives Schiff,
@@ -140,12 +200,29 @@ export default async function Dashboard() {
           display: none !important;
         }
 
+        @media (max-width: 1450px) {
+          .noxia-profile-stats-compact {
+            gap: .35rem;
+            padding: 0 .45rem;
+          }
+          .noxia-dashboard-shell > div > header > div:last-child {
+            gap: .6rem !important;
+          }
+        }
         @media (max-width: 1250px) {
           .noxia-dashboard-shell > div > header + div {
             grid-template-columns: minmax(0, 1fr) 240px !important;
           }
           .noxia-dashboard-shell > div > header > div:last-child {
-            gap: .55rem !important;
+            gap: .45rem !important;
+          }
+          .noxia-profile-stats-compact span b {
+            display: none;
+          }
+        }
+        @media (max-width: 1050px) {
+          .noxia-profile-stats-compact {
+            display: none;
           }
         }
         @media (max-width: 900px) {
@@ -168,6 +245,9 @@ export default async function Dashboard() {
             position: static !important;
             width: 150px !important;
             pointer-events: auto;
+          }
+          .noxia-dashboard-shell > div > header + div > div:first-child > div:nth-last-child(2) > div:last-child > div {
+            min-width: 104px !important;
           }
         }
       `}</style>
