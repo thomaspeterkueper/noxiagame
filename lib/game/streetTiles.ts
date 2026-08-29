@@ -28,11 +28,25 @@ function classify(mask: number): StreetTile['subtype'] {
   return 'side'
 }
 
+function inferredMask(row:number,col:number,positions:Set<string>):number {
+  let mask=0
+  if(positions.has(`${row-1}:${col}`)) mask|=1
+  if(positions.has(`${row}:${col+1}`)) mask|=2
+  if(positions.has(`${row+1}:${col}`)) mask|=4
+  if(positions.has(`${row}:${col-1}`)) mask|=8
+  return mask
+}
+
 /**
  * Returns exactly the road cells produced by the same canonical grid that is
  * rendered in the 2D view. The colony view must never synthesize a second road
  * network: building, removing or changing a grid road therefore affects both
  * representations.
+ *
+ * Legacy/plain `road` cells carry mask 0. For presentation and walkability we
+ * infer only their connection mask from immediately adjacent canonical road
+ * cells. No additional road cells are created, so the grid remains source of
+ * truth while dead-end crosses and disconnected-looking half segments vanish.
  */
 export function getStreetTiles(
   locationSlug: string,
@@ -44,17 +58,22 @@ export function getStreetTiles(
   rows: number = 24,
 ): StreetTile[] {
   const grid = generateGrid(locationSlug, population, entities, pending, userId, cols, rows)
-  const streets: StreetTile[] = []
+  const raw: Array<{row:number;col:number;mask:number}> = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const cell = grid[r]?.[c]
       if (!cell) continue
       const mask = roadMask(cell.type)
       if (mask === null) continue
-      streets.push({ row: r, col: c, mask, subtype: classify(mask) })
+      raw.push({ row:r, col:c, mask })
     }
   }
-  return streets
+
+  const positions=new Set(raw.map(s=>`${s.row}:${s.col}`))
+  return raw.map(s=>{
+    const mask=s.mask===0?inferredMask(s.row,s.col,positions):s.mask
+    return { ...s, mask, subtype:classify(mask) }
+  })
 }
 
 export function nearestStreetTile(row:number,col:number,streets:StreetTile[]):StreetTile|null {
@@ -74,7 +93,6 @@ export function connectedStreetNeighbours(tile:StreetTile,streets:StreetTile[]):
   return candidates.flatMap(([dr,dc,outBit,inBit])=>{
     const next=byPos.get(`${tile.row+dr}:${tile.col+dc}`)
     if(!next) return []
-    // A raw mask 0 is accepted during transitional/non-autotiled states.
     if(tile.mask!==0 && (tile.mask&outBit)===0) return []
     if(next.mask!==0 && (next.mask&inBit)===0) return []
     return [next]
