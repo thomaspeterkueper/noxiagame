@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/npc",
       "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/builds",
+      "schedule": "0 11 * * *"
     }
   ]
 }
