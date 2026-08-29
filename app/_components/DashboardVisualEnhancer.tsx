@@ -21,31 +21,44 @@ export default function DashboardVisualEnhancer() {
     if (window.location.pathname !== '/dashboard') return
 
     let cancelled = false
+    let enhancing = false
+    let statsInstalled = false
+
     const enhance = async () => {
-      const header = document.querySelector('header')
-      const labels = Array.from(document.querySelectorAll('div')).filter(el => el.textContent?.trim() === 'Deine Orte')
-      const placesSection = labels[0]?.parentElement
-
-      if (placesSection) {
-        const cards = Array.from(placesSection.querySelectorAll('[style*="cursor: pointer"]')) as HTMLElement[]
-        for (const card of cards) {
-          const text = card.textContent ?? ''
-          const key = Object.keys(LOCATION_IMAGE).find(name => text.includes(name))
-          if (!key || card.dataset.locationArtwork === '1') continue
-          card.dataset.locationArtwork = '1'
-          card.style.position = 'relative'
-          card.style.overflow = 'hidden'
-          card.style.paddingLeft = '54px'
-          const image = document.createElement('img')
-          image.src = LOCATION_IMAGE[key]
-          image.alt = ''
-          image.style.cssText = 'position:absolute;left:0;top:0;width:46px;height:100%;object-fit:cover;pointer-events:none'
-          card.prepend(image)
-        }
-      }
-
-      if (!header || header.querySelector('[data-noxia-profile-stats]')) return
+      if (enhancing || cancelled) return
+      enhancing = true
       try {
+        const header = document.querySelector('header')
+        const labels = Array.from(document.querySelectorAll('div')).filter(el => el.textContent?.trim() === 'Deine Orte')
+        const placesSection = labels[0]?.parentElement
+
+        if (placesSection) {
+          const cards = Array.from(placesSection.querySelectorAll('[style*="cursor: pointer"]')) as HTMLElement[]
+          for (const card of cards) {
+            const text = card.textContent ?? ''
+            const key = Object.keys(LOCATION_IMAGE).find(name => text.includes(name))
+            if (!key || card.dataset.locationArtwork === '1') continue
+            card.dataset.locationArtwork = '1'
+            card.style.position = 'relative'
+            card.style.overflow = 'hidden'
+            card.style.paddingLeft = '54px'
+            const image = document.createElement('img')
+            image.src = LOCATION_IMAGE[key]
+            image.alt = ''
+            image.style.cssText = 'position:absolute;left:0;top:0;width:46px;height:100%;object-fit:cover;pointer-events:none'
+            card.prepend(image)
+          }
+        }
+
+        if (!header) return
+        const existing = document.querySelectorAll('[data-noxia-profile-stats]')
+        if (existing.length > 0) {
+          statsInstalled = true
+          existing.forEach((node, index) => { if (index > 0) node.remove() })
+          return
+        }
+        if (statsInstalled) return
+
         const { getToken } = await import('@/lib/supabase/auth')
         const token = await getToken()
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined
@@ -54,7 +67,7 @@ export default function DashboardVisualEnhancer() {
           fetch('/api/game/knowledge', { headers }),
           fetch('/api/game/trade?action=getTrades', { headers }),
         ])
-        if (cancelled) return
+        if (cancelled || statsInstalled || document.querySelector('[data-noxia-profile-stats]')) return
         const profile = await profileRes.json()
         const knowledge = await knowledgeRes.json()
         const trades = await tradesRes.json()
@@ -69,7 +82,9 @@ export default function DashboardVisualEnhancer() {
           avatar?.click()
         }
         header.lastElementChild?.prepend(stats)
+        statsInstalled = true
       } catch { /* dashboard remains fully usable without enhancement */ }
+      finally { enhancing = false }
     }
 
     const observer = new MutationObserver(() => void enhance())
