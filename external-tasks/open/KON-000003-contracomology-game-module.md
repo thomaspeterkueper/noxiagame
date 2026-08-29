@@ -1,6 +1,6 @@
 # KON-000003 — Evaluate Contracomology as a NOXIA/SSF academy module
 
-Source: `thomaspeterkueper/contracomology` → `external-tasks/open/KG.KON-000003-noxiagame-kontrakomologie-modul.md`
+Source: `thomaspeterkueper/contracomology` task `KG.KON-000003` → `external-tasks/open/KON-000003-contracomology-game-module.md` (local ID `KON-000003`, source ID `KG.KON-000003`)
 Target: `thomaspeterkueper/noxiagame`
 Status: open
 Routed: 2026-08-27
