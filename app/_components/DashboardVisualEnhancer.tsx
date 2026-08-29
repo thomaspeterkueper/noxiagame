@@ -10,11 +10,15 @@ const LOCATION_IMAGE: Record<string, string> = {
   Prometheus: '/images/locations/prometheus.png',
 }
 
+const CREDIT_MODULE_ID = 'ECO-L0-000001'
+const CREDIT_LEARNING_URL = `/academy/learn?module=${CREDIT_MODULE_ID}`
+
 /**
  * Transitional dashboard enhancer. Keeps the dense DashboardClient untouched
  * while moving the compact profile values into its sticky header and enriching
  * the existing "Deine Orte" cards with already-shipped location artwork.
- * Remove once DashboardClient is split into dedicated header/location components.
+ * It also provides direct in-game learning links for legacy bank lock notices.
+ * Remove once DashboardClient and building overlays are split into dedicated components.
  */
 export default function DashboardVisualEnhancer() {
   useEffect(() => {
@@ -24,10 +28,38 @@ export default function DashboardVisualEnhancer() {
     let enhancing = false
     let statsInstalled = false
 
+    const enhanceBankLearningLinks = () => {
+      const candidates = Array.from(document.querySelectorAll('strong')).filter(el => {
+        const text = el.textContent ?? ''
+        return text.includes('ECO-L0-0001') || text.includes(CREDIT_MODULE_ID)
+      }) as HTMLElement[]
+
+      for (const moduleLabel of candidates) {
+        if (moduleLabel.textContent?.includes('Was ist ein Kredit?')) {
+          moduleLabel.textContent = `${CREDIT_MODULE_ID} — Was ist ein Kredit?`
+        } else if (moduleLabel.textContent?.includes('ECO-L0-0001')) {
+          moduleLabel.textContent = moduleLabel.textContent.replace('ECO-L0-0001', CREDIT_MODULE_ID)
+        }
+
+        const container = moduleLabel.closest('div')?.parentElement as HTMLElement | null
+        if (!container || container.dataset.bankLearningLink === '1') continue
+        container.dataset.bankLearningLink = '1'
+
+        const link = document.createElement('a')
+        link.href = CREDIT_LEARNING_URL
+        link.textContent = 'Modul jetzt lernen →'
+        link.setAttribute('aria-label', `Lernmodul ${CREDIT_MODULE_ID} öffnen`)
+        link.style.cssText = 'display:inline-block;margin-top:12px;padding:8px 13px;border-radius:8px;background:#2a4e7a;color:#fff;text-decoration:none;font:700 12px system-ui;line-height:1.2'
+        container.appendChild(link)
+      }
+    }
+
     const enhance = async () => {
       if (enhancing || cancelled) return
       enhancing = true
       try {
+        enhanceBankLearningLinks()
+
         const header = document.querySelector('header')
         const labels = Array.from(document.querySelectorAll('div')).filter(el => el.textContent?.trim() === 'Deine Orte')
         const placesSection = labels[0]?.parentElement
