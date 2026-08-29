@@ -50,7 +50,8 @@ Diese Forschung darf den technischen OTA-Kanon nach Review präzisieren. Sie dar
 
 ## Umsetzung 2026-08-29
 
-- Die bestehende NOXIA-`ice_drill`-Spielrepräsentation ist explizit an `wasserextraktor-mars-typ-m` gebunden.
+- Die bestehende NOXIA-`water_recycler`-Spielrepräsentation (Mars-only, Atmosphären-Kondensation) ist explizit an `wasserextraktor-mars-typ-m` gebunden.
 - `sourceDocumentId`, `canonicalId`, `objectId` und Mapping-Rolle sind maschinenlesbar im Building-Katalog hinterlegt.
 - Die neue Provenienzstruktur enthält absichtlich keine Kosten-, Produktions-, Unlock- oder sonstigen Balancingwerte.
 - `evidenceImpactPolicy: signal-only` kodiert, dass spätere OTA-Evidenzänderungen nur als Impact behandelt werden dürfen und keine automatische Spielwertmutation auslösen.
+- Die Bindung bleibt auf die Mars-only-Repräsentation beschränkt: Die `ice_drill` (Shackleton-Eis, Mond + Mars) ist bewusst ungebunden, damit spätere OTA-Evidenzimpacts zum Typ-M-Extraktor nicht auf Mond-Infrastruktur durchschlagen.

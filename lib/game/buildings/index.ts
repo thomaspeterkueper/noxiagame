@@ -1,6 +1,6 @@
 // lib/game/buildings/index.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 29.08.2026 — OTA-Technikobjekt-Provenienz für Eisbohrung
+// Aktualisiert: 29.08.2026 — OTA-Technikobjekt-Provenienz für Wasserrecycler (wasserextraktor-mars-typ-m)
 // Version:      1.3.0
 
 import type { BuildingDef, ResourceType } from './types'
@@ -41,14 +41,6 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     cost: 2500, buildTimeTicks: 3,
     produces: { resource: 'water', amount: 4 },
     allowedLocations: ['moon', 'mars'],
-    externalTechnicalObject: {
-      sourceSystem: 'OTA',
-      sourceDocumentId: 'DOC:OTA:OTA-TEC-0034-2026-DE',
-      canonicalId: 'OTA-TEC-0034-WEX-M',
-      objectId: 'wasserextraktor-mars-typ-m',
-      mappingRole: 'buildable',
-      evidenceImpactPolicy: 'signal-only',
-    },
   },
 
   water_recycler: {
@@ -57,6 +49,14 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     cost: 2000, buildTimeTicks: 2,
     produces: { resource: 'water', amount: 2 },
     allowedLocations: ['mars'],
+    externalTechnicalObject: {
+      sourceSystem: 'OTA',
+      sourceDocumentId: 'DOC:OTA:OTA-TEC-0034-2026-DE',
+      canonicalId: 'OTA-TEC-0034-WEX-M',
+      objectId: 'wasserextraktor-mars-typ-m',
+      mappingRole: 'buildable',
+      evidenceImpactPolicy: 'signal-only',
+    },
   },
 
   habitat: {
