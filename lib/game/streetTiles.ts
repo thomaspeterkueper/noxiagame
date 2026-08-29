@@ -1,90 +1,82 @@
 // lib/game/streetTiles.ts
-// Erstellt:     20.07.2026
-// Aktualisiert: 20.07.2026 — Adapter: getStreetTiles (provisorisch: generateGrid)
-// Version:      0.1.0
-//
-// ADAPTER — Abstraktionsgrenze für Straßen-Abfrage.
-// Die Walkable Colony ruft ausschließlich getStreetTiles() auf.
-// Interne Implementierung ist austauschbar:
-//   v0.x: generateGrid() (deterministisch, kein DB)
-//   v1.0: tile_entities WHERE entity_id = 'road' (nach Migration A')
-//
-// GATE: Keine direkte Abhängigkeit von generateGrid() in der Mikro-Ebene.
+// Gemeinsame Abstraktionsgrenze für 2D-Grid und begehbare Kolonieansicht.
 
 import { generateGrid } from '@/lib/grid/generateGrid'
 
 export interface StreetTile {
-  row:      number
-  col:      number
-  // Straßentyp — wird nach A' aus tile_entities gelesen
-  subtype:  'main' | 'side' | 'crossing'
-  // Nach A': aus tile_entities
-  entityId?:    string
-  builtAt?:     string
-  ownerClass?:  string
+  row: number
+  col: number
+  subtype: 'main' | 'side' | 'crossing'
+  mask: number
+  entityId?: string
+  builtAt?: string
+  ownerClass?: string
+}
+
+function roadMask(type: string): number | null {
+  if (type === 'road') return 0
+  const match = type.match(/^road_(\d+)$/)
+  return match ? Number(match[1]) : null
+}
+
+function classify(mask: number): StreetTile['subtype'] {
+  // N/E/S/W bits: 1/2/4/8. Three or four connections are crossings;
+  // straight four-neighbour segments form the public main network.
+  const connections = [1, 2, 4, 8].filter(bit => (mask & bit) !== 0).length
+  if (connections >= 3) return 'crossing'
+  if (mask === 5 || mask === 10) return 'main'
+  return 'side'
 }
 
 /**
- * Gibt alle Straßen-Tiles für eine Location zurück.
- *
- * PROVISORISCH (v0.1): Liest aus generateGrid().
- * NACH A' (v1.0): Liest aus tile_entities WHERE entity_id IN ('road','road_main').
- *
- * Die Walkable Colony darf diese Funktion aufrufen.
- * Die Walkable Colony darf generateGrid() NICHT direkt aufrufen.
+ * Returns exactly the road cells produced by the same canonical grid that is
+ * rendered in the 2D view. The colony view must never synthesize a second road
+ * network: building, removing or changing a grid road therefore affects both
+ * representations.
  */
 export function getStreetTiles(
   locationSlug: string,
-  population:   number,
-  entities:     any[],      // tile_entities für diesen Ort
-  pending:      any[],      // player_builds pending
-  userId:       string,
-  cols:         number = 32,
-  rows:         number = 24,
+  population: number,
+  entities: any[],
+  pending: any[],
+  userId: string,
+  cols: number = 32,
+  rows: number = 24,
 ): StreetTile[] {
-  // Provisorisch: aus generateGrid() ableiten
   const grid = generateGrid(locationSlug, population, entities, pending, userId, cols, rows)
-
   const streets: StreetTile[] = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const cell = grid[r]?.[c]
       if (!cell) continue
-      const t = cell.type
-      if (t === 'tile_road_main' || t === 'tile_road_side' || t === 'tile_road_crossing') {
-        streets.push({
-          row:     r,
-          col:     c,
-          subtype: t === 'tile_road_main'     ? 'main'
-                 : t === 'tile_road_crossing' ? 'crossing'
-                 : 'side',
-        })
-      }
+      const mask = roadMask(cell.type)
+      if (mask === null) continue
+      streets.push({ row: r, col: c, mask, subtype: classify(mask) })
     }
   }
   return streets
 }
 
-/**
- * Gibt den nächstgelegenen Straßen-Tile zu einer Position zurück.
- * Nützlich um NPCs auf Straßen zu halten.
- */
-export function nearestStreetTile(
-  row:     number,
-  col:     number,
-  streets: StreetTile[],
-): StreetTile | null {
-  if (streets.length === 0) return null
-  return streets.reduce((best, s) => {
-    const d  = Math.abs(s.row - row) + Math.abs(s.col - col)
-    const db = Math.abs(best.row - row) + Math.abs(best.col - col)
-    return d < db ? s : best
-  })
+export function nearestStreetTile(row:number,col:number,streets:StreetTile[]):StreetTile|null {
+  if (!streets.length) return null
+  return streets.reduce((best,s) => Math.abs(s.row-row)+Math.abs(s.col-col) < Math.abs(best.row-row)+Math.abs(best.col-col) ? s : best)
 }
 
-/**
- * Prüft ob ein Tile eine Straße ist.
- */
-export function isStreet(row: number, col: number, streets: StreetTile[]): boolean {
-  return streets.some(s => s.row === row && s.col === col)
+export function isStreet(row:number,col:number,streets:StreetTile[]):boolean {
+  return streets.some(s=>s.row===row&&s.col===col)
+}
+
+export function connectedStreetNeighbours(tile:StreetTile,streets:StreetTile[]):StreetTile[] {
+  const byPos = new Map(streets.map(s=>[`${s.row}:${s.col}`,s]))
+  const candidates:[[number,number,number,number],[number,number,number,number],[number,number,number,number],[number,number,number,number]] = [
+    [-1,0,1,4],[0,1,2,8],[1,0,4,1],[0,-1,8,2],
+  ]
+  return candidates.flatMap(([dr,dc,outBit,inBit])=>{
+    const next=byPos.get(`${tile.row+dr}:${tile.col+dc}`)
+    if(!next) return []
+    // A raw mask 0 is accepted during transitional/non-autotiled states.
+    if(tile.mask!==0 && (tile.mask&outBit)===0) return []
+    if(next.mask!==0 && (next.mask&inBit)===0) return []
+    return [next]
+  })
 }
