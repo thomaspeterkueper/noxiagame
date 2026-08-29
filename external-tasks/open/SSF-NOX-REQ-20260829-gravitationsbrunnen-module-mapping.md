@@ -19,16 +19,28 @@ Die Prüfung des aktuellen NOXIA-Codes zeigt jedoch: Der Platzhalter `animation_
 
 SSF darf keine Modul- oder Pfadidentität für einen NOXIA-Kurs erfinden.
 
-## Benötigte NOXIA-Entscheidung / Daten
+## NOXIA-Prüfung 2026-08-29
 
-Bitte die bereits kanonische Zuordnung des lokalen Kurses **„Energie & Arbeit“** zu einer SSF-/KG-Lernidentität angeben bzw. im NOXIA-eigenen Mapping hinterlegen:
+NOXIA bestätigt den Befund:
 
-- lokale `kurs_id` des Kurses,
-- kanonische `PATH:SSF:*`-ID, sofern vorhanden,
-- kanonische `LRN:SSF:*`-/SSF-Modul-ID, über deren `/api/noxia/modules/{moduleId}`-Payload die Interaktion ausgeliefert werden soll,
-- falls noch keine Identität existiert: als NOXIA-Anforderung an den Knowledge Graph routen, statt in SSF eine lokale Konkurrenzidentität anzulegen.
+- `foundation_kurse` besitzt `kurs_id` und `kg_path_id` als getrennte Felder.
+- Für **„Energie & Arbeit“** ist im Repository keine belastbare kanonische `PATH:SSF:*`-/`LRN:SSF:*`-Zuordnung vorhanden.
+- Die konkrete produktive `kurs_id` des DB-Kurses ist ebenfalls nicht als Seed im Repository dokumentiert und wird daher nicht geraten.
+- Die lokale Interactive-ID bleibt stabil: `gravitationsbrunnen`.
 
-Die Interactive-ID selbst bleibt gemäß Quellauftrag stabil: `gravitationsbrunnen`.
+Gemäß Source-of-Truth-Regel wurde die fehlende kanonische Lernidentität an den Knowledge Graph geroutet:
+
+`kueper-knowledge-graph/external-tasks/open/EXT-NOX-KG-20260829-energy-work-gravitational-well-module.md`
+
+KG soll eine bestehende oder neue kanonische `LRN:SSF:*`-Identität und die zugehörige `PATH:SSF:*`-Zuordnung für **Energie & Arbeit** bereitstellen und im Learning-Modules-KXF exportieren.
+
+## Nächster Schritt
+
+Nach KG-Rückgabe:
+
+1. NOXIA bindet den produktiven lokalen `foundation_kurse`-Datensatz über `kg_path_id` an den gelieferten Pfad. Die lokale `kurs_id` bleibt NOXIA-intern.
+2. SSF verwendet die kanonische Modulidentität für den strukturierten `interactive`-Abschnitt `gravitationsbrunnen`.
+3. NOXIA rendert die SSF-Interaktion im bestehenden Akademiefenster.
 
 ## Akzeptanz
 
@@ -38,4 +50,4 @@ Die Interactive-ID selbst bleibt gemäß Quellauftrag stabil: `gravitationsbrunn
 
 ## Rückmeldung an SSF
 
-Nach Festlegung/Bestätigung der Zuordnung kann SSF den strukturierten `interactive`-Abschnitt implementieren und den ursprünglichen Auftrag abschließen.
+Der NOXIA-Anteil ist bis zur KG-Rückgabe vollständig geklärt und korrekt weitergeroutet. Nach Festlegung der kanonischen IDs wird die lokale Bindung abgeschlossen.
