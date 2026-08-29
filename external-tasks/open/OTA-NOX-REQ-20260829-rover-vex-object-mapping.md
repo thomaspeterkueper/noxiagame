@@ -48,3 +48,11 @@ affects: [NOXIA, OTA]
 - VEX-Typ und Vex-Instanz bleiben getrennte Datenklassen.
 - Kanonwerte und Balancingwerte bleiben getrennt.
 - Evidence-Updates können Impact signalisieren, ohne automatische Spielwertmutation.
+
+## Blocker-Analyse 2026-08-29
+
+Der Stale-Task wurde aktiv untersucht. Im aktuellen NOXIA-`main` existiert weder im Building-Katalog noch in den vorhandenen Ship-/Game-Domänen eine bereits etablierte lokale Spielobjekt-Entsprechung für einen Bodenrover oder eine Explorationsdrohne. Anders als beim Wasserextraktor kann daher keine bestehende NOXIA-Entität rein deklarativ mit OTA-Provenienz versehen werden.
+
+Eine Umsetzung würde mindestens eine neue lokale Fahrzeug-/Drohnen-Objektklasse oder eine Entscheidung verlangen, ob Rover/VEX als Building, Ship, Journey-Asset oder eigenständige Entity modelliert werden. Diese Zuordnung ist eine NOXIA-Architekturentscheidung und wird hier nicht erfunden. Ebenso werden keine Bau-, Bewegungs-, Reichweiten- oder Unlockwerte vorweggenommen.
+
+**Konkreter nächster Schritt:** NOXIA muss zuerst festlegen bzw. bereits separat spezifizieren, welche bestehende oder neue lokale Objektklasse Rover und autonome Explorationsdrohnen trägt. Sobald diese lokale Klasse/ID vorhanden ist, ist die OTA-Provenienzbindung einschließlich `TYPE`/`INSTANCE`-Trennung technisch eindeutig und kann ohne Kanon- oder Balancingänderung umgesetzt werden.
