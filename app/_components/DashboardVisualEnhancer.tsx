@@ -46,7 +46,8 @@ export default function DashboardVisualEnhancer() {
 
       if (!header || header.querySelector('[data-noxia-profile-stats]')) return
       try {
-        const token = (await import('@/lib/supabase/auth')).getToken ? await (await import('@/lib/supabase/auth')).getToken() : ''
+        const { getToken } = await import('@/lib/supabase/auth')
+        const token = await getToken()
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined
         const [profileRes, knowledgeRes, tradesRes] = await Promise.all([
           fetch('/api/game/profile', { headers }),
