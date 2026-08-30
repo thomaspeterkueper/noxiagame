@@ -5,12 +5,21 @@ target: SYS:KUEPER:noxia
 priority: high
 type: integration-mapping
 created: 2026-08-29
-status: superseded
+status: resolved
 affects: [NOXIA, OTA]
-supersededBy: OTA-TEC-0038-2026-DE, OTA-TEC-0039-2026-DE
+resolution: OTA-TEC-0036-2026-DE (Rover), OTA-TEC-0037-2026-DE (VEX-47), both v1.1
 ---
 
-> **KORREKTUR (2026-08-30):** Die in diesem Request verwendeten Signaturen `OTA-TEC-0036` (Rover) und `OTA-TEC-0037` (VEX-47) sind ungültig — beide Nummern waren zum Zeitpunkt der Erstellung bereits an die Serie „Die Kette vom Hexenteich" vergeben (OTA-TEC-0035/0036/0036b/0037). Die korrigierten, tatsächlich freien Signaturen sind **OTA-TEC-0038** (Rover) und **OTA-TEC-0039** (VEX-47). Siehe `OTA-TEC-0038-2026-DE.md` und `OTA-TEC-0039-2026-DE.md` in diesem Ordner für die vollständigen, korrigierten Dossiers. Dieser Request bleibt als historisches Dokument erhalten, ist aber durch die genannten Dossiers ersetzt.
+> **FINALE KLARSTELLUNG (2026-08-30):** Nach zwischenzeitlicher Verwirrung ist die
+> Lage jetzt geklärt. Es gibt zwei verschiedene Drive-Ordner: den älteren `OTA`-Ordner
+> (dort liegt "Kette vom Hexenteich" auf 0035/0036/0036b/0037) und den aktuell
+> maßgeblichen `overtime-archive`-Ordner (KXF-0.2-Schema), in dem "Kette vom Hexenteich"
+> korrekt nur 0035 belegt. Dort sind **OTA-TEC-0036 (Rover)** und **OTA-TEC-0037
+> (VEX-47)** bereits als v1.1-Fassungen (wissenschaftlich verstärkt) kanonisch abgelegt.
+> Eine zwischenzeitliche Korrektur auf 0038/0039 basierte auf einer Prüfung des falschen,
+> veralteten Ordners und ist selbst hinfällig — siehe `CORRECTION-20260830-numbering-final.md`
+> in diesem Ordner. Gültig: **0036 = Rover, 0037 = VEX-47**, wie ursprünglich in diesem
+> Request angelegt.
 
 # Erkundungsrover Typ P und VEX-47 an OTA-Technikobjekte anbinden
 
