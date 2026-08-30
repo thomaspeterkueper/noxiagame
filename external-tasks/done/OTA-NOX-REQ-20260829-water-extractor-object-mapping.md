@@ -5,7 +5,7 @@ target: SYS:KUEPER:noxia
 priority: high
 type: integration-mapping
 created: 2026-08-29
-status: open
+status: done
 affects: [NOXIA, OTA]
 ---
 
@@ -49,3 +49,11 @@ Diese Forschung darf den technischen OTA-Kanon nach Review präzisieren. Sie dar
 - Referenz auf `DOC:OTA:OTA-TEC-0034-2026-DE` ist nachvollziehbar.
 - Kanonwerte und Balancingwerte bleiben getrennte Datenklassen.
 - Evidence-Updates können als Impact signalisiert werden, ohne automatische Spielwertmutation.
+
+## Umsetzung 2026-08-30
+
+- Die Mars-only-Spielrepräsentation `water_recycler` ist explizit an `wasserextraktor-mars-typ-m` gebunden.
+- `sourceDocumentId`, `canonicalId`, `objectId` und Mapping-Rolle sind maschinenlesbar im Building-Katalog hinterlegt.
+- Die Provenienzstruktur enthält bewusst keine Kosten-, Produktions-, Unlock- oder sonstigen Balancingwerte.
+- `evidenceImpactPolicy: signal-only` stellt sicher, dass spätere OTA-Evidenzänderungen keine automatische Spielwertmutation auslösen.
+- `ice_drill` bleibt bewusst ungebunden, weil es eine andere, ortsübergreifende Spielrepräsentation ist.
