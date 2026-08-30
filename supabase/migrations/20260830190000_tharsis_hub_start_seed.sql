@@ -765,7 +765,7 @@ FROM (VALUES
       ('A',3,25),
       ('A',2,26),
       ('A',2,27)
-     ) AS s(r, c);
+     ) AS s(label, r, c);
 
 INSERT INTO location_utilities (location_id, ring, media, node_row, node_col)
 SELECT (SELECT id FROM locations WHERE slug='mars'), 'B',
@@ -812,7 +812,7 @@ FROM (VALUES
       ('B',21,24),
       ('B',21,25),
       ('B',21,26)
-     ) AS s(r, c);
+     ) AS s(label, r, c);
 
 -- 9b. Doppelte Medienanbindung: jeder Habitatcluster und jede kritische
 --     Anlage erhält einen Versorgungspfad über Ring A und einen über Ring B.
