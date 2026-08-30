@@ -1,7 +1,7 @@
 // lib/game/buildings/types.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 19.07.2026 — BuildingContext: isCorp, owner_class
-// Version:      1.4.0
+// Aktualisiert: 29.08.2026 — externe Technikobjekt-Provenienz ohne Balancing-Kopplung
+// Version:      1.5.0
 
 export type ResourceType = 'water' | 'energy' | 'metal' | 'components'
 export type LocationSlug = string
@@ -13,6 +13,22 @@ export type BuildingCategory =
   | 'service'
   | 'infrastructure'
   | 'special'
+
+/**
+ * Read-only provenance binding to an externally canonical technical object.
+ *
+ * This metadata deliberately contains no gameplay values. Costs, production,
+ * unlocks, ranges and other balancing stay NOXIA-owned and must never be
+ * mutated automatically when the external source changes.
+ */
+export interface ExternalTechnicalObjectBinding {
+  sourceSystem: 'OTA'
+  sourceDocumentId: string
+  canonicalId: string
+  objectId: string
+  mappingRole: 'buildable' | 'reference'
+  evidenceImpactPolicy: 'signal-only'
+}
 
 export interface BuildingDef {
   id: string
@@ -31,6 +47,7 @@ export interface BuildingDef {
   planHint?: string
   svgVariants?: Partial<Record<LocationSlug, string>>
   tileAsset?: string
+  externalTechnicalObject?: ExternalTechnicalObjectBinding
 }
 
 export interface BuildingContext {
