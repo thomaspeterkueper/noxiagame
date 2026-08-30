@@ -4,6 +4,7 @@ import Image from 'next/image'
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getToken } from '@/lib/supabase/auth'
+import DashboardPrimaryColony from './DashboardPrimaryColony'
 
 const LOCATION_ASSETS: Record<string, string> = {
   Mars: '/images/locations/mars.png',
@@ -124,6 +125,8 @@ export default function DashboardQuickChrome() {
 
   return (
     <>
+      <DashboardPrimaryColony />
+
       {headerTarget && createPortal(
         <button
           type="button"
