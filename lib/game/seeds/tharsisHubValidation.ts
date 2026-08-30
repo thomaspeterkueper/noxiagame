@@ -277,55 +277,57 @@ export function validateRoadResilience(): SeedIssue[] {
     return pts
   }
 
-  const reachable = (removed: Point | null): Set<string> => {
-    const cells = new Set(roadSet)
-    if (removed) cells.delete(cellKey(removed[0], removed[1]))
+  // Echte Single-Source-BFS über den 4-verbundenen Straßen-Graphen: liefert
+  // genau die Zellen, die von `start` aus ohne den entfernten Tile erreichbar
+  // sind. Der Start wird NICHT mit allen Straßenzellen geseedet — die Prüfung
+  // muss fehlschlagen können, wenn ein Tile das Netz zerschneidet.
+  const reachableFrom = (start: Point[], removed: Point | null): Set<string> => {
     const seen = new Set<string>()
-    const queue: Point[] = roads.filter(([r, c]) => cells.has(cellKey(r, c)) && (removed === null || r !== removed[0] || c !== removed[1]))
-    for (const p of queue) seen.add(cellKey(p[0], p[1]))
+    const queue: Point[] = []
+    for (const p of start) {
+      const k = cellKey(p[0], p[1])
+      if (removed && removed[0] === p[0] && removed[1] === p[1]) continue
+      if (!seen.has(k)) { seen.add(k); queue.push(p) }
+    }
     while (queue.length > 0) {
       const p = queue.shift()!
-      for (const n of neighbours(p, cells)) {
-        const key = cellKey(n[0], n[1])
-        if (!seen.has(key)) { seen.add(key); queue.push(n) }
+      for (const n of neighbours(p, roadSet)) {
+        const k = cellKey(n[0], n[1])
+        if (removed && removed[0] === n[0] && removed[1] === n[1]) continue
+        if (!seen.has(k)) { seen.add(k); queue.push(n) }
       }
     }
     return seen
   }
 
-  const clusterReaches = (cluster: SeedBuilding, reachableCells: Set<string>, targets: SeedBuilding[]): boolean => {
+  const clusterReaches = (cluster: SeedBuilding, removed: Point | null, targets: SeedBuilding[]): boolean => {
     const access = accessOf(cluster)
     if (access.length === 0) return false
-    if (!access.some(([r, c]) => reachableCells.has(cellKey(r, c)))) return false
-    return targets.some(t => {
-      const tAccess = accessOf(t)
-      return tAccess.length > 0 && tAccess.some(([r, c]) => reachableCells.has(cellKey(r, c)))
-    })
+    const reachableCells = reachableFrom(access, removed)
+    return targets.some(t =>
+      accessOf(t).some(([r, c]) => reachableCells.has(cellKey(r, c))),
+    )
   }
 
-  // Basis: Straßennetz zusammenhängend + jeder Cluster erreicht Energie & Wasser
-  const full = reachable(null)
+  // Basis: jeder Cluster erreicht Energie & Wasser im unversehrten Netz.
   for (const h of habitats) {
-    if (!clusterReaches(h, full, energyObjects)) {
+    if (!clusterReaches(h, null, energyObjects)) {
       issues.push({ message: `${h.id} erreicht im Basisnetz keine Energie-Objekte` })
     }
-    if (!clusterReaches(h, full, waterObjects)) {
+    if (!clusterReaches(h, null, waterObjects)) {
       issues.push({ message: `${h.id} erreicht im Basisnetz keine Wasser-Objekte` })
     }
   }
 
-  // N-1: Entfernen einer einzelnen Straßenzelle darf nicht gleichzeitig
-  // sämtliche Wege zu Energie und Wasser abschneiden.
+  // N-1: Entfernen einer einzelnen Straßenzelle darf für keinen Habitatcluster
+  // gleichzeitig sämtliche Wege zu Energie und/oder Wasser abschneiden.
   for (const removed of roads) {
-    const cells = reachable(removed)
-    let anyHabitatWithoutBoth = false
     for (const h of habitats) {
-      const hasEnergy = clusterReaches(h, cells, energyObjects)
-      const hasWater = clusterReaches(h, cells, waterObjects)
-      if (!hasEnergy || !hasWater) { anyHabitatWithoutBoth = true; break }
-    }
-    if (anyHabitatWithoutBoth) {
-      issues.push({ message: `N-1 verletzt: Sperrung von (${removed[0]},${removed[1]}) trennt Cluster von Energie und/oder Wasser` })
+      const hasEnergy = clusterReaches(h, removed, energyObjects)
+      const hasWater = clusterReaches(h, removed, waterObjects)
+      if (!hasEnergy || !hasWater) {
+        issues.push({ message: `N-1 verletzt: Sperrung von (${removed[0]},${removed[1]}) trennt ${h.id} von Energie und/oder Wasser` })
+      }
     }
   }
 

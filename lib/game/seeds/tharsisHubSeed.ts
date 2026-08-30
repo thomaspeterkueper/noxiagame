@@ -222,6 +222,11 @@ export const THARSIS_HUB_VEHICLES: SeedVehicle[] = [
 // Innerer Service-Ring + drei Hauptkorridore (Energie, Wasser, Lande/Fracht)
 // + notwendige Service-Spurs zu Radiatorfeldern, Relays, Kommunikation und
 // Reststoffanlagen. Kein dekoratives Straßennetz, keine Schiene.
+//
+// Wichtig: Alle Korridore sind durchgehende 4-verbundene Zellpfade (keine
+// Diagonalsprünge) — das Straßennetz ist ein einziger zusammenhängender Graph.
+// Anforderung §3/§9: Die Sperrung eines einzelnen Tiles darf nicht gleichzeitig
+// sämtliche Wege zu Energie und Wasser abschneiden.
 export const THARSIS_HUB_ROADS: SeedRoad[] = [
   // Innerer Service-Ring um Habitat-/Logistikkern (geschlossener Ring)
   ...range(10, 18).map(col => ({ row: 13, col, kind: 'ring' as const })),
@@ -234,16 +239,22 @@ export const THARSIS_HUB_ROADS: SeedRoad[] = [
   ...range(12, 17).map(col => ({ row: 17, col, kind: 'spur' as const })),
 
   // Energie-Hauptkorridor E1: Ring → Energie-Domäne D1 (Nordost)
-  ...[ [13,19],[12,20],[11,21],[10,22],[9,23],[8,24],[7,25],[6,26],[5,26] ].map(([row, col]) => ({ row, col, kind: 'energy' as const })),
+  // 4-verbundener Pfad über die ehemaligen Service-Spurs zu Relay 2/3 (S3/S4),
+  // damit der Korridor ohne Diagonalsprünge durchgehend zum Ring läuft
+  // (Ring-Anschlüsse bei (13,19) und (17,19)).
+  ...[ [13,19],[14,19],[15,19],[16,19],[17,19],[17,20],[17,21],[17,22],[17,23],[16,23],[15,23],[14,23],[13,23],[12,23],[11,23],[10,23],[10,22],[9,22],[8,22],[7,22],[6,22],[6,23],[6,24],[6,25],[6,26],[5,26] ].map(([row, col]) => ({ row, col, kind: 'energy' as const })),
   // Energie-Hauptkorridor E2: Ring → Energie-Domäne D2 (Nordwest)
-  ...[ [13,9],[12,9],[11,8],[10,7],[9,6],[8,5],[7,4],[6,3],[5,2] ].map(([row, col]) => ({ row, col, kind: 'energy' as const })),
+  // Westliche Umfahrung der Utility-Linien: über den Wasser-/ISRU-Pfad
+  // (21,5)/(22,5) in den Südwesten, entlang der Westkante hoch zur Domäne D2.
+  ...[ [23,4],[23,3],[23,2],[23,1],[23,0],[22,0],[21,0],[20,0],[19,0],[18,0],[17,0],[16,0],[15,0],[14,0],[13,0],[12,0],[11,0],[10,0],[9,0],[8,0],[7,0],[6,0],[5,0],[7,1],[7,2],[7,3],[6,3] ].map(([row, col]) => ({ row, col, kind: 'energy' as const })),
   // Energie-Hauptkorridor E3: Ring → Energie-Domäne D3 (Südost)
   ...[ [19,18],[20,18],[21,18],[22,18],[23,18],[23,19],[23,20],[23,21],[23,22],[23,23],[23,24],[23,25],[23,26],[23,27] ].map(([row, col]) => ({ row, col, kind: 'energy' as const })),
 
   // Wasser-/ISRU-Hauptkorridor: Ring → Zone C (zwei Ring-Anschlüsse)
-  ...[ [14,9],[15,9],[16,9],[17,9],[18,9],[18,8],[19,8],[20,7],[21,7],[21,6],[21,5] ].map(([row, col]) => ({ row, col, kind: 'water' as const })),
-  // Zweiter Wasserpfad (Ring → Südschleife, N-1-resistent)
-  ...[ [19,10],[20,9],[21,9],[21,8] ].map(([row, col]) => ({ row, col, kind: 'water' as const })),
+  // Segment 1 (Anschlüsse (14,10) und (18,10)) plus Segment 2 mit Südschleife
+  // über Reihe 22 bis zum Energie-Korridor E3 — N-1-resistente Schleife ohne
+  // Diagonalsprünge (Anschluss an den Ring über den E3-Knoten (18,18)).
+  ...[ [14,9],[15,9],[16,9],[17,9],[18,9],[18,8],[19,8],[20,7],[21,7],[21,6],[21,5],[21,8],[22,6],[22,7],[22,8],[22,9],[22,10],[22,11],[22,12],[22,13],[22,14],[22,15],[22,16],[22,17] ].map(([row, col]) => ({ row, col, kind: 'water' as const })),
 
   // Lande-/Fracht-Hauptkorridor: Ring → Zone F (direkter Schwerlastweg zum
   // Logistik-Hub). Der Korridor mündet bei (20,18) in den Energie-Korridor E3
@@ -251,18 +262,20 @@ export const THARSIS_HUB_ROADS: SeedRoad[] = [
   ...[ [19,16],[20,16],[20,17],[20,19] ].map(([row, col]) => ({ row, col, kind: 'freight' as const })),
 
   // Service-Spurs — nur notwendige Zufahrten
-  // S1: Radiatorfeld 1 / Langstrecken-Comms 1 (Nordost)
+  // S1: Radiatorfeld 1
   ...[ [4,26],[3,26],[3,27] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
   // S2: Radiatorfeld 2
   ...[ [7,26],[7,27] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
-  // S3: Relay 2 / Radiatorfeld 3
-  ...[ [10,23],[11,23],[12,23],[13,23],[13,24],[13,26],[13,27] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
-  // S4: Relay 3
-  ...[ [17,19],[17,20],[17,21],[17,22],[17,23] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
-  // S5: Radiatorfeld 4
-  ...[ [9,5],[9,4],[9,3] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
+  // S3: Relay 2 (Radiatorfeld 3 liegt abgeschottet zwischen Utility-Knoten und
+  // ist über die Utility-Ringe angebunden; seine Zufahrts-Tiles (13,26)/(13,27)
+  // waren nicht 4-verbunden und entfallen)
+  ...[ [13,24] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
+  // S5: Radiatorfeld 4 (Anschluss an den Energie-Korridor E2 über (8,3))
+  ...[ [9,3],[9,4],[9,5],[8,3],[8,4] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
   // S6: Langstrecken-Comms 2 / Reststoffbereich Südwest
   ...[ [22,5],[22,4] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
+  // S7: Relay 1 (Abzweig vom Energie-Korridor E1)
+  ...[ [9,23] ].map(([row, col]) => ({ row, col, kind: 'spur' as const })),
 ]
 
 // ─── Mediennetz (Abschnitt 4) — Utility Ring A / B, physisch getrennt ───────
