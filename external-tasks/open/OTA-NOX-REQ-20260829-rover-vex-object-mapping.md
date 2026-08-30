@@ -5,9 +5,12 @@ target: SYS:KUEPER:noxia
 priority: high
 type: integration-mapping
 created: 2026-08-29
-status: open
+status: superseded
 affects: [NOXIA, OTA]
+supersededBy: OTA-TEC-0038-2026-DE, OTA-TEC-0039-2026-DE
 ---
+
+> **KORREKTUR (2026-08-30):** Die in diesem Request verwendeten Signaturen `OTA-TEC-0036` (Rover) und `OTA-TEC-0037` (VEX-47) sind ungültig — beide Nummern waren zum Zeitpunkt der Erstellung bereits an die Serie „Die Kette vom Hexenteich" vergeben (OTA-TEC-0035/0036/0036b/0037). Die korrigierten, tatsächlich freien Signaturen sind **OTA-TEC-0038** (Rover) und **OTA-TEC-0039** (VEX-47). Siehe `OTA-TEC-0038-2026-DE.md` und `OTA-TEC-0039-2026-DE.md` in diesem Ordner für die vollständigen, korrigierten Dossiers. Dieser Request bleibt als historisches Dokument erhalten, ist aber durch die genannten Dossiers ersetzt.
 
 # Erkundungsrover Typ P und VEX-47 an OTA-Technikobjekte anbinden
 

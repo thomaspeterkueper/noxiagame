@@ -9,6 +9,8 @@ status: open
 affects: [NOXIA, OTA]
 ---
 
+> **Ergänzung (2026-08-30):** Vollständiges Dossier liegt jetzt als `OTA-TEC-0034-2026-DE.md` in diesem Ordner vor (KXF-0.2-Frontmatter, 22-Punkte-Schema v1.5 FROZEN).
+
 # `wasserextraktor-mars-typ-m` an OTA-TEC-0034 anbinden
 
 ## Anlass
