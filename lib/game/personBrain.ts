@@ -20,7 +20,30 @@ function clamp01(value: number | undefined, fallback = 0): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return fallback
   return Math.max(0, Math.min(1, value))
 }
-function skill(skills: PersonSkillState, ...codes: string[]): number { return Math.max(0, ...codes.map((code) => clamp01(skills[code]))) }
+
+// Role logic speaks in capability concepts; seeds use more concrete skill codes.
+// Keep the vocabulary mapping here so we do not duplicate equivalent skills in DB.
+const SKILL_ALIASES: Record<string, string[]> = {
+  maintenance: ['maintenance_diagnostics', 'repair_planning'],
+  systems_diagnostics: ['maintenance_diagnostics', 'systems_risk_assessment'],
+  additive_manufacturing: ['fabrication'],
+  repair: ['repair_planning', 'maintenance_diagnostics'],
+  materials: ['materials_processing'],
+  spectroscopy: ['measurement_interpretation', 'sample_analysis'],
+  field_operations: ['field_logistics', 'sample_recovery'],
+  navigation: ['route_risk_assessment', 'field_logistics'],
+  infrastructure_coordination: ['coordination', 'infrastructure_planning'],
+  logistics: ['field_logistics', 'trade_logistics'],
+  planning: ['infrastructure_planning'],
+  contracts: ['contract_negotiation'],
+  trade: ['trade_logistics', 'market_analysis'],
+  negotiation: ['contract_negotiation', 'stakeholder_management'],
+}
+
+function skill(skills: PersonSkillState, ...codes: string[]): number {
+  const expanded = codes.flatMap((code) => [code, ...(SKILL_ALIASES[code] ?? [])])
+  return Math.max(0, ...expanded.map((code) => clamp01(skills[code])))
+}
 function strongestPressure(pressures: ColonyPressure[], codes: string[]): ColonyPressure | undefined {
   return pressures.filter((p) => codes.includes(p.code)).slice().sort((a, b) => (clamp01(b.severity) - clamp01(a.severity)) || a.code.localeCompare(b.code))[0]
 }
