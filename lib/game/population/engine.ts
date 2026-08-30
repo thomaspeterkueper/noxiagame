@@ -1,5 +1,10 @@
 // lib/game/population/engine.ts
 // NOXIA-LIVING-0001 — deterministischer v0.1 Population-Tick
+//
+// Ownership rule:
+// - background people: this engine decides routine/action and updates needs/experience
+// - named people (person_key != null): personBrain owns decisions; this engine only
+//   advances basic needs from their already-persisted activity state.
 
 import type { PersonActivityState, PopulationAction } from './types'
 
@@ -61,25 +66,74 @@ function needDelta(action: PopulationAction, needCode: string) {
     if (needCode === 'rest') return -0.015
     if (needCode === 'sustenance') return -0.01
   }
+  if (action === 'social_interaction') {
+    if (needCode === 'social') return 0.12
+    if (needCode === 'rest') return -0.01
+    if (needCode === 'sustenance') return -0.01
+  }
+  if (action === 'inspect_problem' || action === 'report_problem') {
+    if (needCode === 'rest') return -0.03
+    if (needCode === 'sustenance') return -0.015
+    if (needCode === 'purpose') return 0.05
+  }
   return 0
+}
+
+function actionFromNamedActivity(activity: PersonActivityState): PopulationAction {
+  switch (activity) {
+    case 'working': return 'work'
+    case 'resting': return 'rest'
+    case 'travelling': return 'travel_work'
+    case 'socialising': return 'social_interaction'
+    case 'inspecting': return 'inspect_problem'
+    case 'idle':
+    default: return 'satisfy_basic_need'
+  }
+}
+
+async function updateNeedsForAction(supabase: SupabaseLike, personId: string, action: PopulationAction, tick: number) {
+  const { data: needs } = await supabase
+    .from('person_needs')
+    .select('need_code, satisfaction')
+    .eq('person_id', personId)
+
+  for (const need of needs ?? []) {
+    const current = Number(need.satisfaction ?? 1)
+    const next = Math.max(0, Math.min(1, current + needDelta(action, need.need_code)))
+    await supabase
+      .from('person_needs')
+      .update({ satisfaction: next, updated_tick: tick, updated_at: new Date().toISOString() })
+      .eq('person_id', personId)
+      .eq('need_code', need.need_code)
+  }
 }
 
 export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
   const { data: people, error: peopleError } = await supabase
     .from('people')
-    .select('id, activity_state, last_tick')
+    .select('id, person_key, activity_state, last_tick')
     .eq('simulation_tier', 'active')
     .order('id')
     .limit(50)
 
   if (peopleError) {
     // Migration may not yet be applied on a deployment. Do not break world heartbeat.
-    if (String(peopleError.message ?? '').toLowerCase().includes('people')) return { processed: 0, skipped: true }
+    if (String(peopleError.message ?? '').toLowerCase().includes('people')) return { processed: 0, namedNeedsAdvanced: 0, skipped: true }
     throw peopleError
   }
 
   let processed = 0
+  let namedNeedsAdvanced = 0
   for (const person of people ?? []) {
+    // Named people are decided by personBrain. We still advance their physiological
+    // needs so their specialist decisions remain embedded in the same living-world model.
+    if (person.person_key) {
+      const action = actionFromNamedActivity(person.activity_state as PersonActivityState)
+      await updateNeedsForAction(supabase, person.id, action, tick)
+      namedNeedsAdvanced += 1
+      continue
+    }
+
     if (Number(person.last_tick ?? -1) >= tick) continue
 
     const { data: work } = await supabase
@@ -103,20 +157,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       })
       .eq('id', person.id)
 
-    const { data: needs } = await supabase
-      .from('person_needs')
-      .select('need_code, satisfaction')
-      .eq('person_id', person.id)
-
-    for (const need of needs ?? []) {
-      const current = Number(need.satisfaction ?? 1)
-      const next = Math.max(0, Math.min(1, current + needDelta(decision.action, need.need_code)))
-      await supabase
-        .from('person_needs')
-        .update({ satisfaction: next, updated_tick: tick, updated_at: new Date().toISOString() })
-        .eq('person_id', person.id)
-        .eq('need_code', need.need_code)
-    }
+    await updateNeedsForAction(supabase, person.id, decision.action, tick)
 
     if (decision.action === 'work' && work?.role_code) {
       const skillByRole: Record<string, string> = {
@@ -149,5 +190,5 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     processed += 1
   }
 
-  return { processed, skipped: false }
+  return { processed, namedNeedsAdvanced, skipped: false }
 }
