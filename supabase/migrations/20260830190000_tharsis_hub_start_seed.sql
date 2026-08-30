@@ -16,6 +16,10 @@
 --   * alte STATE/NPC-Produktions-/Wohn-Seedbauten werden entfernt
 --     (PLAYER-Eigentum bleibt unangetastet); Service-Bauten (bank, school,
 --     shipyard, admin, scanner) bleiben als laufende Staatsservices erhalten
+--   * Seed-Zellen mit Fremdbelegung (PLAYER-Eigentum oder erhaltene
+--     Staatsservices) werden NIE überschrieben: Abschnitt 6/8 bricht dann mit
+--     einer dokumentierten Meldung ab, statt die Unique-Indexes
+--     te_building_per_tile/uniq_building_per_tile roh zu verletzen
 --   * Fahrwege werden persistente STATE-Infrastruktur (entity_id='road'),
 --     die das alte prozedurale Mars-Straßennetz ablöst (ADR-strassen-infrastruktur)
 --   * Utility Ring A/B als eigene, von Fahrwegen getrennte Netzlogik
@@ -76,9 +80,12 @@ WHERE te.location_id = (SELECT id FROM locations WHERE slug = 'mars')
     'command_center','landing_pad','warehouse','docking_bay','market'
   );
 
--- Kollisionsschutz: der kanonische Seed gewinnt jede Zelle. Alte
--- STATE/NPC/CORPORATION-Bauten auf Seed-Zellen werden entfernt (nur wenn sie
--- NICHT zu den erhaltenen Staatsservices gehören).
+-- Kollisionsschutz: der kanonische Seed gewinnt jede Zelle, die nicht fremd
+-- belegt ist. Alte STATE/NPC/CORPORATION-Bauten auf Seed-Zellen werden entfernt
+-- (nur wenn sie NICHT zu den erhaltenen Staatsservices gehören); PLAYER-Eigentum
+-- und erhaltene Staatsservices bleiben unangetastet. Verbleibt eine Fremdbelegung
+-- auf einer Seed-Zelle, bricht Abschnitt 6/8 mit einer dokumentierten Meldung ab
+-- statt einer rohen Unique-Verletzung.
 DELETE FROM tile_entities te
 USING (VALUES
       (2,28),
@@ -411,6 +418,27 @@ BEGIN
      ) AS s(seed_id, entity_id, trow, tcol)
   LOOP
     b_uuid := noxia_tharsis_uuid('building:'||seed.seed_id);
+
+    -- Kollisionsschutz: te_building_per_tile/uniq_building_per_tile erlauben
+    -- nur EIN Gebäude je Zelle. Eine fremde Belegung der Seed-Zelle
+    -- (PLAYER-Eigentum oder laufender Staatsservice) wird nie überschrieben —
+    -- PLAYER-Eigentum bleibt unangetastet (ADR-Entscheidung 6). Statt einer
+    -- rohen Unique-Verletzung bricht die Migration hier bewusst und
+    -- dokumentiert ab.
+    IF EXISTS (
+      SELECT 1 FROM tile_entities
+       WHERE location_id = mars_id
+         AND tile_level = 0
+         AND tile_row = seed.trow
+         AND tile_col = seed.tcol
+         AND entity_type = 'building'
+         AND id <> b_uuid
+    ) THEN
+      RAISE EXCEPTION
+        'Tharsis-Hub-Seed: Zelle (%,%) ist durch ein fremdes Gebäude belegt (Seed-Objekt %, ID %). PLAYER-Eigentum und laufende Staatsservices bleiben unangetastet — bitte Konflikt manuell auflösen oder Seed anpassen.',
+        seed.trow, seed.tcol, seed.seed_id, b_uuid;
+    END IF;
+
     INSERT INTO tile_entities
       (id, profile_id, location_id, tile_level, tile_row, tile_col,
        entity_type, entity_id, owner_class, owner_id, is_state_owned, built_at)
@@ -643,10 +671,28 @@ BEGIN
       (8,4,'spur'),
       (22,5,'spur'),
       (22,4,'spur'),
-      (9,23,'spur'),
+      (9,23,'spur')
      ) AS s(trow, tcol, kind)
   LOOP
     r_uuid := noxia_tharsis_uuid('road:'||seed.trow||':'||seed.tcol);
+
+    -- Kollisionsschutz wie in Abschnitt 6: Fahrwege sind entity_type='building'
+    -- und unterliegen damit denselben Unique-Indexes. Fremd belegte Zellen
+    -- (PLAYER-Eigentum oder laufender Staatsservice) werden nie überschrieben.
+    IF EXISTS (
+      SELECT 1 FROM tile_entities
+       WHERE location_id = mars_id
+         AND tile_level = 0
+         AND tile_row = seed.trow
+         AND tile_col = seed.tcol
+         AND entity_type = 'building'
+         AND id <> r_uuid
+    ) THEN
+      RAISE EXCEPTION
+        'Tharsis-Hub-Seed: Fahrweg-Zelle (%,%) ist durch ein fremdes Gebäude belegt (ID %). PLAYER-Eigentum und laufende Staatsservices bleiben unangetastet — bitte Konflikt manuell auflösen oder Seed anpassen.',
+        seed.trow, seed.tcol, r_uuid;
+    END IF;
+
     INSERT INTO tile_entities
       (id, profile_id, location_id, tile_level, tile_row, tile_col,
        entity_type, entity_id, owner_class, owner_id, is_state_owned, built_at)

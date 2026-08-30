@@ -34,6 +34,24 @@ export const THARSIS_HUB_HABITAT_CAPACITY = 504   // 6 Cluster × 84 Plätze
 export const HABITAT_CLUSTER_CAPACITY     = 84
 export const STATE_OWNER_CLASS            = 'STATE'
 
+// ─── Kanonisches Eigentumsmodell (Auftrag §6 / ADR-Entscheidung 2) ──────────
+// Alle Startobjekte, Fahrzeuge, Fahrwege und Mediennetze beginnen im
+// bestehenden kanonischen öffentlichen Owner-Konzept:
+//   owner_class = 'STATE', is_state_owned = true, owner_id = NULL.
+// Es wird KEINE neue Eigentums-ID erfunden; Betreiber/Okkupant darf später
+// über das bestehende Leasing-/Konzessionsmodell (concessions, occupant_id)
+// vom Eigentümer abweichen. validateOwnership() prüft dieses Modell gegen
+// die daraus generierte SQL-Migration.
+export const SEED_OWNERSHIP = {
+  ownerClass: STATE_OWNER_CLASS,
+  isStateOwned: true,
+  ownerId: null,
+} as const
+
+/** Relativer Pfad (Repo-Root) der aus dieser Datei generierten SQL-Migration. */
+export const THARSIS_HUB_SEED_MIGRATION =
+  'supabase/migrations/20260830190000_tharsis_hub_start_seed.sql'
+
 // ─── Typen ──────────────────────────────────────────────────────────────────
 
 export type SeedZone =

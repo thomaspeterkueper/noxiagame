@@ -5,6 +5,7 @@
 // (Energie + Wasser), alternative Rettungszugänge, doppelte Medienanbindung,
 // physisch getrennte Utility-Netze, Zonenregeln und Eigentumsmodell.
 
+import { readFileSync } from 'node:fs'
 import {
   THARSIS_HUB_BUILDINGS,
   THARSIS_HUB_VEHICLES,
@@ -17,6 +18,8 @@ import {
   HABITAT_CLUSTER_CAPACITY,
   THARSIS_VEHICLE_CLASSES,
   UTILITY_MEDIA,
+  SEED_OWNERSHIP,
+  THARSIS_HUB_SEED_MIGRATION,
   getRingNodes,
 } from './tharsisHubSeed'
 import type { SeedBuilding } from './tharsisHubSeed'
@@ -388,11 +391,111 @@ export function validateUtilityNetworks(): SeedIssue[] {
 
 // ─── 6. Eigentumsmodell ─────────────────────────────────────────────────────
 
+// Die SQL-Migration (aus tharsisHubSeed.ts generiert) setzt das Eigentumsmodell
+// in den Seed-INSERTs der Abschnitte 6–8 um. Diese Prüfung liest die generierte
+// Datei und stellt sicher, dass JEDE Seed-Zeile staatlich owned ist und die
+// Stückzahl der TS-Quelle entspricht — damit kann die Zusage „kritischer
+// Startbestand staatlich/öffentlich owned“ (Auftrag §9) nicht still regressieren.
+const MIGRATION_URL = new URL(`../../../${THARSIS_HUB_SEED_MIGRATION}`, import.meta.url)
+
+// SQL-VALUES-Row-Muster je Seed-Abschnitt (6 Gebäude, 7 Fahrzeuge, 8 Fahrwege).
+// Die Seed-Zeilen liegen in den FOR-Loop-VALUES-Listen des jeweiligen
+// Abschnitts; das INSERT INTO tile_entities selbst ist eine Ein-Zeilen-
+// Vorlage, die je Schleifendurchlauf das Eigentumsmodell setzt.
+const SEED_INSERT_SECTIONS: Array<{
+  label: string
+  banner: string
+  nextBanner: string
+  count: number
+  rowPattern: RegExp
+}> = [
+  {
+    label: 'Gebäude (Abschnitt 6)',
+    banner: '-- 6. Startobjekte — staatlich owned',
+    nextBanner: '-- 7. Fahrzeug-Startbestand',
+    count: THARSIS_HUB_BUILDINGS.length,
+    rowPattern: /\(\s*'[a-z0-9_]+'\s*,\s*'[a-z0-9_]+'\s*,\s*\d+\s*,\s*\d+\s*\)/g,
+  },
+  {
+    label: 'Fahrzeuge (Abschnitt 7)',
+    banner: '-- 7. Fahrzeug-Startbestand',
+    nextBanner: '-- 8. Fahrwege',
+    count: THARSIS_HUB_VEHICLES.length,
+    rowPattern: /\(\s*'[a-z0-9_]+'\s*,\s*'[a-z0-9_]+'\s*,\s*\d+\s*,\s*\d+\s*\)/g,
+  },
+  {
+    label: 'Fahrwege (Abschnitt 8)',
+    banner: '-- 8. Fahrwege',
+    nextBanner: '-- 9. Mediennetz',
+    count: THARSIS_HUB_ROADS.length,
+    rowPattern: /\(\s*\d+\s*,\s*\d+\s*,\s*'[a-z_]+'\s*\)/g,
+  },
+]
+
+function sectionText(migration: string, banner: string, nextBanner: string): string {
+  const start = migration.indexOf(banner)
+  if (start < 0) return ''
+  const from = start + banner.length
+  const end = migration.indexOf(nextBanner, from)
+  return migration.slice(from, end < 0 ? migration.length : end)
+}
+
 export function validateOwnership(): SeedIssue[] {
   const issues: SeedIssue[] = []
-  // Kanonisches Konzept: owner_class='STATE', keine neue Eigentums-ID.
-  // (Die SQL-Migration setzt owner_class='STATE', is_state_owned=true,
-  // owner_id=NULL für alle Startobjekte, Fahrzeuge, Fahrwege und Mediennetze.)
+  const { ownerClass, isStateOwned, ownerId } = SEED_OWNERSHIP
+
+  // 1. Kanonische Deklaration (TS-Quelle) entspricht dem ADR-Modell.
+  if (ownerClass !== 'STATE') {
+    issues.push({ message: `Seed-Eigentümerklasse: '${ownerClass}' statt 'STATE'` })
+  }
+  if (!isStateOwned) {
+    issues.push({ message: 'Seed-Startbestand ist nicht als staatlich owned deklariert (is_state_owned)' })
+  }
+  if (ownerId !== null) {
+    issues.push({ message: `Seed-owner_id: ${String(ownerId)} statt NULL (keine neue Eigentums-ID)` })
+  }
+
+  // 2. Die generierte SQL-Migration setzt das deklarierte Modell für jede
+  //    Seed-Zeile der Abschnitte 6–8 um. Aus der Deklaration abgeleiteter
+  //    Ownership-Marker je INSERT-Vorlage, z.B. `'STATE', NULL, true`
+  //    (owner_class, owner_id, is_state_owned).
+  const expectedValueMarker = `'${ownerClass}', ${ownerId ?? 'NULL'}, ${isStateOwned}`
+
+  let migration: string
+  try {
+    migration = readFileSync(MIGRATION_URL, 'utf8')
+  } catch {
+    issues.push({ message: `SQL-Seed-Migration nicht lesbar: ${MIGRATION_URL.pathname}` })
+    return issues
+  }
+
+  for (const section of SEED_INSERT_SECTIONS) {
+    const text = sectionText(migration, section.banner, section.nextBanner)
+    if (text.length === 0) {
+      issues.push({ message: `${section.label}: Abschnitt nicht in der SQL-Migration gefunden` })
+      continue
+    }
+
+    // Stückzahl der Seed-Zeilen in der FOR-Loop-VALUES-Liste.
+    const rows = text.match(section.rowPattern) ?? []
+    if (rows.length !== section.count) {
+      issues.push({ message: `${section.label}: ${rows.length} Zeilen in SQL statt ${section.count} in der TS-Quelle` })
+    }
+
+    // Die INSERT-Vorlage setzt die Eigentums-Spalten mit dem deklarierten Modell.
+    const insert = text.match(/INSERT INTO tile_entities[\s\S]*?ON CONFLICT \(id\) DO UPDATE/)
+    if (!insert) {
+      issues.push({ message: `${section.label}: kein INSERT INTO tile_entities mit ON CONFLICT (id) gefunden` })
+      continue
+    }
+    if (!insert[0].includes('owner_class') || !insert[0].includes('owner_id') || !insert[0].includes('is_state_owned')) {
+      issues.push({ message: `${section.label}: INSERT setzt die Eigentums-Spalten nicht (owner_class/owner_id/is_state_owned)` })
+    }
+    if (!insert[0].includes(expectedValueMarker)) {
+      issues.push({ message: `${section.label}: INSERT-Vorlage trägt nicht das deklarierte Eigentumsmodell (${expectedValueMarker})` })
+    }
+  }
+
   return issues
 }
 
