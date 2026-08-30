@@ -478,7 +478,9 @@ export default function ColonyGrid({
           style={{ position: 'relative', width: tileSize, height: tileSize, cursor: interactive ? 'pointer' : 'default', boxShadow: ownerShadow, boxSizing: 'border-box', flexShrink: 0, opacity: isSelling ? 0.45 : 1, filter: isSelling ? 'grayscale(0.7)' : 'none', transition: 'transform 0.15s ease, z-index 0s' }}
         >
           {(() => {
-            if (entity?.entity_id) return <BuildingSVG entityId={entity.entity_id} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={isOwn} size={tileSize} />
+            // Persistente Straßen-Infrastruktur (entity_id='road', STATE) wird als
+            // Fahrweg-Tile gezeichnet, nicht als Gebäude (ADR-strassen-infrastruktur).
+            if (entity?.entity_id && entity.entity_id !== 'road') return <BuildingSVG entityId={entity.entity_id} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={isOwn} size={tileSize} />
             const npcEid = NPC_ENTITY[tileType]
             if (npcEid) return <BuildingSVG entityId={npcEid} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
             if (tileType.startsWith('building_') && tileType !== 'building_construction') return <BuildingSVG entityId={tileType.replace('building_', '')} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
