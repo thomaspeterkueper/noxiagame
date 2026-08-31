@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const key = process.env.DEEPSEEK_API_KEY
+  const key = process.env.DeepSeek_NPC_API_KEY
   if (!key) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
 
   const body = await request.json().catch(() => ({}))
