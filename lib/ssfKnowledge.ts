@@ -1,6 +1,6 @@
 // ssfKnowledge.ts
-// Aktualisiert: 28.08.2026 — SSF-NOXIA-MODULE(S)-1.0 mit pathId/detailUrl
-// Version:      0.5.0
+// Aktualisiert: 31.08.2026 — strukturierte SSF-Interactives
+// Version:      0.6.0
 
 export type SsfUnlock = string | { key: string; condition?: unknown }
 
@@ -24,12 +24,40 @@ export type SsfKnowledgeModule = {
   detailUrl: string
 }
 
+export type SsfInteractiveBody = {
+  id: string
+  label: string
+  massKg: number
+  radiusM: number
+}
+
+export type SsfInteractiveParams = {
+  bodies: SsfInteractiveBody[]
+  distance: {
+    unit: 'body_radii'
+    min: number
+    max: number
+    step: number
+    default: number
+  }
+  testMassKg: number
+  constants: { G: number }
+}
+
 export type SsfModuleSection =
   | { type: 'heading'; text: string }
   | { type: 'text'; text: string }
   | { type: 'key_point'; text: string }
   | { type: 'example'; title: string; text: string }
   | { type: 'task'; prompt: string; hint?: string }
+  | {
+      type: 'interactive'
+      interactiveId: string
+      title: string
+      instruction: string
+      params: SsfInteractiveParams
+      fallback: string
+    }
 
 export type SsfModuleAssessment = {
   type: 'multiple_choice'
