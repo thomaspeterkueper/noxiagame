@@ -1,10 +1,11 @@
 // app/api/game/knowledge/route.ts
 // Erstellt:     20.06.2026
-// Aktualisiert: 20.07.2026 — sync_from_ssf: 403-Fallback + Retry-After Header
-// Version:      2.5.0
+// Aktualisiert: 31.08.2026 — SSF-Unlock-Sync idempotent + NOXIA-Prerequisites
+// Version:      2.6.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { resolveGrantableUnlocks } from '@/lib/knowledge/unlockRegistry'
 
 async function getUserFromRequest(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -139,13 +140,13 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── Modul abschließen ────────────────────────────────────────────────────
-  // Schreibt academy_completions + vergibt knowledge_points
+  // ── Modul abschließen / Unlocks synchronisieren ───────────────────────────
+  // academy_completions bleibt idempotent; SSF-Unlocks werden auch bei bereits
+  // abgeschlossenen Modulen erneut synchronisiert, damit Upstream-Fixes heilen.
   if (action === 'complete_module') {
     const moduleId = searchParams.get('module_id')
     if (!moduleId) return NextResponse.json({ error: 'module_id fehlt' }, { status: 400 })
 
-    // Doppelt-Abschluss verhindern
     const { data: existing } = await supabase
       .from('academy_completions')
       .select('profile_id')
@@ -153,19 +154,20 @@ export async function GET(req: NextRequest) {
       .eq('module_id', moduleId)
       .maybeSingle()
 
-    if (existing) {
-      return NextResponse.json({ ok: true, already_completed: true, module_id: moduleId })
+    const alreadyCompleted = Boolean(existing)
+
+    if (!alreadyCompleted) {
+      await supabase.from('academy_completions').insert({
+        profile_id:   user.id,
+        module_id:    moduleId,
+        completed_at: new Date().toISOString(),
+      })
     }
 
-    // Modul als abgeschlossen markieren
-    await supabase.from('academy_completions').insert({
-      profile_id:   user.id,
-      module_id:    moduleId,
-      completed_at: new Date().toISOString(),
-    })
+    const blockedUnlocks: { id: string; missingUnlocks: string[] }[] = []
 
-    // ── Schritt 3: SSF fragen welche Unlocks dieses Modul gewährt ──────────
-    // Non-blocking: Fehler hier sollen den Modul-Abschluss nicht blockieren
+    // SSF ist Content-/Mapping-Authority; NOXIA erzwingt seine eigene
+    // Unlock-Hierarchie vor dem Persistieren in player_unlocks.
     try {
       const ssfBase = (process.env.SSF_BASE_URL ?? 'https://solarsciencefoundation.vercel.app').replace(/\/$/, '')
       const ssfRes = await fetch(`${ssfBase}/api/noxia/unlocks/check`, {
@@ -176,48 +178,62 @@ export async function GET(req: NextRequest) {
         },
         body: JSON.stringify({ completedModules: [moduleId] }),
       })
+
       if (ssfRes.ok) {
         const ssfData = await ssfRes.json() as { unlocks?: { id: string }[] }
-        const newUnlocks = ssfData.unlocks ?? []
-        if (newUnlocks.length > 0) {
-          // Bereits vorhandene Unlocks für diesen User laden
-          const { data: existingUnlocks } = await supabase
-            .from('player_unlocks')
-            .select('unlock_id')
-            .eq('profile_id', user.id)
-          const existingIds = new Set((existingUnlocks ?? []).map((u: any) => u.unlock_id))
-          // Nur neue Unlocks eintragen
-          const toInsert = newUnlocks
-            .filter((u: { id: string }) => !existingIds.has(u.id))
-            .map((u: { id: string }) => ({
-              profile_id:    user.id,
-              unlock_id:     u.id,
-              granted_at:    new Date().toISOString(),
-              source_module: moduleId,
-            }))
-          if (toInsert.length > 0) {
-            await supabase.from('player_unlocks').insert(toInsert)
-          }
+        const candidateIds = (ssfData.unlocks ?? []).map(u => u.id)
+
+        const { data: existingUnlocks } = await supabase
+          .from('player_unlocks')
+          .select('unlock_id')
+          .eq('profile_id', user.id)
+
+        const existingIds = new Set((existingUnlocks ?? []).map((u: any) => u.unlock_id as string))
+        const resolved = resolveGrantableUnlocks(candidateIds, existingIds)
+        blockedUnlocks.push(...resolved.blocked)
+
+        const toInsert = resolved.grantable.map(id => ({
+          profile_id:    user.id,
+          unlock_id:     id,
+          granted_at:    new Date().toISOString(),
+          source_module: moduleId,
+        }))
+
+        if (toInsert.length > 0) {
+          await supabase.from('player_unlocks').insert(toInsert)
         }
       }
     } catch (unlockErr) {
       console.error('[knowledge] SSF unlock check failed (non-fatal):', unlockErr)
     }
 
-    // Wissenspunkte vergeben (L0=50, L1=100, L2=200)
+    // Wissenspunkte nur beim ersten Abschluss vergeben (L0=50, L1=100, L2=200)
     const level = moduleId.includes('-L0-') ? 50
                 : moduleId.includes('-L1-') ? 100
                 : moduleId.includes('-L2-') ? 200
                 : 50
 
-    const { data: newTotal } = await supabase.rpc('award_knowledge', {
-      p_profile_id: user.id,
-      p_amount:     level,
-      p_reason:     `module_complete:${moduleId}`,
-      p_task_id:    null,
-    })
+    let pointsAwarded = 0
+    let newTotal: number | null = null
 
-    // Unlocks für Response laden
+    if (!alreadyCompleted) {
+      const { data } = await supabase.rpc('award_knowledge', {
+        p_profile_id: user.id,
+        p_amount:     level,
+        p_reason:     `module_complete:${moduleId}`,
+        p_task_id:    null,
+      })
+      pointsAwarded = level
+      newTotal = data ?? 0
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('knowledge_points')
+        .eq('id', user.id)
+        .single()
+      newTotal = profile?.knowledge_points ?? 0
+    }
+
     const { data: grantedUnlocks } = await supabase
       .from('player_unlocks')
       .select('unlock_id, source_module')
@@ -226,10 +242,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      already_completed: alreadyCompleted,
       module_id:        moduleId,
-      points_awarded:   level,
+      points_awarded:   pointsAwarded,
       knowledge_points: newTotal ?? 0,
       unlocks_granted:  (grantedUnlocks ?? []).map((u: any) => u.unlock_id),
+      unlocks_blocked:  blockedUnlocks,
     })
   }
 
