@@ -1,5 +1,7 @@
 // lib/game/seeds/tharsisHubSeed.test.ts
 // Erstellt: 30.08.2026
+// Aktualisiert: 31.08.2026 — Utility-Integrität V2: explizite Graphkanten,
+//   mediumspezifische Redundanz und physische Feeder.
 // Deterministische Akzeptanztests für den kanonischen Tharsis-Hub-Start-Seed
 // (OTA-NOX-REQ-20260830-THARSIS-HUB-START-SEED, Abschnitt 9).
 //
@@ -27,6 +29,7 @@ import {
   validateOwnership,
   type SeedIssue,
 } from './tharsisHubValidation'
+import { validateTharsisUtilityIntegrity } from './tharsisHubUtilityNetwork'
 
 let fails = 0
 function pruefe(ok: boolean, was: string): void {
@@ -36,7 +39,7 @@ function pruefe(ok: boolean, was: string): void {
   }
 }
 
-function reportIssues(title: string, issues: SeedIssue[]): void {
+function reportIssues(title: string, issues: Array<{ message: string }>): void {
   if (issues.length === 0) {
     console.log(`✓ ${title}`)
     return
@@ -55,7 +58,8 @@ reportIssues('Kollisionen / Bounds / getrennte Netze', validatePlacement())
 reportIssues('Exakte Stückzahlen (Abschnitt 1 + 2)', validateCounts())
 reportIssues('Zonen- und Abhängigkeitsregeln (Abschnitt 1/5)', validateZoneRules())
 reportIssues('Straßennetz: N-1 + Rettungszugänge (Abschnitt 3)', validateRoadResilience())
-reportIssues('Utility A/B: doppelte Anbindung (Abschnitt 4)', validateUtilityNetworks())
+reportIssues('Utility A/B: bestehende Seed-Anbindung (Abschnitt 4)', validateUtilityNetworks())
+reportIssues('Utility V2: Graph + Medienredundanz + physische Feeder', validateTharsisUtilityIntegrity())
 reportIssues('Eigentumsmodell (Abschnitt 6)', validateOwnership())
 
 // ── Direkte Akzeptanzprüfungen ─────────────────────────────────────────────
