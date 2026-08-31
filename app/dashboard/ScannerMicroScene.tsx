@@ -9,7 +9,7 @@
 // Die Szene besitzt keine eigene Ground Truth. Sie loest lediglich Messungen
 // der Scanner-Domaenenlogik aus und visualisiert deren Ergebnis.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   SCANNER_BASE_RADIUS,
   loadScanState,
@@ -54,6 +54,25 @@ const RESOURCE_LABEL: Record<string, string> = {
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js'
 
+// Zeichnet eine Konsole in ein bestehendes Canvas. Wird sowohl beim initialen
+// Szenenaufbau als auch beim Aktualisieren der Texturen genutzt.
+interface ConsoleTexture {
+  canvas: HTMLCanvasElement
+  texture: { needsUpdate: boolean; dispose(): void }
+}
+
+function drawConsoleCanvas(canvas: HTMLCanvasElement, lines: string[], accent = '#6fe7e7') {
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#071216'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.strokeStyle = accent
+  ctx.lineWidth = 3
+  ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16)
+  ctx.font = '28px monospace'
+  ctx.fillStyle = accent
+  lines.forEach((line, i) => ctx.fillText(line, 28, 52 + i * 42))
+}
+
 export default function ScannerMicroScene({
   resources,
   population,
@@ -77,9 +96,28 @@ export default function ScannerMicroScene({
 
   const stocks = useMemo(() => Object.fromEntries(resources.map(r => [r.resource, r.stock])), [resources])
   const lowResources = useMemo(() => resources.filter(r => r.stock < 30).map(r => RESOURCE_LABEL[r.resource] ?? r.resource), [resources])
-  const lowResourcesKey = lowResources.join('|')
 
-  const executeScan = () => {
+  // Live-Werte und onClose werden über Refs gelesen. Parent-Re-Renders
+  // (z. B. der 30-Sekunden-Dashboard-Refresh) zeichnen dadurch nur die
+  // Konsolen-Canvases neu, statt die WebGL-Szene abzureißen (Renderer-Dispose,
+  // Pointer-Lock-Verlust, Listener-Neuaufbau).
+  const onCloseRef = useRef(onClose)
+  const stocksRef = useRef(stocks)
+  const populationRef = useRef(population)
+  const lowResourcesRef = useRef(lowResources)
+  const texturesRef = useRef<{ scan: ConsoleTexture; analysis: ConsoleTexture } | null>(null)
+
+  // Refs mit den jeweils aktuellen Props versorgen. Die Szene liest ausschließlich
+  // über diese Refs; das hier ist der einzige Schreibzugriff und erfolgt bewusst
+  // außerhalb des Renderings (react-hooks/refs).
+  useEffect(() => {
+    onCloseRef.current = onClose
+    stocksRef.current = stocks
+    populationRef.current = population
+    lowResourcesRef.current = lowResources
+  })
+
+  const executeScan = useCallback(() => {
     const outcome = runScannerMeasurement({
       locationSlug,
       scannerEntityId,
@@ -103,7 +141,7 @@ export default function ScannerMicroScene({
     setPanel('scanner')
     setScanPulse(true)
     window.setTimeout(() => setScanPulse(false), 1800)
-  }
+  }, [locationSlug, scannerEntityId, scannerRow, scannerCol, gridRows, gridCols])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -124,18 +162,10 @@ export default function ScannerMicroScene({
           const canvas = document.createElement('canvas')
           canvas.width = 512
           canvas.height = 256
-          const ctx = canvas.getContext('2d')!
-          ctx.fillStyle = '#071216'
-          ctx.fillRect(0, 0, canvas.width, canvas.height)
-          ctx.strokeStyle = accent
-          ctx.lineWidth = 3
-          ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16)
-          ctx.font = '28px monospace'
-          ctx.fillStyle = accent
-          lines.forEach((line, i) => ctx.fillText(line, 28, 52 + i * 42))
+          drawConsoleCanvas(canvas, lines, accent)
           const texture = new THREE.CanvasTexture(canvas)
           texture.colorSpace = THREE.SRGBColorSpace
-          return texture
+          return { canvas, texture }
         }
 
         const scene = new THREE.Scene()
@@ -190,10 +220,10 @@ export default function ScannerMicroScene({
         const scanTexture = makeCanvasTexture([
           'NOXIA // FIELD SCANNER',
           `RADIUS ${SCANNER_BASE_RADIUS} GRID`,
-          `H2O   ${Math.round(stocks.water ?? 0)} t`,
-          `ENERG ${Math.round(stocks.energy ?? 0)} t`,
+          `H2O   ${Math.round(stocksRef.current.water ?? 0)} t`,
+          `ENERG ${Math.round(stocksRef.current.energy ?? 0)} t`,
         ])
-        const scanScreen = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.95), new THREE.MeshBasicMaterial({ map: scanTexture }))
+        const scanScreen = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.95), new THREE.MeshBasicMaterial({ map: scanTexture.texture }))
         scanScreen.position.set(0, 1.52, -3.805)
         scene.add(scanScreen)
 
@@ -201,13 +231,14 @@ export default function ScannerMicroScene({
         box(-2.45, 0.72, -0.45, 0.7, 1.2, 2.7, darkMat)
         const analysisTexture = makeCanvasTexture([
           'COLONY ANALYSIS',
-          `POP ${population.toLocaleString('de-DE')}`,
-          lowResources.length ? `LOW ${lowResources.join(', ')}` : 'STATUS NOMINAL',
+          `POP ${populationRef.current.toLocaleString('de-DE')}`,
+          lowResourcesRef.current.length ? `LOW ${lowResourcesRef.current.join(', ')}` : 'STATUS NOMINAL',
         ], '#f0c879')
-        const analysisScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 0.78), new THREE.MeshBasicMaterial({ map: analysisTexture }))
+        const analysisScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 0.78), new THREE.MeshBasicMaterial({ map: analysisTexture.texture }))
         analysisScreen.position.set(-2.085, 1.32, -0.5)
         analysisScreen.rotation.y = Math.PI / 2
         scene.add(analysisScreen)
+        texturesRef.current = { scan: scanTexture, analysis: analysisTexture }
 
         // Rechte Sensoreinheit + zentrale Projektion.
         box(2.35, 0.9, -1.1, 0.9, 1.8, 0.9, darkMat)
@@ -266,11 +297,11 @@ export default function ScannerMicroScene({
           keys.add(event.key.toLowerCase())
           if (event.key.toLowerCase() === 'e' && interactRef.current) {
             const id = interactRef.current
-            if (id === 'airlock') onClose()
+            if (id === 'airlock') onCloseRef.current()
             else if (id === 'scanner') executeScan()
             else setPanel(id)
           }
-          if (event.key === 'Escape' && document.pointerLockElement !== renderer.domElement) onClose()
+          if (event.key === 'Escape' && document.pointerLockElement !== renderer.domElement) onCloseRef.current()
         }
         const onKeyUp = (event: KeyboardEvent) => keys.delete(event.key.toLowerCase())
         const onClick = () => renderer.domElement.requestPointerLock()
@@ -339,8 +370,9 @@ export default function ScannerMicroScene({
             if (Array.isArray(material)) material.forEach((m: any) => m.dispose?.())
             else material?.dispose?.()
           })
-          scanTexture.dispose()
-          analysisTexture.dispose()
+          scanTexture.texture.dispose()
+          analysisTexture.texture.dispose()
+          texturesRef.current = null
           renderer.dispose()
           renderer.domElement.remove()
         }
@@ -355,7 +387,27 @@ export default function ScannerMicroScene({
       disposed = true
       cleanup?.()
     }
-  }, [stocks.water, stocks.energy, population, lowResourcesKey, onClose, locationSlug, scannerEntityId, scannerRow, scannerCol, gridRows, gridCols])
+  }, [executeScan, locationSlug, scannerEntityId, scannerRow, scannerCol, gridRows, gridCols])
+
+  // Geänderte Live-Werte zeichnen nur die vorhandenen Konsolen-Canvases neu;
+  // die WebGL-Szene selbst bleibt erhalten (kein Pointer-Lock-Verlust).
+  useEffect(() => {
+    const textures = texturesRef.current
+    if (!textures) return
+    drawConsoleCanvas(textures.scan.canvas, [
+      'NOXIA // FIELD SCANNER',
+      `RADIUS ${SCANNER_BASE_RADIUS} GRID`,
+      `H2O   ${Math.round(stocks.water ?? 0)} t`,
+      `ENERG ${Math.round(stocks.energy ?? 0)} t`,
+    ])
+    textures.scan.texture.needsUpdate = true
+    drawConsoleCanvas(textures.analysis.canvas, [
+      'COLONY ANALYSIS',
+      `POP ${population.toLocaleString('de-DE')}`,
+      lowResources.length ? `LOW ${lowResources.join(', ')}` : 'STATUS NOMINAL',
+    ], '#f0c879')
+    textures.analysis.texture.needsUpdate = true
+  }, [stocks, population, lowResources])
 
   const prompt = near === 'scanner' ? `E  Radius-${SCANNER_BASE_RADIUS}-Scan starten`
     : near === 'analysis' ? 'E  Kolonieanalyse ansehen'

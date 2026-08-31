@@ -4,7 +4,7 @@
 // Discovery-aware facade. The existing ColonyGrid implementation remains
 // unchanged in LegacyColonyGrid; this wrapper owns only scanner client state.
 
-import { useEffect, useState, type ComponentProps } from 'react'
+import { useEffect, useMemo, useState, type ComponentProps } from 'react'
 import LegacyColonyGrid from './LegacyColonyGrid'
 import { loadScanState, SCANNER_SESSION_CLOSED_EVENT } from '@/lib/game/scanning'
 
@@ -13,9 +13,13 @@ type Props = ComponentProps<typeof LegacyColonyGrid>
 export default function ColonyGrid(props: Props) {
   const [discoveryRevision, setDiscoveryRevision] = useState(0)
 
-  useEffect(() => {
-    loadScanState(props.slug)
+  // Hydrate the runtime discovery cache synchronously during render, before
+  // the keyed LegacyColonyGrid's first generateGrid pass runs. A post-render
+  // effect would populate the cache only after the first grid was generated,
+  // so already-persisted discoveries would not surface on the first paint.
+  useMemo(() => loadScanState(props.slug), [props.slug])
 
+  useEffect(() => {
     const onScannerClosed = (event: Event) => {
       const detail = (event as CustomEvent<{ locationSlug?: string }>).detail
       if (detail?.locationSlug !== props.slug) return
