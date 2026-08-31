@@ -31,6 +31,8 @@ type ResidentPosition = {
   socialGroup: number
 }
 
+type ChatEntry = { role: 'user' | 'assistant'; content: string }
+
 type Props = {
   locationSlug: string
   population: number
@@ -41,6 +43,8 @@ type Props = {
 
 const COLS = 32
 const ROWS = 24
+const MAX_PLAYER_CHARS = 80
+const PLAYER_JOIN_DISTANCE = 1.25
 
 function residentRole(resident: Resident) {
   return resident.assignments?.find(a => a.type === 'work')?.roleCode ?? resident.activityState ?? 'general'
@@ -59,7 +63,7 @@ function hash(value: string) {
   return ((h >>> 0) % 10000) / 10000
 }
 
-function distance(a: ResidentPosition, b: ResidentPosition) {
+function distance(a: { col: number; row: number }, b: { col: number; row: number }) {
   return Math.hypot(a.col - b.col, a.row - b.row)
 }
 
@@ -68,6 +72,11 @@ export default function ColonyConversationLayer({ locationSlug, population, enti
   const [items, setItems] = useState<WorldAwarenessItem[]>([])
   const [open, setOpen] = useState(false)
   const [tick, setTick] = useState(0)
+  const [joining, setJoining] = useState(false)
+  const [message, setMessage] = useState('')
+  const [history, setHistory] = useState<ChatEntry[]>([])
+  const [sending, setSending] = useState(false)
+  const [chatError, setChatError] = useState('')
 
   useEffect(() => {
     let live = true
@@ -96,6 +105,11 @@ export default function ColonyConversationLayer({ locationSlug, population, enti
     const preferred = ['bar', 'school', 'habitat', 'residential_block', 'admin']
     return buildings.filter(building => preferred.includes(building.entity_id))
   }, [buildings])
+
+  const playerAnchor = useMemo(() => {
+    const habitat = buildings.find(building => building.entity_id === 'habitat' && building.profile_id === userId)
+    return nearestStreetTile(habitat?.tile_row ?? 12, habitat?.tile_col ?? 16, streets)
+  }, [buildings, userId, streets])
 
   const positions = useMemo<ResidentPosition[]>(() => {
     const dayProgress = virtualDayProgress(tick)
@@ -133,7 +147,7 @@ export default function ColonyConversationLayer({ locationSlug, population, enti
   const scene = useMemo(() => {
     if (items.length < 1) return null
     const candidates = positions.filter(position => !position.moving && (position.activity === 'meal' || position.activity === 'community'))
-    let best: { first: ResidentPosition; second: ResidentPosition; distance: number } | null = null
+    let best: { first: ResidentPosition; second: ResidentPosition; score: number } | null = null
 
     for (let i = 0; i < candidates.length; i += 1) {
       for (let j = i + 1; j < candidates.length; j += 1) {
@@ -142,7 +156,9 @@ export default function ColonyConversationLayer({ locationSlug, population, enti
         const d = distance(first, second)
         if (d > 0.65) continue
         const groupBonus = first.socialGroup === second.socialGroup ? -0.25 : 0
-        if (!best || d + groupBonus < best.distance) best = { first, second, distance: d + groupBonus }
+        const playerBonus = playerAnchor && Math.min(distance(first, playerAnchor), distance(second, playerAnchor)) <= PLAYER_JOIN_DISTANCE ? -0.2 : 0
+        const score = d + groupBonus + playerBonus
+        if (!best || score < best.score) best = { first, second, score }
       }
     }
 
@@ -150,32 +166,107 @@ export default function ColonyConversationLayer({ locationSlug, population, enti
     const dayKey = new Date().toISOString().slice(0, 10)
     const conversation = awarenessConversationForResident(best.first.resident.id, residentRole(best.first.resident), items, dayKey)
     if (!conversation) return null
+    const playerDistance = playerAnchor ? Math.min(distance(best.first, playerAnchor), distance(best.second, playerAnchor)) : Infinity
     return {
       first: best.first.resident,
       second: best.second.resident,
       conversation,
       source: sourceForAwarenessItem(conversation.item),
       sameGroup: best.first.socialGroup === best.second.socialGroup,
+      playerNearby: playerDistance <= PLAYER_JOIN_DISTANCE,
     }
-  }, [positions, items])
+  }, [positions, items, playerAnchor])
 
   useEffect(() => {
-    if (!scene) setOpen(false)
-  }, [scene])
+    if (!scene) {
+      setOpen(false)
+      setJoining(false)
+      setHistory([])
+      return
+    }
+    setHistory([])
+    setJoining(false)
+    setChatError('')
+  }, [scene?.first.id, scene?.second.id, scene?.conversation.item.id])
+
+  async function sendMessage() {
+    if (!scene || !scene.playerNearby || sending) return
+    const player = message.trim().slice(0, MAX_PLAYER_CHARS)
+    if (!player) return
+    setSending(true)
+    setChatError('')
+    try {
+      const response = await fetch('/api/game/npc-conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          player,
+          npcName: scene.first.displayName,
+          npcRole: residentRole(scene.first),
+          headline: scene.conversation.item.title,
+          source: scene.source?.name ?? scene.conversation.item.sourceId,
+          history,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.reply) throw new Error(data.error || 'conversation_failed')
+      setHistory(current => [...current, { role: 'user', content: player }, { role: 'assistant', content: String(data.reply) }].slice(-6))
+      setMessage('')
+    } catch (error) {
+      const code = error instanceof Error ? error.message : ''
+      setChatError(code === 'conversation_provider_unavailable' ? 'DeepSeek ist noch nicht konfiguriert.' : 'Gespräch derzeit nicht erreichbar.')
+    } finally {
+      setSending(false)
+    }
+  }
 
   if (!scene) return null
 
   return (
-    <div style={{ position: 'absolute', zIndex: 118, left: 16, bottom: 70, width: open ? 350 : 285, fontFamily: 'system-ui', color: '#e8f0f5' }}>
+    <div style={{ position: 'absolute', zIndex: 118, left: 16, bottom: 70, width: open ? 370 : 285, fontFamily: 'system-ui', color: '#e8f0f5' }}>
       <button onClick={() => setOpen(value => !value)} style={{ width: '100%', textAlign: 'left', border: '1px solid #45657c', borderRadius: open ? '9px 9px 0 0' : 9, background: '#091925ee', color: '#e8f0f5', padding: '9px 11px', cursor: 'pointer' }}>
-        <small style={{ color: '#79a6c7', letterSpacing: '.1em' }}>GESPRÄCH IN DER NÄHE · ERDE</small><br />
+        <small style={{ color: '#79a6c7', letterSpacing: '.1em' }}>{scene.playerNearby ? 'GESPRÄCH IN HÖRWEITE · ERDE' : 'GESPRÄCH IN DER NÄHE · ERDE'}</small><br />
         <b>{scene.first.displayName} + {scene.second.displayName}</b>
-        <div style={{ marginTop: 2, color: '#8fa3b1', fontSize: 9 }}>{scene.sameGroup ? 'gleicher Sozialkreis · ' : ''}räumliche Begegnung</div>
+        <div style={{ marginTop: 2, color: '#8fa3b1', fontSize: 9 }}>{scene.sameGroup ? 'gleicher Sozialkreis · ' : ''}{scene.playerNearby ? 'du kannst dich einmischen' : 'räumliche Begegnung'}</div>
       </button>
       {open && <div style={{ border: '1px solid #45657c', borderTop: 0, borderRadius: '0 0 9px 9px', background: '#071421f2', padding: 11, fontSize: 12, lineHeight: 1.5 }}>
         <p style={{ margin: '0 0 8px' }}><b>{scene.first.displayName}:</b> „{scene.conversation.opener}“</p>
         <p style={{ margin: '0 0 9px', color: '#c8d5dd' }}><b>{scene.second.displayName}:</b> „{scene.conversation.followUp}“</p>
-        <div style={{ color: '#8fa3b1', fontSize: 10 }}>Reale Meldung: {scene.source?.name ?? scene.conversation.item.sourceId}. Die Reaktionen der Bewohner sind fiktional.</div>
+
+        {history.map((entry, index) => (
+          <p key={`${entry.role}-${index}`} style={{ margin: '6px 0', color: entry.role === 'assistant' ? '#d9e6ec' : '#f1d57a' }}>
+            <b>{entry.role === 'assistant' ? scene.first.displayName : 'Du'}:</b> „{entry.content}“
+          </p>
+        ))}
+
+        {scene.playerNearby && !joining && (
+          <button onClick={() => setJoining(true)} style={{ width: '100%', margin: '7px 0', padding: '8px 10px', border: '1px solid #3976a5', borderRadius: 6, background: '#0a3150', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>
+            ANSPRECHEN
+          </button>
+        )}
+
+        {scene.playerNearby && joining && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                value={message}
+                maxLength={MAX_PLAYER_CHARS}
+                onChange={event => setMessage(event.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') void sendMessage() }}
+                placeholder="Kurze Antwort …"
+                disabled={sending}
+                style={{ flex: 1, minWidth: 0, padding: '8px 9px', border: '1px solid #45657c', borderRadius: 6, background: '#06111a', color: '#eef5f8' }}
+              />
+              <button onClick={() => void sendMessage()} disabled={sending || !message.trim()} style={{ border: '1px solid #3976a5', borderRadius: 6, background: '#0a3150', color: '#fff', padding: '0 10px', cursor: sending ? 'wait' : 'pointer' }}>
+                {sending ? '…' : 'Senden'}
+              </button>
+            </div>
+            <div style={{ marginTop: 3, textAlign: 'right', color: message.length >= 70 ? '#f1d57a' : '#738795', fontSize: 9 }}>{message.length}/{MAX_PLAYER_CHARS}</div>
+            {chatError && <div style={{ marginTop: 5, color: '#e29a86', fontSize: 10 }}>{chatError}</div>}
+          </div>
+        )}
+
+        <div style={{ marginTop: 8, color: '#8fa3b1', fontSize: 10 }}>Reale Meldung: {scene.source?.name ?? scene.conversation.item.sourceId}. Die Reaktionen der Bewohner sind fiktional.</div>
         <a href={scene.conversation.item.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 7, color: '#f1d57a', fontSize: 10 }}>Originalquelle öffnen ↗</a>
       </div>}
     </div>
