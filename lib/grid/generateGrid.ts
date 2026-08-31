@@ -1,32 +1,20 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Aktualisiert: 30.08.2026 — Tharsis-Hub-Seed-Fahrwege ersetzen das alte
-//   prozedurale Mars-Straßennetz (OTA-NOX-REQ-20260830-THARSIS-HUB-START-SEED)
-// Version:  0.7.0
+// Aktualisiert: 31.08.2026 — Scanner-Discovery als expliziter Informations-Layer
+// Version:  0.8.0
 //
+// v0.8.0: Ein Scanner erzeugt keine Anomalie mehr durch seine bloße Existenz.
+//   Das Grid erhält ausschließlich bereits entdeckte Positionen als expliziten
+//   Informations-Layer. Ground Truth und Messlogik bleiben in lib/game/scanning.ts.
+// v0.7.0: Tharsis-Hub-Seed-Fahrwege ersetzen das alte prozedurale Mars-Straßennetz.
 // v0.6.5: BUGFIX Haupt-Thread-Blockade. reach in addRoadNetwork() war nicht
-//   gedeckelt (anders als span). Bei sehr hoher population (z.B. Erde:
-//   999.999.999, siehe Migration 018) ergab reach = 2 + floor(999999999/600)
-//   ≈ 1.666.668 → die innere Schleife lief ~3,3 Mio. Mal pro Straßenzweig und
-//   blockierte den Haupt-Thread bei JEDEM Re-Render (population/entities/
-//   pending-Änderung — Polling, Bau, jede Aktion), bis der Tab-Prozess
-//   irgendwann kollabierte ("This page couldn't load" ohne jeden JS-Fehler —
-//   kein React-Rendering-Fehler, daher von einer Error Boundary nicht
-//   abfangbar). Fix: reach wie span auf sinnvolle Distanz relativ zur
-//   Gridhöhe gedeckelt.
-//
-// v0.6.4: Mond-Ressourcentiles ice/helium3/titanium als bebaubar
-//   freigeschaltet, damit Shackleton nach Moon Terrain v3 wieder nutzbar ist.
-
-// v0.6.3: Neue spezialisierte Terrain-Tiles als bebaubar/straßenfähig
-//   freigeschaltet: farmland/city/spaceport, mare/highland/research,
-//   dust/plateau/habitat/industry.
-// v0.6.2: Platzhalter-NPC-Bauten deaktiviert. Fremde Gebäude sollen erst
-//   wieder erscheinen, wenn sie echten Akteuren/Fraktionen gehören.
-// v0.6.1: Straßennetz wird vor NPC-Bauten gelegt; NPCs dürfen dadurch keine
-//   Straßen mehr unterbrechen. Terrain-Layer bleibt fest aus locationMaps.ts.
-// v0.6.0: Terrain-Layer kommt zuerst aus festen Location-Maps
-//   (lib/grid/locationMaps.ts). Flüsse/Wälder/Berge bleiben dadurch stabil.
+//   gedeckelt (anders als span). Bei sehr hoher population konnte die Schleife
+//   Millionen Male laufen; reach ist nun an die Gridhöhe gebunden.
+// v0.6.4: Mond-Ressourcentiles ice/helium3/titanium als bebaubar freigeschaltet.
+// v0.6.3: spezialisierte Terrain-Tiles bebaubar/straßenfähig.
+// v0.6.2: Platzhalter-NPC-Bauten deaktiviert.
+// v0.6.1: Straßennetz vor NPC-Bauten.
+// v0.6.0: Terrain-Layer aus festen Location-Maps.
 
 import { getFixedTerrain } from './locationMaps'
 import { getSeedRoadCells } from '@/lib/game/seeds/tharsisHubSeed'
@@ -37,25 +25,30 @@ export const ROWS = 8
 export type CellOwner = 'own' | 'other' | 'state' | null
 
 export interface Cell {
-  type:     string
-  owner:    CellOwner
+  type: string
+  owner: CellOwner
   anomaly?: boolean
 }
 
 export interface GridEntity {
-  entity_id:     string
-  profile_id:    string | null | null
+  entity_id: string
+  profile_id: string | null
   is_state_owned?: boolean
-  entity_type:   string
-  tile_row:      number
-  tile_col:      number
+  entity_type: string
+  tile_row: number
+  tile_col: number
 }
 
 export interface GridPending {
   buildable_id: string
-  tile_row:     number
-  tile_col:     number
-  status:       string
+  tile_row: number
+  tile_col: number
+  status: string
+}
+
+export interface GridDiscovery {
+  row: number
+  col: number
 }
 
 export function seededRandom(seed: number, i: number): number {
@@ -65,32 +58,32 @@ export function seededRandom(seed: number, i: number): number {
 
 export function isBuildable(tileType: string): boolean {
   return (
-    tileType === 'tile_surface'   ||
-    tileType === 'tile_grass'     ||
-    tileType === 'tile_urban'     ||
-    tileType === 'tile_farmland'  ||
-    tileType === 'tile_city'      ||
+    tileType === 'tile_surface' ||
+    tileType === 'tile_grass' ||
+    tileType === 'tile_urban' ||
+    tileType === 'tile_farmland' ||
+    tileType === 'tile_city' ||
     tileType === 'tile_spaceport' ||
-    tileType === 'tile_mare'      ||
-    tileType === 'tile_highland'  ||
-    tileType === 'tile_research'  ||
-    tileType === 'tile_ice'       ||
-    tileType === 'tile_helium3'   ||
-    tileType === 'tile_titanium'  ||
-    tileType === 'tile_dust'      ||
-    tileType === 'tile_plateau'   ||
+    tileType === 'tile_mare' ||
+    tileType === 'tile_highland' ||
+    tileType === 'tile_research' ||
+    tileType === 'tile_ice' ||
+    tileType === 'tile_helium3' ||
+    tileType === 'tile_titanium' ||
+    tileType === 'tile_dust' ||
+    tileType === 'tile_plateau' ||
     // tile_habitat + tile_industry: Terrain-Typen, NICHT bebaubar
     // (sehen aus wie Gebäude aber haben keine DB-Entity — Terrain-Ebene)
-    tileType === 'tile_metal'     ||
-    tileType === 'tile_crater'    ||
-    tileType === 'tile_shaft'     ||
+    tileType === 'tile_metal' ||
+    tileType === 'tile_crater' ||
+    tileType === 'tile_shaft' ||
     tileType.startsWith('road_')
   )
 }
 
 export const NPC_ENTITY: Record<string, string> = {
-  npc_mine:    'mine',
-  npc_solar:   'solar',
+  npc_mine: 'mine',
+  npc_solar: 'solar',
   npc_habitat: 'habitat',
 }
 
@@ -131,8 +124,6 @@ function fallbackTerrain(slug: string, seed: number, r: number, c: number, cols:
 /**
  * Kanonische Seed-Fahrwege (Tharsis Hub): innerer Service-Ring + drei
  * Hauptkorridore (Energie, Wasser, Lande/Fracht) + notwendige Service-Spurs.
- * Ersetzt das alte prozedurale Mars-Straßennetz vollständig — kein
- * dekoratives Netz, keine Schiene.
  */
 function addSeedRoadNetwork(grid: Cell[][], slug: string, rows: number, cols: number): void {
   if (slug !== 'mars') return
@@ -156,10 +147,6 @@ function addRoadNetwork(grid: Cell[][], population: number, userId: string | und
   const span = Math.min(Math.floor(population / 400) + 1, 3)
   for (let q = 1; q <= span; q++) {
     const qc = Math.round((cols * q) / (span + 1))
-    // Gedeckelt wie span (v0.6.5) — ohne Deckel lief die Schleife bei sehr
-    // hoher population (z.B. Erde: 999.999.999) Millionen Male und blockierte
-    // den Haupt-Thread. Das Grid ist ohnehin nur `rows` Zeilen hoch, mehr
-    // reach hat keinen sichtbaren Effekt.
     const reach = Math.min(2 + Math.floor(population / 600), rows)
     for (let r = centerR - reach; r <= centerR + reach; r++) {
       if (r < 0 || r >= rows) continue
@@ -186,13 +173,14 @@ function autotileRoads(grid: Cell[][], rows: number, cols: number): void {
 }
 
 export function generateGrid(
-  slug:       string,
+  slug: string,
   population: number,
-  entities:   GridEntity[],
-  pending:    GridPending[],
-  userId?:    string,
-  cols:       number = COLS,
-  rows:       number = ROWS,
+  entities: GridEntity[],
+  pending: GridPending[],
+  userId?: string,
+  cols: number = COLS,
+  rows: number = ROWS,
+  discoveries: GridDiscovery[] = [],
 ): Cell[][] {
   const grid: Cell[][] = []
   const seed = slug.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
@@ -208,27 +196,16 @@ export function generateGrid(
     grid.push(row)
   }
 
-  // 2. Terrain-Netzwerke maskieren. Der Rohcode 'river' kommt aus locationMaps.
+  // 2. Terrain-Netzwerke maskieren.
   autotilePrefix(grid, 'river', 'river_')
 
   // 3. Straßennetz als öffentliche Infrastruktur.
-  //    Tharsis Hub (mars) nutzt den kanonischen Seed-Fahrwegeplan (Service-Ring
-  //    + Hauptkorridore + Spurs); alle anderen Orte behalten das prozedurale
-  //    Netz. Beide Varianten sind Straßen-Infrastruktur, kein Terrain
-  //    (ADR-strassen-infrastruktur).
-  if (slug === 'mars') {
-    addSeedRoadNetwork(grid, slug, rows, cols)
-  } else {
-    addRoadNetwork(grid, population, userId, rows, cols)
-  }
+  if (slug === 'mars') addSeedRoadNetwork(grid, slug, rows, cols)
+  else addRoadNetwork(grid, population, userId, rows, cols)
 
   // 4. Automatische Platzhalter-NPCs sind vorläufig deaktiviert.
-  //    Echte Fremdgebäude sollen später aus DB-Entities mit realer profile_id /
-  //    actor_id kommen, nicht aus dem Terrain-Generator.
 
-  // 5. Bestand überschreibt den sichtbaren Layer, aber nicht die feste Karte.
-  //    DB-Zeilen mit entity_id='road' sind persistente Straßen-Infrastruktur
-  //    (owner_class STATE) und werden als Fahrweg statt als Gebäude gezeichnet.
+  // 5. Bestand überschreibt den sichtbaren Layer.
   for (const e of entities) {
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
       if (e.entity_type === 'building' && e.entity_id === 'road') {
@@ -237,19 +214,21 @@ export function generateGrid(
       }
       const owner: CellOwner = !userId
         ? null
-        : (e as any).owner_class === 'STATE' || (e as any).owner_class === 'CORPORATION' || e.profile_id === null
-        ? 'state'
-        : e.profile_id === userId
-        ? 'own'
-        : 'other'
+        : (e as GridEntity & { owner_class?: string }).owner_class === 'STATE' ||
+            (e as GridEntity & { owner_class?: string }).owner_class === 'CORPORATION' ||
+            e.profile_id === null
+          ? 'state'
+          : e.profile_id === userId
+            ? 'own'
+            : 'other'
       grid[e.tile_row][e.tile_col] = { type: `building_${e.entity_id}`, owner }
     }
   }
 
-  // 5b. Straßen-Masken nach dem Bestand berechnen (deckt auch DB-Straßen ab).
+  // 5b. Straßen-Masken nach dem Bestand berechnen.
   autotileRoads(grid, rows, cols)
 
-  // 6. Vorgänge
+  // 6. Vorgänge.
   for (const p of pending) {
     if (p.tile_row >= 0 && p.tile_row < rows && p.tile_col >= 0 && p.tile_col < cols) {
       grid[p.tile_row][p.tile_col] = {
@@ -259,21 +238,13 @@ export function generateGrid(
     }
   }
 
-  // 7. Anomalie
-  const hasScanner = entities.some(e => e.entity_type === 'building' && e.entity_id === 'scanner')
-  if (hasScanner) {
-    const terrainCells: [number, number][] = []
-    for (let r = 0; r < rows; r++)
-      for (let c = 0; c < cols; c++) {
-        const t = grid[r][c].type
-        if (!t.startsWith('building_') && !t.startsWith('npc_') && !t.startsWith('road'))
-          terrainCells.push([r, c])
-      }
-    if (terrainCells.length > 0) {
-      const pick = Math.floor(seededRandom(seed, 7777) * terrainCells.length)
-      const [ar, ac] = terrainCells[pick]
-      grid[ar][ac] = { ...grid[ar][ac], anomaly: true }
-    }
+  // 7. Informations-Layer: ausschließlich tatsächlich entdeckte Anomalien.
+  //    Ground Truth wird nicht hier erzeugt und Scanner-Besitz ist kein Wissen.
+  for (const discovery of discoveries) {
+    if (discovery.row < 0 || discovery.row >= rows || discovery.col < 0 || discovery.col >= cols) continue
+    const cell = grid[discovery.row][discovery.col]
+    if (cell.type.startsWith('building_') || cell.type.startsWith('npc_') || cell.type.startsWith('road')) continue
+    grid[discovery.row][discovery.col] = { ...cell, anomaly: true }
   }
 
   return grid
