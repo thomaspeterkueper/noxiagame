@@ -14,6 +14,11 @@ export type UnlockDefinition = {
   tier: 'foundation' | 'component' | 'subsystem' | 'integration';
 };
 
+export type BlockedUnlock = {
+  id: string;
+  missingUnlocks: UnlockId[];
+};
+
 export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
   'UNL:NOX:resource-extraction': {
     id: 'UNL:NOX:resource-extraction',
@@ -96,3 +101,37 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
 
 export function getUnlockDefinition(id: string) { return UNLOCK_REGISTRY[id] ?? null; }
 export function getUnlockLabel(id: string) { return getUnlockDefinition(id)?.label ?? id; }
+
+export function getMissingUnlockPrerequisites(id: string, unlocked: Iterable<string>): UnlockId[] {
+  const definition = getUnlockDefinition(id);
+  if (!definition) return [];
+  const unlockedSet = unlocked instanceof Set ? unlocked : new Set(unlocked);
+  return definition.requiresUnlocks.filter(required => !unlockedSet.has(required));
+}
+
+export function resolveGrantableUnlocks(candidateIds: string[], existingIds: Iterable<string>) {
+  const unlocked = new Set(existingIds);
+  const pending = [...new Set(candidateIds)].filter(id => !unlocked.has(id));
+  const grantable: string[] = [];
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = pending.length - 1; i >= 0; i -= 1) {
+      const id = pending[i];
+      if (getMissingUnlockPrerequisites(id, unlocked).length === 0) {
+        grantable.push(id);
+        unlocked.add(id);
+        pending.splice(i, 1);
+        changed = true;
+      }
+    }
+  }
+
+  const blocked: BlockedUnlock[] = pending.map(id => ({
+    id,
+    missingUnlocks: getMissingUnlockPrerequisites(id, unlocked),
+  }));
+
+  return { grantable, blocked };
+}
