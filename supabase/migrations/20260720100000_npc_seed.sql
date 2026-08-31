@@ -13,6 +13,11 @@
 
 SET search_path TO public;
 
+-- note-Spalte in npc_ledger ergänzen falls nicht vorhanden.
+-- MUSS vor den Endowment-Inserts stehen, damit frische Branches (die die
+-- Zeilen zum ersten Mal einfügen) nicht an der fehlenden Spalte scheitern.
+ALTER TABLE npc_ledger ADD COLUMN IF NOT EXISTS note text;
+
 -- HeliosCorp: Strategischer Rohstoff-Akkumulator
 INSERT INTO actors (id, kind, display_name, bio_short, decision_weights)
 VALUES (
@@ -90,9 +95,6 @@ WHERE NOT EXISTS (SELECT 1 FROM npc_ledger WHERE actor_id = '00000000-0000-0000-
 INSERT INTO npc_ledger (actor_id, tick, kind, credit_delta, note)
 SELECT '00000000-0000-0000-0000-000000000003', 0, 'endowment', 15000, 'Belenus AG Startkapital'
 WHERE NOT EXISTS (SELECT 1 FROM npc_ledger WHERE actor_id = '00000000-0000-0000-0000-000000000003' AND kind = 'endowment');
-
--- note-Spalte in npc_ledger ergänzen falls nicht vorhanden
-ALTER TABLE npc_ledger ADD COLUMN IF NOT EXISTS note text;
 
 -- Kontrolle
 SELECT id, display_name, kind FROM actors ORDER BY created_at;
