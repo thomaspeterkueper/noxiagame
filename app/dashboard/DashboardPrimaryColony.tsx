@@ -6,85 +6,25 @@ import { getSessionInfo } from '@/lib/supabase/auth'
 import WalkableColony from './WalkableColony'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
 
-type WorldLocation = {
-  id: string
-  slug: string
-  name?: string
-  location_type?: string
-  population?: number
-  location_resources?: any[]
-}
+type WorldLocation = { id:string; slug:string; name?:string; location_type?:string; population?:number; location_resources?:any[] }
+
+type SelectedBuilding = { id:string; entity_id:string; entity_type:string; tile_row:number; tile_col:number; profile_id:string|null } | null
 
 const chrome = <style>{`
 .noxia-primary-colony{position:fixed;z-index:900;left:.65rem;right:.65rem;top:112px;bottom:.65rem;border:1px solid #263f55;border-radius:8px;overflow:hidden;background:#081019 url('/assets/environments/mars/terrain-tharsis.webp') center/cover no-repeat;box-shadow:0 12px 34px rgba(7,14,23,.32)}
-.noxia-return-colony{position:fixed;z-index:1180;left:50%;top:102px;transform:translateX(-50%);border:1px solid #2c78b6;border-radius:7px;background:#08243b;color:#e7f3fb;font:700 11px system-ui,sans-serif;letter-spacing:.02em;padding:7px 11px;cursor:pointer;box-shadow:0 3px 10px rgba(20,28,36,.24)}
-.noxia-return-colony:hover{background:#0b5d9c}
-/* Im Koloniemodus gehört die volle Breite der Spielwelt; die alte Dashboard-Rechtsleiste bleibt unter der fixierten Welt erhalten, ist aber nicht mehr der primäre Informationskanal. */
+.noxia-return-colony{position:fixed;z-index:1180;left:50%;top:102px;transform:translateX(-50%);border:1px solid #2c78b6;border-radius:7px;background:#08243b;color:#e7f3fb;font:700 11px system-ui,sans-serif;padding:7px 11px;cursor:pointer}.noxia-return-colony:hover{background:#0b5d9c}
+.noxia-interior{position:absolute;inset:0;z-index:130;background:linear-gradient(180deg,rgba(5,13,21,.18),rgba(5,13,21,.82)),url('/assets/buildings/habitat/mars/interior-main.webp') center/cover no-repeat;color:#edf5fa;font-family:system-ui,sans-serif}.noxia-interior:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,transparent 0 32%,rgba(3,10,17,.55) 100%);pointer-events:none}.noxia-interior-head{position:absolute;left:18px;right:18px;top:18px;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #38546c;border-radius:9px;background:#071421e8;box-shadow:0 6px 20px #0007}.noxia-interior-head small{display:block;color:#79a6c7;font-size:9px;letter-spacing:.14em}.noxia-interior-head b{font-size:17px}.noxia-interior-head button{border:1px solid #3976a5;border-radius:7px;background:#0a3150;color:#fff;padding:8px 12px;font-weight:800;cursor:pointer}.noxia-interior-card{position:absolute;left:22px;bottom:22px;width:280px;padding:14px;border:1px solid #35536c;border-radius:9px;background:#071421e8;box-shadow:0 8px 24px #0008}.noxia-interior-card h3{margin:0 0 7px}.noxia-interior-card p{margin:0;color:#b7c8d4;font-size:11px;line-height:1.55}
 @media(max-width:900px){.noxia-primary-colony{top:120px}.noxia-return-colony{top:108px}}
 `}</style>
 
-export default function DashboardPrimaryColony() {
-  const location = useGameStore(s => s.location)
-  const [planning, setPlanning] = useState(false)
-  const [userId, setUserId] = useState('')
-  const [locations, setLocations] = useState<WorldLocation[]>([])
-  const [entities, setEntities] = useState<any[]>([])
-  const [builds, setBuilds] = useState<any[]>([])
-
-  useEffect(() => { setPlanning(false) }, [location])
-
-  useEffect(() => {
-    let live = true
-    let timer: ReturnType<typeof setInterval> | undefined
-    async function refresh() {
-      try {
-        const { token, userId: uid } = await getSessionInfo()
-        const [buildRes, worldRes] = await Promise.all([
-          fetch('/api/game/build', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
-          fetch('/api/game/world', { cache: 'no-store' }),
-        ])
-        if (!live) return
-        if (buildRes.ok) {
-          const data = await buildRes.json()
-          setUserId(uid)
-          setEntities(Array.isArray(data.entities) ? data.entities : [])
-          setBuilds(Array.isArray(data.builds) ? data.builds : [])
-        }
-        if (worldRes.ok) {
-          const data = await worldRes.json()
-          setLocations(Array.isArray(data.locations) ? data.locations : [])
-        }
-      } catch {}
-    }
-    refresh()
-    timer = setInterval(refresh, 30_000)
-    return () => { live = false; if (timer) clearInterval(timer) }
-  }, [location])
-
-  const current = locations.find(l => l.slug === location)
-  const isStation = current?.location_type === 'station' || location === 'prometheus'
-  const localEntities = useMemo(() => !current ? [] : entities.filter((e:any)=>e.locations?.slug===location || e.location_id===current.id), [entities,current,location])
-  const localBuilds = useMemo(() => !current ? [] : builds.filter((b:any)=>b.locations?.slug===location || b.location_id===current.id), [builds,current,location])
-
-  if (!current || isStation || !userId) return null
-  if (planning) return <>{chrome}<button className="noxia-return-colony" onClick={()=>setPlanning(false)}>◈ Kolonieansicht</button></>
-
-  return <>
-    {chrome}
-    <ColonyHudStyles />
-    <div className="noxia-primary-colony" aria-label="Kolonieansicht">
-      <WalkableColony
-        locationSlug={location}
-        locationName={current.name ?? location}
-        population={current.population ?? 0}
-        entities={localEntities}
-        pending={localBuilds}
-        ships={[]}
-        locationId={current.id}
-        userId={userId}
-        onClose={()=>setPlanning(true)}
-      />
-      <ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} onPlan={()=>setPlanning(true)} />
-    </div>
-  </>
+export default function DashboardPrimaryColony(){
+ const location=useGameStore(s=>s.location),[planning,setPlanning]=useState(false),[userId,setUserId]=useState(''),[locations,setLocations]=useState<WorldLocation[]>([]),[entities,setEntities]=useState<any[]>([]),[builds,setBuilds]=useState<any[]>([]),[selected,setSelected]=useState<SelectedBuilding>(null),[interior,setInterior]=useState<SelectedBuilding>(null)
+ useEffect(()=>{setPlanning(false);setSelected(null);setInterior(null)},[location])
+ useEffect(()=>{let live=true;let timer:ReturnType<typeof setInterval>|undefined;async function refresh(){try{const{token,userId:uid}=await getSessionInfo();const[buildRes,worldRes]=await Promise.all([fetch('/api/game/build',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'}),fetch('/api/game/world',{cache:'no-store'})]);if(!live)return;if(buildRes.ok){const data=await buildRes.json();setUserId(uid);setEntities(Array.isArray(data.entities)?data.entities:[]);setBuilds(Array.isArray(data.builds)?data.builds:[])}if(worldRes.ok){const data=await worldRes.json();setLocations(Array.isArray(data.locations)?data.locations:[])}}catch{}}refresh();timer=setInterval(refresh,30_000);return()=>{live=false;if(timer)clearInterval(timer)}},[location])
+ const current=locations.find(l=>l.slug===location),isStation=current?.location_type==='station'||location==='prometheus'
+ const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
+ const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
+ if(!current||isStation||!userId)return null
+ if(planning)return <>{chrome}<button className="noxia-return-colony" onClick={()=>setPlanning(false)}>◈ Kolonieansicht</button></>
+ return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony" aria-label="Kolonieansicht"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities} pending={localBuilds} ships={[]} locationId={current.id} userId={userId} onClose={()=>setPlanning(true)} onSelectBuilding={b=>setSelected(b)} onEnterBuilding={b=>{setSelected(b);setInterior(b)}}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} selectedBuilding={selected} onEnterBuilding={()=>selected&&setInterior(selected)} onPlan={()=>setPlanning(true)}/>{interior&&<div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · THARSIS HUB</small><b>{interior.entity_id==='habitat'?'Habitat':'Anlageninnenraum'}</b></div><button onClick={()=>setInterior(null)}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Innenansicht'}</h3><p>{interior.entity_id==='habitat'?'Ein bewohnter Raum statt eines Menüs: Aufenthaltsbereich, Pflanzen, Arbeitsplätze und Bewohner bilden die persönliche Ebene der Kolonie.':'Für diese Anlage ist noch keine kanonische Innenraumgrafik registriert.'}</p></div></div>}</div></>
 }
