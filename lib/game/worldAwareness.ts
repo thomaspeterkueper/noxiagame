@@ -8,6 +8,8 @@ export interface WorldAwarenessSource {
   topics: AwarenessTopic[]
   feedUrl?: string
   homepage: string
+  ingestEnabled?: boolean
+  language?: 'de' | 'en'
   usageNote?: string
 }
 
@@ -28,6 +30,8 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
     topics: ['general', 'economy', 'society'],
     feedUrl: 'https://www.deutschlandfunk.de/nachrichten-100.rss',
     homepage: 'https://www.deutschlandfunk.de/',
+    ingestEnabled: true,
+    language: 'de',
   },
   {
     id: 'deutschlandfunk-wissen',
@@ -37,6 +41,63 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
     topics: ['science', 'technology', 'climate', 'space'],
     feedUrl: 'https://www.deutschlandfunk.de/wissen-106.rss',
     homepage: 'https://www.deutschlandfunk.de/wissen-106.html',
+    ingestEnabled: true,
+    language: 'de',
+  },
+  {
+    id: 'esa-space-news',
+    name: 'European Space Agency',
+    kind: 'institution',
+    trustTier: 1,
+    topics: ['space', 'science', 'technology'],
+    feedUrl: 'https://www.esa.int/rssfeed/Our_Activities/Space_News',
+    homepage: 'https://www.esa.int/',
+    ingestEnabled: true,
+    language: 'en',
+  },
+  {
+    id: 'esa-space-science',
+    name: 'ESA Space Science',
+    kind: 'institution',
+    trustTier: 1,
+    topics: ['space', 'science'],
+    feedUrl: 'https://www.esa.int/rssfeed/Our_Activities/Space_Science',
+    homepage: 'https://www.esa.int/Science_Exploration/Space_Science',
+    ingestEnabled: true,
+    language: 'en',
+  },
+  {
+    id: 'nasa',
+    name: 'NASA',
+    kind: 'institution',
+    trustTier: 1,
+    topics: ['space', 'science', 'technology', 'climate'],
+    feedUrl: 'https://www.nasa.gov/feed/',
+    homepage: 'https://www.nasa.gov/',
+    ingestEnabled: true,
+    language: 'en',
+  },
+  {
+    id: 'nasa-jpl',
+    name: 'NASA Jet Propulsion Laboratory',
+    kind: 'institution',
+    trustTier: 1,
+    topics: ['space', 'science', 'technology'],
+    feedUrl: 'https://www.jpl.nasa.gov/feeds/news/',
+    homepage: 'https://www.jpl.nasa.gov/',
+    ingestEnabled: true,
+    language: 'en',
+  },
+  {
+    id: 'dlr',
+    name: 'Deutsches Zentrum für Luft- und Raumfahrt',
+    kind: 'institution',
+    trustTier: 1,
+    topics: ['space', 'science', 'technology', 'climate'],
+    homepage: 'https://www.dlr.de/',
+    ingestEnabled: false,
+    language: 'de',
+    usageNote: 'Trusted institutional source. Add a verified machine-readable feed before automated ingestion.',
   },
   {
     id: 'tagesschau',
@@ -45,6 +106,8 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
     trustTier: 1,
     topics: ['general', 'economy', 'society', 'science', 'technology', 'climate'],
     homepage: 'https://www.tagesschau.de/',
+    ingestEnabled: false,
+    language: 'de',
     usageNote: 'RSS publication/reuse is licence-dependent. Do not ingest into production until the intended NOXIA use is cleared.',
   },
 ]
