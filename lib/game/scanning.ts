@@ -1,13 +1,15 @@
 // lib/game/scanning.ts
 // Erstellt:     24.07.2026
-// Version:      0.1.0
+// Aktualisiert: 31.08.2026 — persistenter Discovery-State + clientseitiger Runtime-Cache
+// Version:      0.2.0
 //
-// Scanner-Domaenenmodell fuer den ersten NOXIA-Vertical-Slice.
+// Scanner-Domänenmodell für den ersten NOXIA-Vertical-Slice.
 // Ground Truth, Messung, Interpretation und Entdeckung bleiben getrennt.
-// Wissen erzeugt keine Anomalien; es kann spaeter nur Interpretationen vertiefen.
+// Wissen erzeugt keine Anomalien; es kann später nur Interpretationen vertiefen.
 
 export const SCANNER_BASE_RADIUS = 4
 export const SCAN_STORAGE_VERSION = 1
+export const SCANNER_SESSION_CLOSED_EVENT = 'noxia:scanner-session-closed'
 
 export interface GridPoint {
   row: number
@@ -57,6 +59,8 @@ export interface StoredScanState {
   discoveries: ScannerDiscovery[]
 }
 
+const runtimeDiscoveries = new Map<string, ScannerDiscovery[]>()
+
 function hashText(value: string): number {
   let hash = 2166136261
   for (let i = 0; i < value.length; i++) {
@@ -75,8 +79,8 @@ function unit(seed: number): number {
 }
 
 /**
- * Deterministische Ground Truth, unabhaengig davon, ob ein Scanner gebaut wurde.
- * Spaeter wird diese Funktion durch persistente planetare Deposits/Anomalien ersetzt.
+ * Deterministische Ground Truth, unabhängig davon, ob ein Scanner gebaut wurde.
+ * Später wird diese Funktion durch persistente planetare Deposits/Anomalien ersetzt.
  */
 export function groundTruthForLocation(locationSlug: string, rows: number, cols: number): GroundTruthAnomaly[] {
   const seed = hashText(`noxia:ground-truth:${locationSlug}`)
@@ -157,7 +161,16 @@ export function scanStorageKey(locationSlug: string): string {
   return `noxia:scan-state:v${SCAN_STORAGE_VERSION}:${locationSlug}`
 }
 
+export function setRuntimeDiscoveries(locationSlug: string, discoveries: ScannerDiscovery[]): void {
+  runtimeDiscoveries.set(locationSlug, [...discoveries])
+}
+
+export function runtimeDiscoveriesForLocation(locationSlug: string): ScannerDiscovery[] {
+  return runtimeDiscoveries.get(locationSlug) ?? []
+}
+
 export function saveScanState(locationSlug: string, state: Omit<StoredScanState, 'version'>): void {
+  setRuntimeDiscoveries(locationSlug, state.discoveries)
   if (typeof window === 'undefined') return
   window.localStorage.setItem(scanStorageKey(locationSlug), JSON.stringify({ version: SCAN_STORAGE_VERSION, ...state }))
 }
@@ -166,9 +179,14 @@ export function loadScanState(locationSlug: string): StoredScanState | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = window.localStorage.getItem(scanStorageKey(locationSlug))
-    if (!raw) return null
+    if (!raw) {
+      setRuntimeDiscoveries(locationSlug, [])
+      return null
+    }
     const parsed = JSON.parse(raw) as StoredScanState
-    return parsed.version === SCAN_STORAGE_VERSION ? parsed : null
+    if (parsed.version !== SCAN_STORAGE_VERSION) return null
+    setRuntimeDiscoveries(locationSlug, parsed.discoveries ?? [])
+    return parsed
   } catch {
     return null
   }
