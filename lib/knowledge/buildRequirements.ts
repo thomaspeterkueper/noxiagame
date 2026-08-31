@@ -1,7 +1,8 @@
 // buildRequirements.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; Wissensvoraussetzungen
-// Version:      0.1.0
+// Aktualisiert: 31.08.2026 — Labels aus kanonischem Unlock-Registry
+// Version:      0.2.0
 import { getKnowledgeBuildingId } from './buildingMap';
+import { getUnlockLabel } from './unlockRegistry';
 import type { KnowledgeProgress } from './types';
 
 const REQUIRED_UNLOCK: Record<string, string> = {
@@ -12,17 +13,14 @@ const REQUIRED_UNLOCK: Record<string, string> = {
   'BLD:NOX:schmelze-1': 'UNL:NOX:smelting',
 };
 
-const UNLOCK_LABEL: Record<string, string> = {
-  'UNL:NOX:resource-extraction': 'Rohstoffgewinnung I',
-  'UNL:NOX:power-generation': 'Energieerzeugung I',
-  'UNL:NOX:water-processing': 'Wasseraufbereitung I',
-  'UNL:NOX:mars-habitat': 'Marskolonisation I',
-  'UNL:NOX:smelting': 'Metallurgie I',
-};
-
 export function getBuildRequirements(buildableId: string, progress: KnowledgeProgress) {
   const id = getKnowledgeBuildingId(buildableId);
   const requiredUnlock = id ? REQUIRED_UNLOCK[id] : null;
   const ok = !requiredUnlock || progress.unlocked.includes(requiredUnlock as any);
-  return { id, ok, requiredUnlock, requiredLabel: requiredUnlock ? (UNLOCK_LABEL[requiredUnlock] ?? requiredUnlock) : null };
+  return {
+    id,
+    ok,
+    requiredUnlock,
+    requiredLabel: requiredUnlock ? getUnlockLabel(requiredUnlock) : null,
+  };
 }
