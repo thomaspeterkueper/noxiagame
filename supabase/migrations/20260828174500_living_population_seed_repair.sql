@@ -29,7 +29,12 @@ BEGIN
   SELECT id INTO fallback_building FROM public.tile_entities
   WHERE location_id = mars_id AND entity_type = 'building'
   ORDER BY built_at NULLS LAST, id LIMIT 1;
-  IF fallback_building IS NULL THEN RAISE EXCEPTION 'Living Population repair: Mars has no building'; END IF;
+  -- Auf frischen Branches existieren die Mars-Gebäude zu diesem Zeitpunkt noch
+  -- nicht — sie entstehen erst mit dem Tharsis-Start-Seed (20260830190000),
+  -- dessen Abschnitt 10 die Assignments anschließend an die neuen Gebäude
+  -- umhängt (WHERE tile_entity_id IS NULL). tile_entity_id ist im Schema
+  -- explizit nullable (ON DELETE SET NULL), daher hier nicht abbrechen: die
+  -- COALESCEs unten lassen die Assignments dann ohne Gebäudebezug entstehen.
 
   SELECT id INTO home_building FROM public.tile_entities WHERE location_id=mars_id AND entity_type='building' AND entity_id='habitat' ORDER BY built_at NULLS LAST,id LIMIT 1;
   SELECT id INTO science_building FROM public.tile_entities WHERE location_id=mars_id AND entity_type='building' AND entity_id IN ('research_lab','academy','school') ORDER BY CASE entity_id WHEN 'research_lab' THEN 0 WHEN 'academy' THEN 1 ELSE 2 END,built_at NULLS LAST,id LIMIT 1;

@@ -219,11 +219,28 @@ CREATE TABLE IF NOT EXISTS locations (
   constraint population_within_max check (population <= population_max)
 );
 
+-- Basisstandorte aus archivierter 001a_noxia_tables.sql. Ohne diese Zeilen
+-- fehlen frischen Branches alle Orte (und spätere Seeds wie der
+-- Living-Population-Guard und der Tharsis-Start-Seed brechen ab).
+INSERT INTO locations (slug, name, description, population, population_max)
+VALUES
+  ('moon',   'Mond / Shackleton',  'Industriestation. Bergbau rund um die Uhr.',     800,  5000),
+  ('mars',   'Mars / Tharsis Hub', 'Größte außerirdische Siedlung. Wächst schnell.', 1200, 20000),
+  ('phobos', 'Phobos',             'Freihafen. Kein Recht, keine Fragen, billig.',    350,  3000)
+ON CONFLICT (slug) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS resources (
   type  resource_type primary key,
   label text not null,
   unit  text not null default 't'
 );
+
+INSERT INTO resources (type, label)
+VALUES
+  ('water'::resource_type,  'Wasser'),
+  ('energy'::resource_type, 'Energie'),
+  ('metal'::resource_type,  'Metall')
+ON CONFLICT (type) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS location_resources (
   id          uuid primary key default uuid_generate_v4(),
@@ -235,6 +252,24 @@ CREATE TABLE IF NOT EXISTS location_resources (
   updated_at  timestamptz not null default now(),
   unique (location_id, resource)
 );
+
+-- Startbestände je Standort aus archivierter 001a_noxia_tables.sql.
+INSERT INTO location_resources (location_id, resource, stock, consumption, production)
+SELECT l.id, v.resource::resource_type, v.stock, v.consumption, v.production
+FROM locations l,
+(VALUES
+  ('moon',   'water',  200,  8,  0),
+  ('moon',   'energy', 300,  4,  6),
+  ('moon',   'metal',  500,  2, 10),
+  ('mars',   'water',  150, 12,  0),
+  ('mars',   'energy', 400,  6,  8),
+  ('mars',   'metal',  300,  3,  5),
+  ('phobos', 'water',   80,  3,  0),
+  ('phobos', 'energy', 150,  2,  3),
+  ('phobos', 'metal',  200,  1,  2)
+) AS v(slug, resource, stock, consumption, production)
+WHERE l.slug = v.slug
+ON CONFLICT (location_id, resource) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS player_buildings (
   id          uuid primary key default uuid_generate_v4(),
@@ -338,6 +373,11 @@ CREATE TABLE IF NOT EXISTS player_builds (
   location_id  uuid        references public.locations(id),
   tile_row     integer,
   tile_col     integer,
+  tile_level   smallint    not null default 0,    -- aus archivierter 002
+  sale_payout  integer,                           -- aus archivierter 002
+  parent_id    uuid,                              -- aus archivierter 006 (Modul-Lebenszyklus)
+  slot         smallint,                          -- aus archivierter 006
+  entity_ref   uuid,                              -- aus archivierter 006
   status       text        not null default 'building',
   started_at   timestamptz default now(),
   completes_at timestamptz not null,
@@ -356,8 +396,26 @@ CREATE TABLE IF NOT EXISTS tile_entities (
   built_at     timestamptz NOT NULL DEFAULT now(),
   created_at   timestamptz NOT NULL DEFAULT now(),
 
+  -- Spalten aus archivierten Migrationen 005/014/033 (Live-Schema-Stand)
+  actor_id           uuid REFERENCES actors(id) ON DELETE CASCADE,          -- 014_npc_economy
+  parent_id          uuid REFERENCES tile_entities(id) ON DELETE CASCADE,   -- 005_addressable_modules
+  slot               smallint,                                              -- 005_addressable_modules
+  condition          smallint NOT NULL DEFAULT 100,                         -- 005_addressable_modules
+  status             text NOT NULL DEFAULT 'active',                        -- 005_addressable_modules
+  is_state_owned     boolean NOT NULL DEFAULT false,                        -- 014_npc_economy (Station)
+  owner_class        text NOT NULL DEFAULT 'PLAYER',                        -- 033_tile_entities_city
+  owner_id           uuid,                                                  -- 033_tile_entities_city
+  occupant_id        uuid,                                                  -- 033_tile_entities_city
+  lease_id           uuid,                                                  -- 033_tile_entities_city
+  land_value         integer NOT NULL DEFAULT 0,                            -- 033_tile_entities_city
+  land_value_updated_at timestamptz,                                        -- 033_tile_entities_city
+  deposit_id         uuid,                                                  -- 033_tile_entities_city
+  deposit_discovered boolean NOT NULL DEFAULT false,                        -- 033_tile_entities_city
+  district_type      text,                                                  -- 033_tile_entities_city
+
   CONSTRAINT tile_level_valid  CHECK (tile_level BETWEEN -3 AND 0),
-  CONSTRAINT entity_type_valid CHECK (entity_type IN ('building','vehicle','specialist','ship'))
+  CONSTRAINT entity_type_valid CHECK (entity_type IN ('building','vehicle','specialist','ship')),
+  CONSTRAINT owner_class_valid CHECK (owner_class IN ('PLAYER','STATE','NPC','CORPORATION'))
 );
 
 CREATE TABLE IF NOT EXISTS tick_log (
