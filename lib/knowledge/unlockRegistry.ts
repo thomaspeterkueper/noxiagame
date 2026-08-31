@@ -50,38 +50,38 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
   'UNL:NOX:pressure-systems': {
     id: 'UNL:NOX:pressure-systems', label: 'Drucksysteme I',
     scope: 'Druck, Gasverhalten, drucktragende und gasdichte Huelle sowie kontrollierter Druckraum.',
-    requiresUnlocks: [], grants: ['Einfache Druckkabine'], ssfMapping: 'module.unlocks[]', tier: 'component',
+    requiresUnlocks: [], grants: ['Voraussetzung fuer druckgekoppelte Mars-Infrastruktur'], ssfMapping: 'module.unlocks[]', tier: 'component',
   },
   'UNL:NOX:airlock': {
     id: 'UNL:NOX:airlock', label: 'Luftschleusen I',
     scope: 'Kontrollierter Personen-/Materialtransfer zwischen Atmosphaeren mit unterschiedlichem Druck und Gasinventar.',
-    requiresUnlocks: ['UNL:NOX:pressure-systems'], grants: ['Luftschleuse'], ssfMapping: 'module.unlocks[]', tier: 'component',
+    requiresUnlocks: ['UNL:NOX:pressure-systems'], grants: ['BLD:NOX:airlock-1'], ssfMapping: 'module.unlocks[]', tier: 'component',
   },
   'UNL:NOX:life-support': {
     id: 'UNL:NOX:life-support', label: 'Lebenserhaltung I',
     scope: 'Sauerstoffversorgung, CO2-Abscheidung, Luftumwaelzung und Kopplung mit Wasser- und Energieversorgung.',
     requiresUnlocks: ['UNL:NOX:pressure-systems', 'UNL:NOX:water-processing', 'UNL:NOX:power-generation'],
-    grants: ['Lebenserhaltungsmodul'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
+    grants: ['BLD:NOX:life-support-1'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
   },
   'UNL:NOX:thermal-control': {
     id: 'UNL:NOX:thermal-control', label: 'Thermische Kontrolle I',
     scope: 'Waermeisolierung, Heizen, Kuehlen und Waermetransport in geschlossenen Habitaten.',
-    requiresUnlocks: ['UNL:NOX:power-generation'], grants: ['Thermisches Kontrollsystem'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
+    requiresUnlocks: ['UNL:NOX:power-generation'], grants: ['BLD:NOX:thermal-control-1'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
   },
   'UNL:NOX:radiation-protection': {
     id: 'UNL:NOX:radiation-protection', label: 'Strahlenschutz I',
     scope: 'Grundlegende Schutzprinzipien gegen die fuer extraterrestrische Habitate relevanten ionisierenden Strahlungsfelder.',
-    requiresUnlocks: [], grants: ['Geschuetzter Aufenthaltsbereich'], ssfMapping: 'module.unlocks[]', tier: 'component',
+    requiresUnlocks: [], grants: ['Voraussetzung fuer den integrierten Mars-Habitatbetrieb'], ssfMapping: 'module.unlocks[]', tier: 'component',
   },
   'UNL:NOX:environment-monitoring': {
     id: 'UNL:NOX:environment-monitoring', label: 'Umweltueberwachung I',
     scope: 'Sensorische Ueberwachung kritischer Habitatparameter und Erkennen gefaehrlicher Abweichungen.',
-    requiresUnlocks: ['UNL:NOX:power-generation'], grants: ['Habitat-Umweltsensorik'], ssfMapping: 'module.unlocks[]', tier: 'component',
+    requiresUnlocks: ['UNL:NOX:power-generation'], grants: ['BLD:NOX:environment-monitoring-1'], ssfMapping: 'module.unlocks[]', tier: 'component',
   },
   'UNL:NOX:habitat-redundancy': {
     id: 'UNL:NOX:habitat-redundancy', label: 'Systemredundanz I',
     scope: 'Single Points of Failure erkennen und kritische Habitatfunktionen fehlertolerant bzw. redundant auslegen.',
-    requiresUnlocks: ['UNL:NOX:life-support', 'UNL:NOX:environment-monitoring'], grants: ['Redundante Habitatversorgung'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
+    requiresUnlocks: ['UNL:NOX:life-support', 'UNL:NOX:environment-monitoring'], grants: ['BLD:NOX:habitat-redundancy-1'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
   },
   'UNL:NOX:mars-habitat': {
     id: 'UNL:NOX:mars-habitat', label: 'Mars-Habitat I',
