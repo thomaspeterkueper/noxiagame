@@ -1,13 +1,30 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY = 6
+
+const serviceClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+)
 
 function clean(value: unknown, max = MAX_PLAYER_CHARS) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
-export async function POST(request: Request) {
+async function getUserFromRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.slice(7)
+  const { data: { user } } = await serviceClient.auth.getUser(token)
+  return user
+}
+
+export async function POST(request: NextRequest) {
+  const user = await getUserFromRequest(request)
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
   const key = process.env.DEEPSEEK_API_KEY
   if (!key) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
 
@@ -42,10 +59,10 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
-        thinking: { type: 'disabled' },
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
         messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
         max_tokens: 180,
+        temperature: 0.7,
         stream: false,
       }),
       signal: AbortSignal.timeout(12000),
