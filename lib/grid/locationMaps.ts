@@ -1,6 +1,7 @@
 // lib/grid/locationMaps.ts
 // Erstellt: 24.06.2026
-// Version: 0.7.0
+// Aktualisiert: 30.08.2026 — Mars Terrain v4: H/I-Marker entfernt (Seed ersetzt sie)
+// Version: 0.8.0
 //
 // Feste Terrain-Layer pro Standort. Das ist der Zwischenschritt zwischen
 // prozeduralem generateGrid() und späterer Supabase-Tabelle location_tiles.
@@ -12,7 +13,9 @@
 // Kürzel spezialisierte Tiles:
 // A = farmland, C = city, P = spaceport
 // L = mare, q = lunar highland, R = research, X = ice, E = helium-3, T = titanium
-// d = mars dust, p = mars plateau, H = mars habitat, I = mars industry
+// d = mars dust, p = mars plateau
+// (H = mars habitat, I = mars industry sind seit Mars v4 nicht mehr in der Karte
+//  verwendet — Gebäude kommen nur aus dem Start-Seed bzw. DB-Entities)
 
 export type TerrainCode = string
 
@@ -77,32 +80,33 @@ export const LOCATION_MAPS: Record<string, string[]> = {
     'qqqqqqqqqqqccccqqqqqqqqqqqqqqqqq',
     'qqqqqqqqqqqccccqqqqqqqqqqqqqqqqq',
   ],
-  // Mars Terrain v3:
-  // - klarer Valles-Marineris-Zug statt Einheitsstaub
-  // - Kraterfelder im Westen, Plateau im Norden/Osten
-  // - Habitat-/Industriecluster als sichtbare Expansionszonen
-  // - freie Staubebenen bleiben als Bau- und Wachstumsraum
+  // Mars Terrain v4 (Tharsis-Hub-Startseed ersetzt das v3-Layout):
+  // - klarer Valles-Marineris-Zug (canyon) und Kraterfelder im Westen
+  // - Plateau im Norden/Osten, Staubebenen als Bau- und Wachstumsraum
+  // - die alten Habitat-/Industrie-Marker (H/I) sind entfernt: Gebäude kommen
+  //   ausschließlich aus dem kanonischen Start-Seed (lib/game/seeds/
+  //   tharsisHubSeed.ts) und aus DB-Entities — Terrain täuscht keine Bauten vor
   mars: [
-    'ccccddddddpppppppppppppppppppppp',
-    'cccccddddppppppppppppppppppppppp',
-    'ccccdddddaaaaaaaappppppppppppppp',
-    'cccddddddaaaaaaaaapppppppppppppp',
-    'ccdddddddaaaaaaaaapppppHHHHHppp',
-    'dddddddddaaaaaaaaapppppHHHHHIIp',
-    'ddddddddddaaaaaaaaapppppHHHHHIIp',
-    'ddddddddddaaaaaaaappppppIIIIIIpp',
-    'dddddddddddsssssddppppppIIIIIIpp',
+    'ccccddddddddpppppppppppppppppppp',
+    'cccccdddddpppppppppppppppppppppp',
+    'ccccdddddddaaaaaaaappppppppppppp',
+    'cccddddddddaaaaaaaaapppppppppppp',
+    'ccdddddddddaaaaaaaaapppppppppppp',
+    'dddddddddddaaaaaaaaapppppppppppp',
+    'dddddddddddaaaaaaaaapppppppppppp',
+    'dddddddddddaaaaaaaappppppppppppp',
+    'dddddddddddsssssddpppppppppppppp',
     'ddddddddssssssssdddppppppppppppp',
     'ddddddssssssssssssdddpppccccpppp',
-    'ddddddssssHHHssssdddpppccccpppp',
-    'ddddddssssHHHssssddddppcccccppp',
-    'ddddddddssHHHssdddddddppccccppp',
+    'ddddddssssssssssssdddpppccccpppp',
+    'ddddddssssssssssssddddppcccccppp',
+    'ddddddddssssssssdddddddppccccppp',
     'pppddddddddddddddddddddppppppppp',
     'ppppdddddddddddddddddddddppppppp',
-    'pppppdddddddddddHHHHHddddpppppp',
-    'pppppdddddddddddHHHHHIIIddppppp',
-    'ppppppddddddddddHHHHHIIIddppppp',
-    'ppppppddddddddddddddIIIIIddpppp',
+    'pppppdddddddddddddddddddpppppppp',
+    'pppppdddddddddddddddddddpppppppp',
+    'ppppppddddddddddddddddddddpppppp',
+    'ppppppddddddddddddddddddddpppppp',
     'dddddddddddddddddddddddddddddddd',
     'ddddddddddccccdddddddddddddddddd',
     'ddddddddddccccdddddddddddddddddd',

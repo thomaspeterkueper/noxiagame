@@ -1,7 +1,8 @@
 // lib/grid/generateGrid.ts
 // Erstellt: 15.06.2026
-// Aktualisiert: 24.08.2026
-// Version:  0.6.5
+// Aktualisiert: 30.08.2026 — Tharsis-Hub-Seed-Fahrwege ersetzen das alte
+//   prozedurale Mars-Straßennetz (OTA-NOX-REQ-20260830-THARSIS-HUB-START-SEED)
+// Version:  0.7.0
 //
 // v0.6.5: BUGFIX Haupt-Thread-Blockade. reach in addRoadNetwork() war nicht
 //   gedeckelt (anders als span). Bei sehr hoher population (z.B. Erde:
@@ -28,6 +29,7 @@
 //   (lib/grid/locationMaps.ts). Flüsse/Wälder/Berge bleiben dadurch stabil.
 
 import { getFixedTerrain } from './locationMaps'
+import { getSeedRoadCells } from '@/lib/game/seeds/tharsisHubSeed'
 
 export const COLS = 12
 export const ROWS = 8
@@ -126,6 +128,23 @@ function fallbackTerrain(slug: string, seed: number, r: number, c: number, cols:
   return rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface'
 }
 
+/**
+ * Kanonische Seed-Fahrwege (Tharsis Hub): innerer Service-Ring + drei
+ * Hauptkorridore (Energie, Wasser, Lande/Fracht) + notwendige Service-Spurs.
+ * Ersetzt das alte prozedurale Mars-Straßennetz vollständig — kein
+ * dekoratives Netz, keine Schiene.
+ */
+function addSeedRoadNetwork(grid: Cell[][], slug: string, rows: number, cols: number): void {
+  if (slug !== 'mars') return
+  const cells = getSeedRoadCells(slug)
+  for (const [r, c] of cells) {
+    if (r < 0 || r >= rows || c < 0 || c >= cols) continue
+    if (isBuildable(grid[r][c].type) || grid[r][c].type.startsWith('road')) {
+      grid[r][c] = { type: 'road', owner: null }
+    }
+  }
+}
+
 function addRoadNetwork(grid: Cell[][], population: number, userId: string | undefined, rows: number, cols: number): void {
   const centerR = Math.floor(rows / 2)
   if (population <= 200) return
@@ -193,16 +212,29 @@ export function generateGrid(
   autotilePrefix(grid, 'river', 'river_')
 
   // 3. Straßennetz als öffentliche Infrastruktur.
-  addRoadNetwork(grid, population, userId, rows, cols)
-  autotileRoads(grid, rows, cols)
+  //    Tharsis Hub (mars) nutzt den kanonischen Seed-Fahrwegeplan (Service-Ring
+  //    + Hauptkorridore + Spurs); alle anderen Orte behalten das prozedurale
+  //    Netz. Beide Varianten sind Straßen-Infrastruktur, kein Terrain
+  //    (ADR-strassen-infrastruktur).
+  if (slug === 'mars') {
+    addSeedRoadNetwork(grid, slug, rows, cols)
+  } else {
+    addRoadNetwork(grid, population, userId, rows, cols)
+  }
 
   // 4. Automatische Platzhalter-NPCs sind vorläufig deaktiviert.
   //    Echte Fremdgebäude sollen später aus DB-Entities mit realer profile_id /
   //    actor_id kommen, nicht aus dem Terrain-Generator.
 
   // 5. Bestand überschreibt den sichtbaren Layer, aber nicht die feste Karte.
+  //    DB-Zeilen mit entity_id='road' sind persistente Straßen-Infrastruktur
+  //    (owner_class STATE) und werden als Fahrweg statt als Gebäude gezeichnet.
   for (const e of entities) {
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
+      if (e.entity_type === 'building' && e.entity_id === 'road') {
+        grid[e.tile_row][e.tile_col] = { type: 'road', owner: null }
+        continue
+      }
       const owner: CellOwner = !userId
         ? null
         : (e as any).owner_class === 'STATE' || (e as any).owner_class === 'CORPORATION' || e.profile_id === null
@@ -213,6 +245,9 @@ export function generateGrid(
       grid[e.tile_row][e.tile_col] = { type: `building_${e.entity_id}`, owner }
     }
   }
+
+  // 5b. Straßen-Masken nach dem Bestand berechnen (deckt auch DB-Straßen ab).
+  autotileRoads(grid, rows, cols)
 
   // 6. Vorgänge
   for (const p of pending) {

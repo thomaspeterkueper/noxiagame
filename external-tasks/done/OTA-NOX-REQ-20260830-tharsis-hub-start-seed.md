@@ -5,7 +5,7 @@ target: SYS:KUEPER:noxia
 priority: high
 type: world-seed-layout
 created: 2026-08-30
-status: open
+status: done
 affects: [NOXIA, OTA, SSF, KG]
 requires:
   - OTA-TEC-0038-2026-DE
@@ -242,3 +242,40 @@ Bitte das im aktuellen NOXIA-Eigentumsmodell mit dem bestehenden kanonischen öf
 
 Kanonische OTA-Architektur: `OTA-TEC-0038-2026-DE` sowie `OTA-TEC-0094-2026-DE` bis `OTA-TEC-0107-2026-DE`.
 SSF-Evidenzbasis: `solarsciencefoundation/docs/research/minimum-viable-mars-colony-497.md` v0.2 und zugehöriger Evidenzaudit.
+
+---
+
+## Umsetzung 2026-08-30 (NOXIA)
+
+- Kanonischer Start-Seed als TS-Quelle: `lib/game/seeds/tharsisHubSeed.ts`
+  (45 Startobjekte, 20 Fahrzeuge, 111 Fahrweg-Tiles, Utility Ring A/B,
+  Zonen A–F, Kühlkreise, Rohwasserbereiche).
+- Akzeptanztests: `lib/game/seeds/tharsisHubSeed.test.ts` —
+  exakte Stückzahlen, 497/504, Zonenregeln, N-1-Straßenpfade (Energie+Wasser),
+  alternative Rettungszugänge, doppelte Medienanbindung, physisch getrennte
+  Utility-Netze. `npx tsx lib/game/seeds/tharsisHubSeed.test.ts` ist grün.
+- Neue NOXIA-Objektklassen im Baukatalog (`lib/game/buildings/index.ts`):
+  habitat_cluster (+84), eclss_hub, reactor_module, black_start, water_isru,
+  radiator_field, medical_core, medical_annex, reserve_depot, plant_module,
+  logistics_hub, workshop_clean, workshop_heavy, material_complex,
+  command_node, surface_relay, longrange_comms, landing_pad —
+  NOXIA-eigene Kosten/Bauzeiten, alle `allowedLocations: ['mars']`.
+- Eigentumsmodell: bestehendes kanonisches Owner-Konzept
+  (owner_class='STATE', is_state_owned=true, owner_id=NULL), KEINE neue
+  Eigentums-ID; Leasing-/Betreibermodell über concessions/occupant_id.
+- Fahrwege: innerer Service-Ring + drei Hauptkorridore + Service-Spurs,
+  persistent als STATE-Infrastruktur (entity_id='road'); das alte prozedurale
+  Mars-Straßennetz ist ersetzt (`generateGrid` + Mars Terrain v4 ohne H/I).
+- Utility Ring A/B: eigene, von Fahrwegen getrennte Netzlogik,
+  Tabelle `location_utilities` (Ring-Knoten + doppelte Anbindungen).
+- SQL-Seed-Migration (aus der TS-Quelle generiert):
+  `supabase/migrations/20260830190000_tharsis_hub_start_seed.sql` —
+  locations.mars: 497 Einwohner / 504 Plätze / base_population_max=0,
+  alte STATE/NPC-Produktions-/Wohn-Seedbauten entfernt (PLAYER unangetastet,
+  Staatsservices bank/school/shipyard/admin/scanner bleiben erhalten),
+  Baukatalog-Registrierung, Seed-Objekte/-Fahrzeuge/-Fahrwege/-Utilities,
+  Personen-Zuordnungen umgehängt.
+- ADR: `docs/decisions/NOXIA-WORLD-0003-tharsis-hub-start-seed.md`.
+- OTA-Dossiers OTA-TEC-0094-2026-DE bis OTA-TEC-0107-2026-DE liegen im
+  OTA-Repository; NOXIA referenziert die Dossier-Serie, ohne deren Werte als
+  Balancing zu kopieren (gleiche Policy wie OTA-TEC-0034).
