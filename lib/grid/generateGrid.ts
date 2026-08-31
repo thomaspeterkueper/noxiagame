@@ -4,12 +4,10 @@
 // Version:  0.8.0
 //
 // v0.8.0: Ein Scanner erzeugt keine Anomalie mehr durch seine bloße Existenz.
-//   Das Grid erhält ausschließlich bereits entdeckte Positionen als expliziten
-//   Informations-Layer. Ground Truth und Messlogik bleiben in lib/game/scanning.ts.
+//   Das Grid erhält ausschließlich bereits entdeckte Positionen als
+//   Informations-Layer. Persistenz/Browser-I/O bleibt außerhalb dieses Moduls.
 // v0.7.0: Tharsis-Hub-Seed-Fahrwege ersetzen das alte prozedurale Mars-Straßennetz.
-// v0.6.5: BUGFIX Haupt-Thread-Blockade. reach in addRoadNetwork() war nicht
-//   gedeckelt (anders als span). Bei sehr hoher population konnte die Schleife
-//   Millionen Male laufen; reach ist nun an die Gridhöhe gebunden.
+// v0.6.5: BUGFIX Haupt-Thread-Blockade: Straßenreichweite an Gridhöhe gebunden.
 // v0.6.4: Mond-Ressourcentiles ice/helium3/titanium als bebaubar freigeschaltet.
 // v0.6.3: spezialisierte Terrain-Tiles bebaubar/straßenfähig.
 // v0.6.2: Platzhalter-NPC-Bauten deaktiviert.
@@ -18,6 +16,7 @@
 
 import { getFixedTerrain } from './locationMaps'
 import { getSeedRoadCells } from '@/lib/game/seeds/tharsisHubSeed'
+import { runtimeDiscoveriesForLocation } from '@/lib/game/scanning'
 
 export const COLS = 12
 export const ROWS = 8
@@ -73,7 +72,6 @@ export function isBuildable(tileType: string): boolean {
     tileType === 'tile_dust' ||
     tileType === 'tile_plateau' ||
     // tile_habitat + tile_industry: Terrain-Typen, NICHT bebaubar
-    // (sehen aus wie Gebäude aber haben keine DB-Entity — Terrain-Ebene)
     tileType === 'tile_metal' ||
     tileType === 'tile_crater' ||
     tileType === 'tile_shaft' ||
@@ -121,10 +119,7 @@ function fallbackTerrain(slug: string, seed: number, r: number, c: number, cols:
   return rand < 0.10 ? 'tile_shaft' : rand < 0.15 ? 'tile_metal' : 'tile_surface'
 }
 
-/**
- * Kanonische Seed-Fahrwege (Tharsis Hub): innerer Service-Ring + drei
- * Hauptkorridore (Energie, Wasser, Lande/Fracht) + notwendige Service-Spurs.
- */
+/** Kanonische Seed-Fahrwege für Tharsis Hub. */
 function addSeedRoadNetwork(grid: Cell[][], slug: string, rows: number, cols: number): void {
   if (slug !== 'mars') return
   const cells = getSeedRoadCells(slug)
@@ -180,12 +175,12 @@ export function generateGrid(
   userId?: string,
   cols: number = COLS,
   rows: number = ROWS,
-  discoveries: GridDiscovery[] = [],
+  discoveries?: GridDiscovery[],
 ): Cell[][] {
   const grid: Cell[][] = []
   const seed = slug.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
 
-  // 1. Terrain-Layer: feste Karten haben Vorrang, Fallback bleibt prozedural.
+  // 1. Terrain-Layer.
   for (let r = 0; r < rows; r++) {
     const row: Cell[] = []
     for (let c = 0; c < cols; c++) {
@@ -205,18 +200,17 @@ export function generateGrid(
 
   // 4. Automatische Platzhalter-NPCs sind vorläufig deaktiviert.
 
-  // 5. Bestand überschreibt den sichtbaren Layer.
+  // 5. Persistenter Bestand.
   for (const e of entities) {
     if (e.tile_row >= 0 && e.tile_row < rows && e.tile_col >= 0 && e.tile_col < cols) {
       if (e.entity_type === 'building' && e.entity_id === 'road') {
         grid[e.tile_row][e.tile_col] = { type: 'road', owner: null }
         continue
       }
+      const ownerClass = (e as GridEntity & { owner_class?: string }).owner_class
       const owner: CellOwner = !userId
         ? null
-        : (e as GridEntity & { owner_class?: string }).owner_class === 'STATE' ||
-            (e as GridEntity & { owner_class?: string }).owner_class === 'CORPORATION' ||
-            e.profile_id === null
+        : ownerClass === 'STATE' || ownerClass === 'CORPORATION' || e.profile_id === null
           ? 'state'
           : e.profile_id === userId
             ? 'own'
@@ -225,7 +219,7 @@ export function generateGrid(
     }
   }
 
-  // 5b. Straßen-Masken nach dem Bestand berechnen.
+  // 5b. Straßen-Masken nach dem Bestand.
   autotileRoads(grid, rows, cols)
 
   // 6. Vorgänge.
@@ -239,8 +233,11 @@ export function generateGrid(
   }
 
   // 7. Informations-Layer: ausschließlich tatsächlich entdeckte Anomalien.
-  //    Ground Truth wird nicht hier erzeugt und Scanner-Besitz ist kein Wissen.
-  for (const discovery of discoveries) {
+  //    Die Fassade hydriert den Runtime-Cache aus Persistenz; dieses Modul
+  //    selbst führt keinerlei Browser-I/O aus. Ein expliziter Parameter hat
+  //    Vorrang und hält generateGrid weiterhin direkt testbar.
+  const visibleDiscoveries = discoveries ?? runtimeDiscoveriesForLocation(slug)
+  for (const discovery of visibleDiscoveries) {
     if (discovery.row < 0 || discovery.row >= rows || discovery.col < 0 || discovery.col >= cols) continue
     const cell = grid[discovery.row][discovery.col]
     if (cell.type.startsWith('building_') || cell.type.startsWith('npc_') || cell.type.startsWith('road')) continue
