@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { SsfKnowledgeModuleDetail, SsfModuleAssessment } from '@/lib/ssfKnowledge'
+import GravityWellInteractive from './GravityWellInteractive'
 
 const C = {
   text: '#1a1a18', muted: '#6b6357', faint: '#9e9485', border: '#ddd6c8',
@@ -101,6 +102,12 @@ export default function SsfModuleRenderer({
         if (section.type === 'text') return <p key={i} style={{ lineHeight: 1.75, margin: '0.55rem 0' }}>{section.text}</p>
         if (section.type === 'key_point') return <div key={i} style={{ background: C.bgAlt, borderLeft: `3px solid ${C.gold}`, padding: '0.75rem 0.9rem', margin: '0.65rem 0', lineHeight: 1.6 }}>{section.text}</div>
         if (section.type === 'example') return <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.8rem 0.9rem', margin: '0.65rem 0' }}><strong style={{ color: C.accent }}>{section.title}</strong><div style={{ marginTop: 5, lineHeight: 1.65 }}>{section.text}</div></div>
+        if (section.type === 'interactive') {
+          if (section.interactiveId === 'gravitationsbrunnen') {
+            return <GravityWellInteractive key={i} title={section.title} instruction={section.instruction} params={section.params} fallback={section.fallback} />
+          }
+          return <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.8rem 0.9rem', margin: '0.65rem 0', color: C.muted }}><strong style={{ color: C.accent }}>{section.title}</strong><div style={{ marginTop: 5 }}>{section.fallback}</div></div>
+        }
         return <div key={i} style={{ background: '#eef4fb', border: '1px solid #c6d8ec', borderRadius: 8, padding: '0.8rem 0.9rem', margin: '0.65rem 0' }}><strong>Aufgabe:</strong> {section.prompt}{section.hint && <div style={{ color: C.muted, fontSize: '0.82rem', marginTop: 5 }}>Hinweis: {section.hint}</div>}</div>
       })}
 
