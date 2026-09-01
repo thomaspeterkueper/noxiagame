@@ -40,10 +40,10 @@ interface BuildingExpansionDef {
   id: string
   name: string
   description: string
-  cost: number
-  buildTimeTicks: number
+  cost?: number
+  buildTimeTicks?: number
   parentBuildingIds: string[]
-  planned?: boolean
+  planned: boolean
   planHint?: string
 }
 ```
@@ -57,10 +57,43 @@ interface BuildingExpansionInstance {
   expansionId: string
   profileId: string | null
   status: 'building' | 'active'
+  slot?: number | null
 }
 ```
 
-Das ist ein Zielmodell, keine Freigabe für eine zweite Tabelle oder einen parallelen State-Store. Vor Implementierung wird geprüft, ob der vorhandene `tile_entities`-/Build-Zustand die Relation bereits ausdrücken kann. Bestehende Persistenzgrenzen werden bevorzugt erweitert.
+## Persistenzentscheidung
+
+Die Prüfung des bestehenden Schemas hat ergeben, dass **keine neue Expansion-Tabelle nötig ist**.
+
+`public.tile_entities` besitzt bereits:
+
+- `parent_id uuid references tile_entities(id) on delete cascade`
+- `slot smallint`
+- `condition`
+- `status`
+
+Damit kann eine gebaute Erweiterung als normale adressierbare `tile_entities`-Instanz persistiert werden, deren `parent_id` auf das Basisgebäude zeigt. `slot` kann die logische Ausbauposition innerhalb des Elterngebäudes tragen.
+
+Der bestehende Bau-Lifecycle besitzt dieselbe Relation bereits in `public.player_builds`:
+
+- `parent_id`
+- `slot`
+- `entity_ref`
+- `status`
+
+Damit ergibt sich ohne zweiten State-Store:
+
+```text
+player_builds
+  parent_id + slot
+       ↓ Fertigstellung
+ tile_entities
+  parent_id + slot
+       ↓
+ Makro-/Overlay-/Mikroprojektion
+```
+
+Eine neue Datenbankmigration wird **nicht** allein für das Erweiterungsmodell eingeführt. Falls später zusätzliche Constraints benötigt werden, erfolgt das als kleine Vorwärtsmigration auf der bestehenden Relation.
 
 ## Projektion in die persönliche Ebene
 
@@ -69,7 +102,7 @@ Innenräume erhalten keine erfundenen Ausbauzustände. Sichtbare Räume, Türen,
 ```text
 Weltzustand
   Gebäudeinstanz
-  + gebaute Erweiterungen
+  + tile_entities-Kinder über parent_id
   + Ressourcen
   + Schiffe
   + Population/Aktivität
@@ -103,12 +136,16 @@ Weltzustand → Projektion → Darstellung
 
 Zuerst werden vorhandene echte Zustände verwendet. Erweiterungen werden erst sichtbar, sobald ihr persistierter Zustand implementiert ist.
 
+## Code-Vertrag
+
+`lib/game/buildingExpansions.ts` bildet die persistierten `tile_entities`-Kinder in einen storage-neutralen Gebäude-Projektionszustand ab. Der Katalog ist absichtlich leer, solange noch keine Erweiterung eine freigegebene Gameplay-Funktion besitzt.
+
 ## Abnahme für zukünftige Erweiterungen
 
 Eine neue Gebäudeerweiterung ist fertig, wenn:
 
 - sie eine reale Gameplay-Funktion besitzt,
-- ihr Besitz/Bauzustand persistent ist,
+- ihr Besitz/Bauzustand über den bestehenden NOXIA-State persistent ist,
 - Makro- und Mikroansicht denselben Zustand verwenden,
 - wiederholtes Laden keine Erweiterungen erzeugt oder verliert,
 - ihre technische Provenienz nicht von NOXIA erfunden wird,
