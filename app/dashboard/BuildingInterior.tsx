@@ -8,15 +8,12 @@ type Props = ComponentProps<typeof LegacyBuildingInterior>
 
 export default function BuildingInterior(props: Props) {
   const { entity } = props
-  if (entity.entity_id !== 'scanner') return <LegacyBuildingInterior {...props} />
-
   const isOwn = entity.profile_id === props.userId
-  const isState = entity.owner_class === 'STATE'
-  const ownerLabel = isOwn
-    ? 'Dein Gebäude'
-    : isState
-      ? 'Staatlich'
-      : (entity.actor_name ?? entity.username ?? 'Fremd')
+  // The scanner micro-scene is backed by the canonical scanner API, which only
+  // resolves the owner's scanner (GET returns scanner: null, POST 403 for a
+  // foreign or STATE-owned one). Only owned scanners get the walkable scene;
+  // everything else keeps the legacy interior with its owner label.
+  if (entity.entity_id !== 'scanner' || !isOwn) return <LegacyBuildingInterior {...props} />
 
   return (
     <ScannerMicroScene
@@ -26,7 +23,7 @@ export default function BuildingInterior(props: Props) {
       scannerCol={entity.tile_col}
       resources={props.locationResources}
       population={props.population}
-      ownerLabel={ownerLabel}
+      ownerLabel="Dein Gebäude"
       onClose={props.onClose}
     />
   )

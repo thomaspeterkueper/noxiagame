@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import * as THREE from 'three'
 import { SCANNER_BASE_RADIUS } from '@/lib/game/scanning'
 
 interface ResourceRow {
@@ -47,8 +48,6 @@ interface Props {
   ownerLabel: string
   onClose: () => void
 }
-
-const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js'
 
 async function scannerRequest(locationSlug: string, method: 'GET' | 'POST', scannerEntityId?: string): Promise<ScannerResponse> {
   const sb = (await import('@/lib/supabase/client')).createClient()
@@ -122,12 +121,10 @@ export default function ScannerMicroScene(props: Props) {
     let disposed = false
     let cleanup: (() => void) | undefined
 
-    async function start() {
+    function start() {
       const mount = mountRef.current
       if (!mount) return
       try {
-        const importer = new Function('url', 'return import(url)') as (url: string) => Promise<any>
-        const THREE = await importer(THREE_URL)
         if (disposed) return
 
         const scene = new THREE.Scene()
@@ -274,7 +271,7 @@ export default function ScannerMicroScene(props: Props) {
         setError(err instanceof Error ? err.message : '3D-Szene konnte nicht geladen werden')
       }
     }
-    void start()
+    start()
     return () => { disposed = true; cleanup?.() }
   }, [props.locationSlug, props.scannerEntityId])
 
