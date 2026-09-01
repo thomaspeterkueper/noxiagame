@@ -12,11 +12,11 @@ interface GameModeState {
 }
 
 export const useGameModeStore = create<GameModeState>((set) => ({
-  mode: 'colony',
+  mode: 'planning',
   interiorBuildingId: null,
 
   enterColony: () => set({ mode: 'colony', interiorBuildingId: null }),
   enterPlanning: () => set({ mode: 'planning', interiorBuildingId: null }),
   enterInterior: (buildingId) => set({ mode: 'interior', interiorBuildingId: buildingId }),
-  resetForLocation: () => set({ mode: 'colony', interiorBuildingId: null }),
+  resetForLocation: () => set({ mode: 'planning', interiorBuildingId: null }),
 }))
