@@ -45,7 +45,7 @@ export default function DashboardPrimaryColony(){
  useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
 
  if(isStation)return null
- if(mode==='planning')return <>{chrome}<button className="noxia-return-colony" onClick={enterColony}>◈ Zur Kolonie</button></>
+ if(mode==='planning')return <>{chrome}<button className="noxia-return-colony" onClick={enterColony}>◈ 2D-Kolonie öffnen</button></>
  if(loading||!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>{error?'SYNCHRONISIERUNG WIRD ERNEUT VERSUCHT …':'KOLONIE WIRD SYNCHRONISIERT …'}</span></div></div></div></>
 
  if(mode==='interior'&&interior)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · {current.name??location}</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={enterColony}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div></div></>
