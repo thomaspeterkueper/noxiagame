@@ -40,8 +40,7 @@ export default async function Dashboard() {
           display: none !important;
         }
 
-        /* Persönliche Kompetenzwerte bleiben permanent sichtbar, ohne die alte
-           große Profilkarte zurückzuholen. */
+        /* Persönliche Kompetenzwerte bleiben zusätzlich kompakt im Header. */
         .noxia-profile-stats-compact {
           height: 34px;
           display: inline-flex;
@@ -182,13 +181,18 @@ export default async function Dashboard() {
           border-radius: 8px !important;
         }
 
-        /* Rechte Leiste: Profilkarte ist redundant zum Avatar im Header. */
+        /* Rechte Leiste: Profil ist wieder ein primärer Spielerstatus.
+           Die dauerhafte SSF-Empfehlung entfällt; Lernen bleibt über Akademie
+           und konkrete Unlock-Situationen erreichbar. */
         .noxia-dashboard-shell > div > header + div > div:last-child {
           top: 62px !important;
           height: calc(100vh - 69px) !important;
           gap: .5rem !important;
         }
         .noxia-dashboard-shell > div > header + div > div:last-child > div:first-child {
+          display: block !important;
+        }
+        .noxia-dashboard-shell > div > header + div > div:last-child > div:nth-child(2) {
           display: none !important;
         }
         .noxia-dashboard-shell > div > header + div > div:last-child > div {
