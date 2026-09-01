@@ -1,25 +1,21 @@
 // lib/game/seeds/tharsisHubUtilityNetwork.ts
 // Erstellt: 31.08.2026
+// Aktualisiert: 01.09.2026 — Review-Korrektur: keine vorweggenommene Vollredundanz
 //
 // Integritätsprojektion für die Tharsis-Hub-Mediennetze.
 //
-// Hintergrund:
-// Die ursprünglichen Utility-Ringe A/B in tharsisHubSeed.ts enthalten räumliche
-// Ankerpunkte, aber keine expliziten Kanten. Dadurch konnte ein formal vorhandener
-// Ring trotz geometrischer Lücken als „redundant“ gelten. Diese Projektion macht
-// aus den Ankerpunkten echte Graphen und aus den bisherigen logischen Links
-// physische Feeder mit eigener Länge und Medienbelegung.
+// Die Seed-Datei enthält räumliche Backbone-Anker und Objekt-Anbindungen. Diese
+// Projektion macht daraus explizite physische Graphkanten und Feeder. Sie ändert
+// NICHT die fachliche Medienbelegung des kanonischen Seeds.
 //
-// WICHTIG: Das 32×24-Spielgrid ist zu grob, um die exakte unterirdische bzw.
-// geschützte Trassenführung jedes Kabels/Rohres als Tilefolge abzubilden.
-// Deshalb sind Ringkanten physische dedizierte Leitungssegmente zwischen
-// Ankerpunkten. Straßen werden dadurch NICHT automatisch zu Medienkorridoren.
+// WICHTIG: Das 32×24-Spielgrid ist zu grob, um jede unterirdische/geschützte
+// Trasse als Tilefolge abzubilden. Utility-Kanten sind deshalb dedizierte
+// Leitungssegmente zwischen Ankerpunkten. Straßen bleiben ein separates System.
 
 import {
   THARSIS_HUB_BUILDINGS,
   THARSIS_HUB_UTILITY_LINKS,
   THARSIS_HUB_UTILITY_RINGS,
-  UTILITY_MEDIA,
   type UtilityMedia,
   type UtilityRingId,
 } from './tharsisHubSeed'
@@ -45,18 +41,9 @@ export interface TharsisUtilityFeeder {
   routingClass: 'dedicated'
 }
 
-/**
- * V2-Regel: Beide physisch getrennten Backbones tragen alle für Tharsis
- * modellierten Medien. Das erzeugt keine zusätzlichen Straßen oder Gebäude;
- * es verhindert lediglich, dass „zwei Ringe“ fälschlich als Redundanz gelten,
- * obwohl ein Medium nur auf einem Ring vorhanden ist.
- */
-export const THARSIS_REDUNDANT_UTILITY_MEDIA: UtilityMedia[] = [...UTILITY_MEDIA]
-
-export const THARSIS_EFFECTIVE_RING_MEDIA: Record<UtilityRingId, UtilityMedia[]> = {
-  A: [...THARSIS_REDUNDANT_UTILITY_MEDIA],
-  B: [...THARSIS_REDUNDANT_UTILITY_MEDIA],
-}
+export const THARSIS_PROVISIONAL_DUAL_PATH_MEDIA: UtilityMedia[] = [
+  'power', 'data', 'water', 'o2',
+]
 
 function pointKey([row, col]: UtilityPoint): string {
   return `${row}:${col}`
@@ -66,22 +53,25 @@ function manhattan(a: UtilityPoint, b: UtilityPoint): number {
   return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1])
 }
 
+function ringDefinition(ring: UtilityRingId) {
+  return THARSIS_HUB_UTILITY_RINGS.find(item => item.ring === ring)
+}
+
 function sortedUniqueNodes(ring: UtilityRingId): UtilityPoint[] {
-  const source = THARSIS_HUB_UTILITY_RINGS.find(r => r.ring === ring)?.nodes ?? []
+  const source = ringDefinition(ring)?.nodes ?? []
   const unique = new Map<string, UtilityPoint>()
   for (const node of source) unique.set(pointKey(node), [node[0], node[1]] as const)
   return [...unique.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1])
 }
 
-/**
- * Deterministischer, zusammenhängender Baum über alle Backbone-Anker eines Rings.
- * Jeder neue Anker wird mit dem nächsten bereits eingebundenen Anker verbunden.
- * Damit ist die Netzkonnektivität explizit und testbar; diagonale/weite Anker
- * sind nicht länger implizit „verbunden“.
- */
+function mediaForRing(ring: UtilityRingId): UtilityMedia[] {
+  return [...(ringDefinition(ring)?.media ?? [])]
+}
+
 function buildConnectedBackbone(ring: UtilityRingId): TharsisUtilityEdge[] {
   const nodes = sortedUniqueNodes(ring)
   const edges: TharsisUtilityEdge[] = []
+  const media = mediaForRing(ring)
 
   for (let index = 1; index < nodes.length; index++) {
     const child = nodes[index]
@@ -104,7 +94,7 @@ function buildConnectedBackbone(ring: UtilityRingId): TharsisUtilityEdge[] {
       ring,
       from: parent,
       to: child,
-      media: [...THARSIS_EFFECTIVE_RING_MEDIA[ring]],
+      media: [...media],
       lengthTiles: bestDistance,
       routingClass: 'dedicated',
     })
@@ -120,11 +110,6 @@ export const THARSIS_HUB_UTILITY_EDGES: TharsisUtilityEdge[] = [
 
 const buildingById = new Map(THARSIS_HUB_BUILDINGS.map(building => [building.id, building]))
 
-/**
- * Physische Feeder-Projektion. Ein Feeder ist nicht nur „Objekt X hängt an Ring
- * A“, sondern ein eigenes Leitungssegment zwischen Objektkoordinate und
- * Backbone-Anker mit expliziter Länge und Medienbelegung.
- */
 export const THARSIS_HUB_UTILITY_FEEDERS: TharsisUtilityFeeder[] =
   THARSIS_HUB_UTILITY_LINKS.flatMap(link => {
     const building = buildingById.get(link.objectId)
@@ -138,7 +123,7 @@ export const THARSIS_HUB_UTILITY_FEEDERS: TharsisUtilityFeeder[] =
       ring: link.ring,
       object,
       node,
-      media: [...THARSIS_EFFECTIVE_RING_MEDIA[link.ring]],
+      media: mediaForRing(link.ring),
       lengthTiles: manhattan(object, node),
       routingClass: 'dedicated' as const,
     }]
@@ -182,39 +167,42 @@ function connectedNodesForMedium(
   return seen
 }
 
-/**
- * Prüft die drei im Implementierungs-/Layout-Review gefundenen NOXIA-Fehler:
- * 1. echte Graph-Konnektivität je Ring,
- * 2. Redundanz je Medium statt nur je Ringname,
- * 3. explizite physische Feeder Objekt ↔ Backbone.
- */
 export function validateTharsisUtilityIntegrity(): UtilityIntegrityIssue[] {
   const issues: UtilityIntegrityIssue[] = []
 
   for (const ring of ['A', 'B'] as const) {
     const nodes = sortedUniqueNodes(ring)
     const nodeKeys = new Set(nodes.map(pointKey))
+    const declaredMedia = mediaForRing(ring)
 
-    for (const medium of THARSIS_REDUNDANT_UTILITY_MEDIA) {
+    for (const medium of declaredMedia) {
       const connected = connectedNodesForMedium(ring, medium)
       if (connected.size !== nodeKeys.size) {
         issues.push({
-          message: `Utility Ring ${ring}: Medium '${medium}' verbindet ${connected.size}/${nodeKeys.size} Backbone-Anker`,
+          message: `Utility Backbone ${ring}: Medium '${medium}' verbindet ${connected.size}/${nodeKeys.size} Anker`,
         })
       }
     }
 
-    for (const edge of THARSIS_HUB_UTILITY_EDGES.filter(e => e.ring === ring)) {
+    for (const edge of THARSIS_HUB_UTILITY_EDGES.filter(item => item.ring === ring)) {
       if (edge.lengthTiles <= 0) {
-        issues.push({ message: `Utility Ring ${ring}: Null-/Negativsegment ${pointKey(edge.from)} → ${pointKey(edge.to)}` })
+        issues.push({ message: `Utility Backbone ${ring}: Null-/Negativsegment ${pointKey(edge.from)} → ${pointKey(edge.to)}` })
       }
       if (!nodeKeys.has(pointKey(edge.from)) || !nodeKeys.has(pointKey(edge.to))) {
-        issues.push({ message: `Utility Ring ${ring}: Kante referenziert unbekannten Backbone-Anker` })
+        issues.push({ message: `Utility Backbone ${ring}: Kante referenziert unbekannten Anker` })
       }
-      for (const medium of THARSIS_REDUNDANT_UTILITY_MEDIA) {
+      for (const medium of declaredMedia) {
         if (!edge.media.includes(medium)) {
-          issues.push({ message: `Utility Ring ${ring}: Segment ${pointKey(edge.from)} → ${pointKey(edge.to)} führt '${medium}' nicht` })
+          issues.push({ message: `Utility Backbone ${ring}: Segment ${pointKey(edge.from)} → ${pointKey(edge.to)} führt '${medium}' nicht` })
         }
+      }
+    }
+  }
+
+  for (const medium of THARSIS_PROVISIONAL_DUAL_PATH_MEDIA) {
+    for (const ring of ['A', 'B'] as const) {
+      if (!mediaForRing(ring).includes(medium)) {
+        issues.push({ message: `Medium '${medium}' fehlt auf dem bereits doppelt vorgesehenen Backbone ${ring}` })
       }
     }
   }
@@ -227,7 +215,7 @@ export function validateTharsisUtilityIntegrity(): UtilityIntegrityIssue[] {
     for (const ring of ['A', 'B'] as const) {
       const feeder = byRing.get(ring)
       if (!feeder) {
-        issues.push({ message: `${building.id}: kein physischer Feeder zu Utility Ring ${ring}` })
+        issues.push({ message: `${building.id}: kein physischer Feeder zu Utility Backbone ${ring}` })
         continue
       }
 
@@ -241,9 +229,9 @@ export function validateTharsisUtilityIntegrity(): UtilityIntegrityIssue[] {
       if (feeder.lengthTiles <= 0) {
         issues.push({ message: `${building.id}: Feeder ${ring} besitzt keine physische Leitungslänge` })
       }
-      for (const medium of THARSIS_REDUNDANT_UTILITY_MEDIA) {
+      for (const medium of THARSIS_PROVISIONAL_DUAL_PATH_MEDIA) {
         if (!feeder.media.includes(medium)) {
-          issues.push({ message: `${building.id}: Feeder ${ring} führt redundantes Medium '${medium}' nicht` })
+          issues.push({ message: `${building.id}: Feeder ${ring} führt doppelt vorgesehenes Medium '${medium}' nicht` })
         }
       }
     }
