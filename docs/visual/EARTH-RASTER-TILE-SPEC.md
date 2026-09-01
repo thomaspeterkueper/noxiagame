@@ -41,6 +41,31 @@ Road tiles use the same 64 × 64 footprint and a fixed connection geometry. All 
 
 The road family should support the existing adjacency mask (`road_0` … `road_15`) rather than baking arbitrary road shapes into terrain tiles.
 
+## Spatial building expansion
+
+Expandable buildings use **real neighbouring grid space**. Expansion is not an abstract level-up that leaves the original footprint unchanged.
+
+- Every expansion module occupies one or more explicit adjacent tiles.
+- An expansion is permitted only when all tiles required by that module are free and buildable.
+- Occupied, blocked or otherwise unavailable required tiles prevent that expansion; existing entities are not displaced automatically.
+- Placement of the initial building therefore has long-term gameplay consequences: players must reserve physical space if they expect to expand later.
+- Building level/technology and physical module count are separate concepts. A technology upgrade may improve a module without creating additional capacity that canonically requires more physical space.
+- Visual assets for expandable buildings should be modular wherever practical rather than baking every possible final footprint into a single image.
+
+### Earth spaceport / `landing_pad` reference rule
+
+The Earth starter spaceport is the first canonical implementation of spatial expansion.
+
+- The starter spaceport contains a core/service component and **one operational landing pad**.
+- Default capacity is **one ship per pad** at the same time.
+- Additional ship capacity requires additional pad modules on neighbouring tiles.
+- Each additional pad occupies real grid space and must connect plausibly to the existing spaceport/service infrastructure.
+- If the required neighbouring tile or tiles are unavailable, the corresponding pad expansion cannot be built.
+- Future improvements to handling speed, fuelling, cargo systems, control systems or service quality do not automatically increase simultaneous ship capacity unless an explicit rule says otherwise.
+- Art direction must preserve visible expansion interfaces and avoid depicting the starter building as a completed multi-pad megastructure.
+
+This spatial-expansion rule should be considered for other suitable NOXIA building families as they are implemented (for example production halls, warehouses and research complexes), but their exact module and capacity rules remain building-specific.
+
 ## Raster rendering
 
 - Runtime target: WebP where transparency/quality is adequate; PNG fallback only where necessary.
