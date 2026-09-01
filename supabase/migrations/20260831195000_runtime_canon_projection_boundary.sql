@@ -11,34 +11,41 @@
 
 set search_path to public;
 
-alter table public.simulation_events
-  add column if not exists canonical_entity_id text,
-  add column if not exists canonical_event_id text;
+-- In a fresh lexicographic replay, simulation_events is created by the later
+-- historical migration 20260831_noxia_events_entity_states.sql. Production may
+-- already have it. Keep this projection migration valid in both histories; the
+-- later migration carries the same canonical columns/indexes/comments.
+DO $$
+BEGIN
+  IF to_regclass('public.simulation_events') IS NOT NULL THEN
+    ALTER TABLE public.simulation_events
+      ADD COLUMN IF NOT EXISTS canonical_entity_id text,
+      ADD COLUMN IF NOT EXISTS canonical_event_id text;
 
-create index if not exists simulation_events_canonical_entity_idx
-  on public.simulation_events(canonical_entity_id)
-  where canonical_entity_id is not null;
+    CREATE INDEX IF NOT EXISTS simulation_events_canonical_entity_idx
+      ON public.simulation_events(canonical_entity_id)
+      WHERE canonical_entity_id IS NOT NULL;
 
-create index if not exists simulation_events_canonical_event_idx
-  on public.simulation_events(canonical_event_id)
-  where canonical_event_id is not null;
+    CREATE INDEX IF NOT EXISTS simulation_events_canonical_event_idx
+      ON public.simulation_events(canonical_event_id)
+      WHERE canonical_event_id IS NOT NULL;
 
-comment on table public.simulation_events is
-  'Authoritative NOXIA runtime simulation event stream. simulation_events.id is a NOXIA runtime UUID, never a KG EVT:* identity. Optional canonical_* fields are opaque KG-owned projection targets.';
+    COMMENT ON TABLE public.simulation_events IS
+      'Authoritative NOXIA runtime simulation event stream. simulation_events.id is a NOXIA runtime UUID, never a KG EVT:* identity. Optional canonical_* fields are opaque KG-owned projection targets.';
 
-comment on column public.simulation_events.id is
-  'NOXIA runtime event UUID. Does not replace or imply a KG EVT:* canonical event identity.';
+    COMMENT ON COLUMN public.simulation_events.id IS
+      'NOXIA runtime event UUID. Does not replace or imply a KG EVT:* canonical event identity.';
 
-comment on column public.simulation_events.canonical_entity_id is
-  'Optional opaque KG canonical subject/entity ID after an explicit KG-approved projection. NOXIA must not mint this value.';
+    COMMENT ON COLUMN public.simulation_events.canonical_entity_id IS
+      'Optional opaque KG canonical subject/entity ID after an explicit KG-approved projection. NOXIA must not mint this value.';
 
-comment on column public.simulation_events.canonical_event_id is
-  'Optional opaque KG EVT:* ID after KG promotion/acceptance. NULL for ordinary runtime-only events. NOXIA must not mint this value.';
+    COMMENT ON COLUMN public.simulation_events.canonical_event_id IS
+      'Optional opaque KG EVT:* ID after KG promotion/acceptance. NULL for ordinary runtime-only events. NOXIA must not mint this value.';
+  END IF;
+END $$;
 
--- Fresh repository replay currently creates entity_states in a later historical
--- migration (20260831_noxia_events_entity_states.sql). Production had the table
--- already when this migration originally ran. Keep this migration valid in both
--- histories; the later migration carries the same canonical columns/indexes.
+-- Fresh repository replay also creates entity_states in the later historical
+-- migration. Keep the same projection rule for already-existing databases.
 DO $$
 BEGIN
   IF to_regclass('public.entity_states') IS NOT NULL THEN
