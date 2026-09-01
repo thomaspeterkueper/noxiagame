@@ -1,7 +1,7 @@
 // lib/grid/locationMaps.ts
 // Erstellt: 24.06.2026
-// Aktualisiert: 30.08.2026 — Mars Terrain v4: H/I-Marker entfernt (Seed ersetzt sie)
-// Version: 0.8.0
+// Aktualisiert: 01.09.2026 — Earth v4 auf 32×24 normalisiert; Raumhafen ist modulare Artificial-State-Anlage
+// Version: 0.9.0
 //
 // Feste Terrain-Layer pro Standort. Das ist der Zwischenschritt zwischen
 // prozeduralem generateGrid() und späterer Supabase-Tabelle location_tiles.
@@ -11,43 +11,45 @@
 // r = river seed/path, c = crater, m = mountain, a = canyon, h = shaft, M = metal
 //
 // Kürzel spezialisierte Tiles:
-// A = farmland, C = city, P = spaceport
+// A = farmland, C = city, P = vorbereitete Spaceport-Hardstand-/Betonfläche
 // L = mare, q = lunar highland, R = research, X = ice, E = helium-3, T = titanium
 // d = mars dust, p = mars plateau
-// (H = mars habitat, I = mars industry sind seit Mars v4 nicht mehr in der Karte
-//  verwendet — Gebäude kommen nur aus dem Start-Seed bzw. DB-Entities)
+// Gebäude/Anlagen werden nicht durch Terrain-Marker vorgetäuscht; sie kommen
+// aus kanonischen Seeds/DB-Entities (Earth: earthStartSeed, Mars: tharsisHubSeed).
 
 export type TerrainCode = string
 
 export const LOCATION_MAPS: Record<string, string[]> = {
-  // Earth Terrain v3:
-  // - Fluss, Waldcluster und freie Grasflächen bleiben erhalten
-  // - Städte, Farmland und Raumhafen sind jetzt eigene Tile-Klassen
+  // Earth Terrain v4:
+  // - exakt 32 Spalten × 24 Zeilen wie das Runtime-Grid
+  // - Fluss, Waldcluster, Städte und Farmland bleiben Terrain
+  // - P bedeutet nur vorbereitete Beton-/Hardstandfläche, KEIN Raumhafengebäude
+  // - die öffentliche Startanlage kommt aus lib/game/seeds/earthStartSeed.ts
   earth: [
-    'gfffffggggrggggggggggggCCCCPggggg',
-    'fFFFFfggggrggggggggggggCCCCPggggg',
-    'fFFFFfggggrrgggggggggggCCCCPggggg',
-    'fFFFFfgggggrgggggggggggCCCCPggggg',
-    'fffffggggggrrgggggggggggffffffffgg',
-    'ggggggAAAAAgrgggggggggggfFFFFFFfgg',
-    'ggAAAAAgggggrgggggggggggfFFFFFFfgg',
-    'ggAAAAAgggggrrggggggggggfFFFFFFfgg',
-    'ggAAAAAgggggggrgggggggggffffffffgg',
-    'gggggggggggggrrggggggggggggggggggg',
-    'ggggggggggggggrgggggCCCCCggggggggg',
-    'fffffgggggggggrgggggCCCCCggggggggg',
-    'fFFFfgggggggggrrggggCCCCCggggggggg',
-    'fFFFfggggggggggrggggggAAAAAggggggg',
-    'fFFFfggggggggggrrgggggAAAAAggggggg',
-    'fFFFfgggggggggggrgggggAAAAAggggggg',
-    'fffffgggggggggggrgggggAAAAAggggggg',
-    'ggggggffffffggggrrgggggggggggggggg',
-    'ggggggfFFFFfgggggrgggggggggggggggg',
-    'ggggggfFFFFfgggggrrggggggggggggggg',
-    'ggggggfFFFFfggggggrggggggggggggggg',
-    'CCCCPfFFFFfggggggrggggggggggggggg',
-    'CCCCPffffffggggggrrgggggggggggggg',
-    'CCCCPgggggggggggggrgggggggggggggg',
+    'gfffffggggrggggggggggggCCCCPgggg',
+    'fFFFFfggggrggggggggggggCCCCPgggg',
+    'fFFFFfggggrrgggggggggggCCCCPgggg',
+    'fFFFFfgggggrgggggggggggCCCCPgggg',
+    'fffffggggggrrgggggggggggffffffff',
+    'ggggggAAAAAgrgggggggggggfFFFFFFf',
+    'ggAAAAAgggggrgggggggggggfFFFFFFf',
+    'ggAAAAAgggggrrggggggggggfFFFFFFf',
+    'ggAAAAAgggggggrgggggggggffffffff',
+    'gggggggggggggrrggggggggggggggggg',
+    'ggggggggggggggrgggggCCCCCggggggg',
+    'fffffgggggggggrgggggCCCCCggggggg',
+    'fFFFfgggggggggrrggggCCCCCggggggg',
+    'fFFFfggggggggggrggggggAAAAAggggg',
+    'fFFFfggggggggggrrgggggAAAAAggggg',
+    'fFFFfgggggggggggrgggggAAAAAggggg',
+    'fffffgggggggggggrgggggAAAAAggggg',
+    'ggggggffffffggggrrgggggggggggggg',
+    'ggggggfFFFFfgggggrgggggggggggggg',
+    'ggggggfFFFFfgggggrrggggggggggggg',
+    'ggggggfFFFFfggggggrggggggggggggg',
+    'CCCCPfFFFFfggggggrgggggggggggggg',
+    'CCCCPffffffggggggrrggggggggggggg',
+    'CCCCPgggggggggggggrggggggggggggg',
   ],
   // Moon Terrain v3 / Shackleton:
   // - markanter polnaher Krater-/Eisbereich
@@ -148,7 +150,7 @@ export function terrainCodeToType(code: TerrainCode): string {
     case 'u': return 'tile_urban'
     case 'A': return 'tile_farmland'
     case 'C': return 'tile_city'
-    case 'P': return 'tile_spaceport'
+    case 'P': return 'tile_concrete'
     case 'L': return 'tile_mare'
     case 'q': return 'tile_highland'
     case 'R': return 'tile_research'
