@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { simulateColonyTick } from '@/lib/game/colonySimulation'
 import { useGameStore } from '@/lib/store/gameStore'
-import { getSessionInfo } from '@/lib/supabase/auth'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
+import { useColonyStateStore } from '@/lib/store/colonyStateStore'
 import WalkableColony from './WalkableColony'
+import ColonyConversationLayer from './ColonyConversationLayer'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
-
-type WorldLocation={id:string;slug:string;name?:string;location_type?:string;population?:number;location_resources?:any[]}
-type Building={id:string;entity_id:string;entity_type:string;tile_row:number;tile_col:number;profile_id:string|null;owner_class?:string}
 
 const chrome=<style>{`
 .noxia-primary-colony{position:fixed;z-index:900;left:0;right:0;top:72px;bottom:0;overflow:hidden;background:#081019;box-shadow:0 -8px 30px rgba(7,14,23,.18)}
@@ -19,12 +19,36 @@ const chrome=<style>{`
 `}</style>
 
 export default function DashboardPrimaryColony(){
- const location=useGameStore(s=>s.location),[planning,setPlanning]=useState(false),[userId,setUserId]=useState(''),[locations,setLocations]=useState<WorldLocation[]>([]),[entities,setEntities]=useState<any[]>([]),[builds,setBuilds]=useState<any[]>([]),[interior,setInterior]=useState<Building|null>(null)
- useEffect(()=>{setPlanning(false);setInterior(null)},[location])
- useEffect(()=>{let live=true;let timer:ReturnType<typeof setInterval>|undefined;async function refresh(){try{const{token,userId:uid}=await getSessionInfo();if(live)setUserId(uid);const[br,wr]=await Promise.all([fetch('/api/game/build',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'}),fetch('/api/game/world',{cache:'no-store'})]);if(!live)return;if(br.ok){const d=await br.json();setEntities(Array.isArray(d.entities)?d.entities:[]);setBuilds(Array.isArray(d.builds)?d.builds:[])}if(wr.ok){const d=await wr.json();setLocations(Array.isArray(d.locations)?d.locations:[])}}catch{}}refresh();timer=setInterval(refresh,30000);return()=>{live=false;if(timer)clearInterval(timer)}},[location])
- const current=locations.find(l=>l.slug===location),isStation=current?.location_type==='station'||location==='prometheus',localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location]),localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
+ const location=useGameStore(s=>s.location)
+ const mode=useGameModeStore(s=>s.mode),interiorBuildingId=useGameModeStore(s=>s.interiorBuildingId),enterColony=useGameModeStore(s=>s.enterColony),enterPlanning=useGameModeStore(s=>s.enterPlanning),enterInterior=useGameModeStore(s=>s.enterInterior),resetForLocation=useGameModeStore(s=>s.resetForLocation)
+ const userId=useColonyStateStore(s=>s.userId),locations=useColonyStateStore(s=>s.locations),entities=useColonyStateStore(s=>s.entities),builds=useColonyStateStore(s=>s.builds),residents=useColonyStateStore(s=>s.residents),loading=useColonyStateStore(s=>s.loading),error=useColonyStateStore(s=>s.error),refresh=useColonyStateStore(s=>s.refresh)
+
+ useEffect(()=>{resetForLocation()},[location,resetForLocation])
+ useEffect(()=>{
+   let live=true
+   refresh(location)
+   const timer=setInterval(()=>{if(live)refresh(location,{background:true})},30000)
+   return()=>{live=false;clearInterval(timer)}
+ },[location,refresh])
+
+ const current=locations.find(l=>l.slug===location)
+ const isStation=current?.location_type==='station'||location==='prometheus'
+ const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
+ const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
+ const interior=useMemo(()=>mode==='interior'&&interiorBuildingId?localEntities.find((b:any)=>b.id===interiorBuildingId)??null:null,[mode,interiorBuildingId,localEntities])
+ const simulation=useMemo(()=>simulateColonyTick(
+   Array.isArray(current?.location_resources) ? current.location_resources as any[] : [],
+   localEntities,
+   current?.population ?? 0,
+ ),[current?.location_resources,current?.population,localEntities])
+
+ useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
+
  if(isStation)return null
- if(planning)return <>{chrome}<button className="noxia-return-colony" onClick={()=>setPlanning(false)}>◈ Zur Kolonie</button></>
- if(!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>KOLONIE WIRD SYNCHRONISIERT …</span></div></div></div></>
- return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities} pending={localBuilds} ships={[]} locationId={current.id} userId={userId} onClose={()=>setPlanning(true)} onEnterBuilding={b=>setInterior(b)}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} onPlan={()=>setPlanning(true)}/>{interior&&<div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · THARSIS HUB</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={()=>setInterior(null)}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div>}</div></>
+ if(mode==='planning')return <>{chrome}<button className="noxia-return-colony" onClick={enterColony}>◈ Zur Kolonie</button></>
+ if(loading||!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>{error?'SYNCHRONISIERUNG WIRD ERNEUT VERSUCHT …':'KOLONIE WIRD SYNCHRONISIERT …'}</span></div></div></div></>
+
+ if(mode==='interior'&&interior)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · {current.name??location}</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={enterColony}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div></div></>
+
+ return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} ships={[]} locationId={current.id} userId={userId} onClose={enterPlanning} onEnterBuilding={b=>enterInterior(b.id)}/><ColonyConversationLayer locationSlug={location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} userId={userId}/><ColonyHudOverlay builds={localBuilds} simulation={simulation}/></div></>
 }
