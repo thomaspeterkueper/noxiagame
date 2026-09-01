@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import ScannerFirstPerson from './ScannerFirstPerson'
 
 type Discovery={id:string;groundTruthKey:string;row:number;col:number;kind:string;sourceType:string;interpretation:{label:string;confidence:'low'|'medium';evidence:string};firstDiscoveredAt:string;lastMeasuredAt:string}
 type ScanResult={scanner?:{id:string;row:number;col:number}|null;measurement?:{origin:{row:number;col:number};radius:number;coveredCells:{row:number;col:number}[];signals:{row:number;col:number;strength:number}[]};interpretations?:{groundTruthKey:string;label:string;confidence:string;evidence:string}[];newDiscoveries?:Discovery[];knownDiscoveries?:Discovery[];discoveries?:Discovery[];error?:string}
@@ -15,16 +16,11 @@ export default function ScannerWorkspace({location}:{location:string}){
  async function scan(){setScanning(true);setError('');try{const headers=await authHeaders(),res=await fetch('/api/game/scanner',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({location})}),data:ScanResult=await res.json();if(!res.ok)throw new Error(data.error||'scan_failed');setResult(data);setScanner(data.scanner??null);setDiscoveries(data.discoveries??[])}catch(e){setError(e instanceof Error?e.message:'scan_failed')}finally{setScanning(false)}}
  const lastNew=result?.newDiscoveries?.length??0,lastKnown=result?.knownDiscoveries?.length??0,signalCount=result?.measurement?.signals.length??0
  const coverage=useMemo(()=>result?.measurement?.coveredCells.length??0,[result])
+ const scannerLabel=scanner?`SCANNER ONLINE · FELD ${scanner.row}/${scanner.col}`:'SCANNER NICHT GEFUNDEN'
  return <main style={{minHeight:'100vh',background:'radial-gradient(circle at 50% 18%,#1e3546 0,#0b1822 34%,#04090d 72%)',color:'#e9f1f4',fontFamily:'system-ui',padding:'18px'}}>
   <div style={{maxWidth:1180,margin:'0 auto'}}>
    <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,marginBottom:14}}><div><div style={{fontSize:11,letterSpacing:'.18em',color:'#79a6c7'}}>NOXIA · FIRST PERSON SYSTEM VIEW</div><h1 style={{margin:'5px 0 0',fontSize:24}}>Scannerraum · {location}</h1></div><a href="/dashboard" style={{color:'#d9c27b',textDecoration:'none',fontSize:13}}>← Zur Kolonie</a></header>
-   <section style={{position:'relative',height:330,border:'1px solid #36556a',borderRadius:14,overflow:'hidden',background:'linear-gradient(180deg,#09131b,#0d202c 52%,#071016)',boxShadow:'inset 0 0 80px #000,0 20px 60px #0008'}}>
-    <div style={{position:'absolute',left:'8%',right:'8%',top:0,height:'42%',clipPath:'polygon(18% 0,82% 0,100% 100%,0 100%)',background:'linear-gradient(#102937,#0b1c26)',borderBottom:'1px solid #385d73'}}/>
-    <div style={{position:'absolute',left:'12%',right:'12%',bottom:0,height:'43%',clipPath:'polygon(0 0,100% 0,78% 100%,22% 100%)',background:'linear-gradient(#13232a,#05090c)',borderTop:'1px solid #2b4756'}}/>
-    <div style={{position:'absolute',left:'50%',top:'16%',transform:'translateX(-50%)',width:'44%',height:'43%',border:'2px solid #436f87',borderRadius:8,background:'radial-gradient(circle,#12384b 0,#07151e 70%)',boxShadow:'0 0 35px #2a779044,inset 0 0 24px #000'}}><div style={{position:'absolute',inset:14,border:'1px solid #2d5a70',background:'repeating-linear-gradient(0deg,#0b202b 0,#0b202b 2px,#091923 3px,#091923 5px)'}}/><div style={{position:'absolute',left:'50%',top:'50%',width:110,height:110,transform:'translate(-50%,-50%)',border:'1px solid #69a8c6',borderRadius:'50%',opacity:.7}}/><div style={{position:'absolute',left:'50%',top:'50%',width:5,height:5,transform:'translate(-50%,-50%)',background:'#f0cf6d',borderRadius:'50%',boxShadow:'0 0 14px #f0cf6d'}}/></div>
-    <div style={{position:'absolute',left:18,bottom:16,padding:'8px 10px',border:'1px solid #294a5d',borderRadius:7,background:'#061017dd',fontFamily:'monospace',fontSize:11,color:'#8ab4c9'}}>SCANNER {scanner?`ONLINE · ${scanner.row}/${scanner.col}`:'NICHT GEFUNDEN'}</div>
-    <button onClick={scan} disabled={loading||scanning||!scanner} style={{position:'absolute',right:22,bottom:20,padding:'12px 20px',border:'1px solid #b99b45',borderRadius:8,background:scanning?'#514922':'#8a6a00',color:'#fff',fontWeight:800,letterSpacing:'.08em',cursor:scanning?'wait':'pointer'}}>{scanning?'MESSUNG LÄUFT …':'SCAN AUSLÖSEN'}</button>
-   </section>
+   <ScannerFirstPerson scannerOnline={!!scanner} scanning={scanning} scannerLabel={scannerLabel} onScan={scan}/>
    {error&&<div style={{marginTop:12,padding:10,border:'1px solid #8d4b43',background:'#351a18',borderRadius:8,color:'#efb2a9'}}>Scanner: {error}</div>}
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginTop:14}}>
     <Panel title="1 · Was wurde gemessen?"><Stat label="Abgedeckte Felder" value={coverage||'—'}/><Stat label="Messsignale" value={signalCount||'—'}/>{result?.measurement&&<small style={{color:'#8da4b1'}}>Radius {result.measurement.radius} Felder um den realen Scannerstandort.</small>}</Panel>
