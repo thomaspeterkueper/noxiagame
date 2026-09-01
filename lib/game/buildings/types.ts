@@ -1,26 +1,14 @@
 // lib/game/buildings/types.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 29.08.2026 — externe Technikobjekt-Provenienz ohne Balancing-Kopplung
-// Version:      1.5.0
+// Aktualisiert: 01.09.2026 — Overlay-Aktionen können interne In-Game-Ziele öffnen
+// Version:      1.6.0
 
 export type ResourceType = 'water' | 'energy' | 'metal' | 'components'
 export type LocationSlug = string
 export type OverlayId = 'BankOverlay' | 'SchoolOverlay' | 'ShipyardOverlay' | 'AdminOverlay' | null
 
-export type BuildingCategory =
-  | 'production'
-  | 'housing'
-  | 'service'
-  | 'infrastructure'
-  | 'special'
+export type BuildingCategory = 'production' | 'housing' | 'service' | 'infrastructure' | 'special'
 
-/**
- * Read-only provenance binding to an externally canonical technical object.
- *
- * This metadata deliberately contains no gameplay values. Costs, production,
- * unlocks, ranges and other balancing stay NOXIA-owned and must never be
- * mutated automatically when the external source changes.
- */
 export interface ExternalTechnicalObjectBinding {
   sourceSystem: 'OTA'
   sourceDocumentId: string
@@ -51,50 +39,23 @@ export interface BuildingDef {
 }
 
 export interface BuildingContext {
-  locationSlug:  string
-  locationName:  string
-  isOwn:         boolean
-  isCorp?:       boolean
-  owner_class?:  string
-  production:    Record<string, number>
-  consumption:   Record<string, number>
-  stocks:        Record<string, number>
-  population?:   number
+  locationSlug: string
+  locationName: string
+  isOwn: boolean
+  isCorp?: boolean
+  owner_class?: string
+  production: Record<string, number>
+  consumption: Record<string, number>
+  stocks: Record<string, number>
+  population?: number
   populationMax?: number
-  credits?:      number
+  credits?: number
 }
 
 export type OverlayTrend = 'up' | 'down' | 'stable' | 'critical'
 export type OverlaySeverity = 'info' | 'success' | 'warning' | 'critical'
 
-export interface OverlayMetric {
-  id: string
-  label: string
-  value: number | string
-  unit?: string
-  trend?: OverlayTrend
-  hint?: string
-}
-
-export interface OverlayAlert {
-  id: string
-  severity: OverlaySeverity
-  text: string
-}
-
-export interface OverlayAction {
-  id: string
-  label: string
-  disabled?: boolean
-  primary?: boolean
-}
-
-export interface OverlayDef {
-  id: string
-  title: string
-  subtitle?: string
-  metrics: OverlayMetric[]
-  alerts: OverlayAlert[]
-  actions: OverlayAction[]
-  insight?: string
-}
+export interface OverlayMetric { id:string; label:string; value:number|string; unit?:string; trend?:OverlayTrend; hint?:string }
+export interface OverlayAlert { id:string; severity:OverlaySeverity; text:string }
+export interface OverlayAction { id:string; label:string; disabled?:boolean; primary?:boolean; href?:string }
+export interface OverlayDef { id:string; title:string; subtitle?:string; metrics:OverlayMetric[]; alerts:OverlayAlert[]; actions:OverlayAction[]; insight?:string }
