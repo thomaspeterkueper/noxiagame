@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-export type GameMode = 'planning' | 'colony'
+type GameMode = 'planning' | 'colony'
 
 type GameModeState = {
   mode: GameMode
