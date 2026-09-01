@@ -2,16 +2,14 @@
 
 import { create } from 'zustand'
 
-type GameMode = 'planning' | 'colony'
+export type GameMode = 'planning' | 'colony'
 
 type GameModeState = {
   mode: GameMode
-  enterColony: () => void
-  enterPlanning: () => void
+  setMode: (mode: GameMode) => void
 }
 
 export const useGameModeStore = create<GameModeState>(set => ({
   mode: 'planning',
-  enterColony: () => set({ mode: 'colony' }),
-  enterPlanning: () => set({ mode: 'planning' }),
+  setMode: mode => set({ mode }),
 }))
