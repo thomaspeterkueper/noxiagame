@@ -1,4 +1,10 @@
 import { BUILDINGS } from './buildings'
+import {
+  POPULATION_RESOURCE_TYPES,
+  isPopulationSupplied,
+  populationResourceConsumption,
+  projectResourceStock,
+} from './resourceEconomy'
 
 export type ColonyBuildingOperationalState = 'operational' | 'starved' | 'idle'
 
@@ -20,10 +26,12 @@ export interface ColonyResourceFlow {
   stock: number
   declaredProduction: number
   declaredConsumption: number
+  populationConsumption: number
   simulatedProduction: number
   simulatedConsumption: number
   netDelta: number
   nextStock: number
+  source: 'authoritative' | 'fallback'
 }
 
 export interface ColonyBuildingSimulationState {
@@ -40,6 +48,7 @@ export interface ColonySimulationResult {
   buildings: ColonyBuildingSimulationState[]
   status: 'stable' | 'strained' | 'critical'
   shortages: string[]
+  populationSupplied: boolean
 }
 
 function amount(value: unknown) {
@@ -48,26 +57,34 @@ function amount(value: unknown) {
 }
 
 /**
- * Pure deterministic one-tick projection.
+ * Pure deterministic one-tick projection for the colony HUD.
  *
- * It does not persist state and does not invent production rules. Only
- * `produces` / `consumes` declared in the canonical building catalogue are
- * executed. Entities are processed in stable id order so identical colony
- * snapshots always produce the same result.
+ * `location_resources.production/consumption` are written by the authoritative
+ * server tick and therefore win whenever they are present. The static TS
+ * building catalogue is only a fallback for snapshots that have no persisted
+ * flow yet; it must never become a second economic source of truth.
+ *
+ * Population supply deliberately uses the stock at the beginning of the tick,
+ * matching `runPopulationTick`: production during the tick does not
+ * retroactively make population growth supplied.
  */
 export function simulateColonyTick(
   resources: ColonySimulationResourceInput[],
   entities: ColonySimulationEntityInput[],
+  population = 0,
 ): ColonySimulationResult {
   const declared = new Map<string, ColonySimulationResourceInput>()
-  const stock = new Map<string, number>()
-  const simulatedProduction = new Map<string, number>()
-  const simulatedConsumption = new Map<string, number>()
+  const stocks: Record<string, number> = {}
+  const fallbackProduction = new Map<string, number>()
+  const fallbackBuildingConsumption = new Map<string, number>()
 
   for (const row of resources) {
     declared.set(row.resource, row)
-    stock.set(row.resource, amount(row.stock))
+    stocks[row.resource] = amount(row.stock)
   }
+
+  const populationConsumption = populationResourceConsumption(population)
+  const populationSupplied = isPopulationSupplied(stocks, population)
 
   const buildingStates: ColonyBuildingSimulationState[] = []
   const buildings = entities
@@ -82,7 +99,7 @@ export function simulateColonyTick(
         entityId: entity.id,
         buildingId: entity.entity_id,
         state: 'idle',
-        reason: 'Keine Simulationsdefinition',
+        reason: 'Keine lokale Fallback-Definition',
         consumes: null,
         produces: null,
       })
@@ -92,52 +109,24 @@ export function simulateColonyTick(
     const consumes = definition.consumes ?? null
     const produces = definition.produces ?? null
 
-    if (!consumes && !produces) {
-      buildingStates.push({
-        entityId: entity.id,
-        buildingId: definition.id,
-        state: 'idle',
-        reason: 'Keine Ressourcenregel deklariert',
-        consumes: null,
-        produces: null,
-      })
-      continue
-    }
-
     if (consumes) {
-      const available = stock.get(consumes.resource) ?? 0
-      if (available < consumes.amount) {
-        buildingStates.push({
-          entityId: entity.id,
-          buildingId: definition.id,
-          state: 'starved',
-          reason: `${consumes.resource} fehlt`,
-          consumes: { ...consumes },
-          produces: produces ? { ...produces } : null,
-        })
-        continue
-      }
-
-      stock.set(consumes.resource, available - consumes.amount)
-      simulatedConsumption.set(
+      fallbackBuildingConsumption.set(
         consumes.resource,
-        (simulatedConsumption.get(consumes.resource) ?? 0) + consumes.amount,
+        (fallbackBuildingConsumption.get(consumes.resource) ?? 0) + amount(consumes.amount),
       )
     }
-
     if (produces) {
-      stock.set(produces.resource, (stock.get(produces.resource) ?? 0) + produces.amount)
-      simulatedProduction.set(
+      fallbackProduction.set(
         produces.resource,
-        (simulatedProduction.get(produces.resource) ?? 0) + produces.amount,
+        (fallbackProduction.get(produces.resource) ?? 0) + amount(produces.amount),
       )
     }
 
     buildingStates.push({
       entityId: entity.id,
       buildingId: definition.id,
-      state: 'operational',
-      reason: null,
+      state: consumes || produces ? 'operational' : 'idle',
+      reason: consumes || produces ? null : 'Keine Ressourcenregel deklariert',
       consumes: consumes ? { ...consumes } : null,
       produces: produces ? { ...produces } : null,
     })
@@ -145,38 +134,54 @@ export function simulateColonyTick(
 
   const resourceCodes = new Set<string>([
     ...declared.keys(),
-    ...simulatedProduction.keys(),
-    ...simulatedConsumption.keys(),
+    ...fallbackProduction.keys(),
+    ...fallbackBuildingConsumption.keys(),
+    ...POPULATION_RESOURCE_TYPES,
   ])
 
+  const projectedDeficits = new Set<string>()
   const flows = [...resourceCodes].sort().map(resource => {
     const row = declared.get(resource)
     const initialStock = amount(row?.stock)
-    const production = simulatedProduction.get(resource) ?? 0
-    const consumption = simulatedConsumption.get(resource) ?? 0
+    const declaredProduction = amount(row?.production)
+    const declaredConsumption = amount(row?.consumption)
+    const hasAuthoritativeFlow = row?.production != null || row?.consumption != null
+    const lifeSupport = amount(populationConsumption[resource as keyof typeof populationConsumption])
+
+    const production = hasAuthoritativeFlow
+      ? declaredProduction
+      : fallbackProduction.get(resource) ?? 0
+    const consumption = hasAuthoritativeFlow
+      ? declaredConsumption
+      : lifeSupport + (fallbackBuildingConsumption.get(resource) ?? 0)
+
+    const unclampedNextStock = initialStock + production - consumption
+    if (unclampedNextStock < 0) projectedDeficits.add(resource)
+
     return {
       resource,
       stock: initialStock,
-      declaredProduction: amount(row?.production),
-      declaredConsumption: amount(row?.consumption),
+      declaredProduction,
+      declaredConsumption,
+      populationConsumption: lifeSupport,
       simulatedProduction: production,
       simulatedConsumption: consumption,
       netDelta: production - consumption,
-      nextStock: Math.max(0, initialStock + production - consumption),
+      nextStock: projectResourceStock(initialStock, production, consumption),
+      source: hasAuthoritativeFlow ? 'authoritative' as const : 'fallback' as const,
     }
   })
 
-  const shortages = [...new Set(
-    buildingStates
-      .filter(building => building.state === 'starved' && building.consumes)
-      .map(building => building.consumes!.resource),
-  )].sort()
+  const lifeSupportShortages = POPULATION_RESOURCE_TYPES.filter(resource =>
+    (stocks[resource] ?? 0) < populationConsumption[resource],
+  )
+  const shortages = [...new Set([...lifeSupportShortages, ...projectedDeficits])].sort()
 
-  const starved = buildingStates.filter(building => building.state === 'starved').length
-  const productive = buildingStates.filter(building => building.state === 'operational').length
-  const status = starved > 0
-    ? (productive === 0 ? 'critical' : 'strained')
-    : 'stable'
+  const status: ColonySimulationResult['status'] = !populationSupplied
+    ? 'critical'
+    : projectedDeficits.size > 0
+      ? 'strained'
+      : 'stable'
 
-  return { resources: flows, buildings: buildingStates, status, shortages }
+  return { resources: flows, buildings: buildingStates, status, shortages, populationSupplied }
 }
