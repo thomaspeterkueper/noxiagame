@@ -10,7 +10,7 @@ type GameModeState = {
   enterPlanning: () => void
 }
 
-export const useGameModeStore = create<GameModeState>((set) => ({
+export const useGameModeStore = create<GameModeState>(set => ({
   mode: 'planning',
   enterColony: () => set({ mode: 'colony' }),
   enterPlanning: () => set({ mode: 'planning' }),
