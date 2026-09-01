@@ -119,6 +119,8 @@ export default function ScannerMicroScene(props: Props) {
     let cleanup: (() => void) | undefined
 
     async function start() {
+      const mount = mountRef.current
+      if (!mount) return
       try {
         const importer = new Function('url', 'return import(url)') as (url: string) => Promise<any>
         const THREE = await importer(THREE_URL)
