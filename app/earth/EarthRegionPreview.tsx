@@ -73,7 +73,7 @@ export default function EarthRegionPreview() {
           {projected.map((f:any)=>{
             const s=styleFor(f.featureType,f.properties||{})
             if(f.p) return <g key={f.id}><circle cx={f.p[0]} cy={f.p[1]} r={f.featureType==='settlement'?4:2.5} fill="#344d59"/><text x={f.p[0]+6} y={f.p[1]-4} fontSize={11/zoom} fill="#17313c">{f.properties?.name||''}</text></g>
-            return <path key={f.id} d={f.d} fill={s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>
+            return <path key={f.id} d={f.d} fill={s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType === 'building' ? 0.9 : 1}/>
           })}
           <circle cx="500" cy="500" r={8/zoom} fill="#c9a961" stroke="#18354b" strokeWidth={2/zoom}/>
           <circle cx="500" cy="500" r={20/zoom} fill="none" stroke="#c9a961" strokeWidth={1/zoom} opacity=".7"/>
