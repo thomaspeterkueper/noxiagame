@@ -22,16 +22,17 @@ const SHIP_OTA_HANDOFF: TechnicalCoverageHandoff = {
 // Keys use the same kind:localId identity as technicalCoverage.ts.
 // Several local objects may intentionally point to one external requirement.
 export const TECHNICAL_COVERAGE_HANDOFFS: Readonly<Record<string, TechnicalCoverageHandoff>> = {
-  'ship_frame:cargo_light': SHIP_OTA_HANDOFF,
-  'ship_frame:cargo_fast': SHIP_OTA_HANDOFF,
-  'ship_frame:cargo_heavy': SHIP_OTA_HANDOFF,
+  'ship_frame:mk1': SHIP_OTA_HANDOFF,
+  'ship_frame:fast': SHIP_OTA_HANDOFF,
+  'ship_frame:heavy': SHIP_OTA_HANDOFF,
   'ship_frame:scout': SHIP_OTA_HANDOFF,
   'ship_frame:pioneer': SHIP_OTA_HANDOFF,
 
-  'ship_module:engine_basic': SHIP_OTA_HANDOFF,
-  'ship_module:engine_fast': SHIP_OTA_HANDOFF,
-  'ship_module:cargo_bay': SHIP_OTA_HANDOFF,
+  'ship_module:cargo': SHIP_OTA_HANDOFF,
+  'ship_module:tank': SHIP_OTA_HANDOFF,
+  'ship_module:habitat_pod': SHIP_OTA_HANDOFF,
   'ship_module:scanner': SHIP_OTA_HANDOFF,
+  'ship_module:drive_booster': SHIP_OTA_HANDOFF,
   'ship_module:deep_scanner': SHIP_OTA_HANDOFF,
   'ship_module:survey_drone': SHIP_OTA_HANDOFF,
   'ship_module:construction_rig': SHIP_OTA_HANDOFF,
