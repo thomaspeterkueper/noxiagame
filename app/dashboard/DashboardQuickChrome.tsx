@@ -54,6 +54,50 @@ function findHeaderTarget(): HTMLElement | null {
   return node instanceof HTMLElement ? node : null
 }
 
+/**
+ * Navigation bridge for persisted scanner discoveries.
+ *
+ * The scanner passes only the canonical discovery coordinates in the URL.
+ * This function does not create a second marker model: it locates the matching
+ * cell in the already-rendered ColonyGrid and highlights that existing cell.
+ * Grid dimensions are read from the live CSS grid instead of being assumed.
+ */
+function focusScannerDiscovery(): boolean {
+  const params = new URLSearchParams(window.location.search)
+  const rawFocus = params.get('focus')
+  if (!rawFocus) return false
+
+  const match = rawFocus.match(/^(\d+),(\d+)$/)
+  if (!match) return false
+  const row = Number(match[1])
+  const col = Number(match[2])
+
+  const scroller = document.querySelector('.grid-pan-container')
+  if (!(scroller instanceof HTMLElement)) return false
+
+  const grid = Array.from(scroller.querySelectorAll('div')).find(node => {
+    if (!(node instanceof HTMLElement) || node.children.length === 0) return false
+    return getComputedStyle(node).display === 'grid'
+  })
+  if (!(grid instanceof HTMLElement)) return false
+
+  const columnTemplate = getComputedStyle(grid).gridTemplateColumns
+  const columns = columnTemplate.split(/\s+/).filter(Boolean).length
+  if (!columns || col >= columns) return false
+
+  const index = row * columns + col
+  const cell = grid.children.item(index)
+  if (!(cell instanceof HTMLElement)) return false
+
+  document.querySelectorAll('.noxia-scanner-focus').forEach(node => node.classList.remove('noxia-scanner-focus'))
+  cell.classList.add('noxia-scanner-focus')
+
+  const left = Math.max(0, cell.offsetLeft - scroller.clientWidth / 2 + cell.offsetWidth / 2)
+  const top = Math.max(0, cell.offsetTop - scroller.clientHeight / 2 + cell.offsetHeight / 2)
+  scroller.scrollTo({ left, top, behavior: 'smooth' })
+  return true
+}
+
 export default function DashboardQuickChrome() {
   const [stats, setStats] = useState<Stats>({ trades: 0, flights: 0, knowledge: 0 })
   const [headerTarget, setHeaderTarget] = useState<HTMLElement | null>(null)
@@ -92,11 +136,13 @@ export default function DashboardQuickChrome() {
 
   useEffect(() => {
     let raf = 0
+    let focusDone = false
     const refreshTargets = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
         setHeaderTarget(findHeaderTarget())
         setLocationTargets(findLocationTargets())
+        if (!focusDone) focusDone = focusScannerDiscovery()
       })
     }
 
@@ -109,6 +155,7 @@ export default function DashboardQuickChrome() {
       cancelAnimationFrame(raf)
       observer?.disconnect()
       window.removeEventListener('resize', refreshTargets)
+      document.querySelectorAll('.noxia-scanner-focus').forEach(node => node.classList.remove('noxia-scanner-focus'))
     }
   }, [])
 
@@ -125,6 +172,32 @@ export default function DashboardQuickChrome() {
 
   return (
     <>
+      <style>{`
+        @keyframes noxia-scanner-focus-pulse {
+          0%,100% { outline-color: rgba(217,194,123,.65); }
+          50% { outline-color: rgba(217,194,123,1); }
+        }
+        .noxia-scanner-focus {
+          outline: 3px solid #d9c27b !important;
+          outline-offset: -3px !important;
+          z-index: 30 !important;
+          animation: noxia-scanner-focus-pulse 1.25s ease-in-out infinite !important;
+        }
+        .noxia-scanner-focus::after {
+          content: 'SCAN';
+          position: absolute;
+          top: 3px;
+          right: 3px;
+          padding: 1px 4px;
+          border-radius: 3px;
+          background: rgba(8,19,26,.9);
+          color: #f0d47c;
+          font: 800 8px/1.4 monospace;
+          letter-spacing: .08em;
+          pointer-events: none;
+        }
+      `}</style>
+
       <DashboardPrimaryColony />
 
       {headerTarget && createPortal(
