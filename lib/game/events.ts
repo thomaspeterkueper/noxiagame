@@ -28,7 +28,7 @@ export type SimulationEventInput = {
 export async function recordSimulationEvent(input: SimulationEventInput) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
-    .from('events')
+    .from('simulation_events')
     .insert({
       event_type: input.eventType,
       subject_type: input.subjectType,
