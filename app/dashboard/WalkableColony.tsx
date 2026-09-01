@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { connectedStreetNeighbours, getStreetTiles, nearestStreetTile, type StreetTile } from '@/lib/game/streetTiles'
-import { positionOnStreetPath, shortestStreetPath } from '@/lib/game/npcStreetMovement'
-import { residentRoutine, virtualDayProgress, type RoutineStop } from '@/lib/game/npcDailyRoutine'
+import { virtualDayProgress } from '@/lib/game/npcDailyRoutine'
+import { simulateNpcSpatialState } from '@/lib/game/npcSpatialSimulation'
 import { nearestInteraction, type Interactable } from '@/lib/game/interactions'
 import { BUILDINGS } from '@/lib/game/buildings/index'
 import { BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
@@ -67,13 +67,6 @@ type Selection =
   | { kind: 'vehicle'; id: string }
   | null
 
-type ResidentPosition = {
-  resident: Resident
-  col: number
-  row: number
-  routine: RoutineStop
-}
-
 type RoverPosition = { id: string; col: number; row: number }
 
 const COLS = 32
@@ -116,14 +109,6 @@ function assignment(resident: Resident, type: string) {
 }
 function role(resident: Resident) {
   return assignment(resident, 'work')?.roleCode ?? resident.activityState
-}
-function hash(value: string) {
-  let h = 2166136261
-  for (let i = 0; i < value.length; i += 1) {
-    h ^= value.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return ((h >>> 0) % 10000) / 10000
 }
 function pct(value: number) {
   return `${Math.round(value * 100)}%`
@@ -236,52 +221,13 @@ export default function WalkableColony({
     center(colonyFocus.col, colonyFocus.row, START_ZOOM)
   }, [locationSlug, streets, buildings, userId, colonyFocus, center])
 
-  const communityBuildings = useMemo(() => {
-    const preferred = ['bar', 'school', 'habitat', 'residential_block', 'admin']
-    return buildings.filter(b => preferred.includes(b.entity_id))
-  }, [buildings])
-
   const dayProgress = virtualDayProgress(tick)
-  const positions = useMemo<ResidentPosition[]>(() => residents.map(resident => {
-    const workBuilding = buildings.find(b => b.id === assignment(resident, 'work')?.tileEntityId)
-    const homeBuilding = buildings.find(b => b.id === assignment(resident, 'home')?.tileEntityId)
-    const routine = residentRoutine(resident.id, dayProgress)
-    const communityBuilding = communityBuildings.length
-      ? communityBuildings[routine.socialGroup % communityBuildings.length]
-      : homeBuilding
-
-    const workAnchor = anchor(workBuilding)
-    const homeAnchor = anchor(homeBuilding)
-    const communityAnchor = anchor(communityBuilding)
-
-    const target = routine.target === 'work' ? workAnchor : routine.target === 'community' ? communityAnchor : homeAnchor
-    const fallback = target ?? workAnchor ?? homeAnchor ?? communityAnchor
-    if (!fallback) return null
-
-    let col = fallback.col
-    let row = fallback.row
-    if (routine.moving) {
-      let from = homeAnchor
-      const to = target
-      if (routine.label === 'Weg zum Treffpunkt') from = workAnchor ?? homeAnchor
-      if (routine.label === 'Heimweg') from = communityAnchor ?? workAnchor ?? homeAnchor
-      if (from && to) {
-        const path = shortestStreetPath(from, to, streets)
-        const position = positionOnStreetPath(path, routine.progress)
-        if (position) {
-          col = position.col
-          row = position.row
-        }
-      }
-    } else {
-      const angle = hash(`${resident.id}:group-angle`) * Math.PI * 2
-      const radius = routine.target === 'community' ? 0.08 + hash(`${resident.id}:group-radius`) * 0.18 : 0.08 + hash(`${resident.id}:local-radius`) * 0.22
-      col += Math.cos(angle) * radius
-      row += Math.sin(angle) * radius
-    }
-
-    return { resident, col, row, routine }
-  }).filter((value): value is ResidentPosition => value !== null), [residents, buildings, communityBuildings, streets, dayProgress, anchor])
+  const positions = useMemo(() => simulateNpcSpatialState({
+    residents,
+    buildings,
+    streets,
+    dayProgress,
+  }), [residents, buildings, streets, dayProgress])
 
   const rovers = useMemo<RoverPosition[]>(() => streets.slice(0, Math.min(3, streets.length)).map((street, index) => ({
     id: `rover-${index}`,
