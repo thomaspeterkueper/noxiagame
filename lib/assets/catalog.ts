@@ -50,13 +50,24 @@ const building = (
 })
 
 export const BUILDING_VISUAL_ASSETS: BuildingVisualAsset[] = [
-  // Earth / LEO Terminal — first playable location.
-  // These entries intentionally exist before the raster files land: BuildingVisual
-  // fails closed to the legacy fallback until each WebP is available.
-  building('landing_pad', 'earth', 'exterior-isometric'),
+  // Earth / public start area. Each physical facility module occupies its own
+  // grid tile, so assets must not visually claim neighbouring expansion space.
+  building('spaceport_core', 'earth', 'exterior-isometric'),
+  building('spaceport_pad_mini', 'earth', 'exterior-isometric'),
+  building('spaceport_pad_standard', 'earth', 'exterior-isometric'),
+  building('spaceport_pad_cargo', 'earth', 'exterior-isometric'),
+  building('spaceport_pad_passenger', 'earth', 'exterior-isometric'),
+  building('spaceport_pad_heavy', 'earth', 'exterior-isometric'),
+  building('spaceport_service', 'earth', 'exterior-isometric'),
+  building('spaceport_storage', 'earth', 'exterior-isometric'),
   building('admin', 'earth', 'exterior-isometric'),
   building('school', 'earth', 'exterior-isometric'),
   building('warehouse', 'earth', 'exterior-isometric'),
+  building('warehouse_storage', 'earth', 'exterior-isometric'),
+
+  // Legacy alias: old worlds/rows may still contain landing_pad while they are
+  // migrated to explicit spaceport modules. It remains a fallback representation.
+  building('landing_pad', 'earth', 'exterior-isometric'),
 
   building('habitat', 'mars', 'exterior-isometric', [2, 2]),
   building('habitat', 'mars', 'exterior-detail', [2, 2]),
