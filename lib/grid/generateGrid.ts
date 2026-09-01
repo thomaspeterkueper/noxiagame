@@ -4,7 +4,7 @@ import { getSeedRoadCells } from '@/lib/game/seeds/tharsisHubSeed'
 export const COLS=12
 export const ROWS=8
 export type CellOwner='own'|'other'|'state'|null
-export interface Cell{type:string;owner:CellOwner}
+export interface Cell{type:string;owner:CellOwner;anomaly?:boolean}
 export interface GridEntity{entity_id:string;profile_id:string|null;is_state_owned?:boolean;entity_type:string;tile_row:number;tile_col:number;owner_class?:string}
 export interface GridPending{buildable_id:string;tile_row:number;tile_col:number;status:string}
 
@@ -32,3 +32,5 @@ function sides(type:string,prefix:string){const m=type.startsWith(prefix)?parseI
 export function roadSides(type:string){return sides(type,'road_')}
 export function riverSides(type:string){return sides(type,'river_')}
 export function gridTypes(grid:Cell[][]){return grid.map(row=>row.map(cell=>cell.type))}
+// Compatibility only. Discoveries now come from /api/game/scanner and scanner_discoveries.
+export function anomalyAt(_grid:Cell[][]):{r:number;c:number}|null{return null}
