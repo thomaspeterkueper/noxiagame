@@ -4,7 +4,8 @@
 // Important boundary:
 // - this file defines gameplay/runtime semantics only;
 // - it does not create a second persistence mechanism;
-// - storage adapters must project the existing NOXIA world state into these types;
+// - existing tile_entities.parent_id + slot are the preferred persistence relation;
+// - player_builds.parent_id + slot can represent the matching build lifecycle;
 // - technical/canonical identities remain external (OTA/KG) and are not minted here.
 
 export type BuildingExpansionStatus = 'building' | 'active'
@@ -27,8 +28,6 @@ export interface BuildingExpansionDef {
 
 /**
  * Storage-neutral representation of one persisted expansion instance.
- * A concrete database adapter may source this from tile_entities, player_builds
- * or a future compatible extension of the existing persistence boundary.
  */
 export interface BuildingExpansionInstance {
   id: string
@@ -36,6 +35,22 @@ export interface BuildingExpansionInstance {
   expansionId: string
   profileId: string | null
   status: BuildingExpansionStatus
+  slot?: number | null
+}
+
+/**
+ * Minimal shape already present on public.tile_entities.
+ * Child infrastructure can stay a normal addressable entity and use parent_id
+ * to point at the owning/base building. No building-expansion table is required.
+ */
+export interface TileEntityExpansionRow {
+  id: string
+  profile_id: string | null
+  entity_type: string
+  entity_id: string
+  parent_id: string | null
+  slot?: number | null
+  status?: string | null
 }
 
 export interface BuildingProjectionState {
@@ -54,13 +69,36 @@ export function getExpansionDef(id: string): BuildingExpansionDef | null {
   return BUILDING_EXPANSIONS[id] ?? null
 }
 
+/**
+ * Projects existing tile_entities children into expansion instances.
+ * Rows without parent_id are base/world entities and are ignored here.
+ */
+export function expansionInstancesFromTileEntities(
+  rows: TileEntityExpansionRow[],
+): BuildingExpansionInstance[] {
+  return rows
+    .filter(row => row.parent_id != null)
+    .map(row => ({
+      id: row.id,
+      parentEntityId: row.parent_id as string,
+      expansionId: row.entity_id,
+      profileId: row.profile_id,
+      status: row.status === 'building' ? 'building' : 'active',
+      slot: row.slot ?? null,
+    }))
+}
+
 export function expansionsForBuilding(
   buildingEntityId: string,
   instances: BuildingExpansionInstance[],
 ): BuildingExpansionInstance[] {
   return instances
     .filter(instance => instance.parentEntityId === buildingEntityId)
-    .sort((a, b) => a.id.localeCompare(b.id))
+    .sort((a, b) => {
+      const slotA = a.slot ?? Number.MAX_SAFE_INTEGER
+      const slotB = b.slot ?? Number.MAX_SAFE_INTEGER
+      return slotA - slotB || a.id.localeCompare(b.id)
+    })
 }
 
 export function activeExpansionIds(
