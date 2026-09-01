@@ -65,7 +65,11 @@ export type SeedZone =
 export type UtilityRingId = 'A' | 'B'
 export type RoadKind = 'ring' | 'energy' | 'water' | 'freight' | 'spur'
 
-/** Alle im Auftrag geforderten Medien; über beide Ringe verteilt modelliert. */
+/**
+ * Alle im Auftrag geforderten Medien. V2-Regel (Review BLOCKER 2): beide
+ * physisch getrennten Backbones tragen alle Medien — Redundanz zählt je
+ * Medium, nicht je Ringname.
+ */
 export const UTILITY_MEDIA = [
   'power', 'data', 'water', 'wastewater', 'o2', 'gas', 'thermal',
 ] as const
@@ -301,10 +305,16 @@ export const THARSIS_HUB_ROADS: SeedRoad[] = [
 // eigene technische Netzlogik mit eigenen, von den Fahrwegen getrennten
 // Pfaden. Beide Ringe teilen sich keine Zelle und keine Zelle mit Straßen,
 // Gebäuden oder Fahrzeugen.
+//
+// V2-Regel (Implementierungs-/Layout-Review BLOCKER 2): Beide Backbones tragen
+// ALLE modellierten Medien (UTILITY_MEDIA). Zwei Ringe zählen nur dann als
+// Redundanz, wenn das konkrete Medium auf beiden Pfaden ankommt; die
+// Arrays unten sind daher kanonisch für die generierte SQL-Migration (9a/9b)
+// und deckungsgleich mit der V2-Integritätsregel in tharsisHubUtilityNetwork.ts.
 export const THARSIS_HUB_UTILITY_RINGS: SeedUtilityRing[] = [
   {
     ring: 'A',
-    media: ['power', 'data', 'water', 'o2', 'gas'],
+    media: [...UTILITY_MEDIA],
     nodes: [
       // A-Nord (oberhalb des Service-Rings)
       [11,10],[11,11],[11,12],[11,13],[11,14],[11,15],[11,16],[11,17],[11,18],
@@ -325,7 +335,7 @@ export const THARSIS_HUB_UTILITY_RINGS: SeedUtilityRing[] = [
   },
   {
     ring: 'B',
-    media: ['power', 'data', 'water', 'o2', 'wastewater', 'thermal'],
+    media: [...UTILITY_MEDIA],
     nodes: [
       // B-Ost (westlich der Zone A/B)
       [13,8],[14,8],[15,8],[16,8],[17,8],
