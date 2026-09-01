@@ -1,4 +1,5 @@
-import type { GeoBounds, GeoPoint } from './earthFeatureSource'
+import type { GeoBounds } from './earthFeatureSource'
+import type { GeoPoint } from './earthSpatial'
 
 export type ElevationSample = GeoPoint & { elevationM: number }
 
