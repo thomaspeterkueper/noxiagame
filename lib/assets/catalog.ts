@@ -50,8 +50,9 @@ const building = (
 })
 
 export const BUILDING_VISUAL_ASSETS: BuildingVisualAsset[] = [
-  // Earth / public start area. Each physical facility module occupies its own
-  // grid tile, so assets must not visually claim neighbouring expansion space.
+  // Earth / shared public start facilities.
+  // The facility modules are independent 1x1 assets so the visible footprint
+  // can grow tile-by-tile without replacing a monolithic building image.
   building('spaceport_core', 'earth', 'exterior-isometric'),
   building('spaceport_pad_mini', 'earth', 'exterior-isometric'),
   building('spaceport_pad_standard', 'earth', 'exterior-isometric'),
@@ -65,8 +66,7 @@ export const BUILDING_VISUAL_ASSETS: BuildingVisualAsset[] = [
   building('warehouse', 'earth', 'exterior-isometric'),
   building('warehouse_storage', 'earth', 'exterior-isometric'),
 
-  // Legacy alias: old worlds/rows may still contain landing_pad while they are
-  // migrated to explicit spaceport modules. It remains a fallback representation.
+  // Legacy alias retained while older Earth seeds / saved entities migrate.
   building('landing_pad', 'earth', 'exterior-isometric'),
 
   building('habitat', 'mars', 'exterior-isometric', [2, 2]),
