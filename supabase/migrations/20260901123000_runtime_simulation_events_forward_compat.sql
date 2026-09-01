@@ -90,6 +90,17 @@ begin
   end loop;
 end $$;
 
+-- Recorded databases hold source_event ids written by the pre-PR trigger, which
+-- pointed at legacy public.events(id). Those events are intentionally not
+-- converted, so orphan the references before the FK re-add validates existing
+-- rows against the (initially empty) simulation_events table.
+update public.entity_states
+  set source_event = null
+  where source_event is not null
+    and not exists (
+      select 1 from public.simulation_events se where se.id = entity_states.source_event
+    );
+
 alter table public.entity_states
   add constraint entity_states_source_event_fkey
   foreign key (source_event) references public.simulation_events(id) on delete set null;
