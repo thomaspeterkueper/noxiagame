@@ -5,6 +5,34 @@
 -- world_events and historical_milestones are intentionally retained until
 -- their roadmap role is decided separately.
 
+-- Fresh replays of the consolidated set create the generalized shape directly
+-- in the canonical baseline. Environments that applied the legacy baseline
+-- before this consolidation still carry the old events shape (bigint id,
+-- profile_id/type/payload); drop it so the create below is authoritative in
+-- both histories. The legacy RLS policy and grants from the baseline are part
+-- of the retired shape and are intentionally not recreated.
+do $$
+begin
+  if to_regclass('public.events') is not null
+     and exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'events'
+         and column_name = 'type'
+     )
+     and not exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'events'
+         and column_name = 'subject_type'
+     )
+  then
+    drop table public.events;
+  end if;
+end $$;
+
 create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
   event_type text not null,
@@ -30,6 +58,21 @@ create index if not exists events_tick_idx
   on public.events(tick) where tick is not null;
 create index if not exists events_effect_group_idx
   on public.events(effect_group_id);
+
+-- Same canonical projection columns as 20260831195000_runtime_canon_projection_boundary.sql,
+-- kept here so the table is complete in both histories (fresh replay and the
+-- legacy-shape drop above).
+alter table public.events
+  add column if not exists canonical_entity_id text,
+  add column if not exists canonical_event_id text;
+
+create index if not exists events_canonical_entity_idx
+  on public.events(canonical_entity_id)
+  where canonical_entity_id is not null;
+
+create index if not exists events_canonical_event_idx
+  on public.events(canonical_event_id)
+  where canonical_event_id is not null;
 
 create table if not exists public.entity_states (
   id uuid primary key default gen_random_uuid(),
