@@ -62,9 +62,9 @@ export interface BuildingProjectionState {
 }
 
 /**
- * Registered expansion types may be planned without being buildable. Keeping a
- * planned type here gives persistence/projection code a stable NOXIA identity
- * without assigning cost/build time or pretending the gameplay effect exists.
+ * Expansion balancing is NOXIA-owned. The first functional expansion is a
+ * second physical landing pad. It is cheaper/faster than a standalone landing
+ * facility because it reuses the parent site's access/control infrastructure.
  */
 export const BUILDING_EXPANSIONS: Record<string, BuildingExpansionDef> = {
   landing_pad_extra_pad: {
@@ -72,8 +72,9 @@ export const BUILDING_EXPANSIONS: Record<string, BuildingExpansionDef> = {
     name: 'Zusätzliches Landefeld',
     description: 'Erweitert einen bestehenden Landeplatz um eine weitere physische Pad-Kapazität.',
     parentBuildingIds: ['landing_pad'],
-    planned: true,
-    planHint: 'Wird erst baubar, wenn serverseitige Dock-/Ankunftskapazität belastbar ausgewertet wird.',
+    cost: 3000,
+    buildTimeTicks: 2,
+    planned: false,
   },
 }
 
