@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getStreetTiles, nearestStreetTile, type StreetTile } from '@/lib/game/streetTiles'
+import { connectedStreetNeighbours, getStreetTiles, nearestStreetTile, type StreetTile } from '@/lib/game/streetTiles'
 import { positionOnStreetPath, shortestStreetPath } from '@/lib/game/npcStreetMovement'
 import { residentRoutine, virtualDayProgress, type RoutineStop } from '@/lib/game/npcDailyRoutine'
+import { nearestInteraction, type Interactable } from '@/lib/game/interactions'
 import { BUILDINGS } from '@/lib/game/buildings/index'
 import { BuildingSpriteStyles } from '@/lib/grid/BuildingSVG'
 import { IsometricBuilding, IsometricBuildingStyles } from '@/lib/grid/IsometricBuilding'
@@ -60,7 +61,11 @@ interface Props {
   onEnterBuilding?: (entity: TileEntity) => void
 }
 
-type Selection = { kind: 'building'; id: string } | { kind: 'person'; id: string } | null
+type Selection =
+  | { kind: 'building'; id: string }
+  | { kind: 'person'; id: string }
+  | { kind: 'vehicle'; id: string }
+  | null
 
 type ResidentPosition = {
   resident: Resident
@@ -68,6 +73,8 @@ type ResidentPosition = {
   row: number
   routine: RoutineStop
 }
+
+type RoverPosition = { id: string; col: number; row: number }
 
 const COLS = 32
 const ROWS = 24
@@ -177,6 +184,7 @@ export default function WalkableColony({
     () => getStreetTiles(locationSlug, population, entities, pending, userId, COLS, ROWS),
     [locationSlug, population, entities, pending, userId],
   )
+  const streetMap = useMemo(() => new Map(streets.map(street => [`${street.col}:${street.row}`, street])), [streets])
   const colonyFocus = useMemo(() => {
     if (!buildings.length) return { col: 16, row: 12 }
     const sum = buildings.reduce((acc, building) => ({ col: acc.col + building.tile_col + 0.5, row: acc.row + building.tile_row + 0.5 }), { col: 0, row: 0 })
@@ -275,6 +283,136 @@ export default function WalkableColony({
     return { resident, col, row, routine }
   }).filter((value): value is ResidentPosition => value !== null), [residents, buildings, communityBuildings, streets, dayProgress, anchor])
 
+  const rovers = useMemo<RoverPosition[]>(() => streets.slice(0, Math.min(3, streets.length)).map((street, index) => ({
+    id: `rover-${index}`,
+    col: street.col + 0.25,
+    row: street.row + 0.15,
+  })), [streets])
+
+  const interactables = useMemo<Interactable[]>(() => {
+    const buildingItems = buildings.map(building => {
+      const street = anchor(building)
+      return street ? {
+        kind: 'building' as const,
+        id: building.id,
+        label: label(building.entity_id),
+        action: 'BETRETEN',
+        col: street.col,
+        row: street.row,
+        range: 1.25,
+      } : null
+    }).filter((value): value is Interactable => value !== null)
+
+    const peopleItems: Interactable[] = positions.map(position => ({
+      kind: 'person',
+      id: position.resident.id,
+      label: position.resident.displayName,
+      action: 'ANSPRECHEN',
+      col: position.col,
+      row: position.row,
+      range: 0.9,
+    }))
+
+    const vehicleItems: Interactable[] = rovers.map(rover => ({
+      kind: 'vehicle',
+      id: rover.id,
+      label: 'Rover',
+      action: 'PRÜFEN',
+      col: rover.col,
+      row: rover.row,
+      range: 1.0,
+    }))
+
+    return [...buildingItems, ...peopleItems, ...vehicleItems]
+  }, [buildings, positions, rovers, anchor])
+
+  const nearbyInteraction = useMemo(() => nearestInteraction(fig, interactables), [fig, interactables])
+
+  const openInteraction = useCallback((interaction: Interactable) => {
+    if (interaction.kind === 'building') {
+      const building = buildings.find(item => item.id === interaction.id)
+      if (!building) return
+      setSelection({ kind: 'building', id: building.id })
+      setShowPeople(false)
+      onEnterBuilding?.(building)
+      return
+    }
+    if (interaction.kind === 'person') {
+      setSelection({ kind: 'person', id: interaction.id })
+      setShowPeople(false)
+      return
+    }
+    setSelection({ kind: 'vehicle', id: interaction.id })
+    setShowPeople(false)
+  }, [buildings, onEnterBuilding])
+
+  const movePlayer = useCallback((key: string) => {
+    const current = streetMap.get(`${Math.round(fig.col)}:${Math.round(fig.row)}`)
+    if (!current) return false
+    const directions: Record<string, [number, number]> = {
+      w: [-1, 0],
+      s: [1, 0],
+      a: [0, -1],
+      d: [0, 1],
+    }
+    const delta = directions[key]
+    if (!delta) return false
+    const next = connectedStreetNeighbours(current, streets)
+      .find(neighbour => neighbour.row === current.row + delta[0] && neighbour.col === current.col + delta[1])
+    if (!next) return true
+    setFig({ col: next.col, row: next.row })
+    center(next.col, next.row, zoom)
+    return true
+  }, [fig, streetMap, streets, center, zoom])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input,textarea,select,[contenteditable="true"]')) return
+
+      if (event.key === 'Escape') {
+        if (selection || showPeople) {
+          setSelection(null)
+          setShowPeople(false)
+        } else {
+          onClose()
+        }
+        return
+      }
+
+      const key = event.key.toLowerCase()
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        event.preventDefault()
+        movePlayer(key)
+        return
+      }
+
+      if ((key === 'f' || event.key === 'Enter') && nearbyInteraction) {
+        event.preventDefault()
+        openInteraction(nearbyInteraction)
+        return
+      }
+
+      if (key === 'c') {
+        event.preventDefault()
+        center(fig.col, fig.row)
+        return
+      }
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault()
+        const step = 55 / zoom
+        setViewport(value => clamp(
+          value.x + (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0),
+          value.y + (event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0),
+        ))
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selection, showPeople, onClose, movePlayer, nearbyInteraction, openInteraction, fig, center, zoom, clamp])
+
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return
@@ -339,6 +477,7 @@ export default function WalkableColony({
   const homeBuilding = buildings.find(b => b.id === home?.tileEntityId)
   const lowNeed = selectedPerson ? [...selectedPerson.needs].sort((a, b) => a.satisfaction - b.satisfaction)[0] : null
   const selectedPosition = selectedPerson ? positions.find(p => p.resident.id === selectedPerson.id) : null
+  const selectedVehicle = selection?.kind === 'vehicle' ? rovers.find(rover => rover.id === selection.id) ?? null : null
   const virtualHour = Math.floor(dayProgress * 24)
   const virtualMinute = Math.floor((dayProgress * 24 - virtualHour) * 60)
 
@@ -367,14 +506,18 @@ export default function WalkableColony({
           onPointerDown={event => {
             if ((event.target as HTMLElement).closest('button')) return
             drag.current = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y }
+            event.currentTarget.setPointerCapture(event.pointerId)
           }}
           onPointerMove={event => {
             const current = drag.current
             if (!current) return
             setViewport(clamp(current.vx - (event.clientX - current.x) / zoom, current.vy - (event.clientY - current.y) / zoom))
           }}
-          onPointerUp={() => { drag.current = null }}
-          onPointerLeave={() => { drag.current = null }}
+          onPointerUp={event => {
+            drag.current = null
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+          }}
+          onPointerCancel={() => { drag.current = null }}
           style={{ position: 'absolute', inset: 0, overflow: 'hidden', cursor: 'grab' }}
         >
           <canvas ref={canvasRef} width={CW} height={CH} style={{ position: 'absolute', transformOrigin: '0 0', transform, pointerEvents: 'none' }} />
@@ -387,6 +530,7 @@ export default function WalkableColony({
                 return (
                   <button
                     key={building.id}
+                    onPointerDown={event => event.stopPropagation()}
                     onClick={event => {
                       event.stopPropagation()
                       setSelection({ kind: 'building', id: building.id })
@@ -422,11 +566,25 @@ export default function WalkableColony({
               return <div key="player" style={{ position: 'absolute', left: p.x - 12, top: p.y - 37, pointerEvents: 'none', transform: 'scale(1.18)', transformOrigin: '50% 100%' }}><NpcFigure id={userId} name="Du" role="operations" showLabel /></div>
             })}
 
-            {streets.slice(0, Math.min(3, streets.length)).map((street, index) => {
-              const p = iso(street.col + 0.25, street.row + 0.15)
-              return <Rover key={`rover-${index}`} left={p.x - 17} top={p.y - 18} />
+            {rovers.map(rover => {
+              const p = iso(rover.col, rover.row)
+              return <Rover key={rover.id} left={p.x - 17} top={p.y - 18} />
             })}
           </div>
+
+          <div style={{ position: 'absolute', left: 10, top: 10, padding: '6px 8px', background: '#07101cdd', border: '1px solid #43586a', color: '#aebbc7', fontSize: 9 }}>
+            WASD LAUFEN · PFEILE/ZIEHEN KAMERA · C FIGUR · F/ENTER INTERAKTION
+          </div>
+
+          {nearbyInteraction && (
+            <button
+              onPointerDown={event => event.stopPropagation()}
+              onClick={() => openInteraction(nearbyInteraction)}
+              style={{ position: 'absolute', left: 10, bottom: 10, padding: '8px 10px', background: '#182a25ee', border: '1px solid #6f9a79', color: '#d9e8d9', font: '10px monospace', cursor: 'pointer', boxShadow: '0 8px 22px #0008' }}
+            >
+              F · {nearbyInteraction.action} · {nearbyInteraction.label}
+            </button>
+          )}
         </div>
 
         {(showPeople || selection) && (
@@ -456,14 +614,21 @@ export default function WalkableColony({
                 <div style={section}>Status: {selectedPerson.activityState}<br />{selectedPerson.lastAction ?? 'Keine aktuelle Aktion'}</div>
                 <div style={section}>{lowNeed && lowNeed.satisfaction < 0.6 ? `${lowNeed.code}: ${pct(lowNeed.satisfaction)}` : 'Bedürfnisse stabil'}</div>
               </>
+            ) : selectedVehicle ? (
+              <>
+                <small style={{ color: '#7fa3bb', letterSpacing: '.12em' }}>FAHRZEUG</small>
+                <h3 style={{ margin: '6px 0 10px' }}>Rover</h3>
+                <div>Position {selectedVehicle.col.toFixed(1)},{selectedVehicle.row.toFixed(1)}</div>
+                <div style={section}>Interaktionsschnittstelle aktiv. Fahrzeugsteuerung wird über denselben Mechanismus angebunden.</div>
+              </>
             ) : null}
           </aside>
         )}
       </main>
 
       <footer style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 11px', background: '#101b27', borderTop: '1px solid #273b4d', color: '#7f94a4', fontSize: 8 }}>
-        <span>{buildings.length} GEBÄUDE · {residents.length} PERSONEN</span>
-        <span>MAUSRAD ZOOM · ZIEHEN VERSCHIEBT · {Math.round(zoom * 100)}%</span>
+        <span>{buildings.length} GEBÄUDE · {residents.length} PERSONEN · {interactables.length} INTERAKTIV</span>
+        <span>POSITION {Math.round(fig.col)},{Math.round(fig.row)} · ZOOM {Math.round(zoom * 100)}%</span>
       </footer>
     </div>
   )
