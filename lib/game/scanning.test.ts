@@ -32,7 +32,9 @@ assert.equal(measurement.signals.length, 2)
 
 const discoveries = discoveriesFromMeasurement(measurement)
 assert.equal(discoveries.length, 2)
-assert.ok(discoveries.every(item => item.interpretation.confidence === 'medium'))
+const confidenceBySource = new Map(discoveries.map(item => [item.sourceType, item.interpretation.confidence]))
+assert.equal(confidenceBySource.get('tile_ice'), 'medium', 'signal at scanner origin should have medium confidence')
+assert.equal(confidenceBySource.get('tile_crater'), 'low', 'weaker signal at radius edge should retain low confidence')
 assert.equal(mergeDiscoveries(discoveries, discoveries).length, 2, 'repeat scans must remain idempotent')
 
 const changedWorld = groundTruthFromTerrain([
