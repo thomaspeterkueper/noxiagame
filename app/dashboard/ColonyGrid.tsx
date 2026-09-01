@@ -2,8 +2,8 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 28.08.2026 — Wissensgesperrte Gebäude verlinken direkt auf In-Game-Lernen
-// Version:      5.24.0
+// Aktualisiert: 01.09.2026 — Raster-Tiles folgen der kanonischen 64px Gridgröße
+// Version:      5.24.1
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -22,12 +22,16 @@ import WalkableColony from './WalkableColony'
 import BuildingInterior from './BuildingInterior'
 import BankOverlay from './BankOverlay'
 
-function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
+function TileDisplay({ tileType, slug, size }: { tileType: string; slug: string; size: number }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
   const [useSVG, setUseSVG] = useState(false)
   if (useSVG) return <TileSVG type={tileType} planet={slug} />
   return (
-    <img src={src} width={44} height={44} style={{ display: 'block' }}
+    <img
+      src={src}
+      width={size}
+      height={size}
+      style={{ display: 'block', width: size, height: size, objectFit: 'cover' }}
       onError={() => {
         if (src.endsWith('.webp')) setSrc(`/images/grid/${slug}/${tileType}.png`)
         else setUseSVG(true)
@@ -258,45 +262,20 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
         </div>
         <div style={{ fontSize: '0.62rem', color: '#6b6357', marginBottom: '0.6rem' }}>Standort: {locationSlug} · Feld: {tileType.replace(/_/g, ' ')}</div>
-        {msg && <div style={{ color: '#e05050', fontSize: '0.7rem', marginBottom: '0.5rem' }}>{msg}</div>}
-        {loading && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Lade verfügbare Bauoptionen …</div>}
-        {!loading && items.length === 0 && !msg && <div style={{ color: '#9e9485', fontSize: '0.72rem', padding: '0.75rem 0' }}>Für dieses Feld sind aktuell keine Bauoptionen verfügbar.</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
-          {[...items].sort((a, b) => {
-            const aHint = journeyBuildHints.includes(a.key) ? 0 : 1
-            const bHint = journeyBuildHints.includes(b.key) ? 0 : 1
-            if (aHint !== bHint) return aHint - bHint
-            const aCost = a.displayCost ?? a.cost
-            const bCost = b.displayCost ?? b.cost
-            const aAfford = credits >= aCost ? 0 : 1
-            const bAfford = credits >= bCost ? 0 : 1
-            return aAfford - bAfford
-          }).map(item => {
-            const shownCost = item.displayCost ?? item.cost
+        {msg && <div style={{ fontSize: '0.68rem', color: '#b52a2a', marginBottom: '0.55rem' }}>{msg}</div>}
+        <div style={{ overflowY: 'auto', display: 'grid', gap: '0.55rem' }}>
+          {loading && <div style={{ color: '#5a6878', fontSize: '0.72rem' }}>Lade Bauoptionen …</div>}
+          {!loading && items.length === 0 && !msg && <div style={{ color: '#5a6878', fontSize: '0.72rem' }}>Keine Gebäude für dieses Feld verfügbar.</div>}
+          {items.map(item => {
             const knowledgeLocked = !!item.knowledgeLocked
-            const siteBlocked = !!item.siteBlocked
-            const canAfford = credits >= shownCost
-            const canBuildNow = canAfford && !knowledgeLocked && !siteBlocked
-            const prodText = item.production?.length
-              ? item.production.map(p => `+${p.amount} ${RES_DE[p.resource] ?? p.resource}/Tick`).join(' · ')
-              : ''
+            const blocked = knowledgeLocked || !!item.siteBlocked
+            const prodText = item.production?.map(p => `+${p.amount} ${RES_DE[p.resource] ?? p.resource}/Tick`).join(' · ')
             return (
-              <div key={item.key} style={{
-                background: journeyBuildHints.includes(item.key) ? 'rgba(201,169,97,0.08)' : '#ffffff',
-                border: `1px solid ${journeyBuildHints.includes(item.key) ? '#c9a961' : canBuildNow ? '#ddd6c8' : '#ece8e0'}`,
-                borderRadius: '6px', padding: '0.6rem 0.75rem',
-                opacity: siteBlocked ? 0.6 : 1,
-                boxShadow: journeyBuildHints.includes(item.key) ? '0 0 8px rgba(201,169,97,0.3)' : 'none',
-              }}>
-                {journeyBuildHints.includes(item.key) && <div style={{ fontSize: '0.52rem', color: '#c9a961', fontWeight: 700, letterSpacing: '2px', marginBottom: '3px' }}>▶ EMPFOHLEN</div>}
-                <button disabled={building || !canBuildNow} onClick={() => startBuild(item.key)} style={{
-                  display: 'block', width: '100%', background: 'transparent', border: 'none', padding: 0,
-                  color: canBuildNow ? '#1a1a18' : '#9e9485',
-                  cursor: canBuildNow ? 'pointer' : 'default', textAlign: 'left', fontSize: '0.75rem',
-                }}>
-                  <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
-                  <div style={{ fontSize: '0.65rem', color: canBuildNow ? '#5a5248' : '#9e9485' }}>
-                    {shownCost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
+              <div key={item.key} style={{ border: '1px solid #ddd6c8', borderRadius: 8, padding: '0.7rem', background: blocked ? '#efebe2' : '#fffdf8' }}>
+                <button disabled={blocked || building} onClick={() => startBuild(item.key)} style={{ width: '100%', textAlign: 'left', border: 0, background: 'transparent', cursor: blocked ? 'not-allowed' : 'pointer', padding: 0, opacity: blocked ? 0.68 : 1 }}>
+                  <div style={{ fontWeight: 700, color: '#2a4e7a', fontSize: '0.75rem' }}>{item.name}</div>
+                  <div style={{ marginTop: '0.25rem', color: '#6b6357', fontSize: '0.64rem' }}>
+                    {item.displayCost ?? item.cost} cr · {item.buildTimeTicks} Ticks
                     {prodText && ` · ${prodText}`}
                     {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
                   </div>
@@ -485,7 +464,7 @@ export default function ColonyGrid({
             if (npcEid) return <BuildingSVG entityId={npcEid} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
             if (tileType.startsWith('building_') && tileType !== 'building_construction') return <BuildingSVG entityId={tileType.replace('building_', '')} planet={slug} occupancy={populationMax > 0 ? population / populationMax : 0} owned={false} size={tileSize} />
             if (tileType.startsWith('road')) return <TileSVG type={tileType} planet={slug} />
-            return <TileDisplay tileType={tileType} slug={slug} />
+            return <TileDisplay tileType={tileType} slug={slug} size={tileSize} />
           })()}
           {isAnom && (
             <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -526,166 +505,61 @@ export default function ColonyGrid({
 
       {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} canSell={canSellSelected} onSellClick={openSellForSelected} />}
-      {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} gates={gates} canSell={canSellSelected} onSellClick={openSellForSelected} />}
-      {showAdmin && <AdminOverlay locationSlug={slug} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} userId={userId} canSell={canSellSelected} onSellClick={openSellForSelected} />}
-
-      {showBuildingOverlay && selectedTile && (() => {
-        const ent = entityAt(selectedTile.r, selectedTile.c)
-        if (!ent) return null
-        const eco = entityInfo?.[ent.id]
-        const stocks: Record<string, number> = {}
-        const consumption: Record<string, number> = {}
-        for (const r of locationResources ?? []) {
-          stocks[r.resource] = r.stock
-          consumption[r.resource] = r.consumption
-        }
-        const production: Record<string, number> = {}
-        if (eco?.ressource && eco.produktion) production[eco.ressource] = eco.produktion
+      {showBank && <BankOverlay locationSlug={slug} locationName={name} credits={credits} onClose={() => { setShowBank(false); setSelectedTile(null) }} onCreditsChanged={() => onChanged?.()} canSell={canSellSelected} onSellClick={openSellForSelected} />}
+      {showAdmin && <AdminOverlay locationSlug={slug} locationName={name} userId={userId} onClose={() => { setShowAdmin(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
+      {showBuildPopup && selectedTile && <BuildPopup tileRow={selectedTile.r} tileCol={selectedTile.c} tileType={selectedTile.type} locationSlug={slug} onClose={() => setShowBuildPopup(false)} onBuildStarted={() => { invalidate(); loadFromServer(); onChanged?.() }} />}
+      {showSellPanel && selectedEnt && <SellPanel entity={selectedEnt} tax={tax} onClose={() => { setShowSellPanel(false); setSelectedTile(null) }} onChanged={() => { invalidate(); loadFromServer(); onChanged?.() }} />}
+      {showBuildingOverlay && selectedEnt && (() => {
+        const def = BUILDINGS[selectedEnt.entity_id]
+        if (!def) return null
         const ctx: BuildingContext = {
           locationSlug: slug,
           locationName: name,
-          isOwn:  ent.profile_id === userId,
-          isCorp: ent.owner_class === 'CORPORATION',
-          production,
-          consumption,
-          stocks,
           population,
           populationMax,
-          credits,
+          isSupplied,
+          resourceStock: Object.fromEntries(locationResources.map(r => [r.resource, r.stock])),
+          entity: selectedEnt,
+          economy: entityInfo?.[selectedEnt.id],
         }
-        const overlay = buildOverlayForBuilding(ent.entity_id, ctx)
-        const handleAction = (actionId: string) => {
-          if (actionId === 'sell_building') {
-            setShowBuildingOverlay(false)
-            setShowSellPanel(true)
-          }
-        }
-        return <BuildingOverlay overlay={overlay} onClose={() => { setShowBuildingOverlay(false); setSelectedTile(null) }} onAction={handleAction} />
+        return <BuildingOverlay title={def.name} model={buildOverlayForBuilding(selectedEnt.entity_id, ctx)} onClose={() => { setShowBuildingOverlay(false); setSelectedTile(null) }} />
       })()}
+      {interiorEntity && <BuildingInterior entity={interiorEntity} locationSlug={slug} onClose={() => setInteriorEntity(null)} onAction={onInteriorAction} />}
+      {showWalking && <WalkableColony slug={slug} entities={entities} onClose={() => setShowWalking(false)} onEnterBuilding={entity => { setShowWalking(false); setInteriorEntity(entity) }} />}
 
-      {showSellPanel && selectedTile && (() => {
-        const ent = entityAt(selectedTile.r, selectedTile.c)
-        if (!ent) return null
-        const entName = BUILDINGS[ent.entity_id]?.name ?? ent.entity_id
-        return <SellPanel entityId={ent.id} entityName={entName} onSold={async () => { setShowSellPanel(false); setSelectedTile(null); await onChanged?.() }} />
-      })()}
-      {showBuildPopup && selectedTile && <BuildPopup journeyBuildHints={highlightEntityIds} tileRow={selectedTile.r} tileCol={selectedTile.c} tileType={selectedTile.type} locationSlug={slug} onClose={() => { setShowBuildPopup(false); setSelectedTile(null) }} onBuildStarted={async () => { await loadFromServer(); invalidate('builds') }} />}
-
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-        <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
-          {hoveredTile && <TileTooltip info={hoveredTile} />}
-          <style>{'.grid-pan-container::-webkit-scrollbar { display: none }'}</style>
-          {interiorEntity && (
-            <div style={{
-              position: 'absolute', inset: 0, zIndex: 200,
-              background: 'rgba(0,0,0,0.85)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }} onClick={e => e.target === e.currentTarget && setInteriorEntity(null)}>
-              <div style={{ width: 460 }}>
-                <BuildingInterior
-                  entity={interiorEntity as any}
-                  userId={userId}
-                  locationResources={locationResources as any}
-                  credits={credits}
-                  population={population}
-                  hasShipyard={entities.some((e: any) => e.entity_id === 'shipyard')}
-                  currentTick={currentTick}
-                  shipRange={shipRange}
-                  currentLocationSlug={slug}
-                  onClose={() => setInteriorEntity(null)}
-                  onAction={kind => { if (kind && kind !== 'navigation') { onInteriorAction?.(kind); setInteriorEntity(null) } }}
-                />
-              </div>
-            </div>
-          )}
-          {showWalking && (
-            <WalkableColony
-              locationSlug={slug}
-              locationName={name}
-              population={population}
-              entities={entities as any}
-              pending={pending}
-              ships={[]}
-              locationId={''}
-              userId={userId}
-              onClose={() => setShowWalking(false)}
-              onEnterBuilding={e => { setInteriorEntity(e as any); setShowWalking(false) }}
-            />
-          )}
-          <button
-            onClick={() => setShowWalking(true)}
-            style={{
-              position: 'absolute', top: 6, left: 6, zIndex: 10,
-              background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8',
-              borderRadius: 8, padding: '3px 10px', cursor: 'pointer',
-              fontSize: '0.68rem', color: '#2a4e7a', fontWeight: 700,
-            }}
-          >
-            🚶 Betreten
-          </button>
-          <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, background: 'rgba(248,245,238,0.92)', border: '1px solid #ddd6c8', borderRadius: 8, padding: '3px 6px', alignItems: 'center' }}>
-            <button onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>+</button>
-            <span style={{ fontSize: '0.62rem', color: '#6b6357', fontFamily: 'monospace', minWidth: 32, textAlign: 'center' as const }}>{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom(z => Math.max(0.3, z - 0.15))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0 4px', color: '#2a4e7a', fontWeight: 700 }}>−</button>
-            <button onClick={() => setZoom(1.0)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.6rem', padding: '0 4px', color: '#9e9485' }}>↺</button>
-          </div>
-          <div
-            ref={gridScrollRef}
-            className="grid-pan-container"
-            onMouseDown={handlePanStart}
-            onMouseMove={handlePanMove}
-            onMouseUp={handlePanEnd}
-            onMouseLeave={handlePanEnd}
-            style={{
-              cursor: 'grab',
-              overflow: 'scroll',
-              maxHeight: 'calc(100vh - 280px)',
-              border: '2px solid #2a4e7a',
-              borderRadius: '6px',
-              background: '#f4f2ed',
-              scrollbarWidth: 'none' as any,
-              msOverflowStyle: 'none' as any,
-            }}>
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: `${COLS * tileSize}px`, height: `${ROWS * tileSize}px`, transition: 'transform 0.15s ease' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`, gridAutoRows: `${tileSize}px`, gap: 0, width: `${COLS * tileSize}px` }}>
-                {gridElements}
-              </div>
-            </div>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
+        <div>
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2a4e7a' }}>{name}</div>
+          <div style={{ fontSize: '0.62rem', color: '#6b6357' }}>{population.toLocaleString('de-DE')} / {populationMax.toLocaleString('de-DE')} Einwohner</div>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button onClick={() => setZoom(z => Math.max(0.3, +(z - 0.15).toFixed(2)))} style={{ border: '1px solid #cfc7b8', background: '#fffdf8', borderRadius: 6, padding: '0.25rem 0.5rem', cursor: 'pointer' }}>−</button>
+          <span style={{ fontSize: '0.62rem', color: '#5a6878', minWidth: 42, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+          <button onClick={() => setZoom(z => Math.min(2, +(z + 0.15).toFixed(2)))} style={{ border: '1px solid #cfc7b8', background: '#fffdf8', borderRadius: 6, padding: '0.25rem 0.5rem', cursor: 'pointer' }}>+</button>
+          <button onClick={() => setZoom(1)} style={{ border: '1px solid #cfc7b8', background: '#fffdf8', borderRadius: 6, padding: '0.25rem 0.45rem', cursor: 'pointer', fontSize: '0.6rem' }}>100%</button>
+          <button onClick={() => setShowWalking(true)} style={{ border: '1px solid #cfc7b8', background: '#fffdf8', borderRadius: 6, padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.6rem' }}>🚶 Erkunden</button>
+        </div>
+      </div>
 
-        <div style={{ width: '190px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
-          <div style={{ background: '#fff', border: '1px solid #e0ddd6', borderRadius: '8px', padding: '0.7rem 0.85rem' }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.82rem', color: '#1a3a5a', fontWeight: 600, marginBottom: '0.25rem' }}>{name}</div>
-            <div style={{ fontSize: '0.62rem', color: '#6a7a8a', marginBottom: '0.4rem' }}>{population.toLocaleString('de')} / {populationMax.toLocaleString('de')} Einw.</div>
-            <div style={{ background: '#e8e4dc', height: '4px', borderRadius: '2px', overflow: 'hidden', marginBottom: '0.5rem' }}>
-              <div style={{ width: `${Math.min(100, Math.round(population / Math.max(1, populationMax) * 100))}%`, height: '100%', borderRadius: '2px', background: population / Math.max(1, populationMax) > 0.8 ? '#e74c3c' : isSupplied ? '#6fcf97' : '#e8702a' }} />
-            </div>
-            {locationResources.map(r => {
-              const icon = r.resource === 'water' ? '💧' : r.resource === 'energy' ? '⚡' : '⛏️'
-              const isLow = r.stock < 50; const isHigh = r.stock > 400
-              return (
-                <div key={r.resource} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.66rem', marginBottom: '2px' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: isLow ? '#e74c3c' : isHigh ? '#6fcf97' : '#f5a623' }} />
-                  <span style={{ color: '#4a5a6a' }}>{icon} {r.stock.toLocaleString('de')}t</span>
-                </div>
-              )
-            })}
-          </div>
-
-          <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
-
-          <div style={{ background: '#fff', border: '1px solid #e0ddd6', borderRadius: '8px', padding: '0.55rem 0.85rem' }}>
-            <div style={{ fontSize: '0.56rem', color: '#8a9ab0', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Legende</div>
-            {([['#c9a961','Dein Gebäude'],['#5aaeff','Staatlich'],['#e05050','NPC / Fremd'],['#d08020','Im Bau']] as [string,string][]).map(([color, label]) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.6rem', color: '#4a5a6a', marginBottom: '2px' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '2px', background: color, flexShrink: 0 }} />
-                {label}
-              </div>
-            ))}
+      <div
+        ref={gridScrollRef}
+        onMouseDown={handlePanStart}
+        onMouseMove={handlePanMove}
+        onMouseUp={handlePanEnd}
+        onMouseLeave={handlePanEnd}
+        style={{ overflow: 'auto', maxHeight: '72vh', cursor: 'grab', borderRadius: 8, border: '1px solid #ddd6c8', background: '#ddd6c8' }}
+      >
+        <div style={{ width: COLS * tileSize * zoom, height: ROWS * tileSize * zoom, position: 'relative' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, ${tileSize}px)`, gridTemplateRows: `repeat(${ROWS}, ${tileSize}px)`, width: COLS * tileSize, height: ROWS * tileSize, transform: `scale(${zoom})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+            {gridElements}
           </div>
         </div>
       </div>
+
+      <div style={{ position: 'fixed', right: 18, bottom: 18, zIndex: 50 }}>
+        <GridMinimap COLS={COLS} ROWS={ROWS} entities={entities} pending={pending} userId={userId} />
+      </div>
+      {hoveredTile && <TileTooltip info={hoveredTile} />}
     </div>
   )
 }
