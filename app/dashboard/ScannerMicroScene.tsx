@@ -77,12 +77,14 @@ export default function ScannerMicroScene(props: Props) {
   const nearRef = useRef<typeof near>(null)
   const [locked, setLocked] = useState(false)
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [discoveries, setDiscoveries] = useState<DiscoveryDto[]>([])
   const [lastScan, setLastScan] = useState<ScannerResponse | null>(null)
 
   useEffect(() => { closeRef.current = props.onClose }, [props.onClose])
   useEffect(() => { nearRef.current = near }, [near])
+  useEffect(() => { busyRef.current = busy }, [busy])
 
   const stockText = useMemo(() => {
     const byResource = Object.fromEntries(props.resources.map(item => [item.resource, item.stock]))
@@ -98,7 +100,8 @@ export default function ScannerMicroScene(props: Props) {
   }, [props.locationSlug])
 
   async function executeScan() {
-    if (busy) return
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setError(null)
     try {
@@ -108,6 +111,7 @@ export default function ScannerMicroScene(props: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan fehlgeschlagen')
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
