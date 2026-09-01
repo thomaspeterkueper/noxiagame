@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import WalkableColony from './WalkableColony'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
@@ -19,12 +20,22 @@ const chrome=<style>{`
 `}</style>
 
 export default function DashboardPrimaryColony(){
- const location=useGameStore(s=>s.location),[planning,setPlanning]=useState(false),[userId,setUserId]=useState(''),[locations,setLocations]=useState<WorldLocation[]>([]),[entities,setEntities]=useState<any[]>([]),[builds,setBuilds]=useState<any[]>([]),[interior,setInterior]=useState<Building|null>(null)
- useEffect(()=>{setPlanning(false);setInterior(null)},[location])
+ const location=useGameStore(s=>s.location)
+ const mode=useGameModeStore(s=>s.mode),interiorBuildingId=useGameModeStore(s=>s.interiorBuildingId),enterColony=useGameModeStore(s=>s.enterColony),enterPlanning=useGameModeStore(s=>s.enterPlanning),enterInterior=useGameModeStore(s=>s.enterInterior),resetForLocation=useGameModeStore(s=>s.resetForLocation)
+ const[userId,setUserId]=useState(''),[locations,setLocations]=useState<WorldLocation[]>([]),[entities,setEntities]=useState<any[]>([]),[builds,setBuilds]=useState<any[]>([])
+
+ useEffect(()=>{resetForLocation()},[location,resetForLocation])
  useEffect(()=>{let live=true;let timer:ReturnType<typeof setInterval>|undefined;async function refresh(){try{const{token,userId:uid}=await getSessionInfo();if(live)setUserId(uid);const[br,wr]=await Promise.all([fetch('/api/game/build',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'}),fetch('/api/game/world',{cache:'no-store'})]);if(!live)return;if(br.ok){const d=await br.json();setEntities(Array.isArray(d.entities)?d.entities:[]);setBuilds(Array.isArray(d.builds)?d.builds:[])}if(wr.ok){const d=await wr.json();setLocations(Array.isArray(d.locations)?d.locations:[])}}catch{}}refresh();timer=setInterval(refresh,30000);return()=>{live=false;if(timer)clearInterval(timer)}},[location])
- const current=locations.find(l=>l.slug===location),isStation=current?.location_type==='station'||location==='prometheus',localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location]),localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
+
+ const current=locations.find(l=>l.slug===location),isStation=current?.location_type==='station'||location==='prometheus',localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location]),localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location]),interior=useMemo(()=>mode==='interior'&&interiorBuildingId?localEntities.find((b:any)=>b.id===interiorBuildingId)??null:null,[mode,interiorBuildingId,localEntities])
+
+ useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
+
  if(isStation)return null
- if(planning)return <>{chrome}<button className="noxia-return-colony" onClick={()=>setPlanning(false)}>◈ Zur Kolonie</button></>
+ if(mode==='planning')return <>{chrome}<button className="noxia-return-colony" onClick={enterColony}>◈ Zur Kolonie</button></>
  if(!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>KOLONIE WIRD SYNCHRONISIERT …</span></div></div></div></>
- return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities} pending={localBuilds} ships={[]} locationId={current.id} userId={userId} onClose={()=>setPlanning(true)} onEnterBuilding={b=>setInterior(b)}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} onPlan={()=>setPlanning(true)}/>{interior&&<div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · THARSIS HUB</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={()=>setInterior(null)}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div>}</div></>
+
+ if(mode==='interior'&&interior)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · {current.name??location}</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={enterColony}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div></div></>
+
+ return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities} pending={localBuilds} ships={[]} locationId={current.id} userId={userId} onClose={enterPlanning} onEnterBuilding={b=>enterInterior(b.id)}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} onPlan={enterPlanning}/></div></>
 }
