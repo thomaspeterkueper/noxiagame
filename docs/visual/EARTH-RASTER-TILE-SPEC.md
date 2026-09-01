@@ -46,25 +46,27 @@ The road family should support the existing adjacency mask (`road_0` … `road_1
 Expandable buildings use **real neighbouring grid space**. Expansion is not an abstract level-up that leaves the original footprint unchanged.
 
 - Every expansion module occupies one or more explicit adjacent tiles.
-- An expansion is permitted only when all tiles required by that module are free and buildable.
+- An expansion is permitted only when all tiles required by that module are free, buildable and legally usable.
 - Occupied, blocked or otherwise unavailable required tiles prevent that expansion; existing entities are not displaced automatically.
 - Placement of the initial building therefore has long-term gameplay consequences: players must reserve physical space if they expect to expand later.
 - Building level/technology and physical module count are separate concepts. A technology upgrade may improve a module without creating additional capacity that canonically requires more physical space.
 - Visual assets for expandable buildings should be modular wherever practical rather than baking every possible final footprint into a single image.
 
-### Earth spaceport / `landing_pad` reference rule
+### Earth spaceport reference rule
 
-The Earth starter spaceport is the first canonical implementation of spatial expansion.
+The Earth starter spaceport is the first canonical implementation of the modular facility system. A `spaceport` is a facility composed of physical modules; a landing pad is one module of that facility rather than an automatic synonym for the entire spaceport.
 
-- The starter spaceport contains a core/service component and **one operational landing pad**.
-- Default capacity is **one ship per pad** at the same time.
-- Additional ship capacity requires additional pad modules on neighbouring tiles.
-- Each additional pad occupies real grid space and must connect plausibly to the existing spaceport/service infrastructure.
-- If the required neighbouring tile or tiles are unavailable, the corresponding pad expansion cannot be built.
-- Future improvements to handling speed, fuelling, cargo systems, control systems or service quality do not automatically increase simultaneous ship capacity unless an explicit rule says otherwise.
-- Art direction must preserve visible expansion interfaces and avoid depicting the starter building as a completed multi-pad megastructure.
+- Earth is a shared multiplayer start and begins with an established **public/state multi-module spaceport**.
+- The initial Earth layout contains a spaceport core, two standard pads, one mini-pad, a service module and a storage module.
+- A **mini-pad** currently provides two small/standard ship parking positions, one active launch/landing operation, integrated mini-storage and basic service. This is the canonical starter/outpost reference.
+- A **standard pad** currently uses a tuning default of four ship parking positions and one active launch/landing operation. Its exact balancing value may change without altering the modular rule.
+- Parking capacity and simultaneous launch/landing operations are separate values.
+- Additional pads or service/cargo/passenger modules require neighbouring grid tiles and plausible physical connections to the existing facility.
+- If a required neighbouring tile is unavailable, the corresponding expansion cannot be built.
+- Better handling, automation, fuelling or control technology may improve throughput but does not silently create physical parking or pad capacity.
+- Art direction must preserve visible connection/expansion interfaces. Individual module artwork must not depict unbuilt future modules.
 
-This spatial-expansion rule should be considered for other suitable NOXIA building families as they are implemented (for example production halls, warehouses and research complexes), but their exact module and capacity rules remain building-specific.
+This spatial-expansion rule also applies where meaningful to warehouses, production facilities, academies/research facilities, utilities and logistics hubs. Exact modules and capacities remain facility-specific.
 
 ## Raster rendering
 
@@ -85,4 +87,11 @@ Before an Earth terrain family is accepted, test at least:
 5. 100%, 50% and 200% game zoom.
 6. No visible seams, one-pixel gaps, border halos, discontinuous road edges or scale jumps.
 
-A tile that looks good in isolation but exposes the grid when repeated is **not accepted**.
+For modular buildings additionally test:
+
+1. Individual modules on their own tiles.
+2. Every intended adjacency/connection edge.
+3. Small and expanded facility layouts assembled from the same module assets.
+4. Clear distinction between occupied module tiles and genuinely free expansion tiles.
+
+A tile that looks good in isolation but exposes the grid when repeated, or a building asset that visually claims unbuilt neighbouring space, is **not accepted**.
