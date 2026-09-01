@@ -3,6 +3,8 @@
 --
 -- Fresh databases obtain the same shape from the corrected historical migrations.
 -- Existing databases obtain it here without mutating or converting legacy public.events.
+-- This migration is intentionally idempotent and also repairs an intermediate
+-- entity_states.source_event foreign key if such a partial schema exists.
 
 set search_path to public;
 
@@ -45,7 +47,7 @@ create table if not exists public.entity_states (
   valid_from timestamptz not null,
   valid_to timestamptz,
   properties jsonb not null default '{}'::jsonb,
-  source_event uuid references public.simulation_events(id) on delete set null,
+  source_event uuid,
   canonical_entity_id text,
   canonical_state_id text,
   created_at timestamptz not null default now(),
@@ -56,6 +58,34 @@ create table if not exists public.entity_states (
 alter table public.entity_states
   add column if not exists canonical_entity_id text,
   add column if not exists canonical_state_id text;
+
+-- Repair any partially-created source_event FK without assuming its generated name.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select c.conname
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where c.contype = 'f'
+      and n.nspname = 'public'
+      and t.relname = 'entity_states'
+      and exists (
+        select 1
+        from unnest(c.conkey) key_attnum
+        join pg_attribute a on a.attrelid = t.oid and a.attnum = key_attnum
+        where a.attname = 'source_event'
+      )
+  loop
+    execute format('alter table public.entity_states drop constraint %I', r.conname);
+  end loop;
+end $$;
+
+alter table public.entity_states
+  add constraint entity_states_source_event_fkey
+  foreign key (source_event) references public.simulation_events(id) on delete set null;
 
 create unique index if not exists entity_states_one_current_idx
   on public.entity_states(subject_type, subject_id) where valid_to is null;
