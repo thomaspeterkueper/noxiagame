@@ -49,6 +49,13 @@ export const BUILDING_TECHNICAL_PROVENANCE: Readonly<Record<string, BuildingTech
   smelter: ota('OTA-TEC-0107-2026-DE', 'specializes', 'BLD:NOX:schmelze-1'),
 
   // Existing safe generic/system references.
+  water_recycler: {
+    sourceSystem: 'OTA',
+    sourceDocumentId: 'DOC:OTA:OTA-TEC-0034-2026-DE',
+    canonicalId: 'OTA-TEC-0034-WEX-M',
+    mappingRole: 'implements',
+    evidenceImpactPolicy: 'signal-only',
+  },
   road: ota('OTA-TEC-0104-2026-DE', 'references'),
   warehouse: ota('OTA-TEC-0102-2026-DE', 'references'),
   oxygen_recycler: ota('OTA-TEC-0096-2026-DE', 'references'),
