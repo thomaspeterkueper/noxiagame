@@ -21,6 +21,12 @@ on:
 jobs:
   scanner-domain:
     runs-on: ubuntu-latest
+    env:
+      # Build-only values: Next.js evaluates Supabase clients while collecting
+      # route metadata. Scanner domain tests do not access this endpoint.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: build-only-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: build-only-service-role-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
