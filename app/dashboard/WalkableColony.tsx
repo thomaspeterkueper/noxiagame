@@ -35,7 +35,7 @@ interface Props {
   population: number
   entities: TileEntity[]
   pending: unknown[]
-  residents: ColonyResident[]
+  residents?: ColonyResident[]
   ships: Ship[]
   locationId: string
   userId: string
@@ -138,7 +138,7 @@ export default function WalkableColony({
   population,
   entities,
   pending,
-  residents,
+  residents = [],
   userId,
   onClose,
   onEnterBuilding,
