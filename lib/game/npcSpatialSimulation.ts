@@ -88,16 +88,16 @@ function point(tile: StreetTile | null | undefined): SpatialPoint | null {
   return tile ? { col: tile.col, row: tile.row } : null
 }
 
-function anchorFor(
+function tileFor(
   buildingId: string | null | undefined,
-  anchorByBuildingId: Map<string, SpatialPoint | null>,
+  anchorByBuildingId: Map<string, StreetTile | null>,
 ) {
   return buildingId ? anchorByBuildingId.get(buildingId) ?? null : null
 }
 
-function anchorForPlace(
+function tileForPlace(
   place: RoutinePlace,
-  anchors: Record<RoutinePlace, SpatialPoint | null>,
+  anchors: Record<RoutinePlace, StreetTile | null>,
 ) {
   return anchors[place]
 }
@@ -112,12 +112,12 @@ export function simulateNpcSpatialState({
 
   const buildingById = new Map(buildings.map(building => [building.id, building]))
   const communityBuildings = buildings.filter(building => COMMUNITY_BUILDING_IDS.has(building.entity_id))
-  const anchorByBuildingId = new Map<string, SpatialPoint | null>()
+  const anchorByBuildingId = new Map<string, StreetTile | null>()
 
   for (const building of buildings) {
     anchorByBuildingId.set(
       building.id,
-      point(nearestStreetTile(building.tile_row, building.tile_col, streets)),
+      nearestStreetTile(building.tile_row, building.tile_col, streets),
     )
   }
 
@@ -133,24 +133,24 @@ export function simulateNpcSpatialState({
       : homeBuilding
     const communityBuildingId = communityBuilding?.id ?? null
 
-    const homeAnchor = anchorFor(homeBuildingId, anchorByBuildingId)
-    const workAnchor = anchorFor(workBuildingId, anchorByBuildingId)
-    const communityAnchor = anchorFor(communityBuildingId, anchorByBuildingId)
-    const anchors: Record<RoutinePlace, SpatialPoint | null> = {
-      home: homeAnchor,
-      work: workAnchor,
-      community: communityAnchor,
+    const homeTile = tileFor(homeBuildingId, anchorByBuildingId)
+    const workTile = tileFor(workBuildingId, anchorByBuildingId)
+    const communityTile = tileFor(communityBuildingId, anchorByBuildingId)
+    const anchors: Record<RoutinePlace, StreetTile | null> = {
+      home: homeTile,
+      work: workTile,
+      community: communityTile,
     }
 
-    const target = anchorForPlace(routine.target, anchors)
-    const fallback = target ?? workAnchor ?? homeAnchor ?? communityAnchor
+    const target = tileForPlace(routine.target, anchors)
+    const fallback = target ?? workTile ?? homeTile ?? communityTile
     if (!fallback) continue
 
     let col = fallback.col
     let row = fallback.row
 
     if (routine.moving) {
-      const from = anchorForPlace(routine.from, anchors) ?? fallback
+      const from = tileForPlace(routine.from, anchors) ?? fallback
       const to = target ?? fallback
       const path = shortestStreetPath(from, to, streets)
       const projected = positionOnStreetPath(path, routine.progress)
@@ -175,9 +175,9 @@ export function simulateNpcSpatialState({
       homeBuildingId,
       workBuildingId,
       communityBuildingId,
-      homeAnchor,
-      workAnchor,
-      communityAnchor,
+      homeAnchor: point(homeTile),
+      workAnchor: point(workTile),
+      communityAnchor: point(communityTile),
     })
   }
 
