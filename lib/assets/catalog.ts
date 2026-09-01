@@ -50,6 +50,14 @@ const building = (
 })
 
 export const BUILDING_VISUAL_ASSETS: BuildingVisualAsset[] = [
+  // Earth / LEO Terminal — first playable location.
+  // These entries intentionally exist before the raster files land: BuildingVisual
+  // fails closed to the legacy fallback until each WebP is available.
+  building('landing_pad', 'earth', 'exterior-isometric'),
+  building('admin', 'earth', 'exterior-isometric'),
+  building('school', 'earth', 'exterior-isometric'),
+  building('warehouse', 'earth', 'exterior-isometric'),
+
   building('habitat', 'mars', 'exterior-isometric', [2, 2]),
   building('habitat', 'mars', 'exterior-detail', [2, 2]),
   building('habitat', 'mars', 'interior-entry', [2, 2]),
