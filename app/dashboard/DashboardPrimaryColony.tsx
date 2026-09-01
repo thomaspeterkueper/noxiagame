@@ -5,6 +5,7 @@ import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
 import { useColonyStateStore } from '@/lib/store/colonyStateStore'
 import WalkableColony from './WalkableColony'
+import ColonyConversationLayer from './ColonyConversationLayer'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
 
 const chrome=<style>{`
@@ -39,5 +40,5 @@ export default function DashboardPrimaryColony(){
 
  if(mode==='interior'&&interior)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · {current.name??location}</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={enterColony}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div></div></>
 
- return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} ships={[]} locationId={current.id} userId={userId} onClose={enterPlanning} onEnterBuilding={b=>enterInterior(b.id)}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} residentCount={residents.length} onPlan={enterPlanning}/></div></>
+ return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} ships={[]} locationId={current.id} userId={userId} onClose={enterPlanning} onEnterBuilding={b=>enterInterior(b.id)}/><ColonyConversationLayer locationSlug={location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} userId={userId}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} residentCount={residents.length} onPlan={enterPlanning}/></div></>
 }
