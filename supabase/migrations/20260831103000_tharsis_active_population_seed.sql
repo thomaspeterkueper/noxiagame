@@ -26,11 +26,11 @@ DO $$
 DECLARE
   mars_id uuid;
   g integer;
-  person_id uuid;
+  v_person_id uuid;
   home_seed text;
   work_seed text;
-  role_code text;
-  skill_code text;
+  v_role_code text;
+  v_skill_code text;
   home_id uuid;
   work_id uuid;
 BEGIN
@@ -44,19 +44,19 @@ BEGIN
   END IF;
 
   FOR g IN 1..36 LOOP
-    person_id := noxia_population_uuid('tharsis-active:'||g);
+    v_person_id := noxia_population_uuid('tharsis-active:'||g);
     home_seed := 'habitat_cluster_' || (((g - 1) % 6) + 1)::text;
 
     CASE ((g - 1) % 9)
-      WHEN 0 THEN work_seed := 'medical_core';       role_code := 'medical';        skill_code := 'medicine';
-      WHEN 1 THEN work_seed := 'eclss_hub_1';        role_code := 'eclss';          skill_code := 'maintenance';
-      WHEN 2 THEN work_seed := 'water_isru_1';       role_code := 'water';          skill_code := 'process_engineering';
-      WHEN 3 THEN work_seed := 'reactor_module_1';   role_code := 'energy';         skill_code := 'power_systems';
-      WHEN 4 THEN work_seed := 'logistics_hub';      role_code := 'logistics';      skill_code := 'logistics';
-      WHEN 5 THEN work_seed := 'workshop_heavy';     role_code := 'technician';     skill_code := 'maintenance';
-      WHEN 6 THEN work_seed := 'material_complex_1'; role_code := 'geologist';      skill_code := 'geology';
-      WHEN 7 THEN work_seed := 'logistics_hub';      role_code := 'rover_operator'; skill_code := 'vehicle_operations';
-      ELSE        work_seed := 'command_node_1';     role_code := 'administrator';  skill_code := 'administration';
+      WHEN 0 THEN work_seed := 'medical_core';       v_role_code := 'medical';        v_skill_code := 'medicine';
+      WHEN 1 THEN work_seed := 'eclss_hub_1';        v_role_code := 'eclss';          v_skill_code := 'maintenance';
+      WHEN 2 THEN work_seed := 'water_isru_1';       v_role_code := 'water';          v_skill_code := 'process_engineering';
+      WHEN 3 THEN work_seed := 'reactor_module_1';   v_role_code := 'energy';         v_skill_code := 'power_systems';
+      WHEN 4 THEN work_seed := 'logistics_hub';      v_role_code := 'logistics';      v_skill_code := 'logistics';
+      WHEN 5 THEN work_seed := 'workshop_heavy';     v_role_code := 'technician';     v_skill_code := 'maintenance';
+      WHEN 6 THEN work_seed := 'material_complex_1'; v_role_code := 'geologist';      v_skill_code := 'geology';
+      WHEN 7 THEN work_seed := 'logistics_hub';      v_role_code := 'rover_operator'; v_skill_code := 'vehicle_operations';
+      ELSE        work_seed := 'command_node_1';     v_role_code := 'administrator';  v_skill_code := 'administration';
     END CASE;
 
     home_id := noxia_tharsis_ref_uuid('building:'||home_seed);
@@ -73,7 +73,7 @@ BEGIN
       id, person_key, display_name, birth_year, current_location_id,
       simulation_tier, activity_state, last_action, last_decision_factors, last_tick
     ) VALUES (
-      person_id, NULL, 'Tharsis Crew '||lpad(g::text,2,'0'), NULL, mars_id,
+      v_person_id, NULL, 'Tharsis Crew '||lpad(g::text,2,'0'), NULL, mars_id,
       'active', 'idle', NULL, '{"seed":"NOX-LIVING-20260831"}'::jsonb, 0
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -84,7 +84,7 @@ BEGIN
     INSERT INTO person_assignments
       (id, person_id, assignment_type, location_id, tile_entity_id, employer_actor_id, role_code, starts_tick, is_active)
     VALUES
-      (noxia_population_uuid('home:'||g), person_id, 'home', mars_id, home_id, NULL, NULL, 0, true)
+      (noxia_population_uuid('home:'||g), v_person_id, 'home', mars_id, home_id, NULL, NULL, 0, true)
     ON CONFLICT (id) DO UPDATE SET
       location_id = EXCLUDED.location_id, tile_entity_id = EXCLUDED.tile_entity_id,
       is_active = true, updated_at = now();
@@ -92,22 +92,22 @@ BEGIN
     INSERT INTO person_assignments
       (id, person_id, assignment_type, location_id, tile_entity_id, employer_actor_id, role_code, starts_tick, is_active)
     VALUES
-      (noxia_population_uuid('work:'||g), person_id, 'work', mars_id, work_id, NULL, role_code, 0, true)
+      (noxia_population_uuid('work:'||g), v_person_id, 'work', mars_id, work_id, NULL, v_role_code, 0, true)
     ON CONFLICT (id) DO UPDATE SET
       location_id = EXCLUDED.location_id, tile_entity_id = EXCLUDED.tile_entity_id,
       role_code = EXCLUDED.role_code, is_active = true, updated_at = now();
 
     INSERT INTO person_needs (person_id, need_code, satisfaction, updated_tick)
     VALUES
-      (person_id,'sustenance',0.90,0),
-      (person_id,'rest',0.90,0),
-      (person_id,'safety',0.95,0),
-      (person_id,'social',0.80,0),
-      (person_id,'purpose',0.85,0)
+      (v_person_id,'sustenance',0.90,0),
+      (v_person_id,'rest',0.90,0),
+      (v_person_id,'safety',0.95,0),
+      (v_person_id,'social',0.80,0),
+      (v_person_id,'purpose',0.85,0)
     ON CONFLICT (person_id, need_code) DO NOTHING;
 
     INSERT INTO person_skills (person_id, skill_code, level, experience, updated_tick)
-    VALUES (person_id, skill_code, 0.55 + (((g - 1) % 4)::numeric * 0.05), 0, 0)
+    VALUES (v_person_id, v_skill_code, 0.55 + (((g - 1) % 4)::numeric * 0.05), 0, 0)
     ON CONFLICT (person_id, skill_code) DO UPDATE SET level = EXCLUDED.level, updated_at = now();
   END LOOP;
 END $$;
