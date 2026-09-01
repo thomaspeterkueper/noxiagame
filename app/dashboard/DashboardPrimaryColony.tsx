@@ -39,7 +39,8 @@ export default function DashboardPrimaryColony(){
  const simulation=useMemo(()=>simulateColonyTick(
    Array.isArray(current?.location_resources) ? current.location_resources as any[] : [],
    localEntities,
- ),[current?.location_resources,localEntities])
+   current?.population ?? 0,
+ ),[current?.location_resources,current?.population,localEntities])
 
  useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
 
