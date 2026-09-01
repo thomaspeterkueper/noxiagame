@@ -1,7 +1,7 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 28.08.2026 — Referenzorte (z. B. Erde) aus Live-Koloniestatistik entfernt
-// Version:      0.11.0
+// Aktualisiert: 01.09.2026 — modulare Anlagen im World-Payload
+// Version:      0.12.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -97,6 +97,26 @@ export async function GET() {
     .eq('entity_type', 'building')
     .order('built_at', { ascending: true })
 
+  // ── Modulare Anlagen ─────────────────────────────────────────────────────────
+  // facility_instances gruppiert physische Module zu einer fachlichen Anlage.
+  // Eigentümer, Betreiber und Nutzer dürfen dabei getrennt sein.
+  const { data: facilities, error: facilitiesError } = await supabase
+    .from('facility_instances')
+    .select('id, seed_key, location_id, facility_type, name, owner_class, owner_id, operator_id, public_access, facility_modules(id, seed_key, definition_key, tile_entity_id, operator_id, occupant_id, public_access)')
+    .order('created_at', { ascending: true })
+
+  const { data: facilityModuleDefinitions, error: facilityDefinitionsError } = await supabase
+    .from('facility_module_definitions')
+    .select('key, name, facility_type, role, description, footprint, capacity, capabilities, allowed_locations, requires_facility, adjacent_roles, buildable, balancing_status')
+    .order('facility_type')
+    .order('role')
+
+  // Während eines gestaffelten Deployments kann Code kurz vor der Migration
+  // live sein. Deshalb blockiert ein noch fehlendes Facility-Schema den alten
+  // World-Payload nicht.
+  if (facilitiesError) console.warn('facility_instances unavailable:', facilitiesError.message)
+  if (facilityDefinitionsError) console.warn('facility_module_definitions unavailable:', facilityDefinitionsError.message)
+
   // Nur tatsächlich simulierte Siedlungen gehören in Live-Statistik und Feed.
   // Referenzorte wie Erde dürfen weder die Einwohnerzahl verfälschen noch
   // Versorgungswarnungen erzeugen.
@@ -145,6 +165,8 @@ export async function GET() {
     locations:    locations ?? [],
     transactions: transactions.slice(0, 10),
     entities:     allEntities ?? [],
+    facilities:   facilities ?? [],
+    facilityModuleDefinitions: facilityModuleDefinitions ?? [],
     celestialBodies: celestialBodies ?? [],
     stats: {
       totalPopulation:  totalPop,
