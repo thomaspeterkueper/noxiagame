@@ -142,25 +142,13 @@ CREATE TABLE IF NOT EXISTS daily_tasks (
 );
 
 -- events
--- Generalized NOXIA event stream. The historical (pre-consolidation) shape of
--- this table was replaced in production by a deleted migration; fresh replays
--- must reproduce the generalized shape here so later retained migrations
--- (20260831_noxia_events_entity_states.sql, wire_builds triggers) are valid.
 CREATE TABLE IF NOT EXISTS events (
-  id                               uuid primary key default gen_random_uuid(),
-  event_type                       text not null,
-  subject_type                     text not null,
-  subject_id                       uuid,
-  actor_id                         uuid,
+  id                               bigint DEFAULT nextval('events_id_seq'::regclass) NOT NULL,
+  profile_id                       uuid,
   location_id                      uuid,
-  tick                             bigint,
-  effect_group_id                  uuid not null default gen_random_uuid(),
-  effects                          jsonb not null default '[]'::jsonb,
-  metadata                         jsonb not null default '{}'::jsonb,
-  occurred_at                      timestamptz not null default now(),
-  created_at                       timestamptz not null default now(),
-  constraint events_effects_array  check (jsonb_typeof(effects) = 'array'),
-  constraint events_metadata_object check (jsonb_typeof(metadata) = 'object')
+  type                             text NOT NULL,
+  payload                          jsonb DEFAULT '{}'::jsonb NOT NULL,
+  created_at                       timestamptz DEFAULT now() NOT NULL
 );
 
 -- foundation_folien
@@ -211,10 +199,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   credits      integer not null default 5000
                  constraint credits_positive check (credits >= 0),
   created_at   timestamptz not null default now(),
-  last_seen_at timestamptz not null default now(),
-  -- Konsolidiert aus archivierter 202606231700_add_flight_count.sql:
-  -- Pilot-Kompetenz serverseitig zählen; das Dashboard liest nur den Wert.
-  flight_count integer not null default 0
+  last_seen_at timestamptz not null default now()
 );
 
 CREATE TABLE IF NOT EXISTS locations (
@@ -556,9 +541,11 @@ CREATE INDEX IF NOT EXISTS idx_daily_tasks_profile ON public.daily_tasks USING b
 
 CREATE UNIQUE INDEX IF NOT EXISTS events_pkey ON public.events USING btree (id);
 
--- Generalized-shape indexes live in 20260831_noxia_events_entity_states.sql;
--- the legacy idx_events_location/idx_events_profile/idx_events_type indexes
--- belonged to the pre-consolidation events shape and are intentionally absent.
+CREATE INDEX IF NOT EXISTS idx_events_location ON public.events USING btree (location_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_events_profile ON public.events USING btree (profile_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_events_type ON public.events USING btree (type, created_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS foundation_folien_kurs_id_position_key ON public.foundation_folien USING btree (kurs_id, "position");
 
