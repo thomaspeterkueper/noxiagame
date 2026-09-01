@@ -2,35 +2,17 @@
 -- Tharsis Hub — Utility-Integrität V2
 --
 -- Korrigiert drei im Implementierungs-/Layout-Review gefundene Modellfehler:
---   1. Ring A/B hatten Ankerpunkte, aber keine expliziten Graphkanten.
---   2. Redundanz wurde je Ring behauptet, obwohl einzelne Medien nur auf einem
---      Ring vorhanden waren.
---   3. Objekt↔Ring-Verbindungen waren nur logische Attachments, keine eigenen
---      physischen Feeder.
+--   1. Backbone A/B hatten Ankerpunkte, aber keine expliziten Graphkanten.
+--   2. Redundanz wurde nur über Ringnamen geprüft, nicht pro Medium.
+--   3. Objekt↔Backbone-Verbindungen waren logische Attachments, keine Feeder.
 --
--- Modellgrenze:
--- Das 32×24-Grid bleibt die grobe Oberflächenprojektion. Utility-Kanten sind
--- dedizierte geschützte/unterirdische Leitungssegmente zwischen Ankerpunkten;
--- sie werden NICHT als Straßen-Tiles projiziert. Exakte Mikrotrassen liegen
--- unterhalb der Tile-Auflösung. Dadurch bleiben Fahrwege und Mediennetze
--- getrennte Systeme, ohne künstlich jede Leitung auf ein Straßentile zu legen.
+-- WICHTIG: Diese Migration ändert NICHT die bestehende Medienbelegung der
+-- Backbones. A und B behalten die im kanonischen Start-Seed definierten Medien.
+-- Bis OTA/SSF entscheiden, gelten nur power/data/water/o2 als bereits auf beiden
+-- Backbones vorgesehen. gas, wastewater und thermal werden nicht künstlich
+-- doppelt geführt.
 
 SET search_path TO public;
-
--- ---------------------------------------------------------------------------
--- 1. Beide Backbones führen alle derzeit in Tharsis modellierten Medien.
---    Zwei Ring-Links zählen damit nur dann als Redundanz, wenn das konkrete
---    Medium tatsächlich auf beiden Pfaden vorhanden ist.
--- ---------------------------------------------------------------------------
-
-UPDATE location_utilities
-SET media = ARRAY['power','data','water','wastewater','o2','gas','thermal']::text[]
-WHERE location_id = (SELECT id FROM locations WHERE slug = 'mars')
-  AND ring IN ('A','B');
-
--- ---------------------------------------------------------------------------
--- 2. Explizite physische Graphkanten zwischen Backbone-Ankern.
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS location_utility_edges (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,24 +35,21 @@ CREATE INDEX IF NOT EXISTS idx_location_utility_edges_ring
   ON location_utility_edges (location_id, ring);
 
 ALTER TABLE location_utility_edges ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "location_utility_edges_select" ON location_utility_edges;
 CREATE POLICY "location_utility_edges_select"
   ON location_utility_edges FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "location_utility_edges_service" ON location_utility_edges;
 CREATE POLICY "location_utility_edges_service"
   ON location_utility_edges FOR ALL TO service_role USING (true) WITH CHECK (true);
-
 GRANT SELECT ON location_utility_edges TO authenticated;
 GRANT ALL ON location_utility_edges TO service_role;
 
 DELETE FROM location_utility_edges
 WHERE location_id = (SELECT id FROM locations WHERE slug = 'mars');
 
--- Deterministischer zusammenhängender Baum je Ring:
--- Anker werden stabil nach (row,col) geordnet; jeder Anker nach dem ersten
--- verbindet sich mit dem nächstgelegenen bereits eingebundenen Anker.
+-- Zusammenhängende physische Projektion je Backbone. Jeder geordnete Anker
+-- verbindet sich mit dem nächstgelegenen bereits eingebundenen Anker. Das
+-- bildet Konnektivität explizit ab, behauptet aber noch KEINE N-1-Loopstruktur.
 WITH mars AS (
   SELECT id AS location_id FROM locations WHERE slug = 'mars'
 ),
@@ -79,7 +58,8 @@ backbone_nodes AS (
     lu.location_id,
     lu.ring,
     lu.node_row,
-    lu.node_col
+    lu.node_col,
+    lu.media
   FROM location_utilities lu
   JOIN mars ON mars.location_id = lu.location_id
   WHERE lu.attaches_entity_id IS NULL
@@ -91,6 +71,7 @@ ordered_nodes AS (
     ring,
     node_row,
     node_col,
+    media,
     row_number() OVER (PARTITION BY location_id, ring ORDER BY node_row, node_col) AS rn
   FROM backbone_nodes
 ),
@@ -102,6 +83,7 @@ edges AS (
     parent.node_col AS from_col,
     child.node_row AS to_row,
     child.node_col AS to_col,
+    child.media,
     (abs(child.node_row - parent.node_row) + abs(child.node_col - parent.node_col))::smallint AS length_tiles
   FROM ordered_nodes child
   JOIN LATERAL (
@@ -128,7 +110,7 @@ SELECT
   from_col,
   to_row,
   to_col,
-  ARRAY['power','data','water','wastewater','o2','gas','thermal']::text[],
+  media,
   length_tiles,
   'dedicated',
   'STATE'
@@ -140,10 +122,6 @@ DO UPDATE SET
   length_tiles = EXCLUDED.length_tiles,
   routing_class = EXCLUDED.routing_class,
   owner_class = 'STATE';
-
--- ---------------------------------------------------------------------------
--- 3. Physische Feeder Objekt ↔ Backbone.
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS location_utility_feeders (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -169,15 +147,12 @@ CREATE INDEX IF NOT EXISTS idx_location_utility_feeders_ring
   ON location_utility_feeders (location_id, ring);
 
 ALTER TABLE location_utility_feeders ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "location_utility_feeders_select" ON location_utility_feeders;
 CREATE POLICY "location_utility_feeders_select"
   ON location_utility_feeders FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "location_utility_feeders_service" ON location_utility_feeders;
 CREATE POLICY "location_utility_feeders_service"
   ON location_utility_feeders FOR ALL TO service_role USING (true) WITH CHECK (true);
-
 GRANT SELECT ON location_utility_feeders TO authenticated;
 GRANT ALL ON location_utility_feeders TO service_role;
 
@@ -196,7 +171,7 @@ SELECT DISTINCT
   te.tile_col,
   lu.node_row,
   lu.node_col,
-  ARRAY['power','data','water','wastewater','o2','gas','thermal']::text[],
+  lu.media,
   (abs(te.tile_row - lu.node_row) + abs(te.tile_col - lu.node_col))::smallint,
   'dedicated',
   'STATE'
@@ -215,10 +190,10 @@ DO UPDATE SET
   routing_class = EXCLUDED.routing_class,
   owner_class = 'STATE';
 
--- ---------------------------------------------------------------------------
--- 4. Integritätsprüfungen auf Datenebene.
--- ---------------------------------------------------------------------------
-
+-- Datenebenen-Prüfungen. Die Graphkonstruktion erzeugt je Backbone n-1 Kanten
+-- aus n Knoten und ist per Konstruktion verbunden. Mediumspezifisch wird nur
+-- das bereits auf beiden Backbones vorhandene Set power/data/water/o2 als
+-- Doppelpfad verlangt.
 DO $$
 DECLARE
   mars_id uuid;
@@ -229,9 +204,6 @@ BEGIN
     RAISE EXCEPTION 'Tharsis Utility V2: location mars nicht gefunden';
   END IF;
 
-  -- Jeder Backbone-Anker außer dem ersten geordneten Anker pro Ring muss
-  -- mindestens eine explizite Kante besitzen. Der Aufbau oben ergibt je Ring
-  -- exakt n-1 Kanten für n Knoten und damit einen zusammenhängenden Baum.
   WITH counts AS (
     SELECT
       ring,
@@ -254,8 +226,6 @@ BEGIN
     RAISE EXCEPTION 'Tharsis Utility V2: Backbone-Kantenzahl verletzt n-1-Baumregel';
   END IF;
 
-  -- Jeder kritische Seed-Bestand, der im bisherigen Utility-Modell angebunden
-  -- war, muss jetzt zwei physische Feeder besitzen: A und B.
   SELECT count(*) INTO missing_count
   FROM (
     SELECT lu.attaches_entity_id
@@ -272,10 +242,10 @@ BEGIN
       AND f.entity_id = expected.attaches_entity_id
     GROUP BY f.entity_id
     HAVING count(DISTINCT f.ring) = 2
-       AND bool_and(ARRAY['power','data','water','wastewater','o2','gas','thermal']::text[] <@ f.media)
+       AND bool_and(ARRAY['power','data','water','o2']::text[] <@ f.media)
   );
 
   IF missing_count > 0 THEN
-    RAISE EXCEPTION 'Tharsis Utility V2: % doppelt angebundene Objekte ohne zwei vollständige physische Feeder', missing_count;
+    RAISE EXCEPTION 'Tharsis Utility V2: % doppelt angebundene Objekte ohne zwei Feeder für power/data/water/o2', missing_count;
   END IF;
 END $$;

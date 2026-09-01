@@ -750,7 +750,7 @@ WHERE location_id = (SELECT id FROM locations WHERE slug='mars')
 
 INSERT INTO location_utilities (location_id, ring, media, node_row, node_col)
 SELECT (SELECT id FROM locations WHERE slug='mars'), 'A',
-       ARRAY['power','data','water','wastewater','o2','gas','thermal'], r, c
+       ARRAY['power','data','water','o2','gas'], r, c
 FROM (VALUES
       ('A',11,10),
       ('A',11,11),
@@ -815,7 +815,7 @@ FROM (VALUES
 
 INSERT INTO location_utilities (location_id, ring, media, node_row, node_col)
 SELECT (SELECT id FROM locations WHERE slug='mars'), 'B',
-       ARRAY['power','data','water','wastewater','o2','gas','thermal'], r, c
+       ARRAY['power','data','water','o2','wastewater','thermal'], r, c
 FROM (VALUES
       ('B',13,8),
       ('B',14,8),
@@ -869,7 +869,8 @@ WHERE location_id = (SELECT id FROM locations WHERE slug='mars')
 INSERT INTO location_utilities
   (location_id, ring, media, node_row, node_col, attaches_entity_id)
 SELECT (SELECT id FROM locations WHERE slug='mars'), l.ring,
-       ARRAY['power','data','water','wastewater','o2','gas','thermal'],
+       CASE WHEN l.ring='A' THEN ARRAY['power','data','water','o2','gas']
+            ELSE ARRAY['power','data','water','o2','wastewater','thermal'] END,
        l.nrow, l.ncol,
        noxia_tharsis_uuid('building:'||l.object_id)
 FROM (VALUES
