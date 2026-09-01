@@ -1,7 +1,9 @@
 // lib/knowledge/ssfPaths.ts
 // Erstellt:     19.07.2026
 // Aktualisiert: 20.07.2026 — SSF-0019 implementiert: /learn?path=...&module=...
-// Version:      1.2.0
+// Aktualisiert: 01.09.2026 — EXT-KG-NOX-20260901-POWER-GENERATION-MAPPING:
+//                              Power-Generation-Modul kanonisch gemappt
+// Version:      1.3.0
 //
 // Kanonische SSF Pfad-IDs (von SSF-0008 bis SSF-0018 geliefert)
 // Mapping: PATH:SSF:* → UNL:NOX:*
@@ -31,6 +33,10 @@ export const MODULE_TO_PATH: Record<string, string> = {
   'PHY-L1-000006': 'PATH:SSF:PHY-WASSER-OBERFL-0001',
   'PHY-L1-000007': 'PATH:SSF:PHY-WASSER-SUBLIM-0001',
   'PHY-L1-000008': 'PATH:SSF:PHY-WASSER-WAERME-0001',
+  // EXT-KG-NOX-20260901-POWER-GENERATION-MAPPING: kanonisches Energieerzeugungs-Modul
+  // LearningModule ENG-L1-000001 / KXF LRN:SSF:ENG-POWER-GENERATION-0001
+  'ENG-L1-000001': 'PATH:SSF:NOX-POWER-GENERATION-0001',
+  'LRN:SSF:ENG-POWER-GENERATION-0001': 'PATH:SSF:NOX-POWER-GENERATION-0001',
 }
 
 export const SSF_BASE_URL = 'https://solarsciencefoundation.vercel.app'

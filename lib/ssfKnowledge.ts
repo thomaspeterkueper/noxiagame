@@ -1,17 +1,20 @@
 // ssfKnowledge.ts
 // Aktualisiert: 31.08.2026 — strukturierte SSF-Interactives
-// Version:      0.6.0
+// Aktualisiert: 01.09.2026 — EXT-KG-NOX-20260901-POWER-GENERATION-MAPPING:
+//                              resolveModuleForUnlock() + legacyId
+// Version:      0.7.0
 
 export type SsfUnlock = string | { key: string; condition?: unknown }
 
 export function unlockLabel(u: SsfUnlock): string {
   if (typeof u === 'string') return u
-  if (u && typeof u === 'object' && typeof (u as any).key === 'string') return (u as any).key
+  if (u && typeof u === 'object' && typeof (u as { key?: unknown }).key === 'string') return (u as { key: string }).key
   return String(u)
 }
 
 export type SsfKnowledgeModule = {
   id: string
+  legacyId: string | null
   pathId: string | null
   title: string
   domain: string
@@ -99,14 +102,30 @@ function ssfHeaders(): Record<string, string> {
   }
 }
 
-function normalizeModule<T extends SsfKnowledgeModule>(m: T): T {
+export function normalizeModule<T extends SsfKnowledgeModule>(m: T): T {
   return {
     ...m,
+    legacyId: typeof m.legacyId === 'string' && m.legacyId ? m.legacyId : null,
     pathId: typeof m.pathId === 'string' && m.pathId ? m.pathId : null,
     unlocks: Array.isArray(m.unlocks)
       ? (m.unlocks as unknown as SsfUnlock[]).map(unlockLabel)
       : [],
   }
+}
+
+// Kanonischer Unlock-Resolver: sucht das erste SSF-Modul, das den Unlock
+// in module.unlocks[] freischaltet (Architektur laut KG/SSF-Vertrag:
+// NOXIA behaelt die lokale Unlock-ID, SSF liefert die Module).
+export function resolveModuleForUnlock(
+  modules: SsfKnowledgeModule[],
+  unlockId: string,
+): SsfKnowledgeModule | null {
+  for (const candidate of modules) {
+    if (Array.isArray(candidate.unlocks) && candidate.unlocks.some((u) => unlockLabel(u as SsfUnlock) === unlockId)) {
+      return candidate
+    }
+  }
+  return null
 }
 
 export async function fetchSsfKnowledgeModules(): Promise<SsfKnowledgeModule[]> {
