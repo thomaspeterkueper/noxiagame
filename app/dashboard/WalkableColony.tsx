@@ -75,21 +75,25 @@ const IW = 56
 const IH = 28
 const CW = (COLS + ROWS) * IW + 240
 const CH = (COLS + ROWS) * IH + 320
-const MIN_ZOOM = 0.5
-const MAX_ZOOM = 2.6
+const MIN_ZOOM = 0.62
+const MAX_ZOOM = 2.8
+const START_ZOOM = 1.16
 
 const panel: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#111b27,#0b121b)',
-  border: '1px solid #45586a',
+  background: 'linear-gradient(180deg,rgba(14,25,36,.96),rgba(8,15,23,.96))',
+  border: '1px solid #3b5367',
   color: '#d8d4c8',
+  boxShadow: '0 14px 34px rgba(0,0,0,.35)',
+  backdropFilter: 'blur(8px)',
 }
 const action: React.CSSProperties = {
   width: '100%',
-  padding: '9px 10px',
-  background: '#263d51',
+  padding: '8px 10px',
+  background: '#20384d',
   color: '#f4dc88',
-  border: '1px solid #65788a',
-  font: 'bold 11px monospace',
+  border: '1px solid #516b80',
+  borderRadius: 5,
+  font: 'bold 10px monospace',
   cursor: 'pointer',
 }
 const section: React.CSSProperties = { borderTop: '1px solid #344657', paddingTop: 10, marginTop: 10 }
@@ -161,7 +165,7 @@ export default function WalkableColony({
   const mapRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [viewport, setViewport] = useState({ x: Math.max(0, CW / 2 - 500), y: 0 })
-  const [zoom, setZoom] = useState(0.78)
+  const [zoom, setZoom] = useState(START_ZOOM)
   const [residents, setResidents] = useState<Resident[]>([])
   const [selection, setSelection] = useState<Selection>(null)
   const [showPeople, setShowPeople] = useState(false)
@@ -173,6 +177,11 @@ export default function WalkableColony({
     () => getStreetTiles(locationSlug, population, entities, pending, userId, COLS, ROWS),
     [locationSlug, population, entities, pending, userId],
   )
+  const colonyFocus = useMemo(() => {
+    if (!buildings.length) return { col: 16, row: 12 }
+    const sum = buildings.reduce((acc, building) => ({ col: acc.col + building.tile_col + 0.5, row: acc.row + building.tile_row + 0.5 }), { col: 0, row: 0 })
+    return { col: sum.col / buildings.length, row: sum.row / buildings.length }
+  }, [buildings])
   const selectedBuilding = selection?.kind === 'building' ? buildings.find(b => b.id === selection.id) ?? null : null
   const selectedPerson = selection?.kind === 'person' ? residents.find(r => r.id === selection.id) ?? null : null
 
@@ -213,12 +222,11 @@ export default function WalkableColony({
 
   useEffect(() => {
     const habitat = buildings.find(b => b.entity_id === 'habitat' && b.profile_id === userId)
-    const street = nearestStreetTile(habitat?.tile_row ?? 12, habitat?.tile_col ?? 16, streets)
-    if (street) {
-      setFig({ col: street.col, row: street.row })
-      center(street.col, street.row)
-    }
-  }, [locationSlug, streets, buildings, userId, center])
+    const street = nearestStreetTile(habitat?.tile_row ?? colonyFocus.row, habitat?.tile_col ?? colonyFocus.col, streets)
+    if (street) setFig({ col: street.col, row: street.row })
+    setZoom(START_ZOOM)
+    center(colonyFocus.col, colonyFocus.row, START_ZOOM)
+  }, [locationSlug, streets, buildings, userId, colonyFocus, center])
 
   const communityBuildings = useMemo(() => {
     const preferred = ['bar', 'school', 'habitat', 'residential_block', 'admin']
@@ -229,14 +237,14 @@ export default function WalkableColony({
   const positions = useMemo<ResidentPosition[]>(() => residents.map(resident => {
     const workBuilding = buildings.find(b => b.id === assignment(resident, 'work')?.tileEntityId)
     const homeBuilding = buildings.find(b => b.id === assignment(resident, 'home')?.tileEntityId)
+    const routine = residentRoutine(resident.id, dayProgress)
     const communityBuilding = communityBuildings.length
-      ? communityBuildings[Math.floor(hash(`${resident.id}:community`) * communityBuildings.length)]
+      ? communityBuildings[routine.socialGroup % communityBuildings.length]
       : homeBuilding
 
     const workAnchor = anchor(workBuilding)
     const homeAnchor = anchor(homeBuilding)
     const communityAnchor = anchor(communityBuilding)
-    const routine = residentRoutine(resident.id, dayProgress)
 
     const target = routine.target === 'work' ? workAnchor : routine.target === 'community' ? communityAnchor : homeAnchor
     const fallback = target ?? workAnchor ?? homeAnchor ?? communityAnchor
@@ -258,8 +266,10 @@ export default function WalkableColony({
         }
       }
     } else {
-      col += 0.15 + (hash(`${resident.id}:c`) - 0.5) * 0.25
-      row += 0.15 + (hash(`${resident.id}:r`) - 0.5) * 0.25
+      const angle = hash(`${resident.id}:group-angle`) * Math.PI * 2
+      const radius = routine.target === 'community' ? 0.08 + hash(`${resident.id}:group-radius`) * 0.18 : 0.08 + hash(`${resident.id}:local-radius`) * 0.22
+      col += Math.cos(angle) * radius
+      row += Math.sin(angle) * radius
     }
 
     return { resident, col, row, routine }
@@ -286,7 +296,7 @@ export default function WalkableColony({
       const street = anchor(building)
       ctx.fillStyle = 'rgba(19,23,24,.72)'
       ctx.beginPath()
-      ctx.ellipse(p.x, p.y, 48, 23, 0, 0, Math.PI * 2)
+      ctx.ellipse(p.x, p.y, 54, 26, 0, 0, Math.PI * 2)
       ctx.fill()
       if (street) {
         const q = iso(street.col, street.row)
@@ -306,14 +316,14 @@ export default function WalkableColony({
     if (!rect) return
     const localX = event.clientX - rect.left
     const localY = event.clientY - rect.top
-    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * (event.deltaY > 0 ? 0.88 : 1.14)))
+    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * (event.deltaY > 0 ? 0.9 : 1.11)))
     const worldX = viewport.x + localX / zoom
     const worldY = viewport.y + localY / zoom
     setZoom(next)
     setViewport(clamp(worldX - localX / next, worldY - localY / next, next))
   }
 
-  const district = zoom >= 1.45
+  const district = zoom >= 1.18
   const transform = `translate(${-viewport.x * zoom}px,${-viewport.y * zoom}px) scale(${zoom})`
   const depth = useMemo(() => [
     ...buildings.map(building => ({ kind: 'b' as const, d: building.tile_col + building.tile_row, building })),
@@ -333,21 +343,24 @@ export default function WalkableColony({
   const virtualMinute = Math.floor((dayProgress * 24 - virtualHour) * 60)
 
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 100, background: '#081019', display: 'grid', gridTemplateRows: '42px minmax(0,1fr) 48px', fontFamily: 'monospace' }}>
+    <div style={{ position: 'absolute', inset: 0, zIndex: 100, background: '#081019', display: 'grid', gridTemplateRows: '36px minmax(0,1fr) 30px', fontFamily: 'monospace' }}>
       <BuildingSpriteStyles />
       <IsometricBuildingStyles />
       <ColonyActivityStyles />
       <NpcVisualStyles />
 
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px', background: '#142230', color: '#f1d57a' }}>
-        <b>NOXIA · {locationName.toUpperCase()} <span style={{ color: '#9eabb8' }}>POP {population.toLocaleString()} · SIM {residents.length} · {district ? 'DISTRIKT' : 'STRATEGIE'} · {String(virtualHour).padStart(2, '0')}:{String(virtualMinute).padStart(2, '0')}</span></b>
-        <div>
-          <button onClick={() => { setShowPeople(value => !value); setSelection(null) }} style={{ ...action, width: 'auto' }}>PERSONEN [{residents.length}]</button>{' '}
-          <button onClick={onClose} style={{ ...action, width: 'auto' }}>SCHLIESSEN</button>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px 0 12px', background: 'linear-gradient(90deg,#122334,#0c1824)', color: '#f1d57a', borderBottom: '1px solid #294259' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <b style={{ letterSpacing: '.08em' }}>{locationName.toUpperCase()}</b>
+          <span style={{ color: '#92a7b8', fontSize: 9 }}>POP {population.toLocaleString()} · {residents.length} AKTIV · {String(virtualHour).padStart(2, '0')}:{String(virtualMinute).padStart(2, '0')}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => { setShowPeople(value => !value); setSelection(null) }} style={{ ...action, width: 'auto', padding: '6px 9px' }}>PERSONEN {residents.length}</button>
+          <button onClick={onClose} style={{ ...action, width: 'auto', padding: '6px 9px', background: '#3a3020' }}>PLANEN & BAUEN</button>
         </div>
       </header>
 
-      <main style={{ position: 'relative', overflow: 'hidden' }}>
+      <main style={{ position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 50% 43%,rgba(109,61,35,.12),transparent 52%),#090b0e' }}>
         <div
           ref={mapRef}
           onWheel={wheel}
@@ -380,11 +393,11 @@ export default function WalkableColony({
                       setShowPeople(false)
                     }}
                     onDoubleClick={() => onEnterBuilding?.(building)}
-                    style={{ position: 'absolute', left: p.x - 50, top: p.y - 88, width: 100, height: 96, border: selected ? '1px solid #f1d57a' : '1px solid transparent', borderRadius: 14, background: selected ? '#f1d57a18' : 'transparent', padding: 0, pointerEvents: 'auto', cursor: 'pointer' }}
+                    style={{ position: 'absolute', left: p.x - 58, top: p.y - 104, width: 116, height: 112, border: selected ? '1px solid #f1d57a' : '1px solid transparent', borderRadius: 16, background: selected ? '#f1d57a16' : 'transparent', padding: 0, pointerEvents: 'auto', cursor: 'pointer' }}
                   >
-                    <IsometricBuilding entityId={building.entity_id} planet={locationSlug} owned={building.profile_id === userId} size={district ? 78 : 70} />
-                    {building.entity_id === 'water_recycler' && <MachineActivity left={28} top={18} />}
-                    <ServiceCrate left={72} top={68} />
+                    <IsometricBuilding entityId={building.entity_id} planet={locationSlug} owned={building.profile_id === userId} size={district ? 96 : 88} />
+                    {building.entity_id === 'water_recycler' && <MachineActivity left={34} top={22} />}
+                    <ServiceCrate left={84} top={80} />
                   </button>
                 )
               }
@@ -392,7 +405,7 @@ export default function WalkableColony({
                 const p = iso(item.position.col, item.position.row)
                 const resident = item.position.resident
                 return (
-                  <div key={resident.id} style={{ position: 'absolute', left: p.x - 12, top: p.y - 35, pointerEvents: 'auto' }}>
+                  <div key={resident.id} style={{ position: 'absolute', left: p.x - 12, top: p.y - 37, pointerEvents: 'auto', transform: 'scale(1.14)', transformOrigin: '50% 100%' }}>
                     <NpcFigure
                       id={resident.id}
                       name={resident.displayName}
@@ -406,7 +419,7 @@ export default function WalkableColony({
                 )
               }
               const p = iso(fig.col + 0.15, fig.row + 0.15)
-              return <div key="player" style={{ position: 'absolute', left: p.x - 12, top: p.y - 35, pointerEvents: 'none' }}><NpcFigure id={userId} name="Du" role="operations" showLabel /></div>
+              return <div key="player" style={{ position: 'absolute', left: p.x - 12, top: p.y - 37, pointerEvents: 'none', transform: 'scale(1.18)', transformOrigin: '50% 100%' }}><NpcFigure id={userId} name="Du" role="operations" showLabel /></div>
             })}
 
             {streets.slice(0, Math.min(3, streets.length)).map((street, index) => {
@@ -417,30 +430,30 @@ export default function WalkableColony({
         </div>
 
         {(showPeople || selection) && (
-          <aside style={{ ...panel, position: 'absolute', zIndex: 80, top: 10, right: 10, bottom: 10, width: 300, padding: 10, overflowY: 'auto' }}>
-            <button onClick={() => { setSelection(null); setShowPeople(false) }} style={{ float: 'right' }}>×</button>
+          <aside style={{ ...panel, position: 'absolute', zIndex: 80, top: 12, right: 12, bottom: 12, width: 280, padding: 12, overflowY: 'auto', borderRadius: 8 }}>
+            <button onClick={() => { setSelection(null); setShowPeople(false) }} style={{ float: 'right', border: 0, background: 'transparent', color: '#9db0be', cursor: 'pointer', fontSize: 18 }}>×</button>
             {showPeople ? residents.map(resident => {
               const current = positions.find(p => p.resident.id === resident.id)
               return (
-                <button key={resident.id} onClick={() => { setSelection({ kind: 'person', id: resident.id }); setShowPeople(false) }} style={{ display: 'block', width: '100%', padding: 0, marginBottom: 6, border: 0, cursor: 'pointer' }}>
+                <button key={resident.id} onClick={() => { setSelection({ kind: 'person', id: resident.id }); setShowPeople(false) }} style={{ display: 'block', width: '100%', padding: 0, marginBottom: 6, border: 0, cursor: 'pointer', background: 'transparent' }}>
                   <NpcPortrait id={resident.id} name={resident.displayName} role={`${role(resident)} · ${current?.routine.label ?? '—'}`} />
                 </button>
               )
             }) : selectedBuilding ? (
               <>
-                <small>GEBÄUDE</small>
-                <h3>{label(selectedBuilding.entity_id)}</h3>
+                <small style={{ color: '#7fa3bb', letterSpacing: '.12em' }}>GEBÄUDE</small>
+                <h3 style={{ margin: '6px 0 10px' }}>{label(selectedBuilding.entity_id)}</h3>
                 <div>Koordinate {selectedBuilding.tile_col},{selectedBuilding.tile_row}</div>
                 <div style={section}>{workers.length} Arbeitende · {homes.length} Wohnende</div>
                 <button style={action} onClick={() => onEnterBuilding?.(selectedBuilding)}>BETRETEN</button>
               </>
             ) : selectedPerson ? (
               <>
-                <small>PERSON</small>
+                <small style={{ color: '#7fa3bb', letterSpacing: '.12em' }}>PERSON</small>
                 <NpcPortrait id={selectedPerson.id} name={selectedPerson.displayName} role={role(selectedPerson)} />
                 <div style={section}><b>Tagesablauf</b><br />{selectedPosition?.routine.label ?? '—'}</div>
                 <div style={section}>Arbeit: {workBuilding ? label(workBuilding.entity_id) : '—'}<br />Wohnen: {homeBuilding ? label(homeBuilding.entity_id) : '—'}</div>
-                <div style={section}>Simulationsstatus: {selectedPerson.activityState}<br />{selectedPerson.lastAction ?? 'Keine aktuelle Aktion'}</div>
+                <div style={section}>Status: {selectedPerson.activityState}<br />{selectedPerson.lastAction ?? 'Keine aktuelle Aktion'}</div>
                 <div style={section}>{lowNeed && lowNeed.satisfaction < 0.6 ? `${lowNeed.code}: ${pct(lowNeed.satisfaction)}` : 'Bedürfnisse stabil'}</div>
               </>
             ) : null}
@@ -448,9 +461,9 @@ export default function WalkableColony({
         )}
       </main>
 
-      <footer style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#172230', color: '#9eabb8', fontSize: 9 }}>
-        <span>{buildings.length} GEBÄUDE · {streets.length} STRASSEN · {residents.length} PERSONEN</span>
-        <span>NPC-TAGESZYKLUS · ZOOM {Math.round(zoom * 100)}%</span>
+      <footer style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 11px', background: '#101b27', borderTop: '1px solid #273b4d', color: '#7f94a4', fontSize: 8 }}>
+        <span>{buildings.length} GEBÄUDE · {residents.length} PERSONEN</span>
+        <span>MAUSRAD ZOOM · ZIEHEN VERSCHIEBT · {Math.round(zoom * 100)}%</span>
       </footer>
     </div>
   )
