@@ -1,6 +1,7 @@
 // lib/game/world/types.ts
 // Erstellt:     10.07.2026
-// Version:      0.1.0
+// Aktualisiert: 01.09.2026 — modulare Anlagen / getrennte Eigentümer- und Betreiberrollen
+// Version:      0.2.0
 //
 // Neutrales Domänenmodell für WORLD-0002.
 // Phase 1 bleibt bewusst klein, das Modell reserviert aber Erweiterungspunkte
@@ -76,6 +77,15 @@ export interface TileBuildingRef {
   id: string
   buildingId: string
   ownerProfileId?: string | null
+
+  // Modulares Anlagenmodell. Optional für Rückwärtskompatibilität mit
+  // bestehenden atomaren Gebäuden und älteren DB-Zeilen.
+  facilityId?: string | null
+  facilityModuleDefinitionId?: string | null
+  ownerClass?: 'STATE' | 'PLAYER' | 'NPC' | 'CORPORATION' | null
+  operatorProfileId?: string | null
+  occupantProfileId?: string | null
+  publicAccess?: boolean
 }
 
 export interface TileArtificialState {
