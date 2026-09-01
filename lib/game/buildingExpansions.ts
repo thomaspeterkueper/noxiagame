@@ -6,6 +6,8 @@
 // - it does not create a second persistence mechanism;
 // - existing tile_entities.parent_id + slot are the preferred persistence relation;
 // - player_builds.parent_id + slot can represent the matching build lifecycle;
+// - renderers consume projections from world state and do not invent expansions;
+// - no graphics/assets are defined here;
 // - technical/canonical identities remain external (OTA/KG) and are not minted here.
 
 export type BuildingExpansionStatus = 'building' | 'active'
@@ -26,22 +28,21 @@ export interface BuildingExpansionDef {
   planHint?: string
 }
 
-/**
- * Storage-neutral representation of one persisted expansion instance.
- */
+/** Storage-neutral representation of one persisted expansion instance. */
 export interface BuildingExpansionInstance {
   id: string
   parentEntityId: string
   expansionId: string
   profileId: string | null
   status: BuildingExpansionStatus
-  slot?: number | null
+  slot: number | null
+  condition: number | null
 }
 
 /**
  * Minimal shape already present on public.tile_entities.
- * Child infrastructure can stay a normal addressable entity and use parent_id
- * to point at the owning/base building. No building-expansion table is required.
+ * Child infrastructure stays a normal addressable entity and uses parent_id to
+ * point at the owning/base building. No building-expansion table is required.
  */
 export interface TileEntityExpansionRow {
   id: string
@@ -51,6 +52,7 @@ export interface TileEntityExpansionRow {
   parent_id: string | null
   slot?: number | null
   status?: string | null
+  condition?: number | null
 }
 
 export interface BuildingProjectionState {
@@ -69,23 +71,40 @@ export function getExpansionDef(id: string): BuildingExpansionDef | null {
   return BUILDING_EXPANSIONS[id] ?? null
 }
 
+function normalizeExpansionStatus(status?: string | null): BuildingExpansionStatus | null {
+  if (status === 'building') return 'building'
+  if (status === 'active') return 'active'
+  return null
+}
+
 /**
  * Projects existing tile_entities children into expansion instances.
- * Rows without parent_id are base/world entities and are ignored here.
+ *
+ * Important: parent_id alone is not enough. tile_entities also contains other
+ * addressable children. Only registered expansion IDs with a valid lifecycle
+ * status become building expansions. This prevents the personal or strategic
+ * layer from accidentally treating arbitrary child entities as an extension.
  */
 export function expansionInstancesFromTileEntities(
   rows: TileEntityExpansionRow[],
 ): BuildingExpansionInstance[] {
-  return rows
-    .filter(row => row.parent_id != null)
-    .map(row => ({
+  return rows.flatMap(row => {
+    if (row.entity_type !== 'building' || row.parent_id == null) return []
+    if (!getExpansionDef(row.entity_id)) return []
+
+    const status = normalizeExpansionStatus(row.status)
+    if (!status) return []
+
+    return [{
       id: row.id,
-      parentEntityId: row.parent_id as string,
+      parentEntityId: row.parent_id,
       expansionId: row.entity_id,
       profileId: row.profile_id,
-      status: row.status === 'building' ? 'building' : 'active',
+      status,
       slot: row.slot ?? null,
-    }))
+      condition: row.condition ?? null,
+    }]
+  })
 }
 
 export function expansionsForBuilding(
@@ -120,6 +139,22 @@ export function projectBuildingState(input: {
     buildingId: input.buildingId,
     expansions: expansionsForBuilding(input.buildingEntityId, input.expansionInstances),
   }
+}
+
+/**
+ * Convenience projection for API/UI adapters. The renderer receives only
+ * persisted, registered children belonging to this concrete building instance.
+ */
+export function projectBuildingFromTileEntities(input: {
+  buildingEntityId: string
+  buildingId: string
+  rows: TileEntityExpansionRow[]
+}): BuildingProjectionState {
+  return projectBuildingState({
+    buildingEntityId: input.buildingEntityId,
+    buildingId: input.buildingId,
+    expansionInstances: expansionInstancesFromTileEntities(input.rows),
+  })
 }
 
 export function canBuildExpansion(
