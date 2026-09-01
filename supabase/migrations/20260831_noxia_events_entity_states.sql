@@ -39,10 +39,16 @@ create table if not exists public.entity_states (
   valid_to timestamptz,
   properties jsonb not null default '{}'::jsonb,
   source_event uuid references public.events(id) on delete set null,
+  canonical_entity_id text,
+  canonical_state_id text,
   created_at timestamptz not null default now(),
   constraint entity_states_valid_range check (valid_to is null or valid_to > valid_from),
   constraint entity_states_properties_object check (jsonb_typeof(properties) = 'object')
 );
+
+alter table public.entity_states
+  add column if not exists canonical_entity_id text,
+  add column if not exists canonical_state_id text;
 
 create unique index if not exists entity_states_one_current_idx
   on public.entity_states(subject_type, subject_id)
@@ -51,6 +57,10 @@ create index if not exists entity_states_history_idx
   on public.entity_states(subject_type, subject_id, valid_from desc);
 create index if not exists entity_states_source_event_idx
   on public.entity_states(source_event) where source_event is not null;
+create index if not exists entity_states_canonical_entity_idx
+  on public.entity_states(canonical_entity_id) where canonical_entity_id is not null;
+create index if not exists entity_states_canonical_state_idx
+  on public.entity_states(canonical_state_id) where canonical_state_id is not null;
 
 alter table public.events enable row level security;
 alter table public.entity_states enable row level security;
@@ -62,4 +72,10 @@ alter table public.entity_states enable row level security;
 comment on table public.events is
   'Generalized NOXIA simulation event stream. One event may carry grouped effects; colony_ledger remains the specialized resource ledger.';
 comment on table public.entity_states is
-  'Temporal state history derived from simulation events. valid_to IS NULL denotes the current state.';
+  'Temporal NOXIA runtime state history derived from simulation events. entity_states.id is a runtime UUID, never a KG STA:* identity. Optional canonical_* fields are KG-owned projections.';
+comment on column public.entity_states.id is
+  'NOXIA runtime state UUID. Does not replace or imply a KG STA:* canonical state identity.';
+comment on column public.entity_states.canonical_entity_id is
+  'Optional opaque KG canonical subject/entity ID. When canonical_state_id is present this subject must, where applicable, agree with KG DESCRIBES_STATE_OF semantics.';
+comment on column public.entity_states.canonical_state_id is
+  'Optional opaque KG STA:* ID after KG promotion/acceptance. NULL for runtime-only state history. NOXIA must not mint this value.';
