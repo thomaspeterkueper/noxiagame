@@ -62,10 +62,20 @@ export interface BuildingProjectionState {
 }
 
 /**
- * Deliberately empty until an expansion has a real NOXIA function.
- * Candidate ideas belong in design docs, not in the buildable catalog.
+ * Registered expansion types may be planned without being buildable. Keeping a
+ * planned type here gives persistence/projection code a stable NOXIA identity
+ * without assigning cost/build time or pretending the gameplay effect exists.
  */
-export const BUILDING_EXPANSIONS: Record<string, BuildingExpansionDef> = {}
+export const BUILDING_EXPANSIONS: Record<string, BuildingExpansionDef> = {
+  landing_pad_extra_pad: {
+    id: 'landing_pad_extra_pad',
+    name: 'Zusätzliches Landefeld',
+    description: 'Erweitert einen bestehenden Landeplatz um eine weitere physische Pad-Kapazität.',
+    parentBuildingIds: ['landing_pad'],
+    planned: true,
+    planHint: 'Wird erst baubar, wenn serverseitige Dock-/Ankunftskapazität belastbar ausgewertet wird.',
+  },
+}
 
 export function getExpansionDef(id: string): BuildingExpansionDef | null {
   return BUILDING_EXPANSIONS[id] ?? null
