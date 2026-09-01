@@ -1,6 +1,6 @@
 -- NOXIA event-stream wiring for authoritative build/entity mutations
 -- 2026-08-31
--- Depends on 20260831_noxia_events_entity_states.sql.
+-- Depends on 20260831000000_noxia_events_entity_states.sql.
 --
 -- Scope deliberately starts with construction and persisted world entities.
 -- Trade/travel are wired separately once their authoritative persistence

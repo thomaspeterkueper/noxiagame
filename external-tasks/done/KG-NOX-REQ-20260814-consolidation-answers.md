@@ -24,7 +24,7 @@ Die beratenden Antworten wurden übernommen.
 
 ## Umsetzung
 
-- Migration: `supabase/migrations/20260831_noxia_events_entity_states.sql`
+- Migration: `supabase/migrations/20260831000000_noxia_events_entity_states.sql` (zuvor `20260831_noxia_events_entity_states.sql`; umbenannt, damit der Tabellenaufbau bei lexikalischer Migrations-Reihenfolge vor den abhängigen Migrationen läuft)
 - Server-Boundary: `lib/game/events.ts`
 - Migration-Commit: `dabdbb0`
 - Event/State-Writer: `1ce391a`

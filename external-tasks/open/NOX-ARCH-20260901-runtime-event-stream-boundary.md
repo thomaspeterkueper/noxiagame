@@ -9,7 +9,7 @@
 
 ## Problem
 
-Die Migration `20260831_noxia_events_entity_states.sql` behandelt `public.events` als neuen generalisierten Runtime-Event-Stream mit UUID-ID und Feldern wie `event_type`, `subject_type`, `subject_id`, `payload` usw.
+Die Migration `20260831000000_noxia_events_entity_states.sql` (zuvor `20260831_noxia_events_entity_states.sql`) behandelt `public.events` als neuen generalisierten Runtime-Event-Stream mit UUID-ID und Feldern wie `event_type`, `subject_type`, `subject_id`, `payload` usw.
 
 Im konsolidierten historischen Baseline-Stand existiert jedoch bereits `public.events` als Legacy-Tabelle mit inkompatibler Struktur (u. a. bigint-ID und historische Felder wie `type`/`payload`). Durch `CREATE TABLE IF NOT EXISTS` entsteht bei Fresh Replay **nicht** das gewünschte neue Schema. Folge-Migrationen erwarten danach Tabellen/Felder, die nicht existieren; Production besitzt aktuell ebenfalls die Legacy-`events`, aber noch keine `entity_states`.
 
