@@ -7,7 +7,7 @@ type Discovery={id:string;groundTruthKey:string;row:number;col:number;kind:strin
 type ScanResult={scanner?:{id:string;row:number;col:number}|null;measurement?:{origin:{row:number;col:number};radius:number;coveredCells:{row:number;col:number}[];signals:{row:number;col:number;strength:number}[]};interpretations?:{groundTruthKey:string;label:string;confidence:string;evidence:string}[];newDiscoveries?:Discovery[];knownDiscoveries?:Discovery[];discoveries?:Discovery[];error?:string}
 const LABEL:Record<string,string>={geological_structure:'Geologische Struktur',volatile_signature:'Flüchtige Signatur',mineral_signature:'Mineralogische Signatur',subsurface_void:'Untergrund-Hohlraum'}
 
-async function authHeaders(){const sb=createClient();const{data:{session}}=await sb.auth.getSession();return session?{Authorization:`Bearer ${session.access_token}`}:{}}
+async function authHeaders():Promise<Record<string,string>>{const sb=createClient();const{data:{session}}=await sb.auth.getSession();return session?{Authorization:`Bearer ${session.access_token}`}:{}}
 
 export default function ScannerWorkspace({location}:{location:string}){
  const[loading,setLoading]=useState(true),[scanning,setScanning]=useState(false),[error,setError]=useState(''),[scanner,setScanner]=useState<ScanResult['scanner']>(null),[discoveries,setDiscoveries]=useState<Discovery[]>([]),[result,setResult]=useState<ScanResult|null>(null)
