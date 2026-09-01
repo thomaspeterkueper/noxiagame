@@ -1,17 +1,22 @@
-'use client'
-
 import { create } from 'zustand'
 
-type GameMode = 'planning' | 'colony'
+export type GameMode = 'colony' | 'planning' | 'interior'
 
-type GameModeState = {
+interface GameModeState {
   mode: GameMode
+  interiorBuildingId: string | null
   enterColony: () => void
   enterPlanning: () => void
+  enterInterior: (buildingId: string) => void
+  resetForLocation: () => void
 }
 
 export const useGameModeStore = create<GameModeState>((set) => ({
-  mode: 'planning',
-  enterColony: () => set({ mode: 'colony' }),
-  enterPlanning: () => set({ mode: 'planning' }),
+  mode: 'colony',
+  interiorBuildingId: null,
+
+  enterColony: () => set({ mode: 'colony', interiorBuildingId: null }),
+  enterPlanning: () => set({ mode: 'planning', interiorBuildingId: null }),
+  enterInterior: (buildingId) => set({ mode: 'interior', interiorBuildingId: buildingId }),
+  resetForLocation: () => set({ mode: 'colony', interiorBuildingId: null }),
 }))
