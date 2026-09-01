@@ -1,39 +1,12 @@
 -- NOXIA Object–Relation–Event foundation
 -- 2026-08-31
--- Adds a generalized event stream plus temporal entity state history.
+-- Adds the generalized runtime simulation event stream plus temporal entity state history.
+-- Legacy public.events remains untouched and keeps its historical bigint/type/payload shape.
 -- Existing colony_ledger remains the resource/economy specialization.
 -- world_events and historical_milestones are intentionally retained until
 -- their roadmap role is decided separately.
 
--- Fresh replays of the consolidated set create the generalized shape directly
--- in the canonical baseline. Environments that applied the legacy baseline
--- before this consolidation still carry the old events shape (bigint id,
--- profile_id/type/payload); drop it so the create below is authoritative in
--- both histories. The legacy RLS policy and grants from the baseline are part
--- of the retired shape and are intentionally not recreated.
-do $$
-begin
-  if to_regclass('public.events') is not null
-     and exists (
-       select 1
-       from information_schema.columns
-       where table_schema = 'public'
-         and table_name = 'events'
-         and column_name = 'type'
-     )
-     and not exists (
-       select 1
-       from information_schema.columns
-       where table_schema = 'public'
-         and table_name = 'events'
-         and column_name = 'subject_type'
-     )
-  then
-    drop table public.events;
-  end if;
-end $$;
-
-create table if not exists public.events (
+create table if not exists public.simulation_events (
   id uuid primary key default gen_random_uuid(),
   event_type text not null,
   subject_type text not null,
@@ -46,33 +19,28 @@ create table if not exists public.events (
   metadata jsonb not null default '{}'::jsonb,
   occurred_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
-  constraint events_effects_array check (jsonb_typeof(effects) = 'array'),
-  constraint events_metadata_object check (jsonb_typeof(metadata) = 'object')
+  canonical_entity_id text,
+  canonical_event_id text,
+  constraint simulation_events_effects_array check (jsonb_typeof(effects) = 'array'),
+  constraint simulation_events_metadata_object check (jsonb_typeof(metadata) = 'object')
 );
 
-create index if not exists events_subject_idx
-  on public.events(subject_type, subject_id, occurred_at desc);
-create index if not exists events_location_idx
-  on public.events(location_id, occurred_at desc);
-create index if not exists events_tick_idx
-  on public.events(tick) where tick is not null;
-create index if not exists events_effect_group_idx
-  on public.events(effect_group_id);
-
--- Same canonical projection columns as 20260831195000_runtime_canon_projection_boundary.sql,
--- kept here so the table is complete in both histories (fresh replay and the
--- legacy-shape drop above).
-alter table public.events
+alter table public.simulation_events
   add column if not exists canonical_entity_id text,
   add column if not exists canonical_event_id text;
 
-create index if not exists events_canonical_entity_idx
-  on public.events(canonical_entity_id)
-  where canonical_entity_id is not null;
-
-create index if not exists events_canonical_event_idx
-  on public.events(canonical_event_id)
-  where canonical_event_id is not null;
+create index if not exists simulation_events_subject_idx
+  on public.simulation_events(subject_type, subject_id, occurred_at desc);
+create index if not exists simulation_events_location_idx
+  on public.simulation_events(location_id, occurred_at desc);
+create index if not exists simulation_events_tick_idx
+  on public.simulation_events(tick) where tick is not null;
+create index if not exists simulation_events_effect_group_idx
+  on public.simulation_events(effect_group_id);
+create index if not exists simulation_events_canonical_entity_idx
+  on public.simulation_events(canonical_entity_id) where canonical_entity_id is not null;
+create index if not exists simulation_events_canonical_event_idx
+  on public.simulation_events(canonical_event_id) where canonical_event_id is not null;
 
 create table if not exists public.entity_states (
   id uuid primary key default gen_random_uuid(),
@@ -81,7 +49,7 @@ create table if not exists public.entity_states (
   valid_from timestamptz not null,
   valid_to timestamptz,
   properties jsonb not null default '{}'::jsonb,
-  source_event uuid references public.events(id) on delete set null,
+  source_event uuid references public.simulation_events(id) on delete set null,
   canonical_entity_id text,
   canonical_state_id text,
   created_at timestamptz not null default now(),
@@ -105,17 +73,23 @@ create index if not exists entity_states_canonical_entity_idx
 create index if not exists entity_states_canonical_state_idx
   on public.entity_states(canonical_state_id) where canonical_state_id is not null;
 
-alter table public.events enable row level security;
+alter table public.simulation_events enable row level security;
 alter table public.entity_states enable row level security;
 
 -- These tables are simulation internals. Browser clients receive projections
 -- through NOXIA APIs; no anon/authenticated write policy is created here.
 -- service_role bypasses RLS and remains the authoritative writer.
 
-comment on table public.events is
-  'Generalized NOXIA simulation event stream. One event may carry grouped effects; colony_ledger remains the specialized resource ledger.';
+comment on table public.simulation_events is
+  'Authoritative NOXIA runtime simulation event stream. Legacy public.events remains the historical application event stock.';
+comment on column public.simulation_events.id is
+  'NOXIA runtime event UUID. Does not replace or imply a KG EVT:* canonical event identity.';
+comment on column public.simulation_events.canonical_entity_id is
+  'Optional opaque KG canonical subject/entity ID after an explicit KG-approved projection. NOXIA must not mint this value.';
+comment on column public.simulation_events.canonical_event_id is
+  'Optional opaque KG EVT:* ID after KG promotion/acceptance. NULL for ordinary runtime-only events. NOXIA must not mint this value.';
 comment on table public.entity_states is
-  'Temporal NOXIA runtime state history derived from simulation events. entity_states.id is a runtime UUID, never a KG STA:* identity. Optional canonical_* fields are KG-owned projections.';
+  'Temporal NOXIA runtime state history derived from simulation_events. entity_states.id is a runtime UUID, never a KG STA:* identity. Optional canonical_* fields are KG-owned projections.';
 comment on column public.entity_states.id is
   'NOXIA runtime state UUID. Does not replace or imply a KG STA:* canonical state identity.';
 comment on column public.entity_states.canonical_entity_id is
