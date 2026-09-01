@@ -12,7 +12,7 @@ function value(row:any){
   return { stock, delta: production - consumption }
 }
 
-export default function ColonyHudOverlay({ current, builds, entityCount, onPlan }:{ current:any; builds:any[]; entityCount:number; onPlan:()=>void }){
+export default function ColonyHudOverlay({ current, builds, entityCount, residentCount, onPlan }:{ current:any; builds:any[]; entityCount:number; residentCount:number; onPlan:()=>void }){
   const resources = Array.isArray(current?.location_resources) ? current.location_resources : []
   const visible = resources.filter((r:any)=>['water','energy','metal','oxygen','food'].includes(r.resource)).slice(0,5)
   const active = builds.find((b:any)=>b.status==='building') ?? null
@@ -30,7 +30,7 @@ export default function ColonyHudOverlay({ current, builds, entityCount, onPlan 
     <aside className="noxia-context-inspector">
       <div className="inspector-kicker">KOLONIE</div>
       <h3>{current?.name ?? current?.slug}</h3>
-      <div className="inspector-meta"><span>👥 {(current?.population ?? 0).toLocaleString('de-DE')}</span><span>▦ {entityCount} Anlagen</span></div>
+      <div className="inspector-meta"><span>👥 {(current?.population ?? 0).toLocaleString('de-DE')} · {residentCount} aktiv</span><span>▦ {entityCount} Anlagen</span></div>
       {active ? <>
         <div className="inspector-divider" />
         <div className="inspector-kicker">AKTIVER BAU</div>
