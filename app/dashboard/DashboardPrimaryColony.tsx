@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
+import { simulateColonyTick } from '@/lib/game/colonySimulation'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
 import { useColonyStateStore } from '@/lib/store/colonyStateStore'
@@ -30,7 +31,15 @@ export default function DashboardPrimaryColony(){
    return()=>{live=false;clearInterval(timer)}
  },[location,refresh])
 
- const current=locations.find(l=>l.slug===location),isStation=current?.location_type==='station'||location==='prometheus',localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location]),localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location]),interior=useMemo(()=>mode==='interior'&&interiorBuildingId?localEntities.find((b:any)=>b.id===interiorBuildingId)??null:null,[mode,interiorBuildingId,localEntities])
+ const current=locations.find(l=>l.slug===location)
+ const isStation=current?.location_type==='station'||location==='prometheus'
+ const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
+ const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
+ const interior=useMemo(()=>mode==='interior'&&interiorBuildingId?localEntities.find((b:any)=>b.id===interiorBuildingId)??null:null,[mode,interiorBuildingId,localEntities])
+ const simulation=useMemo(()=>simulateColonyTick(
+   Array.isArray(current?.location_resources) ? current.location_resources as any[] : [],
+   localEntities,
+ ),[current?.location_resources,localEntities])
 
  useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
 
@@ -40,5 +49,5 @@ export default function DashboardPrimaryColony(){
 
  if(mode==='interior'&&interior)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-interior"><div className="noxia-interior-head"><div><small>INNENRAUM · {current.name??location}</small><b>{interior.entity_id==='habitat'?'Habitat · Gemeinschaftsmodul':'Anlageninnenraum'}</b></div><button onClick={enterColony}>← Zur Kolonie</button></div><div className="noxia-interior-card"><h3>{interior.entity_id==='habitat'?'Persönliche Ebene':'Technischer Innenraum'}</h3><p>{interior.entity_id==='habitat'?'Aufenthalt, Pflanzen, Arbeitsplätze und Bewohner machen die Kolonie hier als Lebensraum erfahrbar.':'Diese Anlage nutzt vorerst den gemeinsamen Innenraum-Fallback; eigene technische Innenräume folgen als Asset-Slices.'}</p></div></div></div></>
 
- return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} ships={[]} locationId={current.id} userId={userId} onClose={enterPlanning} onEnterBuilding={b=>enterInterior(b.id)}/><ColonyConversationLayer locationSlug={location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} userId={userId}/><ColonyHudOverlay current={current} builds={localBuilds} entityCount={localEntities.length} residentCount={residents.length} onPlan={enterPlanning}/></div></>
+ return <>{chrome}<ColonyHudStyles/><div className="noxia-primary-colony"><WalkableColony locationSlug={location} locationName={current.name??location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} ships={[]} locationId={current.id} userId={userId} simulation={simulation} onClose={enterPlanning} onEnterBuilding={b=>enterInterior(b.id)}/><ColonyConversationLayer locationSlug={location} population={current.population??0} entities={localEntities as any} pending={localBuilds} residents={residents} userId={userId}/><ColonyHudOverlay builds={localBuilds} simulation={simulation}/></div></>
 }
