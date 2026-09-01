@@ -1,10 +1,12 @@
 export type NpcRoutineActivity = 'sleep' | 'commute' | 'work' | 'meal' | 'community' | 'home'
 export type NpcShiftKind = 'early' | 'day' | 'late'
+export type RoutinePlace = 'home' | 'work' | 'community'
 
 export interface RoutineStop {
   activity: NpcRoutineActivity
   label: string
-  target: 'home' | 'work' | 'community'
+  from: RoutinePlace
+  target: RoutinePlace
   moving: boolean
   progress: number
   shift: NpcShiftKind
@@ -35,9 +37,17 @@ export function residentRoutine(residentId: string, dayProgress: number): Routin
   const socialGroup = Math.floor(hash01(`${residentId}:social-group`) * 4)
   const socialBias = hash01(`${residentId}:social-bias`)
 
-  const stop = (activity: NpcRoutineActivity, label: string, target: RoutineStop['target'], moving = false, progress = 0): RoutineStop => ({
+  const stop = (
+    activity: NpcRoutineActivity,
+    label: string,
+    target: RoutinePlace,
+    moving = false,
+    progress = 0,
+    from: RoutinePlace = target,
+  ): RoutineStop => ({
     activity,
     label,
+    from,
     target,
     moving,
     progress,
@@ -47,11 +57,17 @@ export function residentRoutine(residentId: string, dayProgress: number): Routin
   })
 
   if (p < 0.21) return stop('sleep', 'Ruhezeit', 'home')
-  if (p < 0.27) return stop('commute', 'Weg zur Arbeit', 'work', true, (p - 0.21) / 0.06)
+  if (p < 0.27) return stop('commute', 'Weg zur Arbeit', 'work', true, (p - 0.21) / 0.06, 'home')
   if (p < 0.58) return stop('work', shiftLabel, 'work')
-  if (p < 0.64) return stop('commute', 'Weg zum Treffpunkt', 'community', true, (p - 0.58) / 0.06)
+  if (p < 0.64) return stop('commute', 'Weg zum Treffpunkt', 'community', true, (p - 0.58) / 0.06, 'work')
   if (p < 0.72) return stop('meal', 'Mahlzeit', 'community')
-  if (p < 0.80 && socialBias > 0.22) return stop('community', socialBias > 0.72 ? 'Treffen mit Kolonisten' : 'Freizeit / Gemeinschaft', 'community')
-  if (p < 0.86) return stop('commute', 'Heimweg', 'home', true, Math.max(0, Math.min(1, (p - 0.80) / 0.06)))
+
+  if (socialBias > 0.22) {
+    if (p < 0.80) return stop('community', socialBias > 0.72 ? 'Treffen mit Kolonisten' : 'Freizeit / Gemeinschaft', 'community')
+    if (p < 0.86) return stop('commute', 'Heimweg', 'home', true, (p - 0.80) / 0.06, 'community')
+  } else if (p < 0.80) {
+    return stop('commute', 'Heimweg', 'home', true, (p - 0.72) / 0.08, 'community')
+  }
+
   return stop('home', socialBias < 0.22 ? 'Private Freizeit' : 'Im Habitat', 'home')
 }
