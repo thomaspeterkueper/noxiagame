@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect } from 'react'
-import { LOCATION_MAPS, terrainCodeToType } from '@/lib/grid/locationMaps'
 
 const LOCATION_IMAGE: Record<string, string> = {
   Erde: '/images/locations/earth.png',
@@ -13,7 +12,6 @@ const LOCATION_IMAGE: Record<string, string> = {
 
 const CREDIT_MODULE_ID = 'ECO-L0-000001'
 const CREDIT_LEARNING_URL = `/academy/learn?module=${CREDIT_MODULE_ID}`
-const SAUERLAND_ROOT = '/assets/environments/earth/sauerland'
 
 function parseScale(transform: string): number {
   const scale = transform.match(/scale\(([-\d.]+)\)/)
@@ -23,291 +21,14 @@ function parseScale(transform: string): number {
   return 1
 }
 
-function earthBuildingAsset(entityId: string): string {
-  const id = entityId.toLowerCase()
-  if (id.includes('school') || id.includes('academy')) return `${SAUERLAND_ROOT}/buildings/school_01.svg`
-  if (id.includes('admin') || id.includes('town') || id.includes('government')) return `${SAUERLAND_ROOT}/buildings/town_hall_01.svg`
-  if (id.includes('factory') || id.includes('smelt') || id.includes('industrial')) return `${SAUERLAND_ROOT}/buildings/factory_small_01.svg`
-  if (id.includes('warehouse') || id.includes('storage') || id.includes('depot')) return `${SAUERLAND_ROOT}/buildings/warehouse_01.svg`
-  if (id.includes('farm') || id.includes('plant')) return `${SAUERLAND_ROOT}/buildings/farm_01.svg`
-  if (id.includes('fire')) return `${SAUERLAND_ROOT}/buildings/fire_station_01.svg`
-  if (id.includes('chapel')) return `${SAUERLAND_ROOT}/buildings/chapel_01.svg`
-  if (id.includes('spaceport') || id.includes('control') || id.includes('command')) return `${SAUERLAND_ROOT}/hub/hub_control_01.svg`
-  if (id.includes('hangar')) return `${SAUERLAND_ROOT}/hub/hub_hangar_01.svg`
-  if (id.includes('lab') || id.includes('research')) return `${SAUERLAND_ROOT}/hub/hub_module_01.svg`
-  if (id.includes('habitat') || id.includes('residential') || id.includes('house')) return `${SAUERLAND_ROOT}/buildings/house_01.svg`
-  return `${SAUERLAND_ROOT}/hub/hub_module_01.svg`
-}
-
-type WorldEntity = {
-  id: string
-  entity_id: string
-  tile_row: number
-  tile_col: number
-  locations?: { slug?: string; name?: string } | null
-}
-
-async function openSauerlandIsometric(): Promise<void> {
-  document.querySelector('[data-noxia-sauerland-iso]')?.remove()
-
-  const overlay = document.createElement('div')
-  overlay.dataset.noxiaSauerlandIso = '1'
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:10050;background:rgba(18,25,28,.76);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px'
-
-  const shell = document.createElement('section')
-  shell.style.cssText = 'width:min(1500px,96vw);height:min(900px,92vh);background:#f7f5ee;border:1px solid #cfc7b8;border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column'
-
-  const header = document.createElement('header')
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #ddd6c8;background:#fbfaf6;min-height:48px'
-  header.innerHTML = '<div><strong style="font:700 14px system-ui;color:#24415e">Erde · Sauerland</strong><span style="font:500 11px system-ui;color:#7d7467;margin-left:10px">Neue isometrische Ansicht</span></div>'
-
-  const controls = document.createElement('div')
-  controls.style.cssText = 'display:flex;gap:6px;align-items:center'
-  const makeButton = (label: string, title: string) => {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.textContent = label
-    button.title = title
-    button.style.cssText = 'height:30px;min-width:32px;border:1px solid #d8d0c2;border-radius:7px;background:#fff;color:#24415e;font:700 13px system-ui;cursor:pointer;padding:0 9px'
-    return button
-  }
-  const minus = makeButton('−', 'Verkleinern')
-  const zoomLabel = document.createElement('span')
-  zoomLabel.style.cssText = 'min-width:44px;text-align:center;font:600 11px ui-monospace,monospace;color:#6b6357'
-  const plus = makeButton('+', 'Vergrößern')
-  const reset = makeButton('100%', 'Zoom zurücksetzen')
-  const close = makeButton('✕', 'Schließen')
-  controls.append(minus, zoomLabel, plus, reset, close)
-  header.appendChild(controls)
-
-  const viewport = document.createElement('div')
-  viewport.style.cssText = 'position:relative;flex:1;overflow:auto;background:linear-gradient(#dcebf0 0,#edf1df 32%,#d5dfbf 100%);cursor:grab;overscroll-behavior:contain'
-
-  const sceneFrame = document.createElement('div')
-  sceneFrame.style.cssText = 'position:relative;width:1550px;height:1040px;transform-origin:top left'
-  const scene = document.createElement('div')
-  scene.style.cssText = 'position:absolute;inset:0'
-  sceneFrame.appendChild(scene)
-  viewport.appendChild(sceneFrame)
-  shell.append(header, viewport)
-  overlay.appendChild(shell)
-  document.body.appendChild(overlay)
-
-  let zoom = 0.85
-  const applyZoom = () => {
-    zoom = Math.max(0.35, Math.min(2.2, Math.round(zoom * 100) / 100))
-    sceneFrame.style.zoom = String(zoom)
-    zoomLabel.textContent = `${Math.round(zoom * 100)}%`
-  }
-  plus.onclick = () => { zoom += 0.15; applyZoom() }
-  minus.onclick = () => { zoom -= 0.15; applyZoom() }
-  reset.onclick = () => { zoom = 1; applyZoom() }
-  close.onclick = () => overlay.remove()
-  overlay.addEventListener('mousedown', event => { if (event.target === overlay) overlay.remove() })
-  viewport.addEventListener('wheel', event => {
-    if (!event.ctrlKey && !event.metaKey) return
-    event.preventDefault()
-    zoom += event.deltaY < 0 ? 0.1 : -0.1
-    applyZoom()
-  }, { passive: false })
-  applyZoom()
-
-  let panning = false
-  let startX = 0
-  let startY = 0
-  let startLeft = 0
-  let startTop = 0
-  viewport.addEventListener('mousedown', event => {
-    if ((event.target as HTMLElement).closest('button')) return
-    panning = true
-    startX = event.clientX
-    startY = event.clientY
-    startLeft = viewport.scrollLeft
-    startTop = viewport.scrollTop
-    viewport.style.cursor = 'grabbing'
-  })
-  window.addEventListener('mousemove', event => {
-    if (!panning) return
-    viewport.scrollLeft = startLeft - (event.clientX - startX)
-    viewport.scrollTop = startTop - (event.clientY - startY)
-  })
-  window.addEventListener('mouseup', () => { panning = false; viewport.style.cursor = 'grab' })
-
-  // Die Iso-Sicht ist eine Projektion des kanonischen Weltzustands (README:
-  // "Eine Simulation, mehrere Sichten"). Terrain und Wasserlauf kommen aus
-  // LOCATION_MAPS.earth bzw. terrainCodeToType — der Quelle, aus der auch
-  // generateGrid() die strategische Karte baut. Kein eigener Terrain-Entwurf.
-  const earthRows = LOCATION_MAPS.earth
-  const rows = earthRows.length
-  const cols = earthRows[0]?.length ?? 32
-  const tileW = 46
-  const tileH = 24
-  const originX = 760
-  const originY = 42
-  const project = (row: number, col: number) => ({
-    x: originX + (col - row) * tileW / 2,
-    y: originY + (col + row) * tileH / 2,
-  })
-
-  // Bodenbelag je kanonischem Terrain-Typ. Wald-Kacheln (f/F) erhalten eine
-  // schlichte Forstfläche; die Bäume setzt der Wald-Pass anhand derselben
-  // Kachel-Codes. Straßen sind im kanonischen Raster dynamische Fahrweg-
-  // Geometrie (kein LOCATION_MAPS-Code) und gehören nicht in diese Ebene.
-  const EARTH_BEDS: Record<string, string> = {
-    tile_farmland: `background:#b9975c url(${SAUERLAND_ROOT}/terrain/terrain_field_01.svg) center/cover no-repeat`,
-    tile_city: 'background:#9aa1a4 url(/images/grid/earth/tile_city.webp) center/cover no-repeat',
-    tile_concrete: 'background:#a3aaac url(/images/grid/earth/tile_concrete.webp) center/cover no-repeat',
-    tile_forest_edge: 'background:#7d9a60',
-    tile_forest_dense: 'background:#5d7c44',
-    river: 'background:#7e9a63',
-  }
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const point = project(row, col)
-      const code = earthRows[row]?.[col]
-      const type = code ? terrainCodeToType(code) : 'tile_grass'
-      let background = EARTH_BEDS[type]
-      if (!background) {
-        // Gras-Varianten wie bisher — nur noch auf kanonischen Gras-Kacheln.
-        const variant = (row * 17 + col * 29) % 13 === 0 ? 'terrain_grass_dark_01.svg' : 'terrain_grass_01.webp'
-        background = `background:#78985f url(${SAUERLAND_ROOT}/terrain/${variant}) center/cover no-repeat`
-      }
-      const tile = document.createElement('div')
-      const lineTint = type === 'river' ? 'rgba(90,140,110,.18)' : 'rgba(60,82,48,.12)'
-      tile.style.cssText = `position:absolute;left:${point.x - tileW / 2}px;top:${point.y}px;width:${tileW}px;height:${tileH}px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);${background};filter:saturate(.88);box-shadow:inset 0 0 0 1px ${lineTint}`
-      scene.appendChild(tile)
-    }
-  }
-
-  // Waldbäume ausschließlich auf kanonischen Wald-Kacheln (f = Waldrand,
-  // F = dichter Wald). Dichte und Baumart variieren dekorativ pro Kachel,
-  // die Waldflächen selbst kommen aus dem Weltzustand.
-  const FOREST_TREES: Record<string, string[]> = {
-    f: ['tree_conifer_01.svg', 'tree_birch_01.svg', 'tree_broadleaf_01.svg', 'tree_conifer_02.svg', 'tree_broadleaf_02.svg'],
-    F: ['tree_conifer_01.svg', 'tree_conifer_02.svg', 'tree_conifer_01.svg', 'tree_broadleaf_01.svg', 'tree_conifer_01.svg'],
-  }
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const code = earthRows[row]?.[col]
-      if (code !== 'f' && code !== 'F') continue
-      if (code === 'f' && (row * 17 + col * 29) % 10 >= 6) continue
-      const point = project(row, col)
-      const pool = FOREST_TREES[code]
-      const asset = pool[(row * 7 + col * 13) % pool.length]
-      const tree = document.createElement('img')
-      tree.src = `${SAUERLAND_ROOT}/nature/${asset}`
-      tree.alt = ''
-      tree.style.cssText = `position:absolute;left:${point.x - 34}px;top:${point.y - 54}px;width:68px;height:68px;object-fit:contain;z-index:${100 + row + col};pointer-events:none`
-      scene.appendChild(tree)
-    }
-  }
-
-  // Talzug/Bach aus dem kanonischen Flussverlauf ('r'): verbunden über die
-  // vier Nachbarn wie autotilePrefix() im Raster, projiziert als durchgehendes
-  // Wasserband — keine eigene Gewässer-Geometrie.
-  const isRiverCell = (r: number, c: number) =>
-    r >= 0 && r < rows && c >= 0 && c < cols && earthRows[r]?.[c] === 'r'
-  const waterSegments: string[] = []
-  const waterPonds: Array<{ x: number; y: number }> = []
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (!isRiverCell(r, c)) continue
-      const from = project(r, c)
-      const x = from.x
-      const y = from.y + tileH / 2
-      const linked = [[r - 1, c], [r, c + 1], [r + 1, c], [r, c - 1]].filter(([nr, nc]) => isRiverCell(nr, nc))
-      if (linked.length === 0) {
-        waterPonds.push({ x, y })
-        continue
-      }
-      for (const [nr, nc] of linked) {
-        if (nr > r || (nr === r && nc > c)) {
-          const to = project(nr, nc)
-          waterSegments.push(`M${x} ${y} L${to.x} ${to.y + tileH / 2}`)
-        }
-      }
-    }
-  }
-  if (waterSegments.length > 0 || waterPonds.length > 0) {
-    const ns = 'http://www.w3.org/2000/svg'
-    const waterLayer = document.createElementNS(ns, 'svg')
-    waterLayer.setAttribute('aria-hidden', 'true')
-    waterLayer.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none'
-    const waterPath = waterSegments.join(' ')
-    const band = document.createElementNS(ns, 'path')
-    band.setAttribute('d', waterPath)
-    band.setAttribute('fill', 'none')
-    band.setAttribute('stroke', '#4d9fc0')
-    band.setAttribute('stroke-width', '21')
-    band.setAttribute('stroke-linecap', 'round')
-    waterLayer.appendChild(band)
-    if (waterPath) {
-      const glint = document.createElementNS(ns, 'path')
-      glint.setAttribute('d', waterPath)
-      glint.setAttribute('fill', 'none')
-      glint.setAttribute('stroke', '#b9e2ed')
-      glint.setAttribute('stroke-width', '6')
-      glint.setAttribute('stroke-linecap', 'round')
-      glint.setAttribute('opacity', '0.45')
-      waterLayer.appendChild(glint)
-    }
-    for (const pond of waterPonds) {
-      const pool = document.createElementNS(ns, 'ellipse')
-      pool.setAttribute('cx', String(pond.x))
-      pool.setAttribute('cy', String(pond.y))
-      pool.setAttribute('rx', '19')
-      pool.setAttribute('ry', '11')
-      pool.setAttribute('fill', '#4d9fc0')
-      waterLayer.appendChild(pool)
-    }
-    scene.appendChild(waterLayer)
-  }
-
-  const loading = document.createElement('div')
-  loading.textContent = 'Weltdaten werden geladen …'
-  loading.style.cssText = 'position:absolute;left:14px;bottom:14px;z-index:2000;padding:7px 10px;border-radius:7px;background:rgba(248,245,238,.9);border:1px solid #d8d0c2;font:600 11px system-ui;color:#526477'
-  viewport.appendChild(loading)
-
-  try {
-    const response = await fetch('/api/game/world')
-    const world = await response.json()
-    const entities = (Array.isArray(world.entities) ? world.entities : []) as WorldEntity[]
-    const earthEntities = entities.filter(entity => {
-      const slug = entity.locations?.slug?.toLowerCase() ?? ''
-      const name = entity.locations?.name?.toLowerCase() ?? ''
-      return slug === 'earth' || slug === 'erde' || slug.includes('sauerland') || name.includes('erde') || name.includes('sauerland')
-    })
-
-    for (const entity of earthEntities.sort((a, b) => (a.tile_row + a.tile_col) - (b.tile_row + b.tile_col))) {
-      if (!Number.isFinite(entity.tile_row) || !Number.isFinite(entity.tile_col)) continue
-      // 'road'-Entities sind im kanonischen Raster Fahrweg-Geometrie, kein
-      // Gebäude-Sprite — die Iso-Sicht zeichnet dafür kein Fantasie-Modul.
-      if (entity.entity_id === 'road') continue
-      const point = project(entity.tile_row, entity.tile_col)
-      const image = document.createElement('img')
-      image.src = earthBuildingAsset(entity.entity_id)
-      image.alt = entity.entity_id
-      image.title = entity.entity_id.replace(/_/g, ' ')
-      image.style.cssText = `position:absolute;left:${point.x - 46}px;top:${point.y - 77}px;width:92px;height:92px;object-fit:contain;z-index:${300 + entity.tile_row + entity.tile_col};filter:drop-shadow(0 8px 5px rgba(31,43,35,.22));cursor:pointer`
-      scene.appendChild(image)
-    }
-    loading.textContent = `${earthEntities.length} Gebäude · ${cols}×${rows} · Sauerland-Grafiksatz`
-  } catch {
-    loading.textContent = 'Weltdaten nicht erreichbar · Terrainansicht aktiv'
-  }
-
-  requestAnimationFrame(() => {
-    viewport.scrollLeft = Math.max(0, (1550 * zoom - viewport.clientWidth) / 2)
-    viewport.scrollTop = 0
-  })
-}
-
 /**
  * Transitional dashboard enhancer. Keeps the dense DashboardClient untouched
  * while moving the compact profile values into its sticky header and enriching
  * the existing "Deine Orte" cards with already-shipped location artwork.
- * It also fixes the legacy transform-based grid zoom and routes the old
- * isometric trigger to the new Sauerland asset renderer.
+ * It also fixes the legacy transform-based grid zoom. The Earth/Sauerland
+ * isometric view has its own explicit, non-hijacking entry in
+ * DashboardPrimaryColony (app/dashboard/sauerland-isometric) and is not
+ * wired up here.
  */
 export default function DashboardVisualEnhancer() {
   useEffect(() => {
@@ -332,38 +53,6 @@ export default function DashboardVisualEnhancer() {
       scaled.dataset.noxiaZoomFixed = '1'
       scaled.style.setProperty('--noxia-grid-zoom', String(scale))
       pan.style.overscrollBehavior = 'contain'
-    }
-
-    const installIsometricTrigger = () => {
-      const candidates = Array.from(document.querySelectorAll('button,[role="button"],a')) as HTMLElement[]
-      let trigger = candidates.find(element => {
-        const haystack = `${element.textContent ?? ''} ${element.getAttribute('title') ?? ''} ${element.getAttribute('aria-label') ?? ''}`.toLowerCase()
-        return haystack.includes('isometr')
-      })
-
-      if (!trigger) {
-        const pan = document.querySelector('.grid-pan-container') as HTMLElement | null
-        const host = pan?.parentElement
-        if (!host || host.querySelector('[data-noxia-iso-trigger]')) return
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.dataset.noxiaIsoTrigger = '1'
-        button.textContent = '◇ Isometrie'
-        button.title = 'Neue Sauerland-Isometrie öffnen'
-        button.style.cssText = 'position:absolute;top:6px;left:6px;z-index:20;border:1px solid #d8d0c2;border-radius:8px;background:rgba(248,245,238,.94);color:#24415e;padding:6px 10px;font:700 11px system-ui;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08)'
-        if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
-        host.appendChild(button)
-        trigger = button
-      }
-
-      if (trigger.dataset.noxiaIsoWired === '1') return
-      trigger.dataset.noxiaIsoWired = '1'
-      trigger.setAttribute('title', 'Neue Sauerland-Isometrie öffnen')
-      trigger.addEventListener('click', event => {
-        event.preventDefault()
-        event.stopPropagation()
-        void openSauerlandIsometric()
-      }, true)
     }
 
     const enhanceBankLearningLinks = () => {
@@ -397,7 +86,6 @@ export default function DashboardVisualEnhancer() {
       enhancing = true
       try {
         fixGridZoom()
-        installIsometricTrigger()
         enhanceBankLearningLinks()
 
         const header = document.querySelector('header')
@@ -466,7 +154,6 @@ export default function DashboardVisualEnhancer() {
       cancelled = true
       observer.disconnect()
       zoomStyle.remove()
-      document.querySelector('[data-noxia-sauerland-iso]')?.remove()
     }
   }, [])
 
