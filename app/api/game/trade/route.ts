@@ -7,6 +7,11 @@
 //   serverseitig gegen konkrete ship_docking_assignments geprüft. Ziele ohne
 //   verwaltete Pads bleiben im Legacy-Modus, damit bestehende Welten nicht
 //   durch den Rollout blockiert werden.
+// v0.8.1 – Docking-Occupancy: Belegungen verfallen nach DOCKING_IDLE_EXPIRE_HOURS
+//   ohne Reise (lazy Eviction bei der nächsten Ankunft), Pad-Auswahl ist auf
+//   öffentliche Pads und eigene Pads beschränkt (profil_id), und Belegungen
+//   fremder Schiffe auf fremden Pads werden beim Reservieren entfernt.
+//   Deaktivierte Schiffe geben ihren Pad per DB-Trigger frei.
 // v0.5.4 – Pilot-Kompetenz: erfolgreiche Reisen zählen serverseitig auf
 //   profiles.flight_count. Das Dashboard soll nur den fertigen Wert lesen.
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
@@ -24,7 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { publishTransaction } from '@/lib/ably/server'
 import { createClient } from '@supabase/supabase-js'
-import { PRICE_MIN, PRICE_MAX, PRICE_IMPULSE_PER_TON } from '@/lib/game/config'
+import { PRICE_MIN, PRICE_MAX, PRICE_IMPULSE_PER_TON, DOCKING_IDLE_EXPIRE_HOURS } from '@/lib/game/config'
 import { flightEnergyCost } from '@/lib/game/ships'
 import { operationalDockingPads, selectFreeDockingPad } from '@/lib/game/dockingAssignments'
 
@@ -60,6 +65,7 @@ async function incrementFlightCount(profileId: string): Promise<number> {
 
 async function reserveDestinationPad(input: {
   shipId: string
+  playerProfileId: string
   destinationLocationId: string
 }): Promise<{ managed: boolean; padEntityId: string | null; error?: string }> {
   const { data: padRows, error: padError } = await serviceClient
@@ -74,7 +80,7 @@ async function reserveDestinationPad(input: {
   const rows = (padRows ?? []) as any[]
   const basePads = rows
     .filter(row => row.entity_id === 'landing_pad')
-    .map(row => ({ id: row.id, status: row.status, condition: row.condition }))
+    .map(row => ({ id: row.id, status: row.status, condition: row.condition, profileId: row.profile_id ?? null }))
 
   const expansions = rows
     .filter(row => row.entity_id === 'landing_pad_extra_pad' && row.parent_id)
@@ -94,18 +100,66 @@ async function reserveDestinationPad(input: {
   // managed pad remains legacy and must not suddenly become unreachable.
   if (pads.length === 0) return { managed: false, padEntityId: null }
 
+  // Idle release: assignments whose ship has not traveled for
+  // DOCKING_IDLE_EXPIRE_HOURS are evicted before occupancy is computed, so an
+  // abandoned ship can never permanently block a pad. Lazy eviction runs on
+  // every arrival attempt; no separate cleanup job is required.
+  const idleCutoff = new Date(Date.now() - DOCKING_IDLE_EXPIRE_HOURS * 3600_000).toISOString()
+  const { error: expireError } = await serviceClient
+    .from('ship_docking_assignments')
+    .delete()
+    .eq('location_id', input.destinationLocationId)
+    .lt('updated_at', idleCutoff)
+
+  if (expireError) return { managed: true, padEntityId: null, error: expireError.message }
+
   const { data: assignmentRows, error: assignmentError } = await serviceClient
     .from('ship_docking_assignments')
-    .select('ship_id, location_id, pad_entity_id')
+    .select('id, ship_id, location_id, pad_entity_id')
     .eq('location_id', input.destinationLocationId)
 
   if (assignmentError) return { managed: true, padEntityId: null, error: assignmentError.message }
 
-  const assignments = (assignmentRows ?? []).map((row: any) => ({
-    shipId: row.ship_id,
-    locationId: row.location_id,
-    padEntityId: row.pad_entity_id,
-  }))
+  // Ownership scoping: an assignment is only valid occupancy while the pad is
+  // public or owned by the assigned ship's player. Rows that violate this
+  // (created before scoping, or after a pad changed hands) are removed so they
+  // can never block the pad's legitimate owner.
+  const padOwnerById: Record<string, string | null> = {}
+  for (const row of rows) padOwnerById[row.id] = row.profile_id ?? null
+
+  const shipIds = Array.from(new Set((assignmentRows ?? []).map(row => row.ship_id)))
+  const shipOwnerById: Record<string, string | null> = {}
+  if (shipIds.length > 0) {
+    const { data: shipOwnerRows } = await serviceClient
+      .from('ships')
+      .select('id, profile_id')
+      .in('id', shipIds)
+    for (const ship of shipOwnerRows ?? []) shipOwnerById[ship.id] = ship.profile_id ?? null
+  }
+
+  const invalidAssignmentIds: string[] = []
+  for (const row of assignmentRows ?? []) {
+    const padOwner = padOwnerById[row.pad_entity_id] ?? null
+    const shipOwner = shipOwnerById[row.ship_id] ?? null
+    if (padOwner != null && shipOwner != null && padOwner !== shipOwner) {
+      invalidAssignmentIds.push(row.id)
+    }
+  }
+  if (invalidAssignmentIds.length > 0) {
+    const { error: cleanupError } = await serviceClient
+      .from('ship_docking_assignments')
+      .delete()
+      .in('id', invalidAssignmentIds)
+    if (cleanupError) return { managed: true, padEntityId: null, error: cleanupError.message }
+  }
+
+  const assignments = (assignmentRows ?? [])
+    .filter(row => !invalidAssignmentIds.includes(row.id))
+    .map(row => ({
+      shipId: row.ship_id,
+      locationId: row.location_id,
+      padEntityId: row.pad_entity_id,
+    }))
 
   // Try free candidates in deterministic order. The unique(pad_entity_id)
   // constraint arbitrates concurrent arrivals; on a race we try the next pad.
@@ -115,6 +169,7 @@ async function reserveDestinationPad(input: {
       pads: remaining,
       assignments,
       arrivingShipId: input.shipId,
+      playerProfileId: input.playerProfileId,
     })
     if (!candidate) break
 
@@ -301,6 +356,7 @@ export async function GET(req: NextRequest) {
     if (fromLocation !== dest) {
       const reservation = await reserveDestinationPad({
         shipId: travelShip.id,
+        playerProfileId: user.id,
         destinationLocationId: destLoc.id,
       })
       if (reservation.error) {

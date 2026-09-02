@@ -48,6 +48,11 @@ export const ORDER_REWARD_MULT   = 1.3
 export const ORDER_EXPIRE_HOURS  = 24
 export const ORDER_COVERAGE_TICKS = 4
 
+// Docking-Occupancy: ein Landeplatz wird freigegeben, wenn das zugewiesene
+// Schiff länger als diese Zeitspanne (Realzeit) keine Reise mehr unternommen
+// hat. Verhindert, dass verlassene Schiffe Pads dauerhaft blockieren.
+export const DOCKING_IDLE_EXPIRE_HOURS = 24
+
 // Cron Secret Header
 export const CRON_SECRET_HEADER = 'x-cron-secret'
 

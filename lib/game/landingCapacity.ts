@@ -12,6 +12,8 @@ export interface LandingPadBaseInstance {
   id: string
   status: string
   condition?: number | null
+  /** Pad owner. null = state-owned/public pad eligible for every player. */
+  profileId?: string | null
 }
 
 export interface LandingCapacityState {
