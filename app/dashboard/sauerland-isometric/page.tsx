@@ -65,7 +65,7 @@ function roadGraphic(dirs:Cardinal[]){
 function riverGraphic(dirs:Cardinal[]){
  const has=(d:Cardinal)=>dirs.includes(d)
  if(dirs.length>=3){const missing=CARDINAL.find(d=>!has(d))??'N';return dirs.length===3?{src:`${ROOT}/water/water_river_t_01/orientations_4.svg`,frames:4,frame:CARDINAL.indexOf(missing)}:{src:`${ROOT}/water/water_river_y_01/orientations_8.svg`,frames:8,frame:0}}
- if(dirs.length===2){const opposite=(has('N')&&has('S'))||(has('E')&&has('W'));if(opposite)return{src:`${ROOT}/water/water_river_straight_01/orientations_4.svg`,frames:4,frame:has('N')?0:1};const pair=dirs.slice().sort().join('');const curve:Record<string,number>={EN:0,ES:2,SW:4,NW:6};return{src:`${ROOT}/water/water_river_curve_01/orientations_8.svg`,frames:8,frame:curve[pair]??0}}
+ if(dirs.length===2){const opposite=(has('N')&&has('S'))||(has('E')&&has('W'));if(opposite)return{src:`${ROOT}/water/water_river_straight_01/orientations_4.svg`,frames:4,frame:has('N')?2:3};const pair=dirs.slice().sort().join('');const curve:Record<string,number>={EN:0,ES:2,SW:4,NW:6};return{src:`${ROOT}/water/water_river_curve_01/orientations_8.svg`,frames:8,frame:curve[pair]??0}}
  return{src:`${ROOT}/water/water_river_straight_01/orientations_4.svg`,frames:4,frame:0}
 }
 
