@@ -1,7 +1,7 @@
 // lib/grid/locationMaps.ts
 // Erstellt: 24.06.2026
-// Aktualisiert: 01.09.2026 — Earth v4 auf 32×24 normalisiert; Raumhafen ist modulare Artificial-State-Anlage
-// Version: 0.9.0
+// Aktualisiert: 02.09.2026 — Earth v5 als verdichtete Sauerland-Repräsentation
+// Version: 0.10.0
 //
 // Feste Terrain-Layer pro Standort. Das ist der Zwischenschritt zwischen
 // prozeduralem generateGrid() und späterer Supabase-Tabelle location_tiles.
@@ -20,42 +20,39 @@
 export type TerrainCode = string
 
 export const LOCATION_MAPS: Record<string, string[]> = {
-  // Earth Terrain v4:
-  // - exakt 32 Spalten × 24 Zeilen wie das Runtime-Grid
-  // - Fluss, Waldcluster, Städte und Farmland bleiben Terrain
-  // - P bedeutet nur vorbereitete Beton-/Hardstandfläche, KEIN Raumhafengebäude
-  // - die öffentliche Startanlage kommt aus lib/game/seeds/earthStartSeed.ts
+  // Earth Terrain v5 / Sauerland:
+  // - exakt 32 Spalten × 24 Zeilen
+  // - verdichtete, nicht-katastergetreue Repräsentation eines Sauerland-Talraums
+  // - Waldgürtel, offenes Grün, Landwirtschaft, Siedlungsanschluss und Fluss/Talzug
+  // - südöstliche P-Zone ist der vorbereitete Tharsis-Hub-Hardstand
+  // - Gebäude selbst kommen aus lib/game/seeds/earthStartSeed.ts
   earth: [
-    'gfffffggggrggggggggggggCCCCPgggg',
-    'fFFFFfggggrggggggggggggCCCCPgggg',
-    'fFFFFfggggrrgggggggggggCCCCPgggg',
-    'fFFFFfgggggrgggggggggggCCCCPgggg',
-    'fffffggggggrrgggggggggggffffffff',
-    'ggggggAAAAAgrgggggggggggfFFFFFFf',
-    'ggAAAAAgggggrgggggggggggfFFFFFFf',
-    'ggAAAAAgggggrrggggggggggfFFFFFFf',
-    'ggAAAAAgggggggrgggggggggffffffff',
-    'gggggggggggggrrggggggggggggggggg',
-    'ggggggggggggggrgggggCCCCCggggggg',
-    'fffffgggggggggrgggggCCCCCggggggg',
-    'fFFFfgggggggggrrggggCCCCCggggggg',
-    'fFFFfggggggggggrggggggAAAAAggggg',
-    'fFFFfggggggggggrrgggggAAAAAggggg',
-    'fFFFfgggggggggggrgggggAAAAAggggg',
-    'fffffgggggggggggrgggggAAAAAggggg',
-    'ggggggffffffggggrrgggggggggggggg',
-    'ggggggfFFFFfgggggrgggggggggggggg',
-    'ggggggfFFFFfgggggrrggggggggggggg',
-    'ggggggfFFFFfggggggrggggggggggggg',
-    'CCCCPfFFFFfggggggrgggggggggggggg',
-    'CCCCPffffffggggggrrggggggggggggg',
-    'CCCCPgggggggggggggrggggggggggggg',
+    'fffffggggggrgggggggggggggggggggg',
+    'fFFFfggggggrrggggggggggggggggggg',
+    'fFFFfgggggggrggggggggggggffffggg',
+    'fffffgggggggrrggggggggggfFFFFfgg',
+    'gggggggggggggrgggAAAAgggfFFFFfgg',
+    'gggAAAAggggggrgggAAAAgggfffffggg',
+    'gggAAAAggggggrrggggggggggggggggg',
+    'ggggggggggggggrgggggggggggCCCCgg',
+    'ffffggggggggggrrggggggggggCCCCgg',
+    'fFFfgggggggggggrggggggggggCCCCgg',
+    'fFFfgggggggggggrrggggggggggggggg',
+    'ffffggggggggggggrggggggggggggggg',
+    'gggggggfffffggggrrgggggggggggggg',
+    'gggggggfFFFfgggggrgggggggggggggg',
+    'gggggggfFFFfgggggrrggggggggggggg',
+    'gggggggfffffggggggrggggggggggggg',
+    'ggggggggggggggggggrrgggggggggggg',
+    'gggggggggggggggggggrgggggPPPPggg',
+    'gggggggggggffffggggrrggggPPPPggg',
+    'gggggggggggfFFfgggggrggggPPPPggg',
+    'gggAAAAggggfFFfgggggrrgggPPPPggg',
+    'gggAAAAggggffffggggggrgggPPPPggg',
+    'gggggggggggggggggggggrggCCCCgggg',
+    'ffffgggggggggggggggggrrggCCCCggg',
   ],
   // Moon Terrain v3 / Shackleton:
-  // - markanter polnaher Krater-/Eisbereich
-  // - Research-Bezirk nahe Startbasis
-  // - sichtbare Ressourcenfelder: Eis, Helium-3, Titan
-  // - deutlich weniger monotone Hochlandtapete
   moon: [
     'XXXXccccssqqqqqqqqqqTTTTqqqqqqqq',
     'XXXcccccSSqqqqqqqqqqTTTTqqqqqqqq',
@@ -82,12 +79,7 @@ export const LOCATION_MAPS: Record<string, string[]> = {
     'qqqqqqqqqqqccccqqqqqqqqqqqqqqqqq',
     'qqqqqqqqqqqccccqqqqqqqqqqqqqqqqq',
   ],
-  // Mars Terrain v4 (Tharsis-Hub-Startseed ersetzt das v3-Layout):
-  // - klarer Valles-Marineris-Zug (canyon) und Kraterfelder im Westen
-  // - Plateau im Norden/Osten, Staubebenen als Bau- und Wachstumsraum
-  // - die alten Habitat-/Industrie-Marker (H/I) sind entfernt: Gebäude kommen
-  //   ausschließlich aus dem kanonischen Start-Seed (lib/game/seeds/
-  //   tharsisHubSeed.ts) und aus DB-Entities — Terrain täuscht keine Bauten vor
+  // Mars Terrain v4
   mars: [
     'ccccddddddddpppppppppppppppppppp',
     'cccccdddddpppppppppppppppppppppp',
