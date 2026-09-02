@@ -22,6 +22,11 @@ create table if not exists public.scanner_discoveries (
 create index if not exists scanner_discoveries_profile_location_idx
   on public.scanner_discoveries(profile_id, location_id);
 
+comment on table public.scanner_discoveries is
+  'NOXIA player knowledge produced by Ground Truth -> Measurement -> Interpretation -> Discovery. Not ground truth and not a parallel simulation.';
+comment on column public.scanner_discoveries.ground_truth_key is
+  'Stable NOXIA idempotency key derived from canonical world truth; repeated scans update rather than duplicate the discovery.';
+
 alter table public.scanner_discoveries enable row level security;
 
 -- No browser write policy. The authenticated game API validates scanner ownership
