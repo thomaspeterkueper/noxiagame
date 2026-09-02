@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { LOCATION_MAPS, terrainCodeToType } from '@/lib/grid/locationMaps'
 
 const LOCATION_IMAGE: Record<string, string> = {
   Erde: '/images/locations/earth.png',
@@ -132,39 +133,134 @@ async function openSauerlandIsometric(): Promise<void> {
   })
   window.addEventListener('mouseup', () => { panning = false; viewport.style.cursor = 'grab' })
 
+  // Die Iso-Sicht ist eine Projektion des kanonischen Weltzustands (README:
+  // "Eine Simulation, mehrere Sichten"). Terrain und Wasserlauf kommen aus
+  // LOCATION_MAPS.earth bzw. terrainCodeToType — der Quelle, aus der auch
+  // generateGrid() die strategische Karte baut. Kein eigener Terrain-Entwurf.
+  const earthRows = LOCATION_MAPS.earth
+  const rows = earthRows.length
+  const cols = earthRows[0]?.length ?? 32
   const tileW = 46
   const tileH = 24
   const originX = 760
   const originY = 42
-  const cols = 32
-  const rows = 24
   const project = (row: number, col: number) => ({
     x: originX + (col - row) * tileW / 2,
     y: originY + (col + row) * tileH / 2,
   })
 
+  // Bodenbelag je kanonischem Terrain-Typ. Wald-Kacheln (f/F) erhalten eine
+  // schlichte Forstfläche; die Bäume setzt der Wald-Pass anhand derselben
+  // Kachel-Codes. Straßen sind im kanonischen Raster dynamische Fahrweg-
+  // Geometrie (kein LOCATION_MAPS-Code) und gehören nicht in diese Ebene.
+  const EARTH_BEDS: Record<string, string> = {
+    tile_farmland: `background:#b9975c url(${SAUERLAND_ROOT}/terrain/terrain_field_01.svg) center/cover no-repeat`,
+    tile_city: 'background:#9aa1a4 url(/images/grid/earth/tile_city.webp) center/cover no-repeat',
+    tile_concrete: 'background:#a3aaac url(/images/grid/earth/tile_concrete.webp) center/cover no-repeat',
+    tile_forest_edge: 'background:#7d9a60',
+    tile_forest_dense: 'background:#5d7c44',
+    river: 'background:#7e9a63',
+  }
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const point = project(row, col)
+      const code = earthRows[row]?.[col]
+      const type = code ? terrainCodeToType(code) : 'tile_grass'
+      let background = EARTH_BEDS[type]
+      if (!background) {
+        // Gras-Varianten wie bisher — nur noch auf kanonischen Gras-Kacheln.
+        const variant = (row * 17 + col * 29) % 13 === 0 ? 'terrain_grass_dark_01.svg' : 'terrain_grass_01.webp'
+        background = `background:#78985f url(${SAUERLAND_ROOT}/terrain/${variant}) center/cover no-repeat`
+      }
       const tile = document.createElement('div')
-      const variant = (row * 17 + col * 29) % 13 === 0 ? 'terrain_grass_dark_01.svg' : 'terrain_grass_01.webp'
-      tile.style.cssText = `position:absolute;left:${point.x - tileW / 2}px;top:${point.y}px;width:${tileW}px;height:${tileH}px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background:#78985f url(${SAUERLAND_ROOT}/terrain/${variant}) center/cover no-repeat;filter:saturate(.88);box-shadow:inset 0 0 0 1px rgba(60,82,48,.12)`
+      const lineTint = type === 'river' ? 'rgba(90,140,110,.18)' : 'rgba(60,82,48,.12)'
+      tile.style.cssText = `position:absolute;left:${point.x - tileW / 2}px;top:${point.y}px;width:${tileW}px;height:${tileH}px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);${background};filter:saturate(.88);box-shadow:inset 0 0 0 1px ${lineTint}`
       scene.appendChild(tile)
     }
   }
 
-  const terrainAccent = [
-    [3, 3, 'tree_conifer_01.svg'], [4, 3, 'tree_conifer_02.svg'], [5, 4, 'tree_birch_01.svg'],
-    [18, 25, 'tree_broadleaf_01.svg'], [19, 26, 'tree_broadleaf_02.svg'], [20, 25, 'tree_conifer_01.svg'],
-    [2, 24, 'rock_02.svg'], [21, 6, 'rock_04.svg'],
-  ] as const
-  for (const [row, col, asset] of terrainAccent) {
-    const point = project(row, col)
-    const image = document.createElement('img')
-    image.src = `${SAUERLAND_ROOT}/nature/${asset}`
-    image.alt = ''
-    image.style.cssText = `position:absolute;left:${point.x - 34}px;top:${point.y - 54}px;width:68px;height:68px;object-fit:contain;z-index:${100 + row + col};pointer-events:none`
-    scene.appendChild(image)
+  // Waldbäume ausschließlich auf kanonischen Wald-Kacheln (f = Waldrand,
+  // F = dichter Wald). Dichte und Baumart variieren dekorativ pro Kachel,
+  // die Waldflächen selbst kommen aus dem Weltzustand.
+  const FOREST_TREES: Record<string, string[]> = {
+    f: ['tree_conifer_01.svg', 'tree_birch_01.svg', 'tree_broadleaf_01.svg', 'tree_conifer_02.svg', 'tree_broadleaf_02.svg'],
+    F: ['tree_conifer_01.svg', 'tree_conifer_02.svg', 'tree_conifer_01.svg', 'tree_broadleaf_01.svg', 'tree_conifer_01.svg'],
+  }
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const code = earthRows[row]?.[col]
+      if (code !== 'f' && code !== 'F') continue
+      if (code === 'f' && (row * 17 + col * 29) % 10 >= 6) continue
+      const point = project(row, col)
+      const pool = FOREST_TREES[code]
+      const asset = pool[(row * 7 + col * 13) % pool.length]
+      const tree = document.createElement('img')
+      tree.src = `${SAUERLAND_ROOT}/nature/${asset}`
+      tree.alt = ''
+      tree.style.cssText = `position:absolute;left:${point.x - 34}px;top:${point.y - 54}px;width:68px;height:68px;object-fit:contain;z-index:${100 + row + col};pointer-events:none`
+      scene.appendChild(tree)
+    }
+  }
+
+  // Talzug/Bach aus dem kanonischen Flussverlauf ('r'): verbunden über die
+  // vier Nachbarn wie autotilePrefix() im Raster, projiziert als durchgehendes
+  // Wasserband — keine eigene Gewässer-Geometrie.
+  const isRiverCell = (r: number, c: number) =>
+    r >= 0 && r < rows && c >= 0 && c < cols && earthRows[r]?.[c] === 'r'
+  const waterSegments: string[] = []
+  const waterPonds: Array<{ x: number; y: number }> = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!isRiverCell(r, c)) continue
+      const from = project(r, c)
+      const x = from.x
+      const y = from.y + tileH / 2
+      const linked = [[r - 1, c], [r, c + 1], [r + 1, c], [r, c - 1]].filter(([nr, nc]) => isRiverCell(nr, nc))
+      if (linked.length === 0) {
+        waterPonds.push({ x, y })
+        continue
+      }
+      for (const [nr, nc] of linked) {
+        if (nr > r || (nr === r && nc > c)) {
+          const to = project(nr, nc)
+          waterSegments.push(`M${x} ${y} L${to.x} ${to.y + tileH / 2}`)
+        }
+      }
+    }
+  }
+  if (waterSegments.length > 0 || waterPonds.length > 0) {
+    const ns = 'http://www.w3.org/2000/svg'
+    const waterLayer = document.createElementNS(ns, 'svg')
+    waterLayer.setAttribute('aria-hidden', 'true')
+    waterLayer.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none'
+    const waterPath = waterSegments.join(' ')
+    const band = document.createElementNS(ns, 'path')
+    band.setAttribute('d', waterPath)
+    band.setAttribute('fill', 'none')
+    band.setAttribute('stroke', '#4d9fc0')
+    band.setAttribute('stroke-width', '21')
+    band.setAttribute('stroke-linecap', 'round')
+    waterLayer.appendChild(band)
+    if (waterPath) {
+      const glint = document.createElementNS(ns, 'path')
+      glint.setAttribute('d', waterPath)
+      glint.setAttribute('fill', 'none')
+      glint.setAttribute('stroke', '#b9e2ed')
+      glint.setAttribute('stroke-width', '6')
+      glint.setAttribute('stroke-linecap', 'round')
+      glint.setAttribute('opacity', '0.45')
+      waterLayer.appendChild(glint)
+    }
+    for (const pond of waterPonds) {
+      const pool = document.createElementNS(ns, 'ellipse')
+      pool.setAttribute('cx', String(pond.x))
+      pool.setAttribute('cy', String(pond.y))
+      pool.setAttribute('rx', '19')
+      pool.setAttribute('ry', '11')
+      pool.setAttribute('fill', '#4d9fc0')
+      waterLayer.appendChild(pool)
+    }
+    scene.appendChild(waterLayer)
   }
 
   const loading = document.createElement('div')
@@ -184,6 +280,9 @@ async function openSauerlandIsometric(): Promise<void> {
 
     for (const entity of earthEntities.sort((a, b) => (a.tile_row + a.tile_col) - (b.tile_row + b.tile_col))) {
       if (!Number.isFinite(entity.tile_row) || !Number.isFinite(entity.tile_col)) continue
+      // 'road'-Entities sind im kanonischen Raster Fahrweg-Geometrie, kein
+      // Gebäude-Sprite — die Iso-Sicht zeichnet dafür kein Fantasie-Modul.
+      if (entity.entity_id === 'road') continue
       const point = project(entity.tile_row, entity.tile_col)
       const image = document.createElement('img')
       image.src = earthBuildingAsset(entity.entity_id)
@@ -192,7 +291,7 @@ async function openSauerlandIsometric(): Promise<void> {
       image.style.cssText = `position:absolute;left:${point.x - 46}px;top:${point.y - 77}px;width:92px;height:92px;object-fit:contain;z-index:${300 + entity.tile_row + entity.tile_col};filter:drop-shadow(0 8px 5px rgba(31,43,35,.22));cursor:pointer`
       scene.appendChild(image)
     }
-    loading.textContent = `${earthEntities.length} Gebäude · 32×24 · Sauerland-Grafiksatz`
+    loading.textContent = `${earthEntities.length} Gebäude · ${cols}×${rows} · Sauerland-Grafiksatz`
   } catch {
     loading.textContent = 'Weltdaten nicht erreichbar · Terrainansicht aktiv'
   }
