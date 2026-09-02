@@ -5,6 +5,7 @@ import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type GeoBounds } from '@/lib/world/spa
 import { EARTH_SAUERLAND_REGION } from '@/lib/world/spatial/regions'
 import { analyseTerrainSuitability } from '@/lib/world/spatial/siteSuitability'
 import { rankSpaceportCandidates } from '@/lib/world/spatial/spaceportSuitability'
+import { createSpaceportShortlist } from '@/lib/world/spatial/spaceportShortlist'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,16 +28,19 @@ export async function GET(request: NextRequest) {
     ])
     const terrain = analyseTerrainSuitability(elevation)
     const ranked = rankSpaceportCandidates(terrain.cells, features)
+    const shortlist = createSpaceportShortlist(ranked)
     return NextResponse.json({
       ok: true,
       bounds,
       candidates: ranked.slice(0, 8),
+      shortlist,
       evaluatedCells: ranked.length,
       featureCount: features.length,
       methodology: {
         terrain: 'elevation, slope and local relief',
         exclusions: ['water', 'waterway', 'building', 'settlement', 'forest'],
         access: ['road', 'rail'],
+        shortlist: 'up to three candidates separated by at least 1.2 km',
         status: 'planning heuristic; not canonical placement',
       },
       attribution: 'Terrain: Copernicus DEM via Open-Meteo · Geography: © OpenStreetMap contributors, ODbL',
