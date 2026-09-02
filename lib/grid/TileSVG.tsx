@@ -63,6 +63,10 @@ function City() {
   </svg>
 }
 
+function Concrete() {
+  return <svg width="48" height="48" viewBox="0 0 48 48"><rect width="48" height="48" fill="#9ba4a6"/><path d="M0 12 H48 M0 24 H48 M0 36 H48 M6 0 V48 M18 0 V48 M30 0 V48 M42 0 V48" stroke="#8a9496" strokeWidth="1" opacity="0.7"/><path d="M0 6 H48 M0 18 H48 M0 30 H48 M0 42 H48" stroke="#aab2b4" strokeWidth="1" opacity="0.55"/><circle cx="10" cy="8" r="2.5" fill="#7d8789" opacity="0.3"/><circle cx="36" cy="32" r="3" fill="#7d8789" opacity="0.25"/></svg>
+}
+
 function Spaceport() {
   return <svg width="48" height="48" viewBox="0 0 48 48">
     <rect width="48" height="48" fill="#8f9b95"/>
@@ -234,6 +238,7 @@ export function TileSVG({ type, planet }: { type: string; planet: string }) {
     case 'tile_farmland':         return <Farmland/>
     case 'tile_city':             return <City/>
     case 'tile_spaceport':        return <Spaceport/>
+    case 'tile_concrete':         return <Concrete/>
     case 'tile_river':            return <River type="river_5"/>
     case 'tile_urban':            return <Urban/>
     case 'tile_surface':          return <Surface c={c}/>

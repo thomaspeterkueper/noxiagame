@@ -74,9 +74,17 @@ function buildingAsset(id:string){
  if(value.includes('school')||value.includes('academy'))return['buildings/school_01',0]as const
  if(value.includes('admin')||value.includes('town')||value.includes('government'))return['buildings/town_hall_01',1]as const
  if(value.includes('factory')||value.includes('smelt')||value.includes('industrial'))return['buildings/factory_small_01',2]as const
+ if(value.includes('spaceport')){
+  if(value.includes('pad_mini'))return['hub/hub_pad_mini_01',0]as const
+  if(value.includes('pad'))return['hub/hub_pad_standard_01',0]as const
+  if(value.includes('storage'))return['hub/hub_storage_01',0]as const
+  if(value.includes('service'))return['hub/hub_service_01',0]as const
+  return['hub/hub_control_01',3]as const
+ }
+ if(value.includes('landing')&&value.includes('pad'))return['hub/hub_pad_standard_01',0]as const
  if(value.includes('warehouse')||value.includes('storage')||value.includes('depot'))return['buildings/warehouse_01',1]as const
  if(value.includes('farm')||value.includes('plant'))return['buildings/farm_01',2]as const
- if(value.includes('spaceport')||value.includes('control')||value.includes('command'))return['hub/hub_control_01',3]as const
+ if(value.includes('control')||value.includes('command'))return['hub/hub_control_01',3]as const
  if(value.includes('hangar'))return['hub/hub_hangar_01',3]as const
  if(value.includes('tower'))return['hub/hub_tower_01',3]as const
  if(value.includes('lab')||value.includes('research')||value.includes('scanner'))return['hub/hub_module_01',0]as const
