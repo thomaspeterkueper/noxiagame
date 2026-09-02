@@ -15,8 +15,8 @@ SET search_path TO public;
 INSERT INTO locations (slug, name, description, population, population_max, is_supplied)
 VALUES (
   'earth',
-  'Erde / Earth Public Spaceport',
-  'Gemeinsamer Startpunkt. Öffentliche Raumhafen-, Verwaltungs-, Akademie- und Logistikinfrastruktur.',
+  'Tharsis Hub Sauerland',
+  'Gemeinsamer NOXIA-Earth-Start im Sauerland, Nordrhein-Westfalen, Deutschland. Regionale Referenz: Sundern (Sauerland). Die 32x24-Karte ist eine verdichtete, topografisch plausible Repräsentation und kein Katasterplan.',
   999999999,
   999999999,
   true
@@ -256,10 +256,10 @@ INSERT INTO facility_instances
 SELECT v.seed_key, l.id, v.facility_type, v.name, 'STATE', NULL, NULL, true
 FROM locations l,
 (VALUES
-  ('earth_public_spaceport','spaceport','Earth Public Spaceport'),
-  ('earth_public_admin','administration','Earth Public Administration'),
-  ('earth_public_academy','education','Earth Public Academy'),
-  ('earth_public_warehouse','warehouse','Earth Public Warehouse')
+  ('earth_public_spaceport','spaceport','Tharsis Hub Sauerland'),
+  ('earth_public_admin','administration','Tharsis Hub Verwaltung'),
+  ('earth_public_academy','education','Tharsis Hub Akademie'),
+  ('earth_public_warehouse','warehouse','Tharsis Hub Logistik')
 ) AS v(seed_key, facility_type, name)
 WHERE l.slug = 'earth'
 ON CONFLICT (seed_key) DO UPDATE SET
@@ -282,6 +282,8 @@ WHERE te.location_id = (SELECT id FROM locations WHERE slug = 'earth')
 
 -- Kollisionsschutz für den neuen kanonischen Seed: fremde Belegung wird nicht
 -- verdrängt. Die Migration meldet stattdessen verständlich den Konflikt.
+-- Die Seed-Zellen sind die südöstliche Hardstand-/Betonzone (P) der Earth-v5-
+-- Karte — kanonisch laut lib/game/seeds/earthStartSeed.ts EARTH_START_MODULES.
 DO $$
 BEGIN
   IF EXISTS (
@@ -289,8 +291,8 @@ BEGIN
     FROM tile_entities te
     JOIN locations l ON l.id = te.location_id
     JOIN (VALUES
-      (1,26),(2,25),(2,26),(2,27),(3,25),(3,26),
-      (5,23),(5,24),(5,25),(5,26)
+      (19,26),(18,26),(19,27),(20,26),(19,25),(20,25),
+      (21,25),(21,26),(21,27),(21,28)
     ) AS s(r,c) ON te.tile_row=s.r AND te.tile_col=s.c
     WHERE l.slug='earth' AND te.tile_level=0
       AND NOT (te.owner_class='STATE' AND te.entity_type='building')
@@ -303,8 +305,8 @@ END $$;
 -- Zustand ersetzt werden; PLAYER/NPC/CORPORATION wurden oben ausdrücklich geschützt.
 DELETE FROM tile_entities te
 USING locations l, (VALUES
-  (1,26),(2,25),(2,26),(2,27),(3,25),(3,26),
-  (5,23),(5,24),(5,25),(5,26)
+  (19,26),(18,26),(19,27),(20,26),(19,25),(20,25),
+  (21,25),(21,26),(21,27),(21,28)
 ) AS s(r,c)
 WHERE te.location_id=l.id AND l.slug='earth'
   AND te.tile_level=0
@@ -318,17 +320,20 @@ INSERT INTO tile_entities
 SELECT NULL, l.id, 0, v.r, v.c,
        'building', v.entity_id, 'STATE', NULL, true, NULL, now()
 FROM locations l,
+-- Positionen = EARTH_START_MODULES aus lib/game/seeds/earthStartSeed.ts:
+-- der Tharsis Hub liegt auf der südöstlichen P-Hardstand-Zone (Zeilen 18–21,
+-- Spalten 25–28) der Earth-v5-Karte, nicht im nordwestlichen Waldgürtel.
 (VALUES
-  (2,26,'spaceport_core'),
-  (1,26,'spaceport_pad_standard'),
-  (2,27,'spaceport_pad_standard'),
-  (3,26,'spaceport_pad_mini'),
-  (2,25,'spaceport_service'),
-  (3,25,'spaceport_storage'),
-  (5,23,'admin'),
-  (5,24,'school'),
-  (5,25,'warehouse'),
-  (5,26,'warehouse_storage')
+  (19,26,'spaceport_core'),
+  (18,26,'spaceport_pad_standard'),
+  (19,27,'spaceport_pad_standard'),
+  (20,26,'spaceport_pad_mini'),
+  (19,25,'spaceport_service'),
+  (20,25,'spaceport_storage'),
+  (21,25,'admin'),
+  (21,26,'school'),
+  (21,27,'warehouse'),
+  (21,28,'warehouse_storage')
 ) AS v(r,c,entity_id)
 WHERE l.slug='earth';
 
@@ -344,16 +349,16 @@ SELECT
   NULL,
   true
 FROM (VALUES
-  ('earth_spaceport_core','earth_public_spaceport','spaceport_core',2,26,'spaceport_core'),
-  ('earth_pad_standard_1','earth_public_spaceport','spaceport_pad_standard',1,26,'spaceport_pad_standard'),
-  ('earth_pad_standard_2','earth_public_spaceport','spaceport_pad_standard',2,27,'spaceport_pad_standard'),
-  ('earth_pad_mini_1','earth_public_spaceport','spaceport_pad_mini',3,26,'spaceport_pad_mini'),
-  ('earth_spaceport_service','earth_public_spaceport','spaceport_service',2,25,'spaceport_service'),
-  ('earth_spaceport_storage','earth_public_spaceport','spaceport_storage',3,25,'spaceport_storage'),
-  ('earth_admin_core','earth_public_admin','administration_core',5,23,'admin'),
-  ('earth_academy_core','earth_public_academy','academy_core',5,24,'school'),
-  ('earth_warehouse_core','earth_public_warehouse','warehouse_core',5,25,'warehouse'),
-  ('earth_warehouse_storage_1','earth_public_warehouse','warehouse_storage',5,26,'warehouse_storage')
+  ('earth_spaceport_core','earth_public_spaceport','spaceport_core',19,26,'spaceport_core'),
+  ('earth_pad_standard_1','earth_public_spaceport','spaceport_pad_standard',18,26,'spaceport_pad_standard'),
+  ('earth_pad_standard_2','earth_public_spaceport','spaceport_pad_standard',19,27,'spaceport_pad_standard'),
+  ('earth_pad_mini_1','earth_public_spaceport','spaceport_pad_mini',20,26,'spaceport_pad_mini'),
+  ('earth_spaceport_service','earth_public_spaceport','spaceport_service',19,25,'spaceport_service'),
+  ('earth_spaceport_storage','earth_public_spaceport','spaceport_storage',20,25,'spaceport_storage'),
+  ('earth_admin_core','earth_public_admin','administration_core',21,25,'admin'),
+  ('earth_academy_core','earth_public_academy','academy_core',21,26,'school'),
+  ('earth_warehouse_core','earth_public_warehouse','warehouse_core',21,27,'warehouse'),
+  ('earth_warehouse_storage_1','earth_public_warehouse','warehouse_storage',21,28,'warehouse_storage')
 ) AS v(module_key, facility_key, definition_key, r, c, entity_id)
 JOIN facility_instances fi ON fi.seed_key=v.facility_key
 JOIN locations l ON l.id=fi.location_id AND l.slug='earth'
