@@ -1,0 +1,28 @@
+name: Population Seed Contract
+
+on:
+  push:
+    paths:
+      - 'lib/game/population/tharsisActivePopulationSeed.test.ts'
+      - 'lib/game/seeds/tharsisHubSeed.ts'
+      - 'supabase/migrations/*tharsis_active_population_seed*'
+      - '.github/workflows/population-seed.yml'
+  pull_request:
+    paths:
+      - 'lib/game/population/tharsisActivePopulationSeed.test.ts'
+      - 'lib/game/seeds/tharsisHubSeed.ts'
+      - 'supabase/migrations/*tharsis_active_population_seed*'
+      - '.github/workflows/population-seed.yml'
+
+jobs:
+  population-seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run population seed contract guard
+        run: npm run test:population-seed
