@@ -1,14 +1,23 @@
 // lib/game/seeds/earthStartSeed.ts
 // Erstellt: 01.09.2026
+// Aktualisiert: 02.09.2026 — Earth-Start kanonisch als Tharsis Hub Sauerland verankert.
 // Kanonische NOXIA-Quelle für die öffentliche Earth-Startinfrastruktur.
 //
-// Earth ist gemeinsamer Multiplayer-Startpunkt. Der Raumhafen wird deshalb
-// nicht als einzelner landing_pad modelliert, sondern als staatliche Anlage
-// aus physischen Funktionsmodulen. Zusätzliche Module benötigen freie Tiles.
+// Der gemeinsame Multiplayer-Start liegt realweltlich im Sauerland (NRW, Deutschland).
+// Die Spielkarte bildet keinen Katasterplan ab, sondern eine verdichtete, topografisch
+// glaubwürdige 32×24-Repräsentation des Standorts mit Wald, Talraum, Landwirtschaft,
+// Siedlungsanschluss und dem modularen Tharsis Hub.
 
 import type { FacilityInstance, FacilityModuleInstance } from '../facilities/types'
 
 export const EARTH_START_LOCATION = 'earth'
+export const EARTH_START_SITE_ID = 'tharsis_hub_sauerland'
+export const EARTH_START_SITE_NAME = 'Tharsis Hub Sauerland'
+export const EARTH_START_REGION = 'Sauerland'
+export const EARTH_START_COUNTRY = 'Deutschland'
+export const EARTH_START_STATE = 'Nordrhein-Westfalen'
+export const EARTH_START_REFERENCE_MUNICIPALITY = 'Sundern (Sauerland)'
+export const EARTH_START_ANCHOR_PRECISION = 'regional' as const
 export const EARTH_GRID_ROWS = 24
 export const EARTH_GRID_COLS = 32
 
@@ -23,7 +32,7 @@ export const EARTH_START_FACILITIES: FacilityInstance[] = [
   {
     id: 'earth_public_spaceport',
     facilityType: 'spaceport',
-    name: 'Earth Public Spaceport',
+    name: 'Tharsis Hub Sauerland',
     locationSlug: EARTH_START_LOCATION,
     ...EARTH_STATE_OWNERSHIP,
     moduleIds: [
@@ -38,7 +47,7 @@ export const EARTH_START_FACILITIES: FacilityInstance[] = [
   {
     id: 'earth_public_admin',
     facilityType: 'administration',
-    name: 'Earth Public Administration',
+    name: 'Tharsis Hub Verwaltung',
     locationSlug: EARTH_START_LOCATION,
     ...EARTH_STATE_OWNERSHIP,
     moduleIds: ['earth_admin_core'],
@@ -46,7 +55,7 @@ export const EARTH_START_FACILITIES: FacilityInstance[] = [
   {
     id: 'earth_public_academy',
     facilityType: 'education',
-    name: 'Earth Public Academy',
+    name: 'Tharsis Hub Akademie',
     locationSlug: EARTH_START_LOCATION,
     ...EARTH_STATE_OWNERSHIP,
     moduleIds: ['earth_academy_core'],
@@ -54,53 +63,42 @@ export const EARTH_START_FACILITIES: FacilityInstance[] = [
   {
     id: 'earth_public_warehouse',
     facilityType: 'warehouse',
-    name: 'Earth Public Warehouse',
+    name: 'Tharsis Hub Logistik',
     locationSlug: EARTH_START_LOCATION,
     ...EARTH_STATE_OWNERSHIP,
     moduleIds: ['earth_warehouse_core', 'earth_warehouse_storage_1'],
   },
 ]
 
-// Nordöstlicher Bereich der 32×24-Earth-Karte. Das Layout nutzt den bereits
-// etablierten urban/spaceport-nahen Kartenbereich, lässt aber mehrere direkte
-// Erweiterungszellen frei. Keine Erweiterungsreserve ist ein unsichtbarer
-// Bonus: sobald ein Spieler/eine Anlage eine benötigte Zelle legal belegt,
-// kann dort nicht gleichzeitig ein neues Raumhafenmodul entstehen.
+// Südöstlicher Tal-/Infrastrukturraum der Sauerland-Karte. Der Hub liegt auf einer
+// vorbereiteten Hardstand-Zone am Rand bestehender Siedlungs- und Verkehrsstruktur.
+// Der Waldgürtel und der Fluss/Talzug bleiben sichtbar und machen den Earth-Start
+// unverwechselbar gegenüber Mars, Mond und generischen Stadtstandorten.
 export const EARTH_START_MODULES: FacilityModuleInstance[] = [
-  // Raumhafen-Kern und initiale gemeinsame Kapazität.
-  { id: 'earth_spaceport_core', definitionId: 'spaceport_core', facilityId: 'earth_public_spaceport', row: 2, col: 26, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_pad_standard_1', definitionId: 'spaceport_pad_standard', facilityId: 'earth_public_spaceport', row: 1, col: 26, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_pad_standard_2', definitionId: 'spaceport_pad_standard', facilityId: 'earth_public_spaceport', row: 2, col: 27, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_pad_mini_1', definitionId: 'spaceport_pad_mini', facilityId: 'earth_public_spaceport', row: 3, col: 26, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_spaceport_service', definitionId: 'spaceport_service', facilityId: 'earth_public_spaceport', row: 2, col: 25, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_spaceport_storage', definitionId: 'spaceport_storage', facilityId: 'earth_public_spaceport', row: 3, col: 25, ...EARTH_STATE_OWNERSHIP },
-
-  // Öffentliche Startservices in direkter, aber nicht raumhafenblockierender Nähe.
-  { id: 'earth_admin_core', definitionId: 'administration_core', facilityId: 'earth_public_admin', row: 5, col: 23, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_academy_core', definitionId: 'academy_core', facilityId: 'earth_public_academy', row: 5, col: 24, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_warehouse_core', definitionId: 'warehouse_core', facilityId: 'earth_public_warehouse', row: 5, col: 25, ...EARTH_STATE_OWNERSHIP },
-  { id: 'earth_warehouse_storage_1', definitionId: 'warehouse_storage', facilityId: 'earth_public_warehouse', row: 5, col: 26, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_spaceport_core', definitionId: 'spaceport_core', facilityId: 'earth_public_spaceport', row: 19, col: 26, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_pad_standard_1', definitionId: 'spaceport_pad_standard', facilityId: 'earth_public_spaceport', row: 18, col: 26, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_pad_standard_2', definitionId: 'spaceport_pad_standard', facilityId: 'earth_public_spaceport', row: 19, col: 27, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_pad_mini_1', definitionId: 'spaceport_pad_mini', facilityId: 'earth_public_spaceport', row: 20, col: 26, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_spaceport_service', definitionId: 'spaceport_service', facilityId: 'earth_public_spaceport', row: 19, col: 25, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_spaceport_storage', definitionId: 'spaceport_storage', facilityId: 'earth_public_spaceport', row: 20, col: 25, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_admin_core', definitionId: 'administration_core', facilityId: 'earth_public_admin', row: 21, col: 25, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_academy_core', definitionId: 'academy_core', facilityId: 'earth_public_academy', row: 21, col: 26, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_warehouse_core', definitionId: 'warehouse_core', facilityId: 'earth_public_warehouse', row: 21, col: 27, ...EARTH_STATE_OWNERSHIP },
+  { id: 'earth_warehouse_storage_1', definitionId: 'warehouse_storage', facilityId: 'earth_public_warehouse', row: 21, col: 28, ...EARTH_STATE_OWNERSHIP },
 ]
 
-/**
- * Zellen, die für den nächsten plausiblen Ausbau bewusst frei gehalten werden.
- * Das ist eine Seed-/Map-Design-Vorgabe, kein ewiger Eigentumsschutz.
- */
 export const EARTH_INITIAL_EXPANSION_RESERVE = [
-  { row: 0, col: 26, purpose: 'spaceport-pad' },
-  { row: 1, col: 25, purpose: 'spaceport-pad-or-service' },
-  { row: 1, col: 27, purpose: 'spaceport-pad' },
-  { row: 2, col: 28, purpose: 'spaceport-pad' },
-  { row: 3, col: 27, purpose: 'spaceport-pad-or-cargo' },
-  { row: 4, col: 25, purpose: 'spaceport-logistics' },
-  { row: 5, col: 27, purpose: 'warehouse-expansion' },
-  { row: 6, col: 24, purpose: 'academy-expansion' },
+  { row: 17, col: 26, purpose: 'spaceport-pad' },
+  { row: 18, col: 25, purpose: 'spaceport-pad-or-service' },
+  { row: 18, col: 27, purpose: 'spaceport-pad' },
+  { row: 18, col: 28, purpose: 'spaceport-heavy-or-passenger' },
+  { row: 19, col: 28, purpose: 'spaceport-pad-or-cargo' },
+  { row: 20, col: 27, purpose: 'spaceport-logistics' },
+  { row: 20, col: 28, purpose: 'warehouse-expansion' },
+  { row: 22, col: 26, purpose: 'academy-expansion' },
 ] as const
 
 export function earthStartShipCapacity(): { parking: number; activeOperations: number } {
-  // Aktuell: 2 Standard-Pads (tuning default 4) + 1 Mini-Pad (canonical 2).
-  // Der Wert wird absichtlich aus dem Seed dokumentiert, nicht als globale
-  // Raumhafenregel behandelt. Später soll die Runtime aus FACILITY_MODULES summieren.
   return { parking: 10, activeOperations: 3 }
 }
 
