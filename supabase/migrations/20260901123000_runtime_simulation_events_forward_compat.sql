@@ -3,6 +3,10 @@
 --
 -- Fresh databases obtain the same shape from the corrected historical migrations.
 -- Existing databases obtain it here without mutating or converting legacy public.events.
+-- Pre-fix generalized public.events rows (the shape the pre-fix 2026-08-31 foundation
+-- created) are carried over id-preserving into simulation_events so recorded runtime
+-- history survives the table switch; the legacy bigint/type/payload public.events table
+-- is never touched.
 -- This migration is intentionally idempotent and also repairs an intermediate
 -- entity_states.source_event foreign key if such a partial schema exists.
 --
@@ -91,9 +95,58 @@ begin
   end loop;
 end $$;
 
+-- Databases that recorded the pre-fix 2026-08-31 foundation carry recorded runtime
+-- history in generalized public.events (uuid/event_type/subject_type/...), with
+-- entity_states.source_event referencing public.events.id. Copy those rows into
+-- simulation_events id-preserving so the history survives the switch and the FK below
+-- can validate. Guarded on the generalized event_type column so the legacy
+-- bigint/type/payload public.events shape is never read; idempotent for re-runs.
+do $$
+begin
+  if exists (
+    select 1
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'events'
+      and a.attname = 'event_type'
+      and not a.attisdropped
+  ) then
+    insert into public.simulation_events (
+      id, event_type, subject_type, subject_id, actor_id, location_id, tick,
+      effect_group_id, effects, metadata, occurred_at, created_at,
+      canonical_entity_id, canonical_event_id
+    )
+    select
+      id, event_type, subject_type, subject_id, actor_id, location_id, tick,
+      effect_group_id, effects, metadata, occurred_at, created_at,
+      null::text, null::text
+    from public.events
+    on conflict (id) do nothing;
+  end if;
+end $$;
+
+-- Null any source_event that still does not resolve in simulation_events (rows whose
+-- generalized public.events row is already gone, or states written without an event).
+-- Runs after the carry-over so only genuinely dangling references are cleared before
+-- the FK is added.
+update public.entity_states
+set source_event = null
+where source_event is not null
+  and not exists (
+    select 1 from public.simulation_events se where se.id = entity_states.source_event
+  );
+
 alter table public.entity_states
   add constraint entity_states_source_event_fkey
-  foreign key (source_event) references public.simulation_events(id) on delete set null;
+  foreign key (source_event) references public.simulation_events(id) on delete set null
+  not valid;
+
+-- The carry-over and repair above guarantee every remaining source_event resolves;
+-- validate explicitly so the constraint ends fully checked, not NOT VALID.
+alter table public.entity_states
+  validate constraint entity_states_source_event_fkey;
 
 create unique index if not exists entity_states_one_current_idx
   on public.entity_states(subject_type, subject_id) where valid_to is null;
