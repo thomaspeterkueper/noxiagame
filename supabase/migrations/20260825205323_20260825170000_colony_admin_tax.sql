@@ -1,0 +1,4 @@
+-- Migration history alignment marker.
+-- Version 20260825205323 is already applied on the linked production project.
+-- The historical migration is recorded remotely under this generated version.
+-- This no-op file restores local/remote version parity for Supabase preview branches.

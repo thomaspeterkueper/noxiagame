@@ -1,0 +1,4 @@
+-- Migration history alignment marker.
+-- Version 20260828161510 is already applied on the linked production project.
+-- This no-op marker restores the missing local migration version so Supabase
+-- preview branches can compare migration history without replaying production DML.
