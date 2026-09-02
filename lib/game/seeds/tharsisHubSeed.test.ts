@@ -1,14 +1,13 @@
 // lib/game/seeds/tharsisHubSeed.test.ts
 // Erstellt: 30.08.2026
-// Aktualisiert: 31.08.2026 — Utility-Integrität V2: explizite Graphkanten,
-//   mediumspezifische Redundanz und physische Feeder.
+// Aktualisiert: 02.09.2026 — Safe Haven + ECLSS 2-von-3 gemäß OTA-Freigabe.
 // Deterministische Akzeptanztests für den kanonischen Tharsis-Hub-Start-Seed
 // (OTA-NOX-REQ-20260830-THARSIS-HUB-START-SEED, Abschnitt 9).
 //
 // Kein Framework — `npx tsx lib/game/seeds/tharsisHubSeed.test.ts`
 // Prüft: exakte Objektzahlen, 497/504, Zonenregeln, N-1-Straßenpfade,
-// alternativer Rettungszugang, doppelte Medienanbindung, physisch getrennte
-// Utility-Netze und Eigentumsmodell.
+// alternativer Rettungszugang, mediumspezifische Utility-Redundanz,
+// Safe-Haven-Evakuierung, ECLSS-2-von-3 und Eigentumsmodell.
 
 import {
   THARSIS_HUB_POPULATION,
@@ -27,9 +26,16 @@ import {
   validateRoadResilience,
   validateUtilityNetworks,
   validateOwnership,
-  type SeedIssue,
 } from './tharsisHubValidation'
 import { validateTharsisUtilityIntegrity } from './tharsisHubUtilityNetwork'
+import {
+  THARSIS_ECLSS_REGIONAL_NODES,
+  THARSIS_REQUIRED_EVACUATION_CAPACITY,
+  THARSIS_SAFE_HAVEN_NODES,
+  availableEvacuationCapacity,
+  degradedEclssCapacity,
+  validateTharsisLifeSupportResilience,
+} from './tharsisHubResilience'
 
 let fails = 0
 function pruefe(ok: boolean, was: string): void {
@@ -60,6 +66,7 @@ reportIssues('Zonen- und Abhängigkeitsregeln (Abschnitt 1/5)', validateZoneRule
 reportIssues('Straßennetz: N-1 + Rettungszugänge (Abschnitt 3)', validateRoadResilience())
 reportIssues('Utility A/B: bestehende Seed-Anbindung (Abschnitt 4)', validateUtilityNetworks())
 reportIssues('Utility V2: Graph + Medienredundanz + physische Feeder', validateTharsisUtilityIntegrity())
+reportIssues('Safe Haven + ECLSS 2-von-3', validateTharsisLifeSupportResilience())
 reportIssues('Eigentumsmodell (Abschnitt 6)', validateOwnership())
 
 // ── Direkte Akzeptanzprüfungen ─────────────────────────────────────────────
@@ -68,10 +75,24 @@ reportIssues('Eigentumsmodell (Abschnitt 6)', validateOwnership())
 pruefe(THARSIS_HUB_POPULATION === 497, 'genau 497 Startbewohner')
 pruefe(THARSIS_HUB_HABITAT_CAPACITY >= 504, 'mindestens 504 Habitatplätze')
 
-// sechs voneinander isolierbare Habitatcluster (je ≥2 interne Druck-/Brandsegmente)
+// sechs voneinander isolierbare Habitatcluster
 const clusters = THARSIS_HUB_BUILDINGS.filter(b => b.entityId === 'habitat_cluster')
 pruefe(clusters.length === 6, 'sechs Habitatcluster')
 pruefe(clusters.every(c => c.critical), 'alle Habitatcluster kritisch')
+
+// Safe Haven: 6 lokale Shelter; Verlust eines beliebigen Clusters lässt >=84 Plätze
+const habitatShelters = THARSIS_SAFE_HAVEN_NODES.filter(node => node.kind === 'habitat_cluster')
+pruefe(habitatShelters.length === 6, 'jeder Habitatcluster besitzt lokale Safe-Haven-Funktion')
+for (const cluster of habitatShelters) {
+  pruefe(
+    availableEvacuationCapacity(cluster.id) >= THARSIS_REQUIRED_EVACUATION_CAPACITY,
+    `${cluster.id}: nach Komplettausfall mindestens 84 externe Evakuierungsplätze`,
+  )
+}
+pruefe(
+  THARSIS_HUB_HABITAT_CAPACITY === 504,
+  'Evakuierungsreserve verändert die permanente Habitatkapazität 504 nicht',
+)
 
 // drei unabhängige Energie-Domänen / sechs Reaktormodule / drei Black-Start-Knoten
 const counts = seedObjectCounts()
@@ -86,6 +107,12 @@ pruefe(new Set(THARSIS_HUB_BUILDINGS.filter(b => b.entityId === 'water_isru').ma
 pruefe(counts['eclss_hub'] === 3, 'drei regionale ECLSS-Hubs')
 pruefe(counts['radiator_field'] === 5, 'fünf Radiatorfelder')
 
+// ECLSS: jeder Knoten 55–60 %, beliebiger Einzel-Ausfall bleibt degradiert tragfähig
+for (const node of THARSIS_ECLSS_REGIONAL_NODES) {
+  pruefe(node.criticalDemandShare >= 0.55 && node.criticalDemandShare <= 0.60, `${node.id}: 55–60 % kritische Auslegung`)
+  pruefe(degradedEclssCapacity(node.id) >= 1, `${node.id}: Einzel-Ausfall lässt >=100 % kritische Restkapazität`)
+}
+
 // Medical Core + Emergency Annex (anderer Cluster)
 pruefe(counts['medical_core'] === 1 && counts['medical_annex'] === 1, 'Medical Core + Emergency Annex vorhanden')
 const annex = THARSIS_HUB_BUILDINGS.find(b => b.entityId === 'medical_annex')
@@ -97,6 +124,11 @@ const depots = THARSIS_HUB_BUILDINGS.filter(b => b.entityId === 'reserve_depot')
 const foodT = depots.reduce((s, d) => s + (d.foodReserveT ?? 0), 0)
 pruefe(depots.length === 3 && foodT >= 27, 'drei Reserve-Depots mit ≥27 t Nahrungsreserve')
 pruefe(depots.every(d => (d.foodReserveT ?? 0) <= foodT / 2), 'kein Depot hält mehr als die Hälfte der lebenswichtigen Reserve')
+
+// Pflanzenmodul ist Startbestand, aber nicht survival-critical
+pruefe(counts['plant_module'] === 1, 'ein staatliches Pflanzen-/Frischproduktionsmodul im Startbestand')
+const plantModule = THARSIS_HUB_BUILDINGS.find(b => b.entityId === 'plant_module')
+pruefe(!!plantModule && !plantModule.critical, 'Pflanzenmodul ist nicht survival-critical')
 
 // zwei Werkstattzellen / zwei Material-/Reststoff-Komplexe
 pruefe(counts['workshop_clean'] === 1 && counts['workshop_heavy'] === 1, 'zwei Werkstattzellen (sauber + schwer)')
