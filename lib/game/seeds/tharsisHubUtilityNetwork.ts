@@ -1,6 +1,6 @@
 // lib/game/seeds/tharsisHubUtilityNetwork.ts
 // Erstellt: 31.08.2026
-// Aktualisiert: 01.09.2026 — Review-Korrektur: keine vorweggenommene Vollredundanz
+// Aktualisiert: 02.09.2026 — OTA Engineering Release: mediumspezifische Redundanz
 //
 // Integritätsprojektion für die Tharsis-Hub-Mediennetze.
 //
@@ -41,8 +41,22 @@ export interface TharsisUtilityFeeder {
   routingClass: 'dedicated'
 }
 
-export const THARSIS_PROVISIONAL_DUAL_PATH_MEDIA: UtilityMedia[] = [
+/**
+ * OTA Engineering Release 2026-09-01:
+ * Diese vier Medien brauchen echte unabhängige A/B-Hauptpfade.
+ */
+export const THARSIS_DUAL_PATH_MEDIA: UtilityMedia[] = [
   'power', 'data', 'water', 'o2',
+]
+
+/**
+ * Medien mit anderer Redundanzsemantik als ein identischer A/B-Vollring.
+ * - wastewater: segmentierte Sammlung + lokale Puffer + >=2 Verarbeitung/Umleitung
+ * - thermal: zwei isolierbare Wärmeabfuhrpfade, fünf Radiatorfelder, Bypass
+ * - gas: Gefahren-/Kritikalitätsklasse statt pauschaler Dualisierung
+ */
+export const THARSIS_SPECIAL_REDUNDANCY_MEDIA: UtilityMedia[] = [
+  'wastewater', 'thermal', 'gas',
 ]
 
 function pointKey([row, col]: UtilityPoint): string {
@@ -199,10 +213,13 @@ export function validateTharsisUtilityIntegrity(): UtilityIntegrityIssue[] {
     }
   }
 
-  for (const medium of THARSIS_PROVISIONAL_DUAL_PATH_MEDIA) {
+  // Nur die fachlich freigegebenen echten Dualmedien müssen auf A UND B liegen.
+  // wastewater/thermal/gas werden bewusst nicht durch diese Prüfung zu
+  // identischen Vollringen umgedeutet.
+  for (const medium of THARSIS_DUAL_PATH_MEDIA) {
     for (const ring of ['A', 'B'] as const) {
       if (!mediaForRing(ring).includes(medium)) {
-        issues.push({ message: `Medium '${medium}' fehlt auf dem bereits doppelt vorgesehenen Backbone ${ring}` })
+        issues.push({ message: `Dualmedium '${medium}' fehlt auf Backbone ${ring}` })
       }
     }
   }
@@ -229,9 +246,9 @@ export function validateTharsisUtilityIntegrity(): UtilityIntegrityIssue[] {
       if (feeder.lengthTiles <= 0) {
         issues.push({ message: `${building.id}: Feeder ${ring} besitzt keine physische Leitungslänge` })
       }
-      for (const medium of THARSIS_PROVISIONAL_DUAL_PATH_MEDIA) {
+      for (const medium of THARSIS_DUAL_PATH_MEDIA) {
         if (!feeder.media.includes(medium)) {
-          issues.push({ message: `${building.id}: Feeder ${ring} führt doppelt vorgesehenes Medium '${medium}' nicht` })
+          issues.push({ message: `${building.id}: Feeder ${ring} führt Dualmedium '${medium}' nicht` })
         }
       }
     }
