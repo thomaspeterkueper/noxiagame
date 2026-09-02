@@ -1,10 +1,12 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 25.08.2026 — Landegebühr (colony_settings.tax_landing) bei
-//               travel: flacher Cr-Betrag pro Ankunft, fließt in
-//               colony_ledger des Zielorts (Kolonie-Kasse, NOXIA-ECON-0002)
-// Version:      0.7.0
+// Aktualisiert: 01.09.2026 — persistente Schiff→Landing-Pad-Zuordnung bei Travel
+// Version:      0.8.0
 //
+// v0.8.0 – Docking-Kapazität: Ziele mit operationalen Landing-Pads werden
+//   serverseitig gegen konkrete ship_docking_assignments geprüft. Ziele ohne
+//   verwaltete Pads bleiben im Legacy-Modus, damit bestehende Welten nicht
+//   durch den Rollout blockiert werden.
 // v0.5.4 – Pilot-Kompetenz: erfolgreiche Reisen zählen serverseitig auf
 //   profiles.flight_count. Das Dashboard soll nur den fertigen Wert lesen.
 // v0.5.0 – Schiffsdaten vollständig: loadFromServer-Block joint jetzt
@@ -24,6 +26,7 @@ import { publishTransaction } from '@/lib/ably/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRICE_MIN, PRICE_MAX, PRICE_IMPULSE_PER_TON } from '@/lib/game/config'
 import { flightEnergyCost } from '@/lib/game/ships'
+import { operationalDockingPads, selectFreeDockingPad } from '@/lib/game/dockingAssignments'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,6 +56,90 @@ async function incrementFlightCount(profileId: string): Promise<number> {
     .eq('id', profileId)
 
   return next
+}
+
+async function reserveDestinationPad(input: {
+  shipId: string
+  destinationLocationId: string
+}): Promise<{ managed: boolean; padEntityId: string | null; error?: string }> {
+  const { data: padRows, error: padError } = await serviceClient
+    .from('tile_entities')
+    .select('id, profile_id, entity_type, entity_id, parent_id, slot, status, condition')
+    .eq('location_id', input.destinationLocationId)
+    .eq('entity_type', 'building')
+    .in('entity_id', ['landing_pad', 'landing_pad_extra_pad'])
+
+  if (padError) return { managed: false, padEntityId: null, error: padError.message }
+
+  const rows = (padRows ?? []) as any[]
+  const basePads = rows
+    .filter(row => row.entity_id === 'landing_pad')
+    .map(row => ({ id: row.id, status: row.status, condition: row.condition }))
+
+  const expansions = rows
+    .filter(row => row.entity_id === 'landing_pad_extra_pad' && row.parent_id)
+    .map(row => ({
+      id: row.id,
+      parentEntityId: row.parent_id,
+      expansionId: row.entity_id,
+      profileId: row.profile_id ?? null,
+      status: row.status,
+      slot: row.slot ?? null,
+      condition: row.condition ?? null,
+    }))
+
+  const pads = operationalDockingPads({ basePads, expansions })
+
+  // Backwards-compatible rollout boundary: a destination with no operational
+  // managed pad remains legacy and must not suddenly become unreachable.
+  if (pads.length === 0) return { managed: false, padEntityId: null }
+
+  const { data: assignmentRows, error: assignmentError } = await serviceClient
+    .from('ship_docking_assignments')
+    .select('ship_id, location_id, pad_entity_id')
+    .eq('location_id', input.destinationLocationId)
+
+  if (assignmentError) return { managed: true, padEntityId: null, error: assignmentError.message }
+
+  const assignments = (assignmentRows ?? []).map((row: any) => ({
+    shipId: row.ship_id,
+    locationId: row.location_id,
+    padEntityId: row.pad_entity_id,
+  }))
+
+  // Try free candidates in deterministic order. The unique(pad_entity_id)
+  // constraint arbitrates concurrent arrivals; on a race we try the next pad.
+  const remaining = [...pads]
+  while (remaining.length > 0) {
+    const candidate = selectFreeDockingPad({
+      pads: remaining,
+      assignments,
+      arrivingShipId: input.shipId,
+    })
+    if (!candidate) break
+
+    const { error } = await serviceClient
+      .from('ship_docking_assignments')
+      .upsert({
+        ship_id: input.shipId,
+        location_id: input.destinationLocationId,
+        pad_entity_id: candidate.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'ship_id' })
+
+    if (!error) return { managed: true, padEntityId: candidate.id }
+
+    // Unique pad collision from a concurrent arrival: remove this candidate and
+    // try another one. Other DB failures are surfaced instead of hiding them.
+    if ((error as any).code !== '23505') {
+      return { managed: true, padEntityId: null, error: error.message }
+    }
+    const idx = remaining.findIndex(pad => pad.id === candidate.id)
+    if (idx >= 0) remaining.splice(idx, 1)
+    assignments.push({ shipId: `race:${candidate.id}`, locationId: input.destinationLocationId, padEntityId: candidate.id })
+  }
+
+  return { managed: true, padEntityId: null }
 }
 
 export async function GET(req: NextRequest) {
@@ -123,8 +210,8 @@ export async function GET(req: NextRequest) {
       cargo: cargoMap,
       shipId: ship?.id,
       shipTypeId: ship?.ship_type_id ?? 'freighter_mk1',
-      speedMult: Number(st?.speed_mult ?? 1.0),          // BUGFIX: war nie geliefert
-      rangeDistance: Number(st?.range_distance ?? 28),   // statische Reichweite
+      speedMult: Number(st?.speed_mult ?? 1.0),
+      rangeDistance: Number(st?.range_distance ?? 28),
     })
   }
 
@@ -135,9 +222,8 @@ export async function GET(req: NextRequest) {
 
   // Travel — Energie aus Laderaum entnehmen (Treibstoff-Mechanik)
   if (action === 'travel') {
-    const dest = resource  // resource-Parameter = Zielort beim Travel
+    const dest = resource
 
-    // Aktives Schiff für Travel
     const { data: shipRowsT } = await serviceClient
       .from('ships')
       .select('id, location, cargo_max, ship_type_id, is_active')
@@ -151,7 +237,6 @@ export async function GET(req: NextRequest) {
     const fromLocation = travelShip.location
     const energyNeeded = flightEnergyCost(fromLocation, dest)
 
-    // Energie im Laderaum prüfen
     const { data: energyCargo } = await serviceClient
       .from('ship_cargo')
       .select('amount')
@@ -172,64 +257,89 @@ export async function GET(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // ── LANDEGEBÜHR (25.08.2026) — flacher Cr-Betrag, colony_settings.tax_landing,
-    // fließt in die Kolonie-Kasse (colony_ledger) des Zielorts. Nur bei
-    // tatsächlichem Ortswechsel, nicht bei fromLocation === dest.
+    const { data: destLoc } = await serviceClient
+      .from('locations')
+      .select('id')
+      .eq('slug', dest)
+      .maybeSingle()
+
+    if (!destLoc) {
+      return NextResponse.json({ error: 'Zielort nicht gefunden' }, { status: 404 })
+    }
+
     let landingFee = 0
+    let payerCredits: number | null = null
     if (fromLocation !== dest) {
-      const { data: destLoc } = await serviceClient
-        .from('locations')
-        .select('id')
-        .eq('slug', dest)
+      const { data: destSettings } = await serviceClient
+        .from('colony_settings')
+        .select('tax_landing')
+        .eq('location_id', destLoc.id)
         .maybeSingle()
+      landingFee = Math.max(0, Math.round(Number(destSettings?.tax_landing ?? 0)))
 
-      if (destLoc) {
-        const { data: destSettings } = await serviceClient
-          .from('colony_settings')
-          .select('tax_landing')
-          .eq('location_id', destLoc.id)
-          .maybeSingle()
-        landingFee = Math.max(0, Math.round(Number(destSettings?.tax_landing ?? 0)))
-
-        if (landingFee > 0) {
-          const { data: payerProfile } = await serviceClient
-            .from('profiles')
-            .select('credits')
-            .eq('id', user.id)
-            .single()
-
-          if (!payerProfile || payerProfile.credits < landingFee) {
-            return NextResponse.json({
-              error: `Landegebühr ${landingFee} Cr — nicht genug Credits`,
-              landingFee,
-            }, { status: 400 })
-          }
-
-          await serviceClient.from('profiles')
-            .update({ credits: payerProfile.credits - landingFee })
-            .eq('id', user.id)
-
-          const { data: destTick } = await serviceClient
-            .from('tick_log')
-            .select('tick_number')
-            .order('tick_number', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          await serviceClient.from('colony_ledger').insert({
-            location_id:   destLoc.id,
-            tick:          Number(destTick?.tick_number ?? 0),
-            entry_type:    'landing_fee',
-            profile_id:    user.id,
-            resource_type: null,
-            amount:        landingFee,
-            note:          `Landegebühr ${dest}`,
-          })
+      if (landingFee > 0) {
+        const { data: payerProfile } = await serviceClient
+          .from('profiles')
+          .select('credits')
+          .eq('id', user.id)
+          .single()
+        payerCredits = Number(payerProfile?.credits ?? 0)
+        if (!payerProfile || payerCredits < landingFee) {
+          return NextResponse.json({
+            error: `Landegebühr ${landingFee} Cr — nicht genug Credits`,
+            landingFee,
+          }, { status: 400 })
         }
       }
     }
 
-    // Energie verbrauchen
+    // Capacity is checked and a concrete pad reserved before any fee/energy is
+    // consumed. Legacy destinations without operational managed pads remain
+    // reachable and release any stale old assignment after a successful move.
+    let dockingManaged = false
+    let dockingPadEntityId: string | null = null
+    if (fromLocation !== dest) {
+      const reservation = await reserveDestinationPad({
+        shipId: travelShip.id,
+        destinationLocationId: destLoc.id,
+      })
+      if (reservation.error) {
+        return NextResponse.json({ error: `Docking konnte nicht geprüft werden: ${reservation.error}` }, { status: 503 })
+      }
+      dockingManaged = reservation.managed
+      dockingPadEntityId = reservation.padEntityId
+      if (dockingManaged && !dockingPadEntityId) {
+        return NextResponse.json({
+          error: 'Kein freier Landeplatz am Ziel verfügbar.',
+          code: 'NO_LANDING_CAPACITY',
+          destination: dest,
+        }, { status: 409 })
+      }
+    }
+
+    if (landingFee > 0 && payerCredits != null) {
+      await serviceClient.from('profiles')
+        .update({ credits: payerCredits - landingFee })
+        .eq('id', user.id)
+
+      const { data: destTick } = await serviceClient
+        .from('tick_log')
+        .select('tick_number')
+        .order('tick_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      await serviceClient.from('colony_ledger').insert({
+        location_id:   destLoc.id,
+        tick:          Number(destTick?.tick_number ?? 0),
+        entry_type:    'landing_fee',
+        profile_id:    user.id,
+        resource_type: null,
+        amount:        landingFee,
+        note:          `Landegebühr ${dest}`,
+      })
+    }
+
     const energyLeft = energyOnBoard - energyNeeded
     if (energyLeft > 0) {
       await serviceClient.from('ship_cargo')
@@ -243,17 +353,33 @@ export async function GET(req: NextRequest) {
         .eq('resource', 'energy')
     }
 
-    // Schiff bewegen (per ID — nur das spezifische Schiff)
     await serviceClient
       .from('ships')
       .update({ location: dest })
       .eq('id', travelShip.id)
 
+    if (fromLocation !== dest && !dockingManaged) {
+      await serviceClient
+        .from('ship_docking_assignments')
+        .delete()
+        .eq('ship_id', travelShip.id)
+    }
+
     const flightCount = fromLocation !== dest
       ? await incrementFlightCount(user.id)
       : Number.NaN
 
-    return NextResponse.json({ ok: true, location: dest, energyUsed: energyNeeded, flightCount, landingFee })
+    return NextResponse.json({
+      ok: true,
+      location: dest,
+      energyUsed: energyNeeded,
+      flightCount,
+      landingFee,
+      docking: {
+        managed: dockingManaged,
+        padEntityId: dockingPadEntityId,
+      },
+    })
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -274,7 +400,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
   }
 
-  // Aktives Schiff für buy/sell via is_active
   const { data: shipRows2 } = await serviceClient
     .from('ships')
     .select('id, location, cargo_max, ship_type_id, is_active')
@@ -287,7 +412,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
   }
 
-  // ── PREIS-WAHRHEIT: aktueller Marktpreis am STANDORT DES SCHIFFS ──────────
   const { data: loc } = await serviceClient
     .from('locations')
     .select('id, slug')
@@ -312,7 +436,6 @@ export async function GET(req: NextRequest) {
   const serverBuy  = market.buy_price
   const serverSell = market.sell_price
 
-  // ── TRANSAKTIONSSTEUER: Satz der Kolonie (serverseitig, nie vom Client) ──
   const { data: settings } = await serviceClient
     .from('colony_settings')
     .select('tax_transaction')
@@ -346,8 +469,6 @@ export async function GET(req: NextRequest) {
   let tax = 0
 
   if (action === 'buy') {
-    // Auktionspreis: Client sendet ausgehandelten Preis. Server prüft Plausibilität
-    // (clientPrice > 0 und ≤ serverBuy). Sonst Fallback auf serverBuy.
     unitPrice = (clientPrice > 0 && clientPrice <= serverBuy) ? clientPrice : serverBuy
     const perTon       = unitPrice * (1 + taxRate)
     const maxByCargo   = Math.max(0, ship.cargo_max - cargoUsed)
@@ -365,7 +486,6 @@ export async function GET(req: NextRequest) {
     newCargoAmount += booked
     profit = -(goods + tax)
   } else {
-    // Auktionspreis: Client sendet ausgehandelten Preis. Server prüft (≥ serverSell).
     unitPrice = (clientPrice > 0 && clientPrice >= serverSell) ? clientPrice : serverSell
     booked = Math.min(amount, newCargoAmount)
 
@@ -400,7 +520,6 @@ export async function GET(req: NextRequest) {
       .eq('resource', resource)
   }
 
-  // Ably publish (non-blocking)
   publishTransaction({
     profileId: user.id,
     username: profile?.username,
@@ -420,9 +539,6 @@ export async function GET(req: NextRequest) {
     profit,
   })
 
-  // ── RUF-INKREMENTIERUNG ───────────────────────────────────────────────────
-  // Verkäufe (Lieferungen) erhöhen den Ruf an dieser Location.
-  // INSERT ... ON CONFLICT DO UPDATE summiert atomar — kein Race-Condition-Problem.
   if (action === 'sell') {
     try {
       await serviceClient.rpc('upsert_location_reputation', {
@@ -448,7 +564,6 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── PREISIMPULS ───────────────────────────────────────────────────────────
   let priceUpdate: { resource: string; buyPrice: number; sellPrice: number } | null = null
 
   let newBuy  = serverBuy

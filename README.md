@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NOXIA
 
-## Getting Started
+NOXIA ist eine Wissens-, Zivilisations- und Gesellschaftssimulation im realen Sonnensystem. Spieler versorgen Kolonien, bauen Infrastruktur, handeln, lernen und erleben dieselbe Simulation sowohl strategisch als auch aus persönlicher Perspektive.
 
-First, run the development server:
+## Architekturprinzipien
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Eine Simulation, mehrere Sichten
+
+Strategische Karte, Gebäude-Overlays, Scanner, Walkable Colony und Innenräume dürfen keinen eigenen parallelen Weltzustand erzeugen. Die persönliche Ebene ist eine Projektion des bestehenden NOXIA-Zustands.
+
+```text
+persistierter NOXIA-Weltzustand
+        ↓
+Gameplay-/Domänenlogik
+        ↓
+strategische Sicht | Overlay | persönliche Sicht
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Der Scanner ist der erste abgeschlossene Referenz-Vertical-Slice für dieses Prinzip.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Erweiterbare Gebäude
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Gebäude sind langfristig keine starren Einzelobjekte mit bloßen Level-Zahlen. Kapazität und Funktion können durch reale, persistierte Erweiterungen wachsen. Eine Erweiterung muss auf Makro- und Mikroebene dieselbe Infrastruktur darstellen.
 
-## Learn More
+Beispiel: Ein Raumhafen kann aus Landing Pad 1, einem später gebauten zweiten Pad, Frachtlager und Terminal bestehen. Die persönliche Ansicht darf Pad 2 erst zeigen, wenn diese Erweiterung im Weltzustand tatsächlich existiert.
 
-To learn more about Next.js, take a look at the following resources:
+Verbindliche Entscheidung: `docs/decisions/NOXIA-BUILD-0001-expandable-buildings.md`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Source of Truth
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **NOXIA:** Gameplay, Balancing, Runtime-Simulation, Kosten, Bauzeiten, Produktionswerte und konkrete Spielinstanzen.
+- **OTA/KG:** kanonische technische Objekte und systemübergreifende Beziehungen.
+- **SSF:** wissenschaftliche/Lerninhalte.
 
-## Deploy on Vercel
+Externe Evidenz oder Kanon-Mappings dürfen NOXIA-Balancing nicht automatisch verändern. NOXIA erfindet keine OTA-, KG- oder SSF-IDs.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Wichtige Designdokumente
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `docs/gamedesign.md` — Game-Design-Grundlage und Kernloop
+- `docs/Spec-gebaeude-katalog.md` — Gebäudekatalog und Baubarkeitsprinzip
+- `docs/Spec:_InfrastrukturProgression.md` — Infrastruktur- und Prerequisite-Progression
+- `docs/design/walkable-colony.md` — persönliche Ebene als Linse auf die Simulation
+- `docs/decisions/ADR-walkable-colony-architektur.md` — Architektur-Invarianten der Walkable Colony
+- `docs/decisions/NOXIA-BUILD-0001-expandable-buildings.md` — persistente, erweiterbare Gebäude
+
+## Entwicklungsregel für Gebäude
+
+Ein Gebäude oder eine Erweiterung wird erst baubar, wenn es eine echte Funktion besitzt. Darstellung folgt dem Weltzustand; sie erzeugt ihn nicht.
+
+Bei jedem Gebäude werden zwei Fragen beantwortet:
+
+1. **Makro:** Was produziert, konsumiert oder ermöglicht das Gebäude?
+2. **Mikro:** Wie erlebt ein Mensch genau den Zustand dieses Gebäudes?
+
+## Technischer Stack
+
+- Next.js / React
+- Supabase als bestehende Persistenzgrenze
+- SVG/Canvas/React für strategische und persönliche 2D-Sichten
+- Three.js nur dort, wo eine gezielte 3D-Präsentation sinnvoll ist; keine Simulation innerhalb der 3D-Szene
+
+## Lokale Entwicklung
+
+```bash
+npm install
+npm run dev
+```
+
+Produktionsbuild:
+
+```bash
+npm run build
+```
+
+## Repository-übergreifende Änderungen
+
+Jedes Repository bleibt Source of Truth nur für seinen Zuständigkeitsbereich. Änderungen, die ein anderes Repository betreffen, werden nicht hier stellvertretend umgesetzt, sondern als Markdown-Anforderung im Ziel-Repository unter `external-tasks/open/` angelegt.

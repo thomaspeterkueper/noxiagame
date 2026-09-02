@@ -309,8 +309,28 @@ export async function GET(req: NextRequest) {
     const entityId = searchParams.get('entityId')
     const mode = (searchParams.get('mode') ?? 'normal') as SaleMode
     if (!entityId) return NextResponse.json({ error: 'Fehlende Entity ID' }, { status: 400 })
-    const { data: entity } = await serviceClient.from('tile_entities').select('*').eq('id', entityId).eq('profile_id', user.id).eq('entity_type', 'building').single()
+    const { data: entity } = await serviceClient.from('tile_entities').select('*').eq('id', entityId).eq('profile_id', user.id).in('entity_type', ['building', 'module']).single()
     if (!entity) return NextResponse.json({ error: 'Gebäude nicht gefunden oder gehört dir nicht' }, { status: 404 })
+
+    // ── Station-Modul: sofortiger Rückkauf (20% Rückbau-Abschlag) ──────────
+    if (entity.entity_type === 'module') {
+      const moduleDef = MODULE_COSTS[entity.entity_id]
+      if (!moduleDef) return NextResponse.json({ error: 'Modul-Definition nicht gefunden' }, { status: 400 })
+      const payout = Math.floor(moduleDef.cost * (1 - BUILDING_SALE.RUECKBAU_PCT))
+      const { data: deleted, error: delErr } = await serviceClient
+        .from('tile_entities')
+        .delete()
+        .eq('id', entity.id)
+        .eq('profile_id', user.id)
+        .select('id')
+      if (delErr || !deleted || deleted.length === 0) {
+        return NextResponse.json({ error: 'Modul bereits im Verkauf oder nicht mehr vorhanden.' }, { status: 409 })
+      }
+      const { data: profile } = await serviceClient.from('profiles').select('credits').eq('id', user.id).single()
+      await serviceClient.from('profiles').update({ credits: (profile?.credits ?? 0) + payout }).eq('id', user.id)
+      return NextResponse.json({ ok: true, sold: true, payout, mode })
+    }
+
     const def = await loadBuildingDef(entity.entity_id)
     if (!def) return NextResponse.json({ error: 'Gebäude-Definition nicht gefunden' }, { status: 400 })
     const result = await getQuoteForEntity(entity, def)
