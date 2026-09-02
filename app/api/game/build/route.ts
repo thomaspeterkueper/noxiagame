@@ -7,6 +7,8 @@ import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '
 import { BUILDINGS } from '@/lib/game/buildings'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
+import { getFixedTerrain } from '@/lib/grid/locationMaps'
+import { isBuildable } from '@/lib/grid/generateGrid'
 
 const WORLD_COLS = 32
 const WORLD_ROWS = 24
@@ -230,6 +232,13 @@ export async function GET(req: NextRequest) {
     if (tileLevel < -3 || tileLevel > 0) return NextResponse.json({ error: 'Ungültige Ebene' }, { status: 400 })
     if (tileRow < 0 || tileRow >= WORLD_ROWS || tileCol < 0 || tileCol >= WORLD_COLS || Number.isNaN(tileRow) || Number.isNaN(tileCol)) {
       return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
+    }
+    // Kanonisches Terrain-Gate: Standorte mit fester Karte (lib/grid/locationMaps)
+    // erlauben Bau nur auf isBuildable()-Flächen — gleiche Regel wie die
+    // strategische Sicht (ColonyGrid). Nicht abgedeckte Standorte bleiben unverändert.
+    const fixedTerrain = getFixedTerrain(locationSlug, tileRow, tileCol)
+    if (fixedTerrain && !isBuildable(fixedTerrain)) {
+      return NextResponse.json({ error: 'Dieses Gelände ist nicht bebaubar.' }, { status: 400 })
     }
 
     const moduleDef = MODULE_COSTS[buildableId]

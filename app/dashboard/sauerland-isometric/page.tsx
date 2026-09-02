@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LOCATION_MAPS, terrainCodeToType } from '@/lib/grid/locationMaps'
+import { isBuildable } from '@/lib/grid/generateGrid'
 import { getToken } from '@/lib/supabase/auth'
 
 const ROOT = '/assets/environments/earth/sauerland'
@@ -48,6 +49,7 @@ const buttonStyle:React.CSSProperties = {height:32,minWidth:34,border:'1px solid
 function iso(row:number,col:number){return{x:ORIGIN_X+(col-row)*TILE_W/2,y:ORIGIN_Y+(col+row)*TILE_H/2}}
 function key(row:number,col:number){return`${row}:${col}`}
 function neighbours(set:Set<string>,row:number,col:number):Cardinal[]{return CARDINAL.filter(dir=>{const[dr,dc]=DELTA[dir];return set.has(key(row+dr,col+dc))})}
+function terrainBuildable(row:number,col:number){return isBuildable(terrainCodeToType(EARTH[row]?.[col]??'g'))}
 
 function Sprite({src,frames,frame,size=104,title}:{src:string;frames:number;frame:number;size?:number;title?:string}){
  const safe=Math.max(0,Math.min(frames-1,frame))
@@ -138,6 +140,7 @@ export default function SauerlandIsometricPage(){
 
  const chooseTile=useCallback(async(row:number,col:number)=>{
   if(!buildMode||occupied.has(key(row,col)))return
+  if(!terrainBuildable(row,col))return
   setSelected({row,col});setMessage('Lade Baumöglichkeiten …');setBuildOptions([])
   try{
    const token=await getToken();const type=terrainCodeToType(EARTH[row]?.[col]??'g')
@@ -177,13 +180,13 @@ export default function SauerlandIsometricPage(){
     {buildings.sort((a,b)=>(a.tile_row+a.tile_col)-(b.tile_row+b.tile_col)).map(entity=>{const p=iso(entity.tile_row,entity.tile_col),[path,frame]=buildingAsset(entity.entity_id);return <div key={entity.id} style={{position:'absolute',left:p.x-58,top:p.y-98,zIndex:300+entity.tile_row+entity.tile_col}}><Sprite src={`${ROOT}/${path}/turnaround_4.svg`} frames={4} frame={frame} size={116} title={entity.entity_id.replace(/_/g,' ')}/></div>})}
     {moving.map((item,i)=>{const p=iso(item.row,item.col),frame=DIR8.indexOf(item.dir);return <div key={`vehicle-${i}`} style={{position:'absolute',left:p.x-item.size/2,top:p.y-item.size*.72,zIndex:420+item.row+item.col}}><Sprite src={`${ROOT}/vehicles/${item.asset}/turnaround_8.svg`} frames={8} frame={frame} size={item.size}/></div>})}
 
-    {buildMode&&Array.from({length:ROWS}).flatMap((_,row)=>Array.from({length:COLS}).map((__,col)=>{const p=iso(row,col),blocked=occupied.has(key(row,col)),active=selected?.row===row&&selected?.col===col;return <button key={`hit-${row}-${col}`} aria-label={`Baufeld ${row}, ${col}`} disabled={blocked} onClick={e=>{e.stopPropagation();if(!dragRef.current?.moved)void chooseTile(row,col)}} style={{position:'absolute',left:p.x-TILE_W/2,top:p.y-TILE_H/2,width:TILE_W,height:TILE_H,clipPath:'polygon(50% 0,100% 50%,50% 100%,0 50%)',background:active?'rgba(236,191,76,.48)':'rgba(255,255,255,.01)',border:0,outline:active?'2px solid #d3a72e':'none',cursor:blocked?'not-allowed':'crosshair',zIndex:700+row+col}}/>}))}
+    {buildMode&&Array.from({length:ROWS}).flatMap((_,row)=>Array.from({length:COLS}).map((__,col)=>{const p=iso(row,col),blocked=occupied.has(key(row,col))||!terrainBuildable(row,col),active=selected?.row===row&&selected?.col===col;return <button key={`hit-${row}-${col}`} aria-label={`Baufeld ${row}, ${col}`} disabled={blocked} onClick={e=>{e.stopPropagation();if(!dragRef.current?.moved)void chooseTile(row,col)}} style={{position:'absolute',left:p.x-TILE_W/2,top:p.y-TILE_H/2,width:TILE_W,height:TILE_H,clipPath:'polygon(50% 0,100% 50%,50% 100%,0 50%)',background:active?'rgba(236,191,76,.48)':'rgba(255,255,255,.01)',border:0,outline:active?'2px solid #d3a72e':'none',cursor:blocked?'not-allowed':'crosshair',zIndex:700+row+col}}/>}))}
    </div></div>
   </div>
 
   {buildMode&&<aside style={{position:'fixed',right:18,top:76,width:340,maxHeight:'calc(100vh - 96px)',overflow:'auto',zIndex:12000,background:'rgba(251,250,246,.97)',border:'1px solid #d7d0c4',borderRadius:12,boxShadow:'0 12px 34px rgba(40,55,46,.22)',padding:14}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong style={{color:'#23415d'}}>Planen & Bauen</strong><button onClick={()=>{setBuildMode(false);setSelected(null);setBuildOptions([])}} style={{...buttonStyle,minWidth:32}}>×</button></div>
-   {!selected&&<p style={{fontSize:12,color:'#6e746d',lineHeight:1.5}}>Klicke direkt in der isometrischen Landschaft auf einen freien Bauplatz. Das logische 32×24-Raster bleibt nur intern für Regeln und Speicherung bestehen; es wird nicht mehr als Planungsraster angezeigt.</p>}
+   {!selected&&<p style={{fontSize:12,color:'#6e746d',lineHeight:1.5}}>Klicke direkt in der isometrischen Landschaft auf einen freien, bebaubaren Bauplatz (Wald und Fluss sind ausgenommen). Das logische 32×24-Raster bleibt nur intern für Regeln und Speicherung bestehen; es wird nicht mehr als Planungsraster angezeigt.</p>}
    {selected&&<div style={{fontSize:11,color:'#7d7467',marginBottom:10}}>Position {selected.row}/{selected.col} · {terrainCodeToType(EARTH[selected.row]?.[selected.col]??'g')}</div>}
    {message&&<div style={{padding:'8px 10px',background:'#f0eee7',borderRadius:7,fontSize:11,color:'#59646a',marginBottom:10}}>{message}</div>}
    {buildOptions.map(option=>{const locked=option.knowledgeLocked||option.siteBlocked;return <div key={option.key} style={{padding:'10px 0',borderTop:'1px solid #e1ddd4'}}><div style={{fontSize:12,fontWeight:700,color:locked?'#8a8175':'#2c465c'}}>{option.name}</div><div style={{fontSize:11,color:'#7d7467',margin:'3px 0 7px'}}>{option.displayCost.toLocaleString('de-DE')} Cr</div>{option.knowledgeLocked&&option.learningUrl?<a href={option.learningUrl} style={{fontSize:11,color:'#2a5d8c'}}>Wissen lernen →</a>:<button disabled={locked||building} onClick={()=>void startBuild(option)} style={{...buttonStyle,height:28,fontSize:11,opacity:locked?.45:1}}>Bauen</button>}</div>})}
