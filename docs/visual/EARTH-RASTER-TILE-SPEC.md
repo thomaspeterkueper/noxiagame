@@ -2,6 +2,12 @@
 
 Status: canonical production rule for the Earth raster asset pass.
 
+## Scope
+
+This specification governs the **square grid raster family**: the repeating 64 × 64 square terrain tiles and the road-mask family (`road_0` … `road_15`) rendered by the grid views. All rules below bind only new Earth assets of this family.
+
+The **isometric presentation family** is explicitly exempt: diamond terrain fills, road/river strips, building and vehicle turnaround frames and nature props authored for the Sauerland isometric view (`app/dashboard/sauerland-isometric`, assets under `public/assets/environments/earth/sauerland/`). That family is isometric sprite/prop artwork for the 3/4 isometric presentation, so the square 64 × 64 footprint, square four-edge repetition, WebP-target and road-mask rules of this document do not apply to it. It stays bound by the exterior strategy asset rules of `docs/visual/NOXIA-VISUAL-BIBLE.md` (§ 2 Exterior strategy assets, § 8 Asset acceptance criteria). Shipping new SVG artwork in the isometric presentation family therefore does not contradict this specification.
+
 ## Runtime tile size
 
 - Grid runtime size: **64 × 64 CSS px**.
@@ -71,7 +77,7 @@ This spatial-expansion rule also applies where meaningful to warehouses, product
 ## Raster rendering
 
 - Runtime target: WebP where transparency/quality is adequate; PNG fallback only where necessary.
-- No new SVG artwork as final Earth terrain/building representation.
+- No new SVG artwork as final square-grid Earth terrain/building representation (the isometric presentation family is exempt per Scope).
 - No baked UI labels or text inside terrain tiles.
 - Visible in-world branding must use **noχ1ᐃ**.
 - Perspective, material response and illumination must stay consistent across the Earth asset family.
