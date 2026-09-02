@@ -33,11 +33,11 @@ function nearestFeatureDistance(point:{lat:number;lon:number},features:ImportedE
 
 /** Area-level planning pass around each shortlist point.
  * This uses the measured DEM sample field and current OSM geometry. It is intentionally
- * conservative: it estimates contiguous buildable terrain but does not claim cadastral,
+ * conservative: it estimates buildable terrain but does not claim cadastral,
  * environmental-law or launch-safety approval.
  */
 export function analyseSpaceportAreas(shortlist:SpaceportShortlistCandidate[],ranked:SpaceportCandidate[],features:ImportedEarthFeature[],radiusM=1000):SpaceportAreaAnalysis[]{
- return shortlist.map(site=>{
+ return shortlist.map<SpaceportAreaAnalysis>(site=>{
   const local=ranked.filter(c=>distanceM(site,c)<=radiusM)
   const suitable=local.filter(c=>c.slopePercent<=5&&c.terrainScore>=55&&(c.exclusionDistanceM===null||c.exclusionDistanceM>=300))
   const sampleSpacing=500
@@ -53,8 +53,9 @@ export function analyseSpaceportAreas(shortlist:SpaceportShortlistCandidate[],ra
   const corridorScore=Math.max(0,Math.min(100,(maxConnectedSpanM/1800)*100))
   const accessScore=Math.max(0,Math.min(100,100-Math.min(60,road/35)-Math.min(40,rail/100)))
   const areaScore=Math.round(site.score*.35+expansionScore*.3+corridorScore*.2+accessScore*.15)
+  const verdict:SpaceportAreaAnalysis['verdict']=areaScore>=70?'strong':areaScore>=50?'conditional':'weak'
   const notes:string[]=[]
-  if(usableAreaHa>=100)notes.push('große zusammenhängende Ausbaureserve im 1-km-Prüfradius')
+  if(usableAreaHa>=100)notes.push('große Ausbaureserve im 1-km-Prüfradius')
   else if(usableAreaHa>=50)notes.push('mittlere Ausbaureserve')
   else notes.push('begrenzte ebene Ausbaufläche')
   if(maxConnectedSpanM>=1500)notes.push('Korridorpotenzial über mindestens 1,5 km')
@@ -62,6 +63,6 @@ export function analyseSpaceportAreas(shortlist:SpaceportShortlistCandidate[],ra
   if(road<1200)notes.push('Straßenerschließung günstig')
   if(rail<2500)notes.push('Bahnanschluss im erweiterten Umfeld')
   if(sensitive<500)notes.push('sensible Realweltnutzung bleibt ein Planungsrisiko')
-  return {label:site.shortlistLabel,center:{lat:site.lat,lon:site.lon},analysisRadiusM:radiusM,usableAreaHa,usableShare,connectedSuitableCells:suitable.length,maxConnectedSpanM:Math.round(maxConnectedSpanM),expansionScore:Math.round(expansionScore),corridorScore:Math.round(corridorScore),accessScore:Math.round(accessScore),areaScore,verdict:areaScore>=70?'strong':areaScore>=50?'conditional':'weak',notes}
+  return {label:site.shortlistLabel,center:{lat:site.lat,lon:site.lon},analysisRadiusM:radiusM,usableAreaHa,usableShare,connectedSuitableCells:suitable.length,maxConnectedSpanM:Math.round(maxConnectedSpanM),expansionScore:Math.round(expansionScore),corridorScore:Math.round(corridorScore),accessScore:Math.round(accessScore),areaScore,verdict,notes}
  }).sort((a,b)=>b.areaScore-a.areaScore)
 }
