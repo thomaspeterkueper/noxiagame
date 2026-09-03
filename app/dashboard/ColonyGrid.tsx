@@ -514,6 +514,9 @@ export default function ColonyGrid({
 
   const selectedEnt = selectedTile ? entityAt(selectedTile.r, selectedTile.c) : null
   const canSellSelected = !!selectedEnt && selectedEnt.profile_id === userId && !selectedEnt.is_state_owned
+  // Der begehbare Scanner-Mikroscene braucht ein Vollbild-Overlay (wie ShipWalkable);
+  // alle anderen Gebäude-Interieurs bleiben im 460px-Modal.
+  const scannerScene = !!interiorEntity && interiorEntity.entity_id === 'scanner' && interiorEntity.profile_id === userId
   const openSellForSelected = () => {
     setShowLanding(false); setShowSchool(false); setShowBank(false); setShowAdmin(false)
     setShowSellPanel(true)
@@ -577,11 +580,12 @@ export default function ColonyGrid({
           <style>{'.grid-pan-container::-webkit-scrollbar { display: none }'}</style>
           {interiorEntity && (
             <div style={{
-              position: 'absolute', inset: 0, zIndex: 200,
+              position: scannerScene ? 'fixed' : 'absolute', inset: 0,
+              zIndex: scannerScene ? 2000 : 200,
               background: 'rgba(0,0,0,0.85)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }} onClick={e => e.target === e.currentTarget && setInteriorEntity(null)}>
-              <div style={{ width: 460 }}>
+              <div style={scannerScene ? undefined : { width: 460 }}>
                 <BuildingInterior
                   entity={interiorEntity as any}
                   userId={userId}
