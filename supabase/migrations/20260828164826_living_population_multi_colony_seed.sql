@@ -1,0 +1,3 @@
+-- Migration history alignment marker.
+-- Version 20260828164826 is already applied on the linked production project.
+-- This no-op marker restores local/remote Supabase migration-history parity only.

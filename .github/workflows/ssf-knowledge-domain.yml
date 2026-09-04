@@ -1,0 +1,44 @@
+name: SSF Knowledge Domain
+
+on:
+  push:
+    paths:
+      - 'lib/ssfKnowledge.ts'
+      - 'lib/ssfKnowledge.test.ts'
+      - 'lib/knowledge/unlockRegistry.ts'
+      - 'lib/knowledge/types.ts'
+      - 'lib/knowledge/ssfPaths.ts'
+      - 'app/academy/**'
+      - '.github/workflows/ssf-knowledge-domain.yml'
+  pull_request:
+    paths:
+      - 'lib/ssfKnowledge.ts'
+      - 'lib/ssfKnowledge.test.ts'
+      - 'lib/knowledge/unlockRegistry.ts'
+      - 'lib/knowledge/types.ts'
+      - 'lib/knowledge/ssfPaths.ts'
+      - 'app/academy/**'
+      - '.github/workflows/ssf-knowledge-domain.yml'
+
+jobs:
+  ssf-knowledge-domain:
+    runs-on: ubuntu-latest
+    env:
+      # Build-only values: Next.js evaluates Supabase clients while collecting
+      # route metadata. SSF knowledge domain tests do not access this endpoint.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: build-only-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: build-only-service-role-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Compile ssf knowledge domain test
+        run: npx tsc lib/ssfKnowledge.ts lib/ssfKnowledge.test.ts lib/knowledge/unlockRegistry.ts lib/knowledge/types.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .ssf-test
+      - name: Run ssf knowledge domain test
+        run: node .ssf-test/ssfKnowledge.test.js
+      - name: Verify application build
+        run: npm run build

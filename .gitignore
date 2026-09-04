@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/.seed-test
 
 # next.js
 /.next/
@@ -39,5 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# domain test compile output
+/.ssf-test
 
 .vercel

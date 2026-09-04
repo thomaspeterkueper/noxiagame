@@ -1,0 +1,5 @@
+-- Migration history alignment marker.
+-- Version 20260825153850 is already applied on the linked production project.
+-- The original change was executed remotely and the local repository lost the
+-- corresponding versioned file. This no-op marker restores Supabase migration
+-- history parity for preview-branch validation; it intentionally performs no DDL/DML.

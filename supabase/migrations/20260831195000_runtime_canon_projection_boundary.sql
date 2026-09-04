@@ -6,63 +6,77 @@
 -- Canonical IDs are opaque strings assigned/promoted by KG and are only stored
 -- here as optional projections after such a mapping exists.
 --
--- Runtime-only UI/tick/gameplay events require no KG identity.
--- Cross-system relation semantics remain KG-owned; NOXIA consumes the KG
--- relation registry and runtime-projection contract instead of inventing
--- parallel global relation types.
+-- Legacy public.events is a separate historical application table and is not
+-- part of this runtime-canon boundary.
 
 set search_path to public;
 
-alter table public.events
-  add column if not exists canonical_entity_id text,
-  add column if not exists canonical_event_id text;
+-- In a fresh lexicographic replay, simulation_events is created by the later
+-- historical migration 20260831_noxia_events_entity_states.sql. Production may
+-- already have it. Keep this projection migration valid in both histories; the
+-- later migration carries the same canonical columns/indexes/comments.
+DO $$
+BEGIN
+  IF to_regclass('public.simulation_events') IS NOT NULL THEN
+    ALTER TABLE public.simulation_events
+      ADD COLUMN IF NOT EXISTS canonical_entity_id text,
+      ADD COLUMN IF NOT EXISTS canonical_event_id text;
 
-alter table public.entity_states
-  add column if not exists canonical_entity_id text,
-  add column if not exists canonical_state_id text;
+    CREATE INDEX IF NOT EXISTS simulation_events_canonical_entity_idx
+      ON public.simulation_events(canonical_entity_id)
+      WHERE canonical_entity_id IS NOT NULL;
 
-create index if not exists events_canonical_entity_idx
-  on public.events(canonical_entity_id)
-  where canonical_entity_id is not null;
+    CREATE INDEX IF NOT EXISTS simulation_events_canonical_event_idx
+      ON public.simulation_events(canonical_event_id)
+      WHERE canonical_event_id IS NOT NULL;
 
-create index if not exists events_canonical_event_idx
-  on public.events(canonical_event_id)
-  where canonical_event_id is not null;
+    COMMENT ON TABLE public.simulation_events IS
+      'Authoritative NOXIA runtime simulation event stream. simulation_events.id is a NOXIA runtime UUID, never a KG EVT:* identity. Optional canonical_* fields are opaque KG-owned projection targets.';
 
-create index if not exists entity_states_canonical_entity_idx
-  on public.entity_states(canonical_entity_id)
-  where canonical_entity_id is not null;
+    COMMENT ON COLUMN public.simulation_events.id IS
+      'NOXIA runtime event UUID. Does not replace or imply a KG EVT:* canonical event identity.';
 
-create index if not exists entity_states_canonical_state_idx
-  on public.entity_states(canonical_state_id)
-  where canonical_state_id is not null;
+    COMMENT ON COLUMN public.simulation_events.canonical_entity_id IS
+      'Optional opaque KG canonical subject/entity ID after an explicit KG-approved projection. NOXIA must not mint this value.';
 
-comment on table public.events is
-  'Authoritative NOXIA runtime simulation event stream. events.id is a NOXIA runtime UUID, never a KG EVT:* identity. Optional canonical_* fields are opaque KG-owned projection targets.';
+    COMMENT ON COLUMN public.simulation_events.canonical_event_id IS
+      'Optional opaque KG EVT:* ID after KG promotion/acceptance. NULL for ordinary runtime-only events. NOXIA must not mint this value.';
+  END IF;
+END $$;
 
-comment on column public.events.id is
-  'NOXIA runtime event UUID. Does not replace or imply a KG EVT:* canonical event identity.';
+-- Fresh repository replay also creates entity_states in the later historical
+-- migration. Keep the same projection rule for already-existing databases.
+DO $$
+BEGIN
+  IF to_regclass('public.entity_states') IS NOT NULL THEN
+    ALTER TABLE public.entity_states
+      ADD COLUMN IF NOT EXISTS canonical_entity_id text,
+      ADD COLUMN IF NOT EXISTS canonical_state_id text;
 
-comment on column public.events.canonical_entity_id is
-  'Optional opaque KG canonical subject/entity ID after an explicit KG-approved projection. NOXIA must not mint this value.';
+    CREATE INDEX IF NOT EXISTS entity_states_canonical_entity_idx
+      ON public.entity_states(canonical_entity_id)
+      WHERE canonical_entity_id IS NOT NULL;
 
-comment on column public.events.canonical_event_id is
-  'Optional opaque KG EVT:* ID after KG promotion/acceptance. NULL for ordinary runtime-only events. NOXIA must not mint this value.';
+    CREATE INDEX IF NOT EXISTS entity_states_canonical_state_idx
+      ON public.entity_states(canonical_state_id)
+      WHERE canonical_state_id IS NOT NULL;
 
-comment on table public.entity_states is
-  'Temporal NOXIA runtime state history derived from simulation events. entity_states.id is a runtime UUID, never a KG STA:* identity. Optional canonical_* fields are KG-owned projections.';
+    COMMENT ON TABLE public.entity_states IS
+      'Temporal NOXIA runtime state history derived from simulation_events. entity_states.id is a runtime UUID, never a KG STA:* identity. Optional canonical_* fields are KG-owned projections.';
 
-comment on column public.entity_states.id is
-  'NOXIA runtime state UUID. Does not replace or imply a KG STA:* canonical state identity.';
+    COMMENT ON COLUMN public.entity_states.id IS
+      'NOXIA runtime state UUID. Does not replace or imply a KG STA:* canonical state identity.';
 
-comment on column public.entity_states.canonical_entity_id is
-  'Optional opaque KG canonical subject/entity ID. When canonical_state_id is present this subject must, where applicable, agree with KG DESCRIBES_STATE_OF semantics.';
+    COMMENT ON COLUMN public.entity_states.canonical_entity_id IS
+      'Optional opaque KG canonical subject/entity ID. When canonical_state_id is present this subject must, where applicable, agree with KG DESCRIBES_STATE_OF semantics.';
 
-comment on column public.entity_states.canonical_state_id is
-  'Optional opaque KG STA:* ID after KG promotion/acceptance. NULL for runtime-only state history. NOXIA must not mint this value.';
+    COMMENT ON COLUMN public.entity_states.canonical_state_id IS
+      'Optional opaque KG STA:* ID after KG promotion/acceptance. NULL for runtime-only state history. NOXIA must not mint this value.';
+  END IF;
+END $$;
 
 comment on function public.noxia_record_player_build_event() is
   'Authoritative NOXIA runtime audit/event projection for player_builds lifecycle changes; does not create KG EVT:* identities.';
 
 comment on function public.noxia_record_tile_entity_state() is
-  'Projects tile_entities mutations into NOXIA runtime events and temporal runtime entity_states; does not create KG EVT:* or STA:* identities.';
+  'Projects tile_entities mutations into NOXIA runtime simulation_events and temporal runtime entity_states; does not create KG EVT:* or STA:* identities.';

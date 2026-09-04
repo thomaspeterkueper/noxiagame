@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:population-seed": "tsc lib/game/population/tharsisActivePopulationSeed.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .seed-test && node .seed-test/population/tharsisActivePopulationSeed.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -17,6 +18,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-pdf": "^9.2.1",
+    "three": "0.185.1",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import KursRenderer from '@/app/dashboard/KursRenderer'
 import SsfModuleRenderer from './SsfModuleRenderer'
-import { unlockLabel, type SsfKnowledgeModule } from '@/lib/ssfKnowledge'
+import { resolveModuleForUnlock, type SsfKnowledgeModule } from '@/lib/ssfKnowledge'
 
 function InGameLearningContent() {
   const router = useRouter()
@@ -45,7 +45,7 @@ function InGameLearningContent() {
         let match: SsfKnowledgeModule | undefined
         if (directPath) match = modules.find(m => m.pathId === directPath)
         if (!match && unlock) {
-          match = modules.find(m => Array.isArray(m.unlocks) && m.unlocks.some(u => unlockLabel(u as any) === unlock))
+          match = resolveModuleForUnlock(modules, unlock) ?? undefined
         }
 
         if (match) {
