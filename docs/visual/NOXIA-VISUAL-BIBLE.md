@@ -113,3 +113,38 @@ An asset becomes canonical presentation only when:
 - perspective and ground anchor match the reference set;
 - it does not contradict the building definition or world canon;
 - replacement of the image requires no simulation migration.
+
+## 9. Continuous-world terrain
+
+For Earth/Sauerland and other large surface environments, the player-facing world should not expose a tile or chunk grid.
+
+Terrain art is authored as composable visual layers:
+
+- calm base terrain materials
+- transition/boundary graphics
+- independent micro-detail sprites
+- continuous visual systems for roads, paths, rivers, hedges and similar linear features
+- area-based land-use graphics such as fields/forest floor
+- freestanding vegetation, buildings and props
+
+A technical renderer may internally use cells, chunks or sectors, but these boundaries must not be encoded visibly into the art.
+
+The old pattern of one highly decorated rhombus image per logical world cell is deprecated as a final visual approach because repetition exposes the grid and creates a wallpaper effect.
+
+For base terrain, composition quality across large areas is more important than isolated-tile beauty. Large memorable rocks, flower clusters and other high-frequency details should usually be separate visual elements rather than repeated inside every ground material.
+
+Earth/Sauerland-specific rules and the current build sequence are defined in `docs/visual/SAUERLAND-INFINITE-TERRAIN.md`.
+
+## 10. Graphics-agent coordination
+
+Graphics work must be transferable between agents without relying on chat history.
+
+Before editing Sauerland graphics, agents should read:
+
+1. this visual bible;
+2. `docs/visual/GRAPHICS-AGENT-HANDOFF.md`;
+3. `docs/visual/SAUERLAND-INFINITE-TERRAIN.md`;
+4. `docs/visual/GRAPHICS-REQUESTS.md`;
+5. `public/assets/environments/earth/sauerland/README.md`.
+
+The graphics branch must not be used for simulation, database, renderer, API, coordinate or world-model changes. If a graphics request exposes a technical dependency, document it and hand it to the appropriate development thread rather than implementing it here.
