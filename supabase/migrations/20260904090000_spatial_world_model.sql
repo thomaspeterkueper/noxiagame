@@ -1,6 +1,7 @@
 -- NOXIA spatial world model v1
 -- Replaces the 32x24 grid as world-space source of truth while keeping legacy tile
 -- coordinates nullable during migration.
+-- Existing parent_id + slot relations remain canonical for building expansions.
 
 create table if not exists public.location_spatial_frames (
   location_id uuid primary key references public.locations(id) on delete cascade,
@@ -56,35 +57,32 @@ alter table public.tile_entities
   add column if not exists footprint_width_m double precision,
   add column if not exists footprint_depth_m double precision,
   add column if not exists footprint jsonb,
-  add column if not exists site_id uuid references public.build_sites(id) on delete set null,
-  add column if not exists parent_entity_id uuid references public.tile_entities(id) on delete cascade,
-  add column if not exists child_slot text;
+  add column if not exists site_id uuid references public.build_sites(id) on delete set null;
 
 create index if not exists idx_tile_entities_spatial_xy
   on public.tile_entities(location_id, x_m, y_m)
   where x_m is not null and y_m is not null;
 create index if not exists idx_tile_entities_site on public.tile_entities(site_id);
-create index if not exists idx_tile_entities_parent on public.tile_entities(parent_entity_id);
-create unique index if not exists uq_tile_entities_parent_child_slot
-  on public.tile_entities(parent_entity_id, child_slot)
-  where parent_entity_id is not null and child_slot is not null;
+create index if not exists idx_tile_entities_parent_slot
+  on public.tile_entities(parent_id, slot)
+  where parent_id is not null;
 
 alter table public.player_builds
   add column if not exists x_m double precision,
   add column if not exists y_m double precision,
   add column if not exists z_m double precision not null default 0,
   add column if not exists rotation_deg double precision not null default 0,
-  add column if not exists site_id uuid references public.build_sites(id) on delete set null,
-  add column if not exists parent_entity_id uuid references public.tile_entities(id) on delete cascade,
-  add column if not exists child_slot text;
+  add column if not exists site_id uuid references public.build_sites(id) on delete set null;
 
 create index if not exists idx_player_builds_spatial_xy
   on public.player_builds(location_id, x_m, y_m)
   where x_m is not null and y_m is not null;
-create index if not exists idx_player_builds_parent on public.player_builds(parent_entity_id);
+create index if not exists idx_player_builds_parent_slot
+  on public.player_builds(parent_id, slot)
+  where parent_id is not null;
 
 -- Legacy bridge: existing tiles receive deterministic local-meter coordinates.
--- This is compatibility only; new builds must write x_m/y_m directly.
+-- This is compatibility only; new builds should write x_m/y_m directly.
 update public.tile_entities
 set x_m = tile_col * 100.0,
     y_m = tile_row * 100.0
@@ -105,5 +103,9 @@ comment on table public.location_spatial_frames is
   'Canonical per-location spatial reference. Observed real-world/planetary data, derived layers and simulated state remain separable.';
 comment on table public.build_sites is
   'Continuous world-space build areas. build_grid is optional and only for local gameplay such as building/campus expansion.';
-comment on column public.tile_entities.parent_entity_id is
-  'Parent building/entity for same-site extensions and internal modules; avoids consuming another world cell.';
+comment on column public.tile_entities.x_m is
+  'Canonical local east/west position in meters. Legacy tile_col remains compatibility data only.';
+comment on column public.tile_entities.y_m is
+  'Canonical local north/south position in meters. Legacy tile_row remains compatibility data only.';
+comment on column public.tile_entities.site_id is
+  'Optional continuous build site. Building expansions continue to use canonical parent_id + slot.';
