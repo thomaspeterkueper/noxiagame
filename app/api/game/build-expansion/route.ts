@@ -30,7 +30,7 @@ async function completeDueExpansions(profileId: string) {
 
     const { data: parent } = await serviceClient
       .from('tile_entities')
-      .select('id, profile_id, location_id, tile_level, tile_row, tile_col, entity_type, entity_id, status')
+      .select('id, profile_id, location_id, tile_level, tile_row, tile_col, entity_type, entity_id, status, x_m, y_m, z_m, rotation_deg, site_id')
       .eq('id', build.parent_id)
       .eq('profile_id', profileId)
       .maybeSingle()
@@ -55,6 +55,11 @@ async function completeDueExpansions(profileId: string) {
           tile_level: parent.tile_level,
           tile_row: parent.tile_row,
           tile_col: parent.tile_col,
+          x_m: parent.x_m,
+          y_m: parent.y_m,
+          z_m: parent.z_m ?? 0,
+          rotation_deg: parent.rotation_deg ?? 0,
+          site_id: parent.site_id,
           entity_type: 'building',
           entity_id: build.buildable_id,
           parent_id: parent.id,
@@ -112,7 +117,7 @@ export async function GET(req: NextRequest) {
 
     const { data: parent } = await serviceClient
       .from('tile_entities')
-      .select('id, profile_id, location_id, tile_level, tile_row, tile_col, entity_type, entity_id, status')
+      .select('id, profile_id, location_id, tile_level, tile_row, tile_col, entity_type, entity_id, status, x_m, y_m, z_m, rotation_deg, site_id')
       .eq('id', parentEntityId)
       .eq('profile_id', user.id)
       .maybeSingle()
@@ -179,6 +184,11 @@ export async function GET(req: NextRequest) {
         tile_level: parent.tile_level,
         tile_row: parent.tile_row,
         tile_col: parent.tile_col,
+        x_m: parent.x_m,
+        y_m: parent.y_m,
+        z_m: parent.z_m ?? 0,
+        rotation_deg: parent.rotation_deg ?? 0,
+        site_id: parent.site_id,
         parent_id: parent.id,
         slot: nextSlot,
         status: 'building',
@@ -205,6 +215,8 @@ export async function GET(req: NextRequest) {
       expansionId,
       parentEntityId: parent.id,
       slot: nextSlot,
+      position: parent.x_m == null || parent.y_m == null ? null : { xM: parent.x_m, yM: parent.y_m, zM: parent.z_m ?? 0 },
+      siteId: parent.site_id ?? null,
       cost,
       newCredits: profile.credits - cost,
       completesAt: completesAt.toISOString(),
