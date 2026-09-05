@@ -1,0 +1,39 @@
+name: Logistics domain
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/logisticsNodes.ts'
+      - 'lib/game/logisticsNodes.test.ts'
+      - 'package.json'
+      - '.github/workflows/logistics-domain.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/game/logisticsNodes.ts'
+      - 'lib/game/logisticsNodes.test.ts'
+      - 'package.json'
+      - '.github/workflows/logistics-domain.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  logistics-semantics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify canonical logistics semantics
+        run: npm run test:logistics
