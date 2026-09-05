@@ -72,7 +72,14 @@ When a build is completed or replaced, update the request instead of silently le
 - `public/assets/environments/earth/sauerland/terrain/materials/rock/`
 - `public/assets/environments/earth/sauerland/terrain/materials/field/`
 
-**Notes:** decorated rhombus terrain images already generated in chat/repo are style/source studies unless explicitly promoted after review. Do not continue generating boards or collages for this request. The next useful output is the first individually usable meadow material source.
+**Progress:**
+
+- meadow family `meadow_base_01.webp` through `meadow_base_06.webp`: complete for the current foundation pass;
+- each source passed an asset-level repetition review with the documented family constraint;
+- mixed 5×5 graphics-family composition: **PASS** — sufficiently reduced wallpaper effect to proceed;
+- runtime/world-space composition is not validated here and remains part of `GFX-SAU-009` (`BLOCKED_TECH`).
+
+**Next:** build the **earth material family**. Decorated rhombus terrain images already generated in chat/repo remain style/source studies unless explicitly promoted after review. Do not resume overview-board production.
 
 ---
 
