@@ -76,7 +76,7 @@ export default function SpatialBuildTest() {
   const load = useCallback(async () => {
     try {
       const token = await getToken()
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
       // Keep the tester self-contained: visiting this page also lets the existing
       // canonical lifecycle finalize due root buildings and due expansions.
