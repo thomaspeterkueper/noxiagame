@@ -95,7 +95,6 @@ export interface TerrainHeightSample {
 }
 
 export interface TerrainFootprintSummary {
-  centerZ M?: never
   centerZM: number
   minZM: number
   maxZM: number
