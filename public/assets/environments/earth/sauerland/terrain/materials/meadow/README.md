@@ -1,60 +1,66 @@
 # Sauerland Meadow Materials
 
-Status: production candidates for `GFX-SAU-001`.
+Status: **graphics source family accepted for `GFX-SAU-001`**. Runtime/world-space composition is a separate technical concern.
 
 ## Current assets
 
-- `meadow_base_01.webp` — first calm meadow base-material candidate; **asset-level result: PASS WITH FAMILY CONSTRAINT**.
-- `meadow_base_02.webp` — second calm meadow base-material candidate; derived by patch-based texture synthesis from the accepted Sauerland meadow source language; **asset-level result: PASS WITH FAMILY CONSTRAINT**.
+- `meadow_base_01.webp` — **PASS WITH FAMILY CONSTRAINT**
+- `meadow_base_02.webp` — **PASS WITH FAMILY CONSTRAINT**
+- `meadow_base_03.webp` — **PASS WITH FAMILY CONSTRAINT**
+- `meadow_base_04.webp` — **PASS WITH FAMILY CONSTRAINT**
+- `meadow_base_05.webp` — **PASS WITH FAMILY CONSTRAINT**
+- `meadow_base_06.webp` — **PASS WITH FAMILY CONSTRAINT**
+
+All six are continuous-world source materials, not visible map tiles.
 
 ## Usage contract
 
-- continuous-world source material, not a visible map tile;
 - no rhombus frame, soil sidewall, label, logo or presentation background;
 - high-interest rocks, flowers, shrubs and tufts belong in separate detail layers;
-- base materials must remain quiet enough for large-area repetition;
-- a base material is not expected to hide periodicity when the exact same source is repeated indefinitely; family-level anti-repetition comes from several variants plus runtime world-space variation;
-- do not mark the meadow family `ACCEPTED` until the family passes a mixed large-area test.
+- base materials remain visually quiet enough for large-area repetition;
+- no single base material is expected to hide periodicity when copied indefinitely;
+- anti-repetition is achieved at family level through variant mixing plus world-space variation;
+- offset/rotation/scale variation and low-frequency macro modulation may be used where the renderer supports them;
+- renderer/runtime implementation is out of scope for the graphics branch.
 
-## Review: meadow_base_01
+## Asset repeat reviews
 
-Repeat test: exact 3×3 repetition at equal scale.
+### `meadow_base_01.webp`
 
-Result:
+Exact 3×3 repetition: no dominant hard seam or border line; local grass texture connects acceptably. The repeated macro-pattern becomes recognisable if this source is used alone.
 
-- no dominant hard seam or border line was visible;
-- colour and local grass texture connect well enough for use as a source material;
-- the repeated macro-pattern is still recognisable when the same source is tiled unchanged;
-- therefore `meadow_base_01.webp` is acceptable as **one member of a material family**, but must not be used alone as the final continuous-world ground solution.
+### `meadow_base_02.webp`
 
-## Review: meadow_base_02
+Exact 3×3 repetition: no dominant tile edge; quieter macro-pattern than the rejected direct-generation candidate; no mirrored four-way symmetry. Periodicity remains detectable when used alone.
 
-Repeat test: exact 3×3 repetition at equal scale.
+### `meadow_base_03.webp` to `meadow_base_06.webp`
 
-Result:
+Exact 2×2 repetition checks were performed before repository acceptance.
 
-- no visually dominant tile edge in the repeat test;
-- quieter macro-pattern than the rejected direct-generation candidate;
-- no mirrored four-way symmetry introduced;
-- still recognisable as periodic if used alone, therefore the same family constraint applies as for base 01.
+Result across the four variants:
 
-## Required family/runtime mitigation
+- no dominant hard seam that disqualifies the material as a family member;
+- density and colour rhythm differ enough to broaden the family;
+- no asset is intended to carry memorable landmark decoration;
+- exact same-source repetition remains detectable, therefore the family constraint applies to all six materials.
 
-- 4–6 meadow variants with different macro distribution;
-- world-space variant mixing rather than one texture copied everywhere;
-- offset/rotation/scale variation where technically supported;
-- low-frequency macro colour/density modulation;
-- separate detail sprites for flowers, stones, tufts and other memorable accents.
+## Mixed-family review
+
+A 5×5 mixed meadow composition was assembled from the family candidates.
+
+**Graphics-family result: PASS.**
+
+The mixed surface reads substantially less like wallpaper than one repeatedly copied source. The six variants provide enough variation to proceed with the continuous-terrain source library. This acceptance applies to the **graphics material family only**; final large-world validation remains dependent on renderer-side world-space mixing and is tracked separately by `GFX-SAU-009` (`BLOCKED_TECH`).
 
 ## Rejected candidate notes
 
-Two `meadow_base_02` experiments were rejected before production acceptance:
+Two earlier `meadow_base_02` experiments were rejected before production acceptance:
 
-1. mirrored construction: immediately visible synthetic symmetry in the 3×3 repeat test;
-2. direct high-detail generation: too many memorable flower/plant clusters for a calm base material.
+1. mirrored construction — synthetic symmetry became immediately visible in repetition;
+2. direct high-detail generation — too many memorable flower/plant clusters for a calm base material.
 
 Neither rejected candidate is a production asset.
 
-## Next production asset
+## Next production step
 
-`meadow_base_03.webp` should differ mainly in grass density/colour rhythm rather than by adding decoration. It must pass the same 3×3 repeat review before acceptance.
+The meadow family is complete for the current foundation pass. Continue `GFX-SAU-001` with the **earth material family**. Do not add more meadow variants unless a later composition test demonstrates a specific gap.
