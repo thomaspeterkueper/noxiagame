@@ -34,9 +34,9 @@ When a build is completed or replaced, update the request instead of silently le
 
 **Deliverables:**
 
-- calm meadow material family, first priority: 4–6 production variants
-- dark/damp grass family
-- earth family
+- calm meadow material family — **COMPLETE (graphics family accepted)**
+- dark/damp grass family — **NEXT**
+- earth family — **COMPLETE (graphics family accepted)**
 - gravel family
 - rocky-ground family
 - ploughed-field family
@@ -72,14 +72,14 @@ When a build is completed or replaced, update the request instead of silently le
 - `public/assets/environments/earth/sauerland/terrain/materials/rock/`
 - `public/assets/environments/earth/sauerland/terrain/materials/field/`
 
-**Progress:**
+**Notes:**
 
-- meadow family `meadow_base_01.webp` through `meadow_base_06.webp`: complete for the current foundation pass;
-- each source passed an asset-level repetition review with the documented family constraint;
-- mixed 5×5 graphics-family composition: **PASS** — sufficiently reduced wallpaper effect to proceed;
-- runtime/world-space composition is not validated here and remains part of `GFX-SAU-009` (`BLOCKED_TECH`).
-
-**Next:** build the **earth material family**. Decorated rhombus terrain images already generated in chat/repo remain style/source studies unless explicitly promoted after review. Do not resume overview-board production.
+- decorated rhombus terrain images already generated in chat/repo are style/source studies unless explicitly promoted after review;
+- meadow family completed as `meadow_base_01.webp` … `meadow_base_06.webp`;
+- earth family completed as `earth_base_01.webp` … `earth_base_04.webp` plus family README;
+- the labelled soil reference board used during the earth pass is reference-only and was not committed as a production asset;
+- no renderer/runtime/database/world-model code was changed as part of either terrain-family pass;
+- next graphics task is the dark/damp grass family.
 
 ---
 
