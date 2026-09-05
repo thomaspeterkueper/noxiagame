@@ -21,8 +21,8 @@ export interface LogisticsNodeSemantics {
   domainMeaning: LogisticsDomainMeaning
   transferEndpoint: TransferEndpointKind
   surfaceLegSeparate: boolean
-  /** Celestial-body slug used by the world model where one exists. */
-  celestialBodySlug: 'earth' | 'moon' | 'mars' | 'phobos' | null
+  /** Celestial-body slug used by the current world model. */
+  celestialBodySlug: 'earth' | 'moon' | 'mars' | 'phobos'
   /** Stable engineering-facing explanation. Not a balancing value. */
   note: string
 }
@@ -66,15 +66,15 @@ export const LOGISTICS_NODES: Record<CanonicalLogisticsNodeId, LogisticsNodeSema
     transferEndpoint: 'node-itself',
     surfaceLegSeparate: false,
     celestialBodySlug: 'phobos',
-    note: 'Phobos is the station/free-port logistics endpoint associated with the moon, not a separate surface-delivery leg.',
+    note: 'Phobos is the station/free-port logistics endpoint associated with the Phobos moon, not a separate surface-delivery leg.',
   },
   prometheus: {
     id: 'prometheus',
     domainMeaning: 'orbital-station',
     transferEndpoint: 'node-itself',
     surfaceLegSeparate: false,
-    celestialBodySlug: null,
-    note: 'Prometheus is the L5 habitat/transfer station itself; arrival at the node completes the transfer and no planetary surface leg follows.',
+    celestialBodySlug: 'earth',
+    note: 'Prometheus is the Earth-associated L5 habitat/transfer station itself; arrival at the node completes the transfer and no planetary surface leg follows.',
   },
 }
 
