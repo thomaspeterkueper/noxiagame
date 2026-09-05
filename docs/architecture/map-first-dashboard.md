@@ -38,6 +38,27 @@ Neither workstream should silently absorb the other's responsibilities.
 5. Player-owned/current locations form a horizontal floating dock near the lower-left edge.
 6. Large tasks such as market, shipyard, profile, journeys, ship interiors and founding continue to use overlays/drawers instead of permanent columns.
 
+## HUD window contract
+
+`DashboardHudManager` currently upgrades the existing player, ship/cargo and feed cards into one common window behavior without requiring a large rewrite of `DashboardClient`. This is a transition bridge; future HUD panels should follow the same semantic window contract directly rather than add more selector-specific layout rules.
+
+Managed window ids are stable semantic ids:
+
+- `profile`
+- `ship`
+- `feed`
+
+Each managed window supports:
+
+- collapse and expand
+- pin to the canonical right-side rail
+- unpin and drag freely above the map
+- reset to its canonical default position
+- persistent layout in browser local storage (`noxia:hud-layout:v1`)
+- viewport clamping so saved windows cannot remain permanently off-screen after a resize
+
+The default state is pinned. Dragging is available only after explicitly unpinning a window, which avoids accidental movement while operating controls inside it. Double-clicking the title bar toggles collapse.
+
 ## Interaction rule
 
 Persistent HUD must use as little map area as possible. Map interaction remains available in all uncovered areas. Floating panes may intercept pointer events only inside their own bounds.
@@ -58,4 +79,4 @@ The active ship/cargo state and location dock remain longer because they directl
 
 ## Renderer independence
 
-The shell must not depend on a specific map DOM structure. The current ColonyGrid and WalkableColony are transitional surfaces. A future georeferenced 2D/3D map can replace them without requiring another dashboard layout rewrite.
+The shell must not depend on renderer state or physical world coordinates. The current ColonyGrid and WalkableColony are transitional surfaces. A future georeferenced 2D/3D map can replace them without requiring another dashboard layout rewrite.
