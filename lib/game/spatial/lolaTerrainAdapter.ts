@@ -1,9 +1,8 @@
-import { fromUrl } from 'geotiff'
 import { planetaryToLocalWorld } from './planetary'
 import type { PlanetaryCoordinate, TerrainDatasetDescriptor, WorldFrame } from './types'
 import type { TerrainRasterAdapter, TerrainRasterSourceSample } from './terrainRaster'
 
-interface RasterImageLike {
+export interface LolaRasterImage {
   getWidth(): number
   getHeight(): number
   getBoundingBox(): [number, number, number, number]
@@ -15,12 +14,7 @@ interface RasterImageLike {
   }): Promise<ArrayLike<number>>
 }
 
-type RasterImageOpener = (url: string) => Promise<RasterImageLike>
-
-async function defaultOpenImage(url: string): Promise<RasterImageLike> {
-  const tiff = await fromUrl(url)
-  return tiff.getImage() as unknown as RasterImageLike
-}
+export type LolaRasterImageOpener = (url: string) => Promise<LolaRasterImage>
 
 function metadataNumber(dataset: TerrainDatasetDescriptor, key: string, fallback: number) {
   const value = dataset.metadata?.[key]
@@ -33,7 +27,7 @@ function normalizeLongitude(lonDeg: number) {
 }
 
 function pixelForCoordinate(
-  image: RasterImageLike,
+  image: LolaRasterImage,
   coordinate: PlanetaryCoordinate,
 ): { x: number; y: number } | null {
   const [minLon, minLat, maxLon, maxLat] = image.getBoundingBox()
@@ -51,7 +45,7 @@ function pixelForCoordinate(
   return { x, y }
 }
 
-function isNoData(image: RasterImageLike, value: number) {
+function isNoData(image: LolaRasterImage, value: number) {
   const rawNoData = image.getGDALNoData?.()
   if (rawNoData == null) return false
   const noData = typeof rawNoData === 'number' ? rawNoData : Number(rawNoData)
@@ -59,22 +53,19 @@ function isNoData(image: RasterImageLike, value: number) {
 }
 
 /**
- * Real global Moon DEM adapter for the canonical USGS/NASA LRO LOLA LDEM 118m.
+ * Dataset-specific interpretation for the canonical global LRO/LOLA LDEM.
  *
- * Source product properties used here:
- * - global simple cylindrical raster, 256 px/degree
- * - elevations relative to Moon mean radius 1,737,400 m
- * - stored Int16 values require scale 0.5 and offset 0
- *
- * The global source is about 8 GB. GeoTIFF.js performs remote reads; production
- * ingestion should progressively cache validated tiles in terrain storage rather
- * than making the renderer depend on repeated remote source access.
+ * TIFF decoding is injected deliberately. The spatial domain owns coordinate,
+ * scaling, NoData and vertical-reference semantics; an ingestion/runtime adapter
+ * owns the concrete byte decoder. This keeps renderers and gameplay independent
+ * of a particular GeoTIFF library and avoids coupling the app bundle to an
+ * 8-GB remote source.
  */
 export class LolaTerrainAdapter implements TerrainRasterAdapter {
   readonly id = 'moon-lro-lola-118m'
-  private imagePromise: Promise<RasterImageLike> | null = null
+  private imagePromise: Promise<LolaRasterImage> | null = null
 
-  constructor(private readonly openImage: RasterImageOpener = defaultOpenImage) {}
+  constructor(private readonly openImage: LolaRasterImageOpener) {}
 
   supports(dataset: TerrainDatasetDescriptor) {
     return dataset.id === 'moon_lro_lola_118m'
@@ -107,9 +98,6 @@ export class LolaTerrainAdapter implements TerrainRasterAdapter {
     const offset = metadataNumber(dataset, 'stored_offset', 0)
     const sourceElevationM = storedValue * scale + offset
 
-    // LOLA elevation and the canonical Moon frame use the same mean-radius
-    // vertical reference. Convert that real elevation into local ENU Up; do not
-    // equate the source elevation numerically with local z away from the origin.
     const local = planetaryToLocalWorld(
       { latDeg: coordinate.latDeg, lonDeg: coordinate.lonDeg, elevationM: sourceElevationM },
       frame,
@@ -119,7 +107,7 @@ export class LolaTerrainAdapter implements TerrainRasterAdapter {
     return {
       sourceElevationM,
       localUpM: local.zM,
-      tileKey: `remote:${dataset.id}:${pixel.x}:${pixel.y}`,
+      tileKey: `source:${dataset.id}:${pixel.x}:${pixel.y}`,
     }
   }
 }
