@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:population-seed": "tsc lib/game/population/tharsisActivePopulationSeed.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .seed-test && node .seed-test/population/tharsisActivePopulationSeed.test.js"
+    "test:population-seed": "tsc lib/game/population/tharsisActivePopulationSeed.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .seed-test && node .seed-test/population/tharsisActivePopulationSeed.test.js",
+    "test:spatial": "tsc lib/game/spatial/geometry.test.ts lib/game/spatial/planetary.test.ts lib/game/spatial/terrain.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib/game/spatial --outDir .spatial-test && node .spatial-test/geometry.test.js && node .spatial-test/planetary.test.js && node .spatial-test/terrain.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

@@ -1,0 +1,4 @@
+-- Supabase migration-history bridge.
+-- This version already exists in the production migration history and its schema
+-- is present in production, but the original local migration file is absent.
+-- Intentionally no-op: preserve production/local migration-history parity.
