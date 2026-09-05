@@ -16,6 +16,18 @@ for (const id of expectedIds) {
   assert.equal(node.surfaceLegSeparate, requiresSeparateSurfaceLeg(id))
 }
 
+assert.deepEqual(
+  Object.fromEntries(expectedIds.map((id) => [id, LOGISTICS_NODES[id].celestialBodySlug])),
+  {
+    earth: 'earth',
+    moon: 'moon',
+    mars: 'mars',
+    phobos: 'phobos',
+    prometheus: 'earth',
+  },
+  'canonical logistics nodes must retain their current world-model anchors',
+)
+
 assert.equal(LOGISTICS_NODES.earth.domainMeaning, 'aggregated-logistics-domain')
 assert.equal(LOGISTICS_NODES.earth.transferEndpoint, 'orbital-interface')
 assert.equal(LOGISTICS_NODES.earth.surfaceLegSeparate, true)
