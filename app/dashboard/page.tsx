@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import DashboardGate from './DashboardGate'
-import DashboardQuickChrome from './DashboardQuickChrome'
+import DashboardPrimaryColony from './DashboardPrimaryColony'
 
 export const revalidate = 30
 
@@ -19,7 +19,7 @@ export default async function Dashboard() {
   return (
     <div className="noxia-dashboard-shell">
       <DashboardGate locations={locations} prices={prices} orders={orders} />
-      <DashboardQuickChrome />
+      <DashboardPrimaryColony />
       <style>{`
         /*
          * Desktop dashboard density v2
