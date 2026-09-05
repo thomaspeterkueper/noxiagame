@@ -22,6 +22,8 @@ Each request should contain:
 
 When a build is completed or replaced, update the request instead of silently leaving old assets in an ambiguous state.
 
+**Production-output rule:** unless a sprite sheet/atlas is explicitly requested, each production image must contain one usable asset only. Overview boards, labelled sheets and multi-asset collages are reference-only and do not satisfy a production deliverable.
+
 ---
 
 ## GFX-SAU-001 — Continuous terrain foundation
@@ -32,7 +34,7 @@ When a build is completed or replaced, update the request instead of silently le
 
 **Deliverables:**
 
-- calm meadow material family
+- calm meadow material family, first priority: 4–6 production variants
 - dark/damp grass family
 - earth family
 - gravel family
@@ -45,9 +47,12 @@ When a build is completed or replaced, update the request instead of silently le
 - avoid dense repeated flower/stone patterns
 - no baked text
 - no visible frame or artificial tile border
+- no floating-tile soil sidewall in production terrain materials
+- no presentation background/vignette in production terrain materials
 - high-interest details should mostly move into independent detail sprites
+- produce individual source assets, not overview sheets
 
-**Intended usage:** repeating/composable ground source material, not a complete illustrated game cell.
+**Intended usage:** repeating/composable ground source material for a continuous world, not a complete illustrated game cell.
 
 **Acceptance criteria:**
 
@@ -55,10 +60,19 @@ When a build is completed or replaced, update the request instead of silently le
 - variants blend into one another
 - no single landmark repeats obviously
 - compatible with transition and detail layers
+- production source is free of presentation-only framing/background
+- each accepted production asset has a stable canonical filename and output path
 
-**Output paths:** target under `public/assets/environments/earth/sauerland/terrain/`
+**Output paths:**
 
-**Notes:** recently generated decorated rhombus terrain images are style/source studies; production materials should be quieter.
+- `public/assets/environments/earth/sauerland/terrain/materials/meadow/`
+- `public/assets/environments/earth/sauerland/terrain/materials/damp_grass/`
+- `public/assets/environments/earth/sauerland/terrain/materials/earth/`
+- `public/assets/environments/earth/sauerland/terrain/materials/gravel/`
+- `public/assets/environments/earth/sauerland/terrain/materials/rock/`
+- `public/assets/environments/earth/sauerland/terrain/materials/field/`
+
+**Notes:** decorated rhombus terrain images already generated in chat/repo are style/source studies unless explicitly promoted after review. Do not continue generating boards or collages for this request. The next useful output is the first individually usable meadow material source.
 
 ---
 
@@ -82,10 +96,14 @@ When a build is completed or replaced, update the request instead of silently le
 - no ruler-straight boundary
 - transitions must compose with calm base materials
 - no large unique landmark baked into every edge
+- transparent/composable output where appropriate
+- one production overlay per output image unless an explicit sprite sheet is requested
 
 **Intended usage:** composable transition/edge graphics over or between base materials.
 
 **Acceptance criteria:** transition remains natural across repeated and rotated/varied use; underlying grid should not become visible.
+
+**Output paths:** target under `public/assets/environments/earth/sauerland/terrain/transitions/`.
 
 ---
 
@@ -105,11 +123,13 @@ When a build is completed or replaced, update the request instead of silently le
 - bare patches
 - optional fern/bracken set
 
-**Visual constraints:** transparent background; consistent light; readable at strategy zoom; several density/size variants.
+**Visual constraints:** transparent background; consistent light; readable at strategy zoom; several density/size variants; one usable sprite per production image unless explicitly authored as a sprite sheet.
 
 **Intended usage:** independent detail layer scattered over terrain materials.
 
 **Acceptance criteria:** enough diversity to break repetition without making every square metre visually busy.
+
+**Output paths:** target under `public/assets/environments/earth/sauerland/terrain/details/`.
 
 ---
 
