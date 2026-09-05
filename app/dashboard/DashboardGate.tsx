@@ -1,12 +1,13 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 05.09.2026 — Map-first HUD-Fenstersteuerung
-// Version:      0.2.0
+// Aktualisiert: 05.09.2026 — Map-first HUD- und Dock-Steuerung
+// Version:      0.3.0
 import React, { useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import DashboardClient from './DashboardClient'
 import DashboardHudManager from './DashboardHudManager'
+import DashboardLocationDockManager from './DashboardLocationDockManager'
 import { T } from './ui'
 
 export default function DashboardGate({ locations, prices, orders }: { locations: any[]; prices: any[]; orders: any[] }) {
@@ -31,5 +32,6 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   return <>
     <DashboardClient locations={locations} prices={prices} orders={orders} />
     <DashboardHudManager />
+    <DashboardLocationDockManager />
   </>
 }
