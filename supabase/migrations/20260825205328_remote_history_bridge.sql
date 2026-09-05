@@ -1,0 +1,4 @@
+-- Supabase migration-history bridge.
+-- This version exists in the production migration history but its historical SQL
+-- has been consolidated into the canonical 20260719000000 baseline or a later
+-- retained idempotent migration. Intentionally no-op: do not remove or repurpose.
