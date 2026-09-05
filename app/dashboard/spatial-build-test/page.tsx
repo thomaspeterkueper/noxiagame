@@ -76,9 +76,16 @@ export default function SpatialBuildTest() {
   const load = useCallback(async () => {
     try {
       const token = await getToken()
-      const response = await fetch('/api/game/build/spatial?location=earth', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
+      const headers = token ? { Authorization: `Bearer ${token}` } : {}
+
+      // Keep the tester self-contained: visiting this page also lets the existing
+      // canonical lifecycle finalize due root buildings and due expansions.
+      await Promise.all([
+        fetch('/api/game/build', { headers }),
+        fetch('/api/game/build-expansion', { headers }),
+      ])
+
+      const response = await fetch('/api/game/build/spatial?location=earth', { headers })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
       setState(data)
