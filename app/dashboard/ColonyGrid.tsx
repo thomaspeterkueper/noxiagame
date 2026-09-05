@@ -2,8 +2,8 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 28.08.2026 — Wissensgesperrte Gebäude verlinken direkt auf In-Game-Lernen
-// Version:      5.24.0
+// Aktualisiert: 05.09.2026 — Scanner-Fokus gehört dem Grid statt Dashboard-DOM-Bridges
+// Version:      5.25.0
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -339,9 +339,41 @@ export default function ColonyGrid({
   const [showWalking, setShowWalking]     = useState(false)
   const [interiorEntity, setInteriorEntity] = useState<TileEntity | null>(null)
   const [zoom, setZoom]               = useState(1.0)
+  const [scannerFocus, setScannerFocus] = useState<{ r: number; c: number } | null>(null)
   const gridScrollRef                 = useRef<HTMLDivElement>(null)
+  const handledScannerFocusRef        = useRef<string | null>(null)
   const isPanning                     = useRef(false)
   const panStart                      = useRef({ x: 0, y: 0, scrollX: 0, scrollY: 0 })
+
+  useEffect(() => {
+    const syncScannerFocus = () => {
+      const raw = new URLSearchParams(window.location.search).get('focus')
+      if (!raw) {
+        setScannerFocus(null)
+        handledScannerFocusRef.current = null
+        return
+      }
+      const match = raw.match(/^(\d+),(\d+)$/)
+      if (!match) {
+        setScannerFocus(null)
+        handledScannerFocusRef.current = null
+        return
+      }
+      const r = Number(match[1])
+      const c = Number(match[2])
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) {
+        setScannerFocus(null)
+        handledScannerFocusRef.current = null
+        return
+      }
+      setScannerFocus({ r, c })
+      handledScannerFocusRef.current = null
+    }
+
+    syncScannerFocus()
+    window.addEventListener('popstate', syncScannerFocus)
+    return () => window.removeEventListener('popstate', syncScannerFocus)
+  }, [slug])
 
   useEffect(() => {
     const el = gridScrollRef.current
@@ -401,6 +433,26 @@ export default function ColonyGrid({
     setAnomaly(anomalyAt(cellGrid))
   }, [slug, population, populationMax, entities, pending, userId])
 
+  useEffect(() => {
+    if (!scannerFocus || grid.length === 0) return
+    const focusKey = `${slug}:${scannerFocus.r},${scannerFocus.c}`
+    if (handledScannerFocusRef.current === focusKey) return
+    const scroller = gridScrollRef.current
+    if (!scroller) return
+
+    handledScannerFocusRef.current = focusKey
+    const raf = requestAnimationFrame(() => {
+      const centerX = (scannerFocus.c + 0.5) * tileSize * zoom
+      const centerY = (scannerFocus.r + 0.5) * tileSize * zoom
+      scroller.scrollTo({
+        left: Math.max(0, centerX - scroller.clientWidth / 2),
+        top: Math.max(0, centerY - scroller.clientHeight / 2),
+        behavior: 'smooth',
+      })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [scannerFocus, grid.length, slug, tileSize, zoom])
+
   const entityMap = useMemo(() => {
     const map = new Map<string, TileEntity>()
     entities.forEach(e => {
@@ -441,6 +493,7 @@ export default function ColonyGrid({
     if (grid.length === 0) return null
     return grid.flatMap((row, r) => row.map((tileType, c) => {
       const isSelected = selectedTile?.r === r && selectedTile?.c === c
+      const isScannerFocus = scannerFocus?.r === r && scannerFocus?.c === c
       const canBuild = isBuildable(tileType)
       const entity = entityAt(r, c)
       const isOwn = !!entity?.profile_id && entity.profile_id === userId
@@ -498,10 +551,15 @@ export default function ColonyGrid({
               <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#c9a961', background: 'rgba(0,0,0,0.7)', borderRadius: 3, padding: '1px 4px', letterSpacing: '0.05em', lineHeight: 1.2, textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>TAP</span>
             </span>
           )}
+          {isScannerFocus && (
+            <span style={{ position: 'absolute', inset: 2, zIndex: 35, pointerEvents: 'none', border: '3px solid #d9c27b', borderRadius: 3, boxShadow: '0 0 12px rgba(217,194,123,.9)', animation: 'noxia-scanner-focus-pulse 1.25s ease-in-out infinite' }}>
+              <span style={{ position: 'absolute', top: 2, right: 2, padding: '1px 4px', borderRadius: 3, background: 'rgba(8,19,26,.9)', color: '#f0d47c', font: '800 8px/1.4 monospace', letterSpacing: '.08em' }}>SCAN</span>
+            </span>
+          )}
         </div>
       )
     }))
-  }, [grid, selectedTile, entities, pending, anomaly, userId, entityInfo, handleTileClick, entityAt, sellingAt, slug, population, populationMax, tileSize, highlightEntityIds])
+  }, [grid, selectedTile, scannerFocus, entities, pending, anomaly, userId, entityInfo, handleTileClick, entityAt, sellingAt, slug, population, populationMax, tileSize, highlightEntityIds])
 
   if (grid.length === 0) return (
     <div style={{ background: '#f4f2ed', borderRadius: '12px', padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
@@ -525,7 +583,7 @@ export default function ColonyGrid({
   return (
     <div style={{ background: '#f4f2ed', borderRadius: '12px', padding: '1rem', boxShadow: '0 4px 8px rgba(0,0,0,0.08)' }}>
       <BuildingSpriteStyles />
-      <style>{`@keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} } @keyframes noxia-spin { to { transform: rotate(360deg) } } @keyframes noxia-hint { 0%,100%{opacity:.5;box-shadow:0 0 6px rgba(201,169,97,0.5)} 50%{opacity:1;box-shadow:0 0 16px rgba(201,169,97,0.95)} }`}</style>
+      <style>{`@keyframes noxia-anomaly { 0%,100%{opacity:.45;transform:scale(0.85)} 50%{opacity:1;transform:scale(1.1)} } @keyframes noxia-spin { to { transform: rotate(360deg) } } @keyframes noxia-hint { 0%,100%{opacity:.5;box-shadow:0 0 6px rgba(201,169,97,0.5)} 50%{opacity:1;box-shadow:0 0 16px rgba(201,169,97,0.95)} } @keyframes noxia-scanner-focus-pulse { 0%,100%{opacity:.68;box-shadow:0 0 7px rgba(217,194,123,.65)} 50%{opacity:1;box-shadow:0 0 16px rgba(217,194,123,1)} }`}</style>
 
       {showLanding && <LandingOverlay currentLocation={slug} locations={allLocations} cargo={cargo} shipRange={shipRange} currentTick={currentTick} inTransit={inTransit} onTravel={dest => onTravel?.(dest)} onClose={() => { setShowLanding(false); setSelectedTile(null) }} canSell={canSellSelected} onSellClick={openSellForSelected} />}
       {showSchool && <SchoolOverlay locationSlug={slug} colonyContext={{ locationName: name, population, waterStock: locationResources.find(r => r.resource === 'water')?.stock ?? 0, waterCons: locationResources.find(r => r.resource === 'water')?.consumption ?? Math.ceil(population / 100), credits }} onClose={() => { setShowSchool(false); setSelectedTile(null) }} onKnowledgeEarned={(pts: number, total: number) => console.log(`+${pts} Wissenspunkte → ${total}`)} canSell={canSellSelected} onSellClick={openSellForSelected} />}
