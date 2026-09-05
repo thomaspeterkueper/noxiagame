@@ -36,6 +36,11 @@ create table if not exists public.build_sites (
   constraint build_sites_dimensions_check check (width_m > 0 and depth_m > 0)
 );
 
+-- These tables live in the exposed public schema but are accessed through the
+-- server-authoritative build API. Keep direct anon/authenticated access closed.
+alter table public.world_frames enable row level security;
+alter table public.build_sites enable row level security;
+
 alter table public.tile_entities
   add column if not exists placement_mode text,
   add column if not exists x_m double precision,
