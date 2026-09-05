@@ -1,110 +1,141 @@
 # ADR: Walkable Colony — Architektur-Invarianten
 
-**Datum:** 20.07.2026
-**Status:** Accepted — gilt für alle Phase-B-Implementierungen
-**Referenz:** docs/design/walkable-colony.md
+**Datum:** 20.07.2026  
+**Aktualisiert:** 05.09.2026  
+**Status:** Accepted  
+**Referenz:** `docs/design/walkable-colony.md`, `docs/decisions/ADR-state-runtime-boundaries.md`
 
 ---
 
 ## Invariante 1: Projektion, kein zweiter Weltzustand
 
-> Die Mikroebene erfindet keinen zweiten Weltzustand.
+> Die Mikroebene erfindet keinen zweiten persistenten Weltzustand.
 > Sie projiziert den bestehenden Weltzustand in menschlichen Maßstab.
 
 **Konkret:**
-- Ein Frachter erscheint am Pad nur wenn `ships.location_id = pad.location_id`
-- Ein Pad bleibt geschlossen wenn kein Landing Pad in `tile_entities`
-- Eine Raumhafenerweiterung erscheint erst nach `tile_entities` INSERT
-- Ein NPC steht in der Werft weil `npc_ledger` eine Werft-Aktivität zeigt
-- Niemals: Mikroebene spawnt Objekte/Personen ohne Weltzustand-Referenz
+- Ein Frachter erscheint an einem Pad nur, wenn der persistente Schiffs-/Dockingzustand dies hergibt.
+- Ein Landing Pad existiert nur, wenn es als persistentes Entity beziehungsweise gültige Erweiterung vorhanden ist.
+- Eine Raumhafenerweiterung erscheint erst nach erfolgreicher persistenter Build-/Entity-Erzeugung.
+- Ein NPC darf sichtbar aus Resident-/Assignment-/Aktivitätsdaten und deterministischer Runtime-Ableitung projiziert werden.
+- Niemals: Die Mikroebene erzeugt gameplayrelevante Gebäude, Personen, Ressourcen oder Fahrzeuge ohne nachvollziehbare Weltzustandsquelle.
 
-**Verletzung dieser Invariante** = Dekorations-Trap.
-Zwei Simulationen unterhalb der ersten.
+**Verletzung dieser Invariante** = zweite Simulation.
 
 ---
 
-## Invariante 2: Makro-Topologie ≠ Mikro-Geometrie
+## Invariante 2: Persistente Topologie ≠ lokale Darstellungsgeometrie
 
-```
-Makro-Tile (64×64px strategisch)
-  ↓  referenziert, nicht kopiert
-Mikro-Szene (eigene lokale Geometrie)
-  ├─ Wege (aus Makro-Straßen abgeleitet, nicht identisch)
-  ├─ Türen (Übergangs-Punkte)
-  ├─ Personen (projiziert aus Weltzustand)
-  ├─ Objekte (projiziert aus tile_entities)
+Die strategische Weltstruktur beschreibt, welche Objekte existieren und wie sie spielmechanisch zusammengehören. Die Walkable-Colony-Szene darf daraus eine eigene lokale Geometrie ableiten:
+
+```text
+Persistenter Weltzustand
+  ↓ referenziert / projiziert
+Walkable-Colony-Szene
+  ├─ Wege und begehbare Verbindungen
+  ├─ Türen / Übergangspunkte
+  ├─ Personen
+  ├─ Gebäude und Objekte
   └─ Interaktionspunkte
 ```
 
-Das 32×24-Grid ist die Topologie-Referenz:
-- Welche Gebäude existieren wo
-- Welche Tiles grenzen aneinander
-- Welche Straßen verbinden welche Bereiche
+Das bestehende 32×24-Layout bleibt derzeit eine gültige persistente Referenz für die aktuelle Spielwelt. Es ist **nicht** als endgültiges physikalisches Meter-Koordinatensystem festgeschrieben.
 
-Die Mikro-Szene hat eigene lokale Koordinaten.
-400×400px = Render-Auflösung, keine Weltinvariante.
+Eine spätere metrische Weltgeometrie ist zulässig, wird aber nur über eine kontrollierte Migration gemäß `ADR-state-runtime-boundaries.md` eingeführt. Ein pauschaler Tile→Meter-Faktor ist kein physikalischer Kanon.
 
 ---
 
-## Invariante 3: Vertical Slice zuerst
+## Invariante 3: Eine Simulation, mehrere Projektionen
 
-Phase B baut einen einzigen Pfad:
+Die strategische Ansicht, Walkable Colony und Innenräume zeigen denselben persistenten Simulationszustand aus unterschiedlichen Perspektiven.
 
+```text
+Supabase / persistente Simulation Truth
+        ↓
+API / Server-Domain
+        ↓
+Client-Projektionen
+  ├─ Planung
+  ├─ Walkable Colony
+  └─ Innenraum
 ```
+
+Der Wechsel der Perspektive erzeugt keine neue Wirtschaft, keine neue Population und keine zweite Entity-Welt.
+
+---
+
+## Invariante 4: Ephemere Interaktion ist erlaubt
+
+Die frühere Formulierung „Kein Mikro-State-Store“ war zu absolut. Zulässig und inzwischen umgesetzt sind ephemere Client-Zustände, zum Beispiel:
+
+- Spielerposition in der aktuellen Walkable-Colony-Projektion;
+- aktuelle Auswahl;
+- nächstgelegene Interaktion;
+- Kamera/Fokus;
+- Präsentationsmodus `colony | planning | interior`.
+
+Diese Zustände sind keine persistente Simulation Truth und dürfen beim Reload verloren gehen. Verboten bleibt ein konkurrierender persistenter Mikro-Weltzustand.
+
+---
+
+## Invariante 5: Abgeleitete NPC-Runtime
+
+NPC-Tagesabläufe und räumliche Positionen dürfen deterministisch aus persistenter Population, Assignments, Gebäuden, Wegen und Zeit abgeleitet werden.
+
+Das ist keine zweite Simulation, solange:
+
+1. keine konkurrierende persistente NPC-Welt entsteht;
+2. gameplayrelevante Entscheidungen weiterhin auf persistenter Truth beruhen;
+3. die Darstellung aus vorhandenen Daten nachvollziehbar bleibt.
+
+Die ursprüngliche Phase-B-Beschränkung „keine NPC-Tagesabläufe“ ist damit historisch überholt; sie war eine Vertical-Slice-Begrenzung, keine dauerhafte Architekturregel.
+
+---
+
+## Vertical-Slice-Prinzip
+
+Der erste Pfad bleibt als Qualitätsmaßstab sinnvoll:
+
+```text
 Habitat → Straße → Raumhafen-Gelände → Terminal → Landing Pad
 ```
 
-**Fünf Prüfpunkte:**
-1. Bewegung fühlt sich gut an
-2. Makro-Geometrie bleibt wiedererkennbar
-3. Gebäude haben plausiblen menschlichen Maßstab
-4. Übergänge zwischen außen/innen funktionieren
-5. Nur Dinge sichtbar die der Weltzustand hergibt
-
-**Eine Frage:**
-> Fühlt sich NOXIA anders an, sobald ich meine eigene Kolonie betreten kann?
-
-Wenn Ja → Ausbau. Wenn Nein → Diagnose vor weiterem Ausbau.
+Prüfpunkte:
+1. Bewegung fühlt sich gut an.
+2. Strategische Struktur bleibt wiedererkennbar.
+3. Gebäude wirken im menschlichen Maßstab plausibel.
+4. Außen/Innen-Übergänge funktionieren.
+5. Sichtbare gameplayrelevante Dinge sind aus Weltzustand oder definierter Runtime ableitbar.
 
 ---
 
-## Was Phase B explizit NICHT ist
+## Datenfluss heute
 
-- Kein allgemeines Personenbewegungssystem
-- Keine NPC-Tagesabläufe (kommt nach Slice-Validierung)
-- Keine Innenraum-Simulation (Phase C)
-- Keine Fahrzeuge
-- Keine Dialoge (noch)
-- Kein zweites Wirtschaftssystem
-
----
-
-## Datenfluss
-
-```
-Supabase (Weltzustand)
-  tile_entities     → welche Gebäude stehen wo
-  ships             → welche Schiffe wo geparkt
-  location_resources→ Lagerbestände
-  actors            → NPC-Firmen + Aktivitäten
-  npc_ledger        → was NPCs gerade tun
+```text
+Supabase
+  locations / location_resources
+  tile_entities / player_builds
+  ships / ship_docking_assignments
+  Population / Residents / Assignments
+  simulation_events / entity_states
         ↓
-  WalkableColonyRenderer (client-seitig)
+API-Routen / Server-Domain
         ↓
-  Projektion: Makro-Tiles → Mikro-Szenen
+colonyStateStore        = Snapshot-/Projection-Cache
+colonyInteractionStore  = ephemere lokale Interaktion
+gameModeStore           = Präsentationsmodus
         ↓
-  Canvas/SVG: Figur, Gebäude, NPCs, Objekte
+WalkableColony / Interior / Planning Renderer
 ```
 
-Keine eigene DB-Tabelle für Mikro-Zustand.
-Kein Mikro-State-Store.
-Alles read-only aus bestehendem Weltzustand.
+Die drei Client-Stores besitzen unterschiedliche Verantwortlichkeiten und dürfen nicht zu einer zweiten persistenten Welt zusammenwachsen.
 
 ---
 
 ## Stilprinzip
 
-Wenn ein Objekt in der Mikro-Szene erscheint
-und der Entwickler nicht sofort sagen kann
-**welche Zeile in welcher Tabelle** es erzeugt hat —
-ist es Dekoration und gehört nicht in Phase B.
+Wenn ein gameplayrelevantes Objekt in der Mikro-Szene erscheint, muss der Entwickler erklären können:
+
+- welche persistente Quelle es begründet oder
+- welche definierte, reproduzierbare Runtime-Ableitung es erzeugt.
+
+Reine Dekoration ist erlaubt, solange sie keine Spielregel, Ressource, Person, Infrastruktur oder Interaktionsmöglichkeit vortäuscht.
