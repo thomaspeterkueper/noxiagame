@@ -1,6 +1,8 @@
 -- NOXIA spatial build model v1
 -- World coordinates are metric and continuous. Legacy tile coordinates remain
 -- nullable compatibility data and are no longer the authoritative world model.
+-- Existing tile_entities/player_builds parent_id + slot remain canonical for
+-- building expansions; this migration does not introduce a second hierarchy.
 
 create table if not exists public.world_frames (
   location_id uuid primary key references public.locations(id) on delete cascade,
@@ -20,7 +22,7 @@ create table if not exists public.world_frames (
 create table if not exists public.build_sites (
   id uuid primary key default gen_random_uuid(),
   location_id uuid not null references public.locations(id) on delete cascade,
-  parent_entity_id uuid references public.tile_entities(id) on delete cascade,
+  parent_site_id uuid references public.build_sites(id) on delete cascade,
   site_type text not null default 'parcel',
   name text,
   origin_x_m double precision not null default 0,
@@ -36,6 +38,10 @@ create table if not exists public.build_sites (
   constraint build_sites_dimensions_check check (width_m > 0 and depth_m > 0)
 );
 
+create index if not exists build_sites_location_idx on public.build_sites(location_id);
+create index if not exists build_sites_parent_idx on public.build_sites(parent_site_id)
+  where parent_site_id is not null;
+
 -- These tables live in the exposed public schema but are accessed through the
 -- server-authoritative build API. Keep direct anon/authenticated access closed.
 alter table public.world_frames enable row level security;
@@ -50,8 +56,6 @@ alter table public.tile_entities
   add column if not exists footprint_width_m double precision,
   add column if not exists footprint_depth_m double precision,
   add column if not exists site_id uuid references public.build_sites(id) on delete set null,
-  add column if not exists parent_entity_id uuid references public.tile_entities(id) on delete cascade,
-  add column if not exists slot_key text,
   add column if not exists source_build_id uuid references public.player_builds(id) on delete set null;
 
 alter table public.player_builds
@@ -62,9 +66,7 @@ alter table public.player_builds
   add column if not exists rotation_deg double precision not null default 0,
   add column if not exists footprint_width_m double precision,
   add column if not exists footprint_depth_m double precision,
-  add column if not exists site_id uuid references public.build_sites(id) on delete set null,
-  add column if not exists parent_entity_id uuid references public.tile_entities(id) on delete cascade,
-  add column if not exists slot_key text;
+  add column if not exists site_id uuid references public.build_sites(id) on delete set null;
 
 -- Backfill only the semantic mode. We deliberately do not manufacture metre
 -- coordinates from the old 32x24 grid because that would turn a rendering grid
@@ -79,27 +81,15 @@ where placement_mode is null and tile_row is not null and tile_col is not null;
 
 alter table public.tile_entities drop constraint if exists tile_entities_placement_mode_check;
 alter table public.tile_entities add constraint tile_entities_placement_mode_check
-  check (placement_mode is null or placement_mode in ('legacy_tile','world','site_slot','child'));
+  check (placement_mode is null or placement_mode in ('legacy_tile','world'));
 
 alter table public.player_builds drop constraint if exists player_builds_placement_mode_check;
 alter table public.player_builds add constraint player_builds_placement_mode_check
-  check (placement_mode is null or placement_mode in ('legacy_tile','world','site_slot','child'));
+  check (placement_mode is null or placement_mode in ('legacy_tile','world'));
 
 create index if not exists tile_entities_spatial_location_idx
   on public.tile_entities(location_id, x_m, y_m)
   where placement_mode = 'world';
-
-create index if not exists tile_entities_parent_idx
-  on public.tile_entities(parent_entity_id)
-  where parent_entity_id is not null;
-
-create unique index if not exists tile_entities_parent_slot_uidx
-  on public.tile_entities(parent_entity_id, slot_key)
-  where parent_entity_id is not null and slot_key is not null;
-
-create unique index if not exists tile_entities_site_slot_uidx
-  on public.tile_entities(site_id, slot_key)
-  where site_id is not null and slot_key is not null and parent_entity_id is null;
 
 create unique index if not exists tile_entities_source_build_uidx
   on public.tile_entities(source_build_id)
@@ -107,23 +97,17 @@ create unique index if not exists tile_entities_source_build_uidx
 
 create index if not exists player_builds_spatial_location_idx
   on public.player_builds(location_id, x_m, y_m)
-  where placement_mode = 'world' and status in ('building','selling');
-
-create unique index if not exists player_builds_parent_slot_active_uidx
-  on public.player_builds(parent_entity_id, slot_key)
-  where parent_entity_id is not null and slot_key is not null and status = 'building';
-
-create unique index if not exists player_builds_site_slot_active_uidx
-  on public.player_builds(site_id, slot_key)
-  where site_id is not null and slot_key is not null and parent_entity_id is null and status = 'building';
+  where placement_mode = 'world' and target_type = 'building' and status in ('building','selling');
 
 -- Existing application/cron completion code creates tile_entities from a
 -- player_build row. This trigger enriches that insert with the authoritative
 -- metric placement, so old completion paths remain compatible during rollout.
+-- It is intentionally SECURITY INVOKER (the default): the caller must already
+-- have the privileges required by the existing completion path.
 create or replace function public.noxia_attach_spatial_build_placement()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -138,8 +122,9 @@ begin
   where pb.profile_id = new.profile_id
     and pb.location_id = new.location_id
     and pb.buildable_id = new.entity_id
+    and pb.target_type = 'building'
     and pb.status = 'complete'
-    and pb.placement_mode in ('world','site_slot','child')
+    and pb.placement_mode = 'world'
     and not exists (
       select 1 from public.tile_entities te where te.source_build_id = pb.id
     )
@@ -159,8 +144,6 @@ begin
   new.footprint_width_m := b.footprint_width_m;
   new.footprint_depth_m := b.footprint_depth_m;
   new.site_id := b.site_id;
-  new.parent_entity_id := b.parent_entity_id;
-  new.slot_key := b.slot_key;
   return new;
 end;
 $$;
@@ -186,5 +169,5 @@ where lower(slug) in ('earth','erde','moon','mond','mars')
 on conflict (location_id) do nothing;
 
 comment on table public.world_frames is 'Planetary/local metric coordinate reference and provenance for a NOXIA location.';
-comment on table public.build_sites is 'Explicit buildable parcels or internal expansion surfaces; optional slot_layout supports Civilization-style building expansion.';
-comment on column public.tile_entities.placement_mode is 'legacy_tile | world | site_slot | child';
+comment on table public.build_sites is 'Explicit buildable parcels or local sub-sites. Building expansions continue to use canonical parent_id + slot.';
+comment on column public.tile_entities.placement_mode is 'legacy_tile | world';
