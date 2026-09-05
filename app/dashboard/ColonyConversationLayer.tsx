@@ -23,6 +23,7 @@ function residentRole(resident:ColonyResident){
 
 export default function ColonyConversationLayer({locationSlug,population,entities,pending,userId,residents}:Props){
   const playerPosition=useColonyInteractionStore(state=>state.playerPosition)
+  const selection=useColonyInteractionStore(state=>state.selection)
   const[items,setItems]=useState<WorldAwarenessItem[]>([])
   const[open,setOpen]=useState(false)
   const[tick,setTick]=useState(0)
@@ -48,7 +49,25 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
   const dayProgress=virtualDayProgress(tick)
   const positions=useMemo(()=>simulateNpcSpatialState({residents,buildings,streets,dayProgress}),[residents,buildings,streets,dayProgress])
 
-  const scene=useMemo(()=>{
+  const directScene=useMemo(()=>{
+    if(selection?.kind!=='person'||!playerPosition||items.length<1)return null
+    const position=positions.find(candidate=>candidate.resident.id===selection.id)
+    if(!position||worldDistance(position,playerPosition)>PLAYER_JOIN_DISTANCE)return null
+    const dayKey=new Date().toISOString().slice(0,10)
+    const conversation=awarenessConversationForResident(position.resident.id,residentRole(position.resident),items,dayKey)
+    if(!conversation)return null
+    return{
+      mode:'direct' as const,
+      first:position.resident,
+      second:null,
+      conversation,
+      source:sourceForAwarenessItem(conversation.item),
+      sameGroup:false,
+      playerNearby:true,
+    }
+  },[selection,playerPosition,positions,items])
+
+  const ambientScene=useMemo(()=>{
     if(items.length<1)return null
     const candidates=positions.filter(position=>!position.routine.moving&&(position.routine.activity==='meal'||position.routine.activity==='community'))
     let best:{first:typeof candidates[number];second:typeof candidates[number];score:number}|null=null
@@ -71,6 +90,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
     const playerDistance=playerPosition?Math.min(worldDistance(best.first,playerPosition),worldDistance(best.second,playerPosition)):Infinity
 
     return{
+      mode:'ambient' as const,
       first:best.first.resident,
       second:best.second.resident,
       conversation,
@@ -80,10 +100,15 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
     }
   },[positions,items,playerPosition])
 
+  const scene=directScene??ambientScene
+
   useEffect(()=>{
     if(!scene){setOpen(false);setJoining(false);setHistory([]);return}
-    setHistory([]);setJoining(false);setChatError('')
-  },[scene?.first.id,scene?.second.id,scene?.conversation.item.id])
+    setHistory([])
+    setJoining(scene.mode==='direct')
+    setOpen(scene.mode==='direct')
+    setChatError('')
+  },[scene?.mode,scene?.first.id,scene?.second?.id,scene?.conversation.item.id])
 
   async function sendMessage(){
     if(!scene||!scene.playerNearby||sending)return
@@ -119,18 +144,18 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
 
   return <div style={{position:'absolute',zIndex:118,left:16,bottom:70,width:open?370:285,fontFamily:'system-ui',color:'#e8f0f5'}}>
     <button onClick={()=>setOpen(value=>!value)} style={{width:'100%',textAlign:'left',border:'1px solid #45657c',borderRadius:open?'9px 9px 0 0':9,background:'#091925ee',color:'#e8f0f5',padding:'9px 11px',cursor:'pointer'}}>
-      <small style={{color:'#79a6c7',letterSpacing:'.1em'}}>{scene.playerNearby?'GESPRÄCH IN HÖRWEITE · ERDE':'GESPRÄCH IN DER NÄHE · ERDE'}</small><br/>
-      <b>{scene.first.displayName} + {scene.second.displayName}</b>
-      <div style={{marginTop:2,color:'#8fa3b1',fontSize:9}}>{scene.sameGroup?'gleicher Sozialkreis · ':''}{scene.playerNearby?'du kannst dich einmischen':'räumliche Begegnung'}</div>
+      <small style={{color:'#79a6c7',letterSpacing:'.1em'}}>{scene.mode==='direct'?'DIREKTGESPRÄCH · ERDE':scene.playerNearby?'GESPRÄCH IN HÖRWEITE · ERDE':'GESPRÄCH IN DER NÄHE · ERDE'}</small><br/>
+      <b>{scene.mode==='direct'||!scene.second?scene.first.displayName:`${scene.first.displayName} + ${scene.second.displayName}`}</b>
+      <div style={{marginTop:2,color:'#8fa3b1',fontSize:9}}>{scene.mode==='direct'?'du sprichst die Person direkt an':<>{scene.sameGroup?'gleicher Sozialkreis · ':''}{scene.playerNearby?'du kannst dich einmischen':'räumliche Begegnung'}</>}</div>
     </button>
     {open&&<div style={{border:'1px solid #45657c',borderTop:0,borderRadius:'0 0 9px 9px',background:'#071421f2',padding:11,fontSize:12,lineHeight:1.5}}>
       <p style={{margin:'0 0 8px'}}><b>{scene.first.displayName}:</b> „{scene.conversation.opener}“</p>
-      <p style={{margin:'0 0 9px',color:'#c8d5dd'}}><b>{scene.second.displayName}:</b> „{scene.conversation.followUp}“</p>
+      {scene.mode==='ambient'&&scene.second&&<p style={{margin:'0 0 9px',color:'#c8d5dd'}}><b>{scene.second.displayName}:</b> „{scene.conversation.followUp}“</p>}
       {history.map((entry,index)=><p key={`${entry.role}-${index}`} style={{margin:'6px 0',color:entry.role==='assistant'?'#d9e6ec':'#f1d57a'}}><b>{entry.role==='assistant'?scene.first.displayName:'Du'}:</b> „{entry.content}“</p>)}
       {scene.playerNearby&&!joining&&<button onClick={()=>setJoining(true)} style={{width:'100%',margin:'7px 0',padding:'8px 10px',border:'1px solid #3976a5',borderRadius:6,background:'#0a3150',color:'#fff',fontWeight:800,cursor:'pointer'}}>ANSPRECHEN</button>}
       {scene.playerNearby&&joining&&<div style={{marginTop:8}}>
         <div style={{display:'flex',gap:6}}>
-          <input value={message} maxLength={MAX_PLAYER_CHARS} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void sendMessage()}} placeholder="Kurze Antwort …" disabled={sending} style={{flex:1,minWidth:0,padding:'8px 9px',border:'1px solid #45657c',borderRadius:6,background:'#06111a',color:'#eef5f8'}}/>
+          <input value={message} maxLength={MAX_PLAYER_CHARS} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void sendMessage()}} placeholder="Kurze Antwort …" disabled={sending} autoFocus={scene.mode==='direct'} style={{flex:1,minWidth:0,padding:'8px 9px',border:'1px solid #45657c',borderRadius:6,background:'#06111a',color:'#eef5f8'}}/>
           <button onClick={()=>void sendMessage()} disabled={sending||!message.trim()} style={{border:'1px solid #3976a5',borderRadius:6,background:'#0a3150',color:'#fff',padding:'0 10px',cursor:sending?'wait':'pointer'}}>{sending?'…':'Senden'}</button>
         </div>
         <div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/{MAX_PLAYER_CHARS}</div>
