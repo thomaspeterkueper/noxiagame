@@ -23,10 +23,18 @@ function findLocationDock(): HTMLElement | null {
 
   const candidates = Array.from(firstColumn.children).filter((node): node is HTMLElement => node instanceof HTMLElement)
   const dock = candidates.find(element => (element.textContent ?? '').toLocaleLowerCase('de-DE').includes('deine orte')) ?? null
-  if (dock) {
-    dock.classList.add('noxia-location-dock-managed')
-    dock.dataset.noxiaRole = 'location-dock'
-  }
+  if (!dock) return null
+
+  dock.classList.add('noxia-location-dock-managed')
+  dock.dataset.noxiaRole = 'location-dock'
+
+  const rows = Array.from(dock.children).filter((node): node is HTMLElement => node instanceof HTMLElement)
+  const cardRow = rows.find(element => {
+    if (element.classList.contains('noxia-location-dock-toolbar')) return false
+    return element.style.display === 'flex' || getComputedStyle(element).display === 'flex'
+  })
+  if (cardRow) cardRow.classList.add('noxia-location-dock-cards')
+
   return dock
 }
 
@@ -50,11 +58,8 @@ export default function DashboardLocationDockManager() {
     const discover = () => {
       const next = findLocationDock()
       setTarget(current => current === next ? current : next)
-      if (next) {
-        const rows = Array.from(next.children).filter((node): node is HTMLElement => node instanceof HTMLElement)
-        const cardRow = rows.find(element => getComputedStyle(element).display === 'flex' || element.style.display === 'flex')
-        setCount(cardRow?.children.length ?? 0)
-      }
+      const cardRow = next?.querySelector<HTMLElement>('.noxia-location-dock-cards') ?? null
+      setCount(cardRow?.children.length ?? 0)
     }
     discover()
     const observer = new MutationObserver(discover)
@@ -106,7 +111,7 @@ export default function DashboardLocationDockManager() {
         min-height: 34px !important;
         padding: .45rem .45rem !important;
       }
-      .noxia-location-dock-managed.noxia-location-dock-collapsed > div:not(.noxia-location-dock-toolbar):last-of-type {
+      .noxia-location-dock-managed.noxia-location-dock-collapsed > .noxia-location-dock-cards {
         display: none !important;
       }
       .noxia-location-dock-managed.noxia-location-dock-collapsed > div:first-child {
