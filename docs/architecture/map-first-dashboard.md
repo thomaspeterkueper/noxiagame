@@ -40,6 +40,38 @@ Neither workstream should silently absorb the other's responsibilities.
 6. Player-owned/current locations form a horizontal navigation dock near the lower-left edge.
 7. Large tasks such as market, shipyard, profile, journeys, ship interiors and founding continue to use overlays/drawers instead of permanent columns.
 
+## Top bar contract
+
+The top bar is an orientation/status anchor, not a second dashboard and not a permanent action toolbar.
+
+Permanently visible desktop content is deliberately limited to:
+
+- NOXIA identity / current product context
+- credits
+- current location
+- direct player/avatar access
+- one compact `Aktionen` entry point
+
+The active ship capacity is not duplicated in the top bar because ship and cargo state already have their own managed HUD window. Global population is likewise not a useful permanent map status.
+
+Secondary actions live in the compact action menu:
+
+- Einweisung
+- Gründen
+- Freunde / messages
+- Abmelden
+
+`DashboardTopbarManager` currently proxies the existing `DashboardClient` actions into this compact menu so their established behavior is preserved without another large client rewrite. The hidden legacy buttons remain the functional source during this transition. Future top-bar actions should expose semantic callbacks directly instead of adding more DOM text matching.
+
+Unread friend/message count remains visible on the compact action trigger and inside the menu. Escape and outside click close the menu.
+
+Responsive behavior:
+
+- desktop: credits + current location + avatar + `Aktionen`
+- narrower widths: status labels disappear before values
+- compact widths: `Aktionen` becomes icon-only
+- very narrow mobile: credits may disappear before the current location, because orientation is more important than a duplicated balance readout
+
 ## HUD taxonomy
 
 The dashboard distinguishes four UI roles. They should not be implemented as interchangeable floating cards.
@@ -110,7 +142,8 @@ At narrower widths, information disappears or compresses in this order:
 2. feed window
 3. resource labels reduce while values remain visible
 4. contextual warning/build indicators may collapse out on narrow mobile widths
-5. secondary header detail
+5. secondary top-bar labels/details
+6. credits before current-location orientation on very narrow widths
 
 The active ship/cargo state and location dock remain longer because they directly affect current play. On small mobile screens the right HUD stack may disappear entirely while large functions remain available through their existing overlays/actions.
 
