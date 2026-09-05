@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 type ActionId = 'briefing' | 'found' | 'friends' | 'logout'
@@ -28,6 +28,12 @@ function sameTargets(a: TopbarTargets, b: TopbarTargets) {
 function findButtonByText(root: ParentNode, value: string): HTMLButtonElement | undefined {
   return Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
     .find(button => (button.textContent ?? '').toLocaleLowerCase('de-DE').includes(value))
+}
+
+function parseFriendBadge(button?: HTMLButtonElement) {
+  const text = button?.textContent ?? ''
+  const match = text.match(/\b(\d+\+?)\b/)
+  return match?.[1] ?? null
 }
 
 function discoverTopbar(): TopbarTargets {
@@ -65,6 +71,7 @@ function discoverTopbar(): TopbarTargets {
 
 export default function DashboardTopbarManager() {
   const [targets, setTargets] = useState<TopbarTargets>({ header: null, right: null, actions: {} })
+  const [friendBadge, setFriendBadge] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -72,10 +79,12 @@ export default function DashboardTopbarManager() {
     const discover = () => {
       const next = discoverTopbar()
       setTargets(current => sameTargets(current, next) ? current : next)
+      const badge = parseFriendBadge(next.actions.friends)
+      setFriendBadge(current => current === badge ? current : badge)
     }
     discover()
     const observer = new MutationObserver(discover)
-    observer.observe(document.body, { childList: true, subtree: true })
+    observer.observe(document.body, { childList: true, characterData: true, subtree: true })
     return () => observer.disconnect()
   }, [])
 
@@ -95,12 +104,6 @@ export default function DashboardTopbarManager() {
       window.removeEventListener('keydown', closeOnKey)
     }
   }, [open])
-
-  const friendBadge = useMemo(() => {
-    const text = targets.actions.friends?.textContent ?? ''
-    const match = text.match(/\b(\d+\+?)\b/)
-    return match?.[1] ?? null
-  }, [targets.actions.friends, targets.actions.friends?.textContent])
 
   function invoke(id: ActionId) {
     setOpen(false)
