@@ -2,6 +2,8 @@ import { CachedShackletonLolaAdapter, ShackletonTerrainIngestion } from './shack
 import type { TerrainRasterTileManifest } from './terrainRaster'
 import type { TerrainDatasetDescriptor, WorldFrame } from './types'
 
+async function main() {
+
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
 }
@@ -103,3 +105,9 @@ const missing = await adapter.sampleAtPlanetary(dataset, frame, { latDeg: -80, l
 assert(missing === null, 'missing cached coverage must remain unresolved')
 
 console.log('Shackleton progressive terrain ingestion tests passed')
+}
+
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
