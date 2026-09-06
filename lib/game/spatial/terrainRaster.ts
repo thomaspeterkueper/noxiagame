@@ -67,7 +67,7 @@ export function validateTerrainTileManifest(manifest: TerrainRasterTileManifest)
   if (manifest.minLatDeg < -90 || manifest.maxLatDeg > 90 || manifest.maxLatDeg < manifest.minLatDeg) {
     throw new Error('Terrain tile latitude bounds are invalid')
   }
-  if (manifest.minLonDeg < -180 || manifest.minLonDeg > 180 || manifest.maxLonDeg < -180 || manifest.maxLonDeg > 180) {
+  if (manifest.minLonDeg < -180 || manifest.maxLonDeg > 180 || manifest.maxLonDeg < manifest.minLonDeg) {
     throw new Error('Terrain tile longitude bounds are invalid')
   }
 }
