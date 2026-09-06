@@ -1,7 +1,7 @@
 // lib/game/buildings/index.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 30.08.2026 — Tharsis-Hub-Startobjekte (OTA-NOX-REQ-20260830)
-// Version:      1.4.0
+// Aktualisiert: 06.09.2026 — Earth-Testgebäude für Placement-/Map-Playtests freigeschaltet
+// Version:      1.5.0
 
 import type { BuildingDef, ResourceType } from './types'
 
@@ -102,17 +102,17 @@ export const BUILDINGS: Record<string, BuildingDef> = {
 
   warehouse: {
     id: 'warehouse', name: 'Warenhaus', category: 'infrastructure',
-    description: 'Erhöht Lagerkapazität der Kolonie',
+    description: 'Erhöht Lagerkapazität der Kolonie · Earth-Testgebäude',
     cost: 3500, buildTimeTicks: 3,
-    planned: true, planHint: 'Lagerkapazität — Alpha 0.3',
+    allowedLocations: ['earth'],
   },
 
   admin: {
     id: 'admin', name: 'Verwaltung', category: 'service',
-    description: 'Kolonieverwaltung, Steuersätze, Statistiken',
+    description: 'Kolonieverwaltung, Steuersätze, Statistiken · Earth-Testgebäude',
     cost: 4000, buildTimeTicks: 3,
     overlay: 'AdminOverlay',
-    planned: true, planHint: 'Kolonieverwaltung — Alpha 0.3',
+    allowedLocations: ['earth'],
   },
 
   smelter: {

@@ -42,6 +42,14 @@ export const BUILDING_VISUALS: Record<string, BuildingVisualProfile> = {
     mapScale: 1.85,
     notes: 'NOXIA Earth Core V1 warehouse/logistics hall.',
   },
+  admin: {
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/admin/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/admin/earth/style-anchor.svg`,
+    visualRole: 'map-ready',
+    location: 'earth',
+    mapScale: 1.7,
+    notes: 'Simple blue-gray Earth administration asset for placement and gameplay testing.',
+  },
   workshop: {
     styleAnchorAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
     mapAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
