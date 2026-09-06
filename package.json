@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:population-seed": "tsc lib/game/population/tharsisActivePopulationSeed.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .seed-test && node .seed-test/population/tharsisActivePopulationSeed.test.js",
-    "test:spatial": "tsc lib/game/spatial/geometry.test.ts lib/game/spatial/planetary.test.ts lib/game/spatial/terrain.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib/game/spatial --outDir .spatial-test && node .spatial-test/geometry.test.js && node .spatial-test/planetary.test.js && node .spatial-test/terrain.test.js"
+    "test:spatial": "tsc lib/game/spatial/geometry.test.ts lib/game/spatial/planetary.test.ts lib/game/spatial/terrain.test.ts lib/game/spatial/terrainSampling.test.ts lib/game/spatial/terrainRaster.test.ts lib/game/spatial/lolaTerrainAdapter.test.ts lib/game/spatial/shackletonTerrainIngestion.test.ts lib/game/spatial/terrainStorage.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib/game/spatial --outDir .spatial-test && node .spatial-test/geometry.test.js && node .spatial-test/planetary.test.js && node .spatial-test/terrain.test.js && node .spatial-test/terrainSampling.test.js && node .spatial-test/terrainRaster.test.js && node .spatial-test/lolaTerrainAdapter.test.js && node .spatial-test/shackletonTerrainIngestion.test.js && node .spatial-test/terrainStorage.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
