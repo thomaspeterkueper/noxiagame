@@ -41,4 +41,9 @@ const stillWater = applyUsageRestrictions(water, [
 ])
 assert(stillWater.state === 'invalid' && stillWater.buildabilityReason === 'water', 'physical invalid state must outrank softer restrictions')
 
+const stillSlopeRestricted = applyUsageRestrictions(mitigated, [
+  { id: 'infrastructure', state: 'restricted', reason: 'utility-clearance' },
+])
+assert(stillSlopeRestricted.state === 'restricted' && stillSlopeRestricted.buildabilityReason === 'slope-requires-mitigation', 'physical restricted reason must remain authoritative unless a later rule is invalid')
+
 console.log('physical buildability tests passed')
