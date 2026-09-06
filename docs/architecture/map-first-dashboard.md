@@ -1,152 +1,148 @@
 # NOXIA Map-first Dashboard
 
-Status: proposed/implemented as dashboard shell baseline
+Status: implemented baseline, cockpit revision 2026-09-06
 
 ## Principle
 
-The world surface is the primary workspace. NOXIA is no longer laid out as a dashboard page with a map placed inside a content column. Instead, the map/world renderer owns the viewport below the global top bar and dashboard information is layered above it as HUD.
+The world surface is the primary workspace. The dashboard is a game viewport, not a scrolling web document. The browser viewport is owned by the application (`100dvh`), browser-level scrolling is disabled while the dashboard is active, and the map/world surface fills every pixel below the compact top bar.
+
+The lower cockpit floats above the world surface. It does not reserve document height and therefore does not reduce the renderer viewport.
 
 ## Ownership boundary
 
-This document covers dashboard chrome and floating UI only.
+This document covers dashboard chrome, HUD, cockpit navigation and host-level sizing only.
 
 The Grid / Map / Terrain workstream tracked in issue #69 owns:
 
 - map and terrain renderer
 - grid/terrain visualization
 - georeferencing and DEM integration
-- map camera, terrain LOD and renderer-specific interaction
-- terrain-aware placement visualization
+- map camera, pan/zoom and renderer-specific pointer interaction
+- terrain LOD and terrain-aware placement visualization
+- first-class fullscreen/embed support inside map components
 
 The Dashboard/HUD workstream owns:
 
-- global top bar
-- floating information windows
-- location dock
+- the `100dvh` application shell
+- compact global top bar
+- bottom cockpit
 - player/ship/feed presentation
+- location navigation presentation
 - resource telemetry and contextual activity indicators
-- z-index/layering contract for application overlays
-- responsive HUD behavior
+- z-index/layering contract for overlays
+- responsive dashboard behavior
 
 Neither workstream should silently absorb the other's responsibilities.
 
 ## Desktop composition
 
-1. Global top bar, 54 px high.
-2. World surface fills the remaining viewport.
-3. Resource telemetry floats as a compact instrument strip above the upper map area; it does not reserve a row.
-4. Warnings and active build progress are contextual status indicators and exist only while relevant.
-5. Player, active ship/cargo and feed are compact managed windows on the right.
-6. Player-owned/current locations form a horizontal navigation dock near the lower-left edge.
-7. Large tasks such as market, shipyard, profile, journeys, ship interiors and founding continue to use overlays/drawers instead of permanent columns.
+1. Compact global top bar, 44 px high.
+2. World/map surface fills the complete remaining viewport.
+3. Bottom cockpit floats above the lower map edge.
+4. Resource telemetry may float above the map without capturing pointer input.
+5. Warnings and build progress exist only while relevant.
+6. Profile, ship/cargo, feed and locations are hidden by default and open on demand from the cockpit.
+7. Large workflows such as market, shipyard, founding, journey, profile detail and interiors remain overlays/drawers.
+
+## No document scroll
+
+The dashboard must never require the browser scrollbar for normal operation.
+
+- application shell: `height: 100dvh; overflow: hidden`
+- dashboard root: fixed to the viewport
+- world host: flexes to the complete space below the top bar
+- internal panels may scroll only inside their own bounded surfaces
+- root/document footers are suppressed on the dashboard route
+- overscroll must not steal wheel/touch interaction from the map
+
+If content cannot fit, it belongs in a bounded drawer/overlay, not below the map in normal document flow.
 
 ## Top bar contract
 
-The top bar is an orientation/status anchor, not a second dashboard and not a permanent action toolbar.
+The top bar is an orientation/status anchor rather than a second toolbar.
 
-Permanently visible desktop content is deliberately limited to:
+Permanent desktop content is deliberately limited to:
 
-- NOXIA identity / current product context
+- NOXIA identity
 - credits
 - current location
-- direct player/avatar access
-- one compact `Aktionen` entry point
+- player/avatar access
+- compact `Aktionen` menu
 
-The active ship capacity is not duplicated in the top bar because ship and cargo state already have their own managed HUD window. Global population is likewise not a useful permanent map status.
+Secondary actions such as Einweisung, Gründen, Freunde/messages and Abmelden live in the action menu.
 
-Secondary actions live in the compact action menu:
+Ship capacity is not duplicated in the top bar; it belongs to the ship cockpit panel. Global population is likewise not permanent top-bar status.
 
-- Einweisung
-- Gründen
-- Freunde / messages
-- Abmelden
+## Cockpit contract
 
-`DashboardTopbarManager` currently proxies the existing `DashboardClient` actions into this compact menu so their established behavior is preserved without another large client rewrite. The hidden legacy buttons remain the functional source during this transition. Future top-bar actions should expose semantic callbacks directly instead of adding more DOM text matching.
+`DashboardCockpit` is the primary UI launcher at the lower edge.
 
-Unread friend/message count remains visible on the compact action trigger and inside the menu. Escape and outside click close the menu.
+Current cockpit entries:
 
-Responsive behavior:
+- Karte: closes all cockpit drawers and exposes the maximum map area
+- Orte: opens location navigation
+- Schiff: opens ship/cargo status
+- Profil: opens player status/profile entry
+- Feed: opens the event feed
+- Standorte: proxies the current Earth map site-layer toggle when available
+- Ansicht: proxies the current planning/isometric view switch when available
 
-- desktop: credits + current location + avatar + `Aktionen`
-- narrower widths: status labels disappear before values
-- compact widths: `Aktionen` becomes icon-only
-- very narrow mobile: credits may disappear before the current location, because orientation is more important than a duplicated balance readout
+Only one information drawer is open at a time. Cockpit drawers float above the map and close back to `Karte` without altering map state.
+
+The current implementation deliberately reuses existing dashboard cards as content sources. This is a transition bridge. Future modules should expose semantic panel APIs rather than rely on DOM discovery.
 
 ## HUD taxonomy
 
-The dashboard distinguishes four UI roles. They should not be implemented as interchangeable floating cards.
+### 1. Cockpit drawers
 
-### 1. Managed windows
+On-demand information surfaces opened from the lower cockpit. Current examples: player, ship/cargo, feed and locations.
 
-Persistent information panes which a player may arrange. Current examples: player, ship/cargo and feed.
+### 2. Telemetry
 
-### 2. Navigation docks
+Continuously useful measurements which must not capture map input. Colony resources remain compact instrumentation rather than full windows.
 
-Stable navigation surfaces tied to an edge of the viewport. The location dock is the first canonical example. It remains anchored rather than freely draggable, because its function is spatial navigation, not inspection. It can be collapsed and remembers that state in browser local storage (`noxia:location-dock:v1`).
+### 3. Contextual activity
 
-### 3. Telemetry
+Transient indicators for conditions such as shortages or active construction. They disappear when no longer relevant.
 
-Small, continuously useful measurements which must not capture map input. Colony resources are telemetry. They remain compact, centered above the world surface and use warning emphasis for negative deltas rather than opening a full information window.
+### 4. Large workflow overlays
 
-### 4. Contextual activity
+Market, shipyard, founding, journey, interiors and similar tasks may temporarily cover more of the world because they represent deliberate workflows rather than ambient HUD.
 
-Transient indicators which should not permanently occupy map area. Active build progress and colony shortages belong here. When the condition no longer exists, the UI element disappears.
+## Visual direction
 
-## HUD window contract
+The persistent shell is moving away from light admin-dashboard styling toward a restrained technical game interface:
 
-`DashboardHudManager` currently upgrades the existing player, ship/cargo and feed cards into one common window behavior without requiring a large rewrite of `DashboardClient`. This is a transition bridge; future HUD panels should follow the same semantic window contract directly rather than add more selector-specific layout rules.
+- dark blue/black cockpit and top-bar surfaces
+- blue/cyan instrument accents with NOXIA gold for identity/priority
+- monospace numerics for credits, resources and technical values
+- map remains visually dominant
+- pale document-style cards are tolerated only inside temporary transition drawers, not as permanent map chrome
 
-Managed window ids are stable semantic ids:
+## Earth fullscreen embedding transition
 
-- `profile`
-- `ship`
-- `feed`
+The current `EarthRegionPreview` still contains an editorial header/footer and self-calculated page-oriented height. The dashboard branch does **not** edit that component. Instead, the host temporarily:
 
-Each managed window supports:
+- hides `.earth-head` and `.earth-foot`
+- sizes `.earth-shell` and `.earth-map` to `100%` of the world host
+- removes card-like map borders/radius at the dashboard boundary
 
-- collapse and expand
-- pin to the canonical right-side rail
-- unpin and drag freely above the map
-- reset to its canonical default position
-- persistent layout in browser local storage (`noxia:hud-layout:v1`)
-- viewport clamping so saved windows cannot remain permanently off-screen after a resize
-
-The default state is pinned. Dragging is available only after explicitly unpinning a window, which avoids accidental movement while operating controls inside it. Double-clicking the title bar toggles collapse.
-
-## Location dock contract
-
-`DashboardLocationDockManager` manages the existing `Deine Orte` block as a dedicated navigation dock.
-
-- canonical position: lower-left map edge
-- default state: expanded
-- may collapse to a small `ORTE` control
-- does not become a free-floating window
-- preserves the existing location-card click behavior
-- persists only its collapsed/expanded state, not an arbitrary position
-
-This distinction prevents primary navigation from drifting around the map and keeps a predictable home position for switching locations.
+Issue #69 contains an internal request for a first-class map fullscreen/embed contract. Once implemented by the map workstream, these host selectors should be removed.
 
 ## Interaction rule
 
-Persistent HUD must use as little map area as possible. Map interaction remains available in all uncovered areas. Telemetry and contextual indicators use `pointer-events: none`; managed windows and navigation docks intercept pointer events only inside their own bounds.
+Map interaction remains available everywhere not covered by an active cockpit drawer or explicit control. Persistent telemetry uses `pointer-events: none`; the cockpit captures input only inside its own bounds.
 
-## Visual rule
-
-The HUD remains readable and science-oriented rather than becoming a dense game cockpit. It uses translucent light surfaces, restrained shadows, NOXIA blue/gold accents and high text contrast over both dark and light map content. Telemetry may use the darker instrument style already established by the colony view because it behaves as instrumentation rather than a document-like window.
+The dashboard must not implement map pan/zoom itself. If map pointer behavior still fails after document scrolling is removed, the fix belongs to #69.
 
 ## Responsive rule
 
-At narrower widths, information disappears or compresses in this order:
-
-1. expanded profile window
-2. feed window
-3. resource labels reduce while values remain visible
-4. contextual warning/build indicators may collapse out on narrow mobile widths
-5. secondary top-bar labels/details
-6. credits before current-location orientation on very narrow widths
-
-The active ship/cargo state and location dock remain longer because they directly affect current play. On small mobile screens the right HUD stack may disappear entirely while large functions remain available through their existing overlays/actions.
+- top bar reduces to 42 px on compact screens
+- cockpit becomes horizontally scrollable when necessary
+- labels may compress before controls disappear
+- active cockpit drawers fit within viewport bounds and scroll internally
+- current location remains higher priority than duplicated financial/status detail
 
 ## Renderer independence
 
-The shell must not depend on renderer state or physical world coordinates. The current ColonyGrid and WalkableColony are transitional surfaces. A future georeferenced 2D/3D map can replace them without requiring another dashboard layout rewrite.
+The application shell must not depend on physical world coordinates, terrain datasets or renderer implementation. A future georeferenced 2D/3D map can replace the current Earth/planning surface inside the same world host without reintroducing browser scroll, permanent sidebars or large editorial headers.
