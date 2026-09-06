@@ -24,6 +24,7 @@ export const EARTH_FEATURE_RENDER_ROLE: Record<EarthFeatureClass, EarthRenderRol
   water: 'terrain-water',
   forest: 'terrain-forest',
   farmland: 'terrain-farmland',
+  urban: 'terrain-urban',
   building: 'structure-building',
   settlement: 'terrain-urban',
   industrial: 'structure-industrial',
