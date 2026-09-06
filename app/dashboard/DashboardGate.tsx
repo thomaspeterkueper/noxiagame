@@ -1,14 +1,15 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 05.09.2026 — Map-first HUD-, Dock- und Topbar-Steuerung
-// Version:      0.4.0
+// Aktualisiert: 06.09.2026 — Vollbild-Cockpit-Shell
+// Version:      0.5.0
 import React, { useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import DashboardClient from './DashboardClient'
 import DashboardHudManager from './DashboardHudManager'
 import DashboardLocationDockManager from './DashboardLocationDockManager'
 import DashboardTopbarManager from './DashboardTopbarManager'
+import DashboardCockpit from './DashboardCockpit'
 import { T } from './ui'
 
 export default function DashboardGate({ locations, prices, orders }: { locations: any[]; prices: any[]; orders: any[] }) {
@@ -21,7 +22,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
 
   if (!loaded) {
     return (
-      <main style={{ minHeight: '100vh', background: T.bg, color: T.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
+      <main style={{ minHeight: '100dvh', background: T.bg, color: T.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'Georgia, serif', color: T.blue, fontSize: '1.4rem', letterSpacing: '0.14em' }}>noχ¹ᐃ</div>
           <div style={{ marginTop: 10, color: T.inkFaint, fontSize: '0.8rem' }}>Lade aktuellen Standort …</div>
@@ -35,5 +36,6 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardHudManager />
     <DashboardLocationDockManager />
     <DashboardTopbarManager />
+    <DashboardCockpit />
   </>
 }
