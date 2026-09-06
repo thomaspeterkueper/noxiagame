@@ -5,21 +5,25 @@ export const dynamic = 'force-dynamic'
 
 async function authenticated(req: NextRequest) {
   const header = req.headers.get('authorization')
-  if (!header?.startsWith('Bearer ')) return false
+  if (!header?.startsWith('Bearer ')) return null
   const supabase = createServiceClient()
   const { data: { user } } = await supabase.auth.getUser(header.slice(7))
-  return Boolean(user)
+  return user ?? null
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await authenticated(req))) return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 })
+  const user = await authenticated(req)
+  if (!user) return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 })
 
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const locationSlug = searchParams.get('location') ?? 'mars'
-  const { data: location, error: locationError } = await supabase.from('locations').select('id, slug, name, population, population_max').eq('slug', locationSlug).maybeSingle()
+  const { data: location, error: locationError } = await supabase.from('locations').select('id, slug, name, population, population_max, governor_profile_id').eq('slug', locationSlug).maybeSingle()
   if (locationError) return NextResponse.json({ error: locationError.message }, { status: 500 })
   if (!location) return NextResponse.json({ error: 'Standort nicht gefunden' }, { status: 404 })
+  if (location.governor_profile_id !== user.id) {
+    return NextResponse.json({ error: 'Nur der Gouverneur darf den internen Bevölkerungszustand einsehen' }, { status: 403 })
+  }
 
   const { data: people, error: peopleError } = await supabase
     .from('people')
