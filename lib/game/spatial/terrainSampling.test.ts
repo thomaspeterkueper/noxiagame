@@ -5,6 +5,8 @@ import {
   type TerrainSampler,
 } from './terrainSampling'
 
+async function main() {
+
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
 }
@@ -97,3 +99,9 @@ const unresolved = await sampleTerrainFootprint(
 assert(unresolved === null, 'partial/NoData footprint must stay unresolved')
 
 console.log('terrain sampling contract tests passed')
+}
+
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
