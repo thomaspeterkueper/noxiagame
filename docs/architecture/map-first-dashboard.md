@@ -29,6 +29,7 @@ The Dashboard/HUD workstream owns:
 - player/ship/feed presentation
 - location navigation presentation
 - resource telemetry and contextual activity indicators
+- cockpit command and music controls
 - legal/information access inside the cockpit
 - z-index/layering contract for overlays
 - responsive dashboard behavior
@@ -39,7 +40,7 @@ Neither workstream should silently absorb the other's responsibilities.
 
 1. Compact global top bar, 44 px high.
 2. World/map surface fills the complete remaining viewport.
-3. Bottom cockpit floats above the lower map edge.
+3. Bottom cockpit floats above the lower map edge and owns interactive dashboard commands.
 4. Resource telemetry may float above the map without capturing pointer input.
 5. Warnings and build progress exist only while relevant.
 6. Profile, ship/cargo and locations are hidden by default and open on demand from the cockpit.
@@ -62,7 +63,7 @@ If content cannot fit, it belongs in a bounded drawer/overlay, not below the map
 
 ## Top bar contract
 
-The top bar is an orientation/status anchor rather than a second toolbar.
+The top bar is an orientation/status anchor, not a command toolbar.
 
 Permanent desktop content is deliberately limited to:
 
@@ -70,30 +71,31 @@ Permanent desktop content is deliberately limited to:
 - credits
 - current location
 - player/avatar access
-- compact `Aktionen` menu
 
-Secondary actions such as Einweisung, Gründen, Freunde/messages and Abmelden live in the action menu.
+The previous `Aktionen` command menu is no longer rendered in the top bar. Einweisung, Gründen, Freunde/messages and Abmelden remain backed by their existing application handlers but are invoked from the bottom cockpit.
 
 Ship capacity is not duplicated in the top bar; it belongs to the ship cockpit panel. Global population is likewise not permanent top-bar status.
 
 ## Cockpit contract
 
-`DashboardCockpit` is the primary UI launcher at the lower edge.
+`DashboardCockpit` is the primary UI launcher and command surface at the lower edge.
 
 Current cockpit entries:
 
-- Karte: closes cockpit drawers/info and exposes the maximum map area
+- Karte: closes interactive cockpit drawers/utilities and exposes the maximum map area
 - Orte: opens location navigation
 - Schiff: opens ship/cargo status
 - Profil: opens player status/profile entry
 - Feed: toggles a passive event stream over the right side of the map
 - Standorte: proxies the current Earth map site-layer toggle when available
 - Ansicht: proxies the current planning/isometric view switch when available
+- Aktionen: opens Einweisung, Gründen, Freunde/messages and Abmelden
+- Musik: opens play/pause and volume controls backed by the global `MusicProvider`
 - Info: opens legal links, copyright and current map/data attribution
 
-Only one interactive information drawer is open at a time. Passive toggles such as Feed may remain enabled while the map or a drawer is active. Cockpit drawers float above the map and close back to `Karte` without altering map state.
+Only one interactive information/utility surface is open at a time. Passive toggles such as Feed may remain enabled while the map or a drawer is active. Cockpit drawers float above the map and close back to `Karte` without altering map state.
 
-The current implementation deliberately reuses existing dashboard cards as content sources. This is a transition bridge. Future modules should expose semantic panel/telemetry APIs rather than rely on DOM discovery.
+The current implementation deliberately reuses existing dashboard cards and action handlers as content/behavior sources. This is a transition bridge. Future modules should expose semantic panel/telemetry/command APIs rather than rely on DOM discovery.
 
 ## HUD taxonomy
 
@@ -103,19 +105,29 @@ On-demand interactive information surfaces opened from the lower cockpit. Curren
 
 ### 2. Passive telemetry overlays
 
-Continuously or optionally useful measurements which must not capture map input. Colony resources remain compact instrumentation. The feed now belongs to this category: when enabled, its existing event content is rendered as a right-side text stream with no card chrome and `pointer-events: none`.
+Continuously or optionally useful measurements which must not capture map input. Colony resources remain compact instrumentation. The feed belongs to this category: when enabled, its event content is rendered as a right-side text stream on one uniform blurred backing surface, with no gradient, card chrome or separator lines and with `pointer-events: none`.
 
 ### 3. Contextual activity
 
 Transient indicators for conditions such as shortages or active construction. They disappear when no longer relevant.
 
-### 4. Information/legal panel
+### 4. Cockpit utility panels
 
-Copyright, Impressum, Datenschutz, Nutzungsbedingungen and current map/data attribution are accessible from the cockpit `Info` control. They must remain available even though the document footer itself is suppressed in fullscreen dashboard mode.
+Short-lived command surfaces such as Aktionen, Musik and Info. They are opened from the cockpit, occupy bounded space above it, and do not become permanent map chrome.
 
 ### 5. Large workflow overlays
 
 Market, shipyard, founding, journey, interiors and similar tasks may temporarily cover more of the world because they represent deliberate workflows rather than ambient HUD.
+
+## Music contract
+
+The global `MusicProvider` remains the single audio-state owner so playback survives navigation. The ordinary site-level floating `MusicControls` remain available outside the dashboard. While the dashboard is active, that floating control is suppressed and the cockpit consumes the same provider directly for play/pause and volume.
+
+This avoids duplicate audio players or competing playback state.
+
+## Information/legal contract
+
+Copyright, Impressum, Datenschutz, Nutzungsbedingungen and current map/data attribution are accessible from the cockpit `Info` control. They must remain available even though the document footer itself is suppressed in fullscreen dashboard mode.
 
 ## Visual direction
 
@@ -126,12 +138,12 @@ The persistent shell is moving away from light admin-dashboard styling toward a 
 - monospace numerics for credits, resources and technical values
 - map remains visually dominant
 - temporary drawers are slightly translucent rather than opaque white cards
-- passive feed content floats as text/telemetry instead of a permanent panel
+- passive feed content floats as simple text over one uniformly blurred translucent surface
 - pale document-style cards are tolerated only as transition content inside temporary drawers, not as permanent map chrome
 
 ## Earth fullscreen embedding transition
 
-The current `EarthRegionPreview` still contains an editorial header/footer and self-calculated page-oriented height. The dashboard branch does **not** edit that component. Instead, the host temporarily:
+The current `EarthRegionPreview` still contains an editorial header/footer and self-calculated page-oriented height. The dashboard does **not** edit that component. Instead, the host temporarily:
 
 - hides `.earth-head` and `.earth-foot`
 - sizes `.earth-shell` and `.earth-map` to `100%` of the world host
@@ -152,7 +164,7 @@ The dashboard must not implement map pan/zoom itself. If map pointer behavior st
 - top bar reduces to 42 px on compact screens
 - cockpit becomes horizontally scrollable when necessary
 - labels may compress before controls disappear
-- active cockpit drawers fit within viewport bounds and scroll internally
+- active cockpit drawers/utilities fit within viewport bounds and scroll internally when needed
 - feed overlay narrows to the available mobile width without blocking map input
 - current location remains higher priority than duplicated financial/status detail
 
