@@ -58,6 +58,14 @@ export const BUILDING_VISUALS: Record<string, BuildingVisualProfile> = {
     mapScale: 1.95,
     notes: 'Factory uses the Earth workshop visual as an interim production-building anchor.',
   },
+  solar: {
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/solar/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/solar/earth/style-anchor.svg`,
+    visualRole: 'map-ready',
+    location: 'earth',
+    mapScale: 1.95,
+    notes: 'Test-first Earth solar field: deliberately blue/anthracite for immediate map readability.',
+  },
 }
 
 export function getBuildingVisual(buildingId: string, location: string) {
