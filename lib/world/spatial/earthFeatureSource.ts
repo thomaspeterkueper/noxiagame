@@ -14,6 +14,7 @@ export type EarthFeatureClass =
   | 'water'
   | 'forest'
   | 'farmland'
+  | 'urban'
   | 'building'
   | 'settlement'
   | 'industrial'
@@ -53,6 +54,7 @@ export const CURRENT_EARTH_BOOTSTRAP_CLASSES: EarthFeatureClass[] = [
   'water',
   'forest',
   'farmland',
+  'urban',
   'building',
   'settlement',
   'industrial',
