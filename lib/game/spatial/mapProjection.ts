@@ -1,3 +1,5 @@
+import type { Footprint } from './types'
+
 export interface MetricMapCamera {
   centerXM: number
   centerYM: number
@@ -27,10 +29,6 @@ function assertViewport(camera: MetricMapCamera, viewport: MetricViewportSize) {
   }
 }
 
-/**
- * Maps canonical local-world metres to a 2D viewport. World +Y is north/up;
- * screen +Y is down. Renderer dimensions never alter world geometry.
- */
 export function worldToViewport(
   point: WorldMapPoint,
   camera: MetricMapCamera,
@@ -55,7 +53,6 @@ export function viewportToWorld(
   }
 }
 
-/** Pan by a screen-space drag while preserving metric camera semantics. */
 export function panMetricCamera(camera: MetricMapCamera, deltaXPx: number, deltaYPx: number): MetricMapCamera {
   return {
     ...camera,
@@ -64,10 +61,6 @@ export function panMetricCamera(camera: MetricMapCamera, deltaXPx: number, delta
   }
 }
 
-/**
- * Zoom around an optional viewport anchor. The world point under the cursor stays
- * fixed, which allows embedded and fullscreen renderers to share one camera.
- */
 export function zoomMetricCamera(
   camera: MetricMapCamera,
   viewport: MetricViewportSize,
@@ -95,4 +88,33 @@ export function visibleMetricBounds(camera: MetricMapCamera, viewport: MetricVie
     minYM: southEast.yM,
     maxYM: northWest.yM,
   }
+}
+
+/**
+ * Projects the authoritative metric building footprint without snapping it to a
+ * display grid. Rotation stays a world-space property and therefore survives
+ * switching between 2D, fullscreen and later isometric renderers.
+ */
+export function projectMetricFootprint(
+  footprint: Footprint,
+  camera: MetricMapCamera,
+  viewport: MetricViewportSize,
+): ViewportPoint[] {
+  if (footprint.widthM <= 0 || footprint.depthM <= 0) throw new Error('Footprint dimensions must be positive')
+  const halfWidth = footprint.widthM / 2
+  const halfDepth = footprint.depthM / 2
+  const angle = (footprint.rotationDeg ?? 0) * Math.PI / 180
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const corners = [
+    [-halfWidth, -halfDepth],
+    [halfWidth, -halfDepth],
+    [halfWidth, halfDepth],
+    [-halfWidth, halfDepth],
+  ] as const
+
+  return corners.map(([dx, dy]) => worldToViewport({
+    xM: footprint.xM + dx * cos - dy * sin,
+    yM: footprint.yM + dx * sin + dy * cos,
+  }, camera, viewport))
 }
