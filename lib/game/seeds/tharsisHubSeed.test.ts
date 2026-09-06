@@ -1,13 +1,6 @@
 // lib/game/seeds/tharsisHubSeed.test.ts
 // Erstellt: 30.08.2026
-// Aktualisiert: 02.09.2026 — vollständige OTA Engineering Release-Abnahme.
-// Deterministische Akzeptanztests für den kanonischen Tharsis-Hub-Start-Seed
-// (OTA-NOX-REQ-20260830-THARSIS-HUB-START-SEED, Abschnitt 9).
-//
-// Kein Framework — `npx tsx lib/game/seeds/tharsisHubSeed.test.ts`
-// Prüft: exakte Objektzahlen, 497/504, Zonenregeln, N-1-Straßenpfade,
-// mediumspezifische Utility-Redundanz, Safe Haven, ECLSS 2-von-3,
-// Bottom-up-Energie, Pflanzenmodul-Grenze und Eigentumsmodell.
+// Aktualisiert: 06.09.2026 — OTA Seed-Review-Klärung.
 
 import {
   THARSIS_HUB_POPULATION,
@@ -21,17 +14,21 @@ import {
 } from './tharsisHubSeed'
 import {
   validatePlacement,
-  validateCounts,
   validateZoneRules,
   validateRoadResilience,
   validateUtilityNetworks,
-  validateOwnership,
 } from './tharsisHubValidation'
+import {
+  validateTharsisMigrationResolution,
+  validateTharsisResolvedCounts,
+} from './tharsisHubMigrationResolution'
 import { validateTharsisUtilityIntegrity } from './tharsisHubUtilityNetwork'
 import {
   THARSIS_ECLSS_REGIONAL_NODES,
   THARSIS_REQUIRED_EVACUATION_CAPACITY,
+  THARSIS_REQUIRED_SURVIVING_CLUSTER_COUNT,
   THARSIS_SAFE_HAVEN_NODES,
+  THARSIS_TEMPORARY_CAPACITY_PER_SURVIVING_CLUSTER,
   availableEvacuationCapacity,
   degradedEclssCapacity,
   validateTharsisLifeSupportResilience,
@@ -42,6 +39,7 @@ import {
   validateTharsisPowerModel,
 } from './tharsisHubPowerModel'
 import {
+  THARSIS_ENERGY_ARCHITECTURE,
   THARSIS_PLANT_MODULE_POLICY,
   THARSIS_PROCESS_GAS_POLICY,
   THARSIS_THERMAL_POLICY,
@@ -71,32 +69,35 @@ console.log('── Tharsis Hub Start-Seed — Akzeptanztests ──────
 console.log(`Bewohner: ${THARSIS_HUB_POPULATION} · Habitatplätze: ${THARSIS_HUB_HABITAT_CAPACITY}`)
 
 reportIssues('Kollisionen / Bounds / getrennte Netze', validatePlacement())
-reportIssues('Exakte Stückzahlen (Abschnitt 1 + 2)', validateCounts())
+reportIssues('Exakte Stückzahlen (reviewed current contract)', validateTharsisResolvedCounts())
 reportIssues('Zonen- und Abhängigkeitsregeln (Abschnitt 1/5)', validateZoneRules())
 reportIssues('Straßennetz: N-1 + Rettungszugänge (Abschnitt 3)', validateRoadResilience())
 reportIssues('Utility A/B: bestehende Seed-Anbindung (Abschnitt 4)', validateUtilityNetworks())
 reportIssues('Utility V2: Graph + echte Dualmedien + physische Feeder', validateTharsisUtilityIntegrity())
-reportIssues('Sondermedien + Pflanzenmodul', validateTharsisEngineeringPolicy())
+reportIssues('Sondermedien + Phase-I-Pflanzenmodul', validateTharsisEngineeringPolicy())
 reportIssues('Safe Haven + ECLSS 2-von-3', validateTharsisLifeSupportResilience())
 reportIssues('Bottom-up-Energie + Lastabwurf', validateTharsisPowerModel())
-reportIssues('Eigentumsmodell (Abschnitt 6)', validateOwnership())
+reportIssues('Migration: Legacy-Seed + Forward-Korrektur', validateTharsisMigrationResolution())
 
 pruefe(THARSIS_HUB_POPULATION === 497, 'genau 497 Startbewohner')
-pruefe(THARSIS_HUB_HABITAT_CAPACITY >= 504, 'mindestens 504 Habitatplätze')
+pruefe(THARSIS_HUB_HABITAT_CAPACITY === 504, 'genau 504 permanente Habitatplätze')
 
 const clusters = THARSIS_HUB_BUILDINGS.filter(b => b.entityId === 'habitat_cluster')
 pruefe(clusters.length === 6, 'sechs Habitatcluster')
 pruefe(clusters.every(c => c.critical), 'alle Habitatcluster kritisch')
 
-const habitatShelters = THARSIS_SAFE_HAVEN_NODES.filter(node => node.kind === 'habitat_cluster')
+const habitatShelters = THARSIS_SAFE_HAVEN_NODES
 pruefe(habitatShelters.length === 6, 'jeder Habitatcluster besitzt lokale Safe-Haven-Funktion')
+pruefe(THARSIS_REQUIRED_SURVIVING_CLUSTER_COUNT === 5, 'Einzelausfall lässt fünf Safe-Haven-Cluster')
+pruefe(THARSIS_TEMPORARY_CAPACITY_PER_SURVIVING_CLUSTER === 100, 'temporäre Kapazität je verbleibendem Cluster ist 100')
+pruefe(THARSIS_REQUIRED_EVACUATION_CAPACITY === 500, 'fünf verbleibende Cluster tragen temporär zusammen 500 Personen')
 for (const cluster of habitatShelters) {
   pruefe(
-    availableEvacuationCapacity(cluster.id) >= THARSIS_REQUIRED_EVACUATION_CAPACITY,
-    `${cluster.id}: nach Komplettausfall mindestens 84 externe Evakuierungsplätze`,
+    availableEvacuationCapacity(cluster.id) === 500,
+    `${cluster.id}: nach Komplettausfall exakt 5×100 temporäre Safe-Haven-Plätze`,
   )
 }
-pruefe(THARSIS_HUB_HABITAT_CAPACITY === 504, 'Evakuierungsreserve verändert permanente Habitatkapazität 504 nicht')
+pruefe(THARSIS_HUB_HABITAT_CAPACITY === 504, 'temporäre Überbelegung verändert permanente Habitatkapazität nicht')
 
 const counts = seedObjectCounts()
 pruefe(counts['reactor_module'] === 6, 'sechs Reaktormodule')
@@ -127,6 +128,8 @@ const peakPower = calculateTharsisPower('peak')
 pruefe(normalPower.classA >= 1.5 && normalPower.classA <= 2.5, 'kritische Dauerlast innerhalb 1,5–2,5 MW')
 pruefe(normalPower.total >= 3 && normalPower.total <= 5, 'Normallast innerhalb 3–5 MW')
 pruefe(peakPower.total >= 5 && peakPower.total <= 8, 'Spitzenlast innerhalb 5–8 MW')
+pruefe(THARSIS_ENERGY_ARCHITECTURE.epistemicStatus === 'world-model-assumption', 'Energiebandbreiten sind als Weltmodell-Annahme markiert')
+pruefe(!THARSIS_ENERGY_ARCHITECTURE.empiricalClaim, 'Energiebandbreiten beanspruchen keinen empirischen [R]-Status')
 for (const complexId of ['energy_complex_1', 'energy_complex_2', 'energy_complex_3']) {
   pruefe(availablePowerAfterDomainFailure(complexId) >= normalPower.classA, `${complexId}: N-1 hält Klasse A`)
 }
@@ -141,9 +144,9 @@ const foodT = depots.reduce((s, d) => s + (d.foodReserveT ?? 0), 0)
 pruefe(depots.length === 3 && foodT >= 27, 'drei Reserve-Depots mit ≥27 t Nahrungsreserve')
 pruefe(depots.every(d => (d.foodReserveT ?? 0) <= foodT / 2), 'kein Depot hält mehr als die Hälfte der lebenswichtigen Reserve')
 
-pruefe(counts['plant_module'] === 1, 'ein staatliches Pflanzen-/Frischproduktionsmodul im Startbestand')
-const plantModule = THARSIS_HUB_BUILDINGS.find(b => b.entityId === 'plant_module')
-pruefe(!!plantModule && !plantModule.critical, 'Pflanzenmodul ist nicht survival-critical')
+pruefe((counts['plant_module'] ?? 0) === 0, 'kein gebautes Pflanzenmodul im Startbestand')
+pruefe(THARSIS_PLANT_MODULE_POLICY.startupPresence === 'prepared-site-only', 'Pflanzenmodul startet nur als vorbereiteter Standort')
+pruefe(THARSIS_PLANT_MODULE_POLICY.buildPhase === 'phase-I', 'Pflanzenmodul ist Phase-I-Ausbau')
 pruefe(!THARSIS_PLANT_MODULE_POLICY.potableWaterLoopShared, 'Pflanzenmodul besitzt hygienisch getrennten Wasser/Nährstoff-Loop')
 pruefe(THARSIS_PLANT_MODULE_POLICY.minimumStrategicStoredFoodT === 27, 'Pflanzenmodul ersetzt die 27-t-Strategiereserve nicht')
 

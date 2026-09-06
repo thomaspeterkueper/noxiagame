@@ -1,6 +1,6 @@
 // lib/game/seeds/tharsisHubEngineeringPolicy.ts
 // Erstellt: 02.09.2026
-// OTA Engineering Release: mediumspezifische Redundanz + Pflanzenmodul-Grenze.
+// OTA Engineering Release + Klärung 2026-09-06.
 
 import { THARSIS_HUB_BUILDINGS } from './tharsisHubSeed'
 
@@ -42,12 +42,32 @@ export const THARSIS_PROCESS_GAS_POLICY = {
 }
 
 /**
- * Pflanzenmodul: Frischproduktion ist strategisch nützlich, aber wegen der
- * getrennten >=27-t-Lagerreserve nicht survival-critical. Wasser/Nährstoffe
- * laufen in einem hygienisch vom Trinkwasserkreislauf getrennten Prozessloop.
+ * Energie-Zahlen sind kanonische OTA/NOXIA-Architekturannahmen des Weltmodells,
+ * keine empirischen [R]-Messwerte. Reale Technikreferenzen können die
+ * Plausibilitätsbasis liefern, aber nicht diese konkreten Leistungswerte.
+ */
+export const THARSIS_ENERGY_ARCHITECTURE = {
+  epistemicStatus: 'world-model-assumption' as const,
+  installedNominalPowerMw: { min: 7, max: 8 },
+  criticalContinuousPowerMw: { min: 1.5, max: 2.5 },
+  normalMeanPowerMw: { min: 3, max: 5 },
+  peakPowerMw: { min: 5, max: 8 },
+  storageMWh: { min: 6, max: 10 },
+  empiricalClaim: false,
+} as const
+
+/**
+ * Pflanzenmodul: NICHT Teil des verpflichtenden Startbestands. Es ist ein
+ * Phase-I-Ausbau zur Stärkung der Frischproduktion. Der Startzustand kennt nur
+ * den vorbereiteten Standort und vorgesehene Medienanschlüsse; das Gebäude
+ * selbst darf im Start-Seed nicht existieren.
  */
 export const THARSIS_PLANT_MODULE_POLICY = {
   buildingId: 'plant_module',
+  startupPresence: 'prepared-site-only' as const,
+  buildPhase: 'phase-I' as const,
+  preparedSite: { row: 12, col: 16, zone: 'A' as const },
+  plannedMedia: ['power', 'data', 'water'] as const,
   survivalCritical: false,
   potableWaterLoopShared: false,
   processLoopId: 'plant_water_nutrient_loop_1',
@@ -99,10 +119,11 @@ export function validateTharsisEngineeringPolicy(): TharsisEngineeringIssue[] {
   }
 
   const plant = THARSIS_HUB_BUILDINGS.find(building => building.id === THARSIS_PLANT_MODULE_POLICY.buildingId)
-  if (!plant) {
-    issues.push({ message: 'Pflanzenmodul fehlt im Start-Seed' })
-  } else if (plant.critical !== THARSIS_PLANT_MODULE_POLICY.survivalCritical) {
-    issues.push({ message: 'Pflanzenmodul ist fälschlich als survival-critical markiert' })
+  if (plant) {
+    issues.push({ message: 'Pflanzenmodul ist fälschlich bereits als gebautes Startobjekt vorhanden' })
+  }
+  if (THARSIS_PLANT_MODULE_POLICY.startupPresence !== 'prepared-site-only') {
+    issues.push({ message: 'Pflanzenmodul muss im Startzustand auf vorbereiteten Standort beschränkt bleiben' })
   }
   if (THARSIS_PLANT_MODULE_POLICY.potableWaterLoopShared) {
     issues.push({ message: 'Pflanzenmodul darf Trinkwasser- und Wasser/Nährstoff-Prozessloop nicht hygienisch koppeln' })
@@ -113,6 +134,10 @@ export function validateTharsisEngineeringPolicy(): TharsisEngineeringIssue[] {
     .reduce((sum, building) => sum + (building.foodReserveT ?? 0), 0)
   if (foodReserveT < THARSIS_PLANT_MODULE_POLICY.minimumStrategicStoredFoodT) {
     issues.push({ message: `Strategische Lagerreserve ${foodReserveT} t unter ${THARSIS_PLANT_MODULE_POLICY.minimumStrategicStoredFoodT} t` })
+  }
+
+  if (THARSIS_ENERGY_ARCHITECTURE.empiricalClaim) {
+    issues.push({ message: 'Tharsis-Energiearchitektur darf nicht als empirischer [R]-Messwert markiert sein' })
   }
 
   if (THARSIS_PROCESS_GAS_POLICY.requiresIdenticalDualRing) {
