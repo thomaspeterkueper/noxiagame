@@ -85,6 +85,30 @@ try {
 }
 assert(rejectedBadChecksum, 'ingestion manifest must require SHA-256')
 
+let rejectedInvertedLongitudeBounds = false
+try {
+  validateTerrainTileManifest({
+    datasetId: dataset.id,
+    tileKey: 'inverted-longitude',
+    minLatDeg: -90,
+    minLonDeg: 140,
+    maxLatDeg: -89,
+    maxLonDeg: 120,
+    rasterWidth: 1,
+    rasterHeight: 1,
+    storageBucket: 'terrain',
+    storagePath: 'inverted.tif',
+    rasterFormat: 'geotiff',
+    checksum: 'a'.repeat(64),
+    checksumAlgorithm: 'sha256',
+    byteSize: 1,
+    status: 'catalogued',
+  })
+} catch {
+  rejectedInvertedLongitudeBounds = true
+}
+assert(rejectedInvertedLongitudeBounds, 'ingestion manifest must reject inverted longitude bounds')
+
 const adapter: TerrainRasterAdapter = {
   id: 'fixture-adapter',
   supports(candidate) {
