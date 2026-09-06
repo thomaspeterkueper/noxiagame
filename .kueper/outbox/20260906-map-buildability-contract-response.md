@@ -32,4 +32,10 @@ The renderer may expose a buildability grid when a cell reaches at least 12 scre
 ## Placement state
 The cockpit may consume `active`, `buildTypeId`, `footprint`, `state`, `reason`, `canPlace`, and `canCancel`. Commit is allowed only for a complete `buildable` placement with a real metric footprint.
 
-Dashboard chrome remains outside the map renderer.
+## Viewport API
+`GET /api/earth/buildability` accepts a metric viewport (`minXM`, `minYM`, `maxXM`, `maxYM`) plus explicit physical slope thresholds (`maxBuildableSlopeDeg`, `maxRestrictedSlopeDeg`). Optional repeated `rule=` values apply usage/infrastructure restrictions as `featureClass:restricted|invalid:reason[:bufferM]`.
+
+The response keeps `planningCellSizeM` separate from observed terrain resolution, returns DEM-derived slope in degrees, buildability state/reason and matched source feature IDs, and never advertises the current Copernicus GLO-90 bootstrap terrain as finer than 90 m. Water/waterways enter the physical gate directly.
+
+## Map overlay chrome
+The previous `Sauerland 2086` legend box in `EarthRegionPreview` has been removed. It is replaced by a compact north-orientation marker and a zoom-aware metric scale bar. Dashboard chrome remains outside the map renderer.
