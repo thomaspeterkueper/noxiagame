@@ -29,6 +29,7 @@ The Dashboard/HUD workstream owns:
 - player/ship/feed presentation
 - location navigation presentation
 - resource telemetry and contextual activity indicators
+- legal/information access inside the cockpit
 - z-index/layering contract for overlays
 - responsive dashboard behavior
 
@@ -41,8 +42,10 @@ Neither workstream should silently absorb the other's responsibilities.
 3. Bottom cockpit floats above the lower map edge.
 4. Resource telemetry may float above the map without capturing pointer input.
 5. Warnings and build progress exist only while relevant.
-6. Profile, ship/cargo, feed and locations are hidden by default and open on demand from the cockpit.
-7. Large workflows such as market, shipyard, founding, journey, profile detail and interiors remain overlays/drawers.
+6. Profile, ship/cargo and locations are hidden by default and open on demand from the cockpit.
+7. Feed is optional passive telemetry rendered as a right-side text overlay, not as an interactive drawer.
+8. Legal information and data attribution live behind a compact cockpit info control instead of a permanent footer.
+9. Large workflows such as market, shipyard, founding, journey, profile detail and interiors remain overlays/drawers.
 
 ## No document scroll
 
@@ -79,33 +82,38 @@ Ship capacity is not duplicated in the top bar; it belongs to the ship cockpit p
 
 Current cockpit entries:
 
-- Karte: closes all cockpit drawers and exposes the maximum map area
+- Karte: closes cockpit drawers/info and exposes the maximum map area
 - Orte: opens location navigation
 - Schiff: opens ship/cargo status
 - Profil: opens player status/profile entry
-- Feed: opens the event feed
+- Feed: toggles a passive event stream over the right side of the map
 - Standorte: proxies the current Earth map site-layer toggle when available
 - Ansicht: proxies the current planning/isometric view switch when available
+- Info: opens legal links, copyright and current map/data attribution
 
-Only one information drawer is open at a time. Cockpit drawers float above the map and close back to `Karte` without altering map state.
+Only one interactive information drawer is open at a time. Passive toggles such as Feed may remain enabled while the map or a drawer is active. Cockpit drawers float above the map and close back to `Karte` without altering map state.
 
-The current implementation deliberately reuses existing dashboard cards as content sources. This is a transition bridge. Future modules should expose semantic panel APIs rather than rely on DOM discovery.
+The current implementation deliberately reuses existing dashboard cards as content sources. This is a transition bridge. Future modules should expose semantic panel/telemetry APIs rather than rely on DOM discovery.
 
 ## HUD taxonomy
 
 ### 1. Cockpit drawers
 
-On-demand information surfaces opened from the lower cockpit. Current examples: player, ship/cargo, feed and locations.
+On-demand interactive information surfaces opened from the lower cockpit. Current examples: player, ship/cargo and locations. They use slight translucency and blur so the map remains perceptually present behind them.
 
-### 2. Telemetry
+### 2. Passive telemetry overlays
 
-Continuously useful measurements which must not capture map input. Colony resources remain compact instrumentation rather than full windows.
+Continuously or optionally useful measurements which must not capture map input. Colony resources remain compact instrumentation. The feed now belongs to this category: when enabled, its existing event content is rendered as a right-side text stream with no card chrome and `pointer-events: none`.
 
 ### 3. Contextual activity
 
 Transient indicators for conditions such as shortages or active construction. They disappear when no longer relevant.
 
-### 4. Large workflow overlays
+### 4. Information/legal panel
+
+Copyright, Impressum, Datenschutz, Nutzungsbedingungen and current map/data attribution are accessible from the cockpit `Info` control. They must remain available even though the document footer itself is suppressed in fullscreen dashboard mode.
+
+### 5. Large workflow overlays
 
 Market, shipyard, founding, journey, interiors and similar tasks may temporarily cover more of the world because they represent deliberate workflows rather than ambient HUD.
 
@@ -117,7 +125,9 @@ The persistent shell is moving away from light admin-dashboard styling toward a 
 - blue/cyan instrument accents with NOXIA gold for identity/priority
 - monospace numerics for credits, resources and technical values
 - map remains visually dominant
-- pale document-style cards are tolerated only inside temporary transition drawers, not as permanent map chrome
+- temporary drawers are slightly translucent rather than opaque white cards
+- passive feed content floats as text/telemetry instead of a permanent panel
+- pale document-style cards are tolerated only as transition content inside temporary drawers, not as permanent map chrome
 
 ## Earth fullscreen embedding transition
 
@@ -127,11 +137,13 @@ The current `EarthRegionPreview` still contains an editorial header/footer and s
 - sizes `.earth-shell` and `.earth-map` to `100%` of the world host
 - removes card-like map borders/radius at the dashboard boundary
 
+The hidden `.earth-foot` remains a metadata source for the cockpit Info panel so attribution is not lost when fullscreen mode suppresses the visual footer.
+
 Issue #69 contains an internal request for a first-class map fullscreen/embed contract. Once implemented by the map workstream, these host selectors should be removed.
 
 ## Interaction rule
 
-Map interaction remains available everywhere not covered by an active cockpit drawer or explicit control. Persistent telemetry uses `pointer-events: none`; the cockpit captures input only inside its own bounds.
+Map interaction remains available everywhere not covered by an active cockpit drawer or explicit control. Persistent/passive telemetry uses `pointer-events: none`; the cockpit captures input only inside its own bounds.
 
 The dashboard must not implement map pan/zoom itself. If map pointer behavior still fails after document scrolling is removed, the fix belongs to #69.
 
@@ -141,6 +153,7 @@ The dashboard must not implement map pan/zoom itself. If map pointer behavior st
 - cockpit becomes horizontally scrollable when necessary
 - labels may compress before controls disappear
 - active cockpit drawers fit within viewport bounds and scroll internally
+- feed overlay narrows to the available mobile width without blocking map input
 - current location remains higher priority than duplicated financial/status detail
 
 ## Renderer independence
