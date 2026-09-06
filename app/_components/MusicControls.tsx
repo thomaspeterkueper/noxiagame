@@ -1,8 +1,8 @@
 'use client'
 
 // app/_components/MusicControls.tsx
-// Erstellt: 31.05.2026
-// Floating Music-Controller – unten rechts auf allen Seiten
+// Floating Music-Controller for non-dashboard pages. The dashboard cockpit
+// consumes the same MusicProvider directly and suppresses this global chrome.
 
 import { useState } from 'react'
 import { useMusicContext } from './MusicProvider'
@@ -12,18 +12,20 @@ export default function MusicControls() {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '1.5rem',
-      right:  '1.5rem',
-      zIndex: 1000,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: '0.5rem',
-    }}>
-
-      {/* Lautstärke-Slider – nur wenn expanded */}
+    <div
+      className="noxia-global-music-controls"
+      data-noxia-role="global-music-controls"
+      style={{
+        position: 'fixed',
+        bottom: '1.5rem',
+        right: '1.5rem',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: '0.5rem',
+      }}
+    >
       {expanded && (
         <div style={{
           background: 'rgba(10,18,28,0.92)',
@@ -43,11 +45,7 @@ export default function MusicControls() {
             min={0} max={1} step={0.05}
             value={volume}
             onChange={e => setVolume(Number(e.target.value))}
-            style={{
-              width: '80px',
-              accentColor: '#c9a961',
-              cursor: 'pointer',
-            }}
+            style={{ width: '80px', accentColor: '#c9a961', cursor: 'pointer' }}
           />
           <span style={{ fontSize: '0.55rem', color: 'rgba(200,212,224,0.5)' }}>
             {Math.round(volume * 100)}%
@@ -55,10 +53,7 @@ export default function MusicControls() {
         </div>
       )}
 
-      {/* Haupt-Button */}
       <div style={{ display: 'flex', gap: '0.4rem' }}>
-
-        {/* Expand/Collapse */}
         <button
           onClick={() => setExpanded(e => !e)}
           title="Lautstärke"
@@ -76,7 +71,6 @@ export default function MusicControls() {
           {expanded ? '✕' : '🎛️'}
         </button>
 
-        {/* Play/Pause */}
         <button
           onClick={toggle}
           title={playing ? 'Musik pausieren' : 'Musik abspielen'}
