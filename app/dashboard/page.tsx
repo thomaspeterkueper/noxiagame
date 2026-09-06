@@ -21,175 +21,186 @@ export default async function Dashboard() {
       <DashboardGate locations={locations} prices={prices} orders={orders} />
       <DashboardPrimaryColony />
       <style>{`
-        /*
-         * Map-first dashboard v3
-         *
-         * Die Weltkarte ist die primäre Arbeitsfläche. Dashboard-Informationen
-         * reservieren keine dauerhaften Spalten mehr, sondern schweben als HUD
-         * über der Karte. Terrain/Grid/Renderer bleiben bewusst außerhalb
-         * dieser Schicht und können unabhängig ersetzt werden.
-         */
+        :root {
+          --noxia-topbar-h: 44px;
+          --noxia-cockpit-clearance: 0px;
+        }
 
-        /* ── Globale Leiste ─────────────────────────────────────────────── */
-        .noxia-dashboard-shell > div > header {
-          height: 54px !important;
-          padding-left: .9rem !important;
-          padding-right: .9rem !important;
-          background: rgba(250,249,246,.94) !important;
-          backdrop-filter: blur(12px);
-          box-shadow: 0 1px 10px rgba(27,39,51,.08) !important;
+        /* The dashboard is a game viewport, not a scrolling document. */
+        .noxia-dashboard-shell {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100dvh;
+          overflow: hidden;
+          background: #07111b;
+          isolation: isolate;
         }
-        .noxia-dashboard-shell > div > header > div:first-child {
-          gap: .65rem !important;
-        }
-        .noxia-dashboard-shell > div > header > div:last-child {
-          gap: .8rem !important;
-        }
-        /* Globale Summenbevölkerung ist kein lokaler Kartenstatus. */
-        .noxia-dashboard-shell > div > header > div:last-child > div:nth-child(4) {
+        body.noxia-dashboard-active footer {
           display: none !important;
         }
-
-        /* Persönliche Kompetenzwerte können kompakt im Header ergänzt werden. */
-        .noxia-profile-stats-compact {
-          height: 32px;
-          display: inline-flex;
-          align-items: center;
-          gap: .5rem;
-          padding: 0 .55rem;
-          border: 1px solid #dedbd4;
-          border-radius: 8px;
-          background: rgba(255,255,255,.82);
-          color: #2a4e7a;
-          cursor: pointer;
-          font: 700 .67rem/1 system-ui, sans-serif;
-          white-space: nowrap;
-          backdrop-filter: blur(8px);
-        }
-        .noxia-profile-stats-compact:hover {
-          border-color: #c9a961;
-          background: #fff;
-        }
-        .noxia-profile-stats-compact span {
-          display: inline-flex;
-          align-items: center;
-          gap: .2rem;
-        }
-        .noxia-profile-stats-compact b {
-          font-size: .72rem;
-          font-weight: 400;
-        }
-
-        /* ── Weltfläche ────────────────────────────────────────────────── */
-        .noxia-dashboard-shell > div > header + div {
-          display: block !important;
-          position: relative !important;
+        .noxia-dashboard-shell > div:first-of-type {
           width: 100% !important;
+          height: 100dvh !important;
+          min-height: 0 !important;
+          max-height: 100dvh !important;
+          display: flex !important;
+          flex-direction: column !important;
+          overflow: hidden !important;
+          background: #07111b !important;
+        }
+
+        /* Compact orientation bar. Large operations live in the cockpit/menu. */
+        .noxia-dashboard-shell > div:first-of-type > header {
+          position: relative !important;
+          top: auto !important;
+          z-index: 2200 !important;
+          width: 100% !important;
+          height: var(--noxia-topbar-h) !important;
+          min-height: var(--noxia-topbar-h) !important;
+          flex: 0 0 var(--noxia-topbar-h) !important;
+          box-sizing: border-box !important;
+          padding: 0 .75rem !important;
+          border-bottom: 1px solid rgba(77,119,145,.36) !important;
+          background: rgba(7,17,27,.97) !important;
+          box-shadow: 0 6px 22px rgba(0,0,0,.22) !important;
+          backdrop-filter: blur(14px);
+        }
+        .noxia-dashboard-shell > div:first-of-type > header h1 {
+          color: #d8e8ef !important;
+          font-size: 1.05rem !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header h1 span {
+          color: #c9a961 !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header > div:last-child {
+          gap: .65rem !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header > div:last-child > div > div:first-child {
+          color: #6e8795 !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header > div:last-child > div > div:last-child {
+          color: #d4e5ed !important;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+        }
+
+        /* World host owns every remaining pixel below the top bar. */
+        .noxia-dashboard-shell > div:first-of-type > header + div {
+          position: relative !important;
+          flex: 1 1 auto !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: 0 !important;
           max-width: none !important;
-          height: calc(100vh - 54px) !important;
           margin: 0 !important;
           padding: 0 !important;
+          display: block !important;
           overflow: hidden !important;
         }
-        .noxia-dashboard-shell > div > header + div > div:first-child {
-          position: relative !important;
+        .noxia-dashboard-shell > div:first-of-type > header + div > div:first-child {
+          position: absolute !important;
+          inset: 0 !important;
           width: 100% !important;
           height: 100% !important;
           min-width: 0 !important;
-          gap: 0 !important;
+          min-height: 0 !important;
+          display: block !important;
           overflow: hidden !important;
         }
 
-        /* Das Legacy-/Planungsgrid nutzt ebenfalls den gesamten freien Raum.
-           Die zukünftige Karte kann diese Fläche übernehmen, ohne das HUD zu
-           verändern. */
+        /* Legacy right rail becomes only a content source for cockpit drawers. */
+        .noxia-dashboard-shell > div:first-of-type > header + div > div:last-child {
+          position: absolute !important;
+          inset: 0 auto auto 0 !important;
+          width: 0 !important;
+          height: 0 !important;
+          min-width: 0 !important;
+          min-height: 0 !important;
+          overflow: visible !important;
+          pointer-events: none !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header + div > div:last-child > div:nth-child(2) {
+          display: none !important;
+        }
+
+        /* Redundant document-era blocks stay out of the world viewport. */
+        .noxia-dashboard-shell > div:first-of-type > footer {
+          display: none !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header + div > div:first-child > div:has(> div:last-child[style*="grid-template-columns"]) {
+          display: none !important;
+        }
+        .noxia-dashboard-shell > div:first-of-type > header + div > div:first-child > div:not(:has(.grid-pan-container)):has(button[title="Diesen Tipp nicht mehr anzeigen"]) {
+          display: none !important;
+        }
+
+        /* Dashboard embedding contract for the current Earth surface.
+           No Earth map logic, data, pointer handling or renderer code is changed.
+           The map workstream gets a separate request for a first-class fullscreen
+           embed mode so these host overrides can later disappear. */
+        .noxia-dashboard-shell .earth-shell {
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 0 !important;
+          box-sizing: border-box !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          background: #07111b !important;
+        }
+        .noxia-dashboard-shell .earth-head,
+        .noxia-dashboard-shell .earth-foot {
+          display: none !important;
+        }
+        .noxia-dashboard-shell .earth-map {
+          width: 100% !important;
+          max-width: none !important;
+          height: 100% !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+
+        /* Transitional planning grids also fill their host instead of creating
+           page-height content. The renderer itself remains untouched. */
         .noxia-dashboard-shell .grid-pan-container {
           width: 100% !important;
-          max-height: calc(100vh - 54px) !important;
-          min-height: calc(100vh - 54px) !important;
+          max-width: none !important;
+          height: 100% !important;
+          min-height: 0 !important;
+          max-height: none !important;
           border-radius: 0 !important;
           border-left: 0 !important;
           border-right: 0 !important;
           border-bottom: 0 !important;
         }
 
-        /* Kontexttipps nicht als breite Banner über die zentrale Karte legen.
-           Einweisung und Feed bleiben die Informationskanäle. */
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:not(:has(.grid-pan-container)):has(button[title="Diesen Tipp nicht mehr anzeigen"]) {
+        /* Primary colony surface follows the compact top bar; the cockpit floats
+           over its lower edge and therefore does not reduce map size. */
+        .noxia-dashboard-shell .noxia-primary-colony {
+          top: var(--noxia-topbar-h) !important;
+          bottom: 0 !important;
+        }
+        .noxia-dashboard-shell .noxia-primary-hudrail {
+          top: 0 !important;
+          height: 48px !important;
+        }
+        .noxia-dashboard-shell .noxia-open-isometric {
           display: none !important;
         }
 
-        /* Die alte ColonyGrid-Innenleiste wird zu einem kleinen Overlay. */
-        .noxia-dashboard-shell div:has(> div > .grid-pan-container) {
-          position: relative !important;
-        }
-        .noxia-dashboard-shell div:has(> .grid-pan-container) + div {
-          position: absolute !important;
-          z-index: 12 !important;
-          top: 58px !important;
-          right: 12px !important;
-          width: 164px !important;
-          max-height: none !important;
-          overflow: visible !important;
-          gap: 0 !important;
-          pointer-events: none;
-        }
-        .noxia-dashboard-shell div:has(> .grid-pan-container) + div > div:first-child {
-          display: block !important;
-          padding: .5rem .6rem !important;
-          background: rgba(250,249,246,.90) !important;
-          border: 1px solid rgba(210,207,198,.82) !important;
-          box-shadow: 0 8px 24px rgba(27,39,51,.13) !important;
-          backdrop-filter: blur(10px);
-        }
-        .noxia-dashboard-shell div:has(> .grid-pan-container) + div > div:not(:first-child) {
-          display: none !important;
-        }
-
-        /* ── Standort-Dock ─────────────────────────────────────────────── */
-        /* Der Ortsblock ist der direkte linke Spalten-Block, dessen Kartenreihe
-           flex-wrap verwendet. Dadurch funktioniert das Dock auch ohne Schiffe. */
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) {
-          position: fixed !important;
-          z-index: 1110 !important;
-          left: 16px !important;
-          bottom: 16px !important;
-          width: min(720px, calc(100vw - 332px)) !important;
-          margin: 0 !important;
-          padding: .45rem .5rem .5rem !important;
-          border: 1px solid rgba(218,214,204,.88);
-          border-radius: 11px;
-          background: rgba(250,249,246,.88);
-          box-shadow: 0 10px 30px rgba(27,39,51,.15);
-          backdrop-filter: blur(12px);
+        /* Location navigation is now invoked by the cockpit instead of staying
+           permanently over the map. Existing card behavior is preserved. */
+        .noxia-dashboard-shell .noxia-location-dock-managed {
           pointer-events: auto;
         }
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) > div:first-child {
-          margin: 0 0 .28rem .15rem !important;
-        }
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) > div:last-child {
-          display: flex !important;
-          flex-wrap: nowrap !important;
-          overflow-x: auto !important;
-          gap: .35rem !important;
-          scrollbar-width: none;
-        }
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) > div:last-child::-webkit-scrollbar {
-          display: none;
-        }
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) > div:last-child > div {
-          min-width: 112px !important;
-          min-height: 44px !important;
-          padding: .3rem .5rem .3rem 56px !important;
-          border-radius: 7px !important;
-          background: rgba(255,255,255,.84) !important;
-        }
-        .noxia-location-card-with-image {
+        .noxia-dashboard-shell .noxia-location-card-with-image {
           position: relative !important;
           overflow: hidden !important;
           isolation: isolate;
         }
-        .noxia-location-thumb {
+        .noxia-dashboard-shell .noxia-location-thumb {
           position: absolute;
           z-index: -1;
           inset: 0 auto 0 0;
@@ -198,144 +209,21 @@ export default async function Dashboard() {
           border-right: 1px solid rgba(255,255,255,.72);
           background: #e8e4dc;
         }
-        .noxia-location-thumb::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(90deg, transparent 55%, rgba(255,255,255,.34));
-          pointer-events: none;
-        }
-        .noxia-location-thumb img {
+        .noxia-dashboard-shell .noxia-location-thumb img {
           width: 100% !important;
           height: 100% !important;
           object-fit: cover !important;
           display: block;
         }
 
-        /* Schiffsliste unter der Weltansicht ist redundant; aktives Schiff und
-           Laderaum sind rechts als HUD-Fenster erreichbar. */
-        .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="grid-template-columns"]) {
-          display: none !important;
-        }
-
-        /* ── Rechte schwebende HUD-Fenster ─────────────────────────────── */
-        .noxia-dashboard-shell > div > header + div > div:last-child {
-          position: fixed !important;
-          z-index: 1120 !important;
-          top: 106px !important;
-          right: 14px !important;
-          width: 286px !important;
-          height: auto !important;
-          max-height: calc(100vh - 126px) !important;
-          display: flex !important;
-          flex-direction: column !important;
-          gap: .5rem !important;
-          pointer-events: none;
-        }
-        .noxia-dashboard-shell > div > header + div > div:last-child > div {
-          pointer-events: auto;
-          border-radius: 10px !important;
-          background: rgba(250,249,246,.91) !important;
-          border-color: rgba(214,211,202,.90) !important;
-          box-shadow: 0 10px 28px rgba(27,39,51,.14) !important;
-          backdrop-filter: blur(12px);
-        }
-        /* Profil bleibt als kleiner Spielerstatus sichtbar. */
-        .noxia-dashboard-shell > div > header + div > div:last-child > div:first-child {
-          display: block !important;
-        }
-        /* Dauerhafte SSF-Werbekarte entfällt; Akademie/Unlocks bleiben Kontext. */
-        .noxia-dashboard-shell > div > header + div > div:last-child > div:nth-child(2) {
-          display: none !important;
-        }
-        /* Laderaum bleibt kompakt, Feed erhält den flexiblen Rest. */
-        .noxia-dashboard-shell > div > header + div > div:last-child > div:nth-child(3) {
-          flex-shrink: 0 !important;
-        }
-        .noxia-dashboard-shell > div > header + div > div:last-child > div:last-child {
-          flex: 1 1 auto !important;
-          min-height: 96px !important;
-          max-height: 240px !important;
-          overflow-y: auto !important;
-        }
-
-        /* Im Root-Layout existiert bereits der rechtliche Footer. */
-        .noxia-dashboard-shell > div > footer {
-          display: none !important;
-        }
-
-        @media (max-width: 1450px) {
-          .noxia-dashboard-shell > div > header > div:last-child {
-            gap: .55rem !important;
-          }
-          .noxia-profile-stats-compact {
-            gap: .3rem;
-            padding: 0 .4rem;
-          }
-          .noxia-dashboard-shell > div > header + div > div:last-child {
-            width: 260px !important;
-          }
-          .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) {
-            width: min(650px, calc(100vw - 302px)) !important;
-          }
-        }
-
-        @media (max-width: 1180px) {
-          .noxia-dashboard-shell > div > header > div:last-child {
-            gap: .4rem !important;
-          }
-          .noxia-profile-stats-compact span b {
-            display: none;
-          }
-          .noxia-dashboard-shell > div > header + div > div:last-child {
-            width: 232px !important;
-          }
-          .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) {
-            width: min(590px, calc(100vw - 270px)) !important;
-          }
-        }
-
-        @media (max-width: 980px) {
-          .noxia-profile-stats-compact {
-            display: none;
-          }
-          .noxia-dashboard-shell > div > header + div > div:last-child {
-            top: 102px !important;
-            right: 8px !important;
-            width: 210px !important;
-          }
-          /* Auf kleinen Screens bleiben nur der unmittelbar spielrelevante
-             Schiffsstatus als rechtes Fenster und das Standort-Dock unten. */
-          .noxia-dashboard-shell > div > header + div > div:last-child > div:first-child,
-          .noxia-dashboard-shell > div > header + div > div:last-child > div:last-child {
-            display: none !important;
-          }
-          .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) {
-            left: 8px !important;
-            right: 8px !important;
-            bottom: 8px !important;
-            width: auto !important;
-          }
-          .noxia-dashboard-shell > div > header + div > div:first-child > div:has(> div:last-child[style*="flex-wrap"]) > div:last-child > div {
-            min-width: 104px !important;
-          }
-        }
-
         @media (max-width: 760px) {
-          .noxia-dashboard-shell > div > header {
-            padding-left: .55rem !important;
-            padding-right: .55rem !important;
+          :root { --noxia-topbar-h: 42px; }
+          .noxia-dashboard-shell > div:first-of-type > header {
+            padding-left: .45rem !important;
+            padding-right: .45rem !important;
           }
-          .noxia-dashboard-shell > div > header > div:last-child > div:nth-child(2),
-          .noxia-dashboard-shell > div > header > div:last-child > button:last-child {
+          .noxia-dashboard-shell > div:first-of-type > header h1 span {
             display: none !important;
-          }
-          .noxia-dashboard-shell > div > header + div > div:last-child {
-            display: none !important;
-          }
-          .noxia-dashboard-shell .grid-pan-container {
-            max-height: calc(100vh - 54px) !important;
-            min-height: calc(100vh - 54px) !important;
           }
         }
       `}</style>
