@@ -5,18 +5,24 @@ import { EARTH_SAUERLAND_REGION } from '@/lib/world/spatial/regions'
 
 const source = new OverpassEarthFeatureSource()
 
-export const revalidate = 3600
+export const revalidate = 300
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams
-  const radiusKm = Math.min(6, Math.max(1, Number(p.get('radiusKm') ?? 3)))
+  const requestedLat = Number(p.get('lat'))
+  const requestedLon = Number(p.get('lon'))
+  const hasLocalCenter = Number.isFinite(requestedLat) && Number.isFinite(requestedLon)
+  const center = hasLocalCenter
+    ? { lat: requestedLat, lon: requestedLon }
+    : EARTH_SAUERLAND_REGION.origin
+  const radiusKm = Math.min(6, Math.max(.2, Number(p.get('radiusKm') ?? (hasLocalCenter ? .6 : 3))))
   const latDelta = radiusKm / 111.32
-  const lonDelta = radiusKm / (111.32 * Math.cos(EARTH_SAUERLAND_REGION.origin.lat * Math.PI / 180))
+  const lonDelta = radiusKm / (111.32 * Math.cos(center.lat * Math.PI / 180))
   const bounds = {
-    south: EARTH_SAUERLAND_REGION.origin.lat - latDelta,
-    west: EARTH_SAUERLAND_REGION.origin.lon - lonDelta,
-    north: EARTH_SAUERLAND_REGION.origin.lat + latDelta,
-    east: EARTH_SAUERLAND_REGION.origin.lon + lonDelta,
+    south: center.lat - latDelta,
+    west: center.lon - lonDelta,
+    north: center.lat + latDelta,
+    east: center.lon + lonDelta,
   }
 
   try {
@@ -24,11 +30,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       region: EARTH_SAUERLAND_REGION,
+      queryCenter: center,
+      detail: hasLocalCenter,
       bounds,
       featureCount: features.length,
       features,
       attribution: '© OpenStreetMap contributors · ODbL',
-    }, { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } })
+    }, {
+      headers: {
+        'Cache-Control': hasLocalCenter
+          ? 'public, s-maxage=120, stale-while-revalidate=300'
+          : 'public, s-maxage=900, stale-while-revalidate=3600',
+      },
+    })
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Earth source unavailable' }, { status: 503 })
   }
