@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs><linearGradient id="r" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d8dcd8"/><stop offset="1" stop-color="#838d89"/></linearGradient><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#efeee7"/><stop offset="1" stop-color="#c5c7c0"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity=".28"/></filter></defs>
+  <g filter="url(#s)" transform="translate(28 104)">
+    <path d="M48 468 336 606 670 424 383 286Z" fill="#7c8475" opacity=".3"/>
+    <path d="M75 250 380 110 655 247 348 391Z" fill="url(#r)" stroke="#59635f" stroke-width="5"/>
+    <path d="M75 250 348 391 348 526 75 385Z" fill="url(#w)" stroke="#59635f" stroke-width="5"/>
+    <path d="M348 391 655 247 655 382 348 526Z" fill="#d2d4cd" stroke="#59635f" stroke-width="5"/>
+    <path d="M103 301 329 419 329 452 103 335Z" fill="#68745c"/>
+    <g fill="#444f52" stroke="#94a4a0" stroke-width="3">
+      <path d="M116 338 175 369 175 441 116 409Z"/><path d="M190 377 249 408 249 479 190 448Z"/><path d="M263 414 322 445 322 515 263 484Z"/>
+    </g>
+    <path d="M90 286 341 416 356 407 105 278Z" fill="#6e7865"/>
+    <g fill="#707a76" stroke="#505a57" stroke-width="4"><path d="M230 170 304 136 347 157 272 192Z"/><path d="M438 157 500 128 538 147 475 176Z"/></g>
+    <path d="M415 368 531 313 531 371 415 426Z" fill="#68745c"/>
+    <path d="M553 301 620 270 620 328 553 360Z" fill="#4e595c"/>
+    <g fill="#8a816d"><path d="M91 425 145 452 145 476 91 449Z"/><path d="M157 458 210 485 210 508 157 481Z"/><path d="M470 451 520 427 520 451 470 475Z"/></g>
+    <g stroke="#e0b840" stroke-width="5"><path d="M103 462 309 568"/><path d="M119 452 325 558"/></g>
+  </g>
+</svg>
