@@ -81,8 +81,9 @@ export function classifyEarthCellFeatures(
   let isWater = false
 
   for (const feature of features) {
-    const isWaterFeature = feature.featureType === 'water' || feature.featureType === 'waterway'
-    const rule = policy[feature.featureType]
+    const featureClass = feature.featureType as EarthFeatureClass
+    const isWaterFeature = featureClass === 'water' || featureClass === 'waterway'
+    const rule = policy[featureClass]
     // Linear watercourses need an area of influence to intersect a planning cell.
     // Without an explicit rule, half a cell is a conservative geometric overlap,
     // not an invented legal setback.
