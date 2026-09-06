@@ -1,6 +1,8 @@
 import { LolaTerrainAdapter } from './lolaTerrainAdapter'
 import type { TerrainDatasetDescriptor, WorldFrame } from './types'
 
+async function main() {
+
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
 }
@@ -84,3 +86,9 @@ const noData = await noDataAdapter.sampleAtPlanetary(dataset, frame, {
 assert(noData === null, 'LOLA NoData must remain unresolved')
 
 console.log('LOLA terrain adapter tests passed')
+}
+
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
