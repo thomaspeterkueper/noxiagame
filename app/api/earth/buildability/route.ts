@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { BuildabilityState } from '@/lib/game/spatial/mapLayers'
 import type { PhysicalBuildabilityPolicy } from '@/lib/game/spatial/buildability'
 import type { EarthFeatureClass } from '@/lib/world/spatial/earthFeatureSource'
-import type { EarthFeatureRestrictionPolicy } from '@/lib/world/spatial/earthUsageRestrictions'
+import type { EarthFeatureRestrictionPolicy, EarthFeatureRestrictionRule } from '@/lib/world/spatial/earthUsageRestrictions'
 import { buildEarthBuildabilitySurface } from '@/lib/world/spatial/earthBuildabilitySurface'
 import { localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { EARTH_SAUERLAND_REGION } from '@/lib/world/spatial/regions'
@@ -22,7 +22,7 @@ function finiteParam(params: URLSearchParams, key: string) {
   return value
 }
 
-function parseRule(raw: string): [EarthFeatureClass, EarthFeatureRestrictionPolicy[EarthFeatureClass]] | null {
+function parseRule(raw: string): [EarthFeatureClass, EarthFeatureRestrictionRule] | null {
   const [featureClassRaw, stateRaw, reasonRaw, bufferRaw] = raw.split(':')
   const featureClass = featureClassRaw as EarthFeatureClass
   const state = stateRaw as BuildabilityState
@@ -49,8 +49,6 @@ export async function GET(request: Request) {
     if (params.get('waterIsBuildable') === 'true') policy.waterIsBuildable = true
 
     const requestedResolutionM = params.get('resolutionM') == null ? 180 : finiteParam(params, 'resolutionM')
-    // Copernicus GLO-90 is the current bootstrap source. Never imply finer observed
-    // terrain than the provider can support by asking it for sub-90 m resolution.
     const resolutionM = Math.max(90, Math.min(1_000, requestedResolutionM))
 
     const northWest = localMetersToGeo({ eastM: minXM, northM: maxYM }, EARTH_SAUERLAND_REGION.origin)
