@@ -1,15 +1,19 @@
 import type { PhysicalBuildabilityPolicy, PhysicalBuildabilityResult } from '../../game/spatial/buildability'
-import { evaluatePhysicalBuildability } from '../../game/spatial/buildability'
+import { applyUsageRestrictions, evaluatePhysicalBuildability } from '../../game/spatial/buildability'
 import type { GeoPoint } from './earthSpatial'
 import { geoToLocalMeters, localMetersToGeo } from './earthSpatial'
 import type { EarthRegionAnchor } from './earthSpatial'
 import type { ElevationGrid, ElevationSample } from './elevationSource'
+import type { ImportedEarthFeature } from './earthFeatureSource'
+import type { EarthFeatureRestrictionPolicy } from './earthUsageRestrictions'
+import { classifyEarthCellFeatures } from './earthUsageRestrictions'
 
 export type EarthBuildabilityCell = PhysicalBuildabilityResult & {
   lat: number
   lon: number
   row: number
   col: number
+  matchedFeatureIds: string[]
 }
 
 export type EarthBuildabilitySurface = {
@@ -18,6 +22,11 @@ export type EarthBuildabilitySurface = {
   cellSizeM: number
   cells: EarthBuildabilityCell[]
   source: ElevationGrid['source']
+}
+
+export interface EarthBuildabilitySurfaceOptions {
+  features?: readonly ImportedEarthFeature[]
+  restrictionPolicy?: EarthFeatureRestrictionPolicy
 }
 
 function horizontalDistanceM(a: ElevationSample, b: ElevationSample): number {
@@ -60,15 +69,19 @@ export function deriveElevationSlopeDeg(
 
 /**
  * Projects an observed Earth DEM grid into the region's local metric planning
- * frame and evaluates the physical buildability gate for every resolved sample.
- * No renderer state and no legacy tile coordinate becomes world truth here.
+ * frame and evaluates physical terrain first. Observed water is folded into the
+ * physical gate; explicit land-use/infrastructure rules are applied afterwards
+ * and may only downgrade a physically viable cell.
  */
 export function buildEarthBuildabilitySurface(
   grid: ElevationGrid,
   region: EarthRegionAnchor,
   policy: PhysicalBuildabilityPolicy,
+  options: EarthBuildabilitySurfaceOptions = {},
 ): EarthBuildabilitySurface {
   const cells: EarthBuildabilityCell[] = []
+  const features = options.features ?? []
+  const restrictionPolicy = options.restrictionPolicy ?? {}
 
   for (let row = 0; row < grid.rows; row++) {
     for (let col = 0; col < grid.cols; col++) {
@@ -76,15 +89,31 @@ export function buildEarthBuildabilitySurface(
       if (!sample) continue
       const metric = geoToLocalMeters(sample, region.origin)
       const slopeDeg = deriveElevationSlopeDeg(grid, row, col)
+      const classified = classifyEarthCellFeatures(
+        metric,
+        region.cellSizeM,
+        features,
+        region,
+        restrictionPolicy,
+      )
       const physical = evaluatePhysicalBuildability({
         xM: metric.eastM,
         yM: metric.northM,
         elevationM: sample.elevationM,
         slopeDeg,
+        isWater: classified.isWater,
         terrainResolved: Number.isFinite(sample.elevationM) && slopeDeg != null,
         gridSizeM: region.cellSizeM,
       }, policy)
-      cells.push({ ...physical, lat: sample.lat, lon: sample.lon, row, col })
+      const final = applyUsageRestrictions(physical, classified.restrictions)
+      cells.push({
+        ...final,
+        lat: sample.lat,
+        lon: sample.lon,
+        row,
+        col,
+        matchedFeatureIds: classified.matchedFeatureIds,
+      })
     }
   }
 
