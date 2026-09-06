@@ -50,3 +50,34 @@ set status = 'ready',
     ),
     updated_at = now()
 where id = 'moon_lro_lola_118m';
+
+-- Fail closed: a schema/history mismatch must not make this migration appear
+-- successful while leaving the canonical Moon frame or LOLA dataset unchanged.
+do $$
+begin
+  if not exists (
+    select 1
+    from public.world_frames wf
+    join public.locations l on l.id = wf.location_id
+    where wf.body = 'moon'
+      and lower(l.slug) in ('moon', 'mond')
+      and wf.origin_status = 'verified'
+      and wf.origin_lat_deg = -89.67
+      and wf.origin_lon_deg = 129.78
+      and wf.origin_alt_m = 0
+      and wf.terrain_dataset_id = 'moon_lro_lola_118m'
+  ) then
+    raise exception 'Shackleton terrain origin migration updated no canonical Moon world frame';
+  end if;
+
+  if not exists (
+    select 1
+    from public.terrain_datasets
+    where id = 'moon_lro_lola_118m'
+      and status = 'ready'
+      and metadata ->> 'runtime_adapter' = 'moon-lro-lola-118m'
+  ) then
+    raise exception 'Shackleton terrain origin migration updated no canonical LOLA dataset';
+  end if;
+end
+$$;
