@@ -23,6 +23,7 @@ function qForClass(cls: EarthFeatureClass, b: EarthFeatureQuery['bounds']): stri
     case 'water': return `way[natural=water](${box});way[water](${box});relation[natural=water](${box});`
     case 'forest': return `way[landuse=forest](${box});way[natural=wood](${box});relation[landuse=forest](${box});relation[natural=wood](${box});`
     case 'farmland': return `way[landuse~"farmland|farmyard|meadow|orchard"](${box});relation[landuse~"farmland|farmyard|meadow|orchard"](${box});`
+    case 'urban': return `way[landuse~"residential|commercial|retail"](${box});relation[landuse~"residential|commercial|retail"](${box});`
     case 'building': return `way[building](${box});`
     case 'settlement': return `node[place~"city|town|village|hamlet"](${box});`
     case 'industrial': return `way[landuse=industrial](${box});relation[landuse=industrial](${box});`
@@ -37,6 +38,7 @@ function classify(tags: Record<string, string> = {}): EarthFeatureClass | null {
   if (tags.natural === 'water' || tags.water) return 'water'
   if (tags.landuse === 'forest' || tags.natural === 'wood') return 'forest'
   if (['farmland','farmyard','meadow','orchard'].includes(tags.landuse ?? '')) return 'farmland'
+  if (['residential','commercial','retail'].includes(tags.landuse ?? '')) return 'urban'
   if (tags.building) return 'building'
   if (tags.place) return 'settlement'
   if (tags.landuse === 'industrial') return 'industrial'
@@ -66,7 +68,7 @@ function toFeature(el: OverpassElement): ImportedEarthFeature | null {
   }
   const coords = geometry.map(p => ({ lat: p.lat, lon: p.lon }))
   const closed = coords.length > 3 && coords[0].lat === coords[coords.length - 1].lat && coords[0].lon === coords[coords.length - 1].lon
-  const polygonClasses: EarthFeatureClass[] = ['water','forest','farmland','building','industrial','public']
+  const polygonClasses: EarthFeatureClass[] = ['water','forest','farmland','urban','building','industrial','public']
   const polygon = closed && polygonClasses.includes(featureClass)
   return { ...base, geometryKind: polygon ? 'polygon' : 'line', geometry: polygon ? { kind: 'polygon', coordinates: coords } : { kind: 'line', coordinates: coords } }
 }
