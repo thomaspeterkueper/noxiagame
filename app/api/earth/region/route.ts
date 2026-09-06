@@ -9,9 +9,11 @@ export const revalidate = 300
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams
-  const requestedLat = Number(p.get('lat'))
-  const requestedLon = Number(p.get('lon'))
-  const hasLocalCenter = Number.isFinite(requestedLat) && Number.isFinite(requestedLon)
+  const rawLat = p.get('lat')
+  const rawLon = p.get('lon')
+  const requestedLat = rawLat === null ? Number.NaN : Number(rawLat)
+  const requestedLon = rawLon === null ? Number.NaN : Number(rawLon)
+  const hasLocalCenter = rawLat !== null && rawLon !== null && Number.isFinite(requestedLat) && Number.isFinite(requestedLon)
   const center = hasLocalCenter
     ? { lat: requestedLat, lon: requestedLon }
     : EARTH_SAUERLAND_REGION.origin
