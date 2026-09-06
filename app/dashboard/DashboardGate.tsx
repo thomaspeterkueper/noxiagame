@@ -2,7 +2,7 @@
 
 // DashboardGate.tsx
 // Aktualisiert: 06.09.2026 — Vollbild-Cockpit-Shell
-// Version:      0.5.4
+// Version:      0.5.5
 import React, { useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import DashboardClient from './DashboardClient'
@@ -11,6 +11,7 @@ import DashboardLocationDockManager from './DashboardLocationDockManager'
 import DashboardTopbarManager from './DashboardTopbarManager'
 import DashboardCockpit from './DashboardCockpit'
 import DashboardCockpitPolish from './DashboardCockpitPolish'
+import DashboardShipPanelPolish from './DashboardShipPanelPolish'
 import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
 import { T } from './ui'
@@ -41,6 +42,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardTopbarManager />
     <DashboardCockpit />
     <DashboardCockpitPolish />
+    <DashboardShipPanelPolish />
     <DashboardContextManager />
     <DashboardFeedOverlay />
   </>
