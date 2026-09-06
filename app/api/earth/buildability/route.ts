@@ -76,7 +76,10 @@ export async function GET(request: Request) {
       elevationSource.load(bounds, resolutionM),
       featureSource.load({ bounds, classes: FEATURE_CLASSES }),
     ])
-    const surface = buildEarthBuildabilitySurface(grid, EARTH_SAUERLAND_REGION, policy, features, restrictionPolicy)
+    const surface = buildEarthBuildabilitySurface(grid, EARTH_SAUERLAND_REGION, policy, {
+      features,
+      restrictionPolicy,
+    })
 
     return NextResponse.json({
       ok: true,
