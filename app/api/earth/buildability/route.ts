@@ -32,6 +32,11 @@ function parseRule(raw: string): [EarthFeatureClass, EarthFeatureRestrictionRule
   return [featureClass, { state, reason: decodeURIComponent(reasonRaw), bufferM }]
 }
 
+/**
+ * Renderer-neutral viewport endpoint. The caller must supply the selected
+ * building/world slope policy; the API deliberately has no hidden generic
+ * buildability thresholds. Optional usage rules are equally explicit inputs.
+ */
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams
