@@ -6,6 +6,8 @@ import {
   type TerrainRasterAdapter,
 } from './terrainRaster'
 
+async function main() {
+
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
 }
@@ -133,3 +135,9 @@ assert(sample!.sourceElevationM !== sample!.zM, 'source elevation and local Up m
 assert(sample!.verticalReference === dataset.verticalReference, 'vertical datum provenance must be preserved')
 
 console.log('terrain raster adapter tests passed')
+}
+
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
