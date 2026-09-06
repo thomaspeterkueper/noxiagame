@@ -1,6 +1,8 @@
 import { sha256Hex, StoredTerrainTileValidator, storeTerrainTile, type TerrainObjectStore } from './terrainStorage'
 import type { TerrainRasterTileManifest } from './terrainRaster'
 
+async function main() {
+
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
 }
@@ -62,3 +64,9 @@ try {
 assert(rejectedWrongManifestChecksum, 'upload must reject bytes that do not match manifest checksum')
 
 console.log('terrain storage checksum tests passed')
+}
+
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
