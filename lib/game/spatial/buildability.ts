@@ -33,18 +33,14 @@ function assertPolicy(policy: PhysicalBuildabilityPolicy) {
 
 /**
  * Physical terrain gate for one metric planning cell.
- *
- * This function deliberately contains no project-specific magic thresholds. The
- * caller supplies the canonical build policy for the selected build type/world.
- * Missing terrain is unresolved, water is invalid unless explicitly supported,
- * and slope only classifies a cell once a real terrain sample exists.
+ * Thresholds belong to the selected build policy/world and are never invented
+ * by the renderer. Missing terrain remains unresolved.
  */
 export function evaluatePhysicalBuildability(
   cell: PhysicalTerrainCell,
   policy: PhysicalBuildabilityPolicy,
 ): PhysicalBuildabilityResult {
   assertPolicy(policy)
-
   const base = {
     xM: cell.xM,
     yM: cell.yM,
@@ -56,46 +52,18 @@ export function evaluatePhysicalBuildability(
   }
 
   if (!cell.terrainResolved || cell.elevationM == null || cell.slopeDeg == null) {
-    return {
-      ...base,
-      buildability: 'unresolved',
-      state: 'unresolved',
-      buildabilityReason: 'terrain-unresolved',
-    }
+    return { ...base, buildability: 'unresolved', state: 'unresolved', buildabilityReason: 'terrain-unresolved' }
   }
-
   if (cell.isWater && !policy.waterIsBuildable) {
-    return {
-      ...base,
-      buildability: 'invalid',
-      state: 'invalid',
-      buildabilityReason: 'water',
-    }
+    return { ...base, buildability: 'invalid', state: 'invalid', buildabilityReason: 'water' }
   }
-
   if (cell.slopeDeg > policy.maxRestrictedSlopeDeg) {
-    return {
-      ...base,
-      buildability: 'invalid',
-      state: 'invalid',
-      buildabilityReason: 'slope-too-steep',
-    }
+    return { ...base, buildability: 'invalid', state: 'invalid', buildabilityReason: 'slope-too-steep' }
   }
-
   if (cell.slopeDeg > policy.maxBuildableSlopeDeg) {
-    return {
-      ...base,
-      buildability: 'restricted',
-      state: 'restricted',
-      buildabilityReason: 'slope-requires-mitigation',
-    }
+    return { ...base, buildability: 'restricted', state: 'restricted', buildabilityReason: 'slope-requires-mitigation' }
   }
-
-  return {
-    ...base,
-    buildability: 'buildable',
-    state: 'buildable',
-  }
+  return { ...base, buildability: 'buildable', state: 'buildable' }
 }
 
 export interface UsageRestriction {
@@ -105,23 +73,23 @@ export interface UsageRestriction {
 }
 
 /**
- * Adds non-terrain restrictions after the physical gate. Physical invalid or
- * unresolved states always win; usage/infrastructure rules may only downgrade a
- * physically buildable cell.
+ * Applies infrastructure/land-use constraints after the physical gate.
+ * Physical invalid/unresolved always wins. A physical restriction also stays
+ * restricted unless a later rule makes it fully invalid.
  */
 export function applyUsageRestrictions(
   physical: PhysicalBuildabilityResult,
   restrictions: readonly UsageRestriction[],
 ): PhysicalBuildabilityResult {
-  if (physical.state === 'invalid' || physical.state === 'unresolved') return physical
-  if (restrictions.length === 0) return physical
+  if (physical.state === 'invalid' || physical.state === 'unresolved' || restrictions.length === 0) return physical
 
   const invalid = restrictions.find(item => item.state === 'invalid')
-  const chosen = invalid ?? restrictions[0]
-  return {
-    ...physical,
-    buildability: chosen.state,
-    state: chosen.state,
-    buildabilityReason: chosen.reason,
+  if (invalid) {
+    return { ...physical, buildability: 'invalid', state: 'invalid', buildabilityReason: invalid.reason }
   }
+
+  if (physical.state === 'restricted') return physical
+  const restricted = restrictions.find(item => item.state === 'restricted')
+  if (!restricted) return physical
+  return { ...physical, buildability: 'restricted', state: 'restricted', buildabilityReason: restricted.reason }
 }
