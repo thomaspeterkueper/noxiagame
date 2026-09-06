@@ -242,11 +242,17 @@ const cockpitStyles = `
     width: min(780px, calc(100vw - 24px)) !important;
     max-width: 780px !important;
     padding: .55rem !important;
+    flex-direction: column !important;
   }
-  .noxia-location-dock-managed.noxia-cockpit-panel-active > div:last-child {
+  .noxia-location-dock-managed.noxia-cockpit-panel-active > div:last-child,
+  .noxia-location-dock-managed.noxia-location-dock-collapsed.noxia-cockpit-panel-active > div:not(.noxia-location-dock-toolbar):last-of-type {
     display: flex !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
+  }
+  .noxia-location-dock-managed.noxia-location-dock-collapsed.noxia-cockpit-panel-active > div:first-child {
+    margin: 0 0 .28rem .15rem !important;
+    padding-right: 0 !important;
   }
   .noxia-location-dock-managed.noxia-cockpit-panel-active .noxia-location-dock-toolbar {
     display: none !important;
