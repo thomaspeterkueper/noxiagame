@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#173a63"/><stop offset="1" stop-color="#0d223d"/>
+    </linearGradient>
+    <linearGradient id="pad" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#c8c3b7"/><stop offset="1" stop-color="#aaa497"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#shadow)" transform="translate(36 82)">
+    <path d="M65 460 340 590 645 430 366 300Z" fill="url(#pad)" stroke="#6f6a60" stroke-width="4"/>
+    <g stroke="#7b8da4" stroke-width="4" fill="url(#panel)">
+      <path d="M115 370 260 305 326 339 180 405Z"/>
+      <path d="M210 420 355 355 421 389 275 455Z"/>
+      <path d="M305 470 450 405 516 439 370 505Z"/>
+      <path d="M335 330 480 265 546 299 400 365Z"/>
+    </g>
+    <g stroke="#aeb9c6" stroke-width="2" opacity=".72">
+      <path d="M143 357 289 324M170 391 315 326M238 407 383 372M333 457 478 422M363 317 508 282"/>
+      <path d="M155 352 220 387M250 394 315 430M345 442 410 478M375 302 440 337"/>
+    </g>
+    <g fill="#d5a62f" stroke="#7c641c" stroke-width="3">
+      <rect x="90" y="425" width="24" height="38" rx="3"/>
+      <rect x="535" y="350" width="24" height="38" rx="3"/>
+      <rect x="505" y="485" width="24" height="38" rx="3"/>
+    </g>
+    <g>
+      <path d="M410 250 520 200 595 238 485 289Z" fill="#dfe2df" stroke="#5c666b" stroke-width="5"/>
+      <path d="M410 250 485 289 485 385 410 347Z" fill="#cbd0ce" stroke="#5c666b" stroke-width="5"/>
+      <path d="M485 289 595 238 595 333 485 385Z" fill="#aeb7b8" stroke="#5c666b" stroke-width="5"/>
+      <path d="M435 286 470 302 470 342 435 326Z" fill="#233746"/>
+      <path d="M505 298 565 270 565 300 505 327Z" fill="#41566b"/>
+      <path d="M516 188 548 174 574 187 542 202Z" fill="#778389"/>
+      <path d="M532 166 539 163 539 186 532 189Z" fill="#5b666b"/>
+    </g>
+  </g>
+</svg>
