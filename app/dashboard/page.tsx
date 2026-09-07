@@ -134,9 +134,9 @@ export default async function Dashboard() {
           display: none !important;
         }
 
-        /* Dashboard embedding contract for the current Earth surface.
-           Keep the document-style title hidden, but expose the actual Earth
-           build selector as a compact cockpit control. */
+        /* Earth is a full cockpit surface. Building controls now belong to the
+           selected-site panel inside the map, so no host-level build selector
+           is exposed here. */
         .noxia-dashboard-shell .earth-shell {
           position: relative !important;
           width: 100% !important;
@@ -147,58 +147,9 @@ export default async function Dashboard() {
           overflow: hidden !important;
           background: #07111b !important;
         }
+        .noxia-dashboard-shell .earth-head,
         .noxia-dashboard-shell .earth-foot {
           display: none !important;
-        }
-        .noxia-dashboard-shell .earth-head {
-          display: flex !important;
-          position: absolute !important;
-          z-index: 14 !important;
-          left: 50% !important;
-          bottom: 74px !important;
-          transform: translateX(-50%) !important;
-          width: auto !important;
-          max-width: calc(100% - 24px) !important;
-          margin: 0 !important;
-          align-items: center !important;
-          pointer-events: none !important;
-        }
-        .noxia-dashboard-shell .earth-head > div:first-child,
-        .noxia-dashboard-shell .earth-head .earth-stats,
-        .noxia-dashboard-shell .earth-head .earth-actions > button:first-child {
-          display: none !important;
-        }
-        .noxia-dashboard-shell .earth-head .earth-actions {
-          display: flex !important;
-          align-items: center !important;
-          flex-wrap: nowrap !important;
-          gap: 6px !important;
-          pointer-events: auto !important;
-          padding: 6px !important;
-          border: 1px solid rgba(65,116,137,.72) !important;
-          border-radius: 9px !important;
-          background: rgba(7,24,35,.92) !important;
-          box-shadow: 0 8px 24px rgba(0,0,0,.32) !important;
-          backdrop-filter: blur(10px) !important;
-        }
-        .noxia-dashboard-shell .earth-head .earth-actions select,
-        .noxia-dashboard-shell .earth-head .earth-actions button {
-          min-height: 32px !important;
-          border: 1px solid rgba(73,139,166,.72) !important;
-          border-radius: 6px !important;
-          background: #0b2635 !important;
-          color: #e2edf0 !important;
-          font-size: 11px !important;
-          font-weight: 750 !important;
-          padding: 6px 10px !important;
-        }
-        .noxia-dashboard-shell .earth-head .earth-actions select {
-          min-width: 230px !important;
-          max-width: min(420px, 62vw) !important;
-        }
-        .noxia-dashboard-shell .earth-head .earth-actions button {
-          cursor: pointer !important;
-          color: #e2c56d !important;
         }
         .noxia-dashboard-shell .earth-map {
           width: 100% !important;
@@ -273,14 +224,6 @@ export default async function Dashboard() {
           }
           .noxia-dashboard-shell > div:first-of-type > header h1 span {
             display: none !important;
-          }
-          .noxia-dashboard-shell .earth-head {
-            bottom: 68px !important;
-            max-width: calc(100% - 12px) !important;
-          }
-          .noxia-dashboard-shell .earth-head .earth-actions select {
-            min-width: 180px !important;
-            max-width: 66vw !important;
           }
         }
       `}</style>
