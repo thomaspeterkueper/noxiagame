@@ -1,5 +1,12 @@
 import type { EarthFeatureClass, EarthFeatureQuery, EarthFeatureSource, ImportedEarthFeature } from './earthFeatureSource'
 
+type OverpassMember = {
+  type: 'node' | 'way' | 'relation'
+  ref: number
+  role?: string
+  geometry?: { lat: number; lon: number }[]
+}
+
 type OverpassElement = {
   type: 'node' | 'way' | 'relation'
   id: number
@@ -7,10 +14,12 @@ type OverpassElement = {
   lon?: number
   center?: { lat: number; lon: number }
   geometry?: { lat: number; lon: number }[]
+  members?: OverpassMember[]
   tags?: Record<string, string>
 }
 
 type OverpassResponse = { elements?: OverpassElement[] }
+type GeoPoint = { lat: number; lon: number }
 
 const ENDPOINT = 'https://overpass-api.de/api/interpreter'
 
@@ -46,31 +55,127 @@ function classify(tags: Record<string, string> = {}): EarthFeatureClass | null {
   return null
 }
 
-function toFeature(el: OverpassElement): ImportedEarthFeature | null {
-  const featureClass = classify(el.tags)
-  if (!featureClass) return null
-  const provider = 'OpenStreetMap / Overpass'
-  const source = { provider, dataset: 'OpenStreetMap current', sourceId: `${el.type}/${el.id}`, license: 'ODbL-1.0' }
-  const base = {
-    id: `osm:${el.type}:${el.id}`,
+function samePoint(a: GeoPoint, b: GeoPoint) {
+  return Math.abs(a.lat - b.lat) < 1e-8 && Math.abs(a.lon - b.lon) < 1e-8
+}
+
+function isClosed(points: GeoPoint[]) {
+  return points.length > 3 && samePoint(points[0], points[points.length - 1])
+}
+
+/**
+ * Overpass multipolygon relations expose geometry on their member ways rather
+ * than as a single relation.geometry array. Stitch outer member fragments into
+ * closed rings so large forests, farmland, urban areas and water bodies are not
+ * silently dropped by the bootstrap renderer.
+ */
+function stitchOuterRings(members: OverpassMember[]): GeoPoint[][] {
+  const pending = members
+    .filter(member => (member.role ?? 'outer') === 'outer' && (member.geometry?.length ?? 0) >= 2)
+    .map(member => member.geometry!.map(point => ({ lat: point.lat, lon: point.lon })))
+  const rings: GeoPoint[][] = []
+
+  while (pending.length) {
+    let ring = pending.shift()!
+    let progressed = true
+
+    while (!isClosed(ring) && progressed && pending.length) {
+      progressed = false
+      const first = ring[0]
+      const last = ring[ring.length - 1]
+
+      for (let i = 0; i < pending.length; i++) {
+        const candidate = pending[i]
+        const candidateFirst = candidate[0]
+        const candidateLast = candidate[candidate.length - 1]
+
+        if (samePoint(last, candidateFirst)) {
+          ring = [...ring, ...candidate.slice(1)]
+        } else if (samePoint(last, candidateLast)) {
+          ring = [...ring, ...candidate.slice(0, -1).reverse()]
+        } else if (samePoint(first, candidateLast)) {
+          ring = [...candidate.slice(0, -1), ...ring]
+        } else if (samePoint(first, candidateFirst)) {
+          ring = [...candidate.slice(1).reverse(), ...ring]
+        } else {
+          continue
+        }
+
+        pending.splice(i, 1)
+        progressed = true
+        break
+      }
+    }
+
+    if (isClosed(ring)) rings.push(ring)
+  }
+
+  return rings
+}
+
+function baseFor(el: OverpassElement, featureClass: EarthFeatureClass, sourceId = `${el.type}/${el.id}`) {
+  return {
     worldId: 'earth' as const,
     featureType: featureClass,
     properties: { ...el.tags, featureClass },
-    source,
+    source: {
+      provider: 'OpenStreetMap / Overpass',
+      dataset: 'OpenStreetMap current',
+      sourceId,
+      license: 'ODbL-1.0',
+    },
   }
+}
+
+function toFeatures(el: OverpassElement): ImportedEarthFeature[] {
+  const featureClass = classify(el.tags)
+  if (!featureClass) return []
+
+  const base = baseFor(el, featureClass)
   if (el.type === 'node' && Number.isFinite(el.lat) && Number.isFinite(el.lon)) {
-    return { ...base, geometryKind: 'point', geometry: { kind: 'point', coordinates: { lat: el.lat!, lon: el.lon! } } }
+    return [{
+      ...base,
+      id: `osm:${el.type}:${el.id}`,
+      geometryKind: 'point',
+      geometry: { kind: 'point', coordinates: { lat: el.lat!, lon: el.lon! } },
+    }]
   }
+
+  const polygonClasses: EarthFeatureClass[] = ['water','forest','farmland','urban','building','industrial','public']
+  if (el.type === 'relation' && polygonClasses.includes(featureClass) && el.members?.length) {
+    const rings = stitchOuterRings(el.members)
+    if (rings.length) {
+      return rings.map((coordinates, index) => ({
+        ...baseFor(el, featureClass, `relation/${el.id}#outer-${index + 1}`),
+        id: `osm:relation:${el.id}:outer:${index + 1}`,
+        properties: { ...base.properties, relationRole: 'outer', relationId: String(el.id) },
+        geometryKind: 'polygon',
+        geometry: { kind: 'polygon', coordinates },
+      }))
+    }
+  }
+
   const geometry = el.geometry ?? []
   if (geometry.length < 2) {
-    if (el.center) return { ...base, geometryKind: 'point', geometry: { kind: 'point', coordinates: el.center } }
-    return null
+    if (el.center) return [{
+      ...base,
+      id: `osm:${el.type}:${el.id}`,
+      geometryKind: 'point',
+      geometry: { kind: 'point', coordinates: el.center },
+    }]
+    return []
   }
-  const coords = geometry.map(p => ({ lat: p.lat, lon: p.lon }))
-  const closed = coords.length > 3 && coords[0].lat === coords[coords.length - 1].lat && coords[0].lon === coords[coords.length - 1].lon
-  const polygonClasses: EarthFeatureClass[] = ['water','forest','farmland','urban','building','industrial','public']
-  const polygon = closed && polygonClasses.includes(featureClass)
-  return { ...base, geometryKind: polygon ? 'polygon' : 'line', geometry: polygon ? { kind: 'polygon', coordinates: coords } : { kind: 'line', coordinates: coords } }
+
+  const coords = geometry.map(point => ({ lat: point.lat, lon: point.lon }))
+  const polygon = isClosed(coords) && polygonClasses.includes(featureClass)
+  return [{
+    ...base,
+    id: `osm:${el.type}:${el.id}`,
+    geometryKind: polygon ? 'polygon' : 'line',
+    geometry: polygon
+      ? { kind: 'polygon', coordinates: coords }
+      : { kind: 'line', coordinates: coords },
+  }]
 }
 
 export class OverpassEarthFeatureSource implements EarthFeatureSource {
@@ -86,6 +191,6 @@ export class OverpassEarthFeatureSource implements EarthFeatureSource {
     })
     if (!response.ok) throw new Error(`Overpass ${response.status}`)
     const payload = await response.json() as OverpassResponse
-    return (payload.elements ?? []).map(toFeature).filter((f): f is ImportedEarthFeature => Boolean(f))
+    return (payload.elements ?? []).flatMap(toFeatures)
   }
 }
