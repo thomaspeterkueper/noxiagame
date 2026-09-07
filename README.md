@@ -1,5 +1,9 @@
 # NOXIA
 
+## Cross-Repository-Hinweis
+
+Vor der Vergabe einer neuen `OTA-*`- oder `ENG-*`-Signatur (z. B. in `external-tasks/`-Requests an OTA/Engineering) bitte **[`ota-signature-index.json` im `kueper-ecosystem`-Repository](https://github.com/thomaspeterkueper/kueper-ecosystem/blob/main/registry/ota-signature-index.json)** konsultieren ([`ECO-ARC-0032`](https://github.com/thomaspeterkueper/kueper-ecosystem/blob/main/decisions/ECO-ARC-0032-2026-DE.md)). Wiederholte unabhängige Kollisionen bei OTA-TEC-Signaturen (u. a. `0035`–`0037`, `0088`–`0097`) haben gezeigt, dass Stichproben-Suche allein nicht ausreicht. Der Google-Drive-Anteil des `overtime-archive`-Bestands ist dort noch nicht automatisiert erfasst — bei Zweifel zusätzlich den Drive-Ordner direkt prüfen.
+
 NOXIA ist eine Wissens-, Zivilisations- und Gesellschaftssimulation im realen Sonnensystem. Spieler versorgen Kolonien, bauen Infrastruktur, handeln, lernen und erleben dieselbe Simulation sowohl strategisch als auch aus persönlicher Perspektive.
 
 ## Architekturprinzipien
