@@ -136,9 +136,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `${def.name} kann hier nicht gebaut werden.` }, { status: 400 })
   }
 
-  const knowledge = await getNoxiaKnowledgeState(user.id)
-  const gate = getBuildRequirements(buildableId, { completedModules: knowledge.completedModules, unlocked: knowledge.unlocked })
-  if (!gate.ok) return NextResponse.json({ error: `Wissen fehlt: ${gate.requiredUnlock}`, requiredUnlock: gate.requiredUnlock }, { status: 403 })
+  // Earth is currently the spatial-placement playtest. Geometry, collision,
+  // persistence and rendering must remain testable independently from the
+  // curriculum/SSF unlock chain. Other locations keep the canonical gate.
+  if (locationSlug !== 'earth') {
+    const knowledge = await getNoxiaKnowledgeState(user.id)
+    const gate = getBuildRequirements(buildableId, { completedModules: knowledge.completedModules, unlocked: knowledge.unlocked })
+    if (!gate.ok) return NextResponse.json({ error: `Wissen fehlt: ${gate.requiredUnlock}`, requiredUnlock: gate.requiredUnlock }, { status: 403 })
+  }
 
   const { data: location } = await serviceClient.from('locations').select('id,slug').eq('slug', locationSlug).single()
   if (!location) return NextResponse.json({ error: 'Standort nicht gefunden' }, { status: 404 })
