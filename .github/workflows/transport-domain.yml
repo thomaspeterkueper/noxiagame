@@ -1,0 +1,40 @@
+name: Transport domain
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/logisticsNodes.ts'
+      - 'lib/game/logisticsNodes.test.ts'
+      - 'lib/game/landingCapacity.ts'
+      - 'lib/game/landingCapacity.test.ts'
+      - 'lib/game/transportDomains.ts'
+      - 'lib/game/transportDomains.test.ts'
+      - 'lib/game/ships.ts'
+      - 'lib/game/buildingExpansions.ts'
+      - 'package.json'
+      - '.github/workflows/transport-domain.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/logisticsNodes.ts'
+      - 'lib/game/logisticsNodes.test.ts'
+      - 'lib/game/landingCapacity.ts'
+      - 'lib/game/landingCapacity.test.ts'
+      - 'lib/game/transportDomains.ts'
+      - 'lib/game/transportDomains.test.ts'
+      - 'lib/game/ships.ts'
+      - 'lib/game/buildingExpansions.ts'
+      - 'package.json'
+      - '.github/workflows/transport-domain.yml'
+
+jobs:
+  transport-domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run test:transport
