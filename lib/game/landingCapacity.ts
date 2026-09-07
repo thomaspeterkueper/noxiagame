@@ -1,10 +1,12 @@
 // lib/game/landingCapacity.ts
-// Pure NOXIA gameplay-domain model for physical landing-pad capacity.
+// Pure NOXIA gameplay-domain model for planetary shuttle-pad capacity.
 //
-// No rendering, no assets and no persistence writes live here. The caller
-// projects existing tile_entities / expansion state into this model.
+// Planetary Raumhäfen are surface-transfer hubs. Their pads are for transfer
+// shuttles (e.g. ASCE), never for intersolar ships. No rendering, assets or
+// persistence writes live here; callers project persisted infrastructure.
 
 import type { BuildingExpansionInstance } from './buildingExpansions'
+import { mayUsePlanetarySurfacePort, type VesselOperatingDomain } from './transportDomains'
 
 export const EXTRA_LANDING_PAD_EXPANSION_ID = 'landing_pad_extra_pad'
 
@@ -32,9 +34,9 @@ export interface LandingCapacityInput {
   expansions: BuildingExpansionInstance[]
   /**
    * Occupancy is deliberately optional. The current ships.location model tells
-   * us which location a ship belongs to, but not which concrete pad it occupies.
-   * Until that attribution exists, capacity can be projected but not safely
-   * enforced against arrivals.
+   * us which logistics domain a craft belongs to, but not which concrete shuttle
+   * pad it occupies. Until that attribution exists, capacity can be projected but
+   * not safely enforced against shuttle arrivals.
    */
   occupiedPadEntityIds?: string[] | null
 }
@@ -44,11 +46,15 @@ function operational(condition?: number | null): boolean {
 }
 
 /**
- * Derives physical pad capacity from persisted infrastructure.
+ * Derives physical transfer-shuttle pad capacity from persisted infrastructure.
  *
  * Base landing_pad entities contribute one pad each when active and operable.
  * Every active landing_pad_extra_pad child contributes one additional pad.
  * A merely planned or currently-building expansion contributes nothing.
+ *
+ * This state is not intersolar docking capacity. Intersolar vessels terminate at
+ * orbital interfaces / transfer stations and therefore never consume a planetary
+ * Raumhafen pad.
  */
 export function deriveLandingCapacity(input: LandingCapacityInput): LandingCapacityState {
   const activeBasePads = input.basePads.filter(
@@ -88,14 +94,25 @@ export function deriveLandingCapacity(input: LandingCapacityInput): LandingCapac
     occupancyKnown,
     occupiedPads,
     availablePads,
-    // Physical capacity must not reject arrivals until ship→pad attribution is
-    // persistent. Counting every ship at a location as a pad occupant would
-    // silently break the existing multiplayer/world model.
+    // Physical capacity must not reject shuttle arrivals until craft→pad
+    // attribution is persistent. Counting every craft in the location domain as
+    // a pad occupant would silently break the multiplayer/world model.
     enforceable: occupancyKnown,
   }
 }
 
-export function hasLandingCapacityForArrival(state: LandingCapacityState): boolean | null {
+/**
+ * Arrival guard for a planetary surface port.
+ *
+ * Existing callers may omit `vesselDomain`; that compatibility path represents a
+ * surface-transfer-shuttle arrival. An explicit intersolar vessel is always
+ * rejected from the surface port, independently of free pad count.
+ */
+export function hasLandingCapacityForArrival(
+  state: LandingCapacityState,
+  vesselDomain: VesselOperatingDomain = 'surface-transfer-shuttle',
+): boolean | null {
+  if (!mayUsePlanetarySurfacePort(vesselDomain)) return false
   if (!state.enforceable || state.availablePads == null) return null
   return state.availablePads > 0
 }
