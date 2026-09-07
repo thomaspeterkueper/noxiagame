@@ -1,38 +1,50 @@
 // lib/game/seeds/tharsisHubResilience.ts
 // Erstellt: 02.09.2026
-// OTA-Freigabe 2026-09-01: Safe Haven + ECLSS 2-von-3 für Tharsis Hub.
+// OTA-Klärung 2026-09-06: Safe Haven = temporäre Überbelegung der fünf
+// verbleibenden Habitatcluster; kein separater 84-Plätze-Reservepool.
 
-import { THARSIS_HUB_BUILDINGS, THARSIS_HUB_POPULATION } from './tharsisHubSeed'
+import {
+  HABITAT_CLUSTER_CAPACITY,
+  THARSIS_HUB_BUILDINGS,
+  THARSIS_HUB_POPULATION,
+} from './tharsisHubSeed'
 
 export interface SafeHavenNode {
   id: string
-  kind: 'habitat_cluster' | 'emergency_annex'
-  evacuationCapacity: number
+  kind: 'habitat_cluster'
+  nominalCapacity: number
+  temporaryEmergencyCapacity: number
 }
 
 /**
- * Evakuierungskapazität ist ausdrücklich keine permanente Wohnkapazität.
- * 6 Habitatcluster besitzen lokale Storm-Shelter-Funktion; der Medical Annex
- * ergänzt als unabhängige Mehrzweck-/Notfallreserve.
+ * Jeder der sechs Habitatcluster besitzt lokale Safe-Haven-/Storm-Shelter-
+ * Funktion. Fällt ein Cluster vollständig aus, werden seine Bewohner auf die
+ * fünf verbleibenden Cluster verteilt. Diese dürfen dafür vorübergehend auf
+ * 100 Personen je Cluster überbelegt werden.
  *
- * 7 × 14 = 98 Plätze; bei Verlust eines beliebigen Habitatclusters verbleiben
- * exakt 84 Plätze außerhalb des ausgefallenen Clusters.
+ * Das ist ausdrücklich KEINE zusätzliche dauerhafte Wohn- oder Annex-Reserve:
+ * nominal bleiben es 6 × 84 = 504 Plätze; im Einzelausfall stehen in den fünf
+ * verbleibenden Clustern temporär 5 × 100 = 500 Plätze zur Verfügung.
  */
-export const THARSIS_SAFE_HAVEN_NODES: SafeHavenNode[] = [
-  ...Array.from({ length: 6 }, (_, index) => ({
+export const THARSIS_SAFE_HAVEN_NODES: SafeHavenNode[] = Array.from(
+  { length: 6 },
+  (_, index) => ({
     id: `habitat_cluster_${index + 1}`,
     kind: 'habitat_cluster' as const,
-    evacuationCapacity: 14,
-  })),
-  { id: 'medical_annex', kind: 'emergency_annex', evacuationCapacity: 14 },
-]
+    nominalCapacity: HABITAT_CLUSTER_CAPACITY,
+    temporaryEmergencyCapacity: 100,
+  }),
+)
 
-export const THARSIS_REQUIRED_EVACUATION_CAPACITY = 84
+export const THARSIS_REQUIRED_SURVIVING_CLUSTER_COUNT = 5
+export const THARSIS_TEMPORARY_CAPACITY_PER_SURVIVING_CLUSTER = 100
+export const THARSIS_REQUIRED_EVACUATION_CAPACITY =
+  THARSIS_REQUIRED_SURVIVING_CLUSTER_COUNT * THARSIS_TEMPORARY_CAPACITY_PER_SURVIVING_CLUSTER
 
 export function availableEvacuationCapacity(failedNodeId?: string): number {
   return THARSIS_SAFE_HAVEN_NODES
     .filter(node => node.id !== failedNodeId)
-    .reduce((sum, node) => sum + node.evacuationCapacity, 0)
+    .reduce((sum, node) => sum + node.temporaryEmergencyCapacity, 0)
 }
 
 export interface EclssRegionalNode {
@@ -71,25 +83,39 @@ export function validateTharsisLifeSupportResilience(): TharsisResilienceIssue[]
   const issues: TharsisResilienceIssue[] = []
   const buildingIds = new Set(THARSIS_HUB_BUILDINGS.map(building => building.id))
 
-  for (const node of THARSIS_SAFE_HAVEN_NODES) {
-    if (!buildingIds.has(node.id)) {
-      issues.push({ message: `Safe-Haven-Knoten '${node.id}' existiert nicht im Start-Seed` })
-    }
-    if (node.evacuationCapacity <= 0) {
-      issues.push({ message: `Safe-Haven-Knoten '${node.id}' besitzt keine Evakuierungskapazität` })
-    }
-  }
-
-  const habitatNodes = THARSIS_SAFE_HAVEN_NODES.filter(node => node.kind === 'habitat_cluster')
+  const habitatNodes = THARSIS_SAFE_HAVEN_NODES
   if (habitatNodes.length !== 6) {
     issues.push({ message: `Lokale Habitat-Safe-Havens: ${habitatNodes.length} statt 6` })
   }
 
-  for (const habitat of habitatNodes) {
-    const remaining = availableEvacuationCapacity(habitat.id)
+  for (const node of habitatNodes) {
+    if (!buildingIds.has(node.id)) {
+      issues.push({ message: `Safe-Haven-Habitat '${node.id}' existiert nicht im Start-Seed` })
+    }
+    if (node.nominalCapacity !== HABITAT_CLUSTER_CAPACITY) {
+      issues.push({ message: `${node.id}: nominal ${node.nominalCapacity} statt ${HABITAT_CLUSTER_CAPACITY} Plätze` })
+    }
+    if (node.temporaryEmergencyCapacity !== THARSIS_TEMPORARY_CAPACITY_PER_SURVIVING_CLUSTER) {
+      issues.push({
+        message: `${node.id}: temporär ${node.temporaryEmergencyCapacity} statt ${THARSIS_TEMPORARY_CAPACITY_PER_SURVIVING_CLUSTER} Plätze`,
+      })
+    }
+
+    const remainingNodes = habitatNodes.filter(candidate => candidate.id !== node.id)
+    if (remainingNodes.length !== THARSIS_REQUIRED_SURVIVING_CLUSTER_COUNT) {
+      issues.push({
+        message: `Ausfall ${node.id}: ${remainingNodes.length} verbleibende Cluster statt ${THARSIS_REQUIRED_SURVIVING_CLUSTER_COUNT}`,
+      })
+    }
+    const remaining = availableEvacuationCapacity(node.id)
     if (remaining < THARSIS_REQUIRED_EVACUATION_CAPACITY) {
       issues.push({
-        message: `Ausfall ${habitat.id}: nur ${remaining} Evakuierungsplätze statt mindestens ${THARSIS_REQUIRED_EVACUATION_CAPACITY}`,
+        message: `Ausfall ${node.id}: nur ${remaining} temporäre Plätze statt mindestens ${THARSIS_REQUIRED_EVACUATION_CAPACITY}`,
+      })
+    }
+    if (remaining < THARSIS_HUB_POPULATION) {
+      issues.push({
+        message: `Ausfall ${node.id}: temporäre Safe-Haven-Kapazität ${remaining} reicht nicht für ${THARSIS_HUB_POPULATION} Bewohner`,
       })
     }
   }
