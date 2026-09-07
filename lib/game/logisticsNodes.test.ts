@@ -3,6 +3,7 @@ import {
   LOGISTICS_NODES,
   getLogisticsNodeSemantics,
   requiresSeparateSurfaceLeg,
+  usesTransferShuttleToSurface,
   type CanonicalLogisticsNodeId,
 } from './logisticsNodes'
 
@@ -20,19 +21,29 @@ assert.equal(LOGISTICS_NODES.earth.domainMeaning, 'aggregated-logistics-domain')
 assert.equal(LOGISTICS_NODES.earth.transferEndpoint, 'orbital-interface')
 assert.equal(LOGISTICS_NODES.earth.surfaceLegSeparate, true)
 
-for (const id of ['moon', 'mars'] as const) {
-  assert.equal(LOGISTICS_NODES[id].domainMeaning, 'surface-domain')
+for (const id of ['earth', 'moon', 'mars'] as const) {
   assert.equal(LOGISTICS_NODES[id].transferEndpoint, 'orbital-interface')
   assert.equal(LOGISTICS_NODES[id].surfaceLegSeparate, true)
+  assert.equal(LOGISTICS_NODES[id].surfaceAccessMode, 'transfer-shuttle')
+  assert.equal(LOGISTICS_NODES[id].surfacePortRole, 'shuttle-port')
+  assert.equal(usesTransferShuttleToSurface(id), true)
+}
+
+for (const id of ['moon', 'mars'] as const) {
+  assert.equal(LOGISTICS_NODES[id].domainMeaning, 'surface-domain')
 }
 
 for (const id of ['phobos', 'prometheus'] as const) {
   assert.equal(LOGISTICS_NODES[id].domainMeaning, 'orbital-station')
   assert.equal(LOGISTICS_NODES[id].transferEndpoint, 'node-itself')
   assert.equal(LOGISTICS_NODES[id].surfaceLegSeparate, false)
+  assert.equal(LOGISTICS_NODES[id].surfaceAccessMode, 'none')
+  assert.equal(LOGISTICS_NODES[id].surfacePortRole, null)
+  assert.equal(usesTransferShuttleToSurface(id), false)
 }
 
 assert.equal(getLogisticsNodeSemantics('unknown'), null)
 assert.equal(requiresSeparateSurfaceLeg('unknown'), false)
+assert.equal(usesTransferShuttleToSurface('unknown'), false)
 
 console.log('Logistics-node semantics: OK')
