@@ -34,6 +34,24 @@ export const SURFACE_TRANSFER_CRAFT: Readonly<Record<string, TransferCraftSemant
 }
 
 /**
+ * Compatibility classification for the current `SHIP_FRAMES` inter-node fleet.
+ * These hulls perform intersolar/inter-node transport and are not planetary
+ * landers. New frames must be classified explicitly rather than inheriting a
+ * permissive default.
+ */
+export const INTERSOLAR_SHIP_FRAME_IDS = new Set<string>([
+  'mk1',
+  'fast',
+  'heavy',
+  'scout',
+  'pioneer',
+])
+
+export function shipFrameOperatingDomain(frameId: string): VesselOperatingDomain | null {
+  return INTERSOLAR_SHIP_FRAME_IDS.has(frameId) ? 'intersolar' : null
+}
+
+/**
  * Surface infrastructure belonging to the planetary shuttle-port system.
  * `spaceport_core`, service and storage support the port; only pad-bearing
  * components contribute physical landing capacity.
@@ -57,4 +75,9 @@ export function mayUsePlanetarySurfacePort(domain: VesselOperatingDomain): boole
 
 export function mayPerformIntersolarLeg(domain: VesselOperatingDomain): boolean {
   return domain === 'intersolar'
+}
+
+export function shipFrameMayUsePlanetarySurfacePort(frameId: string): boolean {
+  const domain = shipFrameOperatingDomain(frameId)
+  return domain != null && mayUsePlanetarySurfacePort(domain)
 }
