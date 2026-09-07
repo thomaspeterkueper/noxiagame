@@ -19,6 +19,8 @@ type StartBody = {
   rotationDeg?: number
 }
 
+type KnowledgeState = Awaited<ReturnType<typeof getNoxiaKnowledgeState>>
+
 async function getUser(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (!auth?.startsWith('Bearer ')) return null
@@ -53,6 +55,18 @@ async function definition(id: string) {
   }
 }
 
+function buildRequirement(buildableId: string, locationSlug: string, knowledge: KnowledgeState) {
+  // `habitat` is the generic early-game building. Its historical knowledge
+  // mapping points at the Mars-habitat curriculum and must not gate Earth.
+  if (locationSlug === 'earth' && buildableId === 'habitat') {
+    return { id: null, ok: true, requiredUnlock: null, requiredLabel: null }
+  }
+  return getBuildRequirements(buildableId, {
+    completedModules: knowledge.completedModules,
+    unlocked: knowledge.unlocked,
+  })
+}
+
 function terrainResolution(frame: any, dataset: any) {
   if (!frame || frame.origin_status !== 'verified' || frame.origin_lat_deg == null || frame.origin_lon_deg == null || frame.origin_alt_m == null) {
     return { status: 'origin_pending' as const, zM: null }
@@ -78,21 +92,34 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
   if (!location) return NextResponse.json({ error: 'Standort nicht gefunden' }, { status: 404 })
 
-  const [{ data: frame }, { data: sites }, { data: entities }, { data: builds }, { data: terrainDatasets }] = await Promise.all([
-    serviceClient.from('world_frames').select('*').eq('location_id', location.id).maybeSingle(),
-    serviceClient.from('build_sites').select('*').eq('location_id', location.id).order('created_at'),
-    serviceClient.from('tile_entities')
-      .select('id,entity_id,entity_type,profile_id,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,status,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
-      .eq('location_id', location.id)
-      .in('entity_type', ['building','module']),
-    serviceClient.from('player_builds')
-      .select('id,buildable_id,target_type,status,completes_at,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
-      .eq('profile_id', user.id)
-      .eq('location_id', location.id)
-      .eq('target_type', 'building')
-      .eq('status', 'building'),
-    serviceClient.from('terrain_datasets').select('*').eq('location_id', location.id).order('resolution_m', { ascending: true }),
+  const [knowledge, spatialData] = await Promise.all([
+    getNoxiaKnowledgeState(user.id),
+    Promise.all([
+      serviceClient.from('profiles').select('credits').eq('id', user.id).maybeSingle(),
+      serviceClient.from('world_frames').select('*').eq('location_id', location.id).maybeSingle(),
+      serviceClient.from('build_sites').select('*').eq('location_id', location.id).order('created_at'),
+      serviceClient.from('tile_entities')
+        .select('id,entity_id,entity_type,profile_id,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,status,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
+        .eq('location_id', location.id)
+        .in('entity_type', ['building','module']),
+      serviceClient.from('player_builds')
+        .select('id,buildable_id,target_type,status,completes_at,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
+        .eq('profile_id', user.id)
+        .eq('location_id', location.id)
+        .eq('target_type', 'building')
+        .eq('status', 'building'),
+      serviceClient.from('terrain_datasets').select('*').eq('location_id', location.id).order('resolution_m', { ascending: true }),
+    ]),
   ])
+
+  const [profileResult, frameResult, sitesResult, entitiesResult, buildsResult, terrainDatasetsResult] = spatialData
+  const profile = profileResult.data
+  const frame = frameResult.data
+  const sites = sitesResult.data
+  const entities = entitiesResult.data
+  const builds = buildsResult.data
+  const terrainDatasets = terrainDatasetsResult.data
+  const credits = Number(profile?.credits ?? 0)
 
   const activeTerrainDataset = frame?.terrain_dataset_id
     ? (terrainDatasets ?? []).find(dataset => dataset.id === frame.terrain_dataset_id) ?? null
@@ -100,10 +127,35 @@ export async function GET(req: NextRequest) {
 
   const available = Object.values(BUILDINGS)
     .filter(def => !def.planned && (!def.allowedLocations || def.allowedLocations.includes(locationSlug)))
-    .map(def => ({ id: def.id, name: def.name, cost: def.cost, buildTimeTicks: def.buildTimeTicks, footprint: getBuildingFootprint(def.id) }))
+    .map(def => {
+      const requirement = buildRequirement(def.id, locationSlug, knowledge)
+      const creditsOk = credits >= def.cost
+      return {
+        id: def.id,
+        name: def.name,
+        cost: def.cost,
+        buildTimeTicks: def.buildTimeTicks,
+        footprint: getBuildingFootprint(def.id),
+        requirements: {
+          knowledgeOk: requirement.ok,
+          creditsOk,
+          canBuild: requirement.ok && creditsOk,
+          requiredUnlock: requirement.requiredUnlock,
+          requiredLabel: requirement.requiredLabel,
+        },
+      }
+    })
 
   return NextResponse.json({
     location,
+    profile: { credits },
+    knowledge: {
+      source: knowledge.source,
+      analysis: {
+        geodetic: knowledge.unlocked.includes('UNL:NOX:SENSOR:GEODETIC' as never),
+        precision: knowledge.unlocked.includes('UNL:NOX:SENSOR:PRECISION' as never),
+      },
+    },
     frame,
     terrain: {
       activeDataset: activeTerrainDataset,
@@ -136,13 +188,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `${def.name} kann hier nicht gebaut werden.` }, { status: 400 })
   }
 
-  // Earth is currently the spatial-placement playtest. Geometry, collision,
-  // persistence and rendering must remain testable independently from the
-  // curriculum/SSF unlock chain. Other locations keep the canonical gate.
-  if (locationSlug !== 'earth') {
-    const knowledge = await getNoxiaKnowledgeState(user.id)
-    const gate = getBuildRequirements(buildableId, { completedModules: knowledge.completedModules, unlocked: knowledge.unlocked })
-    if (!gate.ok) return NextResponse.json({ error: `Wissen fehlt: ${gate.requiredUnlock}`, requiredUnlock: gate.requiredUnlock }, { status: 403 })
+  const knowledge = await getNoxiaKnowledgeState(user.id)
+  const gate = buildRequirement(buildableId, locationSlug, knowledge)
+  if (!gate.ok) {
+    return NextResponse.json({
+      error: `Wissen fehlt: ${gate.requiredLabel ?? gate.requiredUnlock}`,
+      requiredUnlock: gate.requiredUnlock,
+    }, { status: 403 })
   }
 
   const { data: location } = await serviceClient.from('locations').select('id,slug').eq('slug', locationSlug).single()
