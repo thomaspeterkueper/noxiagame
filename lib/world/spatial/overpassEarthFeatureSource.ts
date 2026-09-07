@@ -1,10 +1,13 @@
 import type { EarthFeatureClass, EarthFeatureQuery, EarthFeatureSource, ImportedEarthFeature } from './earthFeatureSource'
 
+type GeoPoint = { lat: number; lon: number }
+type OverpassGeometryPoint = GeoPoint | null
+
 type OverpassMember = {
   type: 'node' | 'way' | 'relation'
   ref: number
   role?: string
-  geometry?: { lat: number; lon: number }[]
+  geometry?: OverpassGeometryPoint[]
 }
 
 type OverpassElement = {
@@ -12,31 +15,42 @@ type OverpassElement = {
   id: number
   lat?: number
   lon?: number
-  center?: { lat: number; lon: number }
-  geometry?: { lat: number; lon: number }[]
+  center?: GeoPoint
+  geometry?: OverpassGeometryPoint[]
   members?: OverpassMember[]
   tags?: Record<string, string>
 }
 
 type OverpassResponse = { elements?: OverpassElement[] }
-type GeoPoint = { lat: number; lon: number }
 
 const ENDPOINT = 'https://overpass-api.de/api/interpreter'
 
-function qForClass(cls: EarthFeatureClass, b: EarthFeatureQuery['bounds']): string {
+function primaryQForClass(cls: EarthFeatureClass, b: EarthFeatureQuery['bounds']): string {
   const box = `${b.south},${b.west},${b.north},${b.east}`
   switch (cls) {
     case 'road': return `way[highway](${box});`
     case 'rail': return `way[railway](${box});`
     case 'waterway': return `way[waterway](${box});`
-    case 'water': return `way[natural=water](${box});way[water](${box});relation[natural=water](${box});`
-    case 'forest': return `way[landuse=forest](${box});way[natural=wood](${box});relation[landuse=forest](${box});relation[natural=wood](${box});`
-    case 'farmland': return `way[landuse~"farmland|farmyard|meadow|orchard"](${box});relation[landuse~"farmland|farmyard|meadow|orchard"](${box});`
-    case 'urban': return `way[landuse~"residential|commercial|retail"](${box});relation[landuse~"residential|commercial|retail"](${box});`
+    case 'water': return `way[natural=water](${box});way[water](${box});`
+    case 'forest': return `way[landuse=forest](${box});way[natural=wood](${box});`
+    case 'farmland': return `way[landuse~"farmland|farmyard|meadow|orchard"](${box});`
+    case 'urban': return `way[landuse~"residential|commercial|retail"](${box});`
     case 'building': return `way[building](${box});`
     case 'settlement': return `node[place~"city|town|village|hamlet"](${box});`
-    case 'industrial': return `way[landuse=industrial](${box});relation[landuse=industrial](${box});`
+    case 'industrial': return `way[landuse=industrial](${box});`
     case 'public': return `way[amenity](${box});node[amenity](${box});`
+  }
+}
+
+function relationQForClass(cls: EarthFeatureClass, b: EarthFeatureQuery['bounds']): string {
+  const box = `${b.south},${b.west},${b.north},${b.east}`
+  switch (cls) {
+    case 'water': return `relation[natural=water](${box});relation[water](${box});`
+    case 'forest': return `relation[landuse=forest](${box});relation[natural=wood](${box});`
+    case 'farmland': return `relation[landuse~"farmland|farmyard|meadow|orchard"](${box});`
+    case 'urban': return `relation[landuse~"residential|commercial|retail"](${box});`
+    case 'industrial': return `relation[landuse=industrial](${box});`
+    default: return ''
   }
 }
 
@@ -55,6 +69,26 @@ function classify(tags: Record<string, string> = {}): EarthFeatureClass | null {
   return null
 }
 
+function isGeoPoint(point: OverpassGeometryPoint): point is GeoPoint {
+  return point !== null && Number.isFinite(point.lat) && Number.isFinite(point.lon)
+}
+
+function geometrySegments(geometry?: OverpassGeometryPoint[]): GeoPoint[][] {
+  const segments: GeoPoint[][] = []
+  let current: GeoPoint[] = []
+
+  for (const point of geometry ?? []) {
+    if (isGeoPoint(point)) {
+      current.push({ lat: point.lat, lon: point.lon })
+      continue
+    }
+    if (current.length) segments.push(current)
+    current = []
+  }
+  if (current.length) segments.push(current)
+  return segments
+}
+
 function samePoint(a: GeoPoint, b: GeoPoint) {
   return Math.abs(a.lat - b.lat) < 1e-8 && Math.abs(a.lon - b.lon) < 1e-8
 }
@@ -64,15 +98,15 @@ function isClosed(points: GeoPoint[]) {
 }
 
 /**
- * Overpass multipolygon relations expose geometry on their member ways rather
- * than as a single relation.geometry array. Stitch outer member fragments into
- * closed rings so large forests, farmland, urban areas and water bodies are not
- * silently dropped by the bootstrap renderer.
+ * Multipolygon relations carry geometry on their member ways. With a geometry
+ * output bounding box Overpass may insert nulls for omitted vertices, so split
+ * each member into contiguous fragments before trying to stitch outer rings.
  */
 function stitchOuterRings(members: OverpassMember[]): GeoPoint[][] {
   const pending = members
-    .filter(member => (member.role ?? 'outer') === 'outer' && (member.geometry?.length ?? 0) >= 2)
-    .map(member => member.geometry!.map(point => ({ lat: point.lat, lon: point.lon })))
+    .filter(member => (member.role ?? 'outer') === 'outer')
+    .flatMap(member => geometrySegments(member.geometry))
+    .filter(segment => segment.length >= 2)
   const rings: GeoPoint[][] = []
 
   while (pending.length) {
@@ -144,19 +178,17 @@ function toFeatures(el: OverpassElement): ImportedEarthFeature[] {
   const polygonClasses: EarthFeatureClass[] = ['water','forest','farmland','urban','building','industrial','public']
   if (el.type === 'relation' && polygonClasses.includes(featureClass) && el.members?.length) {
     const rings = stitchOuterRings(el.members)
-    if (rings.length) {
-      return rings.map((coordinates, index) => ({
-        ...baseFor(el, featureClass, `relation/${el.id}#outer-${index + 1}`),
-        id: `osm:relation:${el.id}:outer:${index + 1}`,
-        properties: { ...base.properties, relationRole: 'outer', relationId: String(el.id) },
-        geometryKind: 'polygon',
-        geometry: { kind: 'polygon', coordinates },
-      }))
-    }
+    return rings.map((coordinates, index) => ({
+      ...baseFor(el, featureClass, `relation/${el.id}#outer-${index + 1}`),
+      id: `osm:relation:${el.id}:outer:${index + 1}`,
+      properties: { ...base.properties, relationRole: 'outer', relationId: String(el.id) },
+      geometryKind: 'polygon',
+      geometry: { kind: 'polygon', coordinates },
+    }))
   }
 
-  const geometry = el.geometry ?? []
-  if (geometry.length < 2) {
+  const segments = geometrySegments(el.geometry).filter(segment => segment.length >= 2)
+  if (!segments.length) {
     if (el.center) return [{
       ...base,
       id: `osm:${el.type}:${el.id}`,
@@ -166,16 +198,17 @@ function toFeatures(el: OverpassElement): ImportedEarthFeature[] {
     return []
   }
 
-  const coords = geometry.map(point => ({ lat: point.lat, lon: point.lon }))
-  const polygon = isClosed(coords) && polygonClasses.includes(featureClass)
-  return [{
-    ...base,
-    id: `osm:${el.type}:${el.id}`,
-    geometryKind: polygon ? 'polygon' : 'line',
-    geometry: polygon
-      ? { kind: 'polygon', coordinates: coords }
-      : { kind: 'line', coordinates: coords },
-  }]
+  return segments.map((coordinates, index) => {
+    const polygon = isClosed(coordinates) && polygonClasses.includes(featureClass)
+    return {
+      ...base,
+      id: segments.length === 1 ? `osm:${el.type}:${el.id}` : `osm:${el.type}:${el.id}:segment:${index + 1}`,
+      geometryKind: polygon ? 'polygon' : 'line',
+      geometry: polygon
+        ? { kind: 'polygon' as const, coordinates }
+        : { kind: 'line' as const, coordinates },
+    }
+  })
 }
 
 export class OverpassEarthFeatureSource implements EarthFeatureSource {
@@ -183,11 +216,15 @@ export class OverpassEarthFeatureSource implements EarthFeatureSource {
 
   async load(query: EarthFeatureQuery): Promise<ImportedEarthFeature[]> {
     const outputBox = `${query.bounds.south},${query.bounds.west},${query.bounds.north},${query.bounds.east}`
-    // `geom` is the required Overpass geolocation modifier for real shapes.
-    // Clip the returned geometry to the requested viewport so a large relation
-    // intersecting a small NOXIA map does not force Overpass to serialize its
-    // complete, potentially region-wide geometry.
-    const body = `[out:json][timeout:30];(${query.classes.map(c => qForClass(c, query.bounds)).join('')});out body geom(${outputBox});`
+    const primaryQuery = query.classes.map(c => primaryQForClass(c, query.bounds)).join('')
+    const relationQuery = query.classes.map(c => relationQForClass(c, query.bounds)).filter(Boolean).join('')
+
+    // Ways and nodes need their complete geometry so roads, streams, buildings
+    // and ordinary land-use polygons preserve their real shape. Multipolygon
+    // relations can span very large regions, so only those are geometry-clipped
+    // to the active map window. This keeps Overpass responses bounded without
+    // collapsing the ordinary map features to centre points.
+    const body = `[out:json][timeout:30];(${primaryQuery});out body geom;${relationQuery ? `(${relationQuery});out body geom(${outputBox});` : ''}`
     const response = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'NOXIA/0.1 earth-bootstrap' },
