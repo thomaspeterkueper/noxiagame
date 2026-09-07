@@ -1,6 +1,6 @@
 // buildRequirements.ts
-// Aktualisiert: 31.08.2026 — Mars-Teilsysteme an kanonische Unlocks gebunden
-// Version:      0.3.0
+// Aktualisiert: 07.09.2026 — kanonischen direkten Lernlink mit Build-Gate ausgeben
+// Version:      0.4.0
 import { getKnowledgeBuildingId } from './buildingMap';
 import { getUnlockLabel } from './unlockRegistry';
 import type { KnowledgeProgress } from './types';
@@ -22,10 +22,15 @@ export function getBuildRequirements(buildableId: string, progress: KnowledgePro
   const id = getKnowledgeBuildingId(buildableId);
   const requiredUnlock = id ? REQUIRED_UNLOCK[id] : null;
   const ok = !requiredUnlock || progress.unlocked.includes(requiredUnlock as any);
+  const learningUrl = requiredUnlock
+    ? `/academy/learn?unlock=${encodeURIComponent(requiredUnlock)}`
+    : null;
+
   return {
     id,
     ok,
     requiredUnlock,
     requiredLabel: requiredUnlock ? getUnlockLabel(requiredUnlock) : null,
+    learningUrl,
   };
 }
