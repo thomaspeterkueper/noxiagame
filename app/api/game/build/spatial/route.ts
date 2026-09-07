@@ -20,6 +20,13 @@ type StartBody = {
 }
 
 type KnowledgeState = Awaited<ReturnType<typeof getNoxiaKnowledgeState>>
+type CatalogEntry = {
+  id: string
+  name: string
+  cost: number
+  allowedLocations: string[] | null
+  buildTimeTicks: number
+}
 
 async function getUser(req: NextRequest) {
   const auth = req.headers.get('authorization')
@@ -28,7 +35,7 @@ async function getUser(req: NextRequest) {
   return user
 }
 
-async function definition(id: string) {
+async function definition(id: string): Promise<CatalogEntry | null> {
   const { data } = await serviceClient
     .from('building_definitions')
     .select('key,name,cost_credits,allowed_locations,build_time_ticks,is_active')
@@ -80,11 +87,19 @@ function terrainResolution(frame: any, dataset: any) {
   return { status: 'unresolved' as const, zM: null }
 }
 
-function catalogMeta(id: string) {
-  const def = BUILDINGS[id]
-  return def && !def.planned
-    ? { name: def.name, cost: def.cost, buildTimeTicks: def.buildTimeTicks }
-    : { name: id, cost: null, buildTimeTicks: null }
+function localCatalog(): Map<string, CatalogEntry> {
+  const catalog = new Map<string, CatalogEntry>()
+  for (const def of Object.values(BUILDINGS)) {
+    if (def.planned) continue
+    catalog.set(def.id, {
+      id: def.id,
+      name: def.name,
+      cost: def.cost,
+      allowedLocations: def.allowedLocations ?? null,
+      buildTimeTicks: def.buildTimeTicks,
+    })
+  }
+  return catalog
 }
 
 export async function GET(req: NextRequest) {
@@ -116,10 +131,13 @@ export async function GET(req: NextRequest) {
         .eq('target_type', 'building')
         .eq('status', 'building'),
       serviceClient.from('terrain_datasets').select('*').eq('location_id', location.id).order('resolution_m', { ascending: true }),
+      serviceClient.from('building_definitions')
+        .select('key,name,cost_credits,allowed_locations,build_time_ticks,is_active')
+        .eq('is_active', true),
     ]),
   ])
 
-  const [profileResult, frameResult, sitesResult, entitiesResult, buildsResult, terrainDatasetsResult] = spatialData
+  const [profileResult, frameResult, sitesResult, entitiesResult, buildsResult, terrainDatasetsResult, dbDefinitionsResult] = spatialData
   const profile = profileResult.data
   const frame = frameResult.data
   const sites = sitesResult.data
@@ -128,31 +146,56 @@ export async function GET(req: NextRequest) {
   const terrainDatasets = terrainDatasetsResult.data
   const credits = Number(profile?.credits ?? 0)
 
-  const entities = rawEntities.map((entity: any) => ({
-    ...entity,
-    ...catalogMeta(entity.entity_id),
-    isOwn: entity.profile_id === user.id,
-    ownerLabel: entity.profile_id === user.id
-      ? 'Dein Gebäude'
-      : entity.owner_class === 'STATE'
-        ? 'Staatlich'
-        : entity.owner_class === 'CORPORATION'
-          ? 'Corporation'
-          : entity.actors?.display_name ?? entity.profiles?.username ?? 'Anderer Pilot',
-  }))
+  // The database catalog is authoritative when a definition exists there.
+  // Local definitions remain the fallback for code-only buildings. This also
+  // restores modular spaceport definitions that were present in production but
+  // disappeared from the site-first Earth selector when it only enumerated BUILDINGS.
+  const catalog = localCatalog()
+  for (const row of dbDefinitionsResult.data ?? []) {
+    catalog.set(row.key, {
+      id: row.key,
+      name: row.name ?? row.key,
+      cost: Number(row.cost_credits ?? 0),
+      allowedLocations: row.allowed_locations as string[] | null,
+      buildTimeTicks: Number(row.build_time_ticks ?? 1),
+    })
+  }
 
-  const builds = rawBuilds.map((build: any) => ({
-    ...build,
-    ...catalogMeta(build.buildable_id),
-    isOwn: true,
-  }))
+  const entities = rawEntities.map((entity: any) => {
+    const meta = catalog.get(entity.entity_id)
+    return {
+      ...entity,
+      name: meta?.name ?? entity.entity_id,
+      cost: meta?.cost ?? null,
+      buildTimeTicks: meta?.buildTimeTicks ?? null,
+      isOwn: entity.profile_id === user.id,
+      ownerLabel: entity.profile_id === user.id
+        ? 'Dein Gebäude'
+        : entity.owner_class === 'STATE'
+          ? 'Staatlich'
+          : entity.owner_class === 'CORPORATION'
+            ? 'Corporation'
+            : entity.actors?.display_name ?? entity.profiles?.username ?? 'Anderer Pilot',
+    }
+  })
+
+  const builds = rawBuilds.map((build: any) => {
+    const meta = catalog.get(build.buildable_id)
+    return {
+      ...build,
+      name: meta?.name ?? build.buildable_id,
+      cost: meta?.cost ?? null,
+      buildTimeTicks: meta?.buildTimeTicks ?? null,
+      isOwn: true,
+    }
+  })
 
   const activeTerrainDataset = frame?.terrain_dataset_id
     ? (terrainDatasets ?? []).find(dataset => dataset.id === frame.terrain_dataset_id) ?? null
     : null
 
-  const available = Object.values(BUILDINGS)
-    .filter(def => !def.planned && (!def.allowedLocations || def.allowedLocations.includes(locationSlug)))
+  const available = [...catalog.values()]
+    .filter(def => !def.allowedLocations?.length || def.allowedLocations.includes(locationSlug))
     .map(def => {
       const requirement = buildRequirement(def.id, locationSlug, knowledge)
       const creditsOk = credits >= def.cost
