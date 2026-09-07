@@ -182,7 +182,11 @@ export class OverpassEarthFeatureSource implements EarthFeatureSource {
   readonly id = 'osm-overpass-current'
 
   async load(query: EarthFeatureQuery): Promise<ImportedEarthFeature[]> {
-    const body = `[out:json][timeout:20];(${query.classes.map(c => qForClass(c, query.bounds)).join('')});out body geom center;`
+    // geom and center are alternative geolocation modifiers in Overpass QL.
+    // Requesting center after geom caused ways and relations to collapse to
+    // bounding-box centres, which made roads, streams and land-use areas render
+    // as points in NOXIA. Full geometry is required by the map renderer.
+    const body = `[out:json][timeout:20];(${query.classes.map(c => qForClass(c, query.bounds)).join('')});out body geom;`
     const response = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'NOXIA/0.1 earth-bootstrap' },
