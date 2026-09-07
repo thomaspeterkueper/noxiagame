@@ -59,7 +59,7 @@ function buildRequirement(buildableId: string, locationSlug: string, knowledge: 
   // `habitat` is the generic early-game building. Its historical knowledge
   // mapping points at the Mars-habitat curriculum and must not gate Earth.
   if (locationSlug === 'earth' && buildableId === 'habitat') {
-    return { id: null, ok: true, requiredUnlock: null, requiredLabel: null }
+    return { id: null, ok: true, requiredUnlock: null, requiredLabel: null, learningUrl: null }
   }
   return getBuildRequirements(buildableId, {
     completedModules: knowledge.completedModules,
@@ -78,6 +78,13 @@ function terrainResolution(frame: any, dataset: any) {
   // Once a validated tile sampler is connected this becomes resolved and z_m
   // is the foundation height in LOCAL_ENU_METERS rather than a client value.
   return { status: 'unresolved' as const, zM: null }
+}
+
+function catalogMeta(id: string) {
+  const def = BUILDINGS[id]
+  return def && !def.planned
+    ? { name: def.name, cost: def.cost, buildTimeTicks: def.buildTimeTicks }
+    : { name: id, cost: null, buildTimeTicks: null }
 }
 
 export async function GET(req: NextRequest) {
@@ -99,11 +106,11 @@ export async function GET(req: NextRequest) {
       serviceClient.from('world_frames').select('*').eq('location_id', location.id).maybeSingle(),
       serviceClient.from('build_sites').select('*').eq('location_id', location.id).order('created_at'),
       serviceClient.from('tile_entities')
-        .select('id,entity_id,entity_type,profile_id,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,status,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
+        .select('id,entity_id,entity_type,profile_id,owner_class,owner_id,actor_id,occupant_id,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,status,built_at,asking_price,lease_price,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg,profiles(username),actors(display_name)')
         .eq('location_id', location.id)
         .in('entity_type', ['building','module']),
       serviceClient.from('player_builds')
-        .select('id,buildable_id,target_type,status,completes_at,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
+        .select('id,profile_id,buildable_id,target_type,status,created_at,completes_at,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
         .eq('profile_id', user.id)
         .eq('location_id', location.id)
         .eq('target_type', 'building')
@@ -116,10 +123,29 @@ export async function GET(req: NextRequest) {
   const profile = profileResult.data
   const frame = frameResult.data
   const sites = sitesResult.data
-  const entities = entitiesResult.data
-  const builds = buildsResult.data
+  const rawEntities = entitiesResult.data ?? []
+  const rawBuilds = buildsResult.data ?? []
   const terrainDatasets = terrainDatasetsResult.data
   const credits = Number(profile?.credits ?? 0)
+
+  const entities = rawEntities.map((entity: any) => ({
+    ...entity,
+    ...catalogMeta(entity.entity_id),
+    isOwn: entity.profile_id === user.id,
+    ownerLabel: entity.profile_id === user.id
+      ? 'Dein Gebäude'
+      : entity.owner_class === 'STATE'
+        ? 'Staatlich'
+        : entity.owner_class === 'CORPORATION'
+          ? 'Corporation'
+          : entity.actors?.display_name ?? entity.profiles?.username ?? 'Anderer Pilot',
+  }))
+
+  const builds = rawBuilds.map((build: any) => ({
+    ...build,
+    ...catalogMeta(build.buildable_id),
+    isOwn: true,
+  }))
 
   const activeTerrainDataset = frame?.terrain_dataset_id
     ? (terrainDatasets ?? []).find(dataset => dataset.id === frame.terrain_dataset_id) ?? null
@@ -142,13 +168,14 @@ export async function GET(req: NextRequest) {
           canBuild: requirement.ok && creditsOk,
           requiredUnlock: requirement.requiredUnlock,
           requiredLabel: requirement.requiredLabel,
+          learningUrl: requirement.learningUrl,
         },
       }
     })
 
   return NextResponse.json({
     location,
-    profile: { credits },
+    profile: { id: user.id, credits },
     knowledge: {
       source: knowledge.source,
       analysis: {
@@ -163,8 +190,8 @@ export async function GET(req: NextRequest) {
       resolution: terrainResolution(frame, activeTerrainDataset),
     },
     sites: sites ?? [],
-    entities: entities ?? [],
-    builds: builds ?? [],
+    entities,
+    builds,
     available,
   })
 }
@@ -194,6 +221,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       error: `Wissen fehlt: ${gate.requiredLabel ?? gate.requiredUnlock}`,
       requiredUnlock: gate.requiredUnlock,
+      requiredLabel: gate.requiredLabel,
+      learningUrl: gate.learningUrl,
     }, { status: 403 })
   }
 
