@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { BUILDINGS } from '@/lib/game/buildings'
+import { TICK_INTERVAL_SECONDS } from '@/lib/game/tick'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 import { overlaps } from '@/lib/game/spatial/geometry'
@@ -63,9 +64,10 @@ async function definition(id: string): Promise<CatalogEntry | null> {
 }
 
 function buildRequirement(buildableId: string, locationSlug: string, knowledge: KnowledgeState) {
-  // `habitat` is the generic early-game building. Its historical knowledge
-  // mapping points at the Mars-habitat curriculum and must not gate Earth.
-  if (locationSlug === 'earth' && buildableId === 'habitat') {
+  // Earth is currently the spatial-placement playtest. Geometry, collision,
+  // persistence and rendering must remain testable independently from the
+  // curriculum/SSF unlock chain. Other locations keep the canonical gate.
+  if (locationSlug === 'earth') {
     return { id: null, ok: true, requiredUnlock: null, requiredLabel: null, learningUrl: null }
   }
   return getBuildRequirements(buildableId, {
@@ -307,7 +309,7 @@ export async function POST(req: NextRequest) {
   }, footprint.clearanceM))
   if (collision) return NextResponse.json({ error: 'Baufläche überschneidet ein bestehendes oder geplantes Gebäude.', collisionId: collision.id }, { status: 409 })
 
-  const completesAt = new Date(Date.now() + Math.max(1, def.buildTimeTicks) * 24 * 60 * 60 * 1000)
+  const completesAt = new Date(Date.now() + Math.max(1, def.buildTimeTicks) * TICK_INTERVAL_SECONDS * 1000)
   const { data: build, error: buildError } = await serviceClient.from('player_builds').insert({
     profile_id: user.id,
     buildable_id: buildableId,
