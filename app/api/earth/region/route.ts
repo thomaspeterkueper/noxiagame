@@ -1,14 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { CURRENT_EARTH_BOOTSTRAP_CLASSES } from '@/lib/world/spatial/earthFeatureSource'
+import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
-import { EARTH_SAUERLAND_REGION } from '@/lib/world/spatial/regions'
+import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 
 const source = new OverpassEarthFeatureSource()
 
 export const revalidate = 300
 
+const SELMECKE_REFERENCE_FEATURE: ImportedEarthFeature = {
+  id: 'noxia:site:selmecke-reference',
+  worldId: 'earth',
+  featureType: 'settlement',
+  geometryKind: 'point',
+  properties: {
+    name: 'Selmecke · NOXIA-Referenzstandort',
+    place: 'noxia_reference_site',
+    source: 'NOXIA',
+  },
+  geometry: {
+    kind: 'point',
+    coordinates: { lat: 51.33745, lon: 7.97975 },
+  },
+  source: {
+    provider: 'NOXIA',
+    dataset: 'canonical-reference-sites',
+    sourceId: 'noxia-earth-selmecke-reference-v1',
+  },
+}
+
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams
+  const requestedRegionId = p.get('region')
+    ?? req.cookies.get('noxia-earth-region')?.value
+    ?? EARTH_SAUERLAND_REGION.id
+  const viewRegion = getEarthRegion(requestedRegionId) ?? EARTH_SAUERLAND_REGION
+
   const rawLat = p.get('lat')
   const rawLon = p.get('lon')
   const requestedLat = rawLat === null ? Number.NaN : Number(rawLat)
@@ -16,7 +42,7 @@ export async function GET(req: NextRequest) {
   const hasLocalCenter = rawLat !== null && rawLon !== null && Number.isFinite(requestedLat) && Number.isFinite(requestedLon)
   const center = hasLocalCenter
     ? { lat: requestedLat, lon: requestedLon }
-    : EARTH_SAUERLAND_REGION.origin
+    : viewRegion.origin
   const radiusKm = Math.min(6, Math.max(.2, Number(p.get('radiusKm') ?? (hasLocalCenter ? .6 : 3))))
   const latDelta = radiusKm / 111.32
   const lonDelta = radiusKm / (111.32 * Math.cos(center.lat * Math.PI / 180))
@@ -28,16 +54,24 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const features = await source.load({ bounds, classes: CURRENT_EARTH_BOOTSTRAP_CLASSES })
+    const imported = await source.load({ bounds, classes: CURRENT_EARTH_BOOTSTRAP_CLASSES })
+    const features = !hasLocalCenter && viewRegion.id === EARTH_SAUERLAND_REGION.id
+      ? [...imported, SELMECKE_REFERENCE_FEATURE]
+      : imported
+
     return NextResponse.json({
       ok: true,
+      // Compatibility boundary: current persisted Earth x/y values still use
+      // the Sauerland metric frame. The selected view region may be anywhere on
+      // Earth, but it must not silently reinterpret those persisted coordinates.
       region: EARTH_SAUERLAND_REGION,
+      viewRegion,
       queryCenter: center,
       detail: hasLocalCenter,
       bounds,
       featureCount: features.length,
       features,
-      attribution: '© OpenStreetMap contributors · ODbL',
+      attribution: '© OpenStreetMap contributors · ODbL · NOXIA canonical sites',
     }, {
       headers: {
         'Cache-Control': hasLocalCenter
