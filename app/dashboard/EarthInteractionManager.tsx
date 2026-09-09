@@ -22,6 +22,24 @@ type QuotePayload = {
   childCount?: number
 }
 
+const EARTH_REGION_COOKIE = 'noxia-earth-region'
+const SAUERLAND_REGION = 'earth-sauerland'
+const NAMIBIA_REGION = 'earth-namibia-erongo'
+
+function readEarthRegion() {
+  if (typeof document === 'undefined') return SAUERLAND_REGION
+  const item = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(`${EARTH_REGION_COOKIE}=`))
+  const value = item ? decodeURIComponent(item.slice(EARTH_REGION_COOKIE.length + 1)) : SAUERLAND_REGION
+  return value === NAMIBIA_REGION ? NAMIBIA_REGION : SAUERLAND_REGION
+}
+
+function selectEarthRegion(regionId: string) {
+  document.cookie = `${EARTH_REGION_COOKIE}=${encodeURIComponent(regionId)}; Path=/; Max-Age=31536000; SameSite=Lax`
+  window.location.reload()
+}
+
 function buttonStyle(kind: 'primary' | 'danger'): string {
   if (kind === 'danger') {
     return 'flex:1;border:1px solid #9a5750;background:#fff7f3;color:#8b332d;border-radius:7px;padding:8px 9px;font:800 10px system-ui;cursor:pointer'
@@ -56,6 +74,92 @@ export default function EarthInteractionManager() {
     let cancelled = false
     let objectLookupSerial = 0
     const mapCleanups: Array<() => void> = []
+    const controlCleanups: Array<() => void> = []
+
+    const enhanceRegionControls = () => {
+      const actions = document.querySelector<HTMLElement>('.earth-actions')
+      const head = document.querySelector<HTMLElement>('.earth-head')
+      if (!actions || !head) return
+
+      const current = readEarthRegion()
+      let switcher = actions.querySelector<HTMLElement>('[data-noxia-earth-region-switcher]')
+      if (!switcher) {
+        switcher = document.createElement('div')
+        switcher.dataset.noxiaEarthRegionSwitcher = '1'
+        switcher.style.cssText = 'display:flex;gap:4px;align-items:center;padding:3px;border:1px solid #9aa9a1;border-radius:8px;background:#f7f6ef'
+
+        const makeButton = (id: string, label: string) => {
+          const button = document.createElement('button')
+          button.type = 'button'
+          button.dataset.regionId = id
+          button.textContent = label
+          button.style.cssText = 'border:0;background:transparent;color:#52666d;border-radius:5px;padding:6px 8px;font:800 9px system-ui;cursor:pointer'
+          button.onclick = () => selectEarthRegion(id)
+          return button
+        }
+
+        switcher.append(
+          makeButton(SAUERLAND_REGION, 'Deutschland · Sauerland'),
+          makeButton(NAMIBIA_REGION, 'Namibia · Erongo'),
+        )
+        actions.prepend(switcher)
+      }
+
+      for (const button of Array.from(switcher.querySelectorAll<HTMLButtonElement>('button[data-region-id]'))) {
+        const active = button.dataset.regionId === current
+        button.style.background = active ? '#173f4d' : 'transparent'
+        button.style.color = active ? '#fffaf0' : '#52666d'
+      }
+
+      const eyebrow = head.querySelector<HTMLElement>('small')
+      const title = head.querySelector<HTMLElement>('h1')
+      const copy = head.querySelector<HTMLElement>('p')
+      if (current === NAMIBIA_REGION) {
+        if (eyebrow && eyebrow.textContent !== 'NOXIA EARTH · NAMIBIA 2086') eyebrow.textContent = 'NOXIA EARTH · NAMIBIA 2086'
+        if (title && title.textContent !== 'Erongo-Korridor · Walvis Bay') title.textContent = 'Erongo-Korridor · Walvis Bay'
+        if (copy && copy.textContent !== 'Reale OSM- und Geländedaten für den zweiten Erdraum. Analyse ist aktiv; Baupersistenz bleibt bis zur regionalen Frame-Migration im Sauerland gesperrt.') {
+          copy.textContent = 'Reale OSM- und Geländedaten für den zweiten Erdraum. Analyse ist aktiv; Baupersistenz bleibt bis zur regionalen Frame-Migration im Sauerland gesperrt.'
+        }
+      }
+
+      if (current === NAMIBIA_REGION) {
+        let badge = actions.querySelector<HTMLElement>('[data-noxia-earth-analysis-mode]')
+        if (!badge) {
+          badge = document.createElement('div')
+          badge.dataset.noxiaEarthAnalysisMode = '1'
+          badge.textContent = 'ANALYSEMODUS · REGIONALE BAUPERSISTENZ FOLGT'
+          badge.style.cssText = 'padding:6px 8px;border:1px solid #b99542;border-radius:6px;background:#fff5d8;color:#765b18;font:800 8px system-ui;letter-spacing:.05em'
+          actions.appendChild(badge)
+        }
+      }
+    }
+
+    const enhanceMapControlGuards = () => {
+      const controls = document.querySelectorAll<HTMLElement>(
+        '.earth-layer-control,.earth-map-tools,.earth-site-panel,.earth-object-panel,.earth-candidate',
+      )
+      for (const control of Array.from(controls)) {
+        if (control.dataset.noxiaPointerGuard === '1') continue
+        control.dataset.noxiaPointerGuard = '1'
+        const stopDragStart = (event: PointerEvent) => event.stopPropagation()
+        control.addEventListener('pointerdown', stopDragStart)
+        controlCleanups.push(() => {
+          control.removeEventListener('pointerdown', stopDragStart)
+          delete control.dataset.noxiaPointerGuard
+        })
+      }
+    }
+
+    const enforceRegionalBuildBoundary = () => {
+      if (readEarthRegion() !== NAMIBIA_REGION) return
+      const buildButton = document.querySelector<HTMLButtonElement>('.earth-site-panel .earth-build-open')
+      if (!buildButton) return
+      buildButton.disabled = true
+      buildButton.textContent = 'Analysemodus · Bauen in Namibia folgt'
+      buildButton.title = 'Weltobjekte benötigen vor dem Bauen einen persistenten Earth-Region-Key.'
+      buildButton.style.opacity = '.65'
+      buildButton.style.cursor = 'not-allowed'
+    }
 
     const enhanceMapClickBridge = () => {
       const map = document.querySelector<HTMLElement>('.earth-map')
@@ -152,6 +256,7 @@ export default function EarthInteractionManager() {
     }
 
     const enhanceCandidate = () => {
+      if (readEarthRegion() !== SAUERLAND_REGION) return
       const panel = document.querySelector<HTMLElement>('.earth-candidate')
       if (!panel) return
 
@@ -303,6 +408,9 @@ export default function EarthInteractionManager() {
     }
 
     const enhance = () => {
+      enhanceRegionControls()
+      enhanceMapControlGuards()
+      enforceRegionalBuildBoundary()
       enhanceMapClickBridge()
       enhanceCandidate()
       void enhanceWorldObject()
@@ -315,6 +423,7 @@ export default function EarthInteractionManager() {
       cancelled = true
       observer.disconnect()
       for (const cleanup of mapCleanups) cleanup()
+      for (const cleanup of controlCleanups) cleanup()
     }
   }, [])
 
