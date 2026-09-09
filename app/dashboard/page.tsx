@@ -23,7 +23,7 @@ export default async function Dashboard() {
       <style>{`
         :root {
           --noxia-topbar-h: 44px;
-          --noxia-cockpit-clearance: 0px;
+          --noxia-cockpit-clearance: 76px;
         }
 
         /* The dashboard is a game viewport, not a scrolling document. */
@@ -134,9 +134,10 @@ export default async function Dashboard() {
           display: none !important;
         }
 
-        /* Earth is a full cockpit surface. Building controls now belong to the
-           selected-site panel inside the map, so no host-level build selector
-           is exposed here. */
+        /* Earth is a full cockpit surface. Building controls live in the
+           selected-site panel inside the map. The cockpit itself floats over
+           the bottom edge, so site/object panels must keep a dedicated clear
+           zone and remain above map overlays. */
         .noxia-dashboard-shell .earth-shell {
           position: relative !important;
           width: 100% !important;
@@ -160,6 +161,24 @@ export default async function Dashboard() {
           border: 0 !important;
           border-radius: 0 !important;
           box-shadow: none !important;
+        }
+        .noxia-dashboard-shell .earth-site-panel,
+        .noxia-dashboard-shell .earth-object-panel {
+          bottom: var(--noxia-cockpit-clearance) !important;
+          z-index: 2250 !important;
+          max-height: calc(100% - var(--noxia-cockpit-clearance) - 18px) !important;
+          pointer-events: auto !important;
+        }
+        .noxia-dashboard-shell .earth-site-panel button,
+        .noxia-dashboard-shell .earth-object-panel button {
+          pointer-events: auto !important;
+        }
+        .noxia-dashboard-shell .earth-placement-actions {
+          position: sticky !important;
+          bottom: 0 !important;
+          z-index: 2 !important;
+          padding-top: 8px !important;
+          background: linear-gradient(180deg, rgba(255,250,240,0), #fffaf0 34%) !important;
         }
 
         /* Transitional planning grids also fill their host instead of creating
@@ -217,7 +236,10 @@ export default async function Dashboard() {
         }
 
         @media (max-width: 760px) {
-          :root { --noxia-topbar-h: 42px; }
+          :root {
+            --noxia-topbar-h: 42px;
+            --noxia-cockpit-clearance: 72px;
+          }
           .noxia-dashboard-shell > div:first-of-type > header {
             padding-left: .45rem !important;
             padding-right: .45rem !important;
