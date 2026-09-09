@@ -155,7 +155,7 @@ export default function EarthBuildingAccessLayer({
       <LandingOverlay
         currentLocation="earth"
         locations={data?.locations ?? []}
-        cargo={cargo}
+        cargo={{ water: cargo.water, energy: cargo.energy, metal: cargo.metal }}
         shipRange={shipRange}
         currentTick={Number(data?.tickNumber ?? 0)}
         inTransit={inTransit}
