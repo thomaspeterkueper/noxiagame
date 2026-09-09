@@ -1,4 +1,14 @@
-export type BuildingEntryKind = 'academy' | 'warehouse' | 'spaceport'
+export type BuildingEntryKind =
+  | 'academy'
+  | 'warehouse'
+  | 'spaceport'
+  | 'administration'
+  | 'bank'
+  | 'shipyard'
+  | 'research'
+  | 'production'
+  | 'residents'
+  | 'foundation'
 
 export type BuildingEntryDefinition = {
   kind: BuildingEntryKind
@@ -28,6 +38,51 @@ const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
     kind: 'warehouse',
     label: 'Lager betreten',
     hint: 'Fracht, Handel und Aufträge öffnen',
+  },
+  admin: {
+    kind: 'administration',
+    label: 'Verwaltung betreten',
+    hint: 'Versorgung, Bevölkerung, Aufträge und Koloniefinanzen öffnen',
+  },
+  bank: {
+    kind: 'bank',
+    label: 'Bank betreten',
+    hint: 'Konto, Einlagen, Kredite und Sicherheiten öffnen',
+  },
+  shipyard: {
+    kind: 'shipyard',
+    label: 'Werft betreten',
+    hint: 'Schiff und verfügbare Werftfunktionen öffnen',
+  },
+  laboratory: {
+    kind: 'research',
+    label: 'Labor betreten',
+    hint: 'Wissens- und Forschungszugänge öffnen',
+  },
+  scanner: {
+    kind: 'research',
+    label: 'Scannerstation betreten',
+    hint: 'Analyse, Scanner und Wissenszugänge öffnen',
+  },
+  factory: {
+    kind: 'production',
+    label: 'Fabrik betreten',
+    hint: 'Produktions- und Versorgungsdaten öffnen',
+  },
+  habitat: {
+    kind: 'residents',
+    label: 'Habitat betreten',
+    hint: 'Bewohner- und Versorgungsdaten öffnen',
+  },
+  residential_block: {
+    kind: 'residents',
+    label: 'Wohnblock betreten',
+    hint: 'Bewohner- und Versorgungsdaten öffnen',
+  },
+  ssf_headquarters_sundern: {
+    kind: 'foundation',
+    label: 'SSF-Hauptsitz betreten',
+    hint: 'Solar Science Foundation, Lernen und Projekte öffnen',
   },
   spaceport_core: {
     kind: 'spaceport',
