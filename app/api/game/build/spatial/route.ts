@@ -6,17 +6,31 @@ import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 import { overlaps } from '@/lib/game/spatial/geometry'
 import { getBuildingFootprint } from '@/lib/game/spatial/footprints'
+import {
+  geoToLocalMeters,
+  localMetersToGeo,
+  validateGeoPoint,
+  type GeoPoint,
+} from '@/lib/world/spatial/earthSpatial'
+import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
   process.env.SUPABASE_SERVICE_ROLE_KEY as string,
 )
 
+const EARTH_VIEW_HALF_SPAN_M = 250_000
+const EARTH_COLLISION_LAT_SPAN_DEG = .03
+
 type StartBody = {
   buildableId?: string
   location?: string
   xM?: number
   yM?: number
+  latDeg?: number
+  lonDeg?: number
+  altitudeM?: number | null
+  regionId?: string
   rotationDeg?: number
 }
 
@@ -104,11 +118,63 @@ function localCatalog(): Map<string, CatalogEntry> {
   return catalog
 }
 
+function finiteNumber(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function earthRegion(req: NextRequest, explicitRegionId?: string | null) {
+  const regionId = explicitRegionId
+    ?? req.cookies.get('noxia-earth-region')?.value
+    ?? EARTH_SAUERLAND_REGION.id
+  return getEarthRegion(regionId) ?? EARTH_SAUERLAND_REGION
+}
+
+function canonicalEarthGeo(row: any): GeoPoint | null {
+  const lat = finiteNumber(row.latitude_deg)
+  const lon = finiteNumber(row.longitude_deg)
+  if (lat != null && lon != null) {
+    try { return validateGeoPoint({ lat, lon, elevationM: finiteNumber(row.altitude_m) }) }
+    catch { return null }
+  }
+
+  // Transitional fallback for old rows that have not yet received canonical
+  // geodetic coordinates. Their x/y cache belongs to the recorded region, or
+  // to the original Sauerland frame when no affinity is present.
+  const xM = finiteNumber(row.x_m)
+  const yM = finiteNumber(row.y_m)
+  if (xM == null || yM == null) return null
+  const region = getEarthRegion(String(row.spatial_region_id ?? '')) ?? EARTH_SAUERLAND_REGION
+  try { return localMetersToGeo({ eastM: xM, northM: yM }, region.origin) }
+  catch { return null }
+}
+
+function projectEarthRow(row: any, region: ReturnType<typeof earthRegion>) {
+  const geo = canonicalEarthGeo(row)
+  if (!geo) return null
+  const metric = geoToLocalMeters(geo, region.origin)
+  if (Math.abs(metric.eastM) > EARTH_VIEW_HALF_SPAN_M || Math.abs(metric.northM) > EARTH_VIEW_HALF_SPAN_M) return null
+  return {
+    ...row,
+    latitude_deg: geo.lat,
+    longitude_deg: geo.lon,
+    altitude_m: geo.elevationM ?? row.altitude_m ?? null,
+    x_m: metric.eastM,
+    y_m: metric.northM,
+  }
+}
+
 export async function GET(req: NextRequest) {
   const user = await getUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const locationSlug = new URL(req.url).searchParams.get('location') ?? 'earth'
+  const url = new URL(req.url)
+  const locationSlug = url.searchParams.get('location') ?? 'earth'
+  const viewRegion = locationSlug === 'earth'
+    ? earthRegion(req, url.searchParams.get('region'))
+    : null
+
   const { data: location } = await serviceClient
     .from('locations')
     .select('id,slug,name')
@@ -123,11 +189,11 @@ export async function GET(req: NextRequest) {
       serviceClient.from('world_frames').select('*').eq('location_id', location.id).maybeSingle(),
       serviceClient.from('build_sites').select('*').eq('location_id', location.id).order('created_at'),
       serviceClient.from('tile_entities')
-        .select('id,entity_id,entity_type,profile_id,owner_class,owner_id,actor_id,occupant_id,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,status,built_at,asking_price,lease_price,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg,profiles(username),actors(display_name)')
+        .select('id,entity_id,entity_type,profile_id,owner_class,owner_id,actor_id,occupant_id,placement_mode,x_m,y_m,z_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,status,built_at,asking_price,lease_price,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg,profiles(username),actors(display_name)')
         .eq('location_id', location.id)
         .in('entity_type', ['building','module']),
       serviceClient.from('player_builds')
-        .select('id,profile_id,buildable_id,target_type,status,created_at,completes_at,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
+        .select('id,profile_id,buildable_id,target_type,status,created_at,completes_at,placement_mode,x_m,y_m,z_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,rotation_deg,footprint_width_m,footprint_depth_m,site_id,parent_id,slot,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
         .eq('profile_id', user.id)
         .eq('location_id', location.id)
         .eq('target_type', 'building')
@@ -149,9 +215,7 @@ export async function GET(req: NextRequest) {
   const credits = Number(profile?.credits ?? 0)
 
   // The database catalog is authoritative when a definition exists there.
-  // Local definitions remain the fallback for code-only buildings. This also
-  // restores modular spaceport definitions that were present in production but
-  // disappeared from the site-first Earth selector when it only enumerated BUILDINGS.
+  // Local definitions remain the fallback for code-only buildings.
   const catalog = localCatalog()
   for (const row of dbDefinitionsResult.data ?? []) {
     catalog.set(row.key, {
@@ -163,7 +227,20 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const entities = rawEntities.map((entity: any) => {
+  const visibleEntities = viewRegion
+    ? rawEntities.flatMap((row: any) => {
+        const projected = projectEarthRow(row, viewRegion)
+        return projected ? [projected] : []
+      })
+    : rawEntities
+  const visibleBuilds = viewRegion
+    ? rawBuilds.flatMap((row: any) => {
+        const projected = projectEarthRow(row, viewRegion)
+        return projected ? [projected] : []
+      })
+    : rawBuilds
+
+  const entities = visibleEntities.map((entity: any) => {
     const meta = catalog.get(entity.entity_id)
     return {
       ...entity,
@@ -181,7 +258,7 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  const builds = rawBuilds.map((build: any) => {
+  const builds = visibleBuilds.map((build: any) => {
     const meta = catalog.get(build.buildable_id)
     return {
       ...build,
@@ -218,8 +295,13 @@ export async function GET(req: NextRequest) {
       }
     })
 
+  const visibleSites = viewRegion
+    ? (sites ?? []).filter((site: any) => !site.metadata?.region || site.metadata.region === viewRegion.id)
+    : (sites ?? [])
+
   return NextResponse.json({
     location,
+    spatialRegion: viewRegion ? { id: viewRegion.id, name: viewRegion.name, origin: viewRegion.origin } : null,
     profile: { id: user.id, credits },
     knowledge: {
       source: knowledge.source,
@@ -234,7 +316,7 @@ export async function GET(req: NextRequest) {
       datasets: terrainDatasets ?? [],
       resolution: terrainResolution(frame, activeTerrainDataset),
     },
-    sites: sites ?? [],
+    sites: visibleSites,
     entities,
     builds,
     available,
@@ -250,8 +332,8 @@ export async function POST(req: NextRequest) {
 
   const buildableId = body.buildableId?.trim()
   const locationSlug = body.location?.trim()
-  if (!buildableId || !locationSlug || !Number.isFinite(body.xM) || !Number.isFinite(body.yM)) {
-    return NextResponse.json({ error: 'Bautyp, Standort und metrische Position fehlen' }, { status: 400 })
+  if (!buildableId || !locationSlug) {
+    return NextResponse.json({ error: 'Bautyp und Standort fehlen' }, { status: 400 })
   }
 
   const def = await definition(buildableId)
@@ -287,26 +369,87 @@ export async function POST(req: NextRequest) {
 
   const footprint = getBuildingFootprint(buildableId)
   const rotation = ((Number(body.rotationDeg ?? 0) % 360) + 360) % 360
-  const xM = Number(body.xM)
-  const yM = Number(body.yM)
-  if (![xM,yM,rotation].every(Number.isFinite)) return NextResponse.json({ error: 'Ungültige metrische Koordinate' }, { status: 400 })
+  if (!Number.isFinite(rotation)) return NextResponse.json({ error: 'Ungültige Rotation' }, { status: 400 })
 
-  const [{ data: existing }, { data: pending }] = await Promise.all([
-    serviceClient.from('tile_entities')
-      .select('id,entity_id,x_m,y_m,footprint_width_m,footprint_depth_m')
-      .eq('location_id', location.id).eq('placement_mode', 'world').eq('entity_type', 'building'),
-    serviceClient.from('player_builds')
-      .select('id,buildable_id,x_m,y_m,footprint_width_m,footprint_depth_m')
-      .eq('location_id', location.id).eq('placement_mode', 'world').eq('target_type', 'building').eq('status', 'building'),
-  ])
+  const selectedRegion = locationSlug === 'earth' ? earthRegion(req, body.regionId) : null
+  let xM = finiteNumber(body.xM)
+  let yM = finiteNumber(body.yM)
+  let canonicalGeo: GeoPoint | null = null
 
-  const target = { xM, yM, widthM: footprint.widthM, depthM: footprint.depthM }
-  const blockers = [...(existing ?? []), ...(pending ?? [])]
-  const collision = blockers.find((row: any) => Number.isFinite(row.x_m) && Number.isFinite(row.y_m) && overlaps(target, {
-    xM: Number(row.x_m), yM: Number(row.y_m),
-    widthM: Number(row.footprint_width_m ?? getBuildingFootprint(row.entity_id ?? row.buildable_id).widthM),
-    depthM: Number(row.footprint_depth_m ?? getBuildingFootprint(row.entity_id ?? row.buildable_id).depthM),
-  }, footprint.clearanceM))
+  if (locationSlug === 'earth') {
+    const lat = finiteNumber(body.latDeg)
+    const lon = finiteNumber(body.lonDeg)
+    try {
+      canonicalGeo = lat != null && lon != null
+        ? validateGeoPoint({ lat, lon, elevationM: finiteNumber(body.altitudeM) })
+        : xM != null && yM != null && selectedRegion
+          ? localMetersToGeo({ eastM: xM, northM: yM }, selectedRegion.origin)
+          : null
+    } catch {
+      canonicalGeo = null
+    }
+    if (!canonicalGeo || !selectedRegion) {
+      return NextResponse.json({ error: 'Globale WGS84-Position fehlt oder ist ungültig' }, { status: 400 })
+    }
+
+    // x/y are a cache in the currently selected local projection only.
+    const local = geoToLocalMeters(canonicalGeo, selectedRegion.origin)
+    xM = local.eastM
+    yM = local.northM
+  } else if (xM == null || yM == null) {
+    return NextResponse.json({ error: 'Metrische Position fehlt' }, { status: 400 })
+  }
+
+  const [existingResult, pendingResult] = locationSlug === 'earth' && canonicalGeo
+    ? await Promise.all([
+        serviceClient.from('tile_entities')
+          .select('id,entity_id,x_m,y_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,footprint_width_m,footprint_depth_m')
+          .eq('location_id', location.id)
+          .eq('placement_mode', 'world')
+          .eq('entity_type', 'building')
+          .gte('latitude_deg', canonicalGeo.lat - EARTH_COLLISION_LAT_SPAN_DEG)
+          .lte('latitude_deg', canonicalGeo.lat + EARTH_COLLISION_LAT_SPAN_DEG),
+        serviceClient.from('player_builds')
+          .select('id,buildable_id,x_m,y_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,footprint_width_m,footprint_depth_m')
+          .eq('location_id', location.id)
+          .eq('placement_mode', 'world')
+          .eq('target_type', 'building')
+          .eq('status', 'building')
+          .gte('latitude_deg', canonicalGeo.lat - EARTH_COLLISION_LAT_SPAN_DEG)
+          .lte('latitude_deg', canonicalGeo.lat + EARTH_COLLISION_LAT_SPAN_DEG),
+      ])
+    : await Promise.all([
+        serviceClient.from('tile_entities')
+          .select('id,entity_id,x_m,y_m,footprint_width_m,footprint_depth_m')
+          .eq('location_id', location.id).eq('placement_mode', 'world').eq('entity_type', 'building'),
+        serviceClient.from('player_builds')
+          .select('id,buildable_id,x_m,y_m,footprint_width_m,footprint_depth_m')
+          .eq('location_id', location.id).eq('placement_mode', 'world').eq('target_type', 'building').eq('status', 'building'),
+      ])
+
+  const blockers = [...(existingResult.data ?? []), ...(pendingResult.data ?? [])]
+  const target = locationSlug === 'earth'
+    ? { xM: 0, yM: 0, widthM: footprint.widthM, depthM: footprint.depthM }
+    : { xM: xM!, yM: yM!, widthM: footprint.widthM, depthM: footprint.depthM }
+
+  const collision = blockers.find((row: any) => {
+    let blockerX = finiteNumber(row.x_m)
+    let blockerY = finiteNumber(row.y_m)
+    if (locationSlug === 'earth' && canonicalGeo) {
+      const blockerGeo = canonicalEarthGeo(row)
+      if (!blockerGeo) return false
+      const local = geoToLocalMeters(blockerGeo, canonicalGeo)
+      blockerX = local.eastM
+      blockerY = local.northM
+    }
+    if (blockerX == null || blockerY == null) return false
+    return overlaps(target, {
+      xM: blockerX,
+      yM: blockerY,
+      widthM: Number(row.footprint_width_m ?? getBuildingFootprint(row.entity_id ?? row.buildable_id).widthM),
+      depthM: Number(row.footprint_depth_m ?? getBuildingFootprint(row.entity_id ?? row.buildable_id).depthM),
+    }, footprint.clearanceM)
+  })
   if (collision) return NextResponse.json({ error: 'Baufläche überschneidet ein bestehendes oder geplantes Gebäude.', collisionId: collision.id }, { status: 409 })
 
   const completesAt = new Date(Date.now() + Math.max(1, def.buildTimeTicks) * TICK_INTERVAL_SECONDS * 1000)
@@ -322,6 +465,10 @@ export async function POST(req: NextRequest) {
     x_m: xM,
     y_m: yM,
     z_m: terrain.zM,
+    latitude_deg: canonicalGeo?.lat ?? null,
+    longitude_deg: canonicalGeo?.lon ?? null,
+    altitude_m: canonicalGeo?.elevationM ?? finiteNumber(body.altitudeM),
+    spatial_region_id: selectedRegion?.id ?? null,
     rotation_deg: rotation,
     footprint_width_m: footprint.widthM,
     footprint_depth_m: footprint.depthM,
@@ -350,6 +497,10 @@ export async function POST(req: NextRequest) {
     placementMode: 'world',
     xM,
     yM,
+    latitudeDeg: canonicalGeo?.lat ?? null,
+    longitudeDeg: canonicalGeo?.lon ?? null,
+    altitudeM: canonicalGeo?.elevationM ?? finiteNumber(body.altitudeM),
+    spatialRegionId: selectedRegion?.id ?? null,
     zM: terrain.zM,
     terrainStatus: terrain.status,
     terrainDatasetId: terrainDataset?.id ?? null,
