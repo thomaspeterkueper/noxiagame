@@ -1,8 +1,10 @@
 // app/api/game/trade/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 01.09.2026 — persistente Schiff→Landing-Pad-Zuordnung bei Travel
-// Version:      0.8.0
+// Aktualisiert: 09.09.2026 — Docking-Schema + modulare Raumhafen-Pads
+// Version:      0.8.2
 //
+// v0.8.2 – Docking-Assignments verwenden ship_id als tatsächlichen Primärschlüssel;
+//   modulare Raumhafen-Pads auf der Erde zählen als reguläre Docking-Pads.
 // v0.8.0 – Docking-Kapazität: Ziele mit operationalen Landing-Pads werden
 //   serverseitig gegen konkrete ship_docking_assignments geprüft. Ziele ohne
 //   verwaltete Pads bleiben im Legacy-Modus, damit bestehende Welten nicht
@@ -73,13 +75,13 @@ async function reserveDestinationPad(input: {
     .select('id, profile_id, entity_type, entity_id, parent_id, slot, status, condition')
     .eq('location_id', input.destinationLocationId)
     .eq('entity_type', 'building')
-    .in('entity_id', ['landing_pad', 'landing_pad_extra_pad'])
+    .in('entity_id', ['landing_pad', 'landing_pad_extra_pad', 'spaceport_pad_mini', 'spaceport_pad_standard'])
 
   if (padError) return { managed: false, padEntityId: null, error: padError.message }
 
   const rows = (padRows ?? []) as any[]
   const basePads = rows
-    .filter(row => row.entity_id === 'landing_pad')
+    .filter(row => ['landing_pad', 'spaceport_pad_mini', 'spaceport_pad_standard'].includes(row.entity_id))
     .map(row => ({ id: row.id, status: row.status, condition: row.condition, profileId: row.profile_id ?? null }))
 
   const expansions = rows
@@ -115,7 +117,7 @@ async function reserveDestinationPad(input: {
 
   const { data: assignmentRows, error: assignmentError } = await serviceClient
     .from('ship_docking_assignments')
-    .select('id, ship_id, location_id, pad_entity_id')
+    .select('ship_id, location_id, pad_entity_id')
     .eq('location_id', input.destinationLocationId)
 
   if (assignmentError) return { managed: true, padEntityId: null, error: assignmentError.message }
@@ -137,24 +139,24 @@ async function reserveDestinationPad(input: {
     for (const ship of shipOwnerRows ?? []) shipOwnerById[ship.id] = ship.profile_id ?? null
   }
 
-  const invalidAssignmentIds: string[] = []
+  const invalidAssignmentShipIds: string[] = []
   for (const row of assignmentRows ?? []) {
     const padOwner = padOwnerById[row.pad_entity_id] ?? null
     const shipOwner = shipOwnerById[row.ship_id] ?? null
     if (padOwner != null && shipOwner != null && padOwner !== shipOwner) {
-      invalidAssignmentIds.push(row.id)
+      invalidAssignmentShipIds.push(row.ship_id)
     }
   }
-  if (invalidAssignmentIds.length > 0) {
+  if (invalidAssignmentShipIds.length > 0) {
     const { error: cleanupError } = await serviceClient
       .from('ship_docking_assignments')
       .delete()
-      .in('id', invalidAssignmentIds)
+      .in('ship_id', invalidAssignmentShipIds)
     if (cleanupError) return { managed: true, padEntityId: null, error: cleanupError.message }
   }
 
   const assignments = (assignmentRows ?? [])
-    .filter(row => !invalidAssignmentIds.includes(row.id))
+    .filter(row => !invalidAssignmentShipIds.includes(row.ship_id))
     .map(row => ({
       shipId: row.ship_id,
       locationId: row.location_id,
