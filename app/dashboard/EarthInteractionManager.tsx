@@ -117,20 +117,21 @@ export default function EarthInteractionManager() {
       if (current === NAMIBIA_REGION) {
         if (eyebrow && eyebrow.textContent !== 'NOXIA EARTH · NAMIBIA 2086') eyebrow.textContent = 'NOXIA EARTH · NAMIBIA 2086'
         if (title && title.textContent !== 'Erongo-Korridor · Walvis Bay') title.textContent = 'Erongo-Korridor · Walvis Bay'
-        if (copy && copy.textContent !== 'Reale OSM- und Geländedaten für den zweiten Erdraum. Analyse ist aktiv; Baupersistenz bleibt bis zur regionalen Frame-Migration im Sauerland gesperrt.') {
-          copy.textContent = 'Reale OSM- und Geländedaten für den zweiten Erdraum. Analyse ist aktiv; Baupersistenz bleibt bis zur regionalen Frame-Migration im Sauerland gesperrt.'
-        }
+        const namibiaCopy = 'Reale OSM- und Geländedaten im globalen WGS84-Erdraum. Lokale Meterprojektion für Analyse und Bauen.'
+        if (copy && copy.textContent !== namibiaCopy) copy.textContent = namibiaCopy
       }
 
+      let badge = actions.querySelector<HTMLElement>('[data-noxia-earth-analysis-mode]')
       if (current === NAMIBIA_REGION) {
-        let badge = actions.querySelector<HTMLElement>('[data-noxia-earth-analysis-mode]')
         if (!badge) {
           badge = document.createElement('div')
           badge.dataset.noxiaEarthAnalysisMode = '1'
-          badge.textContent = 'ANALYSEMODUS · REGIONALE BAUPERSISTENZ FOLGT'
-          badge.style.cssText = 'padding:6px 8px;border:1px solid #b99542;border-radius:6px;background:#fff5d8;color:#765b18;font:800 8px system-ui;letter-spacing:.05em'
+          badge.style.cssText = 'padding:6px 8px;border:1px solid #68838a;border-radius:6px;background:#edf5f3;color:#35535d;font:800 8px system-ui;letter-spacing:.05em'
           actions.appendChild(badge)
         }
+        if (badge.textContent !== 'GLOBAL WGS84 · ERONGO-AUSSCHNITT') badge.textContent = 'GLOBAL WGS84 · ERONGO-AUSSCHNITT'
+      } else if (badge) {
+        badge.remove()
       }
     }
 
@@ -148,17 +149,6 @@ export default function EarthInteractionManager() {
           delete control.dataset.noxiaPointerGuard
         })
       }
-    }
-
-    const enforceRegionalBuildBoundary = () => {
-      if (readEarthRegion() !== NAMIBIA_REGION) return
-      const buildButton = document.querySelector<HTMLButtonElement>('.earth-site-panel .earth-build-open')
-      if (!buildButton) return
-      buildButton.disabled = true
-      buildButton.textContent = 'Analysemodus · Bauen in Namibia folgt'
-      buildButton.title = 'Weltobjekte benötigen vor dem Bauen einen persistenten Earth-Region-Key.'
-      buildButton.style.opacity = '.65'
-      buildButton.style.cursor = 'not-allowed'
     }
 
     const enhanceMapClickBridge = () => {
@@ -410,7 +400,6 @@ export default function EarthInteractionManager() {
     const enhance = () => {
       enhanceRegionControls()
       enhanceMapControlGuards()
-      enforceRegionalBuildBoundary()
       enhanceMapClickBridge()
       enhanceCandidate()
       void enhanceWorldObject()
