@@ -39,6 +39,12 @@ function parseSelectedObject(panel: HTMLElement) {
   return { name, xM: Number(match[1]), yM: Number(match[2]) }
 }
 
+function isInteractiveMapTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest(
+    'button,input,select,textarea,a,[role="button"],.earth-site-panel,.earth-object-panel,.earth-layer-control,.earth-map-tools,.earth-candidate',
+  ))
+}
+
 async function authHeaders() {
   const token = await getToken()
   if (!token) throw new Error('Nicht angemeldet')
@@ -49,6 +55,67 @@ export default function EarthInteractionManager() {
   useEffect(() => {
     let cancelled = false
     let objectLookupSerial = 0
+    const mapCleanups: Array<() => void> = []
+
+    const enhanceMapClickBridge = () => {
+      const map = document.querySelector<HTMLElement>('.earth-map')
+      if (!map || map.dataset.noxiaSpotClickBridge === '1') return
+      map.dataset.noxiaSpotClickBridge = '1'
+      map.style.cursor = 'crosshair'
+
+      let press: { pointerId: number; x: number; y: number; interactive: boolean } | null = null
+
+      const onPointerDown = (event: PointerEvent) => {
+        if (event.button !== 0 && event.pointerType === 'mouse') return
+        press = {
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          interactive: isInteractiveMapTarget(event.target),
+        }
+        if (!press.interactive) map.style.cursor = 'grabbing'
+      }
+
+      const onPointerUp = (event: PointerEvent) => {
+        const current = press
+        press = null
+        map.style.cursor = 'crosshair'
+        if (!current || current.pointerId !== event.pointerId || current.interactive) return
+        if (Math.hypot(event.clientX - current.x, event.clientY - current.y) > 4) return
+
+        // EarthRegionPreview captures the pointer on the map container while
+        // dragging. Browsers can therefore retarget the resulting click to the
+        // container instead of the SVG, so the native SVG onClick never sees a
+        // simple tap. Re-dispatch that click to the SVG after React has handled
+        // pointerup; its existing pointerToSpot logic remains authoritative.
+        window.setTimeout(() => {
+          if (cancelled || !document.body.contains(map)) return
+          const svg = map.querySelector<SVGSVGElement>('svg')
+          if (!svg) return
+          svg.dispatchEvent(new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          }))
+        }, 0)
+      }
+
+      const onPointerCancel = () => {
+        press = null
+        map.style.cursor = 'crosshair'
+      }
+
+      map.addEventListener('pointerdown', onPointerDown, true)
+      map.addEventListener('pointerup', onPointerUp, true)
+      map.addEventListener('pointercancel', onPointerCancel, true)
+      mapCleanups.push(() => {
+        map.removeEventListener('pointerdown', onPointerDown, true)
+        map.removeEventListener('pointerup', onPointerUp, true)
+        map.removeEventListener('pointercancel', onPointerCancel, true)
+        delete map.dataset.noxiaSpotClickBridge
+      })
+    }
 
     const openBuildAtMapCenter = () => {
       const svg = document.querySelector<SVGSVGElement>('.earth-map svg')
@@ -236,6 +303,7 @@ export default function EarthInteractionManager() {
     }
 
     const enhance = () => {
+      enhanceMapClickBridge()
       enhanceCandidate()
       void enhanceWorldObject()
     }
@@ -246,6 +314,7 @@ export default function EarthInteractionManager() {
     return () => {
       cancelled = true
       observer.disconnect()
+      for (const cleanup of mapCleanups) cleanup()
     }
   }, [])
 
