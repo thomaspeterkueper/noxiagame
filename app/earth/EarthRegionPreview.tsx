@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
+import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
+import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
 type GeoPoint = { lat:number; lon:number }
 type Feature = { id:string; featureType:string; properties:Record<string,string>; geometry:{kind:'point';coordinates:GeoPoint}|{kind:'line'|'polygon';coordinates:GeoPoint[]} }
@@ -64,6 +66,7 @@ export default function EarthRegionPreview(){
   const[selectedBuild,setSelectedBuild]=useState<BuildingDef|null>(null)
   const[rotationDeg,setRotationDeg]=useState(0)
   const[selectedWorldObjectId,setSelectedWorldObjectId]=useState<string|null>(null)
+  const[entryRequest,setEntryRequest]=useState<BuildingEntryRequest|null>(null)
   const[buildMessage,setBuildMessage]=useState<string|null>(null)
   const[placing,setPlacing]=useState(false)
   const[layers,setLayers]=useState<Record<LayerKey,boolean>>(defaultLayers)
@@ -95,6 +98,7 @@ export default function EarthRegionPreview(){
   useEffect(()=>{
     const cancel=(e:KeyboardEvent)=>{
       if(e.key!=='Escape')return
+      if(entryRequest){setEntryRequest(null);return}
       if(selectedBuild){setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);return}
       if(buildMenuOpen){setBuildMenuOpen(false);return}
       if(selectedWorldObjectId){setSelectedWorldObjectId(null);return}
@@ -102,7 +106,7 @@ export default function EarthRegionPreview(){
     }
     window.addEventListener('keydown',cancel)
     return()=>window.removeEventListener('keydown',cancel)
-  },[buildMenuOpen,selectedBuild,selectedWorldObjectId])
+  },[buildMenuOpen,selectedBuild,selectedWorldObjectId,entryRequest])
 
   const projection=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds;return{x:(lon:number)=>((lon-b.west)/(b.east-b.west))*1000,y:(lat:number)=>((b.north-lat)/(b.north-b.south))*1000,lon:(x:number)=>b.west+x/1000*(b.east-b.west),lat:(y:number)=>b.north-y/1000*(b.north-b.south)}},[data])
   const mapMetrics=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds,midLat=(b.south+b.north)/2,midLon=(b.west+b.east)/2;return{widthM:distanceMeters({lat:midLat,lon:b.west},{lat:midLat,lon:b.east}),heightM:distanceMeters({lat:b.south,lon:midLon},{lat:b.north,lon:midLon})}},[data])
@@ -140,6 +144,7 @@ export default function EarthRegionPreview(){
   },[projection,data,spatial,mapMetrics])
 
   const selectedWorldObject=useMemo(()=>selectedWorldObjectId?placed.find(b=>b.id===selectedWorldObjectId&&!b.pending)??null:null,[placed,selectedWorldObjectId])
+  const selectedEntry=selectedWorldObject?getBuildingEntryDefinition(selectedWorldObject.typeId):null
   const placementPreview=useMemo(()=>{
     if(!selectedSpot||!selectedBuild||!mapMetrics)return null
     const widthSvg=selectedBuild.footprint.widthM/mapMetrics.widthM*1000
@@ -153,11 +158,11 @@ export default function EarthRegionPreview(){
   function toggleLayer(key:LayerKey){setLayers(v=>({...v,[key]:!v[key]}))}
   function setCamera(nextZoom:number,centerX:number,centerY:number){setZoom(nextZoom);setOffset({x:500-centerX*nextZoom,y:500-centerY*nextZoom})}
   function clearPlacement(){setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null)}
-  function chooseWorldObject(id:string){setSelectedWorldObjectId(id);setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}
+  function chooseWorldObject(id:string){setEntryRequest(null);setSelectedWorldObjectId(id);setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}
 
   async function focusGeoPoint(point:GeoPoint,label:string){
     if(focusLoading)return
-    setFocusLoading(true);setFocusError(null);clearPlacement();setSelectedWorldObjectId(null)
+    setFocusLoading(true);setFocusError(null);clearPlacement();setSelectedWorldObjectId(null);setEntryRequest(null)
     try{
       const q=new URLSearchParams({lat:String(point.lat),lon:String(point.lon),radiusKm:String(LOCAL_DETAIL_RADIUS_KM),v:EARTH_DATA_VERSION})
       const response=await fetch(`/api/earth/region?${q}`,{cache:'no-store'})
@@ -169,7 +174,7 @@ export default function EarthRegionPreview(){
     finally{setFocusLoading(false)}
   }
 
-  function resetOverview(){if(overviewData)setData(overviewData);setZoom(1);setOffset({x:0,y:0});setFocusLabel(null);setFocusError(null);setSelected(null);clearPlacement();setSelectedWorldObjectId(null)}
+  function resetOverview(){if(overviewData)setData(overviewData);setZoom(1);setOffset({x:0,y:0});setFocusLabel(null);setFocusError(null);setSelected(null);clearPlacement();setSelectedWorldObjectId(null);setEntryRequest(null)}
   function zoomAroundCenter(direction:1|-1){const factor=direction>0?1.15:.87,nextZoom=clamp(zoom*factor,.7,128),centerX=(500-offset.x)/zoom,centerY=(500-offset.y)/zoom;setCamera(nextZoom,centerX,centerY)}
 
   function pointerToSpot(e:{clientX:number;clientY:number}){if(!projection||!data?.region?.origin||!mapGroupRef.current)return null;const svg=mapGroupRef.current.ownerSVGElement,ctm=mapGroupRef.current.getScreenCTM();if(!svg||!ctm)return null;const point=svg.createSVGPoint();point.x=e.clientX;point.y=e.clientY;const local=point.matrixTransform(ctm.inverse()),geo={lon:projection.lon(local.x),lat:projection.lat(local.y)},metric=geoToLocalMeters(geo,data.region.origin);return{mapX:local.x,mapY:local.y,xM:metric.eastM,yM:metric.northM}}
@@ -202,7 +207,7 @@ export default function EarthRegionPreview(){
       onPointerDown={e=>{drag.current={x:e.clientX,y:e.clientY,ox:offset.x,oy:offset.y,moved:false};e.currentTarget.setPointerCapture(e.pointerId)}}
       onPointerMove={e=>{if(!drag.current)return;const dx=e.clientX-drag.current.x,dy=e.clientY-drag.current.y;if(Math.hypot(dx,dy)>4)drag.current.moved=true;setOffset({x:drag.current.ox+dx,y:drag.current.oy+dy})}}
       onPointerUp={e=>{suppressMapClick.current=Boolean(drag.current?.moved);drag.current=null;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}}}>
-      <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" onClick={e=>{if(suppressMapClick.current){suppressMapClick.current=false;return}const next=pointerToSpot(e);if(next){setSelectedSpot(next);setSelectedWorldObjectId(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}}}>
+      <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" onClick={e=>{if(suppressMapClick.current){suppressMapClick.current=false;return}const next=pointerToSpot(e);if(next){setSelectedSpot(next);setSelectedWorldObjectId(null);setEntryRequest(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}}}>
         <rect width="1000" height="1000" fill="#9caf78"/>
         <g ref={mapGroupRef} transform={`translate(${offset.x} ${offset.y}) scale(${zoom})`}>
           {layers.relief&&terrainOverlay.map(c=><rect key={`relief-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w*1.08} height={c.h*1.08} fill={c.shade} opacity={c.shadeOpacity}/>) }
@@ -271,7 +276,7 @@ export default function EarthRegionPreview(){
           <div><span>Ausrichtung</span><b>{normalizeRotation(Number(selectedWorldObject.rotation??0))}°</b></div>
           <div><span>Footprint</span><b>{selectedWorldObject.widthM}×{selectedWorldObject.depthM} m</b></div>
         </div>
-        <div className="earth-object-ready">Dieses Gebäude ist ein persistentes, fertiges world-space Objekt. Funktions-, Produktions- und Logistikaktionen können jetzt an dieses Objektpanel angeschlossen werden.</div>
+        {selectedEntry?<div className="earth-entry"><button className="earth-enter-button" onClick={()=>setEntryRequest({entityId:selectedWorldObject.id,buildingTypeId:selectedWorldObject.typeId,buildingName:selectedWorldObject.name,kind:selectedEntry.kind})}><span>Betreten →</span><strong>{selectedEntry.label}</strong><small>{selectedEntry.hint}</small></button></div>:<div className="earth-object-ready">Für diesen Gebäudetyp ist noch keine betretbare Funktion angebunden. Das Weltobjekt selbst bleibt vollständig persistent.</div>}
       </div>}
 
       {active&&!selectedSpot&&!selectedWorldObject&&<div className="earth-candidate"><button onClick={()=>setSelected(null)}>×</button><small>PRÜFSTANDORT {active.shortlistLabel}</small><strong>{active.score.toFixed(0)} / 100</strong><span>{active.elevationM.toFixed(0)} m Höhe · {active.slopePercent.toFixed(1)} % Neigung · {active.reliefM.toFixed(0)} m Relief</span><span>Straße {active.roadDistanceM??'–'} m · Bahn {active.railDistanceM??'–'} m</span><p>{active.reasons.join(' · ')}</p><em>{active.shortlistReason}. Noch keine kanonische Platzierung.</em></div>}
@@ -279,6 +284,8 @@ export default function EarthRegionPreview(){
     </div>
 
     <div className="earth-foot"><span>{candidateData?.attribution||data.attribution}</span><span>{data.detail?`Lokale OSM-Details · ${data.featureCount??0} Objekte`:'DEM-Relief: Copernicus/Open-Meteo · Bebaubarkeit aus metrischen Terrain-Zellen'}</span></div>
+
+    {entryRequest&&<EarthBuildingAccessLayer request={entryRequest} onClose={()=>setEntryRequest(null)}/>} 
 
     <style jsx>{`
       .earth-shell{min-height:100%;background:#eef0e8;color:#1f3440;font-family:system-ui,sans-serif;padding:14px;box-sizing:border-box}
@@ -289,7 +296,7 @@ export default function EarthRegionPreview(){
       .earth-layer-control{position:absolute;right:14px;top:14px;z-index:4}.earth-layer-trigger{border:1px solid #47616d;background:#102632dc;color:#e9f0ed;border-radius:7px;padding:7px 10px;font-size:10px;font-weight:800;cursor:pointer;backdrop-filter:blur(4px)}.earth-layer-menu{margin-top:6px;width:172px;background:#0b1c27ed;border:1px solid #405965;border-radius:9px;padding:6px;box-shadow:0 8px 28px #10202745;backdrop-filter:blur(8px)}.earth-layer-menu button{width:100%;display:flex;gap:8px;align-items:center;border:0;background:transparent;color:#9fb2b8;padding:7px 8px;text-align:left;font-size:10px;border-radius:5px;cursor:pointer}.earth-layer-menu button:hover,.earth-layer-menu button.active{background:#173746;color:#f2e7ba}.earth-layer-menu button span{width:12px;color:#d4ad43}.earth-layer-disabled{padding:7px 8px;color:#64767c;font-size:9px;border-top:1px solid #263b44;margin-top:4px}
       .earth-detail-status{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:#102632e8;color:#f4f0dd;border:1px solid #58717a;border-radius:8px;padding:8px 12px;font-size:10px;font-weight:800}.earth-detail-status.error{background:#612f2fe8;border-color:#9c6262}
       .earth-site-panel,.earth-object-panel{position:absolute;left:14px;bottom:44px;z-index:6;width:min(390px,calc(100% - 28px));max-height:calc(100% - 78px);overflow:auto;background:#fffaf0f4;border:1px solid #a8893d;border-radius:11px;padding:12px;box-sizing:border-box;box-shadow:0 10px 34px #2b341f40;cursor:default;backdrop-filter:blur(8px)}.earth-object-panel{border-color:#567986}.earth-site-head{display:flex;justify-content:space-between;gap:12px}.earth-site-head small{display:block;color:#89691b;font-size:9px;font-weight:900;letter-spacing:.12em}.earth-object-panel .earth-site-head small{color:#466b78}.earth-site-head strong{display:block;font-size:15px;margin-top:2px}.earth-site-head button{border:0;background:none;font-size:20px;cursor:pointer}.earth-analysis-level,.earth-object-state{display:flex;justify-content:space-between;align-items:center;margin:9px 0;padding:7px 8px;background:#edf0e8;border-radius:6px;font-size:10px}.earth-analysis-level span,.earth-object-state span{color:#68777e}.earth-analysis-level b,.earth-object-state b{color:#335360}.earth-site-facts{display:grid;gap:5px}.earth-site-facts>div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e4ddc8;padding:5px 2px;font-size:10px}.earth-site-facts span{color:#6c7879}.earth-site-facts b{text-align:right;font-weight:800}.earth-site-facts .locked-info b{color:#907f63}.earth-site-facts .unknown-info b{color:#826f55}.earth-build-message{margin-top:9px;padding:7px 8px;background:#f3e5b9;border-radius:6px;font-size:10px;font-weight:800;color:#725516}.earth-build-open{width:100%;margin-top:10px;border:1px solid #8a6b21;background:#c89d35;color:#fffaf0;border-radius:7px;padding:9px;font-weight:900;cursor:pointer}.earth-build-picker,.earth-placement-editor{margin-top:10px}.earth-build-picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.earth-build-picker-head button{border:0;background:none;color:#6d5a2a;text-decoration:underline;cursor:pointer}.earth-build-options{display:grid;gap:6px}.earth-build-option{border:1px solid #c5b581;background:#fffdf7;border-radius:7px;padding:8px;text-align:left;display:grid;grid-template-columns:1fr auto;gap:3px 8px;color:#243940;cursor:pointer}.earth-build-option:hover:not(:disabled){border-color:#8a6b21;background:#fff7dc}.earth-build-option.locked{background:#efeee8;color:#777;cursor:not-allowed}.build-name{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px}.build-name strong{font-size:11px}.build-name em{font-style:normal;font-weight:900;color:#9a7622}.build-meta{grid-column:1/-1;font-size:9px;color:#718087}.req-ok,.req-no{font-size:9px;font-weight:800}.req-ok{color:#39704e}.req-no{color:#9a4f45}.earth-terrain-note{display:block;margin-top:9px;color:#857a66;font-size:8px;line-height:1.35}
-      .earth-placement-summary,.earth-rotation-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:6px 2px}.earth-placement-summary b,.earth-rotation-head b{color:#8a681b}.earth-rotation-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 7px}.earth-rotation-presets button,.earth-rotation-fine button,.earth-placement-actions button{border:1px solid #b9aa80;background:#fffdf7;color:#4b4a40;border-radius:6px;padding:7px;font-size:10px;font-weight:800;cursor:pointer}.earth-rotation-presets button.active{background:#d6ae45;color:#fffdf1;border-color:#8a681b}.earth-rotation-fine{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center}.earth-rotation-fine input{width:100%;accent-color:#a77f22}.earth-preview-note{display:block;margin-top:8px;color:#766b54;font-size:8px;line-height:1.35}.earth-placement-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:6px;margin-top:9px}.earth-placement-actions button.primary{background:#b88b27;color:#fffdf2;border-color:#805e18}.earth-placement-actions button:disabled{opacity:.55;cursor:wait}.earth-object-ready{margin-top:10px;padding:8px;background:#e8f0ef;border-radius:6px;color:#416069;font-size:9px;line-height:1.4}
+      .earth-placement-summary,.earth-rotation-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:6px 2px}.earth-placement-summary b,.earth-rotation-head b{color:#8a681b}.earth-rotation-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 7px}.earth-rotation-presets button,.earth-rotation-fine button,.earth-placement-actions button{border:1px solid #b9aa80;background:#fffdf7;color:#4b4a40;border-radius:6px;padding:7px;font-size:10px;font-weight:800;cursor:pointer}.earth-rotation-presets button.active{background:#d6ae45;color:#fffdf1;border-color:#8a681b}.earth-rotation-fine{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center}.earth-rotation-fine input{width:100%;accent-color:#a77f22}.earth-preview-note{display:block;margin-top:8px;color:#766b54;font-size:8px;line-height:1.35}.earth-placement-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:6px;margin-top:9px}.earth-placement-actions button.primary{background:#b88b27;color:#fffdf2;border-color:#805e18}.earth-placement-actions button:disabled{opacity:.55;cursor:wait}.earth-object-ready{margin-top:10px;padding:8px;background:#e8f0ef;border-radius:6px;color:#416069;font-size:9px;line-height:1.4}.earth-entry{margin-top:10px}.earth-enter-button{width:100%;border:1px solid #365e6c;background:#173f4d;color:#f5f1df;border-radius:8px;padding:10px 11px;display:grid;gap:2px;text-align:left;cursor:pointer;box-shadow:0 5px 14px #18384624}.earth-enter-button:hover{background:#205667}.earth-enter-button span{justify-self:end;color:#d7b85f;font-size:9px;font-weight:900;letter-spacing:.05em}.earth-enter-button strong{font-size:12px}.earth-enter-button small{color:#b9c8c8;font-size:9px;line-height:1.35}
       .earth-candidate{position:absolute;right:14px;top:58px;width:285px;background:#fffcf1ee;border:1px solid #b4933f;border-radius:9px;padding:12px 14px;display:grid;gap:5px;font-size:11px}.earth-candidate button{position:absolute;right:7px;top:5px;border:0;background:none;font-size:18px}.earth-candidate small{letter-spacing:.12em;color:#80651d;font-weight:800}.earth-candidate strong{font-size:23px;color:#9a7622}.earth-candidate p{margin:4px 0}.earth-candidate em{font-size:9px;color:#8a7d65}
       .earth-help{position:absolute;right:12px;bottom:10px;background:#203744d9;color:#edf4f4;border-radius:6px;padding:6px 9px;font-size:10px}.earth-foot{max-width:1500px;margin:8px auto 0;display:flex;justify-content:space-between;color:#728079;font-size:10px}.earth-loading{min-height:60vh;display:grid;place-items:center;background:#eef0e8;color:#53666e;font:600 14px system-ui}
       @media(max-width:900px){.earth-head{align-items:start;display:block}.earth-actions{margin-top:10px}.earth-stats{display:none}.earth-head h1{font-size:21px}.earth-map{min-height:500px;height:70vh}.earth-map-tools{left:10px;top:10px}.earth-layer-control{right:10px;top:10px}.earth-site-panel,.earth-object-panel{left:10px;bottom:44px;width:calc(100% - 20px);max-height:60%}.earth-candidate{top:auto;bottom:58px;right:10px;left:10px;width:auto}.earth-foot{display:block}.earth-foot span{display:block;margin-top:3px}.earth-focus{max-width:120px}}
