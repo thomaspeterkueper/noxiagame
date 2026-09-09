@@ -50,9 +50,50 @@ export default function EarthInteractionManager() {
     let cancelled = false
     let objectLookupSerial = 0
 
+    const openBuildAtMapCenter = () => {
+      const svg = document.querySelector<SVGSVGElement>('.earth-map svg')
+      if (!svg) return
+      const rect = svg.getBoundingClientRect()
+      const dispatchCenterClick = () => svg.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }))
+
+      // A previous drag may intentionally suppress the next map click. Try once,
+      // then retry only when React still has not produced a selected-site panel.
+      dispatchCenterClick()
+      window.setTimeout(() => {
+        if (!document.querySelector('.earth-site-panel')) dispatchCenterClick()
+      }, 40)
+
+      // Candidate -> selected spot -> native site-first building picker. Keep the
+      // existing React flow authoritative; this bridge only opens it reliably.
+      let attempts = 0
+      const openPicker = () => {
+        if (cancelled) return
+        const buildButton = document.querySelector<HTMLButtonElement>('.earth-site-panel .earth-build-open')
+        if (buildButton) {
+          buildButton.click()
+          return
+        }
+        attempts += 1
+        if (attempts < 20) window.setTimeout(openPicker, 50)
+      }
+      window.setTimeout(openPicker, 0)
+    }
+
     const enhanceCandidate = () => {
       const panel = document.querySelector<HTMLElement>('.earth-candidate')
       if (!panel) return
+
+      const localFocus = document.querySelector<HTMLElement>('.earth-focus')
+      const ready = Boolean(localFocus && /Prüfstandort/i.test(localFocus.textContent ?? ''))
+      const label = ready ? 'An diesem Standort bauen' : 'Standortdetails werden geladen …'
+      const opacity = ready ? '1' : '0.55'
+      const cursor = ready ? 'pointer' : 'wait'
+
       let button = panel.querySelector<HTMLButtonElement>('[data-noxia-candidate-build]')
       if (!button) {
         button = document.createElement('button')
@@ -62,25 +103,18 @@ export default function EarthInteractionManager() {
         button.onclick = event => {
           event.preventDefault()
           event.stopPropagation()
-          const svg = document.querySelector<SVGSVGElement>('.earth-map svg')
-          if (!svg) return
-          const rect = svg.getBoundingClientRect()
-          svg.dispatchEvent(new MouseEvent('click', {
-            bubbles: true,
-            cancelable: true,
-            clientX: rect.left + rect.width / 2,
-            clientY: rect.top + rect.height / 2,
-          }))
+          if (!button?.disabled) openBuildAtMapCenter()
         }
         panel.appendChild(button)
       }
 
-      const localFocus = document.querySelector<HTMLElement>('.earth-focus')
-      const ready = Boolean(localFocus && /Prüfstandort/i.test(localFocus.textContent ?? ''))
-      button.disabled = !ready
-      button.textContent = ready ? 'An diesem Standort bauen' : 'Standortdetails werden geladen …'
-      button.style.opacity = ready ? '1' : '.55'
-      button.style.cursor = ready ? 'pointer' : 'wait'
+      // Do not rewrite textContent on every MutationObserver pass. Replacing the
+      // text node creates a new mutation and previously caused a self-triggering
+      // observer loop exactly after opening a spaceport candidate.
+      if (button.disabled !== !ready) button.disabled = !ready
+      if (button.textContent !== label) button.textContent = label
+      if (button.style.opacity !== opacity) button.style.opacity = opacity
+      if (button.style.cursor !== cursor) button.style.cursor = cursor
     }
 
     const enhanceWorldObject = async () => {
@@ -208,7 +242,7 @@ export default function EarthInteractionManager() {
 
     enhance()
     const observer = new MutationObserver(enhance)
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+    observer.observe(document.body, { childList: true, subtree: true })
     return () => {
       cancelled = true
       observer.disconnect()
