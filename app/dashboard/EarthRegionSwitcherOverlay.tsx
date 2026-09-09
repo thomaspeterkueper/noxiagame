@@ -86,7 +86,7 @@ export default function EarthRegionSwitcherOverlay(){
       <button type="button" style={buttonStyle(NAMIBIA_REGION)} onClick={()=>selectRegion(NAMIBIA_REGION)}>Namibia · Erongo</button>
       <form onSubmit={runSearch} style={{display:'flex',gap:4,flex:'1 1 280px',minWidth:0}}>
         <input value={query} onChange={event=>setQuery(event.currentTarget.value)} placeholder="Ort oder 51.33745, 7.97975" aria-label="Ort oder Koordinate auf der Erde suchen" autoComplete="off" style={{minWidth:0,flex:1,border:'1px solid rgba(112,143,151,.72)',borderRadius:6,padding:'7px 9px',background:'rgba(240,246,244,.96)',color:'#17313c',font:'700 10px system-ui,sans-serif',outline:'none'}}/>
-        <button type="submit" disabled={searchDisabled} style={{border:'1px solid #9c7b2b',borderRadius:6,padding:'7px 10px',background:'#b88b27',color:'#fffdf2',font:'900 9px system-ui,sans-serif',cursor:searching?'wait':'pointer',opacity:searchDisabled?.55:1,whiteSpace:'nowrap'}}>{searching?'Suche …':'Springen'}</button>
+        <button type="submit" disabled={searchDisabled} style={{border:'1px solid #9c7b2b',borderRadius:6,padding:'7px 10px',background:'#b88b27',color:'#fffdf2',font:'900 9px system-ui,sans-serif',cursor:searching?'wait':'pointer',opacity:searchDisabled ? .55 : 1,whiteSpace:'nowrap'}}>{searching?'Suche …':'Springen'}</button>
       </form>
     </div>
     {viewLabel&&<div style={{justifySelf:'center',maxWidth:'calc(100% - 24px)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',padding:'5px 9px',borderRadius:7,border:'1px solid rgba(104,131,138,.58)',background:'rgba(7,17,27,.84)',color:'#d5e5e7',font:'800 9px system-ui,sans-serif'}}>Aktueller Ausschnitt · {viewLabel}</div>}
