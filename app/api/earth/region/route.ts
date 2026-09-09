@@ -5,7 +5,10 @@ import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regi
 
 const source = new OverpassEarthFeatureSource()
 
-export const revalidate = 300
+export const revalidate = 0
+
+const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
+const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
 
 const SELMECKE_REFERENCE_FEATURE: ImportedEarthFeature = {
   id: 'noxia:site:selmecke-reference',
@@ -28,6 +31,12 @@ const SELMECKE_REFERENCE_FEATURE: ImportedEarthFeature = {
   },
 }
 
+function finiteCoordinate(raw: string | null, min: number, max: number) {
+  if (raw == null || raw.trim() === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) && value >= min && value <= max ? value : null
+}
+
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams
   const requestedRegionId = p.get('region')
@@ -35,17 +44,20 @@ export async function GET(req: NextRequest) {
     ?? EARTH_SAUERLAND_REGION.id
   const viewRegion = getEarthRegion(requestedRegionId) ?? EARTH_SAUERLAND_REGION
 
-  const rawLat = p.get('lat')
-  const rawLon = p.get('lon')
-  const requestedLat = rawLat === null ? Number.NaN : Number(rawLat)
-  const requestedLon = rawLon === null ? Number.NaN : Number(rawLon)
-  const hasLocalCenter = rawLat !== null && rawLon !== null && Number.isFinite(requestedLat) && Number.isFinite(requestedLon)
+  const queryLat = finiteCoordinate(p.get('lat'), -90, 90)
+  const queryLon = finiteCoordinate(p.get('lon'), -180, 180)
+  const cookieLat = finiteCoordinate(req.cookies.get(EARTH_VIEW_LAT_COOKIE)?.value ?? null, -90, 90)
+  const cookieLon = finiteCoordinate(req.cookies.get(EARTH_VIEW_LON_COOKIE)?.value ?? null, -180, 180)
+  const localLat = queryLat ?? cookieLat
+  const localLon = queryLon ?? cookieLon
+  const hasLocalCenter = localLat != null && localLon != null
   const center = hasLocalCenter
-    ? { lat: requestedLat, lon: requestedLon }
+    ? { lat: localLat, lon: localLon }
     : viewRegion.origin
   const radiusKm = Math.min(6, Math.max(.2, Number(p.get('radiusKm') ?? (hasLocalCenter ? .6 : 3))))
   const latDelta = radiusKm / 111.32
-  const lonDelta = radiusKm / (111.32 * Math.cos(center.lat * Math.PI / 180))
+  const cosLat = Math.max(.05, Math.abs(Math.cos(center.lat * Math.PI / 180)))
+  const lonDelta = radiusKm / (111.32 * cosLat)
   const bounds = {
     south: center.lat - latDelta,
     west: center.lon - lonDelta,
@@ -55,7 +67,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const imported = await source.load({ bounds, classes: CURRENT_EARTH_BOOTSTRAP_CLASSES })
-    const features = !hasLocalCenter && viewRegion.id === EARTH_SAUERLAND_REGION.id
+    const containsSelmecke = SELMECKE_REFERENCE_FEATURE.geometry.kind === 'point'
+      && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat >= bounds.south
+      && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat <= bounds.north
+      && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon >= bounds.west
+      && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon <= bounds.east
+    const features = containsSelmecke
       ? [...imported, SELMECKE_REFERENCE_FEATURE]
       : imported
 
@@ -73,13 +90,17 @@ export async function GET(req: NextRequest) {
       features,
       attribution: '© OpenStreetMap contributors · ODbL · NOXIA canonical sites',
     }, {
+      // This response is selected by cookies as well as query parameters. Do not
+      // edge-cache one user's Sauerland view and then replay it for Namibia.
       headers: {
-        'Cache-Control': hasLocalCenter
-          ? 'public, s-maxage=120, stale-while-revalidate=300'
-          : 'public, s-maxage=900, stale-while-revalidate=3600',
+        'Cache-Control': 'private, no-store, max-age=0',
+        'Vary': 'Cookie',
       },
     })
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Earth source unavailable' }, { status: 503 })
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Earth source unavailable' }, {
+      status: 503,
+      headers: { 'Cache-Control': 'private, no-store, max-age=0', 'Vary': 'Cookie' },
+    })
   }
 }
