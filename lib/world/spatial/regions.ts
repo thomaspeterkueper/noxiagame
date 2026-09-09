@@ -4,10 +4,10 @@ import { EARTH_CELL_SIZE_M, EARTH_CHUNK_SIZE_M } from './earthSpatial'
 /**
  * NOXIA Earth streaming anchors.
  *
- * An anchor is deliberately not a map boundary. It gives a regional metric
- * projection a stable origin while geography can stream indefinitely around
- * it. Persistence is still bound to the Sauerland frame until regional Earth
- * placement receives its own persisted region key.
+ * An anchor is deliberately not a map boundary and never owns an object's
+ * canonical position. Earth persistence is global WGS84 latitude/longitude;
+ * anchors only provide stable local metre projections for rendering,
+ * construction geometry, terrain sampling and chunk streaming.
  */
 export const EARTH_SAUERLAND_REGION: EarthRegionAnchor = {
   id: 'earth-sauerland',
@@ -25,8 +25,8 @@ export const EARTH_SAUERLAND_REGION: EarthRegionAnchor = {
  *
  * The coastal anchor deliberately contrasts Sauerland: arid terrain, major
  * port logistics, strong solar potential and large open development areas.
- * It starts as a real-data analysis region; building persistence follows once
- * Earth world objects carry a regional frame identifier.
+ * Buildings created here persist globally in WGS84 and can be reprojected into
+ * this or any future Earth view without changing their identity.
  */
 export const EARTH_NAMIBIA_ERONGO_REGION: EarthRegionAnchor = {
   id: 'earth-namibia-erongo',
