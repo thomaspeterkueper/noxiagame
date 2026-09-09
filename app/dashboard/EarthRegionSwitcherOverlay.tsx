@@ -8,6 +8,9 @@ const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
 const EARTH_VIEW_LABEL_COOKIE = 'noxia-earth-view-label'
 const SAUERLAND_REGION = 'earth-sauerland'
 const NAMIBIA_REGION = 'earth-namibia-erongo'
+const SELMECKE = { lat: 51.33745, lon: 7.97975, label: 'Selmecke · NOXIA-Referenzstandort' }
+const SAUERLAND_ORIGIN = { lat: 51.325, lon: 8.005 }
+const NAMIBIA_ORIGIN = { lat: -22.9576, lon: 14.5053 }
 
 type EarthRegionId = typeof SAUERLAND_REGION | typeof NAMIBIA_REGION
 type SearchResult = { id:string; label:string; lat:number; lon:number; kind:string; source:'coordinates'|'nominatim' }
@@ -26,6 +29,8 @@ function readRegion():EarthRegionId{
 function setCookie(name:string,value:string){document.cookie=`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=31536000; SameSite=Lax`}
 function clearCookie(name:string){document.cookie=`${name}=; Path=/; Max-Age=0; SameSite=Lax`}
 function clearCustomView(){clearCookie(EARTH_VIEW_LAT_COOKIE);clearCookie(EARTH_VIEW_LON_COOKIE);clearCookie(EARTH_VIEW_LABEL_COOKIE)}
+function distanceScore(lat:number,lon:number,origin:{lat:number;lon:number}){const dx=(lon-origin.lon)*Math.cos((lat+origin.lat)*Math.PI/360);const dy=lat-origin.lat;return dx*dx+dy*dy}
+function nearestRegion(lat:number,lon:number):EarthRegionId{return distanceScore(lat,lon,NAMIBIA_ORIGIN)<distanceScore(lat,lon,SAUERLAND_ORIGIN)?NAMIBIA_REGION:SAUERLAND_REGION}
 
 function selectRegion(region:EarthRegionId){
   clearCustomView()
@@ -33,12 +38,15 @@ function selectRegion(region:EarthRegionId){
   window.location.reload()
 }
 
-function selectTarget(result:SearchResult){
-  setCookie(EARTH_VIEW_LAT_COOKIE,String(result.lat))
-  setCookie(EARTH_VIEW_LON_COOKIE,String(result.lon))
-  setCookie(EARTH_VIEW_LABEL_COOKIE,result.label.slice(0,180))
+function selectPoint(lat:number,lon:number,label:string,region:EarthRegionId=nearestRegion(lat,lon)){
+  setCookie(EARTH_REGION_COOKIE,region)
+  setCookie(EARTH_VIEW_LAT_COOKIE,String(lat))
+  setCookie(EARTH_VIEW_LON_COOKIE,String(lon))
+  setCookie(EARTH_VIEW_LABEL_COOKIE,label.slice(0,180))
   window.location.reload()
 }
+
+function selectTarget(result:SearchResult){selectPoint(result.lat,result.lon,result.label)}
 
 export default function EarthRegionSwitcherOverlay(){
   const[visible,setVisible]=useState(false)
@@ -59,7 +67,8 @@ export default function EarthRegionSwitcherOverlay(){
 
   if(!visible)return null
 
-  const buttonStyle=(id:EarthRegionId):React.CSSProperties=>({border:0,borderRadius:6,padding:'7px 10px',background:!viewLabel&&region===id?'#173f4d':'transparent',color:!viewLabel&&region===id?'#fffaf0':'#b7c9d0',font:'800 9px system-ui, sans-serif',letterSpacing:'.02em',cursor:'pointer',whiteSpace:'nowrap'})
+  const buttonStyle=(id:EarthRegionId):React.CSSProperties=>({border:0,borderRadius:6,padding:'7px 9px',background:!viewLabel&&region===id?'#173f4d':'transparent',color:!viewLabel&&region===id?'#fffaf0':'#b7c9d0',font:'800 9px system-ui,sans-serif',letterSpacing:'.02em',cursor:'pointer',whiteSpace:'nowrap'})
+  const selmeckeActive=Boolean(viewLabel?.startsWith('Selmecke'))
 
   const runSearch=async(event:FormEvent)=>{
     event.preventDefault()
@@ -80,9 +89,10 @@ export default function EarthRegionSwitcherOverlay(){
 
   const searchDisabled=searching||query.trim().length<2
 
-  return <div aria-label="Erdnavigation" style={{position:'fixed',zIndex:2260,top:51,left:'50%',transform:'translateX(-50%)',display:'grid',gap:4,width:'min(760px,calc(100vw - 24px))',pointerEvents:'auto'}}>
+  return <div aria-label="Erdnavigation" style={{position:'fixed',zIndex:2260,top:51,left:'50%',transform:'translateX(-50%)',display:'grid',gap:4,width:'min(860px,calc(100vw - 24px))',pointerEvents:'auto'}}>
     <div style={{display:'flex',gap:3,alignItems:'center',padding:3,border:'1px solid rgba(104,131,138,.72)',borderRadius:9,background:'rgba(7,17,27,.92)',boxShadow:'0 8px 24px rgba(0,0,0,.22)',backdropFilter:'blur(12px)'}}>
-      <button type="button" style={buttonStyle(SAUERLAND_REGION)} onClick={()=>selectRegion(SAUERLAND_REGION)}>Deutschland · Sauerland</button>
+      <button type="button" style={buttonStyle(SAUERLAND_REGION)} onClick={()=>selectRegion(SAUERLAND_REGION)}>Sauerland</button>
+      <button type="button" style={{...buttonStyle(SAUERLAND_REGION),background:selmeckeActive?'#7b6120':'transparent',color:selmeckeActive?'#fff8dc':'#d8c68c'}} onClick={()=>selectPoint(SELMECKE.lat,SELMECKE.lon,SELMECKE.label,SAUERLAND_REGION)}>Selmecke</button>
       <button type="button" style={buttonStyle(NAMIBIA_REGION)} onClick={()=>selectRegion(NAMIBIA_REGION)}>Namibia · Erongo</button>
       <form onSubmit={runSearch} style={{display:'flex',gap:4,flex:'1 1 280px',minWidth:0}}>
         <input value={query} onChange={event=>setQuery(event.currentTarget.value)} placeholder="Ort oder 51.33745, 7.97975" aria-label="Ort oder Koordinate auf der Erde suchen" autoComplete="off" style={{minWidth:0,flex:1,border:'1px solid rgba(112,143,151,.72)',borderRadius:6,padding:'7px 9px',background:'rgba(240,246,244,.96)',color:'#17313c',font:'700 10px system-ui,sans-serif',outline:'none'}}/>
