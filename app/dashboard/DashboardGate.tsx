@@ -1,8 +1,8 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 09.09.2026 — Earth-Interaktionen für Prüfstandorte und Eigentümeraktionen
-// Version:      0.5.7
+// Aktualisiert: 09.09.2026 — Earth-Interaktionen und globale Erdregion-Auswahl
+// Version:      0.5.8
 import React, { useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import DashboardClient from './DashboardClient'
@@ -16,6 +16,7 @@ import DashboardCockpitResponsive from './DashboardCockpitResponsive'
 import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
 import EarthInteractionManager from './EarthInteractionManager'
+import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
 import { T } from './ui'
 
 export default function DashboardGate({ locations, prices, orders }: { locations: any[]; prices: any[]; orders: any[] }) {
@@ -49,5 +50,6 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardContextManager />
     <DashboardFeedOverlay />
     <EarthInteractionManager />
+    <EarthRegionSwitcherOverlay />
   </>
 }
