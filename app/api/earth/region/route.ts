@@ -61,10 +61,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      // Compatibility boundary: current persisted Earth x/y values still use
-      // the Sauerland metric frame. The selected view region may be anywhere on
-      // Earth, but it must not silently reinterpret those persisted coordinates.
-      region: EARTH_SAUERLAND_REGION,
+      // The selected region is only the local ENU-like projection/cache frame.
+      // Persisted Earth positions are global WGS84 latitude/longitude and can
+      // therefore be reprojected into any Earth view without changing identity.
+      region: viewRegion,
       viewRegion,
       queryCenter: center,
       detail: hasLocalCenter,
