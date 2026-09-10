@@ -1,6 +1,6 @@
 // app/api/game/ships/route.ts
 // Aktualisiert: 10.09.2026 — atomarer Schiffstyp-Kauf/-Wechsel
-// Version:      0.4.0
+// Version:      0.4.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -21,6 +21,9 @@ async function getUserFromRequest(req: NextRequest) {
 
 function shipPurchaseError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('NOXIA_TRANSIT_SHIP_MUTATION_FORBIDDEN') || message.includes('NOXIA_TRANSIT_CARGO_MUTATION_FORBIDDEN')) {
+    return NextResponse.json({ error: 'Schiff kann während eines laufenden Transits nicht gewechselt werden.', code: 'SHIP_IN_TRANSIT' }, { status: 409 })
+  }
   if (message.includes('NOXIA_SHIP_TYPE_NOT_FOUND')) return NextResponse.json({ error: 'Schiffstyp nicht gefunden' }, { status: 404 })
   if (message.includes('NOXIA_SHIP_NOT_FOUND')) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
   if (message.includes('NOXIA_PROFILE_NOT_FOUND')) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
