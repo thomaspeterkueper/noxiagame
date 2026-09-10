@@ -1,17 +1,14 @@
 // app/api/cron/builds/route.ts
 // Erstellt: 31.05.2026
-// Aktualisiert: 23.06.2026 — BUILDABLE_ITEMS durch BUILDINGS aus buildings/index ersetzt
-// Version:      1.1.0
+// Aktualisiert: 10.09.2026 — atomarer Build-Abschluss über NOXIA Game Core
+// Version:      1.2.0
 //
-// Cron-Job: Prüft fertige Bauaufträge und aktiviert sie.
-// Läuft täglich um 11:00 UTC (vercel.json).
-//
-// Hinweis: completeBuild in build/route.ts erledigt dasselbe on-demand beim
-// nächsten Dashboard-Load. Dieser Cron ist der Fallback für Spieler die
-// mehrere Tage nicht einloggen.
+// Cron-Job: Prüft fällige Bauaufträge. Die eigentliche Zustandsänderung liegt
+// ausschließlich im transaktionalen Core-Command noxia_complete_build().
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { completeBuildCommand } from '@/lib/game/core/commands'
 import { CRON_SECRET_HEADER } from '@/lib/game/config'
 import { BUILDINGS } from '@/lib/game/buildings/index'
 
@@ -23,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
   const completed: Record<string, unknown>[] = []
-  const failed:    string[] = []
+  const failed: string[] = []
 
   try {
     const { data: readyBuilds, error: fetchError } = await supabase
@@ -42,40 +39,18 @@ export async function GET(req: NextRequest) {
           continue
         }
 
-        // Build-Status auf 'complete' setzen
-        const { error: updateError } = await supabase
-          .from('player_builds')
-          .update({ status: 'complete' })
-          .eq('id', build.id)
-
-        if (updateError) throw updateError
-
-        // Gebäude in tile_entities eintragen (Weltzustand)
-        if (!buildable.planned) {
-          const { error: entityError } = await supabase
-            .from('tile_entities')
-            .insert({
-              profile_id:  build.profile_id,
-              location_id: build.location_id,
-              tile_level:  build.tile_level ?? 0,
-              tile_row:    build.tile_row,
-              tile_col:    build.tile_col,
-              entity_type: 'building',
-              entity_id:   build.buildable_id,
-            })
-
-          if (entityError) throw entityError
-        }
+        const result = await completeBuildCommand(build.id, !buildable.planned)
 
         completed.push({
-          buildId:   build.id,
+          buildId: build.id,
           profileId: build.profile_id,
           buildable: buildable.name,
-          location:  build.locations?.slug,
-          tileRow:   build.tile_row,
-          tileCol:   build.tile_col,
+          location: build.locations?.slug,
+          tileRow: build.tile_row,
+          tileCol: build.tile_col,
+          entityId: result.entity_id ?? null,
+          idempotent: result.idempotent ?? false,
         })
-
       } catch (buildErr) {
         console.error(`Build ${build.id} fehlgeschlagen:`, buildErr)
         failed.push(build.id)
@@ -83,13 +58,12 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      ok:        true,
-      tick:      'builds',
+      ok: true,
+      tick: 'builds',
       completed: completed.length,
-      failed:    failed.length,
-      builds:    completed,
+      failed: failed.length,
+      builds: completed,
     })
-
   } catch (err) {
     console.error('Builds cron error:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
