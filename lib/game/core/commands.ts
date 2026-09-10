@@ -41,6 +41,18 @@ export type AtomicBuildResult = {
   idempotent?: boolean
 }
 
+export type AtomicTradeResult = {
+  order_id: string
+  ship_id: string
+  reward: number
+  base_reward: number
+  server_max_reward: number
+  credits: number
+  resource: string
+  cargo_amount: number
+  location_stock: number
+}
+
 function commandError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -98,4 +110,20 @@ export async function completeSaleCommand(buildId: string): Promise<AtomicBuildR
 
   if (error) throw commandError('noxia_complete_sale', error)
   return data as AtomicBuildResult
+}
+
+export async function fulfillTradeOrderCommand(
+  profileId: string,
+  orderId: string,
+  agreedReward: number | null,
+): Promise<AtomicTradeResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_fulfill_trade_order', {
+    p_profile_id: profileId,
+    p_order_id: orderId,
+    p_agreed_reward: agreedReward,
+  })
+
+  if (error) throw commandError('noxia_fulfill_trade_order', error)
+  return data as AtomicTradeResult
 }
