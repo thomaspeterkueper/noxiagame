@@ -53,6 +53,48 @@ export type AtomicTradeResult = {
   location_stock: number
 }
 
+export type BankMutationAction = 'deposit' | 'withdraw' | 'loan' | 'repay'
+
+export type AtomicBankResult = {
+  action: BankMutationAction
+  amount: number
+  credits: number
+  deposit: number
+  loan: number
+}
+
+export type SpotTradeAction = 'buy' | 'sell'
+
+export type AtomicSpotTradeResult = {
+  action: SpotTradeAction
+  ship_id: string
+  ship_type_id: string
+  location: string
+  resource: string
+  booked_amount: number
+  requested_amount: number
+  unit_price: number
+  tax_charged: number
+  tax_rate: number
+  profit: number
+  credits: number
+  cargo_amount: number
+  cargo_max: number
+  market_buy_price: number
+  market_sell_price: number
+  price_changed: boolean
+  username?: string | null
+}
+
+export type AtomicShipPurchaseResult = {
+  ship_id: string
+  ship_type_id: string
+  new_credits: number
+  cargo_max: number
+  speed_mult: number
+  location: string
+}
+
 function commandError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -126,4 +168,56 @@ export async function fulfillTradeOrderCommand(
 
   if (error) throw commandError('noxia_fulfill_trade_order', error)
   return data as AtomicTradeResult
+}
+
+export async function bankMutationCommand(
+  profileId: string,
+  locationId: string,
+  action: BankMutationAction,
+  amount: number,
+  creditLimit: number | null = null,
+): Promise<AtomicBankResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_bank_mutation', {
+    p_profile_id: profileId,
+    p_location_id: locationId,
+    p_action: action,
+    p_amount: amount,
+    p_credit_limit: creditLimit,
+  })
+
+  if (error) throw commandError('noxia_bank_mutation', error)
+  return data as AtomicBankResult
+}
+
+export async function spotTradeCommand(
+  profileId: string,
+  action: SpotTradeAction,
+  resource: string,
+  amount: number,
+): Promise<AtomicSpotTradeResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_spot_trade', {
+    p_profile_id: profileId,
+    p_action: action,
+    p_resource: resource,
+    p_amount: amount,
+  })
+
+  if (error) throw commandError('noxia_spot_trade', error)
+  return data as AtomicSpotTradeResult
+}
+
+export async function buyShipTypeCommand(
+  profileId: string,
+  shipTypeId: string,
+): Promise<AtomicShipPurchaseResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_buy_ship_type', {
+    p_profile_id: profileId,
+    p_ship_type_id: shipTypeId,
+  })
+
+  if (error) throw commandError('noxia_buy_ship_type', error)
+  return data as AtomicShipPurchaseResult
 }
