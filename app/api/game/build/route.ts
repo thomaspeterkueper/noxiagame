@@ -1,10 +1,11 @@
 // route.ts
-// Aktualisiert: 20.07.2026 — C: lease_building + revoke_lease (Staatliche Konzessionen)
-// Version:      1.5.0
+// Aktualisiert: 10.09.2026 — atomare Core-Commands für Start/Abschluss/Verkaufsabschluss
+// Version:      1.6.0
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
 import { BUILDINGS } from '@/lib/game/buildings'
+import { completeBuildCommand, completeSaleCommand, startBuildCommand } from '@/lib/game/core/commands'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 
@@ -148,8 +149,8 @@ export async function GET(req: NextRequest) {
       .lte('completes_at', new Date().toISOString())
 
     for (const build of due ?? []) {
-      if (build.status === 'building') await completeBuild(build, user.id)
-      if (build.status === 'selling') await completeSale(build, user.id)
+      if (build.status === 'building') await completeBuild(build)
+      if (build.status === 'selling') await completeSale(build)
     }
 
     const { data: active } = await serviceClient
@@ -273,10 +274,30 @@ export async function GET(req: NextRequest) {
     const completesAt = new Date()
     completesAt.setHours(completesAt.getHours() + buildTimeTicks * 24)
 
-    await serviceClient.from('player_builds').insert({ profile_id: user.id, buildable_id: buildableId, target_type: 'building', location_id: location.id, tile_level: tileLevel, tile_row: tileRow, tile_col: tileCol, status: 'building', completes_at: completesAt.toISOString() })
-    await serviceClient.from('profiles').update({ credits: profile.credits - buildingDef.cost_credits }).eq('id', user.id)
+    try {
+      const result = await startBuildCommand({
+        profileId: user.id,
+        buildableId,
+        locationId: location.id,
+        costCredits: buildingDef.cost_credits,
+        completesAt: completesAt.toISOString(),
+        tileLevel,
+        tileRow,
+        tileCol,
+        placementMode: 'legacy_tile',
+      })
 
-    return NextResponse.json({ ok: true, newCredits: profile.credits - buildingDef.cost_credits, buildable: rawDef?.name ?? buildableId, completesAt: completesAt.toISOString() })
+      return NextResponse.json({
+        ok: true,
+        buildId: result.build_id,
+        newCredits: result.credits,
+        buildable: rawDef?.name ?? buildableId,
+        completesAt: result.completes_at ?? completesAt.toISOString(),
+      })
+    } catch (error) {
+      console.error('Atomic build start failed:', error)
+      return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 })
+    }
   }
 
   if (action === 'cancel') {
@@ -312,7 +333,6 @@ export async function GET(req: NextRequest) {
     const { data: entity } = await serviceClient.from('tile_entities').select('*').eq('id', entityId).eq('profile_id', user.id).in('entity_type', ['building', 'module']).single()
     if (!entity) return NextResponse.json({ error: 'Gebäude nicht gefunden oder gehört dir nicht' }, { status: 404 })
 
-    // ── Station-Modul: sofortiger Rückkauf (20% Rückbau-Abschlag) ──────────
     if (entity.entity_type === 'module') {
       const moduleDef = MODULE_COSTS[entity.entity_id]
       if (!moduleDef) return NextResponse.json({ error: 'Modul-Definition nicht gefunden' }, { status: 400 })
@@ -338,8 +358,6 @@ export async function GET(req: NextRequest) {
     const payout = mode === 'instant' ? result.quote.valueInstant : result.quote.valueNormal
     const { data: profile } = await serviceClient.from('profiles').select('credits').eq('id', user.id).single()
     if (payout < 0 && (profile?.credits ?? 0) < Math.abs(payout)) return NextResponse.json({ error: `Entsorgung kostet ${Math.abs(payout)} Cr – unzureichende Credits.` }, { status: 400 })
-    // ── Doppel-Verkaufsschutz: atomarer DELETE ───────────────────────────────
-    // Supabase gibt gelöschte Zeilen zurück. Wenn leer → Race Condition → 409.
     const { data: deleted, error: delErr } = await serviceClient
       .from('tile_entities')
       .delete()
@@ -363,15 +381,21 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: 'Ungültige Aktion' }, { status: 400 })
 }
 
-async function completeBuild(build: any, profileId: string) {
-  const def = await loadBuildingDef(build.buildable_id)
-  if (!def) return
-  await serviceClient.from('player_builds').update({ status: 'complete' }).eq('id', build.id)
-  await serviceClient.from('tile_entities').insert({ profile_id: profileId, location_id: build.location_id, tile_level: build.tile_level ?? 0, tile_row: build.tile_row, tile_col: build.tile_col, entity_type: 'building', entity_id: build.buildable_id, owner_class: 'PLAYER', owner_id: profileId })
+async function completeBuild(build: any) {
+  const planned = BUILDINGS[build.buildable_id]?.planned ?? false
+  const def = planned ? null : await loadBuildingDef(build.buildable_id)
+  if (!planned && !def) return
+  try {
+    await completeBuildCommand(build.id, !planned)
+  } catch (error) {
+    console.error(`Atomic build completion ${build.id} failed:`, error)
+  }
 }
 
-async function completeSale(build: any, profileId: string) {
-  await serviceClient.from('player_builds').update({ status: 'sold' }).eq('id', build.id)
-  const { data: profile } = await serviceClient.from('profiles').select('credits').eq('id', profileId).single()
-  if (profile) await serviceClient.from('profiles').update({ credits: profile.credits + (build.sale_payout ?? 0) }).eq('id', profileId)
+async function completeSale(build: any) {
+  try {
+    await completeSaleCommand(build.id)
+  } catch (error) {
+    console.error(`Atomic sale completion ${build.id} failed:`, error)
+  }
 }
