@@ -21,6 +21,22 @@ Vor der Vergabe einer neuen `OTA-*`- oder `ENG-*`-Signatur (z. B. in `external-t
 
 noχ¹ᐃ ist eine Wissens-, Zivilisations- und Gesellschaftssimulation im realen Sonnensystem. Spieler versorgen Kolonien, bauen Infrastruktur, handeln, lernen und erleben dieselbe Simulation sowohl strategisch als auch aus persönlicher Perspektive.
 
+## Projekt-Arbeitsbereiche
+
+Die Entwicklungsarbeit ist dauerhaft nach Verantwortungsbereichen gegliedert, damit Weltkörper gemeinsame Systeme wiederverwenden statt sie parallel neu zu entwickeln:
+
+- **noχ¹ᐃ · Core / Architektur / Backend**
+- **noχ¹ᐃ · Erde**
+- **noχ¹ᐃ · Mond**
+- **noχ¹ᐃ · Mars**
+- **noχ¹ᐃ · Orbit / Raumstationen**
+- **noχ¹ᐃ · Gebäude & Innenräume**
+- **noχ¹ᐃ · Fahrzeuge & Raumschiffe**
+- **noχ¹ᐃ · Grafik / Assets**
+- optional **noχ¹ᐃ · Release / QA / Testspieler**
+
+Die verbindliche Zuständigkeitsbeschreibung und die Startentscheidung für die globale Mondkarte stehen in `docs/project-workstreams.md`.
+
 ## Architekturprinzipien
 
 ### Eine Simulation, mehrere Sichten
@@ -61,6 +77,7 @@ Externe Evidenz oder Kanon-Mappings dürfen noχ¹ᐃ-Balancing nicht automatisc
 - `docs/design/walkable-colony.md` — persönliche Ebene als Linse auf die Simulation
 - `docs/decisions/ADR-walkable-colony-architektur.md` — Architektur-Invarianten der Walkable Colony
 - `docs/decisions/NOXIA-BUILD-0001-expandable-buildings.md` — persistente, erweiterbare Gebäude
+- `docs/project-workstreams.md` — dauerhafte Projekt-/Chat-Zuständigkeiten
 
 ## Entwicklungsregel für Gebäude
 
