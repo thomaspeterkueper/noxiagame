@@ -27,6 +27,10 @@
     {
       "path": "/api/cron/persons",
       "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/transits",
+      "schedule": "* * * * *"
     }
   ]
 }
