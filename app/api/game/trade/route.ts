@@ -1,6 +1,6 @@
 // app/api/game/trade/route.ts
 // Aktualisiert: 10.09.2026 — atomarer Spot-Handel; Transit aus Trade herausgelöst
-// Version:      1.0.0
+// Version:      1.0.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { publishTransaction } from '@/lib/ably/server'
@@ -20,6 +20,7 @@ async function getUserFromRequest(req: NextRequest) {
 
 function spotError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('NOXIA_TRANSIT_CARGO_MUTATION_FORBIDDEN')) return NextResponse.json({ error: 'Handel ist während eines laufenden Transits nicht möglich.', code: 'SHIP_IN_TRANSIT' }, { status: 409 })
   if (message.includes('NOXIA_SPOT_CARGO_FULL')) return NextResponse.json({ error: 'Frachtraum voll' }, { status: 400 })
   if (message.includes('NOXIA_SPOT_CREDITS_INSUFFICIENT')) return NextResponse.json({ error: 'Unzureichende Credits' }, { status: 400 })
   if (message.includes('NOXIA_SPOT_CARGO_INSUFFICIENT')) return NextResponse.json({ error: 'Nicht genug Ware' }, { status: 400 })
