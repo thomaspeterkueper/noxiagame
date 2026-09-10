@@ -1,15 +1,15 @@
 import React from 'react'
 // ui.tsx
-// Aktualisiert: 27.06.2026 — Bauteile als Ressource ergänzt
-// Version:      0.2.0
+// Aktualisiert: 10.09.2026 — Prometheus-Anzeigename durch Kepler Station ersetzt
+// Version:      0.2.1
 // app/dashboard/ui.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 27.06.2026 — Bauteile als Ressource ergänzt
 
 export const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall', components: 'Bauteile' }
 export const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️', components: '🧱' }
-export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨', prometheus: '🛸' }
-export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', prometheus: 'Prometheus' }
+// `prometheus` bleibt vorerst als Legacy-Slug erhalten, bis DB- und Reise-Referenzen atomar migriert sind.
+export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨', prometheus: '🛸', kepler: '🛸' }
+export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', prometheus: 'Kepler Station', kepler: 'Kepler Station' }
 
 export const T = {
   ink:      '#1b2733',
