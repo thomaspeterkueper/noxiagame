@@ -1,7 +1,7 @@
 // app/api/game/orders/route.ts
 // Erstellt:     30.05.2026
 // Aktualisiert: 10.09.2026 — atomare Auftragserfüllung im NOXIA Game Core
-// Version:      0.3.0
+// Version:      0.3.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -24,8 +24,15 @@ function commandStatus(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   if (message.includes('NOXIA_ORDER_NOT_OPEN')) return 404
   if (message.includes('NOXIA_SHIP_NOT_FOUND') || message.includes('NOXIA_PROFILE_NOT_FOUND')) return 404
+  if (message.includes('NOXIA_TRANSIT_CARGO_MUTATION_FORBIDDEN')) return 409
   if (message.includes('NOXIA_ORDER_WRONG_LOCATION') || message.includes('NOXIA_ORDER_CARGO_INSUFFICIENT')) return 400
   return 409
+}
+
+function commandMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('NOXIA_TRANSIT_CARGO_MUTATION_FORBIDDEN')) return 'Aufträge können während eines laufenden Transits nicht erfüllt werden.'
+  return message
 }
 
 async function handle(req: NextRequest) {
@@ -57,8 +64,6 @@ async function handle(req: NextRequest) {
     try {
       const result = await fulfillTradeOrderCommand(user.id, orderId, agreedReward)
 
-      // Preserve the existing response contract: return the complete cargo map
-      // after the atomic transaction, not just the resource changed by it.
       const { data: cargoRows } = await serviceClient
         .from('ship_cargo')
         .select('resource, amount')
@@ -78,7 +83,7 @@ async function handle(req: NextRequest) {
     } catch (error) {
       console.error('Atomic trade fulfillment failed:', error)
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: commandMessage(error) },
         { status: commandStatus(error) },
       )
     }
