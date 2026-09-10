@@ -24,6 +24,18 @@ type ActiveShip = {
   is_active: boolean | null
 }
 
+export type PlayerTransitState = {
+  shipId: string
+  status: 'docked' | 'transit'
+  location: string
+  from: string | null
+  to: string | null
+  departedAt: string | null
+  arrivesAt: string | null
+  totalSeconds: number
+  remainingSeconds: number
+}
+
 async function activeShipForProfile(profileId: string): Promise<ActiveShip | null> {
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -108,4 +120,41 @@ export async function settleDuePlayerTransit(profileId: string): Promise<AtomicT
   if (!ship || ship.status !== 'transit' || !ship.arrives_at) return null
   if (new Date(ship.arrives_at).getTime() > Date.now()) return null
   return completeTransitCommand(ship.id)
+}
+
+export async function getPlayerTransitState(profileId: string): Promise<PlayerTransitState | null> {
+  await settleDuePlayerTransit(profileId)
+  const ship = await activeShipForProfile(profileId)
+  if (!ship) return null
+
+  if (ship.status !== 'transit' || !ship.dest_location || !ship.arrives_at) {
+    return {
+      shipId: ship.id,
+      status: 'docked',
+      location: ship.location,
+      from: null,
+      to: null,
+      departedAt: null,
+      arrivesAt: null,
+      totalSeconds: 0,
+      remainingSeconds: 0,
+    }
+  }
+
+  const arrivesMs = new Date(ship.arrives_at).getTime()
+  const departedMs = ship.transit_started_at ? new Date(ship.transit_started_at).getTime() : Date.now()
+  const totalSeconds = Math.max(1, Math.round((arrivesMs - departedMs) / 1000))
+  const remainingSeconds = Math.max(0, Math.ceil((arrivesMs - Date.now()) / 1000))
+
+  return {
+    shipId: ship.id,
+    status: 'transit',
+    location: ship.location,
+    from: ship.location,
+    to: ship.dest_location,
+    departedAt: ship.transit_started_at,
+    arrivesAt: ship.arrives_at,
+    totalSeconds,
+    remainingSeconds,
+  }
 }
