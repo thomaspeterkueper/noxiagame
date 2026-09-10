@@ -1,4 +1,4 @@
 -- Supabase migration-history bridge.
 -- Production already contains the schema changes associated with this remote
--- migration version. The canonical SQL is retained in a nearby migration.
+-- migration version. The canonical SQL is retained in the repository migration set.
 -- Intentionally no-op: preserve production/local migration-history parity.
