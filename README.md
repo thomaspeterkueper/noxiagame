@@ -37,6 +37,8 @@ Die Entwicklungsarbeit ist dauerhaft nach Verantwortungsbereichen gegliedert, da
 
 Die verbindliche Zuständigkeitsbeschreibung und die Startentscheidung für die globale Mondkarte stehen in `docs/project-workstreams.md`.
 
+Für den Austausch und die Aufgabenzuweisung **zwischen diesen Arbeitsbereichen innerhalb desselben Repositories** dient `coordination/`. Entwicklungsaufgaben bleiben dort als versionierte Markdown-Dateien Source of Truth; die Produktionsdatenbank wird dafür nicht als paralleles Task-System verwendet.
+
 ## Architekturprinzipien
 
 ### Eine Simulation, mehrere Sichten
@@ -78,6 +80,7 @@ Externe Evidenz oder Kanon-Mappings dürfen noχ¹ᐃ-Balancing nicht automatisc
 - `docs/decisions/ADR-walkable-colony-architektur.md` — Architektur-Invarianten der Walkable Colony
 - `docs/decisions/NOXIA-BUILD-0001-expandable-buildings.md` — persistente, erweiterbare Gebäude
 - `docs/project-workstreams.md` — dauerhafte Projekt-/Chat-Zuständigkeiten
+- `coordination/README.md` — interne Austausch- und Aufgabenzuweisung zwischen Arbeitsbereichen
 
 ## Entwicklungsregel für Gebäude
 
