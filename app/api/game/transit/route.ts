@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { completePlayerTransit, startPlayerTransit } from '@/lib/game/core/transit'
+import { completePlayerTransit, getPlayerTransitState, startPlayerTransit } from '@/lib/game/core/transit'
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -43,6 +43,19 @@ function transitError(error: unknown) {
 
   console.error('transit command failed:', message)
   return NextResponse.json({ error: 'Transit fehlgeschlagen' }, { status: 500 })
+}
+
+export async function GET(req: NextRequest) {
+  const user = await getUserFromRequest(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const state = await getPlayerTransitState(user.id)
+    if (!state) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
+    return NextResponse.json({ ok: true, transit: state })
+  } catch (error) {
+    return transitError(error)
+  }
 }
 
 export async function POST(req: NextRequest) {
