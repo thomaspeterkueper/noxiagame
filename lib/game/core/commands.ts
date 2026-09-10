@@ -95,6 +95,38 @@ export type AtomicShipPurchaseResult = {
   location: string
 }
 
+export type AtomicTransitStartResult = {
+  ship_id: string
+  status: 'transit'
+  from_location: string
+  destination: string
+  departed_at: string
+  arrives_at: string
+  duration_seconds: number
+  remaining_seconds: number
+  energy_used: number
+  energy_left: number
+  landing_fee: number
+  credits?: number
+  docking_managed: boolean
+  docking_pad_entity_id: string | null
+  idempotent: boolean
+}
+
+export type AtomicTransitCompletionResult = {
+  ship_id: string
+  completed: boolean
+  idempotent: boolean
+  status: 'transit' | 'docked'
+  location: string
+  destination: string | null
+  departed_at?: string | null
+  arrives_at?: string | null
+  remaining_seconds: number
+  flight_count?: number
+  docking_pad_entity_id?: string | null
+}
+
 function commandError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -220,4 +252,32 @@ export async function buyShipTypeCommand(
 
   if (error) throw commandError('noxia_buy_ship_type', error)
   return data as AtomicShipPurchaseResult
+}
+
+export async function startTransitCommand(input: {
+  profileId: string
+  destination: string
+  durationSeconds: number
+  energyNeeded: number
+  dockingIdleHours?: number
+}): Promise<AtomicTransitStartResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_start_transit', {
+    p_profile_id: input.profileId,
+    p_destination_slug: input.destination,
+    p_duration_seconds: input.durationSeconds,
+    p_energy_needed: input.energyNeeded,
+    p_docking_idle_hours: input.dockingIdleHours ?? 24,
+  })
+
+  if (error) throw commandError('noxia_start_transit', error)
+  return data as AtomicTransitStartResult
+}
+
+export async function completeTransitCommand(shipId: string): Promise<AtomicTransitCompletionResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_complete_transit', { p_ship_id: shipId })
+
+  if (error) throw commandError('noxia_complete_transit', error)
+  return data as AtomicTransitCompletionResult
 }
