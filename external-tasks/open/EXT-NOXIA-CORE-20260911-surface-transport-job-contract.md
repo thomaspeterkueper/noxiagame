@@ -158,6 +158,35 @@ Surface- und Orbit-Transport sollen dieselben Grundprimitive für:
 
 verwenden. Unterschiede gehören in Domain-/Handover-Policy, nicht in parallel erfundene Persistenzmodelle.
 
+## Umsetzungsstand 2026-09-11
+
+Der ursprünglich fehlende gemeinsame Vertrag ist auf `main` inzwischen weitgehend vorhanden:
+
+- `lib/game/core/logistics.ts` – Inventar-Queries, TransportJob, Reservierung und persistierte Zustände,
+- `app/api/game/logistics/route.ts` – gemeinsame Query-/Command-API,
+- `app/api/game/vehicles/route.ts` und `lib/game/core/vehicleInstances.ts` – persistente Fahrzeuginstanzen und Fahrzeug-Inventare,
+- Loading-/Unloading-Kommandos und ETA-basierte Transit-Abwicklung,
+- gemeinsame Handover-/Multi-Leg-Grundlagen,
+- Earth liefert mit `lib/game/earthSurfaceRouting.ts` inzwischen den world-spezifischen OSM-/Offroad-Routenanteil.
+
+### Verbleibender Core-Blocker für Earth
+
+Die produktive Provisionierung **räumlich gebundener Facility-Inventare für Earth** ist noch nicht abgeschlossen.
+
+Der bestehende Core-Cutover in PR #113 (`Core: physical facility output inventories`) verwendet bereits die richtige kanonische Bindung:
+
+```text
+inventory.storage_kind = native
+inventory.subject_type = tile_entity
+inventory.subject_id = tile_entities.id
+```
+
+ist derzeit aber bewusst zunächst auf Moon/Shackleton-Minenpuffer begrenzt.
+
+Für Earth wird derselbe gemeinsame Mechanismus benötigt, sobald ein Earth-Gebäude als physischer Logistikknoten fungiert (Mine, Fabrik, Warenhaus/Depot, Surface Shuttle Port usw.). Erwartet wird **keine Earth-spezifische Tabelle oder API**, sondern die vorhandene Core-Provisionierung/Produktionsanbindung für geeignete Earth-`tile_entities`.
+
+Bis dahin kann Earth bereits Core-Inventare, Fahrzeuge und Jobs anzeigen und OSM-Routen zwischen vorhandenen räumlich gebundenen Knoten planen; die UI darf jedoch nicht behaupten, dass jedes Earth-Gebäude bereits ein Facility-Inventar besitzt.
+
 ## Acceptance Criteria
 
 1. Earth kann einen realen Facility → Vehicle → Facility-Transport anlegen, ohne eigene Backend-/Supabase-Logik.
@@ -168,10 +197,11 @@ verwenden. Unterschiede gehören in Domain-/Handover-Policy, nicht in parallel e
 6. World-spezifisches Routing bleibt außerhalb des Core.
 7. Derselbe Vertrag ist für Moon/Mars wiederverwendbar.
 8. Der Vertrag lässt sich mit dem orbitalen Cargo-Handover ohne zweites Inventar-/Jobmodell kombinieren.
+9. Geeignete Earth-Facilities erhalten über den gemeinsamen Core dieselbe räumliche `tile_entity`-Inventarbindung wie andere World-Domains; Earth muss dafür keine eigene Provisionierung implementieren.
 
 ## Rückgabe an Earth
 
-Bitte nach Umsetzung dokumentieren:
+Bitte nach vollständiger Umsetzung dokumentieren:
 
 - kanonische Typen/Schemas,
 - Commands/Queries/API-Pfade,
@@ -179,6 +209,7 @@ Bitte nach Umsetzung dokumentieren:
 - Reservierungssemantik,
 - Fahrzeugzuweisungsvertrag,
 - Route-Assessment-Payload,
+- Facility-Inventar-Provisionierung für Earth,
 - Commit/PR,
 - verbleibende Blocker.
 
@@ -186,6 +217,10 @@ Bitte nach Umsetzung dokumentieren:
 
 - `external-tasks/open/EXT-NOXIA-EARTH-20260911-surface-logistics.md`
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-orbit-cargo-transfer-core.md`
+- `lib/game/core/logistics.ts`
+- `lib/game/core/vehicleInstances.ts`
+- `app/api/game/logistics/route.ts`
+- `app/api/game/vehicles/route.ts`
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
 - `lib/game/moonSurfaceLogistics.ts`
