@@ -18,7 +18,7 @@ export type StationModuleDef = {
 export const STATION_MODULE_DEFS: Readonly<Record<string, StationModuleDef>> = {
   command_center:  { id: 'command_center', label: 'Kommandozentrum', icon: '🎯', color: '#c9a961', description: 'Koordiniert alle Stationssysteme. Pflichtmodul.', cost: 0, buildTicks: 0 },
   solar_array:     { id: 'solar_array', label: 'Solar-Array', icon: '☀️', color: '#f5d742', description: '+8 Energie/Tick. Nutzlos im Schatten.', produces: { resource: 'energy', amount: 8 }, cost: 1800, buildTicks: 2 },
-  docking_bay:     { id: 'docking_bay', label: 'Andockbucht', icon: '🚀', color: '#7c8590', description: 'Erlaubt Schiffstransfers und Ladeoperationen.', cost: 2200, buildTicks: 3 },
+  docking_bay:     { id: 'docking_bay', label: 'Andockbucht', icon: '🚀', color: '#7c8590', description: 'Stellt physische Andockplätze für kompatible Schiffe bereit. Frachttransfer ist ein separater Vorgang.', cost: 2200, buildTicks: 3 },
   habitat_module:  { id: 'habitat_module', label: 'Wohnmodul', icon: '🏠', color: '#4a7ba3', description: '+50 maximale Besatzung.', cost: 2000, buildTicks: 3 },
   research_lab:    { id: 'research_lab', label: 'Forschungslabor', icon: '🔬', color: '#b48ce8', description: 'Wissenspunkte für die Besatzung.', cost: 3000, buildTicks: 4 },
   water_recycler:  { id: 'water_recycler', label: 'Wasserrecycler', icon: '💧', color: '#2f86c9', description: '+3 Wasser/Tick durch Kreislaufwirtschaft.', produces: { resource: 'water', amount: 3 }, cost: 2500, buildTicks: 3 },
