@@ -1,4 +1,5 @@
 import EarthRegionPreview from './EarthRegionPreview'
+import EarthSurfaceLogisticsConsole from './EarthSurfaceLogisticsConsole'
 import SpaceportAreaComparison from './SpaceportAreaComparison'
 
 export const metadata = {
@@ -8,6 +9,7 @@ export const metadata = {
 export default function EarthPage() {
   return <>
     <EarthRegionPreview />
+    <EarthSurfaceLogisticsConsole />
     <SpaceportAreaComparison />
   </>
 }
