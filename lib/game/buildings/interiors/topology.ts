@@ -1,3 +1,4 @@
+import { isInteriorCapabilityId } from './functions/registry'
 import type { InteriorTemplate, PortalId, RoomId } from './types'
 
 export interface InteriorValidationIssue {
@@ -7,6 +8,7 @@ export interface InteriorValidationIssue {
     | 'duplicate-portal'
     | 'unknown-room-level'
     | 'unknown-portal-room'
+    | 'unknown-capability'
     | 'self-portal'
   message: string
 }
@@ -31,6 +33,14 @@ export function validateInteriorTemplate(template: InteriorTemplate): InteriorVa
     roomIds.add(room.id)
     if (!levelIds.has(room.levelId)) {
       issues.push({ code: 'unknown-room-level', message: `Room ${room.id} references unknown level ${room.levelId}` })
+    }
+    for (const capabilityId of room.capabilities ?? []) {
+      if (!isInteriorCapabilityId(capabilityId)) {
+        issues.push({
+          code: 'unknown-capability',
+          message: `Room ${room.id} references unknown capability ${capabilityId}`,
+        })
+      }
     }
   }
 
