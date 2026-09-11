@@ -3,6 +3,7 @@ import type { InteriorTemplate } from '../types'
 export const LABORATORY_STANDARD_INTERIOR: InteriorTemplate = {
   id: 'laboratory-standard-01',
   buildingTypeId: 'laboratory',
+  hostKinds: ['building'],
   name: 'Standard laboratory interior',
   version: 1,
   levels: [
