@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createInteriorInstance } from './instances'
+import { createInteriorInstance, validateInteriorInstance } from './instances'
 import { findInteriorRoute, isPortalTraversable } from './navigation'
 import { LABORATORY_STANDARD_INTERIOR } from './templates/laboratoryStandard'
 
@@ -14,6 +14,24 @@ describe('interior instances and navigation', () => {
     expect(Object.keys(instance.portalStates)).toHaveLength(LABORATORY_STANDARD_INTERIOR.portals.length)
     expect(Object.values(instance.roomStates).every(room => room.operationalState === 'operational')).toBe(true)
     expect(Object.values(instance.roomStates).every(room => room.occupancy === 0)).toBe(true)
+    expect(validateInteriorInstance(LABORATORY_STANDARD_INTERIOR, instance)).toEqual([])
+  })
+
+  it('detects persisted runtime state that no longer matches its template', () => {
+    const instance = createInteriorInstance(LABORATORY_STANDARD_INTERIOR, {
+      id: 'INT:LAB:INVALID',
+      buildingInstanceId: 'BLD:LAB:INVALID',
+    })
+
+    delete instance.roomStates['analysis-lab']
+    instance.portalStates['legacy-portal'] = {
+      portalId: 'legacy-portal',
+      state: 'closed',
+    }
+
+    expect(validateInteriorInstance(LABORATORY_STANDARD_INTERIOR, instance).map(issue => issue.code)).toEqual(
+      expect.arrayContaining(['missing-room-state', 'unknown-portal-state']),
+    )
   })
 
   it('finds a route through usable portals', () => {
