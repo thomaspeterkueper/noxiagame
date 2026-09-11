@@ -1,3 +1,5 @@
 export * from './types'
 export * from './topology'
+export * from './instances'
+export * from './navigation'
 export * from './templates/laboratoryStandard'
