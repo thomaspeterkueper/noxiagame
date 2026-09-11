@@ -73,6 +73,8 @@ function logisticsError(error: unknown) {
   if (message.includes('NOXIA_TRANSPORT_ROUTE_ETA_REQUIRED')) return NextResponse.json({ error: 'Für den Transport fehlt eine gültige Fahrzeit (routeSnapshot.etaSeconds).', code: 'ROUTE_ETA_REQUIRED' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_ROUTE_NOT_PASSABLE')) return NextResponse.json({ error: 'Die übergebene Route ist nicht passierbar.', code: 'ROUTE_NOT_PASSABLE' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_VEHICLE_BUSY')) return NextResponse.json({ error: 'Das Fahrzeug ist bereits einem aktiven Transport zugewiesen.', code: 'VEHICLE_BUSY' }, { status: 409 })
+  if (message.includes('NOXIA_TRANSPORT_VEHICLE_UNAVAILABLE')) return NextResponse.json({ error: 'Das Fahrzeug ist derzeit nicht verfügbar.', code: 'VEHICLE_UNAVAILABLE' }, { status: 409 })
+  if (message.includes('NOXIA_TRANSPORT_VEHICLE_WRONG_LOCATION')) return NextResponse.json({ error: 'Das Fahrzeug befindet sich nicht am Ausgangsstandort des Transports.', code: 'VEHICLE_WRONG_LOCATION' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_VEHICLE_REQUIRED')) return NextResponse.json({ error: 'Für diesen Transport ist ein Fahrzeug erforderlich.', code: 'VEHICLE_REQUIRED' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_VEHICLE_CAPACITY_INSUFFICIENT')) return NextResponse.json({ error: 'Die Fahrzeugkapazität reicht nicht aus.', code: 'VEHICLE_CAPACITY' }, { status: 409 })
   if (message.includes('NOXIA_INVENTORY_AVAILABLE_INSUFFICIENT') || message.includes('NOXIA_INVENTORY_STOCK_INSUFFICIENT')) return NextResponse.json({ error: 'Am Quellinventar ist nicht genug frei verfügbare Ware vorhanden.', code: 'STOCK_INSUFFICIENT' }, { status: 409 })
