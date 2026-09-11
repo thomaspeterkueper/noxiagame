@@ -1,0 +1,41 @@
+name: Earth surface routing
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/earthSurfaceRouting.ts'
+      - 'lib/game/earthSurfaceRouting.test.ts'
+      - 'lib/game/earthSurfaceLogistics.ts'
+      - 'lib/game/earthSurfaceLogistics.test.ts'
+      - 'lib/world/spatial/earthFeatureSource.ts'
+      - 'lib/world/spatial/earthSpatial.ts'
+      - '.github/workflows/earth-surface-routing.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/earthSurfaceRouting.ts'
+      - 'lib/game/earthSurfaceRouting.test.ts'
+      - 'lib/game/earthSurfaceLogistics.ts'
+      - 'lib/game/earthSurfaceLogistics.test.ts'
+      - 'lib/world/spatial/earthFeatureSource.ts'
+      - 'lib/world/spatial/earthSpatial.ts'
+      - '.github/workflows/earth-surface-routing.yml'
+
+jobs:
+  earth-surface-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Verify shared transport suite
+        run: npm run test:transport
+      - name: Verify Earth OSM routing
+        run: >-
+          npx tsc lib/game/earthSurfaceRouting.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-routing-test
+          && node .earth-routing-test/game/earthSurfaceRouting.test.js

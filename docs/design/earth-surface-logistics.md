@@ -1,6 +1,6 @@
 # Earth Surface Logistics
 
-Status: erste Earth-Policy für `EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS`.
+Status: Earth-Policy und erster OSM-basierter Surface-Router für `EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS`.
 
 ## Zuständigkeit
 
@@ -23,9 +23,9 @@ Es wird keine zweite Straßen- oder Terrain-Geometrie eingeführt.
 
 ### Straßen / OSM
 
-`lib/world/spatial/overpassEarthFeatureSource.ts` liefert die bestehenden `road`-Features aus `way[highway]` und übernimmt die OSM-Tags vollständig in `properties`. Damit stehen unter anderem `highway`, `surface`, `access`, `vehicle` und `motor_vehicle` zur Verfügung, sofern OSM sie enthält.
+`lib/world/spatial/overpassEarthFeatureSource.ts` liefert die bestehenden `road`-Features aus `way[highway]` und übernimmt die OSM-Tags vollständig in `properties`. Damit stehen unter anderem `highway`, `surface`, `access`, `vehicle`, `motor_vehicle` und `oneway` zur Verfügung, sofern OSM sie enthält.
 
-Die aktuelle Earth-Karte bleibt Quelle der Geometrie. `lib/game/earthSurfaceLogistics.ts` klassifiziert nur die Tags.
+Die aktuelle Earth-Karte bleibt Quelle der Geometrie. `lib/game/earthSurfaceLogistics.ts` klassifiziert die Tags; `lib/game/earthSurfaceRouting.ts` baut daraus nur für die aktuelle Routenberechnung einen **ephemeren Graphen**. Dieser Graph wird nicht persistiert und ist keine zweite Straßenquelle.
 
 ### Terrain / Offroad
 
@@ -95,17 +95,22 @@ OSM bildet nicht jede private/innerbetriebliche Zufahrt bis an einen NOXIA-Footp
 
 Diese Werte sind Earth-Gameplay-Policy und können nach Playtests angepasst werden.
 
-## Routing-Prinzip
+## Routing-Prinzip und erster Router
 
-Ein späterer Earth-Router soll vorhandene Segmentgeometrie gewichten, nicht neu erfinden:
+`lib/game/earthSurfaceRouting.ts` implementiert jetzt den ersten renderer-neutralen Router auf der bereits geladenen OSM-Geometrie:
 
-1. befahrbare Straße bevorzugen,
-2. geeignete Service-Straße/Track zulassen,
-3. kurze Offroad-Verbindungen oder echte Offroad-Segmente nur mit Terrain-Assessment,
-4. blockierte oder unaufgelöste Abschnitte nicht automatisch überbrücken,
-5. Route als Segmentfolge mit `routeClass`, Distanz und relativen Kosten an UI/Core-Handoff geben.
+1. nur als befahrbar klassifizierte `road`-Line-Features werden in den ephemeren Graph aufgenommen,
+2. gemeinsame OSM-Koordinaten bilden Graphknoten,
+3. `oneway` und Kreisverkehr-Richtung werden berücksichtigt,
+4. Quelle und Ziel werden auf das **nächste Straßensegment** projiziert, nicht bloß auf den nächsten OSM-Knoten,
+5. kurze Facility-Lücken werden nur mit einem bereits positiven Offroad-Assessment verbunden,
+6. Dijkstra gewichtet Straßen nach der relativen Zeit-Penalty ihrer Earth-Route-Class,
+7. die Ausgabe bleibt eine Segmentfolge mit OSM-Feature-ID, Route-Class, Distanz und relativen Speed-/Energy-/Wear-Faktoren,
+8. zusätzlich wird eine direkt zeichnbare Polyline ausgegeben.
 
-Straße + Offroad dürfen in derselben Route vorkommen.
+Damit kann eine Route bereits aus `paved-road`, `service-road`, `track` und kurzen `offroad`-Access-Segmenten bestehen.
+
+Noch **nicht** implementiert ist beliebiges kilometerweites Cross-Country-Pathfinding über ein Terrainraster. Das wird nicht durch eine Luftlinie ersetzt. Ein späterer Terrain-Graph kann zusätzliche Offroad-Kandidaten über denselben Segment-/Assessment-Vertrag liefern.
 
 ## Facility → Vehicle → Facility
 
@@ -121,7 +126,7 @@ Ziel-Facility-/Lagerinventar (Core)
 Zielbestand (Core)
 ```
 
-Earth muss dafür später in der UI zeigen:
+Earth muss dafür in der UI zeigen:
 
 - Quelle und Ziel,
 - Gut/Menge,
@@ -164,6 +169,15 @@ Implementiert in `lib/game/earthSurfaceLogistics.ts`:
 - kurzer Last-Mile-Fallback,
 - renderer-neutrale Labels/Assessment-Typen.
 
+Implementiert in `lib/game/earthSurfaceRouting.ts`:
+
+- ephemerer Graph direkt aus vorhandenen OSM-Road-Features,
+- Segment-Snapping für Source/Destination,
+- Oneway-Unterstützung,
+- gewichtete kürzeste Straßenroute,
+- kurze validierte Offroad-Access-Connectoren,
+- Route-Segmente + Polyline + aggregierte relative Kosten.
+
 Noch blockiert durch Core:
 
 - reales Inventar lesen/reservieren,
@@ -179,6 +193,7 @@ Noch blockiert durch Core:
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-orbit-cargo-transfer-core.md`
 - `lib/game/earthSurfaceLogistics.ts`
+- `lib/game/earthSurfaceRouting.ts`
 - `lib/game/moonSurfaceLogistics.ts`
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
