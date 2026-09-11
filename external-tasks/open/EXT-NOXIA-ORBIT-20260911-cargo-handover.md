@@ -66,8 +66,67 @@ Nicht implementieren:
 4. bestehende `Transit`-Architektur wird wiederverwendet,
 5. keine parallele Backend-Domain entsteht.
 
+## Orbit/Stations Response — 2026-09-11
+
+Die fachliche Policy ist ausgearbeitet und kanonisch dokumentiert:
+
+- `docs/architecture/orbit-cargo-handover.md`
+
+### Festgelegte Invarianten
+
+- **Docking ist niemals Cargo-Transfer.** Docking stellt nur die physische Verbindung und Portbelegung her.
+- Frachtbewegung erfolgt ausschließlich über einen expliziten Cargo-Transfer zwischen zwei adressierbaren Inventaren.
+- Orbitaldepots besitzen persistentes Inventar und entkoppeln Shuttle- und Frachterfahrpläne.
+- Standard-Handover ist zweistufig: `Shuttle -> Depot -> Frachter`.
+- Direkter Cross-Dock-Transfer `Shuttle -> Frachter` ist später möglich, bleibt aber ebenfalls ein expliziter Transferauftrag.
+- Planetare Surface-Ports bleiben Shuttle-Ports; intersolare Schiffe landen dort nicht.
+- `phobos` bleibt `orbital-station / node-itself` und wird als echter Depot-, Markt- und Free-Port-Knoten behandelt.
+- Marktangebot ist fachlich nicht identisch mit Lagerbestand: Ware kann am Knoten liegen, ohne angeboten zu sein.
+- Ein mehrstufiger Transportauftrag besteht aus **Legs**, die Fahrzeuge bewegen, und **Handovers**, die Fracht zwischen Inventaren bewegen. Diese Begriffe dürfen im Core nicht zusammenfallen.
+
+### Phobos-Zielbild
+
+Phobos übernimmt vier Rollen:
+
+1. interplanetarer Umschlagpunkt,
+2. persistentes Depot,
+3. lokaler physischer Markt,
+4. breit zugänglicher Free Port mit eigener Governance-/Gebührenlogik.
+
+Ein exemplarischer Metallexport läuft damit physisch nachvollziehbar:
+
+```text
+Shackleton Mine
+→ Surface Hauler
+→ Shuttle-Port Storage
+→ Transfer Shuttle
+→ Lunar Orbital Interface
+→ Cargo Transfer Shuttle -> Depot
+→ Cargo Transfer Depot -> Freighter
+→ Intersolar Transit -> Phobos
+→ Cargo Transfer Freighter -> Phobos Depot
+→ Market Offer
+→ Ownership Transfer on Sale
+```
+
+### Input für NOXIA-CORE
+
+Core soll dafür generisch bereitstellen:
+
+- adressierbare Inventarknoten,
+- atomaren/idempotenten Cargo-Transfer,
+- Ownership- und Kapazitätsprüfung,
+- Reservierungen für Markt und Transportjobs,
+- mehrstufige Jobs aus Legs + Handover-Schritten,
+- persistente Zuordnung von Ware, Auftrag und Eigentümer.
+
+Orbit baut dafür **keine zweite Transit- oder Inventar-Domain**.
+
+Der Request bleibt `open`, bis die Core-Schnittstelle und die darauf aufbauende Stations-/Phobos-UX implementiert und gemeinsam getestet sind.
+
 ## References
 
+- `docs/architecture/orbit-cargo-handover.md`
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
 - `lib/game/core/`
