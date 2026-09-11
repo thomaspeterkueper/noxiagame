@@ -176,47 +176,107 @@ Fehlende Core-Funktionen bitte als Dependency/Handoff dokumentieren.
 
 ## Fortschritt 2026-09-11
 
-Earth-owned Policy ist mit **PR #106** umgesetzt und auf `main` gemerged:
+### Umgesetzt auf `main`
+
+**PR #106 – Earth Surface Policy**
 
 - `lib/game/earthSurfaceLogistics.ts`
-  - OSM-Road-Klassifikation für bestehende `highway`-/`surface`-/`access`-Properties,
-  - `paved-road`, `service-road`, `track`, `offroad`, `unresolved`,
-  - gemeinsame Rollen `cargo-rover` und `heavy-hauler`,
-  - relative Speed-/Energy-/Wear-Kosten,
-  - Offroad-Ground-/Landuse-Klassifikation,
-  - Steigungsprüfung gegen einen von Engineering/Core gelieferten Mobility-Envelope,
-  - kurzer Last-Mile-Fallback ohne erfundene Straßen.
-- `docs/design/earth-surface-logistics.md` dokumentiert Zuständigkeit, Datenquellen, Policy und UX-Vertrag.
-- `lib/game/earthSurfaceLogistics.test.ts` ist Teil von `test:transport`.
-- Transport- und Spatial-CI waren für PR #106 erfolgreich; Vercel Preview war READY.
+- OSM-Road-Klassifikation für bestehende `highway`-/`surface`-/`access`-Properties,
+- `paved-road`, `service-road`, `track`, `offroad`, `unresolved`,
+- gemeinsame Rollen `cargo-rover` und `heavy-hauler`,
+- relative Speed-/Energy-/Wear-Kosten,
+- Offroad-Ground-/Landuse-Klassifikation,
+- Steigungsprüfung gegen Engineering/Core-Mobility-Envelope,
+- kurzer Last-Mile-Fallback ohne erfundene Straßen.
 
-Bewusst **nicht** in Earth umgesetzt wurden Inventar-, Reservierungs-, Fahrzeugbelegungs- oder TransportJob-Persistenz.
+**PR #116 – realer OSM-Surface-Router**
 
-Dafür wurde der konkrete Core-Handoff direkt auf `main` angelegt:
+- `lib/game/earthSurfaceRouting.ts`,
+- ephemerer Graph direkt aus der vorhandenen OSM-Geometrie,
+- kein zweites persistiertes Straßennetz,
+- Snap auf Straßensegmente,
+- Einbahnstraßen/Kreisverkehre,
+- Dijkstra-Gewichtung nach Earth-Route-Class,
+- kurze validierte Offroad-Zufahrten,
+- Route als Segmentfolge + direkt zeichnbare Polyline,
+- Distanz und relative Zeit-/Energy-/Wear-Kosten,
+- eigener Earth-Routing-CI, der zusätzlich die gemeinsame Transport-Suite prüft.
 
-- `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
+**PR #117 – Core-live Earth Logistikcockpit**
 
-Dieser Request bleibt deshalb `open`. Nächster Earth-Schritt nach Rückgabe des Core-Vertrags ist die reale UI-/Kartenintegration:
+- `app/earth/EarthSurfaceLogisticsConsole.tsx`,
+- Einbindung in `app/earth/page.tsx`,
+- liest ausschließlich `/api/game/logistics` und `/api/game/vehicles`,
+- zeigt zugängliche Inventare, Fahrzeuge und persistierte TransportJobs,
+- unterscheidet räumlich gebundene `tile_entity`-Inventare vom aggregierten Standortbestand,
+- bindet physische Inventarknoten über `subject_type=tile_entity` / `subject_id=tile_entities.id` an Earth-Weltobjekte,
+- kann zwischen vorhandenen räumlichen Knoten die Earth-OSM-Route prüfen,
+- zeigt Distanz, Segmentklassen sowie relative Energy-/Wear-Faktoren,
+- behandelt aggregierten `location_resources`-Bestand ausdrücklich **nicht** als physische Route-Quelle,
+- vollständiger Next/Vercel-Preview war READY.
+
+### Core-Vertrag inzwischen weitgehend vorhanden
+
+Der ursprüngliche Handoff `EXT-NOXIA-CORE-20260911-SURFACE-TRANSPORT-JOB-CONTRACT` ist inzwischen größtenteils umgesetzt:
+
+- gemeinsame Inventare,
+- Reservierungen,
+- persistente TransportJobs,
+- Vehicle Instances und Fahrzeug-Inventare,
+- Loading / Transit / Arrival / Unloading,
+- gemeinsame APIs,
+- Handover-/Multi-Leg-Grundlagen.
+
+PR #113 (`Core: physical facility output inventories`) ist inzwischen gemerged und führt die physische Facility-Produktion in native Facility-Inventare ein. Der produktive Cutover ist aktuell jedoch bewusst zunächst auf Moon/Shackleton beschränkt.
+
+### Verbleibende Abhängigkeiten vor vollständig spielbarem Earth-Transport
+
+1. **Earth-Facility-Inventare im Core**
+
+   Geeignete Earth-`tile_entities` (Mine, Fabrik, Depot/Warenhaus, Surface Shuttle Port usw.) müssen über denselben gemeinsamen Core-Mechanismus native, räumlich gebundene Inventare erhalten. Dieser Restpunkt ist im bestehenden Core-Handoff dokumentiert; Earth erzeugt dafür keine eigene Tabelle oder Provisionierung.
+
+2. **Gemeinsamer Surface-Mission-Slice**
+
+   PR #115 (`feat: add playable surface vehicle mission slice`) ist zum letzten Abgleich weiterhin offen. Er besitzt die gemeinsame Verantwortung für:
+
+   - ETA aus Vehicle-Referenzgeschwindigkeit × World-Routenfaktor,
+   - Cargo-Massenprüfung,
+   - absolutes Energiebudget,
+   - Wear-Settlement,
+   - `surface-vehicle-route-v1` RouteSnapshot für den Core-TransportJob.
+
+   Earth dupliziert diese Logik nicht. Sobald #115 auf `main` verfügbar ist, kann das bestehende Earth-Cockpit den validierten OSM-Route-Plan zusammen mit dem gewählten Fahrzeug in den gemeinsamen Mission-/TransportJob-Flow übergeben.
+
+### Danach verbleibender Earth-Scope
 
 ```text
-Facility auswählen
-→ Transport
-→ Ziel / Gut / Menge
+physische Earth-Facility-Inventare
+→ Quelle/Ziel/Gut/Menge im bestehenden Cockpit
 → geeignetes Fahrzeug
-→ Earth-Route + ETA/Kosten
+→ OSM-/Offroad-Route
+→ gemeinsamer Surface-Mission-Plan (ETA/Energie/Wear)
 → Core TransportJob
-→ Laden / Fahrt / Entladen sichtbar
+→ Loading / Fahrt / Arrival / Unloading sichtbar
+→ Route/Status direkt in vorhandener Earth-Karte darstellen
 ```
 
-Automatische Transportregeln bleiben danach der zweite UX-Schritt; auch ihre persistierte Regel-/Ausführungssemantik bleibt Core-owned.
+Anschließend folgen automatische Transportregeln. Persistenz und Ausführung dieser Regeln bleiben Core-owned.
+
+Der Request bleibt daher `open`; die bereits abgeschlossenen Earth-Bausteine werden nicht neu implementiert.
 
 ## References
 
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
 - `lib/game/earthSurfaceLogistics.ts`
+- `lib/game/earthSurfaceRouting.ts`
+- `app/earth/EarthSurfaceLogisticsConsole.tsx`
 - `docs/design/earth-surface-logistics.md`
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
+- `lib/game/core/logistics.ts`
+- `lib/game/core/vehicleInstances.ts`
+- `app/api/game/logistics/route.ts`
+- `app/api/game/vehicles/route.ts`
 - `lib/game/spatial/`
 - `external-tasks/open/EXT-OTA-NOXIA-20260906-transfer-logistics-network.md`
 - Earth map/buildability implementation in the current `main` branch
