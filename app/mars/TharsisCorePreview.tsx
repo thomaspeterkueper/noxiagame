@@ -2,25 +2,28 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
-
-type SpatialEntity = {
-  id: string
-  entity_id: string
-  name?: string
-  x_m: number | null
-  y_m: number | null
-  rotation_deg?: number | null
-  status: string
-  type_id?: string | null
-}
+import { THARSIS_HUB_BUILDINGS, THARSIS_HUB_POPULATION, THARSIS_HUB_ROADS } from '@/lib/game/seeds/tharsisHubSeed'
 
 type SpatialPayload = {
   location?: { id: string; slug: string; name: string }
-  spatialRegion?: { id: string; name: string; origin?: { lat: number; lon: number } } | null
-  entities?: SpatialEntity[]
-  pendingBuilds?: Array<{ id: string; type_id: string; x_m: number | null; y_m: number | null; status: string }>
+  frame?: {
+    origin_status?: string | null
+    origin_lat_deg?: number | null
+    origin_lon_deg?: number | null
+    terrain_dataset_id?: string | null
+    vertical_datum?: string | null
+  } | null
+  terrain?: {
+    activeDataset?: { id: string; status: string; resolution_m?: number | null; vertical_reference?: string | null } | null
+    resolution?: { status: string; zM: number | null }
+  }
+  entities?: Array<{ id: string; entity_id: string; placement_mode?: string | null; x_m?: number | null; y_m?: number | null }>
+  builds?: Array<{ id: string; buildable_id: string; placement_mode?: string | null; x_m?: number | null; y_m?: number | null }>
   error?: string
 }
+
+const COLS = 32
+const ROWS = 24
 
 export default function TharsisCorePreview() {
   const [payload, setPayload] = useState<SpatialPayload | null>(null)
@@ -32,7 +35,10 @@ export default function TharsisCorePreview() {
       try {
         const token = await getToken()
         if (!token) throw new Error('Nicht angemeldet')
-        const response = await fetch('/api/game/build/spatial?location=mars', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const response = await fetch('/api/game/build/spatial?location=mars', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
         const json = await response.json() as SpatialPayload
         if (!response.ok) throw new Error(json.error ?? 'Mars-Core-Zustand konnte nicht geladen werden')
         if (!cancelled) setPayload(json)
@@ -43,31 +49,83 @@ export default function TharsisCorePreview() {
     return () => { cancelled = true }
   }, [])
 
-  const entities = useMemo(() => (payload?.entities ?? []).filter(entity => entity.x_m != null && entity.y_m != null), [payload])
-  const bounds = useMemo(() => {
-    if (!entities.length) return { minX: -100, maxX: 100, minY: -100, maxY: 100 }
-    const xs = entities.map(entity => Number(entity.x_m)), ys = entities.map(entity => Number(entity.y_m))
-    const pad = 50
-    return { minX: Math.min(...xs) - pad, maxX: Math.max(...xs) + pad, minY: Math.min(...ys) - pad, maxY: Math.max(...ys) + pad }
-  }, [entities])
-  const sx = (x: number) => ((x - bounds.minX) / Math.max(1, bounds.maxX - bounds.minX)) * 100
-  const sy = (y: number) => 100 - ((y - bounds.minY) / Math.max(1, bounds.maxY - bounds.minY)) * 100
+  const roadKeys = useMemo(() => new Set(THARSIS_HUB_ROADS.map(road => `${road.row}:${road.col}`)), [])
+  const liveEntities = payload?.entities ?? []
+  const metricEntities = liveEntities.filter(entity => entity.x_m != null && entity.y_m != null)
+  const frameReady = payload?.frame?.origin_status === 'verified'
+  const terrainReady = payload?.terrain?.activeDataset?.status === 'ready'
 
   return <section style={{ background: '#0d0b0a', color: '#eee6df', padding: '28px 24px 48px' }}>
     <div style={{ maxWidth: 1440, margin: '0 auto' }}>
-      <div style={{ fontSize: 12, letterSpacing: '.16em', opacity: .62 }}>THARSIS HUB · CORE LIVE</div>
+      <div style={{ fontSize: 12, letterSpacing: '.16em', opacity: .62 }}>THARSIS HUB · CANON + CORE</div>
       <h2 style={{ margin: '6px 0 4px', fontSize: 30 }}>Lokaler Weltzustand</h2>
-      <p style={{ marginTop: 0, opacity: .72 }}>Bestehende Core-Objekte werden in ihren metrischen Weltkoordinaten dargestellt. Das ist der Anschluss zwischen dem kanonischen Tharsis-Hub und der neuen Mars-Geodäsie.</p>
+      <p style={{ marginTop: 0, opacity: .72, maxWidth: 980 }}>
+        Das kanonische 32×24-Startlayout bleibt sichtbar, solange der produktive Mars-World-Frame noch nicht georeferenziert ist. Core-Live-Daten werden daneben geprüft; Legacy-Tiles werden ausdrücklich nicht als Meterkoordinaten ausgegeben.
+      </p>
       {error ? <div style={noticeStyle}>{error}</div> : null}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 16 }}>
-        <div style={{ position: 'relative', minHeight: 520, border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, background: 'radial-gradient(circle at 50% 48%, #43261d 0%, #251610 42%, #140e0b 100%)', overflow: 'hidden' }}>
-          {entities.map(entity => <button key={entity.id} title={`${entity.name ?? entity.entity_id} · ${entity.x_m?.toFixed?.(1) ?? entity.x_m} / ${entity.y_m?.toFixed?.(1) ?? entity.y_m} m`} style={{ position: 'absolute', left: `${sx(Number(entity.x_m))}%`, top: `${sy(Number(entity.y_m))}%`, transform: `translate(-50%,-50%) rotate(${entity.rotation_deg ?? 0}deg)`, width: 12, height: 12, padding: 0, border: '1px solid rgba(255,255,255,.9)', borderRadius: entity.type_id?.includes('road') ? 2 : 4, background: entity.type_id?.includes('road') ? '#8b6b57' : '#d9a66c', boxShadow: '0 1px 5px rgba(0,0,0,.5)' }} />)}
-          {!entities.length && !error ? <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: .65 }}>Core-Zustand wird geladen …</div> : null}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 16 }}>
+        <div style={{ position: 'relative', aspectRatio: `${COLS} / ${ROWS}`, border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, background: 'radial-gradient(circle at 50% 48%, #43261d 0%, #251610 42%, #140e0b 100%)', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${COLS},1fr)`, gridTemplateRows: `repeat(${ROWS},1fr)` }}>
+            {Array.from({ length: COLS * ROWS }, (_, index) => {
+              const row = Math.floor(index / COLS)
+              const col = index % COLS
+              const road = roadKeys.has(`${row}:${col}`)
+              return <div key={`${row}:${col}`} style={{ borderRight: '1px solid rgba(255,255,255,.025)', borderBottom: '1px solid rgba(255,255,255,.025)', background: road ? 'rgba(157,121,91,.25)' : 'transparent' }} />
+            })}
+          </div>
+
+          {THARSIS_HUB_BUILDINGS.map(building => (
+            <button
+              key={building.id}
+              title={`${building.id} · Zone ${building.zone} · Tile ${building.col}/${building.row}`}
+              style={{
+                position: 'absolute',
+                left: `${((building.col + .5) / COLS) * 100}%`,
+                top: `${((building.row + .5) / ROWS) * 100}%`,
+                transform: 'translate(-50%,-50%)',
+                width: '2.6%',
+                aspectRatio: '1',
+                minWidth: 8,
+                padding: 0,
+                border: building.critical ? '1px solid rgba(255,245,220,.95)' : '1px solid rgba(255,255,255,.55)',
+                borderRadius: 4,
+                background: building.zone.startsWith('D') ? '#b97745' : building.zone === 'C' ? '#7f9b9e' : building.zone === 'F' ? '#a88f71' : '#d0aa78',
+                boxShadow: building.critical ? '0 0 7px rgba(255,210,145,.28)' : 'none',
+              }}
+            />
+          ))}
         </div>
+
         <aside style={{ display: 'grid', alignContent: 'start', gap: 12 }}>
-          <div style={panelStyle}><small>LOCATION</small><div style={{ fontSize: 22, marginTop: 6 }}>{payload?.location?.name ?? 'Mars'}</div><div style={{ opacity: .65, marginTop: 5 }}>{payload?.spatialRegion?.name ?? 'Spatial region pending'}</div></div>
-          <div style={panelStyle}><small>CORE OBJECTS</small><div style={{ fontSize: 28, marginTop: 6 }}>{entities.length}</div><div style={{ opacity: .65 }}>Objekte mit metrischer Position</div></div>
-          <div style={panelStyle}><small>TERRAIN GATE</small><div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>MOLA-DEM, Slope und Buildability werden separat auf dieselben lokalen Meterkoordinaten gelegt. Bis ein Terrain-Sample aufgelöst ist, darf Placement nicht stillschweigend als baubar gelten.</div></div>
+          <div style={panelStyle}>
+            <small>LOCATION</small>
+            <div style={{ fontSize: 22, marginTop: 6 }}>{payload?.location?.name ?? 'Mars / Tharsis Hub'}</div>
+            <div style={{ opacity: .65, marginTop: 5 }}>{THARSIS_HUB_POPULATION} Bewohner · kanonischer Start-Seed</div>
+          </div>
+          <div style={panelStyle}>
+            <small>LAYOUT</small>
+            <div style={{ fontSize: 28, marginTop: 6 }}>{THARSIS_HUB_BUILDINGS.length}</div>
+            <div style={{ opacity: .65 }}>kanonische Startgebäude · {THARSIS_HUB_ROADS.length} Straßen-Tiles</div>
+          </div>
+          <div style={panelStyle}>
+            <small>CORE LIVE</small>
+            <div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>{liveEntities.length} persistierte Gebäude/Module · {metricEntities.length} bereits mit metrischer Position.</div>
+          </div>
+          <div style={panelStyle}>
+            <small>GEODESY</small>
+            <div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>
+              World-Frame: <strong>{frameReady ? 'verified' : payload?.frame?.origin_status ?? 'pending'}</strong><br />
+              MOLA: <strong>{terrainReady ? 'ready' : payload?.terrain?.activeDataset?.status ?? 'catalogued'}</strong><br />
+              Terrain gate: <strong>{payload?.terrain?.resolution?.status ?? 'unresolved'}</strong>
+            </div>
+          </div>
+          <div style={panelStyle}>
+            <small>PLACEMENT</small>
+            <div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>
+              Neue Weltkoordinaten bleiben gesperrt, bis Ursprung und Vertikalbezug verifiziert sind. Danach kann das Seed-Layout kontrolliert in ENU-Meter migriert und gegen MOLA-Slope geprüft werden.
+            </div>
+          </div>
         </aside>
       </div>
     </div>
