@@ -88,15 +88,12 @@ export async function getTransportItinerary(profileId: string, jobId: string): P
 }
 
 /**
- * Itinerary definitions are server-authored decompositions of an already-created
- * TransportJob. They do not mutate cargo. Each row references the same shared
- * inventories used by the aggregate job.
- *
- * Only a reserved job can be decomposed, and it can be defined once. This keeps
- * the v1 contract deliberately small; later route replanning should be an explicit
- * revision command rather than silent row replacement.
+ * Atomically decomposes an existing reserved TransportJob into explicit vehicle
+ * legs and explicit cargo handovers. The RPC owns the transaction and command
+ * idempotency; callers never assemble a half-defined itinerary client-side.
  */
 export async function defineTransportItinerary(input: {
+  commandId: string
   actorProfileId: string
   jobId: string
   legs: Array<{
@@ -118,55 +115,16 @@ export async function defineTransportItinerary(input: {
   }>
 }) {
   const supabase = createServiceClient()
-  const { data: job, error: jobError } = await supabase
-    .from('transport_jobs')
-    .select('id,status')
-    .eq('id', input.jobId)
-    .eq('actor_profile_id', input.actorProfileId)
-    .maybeSingle()
-  if (jobError) throw commandError('transport job lookup', jobError)
-  if (!job) throw new Error('NOXIA_TRANSPORT_JOB_NOT_FOUND')
-  if (job.status !== 'reserved') throw new Error('NOXIA_TRANSPORT_ITINERARY_STATE_INVALID')
-
-  const existing = await getTransportItinerary(input.actorProfileId, input.jobId)
-  if (existing.legs.length > 0 || existing.handovers.length > 0) {
-    throw new Error('NOXIA_TRANSPORT_ITINERARY_ALREADY_DEFINED')
+  const { data, error } = await supabase.rpc('noxia_define_transport_itinerary', {
+    p_command_id: input.commandId,
+    p_actor_profile_id: input.actorProfileId,
+    p_job_id: input.jobId,
+    p_legs: input.legs,
+    p_handovers: input.handovers,
+  })
+  if (error) throw commandError('noxia_define_transport_itinerary', error)
+  return {
+    command: data,
+    itinerary: await getTransportItinerary(input.actorProfileId, input.jobId),
   }
-
-  // We intentionally refuse partial definitions at this boundary. The DB rows are
-  // independent projections; consumers should provide the complete itinerary in
-  // one server action. If one insert fails, cleanup the first projection before
-  // surfacing the error so callers never observe a half-defined itinerary.
-  const legRows = input.legs.map(leg => ({
-    job_id: input.jobId,
-    sequence_no: leg.sequenceNo,
-    domain: leg.domain,
-    source_inventory_id: leg.sourceInventoryId,
-    destination_inventory_id: leg.destinationInventoryId,
-    vehicle_inventory_id: leg.vehicleInventoryId ?? null,
-    route_snapshot: leg.routeSnapshot ?? {},
-  }))
-  const handoverRows = input.handovers.map(handover => ({
-    job_id: input.jobId,
-    sequence_no: handover.sequenceNo,
-    source_inventory_id: handover.sourceInventoryId,
-    target_inventory_id: handover.targetInventoryId,
-    resource: handover.resource,
-    amount: handover.amount,
-    requires_docking: handover.requiresDocking ?? false,
-    docking_connection_id: handover.dockingConnectionId ?? null,
-  }))
-
-  if (legRows.length > 0) {
-    const { error } = await supabase.from('transport_job_legs').insert(legRows)
-    if (error) throw commandError('transport leg definition', error)
-  }
-  if (handoverRows.length > 0) {
-    const { error } = await supabase.from('transport_job_handovers').insert(handoverRows)
-    if (error) {
-      if (legRows.length > 0) await supabase.from('transport_job_legs').delete().eq('job_id', input.jobId)
-      throw commandError('transport handover definition', error)
-    }
-  }
-  return getTransportItinerary(input.actorProfileId, input.jobId)
 }
