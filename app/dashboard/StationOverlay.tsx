@@ -2,7 +2,7 @@
 
 // StationOverlay.tsx
 // Aktualisiert: 11.09.2026 — aktive Schiffsklasse gegen Stationsports prüfen
-// Version:      0.7.0
+// Version:      0.7.1
 //
 // Raumstations-Ansicht für L4/L5-Stationen und Orbit-Stationen.
 
