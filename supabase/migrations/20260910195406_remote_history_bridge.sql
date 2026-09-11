@@ -1,0 +1,3 @@
+-- Supabase migration-history bridge.
+-- Production already contains the corresponding atomic finance/asset Core rollout.
+-- Intentionally no-op: preserve production/repository migration-history parity.

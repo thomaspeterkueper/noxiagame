@@ -1,0 +1,3 @@
+-- Supabase migration-history bridge.
+-- Production already contains the emergency runtime event-stream repair applied on 2026-09-11.
+-- Intentionally no-op: preserve production/repository migration-history parity before the canonical idempotent repair migration.
