@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import {
   getPlayerVehicleSnapshot,
   listPlayerVehicleInstances,
   projectPersistedVehicle,
+  provisionStarterCargoRoverCommand,
 } from '@/lib/game/core/vehicleInstances'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -16,8 +18,8 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 
-function uuid(value: string | null): string | null {
-  return value && UUID_RE.test(value) ? value : null
+function uuid(value: unknown): string | null {
+  return typeof value === 'string' && UUID_RE.test(value) ? value : null
 }
 
 function vehicleError(error: unknown) {
@@ -28,8 +30,17 @@ function vehicleError(error: unknown) {
   if (message.includes('NOXIA_VEHICLE_NOT_FOUND')) {
     return NextResponse.json({ error: 'Fahrzeug nicht gefunden.', code: 'VEHICLE_NOT_FOUND' }, { status: 404 })
   }
-  console.error('vehicle query failed:', message)
-  return NextResponse.json({ error: 'Fahrzeugzustand konnte nicht geladen werden.' }, { status: 500 })
+  if (message.includes('NOXIA_PROFILE_NOT_FOUND')) {
+    return NextResponse.json({ error: 'Spielerprofil nicht gefunden.', code: 'PROFILE_NOT_FOUND' }, { status: 404 })
+  }
+  if (message.includes('NOXIA_STARTER_CARGO_ROVER_LOCATION_UNSUPPORTED')) {
+    return NextResponse.json({ error: 'Der Starter-Cargo-Rover kann derzeit nur am verifizierten Mond-/Shackleton-Standort bereitgestellt werden.', code: 'STARTER_LOCATION_UNSUPPORTED' }, { status: 409 })
+  }
+  if (message.includes('NOXIA_VEHICLE_PROVISION_COMMAND_CONFLICT')) {
+    return NextResponse.json({ error: 'Die Command-ID wurde bereits mit anderen Provisionierungsparametern verwendet.', code: 'COMMAND_CONFLICT' }, { status: 409 })
+  }
+  console.error('vehicle command failed:', message)
+  return NextResponse.json({ error: 'Fahrzeugvorgang fehlgeschlagen.' }, { status: 500 })
 }
 
 export async function GET(req: NextRequest) {
@@ -72,6 +83,40 @@ export async function GET(req: NextRequest) {
         updatedAt: row.updated_at,
       })),
     })
+  } catch (error) {
+    return vehicleError(error)
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const user = await getUserFromRequest(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Ungültiger JSON-Body.' }, { status: 400 })
+  }
+
+  const action = typeof body.action === 'string' ? body.action : ''
+  if (action !== 'provision-starter-cargo-rover') {
+    return NextResponse.json({ error: 'Ungültige Fahrzeug-Aktion.' }, { status: 400 })
+  }
+
+  const locationId = uuid(body.locationId)
+  const commandId = body.commandId == null ? randomUUID() : uuid(body.commandId)
+  if (!locationId || !commandId) {
+    return NextResponse.json({ error: 'Ungültige Provisionierungsparameter.' }, { status: 400 })
+  }
+
+  try {
+    const provisioning = await provisionStarterCargoRoverCommand({
+      commandId,
+      actorProfileId: user.id,
+      locationId,
+    })
+    return NextResponse.json({ ok: true, commandId, provisioning })
   } catch (error) {
     return vehicleError(error)
   }
