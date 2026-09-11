@@ -4,11 +4,23 @@ import {
   type InteriorTemplateRegistry,
   INTERIOR_TEMPLATE_REGISTRY,
 } from './registry'
-import type { BuildingInstanceId, InteriorInstance, InteriorInstanceId } from './types'
+import type {
+  BuildingInstanceId,
+  InteriorHostRef,
+  InteriorInstance,
+  InteriorInstanceId,
+  InteriorTemplate,
+  StationInstanceId,
+} from './types'
 
 export interface InteriorBindableBuildingInstance {
   id: BuildingInstanceId
   buildingTypeId: string
+}
+
+export interface InteriorBindableStationInstance {
+  id: StationInstanceId
+  stationSlug: string
 }
 
 export interface CreateInteriorBindingOptions {
@@ -17,9 +29,26 @@ export interface CreateInteriorBindingOptions {
 }
 
 export interface InteriorBindingResult {
-  buildingInstanceId: BuildingInstanceId
-  buildingTypeId: string
+  host: InteriorHostRef
   interior: InteriorInstance
+  buildingInstanceId?: BuildingInstanceId
+  buildingTypeId?: string
+  stationInstanceId?: StationInstanceId
+  stationSlug?: string
+}
+
+export function createInteriorForHost(
+  host: InteriorHostRef,
+  template: InteriorTemplate,
+  interiorInstanceId: InteriorInstanceId,
+): InteriorBindingResult {
+  return {
+    host,
+    interior: createInteriorInstance(template, {
+      id: interiorInstanceId,
+      host,
+    }),
+  }
 }
 
 export function createInteriorForBuildingInstance(
@@ -33,12 +62,33 @@ export function createInteriorForBuildingInstance(
 
   if (!template) return null
 
+  const result = createInteriorForHost(
+    { kind: 'building', id: building.id },
+    template,
+    options.interiorInstanceId,
+  )
+
   return {
+    ...result,
     buildingInstanceId: building.id,
     buildingTypeId: building.buildingTypeId,
-    interior: createInteriorInstance(template, {
-      id: options.interiorInstanceId,
-      buildingInstanceId: building.id,
-    }),
+  }
+}
+
+export function createInteriorForStationInstance(
+  station: InteriorBindableStationInstance,
+  template: InteriorTemplate,
+  interiorInstanceId: InteriorInstanceId,
+): InteriorBindingResult {
+  const result = createInteriorForHost(
+    { kind: 'station', id: station.id },
+    template,
+    interiorInstanceId,
+  )
+
+  return {
+    ...result,
+    stationInstanceId: station.id,
+    stationSlug: station.stationSlug,
   }
 }
