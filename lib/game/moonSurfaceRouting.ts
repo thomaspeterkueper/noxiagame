@@ -16,6 +16,7 @@ import {
   traversalFromMoonAssessment,
   type SurfaceMissionPlan,
 } from './vehicles/surfaceMission'
+import type { SurfaceRouteGeometry } from './vehicles/surfaceRouteGeometry'
 
 export interface ShackletonSurfaceRouteRequest {
   routeId: string
@@ -32,6 +33,8 @@ export interface ShackletonSurfaceRouteResolution {
   plan: SurfaceMissionPlan
   metrics: MoonRouteMetrics
   assessment: MoonRouteAssessment
+  /** Exact sampled local-world path that may be persisted in route_snapshot.geometry. */
+  geometry: SurfaceRouteGeometry
 }
 
 function assertRouteRequest(request: ShackletonSurfaceRouteRequest) {
@@ -66,6 +69,7 @@ export async function resolveShackletonSurfaceMissionPlan(
 
   let cumulativeDistanceM = 0
   const profile: Array<{ distanceM: number; elevationM: number }> = []
+  const routePoints: SurfaceRouteGeometry['points'] = []
 
   for (let index = 0; index < request.points.length; index += 1) {
     const point = request.points[index]
@@ -86,6 +90,7 @@ export async function resolveShackletonSurfaceMissionPlan(
     }
 
     profile.push({ distanceM: cumulativeDistanceM, elevationM: sample.zM })
+    routePoints.push({ xM: point.xM, yM: point.yM, zM: sample.zM })
   }
 
   const metrics = deriveMoonRouteMetrics(profile)
@@ -109,5 +114,10 @@ export async function resolveShackletonSurfaceMissionPlan(
     ],
   }
 
-  return { plan, metrics, assessment }
+  return {
+    plan,
+    metrics,
+    assessment,
+    geometry: { frame: 'local-world-meters', points: routePoints },
+  }
 }

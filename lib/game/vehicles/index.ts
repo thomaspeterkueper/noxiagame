@@ -1,3 +1,5 @@
 export * from './types'
 export * from './adapters'
 export * from './surfaceMission'
+export * from './surfaceProgress'
+export * from './surfaceRouteGeometry'
