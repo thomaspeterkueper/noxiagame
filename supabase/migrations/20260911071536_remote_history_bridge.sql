@@ -1,0 +1,5 @@
+-- Supabase migration-history bridge.
+-- Production already contains the surface-vehicle operating-cost rollout recorded as
+-- 20260911071536_surface_vehicle_operating_costs.
+-- The canonical repository migration is 20260911070000_surface_vehicle_operating_costs.sql.
+-- Intentionally no-op: preserve production/repository migration-history parity.
