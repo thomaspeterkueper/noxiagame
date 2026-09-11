@@ -23,6 +23,7 @@ export interface ShackletonSurfaceRouteRequest {
   destinationInventoryId: string
   routeClass: MoonSurfaceRouteClass
   vehicle: MoonVehicleMobilityEnvelope
+  /** Ordered local-world polyline points in the verified Shackleton frame. */
   points: readonly TerrainSampleRequest[]
   roughness01?: number
 }
@@ -35,13 +36,26 @@ export interface ShackletonSurfaceRouteResolution {
 
 function assertRouteRequest(request: ShackletonSurfaceRouteRequest) {
   if (!request.routeId.trim()) throw new Error('Shackleton surface route requires routeId')
-  if (!request.originInventoryId.trim() || !request.destinationInventoryId.trim()) throw new Error('Shackleton surface route requires origin and destination inventory ids')
+  if (!request.originInventoryId.trim() || !request.destinationInventoryId.trim()) {
+    throw new Error('Shackleton surface route requires origin and destination inventory ids')
+  }
   if (request.points.length < 2) throw new Error('Shackleton surface route requires at least two points')
   for (const point of request.points) {
-    if (!Number.isFinite(point.xM) || !Number.isFinite(point.yM)) throw new Error('Shackleton surface route points must contain finite local coordinates')
+    if (!Number.isFinite(point.xM) || !Number.isFinite(point.yM)) {
+      throw new Error('Shackleton surface route points must contain finite local coordinates')
+    }
   }
 }
 
+/**
+ * Resolve a candidate Shackleton surface route against authoritative terrain and
+ * convert it into the shared SurfaceMissionPlan contract.
+ *
+ * Terrain comes exclusively from the injected TerrainSampler (normally the cached
+ * LOLA pipeline). Missing/NoData coverage aborts resolution rather than inventing
+ * elevations. Vehicle slope capability is supplied by Engineering/Core through the
+ * MoonVehicleMobilityEnvelope; no rover limits, speeds or energy values live here.
+ */
 export async function resolveShackletonSurfaceMissionPlan(
   sampler: TerrainSampler,
   context: TerrainSampleContext,
@@ -49,6 +63,7 @@ export async function resolveShackletonSurfaceMissionPlan(
 ): Promise<ShackletonSurfaceRouteResolution> {
   assertRouteRequest(request)
   assertTerrainSamplingReady(context)
+
   let cumulativeDistanceM = 0
   const profile: Array<{ distanceM: number; elevationM: number }> = []
 
@@ -57,21 +72,42 @@ export async function resolveShackletonSurfaceMissionPlan(
     if (index > 0) {
       const previous = request.points[index - 1]
       cumulativeDistanceM += Math.hypot(point.xM - previous.xM, point.yM - previous.yM)
-      if (!(cumulativeDistanceM > profile[index - 1].distanceM)) throw new Error('Shackleton surface route contains duplicate consecutive points')
+      if (!(cumulativeDistanceM > profile[index - 1].distanceM)) {
+        throw new Error('Shackleton surface route contains duplicate consecutive points')
+      }
     }
+
     const sample = await sampler.sampleTerrainHeight(context, point)
-    if (!sample) throw new Error(`Shackleton terrain unresolved at route point ${index}`)
-    if (!Number.isFinite(sample.zM)) throw new Error(`Shackleton terrain returned non-finite elevation at route point ${index}`)
+    if (!sample) {
+      throw new Error(`Shackleton terrain unresolved at route point ${index}`)
+    }
+    if (!Number.isFinite(sample.zM)) {
+      throw new Error(`Shackleton terrain returned non-finite elevation at route point ${index}`)
+    }
+
     profile.push({ distanceM: cumulativeDistanceM, elevationM: sample.zM })
   }
 
   const metrics = deriveMoonRouteMetrics(profile)
-  const assessment = assessMoonSurfaceRoute({ routeClass: request.routeClass, metrics, vehicle: request.vehicle, roughness01: request.roughness01 })
+  const assessment = assessMoonSurfaceRoute({
+    routeClass: request.routeClass,
+    metrics,
+    vehicle: request.vehicle,
+    roughness01: request.roughness01,
+  })
+
   const plan: SurfaceMissionPlan = {
     routeId: request.routeId,
     originInventoryId: request.originInventoryId,
     destinationInventoryId: request.destinationInventoryId,
-    segments: [{ id: `${request.routeId}:shackleton-terrain`, distanceKm: metrics.distanceM / 1000, traversal: traversalFromMoonAssessment(assessment) }],
+    segments: [
+      {
+        id: `${request.routeId}:shackleton-terrain`,
+        distanceKm: metrics.distanceM / 1000,
+        traversal: traversalFromMoonAssessment(assessment),
+      },
+    ],
   }
+
   return { plan, metrics, assessment }
 }
