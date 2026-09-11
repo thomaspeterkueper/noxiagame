@@ -1,7 +1,7 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 12.07.2026 — runLandValueTick: land_value Berechnung je Tile
-// Version:      3.3.0
+// Aktualisiert: 11.09.2026 — Facility-Produktion in adressierbare Logistics-Inventare
+// Version:      3.4.0
 
 import {
   CONSUMPTION_PER_100,
@@ -102,6 +102,59 @@ export async function runPopulationTick(
       counts[b.entity_id] = (counts[b.entity_id] ?? 0) + 1
     }
 
+    // A physical building switches away from aggregate location stock as soon as
+    // Core has provisioned one native facility inventory for that tile entity.
+    // Historical location_resources stock is deliberately left where it is.
+    const nativeFacilityIds = new Set<string>()
+    const { data: facilityInventories, error: facilityInventoryError } = await supabase
+      .from('logistics_inventories')
+      .select('subject_id')
+      .eq('location_id', loc.id)
+      .eq('inventory_kind', 'facility')
+      .eq('storage_kind', 'native')
+      .eq('subject_type', 'tile_entity')
+      .eq('active', true)
+
+    if (facilityInventoryError) {
+      // Compatibility fallback: if the logistics schema itself cannot be read,
+      // preserve the legacy aggregate simulation instead of stopping all ticks.
+      console.error(`runPopulationTick: facility inventory lookup failed for ${loc.slug}:`, facilityInventoryError)
+    } else {
+      for (const inventory of facilityInventories ?? []) {
+        if (inventory.subject_id) nativeFacilityIds.add(inventory.subject_id)
+      }
+    }
+
+    // Credit newly produced goods to native facility buffers exactly once per
+    // tick/building/resource. Fail closed: once a building is physicalized, an
+    // output-credit failure must never fall back to location stock, or a retry
+    // could duplicate the same goods in two stores.
+    let nativeFacilityCredits = 0
+    const facilityOutputErrors: string[] = []
+    if (!facilityInventoryError) {
+      for (const b of buildings ?? []) {
+        if (!nativeFacilityIds.has(b.id)) continue
+        const def = defs.get(b.entity_id)
+        if (!def) continue
+
+        for (const prod of def.production) {
+          if (!(TICK_RESOURCES as readonly string[]).includes(prod.resource) || prod.amount <= 0) continue
+          const { error } = await supabase.rpc('noxia_credit_facility_output', {
+            p_tick_number: tickNumber,
+            p_tile_entity_id: b.id,
+            p_resource: prod.resource,
+            p_amount: prod.amount,
+          })
+          if (error) {
+            console.error(`runPopulationTick: facility output credit failed for ${b.id}/${prod.resource}:`, error)
+            facilityOutputErrors.push(`${b.id}:${prod.resource}`)
+          } else {
+            nativeFacilityCredits += 1
+          }
+        }
+      }
+    }
+
     const pop = loc.population
 
     let popBonus = 0
@@ -127,19 +180,29 @@ export async function runPopulationTick(
       const r = resMap[res]
       if (!r) continue
 
-      let totalBuildingProduction = 0
+      let legacyBuildingProduction = 0
+      let nativeBuildingProduction = 0
       let totalBuildingConsumption = 0
 
-      for (const [entityId, count] of Object.entries(counts)) {
-        const def = defs.get(entityId)
+      for (const b of buildings ?? []) {
+        const def = defs.get(b.entity_id)
         if (!def) continue
-        for (const prod of def.production) if (prod.resource === res) totalBuildingProduction += prod.amount * count
-        for (const cons of def.consumption) if (cons.resource === res) totalBuildingConsumption += cons.amount * count
+
+        for (const prod of def.production) {
+          if (prod.resource !== res) continue
+          if (!facilityInventoryError && nativeFacilityIds.has(b.id)) nativeBuildingProduction += prod.amount
+          else legacyBuildingProduction += prod.amount
+        }
+        for (const cons of def.consumption) {
+          if (cons.resource === res) totalBuildingConsumption += cons.amount
+        }
       }
 
-      const totalProd = (r.base_production ?? r.production ?? 0) + totalBuildingProduction
+      const baseProduction = Number(r.base_production ?? 0)
+      const totalProd = baseProduction + legacyBuildingProduction + nativeBuildingProduction
+      const aggregateInflow = baseProduction + legacyBuildingProduction
       const totalCons = (consumed[res] ?? 0) + totalBuildingConsumption
-      const newStock  = Math.max(0, r.stock + totalProd - totalCons)
+      const newStock  = Math.max(0, r.stock + aggregateInflow - totalCons)
 
       await supabase.from('location_resources')
         .update({ stock: newStock, production: totalProd, consumption: totalCons })
@@ -224,7 +287,17 @@ export async function runPopulationTick(
       })
     }
 
-    results.push({ location: loc.slug, population: { before: pop, after: newPop, max: popMax }, isSupplied, overcrowded })
+    results.push({
+      location: loc.slug,
+      population: { before: pop, after: newPop, max: popMax },
+      isSupplied,
+      overcrowded,
+      logistics: {
+        nativeFacilities: nativeFacilityIds.size,
+        facilityCredits: nativeFacilityCredits,
+        facilityOutputErrors,
+      },
+    })
   }
 
   return results
@@ -371,7 +444,8 @@ export async function runNpcTick(supabase: SB, tickNumber: number) {
         const { data: eingefuegt } = await supabase.from('npc_trades').upsert({ actor_id: actor.id, tick: tickNumber, resource: a.resource, amount: a.menge, unit_price: a.maxPreis, location_id: locId }, { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true }).select('id')
         if (!eingefuegt?.length) continue
         const key = `${locId}|${a.resource}`
-        const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge)
+        const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge
+        )
         await supabase.from('location_resources').update({ stock: neuerStock }).eq('location_id', locId).eq('resource', a.resource)
         stockMap.set(key, neuerStock)
         trades++
