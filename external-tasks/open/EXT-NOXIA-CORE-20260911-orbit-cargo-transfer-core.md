@@ -108,6 +108,109 @@ leg -> handover -> leg -> handover -> final storage/market
 6. Mehrstufige Routen können Legs und Handovers separat referenzieren.
 7. Bestehende Transit-Architektur wird erweitert statt ersetzt.
 
+## Core-Implementierungsstand — 2026-09-11
+
+Die generische Core-Schicht ist im Repository implementiert. Der Request bleibt dennoch `open`, bis die neuen DB-Migrationen auf einem disponiblen Preview validiert und anschließend kontrolliert auf Hosted Production ausgerollt wurden.
+
+### Bereits vorhanden
+
+- `supabase/migrations/20260911060537_logistics_core_inventories_and_transport_jobs.sql`
+  - adressierbare Inventare,
+  - atomare/idempotente Cargo-Transfers,
+  - Outbound-/Inbound-Reservierungen,
+  - Transportjobs,
+  - Source-/Kapazitätsprüfung.
+- `supabase/migrations/20260911070500_docking_and_multileg_logistics_core.sql`
+  - getrennte Docking-Persistenz,
+  - Cargo-Handover bleibt eigener Vorgang,
+  - Multileg-/Handover-Grundlage.
+- `supabase/migrations/20260911071200_atomic_transport_itinerary_definition.sql`
+  - atomare Definition von Itineraries aus Legs und Handovers.
+- `lib/game/core/logistics.ts`
+- `app/api/game/logistics/route.ts`
+- `app/api/game/logistics/handover/`
+
+### Neu: physische Depot-Custody und Marktangebote
+
+Migration:
+
+- `supabase/migrations/20260911111420_custody_marketplace_core.sql`
+- Hardening: `supabase/migrations/20260911112830_market_command_idempotency_hardening.sql`
+
+Core-Fassade/API:
+
+- `lib/game/core/marketplace.ts`
+- `app/api/game/market/route.ts`
+
+Implementierte Semantik:
+
+```text
+Physischer Depot-Host
+  -> privates Storage Account / Custody Inventory pro Eigentümer
+  -> Market Offer referenziert genau dieses Inventar
+  -> logistics_reservations blockiert die angebotene Menge
+  -> Kauf überträgt Credits + Custody atomar
+  -> Ware bleibt physisch am selben Depot-Host
+```
+
+Damit ist ein Marktangebot **kein zweiter Warenbestand**. Die angebotene Menge bleibt im Verkäufer-Custody-Inventar und wird dort durch eine Outbound-Reservation mit `purpose_type = market_offer` gebunden.
+
+Beim Settlement wird die Ware im selben physischen Depot vom privaten Verkäufer-Custody-Inventar in das private Käufer-Custody-Inventar übertragen. Es findet kein impliziter Transport und keine Teleportation zwischen Knoten statt.
+
+Verfügbare Core-Aktionen:
+
+```text
+ensureStorageAccount(hostInventoryId)
+createMarketOffer(commandId, sellerInventoryId, resource, amount, unitPrice)
+cancelMarketOffer(offerId)
+buyMarketOffer(commandId, offerId, amount)
+```
+
+Die Kauf- und Angebotscommands sind idempotent; das Hardening serialisiert auch konkurrierende Wiederholungen derselben Command-ID innerhalb der PostgreSQL-Transaktion.
+
+### Phobos Live-Ausgangslage verifiziert
+
+Hosted Production besitzt bereits einen echten nativen Phobos-Depotknoten (`Warenhaus · Depot`) mit `public_deposit = true`. Dieser Knoten kann als physischer Host der privaten Custody-Inventare dienen. Es wird keine Phobos-Sonderinventartabelle eingeführt.
+
+### Rolloutstatus
+
+**Repository/Vercel:**
+
+- Marketplace-Migration: Commit `883ac732dca9e3b1e60e490caeed36f4d276d9a1`
+- Core-Fassade: Commit `bbc7e6f7fb962de373ff85993cfb56d847592abc`
+- API: Commit `4b8517356bd70e8e51d1d3e115f0f713fe4f5d1a`
+- Idempotency-Hardening: Commit `d71f9a3487449122ed3b43325377c5d6f80baf54`
+- Vercel-Build für die API-Fassung ist `READY`; der Hardening-Commit wird separat durch den normalen Deployment-Pfad geprüft.
+
+**Hosted Supabase Production:**
+
+Production ist bewusst noch **nicht** verändert worden. Beim letzten Check endet die Hosted-Migrationshistorie bei `20260911101048`. Insbesondere die Repo-Migrationen `20260911070500` / `20260911071200` sowie die neue Custody-/Marketplace-Migration sind dort noch nicht ausgerollt.
+
+Es existiert aktuell kein disponibler Supabase-Preview-Branch. Daher kein Direkt-Rollout auf Production als Ersatz für die Preview-Validierung.
+
+### Acceptance-Status
+
+1. **erfüllt im Repo** — Docking und Cargo-Transfer sind getrennt.
+2. **erfüllt und Hosted vorhanden** — atomarer Inventory-to-Inventory Cargo-Transfer.
+3. **erfüllt und Hosted vorhanden** — Source-Bestand/Zielkapazität werden geschützt.
+4. **erfüllt im Repo** — Transfer und neue Marktcommands sind idempotent; Marktcommands zusätzlich gegen konkurrierende Retries gehärtet.
+5. **erfüllt im Repo** — Phobos-Marktware wird aus privater Custody unter einem realen physischen Depot reserviert; kein Parallelbestand.
+6. **erfüllt im Repo** — Legs und Handovers sind getrennt modellierbar.
+7. **erfüllt im Repo** — bestehende Logistics-/Transit-Architektur wird erweitert, nicht ersetzt.
+
+### Noch offen bis `done`
+
+1. Custody-/Marketplace-Migration auf disposable Preview ausführen.
+2. SQL-/Security-/Idempotency-Tests gegen Preview durchführen, inklusive Partial Fill und paralleler Retry-Semantik.
+3. Fehlende Docking-/Itinerary-Migrationen im selben kontrollierten Hosted-Rollout berücksichtigen bzw. deren bereits vorgesehene Rollout-Reihenfolge verifizieren.
+4. Danach Production-Migration anwenden und Live-Phobos-End-to-End testen:
+
+```text
+Freighter -> Phobos Depot/Custody -> Market Offer -> Reservation -> Sale -> Buyer Custody
+```
+
+5. Erst danach diesen Core-Request nach `external-tasks/done/` verschieben.
+
 ## Orbit-Referenzen
 
 - `docs/architecture/orbit-cargo-handover.md`
