@@ -1,0 +1,3 @@
+-- Supabase migration-history bridge.
+-- Production already contains the corresponding Core security hardening rollout.
+-- Intentionally no-op: preserve production/repository migration-history parity.
