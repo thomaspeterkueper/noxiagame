@@ -207,13 +207,23 @@ export async function createTransportJob(input: {
   return data
 }
 
+export async function beginLoadingTransportJob(profileId: string, jobId: string) {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_begin_loading_transport_job', {
+    p_job_id: jobId,
+    p_actor_profile_id: profileId,
+  })
+  if (error) throw commandError('noxia_begin_loading_transport_job', error)
+  return data
+}
+
 export async function startTransportJob(profileId: string, jobId: string) {
   const job = await getPlayerTransportJob(profileId, jobId)
   if (!job) throw new Error('NOXIA_TRANSPORT_JOB_NOT_FOUND')
 
   // The DB state machine derives arrives_at exclusively from route_snapshot.etaSeconds.
   // Refuse a start without a finite ETA rather than creating an immortal in_transit job.
-  if (job.status === 'reserved' && routeEtaSeconds(job.route_snapshot) == null) {
+  if ((job.status === 'reserved' || job.status === 'loading') && routeEtaSeconds(job.route_snapshot) == null) {
     throw new Error('NOXIA_TRANSPORT_ROUTE_ETA_REQUIRED')
   }
 
@@ -233,6 +243,16 @@ export async function arriveTransportJob(profileId: string, jobId: string) {
     p_actor_profile_id: profileId,
   })
   if (error) throw commandError('noxia_arrive_transport_job', error)
+  return data
+}
+
+export async function beginUnloadingTransportJob(profileId: string, jobId: string) {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_begin_unloading_transport_job', {
+    p_job_id: jobId,
+    p_actor_profile_id: profileId,
+  })
+  if (error) throw commandError('noxia_begin_unloading_transport_job', error)
   return data
 }
 
@@ -259,16 +279,22 @@ export async function cancelTransportJob(profileId: string, jobId: string) {
 export type SettleDueTransportJobsResult = {
   due: number
   arrived: number
+  unloading: number
   completed: number
   failed: string[]
 }
 
+/**
+ * Advance at most one observable lifecycle phase per cron pass. The transit cron
+ * runs once per minute, so arrival and unloading remain queryable instead of being
+ * collapsed into an immediate completed state in the same scheduler invocation.
+ */
 export async function settleDueTransportJobs(limit = 100): Promise<SettleDueTransportJobsResult> {
   const supabase = createServiceClient()
   const boundedLimit = Math.min(Math.max(limit, 1), 250)
   const now = new Date().toISOString()
 
-  const [dueResult, arrivedResult] = await Promise.all([
+  const [dueResult, arrivedResult, unloadingResult] = await Promise.all([
     supabase
       .from('transport_jobs')
       .select('id,actor_profile_id,status')
@@ -282,18 +308,26 @@ export async function settleDueTransportJobs(limit = 100): Promise<SettleDueTran
       .eq('status', 'arrived')
       .order('arrived_at', { ascending: true })
       .limit(boundedLimit),
+    supabase
+      .from('transport_jobs')
+      .select('id,actor_profile_id,status')
+      .eq('status', 'unloading')
+      .order('updated_at', { ascending: true })
+      .limit(boundedLimit),
   ])
 
   if (dueResult.error) throw commandError('due transport job query', dueResult.error)
   if (arrivedResult.error) throw commandError('arrived transport job query', arrivedResult.error)
+  if (unloadingResult.error) throw commandError('unloading transport job query', unloadingResult.error)
 
   const candidates = new Map<string, { id: string; actor_profile_id: string; status: string }>()
-  for (const row of [...(dueResult.data ?? []), ...(arrivedResult.data ?? [])]) {
+  for (const row of [...(dueResult.data ?? []), ...(arrivedResult.data ?? []), ...(unloadingResult.data ?? [])]) {
     if (candidates.size >= boundedLimit) break
     candidates.set(row.id, row)
   }
 
   let arrived = 0
+  let unloading = 0
   let completed = 0
   const failed: string[] = []
 
@@ -302,14 +336,18 @@ export async function settleDueTransportJobs(limit = 100): Promise<SettleDueTran
       if (job.status === 'in_transit') {
         await arriveTransportJob(job.actor_profile_id, job.id)
         arrived += 1
+      } else if (job.status === 'arrived') {
+        await beginUnloadingTransportJob(job.actor_profile_id, job.id)
+        unloading += 1
+      } else if (job.status === 'unloading') {
+        await completeTransportJob(job.actor_profile_id, job.id)
+        completed += 1
       }
-      await completeTransportJob(job.actor_profile_id, job.id)
-      completed += 1
     } catch (error) {
       console.error(`Transport job ${job.id} settlement failed:`, error)
       failed.push(job.id)
     }
   }
 
-  return { due: candidates.size, arrived, completed, failed }
+  return { due: candidates.size, arrived, unloading, completed, failed }
 }
