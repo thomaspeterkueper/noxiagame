@@ -1,0 +1,4 @@
+-- Disposable preview trigger only.
+-- Forces Supabase to rebuild the current migration set so
+-- 20260911100200_facility_inventory_provisioning.sql can be validated.
+-- This branch/marker must never be merged into main.
