@@ -1,67 +1,178 @@
 ---
 id: EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS
-title: Earth Surface Logistics – Straßen, Fahrzeuge und Umschlagpunkte
+title: Earth Surface Logistics – Straßen, Offroad, Fahrzeuge, Lager und Raumhafen
 status: open
 source: NOXIA-CORE
 target: NOXIA-EARTH
 created: 2026-09-11
 priority: high
-affects: [NOXIA, Earth, Core, Logistics]
+affects: [NOXIA, Earth, Core, Logistics, Transport, UX]
 ---
 
 ## Ausgangspunkt
 
-NOXIA führt mit dem gemeinsamen Game Core eine physische Logistikkette ein. Produktionsgebäude sollen Güter künftig nicht mehr nur abstrakt in `location_resources` ablegen. Der Core modelliert objektbezogene Bestände, Fahrzeugfracht und Transportaufträge.
+NOXIA führt mit dem gemeinsamen Game Core eine physische Logistikkette ein. Produktionsgebäude sollen Güter künftig nicht mehr nur abstrakt an einer Location ablegen. Der Core modelliert objektbezogene Bestände, Fahrzeugfracht, Transportaufträge, Ownership sowie persistierte Zustandsübergänge.
 
-Dieser Request betrifft ausschließlich die **Earth-spezifische Oberflächenlogistik**. Datenmodell, Persistenz, atomare Commands und gemeinsame Transportzustände bleiben Eigentum von `NOXIA-CORE`.
+Dieser Request betrifft ausschließlich die **Earth-spezifische Oberflächenlogistik und deren UX**. Datenmodell, Persistenz, Supabase, atomare Commands, Ownership, Economy, Scheduler/Ticks und gemeinsame Transportzustände bleiben Eigentum von `NOXIA-CORE`.
+
+**Earth implementiert keine eigene Backend-Logik.** Falls ein benötigter Core-Vertrag, Command oder Query fehlt, bitte diesen als konkreten Handoff/Dependency an `NOXIA-CORE` zurückmelden, statt eine lokale Ersatz-API oder Earth-spezifische Tabelle einzuführen.
 
 ## Auftrag
 
-Bitte für die spielbare Erde ausarbeiten, wie Surface Logistics auf der bestehenden realen Karte funktioniert:
+Für die spielbare Erde ausarbeiten und in die bestehende Earth-Karten-/Cockpit-Architektur integrieren:
 
-1. reale Straßen/Wege aus der vorhandenen OSM-/Earth-Kartenarchitektur als bevorzugte Fahrzeugrouten,
-2. Offroad-Verbindungen nur dort, wo Terrain/Steigung/Boden dies erlauben,
-3. logistische Knoten an Mine/Industrie/Warenhaus/Logistik-Hub/Raumhafen,
-4. klare Übergabe zwischen Gebäudeinventar und Fahrzeugfracht,
-5. sinnvolle Fahrzeit-/Distanz-/Geländefaktoren als Earth-Policy, nicht als eigenes Backend,
-6. UX-Vorschlag für manuelle und automatische Transportaufträge,
-7. vorhandene Straßen- und Buildability-Layer wiederverwenden; keine parallele Routing-Geometrie erfinden.
+### 1. Reale Straßen und Wege
 
-## Beispielkette
+- vorhandene OSM-Straßen/-Wege als bevorzugtes Surface-Routing verwenden,
+- Straßentypen für Fahrzeugklassen sinnvoll klassifizieren,
+- bestehende Earth-/OSM-Layer wiederverwenden,
+- keine zweite unabhängige Straßen- oder Routing-Geometrie neben der vorhandenen Kartenarchitektur aufbauen.
+
+### 2. Offroad-Fahrbarkeit
+
+- Offroad nur dort zulassen, wo Terrain, Steigung und Boden-/Landnutzung dies plausibel erlauben,
+- vorhandene Elevation-, Slope-, Relief-, Buildability- und Landuse-Daten soweit möglich wiederverwenden,
+- Earth liefert dafür ausschließlich **Surface-Policy/Traversal-Costs**; Fahrzeugzustand, Auftrag und Persistenz kommen aus dem Core,
+- Route soll Straße und Offroad kombinieren können, wenn dies sinnvoll und zulässig ist.
+
+### 3. Gebäude ↔ Fahrzeug ↔ Lager
+
+Die Earth-UX muss die gemeinsame Core-Logistik sichtbar und bedienbar machen:
 
 ```text
-Mine -> Minenpuffer -> LKW/Rover -> Warenhaus / Fabrik
-Mine -> LKW/Rover -> Raumhafenlager -> Surface-Transfer
+Gebäudeinventar
+    ↕ Laden / Entladen
+Fahrzeugfracht
+    ↕ Transport
+Lager / Fabrik / Mine / Logistik-Hub / Raumhafenlager
 ```
 
-## Abgrenzung
+Erforderlich sind:
 
-Nicht in diesem Chat implementieren:
+- Auswahl von Quelle und Ziel,
+- sichtbare verfügbare Güter/Mengen,
+- Auswahl eines geeigneten Fahrzeugs bzw. automatische Fahrzeugzuweisung über den Core,
+- Laden, Fahrt, Entladen als verständliche Zustände,
+- Route, Distanz, erwartete Fahrzeit und Kapazität in der UI,
+- klare Darstellung blockierter Aufträge, z. B. kein Fahrzeug, keine Kapazität oder keine befahrbare Route.
 
-- neue Supabase-Tabellen für Inventare/Fahrzeugfracht/Transportjobs,
-- neue globale Ownership- oder Actor-Semantik,
-- eigene Tick-/Scheduler-Logik,
-- eigene serverseitige Mutations-API,
-- interplanetare Transitlogik.
+### 4. Raumhafen als Oberflächen-Umschlagpunkt
 
-Diese Punkte werden vom Core bereitgestellt.
+Der planetare Raumhafen ist gemäß Core-Semantik ein **Surface Shuttle Port** und kein Terminal für intersolare Schiffe.
+
+Earth soll ihn deshalb als Umschlagkette darstellen:
+
+```text
+Mine / Fabrik / Warenhaus
+        ↓ Surface Transport
+Raumhafen-Lager
+        ↓ Laden
+Surface Transfer Shuttle
+        ↓
+Orbital Interface
+        ↓
+Intersolar / Inter-Node Transport
+```
+
+Die Earth-Seite endet fachlich am Surface-Port-/Shuttle-Handover. Orbitaler und intersolarer Transit bleibt außerhalb dieses Requests.
+
+### 5. UX für manuelle und automatische Transporte
+
+Bitte eine kompakte, spielbare UX vorsehen:
+
+**Manuell**
+
+- Gebäude/Lager auswählen,
+- `Transport` starten,
+- Ziel wählen,
+- Gut/Menge wählen,
+- Fahrzeug wählen oder automatisch zuweisen,
+- Route und ETA prüfen,
+- Auftrag absenden.
+
+**Automatisch**
+
+Ein Gebäude/Lager kann eine Transportregel erhalten, zum Beispiel:
+
+```text
+Wenn Kupfererz > 20 t
+→ bringe bis zu 15 t zur Raffinerie
+→ bevorzugt verfügbare geeignete LKW
+```
+
+oder:
+
+```text
+Halte im Raumhafenlager mindestens 40 t Wasser vor.
+```
+
+Earth implementiert hierfür nur Bedienung, Visualisierung und Earth-spezifische Routeneignung. Regelmodell, Transportjob, Reservierung, Inventarmutation und Ausführung gehören in den Core.
+
+### 6. Kartenintegration
+
+Auf der Earth-Karte sollen bei aktivem Transportkontext sichtbar werden können:
+
+- Source-/Destination-Knoten,
+- berechnete Route,
+- Straßen- und Offroad-Abschnitte,
+- Fahrzeugposition bzw. laufender Auftrag,
+- Raumhafen-/Lager-Umschlagpunkte,
+- Warnungen bei unpassierbaren Abschnitten.
+
+Die Darstellung soll die vorhandene Earth-Karte erweitern und keinen separaten Logistik-Kartenmodus erzwingen.
+
+## Earth-spezifische Policy, die definiert werden soll
+
+Bitte konkrete Regeln/Parameter vorschlagen für:
+
+- nutzbare OSM highway/path-Klassen je Fahrzeugklasse,
+- maximale Offroad-Steigung je Fahrzeugtyp,
+- Terrain-/Landuse-Ausschlüsse,
+- Geschwindigkeits-/Zeitfaktoren Straße vs. Offroad,
+- minimale Anforderungen an Zufahrt zu Mine, Fabrik, Lager und Raumhafen,
+- Umgang mit fehlenden OSM-Daten,
+- Fallback bei kurzen nicht kartierten Zufahrten zwischen Gebäude und nächster Straße.
+
+Diese Werte sind **Earth-Policy**, nicht globales Core-Balancing.
+
+## Abgrenzung – ausdrücklich nicht in Earth implementieren
+
+- neue Supabase-Tabellen für Inventare, Fahrzeugfracht oder Transportjobs,
+- neue serverseitige Earth-Mutations-API,
+- eigene Ownership-/Actor-Semantik,
+- eigene Economy-/Ledger-Logik,
+- eigener Tick-/Scheduler,
+- eigene persistierte Transport-State-Machine,
+- eigene Reservierungslogik für Güter oder Fahrzeuge,
+- interplanetare oder orbitale Transitlogik,
+- alternative Backend-Lösung, falls ein Core-Contract noch fehlt.
+
+Fehlende Core-Funktionen bitte als Dependency/Handoff dokumentieren.
 
 ## Erwartetes Ergebnis
 
-- Earth-spezifische Policy/Requirements für Surface Logistics,
-- Liste der benötigten Knoten-/Routeneigenschaften,
-- Entscheidung, welche vorhandenen Earth-Layer direkt nutzbar sind,
-- UX-Skizze für Route/Transportauftrag,
-- Hinweise auf fehlende Earth-Daten oder APIs,
-- Rückgabe als Response/Handoff an `NOXIA-CORE`.
+- Earth-spezifische Surface-Routing-/Offroad-Policy,
+- Liste der benötigten OSM-/Terrain-/Layerdaten,
+- Entscheidung, welche vorhandenen Earth-Layer direkt wiederverwendet werden,
+- fachlich vollständige Gebäude ↔ Fahrzeug ↔ Lager-Kette,
+- Raumhafen als Surface-Umschlagpunkt,
+- UX für manuelle und automatische Transporte,
+- Kartenintegration für Route und Transportstatus,
+- Liste fehlender Core-Contracts/APIs als Rückgabe an `NOXIA-CORE`,
+- keine Earth-eigene Backend-Parallelarchitektur.
 
 ## Acceptance Criteria
 
-1. keine Duplikation des gemeinsamen Core-Datenmodells,
-2. reale Straßen und Terrain werden genutzt,
-3. Facility -> Vehicle -> Facility ist fachlich vollständig beschrieben,
-4. Raumhafen ist als Oberflächen-Umschlagpunkt abbildbar,
-5. Lösung bleibt mit Moon/Mars über gemeinsame Core-Schnittstellen kompatibel.
+1. reale OSM-Straßen/-Wege werden als bevorzugtes Routingnetz genutzt,
+2. Offroad-Fahrbarkeit berücksichtigt mindestens Terrain/Steigung und geeignete Earth-Daten,
+3. Facility → Vehicle → Facility ist inklusive Laden/Entladen und sichtbaren Zuständen vollständig beschrieben,
+4. Lager sind echte Umschlagknoten der gemeinsamen Core-Logistik,
+5. Raumhafen ist als Surface-Shuttle-Umschlagpunkt mit Lager-Handover abgebildet,
+6. manuelle Transporte sind in der Earth-UX vollständig bedienbar,
+7. automatische Transportregeln sind UX-seitig vorgesehen,
+8. Earth erzeugt keine eigenen Supabase-Tabellen, Scheduler oder Mutations-APIs für diese Funktion,
+9. fehlende Core-Verträge werden als Handoff dokumentiert statt lokal dupliziert,
+10. Lösung bleibt über gemeinsame Core-Schnittstellen mit Moon/Mars kompatibel.
 
 ## References
 
