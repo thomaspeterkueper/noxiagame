@@ -1,10 +1,11 @@
 // app/api/cron/transits/route.ts
-// Scheduler adapter only: finds due transits and delegates each completion to
-// the idempotent transactional Game Core command.
+// Scheduler adapter only: settles due ship transits and shared logistics jobs by
+// delegating to idempotent transactional Game Core commands.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { completeTransitCommand } from '@/lib/game/core/commands'
+import { settleDueTransportJobs } from '@/lib/game/core/logistics'
 import { CRON_SECRET_HEADER } from '@/lib/game/config'
 
 export async function GET(req: NextRequest) {
@@ -41,11 +42,34 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  let transportJobs
+  try {
+    transportJobs = await settleDueTransportJobs(100)
+  } catch (err) {
+    console.error('Transport job settlement failed:', err)
+    return NextResponse.json({
+      error: 'Transport job settlement failed',
+      ships: {
+        due: dueShips?.length ?? 0,
+        completed: completed.length,
+        failed: failed.length,
+      },
+    }, { status: 500 })
+  }
+
   return NextResponse.json({
     ok: true,
     tick: 'transits',
+    // Preserve the existing top-level ship counters for current monitoring.
     due: dueShips?.length ?? 0,
     completed: completed.length,
     failed: failed.length,
+    transportJobs: {
+      due: transportJobs.due,
+      arrived: transportJobs.arrived,
+      completed: transportJobs.completed,
+      failed: transportJobs.failed.length,
+      failedIds: transportJobs.failed,
+    },
   })
 }
