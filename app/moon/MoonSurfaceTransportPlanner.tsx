@@ -43,6 +43,16 @@ type Vehicle = {
 
 type VehiclesPayload = { vehicles?: Vehicle[]; error?: string }
 type SpatialPayload = { location?: { id: string; slug: string; name: string }; error?: string }
+type ReadinessPayload = {
+  ok?: boolean
+  ready?: boolean
+  code?: string
+  error?: string
+  frameId?: string
+  role?: string
+  vehicleInventoryId?: string | null
+  engineeringRequest?: string
+}
 
 const TERMINAL = new Set(['completed', 'cancelled', 'failed'])
 
@@ -57,6 +67,8 @@ export default function MoonSurfaceTransportPlanner() {
   const [resource, setResource] = useState('')
   const [amount, setAmount] = useState(1)
   const [sourceSnapshot, setSourceSnapshot] = useState<InventorySnapshot | null>(null)
+  const [readiness, setReadiness] = useState<ReadinessPayload | null>(null)
+  const [checkingReadiness, setCheckingReadiness] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -93,10 +105,14 @@ export default function MoonSurfaceTransportPlanner() {
   useEffect(() => { void loadCore() }, [])
 
   const nodeInventories = useMemo(() => inventories.filter(item => item.inventory_kind !== 'vehicle'), [inventories])
+  const vehicleInventoryByVehicleId = useMemo(() => new Map(inventories
+    .filter(item => item.inventory_kind === 'vehicle' && item.subject_id)
+    .map(item => [item.subject_id as string, item.id])), [inventories])
   const source = nodeInventories.find(item => item.id === sourceId) ?? null
   const destination = nodeInventories.find(item => item.id === destinationId) ?? null
   const selectedVehicle = vehicles.find(item => item.id === vehicleId) ?? null
-  const activeVehicleIds = useMemo(() => new Set((jobs ?? [])
+  const selectedVehicleInventoryId = selectedVehicle ? vehicleInventoryByVehicleId.get(selectedVehicle.id) ?? null : null
+  const activeVehicleInventoryIds = useMemo(() => new Set((jobs ?? [])
     .filter(job => !TERMINAL.has(job.status) && job.vehicle_inventory_id)
     .map(job => job.vehicle_inventory_id as string)), [jobs])
 
@@ -125,6 +141,32 @@ export default function MoonSurfaceTransportPlanner() {
     return () => { cancelled = true }
   }, [sourceId])
 
+  useEffect(() => {
+    setReadiness(null)
+    if (!vehicleId) return
+    let cancelled = false
+    setCheckingReadiness(true)
+    void (async () => {
+      try {
+        const token = await getToken()
+        if (!token) return
+        const response = await fetch('/api/game/moon/surface-transport/readiness', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vehicleId }),
+          cache: 'no-store',
+        })
+        const payload = await response.json() as ReadinessPayload
+        if (!cancelled) setReadiness(payload)
+      } catch (error) {
+        if (!cancelled) setReadiness({ ready: false, code: 'READINESS_UNAVAILABLE', error: error instanceof Error ? error.message : String(error) })
+      } finally {
+        if (!cancelled) setCheckingReadiness(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [vehicleId])
+
   const stock = useMemo(() => (sourceSnapshot?.items ?? []).filter(item => Number(item.available ?? item.amount) > 0), [sourceSnapshot])
   useEffect(() => {
     if (!resource && stock[0]) setResource(stock[0].resource)
@@ -134,15 +176,19 @@ export default function MoonSurfaceTransportPlanner() {
   const selectedStock = stock.find(item => item.resource === resource)
   const available = Number(selectedStock?.available ?? selectedStock?.amount ?? 0)
   const vehicleAtSource = selectedVehicle?.currentNodeInventoryId === sourceId
-  const vehicleReady = selectedVehicle?.status === 'ready' && !activeVehicleIds.has(selectedVehicle.id)
+  const vehicleBusy = selectedVehicleInventoryId ? activeVehicleInventoryIds.has(selectedVehicleInventoryId) : false
+  const vehicleReady = selectedVehicle?.status === 'ready' && !vehicleBusy
   const basicSelectionReady = Boolean(locationId && source && destination && source.id !== destination.id && resource && amount > 0 && amount <= available)
 
   let blocker: string | null = null
   if (!basicSelectionReady) blocker = 'Quelle, Ziel, Ware und verfügbare Menge müssen vollständig gewählt sein.'
   else if (!selectedVehicle) blocker = 'Kein reales Moon-Surface-Fahrzeug ausgewählt. Engineering-Frame und Instanz fehlen noch.'
+  else if (!selectedVehicleInventoryId) blocker = 'Das Cargo-Inventar des ausgewählten Fahrzeugs ist im Core noch nicht aufgelöst.'
   else if (!vehicleReady) blocker = 'Das ausgewählte Fahrzeug ist nicht bereit oder bereits einem aktiven Transport zugewiesen.'
   else if (!vehicleAtSource) blocker = 'Das Fahrzeug befindet sich laut Core nicht am gewählten Quellknoten.'
-  else blocker = 'Fahrzeug ist Core-seitig verfügbar; für den Start fehlt noch der Engineering-validierte Shackleton-RouteSnapshot mit ETA/Energie/Passability.'
+  else if (checkingReadiness) blocker = 'Engineering-Frame wird geprüft …'
+  else if (!readiness?.ready) blocker = readiness?.error ?? 'Für diesen Fahrzeug-Frame fehlen kanonische Moon-Surface-Engineeringwerte.'
+  else blocker = 'Engineering-Frame ist freigegeben; als letzter Schritt fehlt die LOLA-Routenauflösung zum Core-routeSnapshot.'
 
   return <section className="planner">
     <header>
@@ -173,10 +219,12 @@ export default function MoonSurfaceTransportPlanner() {
           <strong>{selectedVehicle.label ?? selectedVehicle.frameId}</strong>
           <span>Frame: {selectedVehicle.frameId}</span>
           <span>Status: {selectedVehicle.status}</span>
+          <span>Cargo-Inventar: {selectedVehicleInventoryId ? selectedVehicleInventoryId.slice(0, 8) : 'unresolved'}</span>
           <span>Kapazität: {selectedVehicle.cargoCapacityT ?? '–'} t</span>
           <span>Condition: {Math.round(selectedVehicle.condition * 100)}%</span>
           <span>Wear: {Math.round(selectedVehicle.wear * 100)}%</span>
           <span>Am Quellknoten: {vehicleAtSource ? 'ja' : 'nein'}</span>
+          <span>Engineering: {checkingReadiness ? 'prüft …' : readiness?.ready ? 'freigegeben' : readiness?.code ?? 'unresolved'}</span>
         </div> : <div className="notice"><b>Engineering noch offen</b><span>Der Auftrag für Cargo Rover und Heavy Hauler ist vorhanden, aber noch nicht abgeschlossen. Deshalb wird keine Fahrzeuginstanz erfunden.</span></div>}
       </div>
     </div>
