@@ -36,6 +36,7 @@ When an emergency/manual Production rollout used a different timestamp or name f
 | `20260911063840` | `transport_loading_unloading_states` | `20260911065436_transport_loading_unloading_phases.sql` | `20260911063840_remote_history_bridge.sql` |
 | `20260911071050` | `facility_output_production_manual_core_rollout` | `20260911064000_facility_output_production.sql` | `20260911071050_remote_history_bridge.sql` |
 | `20260911071536` | `surface_vehicle_operating_costs` | `20260911070000_surface_vehicle_operating_costs.sql` | `20260911071536_remote_history_bridge.sql` |
+| `20260911101048` | `facility_inventory_provisioning_manual_core_rollout` | `20260911100200_facility_inventory_provisioning.sql` | `20260911101048_remote_history_bridge.sql` |
 
 The mapping above describes historical identity, not execution ordering. In particular, a bridge may sort before or after its canonical migration because it preserves the timestamp that Production actually recorded. Since bridges contain no executable SQL, this does not alter fresh-rebuild semantics.
 
@@ -81,3 +82,9 @@ PR #118 created a new Git-linked Supabase preview (`kouflduesxpkqumzbkra`) from 
 The rebuilt migration ledger contains the three newly added historical markers (`20260911063840`, `20260911071050`, `20260911071536`) together with their canonical migrations. A read-only Core smoke check confirmed the expected current objects, including `transport_jobs`, `vehicle_instances`, `facility_production_commands`, `ship_docking_assignments`, `noxia_start_transit`, `noxia_complete_transit`, `noxia_start_transport_job`, and `noxia_credit_facility_output`.
 
 Production migration history was re-read after the preview verification and was unchanged. No Production SQL or migration-history mutation was performed during this reconciliation.
+
+### Facility inventory provisioning rollout — 2026-09-11
+
+`20260911100200_facility_inventory_provisioning.sql` was validated on disposable Supabase preview `byuatsqjcixcdldzvriy` (PR #123), which reached `MIGRATIONS_PASSED` and `ACTIVE_HEALTHY`. The preview had 13/13 policy-eligible tile entities provisioned, zero missing native inventories and zero inventory-kind mismatches. Repeated `noxia_ensure_facility_inventory()` calls returned the same inventory ID, proving idempotency. ACL verification showed execution disabled for `anon`/`authenticated` and enabled for `service_role` only.
+
+A read-only Production dry-run immediately before rollout found 29 eligible facilities across Earth, Mars, Moon and Phobos with zero kind conflicts. Production rollout was then applied explicitly as `20260911101048 facility_inventory_provisioning_manual_core_rollout`. Post-rollout verification found 29/29 eligible facilities provisioned, zero missing inventories, zero kind mismatches and zero player-owned native inventories with accidental public deposit/withdraw rights.
