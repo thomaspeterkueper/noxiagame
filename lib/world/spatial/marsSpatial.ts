@@ -1,4 +1,4 @@
-import { PLANETARY_REFERENCES, localEnuToPlanetary, planetaryToLocalEnu } from '@/lib/game/spatial/planetary'
+import { PLANETARY_REFERENCES, localEnuToPlanetary, planetaryToLocalEnu } from '../../game/spatial/planetary'
 
 export type MarsGeoPoint = {
   lat: number
@@ -12,16 +12,8 @@ export type MarsLocalMetricPoint = {
   upM?: number
 }
 
-export type MarsChunkCoord = {
-  x: number
-  y: number
-}
-
-export type MarsChunkCell = {
-  chunk: MarsChunkCoord
-  localX: number
-  localY: number
-}
+export type MarsChunkCoord = { x: number; y: number }
+export type MarsChunkCell = { chunk: MarsChunkCoord; localX: number; localY: number }
 
 export type MarsRegionAnchor = {
   id: string
@@ -41,9 +33,7 @@ export function normalizeMarsLongitude(lon: number): number {
 }
 
 export function validateMarsGeoPoint(point: MarsGeoPoint): MarsGeoPoint {
-  if (!Number.isFinite(point.lat) || point.lat < -90 || point.lat > 90) {
-    throw new Error(`Invalid Mars latitude: ${point.lat}`)
-  }
+  if (!Number.isFinite(point.lat) || point.lat < -90 || point.lat > 90) throw new Error(`Invalid Mars latitude: ${point.lat}`)
   if (!Number.isFinite(point.lon)) throw new Error(`Invalid Mars longitude: ${point.lon}`)
   return { ...point, lon: normalizeMarsLongitude(point.lon) }
 }
@@ -70,40 +60,25 @@ export function localMetersToMarsGeo(point: MarsLocalMetricPoint, anchor: MarsGe
 }
 
 export function marsMetricToChunk(point: MarsLocalMetricPoint, chunkSizeM = MARS_CHUNK_SIZE_M): MarsChunkCoord {
-  return {
-    x: Math.floor(point.eastM / chunkSizeM),
-    y: Math.floor(point.northM / chunkSizeM),
-  }
+  return { x: Math.floor(point.eastM / chunkSizeM), y: Math.floor(point.northM / chunkSizeM) }
 }
 
 export function marsGeoToChunk(point: MarsGeoPoint, region: MarsRegionAnchor): MarsChunkCoord {
   return marsMetricToChunk(marsGeoToLocalMeters(point, region.origin), region.chunkSizeM)
 }
 
-export function marsMetricToChunkCell(
-  point: MarsLocalMetricPoint,
-  chunkSizeM = MARS_CHUNK_SIZE_M,
-  cellSizeM = MARS_CELL_SIZE_M,
-): MarsChunkCell {
-  if (chunkSizeM <= 0 || cellSizeM <= 0 || chunkSizeM % cellSizeM !== 0) {
-    throw new Error('chunkSizeM must be a positive multiple of cellSizeM')
-  }
+export function marsMetricToChunkCell(point: MarsLocalMetricPoint, chunkSizeM = MARS_CHUNK_SIZE_M, cellSizeM = MARS_CELL_SIZE_M): MarsChunkCell {
+  if (chunkSizeM <= 0 || cellSizeM <= 0 || chunkSizeM % cellSizeM !== 0) throw new Error('chunkSizeM must be a positive multiple of cellSizeM')
   const chunk = marsMetricToChunk(point, chunkSizeM)
-  const chunkOriginEast = chunk.x * chunkSizeM
-  const chunkOriginNorth = chunk.y * chunkSizeM
   return {
     chunk,
-    localX: Math.floor((point.eastM - chunkOriginEast) / cellSizeM),
-    localY: Math.floor((point.northM - chunkOriginNorth) / cellSizeM),
+    localX: Math.floor((point.eastM - chunk.x * chunkSizeM) / cellSizeM),
+    localY: Math.floor((point.northM - chunk.y * chunkSizeM) / cellSizeM),
   }
 }
 
 export function marsGeoToChunkCell(point: MarsGeoPoint, region: MarsRegionAnchor): MarsChunkCell {
-  return marsMetricToChunkCell(
-    marsGeoToLocalMeters(point, region.origin),
-    region.chunkSizeM,
-    region.cellSizeM,
-  )
+  return marsMetricToChunkCell(marsGeoToLocalMeters(point, region.origin), region.chunkSizeM, region.cellSizeM)
 }
 
 export function marsChunkKey(regionId: string, chunk: MarsChunkCoord): string {
