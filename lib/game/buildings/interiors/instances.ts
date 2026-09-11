@@ -1,4 +1,5 @@
 import type {
+  InteriorHostRef,
   InteriorInstance,
   InteriorInstanceId,
   InteriorPortalState,
@@ -7,14 +8,22 @@ import type {
   BuildingInstanceId,
 } from './types'
 
-export interface CreateInteriorInstanceOptions {
-  id: InteriorInstanceId
-  buildingInstanceId: BuildingInstanceId
-}
+export type CreateInteriorInstanceOptions =
+  | {
+      id: InteriorInstanceId
+      host: InteriorHostRef
+      buildingInstanceId?: never
+    }
+  | {
+      id: InteriorInstanceId
+      buildingInstanceId: BuildingInstanceId
+      host?: never
+    }
 
 export interface InteriorInstanceValidationIssue {
   code:
     | 'template-mismatch'
+    | 'host-mismatch'
     | 'missing-room-state'
     | 'unknown-room-state'
     | 'room-state-id-mismatch'
@@ -24,10 +33,16 @@ export interface InteriorInstanceValidationIssue {
   message: string
 }
 
+function resolveHost(options: CreateInteriorInstanceOptions): InteriorHostRef {
+  if ('host' in options && options.host) return options.host
+  return { kind: 'building', id: options.buildingInstanceId }
+}
+
 export function createInteriorInstance(
   template: InteriorTemplate,
   options: CreateInteriorInstanceOptions,
 ): InteriorInstance {
+  const host = resolveHost(options)
   const roomStates = Object.fromEntries(
     template.rooms.map(room => [
       room.id,
@@ -53,7 +68,8 @@ export function createInteriorInstance(
   return {
     id: options.id,
     templateId: template.id,
-    buildingInstanceId: options.buildingInstanceId,
+    host,
+    buildingInstanceId: host.kind === 'building' ? host.id : undefined,
     roomStates,
     portalStates,
   }
@@ -69,6 +85,13 @@ export function validateInteriorInstance(
     issues.push({
       code: 'template-mismatch',
       message: `Instance ${instance.id} references template ${instance.templateId}, expected ${template.id}`,
+    })
+  }
+
+  if (template.hostKinds && !template.hostKinds.includes(instance.host.kind)) {
+    issues.push({
+      code: 'host-mismatch',
+      message: `Template ${template.id} does not allow host kind ${instance.host.kind}`,
     })
   }
 
