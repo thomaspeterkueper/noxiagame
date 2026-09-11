@@ -1,0 +1,6 @@
+-- Migration history alignment marker.
+-- Production applied `facility_inventory_provisioning_manual_core_rollout`
+-- as version 20260911101048 after disposable-preview validation.
+-- Canonical fresh-rebuild logic lives in
+-- 20260911100200_facility_inventory_provisioning.sql.
+-- This file is intentionally comment-only and MUST remain a no-op.
