@@ -1,5 +1,6 @@
 import type { InteriorTemplate, InteriorTemplateId } from './types'
 import { LABORATORY_STANDARD_INTERIOR } from './templates/laboratoryStandard'
+import { ORBITAL_TRANSFER_STATION_INTERIOR } from './templates/orbitalTransferStation'
 
 export interface InteriorTemplateRegistry {
   byId: Readonly<Record<InteriorTemplateId, InteriorTemplate>>
@@ -9,6 +10,7 @@ export interface InteriorTemplateRegistry {
 export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
   byId: {
     [LABORATORY_STANDARD_INTERIOR.id]: LABORATORY_STANDARD_INTERIOR,
+    [ORBITAL_TRANSFER_STATION_INTERIOR.id]: ORBITAL_TRANSFER_STATION_INTERIOR,
   },
   byBuildingTypeId: {
     laboratory: LABORATORY_STANDARD_INTERIOR.id,
