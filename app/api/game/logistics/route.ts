@@ -5,6 +5,8 @@ import {
   LOGISTICS_RESOURCES,
   TRANSPORT_DOMAINS,
   TRANSPORT_STATUSES,
+  beginLoadingTransportJob,
+  beginUnloadingTransportJob,
   cancelTransportJob,
   completeTransportJob,
   createTransportJob,
@@ -199,12 +201,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, commandId, job })
     }
 
-    if (action === 'start-job' || action === 'complete-job' || action === 'cancel-job') {
+    if (
+      action === 'begin-loading'
+      || action === 'start-job'
+      || action === 'begin-unloading'
+      || action === 'complete-job'
+      || action === 'cancel-job'
+    ) {
       const jobId = uuid(body.jobId)
       if (!jobId) return NextResponse.json({ error: 'Ungültige jobId.' }, { status: 400 })
 
+      if (action === 'begin-loading') {
+        const job = await beginLoadingTransportJob(user.id, jobId)
+        return NextResponse.json({ ok: true, job })
+      }
       if (action === 'start-job') {
         const job = await startTransportJob(user.id, jobId)
+        return NextResponse.json({ ok: true, job })
+      }
+      if (action === 'begin-unloading') {
+        const job = await beginUnloadingTransportJob(user.id, jobId)
         return NextResponse.json({ ok: true, job })
       }
       if (action === 'complete-job') {
