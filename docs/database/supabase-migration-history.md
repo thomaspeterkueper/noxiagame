@@ -11,13 +11,14 @@ When an emergency/manual Production rollout used a different timestamp or name f
 
 ## Rules
 
-- Never repair Production migration history by deleting or renaming applied versions.
+- Never repair Production migration history by deleting or renaming applied versions merely to satisfy a hosted check.
 - Never replace a historical Production rollout with a second semantic migration at the same version.
 - A `remote_history_bridge` contains comments only and must remain idempotent/no-op.
 - The canonical migration contains the actual schema/function change used for fresh rebuilds.
 - Before merging migration-history changes, prove a clean Supabase development/preview rebuild from Git.
 - Production deployment is a separate explicit operation and is not part of migration-history reconciliation.
 - Never call reset/rebase/delete on a Supabase branch record whose `is_default` flag is true or whose project reference equals the Production project reference. Such a record is not a disposable preview database even if its branch-status metadata is stale or failed.
+- New NOXIA migrations must use the canonical 14-digit UTC format `YYYYMMDDHHmmss_name.sql`. Legacy shorter versions remain historical compatibility records only.
 
 ## Active Core rollout aliases, 2026-09-10 to 2026-09-11
 
@@ -38,6 +39,28 @@ When an emergency/manual Production rollout used a different timestamp or name f
 
 The mapping above describes historical identity, not execution ordering. In particular, a bridge may sort before or after its canonical migration because it preserves the timestamp that Production actually recorded. Since bridges contain no executable SQL, this does not alter fresh-rebuild semantics.
 
+## Hosted default-branch check: diagnosed false positive
+
+The red `Supabase Preview` check on `main` is not caused by a missing Production migration file. It matches Supabase CLI issue `supabase/cli#6036`, fixed upstream by PR `#6038`: legacy migration versions that are a numeric prefix of a newer timestamp can be compared in different orders locally and remotely.
+
+NOXIA contains the exact collision pattern:
+
+- historical Production/local version `20260828` in `20260828_noxia_tester_state.sql`;
+- later canonical versions on the same date, beginning with `20260828122500_living_population_seed_guard.sql` and followed by further `20260828HHMMSS_*` migrations.
+
+A legacy comparator orders the remote `version` column by the extracted version, so `20260828` precedes `20260828122500`. The local side can instead be ordered by full file name, where `20260828122500_...` sorts before `20260828_noxia_tester_state.sql` because a digit sorts before the underscore. The merge walk then incorrectly reports `20260828` as a remote migration missing locally even though the file exists.
+
+This also explains why:
+
+- the current Production migration ledger contains `20260828`;
+- the repository contains `20260828_noxia_tester_state.sql`;
+- a clean disposable preview rebuild succeeds;
+- the GitHub `main` check still reports only `Remote migration versions not found in local migrations directory.`
+
+The hosted Supabase GitHub integration is therefore behaving like the affected comparator path even though the ordering bug has already been fixed upstream. **Do not mutate Production history to work around this false positive.** In particular, do not rename `20260828` in Production and do not delete/repair the historical row just to make the hosted check green.
+
+Until the hosted integration has the upstream ordering fix, migration changes are allowed only with the following gate: use canonical 14-digit versions, validate on a disposable Supabase preview, compare Production-applied versions against repository files/history bridges, and treat the default-branch `Supabase Preview` result as non-authoritative when its sole failure is this known ordering message.
+
 ## Older history
 
 The same bridge convention already exists for earlier manually applied/renamed migrations, including the ship/docking, spatial, terrain and world-position rollouts. Those existing bridge files are retained as immutable compatibility markers rather than collapsed or renamed.
@@ -53,7 +76,7 @@ A migration-history reconciliation is complete only when all of the following ar
 
 ### Verified rebuild — 2026-09-11
 
-PR #118 created a new Git-linked Supabase preview (`kouflduesxpkqumzbkra`) from this migration set. The branch reached `MIGRATIONS_PASSED` and `ACTIVE_HEALTHY`, and the Supabase Preview GitHub check completed successfully.
+PR #118 created a new Git-linked Supabase preview (`kouflduesxpkqumzbkra`) from this migration set. The branch reached `MIGRATIONS_PASSED`/`FUNCTIONS_DEPLOYED` and `ACTIVE_HEALTHY`, and the Supabase Preview check for the disposable branch completed successfully during the clean rebuild.
 
 The rebuilt migration ledger contains the three newly added historical markers (`20260911063840`, `20260911071050`, `20260911071536`) together with their canonical migrations. A read-only Core smoke check confirmed the expected current objects, including `transport_jobs`, `vehicle_instances`, `facility_production_commands`, `ship_docking_assignments`, `noxia_start_transit`, `noxia_complete_transit`, `noxia_start_transport_job`, and `noxia_credit_facility_output`.
 
