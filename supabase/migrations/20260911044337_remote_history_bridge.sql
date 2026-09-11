@@ -1,0 +1,3 @@
+-- Supabase migration-history bridge.
+-- Production already contains the corresponding transit mutation guards.
+-- Intentionally no-op: preserve production/repository migration-history parity.
