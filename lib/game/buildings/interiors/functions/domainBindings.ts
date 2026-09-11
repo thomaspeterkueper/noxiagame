@@ -7,9 +7,11 @@ export type InteriorDomainObjectKind =
   | 'raw-data'
   | 'interpretation'
   | 'discovery'
+  | 'equipment'
   | 'inventory'
   | 'vehicle'
   | 'person'
+  | 'habitation'
   | 'station-service'
 
 export interface InteriorDomainObjectRef {
@@ -32,8 +34,9 @@ export interface InteriorFunctionDomainBinding {
  * those objects. The owning domain remains responsible for validation,
  * persistence, lifecycle and ground truth.
  */
-export const INTERIOR_FUNCTION_DOMAIN_BINDINGS: Partial<
-  Record<InteriorFunctionId, InteriorFunctionDomainBinding>
+export const INTERIOR_FUNCTION_DOMAIN_BINDINGS: Record<
+  InteriorFunctionId,
+  InteriorFunctionDomainBinding
 > = {
   'sample.register': {
     functionId: 'sample.register',
@@ -76,6 +79,11 @@ export const INTERIOR_FUNCTION_DOMAIN_BINDINGS: Partial<
     authoritativeDomains: ['research.measurements', 'knowledge', 'discoveries'],
     notes: 'Reanalysis may change interpretation/discovery state but never ground truth or stored raw measurements.',
   },
+  'equipment.maintain': {
+    functionId: 'equipment.maintain',
+    requiredInputs: ['equipment'],
+    authoritativeDomains: ['condition', 'maintenance'],
+  },
   'inventory.open': {
     functionId: 'inventory.open',
     requiredInputs: ['inventory'],
@@ -93,17 +101,32 @@ export const INTERIOR_FUNCTION_DOMAIN_BINDINGS: Partial<
     requiredInputs: ['vehicle', 'station-service'],
     authoritativeDomains: ['orbit', 'travel', 'vehicles'],
   },
+  'station.depot.open': {
+    functionId: 'station.depot.open',
+    requiredInputs: ['inventory', 'station-service'],
+    authoritativeDomains: ['inventory', 'station-services'],
+  },
   'medical.treat': {
     functionId: 'medical.treat',
     requiredInputs: ['person'],
     authoritativeDomains: ['people'],
   },
+  'crew.habitation.inspect': {
+    functionId: 'crew.habitation.inspect',
+    requiredInputs: ['habitation'],
+    authoritativeDomains: ['population', 'habitation'],
+  },
+  'station.operations.open': {
+    functionId: 'station.operations.open',
+    requiredInputs: ['station-service'],
+    authoritativeDomains: ['station-services'],
+  },
 }
 
 export function getInteriorFunctionDomainBinding(
   functionId: InteriorFunctionId,
-): InteriorFunctionDomainBinding | null {
-  return INTERIOR_FUNCTION_DOMAIN_BINDINGS[functionId] ?? null
+): InteriorFunctionDomainBinding {
+  return INTERIOR_FUNCTION_DOMAIN_BINDINGS[functionId]
 }
 
 export function hasRequiredDomainObjects(
