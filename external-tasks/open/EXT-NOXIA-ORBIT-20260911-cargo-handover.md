@@ -124,10 +124,66 @@ Orbit baut dafür **keine zweite Transit- oder Inventar-Domain**.
 
 Der Request bleibt `open`, bis die Core-Schnittstelle und die darauf aufbauende Stations-/Phobos-UX implementiert und gemeinsam getestet sind.
 
+## NOXIA-CORE Response — 2026-09-11
+
+Die angeforderten generischen Core-Fähigkeiten sind jetzt im Repository vorhanden. Orbit muss dafür keine eigene Backend-Domain ergänzen.
+
+### Verfügbare Core-Bausteine
+
+- adressierbare Logistics-Inventare und Reservierungen,
+- atomarer Cargo-Transfer,
+- persistente Transportjobs,
+- Docking-Ports, Reservations und Connections,
+- expliziter Cargo-Handover über eine aktive Docking-Connection,
+- getrennte `transport_job_legs` und `transport_job_handovers`,
+- atomare Itinerary-Definition,
+- private Custody-/Storage-Accounts unter einem realen gemeinsamen Depot,
+- reservierungsgebundene Marktangebote,
+- atomarer Verkauf mit Credits- und Custody-Wechsel am selben physischen Knoten.
+
+Neue Marktsemantik:
+
+```text
+Phobos Depot (physischer Host)
+  -> Seller Custody Inventory
+  -> Market Reservation / Offer
+  -> Sale
+  -> Buyer Custody Inventory
+```
+
+Das Marktangebot erzeugt keinen zweiten Bestand. Die Ware bleibt physisch am Phobos-Depot und wird im Verkäufer-Custody-Inventar durch `logistics_reservations` gebunden. Beim Kauf ändert sich die private Custody, nicht der physische Knoten.
+
+### Relevante Implementierungen
+
+```text
+supabase/migrations/20260911070500_docking_and_multileg_logistics_core.sql
+supabase/migrations/20260911071200_atomic_transport_itinerary_definition.sql
+supabase/migrations/20260911111420_custody_marketplace_core.sql
+supabase/migrations/20260911112830_market_command_idempotency_hardening.sql
+supabase/migrations/20260911113700_docking_itinerary_security_hardening.sql
+supabase/migrations/20260911114600_core_command_retry_serialization.sql
+lib/game/core/dockingPersistence.ts
+lib/game/core/marketplace.ts
+app/api/game/docking/route.ts
+app/api/game/market/route.ts
+```
+
+Die gemeinsame Retry-Härtung serialisiert identische Command-IDs für Cargo-Transfer, Transportjob-Erzeugung, Docking und Itinerary; Marketplace-Commands besitzen denselben Schutz.
+
+### Aktuelle Grenze für Orbit
+
+Hosted Supabase Production liegt noch hinter dem Repository. Bis zum kontrollierten DB-Rollout melden die bereits deployten Docking-/Market-APIs deshalb bewusst `503 DOCKING_CORE_NOT_DEPLOYED` bzw. `503 MARKET_CORE_NOT_DEPLOYED` statt einen internen Fehler vorzutäuschen.
+
+Orbit kann auf Basis der oben genannten Contracts und Typen weiterarbeiten, darf den Backend-Rollout aber noch nicht als live abgenommen markieren.
+
+Der Core-Request bleibt bis Preview-Validierung, Production-Rollout und anschließendem End-to-End-Test auf Phobos `open`.
+
 ## References
 
 - `docs/architecture/orbit-cargo-handover.md`
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
 - `lib/game/core/`
+- `external-tasks/open/EXT-NOXIA-CORE-20260911-orbit-cargo-transfer-core.md`
+- `external-tasks/open/EXT-NOXIA-CORE-20260911-docking-persistence.md`
 - `external-tasks/open/EXT-OTA-NOXIA-20260906-transfer-logistics-network.md`
