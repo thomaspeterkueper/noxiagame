@@ -1,0 +1,5 @@
+-- Supabase migration-history bridge.
+-- Production already contains the facility-output production rollout recorded as
+-- 20260911071050_facility_output_production_manual_core_rollout.
+-- The canonical repository migration is 20260911064000_facility_output_production.sql.
+-- Intentionally no-op: preserve production/repository migration-history parity.

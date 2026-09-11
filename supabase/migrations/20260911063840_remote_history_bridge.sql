@@ -1,0 +1,5 @@
+-- Supabase migration-history bridge.
+-- Production already contains the transport loading/unloading state rollout recorded as
+-- 20260911063840_transport_loading_unloading_states.
+-- The canonical repository migration is 20260911065436_transport_loading_unloading_phases.sql.
+-- Intentionally no-op: preserve production/repository migration-history parity.
