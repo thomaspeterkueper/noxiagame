@@ -21,26 +21,65 @@ export function validateMarsGeoPoint(point: MarsGeoPoint): MarsGeoPoint {
   return { ...point, lon: normalizeMarsLongitude(point.lon) }
 }
 
+export function createMarsRegionAnchor(id: string, name: string, origin: MarsGeoPoint, options: { chunkSizeM?: number; cellSizeM?: number } = {}): MarsRegionAnchor {
+  return {
+    id,
+    name,
+    origin: validateMarsGeoPoint(origin),
+    chunkSizeM: options.chunkSizeM ?? MARS_CHUNK_SIZE_M,
+    cellSizeM: options.cellSizeM ?? MARS_CELL_SIZE_M,
+  }
+}
+
 export function marsGeoToLocalMeters(point: MarsGeoPoint, anchor: MarsGeoPoint): MarsLocalMetricPoint {
-  const p = validateMarsGeoPoint(point), a = validateMarsGeoPoint(anchor)
-  const local = planetaryToLocalEnu({ latDeg: p.lat, lonDeg: p.lon, elevationM: p.elevationM ?? 0 }, { latDeg: a.lat, lonDeg: a.lon, elevationM: a.elevationM ?? 0 }, MARS_REFERENCE)
+  const p = validateMarsGeoPoint(point)
+  const a = validateMarsGeoPoint(anchor)
+  const local = planetaryToLocalEnu(
+    { latDeg: p.lat, lonDeg: p.lon, elevationM: p.elevationM ?? 0 },
+    { latDeg: a.lat, lonDeg: a.lon, elevationM: a.elevationM ?? 0 },
+    MARS_REFERENCE,
+  )
   return { eastM: local.eastM, northM: local.northM, upM: local.upM }
 }
 
 export function localMetersToMarsGeo(point: MarsLocalMetricPoint, anchor: MarsGeoPoint): MarsGeoPoint {
   const a = validateMarsGeoPoint(anchor)
-  const result = localEnuToPlanetary({ eastM: point.eastM, northM: point.northM, upM: point.upM ?? 0 }, { latDeg: a.lat, lonDeg: a.lon, elevationM: a.elevationM ?? 0 }, MARS_REFERENCE)
+  const result = localEnuToPlanetary(
+    { eastM: point.eastM, northM: point.northM, upM: point.upM ?? 0 },
+    { latDeg: a.lat, lonDeg: a.lon, elevationM: a.elevationM ?? 0 },
+    MARS_REFERENCE,
+  )
   return validateMarsGeoPoint({ lat: result.latDeg, lon: result.lonDeg, elevationM: result.elevationM })
 }
 
-export function marsMetricToChunk(point: MarsLocalMetricPoint, chunkSizeM = MARS_CHUNK_SIZE_M): MarsChunkCoord { return { x: Math.floor(point.eastM / chunkSizeM), y: Math.floor(point.northM / chunkSizeM) } }
-export function marsGeoToChunk(point: MarsGeoPoint, region: MarsRegionAnchor): MarsChunkCoord { return marsMetricToChunk(marsGeoToLocalMeters(point, region.origin), region.chunkSizeM) }
+export function marsMetricToChunk(point: MarsLocalMetricPoint, chunkSizeM = MARS_CHUNK_SIZE_M): MarsChunkCoord {
+  return { x: Math.floor(point.eastM / chunkSizeM), y: Math.floor(point.northM / chunkSizeM) }
+}
+
+export function marsGeoToChunk(point: MarsGeoPoint, region: MarsRegionAnchor): MarsChunkCoord {
+  return marsMetricToChunk(marsGeoToLocalMeters(point, region.origin), region.chunkSizeM)
+}
+
 export function marsMetricToChunkCell(point: MarsLocalMetricPoint, chunkSizeM = MARS_CHUNK_SIZE_M, cellSizeM = MARS_CELL_SIZE_M): MarsChunkCell {
   if (chunkSizeM <= 0 || cellSizeM <= 0 || chunkSizeM % cellSizeM !== 0) throw new Error('chunkSizeM must be a positive multiple of cellSizeM')
   const chunk = marsMetricToChunk(point, chunkSizeM)
-  return { chunk, localX: Math.floor((point.eastM - chunk.x * chunkSizeM) / cellSizeM), localY: Math.floor((point.northM - chunk.y * chunkSizeM) / cellSizeM) }
+  return {
+    chunk,
+    localX: Math.floor((point.eastM - chunk.x * chunkSizeM) / cellSizeM),
+    localY: Math.floor((point.northM - chunk.y * chunkSizeM) / cellSizeM),
+  }
 }
-export function marsGeoToChunkCell(point: MarsGeoPoint, region: MarsRegionAnchor): MarsChunkCell { return marsMetricToChunkCell(marsGeoToLocalMeters(point, region.origin), region.chunkSizeM, region.cellSizeM) }
-export function marsChunkKey(regionId: string, chunk: MarsChunkCoord): string { return `mars:${regionId}:${chunk.x}:${chunk.y}` }
 
-export const THARSIS_REGION: MarsRegionAnchor = { id: 'tharsis-hub', name: 'Tharsis Hub', origin: { lat: 0, lon: -112.5, elevationM: 0 }, chunkSizeM: MARS_CHUNK_SIZE_M, cellSizeM: MARS_CELL_SIZE_M }
+export function marsGeoToChunkCell(point: MarsGeoPoint, region: MarsRegionAnchor): MarsChunkCell {
+  return marsMetricToChunkCell(marsGeoToLocalMeters(point, region.origin), region.chunkSizeM, region.cellSizeM)
+}
+
+export function marsChunkKey(regionId: string, chunk: MarsChunkCoord): string {
+  return `mars:${regionId}:${chunk.x}:${chunk.y}`
+}
+
+/**
+ * Production currently marks the Mars/Tharsis world-frame origin as pending.
+ * Therefore this module deliberately exports no canonical THARSIS_REGION yet.
+ * Callers may construct a region only from a verified origin or for isolated tests.
+ */
