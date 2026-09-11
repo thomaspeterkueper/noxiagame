@@ -4,6 +4,14 @@ export type LevelId = string
 export type RoomId = string
 export type PortalId = string
 export type BuildingInstanceId = string
+export type StationInstanceId = string
+
+export type InteriorHostKind = 'building' | 'station'
+
+export interface InteriorHostRef {
+  kind: InteriorHostKind
+  id: string
+}
 
 export type PortalKind =
   | 'door'
@@ -59,7 +67,8 @@ export interface InteriorPortalDef {
 
 export interface InteriorTemplate {
   id: InteriorTemplateId
-  buildingTypeId: string
+  buildingTypeId?: string
+  hostKinds?: InteriorHostKind[]
   name: string
   version: number
   levels: InteriorLevelDef[]
@@ -89,14 +98,18 @@ export interface InteriorRoomState {
 export interface InteriorInstance {
   id: InteriorInstanceId
   templateId: InteriorTemplateId
-  buildingInstanceId: BuildingInstanceId
+  host: InteriorHostRef
+  /** @deprecated Use host. Kept while existing building consumers migrate. */
+  buildingInstanceId?: BuildingInstanceId
   roomStates: Record<RoomId, InteriorRoomState>
   portalStates: Record<PortalId, InteriorPortalState>
 }
 
 export interface PersonnelAssignment {
   personId: string
-  buildingInstanceId: BuildingInstanceId
+  host: InteriorHostRef
+  /** @deprecated Use host. Kept while existing building consumers migrate. */
+  buildingInstanceId?: BuildingInstanceId
   roomId: RoomId
   roleId: string
   shiftId?: string
