@@ -17,6 +17,7 @@ When an emergency/manual Production rollout used a different timestamp or name f
 - The canonical migration contains the actual schema/function change used for fresh rebuilds.
 - Before merging migration-history changes, prove a clean Supabase development/preview rebuild from Git.
 - Production deployment is a separate explicit operation and is not part of migration-history reconciliation.
+- Never call reset/rebase/delete on a Supabase branch record whose `is_default` flag is true or whose project reference equals the Production project reference. Such a record is not a disposable preview database even if its branch-status metadata is stale or failed.
 
 ## Active Core rollout aliases, 2026-09-10 to 2026-09-11
 
@@ -49,3 +50,11 @@ A migration-history reconciliation is complete only when all of the following ar
 2. a fresh Supabase development/preview database can rebuild from the Git migration directory without manual SQL intervention;
 3. the rebuilt database exposes the expected Core schema/functions;
 4. no Production migration record or Production data was modified during reconciliation.
+
+### Verified rebuild — 2026-09-11
+
+PR #118 created a new Git-linked Supabase preview (`kouflduesxpkqumzbkra`) from this migration set. The branch reached `MIGRATIONS_PASSED` and `ACTIVE_HEALTHY`, and the Supabase Preview GitHub check completed successfully.
+
+The rebuilt migration ledger contains the three newly added historical markers (`20260911063840`, `20260911071050`, `20260911071536`) together with their canonical migrations. A read-only Core smoke check confirmed the expected current objects, including `transport_jobs`, `vehicle_instances`, `facility_production_commands`, `ship_docking_assignments`, `noxia_start_transit`, `noxia_complete_transit`, `noxia_start_transport_job`, and `noxia_credit_facility_output`.
+
+Production migration history was re-read after the preview verification and was unchanged. No Production SQL or migration-history mutation was performed during this reconciliation.
