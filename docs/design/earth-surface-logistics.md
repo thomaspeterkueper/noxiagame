@@ -1,21 +1,19 @@
 # Earth Surface Logistics
 
-Status: erste Earth-Policy für `EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS`.
+Status: Earth-Policy und erster OSM-basierter Surface-Router für `EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS`.
 
 ## Zuständigkeit
 
-Earth besitzt ausschließlich die planetenspezifische Interpretation von Karte und Gelände:
+Earth besitzt die planetenspezifische Interpretation von Karte und Gelände:
 
 - OSM-Straßen/-Wege als bevorzugtes Routingnetz,
 - Straßeneignung für Surface-Fahrzeugrollen,
 - Offroad-Fallback,
 - relative Traversal-Kosten für Zeit/Energie/Wear,
 - kurze nicht kartierte Facility-Zufahrten,
-- Karten-/UX-Darstellung.
+- Routen- und Transportdarstellung in der Earth-UX.
 
-Nicht Earth-owned sind Inventar, Reservierungen, Fahrzeugbelegung, TransportJob-Persistenz, Laden/Entladen, Scheduler/Ticks, Ownership oder Economy. Dafür ist der offene Core-Handoff
-`external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
-maßgeblich.
+Core besitzt Inventare, Reservierungen, Fahrzeugbelegung, TransportJob-Persistenz, Laden/Entladen, Scheduler/Ticks, Ownership und Economy. Der früher fehlende Vertrag aus `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md` ist inzwischen auf `main` technisch vorhanden: `lib/game/core/logistics.ts`, `app/api/game/logistics/route.ts`, der Vehicle-Instance-Core und die zugehörigen Supabase-Migrationen stellen die gemeinsame Transport-State-Machine bereit. Earth konsumiert diese Verträge und baut keine lokale Ersatzlogik.
 
 ## Bestehende Daten werden wiederverwendet
 
@@ -23,9 +21,9 @@ Es wird keine zweite Straßen- oder Terrain-Geometrie eingeführt.
 
 ### Straßen / OSM
 
-`lib/world/spatial/overpassEarthFeatureSource.ts` liefert die bestehenden `road`-Features aus `way[highway]` und übernimmt die OSM-Tags vollständig in `properties`. Damit stehen unter anderem `highway`, `surface`, `access`, `vehicle` und `motor_vehicle` zur Verfügung, sofern OSM sie enthält.
+`lib/world/spatial/overpassEarthFeatureSource.ts` liefert die bestehenden `road`-Features aus `way[highway]` und übernimmt die OSM-Tags vollständig in `properties`. Damit stehen unter anderem `highway`, `surface`, `access`, `vehicle`, `motor_vehicle` und `oneway` zur Verfügung, sofern OSM sie enthält.
 
-Die aktuelle Earth-Karte bleibt Quelle der Geometrie. `lib/game/earthSurfaceLogistics.ts` klassifiziert nur die Tags.
+Die aktuelle Earth-Karte bleibt Quelle der Geometrie. `lib/game/earthSurfaceLogistics.ts` klassifiziert die Tags; `lib/game/earthSurfaceRouting.ts` baut daraus nur für die aktuelle Routenberechnung einen ephemeren Graphen. Dieser Graph wird nicht persistiert und ist keine zweite Straßenquelle.
 
 ### Terrain / Offroad
 
@@ -40,18 +38,21 @@ Bestehende Earth-Daten bleiben maßgeblich:
 
 Fehlende Daten werden nicht synthetisiert. Ein unaufgelöster Abschnitt bleibt `unresolved`.
 
-## Fahrzeugrollen
+## Fahrzeugrollen und gemeinsame Vehicle-Domain
 
-Earth verwendet vorerst dieselben funktionalen Rollen wie die gemeinsame Surface-Logistics-Familie:
+Earth verwendet die gemeinsamen Surface-Rollen `cargo-rover` und `heavy-hauler`. Die Rollen sind Gameplay-/Logistikrollen, keine Behauptung identischer Fahrzeuge auf Earth und Moon.
 
-- `cargo-rover`
-- `heavy-hauler`
+Die gemeinsame Vehicle-Domain in `lib/game/vehicles/types.ts` liefert inzwischen unter anderem:
 
-Das bedeutet **nicht**, dass die Moon-Fahrzeuge technisch unverändert auf der Erde eingesetzt werden. Die Rollen sind Gameplay-/Logistikrollen. Masse, Nutzlast, Fahrwerk, absolute Geschwindigkeit, Energiebedarf und physische Steigungsgrenzen kommen aus Engineering/Core.
+- `surfaceMobility.safeLongitudinalSlopeDeg`,
+- `surfaceMobility.referenceSpeedKph`,
+- Cargo-Kapazität,
+- Operational Status,
+- Location/Ownership über den Core-Instance-Layer.
+
+Damit kann Earth aus seiner relativen Routing-Policy zusammen mit dem konkreten Fahrzeug eine absolute ETA ableiten, ohne Fahrzeugphysik lokal zu erfinden.
 
 ## OSM-Straßenklassen
-
-Die erste Policy unterscheidet:
 
 | Earth route class | OSM-Grundlage | Cargo Rover | Heavy Hauler | Bedeutung |
 | --- | --- | --- | --- | --- |
@@ -65,8 +66,6 @@ Explizite `access=no`, `access=private`, `motor_vehicle=no/private` bzw. `vehicl
 
 ## Relative Traversal-Kosten
 
-Die Earth-Policy liefert nur dimensionslose Multiplikatoren relativ zu einer geeigneten befestigten Straße. Sie sind Routing-/Gameplay-Gewichte, keine technischen Messwerte.
-
 | Klasse | Speed | Energy | Wear | nutzbarer Anteil der gelieferten Fahrzeug-Steigungsgrenze |
 | --- | ---: | ---: | ---: | ---: |
 | paved road | 1.00 | 1.00 | 1.00 | 1.00 |
@@ -74,42 +73,55 @@ Die Earth-Policy liefert nur dimensionslose Multiplikatoren relativ zu einer gee
 | track | 0.62 | 1.35 | 1.55 | 0.78 |
 | offroad | 0.42 | 1.75 | 2.20 | 0.62 |
 
-Die physische `safeLongitudinalSlopeDeg` wird dem Earth-Assessment von Engineering/Core übergeben. Earth multipliziert sie nur mit dem Route-Class-Faktor. Damit erfindet Earth keine Fahrzeuggrenze.
+Die physische `safeLongitudinalSlopeDeg` kommt aus der gemeinsamen Vehicle-Domain. Earth wendet nur die Route-Class-/Terrain-Faktoren an.
 
 Offroad wird zusätzlich nach Boden/Landnutzung gewichtet:
 
 - `open`: Basis-Offroadkosten,
 - `vegetated`: langsamer, energie- und verschleißintensiver,
-- `soft-ground`: nochmals stärkere Penalty,
+- `soft-ground`: stärkere Penalty,
 - `water`, `built`, `protected`: blockiert,
 - `unresolved`: nicht als befahrbar angenommen.
 
 ## Kurze nicht kartierte Facility-Zufahrt
 
-OSM bildet nicht jede private/innerbetriebliche Zufahrt bis an einen NOXIA-Footprint ab. Deshalb gibt es einen engen Last-Mile-Fallback, **aber keine erfundene Straße**:
+OSM bildet nicht jede private/innerbetriebliche Zufahrt bis an einen NOXIA-Footprint ab. Deshalb gibt es einen engen Last-Mile-Fallback, aber keine erfundene Straße:
 
 - Cargo Rover: höchstens 75 m,
 - Heavy Hauler: höchstens 50 m,
-- nur wenn das Offroad-Terrain für das Fahrzeug bereits als passierbar bewertet wurde,
-- längere Lücken bleiben `unresolved` und benötigen beobachtete/gebaute Zufahrt oder bessere Daten.
+- nur bei bereits positivem Offroad-Assessment,
+- längere Lücken bleiben `unresolved`.
 
-Diese Werte sind Earth-Gameplay-Policy und können nach Playtests angepasst werden.
+## Routing
 
-## Routing-Prinzip
+`lib/game/earthSurfaceRouting.ts` implementiert den renderer-neutralen Router auf der bereits geladenen OSM-Geometrie:
 
-Ein späterer Earth-Router soll vorhandene Segmentgeometrie gewichten, nicht neu erfinden:
+1. nur als befahrbar klassifizierte `road`-Line-Features werden aufgenommen,
+2. gemeinsame OSM-Koordinaten bilden Graphknoten,
+3. `oneway` und Kreisverkehr-Richtung werden berücksichtigt,
+4. Quelle und Ziel werden auf das nächste Straßensegment projiziert,
+5. kurze Facility-Lücken werden nur mit positivem Offroad-Assessment verbunden,
+6. Dijkstra gewichtet Straßen nach der relativen Zeit-Penalty ihrer Earth-Route-Class,
+7. die Ausgabe enthält Segmentfolge, OSM-Feature-ID, Route-Class, Distanz und relative Speed-/Energy-/Wear-Faktoren,
+8. zusätzlich wird eine direkt zeichnbare Polyline ausgegeben.
 
-1. befahrbare Straße bevorzugen,
-2. geeignete Service-Straße/Track zulassen,
-3. kurze Offroad-Verbindungen oder echte Offroad-Segmente nur mit Terrain-Assessment,
-4. blockierte oder unaufgelöste Abschnitte nicht automatisch überbrücken,
-5. Route als Segmentfolge mit `routeClass`, Distanz und relativen Kosten an UI/Core-Handoff geben.
+Damit kann eine Route aus `paved-road`, `service-road`, `track` und kurzen `offroad`-Access-Segmenten bestehen. Beliebiges kilometerweites Cross-Country-Pathfinding wird weiterhin nicht durch Luftlinien ersetzt.
 
-Straße + Offroad dürfen in derselben Route vorkommen.
+## Core-Handoff für spielbare Transporte
+
+Der gemeinsame Core kann inzwischen:
+
+- zugängliche Inventare und Inventar-Snapshots liefern,
+- persistente TransportJobs anlegen,
+- Ware reservieren,
+- ein Fahrzeuginventar/Fahrzeugrolle binden,
+- `reserved → loading → in_transit → arrived → unloading → completed` persistieren,
+- Jobs starten, abbrechen und automatisch nach ETA weiterführen,
+- konkrete Fehler wie fehlende Kapazität, falsche Fahrzeug-Location, belegtes Fahrzeug oder unpassierbare Route melden.
+
+Für `domain='surface'` erwartet Core im `routeSnapshot` insbesondere ein positives `passable` und zum Start eine gültige `etaSeconds`. Earth muss deshalb seine Route in genau diesen gemeinsamen Snapshot projizieren.
 
 ## Facility → Vehicle → Facility
-
-Die fachliche Kette bleibt:
 
 ```text
 Facility-/Lagerinventar (Core)
@@ -121,21 +133,20 @@ Ziel-Facility-/Lagerinventar (Core)
 Zielbestand (Core)
 ```
 
-Earth muss dafür später in der UI zeigen:
+Nächster Earth-UX-Schritt:
 
-- Quelle und Ziel,
-- Gut/Menge,
-- geeignete/verfügbare Fahrzeuge aus Core,
-- Route mit Straßen-/Track-/Offroad-Segmenten,
-- Distanz,
-- ETA sobald absolute Fahrzeuggeschwindigkeit verfügbar ist,
-- relative Energie-/Wear-Auswirkung,
-- Transportzustand aus Core,
-- konkrete Blocker.
+- Quelle/Ziel aus den Core-Inventaren auswählen,
+- Gut/Menge aus dem Quell-Snapshot wählen,
+- verfügbare Surface-Fahrzeuge aus `/api/game/vehicles` anbieten,
+- OSM-/Offroad-Route berechnen und auf der bestehenden Earth-Karte zeichnen,
+- aus `referenceSpeedKph` + Earth-Routenfaktoren ETA berechnen,
+- `routeSnapshot` erzeugen,
+- den gemeinsamen `/api/game/logistics`-TransportJob anlegen/starten,
+- laufenden Status und Core-Blocker anzeigen.
 
 ## Raumhafen
 
-`NOX:TER:SAUERLAND-SPACEPORT` bleibt ein Surface Shuttle Port. Der Earth-Anteil endet bei:
+`NOX:TER:SAUERLAND-SPACEPORT` bleibt ein Surface Shuttle Port:
 
 ```text
 Mine / Fabrik / Warenhaus
@@ -145,41 +156,20 @@ Raumhafen-Lager
 Surface Transfer Shuttle
 ```
 
-Orbitale Übergabe und intersolarer Transit werden nicht in Earth Surface Logistics implementiert.
+Earth endet fachlich am Surface-Port-/Shuttle-Handover. Orbitale Übergabe und intersolarer Transit bleiben außerhalb dieses Earth-Moduls.
 
 ## Automatische Regeln
 
-Die Earth-UX darf später Regeln konfigurieren und visualisieren, z. B. Mindestbestand oder Schwellwerttransport. Regelmodell, Reservierung und Ausführung gehören jedoch in Core. Solange der Core-Vertrag fehlt, wird in Earth keine lokale Ersatz-State-Machine angelegt.
-
-## Aktueller Implementierungsstand
-
-Implementiert in `lib/game/earthSurfaceLogistics.ts`:
-
-- OSM-Road-Klassifikation,
-- Fahrzeugrollen-Suitability,
-- Straßen-/Track-Kosten,
-- Offroad-Landuse-/Ground-Klassifikation,
-- Steigungsprüfung gegen gelieferten Fahrzeug-Envelope,
-- relative Speed-/Energy-/Wear-Multiplikatoren,
-- kurzer Last-Mile-Fallback,
-- renderer-neutrale Labels/Assessment-Typen.
-
-Noch blockiert durch Core:
-
-- reales Inventar lesen/reservieren,
-- Fahrzeugverfügbarkeit/-zuweisung,
-- TransportJob anlegen,
-- Laden/Transit/Entladen persistieren,
-- laufende Jobs queryen,
-- automatische Regeln ausführen.
+Die Earth-UX darf Regeln konfigurieren und visualisieren, z. B. Mindestbestand oder Schwellwerttransport. Ein gemeinsames persistentes Regelmodell und dessen Ausführung gehören weiterhin in Core; Earth führt keine eigene Regel-State-Machine ein.
 
 ## References
 
 - `external-tasks/open/EXT-NOXIA-EARTH-20260911-surface-logistics.md`
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
-- `external-tasks/open/EXT-NOXIA-CORE-20260911-orbit-cargo-transfer-core.md`
+- `lib/game/core/logistics.ts`
+- `app/api/game/logistics/route.ts`
+- `app/api/game/vehicles/route.ts`
+- `lib/game/vehicles/types.ts`
 - `lib/game/earthSurfaceLogistics.ts`
-- `lib/game/moonSurfaceLogistics.ts`
-- `lib/game/logisticsNodes.ts`
-- `lib/game/transportDomains.ts`
+- `lib/game/earthSurfaceRouting.ts`
 - `lib/world/spatial/overpassEarthFeatureSource.ts`
