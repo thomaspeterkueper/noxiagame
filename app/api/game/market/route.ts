@@ -45,9 +45,18 @@ function offerStatus(value: unknown): MarketOfferStatus | null {
     : null
 }
 
+function coreNotRolledOut(message: string) {
+  return message.includes('PGRST202')
+    || message.includes('PGRST205')
+    || message.includes('Could not find the function')
+    || message.includes('Could not find the table')
+    || message.includes('schema cache')
+}
+
 function marketError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
 
+  if (coreNotRolledOut(message)) return NextResponse.json({ error: 'Der Marketplace-Core ist auf der Datenbank noch nicht ausgerollt.', code: 'MARKET_CORE_NOT_DEPLOYED' }, { status: 503 })
   if (message.includes('NOXIA_MARKET_OFFER_NOT_FOUND')) return NextResponse.json({ error: 'Marktangebot nicht gefunden.', code: 'MARKET_OFFER_NOT_FOUND' }, { status: 404 })
   if (message.includes('NOXIA_STORAGE_HOST_NOT_FOUND')) return NextResponse.json({ error: 'Physischer Depotknoten nicht gefunden.', code: 'STORAGE_HOST_NOT_FOUND' }, { status: 404 })
   if (message.includes('NOXIA_INVENTORY_NOT_FOUND')) return NextResponse.json({ error: 'Inventar nicht gefunden.', code: 'INVENTORY_NOT_FOUND' }, { status: 404 })
