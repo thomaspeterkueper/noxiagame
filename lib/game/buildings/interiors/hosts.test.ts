@@ -60,8 +60,8 @@ describe('interior host abstraction', () => {
       'INT:STA:TEST:001',
     )
 
-    expect(validateInteriorInstance(LABORATORY_STANDARD_INTERIOR, result.interior)).toEqual([
-      expect.objectContaining({ code: 'host-mismatch' }),
-    ])
+    const issues = validateInteriorInstance(LABORATORY_STANDARD_INTERIOR, result.interior)
+    expect(issues).toHaveLength(1)
+    expect(issues[0]).toMatchObject({ code: 'host-mismatch' })
   })
 })
