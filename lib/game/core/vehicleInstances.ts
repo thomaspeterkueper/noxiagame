@@ -30,6 +30,16 @@ export type VehicleInstanceSnapshot = {
   activeTransportJob: Record<string, unknown> | null
 }
 
+export type StarterCargoRoverProvisioning = {
+  slotKey: 'starter_cargo_rover'
+  vehicle: PersistedVehicleInstance
+  inventory: Record<string, unknown>
+  eventId?: string
+  created: boolean
+  slotExisting: boolean
+  idempotent: boolean
+}
+
 function coreError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -121,4 +131,23 @@ export async function createVehicleInstanceCommand(input: {
   })
   if (error) throw coreError('noxia_create_vehicle_instance', error)
   return data
+}
+
+/**
+ * One-time starter/bootstrap provisioning. This command intentionally has no
+ * purchase price, credit debit, or research/unlock semantics.
+ */
+export async function provisionStarterCargoRoverCommand(input: {
+  commandId: string
+  actorProfileId: string
+  locationId: string
+}): Promise<StarterCargoRoverProvisioning> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_provision_starter_cargo_rover', {
+    p_command_id: input.commandId,
+    p_actor_profile_id: input.actorProfileId,
+    p_location_id: input.locationId,
+  })
+  if (error) throw coreError('noxia_provision_starter_cargo_rover', error)
+  return data as unknown as StarterCargoRoverProvisioning
 }
