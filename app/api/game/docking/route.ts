@@ -29,8 +29,17 @@ function portId(value: unknown): string | null {
   return typeof value === 'string' && PORT_ID_RE.test(value) ? value : null
 }
 
+function coreNotRolledOut(message: string) {
+  return message.includes('PGRST202')
+    || message.includes('PGRST205')
+    || message.includes('Could not find the function')
+    || message.includes('Could not find the table')
+    || message.includes('schema cache')
+}
+
 function dockingError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
+  if (coreNotRolledOut(message)) return NextResponse.json({ error: 'Der Docking-Core ist auf der Datenbank noch nicht ausgerollt.', code: 'DOCKING_CORE_NOT_DEPLOYED' }, { status: 503 })
   if (message.includes('NOXIA_DOCKING_SHIP_NOT_FOUND')) return NextResponse.json({ error: 'Schiff nicht gefunden.', code: 'SHIP_NOT_FOUND' }, { status: 404 })
   if (message.includes('NOXIA_DOCKING_PORT_NOT_FOUND')) return NextResponse.json({ error: 'Docking-Port nicht gefunden.', code: 'PORT_NOT_FOUND' }, { status: 404 })
   if (message.includes('NOXIA_DOCKING_CONNECTION_NOT_FOUND')) return NextResponse.json({ error: 'Aktive Docking-Verbindung nicht gefunden.', code: 'CONNECTION_NOT_FOUND' }, { status: 404 })
