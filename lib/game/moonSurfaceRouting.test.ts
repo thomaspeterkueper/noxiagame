@@ -89,6 +89,9 @@ async function run() {
   assert(resolved.plan.segments.length === 1, 'Shackleton adapter must produce one assessed terrain segment')
   assert(Math.abs(resolved.plan.segments[0].distanceKm - 0.2) < 1e-9, 'mission distance must be expressed in kilometres')
   assert(resolved.plan.segments[0].traversal.passable, 'Moon assessment must flow into shared traversal contract')
+  assert(resolved.geometry.frame === 'local-world-meters', 'route geometry must retain the canonical local-world frame')
+  assert(resolved.geometry.points.length === 3, 'all sampled route points must remain available for persistence')
+  assert(resolved.geometry.points[1].zM === 4, 'persisted route geometry must retain sampled terrain elevation')
 
   const steepSampler = new FixtureSampler(new Map([
     ['0,0', 0],
