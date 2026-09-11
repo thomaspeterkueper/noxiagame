@@ -174,10 +174,49 @@ Fehlende Core-Funktionen bitte als Dependency/Handoff dokumentieren.
 9. fehlende Core-Verträge werden als Handoff dokumentiert statt lokal dupliziert,
 10. Lösung bleibt über gemeinsame Core-Schnittstellen mit Moon/Mars kompatibel.
 
+## Fortschritt 2026-09-11
+
+Earth-owned Policy ist mit **PR #106** umgesetzt und auf `main` gemerged:
+
+- `lib/game/earthSurfaceLogistics.ts`
+  - OSM-Road-Klassifikation für bestehende `highway`-/`surface`-/`access`-Properties,
+  - `paved-road`, `service-road`, `track`, `offroad`, `unresolved`,
+  - gemeinsame Rollen `cargo-rover` und `heavy-hauler`,
+  - relative Speed-/Energy-/Wear-Kosten,
+  - Offroad-Ground-/Landuse-Klassifikation,
+  - Steigungsprüfung gegen einen von Engineering/Core gelieferten Mobility-Envelope,
+  - kurzer Last-Mile-Fallback ohne erfundene Straßen.
+- `docs/design/earth-surface-logistics.md` dokumentiert Zuständigkeit, Datenquellen, Policy und UX-Vertrag.
+- `lib/game/earthSurfaceLogistics.test.ts` ist Teil von `test:transport`.
+- Transport- und Spatial-CI waren für PR #106 erfolgreich; Vercel Preview war READY.
+
+Bewusst **nicht** in Earth umgesetzt wurden Inventar-, Reservierungs-, Fahrzeugbelegungs- oder TransportJob-Persistenz.
+
+Dafür wurde der konkrete Core-Handoff direkt auf `main` angelegt:
+
+- `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
+
+Dieser Request bleibt deshalb `open`. Nächster Earth-Schritt nach Rückgabe des Core-Vertrags ist die reale UI-/Kartenintegration:
+
+```text
+Facility auswählen
+→ Transport
+→ Ziel / Gut / Menge
+→ geeignetes Fahrzeug
+→ Earth-Route + ETA/Kosten
+→ Core TransportJob
+→ Laden / Fahrt / Entladen sichtbar
+```
+
+Automatische Transportregeln bleiben danach der zweite UX-Schritt; auch ihre persistierte Regel-/Ausführungssemantik bleibt Core-owned.
+
 ## References
 
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
+- `lib/game/earthSurfaceLogistics.ts`
+- `docs/design/earth-surface-logistics.md`
+- `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
 - `lib/game/spatial/`
 - `external-tasks/open/EXT-OTA-NOXIA-20260906-transfer-logistics-network.md`
 - Earth map/buildability implementation in the current `main` branch
