@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" role="img" aria-labelledby="title desc">
+  <title id="title">SSF Foundation House · Sundern</title>
+  <desc id="desc">1971 bungalow at Bogenstrasse 15 with detached garage along the long side, narrow gap, and side entrance facing the garage.</desc>
+  <defs>
+    <linearGradient id="roof" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#74787b"/><stop offset="1" stop-color="#44494d"/></linearGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f4f0e6"/><stop offset="1" stop-color="#d7d1c5"/></linearGradient>
+    <linearGradient id="garageRoof" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#777c7f"/><stop offset="1" stop-color="#555a5e"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="170%"><feDropShadow dx="0" dy="13" stdDeviation="10" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#shadow)" transform="translate(32 76)">
+    <!-- modest site plane; garage remains visibly detached from the house -->
+    <path d="M32 470 323 620 660 445 366 298Z" fill="#7f8977" opacity=".28"/>
+    <path d="M75 448 315 570 502 476 261 355Z" fill="#c8c5ba" opacity=".72"/>
+
+    <!-- main 1971 bungalow, long facade left/front -->
+    <path d="M76 282 340 154 548 258 282 390Z" fill="url(#roof)" stroke="#4a5052" stroke-width="5"/>
+    <path d="M76 282 282 390 282 505 76 397Z" fill="url(#wall)" stroke="#565c5d" stroke-width="5"/>
+    <path d="M282 390 548 258 548 373 282 505Z" fill="#ded9ce" stroke="#565c5d" stroke-width="5"/>
+    <path d="M76 397 282 505 282 528 76 420Z" fill="#a7a39b"/>
+    <path d="M282 505 548 373 548 396 282 528Z" fill="#989995"/>
+
+    <!-- chimney -->
+    <path d="M313 180 342 166 363 177 334 192Z" fill="#4e5355" stroke="#424749" stroke-width="3"/>
+    <path d="M319 135 349 121 349 171 319 186Z" fill="#d9c9ad" stroke="#505657" stroke-width="3"/>
+    <path d="M349 121 369 131 369 181 349 171Z" fill="#bcae96" stroke="#505657" stroke-width="3"/>
+    <path d="M319 135 349 121 369 131 339 145Z" fill="#545a5d" stroke="#454a4c" stroke-width="3"/>
+
+    <!-- windows on long/front facade -->
+    <g fill="#34444a" stroke="#ece5d6" stroke-width="4">
+      <path d="M108 325 170 357 170 401 108 369Z"/>
+      <path d="M184 365 250 399 250 443 184 409Z"/>
+    </g>
+    <g stroke="#9fa9a7" stroke-width="2">
+      <path d="M139 341V385"/><path d="M217 382V426"/>
+    </g>
+
+    <!-- windows on garage-facing side -->
+    <g fill="#35474e" stroke="#eee6d8" stroke-width="4">
+      <path d="M319 406 358 386 358 426 319 446Z"/>
+      <path d="M464 334 500 316 500 354 464 372Z"/>
+    </g>
+
+    <!-- entrance is explicitly on the side facing the detached garage -->
+    <path d="M389 369 430 349 430 424 389 445Z" fill="#7b563c" stroke="#4e5556" stroke-width="4"/>
+    <path d="M397 378 408 372 408 419 397 425Z" fill="#9eaaa4" opacity=".72"/>
+    <path d="M374 448 435 417 459 429 397 461Z" fill="#b8b3aa" stroke="#626867" stroke-width="3"/>
+    <path d="M387 463 448 432 459 438 398 470Z" fill="#aaa69e"/>
+    <path d="M401 475 450 451 459 456 410 481Z" fill="#999791"/>
+    <path d="M456 421 456 463M456 421 437 411M456 439 438 429" fill="none" stroke="#4c5557" stroke-width="4"/>
+
+    <!-- detached garage: about one metre visual gap, parallel to long side, projecting to rear -->
+    <path d="M492 391 622 326 660 345 529 412Z" fill="url(#garageRoof)" stroke="#4c5254" stroke-width="5"/>
+    <path d="M492 391 529 412 529 521 492 500Z" fill="#e2ddd2" stroke="#565c5d" stroke-width="5"/>
+    <path d="M529 412 660 345 660 454 529 521Z" fill="#d2cec5" stroke="#565c5d" stroke-width="5"/>
+    <!-- garage door at street/front end -->
+    <path d="M500 409 523 421 523 488 500 476Z" fill="#dddeda" stroke="#62696a" stroke-width="3"/>
+    <path d="M503 423 520 432M503 434 520 443M503 445 520 454M503 456 520 465" stroke="#a1a6a4" stroke-width="2"/>
+    <path d="M585 411 620 393 620 429 585 447Z" fill="#384a50" stroke="#eee7da" stroke-width="3"/>
+
+    <!-- narrow separation/path, intentionally no connector -->
+    <path d="M458 474 493 456 523 471 488 489Z" fill="#cfcac0" opacity=".95"/>
+    <path d="M468 491 501 474 514 481 481 498Z" fill="#84936f"/>
+
+    <!-- restrained 1970s residential planting -->
+    <g fill="#657a57" stroke="#4f6346" stroke-width="2">
+      <circle cx="127" cy="440" r="15"/><circle cx="171" cy="463" r="13"/><circle cx="224" cy="487" r="16"/>
+      <circle cx="472" cy="438" r="12"/><circle cx="633" cy="469" r="14"/>
+    </g>
+  </g>
+</svg>
