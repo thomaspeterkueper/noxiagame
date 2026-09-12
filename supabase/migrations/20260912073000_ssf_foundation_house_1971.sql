@@ -27,12 +27,13 @@ begin
     raise exception 'SSF headquarters world entity not found; apply 20260909213000_world_unique_objects_ssf_headquarters.sql first';
   end if;
 
-  -- The existing geodetic placement at Bogenstraße 15 is retained. The footprint
-  -- represents the compound (house plus detached garage), not a generic buildable.
+  -- The existing geodetic placement and world rotation at Bogenstraße 15 are retained.
+  -- The corrected 90-degree relationship between house entrance and garage is encoded
+  -- inside the dedicated SVG asset, not by rotating the complete site in world space.
   update public.tile_entities
   set placement_mode = 'world',
       status = 'active',
-      rotation_deg = 90,
+      rotation_deg = coalesce(rotation_deg, 0),
       footprint_width_m = 18,
       footprint_depth_m = 12,
       spatial_region_id = 'earth-sauerland'
