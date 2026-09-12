@@ -74,6 +74,14 @@ export const BUILDING_VISUALS: Record<string, BuildingVisualProfile> = {
     mapScale: 1.95,
     notes: 'Test-first Earth solar field: deliberately blue/anthracite for immediate map readability.',
   },
+  ssf_headquarters_sundern: {
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/ssf_headquarters_sundern/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/ssf_headquarters_sundern/earth/style-anchor.svg`,
+    visualRole: 'map-ready',
+    location: 'earth',
+    mapScale: 2.05,
+    notes: 'Unique 1971 SSF Foundation House at Bogenstraße 15: hipped-roof bungalow, detached garage along the long side, side entrance facing the garage.',
+  },
 }
 
 export function getBuildingVisual(buildingId: string, location: string) {
