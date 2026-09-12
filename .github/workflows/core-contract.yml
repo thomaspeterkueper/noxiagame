@@ -1,0 +1,30 @@
+name: Core contract
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'docs/core/**'
+      - 'scripts/check-core-contract.mjs'
+      - 'package.json'
+      - '.github/workflows/core-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'docs/core/**'
+      - 'scripts/check-core-contract.mjs'
+      - 'package.json'
+      - '.github/workflows/core-contract.yml'
+
+jobs:
+  core-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate shared Core contracts
+        run: node scripts/check-core-contract.mjs
