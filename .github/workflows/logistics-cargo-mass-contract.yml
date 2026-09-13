@@ -1,11 +1,14 @@
-name: Logistics cargo mass contract
+name: Shared logistics and surface profile contracts
 
 on:
   pull_request:
     paths:
       - 'lib/game/core/logisticsCargoMass.ts'
       - 'lib/game/core/logisticsCargoMass.test.ts'
+      - 'lib/game/vehicles/surfaceProfileResolution.ts'
+      - 'lib/game/vehicles/surfaceProfileResolution.test.ts'
       - 'lib/game/vehicles/types.ts'
+      - 'lib/game/vehicles/surfaceMission.ts'
       - '.github/workflows/logistics-cargo-mass-contract.yml'
   push:
     branches:
@@ -13,11 +16,14 @@ on:
     paths:
       - 'lib/game/core/logisticsCargoMass.ts'
       - 'lib/game/core/logisticsCargoMass.test.ts'
+      - 'lib/game/vehicles/surfaceProfileResolution.ts'
+      - 'lib/game/vehicles/surfaceProfileResolution.test.ts'
       - 'lib/game/vehicles/types.ts'
+      - 'lib/game/vehicles/surfaceMission.ts'
       - '.github/workflows/logistics-cargo-mass-contract.yml'
 
 jobs:
-  logistics-cargo-mass-contract:
+  shared-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -26,16 +32,19 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Compile cargo mass contract
+      - name: Compile shared contracts
         run: >-
           npx tsc
           lib/game/core/logisticsCargoMass.test.ts
+          lib/game/vehicles/surfaceProfileResolution.test.ts
           --target ES2022
           --module commonjs
           --moduleResolution node
           --esModuleInterop
           --skipLibCheck
           --rootDir lib
-          --outDir .logistics-cargo-mass-test
+          --outDir .shared-contract-test
       - name: Run cargo mass contract tests
-        run: node .logistics-cargo-mass-test/game/core/logisticsCargoMass.test.js
+        run: node .shared-contract-test/game/core/logisticsCargoMass.test.js
+      - name: Run surface profile resolution tests
+        run: node .shared-contract-test/game/vehicles/surfaceProfileResolution.test.js
