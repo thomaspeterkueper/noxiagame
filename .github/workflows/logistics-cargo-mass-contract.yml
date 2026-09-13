@@ -1,0 +1,41 @@
+name: Logistics cargo mass contract
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/core/logisticsCargoMass.ts'
+      - 'lib/game/core/logisticsCargoMass.test.ts'
+      - 'lib/game/vehicles/types.ts'
+      - '.github/workflows/logistics-cargo-mass-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/game/core/logisticsCargoMass.ts'
+      - 'lib/game/core/logisticsCargoMass.test.ts'
+      - 'lib/game/vehicles/types.ts'
+      - '.github/workflows/logistics-cargo-mass-contract.yml'
+
+jobs:
+  logistics-cargo-mass-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Compile cargo mass contract
+        run: >-
+          npx tsc
+          lib/game/core/logisticsCargoMass.test.ts
+          --target ES2022
+          --module commonjs
+          --moduleResolution node
+          --esModuleInterop
+          --skipLibCheck
+          --rootDir lib
+          --outDir .logistics-cargo-mass-test
+      - name: Run cargo mass contract tests
+        run: node .logistics-cargo-mass-test/game/core/logisticsCargoMass.test.js
