@@ -174,13 +174,13 @@ Fehlende Core-Funktionen bitte als Dependency/Handoff dokumentieren.
 9. fehlende Core-Verträge werden als Handoff dokumentiert statt lokal dupliziert,
 10. Lösung bleibt über gemeinsame Core-Schnittstellen mit Moon/Mars kompatibel.
 
-## Fortschritt 2026-09-11
+## Fortschritt 2026-09-13
 
 ### Umgesetzt auf `main`
 
 **PR #106 – Earth Surface Policy**
 
-- `lib/game/earthSurfaceLogistics.ts`
+- `lib/game/earthSurfaceLogistics.ts`,
 - OSM-Road-Klassifikation für bestehende `highway`-/`surface`-/`access`-Properties,
 - `paved-road`, `service-road`, `track`, `offroad`, `unresolved`,
 - gemeinsame Rollen `cargo-rover` und `heavy-hauler`,
@@ -212,57 +212,87 @@ Fehlende Core-Funktionen bitte als Dependency/Handoff dokumentieren.
 - bindet physische Inventarknoten über `subject_type=tile_entity` / `subject_id=tile_entities.id` an Earth-Weltobjekte,
 - kann zwischen vorhandenen räumlichen Knoten die Earth-OSM-Route prüfen,
 - zeigt Distanz, Segmentklassen sowie relative Energy-/Wear-Faktoren,
-- behandelt aggregierten `location_resources`-Bestand ausdrücklich **nicht** als physische Route-Quelle,
-- vollständiger Next/Vercel-Preview war READY.
+- behandelt aggregierten `location_resources`-Bestand ausdrücklich **nicht** als physische Route-Quelle.
 
-### Core-Vertrag inzwischen weitgehend vorhanden
+**Gemeinsamer Core-/Vehicle-Stand**
 
-Der ursprüngliche Handoff `EXT-NOXIA-CORE-20260911-SURFACE-TRANSPORT-JOB-CONTRACT` ist inzwischen größtenteils umgesetzt:
+Inzwischen auf `main` vorhanden:
 
-- gemeinsame Inventare,
-- Reservierungen,
+- gemeinsame Inventare und Reservierungen,
 - persistente TransportJobs,
 - Vehicle Instances und Fahrzeug-Inventare,
 - Loading / Transit / Arrival / Unloading,
-- gemeinsame APIs,
-- Handover-/Multi-Leg-Grundlagen.
+- Handover-/Multi-Leg-Grundlagen,
+- physische Facility-Inventare und Facility-Output,
+- gemeinsamer Surface-Mission-Planer (`surface-vehicle-route-v1`) für ETA, Cargo-Massenprüfung, absolutes Energiebudget und Wear-Settlement.
 
-PR #113 (`Core: physical facility output inventories`) ist inzwischen gemerged und führt die physische Facility-Produktion in native Facility-Inventare ein. Der produktive Cutover ist aktuell jedoch bewusst zunächst auf Moon/Shackleton beschränkt.
+Der frühere Surface-Mission-Blocker aus PR #115 ist damit **erledigt**.
 
-### Verbleibende Abhängigkeiten vor vollständig spielbarem Earth-Transport
+**PR #133 – gemeinsame Cargo-Mass- und Surface-Profile-Verträge**
 
-1. **Earth-Facility-Inventare im Core**
+- `lib/game/core/logisticsCargoMass.ts` löst Core-Logistikmengen nur mit **autoritativer** Massenbasis in den vorhandenen `VehicleCargoLoad`-Vertrag auf,
+- autoritative `kg`/`t` können direkt aufgelöst werden,
+- Stück-/Gebinde-/Gameplay-Einheiten benötigen einen autoritativen `massPerUnitKg`-Wert,
+- `legacy-default`, unbekannte Einheiten und `game-unit` bleiben ausdrücklich `unresolved`,
+- insbesondere wird der historische Datenbank-Default `resources.unit = 't'` **nicht** als physikalische Wahrheit behandelt; er wurde historisch auch auf nicht-massenartige Ressourcen wie `energy` angewandt,
+- `lib/game/vehicles/surfaceProfileResolution.ts` löst einen persistierten `frameId` ausschließlich auf den exakten `VehicleFrame + SurfaceOperationProfile` auf,
+- kein Rollen-, Namens- oder Ähnlichkeits-Fallback auf Test- oder Ersatzfahrzeuge,
+- fehlende Engineering-Daten bleiben explizit `unresolved`,
+- beide Resolver besitzen Regressionstests und einen gemeinsamen CI-Check.
 
-   Geeignete Earth-`tile_entities` (Mine, Fabrik, Depot/Warenhaus, Surface Shuttle Port usw.) müssen über denselben gemeinsamen Core-Mechanismus native, räumlich gebundene Inventare erhalten. Dieser Restpunkt ist im bestehenden Core-Handoff dokumentiert; Earth erzeugt dafür keine eigene Tabelle oder Provisionierung.
+Damit fehlt für diese beiden Punkte nicht mehr der gemeinsame Vertrag, sondern die jeweilige **autoritative Fach-/Integrationsdatenbasis**.
 
-2. **Gemeinsamer Surface-Mission-Slice**
+### Noch offene externe Datenabhängigkeiten
 
-   PR #115 (`feat: add playable surface vehicle mission slice`) ist zum letzten Abgleich weiterhin offen. Er besitzt die gemeinsame Verantwortung für:
+1. **Cargo-Massenbasis konkreter Commodities**
 
-   - ETA aus Vehicle-Referenzgeschwindigkeit × World-Routenfaktor,
-   - Cargo-Massenprüfung,
-   - absolutes Energiebudget,
-   - Wear-Settlement,
-   - `surface-vehicle-route-v1` RouteSnapshot für den Core-TransportJob.
+   KUEPER Engineering wurde über
+   `external-tasks/open/EXT-NOXIA-ENG-20260913-cargo-mass-basis.md`
+   um belastbare Massenbasen konkreter transportierbarer Stoff-/Produktformen gebeten.
 
-   Earth dupliziert diese Logik nicht. Sobald #115 auf `main` verfügbar ist, kann das bestehende Earth-Cockpit den validierten OSM-Route-Plan zusammen mit dem gewählten Fahrzeug in den gemeinsamen Mission-/TransportJob-Flow übergeben.
+   NOXIA wird dafür keine Dichte, Verpackungsmasse oder kg-pro-`game-unit` erfinden. Abstrakte Ressourcen wie `energy`, `metal` oder `components` müssen bei Bedarf zunächst auf eine konkrete physische Transportform abgebildet werden.
 
-### Danach verbleibender Earth-Scope
+2. **Kanonische Earth-Fahrzeugdaten**
+
+   Der bereits vorhandene Engineering-Handoff
+   `external-tasks/open/EXT-NOXIA-ENG-20260913-earth-surface-logistics-vehicles.md`
+   fordert die produktiven Earth-Frames und Betriebsprofile für mindestens `cargo-rover` und `heavy-hauler` an.
+
+   Benötigt werden insbesondere die Werte für `VehicleFrame` und `SurfaceOperationProfile`; NOXIA übernimmt keine bisherigen Testwerte als Produktivwerte.
+
+   Für den Mond existiert analog `external-tasks/open/EXT-NOXIA-ENG-20260911-lunar-surface-logistics-vehicles.md`.
+
+### Parallel laufend – nicht duplizieren
+
+PR #119 (`feat: show live surface vehicle progress`) ist beim letzten Abgleich weiterhin offen und übernimmt die read-only Visualisierung persistierter Surface-Fahrten aus `transport_jobs.started_at` / `arrives_at`.
+
+Earth baut deshalb keinen zweiten Progress-/Tick-/Positionsmechanismus. Nach Merge dieses PRs kann dessen normierter Fortschritt später auf die persistierte bzw. im RouteSnapshot verfügbare Earth-Polyline projiziert werden.
+
+### Nächster Earth-Integrationspfad
+
+Sobald konkrete Cargo- und Fahrzeugdaten autoritativ auflösbar sind, soll das bestehende Cockpit den bereits vorhandenen gemeinsamen Pfad schließen:
 
 ```text
 physische Earth-Facility-Inventare
-→ Quelle/Ziel/Gut/Menge im bestehenden Cockpit
-→ geeignetes Fahrzeug
+→ Quelle / Ziel
+→ Gut / Menge
+→ resolveLogisticsCargoMass
+→ Fahrzeug
+→ resolveSurfaceVehicleProfile
 → OSM-/Offroad-Route
-→ gemeinsamer Surface-Mission-Plan (ETA/Energie/Wear)
+→ gemeinsamer Surface-Mission-Plan
 → Core TransportJob
-→ Loading / Fahrt / Arrival / Unloading sichtbar
-→ Route/Status direkt in vorhandener Earth-Karte darstellen
+→ Loading
+→ Fahrt / Arrival
+→ Unloading
+→ Route und Status in vorhandener Earth-Karte
 ```
 
-Anschließend folgen automatische Transportregeln. Persistenz und Ausführung dieser Regeln bleiben Core-owned.
+Bis dahin darf die Earth-UX die fehlenden Voraussetzungen sichtbar als `unresolved`/blockiert diagnostizieren, aber keine Ersatzwerte einsetzen.
 
-Der Request bleibt daher `open`; die bereits abgeschlossenen Earth-Bausteine werden nicht neu implementiert.
+Anschließend folgen automatische Transportregeln. Persistenz, Reservierung und Ausführung dieser Regeln bleiben Core-owned.
+
+Der Request bleibt daher `open`; die bereits abgeschlossenen Earth- und Core-Bausteine werden nicht neu implementiert.
 
 ## References
 
@@ -272,11 +302,16 @@ Der Request bleibt daher `open`; die bereits abgeschlossenen Earth-Bausteine wer
 - `lib/game/earthSurfaceRouting.ts`
 - `app/earth/EarthSurfaceLogisticsConsole.tsx`
 - `docs/design/earth-surface-logistics.md`
-- `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
 - `lib/game/core/logistics.ts`
+- `lib/game/core/logisticsCargoMass.ts`
 - `lib/game/core/vehicleInstances.ts`
+- `lib/game/vehicles/types.ts`
+- `lib/game/vehicles/surfaceMission.ts`
+- `lib/game/vehicles/surfaceProfileResolution.ts`
 - `app/api/game/logistics/route.ts`
 - `app/api/game/vehicles/route.ts`
 - `lib/game/spatial/`
 - `external-tasks/open/EXT-OTA-NOXIA-20260906-transfer-logistics-network.md`
+- KUEPER Engineering: `external-tasks/open/EXT-NOXIA-ENG-20260913-cargo-mass-basis.md`
+- KUEPER Engineering: `external-tasks/open/EXT-NOXIA-ENG-20260913-earth-surface-logistics-vehicles.md`
 - Earth map/buildability implementation in the current `main` branch
