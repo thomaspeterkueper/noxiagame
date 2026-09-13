@@ -1,0 +1,35 @@
+name: Surface mission draft
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/vehicles/surfaceMissionDraft.ts'
+      - 'lib/game/vehicles/surfaceMissionDraft.test.ts'
+      - 'lib/game/vehicles/surfaceMission.ts'
+      - 'lib/game/vehicles/types.ts'
+      - '.github/workflows/surface-mission-draft.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/vehicles/surfaceMissionDraft.ts'
+      - 'lib/game/vehicles/surfaceMissionDraft.test.ts'
+      - 'lib/game/vehicles/surfaceMission.ts'
+      - 'lib/game/vehicles/types.ts'
+      - '.github/workflows/surface-mission-draft.yml'
+
+jobs:
+  surface-mission-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Compile and test prospective cargo mission planning
+        run: >-
+          npx tsc lib/game/vehicles/surfaceMissionDraft.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .surface-mission-draft-test
+          && node .surface-mission-draft-test/game/vehicles/surfaceMissionDraft.test.js
