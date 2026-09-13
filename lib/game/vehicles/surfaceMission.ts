@@ -72,6 +72,8 @@ export interface SurfaceRouteSnapshot extends Record<string, unknown> {
   energyStoreId: string
   energyRequired: number
   energyUnit: 'kWh' | 'kg' | 't' | 'game-unit'
+  /** Total projected vehicle cargo mass after loading, not merely this job's quantity. */
+  cargoMassKg: number
   wearIncrement: number
   segmentCount: number
 }
@@ -206,7 +208,7 @@ export function buildSurfaceRouteSnapshot(
 ): SurfaceRouteSnapshot {
   const estimate = estimateSurfaceMission(frame, instance, profile, plan)
   if (!estimate.feasible || estimate.etaSeconds == null || estimate.energyRequired == null
-    || estimate.energyUnit == null || estimate.wearIncrement == null) {
+    || estimate.energyUnit == null || estimate.cargoMassKg == null || estimate.wearIncrement == null) {
     throw new Error(`Surface mission is not feasible: ${estimate.blockReasons.join(', ')}`)
   }
 
@@ -219,6 +221,7 @@ export function buildSurfaceRouteSnapshot(
     energyStoreId: estimate.energyStoreId,
     energyRequired: estimate.energyRequired,
     energyUnit: estimate.energyUnit,
+    cargoMassKg: estimate.cargoMassKg,
     wearIncrement: estimate.wearIncrement,
     segmentCount: plan.segments.length,
   }
