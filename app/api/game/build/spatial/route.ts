@@ -403,14 +403,14 @@ export async function POST(req: NextRequest) {
   const [existingResult, pendingResult] = locationSlug === 'earth' && canonicalGeo
     ? await Promise.all([
         serviceClient.from('tile_entities')
-          .select('id,entity_id,x_m,y_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,footprint_width_m,footprint_depth_m')
+          .select('id,entity_id,x_m,y_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,rotation_deg,footprint_width_m,footprint_depth_m')
           .eq('location_id', location.id)
           .eq('placement_mode', 'world')
           .eq('entity_type', 'building')
           .gte('latitude_deg', canonicalGeo.lat - EARTH_COLLISION_LAT_SPAN_DEG)
           .lte('latitude_deg', canonicalGeo.lat + EARTH_COLLISION_LAT_SPAN_DEG),
         serviceClient.from('player_builds')
-          .select('id,buildable_id,x_m,y_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,footprint_width_m,footprint_depth_m')
+          .select('id,buildable_id,x_m,y_m,latitude_deg,longitude_deg,altitude_m,spatial_region_id,rotation_deg,footprint_width_m,footprint_depth_m')
           .eq('location_id', location.id)
           .eq('placement_mode', 'world')
           .eq('target_type', 'building')
@@ -420,17 +420,17 @@ export async function POST(req: NextRequest) {
       ])
     : await Promise.all([
         serviceClient.from('tile_entities')
-          .select('id,entity_id,x_m,y_m,footprint_width_m,footprint_depth_m')
+          .select('id,entity_id,x_m,y_m,rotation_deg,footprint_width_m,footprint_depth_m')
           .eq('location_id', location.id).eq('placement_mode', 'world').eq('entity_type', 'building'),
         serviceClient.from('player_builds')
-          .select('id,buildable_id,x_m,y_m,footprint_width_m,footprint_depth_m')
+          .select('id,buildable_id,x_m,y_m,rotation_deg,footprint_width_m,footprint_depth_m')
           .eq('location_id', location.id).eq('placement_mode', 'world').eq('target_type', 'building').eq('status', 'building'),
       ])
 
   const blockers = [...(existingResult.data ?? []), ...(pendingResult.data ?? [])]
   const target = locationSlug === 'earth'
-    ? { xM: 0, yM: 0, widthM: footprint.widthM, depthM: footprint.depthM }
-    : { xM: xM!, yM: yM!, widthM: footprint.widthM, depthM: footprint.depthM }
+    ? { xM: 0, yM: 0, widthM: footprint.widthM, depthM: footprint.depthM, rotationDeg: rotation }
+    : { xM: xM!, yM: yM!, widthM: footprint.widthM, depthM: footprint.depthM, rotationDeg: rotation }
 
   const collision = blockers.find((row: any) => {
     let blockerX = finiteNumber(row.x_m)
@@ -448,6 +448,7 @@ export async function POST(req: NextRequest) {
       yM: blockerY,
       widthM: Number(row.footprint_width_m ?? getBuildingFootprint(row.entity_id ?? row.buildable_id).widthM),
       depthM: Number(row.footprint_depth_m ?? getBuildingFootprint(row.entity_id ?? row.buildable_id).depthM),
+      rotationDeg: finiteNumber(row.rotation_deg) ?? 0,
     }, footprint.clearanceM)
   })
   if (collision) return NextResponse.json({ error: 'Baufläche überschneidet ein bestehendes oder geplantes Gebäude.', collisionId: collision.id }, { status: 409 })
