@@ -6,6 +6,7 @@ on:
       - 'supabase/migrations/**'
       - 'docs/core/**'
       - 'scripts/check-core-contract.mjs'
+      - 'scripts/check-core-ownership-invariants.mjs'
       - 'package.json'
       - '.github/workflows/core-contract.yml'
   push:
@@ -15,6 +16,7 @@ on:
       - 'supabase/migrations/**'
       - 'docs/core/**'
       - 'scripts/check-core-contract.mjs'
+      - 'scripts/check-core-ownership-invariants.mjs'
       - 'package.json'
       - '.github/workflows/core-contract.yml'
 
@@ -27,4 +29,4 @@ jobs:
         with:
           node-version: 22
       - name: Validate shared Core contracts
-        run: node scripts/check-core-contract.mjs
+        run: npm run test:core-invariants
