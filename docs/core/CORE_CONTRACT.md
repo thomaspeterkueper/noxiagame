@@ -17,6 +17,7 @@ This document records contracts already present in the repository. It is intenti
 | Market offers/settlement | `market_offers`, `market_settlements`, atomic market commands | none |
 | Build runtime | world build records + authoritative build commands/costs/events | provide buildability/site assessment |
 | Runtime events | NOXIA runtime event stream/entity states | world modules may emit domain events through Core contracts |
+| World development / macro conditions | derived projection from authoritative runtime state plus explicit scenario inputs | contribute traceable observations; consume projections without duplicating underlying truth |
 | Canon identity | runtime/canon projection boundary and canonical IDs | consume canonical entities; do not redefine shared canon |
 | Position | shared locations/global world positions plus domain-specific reference data | Earth/Moon/Mars/Orbit own their geodetic/orbital adapters |
 
@@ -32,6 +33,7 @@ This document records contracts already present in the repository. It is intenti
 8. **World specialization stays outside the shared lifecycle.** Earth, Moon, Mars and Orbit can use different terrain, coordinate and route adapters while sharing build, inventory, ownership, transport and time contracts.
 9. **Historical migrations are immutable.** Applied migration history is not rewritten to tidy architecture. New migrations are additive; cleanup is performed through explicit reconciliation/baseline strategy and replay validation.
 10. **Cross-repository canon changes are external tasks.** NOXIA may consume shared canonical entities and identifiers but must not silently become the source of truth for another repository's domain.
+11. **World-development projections are derived, not authoritative duplicates.** Macro conditions may classify traceable capacities and pressures from existing Core/domain truth and explicit scenario inputs, but they must not create a second inventory, market, population, research, build, transit or tick state. Any gameplay mutation caused by a macro condition must still pass through the owning authoritative command/domain boundary.
 
 ## Ownership / custody / usage terminology
 
