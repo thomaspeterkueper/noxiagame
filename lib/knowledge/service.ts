@@ -1,6 +1,6 @@
 // service.ts
-// Aktualisiert: 09.07.2026 — ungültige Demo-Modul-ID entfernt
-// Version:      0.2.1
+// Aktualisiert: 14.09.2026 — SSF-Ausfall darf keine Demo-Rechte verleihen
+// Version:      0.3.0
 
 import { completeLearningModule, getUnlockedBuildings, initialKnowledgeProgress } from './progress';
 import { fetchNoxiaUnlocks, type NoxiaUnlockPayload } from './remote';
@@ -28,6 +28,16 @@ function getLocalKnowledgeState(userId: string): NoxiaUnlockPayload {
   };
 }
 
+function getUnavailableSsfKnowledgeState(userId: string): NoxiaUnlockPayload {
+  return {
+    source: 'ssf-unavailable',
+    userId,
+    completedModules: [],
+    unlocked: [],
+    buildings: [],
+  };
+}
+
 export async function getNoxiaKnowledgeState(userId = 'demo'): Promise<NoxiaUnlockPayload> {
   if (getKnowledgeSourceMode() === 'ssf') {
     try {
@@ -39,10 +49,12 @@ export async function getNoxiaKnowledgeState(userId = 'demo'): Promise<NoxiaUnlo
         unlocked: remote.unlocked ?? [],
         buildings: remote.buildings ?? [],
       };
-    } catch {
-      return getLocalKnowledgeState(userId);
+    } catch (error) {
+      console.error('[knowledge] SSF knowledge unavailable; using fail-closed state:', error);
+      return getUnavailableSsfKnowledgeState(userId);
     }
   }
 
+  // The demo progression is only valid when local mode was selected explicitly.
   return getLocalKnowledgeState(userId);
 }
