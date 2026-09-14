@@ -7,6 +7,7 @@ on:
       - 'docs/core/**'
       - 'scripts/check-core-contract.mjs'
       - 'scripts/check-core-ownership-invariants.mjs'
+      - 'scripts/check-core-location-invariants.mjs'
       - 'package.json'
       - '.github/workflows/core-contract.yml'
   push:
@@ -17,6 +18,7 @@ on:
       - 'docs/core/**'
       - 'scripts/check-core-contract.mjs'
       - 'scripts/check-core-ownership-invariants.mjs'
+      - 'scripts/check-core-location-invariants.mjs'
       - 'package.json'
       - '.github/workflows/core-contract.yml'
 
