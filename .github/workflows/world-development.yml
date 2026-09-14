@@ -1,0 +1,36 @@
+name: World Development Contract
+
+on:
+  push:
+    paths:
+      - 'lib/game/worldDevelopment.ts'
+      - 'lib/game/worldDevelopment.test.ts'
+      - 'docs/decisions/ADR-world-development-macro-system.md'
+      - 'docs/architecture/world-development-model.md'
+      - 'docs/core/CORE_CONTRACT.md'
+      - 'package.json'
+      - '.github/workflows/world-development.yml'
+  pull_request:
+    paths:
+      - 'lib/game/worldDevelopment.ts'
+      - 'lib/game/worldDevelopment.test.ts'
+      - 'docs/decisions/ADR-world-development-macro-system.md'
+      - 'docs/architecture/world-development-model.md'
+      - 'docs/core/CORE_CONTRACT.md'
+      - 'package.json'
+      - '.github/workflows/world-development.yml'
+
+jobs:
+  world-development:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run Core invariants
+        run: npm run test:core-invariants
+      - name: Run world-development projection contract
+        run: npm run test:world-development
