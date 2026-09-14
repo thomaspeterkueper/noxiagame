@@ -99,7 +99,8 @@ requireTokens('event tick and occurred_at remain distinct', eventRepair, [
 requireTokens('entity_states remains an event-linked projection', eventRepair, [
   'source_event uuid references public.simulation_events(id) on delete set null',
   'create unique index if not exists entity_states_one_current_idx',
-  'source_event)\n  ) values'.replace('\\n', '\n'),
+  'subject_type,subject_id,valid_from,properties,source_event',
+  "values ('tile_entity',new.id,now(),v_properties,v_event_id)",
 ]);
 
 // 8. Build event projection ignores no-op lifecycle updates.
