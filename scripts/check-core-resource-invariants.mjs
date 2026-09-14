@@ -42,12 +42,10 @@ const componentsChain = read('supabase/migrations/20260831210000_components_chai
 const finance = read('supabase/migrations/20260910090000_atomic_finance_asset_commands.sql');
 const retrySerialization = read('supabase/migrations/20260911114600_core_command_retry_serialization.sql');
 
-// 1. Native physical stock cannot be negative at the schema boundary.
 requireTokens('native inventory stock remains non-negative', logistics, [
   'constraint logistics_inventory_item_amount_check check (amount >= 0)',
 ]);
 
-// 2. The shared adjustment primitive serializes mutations and refuses negative results.
 const adjustInventory = functionBlock(logistics, 'noxia_adjust_inventory_amount');
 if (!adjustInventory) {
   fail('inventory adjustment remains row-locked and non-negative', 'missing noxia_adjust_inventory_amount');
@@ -59,7 +57,6 @@ if (!adjustInventory) {
   ]);
 }
 
-// 3. One read boundary must continue to bridge native, location and ship backing stores.
 requireTokens('inventory adapter boundary remains explicit', logistics, [
   "if v_inventory.storage_kind = 'native' then",
   "elsif v_inventory.storage_kind = 'location_resources' then",
@@ -68,13 +65,12 @@ requireTokens('inventory adapter boundary remains explicit', logistics, [
   "jsonb_build_object('vehicleClass', 'ship')",
 ]);
 
-// 4. Availability is physical quantity minus active outbound reservations.
 const reservedFn = functionBlock(logistics, 'noxia_inventory_reserved');
 if (!reservedFn) {
   fail('active reservations define reserved quantity', 'missing noxia_inventory_reserved');
 } else {
   requireTokens('active reservations define reserved quantity', reservedFn, [
-    "direction = p_direction",
+    'direction = p_direction',
     "status = 'active'",
     'coalesce(sum(amount), 0)',
   ]);
@@ -85,8 +81,6 @@ requireTokens('inventory snapshot exposes physical reserved and available separa
   "'available',greatest(0,public.noxia_inventory_amount(p_inventory_id,r.type)-public.noxia_inventory_reserved(p_inventory_id,r.type,'outbound'))",
 ]);
 
-// 5. Direct cargo transfer must lock both inventories, honor reservations/capacity,
-//    then debit and credit the exact same requested quantity.
 const transferCargo = functionBlock(logistics, 'noxia_transfer_cargo');
 if (!transferCargo) {
   fail('direct cargo transfer remains locally conservative', 'missing noxia_transfer_cargo');
@@ -103,7 +97,6 @@ if (!transferCargo) {
   ]);
 }
 
-// 6. Retried direct transfers remain command-id serialized and payload-safe.
 requireTokens('cargo transfer retry identity remains explicit', retrySerialization + logistics, [
   "pg_advisory_xact_lock(hashtextextended('noxia_transfer_cargo:' || p_command_id::text, 0))",
   'where command_id = p_command_id',
@@ -111,7 +104,6 @@ requireTokens('cargo transfer retry identity remains explicit', retrySerializati
   "jsonb_build_object('idempotent', true)",
 ]);
 
-// 7. Transport reservation must claim both source stock and target capacity.
 const createTransport = functionBlock(logistics, 'noxia_create_transport_job');
 if (!createTransport) {
   fail('transport creates paired reservation claims', 'missing noxia_create_transport_job');
@@ -124,7 +116,6 @@ if (!createTransport) {
   ]);
 }
 
-// 8. Departure physically moves cargo source -> vehicle once and consumes outbound claim.
 const startTransport = functionBlock(transportPhases, 'noxia_start_transport_job');
 if (!startTransport) {
   fail('transport departure consumes source reservation exactly once', 'missing noxia_start_transport_job');
@@ -138,7 +129,6 @@ if (!startTransport) {
   ]);
 }
 
-// 9. Completion physically moves cargo vehicle -> destination once and consumes inbound claim.
 const completeTransport = functionBlock(transportPhases, 'noxia_complete_transport_job');
 if (!completeTransport) {
   fail('transport completion consumes destination reservation exactly once', 'missing noxia_complete_transport_job');
@@ -152,7 +142,6 @@ if (!completeTransport) {
   ]);
 }
 
-// 10. Cancellation releases claims and contains no physical inventory mutation.
 const cancelTransport = functionBlock(transportPhases, 'noxia_cancel_transport_job');
 if (!cancelTransport) {
   fail('transport cancellation releases claims without moving stock', 'missing noxia_cancel_transport_job');
@@ -163,16 +152,15 @@ if (!cancelTransport) {
   else fail('transport cancellation releases claims without moving stock', 'cancellation no longer cleanly releases reservations without stock mutation');
 }
 
-// 11. Marketplace uses custody inventory and an outbound reservation, not a copied stock pool.
 requireTokens('market offers reserve seller custody stock', custodyMarket, [
   'seller_inventory_id uuid not null references public.logistics_inventories(id)',
   'reservation_id uuid not null unique references public.logistics_reservations(id)',
   "storage_kind <> 'native'",
   "subject_type <> 'storage_account'",
-  "'outbound', 'market_offer'",
+  "'outbound'",
+  "'market_offer'",
 ]);
 
-// 12. Market settlement must preserve local goods and payment balance.
 const buyMarket = functionBlock(marketRetry, 'noxia_buy_market_offer');
 if (!buyMarket) {
   fail('market settlement moves equal goods and credits', 'missing noxia_buy_market_offer');
@@ -186,7 +174,6 @@ if (!buyMarket) {
   ]);
 }
 
-// 13. The active reservation must mirror offer remainder; full fill consumes it.
 if (buyMarket) {
   requireTokens('market reservation mirrors remaining offer quantity', buyMarket, [
     'v_reservation.amount is distinct from v_offer.amount_remaining',
@@ -194,10 +181,6 @@ if (buyMarket) {
     'set amount = v_remaining',
     'set amount_remaining = v_remaining',
   ]);
-}
-
-// 14. Market buy is explicit-command idempotent and locks the economic participants.
-if (buyMarket) {
   requireTokens('market settlement remains serialized and replay-safe', buyMarket, [
     "pg_advisory_xact_lock(hashtextextended('noxia_market_buy:' || p_command_id::text, 0))",
     'where command_id = p_command_id',
@@ -209,7 +192,6 @@ if (buyMarket) {
   ]);
 }
 
-// 15. Facility production is a uniquely identified, capacity-checked physical source.
 const creditFacilityOutput = functionBlock(facilityProduction, 'noxia_credit_facility_output');
 if (!creditFacilityOutput) {
   fail('facility production remains explicit and tick-idempotent', 'missing noxia_credit_facility_output');
@@ -223,7 +205,6 @@ if (!creditFacilityOutput) {
   ]);
 }
 
-// 16. Build resource consumption is row-locked and part of the build insert transaction.
 const consumeBuildResources = functionBlock(buildResources, 'noxia_consume_build_resources');
 if (!consumeBuildResources) {
   fail('build resources remain authoritative and atomic', 'missing noxia_consume_build_resources');
@@ -236,13 +217,11 @@ if (!consumeBuildResources) {
   ]);
 }
 
-// 17. Stock-only deductions/transfers must not receive an accidental economy tick.
 requireTokens('resource tick remains isolated from stock-only mutations', resourceTick, [
   'BEFORE UPDATE OF production, consumption',
   'Pure stock transfers/build-cost deductions update only stock',
 ]);
 
-// 18. Bank operations explicitly distinguish conserved wallet/deposit moves from modeled loan source/sink.
 const bankMutation = functionBlock(finance, 'noxia_bank_mutation');
 if (!bankMutation) {
   fail('bank mutation remains atomic and explicitly modeled', 'missing noxia_bank_mutation');
@@ -260,7 +239,6 @@ if (!bankMutation) {
   ]);
 }
 
-// 19. The currently implemented production chain must remain concrete, not overstated as universal.
 requireTokens('components chain remains an explicit metal to components recipe', componentsChain, [
   "'factory', 'Fabrik'",
   "'[{\"resource\":\"components\",\"amount\":1}]'::jsonb",
