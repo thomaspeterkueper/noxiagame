@@ -4,6 +4,13 @@ import {
   WORLD_DEVELOPMENT_DOMAINS,
   WORLD_DEVELOPMENT_DRIVERS,
 } from './worldDevelopment'
+import {
+  buildOrbitalStationCapabilitySnapshot,
+  deriveBufferedResourceSecurity,
+  deriveFirmEnergySignal,
+  deriveOrbitalLogisticsSignal,
+  deriveWaterSecuritySignal,
+} from './worldDevelopmentSignals'
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -60,4 +67,46 @@ try {
 }
 assert(missingSourceRejected, 'macro signals without provenance must fail closed')
 
-console.log('world development projection tests passed')
+const sustainableWater = deriveWaterSecuritySignal(
+  { stock: 400, production: 100, consumption: 100 },
+  'core:location_resources:water:test',
+)
+assert(Boolean(sustainableWater), 'water balance with real activity must produce a signal')
+assert((sustainableWater?.signal.value ?? 0) >= 0.75, 'balanced water production must reach the strong-capacity band')
+assert(sustainableWater?.evidence.sustainable === true, 'balanced water production must be marked sustainable')
+
+const deficitWater = deriveWaterSecuritySignal(
+  { stock: 80, production: 60, consumption: 100 },
+  'core:location_resources:water:test',
+)
+assert(Boolean(deficitWater), 'deficit water balance with stock must produce a signal')
+assert((deficitWater?.signal.value ?? 1) < 0.75, 'a structurally deficit water flow must never be classified strong from stock alone')
+assert(deficitWater?.evidence.sustainable === false, 'deficit water production must be marked unsustainable')
+
+const emptyResource = deriveBufferedResourceSecurity({ stock: 0, production: 0, consumption: 0 })
+assert(emptyResource === null, 'empty resource rows must remain unresolved rather than invent neutral security')
+
+const firmEnergy = deriveFirmEnergySignal(
+  { storedEnergy: 250, firmProduction: 120, demand: 100 },
+  'core:firm-energy:test',
+)
+assert(Boolean(firmEnergy), 'explicit firm-energy inputs must produce a signal')
+assert(firmEnergy?.signal.driverId === 'firm_energy', 'firm-energy adapter must map only to the firm_energy driver')
+assert((firmEnergy?.signal.value ?? 0) >= 0.75, 'firm generation above demand must be strong with reserve')
+
+const phobos = buildOrbitalStationCapabilitySnapshot({ slug: 'phobos' })
+const kepler = buildOrbitalStationCapabilitySnapshot({ slug: 'kepler' })
+const unknownStation = buildOrbitalStationCapabilitySnapshot({ slug: 'invented-station' })
+assert(Boolean(phobos && kepler), 'known canonical stations must resolve structural orbital capabilities')
+assert(unknownStation === null, 'unknown station slugs must fail closed rather than inherit a generic physical topology')
+
+const orbitalSignal = deriveOrbitalLogisticsSignal(
+  [phobos, kepler].filter((station): station is NonNullable<typeof station> => station !== null),
+  'core:station-capabilities:test',
+)
+assert(Boolean(orbitalSignal), 'known operational station capability set must produce an orbital-logistics signal')
+assert((orbitalSignal?.evidence.cargoPorts as number) >= 2, 'orbital evidence must preserve actual cargo-port count')
+assert((orbitalSignal?.evidence.servicePorts as number) >= 1, 'orbital evidence must preserve actual service-port count')
+assert(!Object.prototype.hasOwnProperty.call(orbitalSignal?.evidence ?? {}, 'shipyardCount'), 'unknown shipyard runtime capability must not be invented or scored')
+
+console.log('world development projection and live-signal tests passed')
