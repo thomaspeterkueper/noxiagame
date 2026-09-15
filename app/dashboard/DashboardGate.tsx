@@ -1,8 +1,8 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 09.09.2026 — Earth-Interaktionen und globale Erdregion-Auswahl
-// Version:      0.5.8
+// Aktualisiert: 15.09.2026 — Live World Development als read-only Weltlage
+// Version:      0.5.9
 import React, { useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import DashboardClient from './DashboardClient'
@@ -15,6 +15,7 @@ import DashboardShipPanelPolish from './DashboardShipPanelPolish'
 import DashboardCockpitResponsive from './DashboardCockpitResponsive'
 import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
+import DashboardWorldDevelopmentOverlay from './DashboardWorldDevelopmentOverlay'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
 import { T } from './ui'
@@ -49,6 +50,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardCockpitResponsive />
     <DashboardContextManager />
     <DashboardFeedOverlay />
+    <DashboardWorldDevelopmentOverlay />
     <EarthInteractionManager />
     <EarthRegionSwitcherOverlay />
   </>
