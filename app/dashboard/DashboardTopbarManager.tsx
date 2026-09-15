@@ -49,7 +49,22 @@ export default function DashboardTopbarManager() {
     discoverTopbar()
     const observer = new MutationObserver(discoverTopbar)
     observer.observe(document.body, { childList: true, characterData: true, subtree: true })
-    return () => observer.disconnect()
+
+    const handleLogout = (event: MouseEvent) => {
+      const target = event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>('button[data-noxia-action="logout"]')
+        : null
+      if (!target) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      window.location.assign('/auth/logout')
+    }
+    document.addEventListener('click', handleLogout, true)
+
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('click', handleLogout, true)
+    }
   }, [])
 
   return <style>{baseStyles}</style>

@@ -16,6 +16,7 @@ import DashboardCockpitResponsive from './DashboardCockpitResponsive'
 import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
 import DashboardWorldDevelopmentOverlay from './DashboardWorldDevelopmentOverlay'
+import DashboardMoonSurface from './DashboardMoonSurface'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
 import { T } from './ui'
@@ -41,6 +42,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
 
   return <>
     <DashboardClient locations={locations} prices={prices} orders={orders} />
+    <DashboardMoonSurface />
     <DashboardHudManager />
     <DashboardLocationDockManager />
     <DashboardTopbarManager />
