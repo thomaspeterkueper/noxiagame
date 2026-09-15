@@ -1,0 +1,36 @@
+name: Surface Logistics Nodes
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/vehicles/surfaceLogisticsNodes.ts'
+      - 'lib/game/vehicles/surfaceLogisticsNodes.test.ts'
+      - 'app/api/game/moon/surface-transport/route-context/route.ts'
+      - '.github/workflows/surface-logistics-nodes.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/vehicles/surfaceLogisticsNodes.ts'
+      - 'lib/game/vehicles/surfaceLogisticsNodes.test.ts'
+      - 'app/api/game/moon/surface-transport/route-context/route.ts'
+      - '.github/workflows/surface-logistics-nodes.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify shared surface logistics node contract
+        run: >-
+          npx tsc lib/game/vehicles/surfaceLogisticsNodes.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .surface-node-test
+          && node .surface-node-test/game/vehicles/surfaceLogisticsNodes.test.js
