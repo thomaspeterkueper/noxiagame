@@ -63,15 +63,19 @@ const flat = surface.cells.find(cell => cell.row === 0 && cell.col === 0)
 assert.ok(flat)
 assert.equal(flat.state, 'buildable')
 
-const incomplete: PlanetaryElevationGrid = { ...grid, samples: grid.samples.filter((_, index) => index !== 1) }
+const unresolvedGrid: PlanetaryElevationGrid = {
+  ...grid,
+  samples: grid.samples.map((sample, index) => index === 4 ? { ...sample, elevationM: Number.NaN } : sample),
+}
 const unresolved = buildPlanetaryBuildabilitySurface(
-  incomplete,
+  unresolvedGrid,
   10,
   { maxBuildableSlopeDeg: 3, maxRestrictedSlopeDeg: 8 },
   geometry,
 )
-const first = unresolved.cells.find(cell => cell.row === 0 && cell.col === 0)
-assert.ok(first)
-assert.equal(first.state, 'buildable')
+const unresolvedCenter = unresolved.cells.find(cell => cell.row === 1 && cell.col === 1)
+assert.ok(unresolvedCenter)
+assert.equal(unresolvedCenter.state, 'unresolved')
+assert.equal(unresolvedCenter.buildabilityReason, 'terrain-unresolved')
 
 console.log('Planetary surface tests passed')
