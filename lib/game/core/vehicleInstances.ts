@@ -40,6 +40,17 @@ export type StarterCargoRoverProvisioning = {
   idempotent: boolean
 }
 
+export type EarthStarterCargoRoverProvisioning = {
+  slotKey: 'earth_starter_cargo_rover'
+  engineeringSource: 'ENG-EARTH-SURFACE-LOGISTICS-r1:ENG-VEH-0001'
+  vehicle: PersistedVehicleInstance
+  inventory: Record<string, unknown>
+  eventId?: string
+  created: boolean
+  slotExisting: boolean
+  idempotent: boolean
+}
+
 function coreError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -55,8 +66,6 @@ export function projectPersistedVehicle(row: PersistedVehicleInstance): VehicleI
     condition: row.condition,
     wear: row.wear,
     energy: Array.isArray(row.energy) ? row.energy : [],
-    // Cargo is authoritative in the linked logistics inventory and is therefore
-    // populated by snapshots/consumers rather than duplicated on vehicle_instances.
     cargo: [],
     crewIds: Array.isArray(row.crew_ids) ? row.crew_ids : [],
     modules: Array.isArray(row.modules) ? row.modules : [],
@@ -106,10 +115,6 @@ export async function getPlayerVehicleSnapshot(
   return data as unknown as VehicleInstanceSnapshot
 }
 
-/**
- * Server-side creation command for purchase/build/reward flows. There is deliberately
- * no public spawn API: a gameplay system must decide when a vehicle is earned/built.
- */
 export async function createVehicleInstanceCommand(input: {
   frameId: string
   label: string
@@ -133,10 +138,6 @@ export async function createVehicleInstanceCommand(input: {
   return data
 }
 
-/**
- * One-time starter/bootstrap provisioning. This command intentionally has no
- * purchase price, credit debit, or research/unlock semantics.
- */
 export async function provisionStarterCargoRoverCommand(input: {
   commandId: string
   actorProfileId: string
@@ -150,4 +151,19 @@ export async function provisionStarterCargoRoverCommand(input: {
   })
   if (error) throw coreError('noxia_provision_starter_cargo_rover', error)
   return data as unknown as StarterCargoRoverProvisioning
+}
+
+export async function provisionEarthStarterCargoRoverCommand(input: {
+  commandId: string
+  actorProfileId: string
+  locationId: string
+}): Promise<EarthStarterCargoRoverProvisioning> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_provision_earth_starter_cargo_rover', {
+    p_command_id: input.commandId,
+    p_actor_profile_id: input.actorProfileId,
+    p_location_id: input.locationId,
+  })
+  if (error) throw coreError('noxia_provision_earth_starter_cargo_rover', error)
+  return data as unknown as EarthStarterCargoRoverProvisioning
 }
