@@ -1,8 +1,8 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 15.09.2026 — Live World Development als read-only Weltlage
-// Version:      0.5.9
+// Aktualisiert: 15.09.2026 — Profil-Cockpit öffnet das vollständige Profil
+// Version:      0.6.0
 import React, { useEffect } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import DashboardClient from './DashboardClient'
@@ -17,6 +17,7 @@ import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
 import DashboardWorldDevelopmentOverlay from './DashboardWorldDevelopmentOverlay'
 import DashboardMoonSurface from './DashboardMoonSurface'
+import DashboardProfileBridge from './DashboardProfileBridge'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
 import { T } from './ui'
@@ -43,6 +44,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   return <>
     <DashboardClient locations={locations} prices={prices} orders={orders} />
     <DashboardMoonSurface />
+    <DashboardProfileBridge />
     <DashboardHudManager />
     <DashboardLocationDockManager />
     <DashboardTopbarManager />
