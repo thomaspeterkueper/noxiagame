@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getPlayerVehicleSnapshot } from '@/lib/game/core/vehicleInstances'
-import { getMoonSurfaceEngineeringProfile } from '@/lib/game/moonSurfaceEngineering'
+import { resolveMoonSurfaceEngineeringProfile } from '@/lib/game/moonSurfaceEngineering'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -36,17 +36,19 @@ export async function POST(req: NextRequest) {
     const snapshot = await getPlayerVehicleSnapshot(user.id, vehicleId)
     if (!snapshot) return NextResponse.json({ error: 'Fahrzeug nicht gefunden.', code: 'VEHICLE_NOT_FOUND' }, { status: 404 })
 
-    const profile = getMoonSurfaceEngineeringProfile(snapshot.vehicle.frame_id)
+    const profile = resolveMoonSurfaceEngineeringProfile(snapshot.vehicle.frame_id)
     const cargoInventoryId = inventoryId(snapshot.inventory)
 
-    if (!profile) {
+    if (profile.status === 'unresolved') {
       return NextResponse.json({
         ok: false,
         ready: false,
         code: 'ENGINEERING_FRAME_UNAVAILABLE',
-        error: 'Für diesen Fahrzeug-Frame liegen noch keine kanonischen Moon-Surface-Engineeringwerte vor.',
+        error: 'Für diesen Fahrzeug-Frame liegt noch kein vollständig validiertes Moon-Surface-Profil vor.',
         frameId: snapshot.vehicle.frame_id,
         vehicleInventoryId: cargoInventoryId,
+        reason: profile.reason,
+        details: profile.details,
         engineeringRequest: 'EXT-NOXIA-ENG-20260911-LUNAR-SURFACE-LOGISTICS',
       }, { status: 409 })
     }
@@ -64,12 +66,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       ready: true,
-      frameId: profile.frameId,
-      role: profile.role,
-      cargoCapacityT: profile.cargoCapacityT,
+      frameId: profile.frame.id,
+      role: profile.frame.role,
+      cargoMassCapacityKg: profile.frame.cargo.massCapacityKg,
       vehicleInventoryId: cargoInventoryId,
-      allowedRouteClasses: profile.allowedRouteClasses,
-      source: profile.source,
+      surfaceMobility: profile.frame.surfaceMobility,
+      operationProfile: profile.operationProfile,
+      sourceId: profile.sourceId,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
