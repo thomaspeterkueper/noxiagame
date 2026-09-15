@@ -11,6 +11,8 @@ on:
       - 'app/api/game/world-development/**'
       - 'app/dashboard/DashboardWorldDevelopmentOverlay.tsx'
       - 'app/dashboard/DashboardGate.tsx'
+      - 'supabase/migrations/20260915164500_tharsis_energy_reconciliation.sql'
+      - 'scripts/check-tharsis-energy-reconciliation.mjs'
       - 'docs/decisions/ADR-world-development-macro-system.md'
       - 'docs/architecture/world-development-model.md'
       - 'docs/core/CORE_CONTRACT.md'
@@ -26,6 +28,8 @@ on:
       - 'app/api/game/world-development/**'
       - 'app/dashboard/DashboardWorldDevelopmentOverlay.tsx'
       - 'app/dashboard/DashboardGate.tsx'
+      - 'supabase/migrations/20260915164500_tharsis_energy_reconciliation.sql'
+      - 'scripts/check-tharsis-energy-reconciliation.mjs'
       - 'docs/decisions/ADR-world-development-macro-system.md'
       - 'docs/architecture/world-development-model.md'
       - 'docs/core/CORE_CONTRACT.md'
@@ -44,5 +48,7 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Run Core invariants
         run: npm run test:core-invariants
+      - name: Validate Tharsis energy reconciliation
+        run: node scripts/check-tharsis-energy-reconciliation.mjs
       - name: Run world-development projection contract
         run: npm run test:world-development
