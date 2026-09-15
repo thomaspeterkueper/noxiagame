@@ -51,6 +51,15 @@ export type EarthStarterCargoRoverProvisioning = {
   idempotent: boolean
 }
 
+export type EarthVehicleStagingResult = {
+  vehicleId: string
+  targetInventoryId: string
+  eventId: string
+  vehicle: PersistedVehicleInstance
+  inventory: Record<string, unknown>
+  idempotent: boolean
+}
+
 function coreError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -181,4 +190,25 @@ export async function provisionEarthStarterCargoRoverCommand(input: {
   })
   if (error) throw coreError('noxia_provision_earth_starter_cargo_rover', error)
   return data as unknown as EarthStarterCargoRoverProvisioning
+}
+
+/**
+ * Explicitly stage a ready player-owned Earth vehicle at an owned spatial logistics
+ * node. This is not a travel command and never infers an exact node from broad location.
+ */
+export async function stageEarthVehicleCommand(input: {
+  commandId: string
+  actorProfileId: string
+  vehicleId: string
+  targetInventoryId: string
+}): Promise<EarthVehicleStagingResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_stage_earth_vehicle', {
+    p_command_id: input.commandId,
+    p_actor_profile_id: input.actorProfileId,
+    p_vehicle_instance_id: input.vehicleId,
+    p_target_inventory_id: input.targetInventoryId,
+  })
+  if (error) throw coreError('noxia_stage_earth_vehicle', error)
+  return data as unknown as EarthVehicleStagingResult
 }
