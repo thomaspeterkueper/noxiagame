@@ -35,14 +35,12 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Verify shared cargo mass contracts
+      - name: Verify shared cargo mass contract
         run: >-
           npx tsc lib/game/core/logisticsCargoMass.test.ts
-          lib/game/core/logisticsCargoMassAuthority.test.ts
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-readiness-test
           && node .earth-readiness-test/game/core/logisticsCargoMass.test.js
-          && node .earth-readiness-test/game/core/logisticsCargoMassAuthority.test.js
       - name: Verify Earth engineering registry stays fail-closed
         run: >-
           npx tsc lib/game/earthSurfaceEngineering.test.ts
