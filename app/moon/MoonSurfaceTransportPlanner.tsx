@@ -51,7 +51,19 @@ type ReadinessPayload = {
   frameId?: string
   role?: string
   vehicleInventoryId?: string | null
+  cargoMassCapacityKg?: number
+  reason?: string
+  details?: string[]
   engineeringRequest?: string
+}
+type ProvisionPayload = {
+  ok?: boolean
+  error?: string
+  provisioning?: {
+    vehicle?: { id?: string }
+    created?: boolean
+    slotExisting?: boolean
+  }
 }
 
 const TERMINAL = new Set(['completed', 'cancelled', 'failed'])
@@ -69,10 +81,11 @@ export default function MoonSurfaceTransportPlanner() {
   const [sourceSnapshot, setSourceSnapshot] = useState<InventorySnapshot | null>(null)
   const [readiness, setReadiness] = useState<ReadinessPayload | null>(null)
   const [checkingReadiness, setCheckingReadiness] = useState(false)
+  const [provisioning, setProvisioning] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function loadCore() {
+  async function loadCore(preselectVehicleId?: string) {
     setLoading(true)
     setMessage(null)
     try {
@@ -92,13 +105,43 @@ export default function MoonSurfaceTransportPlanner() {
       const vehiclePayload = await vehiclesResponse.json() as VehiclesPayload
       if (!logisticsResponse.ok) throw new Error(logistics.error ?? 'Moon-Logistik nicht verfügbar')
       if (!vehiclesResponse.ok) throw new Error(vehiclePayload.error ?? 'Moon-Fahrzeuge nicht verfügbar')
+      const nextVehicles = vehiclePayload.vehicles ?? []
       setInventories(logistics.inventories ?? [])
       setJobs(logistics.jobs ?? [])
-      setVehicles(vehiclePayload.vehicles ?? [])
+      setVehicles(nextVehicles)
+      if (preselectVehicleId && nextVehicles.some(vehicle => vehicle.id === preselectVehicleId)) {
+        setVehicleId(preselectVehicleId)
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function provisionStarterRover() {
+    if (!locationId || provisioning) return
+    setProvisioning(true)
+    setMessage(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const response = await fetch('/api/game/vehicles', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'provision-starter-cargo-rover', locationId }),
+      })
+      const payload = await response.json() as ProvisionPayload
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Starter-Cargo-Rover konnte nicht bereitgestellt werden')
+      const createdVehicleId = payload.provisioning?.vehicle?.id
+      setMessage(payload.provisioning?.created
+        ? 'Starter-Cargo-Rover wurde im Core bereitgestellt.'
+        : 'Der vorhandene Starter-Cargo-Rover wurde wiederverwendet.')
+      await loadCore(createdVehicleId)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setProvisioning(false)
     }
   }
 
@@ -182,12 +225,14 @@ export default function MoonSurfaceTransportPlanner() {
 
   let blocker: string | null = null
   if (!basicSelectionReady) blocker = 'Quelle, Ziel, Ware und verfügbare Menge müssen vollständig gewählt sein.'
-  else if (!selectedVehicle) blocker = 'Kein reales Moon-Surface-Fahrzeug ausgewählt. Engineering-Frame und Instanz fehlen noch.'
+  else if (!selectedVehicle) blocker = 'Kein reales Moon-Surface-Fahrzeug ausgewählt.'
   else if (!selectedVehicleInventoryId) blocker = 'Das Cargo-Inventar des ausgewählten Fahrzeugs ist im Core noch nicht aufgelöst.'
   else if (!vehicleReady) blocker = 'Das ausgewählte Fahrzeug ist nicht bereit oder bereits einem aktiven Transport zugewiesen.'
   else if (!vehicleAtSource) blocker = 'Das Fahrzeug befindet sich laut Core nicht am gewählten Quellknoten.'
   else if (checkingReadiness) blocker = 'Engineering-Frame wird geprüft …'
-  else if (!readiness?.ready) blocker = readiness?.error ?? 'Für diesen Fahrzeug-Frame fehlen kanonische Moon-Surface-Engineeringwerte.'
+  else if (!readiness?.ready) blocker = readiness?.reason
+    ? `${readiness.error ?? 'Surface-Profil nicht aufgelöst'} (${readiness.reason})`
+    : readiness?.error ?? 'Für diesen Fahrzeug-Frame fehlen kanonische Moon-Surface-Engineeringwerte.'
   else blocker = 'Engineering-Frame ist freigegeben; als letzter Schritt fehlt die LOLA-Routenauflösung zum Core-routeSnapshot.'
 
   return <section className="planner">
@@ -196,7 +241,7 @@ export default function MoonSurfaceTransportPlanner() {
       <button onClick={() => void loadCore()} disabled={loading}>{loading ? 'Lädt …' : 'Aktualisieren'}</button>
     </header>
 
-    {message && <div className="notice error">{message}</div>}
+    {message && <div className="notice">{message}</div>}
 
     <div className="summary">
       <div><b>{nodeInventories.length}</b><span>Moon-Knoten</span></div>
@@ -204,6 +249,11 @@ export default function MoonSurfaceTransportPlanner() {
       <div><b>{(jobs ?? []).filter(job => !TERMINAL.has(job.status)).length}</b><span>aktive Jobs</span></div>
       <div><b>{stock.length}</b><span>Waren an Quelle</span></div>
     </div>
+
+    {vehicles.length === 0 && <div className="bootstrap">
+      <div><small>CORE BOOTSTRAP</small><strong>Starter Cargo Rover</strong><p>Core kann genau einen race-safe Starter-Rover am verifizierten Shackleton-Standort provisionieren. Die Bereitstellung erzeugt keine Fahrphysik und keine Engineering-Freigabe.</p></div>
+      <button className="primary" onClick={() => void provisionStarterRover()} disabled={!locationId || provisioning}>{provisioning ? 'Wird bereitgestellt …' : 'Starter-Rover bereitstellen'}</button>
+    </div>}
 
     <div className="grid">
       <div className="panel">
@@ -220,12 +270,13 @@ export default function MoonSurfaceTransportPlanner() {
           <span>Frame: {selectedVehicle.frameId}</span>
           <span>Status: {selectedVehicle.status}</span>
           <span>Cargo-Inventar: {selectedVehicleInventoryId ? selectedVehicleInventoryId.slice(0, 8) : 'unresolved'}</span>
-          <span>Kapazität: {selectedVehicle.cargoCapacityT ?? '–'} t</span>
+          <span>Persistenz-Kapazität: {selectedVehicle.cargoCapacityT ?? '–'} t</span>
+          <span>Engineering-Kapazität: {readiness?.cargoMassCapacityKg != null ? `${readiness.cargoMassCapacityKg} kg` : 'unresolved'}</span>
           <span>Condition: {Math.round(selectedVehicle.condition * 100)}%</span>
           <span>Wear: {Math.round(selectedVehicle.wear * 100)}%</span>
           <span>Am Quellknoten: {vehicleAtSource ? 'ja' : 'nein'}</span>
-          <span>Engineering: {checkingReadiness ? 'prüft …' : readiness?.ready ? 'freigegeben' : readiness?.code ?? 'unresolved'}</span>
-        </div> : <div className="notice"><b>Engineering noch offen</b><span>Der Auftrag für Cargo Rover und Heavy Hauler ist vorhanden, aber noch nicht abgeschlossen. Deshalb wird keine Fahrzeuginstanz erfunden.</span></div>}
+          <span>Engineering: {checkingReadiness ? 'prüft …' : readiness?.ready ? 'freigegeben' : readiness?.reason ?? readiness?.code ?? 'unresolved'}</span>
+        </div> : <div className="notice"><b>Kein Fahrzeug gewählt</b><span>Ein vorhandener Core-Rover kann ausgewählt werden. Falls noch keiner existiert, kann der Starter-Rover oben einmalig provisioniert werden.</span></div>}
       </div>
     </div>
 
@@ -236,7 +287,7 @@ export default function MoonSurfaceTransportPlanner() {
     </div>
 
     <style jsx>{`
-      .planner{max-width:1400px;margin:0 auto 18px;background:#0e171d;border:1px solid #293943;border-radius:16px;padding:16px;color:#e8edf0;font-family:system-ui,sans-serif}header{display:flex;justify-content:space-between;gap:18px;align-items:start;margin-bottom:14px}header small,.gate small{font-size:10px;letter-spacing:.16em;color:#c8a75a;font-weight:800}h2{font-family:Georgia,serif;font-weight:400;font-size:24px;margin:2px 0}header p{margin:0;color:#8d9aa2;font-size:12px}button{border:1px solid #465b66;background:#13222a;color:#dbe5e9;padding:8px 12px;border-radius:8px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.summary div{background:#111f27;border:1px solid #293943;border-radius:10px;padding:10px}.summary b{display:block;font-size:20px}.summary span{font-size:9px;color:#82929c}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.panel{display:grid;gap:10px;background:#101a20;border:1px solid #263740;border-radius:12px;padding:12px}label{display:grid;gap:5px;color:#8fa0a9;font-size:10px}select,input{width:100%;box-sizing:border-box;background:#091117;color:#e8edf0;border:1px solid #344852;border-radius:7px;padding:8px}.vehicle-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;background:#0b1419;border-radius:8px;padding:10px}.vehicle-card strong{grid-column:1/-1}.vehicle-card span{font-size:10px;color:#93a3aa}.notice{display:grid;gap:4px;background:#16242c;border:1px dashed #3a4d57;border-radius:8px;padding:10px;color:#9fadb3;font-size:10px}.notice b{color:#dde6ea}.error{border-color:#684247;background:#2a181b}.gate{margin-top:12px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;background:#101a20;border:1px solid #354852;border-radius:12px;padding:12px}.gate strong{display:block;color:#e0b963;margin-top:2px}.gate p{margin:0;color:#9aa9b0;font-size:11px}.primary{background:#5d4d2b;border-color:#8b7340;color:#f4dfaa}@media(max-width:800px){.summary{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.gate{grid-template-columns:1fr}.vehicle-card{grid-template-columns:1fr}}
+      .planner{max-width:1400px;margin:0 auto 18px;background:#0e171d;border:1px solid #293943;border-radius:16px;padding:16px;color:#e8edf0;font-family:system-ui,sans-serif}header{display:flex;justify-content:space-between;gap:18px;align-items:start;margin-bottom:14px}header small,.gate small,.bootstrap small{font-size:10px;letter-spacing:.16em;color:#c8a75a;font-weight:800}h2{font-family:Georgia,serif;font-weight:400;font-size:24px;margin:2px 0}header p,.bootstrap p{margin:0;color:#8d9aa2;font-size:12px}button{border:1px solid #465b66;background:#13222a;color:#dbe5e9;padding:8px 12px;border-radius:8px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.summary div{background:#111f27;border:1px solid #293943;border-radius:10px;padding:10px}.summary b{display:block;font-size:20px}.summary span{font-size:9px;color:#82929c}.bootstrap{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;margin-bottom:12px;background:#171f1c;border:1px solid #4d5137;border-radius:12px;padding:12px}.bootstrap strong{display:block;margin:3px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.panel{display:grid;gap:10px;background:#101a20;border:1px solid #263740;border-radius:12px;padding:12px}label{display:grid;gap:5px;color:#8fa0a9;font-size:10px}select,input{width:100%;box-sizing:border-box;background:#091117;color:#e8edf0;border:1px solid #344852;border-radius:7px;padding:8px}.vehicle-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;background:#0b1419;border-radius:8px;padding:10px}.vehicle-card strong{grid-column:1/-1}.vehicle-card span{font-size:10px;color:#93a3aa}.notice{display:grid;gap:4px;background:#16242c;border:1px dashed #3a4d57;border-radius:8px;padding:10px;color:#9fadb3;font-size:10px;margin-bottom:12px}.notice b{color:#dde6ea}.error{border-color:#684247;background:#2a181b}.gate{margin-top:12px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;background:#101a20;border:1px solid #354852;border-radius:12px;padding:12px}.gate strong{display:block;color:#e0b963;margin-top:2px}.gate p{margin:0;color:#9aa9b0;font-size:11px}.primary{background:#5d4d2b;border-color:#8b7340;color:#f4dfaa}@media(max-width:800px){.summary{grid-template-columns:repeat(2,1fr)}.bootstrap,.grid{grid-template-columns:1fr}.gate{grid-template-columns:1fr}.vehicle-card{grid-template-columns:1fr}}
     `}</style>
   </section>
 }
