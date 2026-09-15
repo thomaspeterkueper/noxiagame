@@ -60,6 +60,26 @@ export async function transferConnectedCargo(input: {
   return data
 }
 
+/**
+ * Finalize an arrived transport job after the job cargo was moved by a separate,
+ * explicit cargo-transfer command. This keeps movement legs and cargo handovers
+ * separate and prevents a second implicit unload during job completion.
+ */
+export async function completeTransportJobAfterHandover(input: {
+  jobId: string
+  actorProfileId: string
+  transferCommandId: string
+}) {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_complete_transport_job_after_handover', {
+    p_job_id: input.jobId,
+    p_actor_profile_id: input.actorProfileId,
+    p_transfer_command_id: input.transferCommandId,
+  })
+  if (error) throw commandError('noxia_complete_transport_job_after_handover', error)
+  return data
+}
+
 export async function getTransportItinerary(profileId: string, jobId: string): Promise<{
   legs: TransportJobLeg[]
   handovers: TransportJobHandover[]
