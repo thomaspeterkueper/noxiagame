@@ -32,6 +32,7 @@ async function authToken(): Promise<string | null> {
 
 export default function DockingApproachPlanner({ stationSlug, shipTypeId }: { stationSlug: string; shipTypeId: string }) {
   const shipId = useGameStore(s => s.shipId)
+  const loadFromServer = useGameStore(s => s.loadFromServer)
   const shipProfile = getShipDockingProfile(shipTypeId)
   const staticOptions = useMemo(
     () => shipProfile ? getDockingApproachOptions(stationSlug, shipProfile.vesselClass) : [],
@@ -87,7 +88,7 @@ export default function DockingApproachPlanner({ stationSlug, shipTypeId }: { st
   const reservedByMe = !!shipId && selectedLive?.reservedForVesselId === shipId
   const occupiedByMe = !!shipId && selectedLive?.occupiedByVesselId === shipId
 
-  const command = useCallback(async (action: 'reserve' | 'dock' | 'cancel-reservation') => {
+  const command = useCallback(async (action: 'reserve' | 'dock' | 'undock' | 'cancel-reservation') => {
     if (!shipId || !selectedPortId) return
     setLoading(true)
     setMessage('')
@@ -101,14 +102,20 @@ export default function DockingApproachPlanner({ stationSlug, shipTypeId }: { st
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error ?? 'Docking-Vorgang fehlgeschlagen.')
-      setMessage(action === 'reserve' ? 'Port reserviert.' : action === 'dock' ? 'Schiff angedockt.' : 'Reservierung aufgehoben.')
-      await loadPorts()
+      const labels = {
+        reserve: 'Port reserviert.',
+        dock: 'Schiff angedockt.',
+        undock: 'Schiff abgedockt. Port wieder freigegeben.',
+        'cancel-reservation': 'Reservierung aufgehoben.',
+      } as const
+      setMessage(labels[action])
+      await Promise.all([loadPorts(), loadFromServer()])
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Docking-Vorgang fehlgeschlagen.')
     } finally {
       setLoading(false)
     }
-  }, [shipId, selectedPortId, loadPorts])
+  }, [shipId, selectedPortId, loadPorts, loadFromServer])
 
   return (
     <div style={{ marginTop: 10, padding: '9px 10px', background: '#0a1721', border: '1px solid #294052', borderRadius: 7 }}>
@@ -141,7 +148,7 @@ export default function DockingApproachPlanner({ stationSlug, shipTypeId }: { st
       {selected && <div style={{ marginTop: 7, fontSize: 10, color: '#8aa0b5', lineHeight: 1.4 }}>
         Ziel: <strong style={{ color: '#d6e2ec' }}>{selected.port.label}</strong>.{' '}
         {selectedLive
-          ? occupiedByMe ? 'Dieses Schiff ist an diesem Port physisch angedockt.'
+          ? occupiedByMe ? 'Dieses Schiff ist an diesem Port physisch angedockt. Abdocken löst nur die Docking-Verbindung und bewegt keine Fracht.'
             : reservedByMe ? 'Port ist für dieses Schiff reserviert; der nächste Schritt ist Docking.'
             : selectedLive.status === 'available' ? 'Port ist aktuell frei und kann reserviert werden.'
             : `Portstatus: ${selectedLive.status}.`
@@ -153,6 +160,7 @@ export default function DockingApproachPlanner({ stationSlug, shipTypeId }: { st
           {selectedLive.status === 'available' && <button disabled={loading} onClick={() => void command('reserve')}>Port reservieren</button>}
           {reservedByMe && <button disabled={loading} onClick={() => void command('dock')}>Andocken</button>}
           {reservedByMe && <button disabled={loading} onClick={() => void command('cancel-reservation')}>Reservierung lösen</button>}
+          {occupiedByMe && <button disabled={loading} onClick={() => void command('undock')}>Abdocken</button>}
         </div>
       )}
 
