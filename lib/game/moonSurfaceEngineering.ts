@@ -1,37 +1,19 @@
-import type { MoonSurfaceRouteClass, MoonVehicleMobilityEnvelope } from './moonSurfaceLogistics'
-import type { SurfaceOperationProfile } from './vehicles/surfaceMission'
+import type { SurfaceVehicleProfileEntry } from './vehicles/surfaceProfileResolution'
+import { resolveSurfaceVehicleProfile } from './vehicles/surfaceProfileResolution'
 
 /**
- * Engineering-owned runtime values required to turn a Shackleton terrain route
- * into a Core-valid surface routeSnapshot. NOXIA must not invent these values.
- */
-export interface MoonSurfaceEngineeringProfile {
-  frameId: string
-  role: 'cargo-rover' | 'heavy-hauler'
-  cargoCapacityT: number
-  mobility: MoonVehicleMobilityEnvelope
-  operations: SurfaceOperationProfile
-  allowedRouteClasses: readonly MoonSurfaceRouteClass[]
-  source: {
-    repository: 'kueper-engineering'
-    reference: string
-  }
-}
-
-/**
- * Canonical Engineering profiles are intentionally empty until
- * EXT-NOXIA-ENG-20260911-LUNAR-SURFACE-LOGISTICS is completed.
+ * Moon-specific registry of Engineering-approved surface vehicle frames.
  *
- * Keeping this registry fail-closed makes the future integration explicit:
- * Engineering publishes a stable frame -> it is registered here -> the Moon
- * route/job API can use it without changing the planner UI or Core contract.
+ * The shared Core resolver owns frame/profile validation. Moon only owns which
+ * exact Engineering frames are accepted for lunar surface routing.
+ *
+ * EXT-NOXIA-ENG-20260911-LUNAR-SURFACE-LOGISTICS is still open, so the registry
+ * intentionally contains no productive frame values yet. In particular,
+ * `cargo-rover-reference` may exist as a Core bootstrap frame, but it is not
+ * silently promoted to a canonical Moon mobility/energy profile here.
  */
-const PROFILES = new Map<string, MoonSurfaceEngineeringProfile>()
+export const MOON_SURFACE_ENGINEERING_PROFILES: readonly SurfaceVehicleProfileEntry[] = []
 
-export function getMoonSurfaceEngineeringProfile(frameId: string) {
-  return PROFILES.get(frameId) ?? null
-}
-
-export function hasMoonSurfaceEngineeringProfile(frameId: string) {
-  return PROFILES.has(frameId)
+export function resolveMoonSurfaceEngineeringProfile(frameId: string) {
+  return resolveSurfaceVehicleProfile(frameId, MOON_SURFACE_ENGINEERING_PROFILES)
 }
