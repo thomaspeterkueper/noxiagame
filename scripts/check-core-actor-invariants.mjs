@@ -13,8 +13,14 @@ const mustNot = (name, text, tokens) => {
   }
   return name;
 };
+const tableDefinition = (text, tableName) => {
+  const match = text.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${tableName}\\s*\\([\\s\\S]*?\\n\\);`, 'i'));
+  if (!match) throw new Error(`table definition not found: ${tableName}`);
+  return match[0];
+};
 
 const actors = read('supabase/migrations/20260718100000_precreate_actors.sql');
+const actorTable = tableDefinition(actors, 'actors');
 const baseline = read('supabase/migrations/20260719000000_baseline.sql');
 const npcEconomy = read('supabase/migrations/_archive/014_npc_economy.sql');
 const living = read('supabase/migrations/20260825161000_living_population_v01.sql');
@@ -26,12 +32,12 @@ checks.push(must('player identity remains profile-backed', baseline, [
   'CREATE TABLE IF NOT EXISTS profiles',
   'references auth.users(id) on delete cascade',
 ]));
-checks.push(must('actors remain independent world actors', actors, [
+checks.push(must('actors remain independent world actors', actorTable, [
   'CREATE TABLE IF NOT EXISTS actors',
   'kind             text NOT NULL',
   'decision_weights jsonb',
 ]));
-checks.push(mustNot('actors do not require player profiles', actors, [
+checks.push(mustNot('actors do not require player profiles', actorTable, [
   'profile_id uuid NOT NULL',
   'references auth.users',
 ]));
