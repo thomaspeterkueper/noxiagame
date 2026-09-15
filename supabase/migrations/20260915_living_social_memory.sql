@@ -1,5 +1,6 @@
 -- NOXIA-LIVING — social memory v1
--- Additive schema only. Existing people/person_needs/person_skills/person_assignments remain authoritative.
+-- Additive extension of the existing Living Population schema.
+-- IMPORTANT: person_relationships already belongs to NOXIA-LIVING-0001 and is reused unchanged.
 
 create table if not exists public.person_memories (
   id uuid primary key default gen_random_uuid(),
@@ -12,25 +13,14 @@ create table if not exists public.person_memories (
   valence double precision not null default 0 check (valence between -1 and 1),
   trust_delta double precision not null default 0 check (trust_delta between -1 and 1),
   summary text not null,
-  source_event_id uuid,
+  source_event_id uuid not null,
   created_at timestamptz not null default now(),
-  check (other_person_id is null or other_person_id <> person_id)
+  check (other_person_id is null or other_person_id <> person_id),
+  unique (person_id, source_event_id)
 );
 
 create index if not exists person_memories_person_tick_idx on public.person_memories(person_id, tick desc);
 create index if not exists person_memories_other_person_idx on public.person_memories(other_person_id) where other_person_id is not null;
-
-create table if not exists public.person_relationships (
-  person_id uuid not null references public.people(id) on delete cascade,
-  other_person_id uuid not null references public.people(id) on delete cascade,
-  familiarity double precision not null default 0 check (familiarity between 0 and 1),
-  trust double precision not null default 0 check (trust between -1 and 1),
-  support_balance double precision not null default 0 check (support_balance between -10 and 10),
-  last_interaction_tick bigint not null default 0,
-  updated_at timestamptz not null default now(),
-  primary key (person_id, other_person_id),
-  check (person_id <> other_person_id)
-);
 
 create table if not exists public.person_goals (
   id uuid primary key default gen_random_uuid(),
@@ -50,8 +40,7 @@ create table if not exists public.person_goals (
 create index if not exists person_goals_active_idx on public.person_goals(person_id, priority desc) where status = 'active';
 
 alter table public.person_memories enable row level security;
-alter table public.person_relationships enable row level security;
 alter table public.person_goals enable row level security;
 
--- v1 intentionally defines no client policies. These are simulation-internal state,
--- written by the authoritative server/tick path. Service-role access bypasses RLS.
+-- No client policies in v1. These are simulation-internal state written by the
+-- authoritative server/tick path. The existing relationship RLS contract is untouched.
