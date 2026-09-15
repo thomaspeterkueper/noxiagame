@@ -53,6 +53,20 @@ type MissionDraftPayload = {
   }
   routeSnapshot?: Record<string, unknown>
 }
+type StartPayload = {
+  ok?: boolean
+  started?: boolean
+  idempotent?: boolean
+  commandId?: string
+  code?: string
+  error?: string
+  job?: {
+    id?: string
+    status?: string
+    started_at?: string | null
+    arrives_at?: string | null
+  }
+}
 
 function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
@@ -81,6 +95,9 @@ export default function EarthSurfaceMissionDraftPanel() {
   const [draft, setDraft] = useState<MissionDraftPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [drafting, setDrafting] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [startCommandId, setStartCommandId] = useState<string | null>(null)
+  const [startResult, setStartResult] = useState<StartPayload | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   async function load() {
@@ -132,6 +149,8 @@ export default function EarthSurfaceMissionDraftPanel() {
 
   useEffect(() => {
     setDraft(null)
+    setStartResult(null)
+    setStartCommandId(null)
     setSourceSnapshot(null)
     setResource('')
     setAmount(1)
@@ -159,12 +178,18 @@ export default function EarthSurfaceMissionDraftPanel() {
     if (!resource && stock[0]) setResource(stock[0].resource)
   }, [resource, stock])
 
-  useEffect(() => { setDraft(null) }, [destinationId, vehicleId, resource, amount])
+  useEffect(() => {
+    setDraft(null)
+    setStartResult(null)
+    setStartCommandId(null)
+  }, [destinationId, vehicleId, resource, amount])
 
   async function calculateDraft() {
     if (!sourceId || !destinationId || !vehicleId || !resource || amount <= 0 || amount > available) return
     setDrafting(true)
     setMessage(null)
+    setStartResult(null)
+    setStartCommandId(null)
     try {
       const token = await getToken()
       if (!token) throw new Error('Nicht angemeldet')
@@ -185,6 +210,36 @@ export default function EarthSurfaceMissionDraftPanel() {
     }
   }
 
+  async function startTransport() {
+    if (!draft?.ready || !sourceId || !destinationId || !vehicleId || !resource) return
+    setStarting(true)
+    setMessage(null)
+    const commandId = startCommandId ?? crypto.randomUUID()
+    if (!startCommandId) setStartCommandId(commandId)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const response = await fetch('/api/game/earth/surface-transport/start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandId, sourceInventoryId: sourceId, destinationInventoryId: destinationId, vehicleId, resource, amount }),
+        cache: 'no-store',
+      })
+      const payload = await response.json() as StartPayload
+      setStartResult(payload)
+      if (!response.ok || !payload.started) {
+        setMessage(payload.error ?? 'Transportstart wurde blockiert.')
+        return
+      }
+      await load()
+    } catch (error) {
+      // Keep startCommandId so an uncertain network outcome can be retried safely.
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setStarting(false)
+    }
+  }
+
   const selectedVehicle = vehicles.find(vehicle => vehicle.id === vehicleId)
   const stagedAtSource = Boolean(selectedVehicle && selectedVehicle.currentNodeInventoryId === sourceId)
   const inputsReady = Boolean(sourceId && destinationId && sourceId !== destinationId && vehicleId && resource && amount > 0 && amount <= available)
@@ -192,15 +247,16 @@ export default function EarthSurfaceMissionDraftPanel() {
   return <section className="earth-mission-draft">
     <header>
       <div>
-        <small>EARTH · SERVER MISSION DRAFT</small>
+        <small>EARTH · SERVER MISSION</small>
         <h2>Physikalische Transportfreigabe</h2>
-        <p>OSM, Cargo-Masse, Engineering, Energie und Wear werden serverseitig erneut geprüft. Der Browser liefert nur die gewünschte Mission.</p>
+        <p>OSM, Cargo-Masse, Engineering, Energie und Wear werden serverseitig geprüft. Beim Start wird die gesamte Mission nochmals frisch berechnet und anschließend atomar in den Core übernommen.</p>
       </div>
       <button onClick={() => void load()} disabled={loading}>{loading ? 'Lädt …' : 'Aktualisieren'}</button>
     </header>
 
     {message && <div className="notice bad">{message}</div>}
     {!locationId && !loading && <div className="notice bad">Earth-Location konnte nicht aufgelöst werden.</div>}
+    {startResult?.started && <div className="notice good"><b>Transport gestartet</b><span>Job {startResult.job?.id?.slice(0, 8) ?? '–'} · {startResult.job?.status ?? 'in_transit'}{startResult.job?.arrives_at ? ` · Ankunft ${new Date(startResult.job.arrives_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : ''}</span></div>}
 
     <div className="grid">
       <div className="inputs">
@@ -210,7 +266,7 @@ export default function EarthSurfaceMissionDraftPanel() {
         <label>Ware<select value={resource} onChange={event => { setResource(event.currentTarget.value); setAmount(1) }}><option value="">–</option>{stock.map(item => <option key={item.resource} value={item.resource}>{item.label ?? item.resource} · {item.available ?? item.amount} {item.unit ?? ''}</option>)}</select></label>
         <label>Menge<input type="number" min={1} max={Math.max(1, available)} value={amount} onChange={event => setAmount(Math.max(1, Math.floor(Number(event.currentTarget.value) || 1)))} /></label>
         <div className={`stage ${stagedAtSource ? 'good' : ''}`}><b>{stagedAtSource ? 'Fahrzeug am Quellknoten' : 'Fahrzeug nicht am Quellknoten'}</b><span>{selectedVehicle?.currentNodeInventoryId ? `Node ${selectedVehicle.currentNodeInventoryId.slice(0, 8)}` : 'Bitte zuerst im Staging-Panel bereitstellen.'}</span></div>
-        <button className="primary" disabled={!inputsReady || drafting || !stagedAtSource} onClick={() => void calculateDraft()}>{drafting ? 'Server prüft Mission …' : 'Server-Mission prüfen'}</button>
+        <button className="primary" disabled={!inputsReady || drafting || starting || !stagedAtSource} onClick={() => void calculateDraft()}>{drafting ? 'Server prüft Mission …' : 'Server-Mission prüfen'}</button>
       </div>
 
       <div className="result">
@@ -228,13 +284,14 @@ export default function EarthSurfaceMissionDraftPanel() {
             <div><span>Straße</span><b>{formatDistance(draft.route.roadDistanceM)}</b></div>
             <div><span>Offroad</span><b>{formatDistance(draft.route.offroadDistanceM)}</b></div>
           </div>
-          <p className="hint">Der Route-Snapshot inklusive Geometrie ist jetzt serverseitig vorbereitet, wird aber noch nicht als TransportJob persistiert. Der nächste Schritt ist ein atomarer Create/Load/Start-Flow auf genau diesem Draft.</p>
+          <button className="start" disabled={starting || Boolean(startResult?.started)} onClick={() => void startTransport()}>{starting ? 'Mission wird neu geprüft und gestartet …' : startResult?.started ? 'Transport läuft' : 'Transport atomar starten'}</button>
+          <p className="hint">Beim Klick wird dieser Browser-Draft nicht vertraut oder wiederverwendet. Der Server lädt Fahrzeug, Cargo und OSM erneut, berechnet einen frischen Route-Snapshot und führt Create → Loading → Start in einer PostgreSQL-Transaktion aus.</p>
         </>}
       </div>
     </div>
 
     <style jsx>{`
-      .earth-mission-draft{max-width:1500px;margin:18px auto;padding:16px;box-sizing:border-box;background:#102632;color:#e7ece8;border:1px solid #425d67;border-radius:13px;font-family:system-ui,sans-serif}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:12px}header small{font-size:9px;letter-spacing:.15em;color:#d1ad55;font-weight:900}h2{font-family:Georgia,serif;font-weight:400;font-size:22px;margin:3px 0}header p{margin:0;color:#9fb0b5;font-size:10px;max-width:820px}button{border:1px solid #8e7433;background:#d2a843;color:#102632;border-radius:7px;padding:8px 11px;font-weight:900;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.grid{display:grid;grid-template-columns:minmax(300px,.8fr) 1.2fr;gap:10px}.inputs,.result{background:#132f3a;border:1px solid #35525d;border-radius:9px;padding:11px;min-width:0}label{display:grid;gap:4px;color:#9fb0b5;font-size:9px;margin:6px 0}select,input{width:100%;box-sizing:border-box;background:#0b202a;color:#e7ece8;border:1px solid #46616a;border-radius:6px;padding:8px}.primary{width:100%;margin-top:8px}.stage,.ready{display:grid;gap:3px;background:#0d2530;border:1px solid #43575e;border-radius:7px;padding:8px;margin-top:8px}.stage.good,.ready{background:#10342f;border-color:#39705c}.stage b,.ready b{font-size:10px}.stage span,.ready span,.ready small{font-size:8px;color:#9db3b1;overflow-wrap:anywhere}.ready small{letter-spacing:.1em;color:#d1ad55}.notice{display:grid;gap:3px;background:#263f48;border-radius:7px;padding:9px;color:#cbd6d7;font-size:9px}.notice.bad{background:#532f31;color:#f2d6d2}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}.metrics>div{display:flex;justify-content:space-between;gap:10px;background:#0d2530;border-radius:6px;padding:8px;font-size:9px}.metrics span{color:#94a9af}.metrics b{color:#e1d27e}.hint{font-size:8px;color:#9fb0b5;line-height:1.45;margin:9px 0 0}@media(max-width:850px){header{flex-direction:column}.grid{grid-template-columns:1fr}.metrics{grid-template-columns:1fr}}
+      .earth-mission-draft{max-width:1500px;margin:18px auto;padding:16px;box-sizing:border-box;background:#102632;color:#e7ece8;border:1px solid #425d67;border-radius:13px;font-family:system-ui,sans-serif}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:12px}header small{font-size:9px;letter-spacing:.15em;color:#d1ad55;font-weight:900}h2{font-family:Georgia,serif;font-weight:400;font-size:22px;margin:3px 0}header p{margin:0;color:#9fb0b5;font-size:10px;max-width:820px}button{border:1px solid #8e7433;background:#d2a843;color:#102632;border-radius:7px;padding:8px 11px;font-weight:900;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.grid{display:grid;grid-template-columns:minmax(300px,.8fr) 1.2fr;gap:10px}.inputs,.result{background:#132f3a;border:1px solid #35525d;border-radius:9px;padding:11px;min-width:0}label{display:grid;gap:4px;color:#9fb0b5;font-size:9px;margin:6px 0}select,input{width:100%;box-sizing:border-box;background:#0b202a;color:#e7ece8;border:1px solid #46616a;border-radius:6px;padding:8px}.primary,.start{width:100%;margin-top:8px}.start{background:#d8c166;border-color:#a38a38}.stage,.ready{display:grid;gap:3px;background:#0d2530;border:1px solid #43575e;border-radius:7px;padding:8px;margin-top:8px}.stage.good,.ready{background:#10342f;border-color:#39705c}.stage b,.ready b{font-size:10px}.stage span,.ready span,.ready small{font-size:8px;color:#9db3b1;overflow-wrap:anywhere}.ready small{letter-spacing:.1em;color:#d1ad55}.notice{display:grid;gap:3px;background:#263f48;border-radius:7px;padding:9px;color:#cbd6d7;font-size:9px;margin-bottom:8px}.notice.bad{background:#532f31;color:#f2d6d2}.notice.good{background:#10342f;color:#d6f0df;border:1px solid #39705c}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}.metrics>div{display:flex;justify-content:space-between;gap:10px;background:#0d2530;border-radius:6px;padding:8px;font-size:9px}.metrics span{color:#94a9af}.metrics b{color:#e1d27e}.hint{font-size:8px;color:#9fb0b5;line-height:1.45;margin:9px 0 0}@media(max-width:850px){header{flex-direction:column}.grid{grid-template-columns:1fr}.metrics{grid-template-columns:1fr}}
     `}</style>
   </section>
 }
