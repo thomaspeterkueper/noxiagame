@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useMemo, useRef, useState } from 'react'
 
 const TILE_ROOT = 'https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm'
@@ -7,7 +8,7 @@ const TILE_ROOT = 'https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_me
 type MarsSite = { id: string; name: string; lat: number; lon: number; kind: 'region' | 'landing' | 'landmark' }
 
 const SITES: MarsSite[] = [
-  { id: 'tharsis', name: 'Tharsis Hub', lat: 0, lon: -112.5, kind: 'region' },
+  { id: 'tharsis', name: 'Tharsis Hub', lat: 14, lon: -102, kind: 'region' },
   { id: 'olympus-mons', name: 'Olympus Mons', lat: 18.65, lon: -133.8, kind: 'landmark' },
   { id: 'valles-marineris', name: 'Valles Marineris', lat: -14, lon: -60, kind: 'landmark' },
   { id: 'gale', name: 'Gale / Curiosity', lat: -5.4, lon: 137.8, kind: 'landing' },
@@ -49,11 +50,11 @@ export default function MarsRegionPreview() {
           </div>
           <div style={{ position: 'absolute', left: 14, bottom: 12, padding: '6px 9px', borderRadius: 8, background: 'rgba(12,8,6,.7)', fontSize: 12 }}>NASA Trek · MGS MOLA · 463 m/pixel source product</div>
         </div>
-        <aside style={{ display: 'grid', alignContent: 'start', gap: 12 }}><div style={panelStyle}><div style={eyebrowStyle}>SELECTED</div><div style={{ fontSize: 22, marginTop: 5 }}>{selected.name}</div><div style={{ opacity: .7, marginTop: 8 }}>{selected.lat.toFixed(2)}° · {selected.lon.toFixed(2)}°</div></div><div style={panelStyle}><div style={eyebrowStyle}>SPATIAL CORE</div><div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>IAU Mars ellipsoid · lokale ENU-Meterkoordinaten · 1-km-Chunks · 10-m-Zellen.</div></div></aside>
+        <aside style={{ display: 'grid', alignContent: 'start', gap: 12 }}><div style={panelStyle}><div style={eyebrowStyle}>SELECTED</div><div style={{ fontSize: 22, marginTop: 5 }}>{selected.name}</div><div style={{ opacity: .7, marginTop: 8 }}>{selected.lat.toFixed(2)}° · {selected.lon.toFixed(2)}°</div></div><div style={panelStyle}><div style={eyebrowStyle}>SPATIAL CORE</div><div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>IAU Mars · planetozentrische Geometrie · lokale ENU-Meterkoordinaten · 1-km-Chunks · 10-m-Zellen.</div></div><div style={panelStyle}><div style={eyebrowStyle}>REAL TERRAIN</div><div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>MOLA MEGDR liefert die reale Höhenoberfläche relativ zum GMM-2B-Areoid. Daraus werden Hangneigung und physische Bebaubarkeit abgeleitet.</div></div></aside>
       </section>
     </div>
   </section>
 }
-const buttonStyle: React.CSSProperties = { appearance: 'none', border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.07)', color: 'inherit', borderRadius: 9, padding: '8px 12px', font: 'inherit' }
-const panelStyle: React.CSSProperties = { border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', borderRadius: 14, padding: 16 }
-const eyebrowStyle: React.CSSProperties = { fontSize: 11, letterSpacing: '.14em', opacity: .55 }
+const buttonStyle: CSSProperties = { appearance: 'none', border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.07)', color: 'inherit', borderRadius: 9, padding: '8px 12px', font: 'inherit' }
+const panelStyle: CSSProperties = { border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', borderRadius: 14, padding: 16 }
+const eyebrowStyle: CSSProperties = { fontSize: 11, letterSpacing: '.14em', opacity: .55 }
