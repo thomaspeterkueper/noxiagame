@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import InteriorTemplateOverview from '@/app/_components/InteriorTemplateOverview'
 import { getToken } from '@/lib/supabase/auth'
+import { projectPersistedBuildingInteriorHosts } from '@/lib/game/buildings/interiors'
 import { THARSIS_HUB_BUILDINGS, THARSIS_HUB_POPULATION, THARSIS_HUB_ROADS } from '@/lib/game/seeds/tharsisHubSeed'
 
 type SpatialPayload = {
@@ -28,6 +30,7 @@ const ROWS = 24
 export default function TharsisCorePreview() {
   const [payload, setPayload] = useState<SpatialPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedInteriorHostId, setSelectedInteriorHostId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -52,8 +55,16 @@ export default function TharsisCorePreview() {
   const roadKeys = useMemo(() => new Set(THARSIS_HUB_ROADS.map(road => `${road.row}:${road.col}`)), [])
   const liveEntities = payload?.entities ?? []
   const metricEntities = liveEntities.filter(entity => entity.x_m != null && entity.y_m != null)
+  const interiorHosts = useMemo(() => projectPersistedBuildingInteriorHosts(liveEntities), [liveEntities])
+  const selectedInteriorHost = interiorHosts.find(host => host.hostId === selectedInteriorHostId) ?? null
   const frameReady = payload?.frame?.origin_status === 'verified'
   const terrainReady = payload?.terrain?.activeDataset?.status === 'ready'
+
+  useEffect(() => {
+    if (selectedInteriorHostId && !interiorHosts.some(host => host.hostId === selectedInteriorHostId)) {
+      setSelectedInteriorHostId(null)
+    }
+  }, [interiorHosts, selectedInteriorHostId])
 
   return <section style={{ background: '#0d0b0a', color: '#eee6df', padding: '28px 24px 48px' }}>
     <div style={{ maxWidth: 1440, margin: '0 auto' }}>
@@ -113,6 +124,36 @@ export default function TharsisCorePreview() {
             <div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>{liveEntities.length} persistierte Gebäude/Module · {metricEntities.length} bereits mit metrischer Position.</div>
           </div>
           <div style={panelStyle}>
+            <small>INTERIORS · CORE HOSTS</small>
+            <div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>
+              {interiorHosts.length} persistierte Gebäude besitzen eine registrierte gemeinsame Innenraumtopologie.
+            </div>
+            {interiorHosts.length > 0 ? <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
+              {interiorHosts.map(host => {
+                const selected = host.hostId === selectedInteriorHostId
+                return <button
+                  key={host.hostId}
+                  onClick={() => setSelectedInteriorHostId(selected ? null : host.hostId)}
+                  style={{
+                    border: selected ? '1px solid #d7b67a' : '1px solid rgba(255,255,255,.15)',
+                    background: selected ? 'rgba(174,120,66,.22)' : 'rgba(255,255,255,.035)',
+                    color: '#eee6df',
+                    borderRadius: 8,
+                    padding: '8px 9px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <strong style={{ display: 'block', fontSize: 11 }}>{host.buildingTypeId}</strong>
+                  <span style={{ display: 'block', marginTop: 3, opacity: .55, fontSize: 9, fontFamily: 'monospace' }}>Core {host.hostId}</span>
+                </button>
+              })}
+            </div> : <div style={{ marginTop: 8, opacity: .55, fontSize: 10 }}>Keine persistierte Core-Instanz mit registriertem Interior-Typ vorhanden.</div>}
+            <div style={{ marginTop: 8, opacity: .5, fontSize: 9, lineHeight: 1.45 }}>
+              Die Bindung verwendet ausschließlich die persistierte Core-ID und den kanonischen Gebäudetyp. Seed-Reihenfolge, Tile und Koordinate erzeugen keine Innenraumidentität.
+            </div>
+          </div>
+          <div style={panelStyle}>
             <small>GEODESY</small>
             <div style={{ marginTop: 7, lineHeight: 1.55, opacity: .82 }}>
               World-Frame: <strong>{frameReady ? 'verified' : payload?.frame?.origin_status ?? 'pending'}</strong><br />
@@ -128,6 +169,10 @@ export default function TharsisCorePreview() {
           </div>
         </aside>
       </div>
+
+      {selectedInteriorHost ? <div style={{ marginTop: 18 }}>
+        <InteriorTemplateOverview template={selectedInteriorHost.template} hostId={selectedInteriorHost.hostId} />
+      </div> : null}
     </div>
   </section>
 }

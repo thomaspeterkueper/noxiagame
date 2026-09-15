@@ -7,9 +7,11 @@ import LandingOverlay from '@/app/dashboard/LandingOverlay'
 import SpaceportOverlay from '@/app/dashboard/SpaceportOverlay'
 import AdminOverlay from '@/app/dashboard/AdminOverlay'
 import BankOverlay from '@/app/dashboard/BankOverlay'
+import InteriorTemplateOverview from '@/app/_components/InteriorTemplateOverview'
 import { getToken } from '@/lib/supabase/auth'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import type { BuildingEntryRequest } from '@/lib/game/buildings/entry'
+import { getInteriorTemplateForBuildingType } from '@/lib/game/buildings/interiors'
 
 type ResourceRow = { resource: string; stock: number; consumption: number; production: number }
 type AccessData = {
@@ -247,6 +249,7 @@ export default function EarthBuildingAccessLayer({
 
   if (request.kind === 'research') {
     const isScanner = request.buildingTypeId === 'scanner'
+    const interiorTemplate = isScanner ? null : getInteriorTemplateForBuildingType(request.buildingTypeId)
     return (
       <FacilityPanel
         eyebrow={isScanner ? 'GEODÄSIE & ANALYSE' : 'FORSCHUNG'}
@@ -254,6 +257,7 @@ export default function EarthBuildingAccessLayer({
         copy={isScanner ? 'Die Earth-Scannerstation ist bereits als Weltgebäude angebunden. Die alte Tile-Scanner-Messung ist für globale WGS84-Positionen noch nicht freigeschaltet.' : 'Forschungszugang auf Basis des bestehenden NOXIA-Wissenssystems.'}
         onClose={onClose}
       >
+        {interiorTemplate && <InteriorTemplateOverview template={interiorTemplate} hostId={request.entityId} />}
         <ResourceTable resources={resources} />
         <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 12 }}>
           <button style={actionButton} onClick={() => window.location.assign('/knowledge')}>Wissensstand öffnen</button>
