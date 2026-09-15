@@ -29,6 +29,28 @@ interface EnergyAssetRow {
   tile_col: number | null
 }
 
+interface PowerBackboneRow {
+  ring: string
+  node_row: number | null
+  node_col: number | null
+}
+
+interface PowerEdgeRow {
+  ring: string
+  from_row: number | null
+  from_col: number | null
+  to_row: number | null
+  to_col: number | null
+}
+
+interface PowerFeederRow {
+  ring: string
+  object_row: number | null
+  object_col: number | null
+  node_row: number | null
+  node_col: number | null
+}
+
 function resourceNumber(value: number | null | undefined): number {
   return Number.isFinite(Number(value)) ? Number(value) : 0
 }
@@ -51,7 +73,8 @@ function serializeDerivedSignal(derived: DerivedWorldDevelopmentSignal) {
  * - no unlocks or gameplay mutations;
  * - no conversion of generic energy stock into grid/firm-energy values;
  * - no conversion of nominal reactor MW into available or firm capacity;
- * - no nested Supabase relation assumptions for source data.
+ * - persisted power topology proves structural reachability only, not live
+ *   breaker/line continuity or transmission capacity.
  */
 export async function GET() {
   const supabase = createServiceClient()
@@ -95,9 +118,6 @@ export async function GET() {
 
   const waterByLocation = new Map<string, LocationResourceRow>()
   for (const row of waterRows) {
-    // One resource balance per location is the existing location_resources
-    // contract. Keep the first row if malformed duplicate source data appears;
-    // this read model does not reconcile or mutate source truth.
     if (!waterByLocation.has(row.location_id)) waterByLocation.set(row.location_id, row)
   }
 
@@ -164,9 +184,61 @@ export async function GET() {
         tileRow: row.tile_row,
         tileCol: row.tile_col,
       }))
+
+      const [backboneResult, edgeResult, feederResult] = await Promise.all([
+        supabase
+          .from('location_utilities')
+          .select('ring, node_row, node_col')
+          .eq('location_id', mars.id)
+          .is('attaches_entity_id', null)
+          .contains('media', ['power']),
+        supabase
+          .from('location_utility_edges')
+          .select('ring, from_row, from_col, to_row, to_col')
+          .eq('location_id', mars.id)
+          .contains('media', ['power']),
+        supabase
+          .from('location_utility_feeders')
+          .select('ring, object_row, object_col, node_row, node_col')
+          .eq('location_id', mars.id)
+          .contains('media', ['power']),
+      ])
+
+      const topologyErrors = [backboneResult.error, edgeResult.error, feederResult.error].filter(Boolean)
+      if (topologyErrors.length > 0) {
+        console.error('world-development power topology query failed:', topologyErrors)
+        infrastructureIssues.push({
+          scope: 'mars',
+          system: 'power-topology',
+          reason: 'Persisted Tharsis power topology could not be read; energy assets remain observable but structural grid topology is unavailable.',
+        })
+      }
+
       energyGridObservations.push(buildTharsisEnergyGridObservation({
         locationId: mars.id,
         liveAssets,
+        liveTopology: topologyErrors.length === 0 ? {
+          backboneNodes: ((backboneResult.data ?? []) as PowerBackboneRow[]).map(row => ({
+            ring: row.ring,
+            nodeRow: row.node_row,
+            nodeCol: row.node_col,
+          })),
+          edges: ((edgeResult.data ?? []) as PowerEdgeRow[]).map(row => ({
+            ring: row.ring,
+            fromRow: row.from_row,
+            fromCol: row.from_col,
+            toRow: row.to_row,
+            toCol: row.to_col,
+          })),
+          feeders: ((feederResult.data ?? []) as PowerFeederRow[]).map(row => ({
+            ring: row.ring,
+            objectRow: row.object_row,
+            objectCol: row.object_col,
+            nodeRow: row.node_row,
+            nodeCol: row.node_col,
+          })),
+          sourceRef: 'core:location_utilities+location_utility_edges+location_utility_feeders:mars:power',
+        } : undefined,
       }))
     }
   }

@@ -6,13 +6,16 @@ on:
       - 'lib/game/worldDevelopment.ts'
       - 'lib/game/worldDevelopmentSignals.ts'
       - 'lib/game/energyGridObservation.ts'
+      - 'lib/game/energyGridObservation.test.ts'
       - 'lib/game/seeds/tharsisHubSeed.ts'
       - 'lib/game/worldDevelopment.test.ts'
       - 'app/api/game/world-development/**'
       - 'app/dashboard/DashboardWorldDevelopmentOverlay.tsx'
       - 'app/dashboard/DashboardGate.tsx'
       - 'supabase/migrations/20260915164500_tharsis_energy_reconciliation.sql'
+      - 'supabase/migrations/20260915173000_tharsis_power_grid_topology_e1.sql'
       - 'scripts/check-tharsis-energy-reconciliation.mjs'
+      - 'scripts/check-tharsis-power-grid-e1.mjs'
       - 'docs/decisions/ADR-world-development-macro-system.md'
       - 'docs/architecture/world-development-model.md'
       - 'docs/core/CORE_CONTRACT.md'
@@ -23,13 +26,16 @@ on:
       - 'lib/game/worldDevelopment.ts'
       - 'lib/game/worldDevelopmentSignals.ts'
       - 'lib/game/energyGridObservation.ts'
+      - 'lib/game/energyGridObservation.test.ts'
       - 'lib/game/seeds/tharsisHubSeed.ts'
       - 'lib/game/worldDevelopment.test.ts'
       - 'app/api/game/world-development/**'
       - 'app/dashboard/DashboardWorldDevelopmentOverlay.tsx'
       - 'app/dashboard/DashboardGate.tsx'
       - 'supabase/migrations/20260915164500_tharsis_energy_reconciliation.sql'
+      - 'supabase/migrations/20260915173000_tharsis_power_grid_topology_e1.sql'
       - 'scripts/check-tharsis-energy-reconciliation.mjs'
+      - 'scripts/check-tharsis-power-grid-e1.mjs'
       - 'docs/decisions/ADR-world-development-macro-system.md'
       - 'docs/architecture/world-development-model.md'
       - 'docs/core/CORE_CONTRACT.md'
@@ -50,5 +56,13 @@ jobs:
         run: npm run test:core-invariants
       - name: Validate Tharsis energy reconciliation
         run: node scripts/check-tharsis-energy-reconciliation.mjs
+      - name: Validate Tharsis E1 power-grid migration
+        run: node scripts/check-tharsis-power-grid-e1.mjs
+      - name: Run Tharsis E1 topology observation tests
+        run: >-
+          npx tsc lib/game/energyGridObservation.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .energy-grid-test
+          && node .energy-grid-test/game/energyGridObservation.test.js
       - name: Run world-development projection contract
         run: npm run test:world-development
