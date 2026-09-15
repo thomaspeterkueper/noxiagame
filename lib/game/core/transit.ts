@@ -24,9 +24,22 @@ type ActiveShip = {
   is_active: boolean | null
 }
 
+export type StationArrivalPhase = 'arrival-rendezvous' | 'holding' | 'approach' | 'docked' | 'departing'
+
+export type StationArrivalState = {
+  shipId: string
+  stationSlug: string
+  phase: StationArrivalPhase
+  holdingZoneId: string | null
+  holdingReason: string | null
+  queuePosition: number | null
+  targetPortId: string | null
+  updatedAt: string | null
+}
+
 export type PlayerTransitState = {
   shipId: string
-  status: 'docked' | 'transit'
+  status: 'docked' | 'transit' | StationArrivalPhase
   location: string
   from: string | null
   to: string | null
@@ -34,6 +47,7 @@ export type PlayerTransitState = {
   arrivesAt: string | null
   totalSeconds: number
   remainingSeconds: number
+  arrival: StationArrivalState | null
 }
 
 async function activeShipForProfile(profileId: string): Promise<ActiveShip | null> {
@@ -47,6 +61,23 @@ async function activeShipForProfile(profileId: string): Promise<ActiveShip | nul
   if (error) throw new Error(`active ship lookup failed: ${error.message}`)
   const rows = (data ?? []) as unknown as ActiveShip[]
   return rows.find(ship => ship.is_active) ?? rows[0] ?? null
+}
+
+function arrivalCoreNotRolledOut(message: string) {
+  return message.includes('PGRST202')
+    || message.includes('Could not find the function')
+    || message.includes('schema cache')
+}
+
+async function arrivalStateForShip(shipId: string): Promise<StationArrivalState | null> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_get_ship_arrival_state', { p_ship_id: shipId })
+  if (error) {
+    if (arrivalCoreNotRolledOut(error.message ?? '')) return null
+    throw new Error(`arrival state lookup failed: ${error.message}`)
+  }
+  if (!data) return null
+  return data as StationArrivalState
 }
 
 export async function startPlayerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
@@ -94,8 +125,6 @@ export async function startPlayerTransit(profileId: string, destination: string)
     throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${ship.location}:${destination}`)
   }
 
-  // speed_mult is a speed factor, not a duration multiplier. A 1.7 ship must
-  // arrive sooner; this also matches lib/game/ships.travelTime().
   const durationSeconds = Math.max(1, Math.round(baseDuration / speedMult))
   const energyNeeded = flightEnergyCost(ship.location, destination)
 
@@ -128,9 +157,10 @@ export async function getPlayerTransitState(profileId: string): Promise<PlayerTr
   if (!ship) return null
 
   if (ship.status !== 'transit' || !ship.dest_location || !ship.arrives_at) {
+    const arrival = await arrivalStateForShip(ship.id)
     return {
       shipId: ship.id,
-      status: 'docked',
+      status: arrival?.phase ?? 'docked',
       location: ship.location,
       from: null,
       to: null,
@@ -138,6 +168,7 @@ export async function getPlayerTransitState(profileId: string): Promise<PlayerTr
       arrivesAt: null,
       totalSeconds: 0,
       remainingSeconds: 0,
+      arrival,
     }
   }
 
@@ -156,5 +187,6 @@ export async function getPlayerTransitState(profileId: string): Promise<PlayerTr
     arrivesAt: ship.arrives_at,
     totalSeconds,
     remainingSeconds,
+    arrival: null,
   }
 }
