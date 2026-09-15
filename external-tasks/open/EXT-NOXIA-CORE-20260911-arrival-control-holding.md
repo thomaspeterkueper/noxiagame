@@ -144,6 +144,90 @@ Optional hilfreich:
 7. Dock/Undock- und Cargo-Invarianten bleiben unverändert.
 8. Bestehende Transit- und Docking-Core-Schichten werden erweitert, nicht parallel ersetzt.
 
+## Implementierungsstand — 2026-09-15
+
+Die Core-Erweiterung ist jetzt **im Repository implementiert**, bleibt aber bis zur Preview-/Hosted-Validierung bewusst `open`.
+
+### Persistenter Arrival-State
+
+Neu:
+
+- `supabase/migrations/20260915101500_arrival_control_holding_core.sql`
+- `ship_arrival_states`
+- stabile serverseitige Queue-Sortierung über `queue_entered_at` + `ship_id`
+- `noxia_get_ship_arrival_state(ship_id)` als kanonische Projektion
+- automatische Holding-Zuordnung nach Vessel-Class
+- Phobos-Zonen `phobos-h-light`, `phobos-h-standard`, `phobos-h-heavy`
+- Kepler/Prometheus entsprechend getrennte Light-/Standard-/Heavy-Korridore
+
+`ships.status` bleibt absichtlich der bestehende Movement-State `docked | transit`. Der Begriff `docked` dort wird **nicht mehr** als Beweis einer physischen Stationsverbindung verwendet. Physisches Docking wird ausschließlich aus einer aktiven `docking_connections.status = docked`-Connection abgeleitet. Damit muss der globale Legacy-Enum nicht erweitert werden und bestehende Surface-/Trade-/Transit-Pfade bleiben kompatibel.
+
+### Atomare Synchronisation
+
+DB-Trigger synchronisieren den Arrival-State mit den vorhandenen Core-Schichten:
+
+```text
+Transit completion an Stationsknoten
+→ ship_arrival_states.phase = holding
+→ persistente Queue
+
+aktive docking_reservation
+→ approach
+
+aktive docking_connection
+→ docked
+
+undock / released connection
+→ departing
+
+neuer Transit
+→ Arrival-State wird entfernt
+```
+
+Neu außerdem:
+
+- `supabase/migrations/20260915102000_arrival_docking_phase_guard.sql`
+
+Eine aktive Stations-Portreservierung wird dort abgewiesen, wenn kein gültiger Arrival-State existiert oder die Phase nicht `arrival-rendezvous | holding | approach` ist. Damit kann `approach` nicht mehr clientseitig oder durch bloße Ortsgleichheit erfunden werden.
+
+### Application Projection
+
+`lib/game/core/transit.ts` liest die neue Core-Projektion und liefert für stationäre Schiffe nun:
+
+```text
+arrival-rendezvous | holding | approach | docked | departing
+```
+
+mit `arrival`-Details. Solange die Migration auf einer Datenbank noch nicht verfügbar ist, fällt die Server-Fassade kompatibel auf den alten Transit-Zustand zurück.
+
+`app/dashboard/ArrivalControlPanel.tsx` zeigt bei aktivem Core jetzt:
+
+- reale Arrival-Phase,
+- persistente Holding-Zone,
+- Queue-Position,
+- Zielport,
+- Holding-Grund.
+
+Es werden weiterhin keine Wartezeiten oder Queue-Werte erfunden, wenn Core sie nicht liefert.
+
+### Hosted-/Preview-Status
+
+Production enthält mit Stand 15.09.2026 weiterhin noch nicht die vorausgesetzten Docking-Migrationen `20260911070500` / `20260911071200` / Security-Hardening. Die vorhandenen Supabase-Preview-Branches melden derzeit `MIGRATIONS_FAILED`.
+
+Daher wurde **kein** blinder Production-Rollout durchgeführt. Arrival Control kann erst nach erfolgreicher Validierung der vorgelagerten Docking-/Itinerary-Migrationen und anschließend der beiden neuen Arrival-Migrationen als `done` gelten.
+
+### Noch offen bis `done`
+
+1. Ursache des Preview-Status `MIGRATIONS_FAILED` klären.
+2. Docking-/Itinerary-Migrationen in korrekter Reihenfolge auf disposable Preview validieren.
+3. `20260915101500_arrival_control_holding_core.sql` anwenden und Queue-/Triggerverhalten prüfen.
+4. `20260915102000_arrival_docking_phase_guard.sql` anwenden.
+5. Testfall Phobos: Transitende → Holding → Reservation → Approach → Dock → Undock durchführen.
+6. Reload-Stabilität und Queue-Reihenfolge mit mindestens zwei Schiffen prüfen.
+7. Heavy-Frachter bei Kepler muss wegen fehlendem Heavy-Port im Holding bleiben.
+8. Connected Cargo muss vor `docked` weiterhin fehlschlagen.
+9. Danach kontrollierter Production-Rollout und Request nach `external-tasks/done/` verschieben.
+
 ## References
 
 - `lib/game/arrivalControl.ts`
@@ -151,5 +235,8 @@ Optional hilfreich:
 - `lib/game/core/transit.ts`
 - `lib/game/core/commands.ts`
 - `lib/game/core/dockingPersistence.ts`
+- `app/dashboard/ArrivalControlPanel.tsx`
+- `supabase/migrations/20260915101500_arrival_control_holding_core.sql`
+- `supabase/migrations/20260915102000_arrival_docking_phase_guard.sql`
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-docking-persistence.md`
 - `external-tasks/open/EXT-NOXIA-CORE-20260911-orbit-cargo-transfer-core.md`
