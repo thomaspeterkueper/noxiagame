@@ -63,7 +63,7 @@ export async function loadShackletonTerrainRuntime(
 
   for (const row of rows) {
     const resolution = resolvePersistedTerrainTileManifest(row)
-    if (!resolution.ok) {
+    if (resolution.ok === false) {
       rejectedTiles.push({ tileKey: row.tile_key, details: resolution.details })
       continue
     }
