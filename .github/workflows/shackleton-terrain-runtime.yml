@@ -34,5 +34,5 @@ jobs:
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .terrain-runtime-test
           && node .terrain-runtime-test/game/spatial/terrainTilePersistence.test.js
-      - name: Type-check production build surface
-        run: npm run build
+      - name: Type-check repository
+        run: npx tsc --noEmit
