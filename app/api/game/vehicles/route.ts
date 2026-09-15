@@ -5,7 +5,9 @@ import {
   getPlayerVehicleSnapshot,
   listPlayerVehicleInstances,
   projectPersistedVehicle,
+  provisionEarthStarterCargoRoverCommand,
   provisionStarterCargoRoverCommand,
+  stageEarthVehicleCommand,
 } from '@/lib/game/core/vehicleInstances'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -24,8 +26,8 @@ function uuid(value: unknown): string | null {
 
 function vehicleError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
-  if (message.includes('NOXIA_VEHICLE_FORBIDDEN')) {
-    return NextResponse.json({ error: 'Kein Zugriff auf dieses Fahrzeug.', code: 'FORBIDDEN' }, { status: 403 })
+  if (message.includes('NOXIA_VEHICLE_FORBIDDEN') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_TARGET_FORBIDDEN')) {
+    return NextResponse.json({ error: 'Kein Zugriff auf dieses Fahrzeug oder den Zielknoten.', code: 'FORBIDDEN' }, { status: 403 })
   }
   if (message.includes('NOXIA_VEHICLE_NOT_FOUND')) {
     return NextResponse.json({ error: 'Fahrzeug nicht gefunden.', code: 'VEHICLE_NOT_FOUND' }, { status: 404 })
@@ -33,11 +35,29 @@ function vehicleError(error: unknown) {
   if (message.includes('NOXIA_PROFILE_NOT_FOUND')) {
     return NextResponse.json({ error: 'Spielerprofil nicht gefunden.', code: 'PROFILE_NOT_FOUND' }, { status: 404 })
   }
+  if (message.includes('NOXIA_EARTH_STARTER_CARGO_ROVER_LOCATION_UNSUPPORTED')) {
+    return NextResponse.json({ error: 'Der Earth-Starter-Cargo-Rover kann nur am kanonischen Earth-Standort bereitgestellt werden.', code: 'EARTH_STARTER_LOCATION_UNSUPPORTED' }, { status: 409 })
+  }
   if (message.includes('NOXIA_STARTER_CARGO_ROVER_LOCATION_UNSUPPORTED')) {
     return NextResponse.json({ error: 'Der Starter-Cargo-Rover kann derzeit nur am verifizierten Mond-/Shackleton-Standort bereitgestellt werden.', code: 'STARTER_LOCATION_UNSUPPORTED' }, { status: 409 })
   }
-  if (message.includes('NOXIA_VEHICLE_PROVISION_COMMAND_CONFLICT')) {
-    return NextResponse.json({ error: 'Die Command-ID wurde bereits mit anderen Provisionierungsparametern verwendet.', code: 'COMMAND_CONFLICT' }, { status: 409 })
+  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_COMMAND_CONFLICT') || message.includes('NOXIA_VEHICLE_PROVISION_COMMAND_CONFLICT')) {
+    return NextResponse.json({ error: 'Die Command-ID wurde bereits mit anderen Parametern verwendet.', code: 'COMMAND_CONFLICT' }, { status: 409 })
+  }
+  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_NOT_READY')) {
+    return NextResponse.json({ error: 'Das Fahrzeug ist derzeit nicht bereit zum Staging.', code: 'VEHICLE_NOT_READY' }, { status: 409 })
+  }
+  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_ACTIVE_TRANSPORT')) {
+    return NextResponse.json({ error: 'Das Fahrzeug ist bereits einem aktiven Transport zugewiesen.', code: 'ACTIVE_TRANSPORT' }, { status: 409 })
+  }
+  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_LOCATION_UNSUPPORTED') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_TARGET_WRONG_LOCATION')) {
+    return NextResponse.json({ error: 'Fahrzeug und Zielknoten müssen am kanonischen Earth-Standort liegen.', code: 'WRONG_LOCATION' }, { status: 409 })
+  }
+  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_TARGET_NOT_FOUND')) {
+    return NextResponse.json({ error: 'Staging-Ziel nicht gefunden.', code: 'TARGET_NOT_FOUND' }, { status: 404 })
+  }
+  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_TARGET_NOT_SPATIAL') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_TARGET_POSITION_UNRESOLVED')) {
+    return NextResponse.json({ error: 'Der Zielknoten besitzt keine aufgelöste räumliche Earth-Position.', code: 'TARGET_NOT_SPATIAL' }, { status: 409 })
   }
   console.error('vehicle command failed:', message)
   return NextResponse.json({ error: 'Fahrzeugvorgang fehlgeschlagen.' }, { status: 500 })
@@ -100,22 +120,46 @@ export async function POST(req: NextRequest) {
   }
 
   const action = typeof body.action === 'string' ? body.action : ''
-  if (action !== 'provision-starter-cargo-rover') {
+  const supportedAction = action === 'provision-starter-cargo-rover'
+    || action === 'provision-earth-starter-cargo-rover'
+    || action === 'stage-earth-vehicle'
+  if (!supportedAction) {
     return NextResponse.json({ error: 'Ungültige Fahrzeug-Aktion.' }, { status: 400 })
   }
 
-  const locationId = uuid(body.locationId)
   const commandId = body.commandId == null ? randomUUID() : uuid(body.commandId)
-  if (!locationId || !commandId) {
-    return NextResponse.json({ error: 'Ungültige Provisionierungsparameter.' }, { status: 400 })
-  }
+  if (!commandId) return NextResponse.json({ error: 'Ungültige commandId.' }, { status: 400 })
 
   try {
-    const provisioning = await provisionStarterCargoRoverCommand({
-      commandId,
-      actorProfileId: user.id,
-      locationId,
-    })
+    if (action === 'stage-earth-vehicle') {
+      const vehicleId = uuid(body.vehicleId)
+      const targetInventoryId = uuid(body.targetInventoryId)
+      if (!vehicleId || !targetInventoryId) {
+        return NextResponse.json({ error: 'Ungültige Staging-Parameter.' }, { status: 400 })
+      }
+      const staging = await stageEarthVehicleCommand({
+        commandId,
+        actorProfileId: user.id,
+        vehicleId,
+        targetInventoryId,
+      })
+      return NextResponse.json({ ok: true, commandId, staging })
+    }
+
+    const locationId = uuid(body.locationId)
+    if (!locationId) return NextResponse.json({ error: 'Ungültige Provisionierungsparameter.' }, { status: 400 })
+
+    const provisioning = action === 'provision-earth-starter-cargo-rover'
+      ? await provisionEarthStarterCargoRoverCommand({
+          commandId,
+          actorProfileId: user.id,
+          locationId,
+        })
+      : await provisionStarterCargoRoverCommand({
+          commandId,
+          actorProfileId: user.id,
+          locationId,
+        })
     return NextResponse.json({ ok: true, commandId, provisioning })
   } catch (error) {
     return vehicleError(error)

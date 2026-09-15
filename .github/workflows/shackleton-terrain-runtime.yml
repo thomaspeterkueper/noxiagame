@@ -1,0 +1,45 @@
+name: Shackleton terrain runtime
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/spatial/terrainTilePersistence.ts'
+      - 'lib/game/spatial/terrainTilePersistence.test.ts'
+      - 'lib/game/spatial/supabaseTerrainObjectStore.ts'
+      - 'lib/game/spatial/shackletonTerrainRuntime.ts'
+      - 'lib/game/shackletonSurfaceRuntime.ts'
+      - '.github/workflows/shackleton-terrain-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/spatial/terrainTilePersistence.ts'
+      - 'lib/game/spatial/terrainTilePersistence.test.ts'
+      - 'lib/game/spatial/supabaseTerrainObjectStore.ts'
+      - 'lib/game/spatial/shackletonTerrainRuntime.ts'
+      - 'lib/game/shackletonSurfaceRuntime.ts'
+      - '.github/workflows/shackleton-terrain-runtime.yml'
+
+jobs:
+  terrain-runtime-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Verify persisted terrain manifest contract
+        run: >-
+          npx tsc lib/game/spatial/terrainTilePersistence.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .terrain-runtime-test
+          && node .terrain-runtime-test/game/spatial/terrainTilePersistence.test.js
+      - name: Type-check Shackleton runtime sources
+        run: >-
+          npx tsc
+          lib/game/spatial/terrainTilePersistence.ts
+          lib/game/spatial/supabaseTerrainObjectStore.ts
+          lib/game/spatial/shackletonTerrainRuntime.ts
+          lib/game/shackletonSurfaceRuntime.ts
+          --noEmit --target ES2022 --module esnext --moduleResolution bundler
+          --esModuleInterop --skipLibCheck
