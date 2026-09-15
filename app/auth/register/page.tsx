@@ -13,10 +13,13 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setResendMessage('')
 
     if (username.length < 3) {
       setError('Benutzername muss mindestens 3 Zeichen haben.')
@@ -29,6 +32,17 @@ export default function RegisterPage() {
 
     setLoading(true)
     const supabase = createClient()
+
+    // A signup that requires email verification does not replace an already
+    // active browser session. Without this explicit logout a newly-created
+    // account could therefore land back in the dashboard of the previous
+    // player. Registration is an account switch boundary: start clean.
+    const { error: signOutError } = await supabase.auth.signOut()
+    if (signOutError) {
+      setError('Die vorherige Sitzung konnte nicht beendet werden. Bitte versuche es erneut.')
+      setLoading(false)
+      return
+    }
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -46,8 +60,7 @@ export default function RegisterPage() {
     }
 
     if (data.session) {
-      router.replace('/dashboard')
-      router.refresh()
+      window.location.assign('/dashboard')
       return
     }
 
@@ -59,6 +72,26 @@ export default function RegisterPage() {
 
     setError('Das Konto konnte nicht vollständig erstellt werden. Bitte versuche es erneut.')
     setLoading(false)
+  }
+
+  async function resendConfirmation() {
+    if (!registeredEmail || resendBusy) return
+    setResendBusy(true)
+    setResendMessage('')
+    setError('')
+
+    const supabase = createClient()
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: registeredEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard`,
+      },
+    })
+
+    if (resendError) setError(resendError.message)
+    else setResendMessage('Bestätigungs-E-Mail wurde erneut angefordert.')
+    setResendBusy(false)
   }
 
   const s = {
@@ -94,6 +127,17 @@ export default function RegisterPage() {
                 Öffne den Link in dieser E-Mail. Danach wirst du automatisch zum NOXIA-Dashboard weitergeleitet.
               </div>
             </div>
+            {resendMessage && (
+              <div style={{ ...s.success, marginTop: '0.75rem' }}>{resendMessage}</div>
+            )}
+            <button
+              type="button"
+              onClick={resendConfirmation}
+              disabled={resendBusy}
+              style={{ ...s.btn, marginTop: '1rem', background: resendBusy ? '#94a3b8' : '#2a4e7a' }}
+            >
+              {resendBusy ? 'Wird gesendet...' : 'Bestätigungs-E-Mail erneut senden'}
+            </button>
             <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>
               Bereits bestätigt?{' '}
               <Link href="/auth/login" style={{ color: '#2a4e7a', fontWeight: 700, textDecoration: 'none' }}>
