@@ -1,0 +1,34 @@
+name: Interior domain
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/buildings/interiors/**'
+      - 'docs/core/**'
+      - 'scripts/check-core-*.mjs'
+      - 'package.json'
+      - '.github/workflows/interior-domain.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/game/buildings/interiors/**'
+      - 'docs/core/**'
+      - 'scripts/check-core-*.mjs'
+      - 'package.json'
+      - '.github/workflows/interior-domain.yml'
+
+jobs:
+  interior-domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Validate shared interiors
+        run: npm run test:interiors
+      - name: Validate Core invariants
+        run: npm run test:core-invariants
