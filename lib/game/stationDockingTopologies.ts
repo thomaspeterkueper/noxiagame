@@ -30,6 +30,39 @@ export interface StationDockingTopology {
 }
 
 export const STATION_DOCKING_TOPOLOGIES: Readonly<Record<string, StationDockingTopology>> = {
+  moon: {
+    stationSlug: 'moon',
+    topologyLabel: 'LUNAR ORBITAL INTERFACE · TRANSFER NODE',
+    ports: [
+      {
+        id: 'moon-a1',
+        label: 'A1 Shuttle Handover',
+        portClass: 'shuttle',
+        role: 'shuttle-handover',
+        cargoEnabled: true,
+        crewEnabled: true,
+        note: 'Primary ASCE 0.3P berth for surface-to-orbit cargo handover.',
+      },
+      {
+        id: 'moon-b1',
+        label: 'B1 Intersolar Transfer',
+        portClass: 'standard',
+        role: 'general-cargo',
+        cargoEnabled: true,
+        crewEnabled: true,
+        note: 'Standard intersolar freighter berth for Lunar Depot transfer.',
+      },
+      {
+        id: 'moon-s1',
+        label: 'S1 Service Dock',
+        portClass: 'service',
+        role: 'service-maintenance',
+        cargoEnabled: false,
+        crewEnabled: true,
+        note: 'Inspection and service berth. No commercial cargo transfer.',
+      },
+    ],
+  },
   phobos: {
     stationSlug: 'phobos',
     topologyLabel: 'PHOBOS FREE PORT · PORT RING A',
