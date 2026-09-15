@@ -54,6 +54,23 @@ begin
     raise exception 'NOXIA_TRANSPORT_JOB_CREATE_RESULT_INVALID' using errcode = 'P0001';
   end if;
 
+  -- The historical create command treats command_id as actor-scoped idempotency.
+  -- This stronger composed command also binds the key to the complete transport
+  -- intent so a concurrent/replayed request can never reuse it for another job.
+  if coalesce((v_created ->> 'idempotent')::boolean, false) then
+    if (v_created ->> 'actor_profile_id')::uuid is distinct from p_actor_profile_id
+      or (v_created ->> 'location_id')::uuid is distinct from p_location_id
+      or v_created ->> 'domain' is distinct from p_domain
+      or (v_created ->> 'source_inventory_id')::uuid is distinct from p_source_inventory_id
+      or (v_created ->> 'destination_inventory_id')::uuid is distinct from p_destination_inventory_id
+      or (v_created ->> 'vehicle_inventory_id')::uuid is distinct from p_vehicle_inventory_id
+      or v_created ->> 'vehicle_role' is distinct from p_vehicle_role
+      or v_created ->> 'resource' is distinct from p_resource::text
+      or (v_created ->> 'amount')::integer is distinct from p_amount then
+      raise exception 'NOXIA_TRANSPORT_COMMAND_CONFLICT' using errcode = 'P0001';
+    end if;
+  end if;
+
   -- A retry with the same command id may already be in transit. Never move a
   -- successfully started job back to loading.
   if (v_created ->> 'status') = 'in_transit' then
@@ -80,4 +97,4 @@ grant execute on function public.noxia_create_and_start_transport_job(
 
 comment on function public.noxia_create_and_start_transport_job(
   uuid,uuid,uuid,text,uuid,uuid,uuid,text,public.resource_type,integer,jsonb
-) is 'Atomically composes the canonical transport create, loading and start functions. Intended for authenticated server-side commands via service_role only.';
+) is 'Atomically composes canonical transport create, loading and start functions and binds command idempotency to the full transport intent. Service-role only.';
