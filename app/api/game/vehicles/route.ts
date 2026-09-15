@@ -5,6 +5,7 @@ import {
   getPlayerVehicleSnapshot,
   listPlayerVehicleInstances,
   projectPersistedVehicle,
+  provisionEarthStarterCargoRoverCommand,
   provisionStarterCargoRoverCommand,
 } from '@/lib/game/core/vehicleInstances'
 
@@ -32,6 +33,9 @@ function vehicleError(error: unknown) {
   }
   if (message.includes('NOXIA_PROFILE_NOT_FOUND')) {
     return NextResponse.json({ error: 'Spielerprofil nicht gefunden.', code: 'PROFILE_NOT_FOUND' }, { status: 404 })
+  }
+  if (message.includes('NOXIA_EARTH_STARTER_CARGO_ROVER_LOCATION_UNSUPPORTED')) {
+    return NextResponse.json({ error: 'Der Earth-Starter-Cargo-Rover kann nur am kanonischen Earth-Standort bereitgestellt werden.', code: 'EARTH_STARTER_LOCATION_UNSUPPORTED' }, { status: 409 })
   }
   if (message.includes('NOXIA_STARTER_CARGO_ROVER_LOCATION_UNSUPPORTED')) {
     return NextResponse.json({ error: 'Der Starter-Cargo-Rover kann derzeit nur am verifizierten Mond-/Shackleton-Standort bereitgestellt werden.', code: 'STARTER_LOCATION_UNSUPPORTED' }, { status: 409 })
@@ -100,7 +104,8 @@ export async function POST(req: NextRequest) {
   }
 
   const action = typeof body.action === 'string' ? body.action : ''
-  if (action !== 'provision-starter-cargo-rover') {
+  const supportedAction = action === 'provision-starter-cargo-rover' || action === 'provision-earth-starter-cargo-rover'
+  if (!supportedAction) {
     return NextResponse.json({ error: 'Ungültige Fahrzeug-Aktion.' }, { status: 400 })
   }
 
@@ -111,11 +116,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const provisioning = await provisionStarterCargoRoverCommand({
-      commandId,
-      actorProfileId: user.id,
-      locationId,
-    })
+    const provisioning = action === 'provision-earth-starter-cargo-rover'
+      ? await provisionEarthStarterCargoRoverCommand({
+          commandId,
+          actorProfileId: user.id,
+          locationId,
+        })
+      : await provisionStarterCargoRoverCommand({
+          commandId,
+          actorProfileId: user.id,
+          locationId,
+        })
     return NextResponse.json({ ok: true, commandId, provisioning })
   } catch (error) {
     return vehicleError(error)
