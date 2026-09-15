@@ -45,11 +45,14 @@ function isNoData(image: MolaRasterImage, value: number) {
 }
 
 /**
- * MOLA elevations are referenced to the GMM-2B areoid while the canonical
- * Mars world frame currently uses the IAU reference ellipsoid. Those are not
- * interchangeable vertical datums. A source sample can therefore become local
- * ENU height only when a datum converter is explicitly supplied (or when a
- * future frame uses the same vertical reference as the dataset).
+ * MOLA MEGDR elevations are real observed Mars topography referenced to the
+ * GMM-2B areoid. The horizontal Mars reference ellipsoid and the vertical
+ * terrain datum are intentionally independent concerns.
+ *
+ * If the world frame already uses the dataset's vertical datum, no synthetic
+ * ellipsoid conversion is needed: local z is simply elevation relative to the
+ * frame origin in that same datum. A converter is required only when the world
+ * frame deliberately uses a different vertical datum.
  */
 export class MolaTerrainAdapter implements TerrainRasterAdapter {
   readonly id = 'mars-mgs-mola-megdr'
@@ -80,10 +83,17 @@ export class MolaTerrainAdapter implements TerrainRasterAdapter {
     if (!Number.isFinite(storedValue) || isNoData(image, storedValue)) return null
 
     const sourceElevationM = storedValue * metadataNumber(dataset, 'stored_scale', 1) + metadataNumber(dataset, 'stored_offset', 0)
-    let frameElevationM: number | null = sourceElevationM
-    if (frame.verticalDatum && frame.verticalDatum !== dataset.verticalReference) {
-      frameElevationM = this.convertVertical?.(sourceElevationM, coordinate, dataset, frame) ?? null
+
+    if (frame.verticalDatum === dataset.verticalReference) {
+      if (frame.originAltM == null || !Number.isFinite(frame.originAltM)) return null
+      return {
+        sourceElevationM,
+        localUpM: sourceElevationM - frame.originAltM,
+        tileKey: `source:${dataset.id}:${pixel.x}:${pixel.y}`,
+      }
     }
+
+    const frameElevationM = this.convertVertical?.(sourceElevationM, coordinate, dataset, frame) ?? null
     if (frameElevationM == null || !Number.isFinite(frameElevationM)) return null
 
     const local = planetaryToLocalWorld(
@@ -112,5 +122,14 @@ export const MARS_MOLA_DATASET: TerrainDatasetDescriptor = {
   sourceLicense: 'public-domain',
   accessMode: 'geotiff',
   status: 'catalogued',
-  metadata: { pixels_per_degree: 128, stored_scale: 1, stored_offset: 0, source_family: 'MOLA MEGDR' },
+  metadata: {
+    pixels_per_degree: 128,
+    pixel_resolution_m_equator: 463.0836,
+    stored_scale: 1,
+    stored_offset: 0,
+    source_family: 'MOLA MEGDR',
+    latitude_type: 'planetocentric',
+    longitude_direction: 'positive_east',
+    vertical_reference: 'GMM-2B areoid',
+  },
 }
