@@ -22,7 +22,7 @@ select
   'holding',
   public.noxia_arrival_holding_zone('moon', public.noxia_ship_docking_class(s.id)),
   'legacy-arrival-backfill',
-  coalesce(s.updated_at, s.created_at, now()),
+  coalesce(s.created_at, now()),
   null,
   now(),
   now()
