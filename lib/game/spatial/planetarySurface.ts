@@ -60,6 +60,10 @@ function sampleAt(grid: PlanetaryElevationGrid, row: number, col: number) {
  * Body-independent DEM slope derivation. The body-specific geometry is injected,
  * so this works for Earth, Moon, Mars and later ellipsoidal/spherical bodies
  * without copying gameplay rules into each world implementation.
+ *
+ * A slope is only resolved when the centre and at least one neighbour carry a
+ * finite observed/derived elevation and the geometry returns a finite physical
+ * distance. NoData never becomes a synthetic zero-height neighbour.
  */
 export function derivePlanetarySlopeDeg(
   grid: PlanetaryElevationGrid,
@@ -68,7 +72,7 @@ export function derivePlanetarySlopeDeg(
   geometry: PlanetarySurfaceGeometry,
 ): number | undefined {
   const center = sampleAt(grid, row, col)
-  if (!center) return undefined
+  if (!center || !Number.isFinite(center.elevationM)) return undefined
 
   const neighbours = [
     sampleAt(grid, row - 1, col),
@@ -81,10 +85,12 @@ export function derivePlanetarySlopeDeg(
   let maxSlopeDeg = 0
   let usableNeighbour = false
   for (const neighbour of neighbours) {
+    if (!Number.isFinite(neighbour.elevationM)) continue
     const distanceM = geometry.horizontalDistanceM(center, neighbour)
     if (!Number.isFinite(distanceM) || distanceM <= 0) continue
-    usableNeighbour = true
     const riseM = Math.abs(neighbour.elevationM - center.elevationM)
+    if (!Number.isFinite(riseM)) continue
+    usableNeighbour = true
     maxSlopeDeg = Math.max(maxSlopeDeg, Math.atan2(riseM, distanceM) * 180 / Math.PI)
   }
   return usableNeighbour ? maxSlopeDeg : undefined
@@ -115,7 +121,7 @@ export function buildPlanetaryBuildabilitySurface(
         yM: metric.yM,
         elevationM: sample.elevationM,
         slopeDeg,
-        terrainResolved: Number.isFinite(sample.elevationM) && slopeDeg != null,
+        terrainResolved: Number.isFinite(sample.elevationM) && Number.isFinite(slopeDeg),
         gridSizeM: cellSizeM,
       }, policy)
       cells.push({
