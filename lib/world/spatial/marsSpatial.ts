@@ -79,7 +79,16 @@ export function marsChunkKey(regionId: string, chunk: MarsChunkCoord): string {
 }
 
 /**
- * Production currently marks the Mars/Tharsis world-frame origin as pending.
- * Therefore this module deliberately exports no canonical THARSIS_REGION yet.
- * Callers may construct a region only from a verified origin or for isolated tests.
+ * Canonical horizontal anchor for the NOXIA Tharsis Hub.
+ *
+ * The coordinates are the verified Core location (14° planetocentric north,
+ * 258° east = -102° in the repository's -180..180 representation). elevationM
+ * is deliberately the zero plane of the selected vertical datum, not a claim
+ * that the physical terrain surface lies at zero elevation. Real terrain z is
+ * supplied by MOLA/GMM-2B.
  */
+export const THARSIS_REGION = createMarsRegionAnchor(
+  'tharsis',
+  'Tharsis Hub',
+  { lat: 14, lon: -102, elevationM: 0 },
+)
