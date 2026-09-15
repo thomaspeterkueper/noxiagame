@@ -1,0 +1,51 @@
+name: Earth surface readiness
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/earthSurfaceEngineering.ts'
+      - 'lib/game/earthSurfaceEngineering.test.ts'
+      - 'lib/game/vehicles/surfaceProfileResolution.ts'
+      - 'lib/game/core/logisticsCargoMass.ts'
+      - 'lib/game/core/logisticsCargoMassAuthority.ts'
+      - 'app/api/game/surface-transport/cargo-readiness/route.ts'
+      - 'app/api/game/earth/surface-transport/readiness/route.ts'
+      - 'app/api/game/moon/surface-transport/cargo-readiness/route.ts'
+      - '.github/workflows/earth-surface-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/earthSurfaceEngineering.ts'
+      - 'lib/game/earthSurfaceEngineering.test.ts'
+      - 'lib/game/vehicles/surfaceProfileResolution.ts'
+      - 'lib/game/core/logisticsCargoMass.ts'
+      - 'lib/game/core/logisticsCargoMassAuthority.ts'
+      - 'app/api/game/surface-transport/cargo-readiness/route.ts'
+      - 'app/api/game/earth/surface-transport/readiness/route.ts'
+      - 'app/api/game/moon/surface-transport/cargo-readiness/route.ts'
+      - '.github/workflows/earth-surface-readiness.yml'
+
+jobs:
+  earth-surface-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Verify shared cargo mass contracts
+        run: >-
+          npx tsc lib/game/core/logisticsCargoMass.test.ts
+          lib/game/core/logisticsCargoMassAuthority.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-readiness-test
+          && node .earth-readiness-test/game/core/logisticsCargoMass.test.js
+          && node .earth-readiness-test/game/core/logisticsCargoMassAuthority.test.js
+      - name: Verify Earth engineering registry stays fail-closed
+        run: >-
+          npx tsc lib/game/earthSurfaceEngineering.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-readiness-test
+          && node .earth-readiness-test/game/earthSurfaceEngineering.test.js
