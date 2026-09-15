@@ -27,8 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - name: Verify persisted terrain manifest contract
         run: >-
           npx tsc lib/game/spatial/terrainTilePersistence.test.ts
