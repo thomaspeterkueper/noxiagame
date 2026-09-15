@@ -52,6 +52,8 @@ function dockingError(error: unknown) {
   if (message.includes('NOXIA_DOCKING_PORT_RESERVED')) return NextResponse.json({ error: 'Der Port ist bereits reserviert.', code: 'PORT_RESERVED' }, { status: 409 })
   if (message.includes('NOXIA_DOCKING_SHIP_ALREADY_DOCKED')) return NextResponse.json({ error: 'Das Schiff ist bereits an einem Port angedockt.', code: 'SHIP_ALREADY_DOCKED' }, { status: 409 })
   if (message.includes('NOXIA_DOCKING_SHIP_ALREADY_RESERVED')) return NextResponse.json({ error: 'Das Schiff besitzt bereits eine aktive Portreservierung.', code: 'SHIP_ALREADY_RESERVED' }, { status: 409 })
+  if (message.includes('NOXIA_DOCKING_ARRIVAL_STATE_REQUIRED')) return NextResponse.json({ error: 'Das Schiff hat noch keinen gültigen Arrival-Control-Zustand an dieser Station.', code: 'ARRIVAL_STATE_REQUIRED' }, { status: 409 })
+  if (message.includes('NOXIA_DOCKING_ARRIVAL_PHASE_INVALID')) return NextResponse.json({ error: 'In der aktuellen Arrival-Phase darf noch keine Portfreigabe erteilt werden.', code: 'ARRIVAL_PHASE_INVALID' }, { status: 409 })
   if (message.includes('NOXIA_DOCKING_COMMAND_CONFLICT')) return NextResponse.json({ error: 'Die Command-ID wurde bereits mit anderen Docking-Parametern verwendet.', code: 'COMMAND_CONFLICT' }, { status: 409 })
 
   console.error('docking command failed:', message)
