@@ -1,0 +1,11 @@
+-- Supabase migration-history bridge.
+--
+-- Version `20260915144838` is already recorded on the hosted NOXIA database as
+-- `tharsis_energy_reconciliation`. That hosted migration is the production
+-- application of the reviewed additive reconciliation whose canonical source
+-- remains `20260915164500_tharsis_energy_reconciliation.sql` in this repository.
+--
+-- Keeping this explicit no-op migration in version control gives the hosted
+-- version a repository counterpart and follows the existing remote-history
+-- bridge convention without replaying or rewriting production state.
+select 1;
