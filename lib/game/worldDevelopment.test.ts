@@ -11,6 +11,8 @@ import {
   deriveOrbitalLogisticsSignal,
   deriveWaterSecuritySignal,
 } from './worldDevelopmentSignals'
+import { buildTharsisEnergyGridObservation } from './energyGridObservation'
+import { THARSIS_HUB_BUILDINGS } from './seeds/tharsisHubSeed'
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -109,4 +111,52 @@ assert((orbitalSignal?.evidence.cargoPorts as number) >= 2, 'orbital evidence mu
 assert((orbitalSignal?.evidence.servicePorts as number) >= 1, 'orbital evidence must preserve actual service-port count')
 assert(!Object.prototype.hasOwnProperty.call(orbitalSignal?.evidence ?? {}, 'shipyardCount'), 'unknown shipyard runtime capability must not be invented or scored')
 
-console.log('world development projection and live-signal tests passed')
+const canonicalTharsisEnergyAssets = THARSIS_HUB_BUILDINGS.filter(
+  asset => asset.entityId === 'reactor_module' || asset.entityId === 'black_start',
+)
+const liveCanonicalTharsisEnergyAssets = canonicalTharsisEnergyAssets.map(asset => ({
+  entityId: asset.entityId,
+  tileRow: asset.row,
+  tileCol: asset.col,
+}))
+
+const tharsisEnergy = buildTharsisEnergyGridObservation({
+  locationId: 'mars-test',
+  liveAssets: liveCanonicalTharsisEnergyAssets,
+})
+assert(tharsisEnergy.domains.length === 3, 'Tharsis energy observation must preserve three canonical energy domains')
+assert(tharsisEnergy.generation.observedReactorModules === 6, 'all six persisted canonical reactor modules must be observed')
+assert(tharsisEnergy.generation.canonicalReactorModules === 6, 'Tharsis canonical energy model must contain six reactor modules')
+assert(tharsisEnergy.generation.liveInstalledNominalPowerMw === 7.5, 'six canonical 1.25 MW reactors must expose 7.5 MW installed nominal power')
+assert(tharsisEnergy.storage.observedBlackStartNodes === 3, 'all three persisted black-start/storage nodes must be observed')
+assert(tharsisEnergy.grid.canonicalPowerRings === 2, 'Tharsis canonical utility topology must expose two power rings')
+assert(tharsisEnergy.grid.ringIds.includes('A') && tharsisEnergy.grid.ringIds.includes('B'), 'both canonical power rings must retain their identities')
+assert(tharsisEnergy.generation.availablePowerMw.status === 'unresolved', 'nominal MW must not be promoted to available power')
+assert(tharsisEnergy.storage.energyMWh.status === 'unresolved', 'black-start nodes must not invent storage depth')
+assert(tharsisEnergy.grid.transmissionCapacityMw.status === 'unresolved', 'power-ring existence must not invent transmission capacity')
+assert(tharsisEnergy.demand.totalDemandMw.status === 'unresolved', 'abstract game consumption must not be presented as MW demand')
+assert(tharsisEnergy.derivedDrivers.firmEnergy.status === 'unresolved', 'nominal reactor power alone must not emit firm-energy truth')
+assert(tharsisEnergy.derivedDrivers.gridCapacity.status === 'unresolved', 'ring topology alone must not emit grid-capacity truth')
+
+const degradedTharsisEnergy = buildTharsisEnergyGridObservation({
+  locationId: 'mars-test',
+  liveAssets: canonicalTharsisEnergyAssets
+    .filter(asset => asset.id !== 'reactor_module_1')
+    .map(asset => ({ entityId: asset.entityId, tileRow: asset.row, tileCol: asset.col })),
+})
+assert(degradedTharsisEnergy.generation.observedReactorModules === 5, 'missing persisted reactor must reduce observed reactor count')
+assert(degradedTharsisEnergy.generation.liveInstalledNominalPowerMw === 6.25, 'missing canonical reactor must reduce installed nominal MW')
+assert(degradedTharsisEnergy.domains.some(domain => !domain.complete), 'a missing domain asset must make its energy domain incomplete')
+
+const unprovenExtraReactor = buildTharsisEnergyGridObservation({
+  locationId: 'mars-test',
+  liveAssets: [
+    ...liveCanonicalTharsisEnergyAssets,
+    { entityId: 'reactor_module', tileRow: 0, tileCol: 0 },
+  ],
+})
+assert(unprovenExtraReactor.generation.observedReactorModules === 6, 'off-seed reactor must not inherit canonical nominal power')
+assert(unprovenExtraReactor.generation.liveInstalledNominalPowerMw === 7.5, 'unproven reactor must not inflate installed nominal MW')
+assert(unprovenExtraReactor.unmatchedLiveEnergyAssets === 1, 'off-seed energy assets must remain visible as unmatched provenance')
+
+console.log('world development projection, live-signal and energy-grid observation tests passed')

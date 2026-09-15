@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { buildTharsisEnergyGridObservation } from '@/lib/game/energyGridObservation'
 import {
   buildOrbitalStationCapabilitySnapshot,
   deriveOrbitalLogisticsSignal,
@@ -22,6 +23,12 @@ interface LocationRow {
   simulate_tick: boolean | null
 }
 
+interface EnergyAssetRow {
+  entity_id: string
+  tile_row: number | null
+  tile_col: number | null
+}
+
 function resourceNumber(value: number | null | undefined): number {
   return Number.isFinite(Number(value)) ? Number(value) : 0
 }
@@ -35,13 +42,15 @@ function serializeDerivedSignal(derived: DerivedWorldDevelopmentSignal) {
 }
 
 /**
- * Read-only projection endpoint for the first live World Development inputs.
+ * Read-only projection endpoint for live World Development inputs and
+ * infrastructure observations.
  *
  * Deliberately absent:
  * - no runDueTicks()/simulation heartbeat;
  * - no persistence;
  * - no unlocks or gameplay mutations;
- * - no invented grid/firm-energy values from generic energy stock;
+ * - no conversion of generic energy stock into grid/firm-energy values;
+ * - no conversion of nominal reactor MW into available or firm capacity;
  * - no nested Supabase relation assumptions for source data.
  */
 export async function GET() {
@@ -130,17 +139,55 @@ export async function GET() {
   )
   if (orbital) systemSignals.push(serializeDerivedSignal(orbital))
 
+  const energyGridObservations: ReturnType<typeof buildTharsisEnergyGridObservation>[] = []
+  const infrastructureIssues: Array<{ scope: string; system: string; reason: string }> = []
+  const mars = locations.find(location => location.slug === 'mars')
+
+  if (mars) {
+    const { data: energyAssetData, error: energyAssetError } = await supabase
+      .from('tile_entities')
+      .select('entity_id, tile_row, tile_col')
+      .eq('location_id', mars.id)
+      .eq('entity_type', 'building')
+      .in('entity_id', ['reactor_module', 'black_start'])
+
+    if (energyAssetError) {
+      console.error('world-development energy infrastructure query failed:', energyAssetError)
+      infrastructureIssues.push({
+        scope: 'mars',
+        system: 'energy-grid',
+        reason: 'Persisted Tharsis energy assets could not be read; no infrastructure observation was emitted.',
+      })
+    } else {
+      const liveAssets = ((energyAssetData ?? []) as EnergyAssetRow[]).map(row => ({
+        entityId: row.entity_id,
+        tileRow: row.tile_row,
+        tileCol: row.tile_col,
+      }))
+      energyGridObservations.push(buildTharsisEnergyGridObservation({
+        locationId: mars.id,
+        liveAssets,
+      }))
+    }
+  }
+
+  const tharsisEnergy = energyGridObservations[0]
+
   return NextResponse.json({
     locationSignals,
     systemSignals,
+    energyGridObservations,
+    infrastructureIssues,
     unresolved: [
       {
         driverId: 'grid_capacity',
-        reason: 'No authoritative grid/transmission/storage capacity model is available yet. Generic energy inventory is not treated as grid capacity.',
+        reason: tharsisEnergy?.derivedDrivers.gridCapacity.reason
+          ?? 'No authoritative grid/transmission/storage capacity model is available yet. Generic energy inventory is not treated as grid capacity.',
       },
       {
         driverId: 'firm_energy',
-        reason: 'Current location energy production does not distinguish firm/dispatchable generation from intermittent output. No firm-energy signal is emitted until that source exists.',
+        reason: tharsisEnergy?.derivedDrivers.firmEnergy.reason
+          ?? 'Current location energy production does not distinguish firm/dispatchable generation from intermittent output. No firm-energy signal is emitted until that source exists.',
       },
       {
         driverId: 'climate_stress',
