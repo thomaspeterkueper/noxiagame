@@ -5,6 +5,8 @@ on:
     paths:
       - 'lib/game/worldDevelopment.ts'
       - 'lib/game/worldDevelopmentSignals.ts'
+      - 'lib/game/energyGridObservation.ts'
+      - 'lib/game/seeds/tharsisHubSeed.ts'
       - 'lib/game/worldDevelopment.test.ts'
       - 'app/api/game/world-development/**'
       - 'app/dashboard/DashboardWorldDevelopmentOverlay.tsx'
@@ -18,6 +20,8 @@ on:
     paths:
       - 'lib/game/worldDevelopment.ts'
       - 'lib/game/worldDevelopmentSignals.ts'
+      - 'lib/game/energyGridObservation.ts'
+      - 'lib/game/seeds/tharsisHubSeed.ts'
       - 'lib/game/worldDevelopment.test.ts'
       - 'app/api/game/world-development/**'
       - 'app/dashboard/DashboardWorldDevelopmentOverlay.tsx'
