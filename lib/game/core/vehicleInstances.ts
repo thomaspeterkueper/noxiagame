@@ -40,6 +40,17 @@ export type StarterCargoRoverProvisioning = {
   idempotent: boolean
 }
 
+export type EarthStarterCargoRoverProvisioning = {
+  slotKey: 'earth_starter_cargo_rover'
+  engineeringSource: 'ENG-EARTH-SURFACE-LOGISTICS-r1:ENG-VEH-0001'
+  vehicle: PersistedVehicleInstance
+  inventory: Record<string, unknown>
+  eventId?: string
+  created: boolean
+  slotExisting: boolean
+  idempotent: boolean
+}
+
 function coreError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -134,8 +145,8 @@ export async function createVehicleInstanceCommand(input: {
 }
 
 /**
- * One-time starter/bootstrap provisioning. This command intentionally has no
- * purchase price, credit debit, or research/unlock semantics.
+ * One-time Moon/Shackleton starter/bootstrap provisioning. This command intentionally
+ * has no purchase price, credit debit, or research/unlock semantics.
  */
 export async function provisionStarterCargoRoverCommand(input: {
   commandId: string
@@ -150,4 +161,24 @@ export async function provisionStarterCargoRoverCommand(input: {
   })
   if (error) throw coreError('noxia_provision_starter_cargo_rover', error)
   return data as unknown as StarterCargoRoverProvisioning
+}
+
+/**
+ * One-time Earth starter provisioning for the Engineering-approved ECR-8.
+ * Kept separate from the Moon bootstrap so legacy/reference frames are never
+ * silently reinterpreted across world bodies.
+ */
+export async function provisionEarthStarterCargoRoverCommand(input: {
+  commandId: string
+  actorProfileId: string
+  locationId: string
+}): Promise<EarthStarterCargoRoverProvisioning> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_provision_earth_starter_cargo_rover', {
+    p_command_id: input.commandId,
+    p_actor_profile_id: input.actorProfileId,
+    p_location_id: input.locationId,
+  })
+  if (error) throw coreError('noxia_provision_earth_starter_cargo_rover', error)
+  return data as unknown as EarthStarterCargoRoverProvisioning
 }
