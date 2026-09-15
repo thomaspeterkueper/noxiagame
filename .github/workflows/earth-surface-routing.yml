@@ -7,8 +7,11 @@ on:
       - 'lib/game/earthSurfaceRouting.test.ts'
       - 'lib/game/earthSurfaceMission.ts'
       - 'lib/game/earthSurfaceMission.test.ts'
+      - 'lib/game/earthSurfaceRouteGeometry.ts'
+      - 'lib/game/earthSurfaceRouteGeometry.test.ts'
       - 'lib/game/earthSurfaceLogistics.ts'
       - 'lib/game/earthSurfaceLogistics.test.ts'
+      - 'lib/game/vehicles/surfaceRouteGeometry.ts'
       - 'lib/world/spatial/earthFeatureSource.ts'
       - 'lib/world/spatial/earthSpatial.ts'
       - '.github/workflows/earth-surface-routing.yml'
@@ -19,8 +22,11 @@ on:
       - 'lib/game/earthSurfaceRouting.test.ts'
       - 'lib/game/earthSurfaceMission.ts'
       - 'lib/game/earthSurfaceMission.test.ts'
+      - 'lib/game/earthSurfaceRouteGeometry.ts'
+      - 'lib/game/earthSurfaceRouteGeometry.test.ts'
       - 'lib/game/earthSurfaceLogistics.ts'
       - 'lib/game/earthSurfaceLogistics.test.ts'
+      - 'lib/game/vehicles/surfaceRouteGeometry.ts'
       - 'lib/world/spatial/earthFeatureSource.ts'
       - 'lib/world/spatial/earthSpatial.ts'
       - '.github/workflows/earth-surface-routing.yml'
@@ -49,3 +55,9 @@ jobs:
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-mission-test
           && node .earth-mission-test/game/earthSurfaceMission.test.js
+      - name: Verify Earth → shared route geometry projection
+        run: >-
+          npx tsc lib/game/earthSurfaceRouteGeometry.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-geometry-test
+          && node .earth-geometry-test/game/earthSurfaceRouteGeometry.test.js
