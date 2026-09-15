@@ -8,6 +8,7 @@ import {
   type TransportDomain,
 } from '@/lib/game/core/logistics'
 import {
+  completeTransportJobAfterHandover,
   defineTransportItinerary,
   getTransportItinerary,
   transferConnectedCargo,
@@ -51,6 +52,10 @@ function handoverError(error: unknown) {
   if (message.includes('NOXIA_CARGO_PORT_NOT_ENABLED')) return NextResponse.json({ error: 'Dieser Docking-Port unterstützt keinen Cargo-Transfer.', code: 'PORT_CARGO_DISABLED' }, { status: 409 })
   if (message.includes('NOXIA_CARGO_CONNECTION_SHIP_MISMATCH')) return NextResponse.json({ error: 'Die Docking-Verbindung gehört nicht zum beteiligten Schiffsinventar.', code: 'CONNECTION_SHIP_MISMATCH' }, { status: 409 })
   if (message.includes('NOXIA_CARGO_CONNECTION_LOCATION_MISMATCH')) return NextResponse.json({ error: 'Das Gegeninventar gehört nicht zur angedockten Station.', code: 'CONNECTION_LOCATION_MISMATCH' }, { status: 409 })
+  if (message.includes('NOXIA_TRANSPORT_HANDOVER_TRANSFER_NOT_FOUND')) return NextResponse.json({ error: 'Der bestätigende Cargo-Transfer wurde nicht gefunden.', code: 'HANDOVER_TRANSFER_NOT_FOUND' }, { status: 404 })
+  if (message.includes('NOXIA_TRANSPORT_HANDOVER_TRANSFER_MISMATCH')) return NextResponse.json({ error: 'Der Cargo-Transfer gehört nicht zu diesem Transportauftrag.', code: 'HANDOVER_TRANSFER_MISMATCH' }, { status: 409 })
+  if (message.includes('NOXIA_TRANSPORT_HANDOVER_TRANSFER_TOO_EARLY')) return NextResponse.json({ error: 'Der Cargo-Transfer erfolgte vor der Ankunft des Transportlegs.', code: 'HANDOVER_TRANSFER_TOO_EARLY' }, { status: 409 })
+  if (message.includes('NOXIA_TRANSPORT_HANDOVER_STATE_INVALID')) return NextResponse.json({ error: 'Der Transport muss vor dem Handover angekommen sein.', code: 'HANDOVER_STATE_INVALID' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_ITINERARY_ALREADY_DEFINED')) return NextResponse.json({ error: 'Für diesen Transportauftrag ist bereits eine Itinerary definiert.', code: 'ITINERARY_ALREADY_DEFINED' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_ITINERARY_STATE_INVALID')) return NextResponse.json({ error: 'Die Itinerary kann nur vor dem Start des Transportauftrags definiert werden.', code: 'ITINERARY_STATE_INVALID' }, { status: 409 })
   if (message.includes('NOXIA_TRANSPORT_ITINERARY_DOCKING_CONNECTION_REQUIRED')) return NextResponse.json({ error: 'Ein als dockingpflichtig markierter Handover benötigt eine connectionId.', code: 'DOCKING_CONNECTION_REQUIRED' }, { status: 400 })
@@ -112,6 +117,20 @@ export async function POST(req: NextRequest) {
         amount,
       })
       return NextResponse.json({ ok: true, commandId, transfer })
+    }
+
+    if (action === 'complete-after-handover') {
+      const jobId = uuid(body.jobId)
+      const transferCommandId = uuid(body.transferCommandId)
+      if (!jobId || !transferCommandId) {
+        return NextResponse.json({ error: 'jobId und transferCommandId sind erforderlich.', code: 'INVALID_ARGUMENT' }, { status: 400 })
+      }
+      const job = await completeTransportJobAfterHandover({
+        jobId,
+        actorProfileId: user.id,
+        transferCommandId,
+      })
+      return NextResponse.json({ ok: true, job })
     }
 
     if (action === 'define-itinerary') {
