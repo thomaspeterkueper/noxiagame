@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 import {
   MARS_REFERENCE,
+  THARSIS_REGION,
   createMarsRegionAnchor,
   localMetersToMarsGeo,
   marsChunkKey,
@@ -12,6 +13,12 @@ import {
 assert.equal(MARS_REFERENCE.body, 'mars')
 assert.equal(MARS_REFERENCE.equatorialRadiusM, 3396190)
 assert.equal(normalizeMarsLongitude(226.2), -133.8)
+
+assert.equal(THARSIS_REGION.id, 'tharsis')
+assert.equal(THARSIS_REGION.origin.lat, 14)
+assert.equal(THARSIS_REGION.origin.lon, -102)
+assert.equal(THARSIS_REGION.chunkSizeM, 1000)
+assert.equal(THARSIS_REGION.cellSizeM, 10)
 
 const origin = { lat: 10, lon: 20, elevationM: 0 }
 const point = { lat: 10.001, lon: 20.001, elevationM: 35 }
