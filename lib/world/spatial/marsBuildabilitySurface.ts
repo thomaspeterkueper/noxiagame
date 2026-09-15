@@ -1,5 +1,11 @@
 import type { PhysicalBuildabilityPolicy, PhysicalBuildabilityResult } from '../../game/spatial/buildability'
-import { evaluatePhysicalBuildability } from '../../game/spatial/buildability'
+import {
+  buildPlanetaryBuildabilitySurface,
+  derivePlanetarySlopeDeg,
+  type PlanetaryElevationGrid,
+  type PlanetaryElevationSample,
+  type PlanetarySurfaceGeometry,
+} from '../../game/spatial/planetarySurface'
 import type { MarsGeoPoint, MarsRegionAnchor } from './marsSpatial'
 import { localMetersToMarsGeo, marsGeoToLocalMeters } from './marsSpatial'
 
@@ -8,41 +14,87 @@ export type MarsElevationGrid = {
   rows: number
   cols: number
   samples: MarsElevationSample[]
-  source: { provider: string; dataset: string; resolutionM: number; verticalReference: string }
+  source: {
+    provider: string
+    dataset: string
+    resolutionM: number
+    verticalReference: string
+    horizontalReference?: string
+  }
 }
 export type MarsBuildabilityCell = PhysicalBuildabilityResult & { lat: number; lon: number; row: number; col: number }
 export type MarsBuildabilitySurface = { rows: number; cols: number; cellSizeM: number; cells: MarsBuildabilityCell[]; source: MarsElevationGrid['source'] }
 
-export function deriveMarsElevationSlopeDeg(grid: MarsElevationGrid, row: number, col: number): number | undefined {
-  const at = (r: number, c: number) => grid.samples[r * grid.cols + c]
-  const center = at(row, col)
-  if (!center) return undefined
-  const neighbours = [at(row - 1, col), at(row + 1, col), at(row, col - 1), at(row, col + 1)].filter(Boolean) as MarsElevationSample[]
-  if (!neighbours.length) return undefined
-  let maxSlopeDeg = 0
-  for (const neighbour of neighbours) {
-    const metric = marsGeoToLocalMeters(neighbour, center)
-    const distanceM = Math.hypot(metric.eastM, metric.northM)
-    if (distanceM <= 0) continue
-    const riseM = Math.abs(neighbour.elevationM - center.elevationM)
-    maxSlopeDeg = Math.max(maxSlopeDeg, Math.atan2(riseM, distanceM) * 180 / Math.PI)
+function asPlanetarySample(sample: MarsElevationSample): PlanetaryElevationSample {
+  return { latDeg: sample.lat, lonDeg: sample.lon, elevationM: sample.elevationM }
+}
+
+function asPlanetaryGrid(grid: MarsElevationGrid): PlanetaryElevationGrid {
+  return {
+    rows: grid.rows,
+    cols: grid.cols,
+    samples: grid.samples.map(asPlanetarySample),
+    source: {
+      body: 'mars',
+      provider: grid.source.provider,
+      dataset: grid.source.dataset,
+      resolutionM: grid.source.resolutionM,
+      horizontalReference: grid.source.horizontalReference ?? 'IAU_MARS_PLANETOCENTRIC',
+      verticalReference: grid.source.verticalReference,
+    },
   }
-  return maxSlopeDeg
+}
+
+function marsGeometry(region: MarsRegionAnchor): PlanetarySurfaceGeometry {
+  return {
+    project(sample) {
+      const metric = marsGeoToLocalMeters(
+        { lat: sample.latDeg, lon: sample.lonDeg, elevationM: sample.elevationM },
+        region.origin,
+      )
+      return { xM: metric.eastM, yM: metric.northM }
+    },
+    horizontalDistanceM(a, b) {
+      const metric = marsGeoToLocalMeters(
+        { lat: b.latDeg, lon: b.lonDeg, elevationM: 0 },
+        { lat: a.latDeg, lon: a.lonDeg, elevationM: 0 },
+      )
+      return Math.hypot(metric.eastM, metric.northM)
+    },
+  }
+}
+
+export function deriveMarsElevationSlopeDeg(grid: MarsElevationGrid, row: number, col: number): number | undefined {
+  const first = grid.samples[0]
+  if (!first) return undefined
+  const referenceRegion: MarsRegionAnchor = {
+    id: 'mars-slope-reference',
+    name: 'Mars slope reference',
+    origin: { lat: first.lat, lon: first.lon, elevationM: 0 },
+    chunkSizeM: 1_000,
+    cellSizeM: 10,
+  }
+  return derivePlanetarySlopeDeg(asPlanetaryGrid(grid), row, col, marsGeometry(referenceRegion))
 }
 
 export function buildMarsBuildabilitySurface(grid: MarsElevationGrid, region: MarsRegionAnchor, policy: PhysicalBuildabilityPolicy): MarsBuildabilitySurface {
-  const cells: MarsBuildabilityCell[] = []
-  for (let row = 0; row < grid.rows; row++) {
-    for (let col = 0; col < grid.cols; col++) {
-      const sample = grid.samples[row * grid.cols + col]
-      if (!sample) continue
-      const metric = marsGeoToLocalMeters(sample, region.origin)
-      const slopeDeg = deriveMarsElevationSlopeDeg(grid, row, col)
-      const physical = evaluatePhysicalBuildability({ xM: metric.eastM, yM: metric.northM, elevationM: sample.elevationM, slopeDeg, terrainResolved: Number.isFinite(sample.elevationM) && slopeDeg != null, gridSizeM: region.cellSizeM }, policy)
-      cells.push({ ...physical, lat: sample.lat, lon: sample.lon, row, col })
-    }
+  const generic = buildPlanetaryBuildabilitySurface(
+    asPlanetaryGrid(grid),
+    region.cellSizeM,
+    policy,
+    marsGeometry(region),
+  )
+  return {
+    rows: generic.rows,
+    cols: generic.cols,
+    cellSizeM: generic.cellSizeM,
+    source: grid.source,
+    cells: generic.cells.map(cell => ({
+      ...cell,
+      lat: cell.latDeg,
+      lon: cell.lonDeg,
+    })),
   }
-  return { rows: grid.rows, cols: grid.cols, cellSizeM: region.cellSizeM, cells, source: grid.source }
 }
 
 export function marsPlanningCellCenter(region: MarsRegionAnchor, xM: number, yM: number): MarsGeoPoint {
