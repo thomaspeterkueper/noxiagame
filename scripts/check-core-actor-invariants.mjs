@@ -74,7 +74,7 @@ checks.push(mustNot('governor rights are not inferred from ownership', colony, [
 checks.push(must('ADR states NPCs are not players', adr, [
   'NPCs sind **keine Spieler**',
   'Gameplay-Symmetrie',
-  'Dummy-Profile',
+  'Dummy-Profil',
 ]));
 checks.push(must('ADR rejects actor id as authentication', adr, [
   'Kein Mechanismus darf `actor_id` als Ersatz für `auth.uid()` verwenden.',
