@@ -2,9 +2,10 @@
 
 // app/dashboard/ProfileOverlay.tsx
 // Erstellt:     21.06.2026
-// Aktualisiert: 04.07.2026 — Einstellungen-Tab: Email ändern, Account löschen
-// Version:      1.1.0
+// Aktualisiert: 15.09.2026 — sichtbare Abmeldung über kanonischen Server-Logout
+// Version:      1.2.0
 //
+// v1.2.0 — sichtbarer Logout im Einstellungen-Tab; nutzt /auth/logout
 // v1.1.0 — Einstellungen-Tab mit Email-Änderung und Account-Löschung
 // v1.0.0 — Kompetenz-System, Statistiken
 
@@ -215,7 +216,25 @@ function EinstellungenTab({ username }: { username: string }) {
         </form>
       </div>
 
-      {/* Trennlinie */}
+      <div style={{ height: 1, background: C.border, marginBottom: '2rem' }} />
+
+      {/* Abmelden */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ fontSize: '0.65rem', color: C.textMuted, textTransform: 'uppercase' as const, letterSpacing: '2px', fontFamily: MONO, marginBottom: '0.75rem' }}>
+          Sitzung
+        </div>
+        <p style={{ fontSize: '0.82rem', color: C.textMuted, lineHeight: 1.6, marginBottom: '1rem' }}>
+          Beendet die aktuelle Sitzung auf diesem Gerät. Dein Konto und dein Spielfortschritt bleiben erhalten.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.assign('/auth/logout')}
+          style={{ padding: '0.65rem 1.25rem', background: C.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, fontFamily: MONO }}
+        >
+          ↪ Abmelden
+        </button>
+      </div>
+
       <div style={{ height: 1, background: C.border, marginBottom: '2rem' }} />
 
       {/* Account löschen */}
