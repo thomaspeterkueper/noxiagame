@@ -1,7 +1,7 @@
 'use client'
 
 // app/auth/login/page.tsx
-// Aktualisiert: 04.07.2026 — Hintergrundbild, heller Kasten, Fade-in
+// Aktualisiert: 15.09.2026 — Registrierung auf kanonischen Flow vereinheitlicht; harter Redirect nach Login
 import React from 'react'
 
 import { useState, useEffect } from 'react'
@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [visible, setVisible]   = useState(false)
-  const [tab, setTab]           = useState<'login' | 'register'>('login')
 
   // Fade-in nach Mount
   useEffect(() => { setTimeout(() => setVisible(true), 50) }, [])
@@ -25,22 +24,25 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('Email oder Passwort falsch.'); setLoading(false); return }
-    router.push('/dashboard')
-    router.refresh()
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (error || !data.session || !data.user) {
+      setError('Email oder Passwort falsch.')
+      setLoading(false)
+      return
+    }
+
+    // Ein voller Seitenwechsel verhindert, dass Zustand-/React-State eines zuvor
+    // angemeldeten Accounts beim Kontowechsel im Browser erhalten bleibt.
+    window.location.assign('/dashboard')
   }
 
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
-    router.push('/dashboard')
-    router.refresh()
+  function handleRegister() {
+    // Es gibt genau einen Registrierungsweg. Dort werden Username,
+    // E-Mail-Verifikation und Confirmation-Callback korrekt behandelt.
+    router.push('/auth/register')
   }
 
   return (
@@ -55,10 +57,8 @@ export default function LoginPage() {
       justifyContent: 'center',
       fontFamily: 'system-ui, sans-serif',
     }}>
-      {/* Dunkler Overlay */}
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,9,16,0.55)', zIndex: 0 }} />
 
-      {/* Karte — hell, eingeblendet */}
       <div style={{
         position: 'relative',
         zIndex: 1,
@@ -73,7 +73,6 @@ export default function LoginPage() {
         transition: 'opacity 0.5s ease, transform 0.5s ease',
         margin: '1rem',
       }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.15em', color: '#2a4e7a', fontSize: '2rem', margin: '0 0 0.4rem' }}>
             noχ<sup style={{ fontSize: '0.45em', verticalAlign: 'super', lineHeight: 0 }}>1</sup>ᐃ
@@ -81,21 +80,28 @@ export default function LoginPage() {
           <div style={{ width: '40px', height: '2px', background: '#c9a961', margin: '0 auto' }} />
         </div>
 
-        {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid #e2ddd4', marginBottom: '1.75rem' }}>
-          {(['login', 'register'] as const).map(t => (
-            <button key={t} onClick={() => { setTab(t); setError('') }}
-              style={{
-                flex: 1, padding: '0.6rem', background: 'transparent', border: 'none',
-                borderBottom: tab === t ? '2px solid #c9a961' : '2px solid transparent',
-                color: tab === t ? '#2a4e7a' : '#94a3b8',
-                fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const,
-                letterSpacing: '2px', cursor: 'pointer',
-                transition: 'color 0.2s',
-              }}>
-              {t === 'login' ? 'Anmelden' : 'Neu registrieren'}
-            </button>
-          ))}
+          <button
+            type="button"
+            style={{
+              flex: 1, padding: '0.6rem', background: 'transparent', border: 'none',
+              borderBottom: '2px solid #c9a961', color: '#2a4e7a',
+              fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const,
+              letterSpacing: '2px', cursor: 'default', transition: 'color 0.2s',
+            }}>
+            Anmelden
+          </button>
+          <button
+            type="button"
+            onClick={handleRegister}
+            style={{
+              flex: 1, padding: '0.6rem', background: 'transparent', border: 'none',
+              borderBottom: '2px solid transparent', color: '#94a3b8',
+              fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const,
+              letterSpacing: '2px', cursor: 'pointer', transition: 'color 0.2s',
+            }}>
+            Neu registrieren
+          </button>
         </div>
 
         {error && (
@@ -104,7 +110,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={tab === 'login' ? handleLogin : handleRegister}>
+        <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.62rem', textTransform: 'uppercase' as const, letterSpacing: '2px', color: '#64748b', marginBottom: '0.4rem', fontWeight: 700 }}>
               Email
@@ -137,17 +143,15 @@ export default function LoginPage() {
             letterSpacing: '3px', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer',
             transition: 'background 0.2s',
           }}>
-            {loading ? 'Bitte warten …' : tab === 'login' ? 'Ins Universum →' : 'Account erstellen →'}
+            {loading ? 'Bitte warten …' : 'Ins Universum →'}
           </button>
         </form>
 
-        {tab === 'login' && (
-          <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-            <Link href="/auth/reset-password" style={{ color: '#94a3b8', textDecoration: 'none' }}>
-              Passwort vergessen?
-            </Link>
-          </p>
-        )}
+        <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+          <Link href="/auth/reset-password" style={{ color: '#94a3b8', textDecoration: 'none' }}>
+            Passwort vergessen?
+          </Link>
+        </p>
 
         <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.65rem', color: '#c8c0b4', letterSpacing: '1px' }}>
           NOXIA · SOLAR SYSTEM TRADING
