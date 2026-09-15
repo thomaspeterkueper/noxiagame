@@ -4,7 +4,9 @@ on:
   push:
     paths:
       - 'lib/game/worldDevelopment.ts'
+      - 'lib/game/worldDevelopmentSignals.ts'
       - 'lib/game/worldDevelopment.test.ts'
+      - 'app/api/game/world-development/**'
       - 'docs/decisions/ADR-world-development-macro-system.md'
       - 'docs/architecture/world-development-model.md'
       - 'docs/core/CORE_CONTRACT.md'
@@ -13,7 +15,9 @@ on:
   pull_request:
     paths:
       - 'lib/game/worldDevelopment.ts'
+      - 'lib/game/worldDevelopmentSignals.ts'
       - 'lib/game/worldDevelopment.test.ts'
+      - 'app/api/game/world-development/**'
       - 'docs/decisions/ADR-world-development-macro-system.md'
       - 'docs/architecture/world-development-model.md'
       - 'docs/core/CORE_CONTRACT.md'
