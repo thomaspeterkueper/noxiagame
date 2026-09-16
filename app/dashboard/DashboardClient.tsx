@@ -2,7 +2,11 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 24.08.2026 — GlobalErrorBoundary um das ganze Dashboard gelegt
+// Aktualisiert: 16.09.2026 — Onboarding-Check (profile.onboarded) entfernt;
+//               DashboardGate.tsx prüft das jetzt exklusiv VOR dem Mounten
+//               dieser Komponente (s. Commit d9d5def), diese Stelle wurde
+//               dadurch wirkungslos und ist jetzt bereinigt.
+// Vorher:       24.08.2026 — GlobalErrorBoundary um das ganze Dashboard gelegt
 //               (Diagnose): React-Fehler #31 "object with keys {key,
 //               condition}" trat außerhalb des TaskErrorBoundary-Bereichs
 //               auf (Akademie-Aufgaben-Block) — muss also anderswo im Baum
@@ -35,7 +39,6 @@ import ProfileOverlay from './ProfileOverlay'
 import ColonyDetail from './ColonyDetail'
 import OrderNegotiation from './OrderNegotiation'
 import MarketAuction from './MarketAuction'
-import WelcomeSetup from './WelcomeSetup'
 import SsfStatusCard from './SsfStatusCard'
 import JourneyDrawer from './JourneyDrawer'
 import { TipBanner, TipDef } from './TipSystem'
@@ -60,7 +63,7 @@ function KompetenzBar({ icon, wert, max, farbe }: { icon: string; wert: number; 
   )
 }
 
-function DashboardClientInner({ locations: initialLocations, prices, orders: initialOrders }: { locations: any[]; prices: any[]; orders: any[] }) {
+function DashboardClientInner({ locations: initialLocations, prices, orders: initialOrders, autoOpenJourney }: { locations: any[]; prices: any[]; orders: any[]; autoOpenJourney?: boolean }) {
   const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loadFromServer, inTransit, shipTypeId, invalidate, invalidations, shipRange } = useGameStore()
 
   const handleInteriorAction = (kind: 'market'|'shipyard'|'navigation'|'ship'|'parts'|null) => {
@@ -81,6 +84,14 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   const [ships, setShips] = useState<any[]>([])
   const [playerStats, setPlayerStats] = useState({ trades: 0, flights: 0, knowledge: 0 })
   const [journeyOpen, setJourneyOpen]           = useState(false)
+
+  // Direkt nach abgeschlossenem Onboarding (WelcomeSetup → onDone({ openJourney: true }),
+  // jetzt in DashboardGate.tsx behandelt und hierher durchgereicht) einmalig den
+  // Einweisungs-Guide öffnen.
+  useEffect(() => {
+    if (autoOpenJourney) setJourneyOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [journeyHints, setJourneyHints]         = useState<string[]>([])
   const [unreadDMs, setUnreadDMs]               = useState(0)
   const [unlocks, setUnlocks]                   = useState<string[]>([])
@@ -355,7 +366,6 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
         />
       )}
       <JourneyDrawer open={journeyOpen} currentLocation={location} onClose={() => setJourneyOpen(false)} {...journeyActions} onActiveStepChange={handleActiveStepChange} onStepCompleted={(title) => showToast(`✓ Geschafft: ${title}`, true)} onJourneyCompleted={handleJourneyCompleted} />
-      {profile && !profile.onboarded && <WelcomeSetup onDone={(opts) => { if (opts?.openJourney) setJourneyOpen(true); window.location.reload(); }} />}
       {/* gates verfügbar für: gates.bankCredit, gates.spectralSensor etc. */}
       {auctionOpen && <MarketAuction open={auctionOpen} onClose={() => setAuctionOpen(false)} location={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))} credits={credits} cargo={cargo} cargoMax={cargoMax} initialResource={auctionConfig.resource} initialMode={auctionConfig.mode} initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} />}
       {warehouseOpen && <WarehouseOverlay locationSlug={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} prices={prices} resources={currentLocationData?.location_resources ?? []} orders={initialOrders.filter((o: any) => o.locations?.slug === location)} cargo={cargo} cargoMax={cargoMax} credits={credits} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} onFulfillOrder={async (orderId, agreedReward) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} onClose={() => setWarehouseOpen(false)} />}
@@ -467,7 +477,7 @@ ${this.state.info ?? '(kein Component-Stack)'}`}
   }
 }
 
-export default function DashboardClient(props: { locations: any[]; prices: any[]; orders: any[] }) {
+export default function DashboardClient(props: { locations: any[]; prices: any[]; orders: any[]; autoOpenJourney?: boolean }) {
   return (
     <GlobalErrorBoundary>
       <DashboardClientInner {...props} />
