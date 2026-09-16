@@ -41,9 +41,9 @@ function haversineKm(a: GeoPoint, b: GeoPoint) {
 }
 
 function tierFor(abundance: number) {
-  if (abundance >= 3) return 'exceptional'
-  if (abundance >= 1) return 'rich'
-  if (abundance >= 0.3) return 'viable'
+  if (abundance >= 3.5) return 'exceptional'
+  if (abundance >= 1.5) return 'rich'
+  if (abundance >= 0.6) return 'viable'
   return 'trace'
 }
 
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
     }
 
     const localAffinity = affinity.get(dominantClass) ?? []
-    if (!localAffinity.length) throw new Error(`Keine Ressourcen-Affinitaet fuer GLiM-Klasse '${dominantClass}'`) 
+    if (!localAffinity.length) throw new Error(`Keine Ressourcen-Affinitaet fuer GLiM-Klasse '${dominantClass}'`)
 
     const { data: mrdsRows, error: mrdsError } = await supabase
       .from('region_mineral_occurrences')
