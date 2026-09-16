@@ -325,7 +325,48 @@ async function importElevation(supabase: ReturnType<typeof createServiceClient>,
   return { ok: true, rows: grid.rows, cols: grid.cols, resolutionM: grid.source.resolutionM }
 }
 
-export async function GET(req: NextRequest) {
+const MRDS_WFS_ENDPOINT = 'https://mrdata.usgs.gov/services/wfs/mrds'
+const GLIM_DATASET_URL = 'https://hdl.handle.net/10013/epic.39939.d001'
+
+async function importMineralOccurrences(supabase: ReturnType<typeof createServiceClient>, regionId: string, bounds: Bounds) {
+  const params = new URLSearchParams({
+    service: 'WFS',
+    version: '1.1.0',
+    request: 'GetFeature',
+    typeName: 'mrds',
+    outputFormat: 'json',
+    srsName: 'EPSG:4326',
+    bbox: `${bounds.south},${bounds.west},${bounds.north},${bounds.east},EPSG:4326`,
+  })
+  const res = await fetch(`${MRDS_WFS_ENDPOINT}?${params}`)
+  if (!res.ok) throw new Error(`MRDS WFS: HTTP ${res.status}`)
+  const geojson = await res.json()
+  const rows = ((geojson.features ?? []) as any[])
+    .filter(f => f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates))
+    .map(f => {
+      const p = f.properties ?? {}
+      const [lon, lat] = f.geometry.coordinates
+      const commodities = String(p.commod1 ?? p.commodities ?? '')
+        .split(/[;,]/).map((s: string) => s.trim()).filter(Boolean)
+      return {
+        region_id: regionId,
+        source: 'usgs-mrds',
+        external_id: p.dep_id != null ? String(p.dep_id) : null,
+        name: p.name ?? p.site_name ?? null,
+        lat, lon,
+        commodities,
+        development_status: p.dev_stat ?? p.development_status ?? null,
+        properties: p,
+      }
+    })
+
+  await supabase.from('region_mineral_occurrences').delete().eq('region_id', regionId)
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from('region_mineral_occurrences').insert(rows.slice(i, i + 500))
+    if (error) throw error
+  }
+  return rows.length
+}
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const secret = req.headers.get('x-noxia-admin-secret') ?? searchParams.get('secret')
@@ -335,6 +376,26 @@ export async function GET(req: NextRequest) {
   }
 
   const slug = searchParams.get('slug')
+
+  // GLiM ist ein einmaliger GLOBALER Import (kein Regionsbezug), daher eigener
+  // Action-Zweig, bevor slug/label/lat/lon als Pflichtfelder geprueft werden.
+  const action = searchParams.get('action')
+  if (action === 'inspect-glim') {
+    try {
+      const res = await fetch(GLIM_DATASET_URL, { redirect: 'follow' })
+      if (!res.ok) return NextResponse.json({ error: `GLiM Download: HTTP ${res.status}` }, { status: 502 })
+      const buf = Buffer.from(await res.arrayBuffer())
+      const JSZip = (await import('jszip')).default
+      const zip = await JSZip.loadAsync(buf)
+      const entries = Object.keys(zip.files)
+      const first = entries.find(n => !zip.files[n].dir)
+      const preview = first ? (await zip.files[first].async('text')).slice(0, 1500) : null
+      return NextResponse.json({ ok: true, finalUrl: res.url, byteLength: buf.length, entries, previewFile: first, preview })
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Inspektion fehlgeschlagen' }, { status: 500 })
+    }
+  }
+
   const label = searchParams.get('label')
   const lat = Number(searchParams.get('lat'))
   const lon = Number(searchParams.get('lon'))
@@ -383,6 +444,14 @@ export async function GET(req: NextRequest) {
       elevation = { ok: false, error: err instanceof Error ? err.message : 'Elevation-Import fehlgeschlagen' }
     }
 
+    let minerals: { ok: boolean; count?: number; error?: string }
+    try {
+      const count = await importMineralOccurrences(supabase, region.id, bounds)
+      minerals = { ok: true, count }
+    } catch (err) {
+      minerals = { ok: false, error: err instanceof Error ? err.message : 'MRDS-Import fehlgeschlagen' }
+    }
+
     return NextResponse.json({
       ok: true,
       regionId: region.id,
@@ -392,6 +461,7 @@ export async function GET(req: NextRequest) {
       source: loaded.source,
       overpassError: loaded.overpassError,
       elevation,
+      minerals,
     })
   } catch (err) {
     console.error('region import failed', { slug, error: err })
