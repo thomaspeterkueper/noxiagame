@@ -1,5 +1,10 @@
 'use client'
 
+// BUGFIX 16.09.2026: LandingOverlay bekam bisher die ungefilterte Location-
+// Liste inkl. 'earth' selbst. Klick auf 'Erde' als Ziel liess travel() im
+// gameStore still abbrechen (location === dest), das Overlay schloss sich
+// aber trotzdem -> wirkte wie "Navigation starten tut nichts". Erde jetzt
+// aus der Zielliste gefiltert, analog zur Kolonien-Tab-Variante.
 import { useEffect, useState, type ReactNode } from 'react'
 import SchoolOverlay from '@/app/dashboard/SchoolOverlay'
 import WarehouseOverlay from '@/app/dashboard/WarehouseOverlay'
@@ -326,7 +331,7 @@ export default function EarthBuildingAccessLayer({
     return (
       <LandingOverlay
         currentLocation="earth"
-        locations={data?.locations ?? []}
+        locations={(data?.locations ?? []).filter((l: any) => l.slug !== 'earth')}
         cargo={{ water: cargo.water, energy: cargo.energy, metal: cargo.metal }}
         shipRange={shipRange}
         currentTick={Number(data?.tickNumber ?? 0)}
