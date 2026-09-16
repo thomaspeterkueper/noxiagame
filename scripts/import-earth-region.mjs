@@ -23,12 +23,8 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-// Der bisherige Hauptserver lieferte beim initialen Produktionsimport
-// wiederholt 504. Diese oeffentliche OSM-Instanz ist als Alternative fuer
-// kleine Projekte dokumentiert. Bei Bedarf kann sie hier zentral getauscht
-// werden; Route und CLI verwenden denselben Importmodus.
-const OVERPASS_ENDPOINT = 'https://overpass.private.coffee/api/interpreter'
-const MAX_POINTS_PER_WAY = 40
+const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
+const MAX_POINTS_PER_WAY = 40 // Geometrie-Reduktion: mehr Punkte bringen auf dieser Zoomstufe nichts
 
 const CLASS_QUERIES = {
   water:      b => `way[natural=water](${b});way[water](${b});relation[natural=water](${b});`,
@@ -67,6 +63,8 @@ function boundsFor(lat, lon, radiusKm) {
   return { south: lat - dLat, west: lon - dLon, north: lat + dLat, east: lon + dLon }
 }
 
+// Douglas-Peucker-Vereinfachung, damit Linien/Polygone nicht jeden
+// OSM-Stuetzpunkt mitschleppen.
 function simplify(points, tolerance = 0.00015) {
   if (points.length <= 2) return points
   let maxDist = 0, index = 0
@@ -101,14 +99,7 @@ function capPoints(points) {
 async function fetchClass(cls, bounds) {
   const b = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   const q = `[out:json][timeout:60];(${CLASS_QUERIES[cls](b)});out geom;`
-  const res = await fetch(OVERPASS_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded',
-      'user-agent': 'NOXIA/0.1 region-import-cli',
-    },
-    body: new URLSearchParams({ data: q }),
-  })
+  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: 'data=' + encodeURIComponent(q) })
   if (!res.ok) throw new Error(`Overpass ${cls}: HTTP ${res.status}`)
   const data = await res.json()
   return data.elements ?? []
@@ -139,6 +130,35 @@ function toFeatures(cls, elements) {
   return out
 }
 
+async function fetchElevationGrid(bounds, targetResolutionM = 200) {
+  const midLat = (bounds.south + bounds.north) / 2
+  const metresPerLat = 111_320
+  const metresPerLon = Math.max(1, metresPerLat * Math.cos(midLat * Math.PI / 180))
+  const widthM = Math.max(1, (bounds.east - bounds.west) * metresPerLon)
+  const heightM = Math.max(1, (bounds.north - bounds.south) * metresPerLat)
+  const cols = Math.max(3, Math.min(18, Math.ceil(widthM / targetResolutionM) + 1))
+  const rows = Math.max(3, Math.min(18, Math.ceil(heightM / targetResolutionM) + 1))
+  const points = []
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) points.push({
+    lat: bounds.north - (r / (rows - 1)) * (bounds.north - bounds.south),
+    lon: bounds.west + (c / (cols - 1)) * (bounds.east - bounds.west),
+  })
+  const values = []
+  for (let start = 0; start < points.length; start += 100) {
+    const batch = points.slice(start, start + 100)
+    const params = new URLSearchParams({
+      latitude: batch.map(p => p.lat.toFixed(6)).join(','),
+      longitude: batch.map(p => p.lon.toFixed(6)).join(','),
+    })
+    const res = await fetch(`https://api.open-meteo.com/v1/elevation?${params}`)
+    if (!res.ok) throw new Error(`Elevation-Quelle: HTTP ${res.status}`)
+    const json = await res.json()
+    if (!Array.isArray(json.elevation) || json.elevation.length !== batch.length) throw new Error('Elevation-Quelle: ungueltige Antwort')
+    values.push(...json.elevation.map(Number))
+  }
+  return { rows, cols, resolutionM: 90, grid: values }
+}
+
 async function main() {
   const { slug, label, lat, lon, radiusKm, body } = parseArgs()
   const supabaseUrl = process.env.SUPABASE_URL
@@ -160,6 +180,7 @@ async function main() {
     .single()
   if (regionError) throw regionError
 
+  // Alte Features dieser Region ersetzen (erneuter Import = frischer Stand)
   await supabase.from('region_features').delete().eq('region_id', region.id)
 
   let totalFeatures = 0
@@ -167,6 +188,7 @@ async function main() {
     const elements = await fetchClass(cls, bounds)
     const features = toFeatures(cls, elements).map(f => ({ ...f, region_id: region.id }))
     if (features.length > 0) {
+      // In Batches schreiben, falls eine Kategorie sehr viele Features hat
       for (let i = 0; i < features.length; i += 500) {
         const { error } = await supabase.from('region_features').insert(features.slice(i, i + 500))
         if (error) throw error
@@ -174,10 +196,29 @@ async function main() {
     }
     console.log(`  ${cls}: ${features.length} Features`)
     totalFeatures += features.length
-    await new Promise(r => setTimeout(r, 1500))
+    await new Promise(r => setTimeout(r, 1500)) // Overpass-freundliches Tempo zwischen Kategorien
   }
 
   console.log(`Fertig: ${totalFeatures} Features fuer ${label} gespeichert (region_id=${region.id})`)
+
+  try {
+    console.log('Importiere Hoehenraster ...')
+    const elevation = await fetchElevationGrid(bounds)
+    await supabase.from('region_elevation').delete().eq('region_id', region.id)
+    const { error } = await supabase.from('region_elevation').insert({
+      region_id: region.id,
+      resolution_m: elevation.resolutionM,
+      rows: elevation.rows,
+      cols: elevation.cols,
+      origin_lat: bounds.north,
+      origin_lon: bounds.west,
+      grid: elevation.grid,
+    })
+    if (error) throw error
+    console.log(`  Hoehenraster: ${elevation.rows}x${elevation.cols}`)
+  } catch (err) {
+    console.error('  Hoehenraster-Import fehlgeschlagen:', err.message)
+  }
 }
 
 main().catch(err => { console.error(err); process.exit(1) })
