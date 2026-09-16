@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     try {
       res = await fetch(GLIM_URL, {
         redirect: 'follow',
-        headers: { accept: 'application/zip,application/octet-stream;q=0.9,*/*;q=0.1', 'user-agent': 'NOXIA/0.1 glim-inspector' },
+        headers: { accept: 'text/tab-separated-values,text/plain;q=0.9,*/*;q=0.1', 'user-agent': 'NOXIA/0.1 glim-inspector' },
         cache: 'no-store',
         signal: controller.signal,
       })
