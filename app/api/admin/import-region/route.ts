@@ -367,6 +367,8 @@ async function importMineralOccurrences(supabase: ReturnType<typeof createServic
   }
   return rows.length
 }
+
+export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const secret = req.headers.get('x-noxia-admin-secret') ?? searchParams.get('secret')
