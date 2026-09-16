@@ -49,6 +49,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   const loadFromServer = useGameStore(s => s.loadFromServer)
 
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
+  const [existingUsername, setExistingUsername] = useState<string | undefined>(undefined)
   const [autoOpenJourney, setAutoOpenJourney] = useState(false)
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
         const res = await fetch('/api/game/profile', { headers: { Authorization: `Bearer ${token}` } })
         const data = await res.json()
         setOnboarded(Boolean(data?.profile?.onboarded))
+        setExistingUsername(data?.profile?.username || undefined)
       } catch {
         // Bei Fehlschlag lieber nicht blockieren als einen Spieler dauerhaft aussperren.
         setOnboarded(true)
@@ -71,7 +73,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   }
 
   if (!onboarded) {
-    return <WelcomeSetup onDone={(opts) => { setOnboarded(true); if (opts?.openJourney) setAutoOpenJourney(true) }} />
+    return <WelcomeSetup initialUsername={existingUsername} onDone={(opts) => { setOnboarded(true); if (opts?.openJourney) setAutoOpenJourney(true) }} />
   }
 
   if (!loaded) {
