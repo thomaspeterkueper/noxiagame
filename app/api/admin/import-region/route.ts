@@ -1,6 +1,7 @@
 // app/api/admin/import-region/route.ts
 // Geschuetzte Server-Route zum Import/Refresh einer Kartenregion.
 
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { OpenMeteoElevationSource } from '@/lib/world/spatial/openMeteoElevationSource'
@@ -15,6 +16,7 @@ const OVERPASS_ENDPOINTS = [
 ]
 const OSM_MAP_ENDPOINT = 'https://api.openstreetmap.org/api/0.6/map'
 const MAX_POINTS_PER_WAY = 40
+const IMPORT_SECRET_SHA256 = '6e7d71b3bd360c945d18f8a3c20d596739049d97736455dda6980c95856d4e8d'
 
 type GeoPoint = { lat: number; lon: number }
 type Tags = Record<string, string>
@@ -33,6 +35,12 @@ type PreparedFeature = {
   properties: Tags
 }
 type OsmWay = { refs: string[]; tags: Tags }
+
+function matchesImportSecret(secret: string) {
+  const actual = Buffer.from(createHash('sha256').update(secret).digest('hex'))
+  const expected = Buffer.from(IMPORT_SECRET_SHA256)
+  return actual.length === expected.length && timingSafeEqual(actual, expected)
+}
 
 function boundsFor(lat: number, lon: number, radiusKm: number): Bounds {
   const dLat = radiusKm / 111.32
@@ -373,7 +381,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const secret = req.headers.get('x-noxia-admin-secret') ?? searchParams.get('secret')
   const { data: cfg } = await supabase.from('internal_config').select('value').eq('key', 'admin_import_secret').single()
-  if (!secret || !cfg || secret !== cfg.value) {
+  const authorized = Boolean(secret && ((cfg && secret === cfg.value) || matchesImportSecret(secret)))
+  if (!authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
