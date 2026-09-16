@@ -2,14 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-type RadarSignal={row:number;col:number;strength:number;known?:boolean}
-type Props={scannerOnline:boolean;scanning:boolean;scannerLabel:string;onScan:()=>void;scannerPosition?:{row:number;col:number}|null;signals?:RadarSignal[];scanRadius?:number}
+type RadarSignal={row?:number;col?:number;lat?:number;lon?:number;strength:number;known?:boolean}
+type ScannerPosition={row?:number;col?:number;lat?:number;lon?:number}
+type Props={scannerOnline:boolean;scanning:boolean;scannerLabel:string;onScan:()=>void;scannerPosition?:ScannerPosition|null;signals?:RadarSignal[];scanRadius?:number;scanRadiusKm?:number}
 type Player={x:number;z:number;yaw:number}
 const ROOM={halfW:6.2,halfD:5.2},TERMINAL={x:0,z:-3.9}
 const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v))
 const distance=(ax:number,az:number,bx:number,bz:number)=>Math.hypot(ax-bx,az-bz)
 
-export default function ScannerFirstPerson({scannerOnline,scanning,scannerLabel,onScan,scannerPosition=null,signals=[],scanRadius=4}:Props){
+function relativeSignal(signal:RadarSignal,scanner:ScannerPosition,scanRadius:number,scanRadiusKm:number){
+ if(Number.isFinite(signal.row)&&Number.isFinite(signal.col)&&Number.isFinite(scanner.row)&&Number.isFinite(scanner.col)){
+  return {dx:(Number(signal.col)-Number(scanner.col))/Math.max(1,scanRadius),dy:(Number(signal.row)-Number(scanner.row))/Math.max(1,scanRadius)}
+ }
+ if(Number.isFinite(signal.lat)&&Number.isFinite(signal.lon)&&Number.isFinite(scanner.lat)&&Number.isFinite(scanner.lon)){
+  const lat0=Number(scanner.lat),lon0=Number(scanner.lon),lat=Number(signal.lat),lon=Number(signal.lon)
+  const dyKm=(lat-lat0)*111.32
+  const dxKm=(lon-lon0)*111.32*Math.max(.2,Math.cos(lat0*Math.PI/180))
+  return {dx:dxKm/Math.max(.001,scanRadiusKm),dy:-dyKm/Math.max(.001,scanRadiusKm)}
+ }
+ return null
+}
+
+export default function ScannerFirstPerson({scannerOnline,scanning,scannerLabel,onScan,scannerPosition=null,signals=[],scanRadius=4,scanRadiusKm=.3}:Props){
  const canvasRef=useRef<HTMLCanvasElement|null>(null),playerRef=useRef<Player>({x:0,z:2.5,yaw:Math.PI}),keysRef=useRef(new Set<string>()),dragRef=useRef({active:false,x:0})
  const[nearTerminal,setNearTerminal]=useState(false),[hasFocus,setHasFocus]=useState(false)
  const interact=useCallback(()=>{if(scannerOnline&&!scanning&&nearTerminal)onScan()},[nearTerminal,onScan,scannerOnline,scanning])
@@ -22,8 +36,8 @@ export default function ScannerFirstPerson({scannerOnline,scanning,scannerLabel,
    const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#061018');sky.addColorStop(.52,'#102531');sky.addColorStop(.53,'#16262b');sky.addColorStop(1,'#05090c');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h)
    for(let z=-5;z<=5;z++)line3d([-6,-1.35,z],[6,-1.35,z],p,w,h,'rgba(91,137,157,.24)');for(let x=-6;x<=6;x++)line3d([x,-1.35,-5],[x,-1.35,5],p,w,h,'rgba(91,137,157,.20)')
    const c='rgba(94,148,174,.58)',corners:[number,number,number][]=[[-ROOM.halfW,-1.35,-ROOM.halfD],[ROOM.halfW,-1.35,-ROOM.halfD],[ROOM.halfW,-1.35,ROOM.halfD],[-ROOM.halfW,-1.35,ROOM.halfD]];for(let i=0;i<4;i++){const a=corners[i],b=corners[(i+1)%4];line3d(a,b,p,w,h,c,2);line3d(a,[a[0],2.6,a[2]],p,w,h,'rgba(72,118,141,.4)',1.5)}
-   panel3d(-1.8,1.8,-.15,1.65,-4.72,p,w,h,'#08202c',close?'#d8bd69':'#4f8097');panel3d(-1.45,1.45,.08,1.38,-4.69,p,w,h,'#0b3445','#69a7c4');const screen=project(0,.72,-4.65,p,w,h);if(screen){const radius=clamp(145/screen.z,8,52);ctx.beginPath();ctx.arc(screen.x,screen.y,radius,0,Math.PI*2);ctx.strokeStyle=scannerOnline?'rgba(120,205,228,.85)':'rgba(210,90,80,.7)';ctx.lineWidth=1.5;ctx.stroke();ctx.beginPath();ctx.arc(screen.x,screen.y,radius*.55,0,Math.PI*2);ctx.strokeStyle='rgba(120,205,228,.35)';ctx.stroke();ctx.fillStyle='#d7c675';ctx.beginPath();ctx.arc(screen.x,screen.y,3,0,Math.PI*2);ctx.fill();if(scannerPosition){for(const sig of signals){const dx=(sig.col-scannerPosition.col)/Math.max(1,scanRadius),dy=(sig.row-scannerPosition.row)/Math.max(1,scanRadius);if(Math.hypot(dx,dy)>1.05)continue;const px=screen.x+dx*radius*.82,py=screen.y+dy*radius*.82,pr=clamp(2+sig.strength*3,2,5);ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.fillStyle=sig.known?'#d9c76f':'#76d6e8';ctx.fill();ctx.strokeStyle='rgba(255,255,255,.45)';ctx.stroke()}}}
+   panel3d(-1.8,1.8,-.15,1.65,-4.72,p,w,h,'#08202c',close?'#d8bd69':'#4f8097');panel3d(-1.45,1.45,.08,1.38,-4.69,p,w,h,'#0b3445','#69a7c4');const screen=project(0,.72,-4.65,p,w,h);if(screen){const radius=clamp(145/screen.z,8,52);ctx.beginPath();ctx.arc(screen.x,screen.y,radius,0,Math.PI*2);ctx.strokeStyle=scannerOnline?'rgba(120,205,228,.85)':'rgba(210,90,80,.7)';ctx.lineWidth=1.5;ctx.stroke();ctx.beginPath();ctx.arc(screen.x,screen.y,radius*.55,0,Math.PI*2);ctx.strokeStyle='rgba(120,205,228,.35)';ctx.stroke();ctx.fillStyle='#d7c675';ctx.beginPath();ctx.arc(screen.x,screen.y,3,0,Math.PI*2);ctx.fill();if(scannerPosition){for(const sig of signals){const rel=relativeSignal(sig,scannerPosition,scanRadius,scanRadiusKm);if(!rel)continue;const{dx,dy}=rel;if(Math.hypot(dx,dy)>1.05)continue;const px=screen.x+dx*radius*.82,py=screen.y+dy*radius*.82,pr=clamp(2+sig.strength*3,2,5);ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.fillStyle=sig.known?'#d9c76f':'#76d6e8';ctx.fill();ctx.strokeStyle='rgba(255,255,255,.45)';ctx.stroke()}}}
    panel3d(-5.6,-4.1,-.8,.55,-3.9,p,w,h,'#101d23','#355365');panel3d(4.1,5.6,-.8,.55,-3.9,p,w,h,'#101d23','#355365');ctx.strokeStyle='rgba(220,236,243,.36)';ctx.beginPath();ctx.moveTo(w/2-8,h/2);ctx.lineTo(w/2+8,h/2);ctx.stroke();ctx.beginPath();ctx.moveTo(w/2,h/2-8);ctx.lineTo(w/2,h/2+8);ctx.stroke();raf=requestAnimationFrame(render)};raf=requestAnimationFrame(render);return()=>cancelAnimationFrame(raf)
- },[scannerOnline,scannerPosition,signals,scanRadius])
+ },[scannerOnline,scannerPosition,signals,scanRadius,scanRadiusKm])
  return <section style={{position:'relative',height:430,border:'1px solid #36556a',borderRadius:14,overflow:'hidden',background:'#05090d',boxShadow:'inset 0 0 80px #000,0 20px 60px #0008'}}><canvas ref={canvasRef} tabIndex={0} aria-label="Begehbarer Scannerraum" onFocus={()=>setHasFocus(true)} onBlur={()=>setHasFocus(false)} onMouseDown={e=>{dragRef.current={active:true,x:e.clientX};e.currentTarget.focus()}} onMouseMove={e=>{if(!dragRef.current.active)return;const dx=e.clientX-dragRef.current.x;dragRef.current.x=e.clientX;playerRef.current.yaw+=dx*.006}} onMouseUp={()=>{dragRef.current.active=false}} onMouseLeave={()=>{dragRef.current.active=false}} style={{width:'100%',height:'100%',display:'block',cursor:'grab',outline:'none'}}/><div style={{position:'absolute',left:14,top:12,padding:'7px 9px',border:'1px solid #294a5d',borderRadius:7,background:'#061017dd',fontFamily:'monospace',fontSize:10,color:'#8ab4c9'}}>WASD bewegen · ← → drehen · Maus ziehen · E interagieren</div><div style={{position:'absolute',left:14,bottom:12,padding:'7px 9px',border:'1px solid #294a5d',borderRadius:7,background:'#061017dd',fontFamily:'monospace',fontSize:10,color:scannerOnline?'#91c7da':'#df8b82'}}>{scannerLabel} · {hasFocus?'STEUERUNG AKTIV':'KLICKEN ZUM STEUERN'} · RADAR {signals.length}</div>{nearTerminal&&<button onClick={interact} disabled={!scannerOnline||scanning} style={{position:'absolute',left:'50%',bottom:26,transform:'translateX(-50%)',padding:'10px 16px',border:'1px solid #b99b45',borderRadius:8,background:scanning?'#514922':'#8a6a00',color:'#fff',fontWeight:800,letterSpacing:'.06em'}}>{scanning?'MESSUNG LÄUFT …':'E · SCAN AUSLÖSEN'}</button>}</section>
 }
