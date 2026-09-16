@@ -1,6 +1,5 @@
 // app/api/admin/import-region/route.ts
 // Geschuetzte Server-Route zum Import/Refresh einer Kartenregion.
-// Route und scripts/import-earth-region.mjs verwenden denselben Importmodus.
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
@@ -13,26 +12,29 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass-api.de/api/interpreter',
 ]
+const OSM_MAP_ENDPOINT = 'https://api.openstreetmap.org/api/0.6/map'
 const MAX_POINTS_PER_WAY = 40
 const IMPORT_SECRET_SHA256 = '6e7d71b3bd360c945d18f8a3c20d596739049d97736455dda6980c95856d4e8d'
 
 type GeoPoint = { lat: number; lon: number }
+type Tags = Record<string, string>
+type Bounds = { south: number; west: number; north: number; east: number }
 type OverpassElement = {
   type?: string
   lat?: number
   lon?: number
-  tags?: Record<string, string>
+  tags?: Tags
   geometry?: GeoPoint[]
   members?: Array<{ geometry?: GeoPoint[] }>
 }
-
 type PreparedFeature = {
   feature_type: string
   geometry: { kind: 'point' | 'line' | 'polygon'; coordinates: GeoPoint | GeoPoint[] }
-  properties: Record<string, string>
+  properties: Tags
 }
+type OsmWay = { refs: string[]; tags: Tags }
 
-function boundsFor(lat: number, lon: number, radiusKm: number) {
+function boundsFor(lat: number, lon: number, radiusKm: number): Bounds {
   const dLat = radiusKm / 111.32
   const dLon = radiusKm / (111.32 * Math.cos(lat * Math.PI / 180))
   return { south: lat - dLat, west: lon - dLon, north: lat + dLat, east: lon + dLon }
@@ -75,9 +77,9 @@ function matchesImportSecret(secret: string) {
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
-function buildCombinedQuery(bounds: { south: number; west: number; north: number; east: number }) {
+function buildCombinedQuery(bounds: Bounds) {
   const b = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
-  return `[out:json][timeout:55];(
+  return `[out:json][timeout:30];(
 way[natural=water](${b});way[water](${b});relation[natural=water](${b});
 way[landuse=forest](${b});way[natural=wood](${b});relation[landuse=forest](${b});relation[natural=wood](${b});
 way[landuse~"farmland|farmyard|meadow|orchard"](${b});
@@ -89,13 +91,12 @@ node[place~"city|town|village|hamlet"](${b});
 );out geom;`
 }
 
-async function fetchRegionElements(bounds: { south: number; west: number; north: number; east: number }) {
+async function fetchOverpass(bounds: Bounds) {
   const query = buildCombinedQuery(bounds)
   const failures: string[] = []
-
   for (const endpoint of OVERPASS_ENDPOINTS) {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 35000)
+    const timeout = setTimeout(() => controller.abort(), 15000)
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -112,21 +113,18 @@ async function fetchRegionElements(bounds: { south: number; west: number; north:
         continue
       }
       const data = await res.json()
-      return { elements: (data.elements ?? []) as OverpassElement[], endpoint }
+      return { elements: (data.elements ?? []) as OverpassElement[], source: `overpass:${new URL(endpoint).host}` }
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err)
-      failures.push(`${new URL(endpoint).host}: ${reason}`)
+      failures.push(`${new URL(endpoint).host}: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       clearTimeout(timeout)
     }
   }
-
-  throw new Error(`Overpass nicht erreichbar (${failures.join('; ')})`)
+  throw new Error(failures.join('; '))
 }
 
-function classifyElement(el: OverpassElement) {
-  const tags = el.tags ?? {}
-  if (el.type === 'node' && /^(city|town|village|hamlet)$/.test(tags.place ?? '')) return 'settlement'
+function classifyTags(tags: Tags, isNode = false) {
+  if (isNode && /^(city|town|village|hamlet)$/.test(tags.place ?? '')) return 'settlement'
   if (tags.highway && /^(motorway|trunk|primary|secondary)$/.test(tags.highway)) return 'road'
   if (tags.railway) return 'rail'
   if (tags.landuse === 'industrial') return 'industrial'
@@ -137,35 +135,25 @@ function classifyElement(el: OverpassElement) {
   return null
 }
 
-function geometryFeature(cls: string, raw: GeoPoint[], properties: Record<string, string>): PreparedFeature | null {
+function geometryFeature(cls: string, raw: GeoPoint[], properties: Tags): PreparedFeature | null {
   const points = raw.filter(p => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
   if (points.length < 2) return null
   const capped = capPoints(points)
   const isPolygon = points.length > 3 && points[0].lat === points[points.length - 1].lat && points[0].lon === points[points.length - 1].lon
-  return {
-    feature_type: cls,
-    geometry: { kind: isPolygon ? 'polygon' : 'line', coordinates: capped },
-    properties,
-  }
+  return { feature_type: cls, geometry: { kind: isPolygon ? 'polygon' : 'line', coordinates: capped }, properties }
 }
 
-function toFeatures(elements: OverpassElement[]) {
+function toFeaturesFromOverpass(elements: OverpassElement[]) {
   const out: PreparedFeature[] = []
   for (const el of elements) {
-    const cls = classifyElement(el)
-    if (!cls) continue
     const properties = el.tags ?? {}
-
+    const cls = classifyTags(properties, el.type === 'node')
+    if (!cls) continue
     if (el.type === 'node') {
       if (!Number.isFinite(el.lat) || !Number.isFinite(el.lon)) continue
-      out.push({
-        feature_type: cls,
-        geometry: { kind: 'point', coordinates: { lat: el.lat!, lon: el.lon! } },
-        properties,
-      })
+      out.push({ feature_type: cls, geometry: { kind: 'point', coordinates: { lat: el.lat!, lon: el.lon! } }, properties })
       continue
     }
-
     if (el.type === 'relation' && Array.isArray(el.members)) {
       for (const member of el.members) {
         const feature = geometryFeature(cls, member.geometry ?? [], properties)
@@ -173,11 +161,143 @@ function toFeatures(elements: OverpassElement[]) {
       }
       continue
     }
-
     const feature = geometryFeature(cls, el.geometry ?? [], properties)
     if (feature) out.push(feature)
   }
   return out
+}
+
+function decodeXml(value: string) {
+  return value
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+}
+
+function attr(text: string, name: string) {
+  const match = text.match(new RegExp(`\\b${name}="([^"]*)"`))
+  return match ? decodeXml(match[1]) : null
+}
+
+function parseTags(body: string): Tags {
+  const tags: Tags = {}
+  const re = /<tag\b([^>]*?)\/>/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(body))) {
+    const key = attr(match[1], 'k')
+    const value = attr(match[1], 'v')
+    if (key != null && value != null) tags[key] = value
+  }
+  return tags
+}
+
+async function fetchOsmMap(bounds: Bounds) {
+  const url = new URL(OSM_MAP_ENDPOINT)
+  url.searchParams.set('bbox', `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000)
+  try {
+    const res = await fetch(url, {
+      headers: { 'user-agent': 'NOXIA/0.1 region-import', accept: 'application/xml,text/xml' },
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+    if (!res.ok) throw new Error(`OSM map API HTTP ${res.status}`)
+    return await res.text()
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function toFeaturesFromOsmXml(xml: string) {
+  const nodes = new Map<string, GeoPoint>()
+  const ways = new Map<string, OsmWay>()
+  const out: PreparedFeature[] = []
+
+  const nodeRe = /<node\b([^>]*?)(?:\/>|>([\s\S]*?)<\/node>)/g
+  let nodeMatch: RegExpExecArray | null
+  while ((nodeMatch = nodeRe.exec(xml))) {
+    const attrs = nodeMatch[1]
+    const id = attr(attrs, 'id')
+    const lat = Number(attr(attrs, 'lat'))
+    const lon = Number(attr(attrs, 'lon'))
+    if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    nodes.set(id, { lat, lon })
+    const tags = parseTags(nodeMatch[2] ?? '')
+    const cls = classifyTags(tags, true)
+    if (cls === 'settlement') {
+      out.push({ feature_type: cls, geometry: { kind: 'point', coordinates: { lat, lon } }, properties: tags })
+    }
+  }
+
+  const wayRe = /<way\b([^>]*)>([\s\S]*?)<\/way>/g
+  let wayMatch: RegExpExecArray | null
+  while ((wayMatch = wayRe.exec(xml))) {
+    const id = attr(wayMatch[1], 'id')
+    if (!id) continue
+    const body = wayMatch[2]
+    const refs: string[] = []
+    const ndRe = /<nd\b([^>]*?)\/>/g
+    let ndMatch: RegExpExecArray | null
+    while ((ndMatch = ndRe.exec(body))) {
+      const ref = attr(ndMatch[1], 'ref')
+      if (ref) refs.push(ref)
+    }
+    ways.set(id, { refs, tags: parseTags(body) })
+  }
+
+  const emitted = new Set<string>()
+  const emitWay = (id: string, way: OsmWay, cls: string, properties: Tags) => {
+    const key = `${cls}:${id}`
+    if (emitted.has(key)) return
+    const points = way.refs.map(ref => nodes.get(ref)).filter((p): p is GeoPoint => Boolean(p))
+    const feature = geometryFeature(cls, points, properties)
+    if (feature) {
+      emitted.add(key)
+      out.push(feature)
+    }
+  }
+
+  for (const [id, way] of ways) {
+    const cls = classifyTags(way.tags)
+    if (cls) emitWay(id, way, cls, way.tags)
+  }
+
+  const relationRe = /<relation\b([^>]*)>([\s\S]*?)<\/relation>/g
+  let relationMatch: RegExpExecArray | null
+  while ((relationMatch = relationRe.exec(xml))) {
+    const body = relationMatch[2]
+    const relationTags = parseTags(body)
+    const cls = classifyTags(relationTags)
+    if (!cls) continue
+    const memberRe = /<member\b([^>]*?)\/>/g
+    let memberMatch: RegExpExecArray | null
+    while ((memberMatch = memberRe.exec(body))) {
+      if (attr(memberMatch[1], 'type') !== 'way') continue
+      const ref = attr(memberMatch[1], 'ref')
+      if (!ref) continue
+      const way = ways.get(ref)
+      if (way) emitWay(ref, way, cls, relationTags)
+    }
+  }
+
+  return out
+}
+
+async function loadFeatures(bounds: Bounds) {
+  let overpassError = ''
+  try {
+    const result = await fetchOverpass(bounds)
+    return { features: toFeaturesFromOverpass(result.elements), source: result.source }
+  } catch (err) {
+    overpassError = err instanceof Error ? err.message : String(err)
+  }
+
+  const xml = await fetchOsmMap(bounds)
+  const features = toFeaturesFromOsmXml(xml)
+  return { features, source: 'osm-map-api', overpassError }
 }
 
 export async function GET(req: NextRequest) {
@@ -201,10 +321,12 @@ export async function GET(req: NextRequest) {
   const bounds = boundsFor(lat, lon, radiusKm)
 
   try {
-    // Erst laden und transformieren. Bestehende DB-Daten bleiben bei einem
-    // Overpass-Fehler dadurch unangetastet.
-    const { elements, endpoint } = await fetchRegionElements(bounds)
-    const prepared = toFeatures(elements)
+    // Externe Daten zuerst laden. Bestehende DB-Daten bleiben bei einem
+    // Netz-/API-Fehler unangetastet.
+    const loaded = await loadFeatures(bounds)
+    const prepared = loaded.features
+    if (prepared.length === 0) throw new Error('Kartendatenquelle lieferte keine verwertbaren Features')
+
     const counts: Record<string, number> = {}
     for (const feature of prepared) counts[feature.feature_type] = (counts[feature.feature_type] ?? 0) + 1
 
@@ -212,7 +334,7 @@ export async function GET(req: NextRequest) {
     const { data: region, error: regionError } = await supabase
       .from('celestial_regions')
       .upsert(
-        { body, slug, label, center_lat: lat, center_lon: lon, radius_km: radiusKm, bounds, source: 'overpass', imported_at: new Date().toISOString() },
+        { body, slug, label, center_lat: lat, center_lon: lon, radius_km: radiusKm, bounds, source: loaded.source, imported_at: new Date().toISOString() },
         { onConflict: 'slug' }
       )
       .select()
@@ -228,7 +350,15 @@ export async function GET(req: NextRequest) {
       if (error) throw error
     }
 
-    return NextResponse.json({ ok: true, regionId: region.id, slug, total: rows.length, counts, endpoint })
+    return NextResponse.json({
+      ok: true,
+      regionId: region.id,
+      slug,
+      total: rows.length,
+      counts,
+      source: loaded.source,
+      overpassError: loaded.overpassError,
+    })
   } catch (err) {
     console.error('region import failed', { slug, error: err })
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Import fehlgeschlagen' }, { status: 500 })
