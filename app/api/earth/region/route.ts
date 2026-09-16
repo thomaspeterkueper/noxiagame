@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
+import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
 
@@ -63,6 +64,55 @@ export async function GET(req: NextRequest) {
     west: center.lon - lonDelta,
     north: center.lat + latDelta,
     east: center.lon + lonDelta,
+  }
+
+  // BUGFIX/UMSTELLUNG 16.09.2026: Live-Overpass-Abfragen bei jedem
+  // Kartenaufruf waren unzuverlaessig (Rate-Limits, teils 10+MB-Antworten,
+  // 503er). Regionen, die per scripts/import-earth-region.mjs bzw.
+  // /api/admin/import-region vorab importiert wurden, werden jetzt aus
+  // celestial_regions/region_features gelesen. Nur wenn fuer die
+  // angefragte Region (noch) kein Import vorliegt, faellt die Route auf
+  // die alte Live-Abfrage zurueck, damit neue/unbekannte Standorte
+  // weiterhin funktionieren, bis sie importiert sind.
+  const supabase = createServiceClient()
+  const { data: storedRegion } = await supabase
+    .from('celestial_regions')
+    .select('id, slug, bounds')
+    .eq('slug', requestedRegionId)
+    .maybeSingle()
+
+  if (storedRegion && !hasLocalCenter) {
+    const { data: rows, error: featuresError } = await supabase
+      .from('region_features')
+      .select('id, feature_type, geometry, properties')
+      .eq('region_id', storedRegion.id)
+
+    if (!featuresError) {
+      const containsSelmecke = SELMECKE_REFERENCE_FEATURE.geometry.kind === 'point'
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat >= bounds.south
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat <= bounds.north
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon >= bounds.west
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon <= bounds.east
+
+      const features = [
+        ...(rows ?? []).map(r => ({ id: r.id, featureType: r.feature_type, properties: r.properties, geometry: r.geometry })),
+        ...(containsSelmecke ? [SELMECKE_REFERENCE_FEATURE] : []),
+      ]
+
+      return NextResponse.json({
+        ok: true,
+        region: viewRegion,
+        viewRegion,
+        queryCenter: center,
+        detail: hasLocalCenter,
+        bounds: (storedRegion.bounds as typeof bounds) ?? bounds,
+        featureCount: features.length,
+        features,
+        attribution: '© OpenStreetMap contributors · ODbL · NOXIA canonical sites (vorimportiert)',
+      }, {
+        headers: { 'Cache-Control': 'private, max-age=60', 'Vary': 'Cookie' },
+      })
+    }
   }
 
   try {
