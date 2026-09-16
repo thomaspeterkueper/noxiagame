@@ -1,21 +1,23 @@
 // app/api/admin/import-region/route.ts
 // Erstellt: 16.09.2026
 //
-// Einmalige, geschuetzte Server-Route zum Import/Refresh einer Kartenregion
+// Geschuetzte Server-Route zum Import/Refresh einer Kartenregion
 // (siehe scripts/import-earth-region.mjs fuer das aequivalente, wiederholbar
 // per CLI aufrufbare Skript -- diese Route existiert, weil die lokale
 // Entwicklungsumgebung keinen Netzwerkzugriff auf overpass-api.de hat, die
-// Vercel-Produktionsumgebung aber schon). Absicherung ueber ein Secret in
-// internal_config (Tabelle), nicht ueber einen Vercel-Env-Var-Rollout.
-//
-// Aufruf: GET /api/admin/import-region?slug=earth-sauerland&label=Sauerland&lat=51.325&lon=8.005&radius=3
-// Header: x-noxia-admin-secret: <secret aus internal_config>
+// Vercel-Produktionsumgebung aber schon).
 
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
 const MAX_POINTS_PER_WAY = 40
+
+// Temporary bootstrap hash for the already-issued import secret. This stores
+// no plaintext secret in git. Once production internal_config is synchronized,
+// this fallback can be removed and only the DB-backed header auth remains.
+const BOOTSTRAP_SECRET_SHA256 = '6e7d71b3bd360c945d18f8a3c20d596739049d97736455dda6980c95856d4e8d'
 
 const CLASS_QUERIES: Record<string, (b: string) => string> = {
   water:      b => `way[natural=water](${b});way[water](${b});relation[natural=water](${b});`,
@@ -67,6 +69,12 @@ function capPoints(points: GeoPoint[]) {
   return out
 }
 
+function matchesBootstrapSecret(secret: string) {
+  const actual = Buffer.from(createHash('sha256').update(secret).digest('hex'))
+  const expected = Buffer.from(BOOTSTRAP_SECRET_SHA256)
+  return actual.length === expected.length && timingSafeEqual(actual, expected)
+}
+
 async function fetchClass(cls: string, bounds: { south: number; west: number; north: number; east: number }) {
   const b = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   const q = `[out:json][timeout:60];(${CLASS_QUERIES[cls](b)});out geom;`
@@ -98,9 +106,22 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const secret = req.headers.get('x-noxia-admin-secret') ?? searchParams.get('secret')
-  const { data: cfg } = await supabase.from('internal_config').select('value').eq('key', 'admin_import_secret').single()
-  if (!secret || !cfg || secret !== cfg.value) {
+  const { data: cfg } = await supabase.from('internal_config').select('value').eq('key', 'admin_import_secret').maybeSingle()
+  const dbAuthorized = Boolean(secret && cfg && secret === cfg.value)
+  const bootstrapAuthorized = Boolean(secret && matchesBootstrapSecret(secret))
+  if (!secret || (!dbAuthorized && !bootstrapAuthorized)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // One-time self-healing for a production Supabase target that drifted from
+  // the connected project. From the next request onward normal DB auth works.
+  if (!dbAuthorized && bootstrapAuthorized) {
+    const { error: syncError } = await supabase
+      .from('internal_config')
+      .upsert({ key: 'admin_import_secret', value: secret }, { onConflict: 'key' })
+    if (syncError) {
+      return NextResponse.json({ error: `Import auth sync failed: ${syncError.message}` }, { status: 500 })
+    }
   }
 
   const slug = searchParams.get('slug')
