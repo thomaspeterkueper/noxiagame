@@ -62,13 +62,26 @@ function simplify(points: GeoPoint[], tolerance = 0.00015): GeoPoint[] {
   return [a, b]
 }
 
-function capPoints(points: GeoPoint[]) {
+function capLinePoints(points: GeoPoint[]) {
   const simplified = simplify(points)
   if (simplified.length <= MAX_POINTS_PER_WAY) return simplified
   const step = simplified.length / MAX_POINTS_PER_WAY
   const out: GeoPoint[] = []
   for (let i = 0; i < MAX_POINTS_PER_WAY; i++) out.push(simplified[Math.floor(i * step)])
   return out
+}
+
+function capPolygonPoints(points: GeoPoint[]) {
+  const ring = points.slice(0, -1)
+  const maxRingPoints = MAX_POINTS_PER_WAY - 1
+  let capped = ring
+  if (ring.length > maxRingPoints) {
+    const step = ring.length / maxRingPoints
+    capped = []
+    for (let i = 0; i < maxRingPoints; i++) capped.push(ring[Math.floor(i * step)])
+  }
+  if (capped.length < 3) return points
+  return [...capped, capped[0]]
 }
 
 function matchesImportSecret(secret: string) {
@@ -138,8 +151,8 @@ function classifyTags(tags: Tags, isNode = false) {
 function geometryFeature(cls: string, raw: GeoPoint[], properties: Tags): PreparedFeature | null {
   const points = raw.filter(p => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
   if (points.length < 2) return null
-  const capped = capPoints(points)
   const isPolygon = points.length > 3 && points[0].lat === points[points.length - 1].lat && points[0].lon === points[points.length - 1].lon
+  const capped = isPolygon ? capPolygonPoints(points) : capLinePoints(points)
   return { feature_type: cls, geometry: { kind: isPolygon ? 'polygon' : 'line', coordinates: capped }, properties }
 }
 
@@ -321,8 +334,6 @@ export async function GET(req: NextRequest) {
   const bounds = boundsFor(lat, lon, radiusKm)
 
   try {
-    // Externe Daten zuerst laden. Bestehende DB-Daten bleiben bei einem
-    // Netz-/API-Fehler unangetastet.
     const loaded = await loadFeatures(bounds)
     const prepared = loaded.features
     if (prepared.length === 0) throw new Error('Kartendatenquelle lieferte keine verwertbaren Features')
@@ -350,15 +361,7 @@ export async function GET(req: NextRequest) {
       if (error) throw error
     }
 
-    return NextResponse.json({
-      ok: true,
-      regionId: region.id,
-      slug,
-      total: rows.length,
-      counts,
-      source: loaded.source,
-      overpassError: loaded.overpassError,
-    })
+    return NextResponse.json({ ok: true, regionId: region.id, slug, total: rows.length, counts, source: loaded.source, overpassError: loaded.overpassError })
   } catch (err) {
     console.error('region import failed', { slug, error: err })
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Import fehlgeschlagen' }, { status: 500 })
