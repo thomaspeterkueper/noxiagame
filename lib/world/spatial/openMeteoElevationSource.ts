@@ -2,6 +2,31 @@ import type { GeoBounds } from './earthFeatureSource'
 import type { EarthElevationSource, ElevationGrid, ElevationSample } from './elevationSource'
 
 const ENDPOINT = 'https://api.open-meteo.com/v1/elevation'
+const BATCH_SIZE = 100
+const MAX_ATTEMPTS = 4
+
+async function sleep(ms: number) {
+  await new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function fetchElevationBatch(url: string) {
+  let lastStatus = 0
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const response = await fetch(url, { next: { revalidate: 86400 } })
+    if (response.ok) return response
+
+    lastStatus = response.status
+    const retryable = response.status === 429 || response.status >= 500
+    if (!retryable || attempt === MAX_ATTEMPTS) break
+
+    const retryAfter = Number(response.headers.get('retry-after'))
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : 750 * 2 ** (attempt - 1)
+    await sleep(waitMs)
+  }
+  throw new Error(`Elevation source failed: ${lastStatus || 'network error'}`)
+}
 
 /**
  * Lightweight bootstrap adapter for Copernicus DEM GLO-90 via Open-Meteo.
@@ -19,29 +44,41 @@ export class OpenMeteoElevationSource implements EarthElevationSource {
     const heightM = Math.max(1, (bounds.north - bounds.south) * metresPerLat)
     const cols = Math.max(3, Math.min(18, Math.ceil(widthM / targetResolutionM) + 1))
     const rows = Math.max(3, Math.min(18, Math.ceil(heightM / targetResolutionM) + 1))
-    const points: { lat:number; lon:number }[] = []
-    for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) points.push({
-      lat: bounds.north - (r/(rows-1))*(bounds.north-bounds.south),
-      lon: bounds.west + (c/(cols-1))*(bounds.east-bounds.west),
+    const points: { lat: number; lon: number }[] = []
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) points.push({
+      lat: bounds.north - (r / (rows - 1)) * (bounds.north - bounds.south),
+      lon: bounds.west + (c / (cols - 1)) * (bounds.east - bounds.west),
     })
 
     const samples: ElevationSample[] = []
-    for (let start=0; start<points.length; start+=100) {
-      const batch=points.slice(start,start+100)
-      const params=new URLSearchParams({
-        latitude: batch.map(p=>p.lat.toFixed(6)).join(','),
-        longitude: batch.map(p=>p.lon.toFixed(6)).join(','),
+    for (let start = 0; start < points.length; start += BATCH_SIZE) {
+      const batch = points.slice(start, start + BATCH_SIZE)
+      const params = new URLSearchParams({
+        latitude: batch.map(p => p.lat.toFixed(6)).join(','),
+        longitude: batch.map(p => p.lon.toFixed(6)).join(','),
       })
-      const response=await fetch(`${ENDPOINT}?${params}`,{next:{revalidate:86400}})
-      if(!response.ok) throw new Error(`Elevation source failed: ${response.status}`)
-      const json=await response.json() as { elevation?: number[] }
-      if(!Array.isArray(json.elevation)||json.elevation.length!==batch.length) throw new Error('Elevation source returned an invalid sample set')
-      batch.forEach((p,i)=>samples.push({...p,elevationM:Number(json.elevation![i])}))
+      const response = await fetchElevationBatch(`${ENDPOINT}?${params}`)
+      const json = await response.json() as { elevation?: number[] }
+      if (!Array.isArray(json.elevation) || json.elevation.length !== batch.length) {
+        throw new Error('Elevation source returned an invalid sample set')
+      }
+      batch.forEach((p, i) => samples.push({ ...p, elevationM: Number(json.elevation![i]) }))
+
+      // Be gentle with the public API when a grid spans multiple batches.
+      if (start + BATCH_SIZE < points.length) await sleep(250)
     }
 
     return {
-      bounds,cols,rows,samples,
-      source:{provider:'Open-Meteo',dataset:'Copernicus DEM 2021 GLO-90',resolutionM:90,license:'Copernicus DEM / Open-Meteo attribution required'},
+      bounds,
+      cols,
+      rows,
+      samples,
+      source: {
+        provider: 'Open-Meteo',
+        dataset: 'Copernicus DEM 2021 GLO-90',
+        resolutionM: 90,
+        license: 'Copernicus DEM / Open-Meteo attribution required',
+      },
     }
   }
 }
