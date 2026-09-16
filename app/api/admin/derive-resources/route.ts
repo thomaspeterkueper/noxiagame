@@ -57,6 +57,18 @@ const RESOURCE_TOKENS: Record<string, string[]> = {
   limestone: ['LIMESTONE', 'CA'],
   salt: ['SALT', 'HALITE'],
   groundwater: ['WATER', 'GROUNDWATER'],
+  // 16.09.2026 ergaenzt (Taxonomie-Erweiterung, fossile/gasfoermige Rohstoffe
+  // bewusst zurueckgestellt -- andere geologische Logik, eigener Datenimport):
+  titanium: ['TI', 'TITANIUM'],
+  zirconium: ['ZR', 'ZIRCONIUM'],
+  bauxite: ['BAUXITE', 'ALUMINUM', 'ALUMINIUM', 'AL'],
+  zinc: ['ZN', 'ZINC'],
+  lead: ['PB', 'LEAD'],
+  nickel: ['NI', 'NICKEL'],
+  cobalt: ['CO', 'COBALT'],
+  lithium: ['LI', 'LITHIUM'],
+  gypsum: ['GYPSUM'],
+  phosphate: ['PHOSPHATE', 'P2O5'],
 }
 
 function mrdsMatches(resourceType: string, commodities: string[] | null) {
