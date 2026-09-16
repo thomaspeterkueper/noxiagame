@@ -1,6 +1,10 @@
 // app/api/game/trade/route.ts
-// Aktualisiert: 10.09.2026 — atomarer Spot-Handel; Transit aus Trade herausgelöst
-// Version:      1.0.1
+// Aktualisiert: 16.09.2026 — BUGFIX: Standort-Fallback für schifflose Neu-
+// Accounts war fälschlich 'moon' (führte dazu, dass frische Spieler ohne
+// aktives Schiff auf der nicht dafür vorgesehenen Mondoberfläche statt auf
+// der Erde bzw. im Onboarding landeten). Fallback korrekt auf 'earth'.
+// Vorher: 10.09.2026 — atomarer Spot-Handel; Transit aus Trade herausgelöst
+// Version:      1.0.2
 
 import { NextRequest, NextResponse } from 'next/server'
 import { publishTransaction } from '@/lib/ably/server'
@@ -155,7 +159,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       credits: profile?.credits ?? 5000,
-      location: ship?.location ?? 'moon',
+      // BUGFIX 16.09.2026: Fallback war 'moon' — neue Accounts ohne Schiff
+      // landeten dadurch auf der Mondoberfläche statt auf der Erde/im
+      // Onboarding. Korrekter Startort ist 'earth'.
+      location: ship?.location ?? 'earth',
       cargoMax: ship?.cargo_max ?? 100,
       cargo,
       shipId: ship?.id,
