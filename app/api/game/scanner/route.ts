@@ -1,12 +1,18 @@
 // app/api/game/scanner/route.ts
-// Aktualisiert: 16.09.2026 — geteilte Welt + paralleler Rohstoff-Signalpfad.
+// Aktualisiert: 16.09.2026 — geteilte Welt + Rohstoff-Scanner mit
+// Hardwarekanaelen und wissensabhaengiger Interpretation.
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { LOCATION_MAPS, terrainCodeToType } from '@/lib/grid/locationMaps'
 import { discoveriesFromMeasurement, groundTruthFromTerrain, measureScanner } from '@/lib/game/scanning'
-import { rollResourceScan, haversineKm, type ResourceCandidate, type ResourceTier } from '@/lib/game/resourceScanning'
-
-const RESOURCE_SCAN_RADIUS_KM = 0.3
+import {
+  rollResourceScan,
+  haversineKm,
+  scannerCapability,
+  type ResourceCandidate,
+  type ResourceTier,
+  type ScannerCapability,
+} from '@/lib/game/resourceScanning'
 
 async function authenticatedUser(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -46,6 +52,71 @@ function discoveryDto(row: any) {
   }
 }
 
+function roundedCoord(value: unknown, decimals: number) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return null
+  const f = 10 ** decimals
+  return Math.round(n * f) / f
+}
+
+// Der Fund selbst ist kanonisch/geteilt; wie viel davon ein Spieler versteht,
+// ist hingegen eine Funktion seines Wissens. Die DB speichert deshalb die volle
+// Wahrheit, waehrend die API pro Betrachter eine passende Sicht erzeugt.
+function resourceDiscoveryDto(row: any, capability: ScannerCapability) {
+  const base = discoveryDto(row)
+  const level = capability.interpretationLevel
+  if (level >= 3) return base
+
+  const lat = roundedCoord(row.lat, level >= 1 ? 4 : 3)
+  const lon = roundedCoord(row.lon, level >= 1 ? 4 : 3)
+
+  if (level === 0) {
+    return {
+      ...base,
+      lat,
+      lon,
+      resourceType: null,
+      abundanceTier: null,
+      evidenceKind: null,
+      interpretation: {
+        groundTruthKey: row.ground_truth_key,
+        label: 'Unklare Ressourcensignatur',
+        confidence: 'low',
+        evidence: 'Anomalie erkannt. Mehr geologisches Fachwissen ist fuer eine Stoffbestimmung erforderlich.',
+      },
+    }
+  }
+
+  if (level === 1) {
+    return {
+      ...base,
+      lat,
+      lon,
+      abundanceTier: null,
+      evidenceKind: null,
+      interpretation: {
+        groundTruthKey: row.ground_truth_key,
+        label: `${row.resource_type ?? 'Rohstoff'} — wahrscheinliche Signatur`,
+        confidence: 'low',
+        evidence: 'Rohstofftyp wahrscheinlich erkannt; Menge und geologische Evidenz sind noch nicht sicher interpretierbar.',
+      },
+    }
+  }
+
+  return {
+    ...base,
+    lat,
+    lon,
+    evidenceKind: null,
+    interpretation: {
+      groundTruthKey: row.ground_truth_key,
+      label: `${row.resource_type ?? 'Rohstoff'} — ${row.abundance_tier ?? 'unbestimmte'} Konzentration`,
+      confidence: 'medium',
+      evidence: 'Rohstofftyp und Konzentrationsklasse interpretiert. Herkunft/Evidenz erfordert wissenschaftliche Analyse.',
+    },
+  }
+}
+
 function tierStrength(tier: ResourceTier | null | undefined) {
   if (tier === 'exceptional') return 1
   if (tier === 'rich') return 0.8
@@ -56,7 +127,7 @@ function tierStrength(tier: ResourceTier | null | undefined) {
 async function findWorldScanner(supabase: ReturnType<typeof createServiceClient>, userId: string, locationId: string) {
   const { data } = await supabase
     .from('player_builds')
-    .select('id, latitude_deg, longitude_deg, status')
+    .select('id, latitude_deg, longitude_deg, status, tile_level')
     .eq('profile_id', userId)
     .eq('location_id', locationId)
     .eq('buildable_id', 'scanner')
@@ -66,6 +137,15 @@ async function findWorldScanner(supabase: ReturnType<typeof createServiceClient>
     .limit(1)
     .maybeSingle()
   return data
+}
+
+async function capabilityFor(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  scanner: { tile_level?: number | null },
+) {
+  const { data: profile } = await supabase.from('profiles').select('knowledge_points').eq('id', userId).maybeSingle()
+  return scannerCapability(Number(scanner.tile_level ?? 0), Number(profile?.knowledge_points ?? 0))
 }
 
 async function findRegionFor(supabase: ReturnType<typeof createServiceClient>, lat: number, lon: number) {
@@ -81,7 +161,8 @@ async function resourceScan(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,
   locationId: string,
-  scanner: { id: string; latitude_deg: number; longitude_deg: number },
+  scanner: { id: string; latitude_deg: number; longitude_deg: number; tile_level?: number | null },
+  capability: ScannerCapability,
 ) {
   const origin = { lat: Number(scanner.latitude_deg), lon: Number(scanner.longitude_deg) }
   const region = await findRegionFor(supabase, origin.lat, origin.lon)
@@ -103,7 +184,7 @@ async function resourceScan(
       tier: (r.properties?.tier ?? 'trace') as ResourceTier,
       mrdsBoosted: Boolean(r.properties?.mrds_boosted),
     }))
-    .filter(c => Number.isFinite(c.lat) && Number.isFinite(c.lon) && haversineKm(origin, c) <= RESOURCE_SCAN_RADIUS_KM)
+    .filter(c => Number.isFinite(c.lat) && Number.isFinite(c.lon) && haversineKm(origin, c) <= capability.radiusKm)
 
   const { data: knownRows, error: knownError } = await supabase
     .from('scanner_discoveries')
@@ -114,7 +195,7 @@ async function resourceScan(
 
   const known = new Set((knownRows ?? []).map((r: any) => r.region_resource_id as string))
   const knownInRadius = new Set(candidates.filter(c => known.has(c.id)).map(c => c.id))
-  const results = rollResourceScan(candidates, known)
+  const results = rollResourceScan(candidates, known, capability)
   const newlyFound = results.filter(r => r.found)
   const newlyFoundIds = new Set(newlyFound.map(r => r.candidate.id))
   const measuredAt = new Date().toISOString()
@@ -156,35 +237,40 @@ async function resourceScan(
   if (persistedError) return { error: 'scanner_persistence_unavailable' as const }
 
   const resourceRows = persistedRows ?? []
-  const newDiscoveries = resourceRows.filter((row: any) => newlyFoundIds.has(row.region_resource_id)).map(discoveryDto)
-  const knownDiscoveries = resourceRows.filter((row: any) => knownInRadius.has(row.region_resource_id)).map(discoveryDto)
+  const newRaw = resourceRows.filter((row: any) => newlyFoundIds.has(row.region_resource_id))
+  const knownRaw = resourceRows.filter((row: any) => knownInRadius.has(row.region_resource_id))
+  const newDiscoveries = newRaw.map((row: any) => resourceDiscoveryDto(row, capability))
+  const knownDiscoveries = knownRaw.map((row: any) => resourceDiscoveryDto(row, capability))
 
+  // Radarpositionen bleiben messbare Geometrie. Fachinformation wird separat
+  // ueber die Discovery-DTOs abgestuft und dadurch nicht vorzeitig geleakt.
   const signals = [
-    ...knownDiscoveries.map((d: any) => ({
-      lat: Number(d.lat), lon: Number(d.lon), strength: tierStrength(d.abundanceTier), known: true,
-      resourceType: d.resourceType, evidenceKind: d.evidenceKind,
+    ...knownRaw.map((row: any) => ({
+      lat: Number(row.lat), lon: Number(row.lon), strength: tierStrength(row.abundance_tier), known: true,
     })),
-    ...newDiscoveries.map((d: any) => ({
-      lat: Number(d.lat), lon: Number(d.lon), strength: tierStrength(d.abundanceTier), known: false,
-      resourceType: d.resourceType, evidenceKind: d.evidenceKind,
+    ...newRaw.map((row: any) => ({
+      lat: Number(row.lat), lon: Number(row.lon), strength: tierStrength(row.abundance_tier), known: false,
     })),
   ]
 
   return {
     ok: true as const,
     regionSlug: region.slug,
-    scanner: { id: scanner.id, lat: origin.lat, lon: origin.lon },
+    scanner: { id: scanner.id, lat: origin.lat, lon: origin.lon, hardwareLevel: capability.hardwareLevel },
+    capability,
     measurement: {
       origin,
-      radiusKm: RESOURCE_SCAN_RADIUS_KM,
+      radiusKm: capability.radiusKm,
       scannedCandidates: candidates.length,
+      measurableCandidates: results.filter(r => r.measurable).length,
+      blockedByTechnique: results.filter(r => !r.measurable).length,
       signals,
     },
     interpretations: newDiscoveries.map((d: any) => d.interpretation),
     newDiscoveries,
     knownDiscoveries,
-    misses: results.length - newlyFound.length,
-    discoveries: resourceRows.map(discoveryDto),
+    misses: results.filter(r => r.measurable && !r.found).length,
+    discoveries: resourceRows.map((row: any) => resourceDiscoveryDto(row, capability)),
   }
 }
 
@@ -208,15 +294,23 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: 'scanner_persistence_unavailable' }, { status: 503 })
 
   const worldScanner = await findWorldScanner(supabase, user.id, location.id)
-  const scanner = terrain
-    ? (tileScanner ? { id: tileScanner.id, row: tileScanner.tile_row, col: tileScanner.tile_col } : null)
-    : (worldScanner ? { id: worldScanner.id, lat: Number(worldScanner.latitude_deg), lon: Number(worldScanner.longitude_deg) } : null)
+  if (terrain) {
+    return NextResponse.json({
+      location: locationSlug,
+      mode: 'terrain',
+      scanner: tileScanner ? { id: tileScanner.id, row: tileScanner.tile_row, col: tileScanner.tile_col } : null,
+      discoveries: (data ?? []).map(discoveryDto),
+    })
+  }
 
+  if (!worldScanner) return NextResponse.json({ location: locationSlug, mode: 'resource', scanner: null, discoveries: [] })
+  const capability = await capabilityFor(supabase, user.id, worldScanner)
   return NextResponse.json({
     location: locationSlug,
-    mode: terrain ? 'terrain' : 'resource',
-    scanner,
-    discoveries: (data ?? []).map(discoveryDto),
+    mode: 'resource',
+    scanner: { id: worldScanner.id, lat: Number(worldScanner.latitude_deg), lon: Number(worldScanner.longitude_deg), hardwareLevel: capability.hardwareLevel },
+    capability,
+    discoveries: (data ?? []).filter((row: any) => row.region_resource_id).map((row: any) => resourceDiscoveryDto(row, capability)),
   })
 }
 
@@ -236,7 +330,8 @@ export async function POST(req: NextRequest) {
   if (!terrain) {
     const worldScanner = await findWorldScanner(supabase, user.id, location.id)
     if (!worldScanner) return NextResponse.json({ error: 'owned_scanner_not_found' }, { status: 403 })
-    const result = await resourceScan(supabase, user.id, location.id, worldScanner as any)
+    const capability = await capabilityFor(supabase, user.id, worldScanner)
+    const result = await resourceScan(supabase, user.id, location.id, worldScanner as any, capability)
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 503 })
     return NextResponse.json({ location: locationSlug, mode: 'resource', ...result })
   }
