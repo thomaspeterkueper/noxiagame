@@ -49,6 +49,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   const loadFromServer = useGameStore(s => s.loadFromServer)
 
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
+  const [autoOpenJourney, setAutoOpenJourney] = useState(false)
 
   useEffect(() => {
     loadFromServer()
@@ -70,7 +71,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   }
 
   if (!onboarded) {
-    return <WelcomeSetup onDone={() => setOnboarded(true)} />
+    return <WelcomeSetup onDone={(opts) => { setOnboarded(true); if (opts?.openJourney) setAutoOpenJourney(true) }} />
   }
 
   if (!loaded) {
@@ -78,7 +79,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   }
 
   return <>
-    <DashboardClient locations={locations} prices={prices} orders={orders} />
+    <DashboardClient locations={locations} prices={prices} orders={orders} autoOpenJourney={autoOpenJourney} />
     <DashboardMoonSurface />
     <DashboardProfileBridge />
     <DashboardHudManager />
