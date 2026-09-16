@@ -20,40 +20,12 @@
 export type TerrainCode = string
 
 export const LOCATION_MAPS: Record<string, string[]> = {
-  // Earth Terrain v3:
-  // - Fluss, Waldcluster und freie Grasflächen bleiben erhalten
-  // - Städte, Farmland und Raumhafen sind jetzt eigene Tile-Klassen
-  earth: [
-    'gfffffggggrggggggggggggCCCCPggggg',
-    'fFFFFfggggrggggggggggggCCCCPggggg',
-    'fFFFFfggggrrgggggggggggCCCCPggggg',
-    'fFFFFfgggggrgggggggggggCCCCPggggg',
-    'fffffggggggrrgggggggggggffffffffgg',
-    'ggggggAAAAAgrgggggggggggfFFFFFFfgg',
-    'ggAAAAAgggggrgggggggggggfFFFFFFfgg',
-    'ggAAAAAgggggrrggggggggggfFFFFFFfgg',
-    'ggAAAAAgggggggrgggggggggffffffffgg',
-    'gggggggggggggrrggggggggggggggggggg',
-    'ggggggggggggggrgggggCCCCCggggggggg',
-    'fffffgggggggggrgggggCCCCCggggggggg',
-    'fFFFfgggggggggrrggggCCCCCggggggggg',
-    'fFFFfggggggggggrggggggAAAAAggggggg',
-    'fFFFfggggggggggrrgggggAAAAAggggggg',
-    'fFFFfgggggggggggrgggggAAAAAggggggg',
-    'fffffgggggggggggrgggggAAAAAggggggg',
-    'ggggggffffffggggrrgggggggggggggggg',
-    'ggggggfFFFFfgggggrgggggggggggggggg',
-    'ggggggfFFFFfgggggrrggggggggggggggg',
-    'ggggggfFFFFfggggggrggggggggggggggg',
-    'CCCCPfFFFFfggggggrggggggggggggggg',
-    'CCCCPffffffggggggrrgggggggggggggg',
-    'CCCCPgggggggggggggrgggggggggggggg',
-  ],
+  // Earth hat KEINE abstrakte Kachelkarte mehr (16.09.2026 entfernt). Die alte
+  // handautorierte 34x24-ASCII-Karte war ein Fruehphase-Platzhalter ohne
+  // echten Geobezug. Earth laeuft vollstaendig auf dem realen Lat/Lon-System
+  // (siehe lib/world/spatial/*, app/api/game/build/spatial, region_resources).
+  //
   // Moon Terrain v3 / Shackleton:
-  // - markanter polnaher Krater-/Eisbereich
-  // - Research-Bezirk nahe Startbasis
-  // - sichtbare Ressourcenfelder: Eis, Helium-3, Titan
-  // - deutlich weniger monotone Hochlandtapete
   moon: [
     'XXXXccccssqqqqqqqqqqTTTTqqqqqqqq',
     'XXXcccccSSqqqqqqqqqqTTTTqqqqqqqq',
