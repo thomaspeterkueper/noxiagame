@@ -57,8 +57,6 @@ const RESOURCE_TOKENS: Record<string, string[]> = {
   limestone: ['LIMESTONE', 'CA'],
   salt: ['SALT', 'HALITE'],
   groundwater: ['WATER', 'GROUNDWATER'],
-  // 16.09.2026 ergaenzt (Taxonomie-Erweiterung, fossile/gasfoermige Rohstoffe
-  // bewusst zurueckgestellt -- andere geologische Logik, eigener Datenimport):
   titanium: ['TI', 'TITANIUM'],
   zirconium: ['ZR', 'ZIRCONIUM'],
   bauxite: ['BAUXITE', 'ALUMINUM', 'ALUMINIUM', 'AL'],
@@ -71,11 +69,44 @@ const RESOURCE_TOKENS: Record<string, string[]> = {
   phosphate: ['PHOSPHATE', 'P2O5'],
 }
 
-function mrdsMatches(resourceType: string, commodities: string[] | null) {
-  const tokens = RESOURCE_TOKENS[resourceType] ?? []
-  if (!tokens.length || !commodities?.length) return false
-  const haystack = commodities.join(' ').toUpperCase()
-  return tokens.some(token => new RegExp(`(^|[^A-Z0-9])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Z0-9]|$)`).test(haystack))
+function normalizeAlias(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, ' ')
+}
+
+function commodityAliases(commodities: string[] | null) {
+  const aliases = new Set<string>()
+  for (const rawValue of commodities ?? []) {
+    const normalized = normalizeAlias(String(rawValue))
+    if (!normalized) continue
+
+    aliases.add(normalized)
+
+    const parts = normalized
+      .split(/[\s,;|/]+/)
+      .map(part => part.trim())
+      .filter(Boolean)
+
+    for (const part of parts) aliases.add(part)
+
+    // Exakte Mehrwort-Aliase ebenfalls erkennen, ohne Substring-Matching.
+    // Beispiel: "RARE EARTH" bleibt als Bigramm erhalten, waehrend
+    // "GEM_SP TI ZR" sauber zu GEM_SP / TI / ZR zerlegt wird.
+    for (let size = 2; size <= Math.min(3, parts.length); size++) {
+      for (let i = 0; i <= parts.length - size; i++) {
+        aliases.add(parts.slice(i, i + size).join(' '))
+      }
+    }
+  }
+  return aliases
+}
+
+function mrdsResourceTypes(commodities: string[] | null) {
+  const aliases = commodityAliases(commodities)
+  const matches = new Set<string>()
+  for (const [resourceType, tokens] of Object.entries(RESOURCE_TOKENS)) {
+    if (tokens.some(token => aliases.has(normalizeAlias(token)))) matches.add(resourceType)
+  }
+  return matches
 }
 
 function errorMessage(err: unknown) {
@@ -151,6 +182,11 @@ export async function GET(req: NextRequest) {
       .eq('region_id', region.id)
     if (mrdsError) throw mrdsError
 
+    const preparedMrds = ((mrdsRows ?? []) as MineralRow[]).map(row => ({
+      ...row,
+      resourceTypes: mrdsResourceTypes(row.commodities),
+    }))
+
     const latStep = SAMPLE_M / 111_320
     const rows: Array<Record<string, unknown>> = []
     for (let lat = bounds.south; lat <= bounds.north + 1e-12; lat += latStep) {
@@ -163,8 +199,8 @@ export async function GET(req: NextRequest) {
           const rarityFactor = -Math.log(u)
 
           let mrdsBoost = 1
-          for (const m of (mrdsRows ?? []) as MineralRow[]) {
-            if (!mrdsMatches(resource_type, m.commodities)) continue
+          for (const m of preparedMrds) {
+            if (!m.resourceTypes.has(resource_type)) continue
             const dKm = haversineKm({ lat, lon }, { lat: Number(m.lat), lon: Number(m.lon) })
             mrdsBoost += 3 * Math.exp(-dKm / 1.5)
           }
