@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 export const maxDuration = 60
 
 const IMPORT_SECRET_SHA256 = '6e7d71b3bd360c945d18f8a3c20d596739049d97736455dda6980c95856d4e8d'
-const MRDS_QUERY_ENDPOINT = 'https://energy.usgs.gov/arcgis/rest/services/MRData/Mineral_Resource_Data_System/FeatureServer/3/query'
+const MRDS_QUERY_ENDPOINT = 'https://energy.usgs.gov/arcgis/rest/services/Hosted/Mineral_Resource_Data_System/FeatureServer/0/query'
 const MRDS_OUT_FIELDS = 'gid,dep_id,site_name,dev_stat,code_list,grade,url'
 
 function matchesSecret(secret: string) {
