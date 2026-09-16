@@ -376,6 +376,122 @@ async function importMineralOccurrences(supabase: ReturnType<typeof createServic
   return rows.length
 }
 
+// --- region_resources: deterministische Ableitung ---
+// abundance = geology_factor x local_variation x rarity_factor x mrds_boost
+// - geology_factor: Basisgewicht aus geology_resource_affinity (GLiM-Klasse -> Rohstofftyp)
+// - local_variation: multiplikatives Rauschen, deterministisch aus (slug, x, y, resourceType)
+// - rarity_factor: exponentialverteilt (Mittelwert 1) -> heavy tail, macht Reichtum selten
+// - mrds_boost: reale MRDS-Vorkommen erhoehen passende Rohstofftypen in der Naehe stark,
+//   sind aber KEIN exklusiver Generator -- ohne MRDS-Treffer bleibt boost bei 1.0
+// Wichtig: rein deterministisch ueber Weltkoordinate + Regions-Slug, nie spielerabhaengig.
+
+function seededUnit(...parts: (string | number)[]): number {
+  // FNV-1a-artiger 32-bit-Hash, ausreichend fuer deterministisches Pseudo-Rauschen
+  const s = parts.join(':')
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return ((h >>> 0) % 1_000_000) / 1_000_000 // Ergebnis liegt in [0, 1)
+}
+
+function haversineKm(a: GeoPoint, b: GeoPoint) {
+  const R = 6371
+  const dLat = (b.lat - a.lat) * Math.PI / 180
+  const dLon = (b.lon - a.lon) * Math.PI / 180
+  const la1 = a.lat * Math.PI / 180, la2 = b.lat * Math.PI / 180
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
+}
+
+function tierFor(abundance: number) {
+  if (abundance >= 3.0) return 'exceptional'
+  if (abundance >= 1.0) return 'rich'
+  if (abundance >= 0.3) return 'viable'
+  return 'trace'
+}
+
+async function deriveRegionResources(supabase: ReturnType<typeof createServiceClient>, slug: string) {
+  const { data: region, error: regionError } = await supabase
+    .from('celestial_regions').select('id, slug, center_lat, center_lon, bounds').eq('slug', slug).single()
+  if (regionError || !region) throw new Error(`Region '${slug}' nicht gefunden`)
+  const bounds = region.bounds as Bounds
+
+  const { data: affinityRows } = await supabase.from('geology_resource_affinity').select('lithology_class, resource_type, base_weight')
+  const affinity = new Map<string, { resource_type: string; base_weight: number }[]>()
+  for (const row of affinityRows ?? []) {
+    const list = affinity.get(row.lithology_class) ?? []
+    list.push({ resource_type: row.resource_type, base_weight: row.base_weight })
+    affinity.set(row.lithology_class, list)
+  }
+
+  // Region ist typischerweise viel kleiner als ein 0.5-Grad-GLiM-Raster --
+  // die naechstgelegene(n) Zelle(n) reichen als Makro-Hintergrund.
+  const { data: cells } = await supabase
+    .from('geology_lithology_grid').select('lat, lon, lithology_class')
+    .gte('lat', bounds.south - 0.5).lte('lat', bounds.north + 0.5)
+    .gte('lon', bounds.west - 0.5).lte('lon', bounds.east + 0.5)
+  const centre = { lat: region.center_lat, lon: region.center_lon }
+  let dominantClass = 'nd'
+  let bestDist = Infinity
+  for (const c of cells ?? []) {
+    const d = haversineKm(centre, { lat: c.lat, lon: c.lon })
+    if (d < bestDist) { bestDist = d; dominantClass = c.lithology_class }
+  }
+  const localAffinity = affinity.get(dominantClass) ?? []
+
+  const { data: mrdsRows } = await supabase
+    .from('region_mineral_occurrences').select('lat, lon, commodities').eq('region_id', region.id)
+
+  const stepDeg = 100 / 111_320 // ~100m Sampling-Raster
+  const rows: any[] = []
+  for (let lat = bounds.south; lat <= bounds.north; lat += stepDeg) {
+    for (let lon = bounds.west; lon <= bounds.east; lon += stepDeg * Math.max(0.2, Math.cos(lat * Math.PI / 180))) {
+      for (const { resource_type, base_weight } of localAffinity) {
+        const localVariation = 0.3 + seededUnit(slug, lat.toFixed(5), lon.toFixed(5), resource_type, 'var') * 1.0
+        const u = Math.max(1e-6, seededUnit(slug, lat.toFixed(5), lon.toFixed(5), resource_type, 'rarity'))
+        const rarityFactor = -Math.log(u) // exponentialverteilt, Mittelwert 1
+
+        let mrdsBoost = 1
+        for (const m of mrdsRows ?? []) {
+          const matches = (m.commodities ?? []).some((c: string) =>
+            resource_type.toLowerCase().includes(String(c).toLowerCase().slice(0, 3)))
+          if (!matches) continue
+          const dKm = haversineKm({ lat, lon }, { lat: m.lat, lon: m.lon })
+          mrdsBoost += 3 * Math.exp(-dKm / 1.5)
+        }
+
+        const abundance = base_weight * localVariation * rarityFactor * mrdsBoost
+        if (abundance < 0.05) continue // Rauschen unterhalb der Spurenschwelle nicht speichern
+
+        rows.push({
+          region_id: region.id,
+          resource_type,
+          lat, lon,
+          abundance,
+          properties: { tier: tierFor(abundance), lithology_class: dominantClass, mrds_boosted: mrdsBoost > 1.05 },
+        })
+      }
+    }
+  }
+
+  await supabase.from('region_resources').delete().eq('region_id', region.id)
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from('region_resources').insert(rows.slice(i, i + 500))
+    if (error) throw error
+  }
+
+  const byType: Record<string, number> = {}
+  const byTier: Record<string, number> = {}
+  for (const r of rows) {
+    byType[r.resource_type] = (byType[r.resource_type] ?? 0) + 1
+    byTier[r.properties.tier] = (byTier[r.properties.tier] ?? 0) + 1
+  }
+
+  return { ok: true, slug, regionId: region.id, dominantLithology: dominantClass, total: rows.length, byType, byTier }
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
@@ -404,6 +520,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, finalUrl: res.url, byteLength: buf.length, entries, previewFile: first, preview })
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : 'Inspektion fehlgeschlagen' }, { status: 500 })
+    }
+  }
+
+  if (action === 'derive-resources') {
+    if (!slug) return NextResponse.json({ error: 'slug erforderlich' }, { status: 400 })
+    try {
+      const result = await deriveRegionResources(supabase, slug)
+      return NextResponse.json(result)
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Ressourcen-Ableitung fehlgeschlagen' }, { status: 500 })
     }
   }
 
