@@ -6,6 +6,7 @@ export const maxDuration = 60
 
 const IMPORT_SECRET_SHA256 = '6e7d71b3bd360c945d18f8a3c20d596739049d97736455dda6980c95856d4e8d'
 const MRDS_QUERY_ENDPOINT = 'https://energy.usgs.gov/arcgis/rest/services/MRData/Mineral_Resource_Data_System/FeatureServer/3/query'
+const MRDS_OUT_FIELDS = 'gid,dep_id,site_name,dev_stat,code_list,grade,url'
 
 function matchesSecret(secret: string) {
   const actual = Buffer.from(createHash('sha256').update(secret).digest('hex'))
@@ -14,57 +15,68 @@ function matchesSecret(secret: string) {
 }
 
 type RegionBounds = { south: number; west: number; north: number; east: number }
-
 type MrdsFeature = {
-  type?: string
   geometry?: { type?: string; coordinates?: number[] }
   properties?: Record<string, unknown>
 }
 
-function parseEmbeddedJson(value: unknown) {
-  if (typeof value !== 'string' || !value.trim()) return null
-  try { return JSON.parse(value) as Record<string, unknown> } catch { return null }
+function commodityList(properties: Record<string, unknown>) {
+  const codeList = typeof properties.code_list === 'string' ? properties.code_list : ''
+  return [...new Set(codeList.split(/[;,|]/).map(v => v.trim()).filter(Boolean))]
 }
 
-function commodityList(properties: Record<string, unknown>, embedded: Record<string, unknown> | null) {
-  const candidates = [
-    properties.commod1,
-    properties.commodities,
-    embedded?.commod1,
-    embedded?.commodities,
-    embedded?.commodity,
-  ]
-  const values = candidates.flatMap(value => {
-    if (Array.isArray(value)) return value.map(String)
-    if (typeof value === 'string') return value.split(/[;,|]/)
-    return []
-  }).map(v => v.trim()).filter(Boolean)
-  return [...new Set(values)]
-}
-
-async function fetchMrds(bounds: RegionBounds) {
+async function requestMrds(bounds: RegionBounds, returnIdsOnly = false) {
   const params = new URLSearchParams({
     where: '1=1',
     geometry: `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`,
     geometryType: 'esriGeometryEnvelope',
     inSR: '4326',
     spatialRel: 'esriSpatialRelIntersects',
-    outFields: '*',
+    returnGeometry: returnIdsOnly ? 'false' : 'true',
+    outSR: '4326',
+    f: returnIdsOnly ? 'json' : 'geojson',
+  })
+  if (returnIdsOnly) params.set('returnIdsOnly', 'true')
+  else params.set('outFields', MRDS_OUT_FIELDS)
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 45000)
+  try {
+    const res = await fetch(`${MRDS_QUERY_ENDPOINT}?${params}`, {
+      headers: { accept: 'application/json,application/geo+json', 'user-agent': 'NOXIA/0.1 mrds-import' },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error(`USGS MRDS ArcGIS: HTTP ${res.status}`)
+    return await res.json()
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function fetchMrds(bounds: RegionBounds) {
+  const ids = await requestMrds(bounds, true) as { objectIds?: number[]; error?: { message?: string } }
+  if (ids.error) throw new Error(`USGS MRDS ArcGIS: ${ids.error.message ?? 'ID query error'}`)
+  if (!Array.isArray(ids.objectIds) || ids.objectIds.length === 0) return [] as MrdsFeature[]
+
+  const params = new URLSearchParams({
+    objectIds: ids.objectIds.join(','),
+    outFields: MRDS_OUT_FIELDS,
     returnGeometry: 'true',
     outSR: '4326',
     f: 'geojson',
   })
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000)
+  const timeout = setTimeout(() => controller.abort(), 45000)
   try {
     const res = await fetch(`${MRDS_QUERY_ENDPOINT}?${params}`, {
       headers: { accept: 'application/geo+json,application/json', 'user-agent': 'NOXIA/0.1 mrds-import' },
       cache: 'no-store',
       signal: controller.signal,
     })
-    if (!res.ok) throw new Error(`USGS MRDS ArcGIS: HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`USGS MRDS ArcGIS details: HTTP ${res.status}`)
     const data = await res.json() as { features?: MrdsFeature[]; error?: { message?: string } }
-    if (data.error) throw new Error(`USGS MRDS ArcGIS: ${data.error.message ?? 'query error'}`)
+    if (data.error) throw new Error(`USGS MRDS ArcGIS details: ${data.error.message ?? 'query error'}`)
     return data.features ?? []
   } finally {
     clearTimeout(timeout)
@@ -100,7 +112,6 @@ export async function GET(req: NextRequest) {
       const [lon, lat] = coords.map(Number)
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return []
       const properties = feature.properties ?? {}
-      const embedded = parseEmbeddedJson(properties.json)
       return [{
         region_id: region.id,
         source: 'usgs-mrds-arcgis',
@@ -108,9 +119,9 @@ export async function GET(req: NextRequest) {
         name: properties.site_name != null ? String(properties.site_name) : null,
         lat,
         lon,
-        commodities: commodityList(properties, embedded),
+        commodities: commodityList(properties),
         development_status: properties.dev_stat != null ? String(properties.dev_stat) : null,
-        properties: { ...properties, embedded },
+        properties,
       }]
     })
 
