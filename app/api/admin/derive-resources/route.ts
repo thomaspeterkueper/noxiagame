@@ -50,6 +50,7 @@ function tierFor(abundance: number) {
 const RESOURCE_TOKENS: Record<string, string[]> = {
   copper_ore: ['CU', 'COPPER'],
   iron_ore: ['FE', 'IRON'],
+  gold: ['AU', 'GOLD'],
   rare_earth: ['REE', 'RARE_EARTH', 'RARE EARTH'],
   silica_quartz: ['SI', 'SILICA', 'QUARTZ'],
   uranium: ['U', 'URANIUM'],
@@ -88,9 +89,6 @@ function commodityAliases(commodities: string[] | null) {
 
     for (const part of parts) aliases.add(part)
 
-    // Exakte Mehrwort-Aliase ebenfalls erkennen, ohne Substring-Matching.
-    // Beispiel: "RARE EARTH" bleibt als Bigramm erhalten, waehrend
-    // "GEM_SP TI ZR" sauber zu GEM_SP / TI / ZR zerlegt wird.
     for (let size = 2; size <= Math.min(3, parts.length); size++) {
       for (let i = 0; i <= parts.length - size; i++) {
         aliases.add(parts.slice(i, i + size).join(' '))
