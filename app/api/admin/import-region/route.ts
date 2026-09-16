@@ -11,7 +11,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
+const OVERPASS_ENDPOINT = 'https://overpass.private.coffee/api/interpreter'
 const MAX_POINTS_PER_WAY = 40
 
 // The plaintext import secret is never stored in git. Authentication compares
