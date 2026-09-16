@@ -78,7 +78,14 @@ function matchesImportSecret(secret: string) {
 async function fetchClass(cls: string, bounds: { south: number; west: number; north: number; east: number }) {
   const b = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   const q = `[out:json][timeout:60];(${CLASS_QUERIES[cls](b)});out geom;`
-  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: 'data=' + encodeURIComponent(q) })
+  const res = await fetch(OVERPASS_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'user-agent': 'NOXIA/0.1 region-import',
+    },
+    body: new URLSearchParams({ data: q }),
+  })
   if (!res.ok) throw new Error(`Overpass ${cls}: HTTP ${res.status}`)
   const data = await res.json()
   return (data.elements ?? []) as any[]
