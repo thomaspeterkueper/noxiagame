@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 
 const IMPORT_SECRET_SHA256 = '6e7d71b3bd360c945d18f8a3c20d596739049d97736455dda6980c95856d4e8d'
-const PANGAEA_TEXT_URL = 'https://doi.pangaea.de/10.1594/PANGAEA.788537?format=textfile'
-const PANGAEA_FILE_URL = 'https://download.pangaea.de/dataset/788537/files/hartmann-moosdorf_2012.zip'
+const GLIM_URL = 'https://doi.pangaea.de/10.1594/PANGAEA.788537?format=textfile'
 
 function matchesSecret(secret: string) {
   const actual = Buffer.from(createHash('sha256').update(secret).digest('hex'))
@@ -13,45 +12,55 @@ function matchesSecret(secret: string) {
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
-async function inspect(url: string, accept?: string) {
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 25000)
-    try {
-      const res = await fetch(url, {
-        redirect: 'follow',
-        headers: accept ? { accept, 'user-agent': 'NOXIA/0.1 glim-inspector' } : { 'user-agent': 'NOXIA/0.1 glim-inspector' },
-        cache: 'no-store',
-        signal: controller.signal,
-      })
-      const buf = Buffer.from(await res.arrayBuffer())
-      const type = res.headers.get('content-type') ?? ''
-      const disposition = res.headers.get('content-disposition') ?? ''
-      const textLike = /text|json|xml|csv|tab-separated/i.test(type)
-      return {
-        requestedUrl: url,
-        ok: res.ok,
-        status: res.status,
-        finalUrl: res.url,
-        contentType: type,
-        contentDisposition: disposition,
-        byteLength: buf.length,
-        preview: textLike ? buf.toString('utf8').slice(0, 2000) : buf.subarray(0, 32).toString('hex'),
-      }
-    } finally {
-      clearTimeout(timeout)
-    }
-  } catch (err) {
-    return { requestedUrl: url, ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const secret = req.headers.get('x-noxia-admin-secret') ?? searchParams.get('secret')
   if (!secret || !matchesSecret(secret)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const text = await inspect(PANGAEA_TEXT_URL, 'text/tab-separated-values,text/plain;q=0.9,*/*;q=0.1')
-  const file = await inspect(PANGAEA_FILE_URL, 'application/zip,application/octet-stream;q=0.9,*/*;q=0.1')
-  return NextResponse.json({ ok: Boolean(text.ok || file.ok), text, file })
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 25000)
+    let res: Response
+    try {
+      res = await fetch(GLIM_URL, {
+        redirect: 'follow',
+        headers: { accept: 'application/zip,application/octet-stream;q=0.9,*/*;q=0.1', 'user-agent': 'NOXIA/0.1 glim-inspector' },
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
+    if (!res.ok) return NextResponse.json({ error: `GLiM Download: HTTP ${res.status}` }, { status: 502 })
+
+    const buf = Buffer.from(await res.arrayBuffer())
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(buf)
+    const entries = Object.values(zip.files).map(entry => ({ name: entry.name, dir: entry.dir }))
+    const previews: Array<{ name: string; byteLength: number; preview: string }> = []
+
+    for (const entry of Object.values(zip.files)) {
+      if (entry.dir) continue
+      const content = await entry.async('nodebuffer')
+      const lower = entry.name.toLowerCase()
+      const textLike = /\.(txt|csv|tsv|asc|dat|xml|json|prj|cpg|dbf\.xml)$/i.test(lower)
+      previews.push({
+        name: entry.name,
+        byteLength: content.length,
+        preview: textLike ? content.toString('utf8').slice(0, 3000) : content.subarray(0, 64).toString('hex'),
+      })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      source: GLIM_URL,
+      finalUrl: res.url,
+      contentType: res.headers.get('content-type'),
+      byteLength: buf.length,
+      entries,
+      previews,
+    })
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'GLiM-Inspektion fehlgeschlagen' }, { status: 500 })
+  }
 }
