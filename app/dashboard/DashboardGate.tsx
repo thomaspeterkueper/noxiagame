@@ -55,16 +55,31 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   useEffect(() => {
     loadFromServer()
     ;(async () => {
-      try {
-        const token = await getToken()
-        const res = await fetch('/api/game/profile', { headers: { Authorization: `Bearer ${token}` } })
-        const data = await res.json()
-        setOnboarded(Boolean(data?.profile?.onboarded))
-        setExistingUsername(data?.profile?.username || undefined)
-      } catch {
-        // Bei Fehlschlag lieber nicht blockieren als einen Spieler dauerhaft aussperren.
-        setOnboarded(true)
+      // BUGFIX 16.09.2026: Direkt nach einem harten Reload (z.B. Regionswechsel
+      // in EarthRegionSwitcherOverlay.tsx) ist die Supabase-Session manchmal
+      // noch nicht sofort verfuegbar; /api/game/profile antwortet dann kurz
+      // mit 401 statt mit dem Profil. Vorher wurde ein fehlendes profile.onboarded
+      // faelschlich als "false" gelesen -> Onboarding erschien erneut, obwohl
+      // der Account laengst onboarded war. Jetzt: bei Fehlschlag bis zu 3x mit
+      // kurzer Pause erneut versuchen, statt sofort false anzunehmen.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const token = await getToken()
+          const res = await fetch('/api/game/profile', { headers: { Authorization: `Bearer ${token}` } })
+          const data = await res.json()
+          if (res.ok && data?.profile) {
+            setOnboarded(Boolean(data.profile.onboarded))
+            setExistingUsername(data.profile.username || undefined)
+            return
+          }
+        } catch {
+          // weiter zum naechsten Versuch
+        }
+        await new Promise(r => setTimeout(r, 400))
       }
+      // Alle Versuche fehlgeschlagen: nicht aussperren, aber auch nicht
+      // faelschlich das Onboarding erneut zeigen.
+      setOnboarded(true)
     })()
   }, [loadFromServer])
 
