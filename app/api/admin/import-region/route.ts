@@ -96,13 +96,13 @@ function toFeatures(cls: string, elements: any[]) {
 export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
 
-  const secret = req.headers.get('x-noxia-admin-secret')
+  const { searchParams } = new URL(req.url)
+  const secret = req.headers.get('x-noxia-admin-secret') ?? searchParams.get('secret')
   const { data: cfg } = await supabase.from('internal_config').select('value').eq('key', 'admin_import_secret').single()
   if (!secret || !cfg || secret !== cfg.value) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { searchParams } = new URL(req.url)
   const slug = searchParams.get('slug')
   const label = searchParams.get('label')
   const lat = Number(searchParams.get('lat'))
