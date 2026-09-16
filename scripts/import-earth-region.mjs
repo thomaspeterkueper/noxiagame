@@ -23,8 +23,12 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
-const MAX_POINTS_PER_WAY = 40 // Geometrie-Reduktion: mehr Punkte bringen auf dieser Zoomstufe nichts
+// Der bisherige Hauptserver lieferte beim initialen Produktionsimport
+// wiederholt 504. Diese oeffentliche OSM-Instanz ist als Alternative fuer
+// kleine Projekte dokumentiert. Bei Bedarf kann sie hier zentral getauscht
+// werden; Route und CLI verwenden denselben Importmodus.
+const OVERPASS_ENDPOINT = 'https://overpass.private.coffee/api/interpreter'
+const MAX_POINTS_PER_WAY = 40
 
 const CLASS_QUERIES = {
   water:      b => `way[natural=water](${b});way[water](${b});relation[natural=water](${b});`,
@@ -63,8 +67,6 @@ function boundsFor(lat, lon, radiusKm) {
   return { south: lat - dLat, west: lon - dLon, north: lat + dLat, east: lon + dLon }
 }
 
-// Douglas-Peucker-Vereinfachung, damit Linien/Polygone nicht jeden
-// OSM-Stuetzpunkt mitschleppen.
 function simplify(points, tolerance = 0.00015) {
   if (points.length <= 2) return points
   let maxDist = 0, index = 0
@@ -99,7 +101,14 @@ function capPoints(points) {
 async function fetchClass(cls, bounds) {
   const b = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   const q = `[out:json][timeout:60];(${CLASS_QUERIES[cls](b)});out geom;`
-  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: 'data=' + encodeURIComponent(q) })
+  const res = await fetch(OVERPASS_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'user-agent': 'NOXIA/0.1 region-import-cli',
+    },
+    body: new URLSearchParams({ data: q }),
+  })
   if (!res.ok) throw new Error(`Overpass ${cls}: HTTP ${res.status}`)
   const data = await res.json()
   return data.elements ?? []
@@ -151,7 +160,6 @@ async function main() {
     .single()
   if (regionError) throw regionError
 
-  // Alte Features dieser Region ersetzen (erneuter Import = frischer Stand)
   await supabase.from('region_features').delete().eq('region_id', region.id)
 
   let totalFeatures = 0
@@ -159,7 +167,6 @@ async function main() {
     const elements = await fetchClass(cls, bounds)
     const features = toFeatures(cls, elements).map(f => ({ ...f, region_id: region.id }))
     if (features.length > 0) {
-      // In Batches schreiben, falls eine Kategorie sehr viele Features hat
       for (let i = 0; i < features.length; i += 500) {
         const { error } = await supabase.from('region_features').insert(features.slice(i, i + 500))
         if (error) throw error
@@ -167,7 +174,7 @@ async function main() {
     }
     console.log(`  ${cls}: ${features.length} Features`)
     totalFeatures += features.length
-    await new Promise(r => setTimeout(r, 1500)) // Overpass-freundliches Tempo zwischen Kategorien
+    await new Promise(r => setTimeout(r, 1500))
   }
 
   console.log(`Fertig: ${totalFeatures} Features fuer ${label} gespeichert (region_id=${region.id})`)
