@@ -9,6 +9,7 @@ import {
   rollResourceScan,
   haversineKm,
   scannerCapability,
+  INSTRUMENTS,
   type ResourceCandidate,
   type ResourceTier,
   type ScannerCapability,
@@ -143,9 +144,19 @@ async function capabilityFor(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,
   scanner: { tile_level?: number | null },
+  requestedInstrument?: string | null,
 ) {
   const { data: profile } = await supabase.from('profiles').select('knowledge_points').eq('id', userId).maybeSingle()
-  return scannerCapability(Number(scanner.tile_level ?? 0), Number(profile?.knowledge_points ?? 0))
+  let instrumentId: string | null = null
+  if (requestedInstrument) {
+    // Nicht besessene Instrumente werden stillschweigend ignoriert (Basis-
+    // Hardware greift dann weiter) statt den Scan mit einem Fehler abzubrechen.
+    const { data: owned } = await supabase
+      .from('player_instruments').select('instrument_id')
+      .eq('profile_id', userId).eq('instrument_id', requestedInstrument).maybeSingle()
+    if (owned) instrumentId = requestedInstrument
+  }
+  return scannerCapability(Number(scanner.tile_level ?? 0), Number(profile?.knowledge_points ?? 0), instrumentId)
 }
 
 async function findRegionFor(supabase: ReturnType<typeof createServiceClient>, lat: number, lon: number) {
@@ -304,12 +315,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (!worldScanner) return NextResponse.json({ location: locationSlug, mode: 'resource', scanner: null, discoveries: [] })
-  const capability = await capabilityFor(supabase, user.id, worldScanner)
+  const requestedInstrument = new URL(req.url).searchParams.get('instrument')
+  const capability = await capabilityFor(supabase, user.id, worldScanner, requestedInstrument)
+  const { data: ownedInstrumentRows } = await supabase.from('player_instruments').select('instrument_id').eq('profile_id', user.id)
   return NextResponse.json({
     location: locationSlug,
     mode: 'resource',
     scanner: { id: worldScanner.id, lat: Number(worldScanner.latitude_deg), lon: Number(worldScanner.longitude_deg), hardwareLevel: capability.hardwareLevel },
     capability,
+    availableInstruments: INSTRUMENTS,
+    ownedInstruments: (ownedInstrumentRows ?? []).map((r: any) => r.instrument_id),
     discoveries: (data ?? []).filter((row: any) => row.region_resource_id).map((row: any) => resourceDiscoveryDto(row, capability)),
   })
 }
@@ -320,6 +335,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const locationSlug = typeof body.location === 'string' ? body.location : ''
   const requestedScanner = typeof body.scannerEntityId === 'string' ? body.scannerEntityId : ''
+  const requestedInstrument = typeof body.instrument === 'string' ? body.instrument : null
   if (!locationSlug) return NextResponse.json({ error: 'location_required' }, { status: 400 })
 
   const supabase = createServiceClient()
@@ -330,7 +346,7 @@ export async function POST(req: NextRequest) {
   if (!terrain) {
     const worldScanner = await findWorldScanner(supabase, user.id, location.id)
     if (!worldScanner) return NextResponse.json({ error: 'owned_scanner_not_found' }, { status: 403 })
-    const capability = await capabilityFor(supabase, user.id, worldScanner)
+    const capability = await capabilityFor(supabase, user.id, worldScanner, requestedInstrument)
     const result = await resourceScan(supabase, user.id, location.id, worldScanner as any, capability)
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 503 })
     return NextResponse.json({ location: locationSlug, mode: 'resource', ...result })
