@@ -2,15 +2,17 @@
 
 // app/dashboard/WelcomeSetup.tsx
 // Erstellt:     07.06.2026
-// Aktualisiert: 09.07.2026 — onDone mit openJourney-Flag für vertikalen Spielpfad
-// Version:      0.2.0
-// Erst-Login-Onboarding: Name + Avatar wählen, dann drei Einweisungskarten.
-// Erscheint wenn profiles.onboarded = false. Dark-UI-Stil (Transit-Ästhetik).
-//
-// Einbindung in DashboardClient:
-//   {profile && !profile.onboarded && (
-//     <WelcomeSetup onDone={() => { reloadProfile(); /* Orders neu laden */ }} />
-//   )}
+// Aktualisiert: 16.09.2026 — Bugfix: Name wurde erneut leer abgefragt, obwohl
+//               er bereits bei der Registrierung vergeben wurde; jetzt über
+//               initialUsername vorbefüllt (Prop kommt aus DashboardGate.tsx,
+//               dort ohnehin schon aus /api/game/profile geladen). Tutorial-
+//               Karten von Mond- auf Erde-Start umgestellt (neuer Startort,
+//               s. Migration fix_new_player_starting_location_earth_not_moon).
+// Vorher:       09.07.2026 — onDone mit openJourney-Flag für vertikalen Spielpfad
+// Version:      0.3.0
+// Erst-Login-Onboarding: Name (vorbefüllt) + Avatar wählen, dann drei
+// Einweisungskarten. Erscheint wenn profiles.onboarded = false, jetzt
+// exklusiv gesteuert über DashboardGate.tsx. Dark-UI-Stil (Transit-Ästhetik).
 
 import React from 'react'
 
@@ -32,14 +34,14 @@ const AVATARS = Array.from({ length: 12 }, (_, i) => `pilot_${String(i + 1).padS
 
 // Die drei Einweisungskarten: der Kernloop als Dreizeiler, Noxia-Ton.
 const CARDS = [
-  { icon: '💧', title: 'Kauf Wasser auf dem Mond', text: 'Hier ist es billig. Die Handelszentrale wartet auf dem Dashboard.' },
+  { icon: '🌍', title: 'Starte auf der Erde', text: 'Hier beginnt alles. Sieh dich um, bau deine erste Anlage, finde deinen Rhythmus.' },
   { icon: '🔴', title: 'Flieg zum Mars', text: 'Dort ist Wasser knapp — und Knappheit hat ihren Preis.' },
   { icon: '📈', title: 'Verkauf mit Gewinn', text: 'Und sieh zu, wie die Kolonie wächst. Sie wird sich erinnern.' },
 ]
 
-export default function WelcomeSetup({ onDone }: { onDone: (opts?: { openJourney?: boolean }) => void }) {
+export default function WelcomeSetup({ initialUsername, onDone }: { initialUsername?: string; onDone: (opts?: { openJourney?: boolean }) => void }) {
   const [step, setStep]       = useState<'setup' | 'cards'>('setup')
-  const [name, setName]       = useState('')
+  const [name, setName]       = useState(initialUsername ?? '')
   const [avatar, setAvatar]   = useState<string | null>(null)
   const [cardIdx, setCardIdx] = useState(0)
   const [saving, setSaving]   = useState(false)
