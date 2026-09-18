@@ -24,7 +24,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Compile social-memory test
-        run: npx tsc lib/game/personSocialMemory.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --allowImportingTsExtensions false --outDir .social-memory-test
       - name: Run deterministic projection test
-        run: node .social-memory-test/personSocialMemory.test.js
+        run: npx --yes tsx lib/game/personSocialMemory.test.ts
