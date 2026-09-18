@@ -1,0 +1,42 @@
+name: Reactor runtime E2a
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/reactorRuntime.ts'
+      - 'lib/game/reactorRuntime.test.ts'
+      - 'app/api/game/reactor-runtime/route.ts'
+      - 'scripts/check-reactor-runtime-migration.mjs'
+      - 'supabase/migrations/*reactor_runtime_e2a.sql'
+      - 'docs/core/REACTOR_RUNTIME_E2A.md'
+      - '.github/workflows/reactor-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/reactorRuntime.ts'
+      - 'lib/game/reactorRuntime.test.ts'
+      - 'app/api/game/reactor-runtime/route.ts'
+      - 'scripts/check-reactor-runtime-migration.mjs'
+      - 'supabase/migrations/*reactor_runtime_e2a.sql'
+      - 'docs/core/REACTOR_RUNTIME_E2A.md'
+      - '.github/workflows/reactor-runtime.yml'
+
+jobs:
+  reactor-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Validate Core invariants
+        run: npm run test:core-invariants
+      - name: Validate E2a read model
+        run: |
+          rm -rf .reactor-runtime-test
+          npx tsc lib/game/reactorRuntime.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .reactor-runtime-test
+          node .reactor-runtime-test/game/reactorRuntime.test.js
+      - name: Guard E2a migration boundary
+        run: node scripts/check-reactor-runtime-migration.mjs
