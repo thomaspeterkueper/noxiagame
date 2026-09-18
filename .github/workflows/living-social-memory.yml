@@ -1,0 +1,30 @@
+name: Living social memory
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/personSocialMemory.ts'
+      - 'lib/game/personSocialMemory.test.ts'
+      - 'lib/game/population/types.ts'
+      - 'supabase/migrations/*living_social_memory.sql'
+      - '.github/workflows/living-social-memory.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/personSocialMemory.ts'
+      - 'lib/game/personSocialMemory.test.ts'
+      - 'lib/game/population/types.ts'
+      - 'supabase/migrations/*living_social_memory.sql'
+
+jobs:
+  deterministic-projection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compile social-memory test
+        run: npx tsc lib/game/personSocialMemory.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --allowImportingTsExtensions false --outDir .social-memory-test
+      - name: Run deterministic projection test
+        run: node .social-memory-test/personSocialMemory.test.js
