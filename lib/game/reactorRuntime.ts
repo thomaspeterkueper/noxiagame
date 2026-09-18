@@ -75,9 +75,14 @@ function runtimeProperties(value: unknown): RuntimeProperties | null {
   if (mode !== 'unknown' && mode !== 'online' && mode !== 'derated' && mode !== 'offline') return null
 
   const factor = value.availabilityFactor
-  const rawReasonCode = value.reasonCode
-  if (rawReasonCode !== null && typeof rawReasonCode !== 'string') return null
-  const reasonCode: string | null = rawReasonCode
+  let reasonCode: string | null
+  if (value.reasonCode === null) {
+    reasonCode = null
+  } else if (typeof value.reasonCode === 'string') {
+    reasonCode = value.reasonCode
+  } else {
+    return null
+  }
 
   if (mode === 'unknown') {
     if (factor !== null) return null
