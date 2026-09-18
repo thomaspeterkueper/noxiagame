@@ -54,10 +54,7 @@ export function scannerCapability(hardwareLevel: number, knowledgePoints: number
   if (level >= 1) channels.push('radiometric')
   if (level >= 2) channels.push('subsurface')
 
-  const candidate = instrumentId && instrumentId in INSTRUMENTS ? INSTRUMENTS[instrumentId as InstrumentId] : null
-  // Zielgebundene Instrumente (aktuell Bohrkern) duerfen niemals ueber den
-  // normalen Radius-Scanner aktiviert werden. Sie besitzen einen eigenen Jobpfad.
-  const instrument = candidate?.targetedOnly ? null : candidate
+  const instrument = instrumentId && instrumentId in INSTRUMENTS ? INSTRUMENTS[instrumentId as InstrumentId] : null
   if (instrument?.interpretationLevelCap !== undefined) {
     interpretationLevel = Math.min(interpretationLevel, instrument.interpretationLevelCap) as 0 | 1 | 2 | 3
   }
@@ -74,7 +71,7 @@ export function scannerCapability(hardwareLevel: number, knowledgePoints: number
 }
 
 export type SensorMethod = 'density' | 'spectral' | 'subsurface' | 'any'
-export type InstrumentId = 'gravimetry' | 'magnetometry' | 'hyperspectral' | 'seismic' | 'core_sample' | 'orbital'
+export type InstrumentId = 'gravimetry' | 'magnetometry' | 'hyperspectral' | 'seismic' | 'orbital'
 
 const RESOURCE_METHOD: Partial<Record<string, SensorMethod>> = {
   iron_ore: 'density', copper_ore: 'density', nickel: 'density', cobalt: 'density',
@@ -92,7 +89,6 @@ export interface InstrumentDef {
   detectionMultiplier: number
   bypassesChannelGate?: boolean
   interpretationLevelCap?: 0 | 1 | 2 | 3
-  targetedOnly?: boolean
 }
 
 export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
@@ -100,7 +96,6 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
   magnetometry: { id: 'magnetometry', name: 'Magnetometrie', method: 'density', radiusKm: 0.4, detectionMultiplier: 1.3 },
   hyperspectral: { id: 'hyperspectral', name: 'Hyperspektralanalyse', method: 'spectral', radiusKm: 0.5, detectionMultiplier: 1.3 },
   seismic: { id: 'seismic', name: 'Seismik', method: 'subsurface', radiusKm: 0.45, detectionMultiplier: 1.25 },
-  core_sample: { id: 'core_sample', name: 'Bohrkernanalyse', method: 'any', radiusKm: 0.005, detectionMultiplier: 5, bypassesChannelGate: true, targetedOnly: true },
   orbital: { id: 'orbital', name: 'Orbitales Remote Sensing', method: 'any', radiusKm: 5, detectionMultiplier: 0.5, interpretationLevelCap: 0 },
 }
 
