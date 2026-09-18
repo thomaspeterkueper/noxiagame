@@ -1,3 +1,5 @@
+'use client'
+
 import { EARTH_LANDMARKS, type EarthLandmark } from '@/lib/world/spatial/earthLandmarks'
 
 function relationLabel(relation: EarthLandmark['sourceProjects'][number]['relation']) {
