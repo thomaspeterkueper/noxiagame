@@ -1,7 +1,8 @@
 // lib/game/population/tick.ts
-// Version: 0.1.0
-// Reiner, deterministischer Population-Tick. Persistenz erfolgt bewusst separat.
+// Version: 0.2.0
+// Reiner, deterministischer Population-Tick. Persistenz und Weltmutation erfolgen bewusst separat.
 
+import { actionIntentForDecision, type PopulationIntentResult } from './actionIntent'
 import { decidePopulationAction, type PopulationDecisionContext } from './decision'
 import {
   clampUnit,
@@ -21,6 +22,7 @@ export interface PopulationTickResult {
   person: Person
   needs: PersonNeed[]
   decision: PopulationDecision
+  intent: PopulationIntentResult
   events: PopulationEvent[]
 }
 
@@ -35,20 +37,22 @@ const NEED_DELTAS: Partial<Record<PopulationAction, Partial<Record<PersonNeed['n
   report_problem: { social: 0.02, purpose: 0.09 },
 }
 
-function eventTypeForAction(action: PopulationAction): string {
+function eventTypeForAction(action: PopulationAction, intent: PopulationIntentResult): string {
+  if (!intent.ok) return 'npc_action_blocked'
   switch (action) {
     case 'work': return 'npc_started_work'
     case 'rest': return 'npc_resting'
     case 'satisfy_basic_need': return 'npc_satisfied_basic_need'
-    case 'travel_home': return 'npc_travelled_home'
-    case 'travel_work': return 'npc_travelled_work'
+    case 'travel_home':
+    case 'travel_work': return 'npc_started_travel'
     case 'social_interaction': return 'npc_met_person'
     case 'inspect_problem': return 'npc_observed_problem'
     case 'report_problem': return 'npc_reported_problem'
   }
 }
 
-function activityForAction(action: PopulationAction): Person['activityState'] {
+function activityForAction(action: PopulationAction, intent: PopulationIntentResult): Person['activityState'] {
+  if (!intent.ok) return 'idle'
   switch (action) {
     case 'work': return 'working'
     case 'rest': return 'resting'
@@ -61,14 +65,8 @@ function activityForAction(action: PopulationAction): Person['activityState'] {
   }
 }
 
-function updateLocationForTravel(input: PopulationTickInput, action: PopulationAction): string {
-  if (action !== 'travel_home' && action !== 'travel_work') return input.person.currentLocationId
-  const assignmentType = action === 'travel_home' ? 'home' : 'work'
-  const assignment = input.assignments.find((entry) => entry.assignmentType === assignmentType && entry.isActive)
-  return assignment?.locationId ?? input.person.currentLocationId
-}
-
-function updateNeeds(needs: PersonNeed[], action: PopulationAction, tick: number): PersonNeed[] {
+function updateNeeds(needs: PersonNeed[], action: PopulationAction, tick: number, intent: PopulationIntentResult): PersonNeed[] {
+  if (!intent.ok || intent.intent.kind === 'travel' || intent.intent.kind === 'work') return needs
   const deltas = NEED_DELTAS[action] ?? {}
   return needs.map((need) => ({
     ...need,
@@ -96,40 +94,46 @@ function eventSubject(decision: PopulationDecision): { subjectType: string | nul
 
 export function runPopulationTick(input: PopulationTickInput): PopulationTickResult {
   const decision = decidePopulationAction(input)
-  const currentLocationId = updateLocationForTravel(input, decision.action)
+  const intent = actionIntentForDecision({
+    personId: input.person.id,
+    currentLocationId: input.person.currentLocationId,
+    assignments: input.assignments,
+    decision,
+  })
+  const blocker = 'reason' in intent ? intent.reason : null
+
   const person: Person = {
     ...input.person,
-    currentLocationId,
-    activityState: activityForAction(decision.action),
-    lastAction: decision.action,
-    lastDecisionFactors: { ...decision.factors, score: decision.score },
+    activityState: activityForAction(decision.action, intent),
+    lastAction: intent.ok ? decision.action : `blocked:${decision.action}`,
+    lastDecisionFactors: {
+      ...decision.factors,
+      score: decision.score,
+      ...(blocker ? { blocker } : {}),
+    },
     lastTick: input.tick,
   }
-  const needs = updateNeeds(input.needs, decision.action, input.tick)
+  const needs = updateNeeds(input.needs, decision.action, input.tick, intent)
   const subject = eventSubject(decision)
   const relatedPersonId = relatedPersonForAction(input, decision.action)
 
   const event: PopulationEvent = {
     id: `population:${input.tick}:${input.person.id}:${decision.action}`,
     tick: input.tick,
-    eventType: eventTypeForAction(decision.action),
+    eventType: eventTypeForAction(decision.action, intent),
     actorPersonId: input.person.id,
     relatedPersonId,
-    locationId: currentLocationId,
+    locationId: input.person.currentLocationId,
     subjectType: subject.subjectType,
     subjectRef: subject.subjectRef,
     payload: {
       action: decision.action,
       score: decision.score,
       factors: decision.factors,
+      intent: intent.ok ? intent.intent : null,
+      blocker,
     },
   }
 
-  return {
-    tick: input.tick,
-    person,
-    needs,
-    decision,
-    events: [event],
-  }
+  return { tick: input.tick, person, needs, decision, intent, events: [event] }
 }
