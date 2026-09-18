@@ -42,7 +42,7 @@ export async function hydrateTerrainRuntimeCatalogue(
     persistedReadyTiles += 1
 
     const resolution = resolvePersistedTerrainTileManifest(row)
-    if (!resolution.ok) {
+    if (resolution.ok === false) {
       rejectedTiles.push({ tileKey: row.tile_key, details: resolution.details })
       continue
     }
