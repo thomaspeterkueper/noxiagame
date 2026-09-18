@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { SHACKLETON_SURFACE_LOGISTICS_CHAIN } from '@/lib/game/moonSurfaceLogistics'
 import { deriveSurfaceMissionProgress } from '@/lib/game/vehicles/surfaceProgress'
@@ -11,20 +11,61 @@ import {
   type SurfaceRoutePoint,
 } from '@/lib/game/vehicles/surfaceRouteGeometry'
 
+type BuildRequirements = {
+  knowledgeOk: boolean
+  creditsOk: boolean
+  canBuild: boolean
+  requiredUnlock?: string | null
+  requiredLabel?: string | null
+  learningUrl?: string | null
+}
+
+type BuildingDef = {
+  id: string
+  name: string
+  cost: number
+  buildTimeTicks: number
+  footprint: { widthM: number; depthM: number; clearanceM: number }
+  requirements?: BuildRequirements
+}
+
 type SpatialEntity = {
   id: string
   entity_id?: string | null
   name?: string | null
   x_m?: number | null
   y_m?: number | null
+  rotation_deg?: number | null
+  footprint_width_m?: number | null
+  footprint_depth_m?: number | null
+  status?: string | null
+  ownerLabel?: string | null
+  isOwn?: boolean
+}
+
+type PendingBuild = {
+  id: string
+  buildable_id?: string | null
+  name?: string | null
+  x_m?: number | null
+  y_m?: number | null
+  rotation_deg?: number | null
+  footprint_width_m?: number | null
+  footprint_depth_m?: number | null
   status?: string | null
 }
 
 type SpatialPayload = {
   location?: { id: string; slug: string; name: string }
+  profile?: { id?: string; credits?: number }
   frame?: { origin_status?: string | null; terrain_dataset_id?: string | null } | null
-  terrain?: { activeDataset?: { id?: string; dataset_name?: string; status?: string } | null }
+  terrain?: {
+    activeDataset?: { id?: string; dataset_name?: string; status?: string } | null
+    resolution?: { status?: string; zM?: number | null }
+  }
   entities?: SpatialEntity[]
+  builds?: PendingBuild[]
+  available?: BuildingDef[]
   error?: string
 }
 
@@ -58,26 +99,30 @@ type LogisticsPayload = {
   error?: string
 }
 
-type MapNode = {
-  inventory: Inventory
-  point: SurfaceRoutePoint
-}
-
+type MapNode = { inventory: Inventory; point: SurfaceRoutePoint }
 type MapRoute = {
   job: TransportJob
   geometry: SurfaceRouteGeometry
   vehiclePoint: SurfaceRoutePoint
   progress01: number
 }
+type SelectedSpot = { xM: number; yM: number }
+type Pan = { x: number; y: number }
 
 const ACTIVE = new Set(['reserved', 'loading', 'in_transit', 'arrived', 'unloading'])
 const VIEW_W = 1000
 const VIEW_H = 620
 const PAD = 54
+const MIN_ZOOM = 0.7
+const MAX_ZOOM = 8
 
 function finite(value: unknown): number | null {
   const number = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(number) ? number : null
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
 }
 
 function inventoryPoint(inventory: Inventory, entities: SpatialEntity[]): SurfaceRoutePoint | null {
@@ -85,7 +130,6 @@ function inventoryPoint(inventory: Inventory, entities: SpatialEntity[]): Surfac
   const metaX = finite(metadata.xM ?? metadata.x_m)
   const metaY = finite(metadata.yM ?? metadata.y_m)
   if (metaX != null && metaY != null) return { xM: metaX, yM: metaY }
-
   if (!inventory.subject_id) return null
   const entity = entities.find(item => item.id === inventory.subject_id || item.entity_id === inventory.subject_id)
   const xM = finite(entity?.x_m)
@@ -113,53 +157,55 @@ export default function ShackletonSurfaceMap() {
   const [jobs, setJobs] = useState<TransportJob[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState<Pan>({ x: 0, y: 0 })
+  const [selectedSpot, setSelectedSpot] = useState<SelectedSpot | null>(null)
+  const [selectedBuildId, setSelectedBuildId] = useState<string>('')
+  const [rotationDeg, setRotationDeg] = useState(0)
+  const [placing, setPlacing] = useState(false)
+  const [buildMessage, setBuildMessage] = useState<string | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const dragRef = useRef<{ pointerId: number; clientX: number; clientY: number; pan: Pan; moved: boolean } | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const headers = { Authorization: `Bearer ${token}` }
+      const spatialResponse = await fetch('/api/game/build/spatial?location=moon', { headers, cache: 'no-store' })
+      const spatialPayload = await spatialResponse.json() as SpatialPayload
+      if (!spatialResponse.ok || !spatialPayload.location?.id) {
+        throw new Error(spatialPayload.error ?? 'Moon-Standort nicht verfügbar')
+      }
+      const logisticsResponse = await fetch(`/api/game/logistics?locationId=${encodeURIComponent(spatialPayload.location.id)}`, {
+        headers,
+        cache: 'no-store',
+      })
+      const logisticsPayload = await logisticsResponse.json() as LogisticsPayload
+      if (!logisticsResponse.ok) throw new Error(logisticsPayload.error ?? 'Moon-Logistik nicht verfügbar')
+      setSpatial(spatialPayload)
+      setInventories(logisticsPayload.inventories ?? [])
+      setJobs(logisticsPayload.jobs ?? [])
+      setMessage(null)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+    const timer = window.setInterval(() => void load(), 15_000)
+    return () => window.clearInterval(timer)
+  }, [load])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    let timer: number | null = null
-
-    const load = async () => {
-      try {
-        const token = await getToken()
-        if (!token) throw new Error('Nicht angemeldet')
-        const headers = { Authorization: `Bearer ${token}` }
-        const spatialResponse = await fetch('/api/game/build/spatial?location=moon', { headers, cache: 'no-store' })
-        const spatialPayload = await spatialResponse.json() as SpatialPayload
-        if (!spatialResponse.ok || !spatialPayload.location?.id) {
-          throw new Error(spatialPayload.error ?? 'Moon-Standort nicht verfügbar')
-        }
-
-        const logisticsResponse = await fetch(`/api/game/logistics?locationId=${encodeURIComponent(spatialPayload.location.id)}`, {
-          headers,
-          cache: 'no-store',
-        })
-        const logisticsPayload = await logisticsResponse.json() as LogisticsPayload
-        if (!logisticsResponse.ok) throw new Error(logisticsPayload.error ?? 'Moon-Logistik nicht verfügbar')
-        if (cancelled) return
-
-        setSpatial(spatialPayload)
-        setInventories(logisticsPayload.inventories ?? [])
-        setJobs(logisticsPayload.jobs ?? [])
-        setMessage(null)
-      } catch (error) {
-        if (!cancelled) setMessage(error instanceof Error ? error.message : String(error))
-      }
-    }
-
-    void load()
-    timer = window.setInterval(() => void load(), 15_000)
-    return () => {
-      cancelled = true
-      if (timer != null) window.clearInterval(timer)
-    }
-  }, [])
-
   const entities = spatial?.entities ?? []
+  const pendingBuilds = spatial?.builds ?? []
+  const available = spatial?.available ?? []
   const nodes = useMemo<MapNode[]>(() => inventories
     .filter(inventory => inventory.inventory_kind !== 'vehicle')
     .flatMap(inventory => {
@@ -172,49 +218,162 @@ export default function ShackletonSurfaceMap() {
     const geometry = parseSurfaceRouteGeometry(job.route_snapshot)
     if (!geometry) return []
     const progress = deriveSurfaceMissionProgress(job, now)
-    return [{
-      job,
-      geometry,
-      progress01: progress.progress01,
-      vehiclePoint: pointAlongSurfaceRoute(geometry, progress.progress01),
-    }]
+    return [{ job, geometry, progress01: progress.progress01, vehiclePoint: pointAlongSurfaceRoute(geometry, progress.progress01) }]
   }), [activeJobs, now])
 
-  const allPoints = useMemo(() => [
+  const allPoints = useMemo<SurfaceRoutePoint[]>(() => [
     ...nodes.map(node => node.point),
     ...routes.flatMap(route => route.geometry.points),
-  ], [nodes, routes])
+    ...entities.flatMap(row => {
+      const xM = finite(row.x_m), yM = finite(row.y_m)
+      return xM != null && yM != null ? [{ xM, yM }] : []
+    }),
+    ...pendingBuilds.flatMap(row => {
+      const xM = finite(row.x_m), yM = finite(row.y_m)
+      return xM != null && yM != null ? [{ xM, yM }] : []
+    }),
+  ], [nodes, routes, entities, pendingBuilds])
 
   const bounds = useMemo(() => {
-    if (!allPoints.length) return null
+    if (!allPoints.length) return { minX: -1000, minY: -1000, spanX: 2000, spanY: 2000 }
     const xs = allPoints.map(point => point.xM)
     const ys = allPoints.map(point => point.yM)
-    const minX = Math.min(...xs), maxX = Math.max(...xs)
-    const minY = Math.min(...ys), maxY = Math.max(...ys)
-    const spanX = Math.max(maxX - minX, 100)
-    const spanY = Math.max(maxY - minY, 100)
-    return { minX, minY, spanX, spanY }
+    const rawMinX = Math.min(...xs), rawMaxX = Math.max(...xs)
+    const rawMinY = Math.min(...ys), rawMaxY = Math.max(...ys)
+    const rawSpanX = Math.max(rawMaxX - rawMinX, 500)
+    const rawSpanY = Math.max(rawMaxY - rawMinY, 500)
+    const marginX = Math.max(250, rawSpanX * 0.35)
+    const marginY = Math.max(250, rawSpanY * 0.35)
+    return {
+      minX: rawMinX - marginX,
+      minY: rawMinY - marginY,
+      spanX: rawSpanX + marginX * 2,
+      spanY: rawSpanY + marginY * 2,
+    }
   }, [allPoints])
 
-  const project = (point: SurfaceRoutePoint) => {
-    if (!bounds) return { x: VIEW_W / 2, y: VIEW_H / 2 }
-    return {
-      x: PAD + ((point.xM - bounds.minX) / bounds.spanX) * (VIEW_W - PAD * 2),
-      y: VIEW_H - PAD - ((point.yM - bounds.minY) / bounds.spanY) * (VIEW_H - PAD * 2),
+  const project = useCallback((point: SurfaceRoutePoint) => ({
+    x: PAD + ((point.xM - bounds.minX) / bounds.spanX) * (VIEW_W - PAD * 2),
+    y: VIEW_H - PAD - ((point.yM - bounds.minY) / bounds.spanY) * (VIEW_H - PAD * 2),
+  }), [bounds])
+
+  const unproject = useCallback((x: number, y: number): SelectedSpot => ({
+    xM: bounds.minX + ((x - PAD) / (VIEW_W - PAD * 2)) * bounds.spanX,
+    yM: bounds.minY + ((VIEW_H - PAD - y) / (VIEW_H - PAD * 2)) * bounds.spanY,
+  }), [bounds])
+
+  const clientToBase = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current
+    if (!svg) return null
+    const rect = svg.getBoundingClientRect()
+    const sx = (clientX - rect.left) / rect.width * VIEW_W
+    const sy = (clientY - rect.top) / rect.height * VIEW_H
+    return { x: (sx - pan.x) / zoom, y: (sy - pan.y) / zoom }
+  }, [pan, zoom])
+
+  function zoomAt(nextZoom: number, clientX?: number, clientY?: number) {
+    const next = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM)
+    const svg = svgRef.current
+    if (!svg || clientX == null || clientY == null) {
+      setZoom(next)
+      return
+    }
+    const rect = svg.getBoundingClientRect()
+    const mouseX = (clientX - rect.left) / rect.width * VIEW_W
+    const mouseY = (clientY - rect.top) / rect.height * VIEW_H
+    const ratio = next / zoom
+    setPan(current => ({
+      x: mouseX - (mouseX - current.x) * ratio,
+      y: mouseY - (mouseY - current.y) * ratio,
+    }))
+    setZoom(next)
+  }
+
+  function resetView() {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }
+
+  function onWheel(event: React.WheelEvent<SVGSVGElement>) {
+    event.preventDefault()
+    zoomAt(zoom * (event.deltaY < 0 ? 1.16 : 0.86), event.clientX, event.clientY)
+  }
+
+  function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    if (event.button !== 0 && event.pointerType === 'mouse') return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, pan, moved: false }
+  }
+
+  function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const dx = (event.clientX - drag.clientX) / rect.width * VIEW_W
+    const dy = (event.clientY - drag.clientY) / rect.height * VIEW_H
+    if (Math.hypot(dx, dy) > 3) drag.moved = true
+    setPan({ x: drag.pan.x + dx, y: drag.pan.y + dy })
+  }
+
+  function onPointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current
+    dragRef.current = null
+    if (!drag || drag.pointerId !== event.pointerId) return
+    try { event.currentTarget.releasePointerCapture(event.pointerId) } catch {}
+    if (drag.moved) return
+    const base = clientToBase(event.clientX, event.clientY)
+    if (!base) return
+    const spot = unproject(base.x, base.y)
+    setSelectedSpot({ xM: Math.round(spot.xM), yM: Math.round(spot.yM) })
+    setBuildMessage(null)
+  }
+
+  async function placeBuilding() {
+    if (!selectedSpot || !selectedBuildId || placing) return
+    setPlacing(true)
+    setBuildMessage(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const response = await fetch('/api/game/build/spatial', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buildableId: selectedBuildId,
+          location: 'moon',
+          xM: selectedSpot.xM,
+          yM: selectedSpot.yM,
+          rotationDeg,
+        }),
+      })
+      const result = await response.json() as { error?: string; newCredits?: number }
+      if (!response.ok) throw new Error(result.error ?? 'Bauauftrag konnte nicht angelegt werden')
+      setBuildMessage(`Bauauftrag angelegt · ${selectedSpot.xM.toLocaleString('de-DE')} m E · ${selectedSpot.yM.toLocaleString('de-DE')} m N`)
+      setSelectedSpot(null)
+      setSelectedBuildId('')
+      setRotationDeg(0)
+      await load()
+    } catch (error) {
+      setBuildMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPlacing(false)
     }
   }
 
+  const selectedDef = available.find(def => def.id === selectedBuildId) ?? null
   const inventoryById = useMemo(() => new Map(inventories.map(item => [item.id, item])), [inventories])
+  const pxPerMeterX = (VIEW_W - PAD * 2) / bounds.spanX
+  const pxPerMeterY = (VIEW_H - PAD * 2) / bounds.spanY
 
   return <main className="moon-shell">
     <header className="hero">
       <div>
-        <small>MOON · SHACKLETON · SURFACE LOGISTICS</small>
+        <small>MOON · SHACKLETON · SURFACE OPERATIONS</small>
         <h1>Shackleton</h1>
-        <p>Persistierte Core-Transporte auf der verifizierten lokalen Mondgeometrie. Die Karte simuliert keinen eigenen Fahrzeugzustand.</p>
+        <p>Lokale ENU-Spieloberfläche für Bau, Infrastruktur und persistierte Surface-Transporte.</p>
       </div>
       <div className="terrain-state">
-        <span>Terrain</span>
+        <span>Terrain / Frame</span>
         <b>{spatial?.terrain?.activeDataset?.status ?? spatial?.frame?.origin_status ?? 'unresolved'}</b>
         <small>{spatial?.terrain?.activeDataset?.dataset_name ?? spatial?.frame?.terrain_dataset_id ?? 'LOLA-Datensatz noch nicht aufgelöst'}</small>
       </div>
@@ -224,53 +383,128 @@ export default function ShackletonSurfaceMap() {
 
     <section className="map-card">
       <div className="map-head">
-        <div><small>LOKALES ENU-FRAME</small><h2>Oberflächenlogistik</h2></div>
-        <div className="counts"><span>{nodes.length} Knoten</span><span>{activeJobs.length} aktive Aufträge</span></div>
+        <div><small>LOKALES ENU-FRAME</small><h2>Spielbare Mondoberfläche</h2></div>
+        <div className="map-actions">
+          <span>{entities.length} Gebäude</span><span>{pendingBuilds.length} im Bau</span>
+          <button type="button" onClick={() => zoomAt(zoom * 1.25)}>+</button>
+          <b>{Math.round(zoom * 100)}%</b>
+          <button type="button" onClick={() => zoomAt(zoom / 1.25)}>−</button>
+          <button type="button" onClick={resetView}>Zentrieren</button>
+        </div>
       </div>
 
-      {bounds ? <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="Shackleton Oberflächenlogistik-Karte">
-        <defs>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#33434d" strokeWidth="0.7" opacity="0.45" />
-          </pattern>
-          <filter id="glow"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        </defs>
-        <rect width={VIEW_W} height={VIEW_H} fill="#0b1218" rx="16" />
-        <rect width={VIEW_W} height={VIEW_H} fill="url(#grid)" rx="16" />
+      <div className="map-wrap">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+          role="application"
+          aria-label="Spielbare Shackleton-Mondkarte"
+          onWheel={onWheel}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => { dragRef.current = null }}
+        >
+          <defs>
+            <pattern id="moon-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d8e1e5" strokeWidth="0.7" opacity="0.28" />
+            </pattern>
+            <filter id="glow"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <rect width={VIEW_W} height={VIEW_H} fill="rgba(18,24,28,.28)" rx="16" />
+          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+            <rect width={VIEW_W} height={VIEW_H} fill="url(#moon-grid)" rx="16" />
 
-        {routes.map(route => {
-          const points = route.geometry.points.map(point => {
-            const p = project(point)
-            return `${p.x},${p.y}`
-          }).join(' ')
-          const vehicle = project(route.vehiclePoint)
-          return <g key={route.job.id}>
-            <polyline points={points} fill="none" stroke="#c8a75a" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
-            <polyline points={points} fill="none" stroke="#f1d78d" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" opacity="0.9" />
-            <circle cx={vehicle.x} cy={vehicle.y} r="10" fill="#f2c65d" stroke="#fff0bd" strokeWidth="2" filter="url(#glow)" />
+            {routes.map(route => {
+              const points = route.geometry.points.map(point => {
+                const p = project(point)
+                return `${p.x},${p.y}`
+              }).join(' ')
+              const vehicle = project(route.vehiclePoint)
+              return <g key={route.job.id}>
+                <polyline points={points} fill="none" stroke="#c8a75a" strokeWidth={5 / zoom} strokeLinejoin="round" strokeLinecap="round" opacity="0.88" />
+                <circle cx={vehicle.x} cy={vehicle.y} r={9 / zoom} fill="#f2c65d" stroke="#fff0bd" strokeWidth={2 / zoom} filter="url(#glow)" />
+              </g>
+            })}
+
+            {entities.map(entity => {
+              const xM = finite(entity.x_m), yM = finite(entity.y_m)
+              if (xM == null || yM == null) return null
+              const p = project({ xM, yM })
+              const width = Math.max(8 / zoom, Number(entity.footprint_width_m ?? 20) * pxPerMeterX)
+              const depth = Math.max(8 / zoom, Number(entity.footprint_depth_m ?? 20) * pxPerMeterY)
+              return <g key={entity.id} transform={`translate(${p.x} ${p.y}) rotate(${-Number(entity.rotation_deg ?? 0)})`}>
+                <rect x={-width / 2} y={-depth / 2} width={width} height={depth} rx={2 / zoom} fill={entity.isOwn ? '#d0ad55' : '#7896a8'} stroke="#f1f5f7" strokeWidth={1.3 / zoom} opacity="0.94" />
+                <text x={width / 2 + 6 / zoom} y={-3 / zoom} fill="#f0f4f6" fontSize={11 / zoom} fontWeight="700">{entity.name ?? entity.entity_id}</text>
+                <text x={width / 2 + 6 / zoom} y={10 / zoom} fill="#a6b6be" fontSize={8 / zoom}>{entity.ownerLabel ?? 'Gebäude'}</text>
+              </g>
+            })}
+
+            {pendingBuilds.map(build => {
+              const xM = finite(build.x_m), yM = finite(build.y_m)
+              if (xM == null || yM == null) return null
+              const p = project({ xM, yM })
+              const width = Math.max(9 / zoom, Number(build.footprint_width_m ?? 20) * pxPerMeterX)
+              const depth = Math.max(9 / zoom, Number(build.footprint_depth_m ?? 20) * pxPerMeterY)
+              return <g key={build.id} transform={`translate(${p.x} ${p.y}) rotate(${-Number(build.rotation_deg ?? 0)})`}>
+                <rect x={-width / 2} y={-depth / 2} width={width} height={depth} fill="rgba(214,155,55,.28)" stroke="#e7b34c" strokeWidth={1.6 / zoom} strokeDasharray={`${6 / zoom} ${4 / zoom}`} />
+                <text x={width / 2 + 6 / zoom} y={3 / zoom} fill="#f1c86f" fontSize={9 / zoom} fontWeight="700">{build.name ?? build.buildable_id} · im Bau</text>
+              </g>
+            })}
+
+            {nodes.map(node => {
+              const p = project(node.point)
+              return <g key={node.inventory.id}>
+                <circle cx={p.x} cy={p.y} r={6 / zoom} fill="#9fb2bd" stroke="#e5edf1" strokeWidth={1.2 / zoom} />
+                <text x={p.x + 10 / zoom} y={p.y - 7 / zoom} fill="#e5edf1" fontSize={9 / zoom} fontWeight="700">{node.inventory.label}</text>
+              </g>
+            })}
+
+            {selectedSpot && (() => {
+              const p = project(selectedSpot)
+              const previewW = selectedDef ? Math.max(12 / zoom, selectedDef.footprint.widthM * pxPerMeterX) : 18 / zoom
+              const previewD = selectedDef ? Math.max(12 / zoom, selectedDef.footprint.depthM * pxPerMeterY) : 18 / zoom
+              return <g transform={`translate(${p.x} ${p.y}) rotate(${-rotationDeg})`}>
+                <circle r={14 / zoom} fill="none" stroke="#7de3ff" strokeWidth={2 / zoom} />
+                {selectedDef && <rect x={-previewW / 2} y={-previewD / 2} width={previewW} height={previewD} fill="rgba(78,203,113,.22)" stroke="#7de3ff" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />}
+              </g>
+            })()}
           </g>
-        })}
+        </svg>
+        <div className="map-hint">Mausrad: Zoom · Ziehen: Karte verschieben · Klick: Bauplatz wählen</div>
+      </div>
 
-        {nodes.map(node => {
-          const p = project(node.point)
-          return <g key={node.inventory.id}>
-            <circle cx={p.x} cy={p.y} r="8" fill="#9fb2bd" stroke="#e5edf1" strokeWidth="1.5" />
-            <text x={p.x + 13} y={p.y - 8} fill="#e5edf1" fontSize="13" fontWeight="700">{node.inventory.label}</text>
-            <text x={p.x + 13} y={p.y + 9} fill="#81949f" fontSize="10">{node.inventory.inventory_kind}</text>
-          </g>
-        })}
-      </svg> : <div className="empty-map">
-        Noch keine räumlich aufgelösten Moon-Logistikknoten. Die Ansicht erfindet keine Ersatzkoordinaten.
-      </div>}
-
-      {activeJobs.length > routes.length && <div className="geometry-note">
-        {activeJobs.length - routes.length} aktive Surface-Auftrag{activeJobs.length - routes.length === 1 ? '' : 'e'} besitzt/besitzen noch keine persistierte <code>route_snapshot.geometry</code>. Der Status wird unten gezeigt, aber ohne erfundene Kartenlinie.
-      </div>}
+      <div className="build-dock">
+        <div className="build-location">
+          <small>BAUPLATZ</small>
+          {selectedSpot
+            ? <strong>{selectedSpot.xM.toLocaleString('de-DE')} m E · {selectedSpot.yM.toLocaleString('de-DE')} m N</strong>
+            : <strong>Auf freie Mondfläche klicken</strong>}
+          <span>Credits: {Number(spatial?.profile?.credits ?? 0).toLocaleString('de-DE')} Cr</span>
+        </div>
+        <label>
+          <small>BAUTYP</small>
+          <select value={selectedBuildId} onChange={event => setSelectedBuildId(event.target.value)} disabled={!selectedSpot}>
+            <option value="">Gebäude wählen …</option>
+            {available.map(def => <option key={def.id} value={def.id} disabled={!def.requirements?.canBuild}>
+              {def.name} · {def.cost.toLocaleString('de-DE')} Cr{def.requirements?.canBuild ? '' : ` · ${def.requirements?.requiredLabel ?? (!def.requirements?.creditsOk ? 'zu wenig Credits' : 'gesperrt')}`}
+            </option>)}
+          </select>
+        </label>
+        <label className="rotation">
+          <small>ROTATION</small>
+          <div><button type="button" onClick={() => setRotationDeg(value => (value + 345) % 360)}>−15°</button><b>{rotationDeg}°</b><button type="button" onClick={() => setRotationDeg(value => (value + 15) % 360)}>+15°</button></div>
+        </label>
+        <button className="build-button" type="button" disabled={!selectedSpot || !selectedDef?.requirements?.canBuild || placing} onClick={placeBuilding}>
+          {placing ? 'Bauauftrag …' : 'Bauen'}
+        </button>
+      </div>
+      {buildMessage && <div className={buildMessage.startsWith('Bauauftrag') ? 'build-message ok' : 'build-message'}>{buildMessage}</div>}
     </section>
 
     <section className="jobs-card">
       <div className="section-title"><small>CORE STATE MACHINE</small><h2>Aktive Transporte</h2></div>
-      {!activeJobs.length && <div className="empty">Noch kein aktiver Moon-Surface-Transport. Ein Cargo Rover wird erst erzeugt, wenn die Engineering-Framewerte kanonisch vorliegen.</div>}
+      {!activeJobs.length && <div className="empty">Noch kein aktiver Moon-Surface-Transport.</div>}
       <div className="job-grid">{activeJobs.map(job => {
         const progress = deriveSurfaceMissionProgress(job, now)
         const source = inventoryById.get(job.source_inventory_id)?.label ?? job.source_inventory_id.slice(0, 8)
@@ -281,11 +515,7 @@ export default function ShackletonSurfaceMap() {
           <div className="cargo">{job.amount} {job.resource}</div>
           <div className="endpoints"><span>{source}</span><b>→</b><span>{destination}</span></div>
           <div className="rail"><div style={{ width: `${percent}%` }} /></div>
-          <div className="facts">
-            <span><b>{percent}%</b> Fahrt</span>
-            <span><b>{progress.travelledKm == null ? '–' : progress.travelledKm.toFixed(2)} km</b> gefahren</span>
-            <span><b>{formatRemaining(progress.remainingSeconds)}</b> verbleibend</span>
-          </div>
+          <div className="facts"><span><b>{percent}%</b> Fahrt</span><span><b>{progress.travelledKm == null ? '–' : progress.travelledKm.toFixed(2)} km</b> gefahren</span><span><b>{formatRemaining(progress.remainingSeconds)}</b> verbleibend</span></div>
         </article>
       })}</div>
     </section>
@@ -298,7 +528,7 @@ export default function ShackletonSurfaceMap() {
     </section>
 
     <style jsx>{`
-      .moon-shell{min-height:100vh;background:#070b0f;color:#e8edf0;padding:28px;font-family:system-ui,sans-serif}.hero,.map-card,.jobs-card,.chain-card{max-width:1400px;margin:0 auto 18px}.hero{display:flex;justify-content:space-between;gap:24px;align-items:end}.hero small,.section-title small,.map-head small{font-size:10px;letter-spacing:.16em;color:#c8a75a;font-weight:800}.hero h1{font-family:Georgia,serif;font-size:44px;font-weight:400;margin:3px 0}.hero p{max-width:760px;margin:0;color:#8d9aa2;font-size:13px}.terrain-state{min-width:250px;background:#101920;border:1px solid #293943;border-radius:12px;padding:12px}.terrain-state span,.terrain-state small{display:block;color:#82929c;font-size:10px}.terrain-state b{display:block;color:#dfe7eb;margin:4px 0}.map-card,.jobs-card,.chain-card{background:#0e171d;border:1px solid #293943;border-radius:16px;padding:16px}.map-head,.section-title{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:12px}.map-head h2,.section-title h2{font-family:Georgia,serif;font-weight:400;margin:2px 0 0;font-size:24px}.counts{display:flex;gap:8px}.counts span{font-size:10px;padding:5px 8px;background:#15232b;border-radius:999px;color:#a7b4ba}.map-card svg{width:100%;display:block;border:1px solid #26353e;border-radius:16px}.empty-map,.empty,.notice,.geometry-note{padding:16px;background:#121f27;border:1px dashed #344650;border-radius:10px;color:#8fa0a9;font-size:12px}.notice{background:#3d2527;color:#f0c7c3;border-style:solid}.geometry-note{margin-top:10px;padding:10px}.geometry-note code{color:#d7c17e}.job-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}.job{background:#111f27;border:1px solid #30424c;border-radius:12px;padding:12px}.job.moving{border-color:#756434}.job.arrived{border-color:#546b51}.job-head,.endpoints,.facts{display:flex;justify-content:space-between;gap:10px}.job-head span{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#d5bd7d}.cargo{font-size:11px;color:#91a1aa;margin:4px 0 12px}.endpoints{font-size:10px;color:#aeb9be}.endpoints b{color:#c8a75a}.rail{height:7px;background:#071116;border-radius:999px;margin:10px 0;overflow:hidden}.rail div{height:100%;background:#b89950}.facts span{font-size:9px;color:#768a95}.facts b{display:block;color:#dce4e7;font-size:11px}.chain{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.chain-node{display:flex;gap:9px;background:#111f27;border:1px solid #293943;border-radius:10px;padding:10px}.chain-node>span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#c8a75a;color:#101417;font-weight:900;font-size:11px;flex:0 0 auto}.chain-node strong{display:block;font-size:11px}.chain-node small{display:block;color:#7f919b;font-size:9px;margin-top:4px;line-height:1.35}@media(max-width:760px){.moon-shell{padding:14px}.hero{align-items:stretch;flex-direction:column}.terrain-state{min-width:0}.chain{grid-template-columns:1fr 1fr}.facts{flex-direction:column}.map-head{align-items:start;flex-direction:column}}@media(max-width:480px){.chain{grid-template-columns:1fr}}
+      .moon-shell{min-height:100vh;background:transparent;color:#e8edf0;padding:28px;font-family:system-ui,sans-serif}.hero,.map-card,.jobs-card,.chain-card{max-width:1400px;margin:0 auto 18px}.hero{display:flex;justify-content:space-between;gap:24px;align-items:end}.hero small,.section-title small,.map-head small,.build-dock small{font-size:10px;letter-spacing:.16em;color:#c8a75a;font-weight:800}.hero h1{font-family:Georgia,serif;font-size:44px;font-weight:400;margin:3px 0}.hero p{max-width:760px;margin:0;color:#a5b1b8;font-size:13px}.terrain-state{min-width:250px;background:rgba(16,25,32,.88);border:1px solid #293943;border-radius:12px;padding:12px}.terrain-state span,.terrain-state small{display:block;color:#82929c;font-size:10px}.terrain-state b{display:block;color:#dfe7eb;margin:4px 0}.map-card,.jobs-card,.chain-card{background:rgba(10,19,25,.88);border:1px solid #354650;border-radius:16px;padding:16px}.map-head,.section-title{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:12px}.map-head h2,.section-title h2{font-family:Georgia,serif;font-weight:400;margin:2px 0 0;font-size:24px}.map-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.map-actions span,.map-actions b{font-size:10px;padding:5px 8px;background:#15232b;border-radius:999px;color:#a7b4ba}.map-actions button,.rotation button{border:1px solid #405a67;background:#13232c;color:#dbe6eb;border-radius:7px;padding:5px 9px;cursor:pointer;font-weight:800}.map-wrap{position:relative}.map-card svg{width:100%;height:min(64vh,720px);display:block;border:1px solid #4a5960;border-radius:16px;touch-action:none;cursor:grab;user-select:none}.map-card svg:active{cursor:grabbing}.map-hint{position:absolute;left:12px;bottom:10px;padding:6px 8px;border-radius:7px;background:rgba(5,11,15,.76);color:#bac7cd;font:10px ui-monospace,monospace;pointer-events:none}.build-dock{display:grid;grid-template-columns:minmax(210px,.9fr) minmax(260px,1.6fr) auto auto;gap:12px;align-items:end;margin-top:12px;padding:12px;border:1px solid #344852;border-radius:12px;background:rgba(8,17,23,.88)}.build-location,.build-dock label{display:flex;flex-direction:column;gap:5px}.build-location strong{font-size:13px}.build-location span{font-size:10px;color:#91a0a8}.build-dock select{width:100%;background:#101c23;color:#e9f0f3;border:1px solid #40535d;border-radius:8px;padding:9px}.rotation div{display:flex;gap:6px;align-items:center}.rotation b{min-width:44px;text-align:center;font-size:11px}.build-button{height:38px;border:1px solid #b9984f;background:#c8a75a;color:#101820;border-radius:8px;padding:0 20px;font-weight:900;cursor:pointer}.build-button:disabled{opacity:.42;cursor:not-allowed}.build-message,.notice,.empty{margin-top:10px;padding:10px 12px;background:#2b1718;border:1px solid #704044;border-radius:8px;color:#f0b4b7;font-size:12px}.build-message.ok{background:#10271c;border-color:#346947;color:#9ee0b5}.job-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.job{background:#111d24;border:1px solid #2d404a;border-radius:11px;padding:12px}.job-head,.endpoints,.facts{display:flex;justify-content:space-between;gap:10px}.job-head span{font-size:10px;color:#c8a75a}.cargo{font-size:22px;font-family:Georgia,serif;margin:9px 0}.endpoints,.facts{font-size:10px;color:#91a1aa}.rail{height:5px;background:#24343d;border-radius:99px;margin:10px 0;overflow:hidden}.rail div{height:100%;background:#c8a75a}.chain{display:flex;gap:8px;flex-wrap:wrap}.chain-node{display:flex;gap:8px;align-items:center;padding:8px 10px;background:#111d24;border:1px solid #2d404a;border-radius:9px;min-width:180px;flex:1}.chain-node>span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#c8a75a;color:#101820;font-weight:900}.chain-node strong,.chain-node small{display:block}.chain-node small{color:#81939d;font-size:9px;margin-top:2px}@media(max-width:900px){.moon-shell{padding:14px}.hero{align-items:stretch;flex-direction:column}.terrain-state{min-width:0}.build-dock{grid-template-columns:1fr}.map-card svg{height:58vh}}
     `}</style>
   </main>
 }
