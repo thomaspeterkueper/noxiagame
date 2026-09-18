@@ -2,12 +2,13 @@
 
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 09.07.2026 — Commit D: moon_colony Abschluss-Sequenz
-// Version:      0.5.2
+// Aktualisiert: 18.09.2026 — Mondweg startet kanonischen Transit nach Shackleton
+// Version:      0.6.0
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { JOURNEY_DEFS, JourneyKey } from '@/lib/game/journeys'
+import { useGameStore } from '@/lib/store/gameStore'
 import { T } from './ui'
 
 type PlayerJourney = {
@@ -39,7 +40,7 @@ type JourneyGuideCardProps = {
   onOpenAcademyHint?: () => void
   onActiveStepChange?: (stepId: string | null) => void
   onStepCompleted?: (title: string) => void
-  onJourneyCompleted?: (journeyKey: string) => void   // Abschluss-Sequenz
+  onJourneyCompleted?: (journeyKey: string) => void
 }
 
 function pct(j: PlayerJourney) {
@@ -53,8 +54,8 @@ function actionForStep(journeyKey: JourneyKey, step: JourneyStep | undefined, ac
 
   if (journeyKey === 'moon_colony') {
     if (step.step_order === 1) return { label: 'Werft öffnen', onClick: actions.onOpenShipyard, style: base }
-    if (step.step_order === 2) return { label: 'Reise / Standort öffnen', onClick: actions.onOpenTravel, style: base }
-    if (step.step_order === 3 || step.step_order === 4) return { label: 'Baufelder ansehen', onClick: actions.onFocusGrid, style: base }
+    if (step.step_order === 2) return { label: 'Mondflug starten', onClick: actions.onOpenTravel, style: base }
+    if (step.step_order === 3 || step.step_order === 4) return { label: 'Shackleton-Oberfläche öffnen', onClick: actions.onFocusGrid, style: base }
   }
 
   if (journeyKey === 'merchant') {
@@ -82,6 +83,9 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const prevCompleted = React.useRef<Set<string>>(new Set())
+  const travel = useGameStore(state => state.travel)
+  const inTransit = useGameStore(state => state.inTransit)
+  const gameLocation = useGameStore(state => state.location)
 
   async function loadJourneys() {
     try {
@@ -94,11 +98,10 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
         return
       }
       const newJourneys = Array.isArray(data.journeys) ? data.journeys : []
-      const newSteps    = Array.isArray(data.steps)    ? data.steps    : []
+      const newSteps = Array.isArray(data.steps) ? data.steps : []
       setJourneys(newJourneys)
       setSteps(newSteps)
 
-      // Toast bei neu abgeschlossenem Schritt
       if (props.onStepCompleted) {
         for (const j of newJourneys) {
           for (const id of j.completed_step_ids ?? []) {
@@ -110,14 +113,13 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
         }
         prevCompleted.current = new Set(newJourneys.flatMap((j: any) => j.completed_step_ids ?? []))
 
-      // Journey-Abschluss erkennen
-      if (props.onJourneyCompleted) {
-        for (const j of newJourneys) {
-          if (j.status === 'completed' || (j.progress >= j.progress_max && j.progress_max > 0)) {
-            props.onJourneyCompleted?.(j.journey_key)
+        if (props.onJourneyCompleted) {
+          for (const j of newJourneys) {
+            if (j.status === 'completed' || (j.progress >= j.progress_max && j.progress_max > 0)) {
+              props.onJourneyCompleted?.(j.journey_key)
+            }
           }
         }
-      }
       }
     } catch {
       setMsg('Wege konnten nicht geladen werden.')
@@ -126,7 +128,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
     }
   }
 
-  useEffect(() => { loadJourneys() }, [])
+  useEffect(() => { void loadJourneys() }, [])
 
   async function startJourney(key: JourneyKey) {
     try {
@@ -151,6 +153,28 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
     }
   }
 
+  async function startMoonTransfer() {
+    if (gameLocation === 'moon') {
+      setMsg('Sie sind bereits in Shackleton. Öffnen Sie die Mondoberfläche und beginnen Sie mit dem Aufbau.')
+      props.onFocusGrid?.()
+      return
+    }
+    if (inTransit) {
+      setMsg('Der aktuelle Flug läuft bereits. Nach der Ankunft wird der Weg automatisch fortgesetzt.')
+      return
+    }
+    setBusy('moon-transfer')
+    setMsg(null)
+    try {
+      await travel('moon')
+      // Der bestehende Dashboard-Callback schließt die Einweisung. Der
+      // TransitPanel übernimmt danach die Darstellung des serverseitigen Flugs.
+      props.onOpenTravel?.()
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const activeKeys = useMemo(() => new Set(journeys.map(j => j.journey_key)), [journeys])
 
   const firstActiveStepId = useMemo(() => {
@@ -168,6 +192,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   useEffect(() => {
     props.onActiveStepChange?.(firstActiveStepId)
   }, [firstActiveStepId])
+
   const activeDefs = JOURNEY_DEFS.filter(j => activeKeys.has(j.key))
   const inactiveDefs = JOURNEY_DEFS.filter(j => !activeKeys.has(j.key))
   const card: React.CSSProperties = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: T.radiusLg }
@@ -197,7 +222,8 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
               const completed = new Set(j?.completed_step_ids ?? [])
               const ownSteps = steps.filter(s => s.journey_key === def.key).sort((a, b) => a.step_order - b.step_order)
               const firstOpen = ownSteps.find(s => !completed.has(s.id))
-              const action = actionForStep(def.key, firstOpen, props)
+              const moonTransfer = def.key === 'moon_colony' && firstOpen?.step_order === 2
+              const action = actionForStep(def.key, firstOpen, moonTransfer ? { ...props, onOpenTravel: startMoonTransfer } : props)
               const progressMax = j?.progress_max ?? (ownSteps.length || 1)
               return (
                 <div key={def.key} style={{ background: '#fbfaf7', border: `1px solid ${T.lineSoft}`, borderRadius: T.radius, padding: '0.75rem' }}>
@@ -210,8 +236,8 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
                   </div>
 
                   {firstOpen && action?.onClick && (
-                    <button onClick={action.onClick} style={{ ...action.style, marginBottom: '0.5rem', border: `1px solid ${T.gold}`, background: '#fff7df', color: T.blueDeep }}>
-                      {action.label} →
+                    <button disabled={busy === 'moon-transfer'} onClick={action.onClick} style={{ ...action.style, marginBottom: '0.5rem', border: `1px solid ${T.gold}`, background: '#fff7df', color: T.blueDeep, opacity: busy === 'moon-transfer' ? 0.6 : 1 }}>
+                      {busy === 'moon-transfer' ? 'Mondtransfer wird gestartet …' : `${action.label} →`}
                     </button>
                   )}
 
