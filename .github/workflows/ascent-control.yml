@@ -1,0 +1,34 @@
+name: Ascent Control
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/ascentControl.ts'
+      - 'lib/game/ascentControl.test.ts'
+      - '.github/workflows/ascent-control.yml'
+  push:
+    paths:
+      - 'lib/game/ascentControl.ts'
+      - 'lib/game/ascentControl.test.ts'
+      - '.github/workflows/ascent-control.yml'
+
+jobs:
+  ascent-control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile and run ascent-control contract tests
+        run: |
+          rm -rf .ascent-control-test
+          npx tsc lib/game/ascentControl.test.ts \
+            --target ES2022 --module commonjs --moduleResolution node \
+            --esModuleInterop --skipLibCheck --rootDir lib --outDir .ascent-control-test
+          node .ascent-control-test/game/ascentControl.test.js
