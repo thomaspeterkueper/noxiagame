@@ -245,6 +245,20 @@ export default function EarthBuildingAccessLayer({
             <button style={actionButton} onClick={() => window.location.assign('/knowledge')}>Wissenssystem öffnen</button>
             <button style={actionButton} onClick={() => window.location.assign('/academy/learn')}>Lernen öffnen</button>
           </div>
+          <div style={{ marginTop: 4, padding: 10, border: '1px solid #c7d2cf', borderRadius: 8, background: '#f4f7f5' }}>
+            <a
+              href="https://solarsciencefoundation.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Offizielle SSF-Website öffnen (öffnet außerhalb von NOXIA in einem neuen Browser-Tab oder Fenster)"
+              style={{ ...actionButton, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+            >
+              Offizielle SSF-Website öffnen ↗
+            </a>
+            <span style={{ display: 'block', marginTop: 7, color: '#65767b', fontSize: 10, lineHeight: 1.45 }}>
+              Öffnet die Website der Solar Science Foundation außerhalb von NOXIA in einem neuen Browser-Tab/Fenster.
+            </span>
+          </div>
         </div>
       </FacilityPanel>
     )
