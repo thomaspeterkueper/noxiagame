@@ -3,7 +3,7 @@ id: EXT-NOXIA-ENG-20260918-LUNAR-SURFACE-TO-ORBIT-ASCENT
 title: Engineering – Authoritatives Profil für Mondoberfläche → Mondorbit
 status: open
 source: NOXIA-MOON
- target: KUEPER-ENGINEERING
+target: KUEPER-ENGINEERING
 created: 2026-09-18
 priority: high
 affects: [NOXIA, Moon, Orbit, Spacecraft, Ascent, Engineering]
