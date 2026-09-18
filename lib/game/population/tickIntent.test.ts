@@ -17,7 +17,7 @@ const needs: PersonNeed[] = [
   { personId: 'p1', needCode: 'purpose', satisfaction: 0.1, updatedTick: 0 },
 ]
 
-const result = runPopulationTick({ tick: 10, person, assignments, needs, skills: [], relationships: [], nearbyProblems: [] })
+const result = runPopulationTick({ tick: 10, person, assignments, needs, skills: [], relationships: [], knowledge: [], localProblems: [] })
 check(result.decision.action === 'travel_work', 'low purpose with remote work chooses travel_work')
 check(result.intent.ok && result.intent.intent.kind === 'travel', 'travel decision yields a travel intent')
 check(result.person.currentLocationId === 'home', 'travel decision does not teleport the person')
