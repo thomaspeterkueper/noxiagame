@@ -76,8 +76,8 @@ export async function GET() {
   }
 
   const liveReactors = (reactorData ?? []) as ReactorRow[]
-  const canonicalByCoordinate = new Map(
-    canonicalReactors.map(reactor => [`${reactor.row}:${reactor.col}`, reactor] as const),
+  const canonicalByCoordinate = new Map<string, (typeof canonicalReactors)[number]>(
+    canonicalReactors.map(reactor => [`${reactor.row}:${reactor.col}`, reactor]),
   )
 
   const assets = liveReactors.map(reactor => {
