@@ -66,8 +66,6 @@ function activityForAction(action: PopulationAction, intent: PopulationIntentRes
 }
 
 function updateNeeds(needs: PersonNeed[], action: PopulationAction, tick: number, intent: PopulationIntentResult): PersonNeed[] {
-  // Travel/work costs and benefits are applied only after the authoritative action layer
-  // accepts/completes them. A blocked intent must not grant or consume simulation effects.
   if (!intent.ok || intent.intent.kind === 'travel' || intent.intent.kind === 'work') return needs
   const deltas = NEED_DELTAS[action] ?? {}
   return needs.map((need) => ({
@@ -102,9 +100,8 @@ export function runPopulationTick(input: PopulationTickInput): PopulationTickRes
     assignments: input.assignments,
     decision,
   })
+  const blocker = 'reason' in intent ? intent.reason : null
 
-  // A decision no longer teleports a person. Travel changes location only when the
-  // authoritative transit completion path persists the arrival.
   const person: Person = {
     ...input.person,
     activityState: activityForAction(decision.action, intent),
@@ -112,7 +109,7 @@ export function runPopulationTick(input: PopulationTickInput): PopulationTickRes
     lastDecisionFactors: {
       ...decision.factors,
       score: decision.score,
-      ...(intent.ok ? {} : { blocker: intent.reason }),
+      ...(blocker ? { blocker } : {}),
     },
     lastTick: input.tick,
   }
@@ -134,7 +131,7 @@ export function runPopulationTick(input: PopulationTickInput): PopulationTickRes
       score: decision.score,
       factors: decision.factors,
       intent: intent.ok ? intent.intent : null,
-      blocker: intent.ok ? null : intent.reason,
+      blocker,
     },
   }
 
