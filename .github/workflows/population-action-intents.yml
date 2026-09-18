@@ -1,0 +1,34 @@
+name: Population action intents
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/actionIntent.ts'
+      - 'lib/game/population/actionIntent.test.ts'
+      - 'lib/game/population/tick.ts'
+      - 'lib/game/population/tickIntent.test.ts'
+      - '.github/workflows/population-action-intents.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/population/actionIntent.ts'
+      - 'lib/game/population/actionIntent.test.ts'
+      - 'lib/game/population/tick.ts'
+      - 'lib/game/population/tickIntent.test.ts'
+      - '.github/workflows/population-action-intents.yml'
+
+jobs:
+  intent-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Compile intent contracts
+        run: npx tsc lib/game/population/actionIntent.test.ts lib/game/population/tickIntent.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .population-intent-test
+      - name: Run intent contracts
+        run: |
+          node .population-intent-test/game/population/actionIntent.test.js
+          node .population-intent-test/game/population/tickIntent.test.js
