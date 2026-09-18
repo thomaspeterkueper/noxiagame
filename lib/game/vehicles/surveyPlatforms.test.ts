@@ -43,7 +43,8 @@ const badVexObservation = validateSurveyObservation({
   spatialResolutionM: null,
   signalKeys: [],
 }, VEX_47_SURVEY_PLATFORM)
-assert(!badVexObservation.ok && badVexObservation.reason === 'instrument-unsupported', 'contact sampling must fail closed on VEX-47')
+if (badVexObservation.ok) throw new Error('contact sampling must fail closed on VEX-47')
+assert(badVexObservation.reason === 'instrument-unsupported', 'contact sampling must fail closed on VEX-47')
 
 const orbitalObservation = validateSurveyObservation({
   id: 'obs-orbit-1',
