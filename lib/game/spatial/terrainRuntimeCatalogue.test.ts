@@ -49,7 +49,7 @@ async function main() {
   assert.ok(runtime.status.rejectedTiles[0]?.details.includes('metadata.byte_size'))
 
   const ready = runtime.catalogue.readyTileAt(
-    { body: 'mars', latDeg: 14, lonDeg: -102, elevationM: 0 },
+    { latDeg: 14, lonDeg: -102, elevationM: 0 },
     'mars_mgs_mola_463m',
   )
   assert.equal(ready?.manifest.tileKey, 'mars-tharsis-a')
