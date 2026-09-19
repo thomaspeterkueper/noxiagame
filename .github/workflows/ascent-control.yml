@@ -6,8 +6,11 @@ on:
       - 'lib/game/ascentControl.ts'
       - 'lib/game/ascentControl.test.ts'
       - 'lib/game/ascentPersistence.contract.test.ts'
+      - 'lib/game/ascentReadiness.contract.test.ts'
       - 'lib/game/core/ascentPersistence.ts'
+      - 'lib/game/core/ascentReadiness.ts'
       - 'app/api/game/ascent/route.ts'
+      - 'app/api/game/ascent/readiness/route.ts'
       - 'supabase/migrations/20260919152000_persistent_ascent_core.sql'
       - '.github/workflows/ascent-control.yml'
   push:
@@ -15,8 +18,11 @@ on:
       - 'lib/game/ascentControl.ts'
       - 'lib/game/ascentControl.test.ts'
       - 'lib/game/ascentPersistence.contract.test.ts'
+      - 'lib/game/ascentReadiness.contract.test.ts'
       - 'lib/game/core/ascentPersistence.ts'
+      - 'lib/game/core/ascentReadiness.ts'
       - 'app/api/game/ascent/route.ts'
+      - 'app/api/game/ascent/readiness/route.ts'
       - 'supabase/migrations/20260919152000_persistent_ascent_core.sql'
       - '.github/workflows/ascent-control.yml'
 
@@ -39,7 +45,9 @@ jobs:
           npx tsc \
             lib/game/ascentControl.test.ts \
             lib/game/ascentPersistence.contract.test.ts \
+            lib/game/ascentReadiness.contract.test.ts \
             --target ES2022 --module commonjs --moduleResolution node \
             --esModuleInterop --skipLibCheck --rootDir lib --outDir .ascent-control-test
           node .ascent-control-test/game/ascentControl.test.js
           node .ascent-control-test/game/ascentPersistence.contract.test.js
+          node .ascent-control-test/game/ascentReadiness.contract.test.js
