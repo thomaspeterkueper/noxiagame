@@ -82,58 +82,59 @@ export const BUILDING_VISUALS: Record<string, BuildingVisualProfile> = {
     mapScale: 2.05,
     notes: 'Unique 1971 SSF Foundation House at Bogenstraße 15: hipped-roof bungalow, detached garage along the long side, side entrance facing the garage.',
   },
-  // 16.09.2026: Raumhafen-Gebaeudetypen hatten noch keinen eigenen Eintrag
-  // und zeigten daher nur die leere Fallback-Kachel auf der Karte. Bis
-  // eigene Raumhafen-Assets existieren, leihen sie sich -- genau wie
-  // residential_block/factory oben -- ein bestehendes Asset als
-  // Uebergangsloesung statt komplett unstilisiert zu bleiben.
+  // 16.09.2026: Raumhafen-Gebaeudetypen hatten zunaechst gar keinen Eintrag
+  // (leere Fallback-Kachel), dann kurzzeitig geliehene Assets als
+  // Uebergangsloesung. Spielerfeedback: geliehene Assets (v.a. Solarpanel-
+  // Optik fuer Landepads) erzeugen die falsche Assoziation -- gerade der
+  // Raumhafen ist meist der erste Eindruck neuer Spieler. Jetzt eigene,
+  // einfache aber inhaltlich passende Assets im bestehenden Iso-Stil.
   spaceport_core: {
-    styleAnchorAsset: `${EARTH_STYLE_ROOT}/admin/earth/style-anchor.svg`,
-    mapAsset: `${EARTH_STYLE_ROOT}/admin/earth/style-anchor.svg`,
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_core/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/spaceport_core/earth/style-anchor.svg`,
     visualRole: 'map-ready',
     location: 'earth',
     mapScale: 2.1,
-    notes: 'Interimsvisual (leiht sich admin-Asset), bis ein eigener Raumhafen-Kern-Anker existiert.',
+    notes: 'Eigenes Kontrollturm-Asset (hoher Baukoerper, Antenne).',
   },
   spaceport_service: {
-    styleAnchorAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
-    mapAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_service/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/spaceport_service/earth/style-anchor.svg`,
     visualRole: 'map-ready',
     location: 'earth',
     mapScale: 1.9,
-    notes: 'Interimsvisual (leiht sich workshop-Asset), bis ein eigener Raumhafen-Service-Anker existiert.',
+    notes: 'Eigenes Hangar-Asset (Rundbogendach, offenes Tor).',
   },
   spaceport_storage: {
-    styleAnchorAsset: `${EARTH_STYLE_ROOT}/warehouse/earth/style-anchor.svg`,
-    mapAsset: `${EARTH_STYLE_ROOT}/warehouse/earth/style-anchor.svg`,
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_storage/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/spaceport_storage/earth/style-anchor.svg`,
     visualRole: 'map-ready',
     location: 'earth',
     mapScale: 1.85,
-    notes: 'Interimsvisual (leiht sich warehouse-Asset), bis ein eigener Raumhafen-Lager-Anker existiert.',
+    notes: 'Eigenes Tank-Cluster-Asset (Treibstoff-/Fracht-Zylinder).',
   },
   spaceport_pad_standard: {
-    styleAnchorAsset: `${EARTH_STYLE_ROOT}/solar/earth/style-anchor.svg`,
-    mapAsset: `${EARTH_STYLE_ROOT}/solar/earth/style-anchor.svg`,
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_pad/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/spaceport_pad/earth/style-anchor.svg`,
     visualRole: 'map-ready',
     location: 'earth',
     mapScale: 2.4,
-    notes: 'Interimsvisual (leiht sich solar-Asset als flache, grossflaechige Form), bis ein eigener Pad-Anker existiert.',
+    notes: 'Eigenes Landepad-Asset (Kreisflaeche, Zielkreuz, Eck-Lichter).',
   },
   spaceport_pad_mini: {
-    styleAnchorAsset: `${EARTH_STYLE_ROOT}/solar/earth/style-anchor.svg`,
-    mapAsset: `${EARTH_STYLE_ROOT}/solar/earth/style-anchor.svg`,
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_pad/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/spaceport_pad/earth/style-anchor.svg`,
     visualRole: 'map-ready',
     location: 'earth',
     mapScale: 1.6,
-    notes: 'Interimsvisual (leiht sich solar-Asset als flache, grossflaechige Form), bis ein eigener Pad-Anker existiert.',
+    notes: 'Eigenes Landepad-Asset, kleiner skaliert.',
   },
   scanner: {
-    styleAnchorAsset: `${EARTH_STYLE_ROOT}/laboratory/earth/style-anchor.svg`,
-    mapAsset: `${EARTH_STYLE_ROOT}/laboratory/earth/style-anchor.svg`,
+    styleAnchorAsset: `${EARTH_STYLE_ROOT}/scanner/earth/style-anchor.svg`,
+    mapAsset: `${EARTH_STYLE_ROOT}/scanner/earth/style-anchor.svg`,
     visualRole: 'map-ready',
     location: 'earth',
-    mapScale: 1.4,
-    notes: 'Interimsvisual (leiht sich laboratory-Asset), bis ein eigener Scanner-Anker existiert.',
+    mapScale: 1.5,
+    notes: 'Eigenes Antennen-/Schuessel-Asset auf Mast.',
   },
 }
 
