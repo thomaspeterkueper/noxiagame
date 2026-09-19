@@ -132,7 +132,7 @@ export default function LandingOverlay({
                     </div>
                   </div>
                   <button
-                    onClick={() => { if (canFly) { onTravel(loc.slug); onClose() } }}
+                    onClick={() => { if (canFly) onTravel(loc.slug) }}
                     disabled={!canFly}
                     style={{
                       background: canFly ? '#2a4e7a' : '#1a2a3a',
