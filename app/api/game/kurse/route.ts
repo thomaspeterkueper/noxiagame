@@ -1,7 +1,7 @@
 // app/api/game/kurse/route.ts
 // Erstellt:     23.06.2026
-// Aktualisiert: 11.07.2026 — NOX-0008: kg_path_id in response
-// Version:      1.3.0
+// Aktualisiert: 19.09.2026 — idempotenter Kursabschluss
+// Version:      1.4.0
 //
 // GET /api/game/kurse                    → alle publizierten Kurse + Fortschritt
 // GET /api/game/kurse?id=kurs_01_...     → Kurs mit Folien
@@ -31,26 +31,28 @@ export async function GET(req: NextRequest) {
   if (action === 'complete') {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const kursDbId = searchParams.get('kurs_db_id')
-    const punkte   = parseInt(searchParams.get('punkte') ?? '0', 10)
     if (!kursDbId) return NextResponse.json({ error: 'kurs_db_id fehlt' }, { status: 400 })
 
-    await supabase.from('kurs_fortschritt').upsert({
-      profile_id:       user.id,
-      kurs_id:          kursDbId,
-      abgeschlossen_at: new Date().toISOString(),
-      quiz_bestanden:   true,
-      punkte_verdient:  punkte,
-    }, { onConflict: 'profile_id,kurs_id' })
-
-    // Wissenspunkte vergeben
-    await supabase.rpc('award_knowledge', {
+    // Punkte werden serverseitig aus foundation_kurse gelesen und atomar nur
+    // beim ersten bestandenen Abschluss vergeben. Ein Client kann die Höhe
+    // nicht mehr beeinflussen und Wiederholungen können keine Punkte farmen.
+    const { data: completion, error } = await supabase.rpc('complete_foundation_course', {
       p_profile_id: user.id,
-      p_amount:     punkte,
-      p_reason:     'kurs_abgeschlossen',
-      p_task_id:    null,
+      p_course_id: kursDbId,
     })
 
-    return NextResponse.json({ ok: true, punkte })
+    if (error) {
+      const status = error.message?.includes('course_not_found') ? 404 : 500
+      return NextResponse.json({ error: 'course_completion_failed' }, { status })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      punkte: Number(completion?.points_awarded ?? 0),
+      coursePoints: Number(completion?.course_points ?? 0),
+      alreadyCompleted: Boolean(completion?.already_completed),
+      knowledgePoints: Number(completion?.knowledge_points ?? 0),
+    })
   }
 
   // ── Einzelner Kurs mit Folien ─────────────────────────────────────────────
