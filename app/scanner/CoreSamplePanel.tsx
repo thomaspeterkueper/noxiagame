@@ -1,128 +1,39 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type DepthPreset={id:'shallow'|'medium'|'deep';label:string;depthM:number;energyCost:number;componentCost:number;durationSeconds:number}
-type CoreJob = {
-  id:string
-  latitude_deg:number
-  longitude_deg:number
-  target_depth_m:number
-  status:'running'|'completed'|'failed'
-  energy_cost:number
-  component_cost:number
-  started_at:string
-  completes_at:string
-  completed_at?:string|null
-  result?:{
-    empty?:boolean
-    resource_type?:string
-    abundance?:number
-    abundance_tier?:string
-    distance_m?:number
-    target_depth_m?:number
-    modeled_resource_depth_m?:number
-    depth_model?:string
-    confidence?:string
-    error?:string
-  }|null
-}
+type DrillRig={id:string;label:string;maxDepthM:number;energyMultiplier:number;durationMultiplier:number;owned:boolean;conditionPercent:number|null}
+type CoreJob={id:string;latitude_deg:number;longitude_deg:number;target_depth_m:number;status:'running'|'completed'|'failed';energy_cost:number;component_cost:number;started_at:string;completes_at:string;completed_at?:string|null;result?:{empty?:boolean;resource_type?:string;abundance?:number;abundance_tier?:string;distance_m?:number;target_depth_m?:number;modeled_resource_depth_m?:number;depth_model?:string;confidence?:string;error?:string;rig_id?:string;wear_cost?:number}|null}
+type CoreState={owned:boolean;sampleRadiusM:number;depthPresets:DepthPreset[];drillRigs:DrillRig[];depthModel:string;jobs:CoreJob[];error?:string}
 
-type CoreState = {
-  owned:boolean
-  sampleRadiusM:number
-  depthPresets:DepthPreset[]
-  depthModel:string
-  jobs:CoreJob[]
-  error?:string
-}
+async function authHeaders():Promise<Record<string,string>>{const sb=createClient();const{data:{session}}=await sb.auth.getSession();return session?{Authorization:`Bearer ${session.access_token}`}:{}}
+const RESOURCE_LABEL:Record<string,string>={gold:'Gold',copper_ore:'Kupfer',iron_ore:'Eisen',rare_earth:'Seltene Erden',silica_quartz:'Quarz/Silika',uranium:'Uran',sand_gravel:'Sand/Kies',limestone:'Kalkstein',salt:'Salz',groundwater:'Grundwasser',titanium:'Titan',zirconium:'Zirkonium',bauxite:'Bauxit',zinc:'Zink',lead:'Blei',nickel:'Nickel',cobalt:'Kobalt',lithium:'Lithium',gypsum:'Gips',phosphate:'Phosphat'}
 
-async function authHeaders():Promise<Record<string,string>> {
-  const sb=createClient()
-  const {data:{session}}=await sb.auth.getSession()
-  return session?{Authorization:`Bearer ${session.access_token}`}:{ }
-}
-
-const RESOURCE_LABEL:Record<string,string>={
-  gold:'Gold',copper_ore:'Kupfer',iron_ore:'Eisen',rare_earth:'Seltene Erden',silica_quartz:'Quarz/Silika',uranium:'Uran',
-  sand_gravel:'Sand/Kies',limestone:'Kalkstein',salt:'Salz',groundwater:'Grundwasser',titanium:'Titan',zirconium:'Zirkonium',
-  bauxite:'Bauxit',zinc:'Zink',lead:'Blei',nickel:'Nickel',cobalt:'Kobalt',lithium:'Lithium',gypsum:'Gips',phosphate:'Phosphat',
-}
-
-export default function CoreSamplePanel({location}:{location:string}) {
-  const [visible,setVisible]=useState(false)
-  const [state,setState]=useState<CoreState|null>(null)
-  const [lat,setLat]=useState('')
-  const [lon,setLon]=useState('')
-  const [depthPreset,setDepthPreset]=useState<'shallow'|'medium'|'deep'>('shallow')
-  const [busy,setBusy]=useState(false)
-  const [error,setError]=useState('')
-
-  const load=useCallback(async()=>{
-    try {
-      const headers=await authHeaders()
-      const [scannerRes,coreRes]=await Promise.all([
-        fetch(`/api/game/scanner?location=${encodeURIComponent(location)}`,{headers}),
-        fetch(`/api/game/core-sample?location=${encodeURIComponent(location)}`,{headers}),
-      ])
-      const scanner=await scannerRes.json()
-      if (scanner.mode!=='resource') { setVisible(false); return }
-      setVisible(true)
-      if (!coreRes.ok) throw new Error((await coreRes.json()).error||'core_sample_load_failed')
-      const data:CoreState=await coreRes.json()
-      setState(data)
-      if (!lat && Number.isFinite(scanner.scanner?.lat)) setLat(Number(scanner.scanner.lat).toFixed(5))
-      if (!lon && Number.isFinite(scanner.scanner?.lon)) setLon(Number(scanner.scanner.lon).toFixed(5))
-    } catch(e) {
-      setError(e instanceof Error?e.message:'core_sample_load_failed')
-    }
-  },[location,lat,lon])
-
-  useEffect(()=>{void load()},[load])
-  useEffect(()=>{
-    if (!visible || !(state?.jobs??[]).some(j=>j.status==='running')) return
-    const timer=window.setInterval(()=>void load(),15000)
-    return()=>window.clearInterval(timer)
-  },[visible,state?.jobs,load])
-
-  async function start() {
-    setBusy(true);setError('')
-    try {
-      const headers=await authHeaders()
-      const res=await fetch('/api/game/core-sample',{
-        method:'POST',headers:{...headers,'Content-Type':'application/json'},
-        body:JSON.stringify({location,lat:Number(lat),lon:Number(lon),depthPreset}),
-      })
-      const data=await res.json()
-      if(!res.ok) throw new Error(data.error||'core_sample_start_failed')
-      await load()
-    } catch(e) { setError(e instanceof Error?e.message:'core_sample_start_failed') }
-    finally { setBusy(false) }
-  }
-
-  if(!visible) return null
-  const running=state?.jobs?.some(j=>j.status==='running')??false
-  const presets=state?.depthPresets??[]
-  const selected=presets.find(p=>p.id===depthPreset)??presets[0]
-
-  return <section style={{maxWidth:1180,margin:'14px auto 24px',padding:'0 18px',color:'#e9f1f4',fontFamily:'system-ui'}}>
-    <div style={{border:'1px solid #5b5130',borderRadius:12,background:'#16140dcc',padding:14}}>
-      <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
-        <div><div style={{fontSize:11,letterSpacing:'.14em',color:'#d0b75e'}}>GEZIELTE PROSPEKTION</div><h2 style={{fontSize:17,margin:'4px 0'}}>Bohrkernanalyse</h2><div style={{fontSize:11,color:'#9aa7ad',maxWidth:720}}>Kein Radius-Scan: Eine konkrete Koordinate wird bis zur gewählten Tiefe beprobt. Tiefere Bohrungen dauern länger und verbrauchen mehr Energie und Komponenten. Die Tiefenlage der Lagerstätten ist derzeit ein deterministischer NOXIA-Modellwert, keine reale geologische Tiefenmessung.</div></div>
-        <div style={{fontSize:11,color:'#c9b66b',textAlign:'right'}}>{state?.sampleRadiusM??5} m Probenradius<br/>{selected?`${selected.depthM} m Tiefe · ${Math.round(selected.durationSeconds/60)} min`:''}</div>
-      </div>
-      {!state?.owned?<div style={{marginTop:12,padding:10,border:'1px solid #4b4540',borderRadius:8,color:'#9c9995'}}>Bohrkernanalyse ist noch nicht verfügbar. Das Instrument muss erst erworben oder freigeschaltet werden.</div>:<>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr)) auto',gap:8,marginTop:12,alignItems:'end'}}>
-          <label style={{fontSize:11,color:'#9caeb6'}}>Breitengrad<input value={lat} onChange={e=>setLat(e.target.value)} inputMode="decimal" style={{display:'block',width:'100%',boxSizing:'border-box',marginTop:4,padding:'8px 9px',borderRadius:7,border:'1px solid #4e513f',background:'#0d1417',color:'#edf2f3'}}/></label>
-          <label style={{fontSize:11,color:'#9caeb6'}}>Längengrad<input value={lon} onChange={e=>setLon(e.target.value)} inputMode="decimal" style={{display:'block',width:'100%',boxSizing:'border-box',marginTop:4,padding:'8px 9px',borderRadius:7,border:'1px solid #4e513f',background:'#0d1417',color:'#edf2f3'}}/></label>
-          <label style={{fontSize:11,color:'#9caeb6'}}>Bohrtiefe<select value={depthPreset} onChange={e=>setDepthPreset(e.target.value as 'shallow'|'medium'|'deep')} style={{display:'block',width:'100%',marginTop:4,padding:'8px 9px',borderRadius:7,border:'1px solid #4e513f',background:'#0d1417',color:'#edf2f3'}}>{presets.map(p=><option key={p.id} value={p.id}>{p.label} · {p.depthM} m</option>)}</select></label>
-          <button onClick={start} disabled={busy||running||!lat||!lon||!selected} style={{padding:'9px 14px',border:'1px solid #aa9143',borderRadius:8,background:busy||running?'#48442f':'#755d12',color:'#fff',fontWeight:700}}>{busy?'STARTE …':running?'BOHRUNG LÄUFT':'BOHRUNG STARTEN'}</button>
-        </div>
-        {selected&&<div style={{marginTop:9,fontSize:11,color:'#aeb9bd'}}><b>{selected.label}</b>: {selected.depthM} m · {selected.energyCost} Energie · {selected.componentCost} Komponenten · ca. {Math.round(selected.durationSeconds/60)} Minuten</div>}
-      </>}
-      {error&&<div style={{marginTop:10,color:'#e9aaa1',fontSize:11}}>Bohrkern: {error}</div>}
-      {!!state?.jobs?.length&&<div style={{marginTop:14,display:'grid',gap:7}}>{state.jobs.map(job=><div key={job.id} style={{padding:'9px 10px',border:'1px solid #343b3d',borderRadius:8,background:'#0b1114'}}><div style={{display:'flex',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}><b style={{fontSize:11}}>{job.status==='running'?'Bohrung läuft':job.status==='failed'?'Bohrung fehlgeschlagen':job.result?.empty?'Kein Vorkommen durchschnitten':`Probe: ${RESOURCE_LABEL[job.result?.resource_type??'']??job.result?.resource_type??'ausgewertet'}`}</b><span style={{fontSize:10,color:'#83949b'}}>{Number(job.latitude_deg).toFixed(5)} / {Number(job.longitude_deg).toFixed(5)} · {job.target_depth_m??10} m</span></div>{job.status==='running'&&<div style={{fontSize:10,color:'#bfae70',marginTop:4}}>Auswertung ab {new Date(job.completes_at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} · Kosten {job.energy_cost} Energie / {job.component_cost} Komponenten</div>}{job.status==='completed'&&!job.result?.empty&&<div style={{fontSize:10,color:'#9eb1b9',marginTop:4}}>Konzentration: {job.result?.abundance_tier??'—'} · modellierte Lagerstättentiefe {job.result?.modeled_resource_depth_m??'—'} m · direkte Probe · Evidenz hoch</div>}{job.status==='completed'&&job.result?.empty&&<div style={{fontSize:10,color:'#83949b',marginTop:4}}>Bis {job.result?.target_depth_m??job.target_depth_m??10} m Tiefe wurde innerhalb des 5-m-Probenbereichs kein modelliertes Rohstoffvorkommen durchschnitten.</div>}{job.status==='failed'&&<div style={{fontSize:10,color:'#d4938b',marginTop:4}}>{job.result?.error??'unbekannter Fehler'}</div>}</div>)}</div>}
-    </div>
-  </section>
+export default function CoreSamplePanel({location}:{location:string}){
+ const[visible,setVisible]=useState(false),[state,setState]=useState<CoreState|null>(null),[lat,setLat]=useState(''),[lon,setLon]=useState(''),[depthPreset,setDepthPreset]=useState<'shallow'|'medium'|'deep'>('shallow'),[rigId,setRigId]=useState('core_sample'),[busy,setBusy]=useState(false),[error,setError]=useState('')
+ const load=useCallback(async()=>{try{const headers=await authHeaders();const[scannerRes,coreRes]=await Promise.all([fetch(`/api/game/scanner?location=${encodeURIComponent(location)}`,{headers}),fetch(`/api/game/core-sample?location=${encodeURIComponent(location)}`,{headers})]);const scanner=await scannerRes.json();if(scanner.mode!=='resource'){setVisible(false);return}setVisible(true);if(!coreRes.ok)throw new Error((await coreRes.json()).error||'core_sample_load_failed');const data:CoreState=await coreRes.json();setState(data);const firstOwned=data.drillRigs?.find(r=>r.owned);if(firstOwned&&!data.drillRigs.some(r=>r.id===rigId&&r.owned))setRigId(firstOwned.id);if(!lat&&Number.isFinite(scanner.scanner?.lat))setLat(Number(scanner.scanner.lat).toFixed(5));if(!lon&&Number.isFinite(scanner.scanner?.lon))setLon(Number(scanner.scanner.lon).toFixed(5))}catch(e){setError(e instanceof Error?e.message:'core_sample_load_failed')}},[location,lat,lon,rigId])
+ useEffect(()=>{void load()},[load])
+ useEffect(()=>{if(!visible||!(state?.jobs??[]).some(j=>j.status==='running'))return;const timer=window.setInterval(()=>void load(),15000);return()=>window.clearInterval(timer)},[visible,state?.jobs,load])
+ const presets=state?.depthPresets??[],rigs=state?.drillRigs??[]
+ const rig=rigs.find(r=>r.id===rigId)??rigs[0]
+ const compatiblePresets=useMemo(()=>presets.filter(p=>!rig||p.depthM<=rig.maxDepthM),[presets,rig])
+ const selected=(compatiblePresets.find(p=>p.id===depthPreset)??compatiblePresets[0])
+ useEffect(()=>{if(selected&&selected.id!==depthPreset)setDepthPreset(selected.id)},[selected,depthPreset])
+ const effective=selected&&rig?{energy:Math.ceil(selected.energyCost*rig.energyMultiplier),components:selected.componentCost,duration:Math.ceil(selected.durationSeconds*rig.durationMultiplier),wear:Math.max(2,Math.ceil(2+6*(selected.depthM/rig.maxDepthM)))}:null
+ async function start(){setBusy(true);setError('');try{const headers=await authHeaders();const res=await fetch('/api/game/core-sample',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({location,lat:Number(lat),lon:Number(lon),depthPreset:selected?.id,rigId:rig?.id})});const data=await res.json();if(!res.ok)throw new Error(data.error||'core_sample_start_failed');await load()}catch(e){setError(e instanceof Error?e.message:'core_sample_start_failed')}finally{setBusy(false)}}
+ if(!visible)return null
+ const running=state?.jobs?.some(j=>j.status==='running')??false
+ const canStart=Boolean(state?.owned&&rig?.owned&&selected&&effective&&(rig.conditionPercent??100)>=effective.wear&&!running&&!busy&&lat&&lon)
+ return <section style={{maxWidth:1180,margin:'14px auto 24px',padding:'0 18px',color:'#e9f1f4',fontFamily:'system-ui'}}><div style={{border:'1px solid #5b5130',borderRadius:12,background:'#16140dcc',padding:14}}>
+  <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}><div><div style={{fontSize:11,letterSpacing:'.14em',color:'#d0b75e'}}>GEZIELTE PROSPEKTION</div><h2 style={{fontSize:17,margin:'4px 0'}}>Bohrkernanalyse</h2><div style={{fontSize:11,color:'#9aa7ad',maxWidth:760}}>Koordinate, Bohrgerät und Tiefe bilden gemeinsam den Auftrag. Geräte begrenzen die maximale Tiefe und besitzen einen realen Verschleißzustand. Die Lagerstättentiefe bleibt ein deterministischer NOXIA-Modellwert, keine reale geologische Tiefenmessung.</div></div><div style={{fontSize:11,color:'#c9b66b',textAlign:'right'}}>{state?.sampleRadiusM??5} m Probenradius<br/>{rig?`${rig.label} · max. ${rig.maxDepthM} m`:''}</div></div>
+  {!state?.owned?<div style={{marginTop:12,padding:10,border:'1px solid #4b4540',borderRadius:8,color:'#9c9995'}}>Bohrkernanalyse ist noch nicht verfügbar.</div>:<>
+   <div style={{marginTop:12,display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:8}}>{rigs.map(r=><button key={r.id} type="button" onClick={()=>r.owned&&setRigId(r.id)} disabled={!r.owned||running} style={{textAlign:'left',padding:'10px 11px',border:`1px solid ${rigId===r.id?'#aa9143':r.owned?'#3d504f':'#2a3032'}`,borderRadius:8,background:rigId===r.id?'#2d2813':'#0c1214',color:r.owned?'#e9f1f4':'#747f84',opacity:r.owned?1:.6}}><b style={{fontSize:11}}>{r.label}</b><div style={{fontSize:10,marginTop:4}}>max. {r.maxDepthM} m · Zustand {r.conditionPercent===null?'—':`${r.conditionPercent}%`}</div><div style={{fontSize:9,marginTop:3,color:r.owned?'#879da5':'#666'}}> {r.owned?'verfügbar':'nicht besitzt / nicht freigeschaltet'}</div></button>)}</div>
+   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr)) auto',gap:8,marginTop:12,alignItems:'end'}}><label style={{fontSize:11,color:'#9caeb6'}}>Breitengrad<input value={lat} onChange={e=>setLat(e.target.value)} inputMode="decimal" style={{display:'block',width:'100%',boxSizing:'border-box',marginTop:4,padding:'8px 9px',borderRadius:7,border:'1px solid #4e513f',background:'#0d1417',color:'#edf2f3'}}/></label><label style={{fontSize:11,color:'#9caeb6'}}>Längengrad<input value={lon} onChange={e=>setLon(e.target.value)} inputMode="decimal" style={{display:'block',width:'100%',boxSizing:'border-box',marginTop:4,padding:'8px 9px',borderRadius:7,border:'1px solid #4e513f',background:'#0d1417',color:'#edf2f3'}}/></label><label style={{fontSize:11,color:'#9caeb6'}}>Bohrtiefe<select value={selected?.id??''} onChange={e=>setDepthPreset(e.target.value as 'shallow'|'medium'|'deep')} style={{display:'block',width:'100%',marginTop:4,padding:'8px 9px',borderRadius:7,border:'1px solid #4e513f',background:'#0d1417',color:'#edf2f3'}}>{presets.map(p=><option key={p.id} value={p.id} disabled={!!rig&&p.depthM>rig.maxDepthM}>{p.label} · {p.depthM} m{rig&&p.depthM>rig.maxDepthM?' · Gerät zu klein':''}</option>)}</select></label><button onClick={start} disabled={!canStart} style={{padding:'9px 14px',border:'1px solid #aa9143',borderRadius:8,background:canStart?'#755d12':'#48442f',color:'#fff',fontWeight:700}}>{busy?'STARTE …':running?'BOHRUNG LÄUFT':effective&&(rig?.conditionPercent??100)<effective.wear?'WARTUNG NÖTIG':'BOHRUNG STARTEN'}</button></div>
+   {selected&&effective&&rig&&<div style={{marginTop:9,fontSize:11,color:'#aeb9bd'}}><b>{rig.label} · {selected.label}</b>: {selected.depthM} m · {effective.energy} Energie · {effective.components} Komponenten · ca. {Math.round(effective.duration/60)} Minuten · Verschleiß {effective.wear} %-Punkte</div>}
+  </>}
+  {error&&<div style={{marginTop:10,color:'#e9aaa1',fontSize:11}}>Bohrkern: {error}</div>}
+  {!!state?.jobs?.length&&<div style={{marginTop:14,display:'grid',gap:7}}>{state.jobs.map(job=><div key={job.id} style={{padding:'9px 10px',border:'1px solid #343b3d',borderRadius:8,background:'#0b1114'}}><div style={{display:'flex',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}><b style={{fontSize:11}}>{job.status==='running'?'Bohrung läuft':job.status==='failed'?'Bohrung fehlgeschlagen':job.result?.empty?'Kein Vorkommen durchschnitten':`Probe: ${RESOURCE_LABEL[job.result?.resource_type??'']??job.result?.resource_type??'ausgewertet'}`}</b><span style={{fontSize:10,color:'#83949b'}}>{Number(job.latitude_deg).toFixed(5)} / {Number(job.longitude_deg).toFixed(5)} · {job.target_depth_m??10} m</span></div><div style={{fontSize:10,color:'#84969d',marginTop:4}}>{job.result?.rig_id?`Gerät: ${rigs.find(r=>r.id===job.result?.rig_id)?.label??job.result.rig_id}${job.result?.wear_cost?` · Verschleiß ${job.result.wear_cost}%`:''}`:''}</div>{job.status==='running'&&<div style={{fontSize:10,color:'#bfae70',marginTop:4}}>Auswertung ab {new Date(job.completes_at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} · Kosten {job.energy_cost} Energie / {job.component_cost} Komponenten</div>}{job.status==='completed'&&!job.result?.empty&&<div style={{fontSize:10,color:'#9eb1b9',marginTop:4}}>Konzentration: {job.result?.abundance_tier??'—'} · modellierte Lagerstättentiefe {job.result?.modeled_resource_depth_m??'—'} m · direkte Probe · Evidenz hoch</div>}{job.status==='completed'&&job.result?.empty&&<div style={{fontSize:10,color:'#83949b',marginTop:4}}>Bis {job.result?.target_depth_m??job.target_depth_m??10} m Tiefe wurde im 5-m-Probenbereich kein modelliertes Rohstoffvorkommen durchschnitten.</div>}{job.status==='failed'&&<div style={{fontSize:10,color:'#d4938b',marginTop:4}}>{job.result?.error??'unbekannter Fehler'}</div>}</div>)}</div>}
+ </div></section>
 }
