@@ -350,7 +350,14 @@ export default function EarthBuildingAccessLayer({
         shipRange={shipRange}
         currentTick={Number(data?.tickNumber ?? 0)}
         inTransit={inTransit}
-        onTravel={dest => void travel(dest as LocationSlug, Number(data?.tickNumber ?? 0))}
+        // BUGFIX 16.09.2026: Zielauswahl sprang bisher nur zurueck ins
+        // Raumhafen-Hub (LandingOverlays eigenes onClose), wirkte fuer
+        // Spieler wie "Fenster schliesst sich nicht". Nach einer
+        // Zielauswahl schliesst jetzt das gesamte Gebaeude-Overlay (man ist
+        // ja gerade abgeflogen). Der X-Button/Backdrop-Klick in
+        // LandingOverlay selbst geht weiterhin nur zurueck zum Hub (siehe
+        // onClose-Prop unten).
+        onTravel={dest => { void travel(dest as LocationSlug, Number(data?.tickNumber ?? 0)); onClose() }}
         onClose={() => setSpaceportMode('hub')}
       />
     )
