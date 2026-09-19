@@ -38,10 +38,13 @@ assert.ok(migration.includes("'arrival-rendezvous'"))
 assert.equal(/update\s+public\.ships/i.test(migration), false, 'ascent persistence must not mutate ship location directly')
 assert.equal(/insert\s+into\s+public\.docking_connections/i.test(migration), false, 'ascent persistence must not dock')
 
-// Until Engineering and an execution resolver exist, the public API is deliberately fail-closed.
-assert.ok(api.includes('ENGINEERING_ASCENT_AUTHORITY_UNAVAILABLE'))
+// Engineering authority now exists. The public route may invoke the trusted
+// authorization command only after server-side readiness/Engineering resolution.
+assert.ok(api.includes('resolveAscentReadiness('))
+assert.ok(api.includes('authorizeAscentCommand({'))
+assert.ok(api.includes('ASCENT_READINESS_BLOCKED'))
 assert.ok(api.includes('ASCENT_EXECUTION_UNAVAILABLE'))
-assert.equal(api.includes('authorizeAscentCommand('), false, 'public route must not invoke trusted authorize command yet')
-assert.equal(api.includes('transitionAscentCommand('), false, 'public route must not expose manual phase advancement')
+assert.equal(api.includes('body.engineering'), false, 'client must not supply Engineering authority')
+assert.equal(api.includes('transitionAscentCommand('), false, 'public route must not expose manual low-level transitions')
 
 console.log('ascent persistence contract tests passed')
