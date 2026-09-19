@@ -236,6 +236,7 @@ export default function EarthRegionPreview(){
             const visual=b.visual,spriteScale=visual?.mapScale??1.7,spriteW=Math.max(b.widthSvg*spriteScale,22/zoom),spriteH=Math.max(Math.max(b.depthSvg,b.widthSvg*.72)*spriteScale,18/zoom),isSelected=!b.pending&&b.id===selectedWorldObjectId
             const hitW=Math.max(b.widthSvg,24/zoom),hitH=Math.max(b.depthSvg,20/zoom)
             return <g key={`noxia-${b.id}`} role={!b.pending?'button':undefined} aria-label={!b.pending?`${b.name} auswählen`:undefined} pointerEvents={b.pending?'none':'auto'} onPointerDown={!b.pending?e=>e.stopPropagation():undefined} onClick={!b.pending?e=>{e.stopPropagation();chooseWorldObject(b.id)}:undefined} style={!b.pending?{cursor:'pointer'}:undefined} transform={`translate(${b.mapX} ${b.mapY}) rotate(${b.rotation??0})`}>
+              <title>{b.name}{b.pending?' · im Bau':''}</title>
               {!b.pending&&<rect x={-hitW/2} y={-hitH/2} width={hitW} height={hitH} fill="transparent" pointerEvents="all"/>}
               <ellipse cx={0} cy={b.depthSvg*.18} rx={Math.max(b.widthSvg*.58,5/zoom)} ry={Math.max(b.depthSvg*.32,2.4/zoom)} fill="#14271e" opacity={b.pending?.22:.28}/>
               <rect x={-b.widthSvg/2} y={-b.depthSvg/2} width={Math.max(b.widthSvg,2/zoom)} height={Math.max(b.depthSvg,2/zoom)} rx={1/zoom} fill={b.pending?'#d9a63d':'#eaf1df'} fillOpacity={b.pending?.38:.22} stroke={isSelected?'#d4ad43':b.pending?'#7b5914':'#173f49'} strokeOpacity={1} strokeWidth={(isSelected?2.8:1.5)/zoom} strokeDasharray={b.pending?`${3/zoom} ${2/zoom}`:undefined}/>
