@@ -7,6 +7,10 @@ import {
   type AscentCommandResult,
   type AscentTransitionAction,
 } from '@/lib/game/core/ascentPersistence'
+import {
+  settleAscentOrbitalPresence,
+  type OrbitalPresenceSettlement,
+} from '@/lib/game/core/orbitalPresence'
 
 export type AscentExecutionPresentation = {
   phase: AscentControlPhase
@@ -14,6 +18,11 @@ export type AscentExecutionPresentation = {
   label: string
   nextAction: AscentTransitionAction | null
   terminal: boolean
+}
+
+export type AscentExecutionResult = AscentCommandResult & {
+  presentation: AscentExecutionPresentation
+  orbitalPresence: OrbitalPresenceSettlement | null
 }
 
 /**
@@ -56,7 +65,7 @@ export async function advanceAscentCommand(input: {
   commandId: string
   actorProfileId: string
   shipId: string
-}): Promise<AscentCommandResult & { presentation: AscentExecutionPresentation }> {
+}): Promise<AscentExecutionResult> {
   const mission = await getAscentMissionForShip(input.actorProfileId, input.shipId)
   if (!mission) throw new Error('NOXIA_ASCENT_MISSION_NOT_FOUND')
   if (mission.status !== 'active') throw new Error('NOXIA_ASCENT_MISSION_NOT_ACTIVE')
@@ -71,8 +80,17 @@ export async function advanceAscentCommand(input: {
     action,
   })
 
+  const orbitalPresence = action === 'mark_arrival'
+    ? await settleAscentOrbitalPresence({
+        actorProfileId: input.actorProfileId,
+        missionId: mission.id,
+        targetOrbitNodeSlug: mission.target_orbit_node_slug,
+      })
+    : null
+
   return {
     ...result,
     presentation: ascentExecutionPresentation(result.phase),
+    orbitalPresence,
   }
 }
