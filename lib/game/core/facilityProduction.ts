@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createServiceClient } from '@/lib/supabase/service'
 import type { LogisticsResource } from './logistics'
+import { projectProductionWear, type FacilityWearPolicy } from './facilityProductionWear'
 
 export type FacilityOutputCreditResult = {
   tickNumber: number
@@ -19,6 +20,7 @@ export async function creditFacilityOutputCommand(input: {
   tileEntityId: string
   resource: LogisticsResource
   amount: number
+  wearPolicy?: FacilityWearPolicy
 }): Promise<FacilityOutputCreditResult> {
   const supabase = createServiceClient()
   const { data, error } = await supabase.rpc('noxia_credit_facility_output', {
@@ -33,5 +35,9 @@ export async function creditFacilityOutputCommand(input: {
     throw new Error(`noxia_credit_facility_output failed${suffix ? `: ${suffix}` : ''}`)
   }
 
-  return data as FacilityOutputCreditResult
+  const result = data as FacilityOutputCreditResult
+  if (input.wearPolicy) {
+    await projectProductionWear(supabase, result, input.wearPolicy)
+  }
+  return result
 }
