@@ -6,10 +6,12 @@ import {
   type AscentEngineeringAuthority,
   type SurfaceToOrbitAscentReadiness,
 } from '@/lib/game/ascentControl'
-import { ORBITS } from '@/lib/game/orbits'
+import { resolveAscentOrbitNode } from '@/lib/game/ascentTargets'
 
 export const LUNAR_ASCENT_ENGINEERING_REQUEST =
   'EXT-NOXIA-ENG-20260918-LUNAR-SURFACE-TO-ORBIT-ASCENT'
+export const EARTH_ASCENT_ENGINEERING_REQUEST =
+  'EXT-NOXIA-ENG-20260919-EARTH-LEO-ASCENT-AUTHORITY'
 
 type ShipRow = {
   id: string
@@ -55,6 +57,12 @@ function sameSlug(a: string | null | undefined, b: string) {
   return (a ?? '').trim().toLowerCase() === b.trim().toLowerCase()
 }
 
+export function engineeringRequestForDeparture(departureSurfaceSlug: string): string {
+  return departureSurfaceSlug.trim().toLowerCase() === 'earth'
+    ? EARTH_ASCENT_ENGINEERING_REQUEST
+    : LUNAR_ASCENT_ENGINEERING_REQUEST
+}
+
 /**
  * Resolve all currently authoritative, server-side ascent facts.
  *
@@ -90,7 +98,7 @@ export async function resolveAscentReadiness(
     && ship.status !== 'transit',
   )
 
-  const destinationOrbitResolved = Boolean(ORBITS[normalizedTarget])
+  const destinationOrbitResolved = Boolean(resolveAscentOrbitNode(normalizedTarget))
 
   let noActiveDockingConnection = false
   let noConflictingMission = false
@@ -152,6 +160,6 @@ export async function resolveAscentReadiness(
     readiness,
     assessment: assessSurfaceToOrbitAscentReadiness(readiness),
     evidence,
-    engineeringRequest: LUNAR_ASCENT_ENGINEERING_REQUEST,
+    engineeringRequest: engineeringRequestForDeparture(normalizedDeparture),
   }
 }
