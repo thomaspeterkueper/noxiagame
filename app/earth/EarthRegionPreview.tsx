@@ -27,6 +27,9 @@ const layerOrder=['farmland','forest','urban','water','industrial','public','bui
 const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,sites:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=300
 const LOCAL_DETAIL_RADIUS_KM=.65
+// Kanonischer NOXIA-Referenzstandort (siehe app/api/earth/region/route.ts,
+// SELMECKE_REFERENCE_FEATURE) -- Default-Startansicht statt der 3km-Uebersicht.
+const SELMECKE_DEFAULT_FOCUS:GeoPoint={lat:51.33745,lon:7.97975}
 const EARTH_DATA_VERSION='20260906-local-detail-1'
 
 function styleFor(type:string,tags:Record<string,string>){
@@ -87,7 +90,21 @@ export default function EarthRegionPreview(){
         const response=await fetch(`/api/earth/region?radiusKm=3&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
         const json=await response.json() as Payload
         setData(json)
-        if(json.ok)setOverviewData(json)
+        if(json.ok){
+          setOverviewData(json)
+          // 16.09.2026: Testspieler waren mit dem grossen Massstab (3km-
+          // Uebersicht als Startansicht) ueberfordert. Default ist jetzt ein
+          // konkreter, kleiner Ausschnitt auf Bauplan-Zoom -- fuer Sauerland
+          // der bebaute Referenzstandort Selmecke, fuer andere Regionen
+          // (aktuell Namibia/Erongo, kuenftig auch neue) deren definierter
+          // Ursprungspunkt. Dass die Welt groesser ist, erschliesst sich
+          // ueber "Uebersicht" (auszoomen), nicht als erzwungener erster
+          // Eindruck.
+          const isSauerland=Boolean(json.region?.name?.includes('Sauerland'))
+          const defaultFocus=isSauerland?SELMECKE_DEFAULT_FOCUS:(json.region?.origin??SELMECKE_DEFAULT_FOCUS)
+          const defaultFocusLabel=isSauerland?'Selmecke':(json.region?.name??'Regionsansicht')
+          void focusGeoPoint(defaultFocus,defaultFocusLabel)
+        }
       }catch(e){setData({ok:false,error:String(e)})}
     }
     void load()
