@@ -1,0 +1,32 @@
+name: Population domain
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/**'
+      - 'lib/game/personSocialMemory.ts'
+      - 'package.json'
+      - '.github/workflows/population-domain.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/game/population/**'
+      - 'lib/game/personSocialMemory.ts'
+      - 'package.json'
+      - '.github/workflows/population-domain.yml'
+
+jobs:
+  population-domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Validate population contracts
+        run: npm run test:population
+      - name: Validate Core invariants
+        run: npm run test:core-invariants
