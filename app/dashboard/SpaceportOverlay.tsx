@@ -58,8 +58,12 @@ export default function SpaceportOverlay({
   onOpenMaintenance,
   onOpenCargo,
 }: SpaceportOverlayProps) {
+  // BUGFIX 16.09.2026: run() rief bisher zuerst onClose() auf, was das
+  // gesamte Gebaeude-Overlay schloss, bevor die eigentliche Aktion
+  // (Navigation/Wartung/Fracht) ueberhaupt oeffnen konnte -- dadurch schien
+  // jeder Aktionsklick das Fenster nur zu schliessen. onClose gehoert nur
+  // an den X-Button/Backdrop-Klick, nicht an die Aktionsauswahl.
   const run = (id: ActionId) => {
-    onClose()
     if (id === 'navigation') onOpenNavigation()
     if (id === 'maintenance') onOpenMaintenance()
     if (id === 'cargo') onOpenCargo()
