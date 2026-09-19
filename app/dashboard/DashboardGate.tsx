@@ -1,17 +1,8 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 16.09.2026 — BUGFIX: Onboarding-Gate vor die Spieloberfläche
-// gezogen. Vorher prüfte nur DashboardClient (tief im Baum) profile.onboarded
-// und zeigte WelcomeSetup als Overlay — DashboardMoonSurface & Co. liefen
-// aber als Geschwisterkomponenten bereits mit und konnten das Overlay
-// optisch verdecken (sichtbar geworden durch den Mond-Standort-Bug vom
-// selben Tag, s. Commit d6f6c5d + DB-Migration
-// fix_new_player_starting_location_earth_not_moon). Jetzt: profiles.onboarded
-// wird HIER zuerst geprüft; bei false wird ausschließlich WelcomeSetup
-// gerendert, nichts vom eigentlichen Spiel mountet vorher.
-// Vorher: 15.09.2026 — Profil-Cockpit öffnet das vollständige Profil
-// Version:      0.7.0
+// Aktualisiert: 19.09.2026 — Earth→LEO Raumflugkonsole im Cockpit mounten
+// Version:      0.7.1
 import React, { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
@@ -30,6 +21,7 @@ import DashboardMoonSurface from './DashboardMoonSurface'
 import DashboardProfileBridge from './DashboardProfileBridge'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
+import EarthOrbitFlightPanel from './EarthOrbitFlightPanel'
 import WelcomeSetup from './WelcomeSetup'
 import { T } from './ui'
 
@@ -55,13 +47,8 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   useEffect(() => {
     loadFromServer()
     ;(async () => {
-      // BUGFIX 16.09.2026: Direkt nach einem harten Reload (z.B. Regionswechsel
-      // in EarthRegionSwitcherOverlay.tsx) ist die Supabase-Session manchmal
-      // noch nicht sofort verfuegbar; /api/game/profile antwortet dann kurz
-      // mit 401 statt mit dem Profil. Vorher wurde ein fehlendes profile.onboarded
-      // faelschlich als "false" gelesen -> Onboarding erschien erneut, obwohl
-      // der Account laengst onboarded war. Jetzt: bei Fehlschlag bis zu 3x mit
-      // kurzer Pause erneut versuchen, statt sofort false anzunehmen.
+      // Direkt nach einem harten Reload kann die Supabase-Session kurz fehlen.
+      // Nicht vorschnell erneut ins Onboarding schicken.
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const token = await getToken()
@@ -73,12 +60,10 @@ export default function DashboardGate({ locations, prices, orders }: { locations
             return
           }
         } catch {
-          // weiter zum naechsten Versuch
+          // weiter zum nächsten Versuch
         }
         await new Promise(r => setTimeout(r, 400))
       }
-      // Alle Versuche fehlgeschlagen: nicht aussperren, aber auch nicht
-      // faelschlich das Onboarding erneut zeigen.
       setOnboarded(true)
     })()
   }, [loadFromServer])
@@ -111,5 +96,6 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardWorldDevelopmentOverlay />
     <EarthInteractionManager />
     <EarthRegionSwitcherOverlay />
+    <EarthOrbitFlightPanel />
   </>
 }

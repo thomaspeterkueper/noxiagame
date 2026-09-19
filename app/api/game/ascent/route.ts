@@ -1,9 +1,16 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getAscentMissionForShip } from '@/lib/game/core/ascentPersistence'
+import {
+  advanceAscentCommand,
+  ascentExecutionPresentation,
+  nextExecutionAction,
+} from '@/lib/game/core/ascentExecution'
+import { engineeringRequestForDeparture } from '@/lib/game/core/ascentReadiness'
+import { getOrbitalPresenceForShip } from '@/lib/game/core/orbitalPresence'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const ENGINEERING_REQUEST = 'EXT-NOXIA-ENG-20260918-LUNAR-SURFACE-TO-ORBIT-ASCENT'
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -15,6 +22,12 @@ async function getUserFromRequest(req: NextRequest) {
 
 function uuid(value: unknown): string | null {
   return typeof value === 'string' && UUID_RE.test(value) ? value : null
+}
+
+function nonEmpty(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
 function coreNotRolledOut(message: string) {
@@ -36,8 +49,14 @@ function ascentError(error: unknown) {
   if (message.includes('NOXIA_ASCENT_FORBIDDEN')) {
     return NextResponse.json({ error: 'Kein Zugriff auf dieses Schiff.', code: 'FORBIDDEN' }, { status: 403 })
   }
+  if (message.includes('NOXIA_ASCENT_MISSION_NOT_FOUND')) {
+    return NextResponse.json({ error: 'Keine Ascent-Mission für dieses Schiff vorhanden.', code: 'ASCENT_MISSION_NOT_FOUND' }, { status: 404 })
+  }
+  if (message.includes('NOXIA_ASCENT_MISSION_NOT_ACTIVE') || message.includes('NOXIA_ASCENT_NO_EXECUTABLE_TRANSITION')) {
+    return NextResponse.json({ error: 'Diese Ascent-Mission kann nicht weiter ausgeführt werden.', code: 'ASCENT_NOT_EXECUTABLE' }, { status: 409 })
+  }
   console.error('ascent state query failed:', message)
-  return NextResponse.json({ error: 'Ascent-Zustand konnte nicht geladen werden.' }, { status: 500 })
+  return NextResponse.json({ error: 'Ascent-Zustand konnte nicht verarbeitet werden.' }, { status: 500 })
 }
 
 export async function GET(req: NextRequest) {
@@ -48,12 +67,24 @@ export async function GET(req: NextRequest) {
   if (!shipId) return NextResponse.json({ error: 'Gültige shipId erforderlich.' }, { status: 400 })
 
   try {
-    const mission = await getAscentMissionForShip(user.id, shipId)
+    const [mission, orbitalPresence] = await Promise.all([
+      getAscentMissionForShip(user.id, shipId),
+      getOrbitalPresenceForShip(user.id, shipId),
+    ])
+    const presentation = mission ? ascentExecutionPresentation(mission.phase) : null
     return NextResponse.json({
       ok: true,
       mission,
-      engineeringRequest: ENGINEERING_REQUEST,
-      executionReady: false,
+      presentation,
+      orbitalPresence,
+      executionReady: Boolean(
+        mission
+        && mission.status === 'active'
+        && nextExecutionAction(mission.phase),
+      ),
+      engineeringRequest: mission
+        ? engineeringRequestForDeparture(mission.departure_surface_slug)
+        : null,
     })
   } catch (error) {
     return ascentError(error)
@@ -75,24 +106,42 @@ export async function POST(req: NextRequest) {
   const shipId = uuid(body.shipId)
   if (!shipId) return NextResponse.json({ error: 'Gültige shipId erforderlich.' }, { status: 400 })
 
-  // Intentionally fail closed. Neither Engineering authority nor a flight executor may
-  // be asserted by an untrusted client. Once Engineering supplies the exact lunar
-  // ascent profile, this route can resolve it server-side and invoke the trusted Core
-  // facade without changing the persistence contract.
+  if (action === 'advance') {
+    try {
+      // The client requests only "advance". Persisted mission state determines the
+      // actual low-level transition; clients cannot forge start/insertion/arrival.
+      const result = await advanceAscentCommand({
+        commandId: randomUUID(),
+        actorProfileId: user.id,
+        shipId,
+      })
+      return NextResponse.json({ ok: true, ...result })
+    } catch (error) {
+      return ascentError(error)
+    }
+  }
+
   if (action === 'authorize') {
+    const departureSurfaceSlug = nonEmpty(body.departureSurfaceSlug) ?? 'moon'
+    const targetOrbitNodeSlug = nonEmpty(body.targetOrbitNodeSlug)
+    const engineeringRequest = engineeringRequestForDeparture(departureSurfaceSlug)
     return NextResponse.json({
-      error: 'Für diesen Schiffsrahmen liegt noch keine autoritative Engineering-Freigabe für Mondoberfläche → Mondorbit vor.',
+      error: departureSurfaceSlug.toLowerCase() === 'earth'
+        ? 'Für diesen Schiffsrahmen liegt noch keine autoritative Engineering-Freigabe für Erde → 400-km-LEO vor.'
+        : 'Für diesen Schiffsrahmen liegt noch keine autoritative Engineering-Freigabe für Mondoberfläche → Mondorbit vor.',
       code: 'ENGINEERING_ASCENT_AUTHORITY_UNAVAILABLE',
-      engineeringRequest: ENGINEERING_REQUEST,
+      engineeringRequest,
       shipId,
+      departureSurfaceSlug,
+      targetOrbitNodeSlug,
     }, { status: 409 })
   }
 
+  // Low-level state changes stay private even though server-side execution now exists.
   if (['start', 'mark-insertion', 'mark-arrival', 'cancel'].includes(action)) {
     return NextResponse.json({
-      error: 'Die operative Ascent-Ausführung ist noch nicht freigegeben. Zustandsübergänge dürfen nicht vom Client vorgetäuscht werden.',
+      error: 'Direkte Ascent-Phasenwechsel sind nicht erlaubt. Verwende den serverseitig aufgelösten advance-Pfad.',
       code: 'ASCENT_EXECUTION_UNAVAILABLE',
-      engineeringRequest: ENGINEERING_REQUEST,
       shipId,
     }, { status: 409 })
   }
