@@ -14,6 +14,8 @@ type ReadinessResponse = {
   ok?: boolean
   assessment?: { ready: boolean; blockers: string[] }
   evidence?: Evidence
+  crew?: { boarded: boolean; role: string | null }
+  cargo?: { empty: boolean; totalLegacyAmount: number; unresolvedResources: string[]; rationale: string }
   engineeringRequest?: string
   error?: string
 }
@@ -68,8 +70,9 @@ async function gameRequest(path: string, init?: RequestInit) {
 }
 
 /**
- * First playable-spaceflight surface. It deliberately exposes unresolved Core
- * gates instead of offering a fake teleport button.
+ * First playable-spaceflight surface. It exposes unresolved Core gates instead
+ * of offering a fake teleport button. Player crew presence is explicit and
+ * empty cargo is resolved as a physical zero-payload state.
  */
 export default function EarthOrbitFlightPanel() {
   const location = useGameStore(s => s.location)
@@ -116,6 +119,24 @@ export default function EarthOrbitFlightPanel() {
   const activeMission = mission?.mission && mission.mission.status === 'active'
   const canAdvance = Boolean(activeMission && mission?.executionReady)
   const ready = Boolean(readiness?.assessment?.ready)
+  const needsCrew = Boolean(readiness?.evidence && readiness.evidence.crew !== 'ready')
+
+  async function boardSelf() {
+    if (!shipId) return
+    setLoading(true)
+    setMessage(null)
+    try {
+      const res = await gameRequest('/api/game/ascent/crew', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'board-self', shipId }),
+      })
+      const data = await res.json()
+      if (!res.ok) setMessage(data.error ?? 'Crew konnte nicht an Bord gehen.')
+      await refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function authorize() {
     if (!shipId) return
@@ -175,7 +196,7 @@ export default function EarthOrbitFlightPanel() {
           ↑ Erde → LEO
         </button>
       ) : (
-        <section style={{ width: 310, border: '1px solid rgba(201,169,97,.42)', borderRadius: 10, background: 'rgba(5,13,22,.97)', color: '#d8e8ef', boxShadow: '0 14px 40px rgba(0,0,0,.45)', overflow: 'hidden' }}>
+        <section style={{ width: 330, border: '1px solid rgba(201,169,97,.42)', borderRadius: 10, background: 'rgba(5,13,22,.97)', color: '#d8e8ef', boxShadow: '0 14px 40px rgba(0,0,0,.45)', overflow: 'hidden' }}>
           <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 11px', borderBottom: '1px solid rgba(77,119,145,.32)' }}>
             <div>
               <div style={{ color: '#c9a961', fontSize: 12, fontWeight: 700 }}>RAUMFLUG</div>
@@ -207,12 +228,38 @@ export default function EarthOrbitFlightPanel() {
               </div>
             ) : null}
 
+            {!activeMission && readiness?.crew?.boarded && (
+              <div style={{ marginBottom: 8, fontSize: 9, color: '#7fa98b' }}>
+                Crew: du bist als {readiness.crew.role ?? 'Crew'} an Bord.
+              </div>
+            )}
+
+            {!activeMission && readiness?.cargo && (
+              <div style={{ marginBottom: 8, fontSize: 9, lineHeight: 1.4, color: readiness.cargo.empty ? '#7fa98b' : '#b7a97e' }}>
+                Cargo: {readiness.cargo.rationale}
+                {!readiness.cargo.empty && readiness.cargo.unresolvedResources.length > 0
+                  ? ` Betroffen: ${readiness.cargo.unresolvedResources.join(', ')}.`
+                  : ''}
+              </div>
+            )}
+
             {message && <div style={{ marginBottom: 9, fontSize: 10, lineHeight: 1.45, color: '#e0b2a7' }}>{message}</div>}
 
             {readiness?.engineeringRequest && !activeMission && (
               <div style={{ marginBottom: 9, fontSize: 9, lineHeight: 1.4, color: '#6f8795' }}>
                 Authority: {readiness.engineeringRequest}
               </div>
+            )}
+
+            {!activeMission && needsCrew && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void boardSelf()}
+                style={{ width: '100%', marginBottom: 7, border: '1px solid #315b70', background: 'rgba(49,91,112,.18)', color: '#a9d3df', borderRadius: 6, padding: '7px 8px', cursor: loading ? 'default' : 'pointer', fontSize: 10 }}
+              >
+                ALS COMMANDER / PILOT AN BORD
+              </button>
             )}
 
             <div style={{ display: 'flex', gap: 7 }}>
