@@ -13,13 +13,16 @@ on:
       - 'lib/game/core/ascentPersistence.ts'
       - 'lib/game/core/ascentReadiness.ts'
       - 'lib/game/core/ascentExecution.ts'
+      - 'lib/game/core/ascentCrew.ts'
       - 'lib/game/core/orbitalPresence.ts'
       - 'app/api/game/ascent/route.ts'
       - 'app/api/game/ascent/readiness/route.ts'
+      - 'app/api/game/ascent/crew/route.ts'
       - 'app/dashboard/EarthOrbitFlightPanel.tsx'
       - 'app/dashboard/DashboardGate.tsx'
       - 'supabase/migrations/20260919152000_persistent_ascent_core.sql'
       - 'supabase/migrations/20260919170000_orbital_presence_from_ascent.sql'
+      - 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'
       - '.github/workflows/ascent-control.yml'
   push:
     paths:
@@ -33,13 +36,16 @@ on:
       - 'lib/game/core/ascentPersistence.ts'
       - 'lib/game/core/ascentReadiness.ts'
       - 'lib/game/core/ascentExecution.ts'
+      - 'lib/game/core/ascentCrew.ts'
       - 'lib/game/core/orbitalPresence.ts'
       - 'app/api/game/ascent/route.ts'
       - 'app/api/game/ascent/readiness/route.ts'
+      - 'app/api/game/ascent/crew/route.ts'
       - 'app/dashboard/EarthOrbitFlightPanel.tsx'
       - 'app/dashboard/DashboardGate.tsx'
       - 'supabase/migrations/20260919152000_persistent_ascent_core.sql'
       - 'supabase/migrations/20260919170000_orbital_presence_from_ascent.sql'
+      - 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'
       - '.github/workflows/ascent-control.yml'
 
 jobs:
