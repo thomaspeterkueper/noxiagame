@@ -100,7 +100,7 @@ export function decidePerson(context: PersonDecisionContext): PersonDecision {
 export interface PersonTickResult { processed: number; decisions: number; events: number; errors: string[] }
 export async function runPersonTick(supabase: any, tick: number, pressuresByLocation: Map<string, ColonyPressure[]> = new Map()): Promise<PersonTickResult> {
   const result: PersonTickResult = { processed: 0, decisions: 0, events: 0, errors: [] }
-  const { data: people, error } = await supabase.from('people').select('id, person_key, public_role, traits, current_location_id, simulation_tier, activity_state, last_action, last_tick').eq('simulation_tier', 'active')
+  const { data: people, error } = await supabase.from('people').select('id, person_key, public_role, traits, current_location_id, simulation_tier, activity_state, last_action, last_tick').eq('simulation_tier', 'active').not('person_key', 'is', null)
   if (error) return { ...result, errors: [`people load: ${error.message ?? error}`] }
   for (const person of people ?? []) {
     try {
