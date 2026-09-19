@@ -1,13 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { getAscentMissionForShip } from '@/lib/game/core/ascentPersistence'
+import {
+  authorizeAscentCommand,
+  getAscentMissionForShip,
+} from '@/lib/game/core/ascentPersistence'
 import {
   advanceAscentCommand,
   ascentExecutionPresentation,
   nextExecutionAction,
 } from '@/lib/game/core/ascentExecution'
-import { engineeringRequestForDeparture } from '@/lib/game/core/ascentReadiness'
+import {
+  engineeringRequestForDeparture,
+  resolveAscentReadiness,
+} from '@/lib/game/core/ascentReadiness'
 import { getOrbitalPresenceForShip } from '@/lib/game/core/orbitalPresence'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -85,6 +91,7 @@ export async function GET(req: NextRequest) {
       engineeringRequest: mission
         ? engineeringRequestForDeparture(mission.departure_surface_slug)
         : null,
+      engineeringAuthorityRef: mission?.engineering_authority_ref ?? null,
     })
   } catch (error) {
     return ascentError(error)
@@ -124,20 +131,63 @@ export async function POST(req: NextRequest) {
   if (action === 'authorize') {
     const departureSurfaceSlug = nonEmpty(body.departureSurfaceSlug) ?? 'moon'
     const targetOrbitNodeSlug = nonEmpty(body.targetOrbitNodeSlug)
-    const engineeringRequest = engineeringRequestForDeparture(departureSurfaceSlug)
-    return NextResponse.json({
-      error: departureSurfaceSlug.toLowerCase() === 'earth'
-        ? 'Für diesen Schiffsrahmen liegt noch keine autoritative Engineering-Freigabe für Erde → 400-km-LEO vor.'
-        : 'Für diesen Schiffsrahmen liegt noch keine autoritative Engineering-Freigabe für Mondoberfläche → Mondorbit vor.',
-      code: 'ENGINEERING_ASCENT_AUTHORITY_UNAVAILABLE',
-      engineeringRequest,
-      shipId,
-      departureSurfaceSlug,
-      targetOrbitNodeSlug,
-    }, { status: 409 })
+    if (!targetOrbitNodeSlug) {
+      return NextResponse.json({ error: 'targetOrbitNodeSlug ist erforderlich.' }, { status: 400 })
+    }
+
+    try {
+      // The browser never supplies Engineering authority, mass, propellant or
+      // launch-site facts. The trusted resolver derives all authorization gates
+      // from server-side/canonical state and fails closed when any are unresolved.
+      const resolved = await resolveAscentReadiness(
+        user.id,
+        shipId,
+        departureSurfaceSlug,
+        targetOrbitNodeSlug,
+      )
+
+      if (resolved.ship && resolved.ship.profile_id !== user.id) {
+        return NextResponse.json({ error: 'Kein Zugriff auf dieses Schiff.', code: 'FORBIDDEN' }, { status: 403 })
+      }
+
+      if (!resolved.assessment.ready || !resolved.readiness.engineering) {
+        const engineeringResult = resolved.engineeringAssessment?.result ?? 'unavailable'
+        return NextResponse.json({
+          error: engineeringResult === 'frame-unmapped'
+            ? 'Dieses NOXIA-Schiff ist nicht dem freigegebenen ASCE-Frame ENG-SCV-0003 zugeordnet.'
+            : 'Die Engineering-Freigabe ist vorhanden, aber der konkrete physische Abflugzustand erfüllt die Authority noch nicht vollständig.',
+          code: 'ASCENT_READINESS_BLOCKED',
+          shipId,
+          departureSurfaceSlug,
+          targetOrbitNodeSlug,
+          assessment: resolved.assessment,
+          evidence: resolved.evidence,
+          engineeringRequest: resolved.engineeringRequest,
+          engineeringAuthorityRef: resolved.engineeringAuthorityRef,
+          engineeringAssessment: resolved.engineeringAssessment,
+        }, { status: 409 })
+      }
+
+      const result = await authorizeAscentCommand({
+        commandId: randomUUID(),
+        actorProfileId: user.id,
+        shipId,
+        departureSurfaceSlug: resolved.departureSurfaceSlug,
+        targetOrbitNodeSlug: resolved.targetOrbitNodeSlug,
+        engineeringAuthorityRef: resolved.readiness.engineering.profileId,
+      })
+
+      return NextResponse.json({
+        ok: true,
+        ...result,
+        engineeringAuthorityRef: resolved.readiness.engineering.profileId,
+      })
+    } catch (error) {
+      return ascentError(error)
+    }
   }
 
-  // Low-level state changes stay private even though server-side execution now exists.
+  // Low-level state changes stay private even though server-side execution exists.
   if (['start', 'mark-insertion', 'mark-arrival', 'cancel'].includes(action)) {
     return NextResponse.json({
       error: 'Direkte Ascent-Phasenwechsel sind nicht erlaubt. Verwende den serverseitig aufgelösten advance-Pfad.',
