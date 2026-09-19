@@ -28,5 +28,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - name: Validate population contracts
         run: npm run test:population
+      - name: Compile population persistence engine
+        run: npx tsc lib/game/population/engine.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
       - name: Validate Core invariants
         run: npm run test:core-invariants
