@@ -7,6 +7,11 @@ import {
   type SurfaceToOrbitAscentReadiness,
 } from '@/lib/game/ascentControl'
 import { resolveAscentOrbitNode } from '@/lib/game/ascentTargets'
+import {
+  EARTH_LEO_ASCENT_AUTHORITY_R1,
+  resolveEarthAscentEngineeringAuthority,
+  type EarthAscentEngineeringAssessment,
+} from '@/lib/game/core/earthAscentEngineeringAuthority'
 
 export const LUNAR_ASCENT_ENGINEERING_REQUEST =
   'EXT-NOXIA-ENG-20260918-LUNAR-SURFACE-TO-ORBIT-ASCENT'
@@ -59,6 +64,8 @@ export interface ResolvedAscentReadiness {
   crew: AscentCrewEvidence
   cargo: AscentCargoEvidence
   engineeringRequest: string
+  engineeringAuthorityRef: string | null
+  engineeringAssessment: EarthAscentEngineeringAssessment | null
 }
 
 export interface AscentReadinessResolutionOptions {
@@ -80,12 +87,16 @@ export function engineeringRequestForDeparture(departureSurfaceSlug: string): st
 /**
  * Resolve authoritative server-side ascent facts.
  *
- * Crew is now resolved from the explicit spacecraft crew manifest. Cargo is
- * safely ready when the ship carries no cargo at all. Non-empty legacy cargo
- * remains unresolved until every gameplay quantity has an explicit physical
- * mass mapping; the historical resources.unit='t' default is not treated as
- * Engineering authority. Engineering ascent authority itself remains fail-closed
- * until the owning Engineering repository supplies an accepted versioned result.
+ * Crew comes from the explicit spacecraft crew manifest. Empty cargo is a
+ * resolved 0 kg payload; non-empty legacy cargo remains fail-closed until its
+ * physical mass basis is mapped. Earth Engineering authority is now consumed
+ * from ENG-EARTH-LEO-ASCENT-r1 rather than being treated as an open request.
+ *
+ * The current legacy ship table still has no persisted ASCE physical departure
+ * state (measured start mass, reference propellant state, mapped launch-assist
+ * site/release state and resolved target plane). Consequently the Engineering
+ * resolver remains fail-closed until an exact ASCE flight article is represented
+ * by NOXIA; legacy freighters are never relabelled as ENG-SCV-0003.
  */
 export async function resolveAscentReadiness(
   actorProfileId: string,
@@ -97,6 +108,7 @@ export async function resolveAscentReadiness(
   const supabase = createServiceClient()
   const normalizedDeparture = departureSurfaceSlug.trim().toLowerCase()
   const normalizedTarget = targetOrbitNodeSlug.trim().toLowerCase()
+  const target = resolveAscentOrbitNode(normalizedTarget)
 
   const { data: shipData, error: shipError } = await supabase
     .from('ships')
@@ -114,7 +126,7 @@ export async function resolveAscentReadiness(
     && ship.status !== 'transit',
   )
 
-  const destinationOrbitResolved = Boolean(resolveAscentOrbitNode(normalizedTarget))
+  const destinationOrbitResolved = Boolean(target)
 
   let noActiveDockingConnection = false
   let noConflictingMission = false
@@ -176,7 +188,21 @@ export async function resolveAscentReadiness(
 
   const crewReady = options.crewReady == null ? canonicalCrewReady : options.crewReady === true
   const cargoReady = options.cargoReady == null ? canonicalCargoReady : options.cargoReady === true
-  const engineering = options.engineering ?? null
+
+  const engineeringAssessment = normalizedDeparture === 'earth'
+    ? resolveEarthAscentEngineeringAuthority({
+      shipTypeId: ship?.ship_type_id ?? null,
+      departureSurfaceSlug: normalizedDeparture,
+      target,
+      // No client field may satisfy this. A later NOXIA flight-article state
+      // projection will supply trusted measured/configuration values here.
+      physicalState: null,
+    })
+    : null
+
+  const engineering = options.engineering !== undefined
+    ? options.engineering
+    : engineeringAssessment?.authority ?? null
 
   const readiness: SurfaceToOrbitAscentReadiness = {
     spacecraftResolved,
@@ -189,6 +215,16 @@ export async function resolveAscentReadiness(
     cargoReady,
     engineering,
   }
+
+  const engineeringEvidence: AscentReadinessEvidenceState = engineering
+    ? 'ready'
+    : engineeringAssessment?.result === 'frame-unmapped'
+      || engineeringAssessment?.result === 'unsupported-launch-site'
+      || engineeringAssessment?.result === 'unsupported-orbit'
+      || engineeringAssessment?.result === 'over-mass'
+      || engineeringAssessment?.result === 'insufficient-release-speed'
+      ? 'blocked'
+      : 'unresolved'
 
   const evidence: AscentReadinessEvidence = {
     spacecraft: spacecraftResolved ? 'ready' : 'blocked',
@@ -203,7 +239,7 @@ export async function resolveAscentReadiness(
     cargo: options.cargoReady == null
       ? cargoEmpty ? 'ready' : 'unresolved'
       : cargoReady ? 'ready' : 'blocked',
-    engineering: engineering ? 'ready' : 'unresolved',
+    engineering: engineeringEvidence,
   }
 
   return {
@@ -226,5 +262,9 @@ export async function resolveAscentReadiness(
         : 'Nichtleere Legacy-Fracht bleibt gesperrt, bis ihre Gameplay-Mengen explizit auf physikalische Massenbasen abgebildet sind.',
     },
     engineeringRequest: engineeringRequestForDeparture(normalizedDeparture),
+    engineeringAuthorityRef: normalizedDeparture === 'earth'
+      ? EARTH_LEO_ASCENT_AUTHORITY_R1.authorityId
+      : null,
+    engineeringAssessment,
   }
 }
