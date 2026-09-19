@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <radialGradient id="padSurface" cx=".5" cy=".38" r=".7"><stop stop-color="#4a6470"/><stop offset="1" stop-color="#2c3e46"/></radialGradient>
+    <filter id="padShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-opacity=".28"/></filter>
+  </defs>
+  <g filter="url(#padShadow)" transform="translate(60 140)">
+    <ellipse cx="300" cy="330" rx="300" ry="150" fill="#1c262a" opacity=".22"/>
+    <ellipse cx="300" cy="300" rx="290" ry="145" fill="url(#padSurface)" stroke="#0f1b1f" stroke-width="6"/>
+    <ellipse cx="300" cy="300" rx="230" ry="115" fill="none" stroke="#7d95a0" stroke-width="4" opacity=".55"/>
+    <g stroke="#d8bd68" stroke-width="10" stroke-linecap="round" opacity=".92">
+      <line x1="300" y1="215" x2="300" y2="385"/>
+      <line x1="150" y1="300" x2="450" y2="300"/>
+    </g>
+    <circle cx="300" cy="300" r="26" fill="none" stroke="#d8bd68" stroke-width="7" opacity=".9"/>
+    <g fill="#f4c94b" stroke="#5c4300" stroke-width="2">
+      <circle cx="80" cy="230" r="12"/>
+      <circle cx="520" cy="230" r="12"/>
+      <circle cx="80" cy="370" r="12"/>
+      <circle cx="520" cy="370" r="12"/>
+    </g>
+    <g fill="#3a4d55" opacity=".5">
+      <ellipse cx="150" cy="260" rx="16" ry="8"/>
+      <ellipse cx="450" cy="260" rx="16" ry="8"/>
+      <ellipse cx="150" cy="340" rx="16" ry="8"/>
+      <ellipse cx="450" cy="340" rx="16" ry="8"/>
+    </g>
+  </g>
+</svg>
