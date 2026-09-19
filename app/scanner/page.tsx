@@ -1,5 +1,6 @@
 import ScannerWorkspace from './ScannerWorkspace'
 import CoreSamplePanel from './CoreSamplePanel'
+import CoreSampleLearningCard from './CoreSampleLearningCard'
 
 export default async function ScannerPage({ searchParams }: { searchParams: Promise<{ location?: string }> }) {
   const params = await searchParams
@@ -7,5 +8,6 @@ export default async function ScannerPage({ searchParams }: { searchParams: Prom
   return <>
     <ScannerWorkspace location={location} />
     <CoreSamplePanel location={location} />
+    <CoreSampleLearningCard />
   </>
 }
