@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="hangarRoof" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#dfe8ef"/><stop offset="1" stop-color="#93a7b6"/></linearGradient>
+    <linearGradient id="hangarWall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef2f4"/><stop offset="1" stop-color="#c3d0d7"/></linearGradient>
+    <filter id="hangarShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity=".24"/></filter>
+  </defs>
+  <g filter="url(#hangarShadow)" transform="translate(48 150)">
+    <path d="M40 420 330 560 650 388 360 250Z" fill="#5c6c72" opacity=".22"/>
+    <path d="M40 300 80 210Q330 60 580 210L624 300 360 430Z" fill="url(#hangarRoof)" stroke="#4c626f" stroke-width="5"/>
+    <path d="M40 300 360 430 360 520 40 392Z" fill="url(#hangarWall)" stroke="#4c626f" stroke-width="5"/>
+    <path d="M360 430 624 300 624 388 360 520Z" fill="#c9d6dc" stroke="#4c626f" stroke-width="5"/>
+    <path d="M198 372 360 442 360 520 198 452Z" fill="#2c3d44"/>
+    <path d="M212 382 348 440 348 505 212 448Z" fill="#0f181c"/>
+    <g fill="#5f7987" opacity=".85">
+      <path d="M100 250Q330 110 560 250" fill="none" stroke="#4c626f" stroke-width="4"/>
+      <path d="M150 275Q330 155 510 275" fill="none" stroke="#4c626f" stroke-width="3" opacity=".6"/>
+    </g>
+    <g fill="#d8bd68" stroke="#5c4300" stroke-width="2">
+      <circle cx="70" cy="316" r="9"/><circle cx="608" cy="316" r="9"/>
+    </g>
+  </g>
+</svg>
