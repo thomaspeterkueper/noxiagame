@@ -8,6 +8,7 @@ import {
   nextExecutionAction,
 } from '@/lib/game/core/ascentExecution'
 import { engineeringRequestForDeparture } from '@/lib/game/core/ascentReadiness'
+import { getOrbitalPresenceForShip } from '@/lib/game/core/orbitalPresence'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -66,12 +67,16 @@ export async function GET(req: NextRequest) {
   if (!shipId) return NextResponse.json({ error: 'Gültige shipId erforderlich.' }, { status: 400 })
 
   try {
-    const mission = await getAscentMissionForShip(user.id, shipId)
+    const [mission, orbitalPresence] = await Promise.all([
+      getAscentMissionForShip(user.id, shipId),
+      getOrbitalPresenceForShip(user.id, shipId),
+    ])
     const presentation = mission ? ascentExecutionPresentation(mission.phase) : null
     return NextResponse.json({
       ok: true,
       mission,
       presentation,
+      orbitalPresence,
       executionReady: Boolean(
         mission
         && mission.status === 'active'
