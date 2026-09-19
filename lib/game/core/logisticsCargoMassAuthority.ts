@@ -19,10 +19,11 @@ export interface LogisticsCargoMassAuthorityEntry {
  * cargo-mass bases. Entries belong here only after the owning Engineering/domain
  * source has defined the physical transport form and quantity basis.
  *
- * EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS is still open, so the productive
- * catalog remains empty. In particular, a legacy catalog unit such as `t` is
- * not promoted to physical mass merely because it is present in an inventory
- * snapshot.
+ * KUEPER Engineering completed EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS with
+ * engineering-commodities-r1.json. That result deliberately does not assign
+ * Engineering commodities to NOXIA gameplay ids or reinterpret legacy `unit='t'`.
+ * The productive mapping therefore remains empty until NOXIA creates explicit,
+ * defensible gameplay-id/quantity-basis mappings.
  */
 export const LOGISTICS_CARGO_MASS_AUTHORITIES: readonly LogisticsCargoMassAuthorityEntry[] = []
 
