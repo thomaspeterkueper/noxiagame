@@ -204,8 +204,8 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     assignmentRows = data ?? []
   }
   const assignments = assignmentRows.map(assignmentFromRow)
-  const previousPeople = peopleRows.map(personFromRow)
-  const currentPeople = new Map(previousPeople.map(person => [person.id, person] as const))
+  const previousPeople: Person[] = peopleRows.map(personFromRow)
+  const currentPeople = new Map<string, Person>(previousPeople.map(person => [person.id, person] as const))
   const previousCandidates = resolvedPresenceCandidates(previousPeople, assignments)
 
   let processed = 0
