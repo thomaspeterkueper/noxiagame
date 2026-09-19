@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="towerWall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef3f5"/><stop offset="1" stop-color="#b9c8d0"/></linearGradient>
+    <linearGradient id="towerCap" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dfe8ef"/><stop offset="1" stop-color="#8fa4b3"/></linearGradient>
+    <filter id="towerShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#towerShadow)" transform="translate(140 40)">
+    <ellipse cx="220" cy="600" rx="150" ry="46" fill="#26343a" opacity=".2"/>
+    <path d="M120 560 220 610 320 560 320 260 220 210 120 260Z" fill="url(#towerWall)" stroke="#526977" stroke-width="5"/>
+    <path d="M120 260 220 210 320 260 220 310Z" fill="#dbe4ea" stroke="#526977" stroke-width="5"/>
+    <g fill="#33474f" stroke="#dce9ef" stroke-width="2" opacity=".9">
+      <path d="M148 330 178 345 178 375 148 360Z"/><path d="M148 400 178 415 178 445 148 430Z"/><path d="M148 470 178 485 178 515 148 500Z"/>
+      <path d="M262 345 292 330 292 360 262 375Z"/><path d="M262 415 292 400 292 430 262 445Z"/><path d="M262 485 292 470 292 500 262 515Z"/>
+    </g>
+    <path d="M150 96 220 60 290 96 220 132Z" fill="url(#towerCap)" stroke="#526977" stroke-width="5"/>
+    <path d="M150 96 150 210 220 246 220 132Z" fill="#c3d2da" stroke="#526977" stroke-width="4"/>
+    <path d="M220 132 220 246 290 210 290 96Z" fill="#a9bcc7" stroke="#526977" stroke-width="4"/>
+    <rect x="180" y="150" width="80" height="34" rx="4" fill="#3d5866" opacity=".85"/>
+    <line x1="220" y1="60" x2="220" y2="0" stroke="#526977" stroke-width="6"/>
+    <circle cx="220" cy="0" r="9" fill="#d8bd68" stroke="#5c4300" stroke-width="2"/>
+  </g>
+</svg>
