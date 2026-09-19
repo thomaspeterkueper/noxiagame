@@ -5,11 +5,15 @@ import { resolve } from 'node:path'
 const resolver = readFileSync(resolve(process.cwd(), 'lib/game/core/ascentReadiness.ts'), 'utf8')
 const targets = readFileSync(resolve(process.cwd(), 'lib/game/ascentTargets.ts'), 'utf8')
 const api = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/readiness/route.ts'), 'utf8')
+const crewApi = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/crew/route.ts'), 'utf8')
+const crewMigration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'), 'utf8')
 
 // Server-side facts must come from canonical persisted state.
 assert.ok(resolver.includes(".from('ships')"))
 assert.ok(resolver.includes(".from('docking_connections')"))
 assert.ok(resolver.includes(".from('ascent_missions')"))
+assert.ok(resolver.includes(".from('ship_crew_manifest')"))
+assert.ok(resolver.includes(".from('ship_cargo')"))
 assert.ok(resolver.includes("ship.status !== 'transit'"))
 
 // Surface and orbit must be distinguishable for the Earth vertical slice.
@@ -22,16 +26,26 @@ assert.ok(resolver.includes('resolveAscentOrbitNode(normalizedTarget)'))
 assert.ok(resolver.includes('EXT-NOXIA-ENG-20260919-EARTH-LEO-ASCENT-AUTHORITY'))
 assert.ok(resolver.includes('EXT-NOXIA-ENG-20260918-LUNAR-SURFACE-TO-ORBIT-ASCENT'))
 
-// Unknown crew/cargo/Engineering truth must fail closed.
-assert.ok(resolver.includes("crew: options.crewReady == null ? 'unresolved'"))
-assert.ok(resolver.includes("cargo: options.cargoReady == null ? 'unresolved'"))
-assert.ok(resolver.includes("engineering: engineering ? 'ready' : 'unresolved'"))
-assert.ok(resolver.includes('crewReady = options.crewReady === true'))
-assert.ok(resolver.includes('cargoReady = options.cargoReady === true'))
-
-// Public clients may request an assessment but may not assert trusted readiness dimensions.
+// Crew is now an explicit gameplay fact. The owner can board their own ship as
+// commander/pilot, but cannot assert readiness directly from the browser.
+assert.ok(crewMigration.includes('ship_crew_manifest'))
+assert.ok(crewMigration.includes('noxia_board_player_crew'))
+assert.ok(crewMigration.includes("v_ship.profile_id <> p_profile_id"))
+assert.ok(crewMigration.includes("v_ship.status = 'transit'"))
+assert.ok(resolver.includes("crewRow.role === 'commander' || crewRow.role === 'pilot'"))
+assert.ok(crewApi.includes("body.action === 'board-self'"))
 assert.equal(api.includes('body.crewReady'), false)
+
+// Empty cargo is authoritatively zero payload. Non-empty legacy cargo remains
+// unresolved instead of treating resources.unit='t' as a physical mass claim.
+assert.ok(resolver.includes('const cargoEmpty = cargoRows.length === 0'))
+assert.ok(resolver.includes('const canonicalCargoReady = cargoEmpty'))
+assert.ok(resolver.includes("cargoEmpty ? 'ready' : 'unresolved'"))
+assert.ok(resolver.includes('Legacy-Fracht bleibt gesperrt'))
 assert.equal(api.includes('body.cargoReady'), false)
+
+// Engineering remains externally owned and fail-closed until an accepted authority exists.
+assert.ok(resolver.includes("engineering: engineering ? 'ready' : 'unresolved'"))
 assert.equal(api.includes('body.engineering'), false)
 assert.ok(api.includes('resolveAscentReadiness('))
 
