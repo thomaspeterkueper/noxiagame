@@ -33,6 +33,7 @@ const NEED_DELTAS: Partial<Record<PopulationAction, Partial<Record<PersonNeed['n
   travel_home: { sustenance: -0.02, rest: -0.03, safety: 0.03 },
   travel_work: { sustenance: -0.02, rest: -0.03, purpose: 0.02 },
   social_interaction: { sustenance: -0.01, rest: -0.01, social: 0.2, purpose: 0.03 },
+  seek_medical_care: {},
   inspect_problem: { rest: -0.03, safety: -0.01, purpose: 0.08 },
   report_problem: { social: 0.02, purpose: 0.09 },
 }
@@ -46,6 +47,7 @@ function eventTypeForAction(action: PopulationAction, intent: PopulationIntentRe
     case 'travel_home':
     case 'travel_work': return 'npc_started_travel'
     case 'social_interaction': return 'npc_met_person'
+    case 'seek_medical_care': return 'npc_seeking_medical_care'
     case 'inspect_problem': return 'npc_observed_problem'
     case 'report_problem': return 'npc_reported_problem'
   }
@@ -60,6 +62,7 @@ function activityForAction(action: PopulationAction, intent: PopulationIntentRes
     case 'travel_home':
     case 'travel_work': return 'travelling'
     case 'social_interaction': return 'socialising'
+    case 'seek_medical_care': return 'travelling'
     case 'inspect_problem':
     case 'report_problem': return 'inspecting'
   }
