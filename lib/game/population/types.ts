@@ -133,6 +133,7 @@ export type PopulationAction =
   | 'work'
   | 'rest'
   | 'satisfy_basic_need'
+  | 'seek_medical_care'
   | 'travel_home'
   | 'travel_work'
   | 'social_interaction'
