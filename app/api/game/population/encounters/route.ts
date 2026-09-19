@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
+interface EncounterPersonResponse {
+  id: string
+  displayName: string
+  personKey: string | null
+  publicRole: string | null
+}
+
+interface EncounterResponse {
+  id: string
+  tick: number
+  occurredAt: string | null
+  tileEntityId: string | null
+  people: EncounterPersonResponse[]
+}
+
 export async function GET(req: NextRequest) {
   const locationId = req.nextUrl.searchParams.get('locationId')
   if (!locationId) return NextResponse.json({ error: 'locationId erforderlich.' }, { status: 400 })
@@ -22,18 +37,21 @@ export async function GET(req: NextRequest) {
   const byId = new Map((people ?? []).map((person: any) => [person.id, person]))
 
   const seen = new Set<string>()
-  const encounters = []
+  const encounters: EncounterResponse[] = []
   for (const event of events ?? []) {
     const encounterId = typeof event.payload?.encounterId === 'string' ? event.payload.encounterId : event.id
     if (seen.has(encounterId)) continue
     seen.add(encounterId)
     encounters.push({
       id: encounterId,
-      tick: event.tick,
-      occurredAt: event.occurred_at,
-      tileEntityId: event.payload?.tileEntityId ?? null,
+      tick: Number(event.tick),
+      occurredAt: event.occurred_at ?? null,
+      tileEntityId: typeof event.payload?.tileEntityId === 'string' ? event.payload.tileEntityId : null,
       people: [byId.get(event.actor_person_id), byId.get(event.related_person_id)].filter(Boolean).map((p: any) => ({
-        id: p.id, displayName: p.display_name, personKey: p.person_key, publicRole: p.public_role,
+        id: p.id,
+        displayName: p.display_name,
+        personKey: p.person_key ?? null,
+        publicRole: p.public_role ?? null,
       })),
     })
   }
