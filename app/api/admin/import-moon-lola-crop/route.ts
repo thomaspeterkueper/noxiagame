@@ -118,7 +118,16 @@ export async function GET(req: NextRequest) {
     const image = await tiff.getImage()
     const width = image.getWidth()
     const height = image.getHeight()
-    const [minLon, minLat, maxLon, maxLat] = image.getBoundingBox()
+    // BUGFIX: getBoundingBox() liefert hier projizierte Meter (Simple
+    // Cylindrical/Equirectangular, Standardparallele 0deg), keine Grad --
+    // bestaetigt per Diagnose (boundingBox bis +-5.458.203m / +-2.729.101m,
+    // exakt Radius*pi bzw. Radius*pi/2). Erst in echte Lat/Lon-Grad
+    // umrechnen, bevor irgendetwas anderes damit gerechnet wird.
+    const MOON_RADIUS_M = 1737400
+    const [minXm, minYm, maxXm, maxYm] = image.getBoundingBox()
+    const toDeg = (m: number) => (m / MOON_RADIUS_M) * (180 / Math.PI)
+    const minLon = toDeg(minXm), maxLon = toDeg(maxXm)
+    const minLat = toDeg(minYm), maxLat = toDeg(maxYm)
 
     if (searchParams.get('debug') === '1') {
       const fileDirectory = (image as any).fileDirectory ?? {}
