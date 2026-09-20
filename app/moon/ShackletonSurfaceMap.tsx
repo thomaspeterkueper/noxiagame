@@ -63,6 +63,7 @@ type SpatialPayload = {
   terrain?: {
     activeDataset?: { id?: string; dataset_name?: string; status?: string } | null
     resolution?: { status?: string; zM?: number | null }
+    elevationGrid?: { stepM: number; size: number; values: (number | null)[] } | null
   }
   entities?: SpatialEntity[]
   builds?: PendingBuild[]
@@ -415,6 +416,41 @@ export default function ShackletonSurfaceMap() {
           <rect width={VIEW_W} height={VIEW_H} fill="rgba(18,24,28,.28)" rx="16" />
           <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
             <rect width={VIEW_W} height={VIEW_H} fill="url(#moon-grid)" rx="16" />
+
+            {(() => {
+              const grid = spatial?.terrain?.elevationGrid
+              if (!grid || !grid.values.length) return null
+              const finite = grid.values.filter((v): v is number => v != null && Number.isFinite(v))
+              if (!finite.length) return null
+              const minZ = Math.min(...finite)
+              const maxZ = Math.max(...finite)
+              const span = Math.max(1e-6, maxZ - minZ)
+              const half = Math.floor(grid.size / 2)
+              const cellW = grid.stepM * pxPerMeterX
+              const cellH = grid.stepM * pxPerMeterY
+              // Einfache Hoehen-zu-Farbe-Rampe (dunkel = tief, hell = hoch) --
+              // kein echtes Hillshading (Sonnenwinkel/Schlagschatten), aber
+              // macht das reale NASA-Relief zum ersten Mal tatsaechlich
+              // sichtbar statt nur im Status-Badge zu stehen.
+              return <g opacity={0.85} pointerEvents="none">
+                {grid.values.map((v, i) => {
+                  if (v == null || !Number.isFinite(v)) return null
+                  const row = Math.floor(i / grid.size) - half
+                  const col = (i % grid.size) - half
+                  const center = project({ xM: col * grid.stepM, yM: -row * grid.stepM })
+                  const t = (v - minZ) / span
+                  const lightness = 14 + t * 46 // 14%..60%
+                  return <rect
+                    key={`elev-${i}`}
+                    x={center.x - cellW / 2}
+                    y={center.y - cellH / 2}
+                    width={cellW + 0.5}
+                    height={cellH + 0.5}
+                    fill={`hsl(205 22% ${lightness}%)`}
+                  />
+                })}
+              </g>
+            })()}
 
             {routes.map(route => {
               const points = route.geometry.points.map(point => {
