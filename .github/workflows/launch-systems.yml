@@ -1,0 +1,34 @@
+name: Launch Systems
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/launchSystems.ts'
+      - 'lib/game/launchSystems.test.ts'
+      - '.github/workflows/launch-systems.yml'
+  push:
+    paths:
+      - 'lib/game/launchSystems.ts'
+      - 'lib/game/launchSystems.test.ts'
+      - '.github/workflows/launch-systems.yml'
+
+jobs:
+  launch-systems:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile and run launch-system contract tests
+        run: |
+          rm -rf .launch-system-test
+          npx tsc lib/game/launchSystems.test.ts \
+            --target ES2022 --module commonjs --moduleResolution node \
+            --esModuleInterop --skipLibCheck --rootDir lib --outDir .launch-system-test
+          node .launch-system-test/game/launchSystems.test.js
