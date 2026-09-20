@@ -18,7 +18,7 @@ export default function BuildingStyleAnchorsPage() {
 
       <section className="anchor-grid">
         {anchors.map(anchor => {
-          const visual = BUILDING_VISUALS[anchor.id]
+          const visual = BUILDING_VISUALS[anchor.id]?.earth
           return (
             <article key={anchor.id}>
               <div className="image-wrap">
