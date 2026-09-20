@@ -143,6 +143,13 @@ export async function GET(req: NextRequest) {
 
     const cropOriginLon = minLon + x0 * pixelScaleLon
     const cropOriginLat = maxLat - y0 * pixelScaleLat // y0 Zeilen vom oberen (Nord-)Rand entfernt
+    // BUGFIX: minimale Gleitkomma-Ungenauigkeit liess den unteren Rand
+    // hauchduenn unter -90 Grad rutschen und die strenge Validierung
+    // (minLatDeg < -90) schlagen fehl. Skala hart so kappen, dass der
+    // untere Rand physikalisch nie -90 unterschreiten kann.
+    const cropRows = y1 - y0
+    const maxSafePixelScaleLat = (cropOriginLat + 90) / cropRows
+    const safePixelScaleLat = Math.min(pixelScaleLat, maxSafePixelScaleLat)
 
     const tiffBytes = encodeFloat32GeoTiff({
       width: x1 - x0,
@@ -151,7 +158,7 @@ export async function GET(req: NextRequest) {
       originLonDeg: cropOriginLon,
       originLatDeg: cropOriginLat,
       pixelScaleLonDeg: pixelScaleLon,
-      pixelScaleLatDeg: pixelScaleLat,
+      pixelScaleLatDeg: safePixelScaleLat,
     })
 
     const manifest = await ingestPreparedTerrainTileToSupabase(supabase, {
