@@ -163,6 +163,13 @@ export async function GET(req: NextRequest) {
     }
 
     const cropOriginLon = minLon + x0 * pixelScaleLon
+    // BUGFIX: gleiche Gleitkomma-Ungenauigkeit wie bei der Breite --
+    // rechter Rand kann hauchduenn ueber 180 Grad rutschen. Auch hier hart
+    // kappen. Linken Rand ebenfalls minimal gegen -180 absichern.
+    const safeCropOriginLon = Math.max(cropOriginLon, -180)
+    const cropCols = x1 - x0
+    const maxSafePixelScaleLon = (180 - safeCropOriginLon) / cropCols
+    const safePixelScaleLon = Math.min(pixelScaleLon, maxSafePixelScaleLon)
     const cropOriginLat = maxLat - y0 * pixelScaleLat // y0 Zeilen vom oberen (Nord-)Rand entfernt
     // BUGFIX: minimale Gleitkomma-Ungenauigkeit liess den unteren Rand
     // hauchduenn unter -90 Grad rutschen und die strenge Validierung
@@ -176,9 +183,9 @@ export async function GET(req: NextRequest) {
       width: x1 - x0,
       height: y1 - y0,
       data,
-      originLonDeg: cropOriginLon,
+      originLonDeg: safeCropOriginLon,
       originLatDeg: cropOriginLat,
-      pixelScaleLonDeg: pixelScaleLon,
+      pixelScaleLonDeg: safePixelScaleLon,
       pixelScaleLatDeg: safePixelScaleLat,
     })
 
