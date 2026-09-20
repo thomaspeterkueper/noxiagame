@@ -1,0 +1,45 @@
+0 FILE noxia_cr01_stage1.mpd
+0 NOXIA CR-01 Cargo Rover - Stage 1 Chassis
+0 Name: noxia_cr01_stage1.mpd
+0 Author: OpenAI / Thomas Peter Kueper
+0 !LDRAW_ORG Unofficial_Model
+0 !LICENSE Redistributable under CC BY 4.0
+0 // PROTOTYPE: intended for BrickLink Studio/LDraw import.
+0 // Geometry is a first-pass structural layout and still requires Studio collision review.
+0 // Coordinate convention: X left/right, Y vertical, Z front/rear.
+0 // LDraw units: 20 LDU = 1 stud, 24 LDU = 1 brick height.
+
+0 STEP
+0 // LEFT LONGITUDINAL RAIL
+1 72 -80 0 -120 1 0 0 0 1 0 0 0 1 32278.dat
+0 // RIGHT LONGITUDINAL RAIL
+1 72 80 0 -120 1 0 0 0 1 0 0 0 1 32278.dat
+
+0 STEP
+0 // REAR RAIL EXTENSIONS
+1 72 -80 0 140 1 0 0 0 1 0 0 0 1 32525.dat
+1 72 80 0 140 1 0 0 0 1 0 0 0 1 32525.dat
+
+0 STEP
+0 // TRANSVERSE 5x7 TECHNIC FRAMES
+0 // Rotated 90 degrees around Y so their long axis bridges the two rails.
+1 72 0 0 -180 0 0 1 0 1 0 -1 0 0 64179.dat
+1 72 0 0 -60 0 0 1 0 1 0 -1 0 0 64179.dat
+1 72 0 0 60 0 0 1 0 1 0 -1 0 0 64179.dat
+1 72 0 0 180 0 0 1 0 1 0 -1 0 0 64179.dat
+
+0 STEP
+0 // LOCAL CROSS BRACES / HARDPOINT MARKERS
+1 72 -80 0 -20 1 0 0 0 1 0 0 0 1 32316.dat
+1 72 80 0 -20 1 0 0 0 1 0 0 0 1 32316.dat
+1 72 -80 0 100 1 0 0 0 1 0 0 0 1 32316.dat
+1 72 80 0 100 1 0 0 0 1 0 0 0 1 32316.dat
+
+0 STEP
+0 // CARGO INTERFACE REFERENCE MARKERS (temporary 3L beams)
+1 14 -40 -24 -40 1 0 0 0 1 0 0 0 1 32523.dat
+1 14 40 -24 -40 1 0 0 0 1 0 0 0 1 32523.dat
+1 14 -40 -24 80 1 0 0 0 1 0 0 0 1 32523.dat
+1 14 40 -24 80 1 0 0 0 1 0 0 0 1 32523.dat
+
+0 NOFILE
