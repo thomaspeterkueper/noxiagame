@@ -1,0 +1,43 @@
+0 FILE noxia_cr01_stage1_v02.mpd
+0 NOXIA CR-01 Cargo Rover - Stage 1 Chassis v0.2
+0 Name: noxia_cr01_stage1_v02.mpd
+0 Author: OpenAI / Thomas Peter Kueper
+0 !LDRAW_ORG Unofficial_Model
+0 !LICENSE Redistributable under CC BY 4.0
+0 // Revised after first BrickLink Studio import screenshot.
+0 // Coordinate convention: X left/right, Y vertical, Z front/rear.
+0 // LDraw: 20 LDU = 1 stud.
+
+0 STEP
+0 // LOWER PRIMARY RAILS: 15L
+1 72 -60 0 -120 1 0 0 0 1 0 0 0 1 32278.dat
+1 72 60 0 -120 1 0 0 0 1 0 0 0 1 32278.dat
+
+0 STEP
+0 // UPPER REAR EXTENSIONS: 11L, raised by one stud layer
+1 72 -60 -20 80 1 0 0 0 1 0 0 0 1 32525.dat
+1 72 60 -20 80 1 0 0 0 1 0 0 0 1 32525.dat
+
+0 STEP
+0 // TRANSVERSE 5x7 FRAMES
+0 // Long 7-hole axis across X; outer holes should align with X = +/-60.
+1 72 0 0 -180 0 0 1 0 1 0 -1 0 0 64179.dat
+1 72 0 0 -60 0 0 1 0 1 0 -1 0 0 64179.dat
+1 72 0 0 60 0 0 1 0 1 0 -1 0 0 64179.dat
+1 72 0 0 180 0 0 1 0 1 0 -1 0 0 64179.dat
+
+0 STEP
+0 // SPLICE / LOCAL BRACE BEAMS, same raised layer as extensions
+1 72 -60 -20 -20 1 0 0 0 1 0 0 0 1 32316.dat
+1 72 60 -20 -20 1 0 0 0 1 0 0 0 1 32316.dat
+1 72 -60 -20 100 1 0 0 0 1 0 0 0 1 32316.dat
+1 72 60 -20 100 1 0 0 0 1 0 0 0 1 32316.dat
+
+0 STEP
+0 // TEMPORARY CARGO INTERFACE MARKERS
+1 14 -40 -40 -40 1 0 0 0 1 0 0 0 1 32523.dat
+1 14 40 -40 -40 1 0 0 0 1 0 0 0 1 32523.dat
+1 14 -40 -40 80 1 0 0 0 1 0 0 0 1 32523.dat
+1 14 40 -40 80 1 0 0 0 1 0 0 0 1 32523.dat
+
+0 NOFILE
