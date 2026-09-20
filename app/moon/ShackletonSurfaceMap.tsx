@@ -440,7 +440,7 @@ export default function ShackletonSurfaceMap() {
               // fuehrte. Jetzt: echtes Icon wie bei Earth (getBuildingVisual),
               // Name als Hover-Tooltip immer verfuegbar, als Text-Label nur
               // ab genuegend Zoom sichtbar.
-              const visual = getBuildingVisual(entity.entity_id, 'moon')
+              const visual = getBuildingVisual(entity.entity_id ?? '', 'moon')
               const spriteScale = visual?.mapScale ?? 1.7
               const spriteW = Math.max(width * spriteScale, 22 / zoom)
               const spriteH = Math.max(Math.max(depth, width * .72) * spriteScale, 18 / zoom)
