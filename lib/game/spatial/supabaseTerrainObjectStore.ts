@@ -22,6 +22,13 @@ export class SupabaseTerrainObjectStore implements TerrainObjectStore {
 
   async write(bucket: string, path: string, bytes: Uint8Array, contentType: string): Promise<void> {
     const body = bytes.slice().buffer
+    // BUGFIX 16.09.2026: upload(..., {upsert:true}) allein fuehrte bei einer
+    // erneuten Ingestion mit gleichem Pfad zu einem Read-after-Write-
+    // Konsistenzproblem -- die direkt anschliessende Verifizierung las noch
+    // den alten Inhalt zurueck. Objekt daher zuerst explizit entfernen
+    // (Fehlschlag ignorieren, falls es noch nicht existiert), dann frisch
+    // hochladen.
+    await this.supabase.storage.from(bucket).remove([path]).catch(() => {})
     const { error } = await this.supabase.storage.from(bucket).upload(path, body, {
       contentType,
       upsert: true,
