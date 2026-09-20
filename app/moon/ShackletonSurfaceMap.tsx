@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { SHACKLETON_SURFACE_LOGISTICS_CHAIN } from '@/lib/game/moonSurfaceLogistics'
 import { deriveSurfaceMissionProgress } from '@/lib/game/vehicles/surfaceProgress'
 import {
@@ -433,10 +434,25 @@ export default function ShackletonSurfaceMap() {
               const p = project({ xM, yM })
               const width = Math.max(8 / zoom, Number(entity.footprint_width_m ?? 20) * pxPerMeterX)
               const depth = Math.max(8 / zoom, Number(entity.footprint_depth_m ?? 20) * pxPerMeterY)
+              // BUGFIX 16.09.2026: bisher generisches eingefaerbtes Rechteck
+              // fuer JEDEN Gebaeudetyp -- dazu Namen IMMER eingeblendet, was
+              // bei eng stehenden Gebaeuden zu unlesbar ueberlappendem Text
+              // fuehrte. Jetzt: echtes Icon wie bei Earth (getBuildingVisual),
+              // Name als Hover-Tooltip immer verfuegbar, als Text-Label nur
+              // ab genuegend Zoom sichtbar.
+              const visual = getBuildingVisual(entity.entity_id, 'moon')
+              const spriteScale = visual?.mapScale ?? 1.7
+              const spriteW = Math.max(width * spriteScale, 22 / zoom)
+              const spriteH = Math.max(Math.max(depth, width * .72) * spriteScale, 18 / zoom)
               return <g key={entity.id} transform={`translate(${p.x} ${p.y}) rotate(${-Number(entity.rotation_deg ?? 0)})`}>
-                <rect x={-width / 2} y={-depth / 2} width={width} height={depth} rx={2 / zoom} fill={entity.isOwn ? '#d0ad55' : '#7896a8'} stroke="#f1f5f7" strokeWidth={1.3 / zoom} opacity="0.94" />
-                <text x={width / 2 + 6 / zoom} y={-3 / zoom} fill="#f0f4f6" fontSize={11 / zoom} fontWeight="700">{entity.name ?? entity.entity_id}</text>
-                <text x={width / 2 + 6 / zoom} y={10 / zoom} fill="#a6b6be" fontSize={8 / zoom}>{entity.ownerLabel ?? 'Gebäude'}</text>
+                <title>{entity.name ?? entity.entity_id}{entity.ownerLabel ? ` · ${entity.ownerLabel}` : ''}</title>
+                {visual?.mapAsset
+                  ? <image href={visual.mapAsset} x={-spriteW / 2} y={-spriteH * .72} width={spriteW} height={spriteH} preserveAspectRatio="xMidYMid meet" opacity={.97} pointerEvents="none" />
+                  : <rect x={-width / 2} y={-depth / 2} width={width} height={depth} rx={2 / zoom} fill={entity.isOwn ? '#d0ad55' : '#7896a8'} stroke="#f1f5f7" strokeWidth={1.3 / zoom} opacity="0.94" />}
+                {zoom >= 3 && <>
+                  <text x={width / 2 + 6 / zoom} y={-3 / zoom} fill="#f0f4f6" fontSize={11 / zoom} fontWeight="700">{entity.name ?? entity.entity_id}</text>
+                  <text x={width / 2 + 6 / zoom} y={10 / zoom} fill="#a6b6be" fontSize={8 / zoom}>{entity.ownerLabel ?? 'Gebäude'}</text>
+                </>}
               </g>
             })}
 
