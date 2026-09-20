@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="drillBody" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef6fa"/><stop offset="1" stop-color="#9fc3d4"/></linearGradient>
+    <linearGradient id="drillBit" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c9d8de"/><stop offset="1" stop-color="#5f7b87"/></linearGradient>
+    <filter id="drillShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#drillShadow)" transform="translate(120 60)">
+    <ellipse cx="220" cy="600" rx="180" ry="46" fill="#101c22" opacity=".2"/>
+    <path d="M150 560 220 600 290 560 290 420 220 388 150 420Z" fill="url(#drillBody)" stroke="#4c626f" stroke-width="5"/>
+    <path d="M150 420 220 388 290 420 220 452Z" fill="#dbe9ee" stroke="#4c626f" stroke-width="4"/>
+    <g stroke="#4c626f" stroke-width="6"><line x1="180" y1="470" x2="260" y2="470"/><line x1="180" y1="510" x2="260" y2="510"/></g>
+    <path d="M190 388 220 340 250 388Z" fill="#c9d8de" stroke="#4c626f" stroke-width="4"/>
+    <line x1="220" y1="340" x2="220" y2="60" stroke="#4c626f" stroke-width="16"/>
+    <path d="M198 60 220 0 242 60Z" fill="url(#drillBit)" stroke="#4c626f" stroke-width="4"/>
+    <g stroke="#8fa7b2" stroke-width="4" opacity=".7">
+      <line x1="205" y1="100" x2="235" y2="90"/><line x1="205" y1="150" x2="235" y2="140"/><line x1="205" y1="200" x2="235" y2="190"/>
+      <line x1="205" y1="250" x2="235" y2="240"/><line x1="205" y1="300" x2="235" y2="290"/>
+    </g>
+    <g fill="#7fd4f0" opacity=".55">
+      <circle cx="220" cy="20" r="30"/>
+    </g>
+  </g>
+</svg>
