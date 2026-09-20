@@ -119,6 +119,18 @@ export async function GET(req: NextRequest) {
     const width = image.getWidth()
     const height = image.getHeight()
     const [minLon, minLat, maxLon, maxLat] = image.getBoundingBox()
+
+    if (searchParams.get('debug') === '1') {
+      const fileDirectory = (image as any).fileDirectory ?? {}
+      return NextResponse.json({
+        width, height,
+        boundingBox: [minLon, minLat, maxLon, maxLat],
+        modelPixelScale: fileDirectory.ModelPixelScale ?? null,
+        modelTiepoint: fileDirectory.ModelTiepoint ?? null,
+        geoKeys: (image as any).getGeoKeys ? (image as any).getGeoKeys() : null,
+      })
+    }
+
     const pixelScaleLon = (maxLon - minLon) / width
     const pixelScaleLat = (maxLat - minLat) / height
 
