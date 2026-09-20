@@ -34,7 +34,7 @@ export default function DashboardMoonSurface() {
           position: fixed;
           inset: var(--noxia-topbar-h, 44px) 0 0;
           pointer-events: none;
-          background: linear-gradient(180deg, rgba(5,9,13,.42), rgba(5,9,13,.74) 78%, rgba(5,9,13,.9));
+          background: linear-gradient(180deg, rgba(5,9,13,.62), rgba(5,9,13,.85) 78%, rgba(5,9,13,.94));
           z-index: 0;
         }
         .moon-context-label {
@@ -76,13 +76,19 @@ export default function DashboardMoonSurface() {
           background: rgba(10,19,25,.8) !important;
         }
         .noxia-dashboard-moon-surface :global(.map-card svg) {
-          background: linear-gradient(rgba(5,10,14,.28), rgba(5,10,14,.5)), url('${NASA_LOLA_SHACKLETON}') center 58% / cover no-repeat;
+          /* BUGFIX 16.09.2026: Das NASA-Foto lag bisher direkt hinter der
+             Karten-SVG (nur 28-50% abgedunkelt) -- Gebaeude waren gegen das
+             kontrastreiche Kraterfoto kaum zu erkennen. Kartenflaeche
+             bekommt jetzt einen ruhigen, dunklen Verlauf statt des Fotos;
+             das Foto bleibt nur als Seiten-Ambiente (siehe oben), nicht mehr
+             im direkten Gebaeude-Kontrastbereich. */
+          background: linear-gradient(160deg, #0c1418, #050a0d) !important;
         }
         .noxia-dashboard-moon-surface :global(.map-card svg > rect:first-of-type) {
-          fill: rgba(8,15,20,.34) !important;
+          fill: rgba(8,15,20,.6) !important;
         }
         .noxia-dashboard-moon-surface :global(.map-card svg > rect:nth-of-type(2)) {
-          opacity: .45 !important;
+          opacity: .3 !important;
         }
       `}</style>
     </section>
