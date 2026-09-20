@@ -24,7 +24,13 @@ export function createSupabaseLolaImageOpener(supabase: SupabaseClient): LolaRas
   return async (uri: string): Promise<LolaRasterImage> => {
     const { bucket, path } = parseTerrainUri(uri)
     const bytes = await store.read(bucket, path)
-    const tiff = await fromArrayBuffer(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+    // TS2345: .buffer ist ArrayBufferLike (ArrayBuffer | SharedArrayBuffer),
+    // fromArrayBuffer will strikt ArrayBuffer. Explizite Kopie erzwingt den
+    // richtigen Typ und ist gleichzeitig robust gegen einen evtl. groesseren
+    // zugrunde liegenden Buffer (byteOffset/length werden respektiert).
+    const arrayBuffer = new ArrayBuffer(bytes.byteLength)
+    new Uint8Array(arrayBuffer).set(bytes)
+    const tiff = await fromArrayBuffer(arrayBuffer)
     const image = await tiff.getImage()
     return image as unknown as LolaRasterImage
   }
