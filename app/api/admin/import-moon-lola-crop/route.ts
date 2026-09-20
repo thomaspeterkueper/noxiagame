@@ -1,13 +1,18 @@
 // app/api/admin/import-moon-lola-crop/route.ts
 // Erstellt: 16.09.2026
+// Aktualisiert: 16.09.2026 -- Zuschnitt auf ein kleines Fenster (+-40px,
+// ~4,7km) um den tatsaechlichen world_frames-Ursprung statt der vollen
+// Bildbreite. Vorher wurden 92.160 Spalten mitgenommen (14,7MB), obwohl der
+// spielbare Bereich nur wenige hundert Meter gross ist -- das kostete bei
+// jedem Sampling-Request unnoetig Zeit.
 //
-// Liest per HTTP-Range-Requests NUR den Shackleton-Ausschnitt (letzte ~40
-// Zeilen = Suedpol-naechste ~4,7km) aus dem globalen 8,5GB LOLA-118m-LDEM
-// (USGS Astrogeology, einfache zylindrische Projektion), baut daraus eine
-// eigene, kleine, gueltige Single-Band-Float32-GeoTIFF und speist sie ueber
-// die bereits bestehende Produktions-Pipeline
-// (ingestPreparedTerrainTileToSupabase) in terrain_tiles ein. Die 8,5GB-
-// Originaldatei wird zu keinem Zeitpunkt vollstaendig geladen.
+// Liest per HTTP-Range-Requests NUR diesen kleinen Shackleton-Ausschnitt aus
+// dem globalen 8,5GB LOLA-118m-LDEM (USGS Astrogeology, einfache
+// zylindrische Projektion), baut daraus eine eigene, kleine, gueltige
+// Single-Band-Float32-GeoTIFF und speist sie ueber die bereits bestehende
+// Produktions-Pipeline (ingestPreparedTerrainTileToSupabase) in
+// terrain_tiles ein. Die 8,5GB-Originaldatei wird zu keinem Zeitpunkt
+// vollstaendig geladen.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { fromUrl } from 'geotiff'
@@ -16,7 +21,6 @@ import { ingestPreparedTerrainTileToSupabase } from '@/lib/game/spatial/supabase
 
 const LOLA_GLOBAL_URL = 'http://planetarymaps.usgs.gov/mosaic/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif'
 const DATASET_ID = 'moon_lro_lola_118m'
-const CROP_ROWS_FROM_SOUTH_POLE = 40 // ~4.7 km bei 118 m/Pixel -- deckt Shackleton (21 km) bequem ab
 
 // Minimaler, korrekter Baseline-TIFF/GeoTIFF-Encoder fuer genau unseren
 // Anwendungsfall: 1 Band, Float32, unkomprimiert, eine Strip. Nur die Tags,
@@ -143,10 +147,30 @@ export async function GET(req: NextRequest) {
     const pixelScaleLon = (maxLon - minLon) / width
     const pixelScaleLat = (maxLat - minLat) / height
 
-    const y0 = height - CROP_ROWS_FROM_SOUTH_POLE
-    const y1 = height
-    const x0 = 0
-    const x1 = width
+    // BUGFIX (Performance): bisher wurde die VOLLE Bildbreite mitgenommen
+    // (92.160 Spalten), obwohl der spielbare lokale ENU-Bereich nur wenige
+    // hundert Meter um den Frame-Ursprung gross ist -- daraus resultierten
+    // 14,7MB, die bei JEDEM Sampling-Request neu heruntergeladen und
+    // dekodiert wurden. Jetzt: kleines Fenster (Margin) direkt um den
+    // tatsaechlichen world_frames-Ursprung, nicht mehr um den geografischen
+    // Suedpol und nicht mehr die volle Laengengrad-Breite.
+    const { data: moonLocation } = await supabase.from('locations').select('id').eq('slug', 'moon').maybeSingle()
+    const { data: frame } = moonLocation
+      ? await supabase.from('world_frames').select('origin_lat_deg, origin_lon_deg').eq('location_id', moonLocation.id).maybeSingle()
+      : { data: null }
+    if (!frame?.origin_lat_deg || !frame?.origin_lon_deg) {
+      return NextResponse.json({ error: 'world_frames Ursprung fuer Mond nicht gefunden -- kann Zuschnittfenster nicht bestimmen' }, { status: 500 })
+    }
+    const originLatDeg = Number(frame.origin_lat_deg)
+    const originLonDeg = Number(frame.origin_lon_deg)
+
+    const MARGIN_PX = 40 // ~4.7km bei 118m/Pixel in jede Richtung -- reichlich Puffer um den spielbaren Bereich
+    const colCenter = Math.round((originLonDeg - minLon) / pixelScaleLon)
+    const rowCenter = Math.round((maxLat - originLatDeg) / pixelScaleLat)
+    const x0 = Math.max(0, colCenter - MARGIN_PX)
+    const x1 = Math.min(width, colCenter + MARGIN_PX)
+    const y0 = Math.max(0, rowCenter - MARGIN_PX)
+    const y1 = Math.min(height, rowCenter + MARGIN_PX)
 
     const rasters = await image.readRasters({ window: [x0, y0, x1, y1], samples: [0], interleave: true })
     const raw = rasters as unknown as ArrayLike<number>
@@ -201,7 +225,8 @@ export async function GET(req: NextRequest) {
       metadata: {
         stored_scale: 0.5,
         stored_offset: 0,
-        crop_rows: CROP_ROWS_FROM_SOUTH_POLE,
+        crop_margin_px: MARGIN_PX,
+        crop_center: { originLatDeg, originLonDeg },
         min_elevation_m: Number.isFinite(min) ? min : null,
         max_elevation_m: Number.isFinite(max) ? max : null,
       },
