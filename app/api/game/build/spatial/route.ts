@@ -13,6 +13,9 @@ import {
   type GeoPoint,
 } from '@/lib/world/spatial/earthSpatial'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
+import { loadShackletonTerrainRuntime } from '@/lib/game/spatial/shackletonTerrainRuntime'
+import { createSupabaseLolaImageOpener } from '@/lib/game/spatial/supabaseLolaImageOpener.server'
+import type { TerrainDatasetDescriptor, WorldFrame } from '@/lib/game/spatial/types'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -90,17 +93,89 @@ function buildRequirement(buildableId: string, locationSlug: string, knowledge: 
   })
 }
 
-function terrainResolution(frame: any, dataset: any) {
+function toDatasetDescriptor(row: any): TerrainDatasetDescriptor {
+  return {
+    id: row.id,
+    body: row.body,
+    locationId: row.location_id,
+    provider: row.provider,
+    datasetName: row.dataset_name,
+    datasetVersion: row.dataset_version,
+    datasetKind: row.dataset_kind,
+    resolutionM: row.resolution_m,
+    horizontalReference: row.horizontal_reference,
+    verticalReference: row.vertical_reference,
+    latitudeType: row.latitude_type,
+    longitudeDirection: row.longitude_direction,
+    sourceUri: row.source_uri,
+    sourceLicense: row.source_license,
+    accessMode: row.access_mode,
+    status: row.status,
+    metadata: row.metadata ?? {},
+  }
+}
+
+function toWorldFrame(row: any): WorldFrame {
+  return {
+    locationId: row.location_id,
+    body: row.body,
+    coordinateSystem: row.coordinate_system,
+    originLatDeg: row.origin_lat_deg,
+    originLonDeg: row.origin_lon_deg,
+    originAltM: row.origin_alt_m,
+    originStatus: row.origin_status,
+    referenceFrame: row.reference_frame,
+    latitudeType: row.latitude_type,
+    longitudeDirection: row.longitude_direction,
+    equatorialRadiusM: row.equatorial_radius_m,
+    polarRadiusM: row.polar_radius_m,
+    verticalDatum: row.vertical_datum,
+    terrainDatasetId: row.terrain_dataset_id,
+    worldSeed: row.world_seed,
+    observedSource: row.observed_source,
+    derivedConfig: row.derived_config,
+  }
+}
+
+// 16.09.2026: Phase 1 hatte das Dekodieren der Rasterbytes bewusst
+// aufgeschoben ("Phase 1 deliberately does not decode raster bytes").
+// Mit einer echten, validierten Shackleton-LOLA-Kachel in terrain_tiles ist
+// dieser Schritt jetzt nachgezogen -- Status kann echt 'resolved' werden,
+// und die Fundamenthoehe kommt aus realen NASA-Hoehendaten statt aus einem
+// Client-Wert. Sampler wird pro Request einmalig gebaut (nicht pro
+// Gebaeude), da das Dekodieren der Kachel Kosten hat.
+let cachedShackletonSampler: ReturnType<typeof loadShackletonTerrainRuntime> | null = null
+async function shackletonSampler() {
+  if (!cachedShackletonSampler) {
+    cachedShackletonSampler = loadShackletonTerrainRuntime(serviceClient, createSupabaseLolaImageOpener(serviceClient))
+  }
+  return cachedShackletonSampler
+}
+
+async function terrainResolution(frame: any, dataset: any, xM = 0, yM = 0) {
   if (!frame || frame.origin_status !== 'verified' || frame.origin_lat_deg == null || frame.origin_lon_deg == null || frame.origin_alt_m == null) {
     return { status: 'origin_pending' as const, zM: null }
   }
   if (!dataset || dataset.status !== 'ready') {
     return { status: 'dataset_pending' as const, zM: null }
   }
-  // Phase 1 deliberately does not decode raster bytes inside the build route.
-  // Once a validated tile sampler is connected this becomes resolved and z_m
-  // is the foundation height in LOCAL_ENU_METERS rather than a client value.
-  return { status: 'unresolved' as const, zM: null }
+  if (dataset.id !== 'moon_lro_lola_118m') {
+    // Andere Datensaetze (Mars/Erde) haben noch keinen verdrahteten Sampler.
+    return { status: 'unresolved' as const, zM: null }
+  }
+
+  try {
+    const runtime = await shackletonSampler()
+    if (!runtime.sampler) return { status: 'unresolved' as const, zM: null }
+    const sample = await runtime.sampler.sampleTerrainHeight(
+      { frame: toWorldFrame(frame), dataset: toDatasetDescriptor(dataset) },
+      { xM, yM },
+    )
+    if (!sample) return { status: 'unresolved' as const, zM: null }
+    return { status: 'resolved' as const, zM: sample.zM, sourceElevationM: sample.sourceElevationM }
+  } catch {
+    return { status: 'unresolved' as const, zM: null }
+  }
 }
 
 function localCatalog(): Map<string, CatalogEntry> {
@@ -299,6 +374,34 @@ export async function GET(req: NextRequest) {
     ? (sites ?? []).filter((site: any) => !site.metadata?.region || site.metadata.region === viewRegion.id)
     : (sites ?? [])
 
+  const terrainRes = await terrainResolution(frame, activeTerrainDataset)
+  // Kleines Raster fuer eine echte Terrain-Visualisierung auf der Karte
+  // (Hillshade/Relief), statt nur den Status anzuzeigen. Bewusst klein
+  // gehalten (11x11 = 121 Punkte, ~60m Abstand) -- jeder Punkt ist ein
+  // echter Sampler-Aufruf gegen die bereits geladene Kachel.
+  let elevationGrid: { stepM: number; size: number; values: (number | null)[] } | null = null
+  if (terrainRes.status === 'resolved' && activeTerrainDataset?.id === 'moon_lro_lola_118m') {
+    try {
+      const runtime = await shackletonSampler()
+      if (runtime.sampler) {
+        const size = 11
+        const stepM = 60
+        const half = Math.floor(size / 2)
+        const ctx = { frame: toWorldFrame(frame), dataset: toDatasetDescriptor(activeTerrainDataset) }
+        const values: (number | null)[] = []
+        for (let row = -half; row <= half; row++) {
+          for (let col = -half; col <= half; col++) {
+            const sample = await runtime.sampler.sampleTerrainHeight(ctx, { xM: col * stepM, yM: -row * stepM })
+            values.push(sample?.zM ?? null)
+          }
+        }
+        elevationGrid = { stepM, size, values }
+      }
+    } catch {
+      elevationGrid = null
+    }
+  }
+
   return NextResponse.json({
     location,
     spatialRegion: viewRegion ? { id: viewRegion.id, name: viewRegion.name, origin: viewRegion.origin } : null,
@@ -314,7 +417,8 @@ export async function GET(req: NextRequest) {
     terrain: {
       activeDataset: activeTerrainDataset,
       datasets: terrainDatasets ?? [],
-      resolution: terrainResolution(frame, activeTerrainDataset),
+      resolution: terrainRes,
+      elevationGrid,
     },
     sites: visibleSites,
     entities,
@@ -365,7 +469,6 @@ export async function POST(req: NextRequest) {
   const { data: terrainDataset } = frame?.terrain_dataset_id
     ? await serviceClient.from('terrain_datasets').select('*').eq('id', frame.terrain_dataset_id).maybeSingle()
     : { data: null }
-  const terrain = terrainResolution(frame, terrainDataset)
 
   const footprint = getBuildingFootprint(buildableId)
   const rotation = ((Number(body.rotationDeg ?? 0) % 360) + 360) % 360
@@ -399,6 +502,8 @@ export async function POST(req: NextRequest) {
   } else if (xM == null || yM == null) {
     return NextResponse.json({ error: 'Metrische Position fehlt' }, { status: 400 })
   }
+
+  const terrain = await terrainResolution(frame, terrainDataset, xM ?? 0, yM ?? 0)
 
   const [existingResult, pendingResult] = locationSlug === 'earth' && canonicalGeo
     ? await Promise.all([
