@@ -23,6 +23,14 @@ type EntityRow = {
   footprint_depth_m: number | null
 }
 
+type ExistingRoadAccessEdge = {
+  id: string
+  status: string
+  length_m: number
+  build_cost_credits: number
+  created_at: string
+}
+
 async function getUser(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (!auth?.startsWith('Bearer ')) return null
@@ -147,7 +155,7 @@ export async function GET(req: NextRequest) {
       .eq('owner_entity_id', entityId)
       .eq('network_type', 'road')
       .eq('node_kind', 'facility-port')
-    let existingEdge = null
+    let existingEdge: ExistingRoadAccessEdge | null = null
     if (existingNodes?.length) {
       const ids = existingNodes.map(node => node.id)
       const { data } = await service
