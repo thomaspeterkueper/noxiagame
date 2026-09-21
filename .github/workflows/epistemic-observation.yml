@@ -1,0 +1,32 @@
+name: Epistemic observation contract
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/observation.ts'
+      - 'lib/game/population/observation.test.ts'
+      - 'lib/game/population/types.ts'
+      - 'docs/core/EPISTEMIC_OBSERVATION_CONTRACT.md'
+      - '.github/workflows/epistemic-observation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/population/observation.ts'
+      - 'lib/game/population/observation.test.ts'
+      - 'lib/game/population/types.ts'
+      - 'docs/core/EPISTEMIC_OBSERVATION_CONTRACT.md'
+      - '.github/workflows/epistemic-observation.yml'
+
+jobs:
+  epistemic-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Compile epistemic observation contract
+        run: npx tsc lib/game/population/observation.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .epistemic-observation-test
+      - name: Run epistemic observation contract
+        run: node .epistemic-observation-test/game/population/observation.test.js
