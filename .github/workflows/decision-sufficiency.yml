@@ -5,6 +5,8 @@ on:
     paths:
       - 'lib/game/population/decisionSufficiency.ts'
       - 'lib/game/population/decisionSufficiency.test.ts'
+      - 'lib/game/population/informationGatheringIntent.ts'
+      - 'lib/game/population/informationGatheringIntent.test.ts'
       - '.github/workflows/decision-sufficiency.yml'
   push:
     branches: [main]
@@ -22,5 +24,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - run: npx tsc lib/game/population/decisionSufficiency.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .decision-sufficiency-test
+      - run: npx tsc lib/game/population/decisionSufficiency.test.ts lib/game/population/informationGatheringIntent.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .decision-sufficiency-test
       - run: node .decision-sufficiency-test/game/population/decisionSufficiency.test.js
+      - run: node .decision-sufficiency-test/game/population/informationGatheringIntent.test.js
