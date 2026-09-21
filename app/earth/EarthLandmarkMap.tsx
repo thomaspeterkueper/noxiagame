@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EARTH_LANDMARKS, type EarthLandmark } from '@/lib/world/spatial/earthLandmarks'
+import EarthLandmarkRegionFocus from './EarthLandmarkRegionFocus'
 
 type ViewKey = 'world' | 'europe' | 'germany' | 'mediterranean'
 type FilterKey = 'all' | 'science' | 'cross-universe'
@@ -21,8 +22,9 @@ const VIEW_H = 620
 const PAD = 54
 
 /**
- * Presentation coordinates for the landmark overview. Canonical identity stays address-based
- * in earthLandmarks.ts; these coordinates are only used to place markers on this visual layer.
+ * Presentation/view coordinates for the landmark overview and regional Earth focus.
+ * Canonical landmark identity remains address-based in earthLandmarks.ts; these values
+ * do not become persisted object or travel coordinates.
  */
 const LANDMARK_GEO: Readonly<Record<string, GeoPoint>> = {
   'earth-de-sundern-ssf-hq': { lat: 51.328, lon: 8.004 },
@@ -55,7 +57,13 @@ function markerKind(landmark: EarthLandmark) {
 export default function EarthLandmarkMap() {
   const [viewKey, setViewKey] = useState<ViewKey>('world')
   const [filter, setFilter] = useState<FilterKey>('all')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const view = VIEWS[viewKey]
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('landmark')
+    if (id && EARTH_LANDMARKS.some(landmark => landmark.id === id) && LANDMARK_GEO[id]) setSelectedId(id)
+  }, [])
 
   const markers = useMemo(() => EARTH_LANDMARKS.flatMap(landmark => {
     const point = LANDMARK_GEO[landmark.id]
@@ -65,14 +73,31 @@ export default function EarthLandmarkMap() {
     return [{ landmark, point }]
   }), [view, filter])
 
+  const selected = useMemo(() => {
+    if (!selectedId) return null
+    const landmark = EARTH_LANDMARKS.find(item => item.id === selectedId)
+    const point = LANDMARK_GEO[selectedId]
+    return landmark && point ? { landmark, point } : null
+  }, [selectedId])
+
   const project = (point: GeoPoint) => ({
     x: PAD + ((point.lon - view.west) / (view.east - view.west)) * (VIEW_W - PAD * 2),
     y: VIEW_H - PAD - ((point.lat - view.south) / (view.north - view.south)) * (VIEW_H - PAD * 2),
   })
 
-  const openLandmark = (id: string) => {
-    const element = document.getElementById(id)
-    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  const openRegionalFocus = (id: string) => {
+    setSelectedId(id)
+    const url = new URL(window.location.href)
+    url.searchParams.set('landmark', id)
+    window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}${url.hash}`)
+    window.requestAnimationFrame(() => document.getElementById('earth-landmark-region-focus')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+  }
+
+  const closeRegionalFocus = () => {
+    setSelectedId(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('landmark')
+    window.history.replaceState(null, '', `${url.pathname}${url.search ? `?${url.searchParams.toString()}` : ''}${url.hash}`)
   }
 
   return <section className="landmark-map-layer">
@@ -80,7 +105,7 @@ export default function EarthLandmarkMap() {
       <div>
         <small>EARTH · LANDMARK GEO LAYER</small>
         <h2>Geographische Weltanker</h2>
-        <p>Die kanonischen Earth-Landmarks als eigene geographische Ebene. Marker öffnen den zugehörigen Eintrag im Landmark-Explorer; die Karte greift nicht in Build-, Reise- oder Persistenzlogik ein.</p>
+        <p>Die kanonischen Earth-Landmarks als geographische Ebene. Marker öffnen jetzt einen realen regionalen Earth-Ausschnitt über dieselbe Geodaten-Authority wie die Produktionskarte; sie starten noch keine simulierte terrestrische Reise.</p>
       </div>
       <div className="metric"><b>{markers.length}</b><span>sichtbar</span></div>
     </header>
@@ -104,8 +129,9 @@ export default function EarthLandmarkMap() {
         {markers.map(({ landmark, point }) => {
           const p = project(point)
           const kind = markerKind(landmark)
-          return <g key={landmark.id} className="marker" tabIndex={0} role="button" aria-label={`${landmark.name} öffnen`} onClick={() => openLandmark(landmark.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') openLandmark(landmark.id) }}>
-            <circle cx={p.x} cy={p.y} r="14" className={`halo ${kind}`} />
+          const isSelected = selectedId === landmark.id
+          return <g key={landmark.id} className={`marker ${isSelected ? 'selected' : ''}`} tabIndex={0} role="button" aria-label={`${landmark.name} regional öffnen`} onClick={() => openRegionalFocus(landmark.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') openRegionalFocus(landmark.id) }}>
+            <circle cx={p.x} cy={p.y} r={isSelected ? 19 : 14} className={`halo ${kind}`} />
             <circle cx={p.x} cy={p.y} r="6" className={`dot ${kind}`} />
             <line x1={p.x} y1={p.y + 7} x2={p.x} y2={p.y + 21} stroke="#d8e9e5" strokeWidth="1" opacity=".7" />
             <text x={p.x + 12} y={p.y - 10} className="marker-name">{landmark.name}</text>
@@ -116,10 +142,12 @@ export default function EarthLandmarkMap() {
       {!markers.length && <div className="empty">In dieser Kombination aus Ansicht und Layer sind noch keine Landmark-Einträge vorhanden.</div>}
     </div>
 
-    <div className="legend"><span><i className="space" /> Raumfahrt / Wissenschaft</span><span><i className="science" /> Wissenschaft</span><span><i className="cross" /> Cross-Universe</span><span className="note">Kartendarstellung: Präsentationskoordinaten; kanonische Ortsidentität bleibt adressbasiert.</span></div>
+    <div className="legend"><span><i className="space" /> Raumfahrt / Wissenschaft</span><span><i className="science" /> Wissenschaft</span><span><i className="cross" /> Cross-Universe</span><span className="note">Marker = Earth-Regionalfokus; keine simulierte Reise. Kanonische Ortsidentität bleibt adressbasiert.</span></div>
+
+    {selected && <div id="earth-landmark-region-focus"><EarthLandmarkRegionFocus landmark={selected.landmark} point={selected.point} onClose={closeRegionalFocus} /></div>}
 
     <style jsx>{`
-      .landmark-map-layer{max-width:1500px;margin:18px auto;padding:16px;box-sizing:border-box;background:#0f2732;color:#e9efec;border:1px solid #3d5962;border-radius:13px;font-family:system-ui,sans-serif}.intro{display:flex;justify-content:space-between;gap:18px;align-items:start}.intro small{font-size:9px;letter-spacing:.16em;color:#d0ad59;font-weight:900}.intro h2{font-family:Georgia,serif;font-size:26px;font-weight:400;margin:3px 0 5px}.intro p{max-width:800px;margin:0;color:#9fb1b5;font-size:10px;line-height:1.55}.metric{text-align:right}.metric b{display:block;color:#f0ca69;font-size:28px}.metric span{font-size:8px;text-transform:uppercase;color:#91a4a9}.controls{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 10px}.control-group{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.control-group>span{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#839ba1;margin-right:3px}.controls button{appearance:none;border:1px solid #3a5b65;background:#102f3b;color:#b9c8ca;border-radius:999px;padding:5px 9px;font-size:8px;cursor:pointer}.controls button.active{background:#d0aa51;border-color:#e0c276;color:#15272d;font-weight:850}.map-shell{position:relative}.map-shell svg{width:100%;height:auto;display:block;border:1px solid #385560;border-radius:16px}.marker{cursor:pointer;outline:none}.marker:focus .halo,.marker:hover .halo{opacity:.9;transform:scale(1.22);transform-origin:center}.halo{opacity:.35;transition:.15s}.halo.space{fill:#e6c05f}.halo.science{fill:#70b7ae}.halo.cross{fill:#c38ad7}.dot.space{fill:#f1ce72;stroke:#fff0b7;stroke-width:2}.dot.science{fill:#83c7bf;stroke:#d9f4ef;stroke-width:2}.dot.cross{fill:#d9a7e7;stroke:#f1d9f7;stroke-width:2}.marker-name{fill:#eef5f2;font-size:12px;font-weight:800;paint-order:stroke;stroke:#0b2029;stroke-width:3px}.marker-place{fill:#93aaaf;font-size:9px;paint-order:stroke;stroke:#0b2029;stroke-width:2px}.legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;color:#91a4a8;font-size:8px}.legend span{display:flex;align-items:center;gap:5px}.legend i{width:8px;height:8px;border-radius:50%;display:inline-block}.legend i.space{background:#e6c05f}.legend i.science{background:#70b7ae}.legend i.cross{background:#c38ad7}.legend .note{margin-left:auto;color:#6f858a}.empty{position:absolute;inset:0;display:grid;place-items:center;color:#a8b9bd;font-size:10px;pointer-events:none}@media(max-width:700px){.intro{flex-direction:column}.metric{text-align:left}.legend .note{margin-left:0;width:100%}.marker-name{font-size:14px}.marker-place{font-size:11px}}
+      .landmark-map-layer{max-width:1500px;margin:18px auto;padding:16px;box-sizing:border-box;background:#0f2732;color:#e9efec;border:1px solid #3d5962;border-radius:13px;font-family:system-ui,sans-serif}.intro{display:flex;justify-content:space-between;gap:18px;align-items:start}.intro small{font-size:9px;letter-spacing:.16em;color:#d0ad59;font-weight:900}.intro h2{font-family:Georgia,serif;font-size:26px;font-weight:400;margin:3px 0 5px}.intro p{max-width:800px;margin:0;color:#9fb1b5;font-size:10px;line-height:1.55}.metric{text-align:right}.metric b{display:block;color:#f0ca69;font-size:28px}.metric span{font-size:8px;text-transform:uppercase;color:#91a4a9}.controls{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 10px}.control-group{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.control-group>span{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#839ba1;margin-right:3px}.controls button{appearance:none;border:1px solid #3a5b65;background:#102f3b;color:#b9c8ca;border-radius:999px;padding:5px 9px;font-size:8px;cursor:pointer}.controls button.active{background:#d0aa51;border-color:#e0c276;color:#15272d;font-weight:850}.map-shell{position:relative}.map-shell svg{width:100%;height:auto;display:block;border:1px solid #385560;border-radius:16px}.marker{cursor:pointer;outline:none}.marker:focus .halo,.marker:hover .halo,.marker.selected .halo{opacity:.9;transform:scale(1.22);transform-origin:center}.halo{opacity:.35;transition:.15s}.halo.space{fill:#e6c05f}.halo.science{fill:#70b7ae}.halo.cross{fill:#c38ad7}.dot.space{fill:#f1ce72;stroke:#fff0b7;stroke-width:2}.dot.science{fill:#83c7bf;stroke:#d9f4ef;stroke-width:2}.dot.cross{fill:#d9a7e7;stroke:#f1d9f7;stroke-width:2}.marker-name{fill:#eef5f2;font-size:12px;font-weight:800;paint-order:stroke;stroke:#0b2029;stroke-width:3px}.marker-place{fill:#93aaaf;font-size:9px;paint-order:stroke;stroke:#0b2029;stroke-width:2px}.legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;color:#91a4a8;font-size:8px}.legend span{display:flex;align-items:center;gap:5px}.legend i{width:8px;height:8px;border-radius:50%;display:inline-block}.legend i.space{background:#e6c05f}.legend i.science{background:#70b7ae}.legend i.cross{background:#c38ad7}.legend .note{margin-left:auto;color:#6f858a}.empty{position:absolute;inset:0;display:grid;place-items:center;color:#a8b9bd;font-size:10px;pointer-events:none}@media(max-width:700px){.intro{flex-direction:column}.metric{text-align:left}.legend .note{margin-left:0;width:100%}.marker-name{font-size:14px}.marker-place{font-size:11px}}
     `}</style>
   </section>
 }
