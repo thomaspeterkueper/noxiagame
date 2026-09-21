@@ -21,6 +21,7 @@ type Payload = {
 const W = 1000
 const H = 560
 const PAD = 28
+const PASSENGER_TRAVEL_REQUEST = 'EXT-NOXIA-CORE-20260921-EARTH-PASSENGER-TRAVEL'
 
 function styleFor(type: string) {
   switch (type) {
@@ -125,16 +126,25 @@ export default function EarthLandmarkRegionFocus({
       </div>
     </>}
 
+    <div className="travel-readiness">
+      <div className="travel-status"><span>REGIONALFOKUS</span><b>bereit</b></div>
+      <div className="travel-status pending"><span>PERSONENREISE</span><b>Core-Vertrag ausstehend</b></div>
+      <p>Landmarks sind Besuchsziele, aber keine künstlichen Frachtdepots. Die bestehende Earth-Surface-Logistik bleibt für physische Facility-Inventare reserviert; echte terrestrische Personenreisen werden über <code>{PASSENGER_TRAVEL_REQUEST}</code> angebunden.</p>
+    </div>
+
     <footer>
       <div>
         <b>Earth-Navigationsziel</b>
-        <span>Dieser Fokus ist noch keine simulierte terrestrische Reise. Er verwendet ausschließlich die vorhandene Earth-Geodaten-Authority; Fahrzeug-/Transportzeit wird erst angebunden, wenn dafür eine Core-Authority existiert.</span>
+        <span>Der reale Regionsausschnitt ist bereits nutzbar. Ein späterer Reise-Start darf erst aktiviert werden, wenn Core einen serverautoritativen Passenger-Journey-Draft mit kanonischem Ankunftspunkt, ETA und Journey-State liefert.</span>
       </div>
-      <button onClick={openCanonicalEntry}>Kanonischen Eintrag öffnen ↓</button>
+      <div className="footer-actions">
+        <button className="travel-disabled" disabled title={PASSENGER_TRAVEL_REQUEST}>Reise planen · ausstehend</button>
+        <button onClick={openCanonicalEntry}>Kanonischen Eintrag öffnen ↓</button>
+      </div>
     </footer>
 
     <style jsx>{`
-      .region-focus{margin-top:12px;padding:13px;background:#112a33;border:1px solid #45636b;border-radius:12px}.region-focus header{display:flex;justify-content:space-between;gap:14px;align-items:start}.region-focus small{font-size:8px;letter-spacing:.14em;color:#d2ae58;font-weight:900}.region-focus h3{font-family:Georgia,serif;font-size:21px;font-weight:400;margin:2px 0 4px}.region-focus header p{margin:0;color:#9cb0b3;font-size:9px;line-height:1.5}.close{border:1px solid #49656c;background:transparent;color:#b7c7c9;border-radius:6px;width:30px;height:30px;font-size:18px;cursor:pointer}.state{display:grid;place-items:center;min-height:180px;margin-top:10px;background:#0b2028;border-radius:10px;color:#a8babc;font-size:10px}.state.error{color:#f0c7c3;background:#41292c}.region-focus svg{display:block;width:100%;height:auto;margin-top:10px;border:1px solid #38545b;border-radius:12px;background:#253b36}.meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px;color:#7f969a;font-size:7px}.region-focus footer{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-top:12px;padding-top:10px;border-top:1px solid #34515a}.region-focus footer div{display:grid;gap:3px;max-width:780px}.region-focus footer b{font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:#d1ad57}.region-focus footer span{font-size:8px;line-height:1.45;color:#8fa4a8}.region-focus footer button{border:1px solid #bea04f;background:#d0ad59;color:#16292f;border-radius:7px;padding:7px 10px;font-size:8px;font-weight:850;cursor:pointer;white-space:nowrap}@media(max-width:700px){.region-focus footer{align-items:stretch;flex-direction:column}.region-focus footer button{align-self:flex-start}}
+      .region-focus{margin-top:12px;padding:13px;background:#112a33;border:1px solid #45636b;border-radius:12px}.region-focus header{display:flex;justify-content:space-between;gap:14px;align-items:start}.region-focus small{font-size:8px;letter-spacing:.14em;color:#d2ae58;font-weight:900}.region-focus h3{font-family:Georgia,serif;font-size:21px;font-weight:400;margin:2px 0 4px}.region-focus header p{margin:0;color:#9cb0b3;font-size:9px;line-height:1.5}.close{border:1px solid #49656c;background:transparent;color:#b7c7c9;border-radius:6px;width:30px;height:30px;font-size:18px;cursor:pointer}.state{display:grid;place-items:center;min-height:180px;margin-top:10px;background:#0b2028;border-radius:10px;color:#a8babc;font-size:10px}.state.error{color:#f0c7c3;background:#41292c}.region-focus svg{display:block;width:100%;height:auto;margin-top:10px;border:1px solid #38545b;border-radius:12px;background:#253b36}.meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px;color:#7f969a;font-size:7px}.travel-readiness{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:center;margin-top:10px;padding:9px;border:1px solid #38545b;border-radius:9px;background:#0c222a}.travel-status{display:grid;gap:2px;padding:6px 8px;border:1px solid #456b61;border-radius:7px;background:#14362f}.travel-status.pending{border-color:#75633d;background:#352f1d}.travel-status span{font-size:7px;letter-spacing:.08em;color:#8ba5a4}.travel-status b{font-size:9px;color:#d9eee6}.travel-status.pending b{color:#e7cb7b}.travel-readiness p{margin:0;color:#91a6a9;font-size:8px;line-height:1.45}.travel-readiness code{color:#d5b55f;font-size:7px}.region-focus footer{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-top:12px;padding-top:10px;border-top:1px solid #34515a}.region-focus footer>div:first-child{display:grid;gap:3px;max-width:720px}.region-focus footer b{font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:#d1ad57}.region-focus footer span{font-size:8px;line-height:1.45;color:#8fa4a8}.footer-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.region-focus footer button{border:1px solid #bea04f;background:#d0ad59;color:#16292f;border-radius:7px;padding:7px 10px;font-size:8px;font-weight:850;cursor:pointer;white-space:nowrap}.region-focus footer button.travel-disabled{border-color:#536369;background:#26373c;color:#7e9296;cursor:not-allowed}@media(max-width:700px){.travel-readiness{grid-template-columns:1fr 1fr}.travel-readiness p{grid-column:1/-1}.region-focus footer{align-items:stretch;flex-direction:column}.footer-actions{justify-content:flex-start}}
     `}</style>
   </section>
 }
