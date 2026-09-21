@@ -11,6 +11,12 @@ on:
       - 'lib/game/earthSurfaceRouteGeometry.test.ts'
       - 'lib/game/earthSurfaceLogistics.ts'
       - 'lib/game/earthSurfaceLogistics.test.ts'
+      - 'lib/game/earthSurfaceHandover.ts'
+      - 'lib/game/earthSurfaceHandover.test.ts'
+      - 'lib/game/earthTransportOverlay.ts'
+      - 'lib/game/earthTransportOverlay.test.ts'
+      - 'lib/game/earthTransportRulePreview.ts'
+      - 'lib/game/earthTransportRulePreview.test.ts'
       - 'lib/game/vehicles/surfaceRouteGeometry.ts'
       - 'lib/world/spatial/earthFeatureSource.ts'
       - 'lib/world/spatial/earthSpatial.ts'
@@ -26,6 +32,12 @@ on:
       - 'lib/game/earthSurfaceRouteGeometry.test.ts'
       - 'lib/game/earthSurfaceLogistics.ts'
       - 'lib/game/earthSurfaceLogistics.test.ts'
+      - 'lib/game/earthSurfaceHandover.ts'
+      - 'lib/game/earthSurfaceHandover.test.ts'
+      - 'lib/game/earthTransportOverlay.ts'
+      - 'lib/game/earthTransportOverlay.test.ts'
+      - 'lib/game/earthTransportRulePreview.ts'
+      - 'lib/game/earthTransportRulePreview.test.ts'
       - 'lib/game/vehicles/surfaceRouteGeometry.ts'
       - 'lib/world/spatial/earthFeatureSource.ts'
       - 'lib/world/spatial/earthSpatial.ts'
@@ -61,3 +73,21 @@ jobs:
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-geometry-test
           && node .earth-geometry-test/game/earthSurfaceRouteGeometry.test.js
+      - name: Verify Earth surface handover chain
+        run: >-
+          npx tsc lib/game/earthSurfaceHandover.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-logistics-test
+          && node .earth-logistics-test/game/earthSurfaceHandover.test.js
+      - name: Verify Earth transport map overlay
+        run: >-
+          npx tsc lib/game/earthTransportOverlay.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-logistics-test
+          && node .earth-logistics-test/game/earthTransportOverlay.test.js
+      - name: Verify Earth automatic transport rule preview
+        run: >-
+          npx tsc lib/game/earthTransportRulePreview.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-logistics-test
+          && node .earth-logistics-test/game/earthTransportRulePreview.test.js

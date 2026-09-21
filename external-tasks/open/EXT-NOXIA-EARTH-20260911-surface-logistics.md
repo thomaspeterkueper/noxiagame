@@ -246,21 +246,32 @@ Damit fehlt für diese beiden Punkte nicht mehr der gemeinsame Vertrag, sondern 
 
 1. **Cargo-Massenbasis konkreter Commodities**
 
-   KUEPER Engineering wurde über
-   `external-tasks/open/EXT-NOXIA-ENG-20260913-cargo-mass-basis.md`
-   um belastbare Massenbasen konkreter transportierbarer Stoff-/Produktformen gebeten.
+   KUEPER Engineering hat die Massenbasis unter der stabilen Task-ID
+   `EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS` mit `engineering-commodities-r1.json`
+   geliefert (siehe Kommentar in `lib/game/core/logisticsCargoMassAuthority.ts`);
+   die ID wird in `CARGO_MASS_UNRESOLVED`-Antworten weiterhin an den Client gemeldet.
+   Eine Handoff-Datei dazu liegt nicht in `external-tasks/open/` dieses Repositories
+   (Stand 2026-09-21).
+
+   Die gelieferte Basis bildet Engineering-Commodities bewusst **nicht** auf
+   NOXIA-Gameplay-IDs und nicht auf die historische Einheit `t` ab. Offen ist
+   deshalb der NOXIA-seitige Schritt: eine explizite, belastbare Zuordnung in
+   `LOGISTICS_CARGO_MASS_AUTHORITIES`.
 
    NOXIA wird dafür keine Dichte, Verpackungsmasse oder kg-pro-`game-unit` erfinden. Abstrakte Ressourcen wie `energy`, `metal` oder `components` müssen bei Bedarf zunächst auf eine konkrete physische Transportform abgebildet werden.
 
 2. **Kanonische Earth-Fahrzeugdaten**
 
-   Der bereits vorhandene Engineering-Handoff
+   Benötigt werden die produktiven Earth-Werte für `VehicleFrame` und
+   `SurfaceOperationProfile` für mindestens `cargo-rover` und `heavy-hauler`;
+   NOXIA übernimmt keine bisherigen Testwerte als Produktivwerte.
+
+   Die früher hier genannte Handoff-Datei
    `external-tasks/open/EXT-NOXIA-ENG-20260913-earth-surface-logistics-vehicles.md`
-   fordert die produktiven Earth-Frames und Betriebsprofile für mindestens `cargo-rover` und `heavy-hauler` an.
-
-   Benötigt werden insbesondere die Werte für `VehicleFrame` und `SurfaceOperationProfile`; NOXIA übernimmt keine bisherigen Testwerte als Produktivwerte.
-
-   Für den Mond existiert analog `external-tasks/open/EXT-NOXIA-ENG-20260911-lunar-surface-logistics-vehicles.md`.
+   ist in `external-tasks/open/` dieses Repositories nicht vorhanden (Stand
+   2026-09-21) — der Handoff ist damit nicht belegbar und ggf. neu anzulegen. Im
+   Code sichtbar ist das Mond-Gegenstück `EXT-NOXIA-ENG-20260911-LUNAR-SURFACE-LOGISTICS`
+   (`app/api/game/moon/surface-transport/readiness/route.ts`).
 
 ### Parallel laufend – nicht duplizieren
 
@@ -294,14 +305,62 @@ Anschließend folgen automatische Transportregeln. Persistenz, Reservierung und 
 
 Der Request bleibt daher `open`; die bereits abgeschlossenen Earth- und Core-Bausteine werden nicht neu implementiert.
 
+## Fortschritt 2026-09-21
+
+### Umgesetzt auf dem Task-/PR-Branch
+
+**Kartenintegration für Route und Transportstatus**
+
+- `lib/game/earthTransportOverlay.ts` projiziert den Transportkontext renderer-neutral in zeichenbare Geometrie (Knoten, geplante und laufende Routen, Fahrzeugpunkt, Warnungen),
+- `lib/store/earthTransportOverlayStore.ts` teilt diese Projektion zwischen den Earth-Panels; es ist **keine** zweite Datenquelle für Inventare, Fahrzeuge, Jobs oder Routen,
+- `app/earth/EarthRegionPreview.tsx` zeichnet einen zusätzlichen Layer `transport` auf der bestehenden OSM-/Terrain-Karte: Route-Class-Styling, Knotenmarker (`facility`, `depot`, `spaceport-storage`, `surface-port`), Fahrzeugpunkt und ein Warnbanner,
+- `app/earth/EarthSurfaceLiveMap.tsx` veröffentlicht laufende Core-Fahrten aus der persistierten `route_snapshot.geometry` + `earthSpatialOrigin`; der Fortschritt wird in ≈5-%-Schritten veröffentlicht, damit die Karte nicht sekündlich neu rendert,
+- `app/earth/EarthSurfaceLogisticsConsole.tsx` veröffentlicht die aktuell vorbereitete Route in denselben Layer,
+- persistierte Fahrten werden bewusst mit `routeClass: null` gezeichnet: der gemeinsame Snapshot speichert keine Segmentklassen, Earth erfindet sie nicht,
+- fehlende Geometrie/fehlender Bezugsursprung erzeugen eine sichtbare Warnung statt einer Ersatzroute.
+
+**Gebäude ↔ Fahrzeug ↔ Lager-Kette und Raumhafen-Umschlag**
+
+- `lib/game/earthSurfaceHandover.ts` klassifiziert die Core-Inventare (`inventory_kind` + `metadata.role`) als planetare Oberflächenkette und bewertet den Raumhafen (`ready` / `storage-missing` / `surface-port-missing`),
+- `app/earth/EarthSurfaceHandoverPanel.tsx` zeigt die Kette inklusive der Fahrzeuge, die laut `currentNodeInventoryId` vor Ort stehen, den Umschlagknoten und die Shuttle-Grenze,
+- das Raumhafenlager ist ein echtes Core-`depot` mit `metadata.role = spaceport_storage`, die Pads sind `surface_port` mit `metadata.role = shuttle_port`; es entstehen keine neuen Tabellen.
+
+**Automatische Transportregeln (UX-Vorschau)**
+
+- `lib/game/earthTransportRulePreview.ts` wertet `surplus-transfer` / `minimum-stock` gegen den beobachteten Core-Bestand und die Earth-Route aus,
+- das Panel zeigt Auslöser, Menge je Lauf, Routenstatus und Blocker — ohne Persistenz, Reservierung oder Ausführung,
+- der fehlende Contract wird als `core-transport-rule-v1` benannt und an NOXIA-CORE gemeldet.
+
+**Core-Rückgabe**
+
+- `.kueper/outbox/20260921-earth-surface-logistics-core-contracts.md` listet die fehlenden Core-Verträge/APIs (`core-transport-rule-v1`, Frachtmasse je Commodity, kanonische Earth-Fahrzeugdaten) und die stabilen Schnittstellen, die Earth heute liest,
+- `docs/design/earth-surface-logistics.md` beschreibt jetzt zusätzlich Layerdaten, Layer-Wiederverwendung, Kartenintegration, Kette und Regelvorschau.
+
+**Keine Earth-Parallelarchitektur**
+
+Es entstehen keine neuen Supabase-Tabellen, Scheduler, Mutations-APIs oder ein zweiter Fortschrittsmechanismus. Earth liest weiterhin nur `/api/game/build/spatial`, `/api/game/logistics`, `/api/game/vehicles` und die read-only OSM-/Terrain-Endpunkte.
+
+### Weiterhin offen
+
+1. **Frachtmasse je Commodity** — `logisticsCargoMassAuthority` ist leer, damit blockiert `surface-transport/cargo-readiness` jeden manuellen Transport mit `CARGO_MASS_UNRESOLVED`. Die Engineering-Basis ist geliefert (`EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS`, `engineering-commodities-r1.json`); offen ist der NOXIA-seitige Schritt, die Gameplay-ID-/Mengenbasis-Zuordnung in `LOGISTICS_CARGO_MASS_AUTHORITIES` (siehe „Noch offene externe Datenabhängigkeiten“).
+2. **Kanonische Earth-Fahrzeugdaten** — ohne autoritative `VehicleFrame`-/`SurfaceOperationProfile`-Daten bleiben ETA, Energie und Wear `unresolved`; ein belegbarer Engineering-Handoff für Earth fehlt (siehe „Noch offene externe Datenabhängigkeiten“).
+3. **Ausführung automatischer Regeln** — wartet auf `core-transport-rule-v1` in Core.
+
 ## References
 
 - `lib/game/logisticsNodes.ts`
 - `lib/game/transportDomains.ts`
 - `lib/game/earthSurfaceLogistics.ts`
 - `lib/game/earthSurfaceRouting.ts`
+- `lib/game/earthSurfaceHandover.ts`
+- `lib/game/earthTransportOverlay.ts`
+- `lib/game/earthTransportRulePreview.ts`
+- `lib/store/earthTransportOverlayStore.ts`
 - `app/earth/EarthSurfaceLogisticsConsole.tsx`
+- `app/earth/EarthSurfaceHandoverPanel.tsx`
+- `app/earth/EarthSurfaceLiveMap.tsx`
 - `docs/design/earth-surface-logistics.md`
+- `.kueper/outbox/20260921-earth-surface-logistics-core-contracts.md`
 - `lib/game/core/logistics.ts`
 - `lib/game/core/logisticsCargoMass.ts`
 - `lib/game/core/vehicleInstances.ts`
@@ -312,6 +371,7 @@ Der Request bleibt daher `open`; die bereits abgeschlossenen Earth- und Core-Bau
 - `app/api/game/vehicles/route.ts`
 - `lib/game/spatial/`
 - `external-tasks/open/EXT-OTA-NOXIA-20260906-transfer-logistics-network.md`
-- KUEPER Engineering: `external-tasks/open/EXT-NOXIA-ENG-20260913-cargo-mass-basis.md`
-- KUEPER Engineering: `external-tasks/open/EXT-NOXIA-ENG-20260913-earth-surface-logistics-vehicles.md`
+- KUEPER Engineering: Massenbasis je Commodity unter der Task-ID `EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS` (geliefert als `engineering-commodities-r1.json`)
+- KUEPER Engineering: produktive Earth-`VehicleFrame`-/`SurfaceOperationProfile`-Daten für `cargo-rover` und `heavy-hauler` (Handoff derzeit nicht als Datei in `external-tasks/open/` vorhanden)
+- Mond-Gegenstück im Code: `EXT-NOXIA-ENG-20260911-LUNAR-SURFACE-LOGISTICS`
 - Earth map/buildability implementation in the current `main` branch

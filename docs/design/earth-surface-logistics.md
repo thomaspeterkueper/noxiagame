@@ -1,6 +1,13 @@
 # Earth Surface Logistics
 
-Status: Earth-Policy und erster OSM-basierter Surface-Router für `EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS`.
+Status: Earth-Policy, OSM-basierter Surface-Router, Kartenintegration und
+Oberflächen-/Raumhafenkette für `EXT-NOXIA-EARTH-20260911-SURFACE-LOGISTICS`.
+Manuelle Transporte und automatische Regelvorschau sind UX-seitig vorhanden. Die
+Massenbasis je Commodity hat KUEPER Engineering geliefert
+(`EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS`, `engineering-commodities-r1.json`); offen
+ist die NOXIA-seitige Zuordnung Gameplay-ID/Transportform → Massenbasis. Kanonische
+Earth-Fahrzeugdaten (`VehicleFrame` + `SurfaceOperationProfile`) fehlen weiterhin.
+Beides bleibt `unresolved` und wird nicht durch Defaults überbrückt.
 
 ## Zuständigkeit
 
@@ -13,7 +20,7 @@ Earth besitzt die planetenspezifische Interpretation von Karte und Gelände:
 - kurze nicht kartierte Facility-Zufahrten,
 - Routen- und Transportdarstellung in der Earth-UX.
 
-Core besitzt Inventare, Reservierungen, Fahrzeugbelegung, TransportJob-Persistenz, Laden/Entladen, Scheduler/Ticks, Ownership und Economy. Der früher fehlende Vertrag aus `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md` ist inzwischen auf `main` technisch vorhanden: `lib/game/core/logistics.ts`, `app/api/game/logistics/route.ts`, der Vehicle-Instance-Core und die zugehörigen Supabase-Migrationen stellen die gemeinsame Transport-State-Machine bereit. Earth konsumiert diese Verträge und baut keine lokale Ersatzlogik.
+Core besitzt Inventare, Reservierungen, Fahrzeugbelegung, TransportJob-Persistenz, Laden/Entladen, Scheduler/Ticks, Ownership und Economy. Der früher fehlende Vertrag aus `external-tasks/done/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md` ist inzwischen auf `main` technisch vorhanden: `lib/game/core/logistics.ts`, `app/api/game/logistics/route.ts`, der Vehicle-Instance-Core und die zugehörigen Supabase-Migrationen stellen die gemeinsame Transport-State-Machine bereit. Earth konsumiert diese Verträge und baut keine lokale Ersatzlogik.
 
 ## Bestehende Daten werden wiederverwendet
 
@@ -133,16 +140,35 @@ Ziel-Facility-/Lagerinventar (Core)
 Zielbestand (Core)
 ```
 
-Nächster Earth-UX-Schritt:
+Umgesetzt ist dieser Pfad in zwei Earth-Panels:
 
-- Quelle/Ziel aus den Core-Inventaren auswählen,
-- Gut/Menge aus dem Quell-Snapshot wählen,
-- verfügbare Surface-Fahrzeuge aus `/api/game/vehicles` anbieten,
-- OSM-/Offroad-Route berechnen und auf der bestehenden Earth-Karte zeichnen,
-- aus `referenceSpeedKph` + Earth-Routenfaktoren ETA berechnen,
-- `routeSnapshot` erzeugen,
-- den gemeinsamen `/api/game/logistics`-TransportJob anlegen/starten,
-- laufenden Status und Core-Blocker anzeigen.
+- `app/earth/EarthSurfaceLogisticsConsole.tsx` — Quelle/Ziel aus den Core-Inventaren, Gut/Menge aus dem Quell-Snapshot, Fahrzeugauswahl, Earth-Route prüfen, relative Kosten und Core-Blocker. Der Start läuft ausschließlich über den gemeinsamen Core-Pfad; die UI erfindet keine Fahrzeit und keine Buchung.
+- `app/earth/EarthSurfaceMissionDraftPanel.tsx` — serverseitiger prospectiver Mission-Draft und Start.
+
+Beide Panels diagnostizieren fehlende Voraussetzungen sichtbar als `unresolved`
+(Cargo-Masse, Engineering-Profil, Fahrzeugstandort) und setzen **keine** Ersatzwerte ein.
+
+## Gebäude ↔ Fahrzeug ↔ Lager-Kette
+
+`lib/game/earthSurfaceHandover.ts` interpretiert die Core-Inventare als planetare
+Oberflächenkette, ohne Core-Knoten umzubenennen:
+
+```text
+facility (Produktion/Verarbeitung, metadata.role = extraction|processing|production)
+        ↓
+depot (storage|logistics)
+        ↓
+spaceport_storage (depot mit metadata.role = spaceport_storage)
+        ↓
+surface_port (metadata.role = shuttle_port)
+```
+
+- `classifyEarthSurfaceNode` bildet `inventory_kind` + `metadata.role` auf die Kette ab; unbekannte Kinds bleiben `other`.
+- `buildEarthSurfaceHandoverChain` gruppiert die tatsächlich geladenen Core-Inventare.
+- `assessEarthSpaceportHandover` meldet `ready`, `storage-missing` oder `surface-port-missing` und benennt die Umschlaggrenze (`surface-port`).
+
+`app/earth/EarthSurfaceHandoverPanel.tsx` zeigt diese Kette inklusive der Fahrzeuge,
+die laut `currentNodeInventoryId` aktuell an einem Knoten stehen.
 
 ## Raumhafen
 
@@ -156,20 +182,80 @@ Raumhafen-Lager
 Surface Transfer Shuttle
 ```
 
-Earth endet fachlich am Surface-Port-/Shuttle-Handover. Orbitale Übergabe und intersolarer Transit bleiben außerhalb dieses Earth-Moduls.
+Das Raumhafenlager ist ein echtes Core-`depot` mit `metadata.role = spaceport_storage`,
+die Shuttle-Pads sind Core-`surface_port`-Inventare mit `metadata.role = shuttle_port`
+(siehe `supabase/migrations/20260911100200_facility_inventory_provisioning.sql`).
+Earth endet fachlich am Surface-Port-/Shuttle-Handover. Orbitale Übergabe und
+intersolarer Transit bleiben außerhalb dieses Earth-Moduls.
+
+## Kartenintegration
+
+`lib/game/earthTransportOverlay.ts` ist die renderer-neutrale Projektion des
+Transportkontexts in zeichenbare Geometrie, `lib/store/earthTransportOverlayStore.ts`
+transportiert sie zwischen den Panels. Die Earth-Karte selbst zeichnet weiterhin ihre
+vorhandenen OSM-/Terrain-Layer und bekommt nur einen zusätzlichen Layer `transport`.
+
+- Panels veröffentlichen ihren Beitrag (`nodes`, `planned`, `live`, `warnings`), die Karte mischt sie über `mergeEarthTransportOverlay`.
+- Geplante Earth-Routen erscheinen mit ihrer Route-Class (durchgezogen für `paved-road`/`service-road`, gestrichelt für `track`/`offroad`); eine nicht freigegebene Route wird nicht gezeichnet, sondern als Warnung gemeldet.
+- Persistierte Fahrten (`route_snapshot.geometry` + `earthSpatialOrigin`) werden mit `routeClass: null` gezeichnet: der gemeinsame Snapshot speichert bewusst keine Segmentklassen, Earth erfindet sie nicht.
+- Der Fahrzeugpunkt kommt aus `deriveSurfaceMissionProgress` + `pointAlongSurfaceRoute`; das Panel veröffentlicht ihn nur in ≈5-%-Schritten, damit die Karte nicht sekündlich neu rendert.
+- Fehlende Geometrie oder ein fehlender Bezugsursprung erzeugen eine Warnung im Kartenlayer statt einer Ersatzroute.
 
 ## Automatische Regeln
 
-Die Earth-UX darf Regeln konfigurieren und visualisieren, z. B. Mindestbestand oder Schwellwerttransport. Ein gemeinsames persistentes Regelmodell und dessen Ausführung gehören weiterhin in Core; Earth führt keine eigene Regel-State-Machine ein.
+`lib/game/earthTransportRulePreview.ts` wertet eine Regelabsicht gegen den
+**beobachteten** Core-Bestand und die Earth-Route aus (`surplus-transfer`,
+`minimum-stock`): greift die Regel, welche Menge würde bewegt, ist die Route
+freigegeben, welche Blocker bestehen. Es wird nichts gespeichert, nichts reserviert
+und nichts ausgeführt.
+
+Das persistente Regelmodell, seine Reservierung und seine Ausführung bleiben
+Core-owned und fehlen als Contract `core-transport-rule-v1`; die Rückgabe an
+NOXIA-CORE liegt in `.kueper/outbox/20260921-earth-surface-logistics-core-contracts.md`.
+Earth führt keine eigene Regel-State-Machine und keinen eigenen Scheduler ein.
+
+## Layerdaten
+
+### Direkt wiederverwendete Earth-Layer
+
+| Layer | Quelle | Verwendung für Surface-Logistik |
+| --- | --- | --- |
+| `infrastructure` (OSM-Straßen) | `/api/earth/region` (Overpass, read-only) | bevorzugtes Routingnetz, Route-Class-Klassifikation, Einbahnstraßen |
+| `landuse` / OSM-Areal | dieselbe Antwort | Offroad-Bodenklassen (`open`, `vegetated`, `soft-ground`, blockierte Areale) |
+| `water` | dieselbe Antwort | Offroad blockiert, keine erfundene Furt |
+| `relief` (DEM/Hillshade) | `/api/earth/buildability` | Steigungsprüfung gegen die Fahrzeug-Steigungsgrenze |
+| `slope` | `/api/earth/buildability` | Offroad-Eignung, Steigungsgrenze |
+| `buildability` | `/api/earth/buildability` | blockiert bebaute/unzulässige Flächen für Offroad |
+| `noxia` / `sites` | `/api/game/build/spatial`, `/api/earth/spaceport-candidates` | Facility-Footprints als Routenendpunkte, Raumhafenflächen |
+
+Es wird **keine** zweite Straßen-, Terrain- oder Layerquelle eingeführt. Der OSM-Graph
+existiert nur für die Dauer einer Routenberechnung.
+
+### Daten, die für die Surface-Logistik zusätzlich nötig wären
+
+- Fahrzeug-Steigungsgrenze und Referenzgeschwindigkeit je Frame (`SurfaceOperationProfile`) — Engineering; für Earth liegt dazu in `external-tasks/open/` dieses Repositories keine Handoff-Datei (Stand 2026-09-21),
+- Zuordnung Gameplay-ID/Transportform → autoritative Masse je Commodity — die Massenbasis selbst liefert Engineering (`EXT-NOXIA-ENG-20260913-CARGO-MASS-BASIS`), die Zuordnung ist NOXIA-seitig offen,
+- Verkehrsregeln jenseits von `oneway`/`access` (z. B. Gewichtsbeschränkungen) — derzeit nicht modelliert und **nicht** angenommen,
+- saisonale/zeitliche Befahrbarkeit — nicht modelliert.
+
+Diese Lücken bleiben `unresolved`; sie werden nicht durch Defaults überbrückt.
 
 ## References
 
 - `external-tasks/open/EXT-NOXIA-EARTH-20260911-surface-logistics.md`
-- `external-tasks/open/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
+- `external-tasks/done/EXT-NOXIA-CORE-20260911-surface-transport-job-contract.md`
 - `lib/game/core/logistics.ts`
 - `app/api/game/logistics/route.ts`
 - `app/api/game/vehicles/route.ts`
 - `lib/game/vehicles/types.ts`
 - `lib/game/earthSurfaceLogistics.ts`
 - `lib/game/earthSurfaceRouting.ts`
+- `lib/game/earthSurfaceHandover.ts`
+- `lib/game/earthTransportOverlay.ts`
+- `lib/game/earthTransportRulePreview.ts`
+- `lib/store/earthTransportOverlayStore.ts`
+- `app/earth/EarthSurfaceHandoverPanel.tsx`
+- `app/earth/EarthSurfaceLogisticsConsole.tsx`
+- `app/earth/EarthSurfaceLiveMap.tsx`
 - `lib/world/spatial/overpassEarthFeatureSource.ts`
+- `.kueper/outbox/20260921-earth-surface-logistics-core-contracts.md`
