@@ -1,4 +1,5 @@
 import EarthRegionPreview from './EarthRegionPreview'
+import EarthInfrastructurePlanner from './EarthInfrastructurePlanner'
 import EarthLandmarkMap from './EarthLandmarkMap'
 import EarthLandmarkExplorer from './EarthLandmarkExplorer'
 import EarthSurfaceLiveMap from './EarthSurfaceLiveMap'
@@ -14,6 +15,7 @@ export const metadata = {
 export default function EarthPage() {
   return <>
     <EarthRegionPreview />
+    <EarthInfrastructurePlanner />
     <EarthLandmarkMap />
     <EarthLandmarkExplorer />
     <EarthSurfaceLiveMap />
