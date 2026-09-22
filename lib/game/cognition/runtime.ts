@@ -80,7 +80,7 @@ export function classifyTrigger(input: Omit<CognitiveTrigger, 'recommendedTier'>
   const importance = unit(input.importance)
   const urgency = unit(input.urgency)
   const score = novelty * 0.35 + uncertainty * 0.3 + importance * 0.25 + urgency * 0.1
-  const recommendedTier: CognitiveTier = score >= 0.78 ? 'L4' : score >= 0.5 ? 'L2' : score >= 0.2 ? 'L1' : 'L0'
+  const recommendedTier: CognitiveTier = score >= 0.78 ? 'L4' : score >= 0.45 ? 'L2' : score >= 0.2 ? 'L1' : 'L0'
   return { ...input, novelty, uncertainty, importance, urgency, recommendedTier }
 }
 
