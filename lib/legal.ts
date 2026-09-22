@@ -1,7 +1,7 @@
 /**
  * KUEPER · NOXIA
  * Path: lib/legal.ts
- * Version: 1.0.0 · 2026-07-10
+ * Version: 1.1.0 · 2026-09-22
  * Source: REQ-KG-LEGAL-ACCESS-20260710
  */
 
@@ -21,6 +21,18 @@ export interface LegalContent {
   status: 'draft_productive' | 'released';
 }
 
+type ImpressumRegistry = {
+  responsible?: Partial<Pick<ImpressumData, 'name' | 'address' | 'email'>>;
+  updated?: string;
+};
+
+const FALLBACK_IMPRESSUM: ImpressumData = {
+  name: 'Thomas Peter Küper',
+  address: 'Mörfelder Landstraße 103, 60598 Frankfurt am Main, Deutschland',
+  email: 't.kueper@camaleo.de',
+  updated: '2026-07-19',
+};
+
 function resolveTemplate(text: string, impressum: ImpressumData): string {
   return text
     .replace(/\{\{\s*impressum\.responsible\.name\s*\}\}/g, impressum.name)
@@ -29,24 +41,46 @@ function resolveTemplate(text: string, impressum: ImpressumData): string {
     .replace(/\{\{\s*impressum\.updated\s*\}\}/g, impressum.updated);
 }
 
+async function fetchText(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchImpressum(): Promise<ImpressumData> {
+  const raw = await fetchText(`${KG_RAW}/registry/legal/impressum-master.json`);
+  if (!raw) return FALLBACK_IMPRESSUM;
+
+  try {
+    const parsed = JSON.parse(raw) as ImpressumRegistry;
+    return {
+      name: parsed.responsible?.name ?? FALLBACK_IMPRESSUM.name,
+      address: parsed.responsible?.address ?? FALLBACK_IMPRESSUM.address,
+      email: parsed.responsible?.email ?? FALLBACK_IMPRESSUM.email,
+      updated: parsed.updated ?? FALLBACK_IMPRESSUM.updated,
+    };
+  } catch {
+    return FALLBACK_IMPRESSUM;
+  }
+}
+
 export async function fetchLegalContent(): Promise<LegalContent> {
-  const [impressumRaw, privacyRaw, termsRaw] = await Promise.all([
-    fetch(`${KG_RAW}/registry/legal/impressum-master.json`, {}).then(r => r.json()),
-    fetch(`${KG_RAW}/registry/legal/datenschutz.de.md`, {}).then(r => r.text()),
-    fetch(`${KG_RAW}/registry/legal/terms.de.md`, {}).then(r => r.text()),
+  const [impressum, privacyRaw, termsRaw] = await Promise.all([
+    fetchImpressum(),
+    fetchText(`${KG_RAW}/registry/legal/datenschutz.de.md`),
+    fetchText(`${KG_RAW}/registry/legal/terms.de.md`),
   ]);
 
-  const impressum: ImpressumData = {
-    name: impressumRaw.responsible?.name ?? '',
-    address: impressumRaw.responsible?.address ?? '',
-    email: impressumRaw.responsible?.email ?? '',
-    updated: impressumRaw.updated ?? '2026-07-10',
-  };
+  const unavailable = 'Rechtlicher Inhalt konnte aus der kanonischen Quelle vorübergehend nicht geladen werden.';
 
   return {
     impressum,
-    privacy: resolveTemplate(privacyRaw, impressum),
-    terms: resolveTemplate(termsRaw, impressum),
+    privacy: resolveTemplate(privacyRaw ?? unavailable, impressum),
+    terms: resolveTemplate(termsRaw ?? unavailable, impressum),
     status: 'draft_productive',
   };
 }
