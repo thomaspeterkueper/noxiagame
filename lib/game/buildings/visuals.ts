@@ -106,6 +106,24 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
       mapScale: 1.8,
       notes: 'NOXIA Earth Core V1 workshop/light-production hall.',
     },
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 1.8,
+      notes: 'Mond-Werkstatt verwendet dieselbe Werkstatt-Sprache wie die Erde.',
+    },
+  },
+  surface_workshop: {
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/workshop/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 1.8,
+      notes: 'Shackleton-Werkstatt: bestehendes Werkstatt-Asset bis ein eigenes Lunar-Asset vorliegt.',
+    },
   },
   factory: {
     earth: {
@@ -135,6 +153,46 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
       notes: 'Mond-Solarfeld leiht sich bis auf Weiteres das Earth-Solar-Asset.',
     },
   },
+  battery_storage: {
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/warehouse/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/warehouse/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 1.35,
+      notes: 'Interimsvisual fuer Shackleton-Batteriespeicher; kompakter als das Warenhaus skaliert.',
+    },
+  },
+  life_support_hub: {
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/habitat/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/habitat/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 1.35,
+      notes: 'Interimsvisual fuer den ECLSS-/Lebenserhaltungsknoten der Shackleton-Basis.',
+    },
+  },
+  rover_yard: {
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_service/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/spaceport_service/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 1.55,
+      notes: 'Roverhof verwendet vorerst den Service-Hangar als funktional passendes Kartenvisual.',
+    },
+  },
+  surface_comms: {
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/scanner/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/scanner/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 1.45,
+      notes: 'Kommunikationsmast verwendet das vorhandene Antennen-/Scanner-Asset.',
+    },
+  },
   ssf_headquarters_sundern: {
     earth: {
       styleAnchorAsset: `${EARTH_STYLE_ROOT}/ssf_headquarters_sundern/earth/style-anchor.svg`,
@@ -145,12 +203,6 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
       notes: 'Unique 1971 SSF Foundation House at Bogenstraße 15: hipped-roof bungalow, detached garage along the long side, side entrance facing the garage.',
     },
   },
-  // 16.09.2026: Raumhafen-Gebaeudetypen hatten zunaechst gar keinen Eintrag
-  // (leere Fallback-Kachel), dann kurzzeitig geliehene Assets als
-  // Uebergangsloesung. Spielerfeedback: geliehene Assets (v.a. Solarpanel-
-  // Optik fuer Landepads) erzeugen die falsche Assoziation -- gerade der
-  // Raumhafen ist meist der erste Eindruck neuer Spieler. Jetzt eigene,
-  // einfache aber inhaltlich passende Assets im bestehenden Iso-Stil.
   spaceport_core: {
     earth: {
       styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_core/earth/style-anchor.svg`,
@@ -201,12 +253,6 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
       notes: 'Eigenes Landepad-Asset, kleiner skaliert.',
     },
   },
-  // 16.09.2026: Mond-Karte (ShackletonSurfaceMap.tsx) zeichnete Gebaeude bis
-  // eben nur als generische eingefaerbte Rechtecke -- gar kein Icon-System.
-  // Umgestellt auf dasselbe getBuildingVisual()-Muster wie Earth. Shared
-  // Gebaeudetypen (admin/solar/laboratory/warehouse/habitat/scanner) leihen
-  // sich vorerst ihr Earth-Asset (siehe jeweils oben); mondspezifische Typen
-  // bekommen eigene Assets.
   scanner: {
     earth: {
       styleAnchorAsset: `${EARTH_STYLE_ROOT}/scanner/earth/style-anchor.svg`,
@@ -263,6 +309,16 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
       location: 'moon',
       mapScale: 2.2,
       notes: 'Mond-Landepad leiht sich dasselbe Landepad-Asset wie die Erde.',
+    },
+  },
+  landing_pad_moon: {
+    moon: {
+      styleAnchorAsset: `${EARTH_STYLE_ROOT}/spaceport_pad/earth/style-anchor.svg`,
+      mapAsset: `${EARTH_STYLE_ROOT}/spaceport_pad/earth/style-anchor.svg`,
+      visualRole: 'map-ready',
+      location: 'moon',
+      mapScale: 2.15,
+      notes: 'Shackleton Lande- und Cargo-Zone nutzt das vorhandene Landepad-Asset.',
     },
   },
   school: {
