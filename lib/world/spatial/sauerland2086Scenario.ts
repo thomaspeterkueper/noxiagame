@@ -14,6 +14,9 @@ export type Sauerland2086Scenario = {
     forestConflictWeight: number
     climateResilienceWeight: number
     undergroundFreightLink: boolean
+    selmeckeRapidTransitLink: boolean
+    shuttleLaunchPads: 1 | 2
+    maintenanceApronPriority: 'high'
     europeanSpaceportProgram: boolean
   }
   narrative: string[]
@@ -28,12 +31,17 @@ export const SAUERLAND_2086_SCENARIO: Sauerland2086Scenario = {
     forestConflictWeight: 0.45,
     climateResilienceWeight: 1.25,
     undergroundFreightLink: true,
+    selmeckeRapidTransitLink: true,
+    shuttleLaunchPads: 2,
+    maintenanceApronPriority: 'high',
     europeanSpaceportProgram: true,
   },
   narrative: [
     'demographicischer Wandel kann größere zusammenhängende Entwicklungsflächen verfügbar machen',
     'Waldumbau und Klimafolgen können heutige Waldnutzungen räumlich verändern',
     'eine neue unterirdische Hochleistungs-Güterverbindung wird als Szenario-Infrastruktur angenommen',
+    'Selmecke wird über eine unterirdische Schnellbahn direkt mit dem außerhalb der Siedlung liegenden Raumhafen verbunden',
+    'der Raumhafen priorisiert Shuttle-Abstellung, Wartung, Hangars und Lagerflächen; vorgesehen sind höchstens zwei Shuttle-Startrampen',
     'der Raumhafen wird als europäischer Forschungs-, Logistik- und Raumfahrtstandort gedacht',
   ],
 }
