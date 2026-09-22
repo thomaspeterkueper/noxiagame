@@ -2,14 +2,14 @@
 
 // app/dashboard/WelcomeSetup.tsx
 // Erstellt:     07.06.2026
-// Aktualisiert: 16.09.2026 — Bugfix: Name wurde erneut leer abgefragt, obwohl
+// Aktualisiert: 22.09.2026 — Playability: Earth-Starttext und erster Journey-CTA\n//               an den tatsächlichen Earth/Selmecke-Einstieg angeglichen.\n// Vorher:       16.09.2026 — Bugfix: Name wurde erneut leer abgefragt, obwohl
 //               er bereits bei der Registrierung vergeben wurde; jetzt über
 //               initialUsername vorbefüllt (Prop kommt aus DashboardGate.tsx,
 //               dort ohnehin schon aus /api/game/profile geladen). Tutorial-
 //               Karten von Mond- auf Erde-Start umgestellt (neuer Startort,
 //               s. Migration fix_new_player_starting_location_earth_not_moon).
 // Vorher:       09.07.2026 — onDone mit openJourney-Flag für vertikalen Spielpfad
-// Version:      0.3.0
+// Version:      0.3.1
 // Erst-Login-Onboarding: Name (vorbefüllt) + Avatar wählen, dann drei
 // Einweisungskarten. Erscheint wenn profiles.onboarded = false, jetzt
 // exklusiv gesteuert über DashboardGate.tsx. Dark-UI-Stil (Transit-Ästhetik).
@@ -82,7 +82,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
         {step === 'setup' && (
           <div style={{ background: C.panel, border: `1px solid ${C.line}`, padding: '1.8rem' }}>
             <div style={{ ...mono, fontSize: 10, letterSpacing: '0.2em', color: C.dim, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              Pilotenregistrierung · Shackleton-Basis
+              Pilotenregistrierung · Erde
             </div>
             <div style={{ ...mono, fontSize: 13, color: C.text, marginBottom: '1.5rem', lineHeight: 1.6 }}>
               Ein Frachter wartet im Dock. 5.000 Credits auf dem Konto.
@@ -179,7 +179,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
                 fontSize: 13, letterSpacing: '0.1em', cursor: 'pointer',
               }}
             >
-              {cardIdx < CARDS.length - 1 ? 'Weiter →' : 'Zum Dock — Journey starten'}
+              {cardIdx < CARDS.length - 1 ? 'Weiter →' : 'Nach Selmecke — Einstieg starten'}
             </button>
           </div>
         )}
