@@ -64,6 +64,37 @@ export interface EarthSurfaceRouteFailure {
 
 export type EarthSurfaceRoutePlanResult = EarthSurfaceRoutePlan | EarthSurfaceRouteFailure
 
+/** Largest OSM window a single `/api/earth/region` request serves. */
+export const EARTH_ROUTING_WINDOW_MAX_KM = 6
+
+/**
+ * Longest node-to-node straight line that still fits into one routing window. A
+ * 6 km window reaches at most 12 km between two opposite rim points, minus the
+ * margin the actual road detour needs.
+ */
+export const EARTH_ROUTING_MAX_DIRECT_M = 10_500
+
+export type EarthRoutingWindow =
+  | { ok: true; center: GeoPoint; radiusKm: number; directDistanceM: number }
+  | { ok: false; reason: 'beyond-routing-window'; directDistanceM: number }
+
+/**
+ * OSM window for a node pair. Manual transports and the automatic rule preview must
+ * request exactly the same window, so the limit lives here instead of in each panel.
+ */
+export function earthRoutingWindowFor(source: GeoPoint, destination: GeoPoint): EarthRoutingWindow {
+  const directDistanceM = distanceMeters(source, destination)
+  if (directDistanceM > EARTH_ROUTING_MAX_DIRECT_M) {
+    return { ok: false, reason: 'beyond-routing-window', directDistanceM }
+  }
+  return {
+    ok: true,
+    directDistanceM,
+    center: { lat: (source.lat + destination.lat) / 2, lon: (source.lon + destination.lon) / 2 },
+    radiusKm: Math.min(EARTH_ROUTING_WINDOW_MAX_KM, Math.max(.6, directDistanceM / 2000 + .75)),
+  }
+}
+
 type GraphNode = {
   key: string
   point: GeoPoint

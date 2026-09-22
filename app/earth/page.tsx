@@ -4,6 +4,7 @@ import EarthLandmarkMap from './EarthLandmarkMap'
 import EarthLandmarkExplorer from './EarthLandmarkExplorer'
 import EarthSurfaceLiveMap from './EarthSurfaceLiveMap'
 import EarthSurfaceLogisticsConsole from './EarthSurfaceLogisticsConsole'
+import EarthSurfaceHandoverPanel from './EarthSurfaceHandoverPanel'
 import EarthSurfaceMissionDraftPanel from './EarthSurfaceMissionDraftPanel'
 import EarthVehicleStagingPanel from './EarthVehicleStagingPanel'
 import SpaceportAreaComparison from './SpaceportAreaComparison'
@@ -21,6 +22,7 @@ export default function EarthPage() {
     <EarthSurfaceLiveMap />
     <EarthVehicleStagingPanel />
     <EarthSurfaceLogisticsConsole />
+    <EarthSurfaceHandoverPanel />
     <EarthSurfaceMissionDraftPanel />
     <SpaceportAreaComparison />
   </>

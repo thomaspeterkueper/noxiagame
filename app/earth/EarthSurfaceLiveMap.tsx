@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import { earthOverlayRouteFromJob, type EarthTransportOverlayRoute } from '@/lib/game/earthTransportOverlay'
 import { deriveSurfaceMissionProgress } from '@/lib/game/vehicles/surfaceProgress'
+import { useEarthTransportOverlayStore } from '@/lib/store/earthTransportOverlayStore'
 import {
   parseSurfaceRouteGeometry,
   pointAlongSurfaceRoute,
@@ -64,9 +66,18 @@ type MapRoute = {
 }
 
 const ACTIVE = new Set(['reserved', 'loading', 'in_transit', 'arrived', 'unloading'])
+const JOB_STATUS_LABELS: Record<string, string> = {
+  reserved: 'Reserviert', loading: 'Lädt', in_transit: 'Unterwegs', arrived: 'Angekommen', unloading: 'Entlädt',
+}
 const VIEW_W = 1000
 const VIEW_H = 520
 const PAD = 54
+/**
+ * Cadence of the shared map overlay. This panel ticks once per second for its own
+ * readouts, but the Earth map behind it must not re-render at that rate for every
+ * running job; five seconds is a ≈5 % step on a typical Earth surface route.
+ */
+const OVERLAY_TICK_MS = 5000
 
 function finite(value: unknown): number | null {
   const number = typeof value === 'number' ? value : Number(value)
@@ -102,9 +113,15 @@ export default function EarthSurfaceLiveMap() {
   const [jobs, setJobs] = useState<TransportJob[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [overlayNow, setOverlayNow] = useState(() => Date.now())
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setOverlayNow(Date.now()), OVERLAY_TICK_MS)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -195,6 +212,36 @@ export default function EarthSurfaceLiveMap() {
   }
 
   const inventoryById = useMemo(() => new Map(inventories.map(item => [item.id, item])), [inventories])
+
+  // Hand the running Core jobs to the Earth map as drawable geometry. The shared
+  // snapshot already carries both the local-world polyline and the Earth origin it
+  // was built against, so nothing is re-planned here.
+  const publishOverlay = useEarthTransportOverlayStore(state => state.publish)
+  const clearOverlay = useEarthTransportOverlayStore(state => state.clear)
+  const overlay = useMemo(() => {
+    const live: EarthTransportOverlayRoute[] = []
+    const warnings: string[] = []
+    for (const job of activeJobs) {
+      const source = inventoryById.get(job.source_inventory_id)?.label ?? job.source_inventory_id.slice(0, 8)
+      const destination = inventoryById.get(job.destination_inventory_id)?.label ?? job.destination_inventory_id.slice(0, 8)
+      const result = earthOverlayRouteFromJob({
+        id: job.id,
+        label: `${source} → ${destination}`,
+        statusLabel: JOB_STATUS_LABELS[job.status] ?? job.status,
+        snapshot: job.route_snapshot,
+        progress01: deriveSurfaceMissionProgress(job, overlayNow).progress01,
+      })
+      if (result.ok) live.push(result.route)
+      else warnings.push(`${source} → ${destination}: ${result.warning}`)
+    }
+    return { live, warnings }
+  }, [activeJobs, inventoryById, overlayNow])
+
+  useEffect(() => {
+    publishOverlay('live-map', { live: overlay.live, warnings: overlay.warnings })
+  }, [publishOverlay, overlay])
+
+  useEffect(() => () => clearOverlay('live-map'), [clearOverlay])
 
   return <section className="earth-live-map">
     <header>

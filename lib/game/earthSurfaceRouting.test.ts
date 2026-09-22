@@ -1,6 +1,11 @@
 import type { ImportedEarthFeature } from '../world/spatial/earthFeatureSource'
 import { assessEarthOffroad } from './earthSurfaceLogistics'
-import { planEarthSurfaceRoute } from './earthSurfaceRouting'
+import {
+  EARTH_ROUTING_MAX_DIRECT_M,
+  EARTH_ROUTING_WINDOW_MAX_KM,
+  earthRoutingWindowFor,
+  planEarthSurfaceRoute,
+} from './earthSurfaceRouting'
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -105,5 +110,21 @@ const tooFarFromRoad = planEarthSurfaceRoute({
 })
 assert('reason' in tooFarFromRoad, 'long unmapped facility access must not be fabricated')
 if ('reason' in tooFarFromRoad) assert(tooFarFromRoad.reason === 'source-access-unresolved', 'overlong access must report source access unresolved')
+
+const nearWindow = earthRoutingWindowFor(A, B)
+assert(nearWindow.ok, 'a node pair inside the routing distance must yield a window')
+if (nearWindow.ok) {
+  assert(nearWindow.radiusKm <= EARTH_ROUTING_WINDOW_MAX_KM, 'the routing window must stay inside the served OSM radius')
+  assert(nearWindow.radiusKm >= .6, 'the routing window must keep the minimum radius around the midpoint')
+  assert(Math.abs(nearWindow.center.lat - (A.lat + B.lat) / 2) < 1e-12, 'the window must be centred on the node pair')
+  assert(nearWindow.directDistanceM > 0 && nearWindow.directDistanceM <= EARTH_ROUTING_MAX_DIRECT_M, 'a served window must report the direct distance that produced it')
+}
+
+const farWindow = earthRoutingWindowFor(A, { lat: A.lat + 1, lon: A.lon })
+assert(!farWindow.ok, 'a node pair beyond one routing window must be refused')
+if (!farWindow.ok) {
+  assert(farWindow.reason === 'beyond-routing-window', 'an oversized window must name its reason')
+  assert(farWindow.directDistanceM > EARTH_ROUTING_MAX_DIRECT_M, 'the refusal must report the distance that exceeded the window')
+}
 
 console.log('earth surface routing tests passed')

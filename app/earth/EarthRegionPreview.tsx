@@ -5,6 +5,9 @@ import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
+import { mergeEarthTransportOverlay, type EarthTransportOverlayNode } from '@/lib/game/earthTransportOverlay'
+import type { EarthSurfaceRouteClass } from '@/lib/game/earthSurfaceLogistics'
+import { useEarthTransportOverlayStore } from '@/lib/store/earthTransportOverlayStore'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
 type GeoPoint = { lat:number; lon:number }
@@ -21,10 +24,10 @@ type SpatialPayload = { location?:{slug:string;name:string}; profile?:{credits:n
 type SelectedSpot = { mapX:number;mapY:number;xM:number;yM:number }
 type TerrainCell = { row:number;col:number;xM:number;yM:number;elevationM:number;slopeDeg:number|null;state:'buildable'|'restricted'|'invalid'|'unresolved';reason:string|null }
 type TerrainPayload = { ok:boolean; sourceResolutionM?:number; sampledRows?:number; sampledCols?:number; cells?:TerrainCell[]; error?:string }
-type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slope'|'noxia'|'sites'
+type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slope'|'noxia'|'sites'|'transport'
 
 const layerOrder=['farmland','forest','urban','water','industrial','public','building','waterway','rail','road','settlement']
-const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,sites:true}
+const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,sites:true,transport:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=300
 const LOCAL_DETAIL_RADIUS_KM=.65
 // Kanonischer NOXIA-Referenzstandort (siehe app/api/earth/region/route.ts,
@@ -48,6 +51,27 @@ function styleFor(type:string,tags:Record<string,string>){
   }
 }
 
+/** Draw style per Earth route class. A persisted Core route carries no class claim. */
+function transportPathStyle(routeClass:EarthSurfaceRouteClass|null){
+  switch(routeClass){
+    case'paved-road':return{stroke:'#8a5a12',width:4,dash:undefined as string|undefined,opacity:.95}
+    case'service-road':return{stroke:'#9c6c1c',width:3.4,dash:undefined as string|undefined,opacity:.9}
+    case'track':return{stroke:'#7d6224',width:3,dash:'7 4',opacity:.9}
+    case'offroad':return{stroke:'#6f4a16',width:2.6,dash:'3 5',opacity:.85}
+    case'unresolved':return{stroke:'#7a2f26',width:2.6,dash:'2 4',opacity:.8}
+    default:return{stroke:'#3c5a63',width:3.4,dash:undefined as string|undefined,opacity:.75}
+  }
+}
+/** Marker colour per overlay node kind; the spaceport handover stops are highlighted. */
+function transportNodeColor(kind:EarthTransportOverlayNode['kind']){
+  switch(kind){
+    case'facility':return'#1f5967'
+    case'depot':return'#3c6b52'
+    case'spaceport-storage':return'#8a5a12'
+    case'surface-port':return'#c19434'
+    default:return'#43535a'
+  }
+}
 function distanceMeters(a:GeoPoint,b:GeoPoint){const lat=(a.lat+b.lat)*Math.PI/360;const dx=(b.lon-a.lon)*111320*Math.cos(lat);const dy=(b.lat-a.lat)*110540;return Math.hypot(dx,dy)}
 function clamp(v:number,min:number,max:number){return Math.max(min,Math.min(max,v))}
 function normalizeRotation(v:number){return((Math.round(v)%360)+360)%360}
@@ -136,6 +160,9 @@ export default function EarthRegionPreview(){
   const active=selected?shortlist.find(c=>c.shortlistLabel===selected)??null:null
 
   const scale=useMemo(()=>{if(!mapMetrics)return null;const visibleWidthM=mapMetrics.widthM/zoom,targetM=visibleWidthM/5,options=[2,5,10,20,50,100,200,500,1000,2000,5000,10000];const meters=options.reduce((best,n)=>Math.abs(n-targetM)<Math.abs(best-targetM)?n:best,options[0]);return{meters,pixels:meters/mapMetrics.widthM*1000*zoom}},[mapMetrics,zoom])
+
+  const overlaySources=useEarthTransportOverlayStore(s=>s.sources)
+  const transportView=useMemo(()=>mergeEarthTransportOverlay(overlaySources),[overlaySources])
 
   const terrainOverlay=useMemo(()=>{if(!terrain?.ok||!terrain.cells||!projection||!data?.region?.origin||!mapMetrics)return[];const cells=terrain.cells,byKey=new Map(cells.map(c=>[`${c.row}:${c.col}`,c]));const stepX=(terrain.sourceResolutionM??120)/mapMetrics.widthM*1000,stepY=(terrain.sourceResolutionM??120)/mapMetrics.heightM*1000;return cells.map(c=>{const geo=localMetersToGeo({eastM:c.xM,northM:c.yM},data.region!.origin),x=projection.x(geo.lon),y=projection.y(geo.lat),west=byKey.get(`${c.row}:${c.col-1}`),east=byKey.get(`${c.row}:${c.col+1}`),north=byKey.get(`${c.row-1}:${c.col}`),south=byKey.get(`${c.row+1}:${c.col}`),dx=(east?.elevationM??c.elevationM)-(west?.elevationM??c.elevationM),dy=(south?.elevationM??c.elevationM)-(north?.elevationM??c.elevationM),light=clamp(.52+(-dx+dy)*.012,.18,.82);return{...c,x,y,w:stepX,h:stepY,shade:light<.5?'#203026':'#fff7da',shadeOpacity:Math.abs(light-.5)*.42,buildFill:c.state==='buildable'?'#4ecb71':c.state==='restricted'?'#e6bc46':c.state==='invalid'?'#d85757':'#78818a',slopeOpacity:clamp((c.slopeDeg??0)/22,0,.55)}})},[terrain,projection,data,mapMetrics])
 
@@ -245,6 +272,27 @@ export default function EarthRegionPreview(){
             </g>
           })}
 
+          {layers.transport&&projection&&transportView.routes.length>0&&<g pointerEvents="none">
+            {transportView.routes.map(route=>route.paths.map((path,pathIndex)=>{
+              const d=path.points.map((point,index)=>`${index?'L':'M'}${projection.x(point.lon).toFixed(2)} ${projection.y(point.lat).toFixed(2)}`).join(' ')
+              const s=transportPathStyle(path.routeClass)
+              return <path key={`${route.id}-${pathIndex}`} d={d} fill="none" stroke={s.stroke} strokeWidth={s.width} strokeDasharray={s.dash} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" opacity={route.kind==='planned'?s.opacity*.8:s.opacity}/>
+            }))}
+            {transportView.routes.map(route=>{
+              if(!route.vehiclePoint)return null
+              const x=projection.x(route.vehiclePoint.lon),y=projection.y(route.vehiclePoint.lat)
+              return <g key={`vehicle-${route.id}`}><circle cx={x} cy={y} r={11/zoom} fill="#f5d75f" fillOpacity=".3"/><circle cx={x} cy={y} r={6/zoom} fill="#3a2c08" stroke="#f7e6a8" strokeWidth={2/zoom}/></g>
+            })}
+          </g>}
+          {layers.transport&&projection&&transportView.nodes.map(node=>{
+            const x=projection.x(node.point.lon),y=projection.y(node.point.lat),color=transportNodeColor(node.kind),isPort=node.kind==='surface-port'
+            return <g key={`transport-node-${node.id}`} pointerEvents="none">
+              <circle cx={x} cy={y} r={isPort?10/zoom:8/zoom} fill="none" stroke={color} strokeWidth={2/zoom} opacity=".85"/>
+              <circle cx={x} cy={y} r={isPort?3.6/zoom:3/zoom} fill={color}/>
+              <text x={x+9/zoom} y={y-6/zoom} fontSize={9/zoom} fontWeight="700" fill="#22333a" paintOrder="stroke" stroke="#f5f2e8" strokeWidth={2.2/zoom}>{node.label}</text>
+            </g>
+          })}
+
           {!data.detail&&layers.sites&&candidates.map(c=><circle key={`raw-${c.lat}-${c.lon}`} cx={c.x} cy={c.y} r={4/zoom} fill="#fff4be" stroke="#8d732e" strokeWidth={1/zoom} opacity=".45"/>)}
           {!data.detail&&layers.sites&&shortlist.map(c=><g key={c.shortlistLabel} role="button" aria-label={`Prüfstandort ${c.shortlistLabel} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(c.shortlistLabel);void focusGeoPoint({lat:c.lat,lon:c.lon},`Prüfstandort ${c.shortlistLabel}`)}} style={{cursor:'pointer'}}><circle cx={c.x} cy={c.y} r={20/zoom} fill="transparent"/><circle cx={c.x} cy={c.y} r={15/zoom} fill={c.shortlistRank===1?'#efc34d':'#fff3bd'} stroke="#5d4300" strokeWidth={2.5/zoom}/><text pointerEvents="none" x={c.x} y={c.y+4/zoom} textAnchor="middle" fontSize={11/zoom} fontWeight="900" fill="#493500">{c.shortlistLabel}</text></g>)}
 
@@ -259,9 +307,13 @@ export default function EarthRegionPreview(){
       </svg>
 
       <div className="earth-map-tools"><div className="earth-compass" aria-label="Karte ist nach Norden ausgerichtet"><span>N</span><b>↑</b></div>{scale&&<div className="earth-scale"><span>{scale.meters>=1000?`${scale.meters/1000} km`:`${scale.meters} m`}</span><i style={{width:`${Math.max(26,Math.min(150,scale.pixels))}px`}}/></div>}{focusLabel&&<button className="earth-focus" onClick={resetOverview}>{focusLabel}<small>Übersicht</small></button>}</div>
-      <div className="earth-layer-control"><button className="earth-layer-trigger" onClick={()=>setLayersOpen(v=>!v)}>☷ Layer</button>{layersOpen&&<div className="earth-layer-menu">{([['relief','Relief / DEM'],['landuse','Landnutzung'],['water','Wasser'],['infrastructure','Infrastruktur'],['buildability','Bebaubarkeit'],['slope','Neigung'],['noxia','NOXIA-Bauten'],['sites','Prüfstandorte']] as [LayerKey,string][]).map(([key,label])=><button key={key} className={layers[key]?'active':''} onClick={()=>toggleLayer(key)}><span>{layers[key]?'●':'○'}</span>{label}</button>)}<div className="earth-layer-disabled">○ Ressourcen · Daten folgen</div></div>}</div>
+      <div className="earth-layer-control"><button className="earth-layer-trigger" onClick={()=>setLayersOpen(v=>!v)}>☷ Layer</button>{layersOpen&&<div className="earth-layer-menu">{([['relief','Relief / DEM'],['landuse','Landnutzung'],['water','Wasser'],['infrastructure','Infrastruktur'],['buildability','Bebaubarkeit'],['slope','Neigung'],['noxia','NOXIA-Bauten'],['sites','Prüfstandorte'],['transport','Transport']] as [LayerKey,string][]).map(([key,label])=><button key={key} className={layers[key]?'active':''} onClick={()=>toggleLayer(key)}><span>{layers[key]?'●':'○'}</span>{label}</button>)}<div className="earth-layer-disabled">○ Ressourcen · Daten folgen</div></div>}</div>
       {focusLoading&&<div className="earth-detail-status">Kartendetails werden geladen …</div>}
       {focusError&&<div className="earth-detail-status error">{focusError}</div>}
+      {layers.transport&&transportView.warnings.length>0&&<div className="earth-transport-warnings" role="status">
+        <b>Transport · {transportView.warnings.length} Warnung{transportView.warnings.length===1?'':'en'}</b>
+        {transportView.warnings.map(warning=><span key={warning}>{warning}</span>)}
+      </div>}
 
       {selectedSpot&&<div className="earth-site-panel" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
         <div className="earth-site-head"><div><small>AUSGEWÄHLTE STELLE</small><strong>{selectedTerrain?terrainLabel(selectedTerrain.state):'Geländedaten werden gesucht'}</strong></div><button onClick={clearPlacement}>×</button></div>
@@ -313,6 +365,7 @@ export default function EarthRegionPreview(){
       .earth-map-tools{position:absolute;left:16px;top:14px;display:flex;align-items:flex-start;gap:12px;color:#17313c;text-shadow:0 1px 2px #fff,0 0 7px #f4f1e6}.earth-compass,.earth-scale{pointer-events:none}.earth-compass{width:30px;height:38px;display:grid;place-items:center;position:relative;color:#17313c}.earth-compass span{position:absolute;top:0;font-size:10px;font-weight:900}.earth-compass b{font-size:26px;line-height:1;margin-top:8px}.earth-scale{min-width:72px;padding-top:2px;color:#17313c}.earth-scale span{display:block;font-size:10px;font-weight:900;margin-bottom:3px;text-align:center}.earth-scale i{display:block;height:7px;border-left:2px solid #17313c;border-right:2px solid #17313c;border-bottom:3px solid #17313c;box-sizing:border-box;filter:drop-shadow(0 1px 1px #fff)}.earth-focus{pointer-events:auto;border:1px solid #506b73;background:#f5f2e8dd;color:#17313c;border-radius:7px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;text-shadow:none;display:grid;gap:1px}.earth-focus small{font-size:8px;font-weight:700;color:#738087}
       .earth-layer-control{position:absolute;right:14px;top:14px;z-index:4}.earth-layer-trigger{border:1px solid #47616d;background:#102632dc;color:#e9f0ed;border-radius:7px;padding:7px 10px;font-size:10px;font-weight:800;cursor:pointer;backdrop-filter:blur(4px)}.earth-layer-menu{margin-top:6px;width:172px;background:#0b1c27ed;border:1px solid #405965;border-radius:9px;padding:6px;box-shadow:0 8px 28px #10202745;backdrop-filter:blur(8px)}.earth-layer-menu button{width:100%;display:flex;gap:8px;align-items:center;border:0;background:transparent;color:#9fb2b8;padding:7px 8px;text-align:left;font-size:10px;border-radius:5px;cursor:pointer}.earth-layer-menu button:hover,.earth-layer-menu button.active{background:#173746;color:#f2e7ba}.earth-layer-menu button span{width:12px;color:#d4ad43}.earth-layer-disabled{padding:7px 8px;color:#64767c;font-size:9px;border-top:1px solid #263b44;margin-top:4px}
       .earth-detail-status{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:#102632e8;color:#f4f0dd;border:1px solid #58717a;border-radius:8px;padding:8px 12px;font-size:10px;font-weight:800}.earth-detail-status.error{background:#612f2fe8;border-color:#9c6262}
+      .earth-transport-warnings{position:absolute;left:14px;bottom:14px;z-index:5;max-width:min(420px,60%);display:grid;gap:4px;background:#3a2b16ed;border:1px solid #8a6b21;border-radius:9px;padding:9px 11px;color:#f5e5c2}.earth-transport-warnings b{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#ecc55f}.earth-transport-warnings span{font-size:9px;line-height:1.45}
       .earth-site-panel,.earth-object-panel{position:absolute;left:14px;bottom:44px;z-index:6;width:min(390px,calc(100% - 28px));max-height:calc(100% - 78px);overflow:auto;background:#fffaf0f4;border:1px solid #a8893d;border-radius:11px;padding:12px;box-sizing:border-box;box-shadow:0 10px 34px #2b341f40;cursor:default;backdrop-filter:blur(8px)}.earth-object-panel{border-color:#567986}.earth-site-head{display:flex;justify-content:space-between;gap:12px}.earth-site-head small{display:block;color:#89691b;font-size:9px;font-weight:900;letter-spacing:.12em}.earth-object-panel .earth-site-head small{color:#466b78}.earth-site-head strong{display:block;font-size:15px;margin-top:2px}.earth-site-head button{border:0;background:none;font-size:20px;cursor:pointer}.earth-analysis-level,.earth-object-state{display:flex;justify-content:space-between;align-items:center;margin:9px 0;padding:7px 8px;background:#edf0e8;border-radius:6px;font-size:10px}.earth-analysis-level span,.earth-object-state span{color:#68777e}.earth-analysis-level b,.earth-object-state b{color:#335360}.earth-site-facts{display:grid;gap:5px}.earth-site-facts>div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e4ddc8;padding:5px 2px;font-size:10px}.earth-site-facts span{color:#6c7879}.earth-site-facts b{text-align:right;font-weight:800}.earth-site-facts .locked-info b{color:#907f63}.earth-site-facts .unknown-info b{color:#826f55}.earth-build-message{margin-top:9px;padding:7px 8px;background:#f3e5b9;border-radius:6px;font-size:10px;font-weight:800;color:#725516}.earth-build-open{width:100%;margin-top:10px;border:1px solid #8a6b21;background:#c89d35;color:#fffaf0;border-radius:7px;padding:9px;font-weight:900;cursor:pointer}.earth-build-picker,.earth-placement-editor{margin-top:10px}.earth-build-picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.earth-build-picker-head button{border:0;background:none;color:#6d5a2a;text-decoration:underline;cursor:pointer}.earth-build-options{display:grid;gap:6px}.earth-build-option{border:1px solid #c5b581;background:#fffdf7;border-radius:7px;padding:8px;text-align:left;display:grid;grid-template-columns:1fr auto;gap:3px 8px;color:#243940;cursor:pointer}.earth-build-option:hover:not(:disabled){border-color:#8a6b21;background:#fff7dc}.earth-build-option.locked{background:#efeee8;color:#777;cursor:not-allowed}.build-name{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px}.build-name strong{font-size:11px}.build-name em{font-style:normal;font-weight:900;color:#9a7622}.build-meta{grid-column:1/-1;font-size:9px;color:#718087}.req-ok,.req-no{font-size:9px;font-weight:800}.req-ok{color:#39704e}.req-no{color:#9a4f45}.earth-terrain-note{display:block;margin-top:9px;color:#857a66;font-size:8px;line-height:1.35}
       .earth-placement-summary,.earth-rotation-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:6px 2px}.earth-placement-summary b,.earth-rotation-head b{color:#8a681b}.earth-rotation-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 7px}.earth-rotation-presets button,.earth-rotation-fine button,.earth-placement-actions button{border:1px solid #b9aa80;background:#fffdf7;color:#4b4a40;border-radius:6px;padding:7px;font-size:10px;font-weight:800;cursor:pointer}.earth-rotation-presets button.active{background:#d6ae45;color:#fffdf1;border-color:#8a681b}.earth-rotation-fine{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center}.earth-rotation-fine input{width:100%;accent-color:#a77f22}.earth-preview-note{display:block;margin-top:8px;color:#766b54;font-size:8px;line-height:1.35}.earth-placement-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:6px;margin-top:9px}.earth-placement-actions button.primary{background:#b88b27;color:#fffdf2;border-color:#805e18}.earth-placement-actions button:disabled{opacity:.55;cursor:wait}.earth-object-ready{margin-top:10px;padding:8px;background:#e8f0ef;border-radius:6px;color:#416069;font-size:9px;line-height:1.4}.earth-entry{margin-top:10px}.earth-enter-button{width:100%;border:1px solid #365e6c;background:#173f4d;color:#f5f1df;border-radius:8px;padding:10px 11px;display:grid;gap:2px;text-align:left;cursor:pointer;box-shadow:0 5px 14px #18384624}.earth-enter-button:hover{background:#205667}.earth-enter-button span{justify-self:end;color:#d7b85f;font-size:9px;font-weight:900;letter-spacing:.05em}.earth-enter-button strong{font-size:12px}.earth-enter-button small{color:#b9c8c8;font-size:9px;line-height:1.35}
       .earth-candidate{position:absolute;right:14px;top:58px;width:285px;background:#fffcf1ee;border:1px solid #b4933f;border-radius:9px;padding:12px 14px;display:grid;gap:5px;font-size:11px}.earth-candidate button{position:absolute;right:7px;top:5px;border:0;background:none;font-size:18px}.earth-candidate small{letter-spacing:.12em;color:#80651d;font-weight:800}.earth-candidate strong{font-size:23px;color:#9a7622}.earth-candidate p{margin:4px 0}.earth-candidate em{font-size:9px;color:#8a7d65}

@@ -2,8 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
-import { planEarthSurfaceRoute, type EarthSurfaceRoutePlanResult } from '@/lib/game/earthSurfaceRouting'
+import { earthRoutingWindowFor, planEarthSurfaceRoute, type EarthSurfaceRoutePlanResult } from '@/lib/game/earthSurfaceRouting'
 import type { EarthSurfaceVehicleRole } from '@/lib/game/earthSurfaceLogistics'
+import {
+  earthOverlayNodeFromInventory,
+  earthOverlayRouteFromPlan,
+  earthRouteFailureWarning,
+  type EarthTransportOverlayNode,
+} from '@/lib/game/earthTransportOverlay'
+import { useEarthTransportOverlayStore } from '@/lib/store/earthTransportOverlayStore'
 import { localMetersToGeo, type GeoPoint } from '@/lib/world/spatial/earthSpatial'
 import type { ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
 
@@ -126,13 +133,6 @@ const STATUS_LABELS: Record<string, string> = {
 }
 const TERMINAL = new Set(['completed', 'cancelled', 'failed'])
 
-function distanceMeters(a: GeoPoint, b: GeoPoint) {
-  const lat = (a.lat + b.lat) * Math.PI / 360
-  const dx = (b.lon - a.lon) * 111_320 * Math.cos(lat)
-  const dy = (b.lat - a.lat) * 110_540
-  return Math.hypot(dx, dy)
-}
-
 function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
 }
@@ -146,16 +146,6 @@ function pointForEntity(entity: SpatialEntity, origin?: GeoPoint | null): GeoPoi
     return localMetersToGeo({ eastM: Number(entity.x_m), northM: Number(entity.y_m) }, origin)
   } catch {
     return null
-  }
-}
-
-function routeFailureLabel(result: EarthSurfaceRoutePlanResult) {
-  if (!('reason' in result)) return null
-  switch (result.reason) {
-    case 'no-routable-roads': return 'Im geladenen OSM-Ausschnitt gibt es kein geeignetes Fahrzeugnetz.'
-    case 'source-access-unresolved': return 'Die Zufahrt vom Quellknoten zur beobachteten Straße ist noch nicht aufgelöst.'
-    case 'destination-access-unresolved': return 'Die Zufahrt vom Straßennetz zum Zielknoten ist noch nicht aufgelöst.'
-    case 'disconnected-road-network': return 'Quelle und Ziel liegen in getrennten oder richtungsbedingt nicht verbundenen Straßennetzen.'
   }
 }
 
@@ -333,11 +323,9 @@ export default function EarthSurfaceLogisticsConsole() {
     setRoute(null)
     setMessage(null)
     try {
-      const directDistance = distanceMeters(source.point, destination.point)
-      if (directDistance > 10_500) throw new Error('Die beiden Knoten liegen außerhalb des derzeit maximal 6-km-lokalen OSM-Routingfensters.')
-      const center = { lat: (source.point.lat + destination.point.lat) / 2, lon: (source.point.lon + destination.point.lon) / 2 }
-      const radiusKm = Math.min(6, Math.max(.6, directDistance / 2000 + .75))
-      const query = new URLSearchParams({ lat: String(center.lat), lon: String(center.lon), radiusKm: String(radiusKm) })
+      const window = earthRoutingWindowFor(source.point, destination.point)
+      if (!window.ok) throw new Error('Die beiden Knoten liegen außerhalb des derzeit maximal 6-km-lokalen OSM-Routingfensters.')
+      const query = new URLSearchParams({ lat: String(window.center.lat), lon: String(window.center.lon), radiusKm: String(window.radiusKm) })
       const response = await fetch(`/api/earth/region?${query}`, { cache: 'no-store' })
       const json = await response.json() as RegionPayload
       if (!response.ok || !json.ok) throw new Error(json.error ?? 'OSM-Routingdaten konnten nicht geladen werden')
@@ -351,8 +339,47 @@ export default function EarthSurfaceLogisticsConsole() {
     }
   }
 
-  const routeFailure = route ? routeFailureLabel(route) : null
+  const routeFailure = route ? earthRouteFailureWarning(route) : null
   const routeReady = Boolean(route && !('reason' in route))
+  const plannedOverlay = useMemo(() => route && !('reason' in route) && source && destination
+    ? earthOverlayRouteFromPlan({
+      id: `planned:${source.id}:${destination.id}`,
+      label: `${source.label} → ${destination.label}`,
+      statusLabel: 'Earth-validierte Route',
+      plan: route,
+    })
+    : null, [route, source, destination])
+
+  // The Earth map draws whatever transport context is being prepared here. Only the
+  // derived overlay is shared; inventories, vehicles and jobs stay Core-owned.
+  const publishOverlay = useEarthTransportOverlayStore(state => state.publish)
+  const clearOverlay = useEarthTransportOverlayStore(state => state.clear)
+  const overlayNodes = useMemo<EarthTransportOverlayNode[]>(() => {
+    const nodes: EarthTransportOverlayNode[] = []
+    for (const node of [source, destination]) {
+      if (!node) continue
+      const overlayNode = earthOverlayNodeFromInventory({
+        id: node.id,
+        label: node.label,
+        inventory_kind: node.inventory_kind,
+        subject_type: node.subject_type,
+        subject_id: node.subject_id,
+        metadata: node.metadata,
+      }, node.point)
+      if (overlayNode) nodes.push(overlayNode)
+    }
+    return nodes
+  }, [source, destination])
+
+  useEffect(() => {
+    publishOverlay('logistics-console', {
+      nodes: overlayNodes,
+      planned: plannedOverlay,
+      warnings: routeFailure ? [routeFailure] : [],
+    })
+  }, [publishOverlay, overlayNodes, plannedOverlay, routeFailure])
+
+  useEffect(() => () => clearOverlay('logistics-console'), [clearOverlay])
 
   let blocker: string | null = null
   if (!source || !destination || source.id === destination.id) blocker = 'Quelle und Ziel müssen zwei verschiedene räumliche Earth-Knoten sein.'
