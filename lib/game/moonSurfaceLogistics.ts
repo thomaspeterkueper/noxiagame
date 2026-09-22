@@ -34,7 +34,7 @@ export const SHACKLETON_SURFACE_LOGISTICS_CHAIN: readonly MoonSurfaceChainNode[]
   {
     role: 'logistics-hub',
     label: 'Warenhaus / Logistik-Hub',
-    purpose: 'Bündelt lokale Warenströme, Fahrzeugzuweisung und Weiterverteilung in der Shackleton-Siedlung.',
+    purpose: 'Bündelt ankommende Fracht, Bau- und Wartungsmaterial, lokale Warenströme, Fahrzeugzuweisung und Weiterverteilung in der Shackleton-Siedlung.',
   },
   {
     role: 'shuttle-port-storage',
