@@ -157,7 +157,7 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     // Memory is downstream of the authoritative persisted event. Use its DB UUID,
     // never the synthetic in-memory encounter id, as source_event_id.
     const persistedEvent: PopulationEvent = { ...event, id: insertedEvent.id }
-    const memoryResult = await persistPopulationEventMemory(supabase, persistedEvent)
+    const memoryResult = await persistPopulationEventMemory(supabase, persistedEvent, { projectRelationship: false })
     if (memoryResult.errors.length) throw new Error(memoryResult.errors.join('; '))
   }
 
