@@ -26,7 +26,7 @@ const EARTH_VIEW_HALF_SPAN_M = 250_000
 const EARTH_COLLISION_LAT_SPAN_DEG = .03
 // Playability: keep the first Earth decision small. This is a presentation
 // gate only; POST remains authoritative and existing buildings stay valid.
-const EARTH_STARTER_BUILDABLE_IDS = new Set(['solar', 'warehouse'])
+const EARTH_STARTER_BUILDABLE_IDS = new Set(['solar', 'habitat'])
 
 type StartBody = {
   buildableId?: string
