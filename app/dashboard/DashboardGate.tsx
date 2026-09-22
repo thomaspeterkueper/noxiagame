@@ -83,7 +83,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
 
   return <>
     <DashboardClient locations={locations} prices={prices} orders={orders} autoOpenJourney={autoOpenJourney} />
-    <DashboardMoonSurface />
+    <DashboardMoonSurface locations={locations} prices={prices} orders={orders} />
     <DashboardProfileBridge />
     <DashboardHudManager />
     <DashboardLocationDockManager />
