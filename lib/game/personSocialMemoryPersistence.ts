@@ -41,7 +41,7 @@ function relationshipFromRow(row: any): PersonRelationship | null {
   }
 }
 
-export async function persistPopulationEventMemory(supabase: any, event: PopulationEvent): Promise<SocialMemoryProjectionResult> {
+export async function persistPopulationEventMemory(supabase: any, event: PopulationEvent, options: { projectRelationship?: boolean } = {}): Promise<SocialMemoryProjectionResult> {
   const result: SocialMemoryProjectionResult = { considered: 1, memoriesInserted: 0, memoriesExisting: 0, relationshipsUpdated: 0, errors: [] }
   const memory = memoryFromPopulationEvent(event)
   if (!memory) return result
@@ -66,7 +66,7 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
   }
   result.memoriesInserted++
 
-  if (!memory.otherPersonId) return result
+  if (!memory.otherPersonId || options.projectRelationship === false) return result
   const { data: relationRow, error: relationError } = await supabase
     .from('person_relationships')
     .select('id, person_id, other_person_id, relationship_type, familiarity, trust, affinity, last_interaction_tick')
