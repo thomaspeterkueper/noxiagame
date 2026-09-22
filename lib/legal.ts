@@ -29,11 +29,26 @@ function resolveTemplate(text: string, impressum: ImpressumData): string {
     .replace(/\{\{\s*impressum\.updated\s*\}\}/g, impressum.updated);
 }
 
+async function fetchText(path: string): Promise<string> {
+  const response = await fetch(`${KG_RAW}/${path}`, {});
+  if (!response.ok) throw new Error(`Legal source ${path} returned HTTP ${response.status}`);
+  return response.text();
+}
+
+async function fetchJson<T>(path: string): Promise<T> {
+  const raw = await fetchText(path);
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`Legal source ${path} did not return valid JSON`);
+  }
+}
+
 export async function fetchLegalContent(): Promise<LegalContent> {
   const [impressumRaw, privacyRaw, termsRaw] = await Promise.all([
-    fetch(`${KG_RAW}/registry/legal/impressum-master.json`, {}).then(r => r.json()),
-    fetch(`${KG_RAW}/registry/legal/datenschutz.de.md`, {}).then(r => r.text()),
-    fetch(`${KG_RAW}/registry/legal/terms.de.md`, {}).then(r => r.text()),
+    fetchJson<{ responsible?: Partial<ImpressumData>; updated?: string }>('registry/legal/impressum-master.json'),
+    fetchText('registry/legal/datenschutz.de.md'),
+    fetchText('registry/legal/terms.de.md'),
   ]);
 
   const impressum: ImpressumData = {
