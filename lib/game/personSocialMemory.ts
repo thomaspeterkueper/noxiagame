@@ -16,7 +16,7 @@ export function memoryFromPopulationEvent(event: PopulationEvent): PersonMemory 
   const p = event.payload ?? {}
   let kind: PersonMemoryKind | null = null
   let defaultValence = 0, defaultTrust = 0, defaultSalience = 0.4
-  if (event.eventType === 'npc_social_interaction' || event.eventType === 'social_interaction') { if (!event.relatedPersonId) return null; kind = 'interaction'; defaultValence = 0.2; defaultTrust = 0.04; defaultSalience = 0.45 }
+  if (event.eventType === 'npc_social_interaction' || event.eventType === 'social_interaction' || event.eventType === 'npc_met_person') { if (!event.relatedPersonId) return null; kind = 'interaction'; defaultValence = 0.2; defaultTrust = 0.04; defaultSalience = 0.45 }
   else if (event.eventType === 'person_assistance' || event.eventType === 'npc_assistance') { if (!event.relatedPersonId) return null; kind = 'assistance'; defaultValence = 0.65; defaultTrust = 0.12; defaultSalience = 0.7 }
   else if (event.eventType === 'person_conflict' || event.eventType === 'npc_conflict') { if (!event.relatedPersonId) return null; kind = 'conflict'; defaultValence = -0.65; defaultTrust = -0.15; defaultSalience = 0.75 }
   else if (event.eventType === 'shared_work') { if (!event.relatedPersonId) return null; kind = 'shared_work'; defaultValence = 0.25; defaultTrust = 0.05; defaultSalience = 0.5 }
