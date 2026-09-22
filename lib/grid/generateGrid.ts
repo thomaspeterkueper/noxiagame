@@ -5,8 +5,8 @@ export const COLS=12
 export const ROWS=8
 export type CellOwner='own'|'other'|'state'|null
 export interface Cell{type:string;owner:CellOwner;anomaly?:boolean}
-export interface GridEntity{entity_id:string;profile_id:string|null;is_state_owned?:boolean;entity_type:string;tile_row:number;tile_col:number;owner_class?:string}
-export interface GridPending{buildable_id:string;tile_row:number;tile_col:number;status:string}
+export interface GridEntity{entity_id:string;profile_id:string|null;is_state_owned?:boolean;entity_type:string;tile_row:number|null;tile_col:number|null;owner_class?:string}
+export interface GridPending{buildable_id:string;tile_row:number|null;tile_col:number|null;status:string}
 
 export function seededRandom(seed:number,i:number){const x=Math.sin(seed+i)*10000;return x-Math.floor(x)}
 export function isBuildable(tileType:string){return tileType==='tile_surface'||tileType==='tile_grass'||tileType==='tile_urban'||tileType==='tile_farmland'||tileType==='tile_city'||tileType==='tile_spaceport'||tileType==='tile_mare'||tileType==='tile_highland'||tileType==='tile_research'||tileType==='tile_ice'||tileType==='tile_helium3'||tileType==='tile_titanium'||tileType==='tile_dust'||tileType==='tile_plateau'||tileType==='tile_metal'||tileType==='tile_crater'||tileType==='tile_shaft'||tileType.startsWith('road_')}
@@ -18,14 +18,24 @@ function addSeedRoadNetwork(grid:Cell[][],slug:string,rows:number,cols:number){i
 function addRoadNetwork(grid:Cell[][],population:number,userId:string|undefined,rows:number,cols:number){const centerR=Math.floor(rows/2);if(population<=200)return;for(let c=0;c<cols;c++)if(isBuildable(grid[centerR][c].type))grid[centerR][c]={type:'road',owner:userId?'state':null};const span=Math.min(Math.floor(population/400)+1,3);for(let q=1;q<=span;q++){const qc=Math.round(cols*q/(span+1)),reach=Math.min(2+Math.floor(population/600),rows);for(let r=centerR-reach;r<=centerR+reach;r++){if(r<0||r>=rows)continue;if(isBuildable(grid[r][qc].type))grid[r][qc]={type:'road',owner:userId?'state':null}}}}
 function autotileRoads(grid:Cell[][],rows:number,cols:number){const isRoad=(r:number,c:number)=>r>=0&&r<rows&&c>=0&&c<cols&&grid[r][c].type.startsWith('road');for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){if(grid[r][c].type!=='road')continue;let mask=0;if(isRoad(r-1,c))mask|=1;if(isRoad(r,c+1))mask|=2;if(isRoad(r+1,c))mask|=4;if(isRoad(r,c-1))mask|=8;grid[r][c]={type:`road_${mask}`,owner:null}}}
 
+function isValidTileCoordinate(value:number|null,limit:number):value is number{return Number.isInteger(value)&&value!==null&&value>=0&&value<limit}
+
 export function generateGrid(slug:string,population:number,entities:GridEntity[],pending:GridPending[],userId?:string,cols:number=COLS,rows:number=ROWS):Cell[][]{
  const grid:Cell[][]=[],seed=slug.split('').reduce((a,c)=>a+c.charCodeAt(0),0)
  for(let r=0;r<rows;r++){const row:Cell[]=[];for(let c=0;c<cols;c++){const fixed=getFixedTerrain(slug,r,c);row.push({type:fixed??fallbackTerrain(slug,seed,r,c,cols),owner:null})}grid.push(row)}
  autotilePrefix(grid,'river','river_')
  if(slug==='mars')addSeedRoadNetwork(grid,slug,rows,cols);else addRoadNetwork(grid,population,userId,rows,cols)
- for(const e of entities){if(e.tile_row<0||e.tile_row>=rows||e.tile_col<0||e.tile_col>=cols)continue;if(e.entity_type==='building'&&e.entity_id==='road'){grid[e.tile_row][e.tile_col]={type:'road',owner:null};continue}const owner:CellOwner=!userId?null:e.owner_class==='STATE'||e.owner_class==='CORPORATION'||e.profile_id===null?'state':e.profile_id===userId?'own':'other';grid[e.tile_row][e.tile_col]={type:`building_${e.entity_id}`,owner}}
+ for(const e of entities){
+  if(!isValidTileCoordinate(e.tile_row,rows)||!isValidTileCoordinate(e.tile_col,cols))continue
+  if(e.entity_type==='building'&&e.entity_id==='road'){grid[e.tile_row][e.tile_col]={type:'road',owner:null};continue}
+  const owner:CellOwner=!userId?null:e.owner_class==='STATE'||e.owner_class==='CORPORATION'||e.profile_id===null?'state':e.profile_id===userId?'own':'other'
+  grid[e.tile_row][e.tile_col]={type:`building_${e.entity_id}`,owner}
+ }
  autotileRoads(grid,rows,cols)
- for(const p of pending)if(p.tile_row>=0&&p.tile_row<rows&&p.tile_col>=0&&p.tile_col<cols)grid[p.tile_row][p.tile_col]={type:p.status==='building'?'building_construction':`building_${p.buildable_id}`,owner:null}
+ for(const p of pending){
+  if(!isValidTileCoordinate(p.tile_row,rows)||!isValidTileCoordinate(p.tile_col,cols))continue
+  grid[p.tile_row][p.tile_col]={type:p.status==='building'?'building_construction':`building_${p.buildable_id}`,owner:null}
+ }
  return grid
 }
 function sides(type:string,prefix:string){const m=type.startsWith(prefix)?parseInt(type.slice(prefix.length),10)||0:0;return{n:!!(m&1),o:!!(m&2),s:!!(m&4),w:!!(m&8)}}
