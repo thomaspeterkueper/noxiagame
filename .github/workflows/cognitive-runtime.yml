@@ -1,0 +1,26 @@
+name: Cognitive runtime
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/cognition/**'
+      - 'lib/game/population/observation.ts'
+      - 'lib/game/population/decisionSufficiency.ts'
+      - 'docs/core/COGNITIVE_RUNTIME.md'
+      - '.github/workflows/cognitive-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/cognition/**'
+
+jobs:
+  cognitive-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/cognition/runtime.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .cognitive-runtime-test
+      - run: node .cognitive-runtime-test/game/cognition/runtime.test.js
