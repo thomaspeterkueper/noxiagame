@@ -1,0 +1,24 @@
+name: Evidence hypothesis contract
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/hypothesis.ts'
+      - 'lib/game/population/hypothesis.test.ts'
+      - 'docs/core/EVIDENCE_HYPOTHESIS_CONTRACT.md'
+      - '.github/workflows/evidence-hypothesis.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/population/hypothesis.ts'
+      - 'lib/game/population/hypothesis.test.ts'
+jobs:
+  hypothesis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/population/hypothesis.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .hypothesis-test
+      - run: node .hypothesis-test/game/population/hypothesis.test.js
