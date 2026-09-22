@@ -1,7 +1,7 @@
 ---
 id: EXT-OTA-NOXIA-20260911-REPRODUCTIVE-OBSTETRIC-CAPABILITY-NOTICE
 title: Schwangerschaft, Geburt und Neonatologie als eigenständige Siedlungs-Capability berücksichtigen
-status: open
+status: done
 source: OTA
 target: NOXIA
 created: 2026-09-11
@@ -54,3 +54,7 @@ Diese Capabilities können später aus OTA-/Engineering-Entitäten read-only ref
 ## Abnahme
 
 Erledigt, wenn NOXIA `OTA-SCI-0086` als Evidenzreferenz kennt und die spätere Population-/Siedlungslogik reproduktive Versorgung als getrennte Capability aufnehmen kann, ohne wissenschaftlich unbelegte Zahlen als Kanon zu behandeln.
+
+## NOXIA closure — 2026-09-22
+
+Implemented as a descriptive settlement-capability contract in `lib/game/population/settlementCapabilities.ts`, referencing OTA-SCI-0086 v1.2 and the Engineering gravity-human-environment r1 profile. Capabilities are independent and no biological/gameplay values are inferred.

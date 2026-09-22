@@ -1,6 +1,6 @@
 # EXT-OTA-NOXIA-20260911 — Child Development / Gravity Capability Notice
 
-**Status:** open  
+**Status:** done  
 **From:** OTA  
 **To:** NOXIA  
 **Date:** 2026-09-11
@@ -41,3 +41,7 @@ Nur als Anknüpfungspunkte nach technischer/narrativer Klärung:
 - evacuation/diversion capability.
 
 NOXIA bleibt Source of Truth für Runtime, Kosten, Unlocks und Balancing.
+
+## NOXIA closure — 2026-09-22
+
+Implemented as a descriptive settlement-capability contract in `lib/game/population/settlementCapabilities.ts`, referencing OTA-SCI-0086 v1.2 and the Engineering gravity-human-environment r1 profile. Capabilities are independent and no biological/gameplay values are inferred.
