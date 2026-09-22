@@ -64,7 +64,14 @@ export function assessHypothesis(definition: EpistemicHypothesisDefinition, know
   }
 
   const prior = clampUnit(definition.prior)
-  const confidence = clampUnit((prior + support) / Math.max(1, 1 + support + contradiction))
+  const supportWeight = definition.supporting.reduce((sum, rule) => sum + Math.max(0, rule.weight), 0)
+  const contradictionWeight = (definition.contradicting ?? []).reduce((sum, rule) => sum + Math.max(0, rule.weight), 0)
+  const supportRatio = supportWeight > 0 ? clampUnit(support / supportWeight) : 0
+  const contradictionRatio = contradictionWeight > 0 ? clampUnit(contradiction / contradictionWeight) : 0
+  // Evidence updates a bounded prior instead of dividing by accumulated evidence.
+  // This lets independent supporting observations increase confidence while
+  // contradictory observations reduce it without ever exposing ground truth.
+  const confidence = clampUnit(prior + (1 - prior) * supportRatio * (1 - contradictionRatio))
   let status: HypothesisAssessment['status'] = 'unsupported'
   if (support > 0 && contradiction > 0) status = 'contested'
   else if (confidence >= 0.75 && missingSupportingRules === 0) status = 'supported'
