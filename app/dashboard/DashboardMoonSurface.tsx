@@ -96,6 +96,25 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
 
   if (location !== 'moon') return null
 
+  const getMapSvg = () => document.querySelector<SVGSVGElement>('.noxia-dashboard-moon-surface .earth-map svg')
+
+  const zoomMap = (direction: 'in' | 'out') => {
+    const svg = getMapSvg()
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    svg.dispatchEvent(new WheelEvent('wheel', {
+      deltaY: direction === 'in' ? -220 : 220,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      bubbles: true,
+      cancelable: true,
+    }))
+  }
+
+  const centerMap = () => {
+    document.querySelector<HTMLButtonElement>('.noxia-dashboard-moon-surface .earth-focus')?.click()
+  }
+
   const selectFromMap = (event: MouseEvent<HTMLElement>) => {
     const target = event.target instanceof Element ? event.target : null
     const button = target?.closest('[role="button"][aria-label$=" auswählen"]')
@@ -140,6 +159,12 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
       <div className="moon-context-label">
         <strong>LRO / LOLA · Shackleton</strong>
         <span>NASA-Terrainkontext · lokales ENU-Netz bleibt metrisch separat</span>
+      </div>
+
+      <div className="moon-map-controls" aria-label="Mondkarten-Steuerung">
+        <button type="button" onClick={centerMap}>Zentrieren</button>
+        <button type="button" aria-label="Hineinzoomen" onClick={() => zoomMap('in')}>+</button>
+        <button type="button" aria-label="Herauszoomen" onClick={() => zoomMap('out')}>−</button>
       </div>
 
       <ShackletonSurfaceMap />
@@ -294,6 +319,28 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
         }
         .moon-context-label strong { color: #d7b96e; letter-spacing: .08em; }
         .moon-context-label span { color: #8ea2ad; }
+        .moon-map-controls {
+          position: fixed;
+          z-index: 2290;
+          top: calc(var(--noxia-topbar-h, 44px) + 14px);
+          left: 318px;
+          display: flex;
+          gap: 6px;
+          pointer-events: auto;
+        }
+        .moon-map-controls button {
+          min-width: 34px;
+          height: 34px;
+          border: 1px solid #506b73;
+          border-radius: 7px;
+          background: rgba(245,242,232,.95);
+          color: #17313c;
+          font: 800 11px system-ui,sans-serif;
+          cursor: pointer;
+          box-shadow: 0 2px 10px rgba(12,27,34,.18);
+        }
+        .moon-map-controls button:first-child { padding:0 12px; }
+        .moon-map-controls button:hover { background:#fffaf0; border-color:#9b7a2c; }
         .moon-building-actions {
           position: fixed;
           z-index: 2290;
@@ -347,6 +394,17 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
         }
         .noxia-dashboard-moon-surface :global(.map-card svg > rect:nth-of-type(2)) {
           opacity: .3 !important;
+        }
+        .noxia-dashboard-moon-surface :global(.earth-map svg g[role='button'] > rect:nth-of-type(2)) {
+          fill-opacity: .04 !important;
+          stroke-opacity: .28 !important;
+        }
+        .noxia-dashboard-moon-surface :global(.earth-map svg g[role='button'] > ellipse) {
+          opacity: .14 !important;
+        }
+        @media(max-width:760px){
+          .moon-map-controls{left:auto;right:82px}
+          .moon-map-controls button:first-child{display:none}
         }
       `}</style>
     </section>
