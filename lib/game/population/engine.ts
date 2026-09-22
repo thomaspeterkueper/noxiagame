@@ -6,6 +6,7 @@ import { decidePopulationAction as decideFromState, type PopulationDecisionConte
 import { derivePopulationEncounters, type PopulationEncounter } from './encounters'
 import { projectEncounterRelationship } from './encounterProjection'
 import { resolvedPresenceCandidates } from './presence'
+import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
 type SupabaseLike = any
@@ -142,7 +143,7 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
   if (eventLookupError) throw eventLookupError
 
   if (!existingEvents?.length) {
-    const { error: insertError } = await supabase.from('population_events').insert({
+    const { data: insertedEvent, error: insertError } = await supabase.from('population_events').insert({
       tick: event.tick,
       event_type: event.eventType,
       actor_person_id: event.actorPersonId,
@@ -151,8 +152,13 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
       subject_type: event.subjectType,
       subject_ref: event.subjectRef,
       payload: event.payload,
-    })
+    }).select('id').single()
     if (insertError) throw insertError
+    // Memory is downstream of the authoritative persisted event. Use its DB UUID,
+    // never the synthetic in-memory encounter id, as source_event_id.
+    const persistedEvent: PopulationEvent = { ...event, id: insertedEvent.id }
+    const memoryResult = await persistPopulationEventMemory(supabase, persistedEvent)
+    if (memoryResult.errors.length) throw new Error(memoryResult.errors.join('; '))
   }
 
   const { data: relationshipRow, error: relationshipError } = await supabase
