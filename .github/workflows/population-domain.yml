@@ -41,4 +41,10 @@ jobs:
       - name: Validate Core invariants
         run: npm run test:core-invariants
       - name: Reproduce production Next build
+        env:
+          # CI-only placeholders: page-data collection requires Supabase configuration even
+          # though population tests do not access Supabase. No production credentials here.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
         run: npm run build
