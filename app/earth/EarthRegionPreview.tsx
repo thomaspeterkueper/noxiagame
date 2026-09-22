@@ -298,7 +298,7 @@ export default function EarthRegionPreview(){
       </div>}
 
       {active&&!selectedSpot&&!selectedWorldObject&&<div className="earth-candidate"><button onClick={()=>setSelected(null)}>×</button><small>PRÜFSTANDORT {active.shortlistLabel}</small><strong>{active.score.toFixed(0)} / 100</strong><span>{active.elevationM.toFixed(0)} m Höhe · {active.slopePercent.toFixed(1)} % Neigung · {active.reliefM.toFixed(0)} m Relief</span><span>Straße {active.roadDistanceM??'–'} m · Bahn {active.railDistanceM??'–'} m</span><p>{active.reasons.join(' · ')}</p><em>{active.shortlistReason}. Noch keine kanonische Platzierung.</em></div>}
-      <div className="earth-help">{selectedWorldObject?'Weltobjekt gewählt · Details links':selectedBuild?`${selectedBuild.name} · ausrichten · Bau bestätigen`:selectedSpot?'Stelle gewählt · Gelände prüfen · Bauen':data.detail?'Stelle anklicken · Mausrad: Zoom · Ziehen: Karte':'Stadt/Punkt öffnen oder Stelle direkt untersuchen'}</div>
+      <div className="earth-help">{selectedWorldObject?'Weltobjekt gewählt · Details links':selectedBuild?`${selectedBuild.name} · ausrichten · Bau bestätigen`:selectedSpot?'Stelle gewählt · Gelände prüfen · Bauen':data.detail?'ERSTER SCHRITT · Klicke auf eine freie Stelle in Selmecke, prüfe das Gelände und wähle „Bauen“.':'Stadt/Punkt öffnen oder Stelle direkt untersuchen'}</div>
     </div>
 
     <div className="earth-foot"><span>{candidateData?.attribution||data.attribution}</span><span>{data.detail?`Lokale OSM-Details · ${data.featureCount??0} Objekte`:'DEM-Relief: Copernicus/Open-Meteo · Bebaubarkeit aus metrischen Terrain-Zellen'}</span></div>
