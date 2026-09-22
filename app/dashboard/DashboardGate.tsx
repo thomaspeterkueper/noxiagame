@@ -1,8 +1,8 @@
 'use client'
 
 // DashboardGate.tsx
-// Aktualisiert: 19.09.2026 — Earth→LEO Raumflugkonsole im Cockpit mounten
-// Version:      0.7.1
+// Aktualisiert: 22.09.2026 — Earth-Navigation strikt auf den Earth-Kontext begrenzen
+// Version:      0.7.2
 import React, { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
@@ -39,6 +39,7 @@ function LoadingScreen({ label }: { label: string }) {
 export default function DashboardGate({ locations, prices, orders }: { locations: any[]; prices: any[]; orders: any[] }) {
   const loaded = useGameStore(s => s.loaded)
   const loadFromServer = useGameStore(s => s.loadFromServer)
+  const location = useGameStore(s => s.location)
 
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const [existingUsername, setExistingUsername] = useState<string | undefined>(undefined)
@@ -95,7 +96,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardFeedOverlay />
     <DashboardWorldDevelopmentOverlay />
     <EarthInteractionManager />
-    <EarthRegionSwitcherOverlay />
+    {location === 'earth' && <EarthRegionSwitcherOverlay />}
     <EarthOrbitFlightPanel />
   </>
 }
