@@ -417,6 +417,9 @@ export default function ShackletonSurfaceMap() {
 
   const selectedDef = available.find(def => def.id === selectedBuildId) ?? null
   const selectedWorldObject = entities.find(entity => entity.id === selectedWorldObjectId) ?? null
+  const selectedCanBuild = selectedDef
+    ? (selectedDef.requirements?.canBuild ?? Number(spatial?.profile?.credits ?? 0) >= selectedDef.cost)
+    : false
   const inventoryById = useMemo(() => new Map(inventories.map(item => [item.id, item])), [inventories])
   const pxPerMeterX = (VIEW_W - PAD * 2) / bounds.spanX
   const pxPerMeterY = (VIEW_H - PAD * 2) / bounds.spanY
@@ -648,7 +651,7 @@ export default function ShackletonSurfaceMap() {
                 <div className="earth-rotation-presets">{[0, 90, 180, 270].map(value => <button key={value} type="button" className={rotationDeg === value ? 'active' : ''} onClick={() => setRotationDeg(value)}>{value}°</button>)}</div>
                 <div className="earth-rotation-fine"><button type="button" onClick={() => setRotationDeg(value => normalizeRotation(value - 15))}>−15°</button><input aria-label="Gebäuderotation" type="range" min="0" max="359" step="1" value={rotationDeg} onChange={event => setRotationDeg(normalizeRotation(Number(event.currentTarget.value)))}/><button type="button" onClick={() => setRotationDeg(value => normalizeRotation(value + 15))}>+15°</button></div>
                 <small className="earth-preview-note">Gelb: metrischer Footprint · gestrichelt: lokaler Freiraum. Die gespeicherte Rotation wird vom Weltobjekt übernommen.</small>
-                <div className="earth-placement-actions"><button type="button" onClick={() => { setSelectedBuildId(''); setRotationDeg(0) }}>Zurück</button><button type="button" className="primary" disabled={placing || !selectedDef.requirements?.canBuild} onClick={() => void placeBuilding()}>{placing ? 'Prüfe …' : 'Jetzt bauen'}</button></div>
+                <div className="earth-placement-actions"><button type="button" onClick={() => { setSelectedBuildId(''); setRotationDeg(0) }}>Zurück</button><button type="button" className="primary" disabled={placing || !selectedCanBuild} onClick={() => void placeBuilding()}>{placing ? 'Prüfe …' : 'Jetzt bauen'}</button></div>
               </div>
             : <div className="earth-build-picker">
                 <div className="earth-build-picker-head"><b>Gebäude wählen</b><button type="button" onClick={() => setBuildMenuOpen(false)}>zurück</button></div>
