@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert'
-import { fillLocalElevationHoles, reconstructLocalTerrain } from './terrainReconstruction'
+import { analyzeLocalTerrainAt, fillLocalElevationHoles, reconstructLocalTerrain } from './terrainReconstruction'
 
 const grid = {
   stepM: 100,
@@ -28,6 +28,12 @@ const grid = {
   assert.ok(surface.coverage01 > 0.9)
   assert.ok(surface.cells.some(cell => cell && cell.slopeDeg > 0))
   assert.ok(surface.cells.every(cell => !cell || (cell.hillshade01 >= 0 && cell.hillshade01 <= 1)))
+  assert.ok(surface.cells.every(cell => !cell || (cell.downhillAzimuthDeg >= 0 && cell.downhillAzimuthDeg < 360)))
+
+  const analysis = analyzeLocalTerrainAt(surface, 0, 0, 2)
+  assert.ok(analysis)
+  assert.ok((analysis?.localReliefM ?? 0) >= 0)
+  assert.ok((analysis?.sampleRadiusM ?? 0) > 0)
 }
 
 {
@@ -41,6 +47,7 @@ const grid = {
     ],
   }, { upsampleFactor: 3, maxHoleRadiusCells: 1, minNeighbourCount: 3 })
   assert.ok(sparse.coverage01 < 0.5, 'large NoData gaps must remain unresolved instead of being invented')
+  assert.equal(analyzeLocalTerrainAt(sparse, 0, 0), null, 'analysis must stay unresolved where the terrain surface is unknown')
 }
 
 console.log('terrainReconstruction.test: ok')
