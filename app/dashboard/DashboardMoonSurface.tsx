@@ -8,15 +8,12 @@ import BuildingInterior from './BuildingInterior'
 import ShipyardOverlay from './ShipyardOverlay'
 import SolarSystem from './SolarSystem'
 import SpaceportOverlay from './SpaceportOverlay'
+import SurfaceLogisticsOverlay from './SurfaceLogisticsOverlay'
 import WarehouseOverlay from './WarehouseOverlay'
 
 const NASA_LOLA_SHACKLETON = 'https://svs.gsfc.nasa.gov/vis/a000000/a004200/a004289/lro_south_pole_print.jpg'
 
-type Props = {
-  locations: any[]
-  prices: any[]
-  orders: any[]
-}
+type Props = { locations: any[]; prices: any[]; orders: any[] }
 
 const INTERIOR_ALIAS: Record<string, string> = {
   landing_pad_moon: 'landing_pad',
@@ -40,6 +37,7 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
   const [navigationOpen, setNavigationOpen] = useState(false)
   const [shipyardOpen, setShipyardOpen] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
+  const [logisticsOpen, setLogisticsOpen] = useState(false)
   const [tick, setTick] = useState(0)
 
   const moonLocation = useMemo(() => locations.find((item: any) => item.slug === 'moon') ?? null, [locations])
@@ -63,10 +61,7 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
     if (entityId === 'warehouse') { setWarehouseOpen(true); return }
     if (entityId === 'surface_workshop') { setShipyardOpen(true); return }
     if (entityId === 'surface_comms') { setNavigationOpen(true); return }
-    if (entityId === 'rover_yard') {
-      document.querySelector<HTMLElement>('.noxia-dashboard-moon-surface .earth-lower-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
-    }
+    if (entityId === 'rover_yard') { setLogisticsOpen(true); return }
     setInteriorEntity(entity)
   }
 
@@ -108,10 +103,12 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
       return Boolean(payload.ok)
     }} onClose={() => setWarehouseOpen(false)} />}
 
+    {logisticsOpen && <SurfaceLogisticsOverlay locationSlug="moon" locationName="Shackleton · Roverhof" onClose={() => setLogisticsOpen(false)} />}
+
     {interiorEntity && <div className="moon-modal" onClick={event => event.target === event.currentTarget && setInteriorEntity(null)}><div className="moon-interior-panel"><BuildingInterior entity={{ ...interiorEntity, entity_id: INTERIOR_ALIAS[interiorEntity.entity_id ?? ''] ?? interiorEntity.entity_id ?? 'unknown', entity_type: 'building', tile_row: 0, tile_col: 0, profile_id: interiorEntity.profile_id ?? null, owner_class: interiorEntity.owner_class ?? 'STATE' } as any} userId="" locationResources={currentResources as any} credits={credits} population={Number(moonLocation?.population ?? 0)} hasShipyard={Boolean(moonLocation?.has_shipyard)} currentTick={tick} shipRange={shipRange} currentLocationSlug="moon" onClose={() => setInteriorEntity(null)} onAction={handleInteriorAction} /></div></div>}
 
     <style jsx>{`
-      .noxia-dashboard-moon-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:auto;background:#070b0f url('${NASA_LOLA_SHACKLETON}') center 32%/cover fixed no-repeat;overscroll-behavior:contain}.noxia-dashboard-moon-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:linear-gradient(180deg,rgba(5,9,13,.38),rgba(5,9,13,.78));z-index:0}.moon-context-label{position:fixed;z-index:2;left:18px;bottom:calc(var(--noxia-cockpit-clearance,76px) + 10px);display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid rgba(189,213,225,.2);border-radius:8px;background:rgba(5,12,18,.72);backdrop-filter:blur(8px);color:#d7e3e8;font:10px/1.25 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none}.moon-context-label strong{color:#d7b96e;letter-spacing:.08em}.moon-context-label span{color:#8ea2ad}.moon-modal{position:fixed;inset:0;z-index:2400;display:grid;place-items:center;padding:1rem;background:rgba(2,7,12,.86)}.moon-navigation-panel,.moon-interior-panel{width:min(960px,96vw);max-height:94vh;overflow:auto;border:1px solid #40596a;border-radius:14px;background:#eef1ed;box-shadow:0 18px 60px rgba(0,0,0,.5)}.moon-navigation-panel{padding:1rem;background:#070b14}.moon-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;color:#d7b96e;font:800 11px/1.2 ui-monospace,monospace}.moon-modal-head button{border:1px solid #314756;border-radius:6px;background:transparent;color:#9cb0bb;padding:3px 9px;cursor:pointer}.noxia-dashboard-moon-surface :global(.earth-shell){position:relative;z-index:1}
+      .noxia-dashboard-moon-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:hidden;background:#070b0f url('${NASA_LOLA_SHACKLETON}') center 32%/cover fixed no-repeat;overscroll-behavior:contain}.noxia-dashboard-moon-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:linear-gradient(180deg,rgba(5,9,13,.38),rgba(5,9,13,.78));z-index:0}.moon-context-label{position:fixed;z-index:2;left:18px;bottom:calc(var(--noxia-cockpit-clearance,76px) + 10px);display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid rgba(189,213,225,.2);border-radius:8px;background:rgba(5,12,18,.72);backdrop-filter:blur(8px);color:#d7e3e8;font:10px/1.25 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none}.moon-context-label strong{color:#d7b96e;letter-spacing:.08em}.moon-context-label span{color:#8ea2ad}.moon-modal{position:fixed;inset:0;z-index:2400;display:grid;place-items:center;padding:1rem;background:rgba(2,7,12,.86)}.moon-navigation-panel,.moon-interior-panel{width:min(960px,96vw);max-height:94vh;overflow:auto;border:1px solid #40596a;border-radius:14px;background:#eef1ed;box-shadow:0 18px 60px rgba(0,0,0,.5)}.moon-navigation-panel{padding:1rem;background:#070b14}.moon-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;color:#d7b96e;font:800 11px/1.2 ui-monospace,monospace}.moon-modal-head button{border:1px solid #314756;border-radius:6px;background:transparent;color:#9cb0bb;padding:3px 9px;cursor:pointer}.noxia-dashboard-moon-surface :global(.earth-shell){position:relative;z-index:1;height:100%;min-height:0;overflow:hidden}.noxia-dashboard-moon-surface :global(.earth-lower-card),.noxia-dashboard-moon-surface :global(.earth-foot){display:none!important}
     `}</style>
   </section>
 }
