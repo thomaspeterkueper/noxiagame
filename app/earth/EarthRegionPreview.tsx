@@ -7,6 +7,7 @@ import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/gam
 import { constructionState } from '@/lib/game/constructionProgress'
 import { isEarthMapSurfaceTarget, shouldChooseEarthMapSpot } from '@/lib/world/spatial/earthMapInteraction'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
+import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
 type GeoPoint = { lat:number; lon:number }
@@ -29,9 +30,7 @@ const layerOrder=['farmland','forest','urban','water','industrial','public','bui
 const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,sites:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=300
 const LOCAL_DETAIL_RADIUS_KM=.65
-// Kanonischer NOXIA-Referenzstandort (siehe app/api/earth/region/route.ts,
-// SELMECKE_REFERENCE_FEATURE) -- Default-Startansicht statt der 3km-Uebersicht.
-const SELMECKE_DEFAULT_FOCUS:GeoPoint={lat:51.33745,lon:7.97975}
+const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
 const EARTH_DATA_VERSION='20260906-local-detail-1'
 
 function styleFor(type:string,tags:Record<string,string>){

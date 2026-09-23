@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
+import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 
 const EARTH_REGION_COOKIE = 'noxia-earth-region'
 const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
@@ -8,7 +9,7 @@ const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
 const EARTH_VIEW_LABEL_COOKIE = 'noxia-earth-view-label'
 const SAUERLAND_REGION = 'earth-sauerland'
 const NAMIBIA_REGION = 'earth-namibia-erongo'
-const SELMECKE = { lat: 51.33745, lon: 7.97975, label: 'Selmecke · NOXIA-Referenzstandort' }
+const SELMECKE = { ...SELMECKE_REFERENCE_SITE.point, label: SELMECKE_REFERENCE_SITE.label }
 const SAUERLAND_ORIGIN = { lat: 51.325, lon: 8.005 }
 const NAMIBIA_ORIGIN = { lat: -22.9576, lon: 14.5053 }
 
