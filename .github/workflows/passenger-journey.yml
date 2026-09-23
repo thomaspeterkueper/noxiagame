@@ -5,7 +5,9 @@ on:
     paths:
       - 'lib/game/passengerJourney.ts'
       - 'lib/game/passengerJourney.test.ts'
+      - 'lib/world/spatial/earthArrivalNodes.ts'
       - 'lib/world/spatial/earthPassengerJourney.ts'
+      - 'lib/world/spatial/earthPassengerJourney.test.ts'
       - 'app/api/earth/journey/draft/route.ts'
       - 'app/earth/EarthLandmarkRegionFocus.tsx'
       - '.github/workflows/passenger-journey.yml'
@@ -14,6 +16,9 @@ on:
     paths:
       - 'lib/game/passengerJourney.ts'
       - 'lib/game/passengerJourney.test.ts'
+      - 'lib/world/spatial/earthArrivalNodes.ts'
+      - 'lib/world/spatial/earthPassengerJourney.ts'
+      - 'lib/world/spatial/earthPassengerJourney.test.ts'
 
 jobs:
   passenger-journey:
@@ -24,5 +29,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - run: npx tsc lib/game/passengerJourney.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .passenger-journey-test
+      - run: npx tsc lib/game/passengerJourney.test.ts lib/world/spatial/earthPassengerJourney.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .passenger-journey-test
       - run: node .passenger-journey-test/game/passengerJourney.test.js
+      - run: node .passenger-journey-test/world/spatial/earthPassengerJourney.test.js
