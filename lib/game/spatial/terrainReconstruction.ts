@@ -66,8 +66,8 @@ export function fillLocalElevationHoles(
 ): { values: (number | null)[]; observed: boolean[]; confidence: number[] } {
   validateGrid(grid)
   const values = [...grid.values]
-  const observed = grid.values.map(finite)
-  const confidence = observed.map(value => value ? 1 : 0)
+  const observed: boolean[] = grid.values.map(finite)
+  const confidence: number[] = observed.map(value => value ? 1 : 0)
   const radius = Math.max(0, Math.floor(maxRadiusCells))
 
   if (radius === 0) return { values, observed, confidence }
@@ -173,8 +173,8 @@ export function reconstructLocalTerrain(
   const outSize = (grid.size - 1) * factor + 1
   const outStepM = grid.stepM / factor
   const values: (number | null)[] = new Array(outSize * outSize).fill(null)
-  const confidence = new Array(outSize * outSize).fill(0)
-  const observed = new Array(outSize * outSize).fill(false)
+  const confidence: number[] = new Array(outSize * outSize).fill(0)
+  const observed: boolean[] = new Array(outSize * outSize).fill(false)
 
   for (let row = 0; row < outSize; row++) {
     for (let col = 0; col < outSize; col++) {
