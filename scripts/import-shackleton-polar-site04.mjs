@@ -60,8 +60,8 @@ const metadata = {
 const { error: tileError } = await supabase.from('terrain_tiles').upsert({
   dataset_id: DATASET_ID,
   tile_key: TILE_KEY,
-  // Catalogue coverage is intentionally conservative/broad; the polar adapter
-  // performs the authoritative projected-X/Y TIFF bounds check per sample.
+  // Broad spherical catalogue envelope. The polar adapter performs the
+  // authoritative projected-X/Y GeoTIFF bounds check for every sample.
   min_lat: -90,
   min_lon: -180,
   max_lat: -88,
@@ -81,7 +81,7 @@ const { error: tileError } = await supabase.from('terrain_tiles').upsert({
 }, { onConflict: 'dataset_id,tile_key' })
 if (tileError) throw new Error(`terrain_tiles upsert failed: ${tileError.message}`)
 
-const { data: dataset, error: datasetError } = await supabase
+const { error: datasetError } = await supabase
   .from('terrain_datasets')
   .update({
     status: 'ready',
@@ -90,14 +90,10 @@ const { data: dataset, error: datasetError } = await supabase
     metadata,
   })
   .eq('id', DATASET_ID)
-  .select('location_id')
-  .single()
-if (datasetError || !dataset) throw new Error(`terrain dataset activation failed: ${datasetError?.message ?? 'missing dataset'}`)
+if (datasetError) throw new Error(`terrain dataset activation failed: ${datasetError.message}`)
 
-const { error: frameError } = await supabase
-  .from('world_frames')
-  .update({ terrain_dataset_id: DATASET_ID })
-  .eq('location_id', dataset.location_id)
-if (frameError) throw new Error(`world frame activation failed: ${frameError.message}`)
-
+// Do not switch world_frames yet. The legacy Shackleton runtime now hydrates
+// this polar tile as a higher-resolution preferred source while retaining the
+// existing active dataset id. This keeps the current spatial API backward-
+// compatible until all bodies use the shared runtime sampler registry directly.
 console.log(JSON.stringify({ ok: true, datasetId: DATASET_ID, tileKey: TILE_KEY, width, height, checksum, bbox }, null, 2))
