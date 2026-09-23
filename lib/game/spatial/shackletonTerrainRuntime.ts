@@ -1,18 +1,21 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { CachedShackletonLolaAdapter, ShackletonTerrainIngestion } from './shackletonTerrainIngestion'
+import {
+  CachedShackletonLolaAdapter,
+  CachedShackletonPolarLolaAdapter,
+  ShackletonTerrainIngestion,
+} from './shackletonTerrainIngestion'
 import type { LolaRasterImageOpener } from './lolaTerrainAdapter'
+import { SHACKLETON_POLAR_LOLA_DATASET_ID } from './lolaPolarTerrainAdapter'
 import { RasterTerrainSampler } from './terrainRaster'
 import { StoredTerrainTileValidator } from './terrainStorage'
 import { SupabaseTerrainObjectStore } from './supabaseTerrainObjectStore'
-import {
-  resolvePersistedTerrainTileManifest,
-  type PersistedTerrainTileRow,
-} from './terrainTilePersistence'
+import { resolvePersistedTerrainTileManifest, type PersistedTerrainTileRow } from './terrainTilePersistence'
 import type { TerrainSampler } from './terrainSampling'
 
 export const SHACKLETON_LOLA_DATASET_ID = 'moon_lro_lola_118m'
+export { SHACKLETON_POLAR_LOLA_DATASET_ID }
 
 export interface ShackletonTerrainRuntimeStatus {
   datasetId: string
@@ -34,22 +37,15 @@ const TILE_SELECT = [
   'checksum', 'status', 'metadata',
 ].join(',')
 
-/**
- * Reconstruct the cached Shackleton LOLA runtime from persisted terrain_tiles.
- *
- * Every candidate tile is validated against the private object store before it
- * can become runtime-ready. Missing manifest provenance or corrupt/missing bytes
- * stay rejected. A concrete TIFF decoder is injected separately; without one the
- * runtime reports decoderAvailable=false and deliberately exposes no sampler.
- */
 export async function loadShackletonTerrainRuntime(
   supabase: SupabaseClient,
   openImage?: LolaRasterImageOpener | null,
+  datasetId: string = SHACKLETON_LOLA_DATASET_ID,
 ): Promise<ShackletonTerrainRuntime> {
   const { data, error } = await supabase
     .from('terrain_tiles')
     .select(TILE_SELECT)
-    .eq('dataset_id', SHACKLETON_LOLA_DATASET_ID)
+    .eq('dataset_id', datasetId)
     .eq('status', 'ready')
     .order('pixel_size_m', { ascending: true })
 
@@ -67,39 +63,28 @@ export async function loadShackletonTerrainRuntime(
       rejectedTiles.push({ tileKey: row.tile_key, details: resolution.details })
       continue
     }
-
     try {
       ingestion.catalogue(resolution.manifest)
       const record = await ingestion.ingest(resolution.manifest.tileKey)
-      if (record.state !== 'ready') {
-        rejectedTiles.push({
-          tileKey: resolution.manifest.tileKey,
-          details: [record.error ?? `unexpected ingestion state ${record.state}`],
-        })
-      }
+      if (record.state !== 'ready') rejectedTiles.push({ tileKey: resolution.manifest.tileKey, details: [record.error ?? `unexpected ingestion state ${record.state}`] })
     } catch (runtimeError) {
-      rejectedTiles.push({
-        tileKey: resolution.manifest.tileKey,
-        details: [runtimeError instanceof Error ? runtimeError.message : String(runtimeError)],
-      })
+      rejectedTiles.push({ tileKey: resolution.manifest.tileKey, details: [runtimeError instanceof Error ? runtimeError.message : String(runtimeError)] })
     }
   }
 
   const runtimeReadyTiles = ingestion.snapshot().filter(tile => tile.state === 'ready').length
   const status: ShackletonTerrainRuntimeStatus = {
-    datasetId: SHACKLETON_LOLA_DATASET_ID,
+    datasetId,
     persistedReadyTiles: rows.length,
     runtimeReadyTiles,
     rejectedTiles,
     decoderAvailable: Boolean(openImage),
   }
-
   if (!openImage || runtimeReadyTiles === 0) return { sampler: null, status }
 
-  return {
-    sampler: new RasterTerrainSampler([
-      new CachedShackletonLolaAdapter(ingestion, openImage),
-    ]),
-    status,
-  }
+  const adapter = datasetId === SHACKLETON_POLAR_LOLA_DATASET_ID
+    ? new CachedShackletonPolarLolaAdapter(ingestion, openImage)
+    : new CachedShackletonLolaAdapter(ingestion, openImage)
+
+  return { sampler: new RasterTerrainSampler([adapter]), status }
 }
