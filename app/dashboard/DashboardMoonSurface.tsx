@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
-import ShackletonSurfaceMap, { type MoonSurfaceEntity } from '@/app/moon/ShackletonSurfaceMap'
+import PlanetarySurfaceMap, { type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
+import {
+  SHACKLETON_BASE_ALPHA_LOGISTICS,
+  SHACKLETON_BASE_ALPHA_NODES,
+} from '@/lib/game/seeds/shackletonBaseAlphaSeed'
 import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
 import ShipyardOverlay from './ShipyardOverlay'
@@ -15,21 +19,46 @@ import WarehouseOverlay from './WarehouseOverlay'
 type Props = { locations: any[]; prices: any[]; orders: any[] }
 const INTERIOR_ALIAS: Record<string, string> = { landing_pad_moon: 'landing_pad', surface_workshop: 'shipyard', surface_comms: 'command_center' }
 
+const SHACKLETON_CORRIDORS: PreparedCorridor[] = (() => {
+  const nodes = new Map(SHACKLETON_BASE_ALPHA_NODES.map(node => [node.id, node]))
+  const seen = new Set<string>()
+  return SHACKLETON_BASE_ALPHA_LOGISTICS.flatMap((edge, index) => {
+    const from = nodes.get(edge.from), to = nodes.get(edge.to)
+    if (!from || !to) return []
+    const physicalKey = [edge.from, edge.to].sort().join('::')
+    if (seen.has(physicalKey)) return []
+    seen.add(physicalKey)
+    return [{
+      id: `shackleton-corridor-${index}`,
+      kind: edge.corridor,
+      points: [{ xM: from.xM, yM: from.yM }, { xM: to.xM, yM: to.yM }],
+    }]
+  })
+})()
+
 export default function DashboardMoonSurface({ locations, prices, orders }: Props) {
   const location=useGameStore(s=>s.location),credits=useGameStore(s=>s.credits),cargo=useGameStore(s=>s.cargo),cargoMax=useGameStore(s=>s.cargoMax),shipTypeId=useGameStore(s=>s.shipTypeId),shipRange=useGameStore(s=>s.shipRange),buy=useGameStore(s=>s.buy),sell=useGameStore(s=>s.sell),loadFromServer=useGameStore(s=>s.loadFromServer)
-  const [interiorEntity,setInteriorEntity]=useState<MoonSurfaceEntity|null>(null),[spaceportEntity,setSpaceportEntity]=useState<MoonSurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
+  const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null),[spaceportEntity,setSpaceportEntity]=useState<PlanetarySurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
   const moonLocation=useMemo(()=>locations.find((item:any)=>item.slug==='moon')??null,[locations]),moonOrders=useMemo(()=>orders.filter((item:any)=>item.locations?.slug==='moon'),[orders])
   useEffect(()=>{if(location!=='moon')return;let cancelled=false;fetch('/api/game/world',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(!cancelled)setTick(Number(p?.stats?.tickNumber??0))}).catch(()=>{});return()=>{cancelled=true}},[location])
   if(location!=='moon')return null
 
-  const openWorldObject=(entity:MoonSurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_moon'){setSpaceportEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
+  const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_moon'){setSpaceportEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
   const handleInteriorAction=(kind:'market'|'shipyard'|'navigation'|'ship'|'parts'|null)=>{if(kind==='market')setWarehouseOpen(true);if(kind==='shipyard'||kind==='parts'||kind==='ship')setShipyardOpen(true);if(kind==='navigation')setNavigationOpen(true);if(kind)setInteriorEntity(null)}
   const currentResources=moonLocation?.location_resources??[],spaceportName=spaceportEntity?.name??spaceportEntity?.entity_id??'Lande- und Cargo-Zone'
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Anlage'
 
   return <section className="noxia-dashboard-moon-surface" aria-label="Mondoberfläche Shackleton">
-    <div className="moon-context-label"><strong>LOLA · Shackleton</strong><span>rekonstruiertes lokales Terrain · ENU/LOLA = metrische Wahrheit</span></div>
-    <ShackletonSurfaceMap onOpenWorldObject={openWorldObject}/>
+    <div className="moon-context-label"><strong>LOLA · Shackleton</strong><span>rekonstruiertes lokales Terrain · gemeinsamer Planetary-Surface-Renderer</span></div>
+    <PlanetarySurfaceMap
+      locationSlug="moon"
+      body="moon"
+      mapLabel="Spielbare Shackleton-Mondkarte"
+      terrainLabel="LRO / LOLA"
+      minimumWorldSpanM={600}
+      corridors={SHACKLETON_CORRIDORS}
+      onOpenWorldObject={openWorldObject}
+    />
 
     {spaceportEntity&&<SpaceportOverlay buildingTypeId="landing_pad_moon" buildingName={spaceportName} onClose={()=>setSpaceportEntity(null)} onOpenNavigation={()=>{setSpaceportEntity(null);setNavigationOpen(true)}} onOpenMaintenance={()=>{setSpaceportEntity(null);setShipyardOpen(true)}} onOpenCargo={()=>{setSpaceportEntity(null);setWarehouseOpen(true)}}/>}
 
@@ -47,11 +76,7 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
       .noxia-dashboard-moon-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:hidden;background:#090b0c;overscroll-behavior:contain}
       .noxia-dashboard-moon-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:radial-gradient(circle at 45% 32%,rgba(133,137,132,.16),transparent 48%),linear-gradient(180deg,#111516,#080a0b 76%);z-index:0}
       .moon-context-label{position:fixed;z-index:2;left:18px;bottom:calc(var(--noxia-cockpit-clearance,76px) + 10px);display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid rgba(189,213,225,.2);border-radius:8px;background:rgba(5,12,18,.72);backdrop-filter:blur(8px);color:#d7e3e8;font:10px/1.25 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none}.moon-context-label strong{color:#d7b96e;letter-spacing:.08em}.moon-context-label span{color:#8ea2ad}.navigation-body{min-height:520px;background:#070b14;border-radius:8px;overflow:hidden}
-      .noxia-dashboard-moon-surface :global(.earth-shell){position:relative;z-index:1;height:100%;min-height:0;overflow:hidden;background:transparent!important}
-      .noxia-dashboard-moon-surface :global(.earth-map){background:#535653!important;border-color:rgba(196,205,202,.32)!important;box-shadow:inset 0 0 90px rgba(0,0,0,.24),0 16px 45px rgba(0,0,0,.28)!important}
-      .noxia-dashboard-moon-surface :global(.earth-map svg){background:transparent!important}
-      .noxia-dashboard-moon-surface :global(.earth-map svg>g>rect:first-child){opacity:.10!important}
-      .noxia-dashboard-moon-surface :global(.earth-lower-card),.noxia-dashboard-moon-surface :global(.earth-foot){display:none!important}
+      .noxia-dashboard-moon-surface :global(.planetary-shell){position:relative;z-index:1;height:100%;min-height:0;overflow:hidden}
     `}</style>
   </section>
 }
