@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EarthLandmark } from '@/lib/world/spatial/earthLandmarks'
 import { buildEarthLandmarkJourneyTarget } from '@/lib/world/spatial/earthLandmarkJourney'
+import type { PassengerJourneyBlockReason, PassengerJourneyDraft } from '@/lib/game/passengerJourney'
 
 type GeoPoint = { lat: number; lon: number }
 type Feature = {
@@ -18,11 +19,21 @@ type Payload = {
   attribution?: string
   error?: string
 }
+type DraftResponse = {
+  ok: boolean
+  draft?: PassengerJourneyDraft
+  error?: string
+}
 
 const W = 1000
 const H = 560
 const PAD = 28
-const PASSENGER_TRAVEL_REQUEST = 'EXT-NOXIA-CORE-20260921-EARTH-PASSENGER-TRAVEL'
+
+const BLOCK_LABELS: Readonly<Record<PassengerJourneyBlockReason, string>> = {
+  'actor-unresolved': 'Spieler-/Actor-Kontext noch nicht serverseitig gebunden',
+  'arrival-node-unresolved': 'kanonischer Arrival Node fehlt',
+  'route-unresolved': 'World-Routing noch nicht aufgelöst',
+}
 
 function styleFor(type: string) {
   switch (type) {
@@ -48,11 +59,14 @@ export default function EarthLandmarkRegionFocus({
   onClose: () => void
 }) {
   const [payload, setPayload] = useState<Payload | null>(null)
+  const [draftResult, setDraftResult] = useState<DraftResponse | null>(null)
+  const [planning, setPlanning] = useState(false)
   const journeyTarget = useMemo(() => buildEarthLandmarkJourneyTarget(landmark.id), [landmark.id])
 
   useEffect(() => {
     let cancelled = false
     setPayload(null)
+    setDraftResult(null)
     const q = new URLSearchParams({ lat: String(point.lat), lon: String(point.lon), radiusKm: '.8' })
     fetch(`/api/earth/region?${q.toString()}`, { cache: 'no-store' })
       .then(async response => {
@@ -89,6 +103,31 @@ export default function EarthLandmarkRegionFocus({
     const element = document.getElementById(landmark.id)
     if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
+
+  const planJourney = async () => {
+    setPlanning(true)
+    setDraftResult(null)
+    try {
+      const response = await fetch('/api/earth/journey/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          actorId: null,
+          target: journeyTarget,
+          mobilityMode: 'mixed',
+        }),
+      })
+      const json = await response.json() as DraftResponse
+      setDraftResult(response.ok ? json : { ok: false, error: json.error ?? `HTTP ${response.status}` })
+    } catch (error) {
+      setDraftResult({ ok: false, error: error instanceof Error ? error.message : String(error) })
+    } finally {
+      setPlanning(false)
+    }
+  }
+
+  const draft = draftResult?.draft
 
   return <section className="region-focus" aria-live="polite">
     <header>
@@ -130,10 +169,17 @@ export default function EarthLandmarkRegionFocus({
 
     <div className="travel-readiness">
       <div className="travel-status"><span>REGIONALFOKUS</span><b>bereit</b></div>
-      <div className="travel-status pending"><span>PERSONENREISE</span><b>Core-Vertrag ausstehend</b></div>
+      <div className={`travel-status ${draft?.ready ? '' : 'pending'}`}><span>PERSONENREISE</span><b>{draft ? (draft.ready ? 'Draft bereit' : 'Draft blockiert') : 'Draft verfügbar'}</b></div>
       <div className="travel-status staged"><span>IMMERSIVE HANDOFF</span><b>nach Ankunft vorbereitet</b></div>
-      <p>Reiseziel ist die stabile WorldObject-Referenz <code>{journeyTarget.worldObject.id}</code>, nicht der Kartenpunkt. Der Arrival Node wird serverseitig aufgelöst; ein Immersive Space bleibt bis zur bestätigten Ankunft und WorldObject-Auflösung bewusst leer.</p>
+      <p>Reiseziel ist die stabile WorldObject-Referenz <code>{journeyTarget.worldObject.id}</code>, nicht der Kartenpunkt. Der Journey-Draft prüft serverseitig, ob Actor, kanonischer Arrival Node und World-Route bereits autoritativ vorliegen.</p>
     </div>
+
+    {draftResult && <div className={`draft-result ${draft?.ready ? 'ready' : 'blocked'}`}>
+      <b>{draft?.ready ? 'Journey-Draft bereit' : 'Journey-Draft noch nicht startfähig'}</b>
+      {draft && !draft.ready && <ul>{draft.blockReasons.map(reason => <li key={reason}>{BLOCK_LABELS[reason]}</li>)}</ul>}
+      {!draftResult.ok && <span>{draftResult.error ?? 'Draft konnte nicht erstellt werden.'}</span>}
+      {draft?.ready && <span>{draft.distanceKm?.toFixed(1)} km · ETA {draft.etaSeconds}s · {draft.legs.length} Legs</span>}
+    </div>}
 
     <div className="journey-contract">
       <span><b>Ziel</b>{journeyTarget.worldObject.kind}</span>
@@ -144,16 +190,16 @@ export default function EarthLandmarkRegionFocus({
     <footer>
       <div>
         <b>Earth-Navigationsziel</b>
-        <span>Der reale Regionsausschnitt ist bereits nutzbar. Ein späterer Reise-Start darf erst aktiviert werden, wenn Core einen serverautoritativen Passenger-Journey-Draft mit kanonischem Arrival Node, ETA und Journey-State liefert. Erst nach `arrived` darf die Welt optional in einen lokalen oder Interior-Kontext übergeben.</span>
+        <span>„Reise planen“ erzeugt jetzt einen echten serverseitigen Passenger-Journey-Draft. Ein Start bleibt gesperrt, bis Core/Earth Actor, kanonischen Arrival Node und eine world-owned Route vollständig aufgelöst haben. Erst nach `arrived` darf ein lokaler oder Interior-Kontext übernommen werden.</span>
       </div>
       <div className="footer-actions">
-        <button className="travel-disabled" disabled title={PASSENGER_TRAVEL_REQUEST}>Reise planen · ausstehend</button>
+        <button onClick={planJourney} disabled={planning}>{planning ? 'Reise wird geprüft …' : 'Reise planen'}</button>
         <button onClick={openCanonicalEntry}>Kanonischen Eintrag öffnen ↓</button>
       </div>
     </footer>
 
     <style jsx>{`
-      .region-focus{margin-top:12px;padding:13px;background:#112a33;border:1px solid #45636b;border-radius:12px}.region-focus header{display:flex;justify-content:space-between;gap:14px;align-items:start}.region-focus small{font-size:8px;letter-spacing:.14em;color:#d2ae58;font-weight:900}.region-focus h3{font-family:Georgia,serif;font-size:21px;font-weight:400;margin:2px 0 4px}.region-focus header p{margin:0;color:#9cb0b3;font-size:9px;line-height:1.5}.close{border:1px solid #49656c;background:transparent;color:#b7c7c9;border-radius:6px;width:30px;height:30px;font-size:18px;cursor:pointer}.state{display:grid;place-items:center;min-height:180px;margin-top:10px;background:#0b2028;border-radius:10px;color:#a8babc;font-size:10px}.state.error{color:#f0c7c3;background:#41292c}.region-focus svg{display:block;width:100%;height:auto;margin-top:10px;border:1px solid #38545b;border-radius:12px;background:#253b36}.meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px;color:#7f969a;font-size:7px}.travel-readiness{display:grid;grid-template-columns:auto auto auto 1fr;gap:8px;align-items:center;margin-top:10px;padding:9px;border:1px solid #38545b;border-radius:9px;background:#0c222a}.travel-status{display:grid;gap:2px;padding:6px 8px;border:1px solid #456b61;border-radius:7px;background:#14362f}.travel-status.pending{border-color:#75633d;background:#352f1d}.travel-status.staged{border-color:#425f70;background:#152d39}.travel-status span{font-size:7px;letter-spacing:.08em;color:#8ba5a4}.travel-status b{font-size:9px;color:#d9eee6}.travel-status.pending b{color:#e7cb7b}.travel-status.staged b{color:#acd5e5}.travel-readiness p{margin:0;color:#91a6a9;font-size:8px;line-height:1.45}.travel-readiness code{color:#d5b55f;font-size:7px}.journey-contract{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.journey-contract span{display:flex;gap:5px;align-items:center;padding:5px 7px;border:1px solid #324e56;border-radius:6px;background:#0b2028;color:#8fa5a9;font-size:7px}.journey-contract b{color:#d0ad59;text-transform:uppercase;letter-spacing:.05em}.region-focus footer{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-top:12px;padding-top:10px;border-top:1px solid #34515a}.region-focus footer>div:first-child{display:grid;gap:3px;max-width:720px}.region-focus footer b{font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:#d1ad57}.region-focus footer span{font-size:8px;line-height:1.45;color:#8fa4a8}.footer-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.region-focus footer button{border:1px solid #bea04f;background:#d0ad59;color:#16292f;border-radius:7px;padding:7px 10px;font-size:8px;font-weight:850;cursor:pointer;white-space:nowrap}.region-focus footer button.travel-disabled{border-color:#536369;background:#26373c;color:#7e9296;cursor:not-allowed}@media(max-width:900px){.travel-readiness{grid-template-columns:1fr 1fr 1fr}.travel-readiness p{grid-column:1/-1}}@media(max-width:700px){.travel-readiness{grid-template-columns:1fr}.travel-readiness p{grid-column:auto}.region-focus footer{align-items:stretch;flex-direction:column}.footer-actions{justify-content:flex-start}}
+      .region-focus{margin-top:12px;padding:13px;background:#112a33;border:1px solid #45636b;border-radius:12px}.region-focus header{display:flex;justify-content:space-between;gap:14px;align-items:start}.region-focus small{font-size:8px;letter-spacing:.14em;color:#d2ae58;font-weight:900}.region-focus h3{font-family:Georgia,serif;font-size:21px;font-weight:400;margin:2px 0 4px}.region-focus header p{margin:0;color:#9cb0b3;font-size:9px;line-height:1.5}.close{border:1px solid #49656c;background:transparent;color:#b7c7c9;border-radius:6px;width:30px;height:30px;font-size:18px;cursor:pointer}.state{display:grid;place-items:center;min-height:180px;margin-top:10px;background:#0b2028;border-radius:10px;color:#a8babc;font-size:10px}.state.error{color:#f0c7c3;background:#41292c}.region-focus svg{display:block;width:100%;height:auto;margin-top:10px;border:1px solid #38545b;border-radius:12px;background:#253b36}.meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px;color:#7f969a;font-size:7px}.travel-readiness{display:grid;grid-template-columns:auto auto auto 1fr;gap:8px;align-items:center;margin-top:10px;padding:9px;border:1px solid #38545b;border-radius:9px;background:#0c222a}.travel-status{display:grid;gap:2px;padding:6px 8px;border:1px solid #456b61;border-radius:7px;background:#14362f}.travel-status.pending{border-color:#75633d;background:#352f1d}.travel-status.staged{border-color:#425f70;background:#152d39}.travel-status span{font-size:7px;letter-spacing:.08em;color:#8ba5a4}.travel-status b{font-size:9px;color:#d9eee6}.travel-status.pending b{color:#e7cb7b}.travel-status.staged b{color:#acd5e5}.travel-readiness p{margin:0;color:#91a6a9;font-size:8px;line-height:1.45}.travel-readiness code{color:#d5b55f;font-size:7px}.draft-result{margin-top:8px;padding:8px 10px;border:1px solid #52616a;border-radius:8px;background:#19262c;color:#aebbc0;font-size:8px;line-height:1.5}.draft-result.blocked{border-color:#75633d;background:#302a1b}.draft-result.ready{border-color:#456b61;background:#14362f}.draft-result b{display:block;color:#e6cc83;margin-bottom:3px}.draft-result ul{margin:3px 0 0 16px;padding:0}.journey-contract{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.journey-contract span{display:flex;gap:5px;align-items:center;padding:5px 7px;border:1px solid #324e56;border-radius:6px;background:#0b2028;color:#8fa5a9;font-size:7px}.journey-contract b{color:#d0ad59;text-transform:uppercase;letter-spacing:.05em}.region-focus footer{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-top:12px;padding-top:10px;border-top:1px solid #34515a}.region-focus footer>div:first-child{display:grid;gap:3px;max-width:720px}.region-focus footer b{font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:#d1ad57}.region-focus footer span{font-size:8px;line-height:1.45;color:#8fa4a8}.footer-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.region-focus footer button{border:1px solid #bea04f;background:#d0ad59;color:#16292f;border-radius:7px;padding:7px 10px;font-size:8px;font-weight:850;cursor:pointer;white-space:nowrap}.region-focus footer button:disabled{border-color:#536369;background:#26373c;color:#7e9296;cursor:wait}@media(max-width:900px){.travel-readiness{grid-template-columns:1fr 1fr 1fr}.travel-readiness p{grid-column:1/-1}}@media(max-width:700px){.travel-readiness{grid-template-columns:1fr}.travel-readiness p{grid-column:auto}.region-focus footer{align-items:stretch;flex-direction:column}.footer-actions{justify-content:flex-start}}
     `}</style>
   </section>
 }
