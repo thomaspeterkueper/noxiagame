@@ -1,0 +1,17 @@
+name: Hypothesis discrimination
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/hypothesisDiscrimination.ts'
+      - 'lib/game/population/hypothesisDiscrimination.test.ts'
+      - '.github/workflows/hypothesis-discrimination.yml'
+jobs:
+  discrimination:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/population/hypothesisDiscrimination.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .hypothesis-discrimination-test
+      - run: node .hypothesis-discrimination-test/game/population/hypothesisDiscrimination.test.js
