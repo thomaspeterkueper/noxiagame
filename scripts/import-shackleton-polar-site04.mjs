@@ -7,12 +7,24 @@ const DATASET_ID = 'moon_lro_lola_south_pole_5m'
 const TILE_KEY = 'shackleton-site04-5m-v1'
 const SOURCE_URL = 'https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_surf.tif'
 const BUCKET = 'terrain'
-const STORAGE_PATH = 'moon/lro-lola/south-pole/site04/Site04_final_adj_5mpp_surf.tif'
+const STORAGE_PATH = 'moon/lro-lola/south-pole/site04/site04-final-adj-5mpp-surf.tif'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+if (!rawUrl || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+
+function normalizeSupabaseUrl(value) {
+  const trimmed = value.trim()
+  const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+  if (!parsed.hostname.endsWith('.supabase.co')) {
+    throw new Error(`Unexpected Supabase host: ${parsed.hostname}`)
+  }
+  return parsed.origin
+}
+
+const url = normalizeSupabaseUrl(rawUrl)
 const supabase = createClient(url, key)
+console.log(`Supabase project host: ${new URL(url).hostname}`)
 
 console.log(`Downloading ${SOURCE_URL}`)
 const response = await fetch(SOURCE_URL, { redirect: 'follow' })
@@ -60,8 +72,6 @@ const metadata = {
 const { error: tileError } = await supabase.from('terrain_tiles').upsert({
   dataset_id: DATASET_ID,
   tile_key: TILE_KEY,
-  // Broad spherical catalogue envelope. The polar adapter performs the
-  // authoritative projected-X/Y GeoTIFF bounds check for every sample.
   min_lat: -90,
   min_lon: -180,
   max_lat: -88,
@@ -92,8 +102,4 @@ const { error: datasetError } = await supabase
   .eq('id', DATASET_ID)
 if (datasetError) throw new Error(`terrain dataset activation failed: ${datasetError.message}`)
 
-// Do not switch world_frames yet. The legacy Shackleton runtime now hydrates
-// this polar tile as a higher-resolution preferred source while retaining the
-// existing active dataset id. This keeps the current spatial API backward-
-// compatible until all bodies use the shared runtime sampler registry directly.
-console.log(JSON.stringify({ ok: true, datasetId: DATASET_ID, tileKey: TILE_KEY, width, height, checksum, bbox }, null, 2))
+console.log(JSON.stringify({ ok: true, datasetId: DATASET_ID, tileKey: TILE_KEY, width, height, checksum, bbox, storagePath: STORAGE_PATH }, null, 2))
