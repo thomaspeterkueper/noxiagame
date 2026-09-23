@@ -2,6 +2,12 @@ name: Import Shackleton polar terrain
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/import-shackleton-polar-site04.mjs'
+      - '.github/workflows/import-shackleton-terrain.yml'
 
 permissions:
   contents: read
