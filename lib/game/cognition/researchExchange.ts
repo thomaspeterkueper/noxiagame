@@ -92,3 +92,65 @@ export function adoptProtocolFromFinding(input: {
     status: 'adopted',
   }
 }
+
+
+export interface ResearchChallenge {
+  id: string
+  challengerGroupId: string
+  challengedFindingId: string
+  subjectRef: string
+  evidenceRefs: string[]
+  confidence: number
+  reasonCode: 'conflicting_measurement' | 'different_population' | 'side_effect' | 'failed_replication'
+  createdAtTick: number
+  status: 'open' | 'resolved'
+}
+
+export interface ScientificControversy {
+  id: string
+  subjectRef: string
+  findingIds: string[]
+  challengeIds: string[]
+  participantGroupIds: string[]
+  openedAtTick: number
+  status: 'open' | 'resolved'
+}
+
+export function challengeFinding(input: {
+  groupId: string
+  finding: ResearchFinding
+  evidenceRefs: string[]
+  confidence: number
+  reasonCode: ResearchChallenge['reasonCode']
+  atTick: number
+}): ResearchChallenge {
+  return {
+    id: 'challenge:' + input.groupId + ':' + input.finding.id,
+    challengerGroupId: input.groupId,
+    challengedFindingId: input.finding.id,
+    subjectRef: input.finding.subjectRef,
+    evidenceRefs: [...input.evidenceRefs],
+    confidence: Math.max(0, Math.min(1, input.confidence)),
+    reasonCode: input.reasonCode,
+    createdAtTick: input.atTick,
+    status: 'open',
+  }
+}
+
+export function openControversy(input: { finding: ResearchFinding; challenge: ResearchChallenge }): ScientificControversy {
+  return {
+    id: 'controversy:' + input.finding.subjectRef + ':' + input.finding.id,
+    subjectRef: input.finding.subjectRef,
+    findingIds: [input.finding.id],
+    challengeIds: [input.challenge.id],
+    participantGroupIds: Array.from(new Set([input.finding.producerGroupId, input.challenge.challengerGroupId])),
+    openedAtTick: input.challenge.createdAtTick,
+    status: 'open',
+  }
+}
+
+export function shouldEscalateControversy(input: { finding: ResearchFinding; challenges: ResearchChallenge[] }): boolean {
+  const strong = input.challenges.filter((c) => c.status === 'open' && c.confidence >= 0.7)
+  const independentGroups = new Set(strong.map((c) => c.challengerGroupId))
+  return input.finding.confidence >= 0.7 && independentGroups.size >= 2
+}
