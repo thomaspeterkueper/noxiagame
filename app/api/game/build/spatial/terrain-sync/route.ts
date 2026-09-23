@@ -1,0 +1,201 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { resolveRuntimeTerrainSampler } from '@/lib/game/spatial/runtimeTerrainSampler.server'
+import { sampleTerrainFootprint } from '@/lib/game/spatial/terrainSampling'
+import type { TerrainDatasetDescriptor, WorldFrame } from '@/lib/game/spatial/types'
+
+const serviceClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+)
+
+type SyncBody = { location?: string; force?: boolean }
+
+async function getUser(req: NextRequest) {
+  const auth = req.headers.get('authorization')
+  if (!auth?.startsWith('Bearer ')) return null
+  const { data: { user } } = await serviceClient.auth.getUser(auth.slice(7))
+  return user
+}
+
+function finite(value: unknown): number | null {
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function toFrame(row: any): WorldFrame {
+  return {
+    locationId: row.location_id,
+    body: row.body,
+    coordinateSystem: row.coordinate_system,
+    originLatDeg: row.origin_lat_deg,
+    originLonDeg: row.origin_lon_deg,
+    originAltM: row.origin_alt_m,
+    originStatus: row.origin_status,
+    referenceFrame: row.reference_frame,
+    latitudeType: row.latitude_type,
+    longitudeDirection: row.longitude_direction,
+    equatorialRadiusM: row.equatorial_radius_m,
+    polarRadiusM: row.polar_radius_m,
+    verticalDatum: row.vertical_datum,
+    terrainDatasetId: row.terrain_dataset_id,
+    worldSeed: String(row.world_seed ?? row.location_id),
+    observedSource: row.observed_source ?? undefined,
+    derivedConfig: row.derived_config ?? undefined,
+  }
+}
+
+function toDataset(row: any): TerrainDatasetDescriptor {
+  return {
+    id: row.id,
+    body: row.body,
+    locationId: row.location_id,
+    provider: row.provider,
+    datasetName: row.dataset_name,
+    datasetVersion: row.dataset_version,
+    datasetKind: row.dataset_kind,
+    resolutionM: row.resolution_m,
+    horizontalReference: row.horizontal_reference,
+    verticalReference: row.vertical_reference,
+    latitudeType: row.latitude_type,
+    longitudeDirection: row.longitude_direction,
+    sourceUri: row.source_uri,
+    sourceLicense: row.source_license,
+    accessMode: row.access_mode,
+    status: row.status,
+    metadata: row.metadata ?? {},
+  }
+}
+
+/**
+ * Persist authoritative footprint-level terrain metrics for metric world objects.
+ * This route is body-independent: dataset-specific sampling is selected through
+ * the runtime terrain-sampler registry, while footprint sampling and persistence
+ * are shared by Moon, Mars and later spherical/ellipsoidal worlds.
+ */
+export async function POST(req: NextRequest) {
+  const user = await getUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json().catch(() => ({})) as SyncBody
+  const locationSlug = body.location ?? 'moon'
+
+  const { data: location } = await serviceClient
+    .from('locations')
+    .select('id,slug,name')
+    .eq('slug', locationSlug)
+    .maybeSingle()
+  if (!location) return NextResponse.json({ error: 'Standort nicht gefunden' }, { status: 404 })
+
+  const { data: frameRow } = await serviceClient
+    .from('world_frames')
+    .select('*')
+    .eq('location_id', location.id)
+    .maybeSingle()
+  if (!frameRow?.terrain_dataset_id) {
+    return NextResponse.json({ ok: true, location: locationSlug, updated: 0, unresolved: 0, skipped: 0, reason: 'no-active-terrain-dataset' })
+  }
+
+  const { data: datasetRow } = await serviceClient
+    .from('terrain_datasets')
+    .select('*')
+    .eq('id', frameRow.terrain_dataset_id)
+    .maybeSingle()
+  if (!datasetRow || datasetRow.status !== 'ready') {
+    return NextResponse.json({ ok: true, location: locationSlug, updated: 0, unresolved: 0, skipped: 0, reason: 'terrain-dataset-not-ready' })
+  }
+
+  const frame = toFrame(frameRow)
+  const dataset = toDataset(datasetRow)
+  const runtime = await resolveRuntimeTerrainSampler(serviceClient, dataset.id)
+  if (!runtime.sampler) {
+    return NextResponse.json({ ok: true, location: locationSlug, updated: 0, unresolved: 0, skipped: 0, reason: runtime.details ?? 'terrain-runtime-unavailable' })
+  }
+
+  const { data: rows, error: rowError } = await serviceClient
+    .from('tile_entities')
+    .select('id,entity_id,placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg')
+    .eq('location_id', location.id)
+    .in('entity_type', ['building', 'module'])
+  if (rowError) return NextResponse.json({ error: rowError.message }, { status: 500 })
+
+  let updated = 0
+  let unresolved = 0
+  let skipped = 0
+  const results: Array<{ id: string; entityId: string; status: string; slopeDeg?: number; reliefM?: number }> = []
+
+  for (const row of rows ?? []) {
+    const xM = finite(row.x_m), yM = finite(row.y_m)
+    const widthM = finite(row.footprint_width_m), depthM = finite(row.footprint_depth_m)
+    if (row.placement_mode !== 'world' || xM == null || yM == null || widthM == null || depthM == null || widthM <= 0 || depthM <= 0) {
+      skipped += 1
+      continue
+    }
+
+    const alreadyResolved = row.terrain_dataset_id === dataset.id
+      && row.terrain_status === 'resolved'
+      && finite(row.ground_elevation_m) != null
+      && finite(row.terrain_min_elevation_m) != null
+      && finite(row.terrain_max_elevation_m) != null
+      && finite(row.terrain_slope_deg) != null
+    if (alreadyResolved && !body.force) {
+      skipped += 1
+      continue
+    }
+
+    const resolution = await sampleTerrainFootprint(runtime.sampler, { frame, dataset }, {
+      xM,
+      yM,
+      zM: null,
+      widthM,
+      depthM,
+      rotationDeg: finite(row.rotation_deg) ?? 0,
+    })
+
+    if (!resolution) {
+      unresolved += 1
+      await serviceClient.from('tile_entities').update({
+        terrain_dataset_id: dataset.id,
+        terrain_status: 'unresolved',
+        ground_elevation_m: null,
+        terrain_min_elevation_m: null,
+        terrain_max_elevation_m: null,
+        terrain_slope_deg: null,
+      }).eq('id', row.id)
+      results.push({ id: row.id, entityId: row.entity_id, status: 'unresolved' })
+      continue
+    }
+
+    const summary = resolution.summary
+    const { error: updateError } = await serviceClient.from('tile_entities').update({
+      z_m: summary.centerZM,
+      terrain_dataset_id: dataset.id,
+      terrain_status: 'resolved',
+      ground_elevation_m: summary.centerZM,
+      terrain_min_elevation_m: summary.minZM,
+      terrain_max_elevation_m: summary.maxZM,
+      terrain_slope_deg: summary.maxSlopeDeg,
+    }).eq('id', row.id)
+    if (updateError) return NextResponse.json({ error: updateError.message, entityId: row.entity_id }, { status: 500 })
+
+    updated += 1
+    results.push({
+      id: row.id,
+      entityId: row.entity_id,
+      status: 'resolved',
+      slopeDeg: summary.maxSlopeDeg,
+      reliefM: summary.reliefM,
+    })
+  }
+
+  return NextResponse.json({
+    ok: true,
+    location: locationSlug,
+    body: frame.body,
+    datasetId: dataset.id,
+    updated,
+    unresolved,
+    skipped,
+    results,
+  })
+}
