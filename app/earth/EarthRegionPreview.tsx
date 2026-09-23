@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
+import { constructionState } from '@/lib/game/constructionProgress'
 import { isEarthMapSurfaceTarget, shouldChooseEarthMapSpot } from '@/lib/world/spatial/earthMapInteraction'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
@@ -17,7 +18,7 @@ type CandidatePayload = { ok:boolean; candidates?:Candidate[]; shortlist?:Shortl
 type BuildRequirements = { knowledgeOk:boolean; creditsOk:boolean; canBuild:boolean; requiredUnlock:string|null; requiredLabel:string|null }
 type BuildingDef = { id:string; name:string; cost:number; buildTimeTicks:number; footprint:{widthM:number;depthM:number;clearanceM:number}; requirements?:BuildRequirements }
 type SpatialEntity = { id:string; entity_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string; ownerLabel?:string; isOwn?:boolean }
-type PendingBuild = { id:string; buildable_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string }
+type PendingBuild = { id:string; buildable_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string; created_at?:string|null; completes_at?:string|null; buildTimeTicks?:number|null }
 type SpatialPayload = { location?:{slug:string;name:string}; profile?:{credits:number}; knowledge?:{source?:string;analysis?:{geodetic:boolean;precision:boolean}}; available?:BuildingDef[]; entities?:SpatialEntity[]; builds?:PendingBuild[]; error?:string }
 type SelectedSpot = { mapX:number;mapY:number;xM:number;yM:number }
 type TerrainCell = { row:number;col:number;xM:number;yM:number;elevationM:number;slopeDeg:number|null;state:'buildable'|'restricted'|'invalid'|'unresolved';reason:string|null }
@@ -70,6 +71,8 @@ export default function EarthRegionPreview(){
   const[selectedBuild,setSelectedBuild]=useState<BuildingDef|null>(null)
   const[rotationDeg,setRotationDeg]=useState(0)
   const[selectedWorldObjectId,setSelectedWorldObjectId]=useState<string|null>(null)
+  const[selectedPendingBuildId,setSelectedPendingBuildId]=useState<string|null>(null)
+  const[now,setNow]=useState(()=>Date.now())
   const[entryRequest,setEntryRequest]=useState<BuildingEntryRequest|null>(null)
   const[buildMessage,setBuildMessage]=useState<string|null>(null)
   const[placing,setPlacing]=useState(false)
@@ -120,12 +123,20 @@ export default function EarthRegionPreview(){
       if(entryRequest){setEntryRequest(null);return}
       if(selectedBuild){setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);return}
       if(buildMenuOpen){setBuildMenuOpen(false);return}
+      if(selectedPendingBuildId){setSelectedPendingBuildId(null);return}
       if(selectedWorldObjectId){setSelectedWorldObjectId(null);return}
       setSelectedSpot(null);setBuildMessage(null)
     }
     window.addEventListener('keydown',cancel)
     return()=>window.removeEventListener('keydown',cancel)
-  },[buildMenuOpen,selectedBuild,selectedWorldObjectId,entryRequest])
+  },[buildMenuOpen,selectedBuild,selectedWorldObjectId,selectedPendingBuildId,entryRequest])
+
+  useEffect(()=>{
+    if(!(spatial?.builds?.length))return
+    const clock=window.setInterval(()=>setNow(Date.now()),1000)
+    const refresh=window.setInterval(()=>void loadSpatial(),15000)
+    return()=>{window.clearInterval(clock);window.clearInterval(refresh)}
+  },[spatial?.builds?.length])
 
   const projection=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds;return{x:(lon:number)=>((lon-b.west)/(b.east-b.west))*1000,y:(lat:number)=>((b.north-lat)/(b.north-b.south))*1000,lon:(x:number)=>b.west+x/1000*(b.east-b.west),lat:(y:number)=>b.north-y/1000*(b.north-b.south)}},[data])
   const mapMetrics=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds,midLat=(b.south+b.north)/2,midLon=(b.west+b.east)/2;return{widthM:distanceMeters({lat:midLat,lon:b.west},{lat:midLat,lon:b.east}),heightM:distanceMeters({lat:b.south,lon:midLon},{lat:b.north,lon:midLon})}},[data])
@@ -149,8 +160,8 @@ export default function EarthRegionPreview(){
     if(!projection||!data?.region?.origin||!mapMetrics)return[]
     const defs=new Map((spatial?.available??[]).map(b=>[b.id,b]))
     const rows=[
-      ...(spatial?.entities??[]).map(e=>({id:e.id,typeId:e.entity_id,xM:e.x_m,yM:e.y_m,rotation:e.rotation_deg,widthM:e.footprint_width_m,depthM:e.footprint_depth_m,pending:false,status:e.status,name:e.name,ownerLabel:e.ownerLabel,isOwn:e.isOwn})),
-      ...(spatial?.builds??[]).map(b=>({id:b.id,typeId:b.buildable_id,xM:b.x_m,yM:b.y_m,rotation:b.rotation_deg,widthM:b.footprint_width_m,depthM:b.footprint_depth_m,pending:true,status:b.status,name:b.name,ownerLabel:'Dein Bauauftrag',isOwn:true})),
+      ...(spatial?.entities??[]).map(e=>({id:e.id,typeId:e.entity_id,xM:e.x_m,yM:e.y_m,rotation:e.rotation_deg,widthM:e.footprint_width_m,depthM:e.footprint_depth_m,pending:false,status:e.status,name:e.name,ownerLabel:e.ownerLabel,isOwn:e.isOwn,created_at:null,completes_at:null,buildTimeTicks:null})),
+      ...(spatial?.builds??[]).map(b=>({id:b.id,typeId:b.buildable_id,xM:b.x_m,yM:b.y_m,rotation:b.rotation_deg,widthM:b.footprint_width_m,depthM:b.footprint_depth_m,pending:true,status:b.status,name:b.name,ownerLabel:'Dein Bauauftrag',isOwn:true,created_at:b.created_at,completes_at:b.completes_at,buildTimeTicks:b.buildTimeTicks})),
     ]
     return rows.flatMap(row=>{
       if(row.xM==null||row.yM==null)return[]
@@ -163,6 +174,8 @@ export default function EarthRegionPreview(){
   },[projection,data,spatial,mapMetrics])
 
   const selectedWorldObject=useMemo(()=>selectedWorldObjectId?placed.find(b=>b.id===selectedWorldObjectId&&!b.pending)??null:null,[placed,selectedWorldObjectId])
+  const selectedPendingBuild=useMemo(()=>selectedPendingBuildId?placed.find(b=>b.id===selectedPendingBuildId&&b.pending)??null:null,[placed,selectedPendingBuildId])
+  const selectedConstruction=selectedPendingBuild?constructionState({buildable_id:selectedPendingBuild.typeId,tile_row:0,tile_col:0,status:selectedPendingBuild.status,created_at:selectedPendingBuild.created_at,completes_at:selectedPendingBuild.completes_at},now):null
   const selectedEntry=selectedWorldObject?getBuildingEntryDefinition(selectedWorldObject.typeId):null
   const placementPreview=useMemo(()=>{
     if(!selectedSpot||!selectedBuild||!mapMetrics)return null
@@ -177,11 +190,12 @@ export default function EarthRegionPreview(){
   function toggleLayer(key:LayerKey){setLayers(v=>({...v,[key]:!v[key]}))}
   function setCamera(nextZoom:number,centerX:number,centerY:number){setZoom(nextZoom);setOffset({x:500-centerX*nextZoom,y:500-centerY*nextZoom})}
   function clearPlacement(){setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null)}
-  function chooseWorldObject(id:string){setEntryRequest(null);setSelectedWorldObjectId(id);setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}
+  function chooseWorldObject(id:string){setEntryRequest(null);setSelectedWorldObjectId(id);setSelectedPendingBuildId(null);setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}
+  function choosePendingBuild(id:string){setEntryRequest(null);setSelectedPendingBuildId(id);setSelectedWorldObjectId(null);setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)}
 
   async function focusGeoPoint(point:GeoPoint,label:string){
     if(focusLoading)return
-    setFocusLoading(true);setFocusError(null);clearPlacement();setSelectedWorldObjectId(null);setEntryRequest(null)
+    setFocusLoading(true);setFocusError(null);clearPlacement();setSelectedWorldObjectId(null);setSelectedPendingBuildId(null);setEntryRequest(null)
     try{
       const q=new URLSearchParams({lat:String(point.lat),lon:String(point.lon),radiusKm:String(LOCAL_DETAIL_RADIUS_KM),v:EARTH_DATA_VERSION})
       const response=await fetch(`/api/earth/region?${q}`,{cache:'no-store'})
@@ -193,7 +207,7 @@ export default function EarthRegionPreview(){
     finally{setFocusLoading(false)}
   }
 
-  function resetOverview(){if(overviewData)setData(overviewData);setZoom(1);setOffset({x:0,y:0});setFocusLabel(null);setFocusError(null);setSelected(null);clearPlacement();setSelectedWorldObjectId(null);setEntryRequest(null)}
+  function resetOverview(){if(overviewData)setData(overviewData);setZoom(1);setOffset({x:0,y:0});setFocusLabel(null);setFocusError(null);setSelected(null);clearPlacement();setSelectedWorldObjectId(null);setSelectedPendingBuildId(null);setEntryRequest(null)}
   function zoomAroundCenter(direction:1|-1){const factor=direction>0?1.15:.87,nextZoom=clamp(zoom*factor,.7,128),centerX=(500-offset.x)/zoom,centerY=(500-offset.y)/zoom;setCamera(nextZoom,centerX,centerY)}
 
   function pointerToSpot(e:{clientX:number;clientY:number}){if(!projection||!data?.region?.origin||!mapGroupRef.current)return null;const svg=mapGroupRef.current.ownerSVGElement,ctm=mapGroupRef.current.getScreenCTM();if(!svg||!ctm)return null;const point=svg.createSVGPoint();point.x=e.clientX;point.y=e.clientY;const local=point.matrixTransform(ctm.inverse()),geo={lon:projection.lon(local.x),lat:projection.lat(local.y)},metric=geoToLocalMeters(geo,data.region.origin);return{mapX:local.x,mapY:local.y,xM:metric.eastM,yM:metric.northM}}
@@ -206,7 +220,7 @@ export default function EarthRegionPreview(){
     if(!shouldChooseEarthMapSpot(startedOnSurface,dragged))return
     const next=pointerToSpot(e)
     if(!next)return
-    setSelectedSpot(next);setSelectedWorldObjectId(null);setEntryRequest(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)
+    setSelectedSpot(next);setSelectedWorldObjectId(null);setSelectedPendingBuildId(null);setEntryRequest(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)
   }
 
   async function placeBuilding(building:BuildingDef,target:SelectedSpot,rotation:number){
@@ -220,7 +234,7 @@ export default function EarthRegionPreview(){
       const json=await response.json()
       if(!response.ok)throw new Error(json.error??'Bauauftrag fehlgeschlagen')
       setBuildMessage(`${building.name}: Bauauftrag bei ${normalized}° angelegt`)
-      setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setLayers(v=>({...v,noxia:true}))
+      setSelectedSpot(null);setSelectedPendingBuildId(json.buildId);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setLayers(v=>({...v,noxia:true}))
       await loadSpatial()
     }catch(error){setBuildMessage(error instanceof Error?error.message:String(error))}
     finally{setPlacing(false)}
@@ -247,11 +261,11 @@ export default function EarthRegionPreview(){
           {layers.slope&&terrainOverlay.map(c=><rect key={`slope-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill="#351d18" opacity={c.slopeOpacity}/>)}
 
           {layers.noxia&&placed.map(b=>{
-            const visual=b.visual,spriteScale=visual?.mapScale??1.7,spriteW=Math.max(b.widthSvg*spriteScale,22/zoom),spriteH=Math.max(Math.max(b.depthSvg,b.widthSvg*.72)*spriteScale,18/zoom),isSelected=!b.pending&&b.id===selectedWorldObjectId
+            const visual=b.visual,spriteScale=visual?.mapScale??1.7,spriteW=Math.max(b.widthSvg*spriteScale,22/zoom),spriteH=Math.max(Math.max(b.depthSvg,b.widthSvg*.72)*spriteScale,18/zoom),isSelected=b.pending?b.id===selectedPendingBuildId:b.id===selectedWorldObjectId
             const hitW=Math.max(b.widthSvg,24/zoom),hitH=Math.max(b.depthSvg,20/zoom)
-            return <g key={`noxia-${b.id}`} role={!b.pending?'button':undefined} aria-label={!b.pending?`${b.name} auswählen`:undefined} pointerEvents={b.pending?'none':'auto'} onPointerDown={!b.pending?e=>e.stopPropagation():undefined} onClick={!b.pending?e=>{e.stopPropagation();chooseWorldObject(b.id)}:undefined} style={!b.pending?{cursor:'pointer'}:undefined} transform={`translate(${b.mapX} ${b.mapY}) rotate(${b.rotation??0})`}>
+            return <g key={`noxia-${b.id}`} role="button" aria-label={`${b.name}${b.pending?' im Bau':' auswählen'}`} pointerEvents="auto" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();b.pending?choosePendingBuild(b.id):chooseWorldObject(b.id)}} style={{cursor:'pointer'}} transform={`translate(${b.mapX} ${b.mapY}) rotate(${b.rotation??0})`}>
               <title>{b.name}{b.pending?' · im Bau':''}</title>
-              {!b.pending&&<rect x={-hitW/2} y={-hitH/2} width={hitW} height={hitH} fill="transparent" pointerEvents="all"/>}
+              <rect x={-hitW/2} y={-hitH/2} width={hitW} height={hitH} fill="transparent" pointerEvents="all"/>
               <ellipse cx={0} cy={b.depthSvg*.18} rx={Math.max(b.widthSvg*.58,5/zoom)} ry={Math.max(b.depthSvg*.32,2.4/zoom)} fill="#14271e" opacity={b.pending?.22:.28}/>
               <rect x={-b.widthSvg/2} y={-b.depthSvg/2} width={Math.max(b.widthSvg,2/zoom)} height={Math.max(b.depthSvg,2/zoom)} rx={1/zoom} fill={b.pending?'#d9a63d':'#eaf1df'} fillOpacity={b.pending?.38:.22} stroke={isSelected?'#d4ad43':b.pending?'#7b5914':'#173f49'} strokeOpacity={1} strokeWidth={(isSelected?2.8:1.5)/zoom} strokeDasharray={b.pending?`${3/zoom} ${2/zoom}`:undefined}/>
               {visual?.mapAsset?<image href={visual.mapAsset} x={-spriteW/2} y={-spriteH*.72} width={spriteW} height={spriteH} preserveAspectRatio="xMidYMid meet" opacity={b.pending?.7:1} pointerEvents="none"/>:<rect x={-b.widthSvg/2} y={-b.depthSvg/2} width={Math.max(b.widthSvg,2/zoom)} height={Math.max(b.depthSvg,2/zoom)} rx={1/zoom} fill={b.pending?'#d9a63d':'#1f5967'} fillOpacity={b.pending?.8:.95} pointerEvents="none"/>}
@@ -311,8 +325,17 @@ export default function EarthRegionPreview(){
         {selectedEntry?<div className="earth-entry"><button className="earth-enter-button" onClick={()=>setEntryRequest({entityId:selectedWorldObject.id,buildingTypeId:selectedWorldObject.typeId,buildingName:selectedWorldObject.name,kind:selectedEntry.kind})}><span>Betreten →</span><strong>{selectedEntry.label}</strong><small>{selectedEntry.hint}</small></button></div>:<div className="earth-object-ready">Für diesen Gebäudetyp ist noch keine betretbare Funktion angebunden. Das Weltobjekt selbst bleibt vollständig persistent.</div>}
       </div>}
 
+      {selectedPendingBuild&&selectedConstruction&&<div className="earth-object-panel earth-construction-panel" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+        <div className="earth-site-head"><div><small>BAUSTELLE</small><strong>{selectedPendingBuild.name}</strong></div><button onClick={()=>setSelectedPendingBuildId(null)}>×</button></div>
+        <div className="earth-object-state"><span>Status</span><b>{selectedConstruction.phaseLabel}</b></div>
+        <div className="earth-progress-track" role="progressbar" aria-label={`Baufortschritt ${selectedPendingBuild.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(selectedConstruction.progress*100)}><i style={{width:`${Math.round(selectedConstruction.progress*100)}%`}}/></div>
+        <div className="earth-progress-copy"><b>{Math.round(selectedConstruction.progress*100)} %</b><span>{selectedConstruction.remainingSeconds!=null?`noch etwa ${Math.max(1,Math.ceil(selectedConstruction.remainingSeconds/60))} Min.`:'Bau läuft'}</span></div>
+        <div className="earth-site-facts"><div><span>Position</span><b>{selectedPendingBuild.xM.toFixed(0)} m E · {selectedPendingBuild.yM.toFixed(0)} m N</b></div><div><span>Ausrichtung</span><b>{normalizeRotation(Number(selectedPendingBuild.rotation??0))}°</b></div><div><span>Footprint</span><b>{selectedPendingBuild.widthM}×{selectedPendingBuild.depthM} m</b></div></div>
+        <div className="earth-construction-lock">Diese Fläche ist belegt. Ein weiterer Bauauftrag wird hier nicht angeboten.</div>
+      </div>}
+
       {active&&!selectedSpot&&!selectedWorldObject&&<div className="earth-candidate"><button onClick={()=>setSelected(null)}>×</button><small>PRÜFSTANDORT {active.shortlistLabel}</small><strong>{active.score.toFixed(0)} / 100</strong><span>{active.elevationM.toFixed(0)} m Höhe · {active.slopePercent.toFixed(1)} % Neigung · {active.reliefM.toFixed(0)} m Relief</span><span>Straße {active.roadDistanceM??'–'} m · Bahn {active.railDistanceM??'–'} m</span><p>{active.reasons.join(' · ')}</p><em>{active.shortlistReason}. Noch keine kanonische Platzierung.</em></div>}
-      <div className="earth-help">{selectedWorldObject?'Weltobjekt gewählt · Details links':selectedBuild?`${selectedBuild.name} · ausrichten · Bau bestätigen`:selectedSpot?'Stelle gewählt · Gelände prüfen · Bauen':data.detail?'Stelle anklicken · Mausrad: Zoom · Ziehen: Karte':'Stadt/Punkt öffnen oder Stelle direkt untersuchen'}</div>
+      <div className="earth-help">{selectedPendingBuild?'Baustelle gewählt · Fortschritt links':selectedWorldObject?'Weltobjekt gewählt · Details links':selectedBuild?`${selectedBuild.name} · ausrichten · Bau bestätigen`:selectedSpot?'Stelle gewählt · Gelände prüfen · Bauen':data.detail?'Stelle anklicken · Mausrad: Zoom · Ziehen: Karte':'Stadt/Punkt öffnen oder Stelle direkt untersuchen'}</div>
     </div>
 
     <div className="earth-foot"><span>{candidateData?.attribution||data.attribution}</span><span>{data.detail?`Lokale OSM-Details · ${data.featureCount??0} Objekte`:'DEM-Relief: Copernicus/Open-Meteo · Bebaubarkeit aus metrischen Terrain-Zellen'}</span></div>
@@ -329,6 +352,7 @@ export default function EarthRegionPreview(){
       .earth-detail-status{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:#102632e8;color:#f4f0dd;border:1px solid #58717a;border-radius:8px;padding:8px 12px;font-size:10px;font-weight:800}.earth-detail-status.error{background:#612f2fe8;border-color:#9c6262}
       .earth-site-panel,.earth-object-panel{position:absolute;left:14px;bottom:44px;z-index:6;width:min(390px,calc(100% - 28px));max-height:calc(100% - 78px);overflow:auto;background:#fffaf0f4;border:1px solid #a8893d;border-radius:11px;padding:12px;box-sizing:border-box;box-shadow:0 10px 34px #2b341f40;cursor:default;backdrop-filter:blur(8px)}.earth-object-panel{border-color:#567986}.earth-site-head{display:flex;justify-content:space-between;gap:12px}.earth-site-head small{display:block;color:#89691b;font-size:9px;font-weight:900;letter-spacing:.12em}.earth-object-panel .earth-site-head small{color:#466b78}.earth-site-head strong{display:block;font-size:15px;margin-top:2px}.earth-site-head button{border:0;background:none;font-size:20px;cursor:pointer}.earth-analysis-level,.earth-object-state{display:flex;justify-content:space-between;align-items:center;margin:9px 0;padding:7px 8px;background:#edf0e8;border-radius:6px;font-size:10px}.earth-analysis-level span,.earth-object-state span{color:#68777e}.earth-analysis-level b,.earth-object-state b{color:#335360}.earth-site-facts{display:grid;gap:5px}.earth-site-facts>div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e4ddc8;padding:5px 2px;font-size:10px}.earth-site-facts span{color:#6c7879}.earth-site-facts b{text-align:right;font-weight:800}.earth-site-facts .locked-info b{color:#907f63}.earth-site-facts .unknown-info b{color:#826f55}.earth-build-message{margin-top:9px;padding:7px 8px;background:#f3e5b9;border-radius:6px;font-size:10px;font-weight:800;color:#725516}.earth-build-open{width:100%;margin-top:10px;border:1px solid #8a6b21;background:#c89d35;color:#fffaf0;border-radius:7px;padding:9px;font-weight:900;cursor:pointer}.earth-build-picker,.earth-placement-editor{margin-top:10px}.earth-build-picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.earth-build-picker-head button{border:0;background:none;color:#6d5a2a;text-decoration:underline;cursor:pointer}.earth-build-options{display:grid;gap:6px}.earth-build-option{border:1px solid #c5b581;background:#fffdf7;border-radius:7px;padding:8px;text-align:left;display:grid;grid-template-columns:1fr auto;gap:3px 8px;color:#243940;cursor:pointer}.earth-build-option:hover:not(:disabled){border-color:#8a6b21;background:#fff7dc}.earth-build-option.locked{background:#efeee8;color:#777;cursor:not-allowed}.build-name{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px}.build-name strong{font-size:11px}.build-name em{font-style:normal;font-weight:900;color:#9a7622}.build-meta{grid-column:1/-1;font-size:9px;color:#718087}.req-ok,.req-no{font-size:9px;font-weight:800}.req-ok{color:#39704e}.req-no{color:#9a4f45}.earth-terrain-note{display:block;margin-top:9px;color:#857a66;font-size:8px;line-height:1.35}
       .earth-placement-summary,.earth-rotation-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:6px 2px}.earth-placement-summary b,.earth-rotation-head b{color:#8a681b}.earth-rotation-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 7px}.earth-rotation-presets button,.earth-rotation-fine button,.earth-placement-actions button{border:1px solid #b9aa80;background:#fffdf7;color:#4b4a40;border-radius:6px;padding:7px;font-size:10px;font-weight:800;cursor:pointer}.earth-rotation-presets button.active{background:#d6ae45;color:#fffdf1;border-color:#8a681b}.earth-rotation-fine{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center}.earth-rotation-fine input{width:100%;accent-color:#a77f22}.earth-preview-note{display:block;margin-top:8px;color:#766b54;font-size:8px;line-height:1.35}.earth-placement-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:6px;margin-top:9px}.earth-placement-actions button.primary{background:#b88b27;color:#fffdf2;border-color:#805e18}.earth-placement-actions button:disabled{opacity:.55;cursor:wait}.earth-object-ready{margin-top:10px;padding:8px;background:#e8f0ef;border-radius:6px;color:#416069;font-size:9px;line-height:1.4}.earth-entry{margin-top:10px}.earth-enter-button{width:100%;border:1px solid #365e6c;background:#173f4d;color:#f5f1df;border-radius:8px;padding:10px 11px;display:grid;gap:2px;text-align:left;cursor:pointer;box-shadow:0 5px 14px #18384624}.earth-enter-button:hover{background:#205667}.earth-enter-button span{justify-self:end;color:#d7b85f;font-size:9px;font-weight:900;letter-spacing:.05em}.earth-enter-button strong{font-size:12px}.earth-enter-button small{color:#b9c8c8;font-size:9px;line-height:1.35}
+      .earth-construction-panel{border-color:#b28525}.earth-progress-track{height:10px;margin:10px 0 5px;background:#d9d6c7;border:1px solid #b6aa82;border-radius:999px;overflow:hidden}.earth-progress-track i{display:block;height:100%;background:linear-gradient(90deg,#b88924,#e0bd58);transition:width .6s ease}.earth-progress-copy{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:10px}.earth-progress-copy b{color:#8a681b;font-size:14px}.earth-progress-copy span{color:#67777c}.earth-construction-lock{margin-top:10px;padding:8px;background:#f0e7cc;border-radius:6px;color:#6e5723;font-size:9px;font-weight:750;line-height:1.4}
       .earth-candidate{position:absolute;right:14px;top:58px;width:285px;background:#fffcf1ee;border:1px solid #b4933f;border-radius:9px;padding:12px 14px;display:grid;gap:5px;font-size:11px}.earth-candidate button{position:absolute;right:7px;top:5px;border:0;background:none;font-size:18px}.earth-candidate small{letter-spacing:.12em;color:#80651d;font-weight:800}.earth-candidate strong{font-size:23px;color:#9a7622}.earth-candidate p{margin:4px 0}.earth-candidate em{font-size:9px;color:#8a7d65}
       .earth-help{position:absolute;right:12px;bottom:10px;background:#203744d9;color:#edf4f4;border-radius:6px;padding:6px 9px;font-size:10px}.earth-foot{max-width:1500px;margin:8px auto 0;display:flex;justify-content:space-between;color:#728079;font-size:10px}.earth-loading{min-height:60vh;display:grid;place-items:center;background:#eef0e8;color:#53666e;font:600 14px system-ui}
       @media(max-width:900px){.earth-head{align-items:start;display:block}.earth-actions{margin-top:10px}.earth-stats{display:none}.earth-head h1{font-size:21px}.earth-map{min-height:500px;height:70vh}.earth-map-tools{left:10px;top:10px}.earth-layer-control{right:10px;top:10px}.earth-site-panel,.earth-object-panel{left:10px;bottom:44px;width:calc(100% - 20px);max-height:60%}.earth-candidate{top:auto;bottom:58px;right:10px;left:10px;width:auto}.earth-foot{display:block}.earth-foot span{display:block;margin-top:3px}.earth-focus{max-width:120px}}
