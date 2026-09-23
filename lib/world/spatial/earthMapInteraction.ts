@@ -2,6 +2,7 @@ const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
 
 type NamespaceTarget = {
   namespaceURI?: string | null
+  closest?: (selector: string) => unknown
 }
 
 /**
@@ -10,7 +11,9 @@ type NamespaceTarget = {
  */
 export function isEarthMapSurfaceTarget(target: EventTarget | null): boolean {
   if (!target || typeof target !== 'object' || !('namespaceURI' in target)) return false
-  return (target as NamespaceTarget).namespaceURI === SVG_NAMESPACE
+  const candidate = target as NamespaceTarget
+  if (candidate.namespaceURI !== SVG_NAMESPACE) return false
+  return typeof candidate.closest !== 'function' || !candidate.closest('[role="button"]')
 }
 
 export function shouldChooseEarthMapSpot(startedOnSurface: boolean, dragged: boolean): boolean {

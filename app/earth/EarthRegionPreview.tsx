@@ -248,7 +248,7 @@ export default function EarthRegionPreview(){
 
     <div className="earth-map"
       onWheel={e=>{e.preventDefault();zoomAroundCenter(e.deltaY<0?1:-1)}}
-      onPointerDown={e=>{pointerStartedOnSurface.current=isEarthMapSurfaceTarget(e.target);drag.current={x:e.clientX,y:e.clientY,ox:offset.x,oy:offset.y,moved:false};e.currentTarget.setPointerCapture(e.pointerId)}}
+      onPointerDown={e=>{const startedOnSurface=isEarthMapSurfaceTarget(e.target);pointerStartedOnSurface.current=startedOnSurface;if(!startedOnSurface){drag.current=null;return}drag.current={x:e.clientX,y:e.clientY,ox:offset.x,oy:offset.y,moved:false};e.currentTarget.setPointerCapture(e.pointerId)}}
       onPointerMove={e=>{if(!drag.current)return;const dx=e.clientX-drag.current.x,dy=e.clientY-drag.current.y;if(Math.hypot(dx,dy)>4)drag.current.moved=true;setOffset({x:drag.current.ox+dx,y:drag.current.oy+dy})}}
       onPointerUp={e=>{suppressMapClick.current=Boolean(drag.current?.moved);drag.current=null;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}}}
       onClick={chooseMapSpot}>
