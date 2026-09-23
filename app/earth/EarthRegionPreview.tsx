@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
-import { isEarthMapSurfaceTarget } from '@/lib/world/spatial/earthMapInteraction'
+import { isEarthMapSurfaceTarget, shouldChooseEarthMapSpot } from '@/lib/world/spatial/earthMapInteraction'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
@@ -81,6 +81,7 @@ export default function EarthRegionPreview(){
 
   const drag=useRef<{x:number;y:number;ox:number;oy:number;moved:boolean}|null>(null)
   const suppressMapClick=useRef(false)
+  const pointerStartedOnSurface=useRef(false)
   const mapGroupRef=useRef<SVGGElement|null>(null)
 
   const loadSpatial=async()=>{const token=await getToken();if(!token){setSpatial({error:'Nicht angemeldet'});return}const response=await fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`}});setSpatial(await response.json())}
@@ -197,9 +198,12 @@ export default function EarthRegionPreview(){
 
   function pointerToSpot(e:{clientX:number;clientY:number}){if(!projection||!data?.region?.origin||!mapGroupRef.current)return null;const svg=mapGroupRef.current.ownerSVGElement,ctm=mapGroupRef.current.getScreenCTM();if(!svg||!ctm)return null;const point=svg.createSVGPoint();point.x=e.clientX;point.y=e.clientY;const local=point.matrixTransform(ctm.inverse()),geo={lon:projection.lon(local.x),lat:projection.lat(local.y)},metric=geoToLocalMeters(geo,data.region.origin);return{mapX:local.x,mapY:local.y,xM:metric.eastM,yM:metric.northM}}
 
-  function chooseMapSpot(e:{clientX:number;clientY:number;target:EventTarget|null}){
-    if(!isEarthMapSurfaceTarget(e.target))return
-    if(suppressMapClick.current){suppressMapClick.current=false;return}
+  function chooseMapSpot(e:{clientX:number;clientY:number}){
+    const startedOnSurface=pointerStartedOnSurface.current
+    pointerStartedOnSurface.current=false
+    const dragged=suppressMapClick.current
+    suppressMapClick.current=false
+    if(!shouldChooseEarthMapSpot(startedOnSurface,dragged))return
     const next=pointerToSpot(e)
     if(!next)return
     setSelectedSpot(next);setSelectedWorldObjectId(null);setEntryRequest(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null);setSelected(null)
@@ -230,7 +234,7 @@ export default function EarthRegionPreview(){
 
     <div className="earth-map"
       onWheel={e=>{e.preventDefault();zoomAroundCenter(e.deltaY<0?1:-1)}}
-      onPointerDown={e=>{drag.current={x:e.clientX,y:e.clientY,ox:offset.x,oy:offset.y,moved:false};e.currentTarget.setPointerCapture(e.pointerId)}}
+      onPointerDown={e=>{pointerStartedOnSurface.current=isEarthMapSurfaceTarget(e.target);drag.current={x:e.clientX,y:e.clientY,ox:offset.x,oy:offset.y,moved:false};e.currentTarget.setPointerCapture(e.pointerId)}}
       onPointerMove={e=>{if(!drag.current)return;const dx=e.clientX-drag.current.x,dy=e.clientY-drag.current.y;if(Math.hypot(dx,dy)>4)drag.current.moved=true;setOffset({x:drag.current.ox+dx,y:drag.current.oy+dy})}}
       onPointerUp={e=>{suppressMapClick.current=Boolean(drag.current?.moved);drag.current=null;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}}}
       onClick={chooseMapSpot}>

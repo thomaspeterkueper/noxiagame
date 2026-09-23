@@ -5,12 +5,14 @@ type NamespaceTarget = {
 }
 
 /**
- * The map container owns pointer capture for panning. Therefore the final click
- * can target the container instead of the nested SVG. Only clicks originating
- * from the SVG surface may create a building placement; HTML controls layered
- * over the map must stay inert.
+ * Records whether pointer-down originated on the SVG before the map container
+ * captures that pointer. The later click may be retargeted to the container.
  */
 export function isEarthMapSurfaceTarget(target: EventTarget | null): boolean {
   if (!target || typeof target !== 'object' || !('namespaceURI' in target)) return false
   return (target as NamespaceTarget).namespaceURI === SVG_NAMESPACE
+}
+
+export function shouldChooseEarthMapSpot(startedOnSurface: boolean, dragged: boolean): boolean {
+  return startedOnSurface && !dragged
 }
