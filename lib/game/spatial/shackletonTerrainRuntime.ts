@@ -42,10 +42,14 @@ export async function loadShackletonTerrainRuntime(
   openImage?: LolaRasterImageOpener | null,
   datasetId: string = SHACKLETON_LOLA_DATASET_ID,
 ): Promise<ShackletonTerrainRuntime> {
+  const datasetIds = datasetId === SHACKLETON_LOLA_DATASET_ID
+    ? [SHACKLETON_POLAR_LOLA_DATASET_ID, SHACKLETON_LOLA_DATASET_ID]
+    : [datasetId]
+
   const { data, error } = await supabase
     .from('terrain_tiles')
     .select(TILE_SELECT)
-    .eq('dataset_id', datasetId)
+    .in('dataset_id', datasetIds)
     .eq('status', 'ready')
     .order('pixel_size_m', { ascending: true })
 
