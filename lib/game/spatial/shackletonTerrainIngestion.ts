@@ -28,6 +28,28 @@ export class CachedShackletonLolaAdapter implements TerrainRasterAdapter {
   }
 
   async sampleAtPlanetary(dataset: TerrainDatasetDescriptor, frame: WorldFrame, coordinate: PlanetaryCoordinate): Promise<TerrainRasterSourceSample | null> {
+    // Migration bridge: while the world frame still names the historical 118 m
+    // dataset, prefer a validated metric south-polar Site04 tile when present.
+    // This removes the polar lat/lon-strip artefact without changing gameplay
+    // callers. The authoritative source provenance is carried by the returned
+    // tile key and its manifest metadata.
+    const polarTile = this.ingestion.readyTileAt(coordinate, SHACKLETON_POLAR_LOLA_DATASET_ID)
+    if (polarTile) {
+      const polarDataset: TerrainDatasetDescriptor = {
+        ...dataset,
+        id: SHACKLETON_POLAR_LOLA_DATASET_ID,
+        datasetName: 'LOLA Shackleton Rim Site04 5m',
+        resolutionM: polarTile.manifest.pixelSizeM ?? 5,
+        horizontalReference: 'MOON_ME_SOUTH_POLAR_STEREOGRAPHIC_DE421',
+        verticalReference: 'MOON_ME_DE421_SURFACE_HEIGHT',
+        sourceUri: terrainStorageUri(polarTile.manifest),
+        accessMode: 'polar-stereographic-geotiff',
+        metadata: { ...(dataset.metadata ?? {}), ...(polarTile.manifest.metadata ?? {}) },
+      }
+      const sample = await new LolaSouthPolarTerrainAdapter(this.openImage).sampleAtPlanetary(polarDataset, frame, coordinate)
+      if (sample) return { ...sample, tileKey: polarTile.manifest.tileKey }
+    }
+
     const tile = this.ingestion.readyTileAt(coordinate, dataset.id)
     if (!tile) return null
     const cachedDataset = { ...dataset, sourceUri: terrainStorageUri(tile.manifest) }
