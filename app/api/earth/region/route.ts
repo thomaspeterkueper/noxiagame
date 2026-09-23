@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
+import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
@@ -12,18 +13,18 @@ const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
 const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
 
 const SELMECKE_REFERENCE_FEATURE: ImportedEarthFeature = {
-  id: 'noxia:site:selmecke-reference',
+  id: SELMECKE_REFERENCE_SITE.id,
   worldId: 'earth',
   featureType: 'settlement',
   geometryKind: 'point',
   properties: {
-    name: 'Selmecke · NOXIA-Referenzstandort',
+    name: SELMECKE_REFERENCE_SITE.label,
     place: 'noxia_reference_site',
     source: 'NOXIA',
   },
   geometry: {
     kind: 'point',
-    coordinates: { lat: 51.33745, lon: 7.97975 },
+    coordinates: SELMECKE_REFERENCE_SITE.point,
   },
   source: {
     provider: 'NOXIA',

@@ -1,6 +1,7 @@
 import type { ImportedEarthFeature } from './earthFeatureSource'
 import type { SpaceportCandidate } from './spaceportSuitability'
 import type { SpaceportShortlistCandidate } from './spaceportShortlist'
+import { SELMECKE_REFERENCE_SITE } from './earthReferenceSites'
 
 export type SpaceportAreaAnalysis = {
   label: 'A' | 'B' | 'C'
@@ -13,6 +14,8 @@ export type SpaceportAreaAnalysis = {
   expansionScore: number
   corridorScore: number
   accessScore: number
+  selmeckeDistanceM: number
+  compactShuttleFit: boolean
   areaScore: number
   verdict: 'strong' | 'conditional' | 'weak'
   notes: string[]
@@ -52,6 +55,10 @@ export function analyseSpaceportAreas(shortlist:SpaceportShortlistCandidate[],ra
   const expansionScore=Math.max(0,Math.min(100,usableShare*75+Math.min(25,usableAreaHa/4)))
   const corridorScore=Math.max(0,Math.min(100,(maxConnectedSpanM/1800)*100))
   const accessScore=Math.max(0,Math.min(100,100-Math.min(60,road/35)-Math.min(40,rail/100)))
+  const selmeckeDistanceM=Math.round(distanceM(site,SELMECKE_REFERENCE_SITE.point))
+  // Planning threshold for one operational pad, one reserve pad, apron,
+  // maintenance/hangars and storage. It is not a launch-safety approval.
+  const compactShuttleFit=usableAreaHa>=25&&maxConnectedSpanM>=500
   const areaScore=Math.round(site.score*.35+expansionScore*.3+corridorScore*.2+accessScore*.15)
   const verdict:SpaceportAreaAnalysis['verdict']=areaScore>=70?'strong':areaScore>=50?'conditional':'weak'
   const notes:string[]=[]
@@ -63,6 +70,9 @@ export function analyseSpaceportAreas(shortlist:SpaceportShortlistCandidate[],ra
   if(road<1200)notes.push('Straßenerschließung günstig')
   if(rail<2500)notes.push('Bahnanschluss im erweiterten Umfeld')
   if(sensitive<500)notes.push('sensible Realweltnutzung bleibt ein Planungsrisiko')
-  return {label:site.shortlistLabel,center:{lat:site.lat,lon:site.lon},analysisRadiusM:radiusM,usableAreaHa,usableShare,connectedSuitableCells:suitable.length,maxConnectedSpanM:Math.round(maxConnectedSpanM),expansionScore:Math.round(expansionScore),corridorScore:Math.round(corridorScore),accessScore:Math.round(accessScore),areaScore,verdict,notes}
+  if(compactShuttleFit)notes.push('ausreichende zusammenhängende Fläche für kompakten 1–2-Pad-Shuttlebetrieb')
+  else notes.push('kompakter Shuttlebetrieb benötigt genauere Flächenprüfung')
+  notes.push(`Luftlinie Selmecke: ${(selmeckeDistanceM/1000).toFixed(1)} km; Tunneltrasse separat zu prüfen`)
+  return {label:site.shortlistLabel,center:{lat:site.lat,lon:site.lon},analysisRadiusM:radiusM,usableAreaHa,usableShare,connectedSuitableCells:suitable.length,maxConnectedSpanM:Math.round(maxConnectedSpanM),expansionScore:Math.round(expansionScore),corridorScore:Math.round(corridorScore),accessScore:Math.round(accessScore),selmeckeDistanceM,compactShuttleFit,areaScore,verdict,notes}
  }).sort((a,b)=>b.areaScore-a.areaScore)
 }
