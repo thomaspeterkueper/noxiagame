@@ -22,6 +22,8 @@ export interface ReconstructedTerrainCell {
   confidence: number
   normalizedHeight01: number
   slopeDeg: number
+  /** Azimuth of steepest descent: 0° north, 90° east. */
+  downhillAzimuthDeg: number
   hillshade01: number
 }
 
@@ -34,6 +36,14 @@ export interface ReconstructedTerrainSurface {
   minElevationM: number
   maxElevationM: number
   cells: (ReconstructedTerrainCell | null)[]
+}
+
+export interface LocalTerrainAnalysis {
+  cell: ReconstructedTerrainCell
+  localMinElevationM: number
+  localMaxElevationM: number
+  localReliefM: number
+  sampleRadiusM: number
 }
 
 function finite(value: number | null | undefined): value is number {
@@ -131,7 +141,6 @@ function bilinear(
     conf += confidence[i] * corner.w
     total += corner.w
   }
-  // Do not stretch a lone value over a large unsupported area.
   if (total < 0.74) return null
   return { elevationM: z / total, confidence: clamp01(conf / total) }
 }
@@ -145,7 +154,6 @@ function sampleElevation(size: number, values: (number | null)[], row: number, c
 function lightVector(azimuthDeg: number, altitudeDeg: number) {
   const az = azimuthDeg * Math.PI / 180
   const alt = altitudeDeg * Math.PI / 180
-  // azimuth: 0° north, 90° east; local axes x=east, y=north, z=up.
   return {
     x: Math.cos(alt) * Math.sin(az),
     y: Math.cos(alt) * Math.cos(az),
@@ -153,23 +161,13 @@ function lightVector(azimuthDeg: number, altitudeDeg: number) {
   }
 }
 
-/**
- * Body-independent local terrain reconstruction. Spherical/ellipsoidal body
- * geometry is resolved before this stage by the shared body-fixed -> tangent
- * frame pipeline. The renderer therefore works purely in local metres and can
- * be reused for Earth, Moon, Mars and later planetary bodies.
- */
 export function reconstructLocalTerrain(
   grid: LocalElevationGrid,
   options: TerrainReconstructionOptions = {},
 ): ReconstructedTerrainSurface {
   validateGrid(grid)
   const factor = Math.max(1, Math.floor(options.upsampleFactor ?? 4))
-  const filled = fillLocalElevationHoles(
-    grid,
-    options.maxHoleRadiusCells ?? 1,
-    options.minNeighbourCount ?? 3,
-  )
+  const filled = fillLocalElevationHoles(grid, options.maxHoleRadiusCells ?? 1, options.minNeighbourCount ?? 3)
   const outSize = (grid.size - 1) * factor + 1
   const outStepM = grid.stepM / factor
   const values: (number | null)[] = new Array(outSize * outSize).fill(null)
@@ -184,9 +182,7 @@ export function reconstructLocalTerrain(
       const target = idx(outSize, row, col)
       values[target] = sample.elevationM
       confidence[target] = sample.confidence
-      if (row % factor === 0 && col % factor === 0) {
-        observed[target] = filled.observed[idx(grid.size, row / factor, col / factor)]
-      }
+      if (row % factor === 0 && col % factor === 0) observed[target] = filled.observed[idx(grid.size, row / factor, col / factor)]
     }
   }
 
@@ -207,12 +203,12 @@ export function reconstructLocalTerrain(
       const north = sampleElevation(outSize, values, row - 1, col)
       const south = sampleElevation(outSize, values, row + 1, col)
       const dzdx = finite(left) && finite(right) ? (right - left) / (2 * outStepM) : 0
-      // Grid row grows southward, while local y grows northward.
       const dzdy = finite(north) && finite(south) ? (north - south) / (2 * outStepM) : 0
       const norm = Math.hypot(dzdx, dzdy, 1)
       const nx = -dzdx / norm, ny = -dzdy / norm, nz = 1 / norm
       const shade = clamp01(0.5 + 0.5 * (nx * light.x + ny * light.y + nz * light.z))
       const slopeDeg = Math.atan(Math.hypot(dzdx, dzdy)) * 180 / Math.PI
+      const downhillAzimuthDeg = ((Math.atan2(-dzdx, -dzdy) * 180 / Math.PI) + 360) % 360
       const i = idx(outSize, row, col)
       cells[i] = {
         row,
@@ -224,6 +220,7 @@ export function reconstructLocalTerrain(
         confidence: confidence[i],
         normalizedHeight01: clamp01((current - minElevationM) / span),
         slopeDeg,
+        downhillAzimuthDeg,
         hillshade01: shade,
       }
     }
@@ -238,5 +235,41 @@ export function reconstructLocalTerrain(
     minElevationM,
     maxElevationM,
     cells,
+  }
+}
+
+export function analyzeLocalTerrainAt(
+  surface: ReconstructedTerrainSurface,
+  xM: number,
+  yM: number,
+  radiusCells = 2,
+): LocalTerrainAnalysis | null {
+  if (!surface.cells.length || surface.size < 1 || surface.stepM <= 0) return null
+  const half = (surface.size - 1) / 2
+  const col = Math.round(xM / surface.stepM + half)
+  const row = Math.round(half - yM / surface.stepM)
+  if (row < 0 || col < 0 || row >= surface.size || col >= surface.size) return null
+  const cell = surface.cells[idx(surface.size, row, col)]
+  if (!cell) return null
+
+  const radius = Math.max(0, Math.floor(radiusCells))
+  const elevations: number[] = []
+  for (let dr = -radius; dr <= radius; dr++) {
+    for (let dc = -radius; dc <= radius; dc++) {
+      const rr = row + dr, cc = col + dc
+      if (rr < 0 || cc < 0 || rr >= surface.size || cc >= surface.size) continue
+      const neighbour = surface.cells[idx(surface.size, rr, cc)]
+      if (neighbour) elevations.push(neighbour.elevationM)
+    }
+  }
+  if (!elevations.length) return null
+  const localMinElevationM = Math.min(...elevations)
+  const localMaxElevationM = Math.max(...elevations)
+  return {
+    cell,
+    localMinElevationM,
+    localMaxElevationM,
+    localReliefM: localMaxElevationM - localMinElevationM,
+    sampleRadiusM: radius * surface.stepM,
   }
 }
