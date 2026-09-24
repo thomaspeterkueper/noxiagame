@@ -5,8 +5,7 @@ import { ORBITS } from './orbits'
  *
  * These nodes deliberately describe *where gameplay state ends up*, not the
  * propulsion/trajectory needed to reach them. Engineering remains authoritative
- * for ascent feasibility. A logical LEO node is required so `earth` on the
- * surface is not indistinguishable from a spacecraft that is actually in orbit.
+ * for ascent feasibility. Explicit nodes keep surface and orbital presence apart.
  */
 export type AscentOrbitNode = {
   slug: string
@@ -25,6 +24,14 @@ export const ASCENT_ORBIT_NODES: Readonly<Record<string, AscentOrbitNode>> = {
     orbitClass: 'leo-circular',
     altitudeKm: 400,
     sourceReference: 'KUEPER-ENGINEERING spacecraft/asce mission-baseline-book-0.7 mission target',
+  },
+  'moon-llo-100': {
+    slug: 'moon-llo-100',
+    bodySlug: 'moon',
+    label: 'Moon · 100 km LLO',
+    orbitClass: 'llo-circular',
+    altitudeKm: 100,
+    sourceReference: 'KUEPER-ENGINEERING systems/lunar-ascent-authority-r1.json',
   },
 }
 
