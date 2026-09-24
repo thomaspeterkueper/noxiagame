@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <!-- NCML-Funktionsakzent 24.09.2026: cyan-blau = Wasser-/Eisgewinnung,
+       passte schon vor der Systematisierung. Huelle bleibt hell/metallisch.
+       Siehe EXT-NOXIA-UNIVERSE-20260924-chromatic-renaissance-game-
+       integration.md -->
   <defs>
     <linearGradient id="drillBody" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef6fa"/><stop offset="1" stop-color="#9fc3d4"/></linearGradient>
     <linearGradient id="drillBit" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c9d8de"/><stop offset="1" stop-color="#5f7b87"/></linearGradient>
