@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <!-- NCML-Funktionsakzent 24.09.2026: gruen = Mobilitaet/Logistik-Flotte.
+       Huelle bleibt hell/metallisch. Siehe EXT-NOXIA-UNIVERSE-20260924-
+       chromatic-renaissance-game-integration.md -->
+  <defs>
+    <linearGradient id="yardPad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#dfe8ef"/><stop offset="1" stop-color="#a9bcc7"/></linearGradient>
+    <linearGradient id="roverBody" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef3f5"/><stop offset="1" stop-color="#c3d0d7"/></linearGradient>
+    <filter id="yardShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#yardShadow)" transform="translate(60 150)">
+    <path d="M20 320 300 460 620 300 340 160Z" fill="url(#yardPad)" stroke="#526977" stroke-width="6"/>
+    <path d="M20 320 300 460 300 500 20 360Z" fill="#c3d0d7" stroke="#526977" stroke-width="5"/>
+    <path d="M300 460 620 300 620 340 300 500Z" fill="#a9bcc7" stroke="#526977" stroke-width="5"/>
+    <g stroke="#8ea3af" stroke-width="3" opacity=".6">
+      <path d="M120 300 400 440" fill="none"/>
+      <path d="M180 250 460 390" fill="none"/>
+    </g>
+    <g transform="translate(360 210)">
+      <ellipse cx="0" cy="90" rx="120" ry="36" fill="#26343a" opacity=".18"/>
+      <path d="M-90 60 0 100 90 60 90 10 40 -20 -40 -20 -90 10Z" fill="url(#roverBody)" stroke="#526977" stroke-width="5"/>
+      <path d="M-40 -20 40 -20 60 -2 -60 -2Z" fill="#dbe4ea" stroke="#526977" stroke-width="4"/>
+      <g fill="#3d3d3d" stroke="#1c1c1c" stroke-width="3">
+        <circle cx="-55" cy="68" r="22"/><circle cx="55" cy="68" r="22"/>
+      </g>
+      <g fill="#7fd97f" stroke="#1d5c1d" stroke-width="2">
+        <circle cx="-70" cy="30" r="9"/><circle cx="70" cy="30" r="9"/>
+      </g>
+    </g>
+  </g>
+</svg>
