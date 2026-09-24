@@ -5,11 +5,19 @@ on:
     paths:
       - 'lib/game/launchSystems.ts'
       - 'lib/game/launchSystems.test.ts'
+      - 'lib/game/ascentTargets.ts'
+      - 'lib/game/engineeringLaunchAuthorities.test.ts'
+      - 'lib/game/core/lunarAscentEngineeringAuthority.ts'
+      - 'lib/game/core/carrierRocketEngineeringAuthority.ts'
       - '.github/workflows/launch-systems.yml'
   push:
     paths:
       - 'lib/game/launchSystems.ts'
       - 'lib/game/launchSystems.test.ts'
+      - 'lib/game/ascentTargets.ts'
+      - 'lib/game/engineeringLaunchAuthorities.test.ts'
+      - 'lib/game/core/lunarAscentEngineeringAuthority.ts'
+      - 'lib/game/core/carrierRocketEngineeringAuthority.ts'
       - '.github/workflows/launch-systems.yml'
 
 jobs:
@@ -28,7 +36,10 @@ jobs:
       - name: Compile and run launch-system contract tests
         run: |
           rm -rf .launch-system-test
-          npx tsc lib/game/launchSystems.test.ts \
+          npx tsc \
+            lib/game/launchSystems.test.ts \
+            lib/game/engineeringLaunchAuthorities.test.ts \
             --target ES2022 --module commonjs --moduleResolution node \
             --esModuleInterop --skipLibCheck --rootDir lib --outDir .launch-system-test
           node .launch-system-test/game/launchSystems.test.js
+          node .launch-system-test/game/engineeringLaunchAuthorities.test.js
