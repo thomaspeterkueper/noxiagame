@@ -1,4 +1,4 @@
-import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, type ResearchGroup } from './researchExchange'
+import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, type ResearchGroup } from './researchExchange'
 import type { ProtocolRevision } from './runtime'
 
 let failures = 0
@@ -21,6 +21,13 @@ const adopted=adoptProtocolFromFinding({groupId:'plants',finding,atTick:122})
 check(adopted?.protocolVersion===2,'plant science can adopt sufficiently supported protocol')
 const weak={...finding,id:'finding:weak',confidence:0.4}
 check(adoptProtocolFromFinding({groupId:'life',finding:weak,atTick:122})===null,'weak evidence is not automatically adopted')
+
+const plantChallenge=challengeFinding({groupId:'plants',finding,evidenceRefs:['experiment:plants-replication'],confidence:0.82,reasonCode:'failed_replication',atTick:130})
+const controversy=openControversy({finding,challenge:plantChallenge})
+check(controversy.status==='open' && controversy.participantGroupIds.length===2,'strong conflicting evidence opens explicit controversy')
+check(!shouldEscalateControversy({finding,challenges:[plantChallenge]}),'one independent challenge stays within deterministic research loop')
+const lifeChallenge=challengeFinding({groupId:'life',finding,evidenceRefs:['experiment:life-support-side-effect'],confidence:0.76,reasonCode:'side_effect',atTick:132})
+check(shouldEscalateControversy({finding,challenges:[plantChallenge,lifeChallenge]}),'two independent strong challenges justify higher cognitive escalation')
 
 if(failures) throw new Error(String(failures)+' research exchange test(s) failed')
 console.log('Research exchange: tests passed; cross-group reuse requires no LLM call')
