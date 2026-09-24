@@ -18,7 +18,9 @@ export interface RuntimeTerrainSamplerResolution {
   details?: string
 }
 
-export async function resolveRuntimeTerrainSampler(
+const runtimeCache = new Map<string, Promise<RuntimeTerrainSamplerResolution>>()
+
+async function createRuntimeTerrainSampler(
   supabase: SupabaseClient,
   datasetId: string,
 ): Promise<RuntimeTerrainSamplerResolution> {
@@ -52,4 +54,19 @@ export async function resolveRuntimeTerrainSampler(
     datasetId,
     details: `No runtime terrain adapter registered for dataset ${datasetId}`,
   }
+}
+
+export function resolveRuntimeTerrainSampler(
+  supabase: SupabaseClient,
+  datasetId: string,
+): Promise<RuntimeTerrainSamplerResolution> {
+  const cached = runtimeCache.get(datasetId)
+  if (cached) return cached
+
+  const pending = createRuntimeTerrainSampler(supabase, datasetId).catch(error => {
+    runtimeCache.delete(datasetId)
+    throw error
+  })
+  runtimeCache.set(datasetId, pending)
+  return pending
 }
