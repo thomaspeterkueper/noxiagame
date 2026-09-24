@@ -9,8 +9,6 @@ import {
 import type { LolaRasterImageOpener } from './lolaTerrainAdapter'
 import { SHACKLETON_POLAR_LOLA_DATASET_ID } from './lolaPolarTerrainAdapter'
 import { RasterTerrainSampler } from './terrainRaster'
-import { StoredTerrainTileValidator } from './terrainStorage'
-import { SupabaseTerrainObjectStore } from './supabaseTerrainObjectStore'
 import { resolvePersistedTerrainTileManifest, type PersistedTerrainTileRow } from './terrainTilePersistence'
 import type { TerrainSampler } from './terrainSampling'
 
@@ -37,6 +35,19 @@ const TILE_SELECT = [
   'checksum', 'status', 'metadata',
 ].join(',')
 
+/**
+ * terrain_tiles.status='ready' is the persisted result of ingestion-time byte
+ * size/checksum validation. Live gameplay must not download and hash a ~41 MB
+ * GeoTIFF again merely to reconstruct that already-persisted state. Structural
+ * manifest validation still happens through resolvePersistedTerrainTileManifest;
+ * the raster bytes are read by the decoder only when sampling actually starts.
+ */
+const persistedReadyValidator = {
+  async validate() {
+    return
+  },
+}
+
 export async function loadShackletonTerrainRuntime(
   supabase: SupabaseClient,
   openImage?: LolaRasterImageOpener | null,
@@ -56,9 +67,7 @@ export async function loadShackletonTerrainRuntime(
   if (error) throw new Error(`Shackleton terrain tile query failed: ${error.message}`)
 
   const rows = (data ?? []) as unknown as PersistedTerrainTileRow[]
-  const store = new SupabaseTerrainObjectStore(supabase)
-  const validator = new StoredTerrainTileValidator(store)
-  const ingestion = new ShackletonTerrainIngestion(validator)
+  const ingestion = new ShackletonTerrainIngestion(persistedReadyValidator)
   const rejectedTiles: Array<{ tileKey: string; details: string[] }> = []
 
   for (const row of rows) {
