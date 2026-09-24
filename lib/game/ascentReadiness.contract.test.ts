@@ -4,11 +4,13 @@ import { resolve } from 'node:path'
 
 const resolver = readFileSync(resolve(process.cwd(), 'lib/game/core/ascentReadiness.ts'), 'utf8')
 const engineering = readFileSync(resolve(process.cwd(), 'lib/game/core/earthAscentEngineeringAuthority.ts'), 'utf8')
+const flightArticle = readFileSync(resolve(process.cwd(), 'lib/game/core/ascentFlightArticle.ts'), 'utf8')
 const targets = readFileSync(resolve(process.cwd(), 'lib/game/ascentTargets.ts'), 'utf8')
 const api = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/readiness/route.ts'), 'utf8')
 const ascentApi = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/route.ts'), 'utf8')
 const crewApi = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/crew/route.ts'), 'utf8')
 const crewMigration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'), 'utf8')
+const articleMigration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260925001000_spacecraft_flight_articles.sql'), 'utf8')
 
 // Server-side facts must come from canonical persisted state.
 assert.ok(resolver.includes(".from('ships')"))
@@ -35,13 +37,22 @@ assert.ok(engineering.includes('minCircularAltitudeKm: 395'))
 assert.ok(engineering.includes('maxCircularAltitudeKm: 405'))
 assert.ok(engineering.includes("sourceReference: 'systems/earth-leo-ascent-authority-r1.json'"))
 
-// NOXIA must not relabel legacy freighters as ASCE. Only an explicit gameplay
-// ship type may map to ENG-SCV-0003, and unknown physical state fails closed.
-assert.ok(engineering.includes("noxiaShipTypeId: 'asce_p85_r1'"))
-assert.ok(engineering.includes("result: 'frame-unmapped'"))
-assert.ok(engineering.includes("'physical-departure-state-unavailable'"))
-assert.ok(engineering.includes("'target-plane-unresolved'"))
-assert.ok(resolver.includes('physicalState: null'))
+// Concrete Engineering identity must come from a trusted flight article, never a
+// legacy ship name/type or client field.
+assert.ok(articleMigration.includes('spacecraft_flight_articles'))
+assert.ok(articleMigration.includes('engineering_frame_id text not null'))
+assert.ok(articleMigration.includes('engineering_authority_ref text not null'))
+assert.ok(articleMigration.includes('actual_start_mass_kg numeric null'))
+assert.ok(articleMigration.includes('enable row level security'))
+assert.ok(articleMigration.includes('revoke all on table public.spacecraft_flight_articles from public, anon, authenticated'))
+assert.ok(flightArticle.includes(".from('spacecraft_flight_articles')"))
+assert.ok(flightArticle.includes("row.owner_profile_id !== actorProfileId"))
+assert.ok(engineering.includes("input.engineeringFrameId !== a.engineeringFrameId"))
+assert.ok(engineering.includes("'flight-article-not-mapped-to-eng-scv-0003'"))
+assert.equal(engineering.includes('noxiaShipTypeId'), false)
+assert.equal(resolver.includes('physicalState: null'), false)
+assert.ok(resolver.includes('getSpacecraftFlightArticle(actorProfileId, shipId)'))
+assert.ok(resolver.includes('flightArticlePhysicalState(flightArticle)'))
 
 // Crew is an explicit gameplay fact. The owner can board their own ship as
 // commander/pilot, but cannot assert readiness directly from the browser.
@@ -53,16 +64,16 @@ assert.ok(resolver.includes("crewRow.role === 'commander' || crewRow.role === 'p
 assert.ok(crewApi.includes("body.action === 'board-self'"))
 assert.equal(api.includes('body.crewReady'), false)
 
-// Empty cargo is authoritatively zero payload. Non-empty legacy cargo remains
-// unresolved instead of treating resources.unit='t' as a physical mass claim.
+// Empty cargo is authoritatively zero gameplay payload. Physical launch mass is
+// still independently fail-closed in the persisted flight article.
 assert.ok(resolver.includes('const cargoEmpty = cargoRows.length === 0'))
 assert.ok(resolver.includes('const canonicalCargoReady = cargoEmpty'))
 assert.ok(resolver.includes("cargoEmpty ? 'ready' : 'unresolved'"))
 assert.ok(resolver.includes('Legacy-Fracht bleibt gesperrt'))
 assert.equal(api.includes('body.cargoReady'), false)
 
-// Public clients cannot inject trusted Engineering facts. Authorization now calls
-// the trusted resolver and only then the persistent Core command.
+// Public clients cannot inject trusted Engineering facts. Authorization resolves
+// persisted state and only then calls the persistent Core command.
 for (const forbidden of [
   'body.engineering',
   'body.actualStartMassKg',
@@ -70,6 +81,7 @@ for (const forbidden of [
   'body.departureSiteClass',
   'body.releaseSpeedMS',
   'body.targetPlaneResolved',
+  'body.engineeringFrameId',
 ]) {
   assert.equal(ascentApi.includes(forbidden), false, `client may not supply ${forbidden}`)
 }

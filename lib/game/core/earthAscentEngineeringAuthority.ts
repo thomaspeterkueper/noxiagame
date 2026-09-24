@@ -11,7 +11,6 @@ import type { ResolvedAscentOrbitNode } from '@/lib/game/ascentTargets'
 export const EARTH_LEO_ASCENT_AUTHORITY_R1 = {
   authorityId: 'ENG-EARTH-LEO-ASCENT-r1',
   engineeringFrameId: 'ENG-SCV-0003',
-  noxiaShipTypeId: 'asce_p85_r1',
   departureBody: 'earth',
   targetBody: 'earth',
   targetOrbitClass: 'leo-circular',
@@ -58,7 +57,8 @@ export interface EarthAscentEngineeringAssessment {
 }
 
 export function resolveEarthAscentEngineeringAuthority(input: {
-  shipTypeId: string | null
+  engineeringFrameId: string | null
+  engineeringAuthorityRef?: string | null
   departureSurfaceSlug: string
   target: ResolvedAscentOrbitNode | null
   physicalState: EarthAscentPhysicalState | null
@@ -76,11 +76,14 @@ export function resolveEarthAscentEngineeringAuthority(input: {
     }
   }
 
-  if (input.shipTypeId !== a.noxiaShipTypeId) {
+  if (
+    input.engineeringFrameId !== a.engineeringFrameId
+    || (input.engineeringAuthorityRef != null && input.engineeringAuthorityRef !== a.authorityId)
+  ) {
     return {
       result: 'frame-unmapped',
       authority: null,
-      blockers: ['noxia-ship-not-mapped-to-eng-scv-0003'],
+      blockers: ['flight-article-not-mapped-to-eng-scv-0003'],
       authorityId: a.authorityId,
       engineeringFrameId: a.engineeringFrameId,
     }
