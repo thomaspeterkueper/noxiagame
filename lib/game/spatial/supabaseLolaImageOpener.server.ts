@@ -19,9 +19,34 @@ function parseTerrainUri(uri: string): { bucket: string; path: string } {
   return { bucket: match[1], path: match[2] }
 }
 
+// Module-level on purpose: multiple terrain runtime/adaptor instances can be
+// created during one warm Vercel process. A Site04 raster is ~41 MB, therefore
+// reopening it for every sampler or every sample is prohibitively expensive.
+// Promise caching also coalesces concurrent first readers into one download and
+// one GeoTIFF decode. Failed opens are evicted so a later request can retry.
+const imageCache = new Map<string, Promise<LolaRasterImage>>()
+const MAX_CACHED_IMAGES = 4
+
+function cacheImage(uri: string, loader: () => Promise<LolaRasterImage>) {
+  const existing = imageCache.get(uri)
+  if (existing) return existing
+
+  const pending = loader().catch(error => {
+    imageCache.delete(uri)
+    throw error
+  })
+  imageCache.set(uri, pending)
+
+  if (imageCache.size > MAX_CACHED_IMAGES) {
+    const oldest = imageCache.keys().next().value as string | undefined
+    if (oldest && oldest !== uri) imageCache.delete(oldest)
+  }
+  return pending
+}
+
 export function createSupabaseLolaImageOpener(supabase: SupabaseClient): LolaRasterImageOpener {
   const store = new SupabaseTerrainObjectStore(supabase)
-  return async (uri: string): Promise<LolaRasterImage> => {
+  return async (uri: string): Promise<LolaRasterImage> => cacheImage(uri, async () => {
     const { bucket, path } = parseTerrainUri(uri)
     const bytes = await store.read(bucket, path)
     // TS2345: .buffer ist ArrayBufferLike (ArrayBuffer | SharedArrayBuffer),
@@ -33,5 +58,5 @@ export function createSupabaseLolaImageOpener(supabase: SupabaseClient): LolaRas
     const tiff = await fromArrayBuffer(arrayBuffer)
     const image = await tiff.getImage()
     return image as unknown as LolaRasterImage
-  }
+  })
 }
