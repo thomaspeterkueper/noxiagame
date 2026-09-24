@@ -1,8 +1,8 @@
-import type { ResolvedAscentOrbitNode } from '@/lib/game/ascentTargets'
+import type { ResolvedAscentOrbitNode } from '../ascentTargets'
 import type {
   LaunchEngineeringAuthority,
   LaunchVehicleReusability,
-} from '@/lib/game/launchSystems'
+} from '../launchSystems'
 
 export const CARRIER_ROCKET_LAUNCH_AUTHORITY_R1 = {
   authorityId: 'ENG-CARRIER-ROCKET-LAUNCH-r1',
