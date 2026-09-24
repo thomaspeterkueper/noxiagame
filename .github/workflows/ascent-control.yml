@@ -26,6 +26,7 @@ on:
       - 'supabase/migrations/20260919170000_orbital_presence_from_ascent.sql'
       - 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'
       - 'supabase/migrations/20260925001000_spacecraft_flight_articles.sql'
+      - 'supabase/migrations/20260925002500_asce_reference_vehicle_binding.sql'
       - '.github/workflows/ascent-control.yml'
   push:
     paths:
@@ -52,6 +53,7 @@ on:
       - 'supabase/migrations/20260919170000_orbital_presence_from_ascent.sql'
       - 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'
       - 'supabase/migrations/20260925001000_spacecraft_flight_articles.sql'
+      - 'supabase/migrations/20260925002500_asce_reference_vehicle_binding.sql'
       - '.github/workflows/ascent-control.yml'
 
 jobs:
