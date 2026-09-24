@@ -12,6 +12,11 @@ import {
   resolveEarthAscentEngineeringAuthority,
   type EarthAscentEngineeringAssessment,
 } from '@/lib/game/core/earthAscentEngineeringAuthority'
+import {
+  flightArticlePhysicalState,
+  getSpacecraftFlightArticle,
+  type PersistedSpacecraftFlightArticle,
+} from '@/lib/game/core/ascentFlightArticle'
 
 export const LUNAR_ASCENT_ENGINEERING_REQUEST =
   'EXT-NOXIA-ENG-20260918-LUNAR-SURFACE-TO-ORBIT-ASCENT'
@@ -66,6 +71,7 @@ export interface ResolvedAscentReadiness {
   engineeringRequest: string
   engineeringAuthorityRef: string | null
   engineeringAssessment: EarthAscentEngineeringAssessment | null
+  flightArticle: PersistedSpacecraftFlightArticle | null
 }
 
 export interface AscentReadinessResolutionOptions {
@@ -87,16 +93,10 @@ export function engineeringRequestForDeparture(departureSurfaceSlug: string): st
 /**
  * Resolve authoritative server-side ascent facts.
  *
- * Crew comes from the explicit spacecraft crew manifest. Empty cargo is a
- * resolved 0 kg payload; non-empty legacy cargo remains fail-closed until its
- * physical mass basis is mapped. Earth Engineering authority is now consumed
- * from ENG-EARTH-LEO-ASCENT-r1 rather than being treated as an open request.
- *
- * The current legacy ship table still has no persisted ASCE physical departure
- * state (measured start mass, reference propellant state, mapped launch-assist
- * site/release state and resolved target plane). Consequently the Engineering
- * resolver remains fail-closed until an exact ASCE flight article is represented
- * by NOXIA; legacy freighters are never relabelled as ENG-SCV-0003.
+ * Crew comes from the explicit spacecraft crew manifest. Empty legacy cargo is
+ * a resolved gameplay payload of 0, while Engineering mass readiness comes only
+ * from a persisted spacecraft_flight_articles row. A ship name or legacy
+ * ship_type_id can never promote a craft to ENG-SCV-0003.
  */
 export async function resolveAscentReadiness(
   actorProfileId: string,
@@ -189,14 +189,17 @@ export async function resolveAscentReadiness(
   const crewReady = options.crewReady == null ? canonicalCrewReady : options.crewReady === true
   const cargoReady = options.cargoReady == null ? canonicalCargoReady : options.cargoReady === true
 
+  const flightArticle = normalizedDeparture === 'earth' && actorAuthorized
+    ? await getSpacecraftFlightArticle(actorProfileId, shipId)
+    : null
+
   const engineeringAssessment = normalizedDeparture === 'earth'
     ? resolveEarthAscentEngineeringAuthority({
-      shipTypeId: ship?.ship_type_id ?? null,
+      engineeringFrameId: flightArticle?.engineering_frame_id ?? null,
+      engineeringAuthorityRef: flightArticle?.engineering_authority_ref ?? null,
       departureSurfaceSlug: normalizedDeparture,
       target,
-      // No client field may satisfy this. A later NOXIA flight-article state
-      // projection will supply trusted measured/configuration values here.
-      physicalState: null,
+      physicalState: flightArticlePhysicalState(flightArticle),
     })
     : null
 
@@ -266,5 +269,6 @@ export async function resolveAscentReadiness(
       ? EARTH_LEO_ASCENT_AUTHORITY_R1.authorityId
       : null,
     engineeringAssessment,
+    flightArticle,
   }
 }
