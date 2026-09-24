@@ -11,6 +11,7 @@ const ascentApi = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/route
 const crewApi = readFileSync(resolve(process.cwd(), 'app/api/game/ascent/crew/route.ts'), 'utf8')
 const crewMigration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'), 'utf8')
 const articleMigration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260925001000_spacecraft_flight_articles.sql'), 'utf8')
+const vehicleBindingMigration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260925002500_asce_reference_vehicle_binding.sql'), 'utf8')
 
 // Server-side facts must come from canonical persisted state.
 assert.ok(resolver.includes(".from('ships')"))
@@ -54,6 +55,26 @@ assert.equal(resolver.includes('physicalState: null'), false)
 assert.ok(resolver.includes('getSpacecraftFlightArticle(actorProfileId, shipId)'))
 assert.ok(resolver.includes('flightArticlePhysicalState(flightArticle)'))
 
+// The shared vehicle model is the canonical concrete vehicle identity. Flight
+// articles are 1:1-bound to it and the runtime rechecks owner + exact frame.
+assert.ok(vehicleBindingMigration.includes('vehicle_instance_id uuid'))
+assert.ok(vehicleBindingMigration.includes('references public.vehicle_instances(id)'))
+assert.ok(vehicleBindingMigration.includes('spacecraft_flight_articles_vehicle_instance_uidx'))
+assert.ok(vehicleBindingMigration.includes('alter column vehicle_instance_id set not null'))
+assert.ok(flightArticle.includes(".from('vehicle_instances')"))
+assert.ok(flightArticle.includes('vehicle.owner_profile_id !== actorProfileId'))
+assert.ok(flightArticle.includes('vehicle.frame_id !== row.engineering_frame_id'))
+assert.ok(flightArticle.includes("vehicle.status === 'lost'"))
+
+// Seed only an inactive, unowned reference identity. It must not silently assert
+// a launch site, owner, payload capability, energy or crew readiness.
+assert.ok(vehicleBindingMigration.includes("'noxia:spacecraft:asce-p85-r1:reference-001'"))
+assert.ok(vehicleBindingMigration.includes("'ENG-SCV-0003'"))
+assert.ok(vehicleBindingMigration.includes("'inactive'"))
+assert.ok(vehicleBindingMigration.includes("'reference-unassigned'"))
+assert.ok(vehicleBindingMigration.includes("'physicalCapacityAuthority', 'unresolved'"))
+assert.ok(vehicleBindingMigration.includes("'launchSiteStatus', 'unresolved'"))
+
 // Crew is an explicit gameplay fact. The owner can board their own ship as
 // commander/pilot, but cannot assert readiness directly from the browser.
 assert.ok(crewMigration.includes('ship_crew_manifest'))
@@ -82,6 +103,7 @@ for (const forbidden of [
   'body.releaseSpeedMS',
   'body.targetPlaneResolved',
   'body.engineeringFrameId',
+  'body.vehicleInstanceId',
 ]) {
   assert.equal(ascentApi.includes(forbidden), false, `client may not supply ${forbidden}`)
 }

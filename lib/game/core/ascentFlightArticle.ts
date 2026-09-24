@@ -6,6 +6,7 @@ import type { EarthAscentPhysicalState } from '@/lib/game/core/earthAscentEngine
 export type PersistedSpacecraftFlightArticle = {
   ship_id: string
   owner_profile_id: string
+  vehicle_instance_id: string
   engineering_frame_id: string
   engineering_authority_ref: string
   configuration_ref: string
@@ -25,6 +26,13 @@ export type PersistedSpacecraftFlightArticle = {
   updated_at: string
 }
 
+type CanonicalVehicleIdentity = {
+  id: string
+  frame_id: string
+  owner_profile_id: string | null
+  status: string
+}
+
 function coreError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -32,7 +40,8 @@ function coreError(command: string, error: { message?: string; code?: string; de
 
 /**
  * Trusted Core lookup for the physical/Engineering identity of one concrete ship.
- * There is deliberately no client-supplied fallback: absence means unresolved.
+ * The flight article and shared vehicle identity must agree on owner and exact
+ * Engineering frame. There is deliberately no name/type/client fallback.
  */
 export async function getSpacecraftFlightArticle(
   actorProfileId: string,
@@ -51,6 +60,24 @@ export async function getSpacecraftFlightArticle(
   const row = data as unknown as PersistedSpacecraftFlightArticle
   if (row.owner_profile_id !== actorProfileId) throw new Error('NOXIA_ASCENT_FORBIDDEN')
   if (row.state_status === 'retired') return null
+
+  const { data: vehicleData, error: vehicleError } = await supabase
+    .from('vehicle_instances')
+    .select('id,frame_id,owner_profile_id,status')
+    .eq('id', row.vehicle_instance_id)
+    .maybeSingle()
+  if (vehicleError) throw coreError('spacecraft vehicle identity lookup', vehicleError)
+  if (!vehicleData) throw new Error('NOXIA_FLIGHT_ARTICLE_VEHICLE_MISSING')
+
+  const vehicle = vehicleData as unknown as CanonicalVehicleIdentity
+  if (
+    vehicle.owner_profile_id !== actorProfileId
+    || vehicle.frame_id !== row.engineering_frame_id
+    || vehicle.status === 'lost'
+  ) {
+    throw new Error('NOXIA_FLIGHT_ARTICLE_VEHICLE_MISMATCH')
+  }
+
   return row
 }
 
