@@ -1,5 +1,5 @@
-import type { AscentEngineeringAuthority } from '@/lib/game/ascentControl'
-import type { ResolvedAscentOrbitNode } from '@/lib/game/ascentTargets'
+import type { AscentEngineeringAuthority } from '../ascentControl'
+import type { ResolvedAscentOrbitNode } from '../ascentTargets'
 
 /** Consumer projection of KUEPER Engineering ENG-LUNAR-ASCENT-r1. */
 export const LUNAR_ASCENT_AUTHORITY_R1 = {
