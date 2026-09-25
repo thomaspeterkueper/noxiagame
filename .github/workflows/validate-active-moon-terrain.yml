@@ -1,0 +1,30 @@
+name: Validate active Moon terrain
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/validate-active-moon-terrain.mjs'
+      - '.github/workflows/validate-active-moon-terrain.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-moon-terrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate active Site04 terrain
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/validate-active-moon-terrain.mjs
