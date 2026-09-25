@@ -31,6 +31,15 @@ export const PLANETARY_REFERENCES: Record<Exclude<WorldBody, 'other'>, Planetary
     polarRadiusM: 3376200.0,
     verticalDatum: 'IAU_MARS_REFERENCE_ELLIPSOID',
   },
+  phobos: {
+    body: 'phobos',
+    referenceFrame: 'PHOBOS_PLANETOCENTRIC',
+    latitudeType: 'planetocentric',
+    longitudeDirection: 'positive_east',
+    equatorialRadiusM: 11100.0,
+    polarRadiusM: 11100.0,
+    verticalDatum: 'PHOBOS_MEAN_RADIUS_11100M',
+  },
 }
 
 export interface CartesianPoint {
