@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <!-- Eigenes Lunar-Asset 25.09.2026: Batteriespeicher der Shackleton-
+       Basis, ersetzt das geliehene Earth-Warehouse-Asset. Funktionsakzent
+       bernstein/gelb = Energiespeicherung. Siehe EXT-NOXIA-UNIVERSE-
+       20260924-chromatic-renaissance-game-integration.md -->
+  <defs>
+    <linearGradient id="battShell" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e9ece7"/><stop offset="1" stop-color="#b3bab1"/></linearGradient>
+    <linearGradient id="battCell" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f5e6b8"/><stop offset="1" stop-color="#d8b95a"/></linearGradient>
+    <filter id="battShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-opacity=".3"/></filter>
+  </defs>
+  <g filter="url(#battShadow)" transform="translate(70 170)">
+    <ellipse cx="290" cy="340" rx="240" ry="52" fill="#0d0d0c" opacity=".32"/>
+    <rect x="40" y="180" width="500" height="150" rx="14" fill="url(#battShell)" stroke="#586055" stroke-width="6"/>
+    <g>
+      <rect x="66" y="204" width="86" height="100" rx="6" fill="url(#battCell)" stroke="#8a6a1e" stroke-width="4"/>
+      <rect x="164" y="204" width="86" height="100" rx="6" fill="url(#battCell)" stroke="#8a6a1e" stroke-width="4"/>
+      <rect x="262" y="204" width="86" height="100" rx="6" fill="url(#battCell)" stroke="#8a6a1e" stroke-width="4"/>
+      <rect x="360" y="204" width="86" height="100" rx="6" fill="url(#battCell)" stroke="#8a6a1e" stroke-width="4"/>
+      <rect x="458" y="204" width="60" height="100" rx="6" fill="#dfe4dc" stroke="#586055" stroke-width="4"/>
+    </g>
+    <g stroke="#8a6a1e" stroke-width="2" opacity=".6">
+      <line x1="109" y1="224" x2="109" y2="284"/><line x1="207" y1="224" x2="207" y2="284"/>
+      <line x1="305" y1="224" x2="305" y2="284"/><line x1="403" y1="224" x2="403" y2="284"/>
+    </g>
+    <g fill="#f2c14e" stroke="#5c3f08" stroke-width="2">
+      <circle cx="488" cy="222" r="8"/><circle cx="488" cy="252" r="8"/><circle cx="488" cy="282" r="8"/>
+    </g>
+  </g>
+</svg>
