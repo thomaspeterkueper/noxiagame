@@ -13,6 +13,8 @@
 # testing
 /coverage
 /.seed-test
+/.earth-planning-test
+/.spatial-test
 
 # next.js
 /.next/
