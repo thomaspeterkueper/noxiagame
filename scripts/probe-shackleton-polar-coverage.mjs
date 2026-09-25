@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { fromArrayBuffer, fromUrl } from 'geotiff'
 
+const CATALOGUE_URL = 'https://pgda.gsfc.nasa.gov/products/78'
 const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!rawUrl || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
@@ -34,13 +35,33 @@ async function openRemoteGeoTiff(sourceUrl) {
   }
 }
 
-const candidates = [
-  ['Site04', 'Shackleton rim', 'https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_surf.tif'],
-  ['LM1', 'Shackleton Rim B', 'https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/LM1/LM1_final_adj_5mpp_surf.tif'],
-  ['Site07', 'Peak near Shackleton', 'https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_surf.tif'],
-  ['Site01', 'Connecting ridge', 'https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_surf.tif'],
-  ['SL3', 'Connecting ridge extension', 'https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/SL3/SL3_final_adj_5mpp_surf.tif'],
-]
+async function discoverLdemCandidates() {
+  const response = await fetch(CATALOGUE_URL, { redirect: 'follow' })
+  if (!response.ok) throw new Error(`NASA catalogue download failed: ${response.status} ${response.statusText}`)
+  const html = await response.text()
+  const labels = new Map([
+    ['Site01', 'Connecting ridge'],
+    ['Site04', 'Shackleton rim'],
+    ['Site07', 'Peak near Shackleton'],
+    ['SL3', 'Connecting ridge extension'],
+    ['LM1', 'Shackleton Rim B'],
+  ])
+  const wanted = new Set(labels.keys())
+  const discovered = new Map()
+  const hrefPattern = /href=["']([^"']+_final_adj_5mpp_surf\.tif)["']/gi
+  for (const match of html.matchAll(hrefPattern)) {
+    const sourceUrl = new URL(match[1], CATALOGUE_URL).href
+    const fileName = sourceUrl.split('/').pop() ?? ''
+    const site = fileName.replace(/_final_adj_5mpp_surf\.tif$/i, '')
+    if (wanted.has(site)) discovered.set(site, [site, labels.get(site), sourceUrl])
+  }
+  const missing = [...wanted].filter(site => !discovered.has(site))
+  if (missing.length) console.warn(`NASA catalogue did not expose expected LDEM links for: ${missing.join(', ')}`)
+  return [...discovered.values()]
+}
+
+const candidates = await discoverLdemCandidates()
+console.log(JSON.stringify({ discoveredCandidates: candidates }, null, 2))
 
 const supabase = createClient(normalizeSupabaseUrl(rawUrl), key)
 const { data: frames, error: frameError } = await supabase
