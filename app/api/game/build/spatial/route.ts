@@ -13,8 +13,7 @@ import {
   type GeoPoint,
 } from '@/lib/world/spatial/earthSpatial'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
-import { loadShackletonTerrainRuntime } from '@/lib/game/spatial/shackletonTerrainRuntime'
-import { createSupabaseLolaImageOpener } from '@/lib/game/spatial/supabaseLolaImageOpener.server'
+import { resolveRuntimeTerrainSampler } from '@/lib/game/spatial/runtimeTerrainSampler.server'
 import type { TerrainDatasetDescriptor, WorldFrame } from '@/lib/game/spatial/types'
 
 const serviceClient = createClient(
@@ -137,21 +136,6 @@ function toWorldFrame(row: any): WorldFrame {
   }
 }
 
-// 16.09.2026: Phase 1 hatte das Dekodieren der Rasterbytes bewusst
-// aufgeschoben ("Phase 1 deliberately does not decode raster bytes").
-// Mit einer echten, validierten Shackleton-LOLA-Kachel in terrain_tiles ist
-// dieser Schritt jetzt nachgezogen -- Status kann echt 'resolved' werden,
-// und die Fundamenthoehe kommt aus realen NASA-Hoehendaten statt aus einem
-// Client-Wert. Sampler wird pro Request einmalig gebaut (nicht pro
-// Gebaeude), da das Dekodieren der Kachel Kosten hat.
-let cachedShackletonSampler: ReturnType<typeof loadShackletonTerrainRuntime> | null = null
-async function shackletonSampler() {
-  if (!cachedShackletonSampler) {
-    cachedShackletonSampler = loadShackletonTerrainRuntime(serviceClient, createSupabaseLolaImageOpener(serviceClient))
-  }
-  return cachedShackletonSampler
-}
-
 async function terrainResolution(frame: any, dataset: any, xM = 0, yM = 0) {
   if (!frame || frame.origin_status !== 'verified' || frame.origin_lat_deg == null || frame.origin_lon_deg == null || frame.origin_alt_m == null) {
     return { status: 'origin_pending' as const, zM: null }
@@ -159,13 +143,8 @@ async function terrainResolution(frame: any, dataset: any, xM = 0, yM = 0) {
   if (!dataset || dataset.status !== 'ready') {
     return { status: 'dataset_pending' as const, zM: null }
   }
-  if (dataset.id !== 'moon_lro_lola_118m') {
-    // Andere Datensaetze (Mars/Erde) haben noch keinen verdrahteten Sampler.
-    return { status: 'unresolved' as const, zM: null }
-  }
-
   try {
-    const runtime = await shackletonSampler()
+    const runtime = await resolveRuntimeTerrainSampler(serviceClient, dataset.id)
     if (!runtime.sampler) return { status: 'unresolved' as const, zM: null }
     const sample = await runtime.sampler.sampleTerrainHeight(
       { frame: toWorldFrame(frame), dataset: toDatasetDescriptor(dataset) },
@@ -380,9 +359,9 @@ export async function GET(req: NextRequest) {
   // gehalten (11x11 = 121 Punkte, ~60m Abstand) -- jeder Punkt ist ein
   // echter Sampler-Aufruf gegen die bereits geladene Kachel.
   let elevationGrid: { stepM: number; size: number; values: (number | null)[] } | null = null
-  if (terrainRes.status === 'resolved' && activeTerrainDataset?.id === 'moon_lro_lola_118m') {
+  if (terrainRes.status === 'resolved' && activeTerrainDataset) {
     try {
-      const runtime = await shackletonSampler()
+      const runtime = await resolveRuntimeTerrainSampler(serviceClient, activeTerrainDataset.id)
       if (runtime.sampler) {
         const size = 11
         const stepM = 60
