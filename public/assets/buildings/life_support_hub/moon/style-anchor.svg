@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <!-- Eigenes Lunar-Asset 25.09.2026: ECLSS-/Lebenserhaltungsknoten,
+       ersetzt das bis dahin geliehene Earth-Habitat-Asset. Kontrastreiche
+       Regolith-Palette (helle Huelle, harte Schatten) nach NOXIA Visual
+       Bible; Funktionsakzent tuerkis = Lebenserhaltung/Atmosphaere.
+       Siehe EXT-NOXIA-UNIVERSE-20260924-chromatic-renaissance-game-
+       integration.md -->
+  <defs>
+    <linearGradient id="lshShell" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef1ec"/><stop offset="1" stop-color="#b9c0b6"/></linearGradient>
+    <linearGradient id="lshDome" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#dff6ee"/><stop offset="1" stop-color="#9fd8c8"/></linearGradient>
+    <filter id="lshShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-opacity=".3"/></filter>
+  </defs>
+  <g filter="url(#lshShadow)" transform="translate(70 150)">
+    <ellipse cx="290" cy="400" rx="250" ry="60" fill="#0d0d0c" opacity=".35"/>
+    <path d="M40 320 290 460 540 320 540 220 290 80 40 220Z" fill="url(#lshShell)" stroke="#5a6259" stroke-width="6"/>
+    <path d="M40 220 290 80 540 220 290 360Z" fill="#dfe4dc" stroke="#5a6259" stroke-width="5"/>
+    <g stroke="#8a9188" stroke-width="3" opacity=".55">
+      <path d="M290 80 290 360" fill="none"/>
+      <path d="M120 168 460 168" fill="none"/>
+    </g>
+    <path d="M170 260a120 70 0 0 1 240 0 120 70 0 0 1 -240 0Z" fill="url(#lshDome)" stroke="#3d7566" stroke-width="5" opacity=".92"/>
+    <g stroke="#3d7566" stroke-width="2.5" opacity=".5">
+      <path d="M175 258 405 258" fill="none"/>
+      <path d="M195 226 385 226" fill="none"/>
+      <path d="M195 292 385 292" fill="none"/>
+    </g>
+    <g fill="#5ecbb0" stroke="#0f4a3c" stroke-width="2">
+      <circle cx="80" cy="300" r="9"/><circle cx="500" cy="300" r="9"/>
+      <circle cx="290" cy="150" r="7"/>
+    </g>
+  </g>
+</svg>
