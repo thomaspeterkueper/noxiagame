@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <!-- Eigenes Lunar-Asset 25.09.2026: Shackleton-Wohnmodul. Ersetzt das
+       bis dahin 1:1 geliehene Earth-Habitat. Halb im Regolith vergrabener
+       Zylinder mit Abdeckwall als Strahlenschutz; warmes Fensterlicht als
+       Funktionsakzent. -->
+  <defs>
+    <linearGradient id="habBerm" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8a8578"/><stop offset="1" stop-color="#57534a"/></linearGradient>
+    <linearGradient id="habHull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef0ec"/><stop offset="1" stop-color="#b7bcb3"/></linearGradient>
+    <radialGradient id="habWindow" cx=".5" cy=".5" r=".6"><stop stop-color="#ffe8ad"/><stop offset="1" stop-color="#c99a3f"/></radialGradient>
+    <filter id="habShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="11" flood-opacity=".34"/></filter>
+  </defs>
+  <g filter="url(#habShadow)" transform="translate(50 190)">
+    <ellipse cx="310" cy="380" rx="280" ry="60" fill="#0b0b0a" opacity=".38"/>
+    <g stroke="#3a3730" stroke-width="2">
+      <rect x="30" y="330" width="34" height="30" rx="3" fill="#c9cec5"/><rect x="30" y="330" width="34" height="30" rx="3" fill="#000" opacity=".08"/>
+      <rect x="68" y="342" width="26" height="24" rx="3" fill="#b6bcb0"/>
+      <ellipse cx="555" cy="370" rx="20" ry="12" fill="#5f5c53" stroke="none"/><ellipse cx="580" cy="378" rx="13" ry="8" fill="#4c493f" stroke="none"/>
+    </g>
+    <path d="M20 380 Q40 200 310 190 Q580 200 600 380Z" fill="url(#habBerm)" stroke="#3f3c34" stroke-width="6"/>
+    <path d="M60 372 Q80 230 310 222 Q540 230 560 372Z" fill="#6f6a5c" opacity=".55"/>
+    <rect x="140" y="150" width="340" height="180" rx="90" fill="url(#habHull)" stroke="#565e53" stroke-width="7"/>
+    <rect x="140" y="150" width="340" height="60" rx="30" fill="#dfe4dc" opacity=".7"/>
+    <g fill="url(#habWindow)" stroke="#8a6a1e" stroke-width="2.5">
+      <circle cx="215" cy="240" r="20"/><circle cx="280" cy="240" r="20"/><circle cx="345" cy="240" r="20"/><circle cx="410" cy="240" r="20"/>
+    </g>
+    <rect x="292" y="60" width="36" height="95" rx="8" fill="#c9cec5" stroke="#565e53" stroke-width="5"/>
+    <circle cx="310" cy="48" r="14" fill="#e2e6df" stroke="#565e53" stroke-width="4"/>
+    <path d="M480 300 560 372 480 372Z" fill="#dfe4dc" stroke="#565e53" stroke-width="4"/>
+  </g>
+</svg>
