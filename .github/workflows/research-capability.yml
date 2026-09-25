@@ -1,0 +1,17 @@
+name: Research capability contract
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/researchCapability.ts'
+      - 'lib/game/population/researchCapability.test.ts'
+      - '.github/workflows/research-capability.yml'
+jobs:
+  capability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/population/researchCapability.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .research-capability-test
+      - run: node .research-capability-test/game/population/researchCapability.test.js
