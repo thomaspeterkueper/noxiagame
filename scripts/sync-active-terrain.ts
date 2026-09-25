@@ -3,12 +3,19 @@ import { resolveRuntimeTerrainSampler } from '../lib/game/spatial/runtimeTerrain
 import { sampleTerrainFootprint } from '../lib/game/spatial/terrainSampling'
 import type { TerrainDatasetDescriptor, WorldFrame } from '../lib/game/spatial/types'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY
-if (!url || !serviceRole) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+if (!rawUrl || !serviceRole) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+
+function normalizeSupabaseUrl(value: string) {
+  const trimmed = value.trim()
+  const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+  if (!parsed.hostname.endsWith('.supabase.co')) throw new Error(`Unexpected Supabase host: ${parsed.hostname}`)
+  return parsed.origin
+}
 
 const locationSlug = process.argv[2] ?? 'moon'
-const client = createClient(url, serviceRole)
+const client = createClient(normalizeSupabaseUrl(rawUrl), serviceRole)
 
 function finite(value: unknown): number | null {
   const n = typeof value === 'number' ? value : Number(value)
