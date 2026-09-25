@@ -17,6 +17,17 @@ function normalizeSupabaseUrl(value: string) {
 const locationSlug = process.argv[2] ?? 'moon'
 const client = createClient(normalizeSupabaseUrl(rawUrl), serviceRole)
 
+type SyncResult = {
+  id: string
+  entityId: string
+  status: 'skipped' | 'unresolved' | 'resolved'
+  centerZM?: number
+  minZM?: number
+  maxZM?: number
+  slopeDeg?: number
+  reliefM?: number
+}
+
 function finite(value: unknown): number | null {
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : null
@@ -80,6 +91,7 @@ async function main() {
   const dataset = toDataset(datasetRow)
   const runtime = await resolveRuntimeTerrainSampler(client, dataset.id)
   if (!runtime.sampler) throw new Error(`Terrain runtime unavailable: ${runtime.details ?? dataset.id}`)
+  const sampler = runtime.sampler
 
   async function syncTable(table: 'tile_entities' | 'player_builds', idColumn: 'entity_id' | 'buildable_id') {
     let query = client
@@ -90,20 +102,20 @@ async function main() {
       ? query.in('entity_type', ['building', 'module'])
       : query.eq('target_type', 'building')
 
-    const { data: rows, error } = await query
+    const { data, error } = await query
     if (error) throw new Error(`${table} lookup failed: ${error.message}`)
 
-    const results = []
-    for (const row of rows ?? []) {
+    const results: SyncResult[] = []
+    for (const row of (data ?? []) as any[]) {
       const xM = finite(row.x_m), yM = finite(row.y_m)
       const widthM = finite(row.footprint_width_m), depthM = finite(row.footprint_depth_m)
       const entityId = String(row[idColumn] ?? row.id)
       if (row.placement_mode !== 'world' || xM == null || yM == null || widthM == null || depthM == null || widthM <= 0 || depthM <= 0) {
-        results.push({ id: row.id, entityId, status: 'skipped' })
+        results.push({ id: String(row.id), entityId, status: 'skipped' })
         continue
       }
 
-      const resolution = await sampleTerrainFootprint(runtime.sampler, { frame, dataset }, {
+      const resolution = await sampleTerrainFootprint(sampler, { frame, dataset }, {
         xM,
         yM,
         zM: null,
@@ -123,7 +135,7 @@ async function main() {
           terrain_slope_deg: null,
         }).eq('id', row.id)
         if (updateError) throw new Error(`${table} ${entityId} update failed: ${updateError.message}`)
-        results.push({ id: row.id, entityId, status: 'unresolved' })
+        results.push({ id: String(row.id), entityId, status: 'unresolved' })
         continue
       }
 
@@ -140,7 +152,7 @@ async function main() {
       if (updateError) throw new Error(`${table} ${entityId} update failed: ${updateError.message}`)
 
       results.push({
-        id: row.id,
+        id: String(row.id),
         entityId,
         status: 'resolved',
         centerZM: summary.centerZM,
