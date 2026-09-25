@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <!-- Eigenes Lunar-Asset 25.09.2026: Shackleton-Energieturm. Hoher Mast mit
+       geneigtem Panel fuer die tief stehende Suedpol-Sonne statt flachem
+       Erd-Solarfeld. -->
+  <defs>
+    <linearGradient id="solTower" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eef0ec"/><stop offset="1" stop-color="#aeb4a9"/></linearGradient>
+    <linearGradient id="solPanel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#2c5aa0"/><stop offset="1" stop-color="#173a6e"/></linearGradient>
+    <filter id="solShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-opacity=".3"/></filter>
+  </defs>
+  <g filter="url(#solShadow)" transform="translate(60 90)">
+    <ellipse cx="300" cy="500" rx="230" ry="46" fill="#0b0b0a" opacity=".32"/>
+    <g stroke="#3a3730" stroke-width="2">
+      <ellipse cx="130" cy="512" rx="16" ry="10" fill="#5f5c53" stroke="none"/><ellipse cx="470" cy="508" rx="14" ry="9" fill="#4c493f" stroke="none"/>
+    </g>
+    <rect x="270" y="120" width="60" height="380" rx="10" fill="url(#solTower)" stroke="#565e53" stroke-width="6"/>
+    <g stroke="#7b8177" stroke-width="4" opacity=".5">
+      <line x1="270" y1="200" x2="330" y2="200"/><line x1="270" y1="300" x2="330" y2="300"/><line x1="270" y1="400" x2="330" y2="400"/>
+    </g>
+    <rect x="40" y="20" width="520" height="90" rx="6" fill="url(#solPanel)" stroke="#0e2140" stroke-width="6" transform="rotate(3 300 65)"/>
+    <g stroke="#0e2140" stroke-width="3" opacity=".55" transform="rotate(3 300 65)">
+      <line x1="105" y1="20" x2="105" y2="110"/><line x1="170" y1="20" x2="170" y2="110"/><line x1="235" y1="20" x2="235" y2="110"/>
+      <line x1="300" y1="20" x2="300" y2="110"/><line x1="365" y1="20" x2="365" y2="110"/><line x1="430" y1="20" x2="430" y2="110"/><line x1="495" y1="20" x2="495" y2="110"/>
+    </g>
+    <path d="M300 120 300 65" stroke="#7b8177" stroke-width="8"/>
+    <ellipse cx="300" cy="500" rx="120" ry="32" fill="url(#solTower)" stroke="#565e53" stroke-width="6"/>
+    <g fill="#f2c14e" stroke="#5c3f08" stroke-width="2"><circle cx="230" cy="500" r="8"/><circle cx="370" cy="500" r="8"/></g>
+  </g>
+</svg>
