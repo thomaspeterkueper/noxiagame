@@ -40,6 +40,15 @@ export const PLANETARY_REFERENCES: Record<Exclude<WorldBody, 'other'>, Planetary
     polarRadiusM: 11100.0,
     verticalDatum: 'PHOBOS_MEAN_RADIUS_11100M',
   },
+  deimos: {
+    body: 'deimos',
+    referenceFrame: 'DEIMOS_PLANETOCENTRIC',
+    latitudeType: 'planetocentric',
+    longitudeDirection: 'positive_east',
+    equatorialRadiusM: 6200.0,
+    polarRadiusM: 6200.0,
+    verticalDatum: 'DEIMOS_MEAN_RADIUS_6200M',
+  },
 }
 
 export interface CartesianPoint {
