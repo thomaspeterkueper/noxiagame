@@ -27,6 +27,25 @@ function finiteNoData(value: number | string | null | undefined): number | null 
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function manifestBounds(
+  box: [number, number, number, number],
+  metadata?: Record<string, unknown>,
+): [number, number, number, number] {
+  if (metadata?.whole_body !== true) return box
+
+  // Global cylindrical rasters commonly encode outer pixel edges a fraction of
+  // a degree beyond the physical +/-180 / +/-90 body limits. Keep the stored
+  // GeoTIFF untouched for authoritative pixel geometry, but catalogue only the
+  // physically valid whole-body coverage so shared manifest validation and
+  // coverage lookup remain body-safe.
+  return [
+    Math.max(-180, box[0]),
+    Math.max(-90, box[1]),
+    Math.min(180, box[2]),
+    Math.min(90, box[3]),
+  ]
+}
+
 /**
  * Inspect a prepared GeoTIFF, derive its authoritative raster geometry, store the
  * exact bytes, re-read/checksum them, and only then expose the manifest as ready.
@@ -57,7 +76,8 @@ export async function ingestPreparedGeoTiffTile(
     throw new Error('Prepared terrain tile must be a single-band elevation raster')
   }
 
-  const [minLonDeg, minLatDeg, maxLonDeg, maxLatDeg] = image.getBoundingBox()
+  const rawBounds = image.getBoundingBox() as [number, number, number, number]
+  const [minLonDeg, minLatDeg, maxLonDeg, maxLatDeg] = manifestBounds(rawBounds, input.metadata)
   const manifest: TerrainRasterTileManifest = {
     datasetId: input.datasetId,
     tileKey: input.tileKey,
@@ -82,6 +102,7 @@ export async function ingestPreparedGeoTiffTile(
       source_uri: input.sourceUri,
       source_product: input.sourceProduct ?? null,
       ingest_contract: 'prepared-geotiff-v1',
+      ...(input.metadata?.whole_body === true ? { source_raster_bounds: rawBounds } : {}),
     },
   }
 
