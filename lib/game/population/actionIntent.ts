@@ -23,6 +23,9 @@ export type PopulationActionIntent =
       employerActorId: string | null
       roleCode: string | null
     }
+  | { kind: 'acquire_tool'; personId: string; toolType: string; purpose: 'research' }
+  | { kind: 'gain_capability'; personId: string; capability: string; minLevel: number; purpose: 'research' }
+  | { kind: 'secure_resource'; personId: string; resource: 'credits' | 'energy' | 'time'; amount: number; purpose: 'research' }
   | {
       kind: 'local'
       personId: string

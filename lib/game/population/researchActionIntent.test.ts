@@ -1,0 +1,6 @@
+import { populationActionIntentsForResearch,resolveResearchExecutability } from './researchCapability'
+const q:any={id:'scan',hypothesisId:'a,b',kind:'seek_support',rule:{subjectType:'site',subjectRef:'s',knowledgeType:'spectrum',weight:1},priority:4,discriminatesHypothesisIds:['a','b'],discriminationScore:4}
+const actor={personId:'p1',capabilities:{spectroscopy:1},availableToolTypes:[],credits:2,energy:9,availableTimeTicks:9}
+const o=resolveResearchExecutability(q,{timeTicks:2,credits:5,energy:3,risk:.01},{capability:'spectroscopy',minLevel:2,toolType:'spectrometer'},actor)
+const i=populationActionIntentsForResearch(o,actor);let f=0;const ck=(x:boolean,m:string)=>{if(!x){f++;console.error('FAIL '+m)}}
+ck(i.some(x=>x.kind==='acquire_tool'&&x.toolType==='spectrometer'),'tool');ck(i.some(x=>x.kind==='gain_capability'&&x.capability==='spectroscopy'),'skill');ck(i.some(x=>x.kind==='secure_resource'&&x.resource==='credits'&&x.amount===3),'credits');ck(i.every(x=>x.purpose==='research'),'purpose');if(f)throw new Error(String(f));console.log('Research action-intent bridge: tests passed')
