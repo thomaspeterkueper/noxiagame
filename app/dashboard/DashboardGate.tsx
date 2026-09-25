@@ -18,6 +18,7 @@ import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
 import DashboardWorldDevelopmentOverlay from './DashboardWorldDevelopmentOverlay'
 import DashboardMoonSurface from './DashboardMoonSurface'
+import DashboardPhobosSurface from './DashboardPhobosSurface'
 import DashboardProfileBridge from './DashboardProfileBridge'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
@@ -69,21 +70,18 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     })()
   }, [loadFromServer])
 
-  if (onboarded === null) {
-    return <LoadingScreen label="Lade Profil …" />
-  }
+  if (onboarded === null) return <LoadingScreen label="Lade Profil …" />
 
   if (!onboarded) {
     return <WelcomeSetup initialUsername={existingUsername} onDone={(opts) => { setOnboarded(true); if (opts?.openJourney) setAutoOpenJourney(true) }} />
   }
 
-  if (!loaded) {
-    return <LoadingScreen label="Lade aktuellen Standort …" />
-  }
+  if (!loaded) return <LoadingScreen label="Lade aktuellen Standort …" />
 
   return <>
     <DashboardClient locations={locations} prices={prices} orders={orders} autoOpenJourney={autoOpenJourney} />
     <DashboardMoonSurface locations={locations} prices={prices} orders={orders} />
+    <DashboardPhobosSurface locations={locations} prices={prices} orders={orders} />
     <DashboardProfileBridge />
     <DashboardHudManager />
     <DashboardLocationDockManager />
