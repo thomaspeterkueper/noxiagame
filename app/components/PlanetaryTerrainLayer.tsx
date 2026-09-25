@@ -15,7 +15,10 @@ export type PlanetaryTerrainTheme = {
 }
 
 const THEMES: Record<string, PlanetaryTerrainTheme> = {
-  moon: { baseLightness: 43, reliefRange: 30, saturation: 2, hue: 42, shadeStrength: 27, unresolvedFill: '#4e504d', contourStroke: '#d8d4c8', steepSlopeStroke: '#c6aa6a' },
+  // Lunar terrain needs materially stronger local contrast than Earth/Mars.
+  // The low solar angle is used only as relief shading; it is not a claim about
+  // instantaneous real illumination at the selected site.
+  moon: { baseLightness: 39, reliefRange: 38, saturation: 2, hue: 42, shadeStrength: 40, unresolvedFill: '#363936', contourStroke: '#ded9ca', steepSlopeStroke: '#d6b36b' },
   mars: { baseLightness: 42, reliefRange: 27, saturation: 30, hue: 18, shadeStrength: 23, unresolvedFill: '#6a4e43', contourStroke: '#ddc0ad', steepSlopeStroke: '#e3b168' },
   earth: { baseLightness: 47, reliefRange: 21, saturation: 14, hue: 75, shadeStrength: 18, unresolvedFill: '#566057', contourStroke: '#dce1d7', steepSlopeStroke: '#c8ad68' },
 }
@@ -57,7 +60,7 @@ export default function PlanetaryTerrainLayer({
     maxHoleRadiusCells: 1,
     minNeighbourCount: 3,
     sunAzimuthDeg: 315,
-    sunAltitudeDeg: body === 'moon' ? 16 : 24,
+    sunAltitudeDeg: body === 'moon' ? 11 : 24,
   }) : null, [grid, upsampleFactor, body])
 
   const resolvedTheme = { ...(THEMES[body] ?? THEMES.moon), ...theme }
@@ -77,15 +80,15 @@ export default function PlanetaryTerrainLayer({
       const center = project(cell)
       const heightTerm = (cell.normalizedHeight01 - .5) * resolvedTheme.reliefRange
       const shadeTerm = (cell.hillshade01 - .5) * resolvedTheme.shadeStrength * 2
-      const slopeDarkening = showSlope ? Math.min(12, cell.slopeDeg * .45) : 0
-      const lightness = Math.max(9, Math.min(86, resolvedTheme.baseLightness + heightTerm + shadeTerm - slopeDarkening))
-      const opacity = Math.max(.54, Math.min(1, .64 + cell.confidence * .36))
+      const slopeDarkening = showSlope ? Math.min(body === 'moon' ? 19 : 12, cell.slopeDeg * (body === 'moon' ? .7 : .45)) : 0
+      const lightness = Math.max(body === 'moon' ? 5 : 9, Math.min(body === 'moon' ? 91 : 86, resolvedTheme.baseLightness + heightTerm + shadeTerm - slopeDarkening))
+      const opacity = Math.max(.58, Math.min(1, .68 + cell.confidence * .32))
       return <rect
         key={`terrain-${index}`}
         x={center.x - cellPx / 2}
         y={center.y - cellPx / 2}
-        width={cellPx + .8}
-        height={cellPx + .8}
+        width={cellPx + 1.1}
+        height={cellPx + 1.1}
         fill={`hsl(${resolvedTheme.hue} ${resolvedTheme.saturation}% ${lightness}%)`}
         opacity={opacity}
       />
@@ -102,23 +105,23 @@ export default function PlanetaryTerrainLayer({
       if (east && Math.floor((east.elevationM - surface.minElevationM) / interval) !== band) segments.push(<line key="e" x1={x0 + cellPx} y1={y0} x2={x0 + cellPx} y2={y0 + cellPx}/>)
       if (south && Math.floor((south.elevationM - surface.minElevationM) / interval) !== band) segments.push(<line key="s" x1={x0} y1={y0 + cellPx} x2={x0 + cellPx} y2={y0 + cellPx}/>)
       if (!segments.length) return null
-      return <g key={`contour-${index}`} stroke={resolvedTheme.contourStroke} strokeWidth={Math.max(.35 / zoom, .45)} opacity={body === 'moon' ? .38 : .3}>{segments}</g>
+      return <g key={`contour-${index}`} stroke={resolvedTheme.contourStroke} strokeWidth={Math.max(.35 / zoom, body === 'moon' ? .58 : .45)} opacity={body === 'moon' ? .52 : .3}>{segments}</g>
     })}
 
     {showSlope && surface.cells.map((cell, index) => {
-      if (!cell || cell.slopeDeg < 10) return null
+      if (!cell || cell.slopeDeg < (body === 'moon' ? 8 : 10)) return null
       const center = project(cell)
-      const severity = Math.min(1, (cell.slopeDeg - 10) / 18)
+      const severity = Math.min(1, (cell.slopeDeg - (body === 'moon' ? 8 : 10)) / 18)
       return <rect
         key={`slope-${index}`}
         x={center.x - cellPx / 2}
         y={center.y - cellPx / 2}
-        width={cellPx + .4}
-        height={cellPx + .4}
-        fill="none"
+        width={cellPx + .6}
+        height={cellPx + .6}
+        fill={body === 'moon' ? `rgba(8,9,8,${.05 + severity * .17})` : 'none'}
         stroke={resolvedTheme.steepSlopeStroke}
-        strokeWidth={Math.max(.25 / zoom, .35)}
-        opacity={.10 + severity * .22}
+        strokeWidth={Math.max(.25 / zoom, body === 'moon' ? .42 : .35)}
+        opacity={body === 'moon' ? .18 + severity * .32 : .10 + severity * .22}
       />
     })}
   </g>
