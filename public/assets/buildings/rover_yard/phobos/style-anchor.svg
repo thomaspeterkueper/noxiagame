@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <radialGradient id="regoBg" cx="50%" cy="60%" r="70%"><stop offset="0" stop-color="#1c1712"/><stop offset="1" stop-color="#0c0a08"/></radialGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c7ccd1"/><stop offset="1" stop-color="#565d64"/></linearGradient>
+    <filter id="dropSh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".5"/></filter>
+  </defs>
+  <rect x="0" y="0" width="720" height="720" fill="url(#regoBg)" opacity=".18"/>
+  <g filter="url(#dropSh)" transform="translate(360 420)">
+    <ellipse cx="0" cy="150" rx="210" ry="46" fill="#000" opacity=".55"/>
+    <path d="M-200 90 -20 190 200 70 20 -30Z" fill="url(#hull)" stroke="#4dab5e" stroke-width="5" opacity=".9"/>
+    <path d="M60 20 L120 150" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="120" cy="150" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/><path d="M-40 60 L-90 170" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="-90" cy="170" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/>
+    <g transform="translate(40 -10)">
+      <path d="M-70 60 10 95 90 60 90 15 40 -15 -30 -15 -70 15Z" fill="#cfd4d8" stroke="#4a5157" stroke-width="5"/>
+      <g fill="#2c2c2c" stroke="#111" stroke-width="3"><circle cx="-45" cy="58" r="18"/><circle cx="45" cy="58" r="18"/></g>
+      <g fill="#4dab5e" stroke="#1f5c2c" stroke-width="2"><circle cx="-55" cy="20" r="7"/><circle cx="55" cy="20" r="7"/></g>
+    </g>
+  </g>
+  <g opacity=".9"><ellipse cx="220" cy="570" rx="22" ry="9" fill="#1c1712" stroke="#000" stroke-width="1"/><ellipse cx="520" cy="564" rx="16" ry="7" fill="#1c1712" stroke="#000" stroke-width="1"/><circle cx="265" cy="576" r="6" fill="#2a231b"/></g>
+</svg>
