@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js'
-import { fromUrl } from 'geotiff'
+import { fromArrayBuffer, fromUrl } from 'geotiff'
 
 const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -20,6 +20,17 @@ function southPolarStereographic(latDeg, lonDeg, radiusM = 1_737_400, centerLonD
   return {
     xM: rho * Math.sin(lon),
     yM: rho * Math.cos(lon),
+  }
+}
+
+async function openRemoteGeoTiff(sourceUrl) {
+  try {
+    return await fromUrl(sourceUrl)
+  } catch (rangeError) {
+    console.warn(`Range probe failed for ${sourceUrl}; falling back to full download: ${rangeError instanceof Error ? rangeError.message : String(rangeError)}`)
+    const response = await fetch(sourceUrl, { redirect: 'follow' })
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`)
+    return fromArrayBuffer(await response.arrayBuffer())
   }
 }
 
@@ -56,7 +67,7 @@ for (const frame of frames) {
   const results = []
   for (const [site, label, sourceUrl] of candidates) {
     try {
-      const tiff = await fromUrl(sourceUrl)
+      const tiff = await openRemoteGeoTiff(sourceUrl)
       const image = await tiff.getImage()
       const bbox = image.getBoundingBox()
       const containsOrigin = p.xM >= bbox[0] && p.xM <= bbox[2] && p.yM >= bbox[1] && p.yM <= bbox[3]
