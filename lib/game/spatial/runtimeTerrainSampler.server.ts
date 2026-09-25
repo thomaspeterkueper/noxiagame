@@ -11,6 +11,8 @@ import { loadMarsTerrainRuntime } from './marsTerrainRuntime'
 import { MARS_MOLA_DATASET } from './molaTerrainAdapter'
 import { loadPhobosTerrainRuntime } from './phobosTerrainRuntime'
 import { PHOBOS_HRSC_DATASET } from './phobosTerrainAdapter'
+import { DeimosSyntheticTerrainAdapter, DEIMOS_SYNTHETIC_DATASET } from './deimosTerrainAdapter'
+import { RasterTerrainSampler } from './terrainRaster'
 import type { TerrainSampler } from './terrainSampling'
 
 export interface RuntimeTerrainSamplerResolution {
@@ -57,6 +59,15 @@ async function createRuntimeTerrainSampler(
       supported: true,
       datasetId,
       details: runtime.sampler ? undefined : 'No validated/decodable Phobos HRSC tile is runtime-ready',
+    }
+  }
+
+  if (datasetId === DEIMOS_SYNTHETIC_DATASET.id) {
+    return {
+      sampler: new RasterTerrainSampler([new DeimosSyntheticTerrainAdapter()]),
+      supported: true,
+      datasetId,
+      details: 'Synthetic procedural Deimos terrain; not an observed DEM',
     }
   }
 
