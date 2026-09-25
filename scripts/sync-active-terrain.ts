@@ -69,8 +69,9 @@ function toDataset(row: any): TerrainDatasetDescriptor {
 async function main() {
   const { data: location, error: locationError } = await client.from('locations').select('id,slug').eq('slug', locationSlug).single()
   if (locationError || !location) throw new Error(`Location ${locationSlug} not found: ${locationError?.message ?? 'missing'}`)
+  const locationId = location.id
 
-  const { data: frameRow, error: frameError } = await client.from('world_frames').select('*').eq('location_id', location.id).single()
+  const { data: frameRow, error: frameError } = await client.from('world_frames').select('*').eq('location_id', locationId).single()
   if (frameError || !frameRow?.terrain_dataset_id) throw new Error(`World frame missing active terrain dataset: ${frameError?.message ?? 'missing'}`)
   const { data: datasetRow, error: datasetError } = await client.from('terrain_datasets').select('*').eq('id', frameRow.terrain_dataset_id).single()
   if (datasetError || !datasetRow || datasetRow.status !== 'ready') throw new Error(`Active terrain dataset is not ready: ${datasetError?.message ?? frameRow.terrain_dataset_id}`)
@@ -84,7 +85,7 @@ async function main() {
     let query = client
       .from(table)
       .select(`id,${idColumn},placement_mode,x_m,y_m,z_m,rotation_deg,footprint_width_m,footprint_depth_m,terrain_dataset_id,terrain_status,ground_elevation_m,terrain_min_elevation_m,terrain_max_elevation_m,terrain_slope_deg`)
-      .eq('location_id', location.id)
+      .eq('location_id', locationId)
     query = table === 'tile_entities'
       ? query.in('entity_type', ['building', 'module'])
       : query.eq('target_type', 'building')
