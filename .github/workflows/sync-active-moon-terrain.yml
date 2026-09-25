@@ -22,9 +22,11 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund server-only tsx
       - name: Sync active terrain metrics through canonical runtime
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: npx --yes tsx scripts/sync-active-terrain.ts moon
+        run: npx tsx scripts/sync-active-terrain.ts moon
