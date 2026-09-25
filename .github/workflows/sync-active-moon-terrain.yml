@@ -1,0 +1,30 @@
+name: Sync active Moon terrain metrics
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/sync-active-terrain.ts'
+      - '.github/workflows/sync-active-moon-terrain.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-moon-terrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Sync active terrain metrics through canonical runtime
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx --yes tsx scripts/sync-active-terrain.ts moon
