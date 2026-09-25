@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <radialGradient id="regoBg" cx="50%" cy="60%" r="70%"><stop offset="0" stop-color="#1c1712"/><stop offset="1" stop-color="#0c0a08"/></radialGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c7ccd1"/><stop offset="1" stop-color="#565d64"/></linearGradient>
+    <filter id="dropSh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".5"/></filter>
+  </defs>
+  <rect x="0" y="0" width="720" height="720" fill="url(#regoBg)" opacity=".18"/>
+  <g filter="url(#dropSh)" transform="translate(360 420)">
+    <ellipse cx="0" cy="120" rx="150" ry="34" fill="#000" opacity=".55"/>
+    <path d="M-110 40 L-150 110" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="-150" cy="110" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/><path d="M110 40 L150 110" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="150" cy="110" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/>
+    <rect x="-120" y="-40" width="240" height="90" rx="8" fill="url(#hull)" stroke="#2a2d30" stroke-width="6"/>
+    <g fill="#f2b23c" stroke="#8a5e14" stroke-width="3"><rect x="-100" y="-25" width="26" height="60" rx="4"/><rect x="-60" y="-25" width="26" height="60" rx="4"/><rect x="-20" y="-25" width="26" height="60" rx="4"/><rect x="20" y="-25" width="26" height="60" rx="4"/><rect x="60" y="-25" width="26" height="60" rx="4"/></g>
+    <rect x="-120" y="50" width="240" height="20" fill="#565d64" stroke="#2a2d30" stroke-width="4"/>
+  </g>
+  <g opacity=".9"><ellipse cx="220" cy="510" rx="22" ry="9" fill="#1c1712" stroke="#000" stroke-width="1"/><ellipse cx="520" cy="504" rx="16" ry="7" fill="#1c1712" stroke="#000" stroke-width="1"/><circle cx="265" cy="516" r="6" fill="#2a231b"/></g>
+</svg>

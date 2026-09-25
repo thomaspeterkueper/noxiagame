@@ -9,6 +9,8 @@ import {
 import { createSupabaseLolaImageOpener } from './supabaseLolaImageOpener.server'
 import { loadMarsTerrainRuntime } from './marsTerrainRuntime'
 import { MARS_MOLA_DATASET } from './molaTerrainAdapter'
+import { loadPhobosTerrainRuntime } from './phobosTerrainRuntime'
+import { PHOBOS_HRSC_DATASET } from './phobosTerrainAdapter'
 import type { TerrainSampler } from './terrainSampling'
 
 export interface RuntimeTerrainSamplerResolution {
@@ -45,6 +47,16 @@ async function createRuntimeTerrainSampler(
       supported: true,
       datasetId,
       details: runtime.sampler ? undefined : 'No validated/decodable Mars MOLA tile is runtime-ready',
+    }
+  }
+
+  if (datasetId === PHOBOS_HRSC_DATASET.id) {
+    const runtime = await loadPhobosTerrainRuntime(supabase)
+    return {
+      sampler: runtime.sampler,
+      supported: true,
+      datasetId,
+      details: runtime.sampler ? undefined : 'No validated/decodable Phobos HRSC tile is runtime-ready',
     }
   }
 
