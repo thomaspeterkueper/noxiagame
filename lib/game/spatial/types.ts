@@ -1,6 +1,6 @@
-export type SpatialProvenance = 'observed' | 'derived' | 'simulated'
+export type SpatialProvenance = 'observed' | 'derived' | 'simulated' | 'synthetic'
 
-export type WorldBody = 'earth' | 'moon' | 'mars' | 'phobos' | 'other'
+export type WorldBody = 'earth' | 'moon' | 'mars' | 'phobos' | 'deimos' | 'other'
 export type LatitudeType = 'planetographic' | 'planetocentric'
 export type LongitudeDirection = 'positive_east'
 
