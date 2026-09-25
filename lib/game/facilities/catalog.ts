@@ -196,6 +196,10 @@ export function facilityIdForBuilding(buildingId: string) {
   return ALIASES[buildingId] ?? buildingId
 }
 
+export function hasFacilityDefinition(buildingId: string) {
+  return Boolean(FACILITIES[facilityIdForBuilding(buildingId)])
+}
+
 export function getFacilityDefinition(buildingId: string): FacilityDefinition {
   const id = facilityIdForBuilding(buildingId)
   return FACILITIES[id] ?? { ...FALLBACK, id, label: buildingId || FALLBACK.label }
