@@ -25,7 +25,7 @@ function profile(asset: string, location: string, mapScale: number, notes: strin
 export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfile>> = {
   habitat: {
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.65, 'NOXIA Earth Core V1 style anchor: compact residential/operations building.'),
-    moon: profile('habitat/earth/style-anchor.svg', 'moon', 1.65, 'Mond-Habitat leiht sich bis auf Weiteres das Earth-Habitat-Asset.'),
+    moon: profile('habitat/moon/style-anchor.svg', 'moon', 1.7, 'Eigenes Habitat-Asset: halb im Regolith vergrabener Zylinder mit Abdeckwall und warmem Fensterlicht.'),
   },
   residential_block: {
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.85, 'Earth residential block currently reuses the habitat visual language until its own anchor exists.'),
@@ -36,7 +36,7 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
   },
   warehouse: {
     earth: profile('warehouse/earth/style-anchor.svg', 'earth', 1.85, 'NOXIA Earth Core V1 warehouse/logistics hall.'),
-    moon: profile('warehouse/earth/style-anchor.svg', 'moon', 1.85, 'Mond-Warenhalle leiht sich bis auf Weiteres das Earth-Warehouse-Asset.'),
+    moon: profile('warehouse/moon/style-anchor.svg', 'moon', 1.85, 'Eigenes Lager-Asset: niedriger regolith-uebererdeter Tonnengewoelbe-Bunker mit Aussenpaletten und Schleuse.'),
   },
   admin: {
     earth: profile('admin/earth/style-anchor.svg', 'earth', 1.7, 'Simple blue-gray Earth administration asset for placement and gameplay testing.'),
@@ -54,7 +54,7 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
   },
   solar: {
     earth: profile('solar/earth/style-anchor.svg', 'earth', 1.95, 'Test-first Earth solar field: deliberately blue/anthracite for immediate map readability.'),
-    moon: profile('solar/earth/style-anchor.svg', 'moon', 1.95, 'Mond-Solarfeld leiht sich bis auf Weiteres das Earth-Solar-Asset.'),
+    moon: profile('solar/moon/style-anchor.svg', 'moon', 1.85, 'Eigenes Energieturm-Asset: hoher Mast mit geneigtem Panel fuer die tief stehende Suedpol-Sonne.'),
   },
   battery_storage: {
     moon: profile('battery_storage/moon/style-anchor.svg', 'moon', 1.5, 'Eigenes Batteriespeicher-Asset (Zellenreihe, Bernstein-Funktionsakzent fuer Energie).'),
