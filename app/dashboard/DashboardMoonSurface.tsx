@@ -10,6 +10,7 @@ import {
 } from '@/lib/game/seeds/shackletonBaseAlphaSeed'
 import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
+import ShackletonSiteContextOverlay from './ShackletonSiteContextOverlay'
 import ShipyardOverlay from './ShipyardOverlay'
 import SolarSystem from './SolarSystem'
 import SpaceportOverlay from './SpaceportOverlay'
@@ -51,6 +52,7 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
 
   return <section className="noxia-dashboard-moon-surface" aria-label="Mondoberfläche Shackleton">
     <div className="moon-context-label"><strong>LOLA · Shackleton</strong><span>rekonstruiertes lokales Terrain · gemeinsamer Planetary-Surface-Renderer</span></div>
+    <ShackletonSiteContextOverlay />
     <PlanetarySurfaceMap
       locationSlug="moon"
       body="moon"
