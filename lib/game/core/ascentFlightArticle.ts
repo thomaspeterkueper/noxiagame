@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createServiceClient } from '@/lib/supabase/service'
 import type { EarthAscentPhysicalState } from '@/lib/game/core/earthAscentEngineeringAuthority'
+import type { LunarAscentPhysicalState } from '@/lib/game/core/lunarAscentEngineeringAuthority'
 
 export type PersistedSpacecraftFlightArticle = {
   ship_id: string
@@ -14,6 +15,8 @@ export type PersistedSpacecraftFlightArticle = {
   crew_mass_resolved: boolean
   cargo_mass_resolved: boolean
   mission_equipment_mass_resolved: boolean
+  crew_cargo_mission_equipment_kg: number | null
+  usable_ascent_propellant_kg: number | null
   propellant_state_ref: string | null
   departure_site_ref: string | null
   departure_site_class: string | null
@@ -93,6 +96,28 @@ export function flightArticlePhysicalState(
     propellantStateRef: article.propellant_state_ref,
     departureSiteClass: article.departure_site_class,
     releaseSpeedMS: article.release_speed_m_s == null ? null : Number(article.release_speed_m_s),
+    targetPlaneResolved: article.target_plane_resolved,
+  }
+}
+
+/**
+ * Lunar projection of the same trusted flight article. Lunar readiness uses the
+ * exact Engineering frame plus explicit physical quantities required by
+ * ENG-LUNAR-ASCENT-r1. Missing values remain null and therefore fail closed.
+ */
+export function flightArticleLunarPhysicalState(
+  article: PersistedSpacecraftFlightArticle | null,
+): LunarAscentPhysicalState | null {
+  if (!article) return null
+  return {
+    engineeringFrameId: article.engineering_frame_id,
+    actualLiftoffMassKg: article.actual_start_mass_kg == null ? null : Number(article.actual_start_mass_kg),
+    crewCargoMissionEquipmentKg: article.crew_cargo_mission_equipment_kg == null
+      ? null
+      : Number(article.crew_cargo_mission_equipment_kg),
+    usableAscentPropellantKg: article.usable_ascent_propellant_kg == null
+      ? null
+      : Number(article.usable_ascent_propellant_kg),
     targetPlaneResolved: article.target_plane_resolved,
   }
 }
