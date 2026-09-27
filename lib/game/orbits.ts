@@ -36,12 +36,12 @@
 export interface Vec3 { x: number; y: number; z: number }
 
 export interface OrbitParams {
-  parent: string | null
-  radius: number
-  period: number
-  phase:  number
-  incl?:  number
-  node?:  number
+  parent: string | null   // null = heliozentrisch (umkreist den Ursprung)
+  radius: number          // Bahnradius in Spieleinheiten
+  period: number          // Umlaufzeit in TICKS
+  phase:  number          // Phase bei Tick 0 (Radiant). 0 = positive x-Achse.
+  incl?:  number          // Bahnneigung (Radiant). Default 0 = koplanar → z=0 (2D)
+  node?:  number          // aufsteigender Knoten (Radiant). Default 0
 }
 
 const KEPLER_L5: OrbitParams = {
@@ -51,22 +51,28 @@ const KEPLER_L5: OrbitParams = {
   phase: -Math.PI / 3,
 }
 
+// ── Bahnen (Physik-Konstanten, hierarchisch) ──────────────────────────────────
+// Alle heliozentrischen Bahnen (parent: null) umkreisen den Ursprung (Sonne).
+// Hierarchische Bahnen (parent: slug) addieren zur Elternposition.
 export const ORBITS: Record<string, OrbitParams> = {
   earth:      { parent: null,    radius: 45,  period: 88,  phase: 0            },
   moon:       { parent: 'earth', radius: 3,   period: 2,   phase: 0            },
   kepler:     KEPLER_L5,
+  // DEPRECATED runtime alias. Entfernen nach persistierter Slug-Migration.
   prometheus: KEPLER_L5,
   mars:       { parent: null,    radius: 150, period: 188, phase: 0            },
   phobos:     { parent: 'mars',  radius: 3,   period: 2,   phase: 0            },
   deimos:     { parent: 'mars',  radius: 5,   period: 4,   phase: Math.PI      },
 }
 
+// ── Tuning ────────────────────────────────────────────────────────────────────
 export const SEC_PER_UNIT = 0.25
 export const MIN_SECONDS   = 10
 export const MAX_SECONDS   = 50
 
 const TWO_PI = Math.PI * 2
 
+// ── Position (deterministisch, 3D-bereit, rekursiv über parent) ──────────────
 export function position(slug: string, tick: number): Vec3 {
   const o = ORBITS[slug]
   if (!o) return { x: 0, y: 0, z: 0 }
