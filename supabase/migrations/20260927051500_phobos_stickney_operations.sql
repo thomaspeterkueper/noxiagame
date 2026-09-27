@@ -105,13 +105,15 @@ select id,'water'::resource_type,12 from anchor_inventory
 on conflict (inventory_id,resource) do update
 set amount=greatest(logistics_inventory_items.amount,excluded.amount), updated_at=now();
 
--- region_resources requires a celestial_regions parent. This local region is
--- explicitly derived from the documented Stickney Base Alpha frame.
 insert into celestial_regions (body,slug,label,center_lat,center_lon,radius_km,bounds,source,imported_at)
 select
   'phobos','phobos-stickney-alpha','Phobos · Stickney Alpha',24.235,-49.0,0.7,
-  jsonb_build_object('localFrame','PHOBOS_PLANETOCENTRIC','originStatus','derived'),
-  'noxia:derived-gameplay-model',now()
+  jsonb_build_object(
+    'localFrame','PHOBOS_PLANETOCENTRIC',
+    'originStatus','derived',
+    'provenance','derived-gameplay-model'
+  ),
+  'manual',now()
 where not exists (select 1 from celestial_regions where slug='phobos-stickney-alpha');
 
 insert into region_resources (id,region_id,resource_type,lat,lon,x_m,y_m,abundance,properties)
