@@ -32,10 +32,18 @@ assert.equal(ssf.externalUrl, 'https://solarsciencefoundation.vercel.app/')
 const crossUniverse = getCrossUniverseEarthLandmarks()
 assert.deepEqual(
   crossUniverse.map(landmark => landmark.id).sort(),
-  ['earth-eg-alexandria', 'earth-gr-phaistos', 'earth-in-dwarka'].sort(),
+  [
+    'earth-de-frankfurt-camaleo-artlounge',
+    'earth-de-frankfurt-senckenberg',
+    'earth-eg-alexandria',
+    'earth-gr-phaistos',
+    'earth-in-dwarka',
+  ].sort(),
 )
 
 assert.ok(getEarthLandmarksByTag('spaceflight').length >= 3)
+assert.ok(getEarthLandmarksByTag('culture').some(landmark => landmark.id === 'earth-de-frankfurt-camaleo-artlounge'))
+assert.equal(getEarthLandmark('earth-de-frankfurt-senckenberg')?.locality, 'Frankfurt am Main')
 assert.ok(getEarthLandmarksByTag('real-science').some(landmark => landmark.id === 'earth-de-darmstadt-esoc'))
 assert.equal(getEarthLandmark('does-not-exist'), undefined)
 
