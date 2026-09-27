@@ -41,7 +41,7 @@ function relationshipFromRow(row: any): PersonRelationship | null {
   }
 }
 
-export async function persistPopulationEventMemory(supabase: any, event: PopulationEvent, options: { projectRelationship?: boolean } = {}): Promise<SocialMemoryProjectionResult> {
+export async function persistPopulationEventMemory(supabase: any, event: PopulationEvent, options: { projectRelationship?: boolean; reconcileGoals?: boolean } = {}): Promise<SocialMemoryProjectionResult> {
   const result: SocialMemoryProjectionResult = { considered: 1, memoriesInserted: 0, memoriesExisting: 0, relationshipsUpdated: 0, errors: [] }
   const memory = memoryFromPopulationEvent(event)
   if (!memory) return result
@@ -65,6 +65,11 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
     return result
   }
   result.memoriesInserted++
+
+  if (options.reconcileGoals !== false) {
+    const goalResult = await reconcileEmergentGoals(supabase, memory.personId)
+    result.errors.push(...goalResult.errors)
+  }
 
   if (!memory.otherPersonId || options.projectRelationship === false) return result
   const { data: relationRow, error: relationError } = await supabase
