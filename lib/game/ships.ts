@@ -23,7 +23,7 @@ import { orbitalBaseSeconds, ORBITS } from './orbits';
 
 // ── Achsen ───────────────────────────────────────────────────────────────────
 export type ShipyardLocation = 'start' | 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus';
-export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus';
+export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'deimos' | 'prometheus';
 export type ModuleType = 'cargo' | 'tank' | 'habitat' | 'equipment';
 export type ModuleStatus = 'active' | 'damaged' | 'disabled';
 
@@ -102,11 +102,12 @@ export function baseTravelSeconds(from: LocationSlug, to: LocationSlug, tick = 0
 // Prometheus (L5-Lagrange): kein nennenswertes Gravitationsfeld — nur Bahnkorrektur.
 // Alle Flüge zu/von Prometheus sind günstig (5t). Anreiz: Energie dort tanken.
 export const FLIGHT_ENERGY: Partial<Record<string, Partial<Record<string, number>>>> = {
-  earth:      { moon: 20, mars: 35, phobos: 38, prometheus: 5  },
-  moon:       { earth: 8, mars: 12, phobos: 10, prometheus: 5  },
-  mars:       { earth: 30, moon: 12, phobos: 4, prometheus: 30 },
-  phobos:     { earth: 32, moon: 10, mars: 6,   prometheus: 30 },
-  prometheus: { earth: 5,  moon: 5,  mars: 30,  phobos: 30     },
+  earth:      { moon: 20, mars: 35, phobos: 38, deimos: 39, prometheus: 5  },
+  moon:       { earth: 8, mars: 12, phobos: 10, deimos: 11, prometheus: 5  },
+  mars:       { earth: 30, moon: 12, phobos: 4, deimos: 5,  prometheus: 30 },
+  phobos:     { earth: 32, moon: 10, mars: 6,   deimos: 3,  prometheus: 30 },
+  deimos:     { earth: 33, moon: 11, mars: 5,   phobos: 3,  prometheus: 30 },
+  prometheus: { earth: 5,  moon: 5,  mars: 30,  phobos: 30, deimos: 30     },
 }
 
 // Energie-Kosten für einen Flug (t). 0 = kein Antrieb nötig (Orbit-Korrektur).
@@ -120,6 +121,7 @@ export const GRAVITY_MS2: Record<string, number> = {
   moon:       1.62,
   mars:       3.72,
   phobos:     0.0057,
+  deimos:     0.003,
   prometheus: 0.0,    // Lagrange-Punkt: keine Eigengravitation
 }
 
