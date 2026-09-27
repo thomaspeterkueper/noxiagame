@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
-import PlanetarySurfaceMap, { type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
+import { deriveStickneyFleetMapMarkers } from '@/lib/game/vehicles/stickneyFleetMotion'
+import PlanetarySurfaceMap, { type MobileSurfaceObject, type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
 import {
   PHOBOS_BASE_ALPHA_LOGISTICS,
   PHOBOS_BASE_ALPHA_NODES,
@@ -43,9 +44,13 @@ const PHOBOS_CORRIDORS: PreparedCorridor[] = (() => {
 export default function DashboardPhobosSurface({ locations, prices, orders }: Props) {
   const location=useGameStore(s=>s.location),credits=useGameStore(s=>s.credits),cargo=useGameStore(s=>s.cargo),cargoMax=useGameStore(s=>s.cargoMax),shipTypeId=useGameStore(s=>s.shipTypeId),shipRange=useGameStore(s=>s.shipRange),buy=useGameStore(s=>s.buy),sell=useGameStore(s=>s.sell),loadFromServer=useGameStore(s=>s.loadFromServer)
   const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null),[dockEntity,setDockEntity]=useState<PlanetarySurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
+  const [fleetRobots,setFleetRobots]=useState<any[]>([]),[fleetJobs,setFleetJobs]=useState<any[]>([]),[fleetNow,setFleetNow]=useState(()=>Date.now())
   const phobosLocation=useMemo(()=>locations.find((item:any)=>item.slug==='phobos')??null,[locations]),phobosOrders=useMemo(()=>orders.filter((item:any)=>item.locations?.slug==='phobos'),[orders])
   useEffect(()=>{if(location!=='phobos')return;let cancelled=false;fetch('/api/game/world',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(!cancelled)setTick(Number(p?.stats?.tickNumber??0))}).catch(()=>{});return()=>{cancelled=true}},[location])
   useEffect(()=>{if(location!=='phobos')return;let cancelled=false;(async()=>{try{const token=await getToken();if(!token||cancelled)return;await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({location:'phobos'})})}catch{}})();return()=>{cancelled=true}},[location])
+  useEffect(()=>{if(location!=='phobos')return;let cancelled=false;const loadFleet=async()=>{try{const token=await getToken();if(!token||cancelled)return;const response=await fetch('/api/game/phobos/pilot-extraction',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});const payload=await response.json();if(!cancelled&&response.ok){setFleetRobots(Array.isArray(payload.robots)?payload.robots:[]);setFleetJobs(Array.isArray(payload.jobs)?payload.jobs:[])}}catch{}};void loadFleet();const timer=window.setInterval(()=>void loadFleet(),15000);return()=>{cancelled=true;window.clearInterval(timer)}},[location])
+  useEffect(()=>{if(location!=='phobos')return;const timer=window.setInterval(()=>setFleetNow(Date.now()),1000);return()=>window.clearInterval(timer)},[location])
+  const robotMapObjects=useMemo<MobileSurfaceObject[]>(()=>deriveStickneyFleetMapMarkers(fleetRobots,fleetJobs,fleetNow),[fleetRobots,fleetJobs,fleetNow])
   if(location!=='phobos')return null
 
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_phobos'){setDockEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
@@ -63,6 +68,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
       terrainLabel="MEX / HRSC DEM"
       minimumWorldSpanM={400}
       corridors={PHOBOS_CORRIDORS}
+      mobileObjects={robotMapObjects}
       onOpenWorldObject={openWorldObject}
     />
 
