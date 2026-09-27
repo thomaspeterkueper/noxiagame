@@ -14,7 +14,7 @@
 import { create } from 'zustand'
 
 export type ResourceType = 'water' | 'energy' | 'metal'
-export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus'
+export type LocationSlug = 'earth' | 'moon' | 'mars' | 'phobos' | 'deimos' | 'prometheus'
 
 // Effektive Reichweite eines Schiffs (in Basis-Distanz).
 // HEUTE: gibt schlicht baseRange zurück (statische Reichweite aus ship_types).
