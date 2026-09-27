@@ -32,7 +32,6 @@ function canonicalTerrain(locationSlug: string) {
 function discoveryDto(row: any) {
   return {
     id: row.id,
-    groundTruthKey: row.ground_truth_key,
     kind: row.signal_kind,
     sourceType: row.source_type,
     row: row.tile_row,
@@ -43,7 +42,6 @@ function discoveryDto(row: any) {
     abundanceTier: row.abundance_tier,
     evidenceKind: row.evidence_kind,
     interpretation: {
-      groundTruthKey: row.ground_truth_key,
       label: row.interpretation_label,
       confidence: row.confidence,
       evidence: row.evidence,
@@ -64,12 +62,29 @@ function roundedCoord(value: unknown, decimals: number) {
 // ist hingegen eine Funktion seines Wissens. Die DB speichert deshalb die volle
 // Wahrheit, waehrend die API pro Betrachter eine passende Sicht erzeugt.
 function resourceDiscoveryDto(row: any, capability: ScannerCapability) {
-  const base = discoveryDto(row)
   const level = capability.interpretationLevel
+  const lat = roundedCoord(row.lat, level >= 3 ? 5 : level >= 1 ? 4 : 3)
+  const lon = roundedCoord(row.lon, level >= 3 ? 5 : level >= 1 ? 4 : 3)
+  const base = {
+    id: row.id,
+    kind: row.signal_kind,
+    sourceType: row.source_type,
+    row: row.tile_row,
+    col: row.tile_col,
+    lat,
+    lon,
+    resourceType: row.resource_type,
+    abundanceTier: row.abundance_tier,
+    evidenceKind: row.evidence_kind,
+    interpretation: {
+      label: row.interpretation_label,
+      confidence: row.confidence,
+      evidence: row.evidence,
+    },
+    firstDiscoveredAt: row.first_discovered_at,
+    lastMeasuredAt: row.last_measured_at,
+  }
   if (level >= 3) return base
-
-  const lat = roundedCoord(row.lat, level >= 1 ? 4 : 3)
-  const lon = roundedCoord(row.lon, level >= 1 ? 4 : 3)
 
   if (level === 0) {
     return {
@@ -80,8 +95,7 @@ function resourceDiscoveryDto(row: any, capability: ScannerCapability) {
       abundanceTier: null,
       evidenceKind: null,
       interpretation: {
-        groundTruthKey: row.ground_truth_key,
-        label: 'Unklare Ressourcensignatur',
+          label: 'Unklare Ressourcensignatur',
         confidence: 'low',
         evidence: 'Anomalie erkannt. Mehr geologisches Fachwissen ist fuer eine Stoffbestimmung erforderlich.',
       },
@@ -96,8 +110,7 @@ function resourceDiscoveryDto(row: any, capability: ScannerCapability) {
       abundanceTier: null,
       evidenceKind: null,
       interpretation: {
-        groundTruthKey: row.ground_truth_key,
-        label: `${row.resource_type ?? 'Rohstoff'} — wahrscheinliche Signatur`,
+          label: `${row.resource_type ?? 'Rohstoff'} — wahrscheinliche Signatur`,
         confidence: 'low',
         evidence: 'Rohstofftyp wahrscheinlich erkannt; Menge und geologische Evidenz sind noch nicht sicher interpretierbar.',
       },
@@ -110,7 +123,6 @@ function resourceDiscoveryDto(row: any, capability: ScannerCapability) {
     lon,
     evidenceKind: null,
     interpretation: {
-      groundTruthKey: row.ground_truth_key,
       label: `${row.resource_type ?? 'Rohstoff'} — ${row.abundance_tier ?? 'unbestimmte'} Konzentration`,
       confidence: 'medium',
       evidence: 'Rohstofftyp und Konzentrationsklasse interpretiert. Herkunft/Evidenz erfordert wissenschaftliche Analyse.',
