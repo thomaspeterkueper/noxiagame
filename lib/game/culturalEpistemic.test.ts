@@ -5,6 +5,9 @@ import {
   resolveCesQuestion,
   classifyCesMemoryClaim,
   validateCesReceptionGraph,
+  validateCesInstitution,
+  validateCesControversy,
+  normalizeCesControversy,
 } from './culturalEpistemic'
 
 describe('CES foundation', () => {
@@ -91,5 +94,43 @@ describe('CES foundation', () => {
         sourceRef: '',
       }],
     })).toContain('missing provenance: memory-1->source-1')
+  })
+  it('keeps resonance centres plural-use by contract', () => {
+    expect(validateCesInstitution({
+      id: 'rc-luna-01',
+      kind: 'resonance_centre',
+      name: 'Luna Resonance Centre',
+      traditionTags: ['omnizedenz'],
+      activityTags: ['dialogue', 'archive', 'meditation'],
+      pluralUse: false,
+    })).toContain('resonance centre must default to plural use')
+  })
+
+  it('does not encode a winning side in controversies', () => {
+    const controversy = normalizeCesControversy({
+      id: 'shared-dome-01',
+      subjectRef: 'place:observation-dome',
+      positionIds: ['shared-use', 'dedicated-use'],
+      salience: 2,
+      openedByEventRef: 'event:allocation-hearing',
+    })
+    expect(controversy.salience).toBe(1)
+    expect(validateCesControversy(controversy, [
+      { id: 'shared-use', label: 'Shared use', sourceRef: 'hearing:a' },
+      { id: 'dedicated-use', label: 'Dedicated use', sourceRef: 'hearing:b' },
+    ])).toEqual([])
+    expect(controversy).not.toHaveProperty('winner')
+    expect(controversy).not.toHaveProperty('correctPositionId')
+  })
+
+  it('requires plural documented positions for a controversy', () => {
+    expect(validateCesControversy({
+      id: 'c1',
+      subjectRef: 'policy:space',
+      positionIds: ['only-one'],
+      salience: 0.5,
+      openedByEventRef: 'event:1',
+    }, [{ id: 'only-one', label: 'Only position', sourceRef: 'record:1' }]))
+      .toContain('controversy requires at least two positions')
   })
 })
