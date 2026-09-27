@@ -1,7 +1,7 @@
 // NOXIA-LIVING — persistent, idempotent projection of population events into social memory.
 // Persistence is deliberately separate from the pure population tick.
 
-import { memoryFromPopulationEvent, projectRelationship, type PersonMemory } from './personSocialMemory'
+import { deriveEmergentGoals, memoryFromPopulationEvent, projectRelationship, type PersonMemory } from './personSocialMemory'
 import type { PersonRelationship, PopulationEvent } from './population/types'
 
 export interface SocialMemoryProjectionResult {
@@ -104,4 +104,36 @@ export async function persistPopulationEventMemories(supabase: any, events: Popu
     total.errors.push(...r.errors.map((error) => `${event.id}: ${error}`))
   }
   return total
+}
+
+
+function memoryFromRow(row: any): PersonMemory {
+  return { id: row.id, personId: row.person_id, otherPersonId: row.other_person_id ?? null, locationId: row.location_id ?? null, kind: row.memory_kind, tick: Number(row.tick), salience: Number(row.salience), valence: Number(row.valence), trustDelta: Number(row.trust_delta), summary: row.summary, sourceEventId: row.source_event_id }
+}
+
+/** Recompute bounded emergent goals from the persisted memory log. Safe to replay. */
+export async function reconcileEmergentGoals(supabase: any, personId: string): Promise<{ derived: number; upserted: number; errors: string[] }> {
+  const result = { derived: 0, upserted: 0, errors: [] as string[] }
+  const { data: rows, error } = await supabase.from('person_memories')
+    .select('id, person_id, other_person_id, location_id, memory_kind, tick, salience, valence, trust_delta, summary, source_event_id')
+    .eq('person_id', personId).order('tick', { ascending: true }).limit(200)
+  if (error) { result.errors.push(`memory goal scan: ${error.message ?? error}`); return result }
+  const goals = deriveEmergentGoals((rows ?? []).map(memoryFromRow))
+  result.derived = goals.length
+  for (const goal of goals) {
+    const query = supabase.from('person_goals').select('id, progress').eq('person_id', personId).eq('goal_code', goal.code).eq('status', 'active')
+    const scoped = goal.subjectRef == null ? query.is('subject_ref', null) : query.eq('subject_ref', goal.subjectRef)
+    const { data: existing, error: lookupError } = await scoped.limit(1).maybeSingle()
+    if (lookupError) { result.errors.push(`goal lookup ${goal.code}: ${lookupError.message ?? lookupError}`); continue }
+    if (existing) {
+      const { error: updateError } = await supabase.from('person_goals').update({ priority: goal.priority, updated_tick: goal.latestTick, updated_at: new Date().toISOString() }).eq('id', existing.id)
+      if (updateError) result.errors.push(`goal update ${goal.code}: ${updateError.message ?? updateError}`)
+      else result.upserted++
+    } else {
+      const { error: insertError } = await supabase.from('person_goals').insert({ person_id: personId, goal_code: goal.code, subject_type: goal.subjectType, subject_ref: goal.subjectRef, priority: goal.priority, progress: 0, status: 'active', created_tick: goal.latestTick, updated_tick: goal.latestTick })
+      if (insertError) result.errors.push(`goal insert ${goal.code}: ${insertError.message ?? insertError}`)
+      else result.upserted++
+    }
+  }
+  return result
 }
