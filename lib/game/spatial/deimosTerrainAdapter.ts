@@ -4,8 +4,8 @@ import type { TerrainRasterAdapter, TerrainRasterSourceSample } from './terrainR
 
 // Deimos currently has no raster DEM in the NOXIA terrain pipeline. This
 // adapter therefore provides an explicitly synthetic, deterministic heightfield
-// so a future playable surface can use the common terrain stack without
-// pretending that invented elevations are observations.
+// so the playable surface can use the common terrain stack without pretending
+// that invented elevations are observations.
 const DEIMOS_MEAN_RADIUS_M = 6200
 
 type NamedCraterSeed = {
@@ -16,11 +16,13 @@ type NamedCraterSeed = {
   inventedDepthM: number
 }
 
-// Named-feature positions are reference anchors; depth/profile are deliberately
-// invented for gameplay legibility and remain marked as synthetic metadata.
+// Names, center coordinates and nominal diameters come from the IAU/USGS
+// Gazetteer of Planetary Nomenclature. Gazetteer longitudes are converted from
+// Deimos' +West convention to NOXIA's internal +East convention. Crater
+// depth/profile remain deliberately invented for gameplay legibility.
 const NAMED_CRATERS: readonly NamedCraterSeed[] = [
-  { name: 'Voltaire', latDeg: 22.0, lonDeg: -3.5, diameterKm: 3.0, inventedDepthM: 260 },
-  { name: 'Swift', latDeg: 12.5, lonDeg: 1.8, diameterKm: 3.0, inventedDepthM: 240 },
+  { name: 'Voltaire', latDeg: 22.0, lonDeg: -3.5, diameterKm: 1.9, inventedDepthM: 260 },
+  { name: 'Swift', latDeg: 12.5, lonDeg: 1.8, diameterKm: 1.0, inventedDepthM: 240 },
 ]
 
 function normalizeLongitude(lonDeg: number) {
@@ -109,7 +111,7 @@ export const DEIMOS_SYNTHETIC_DATASET: TerrainDatasetDescriptor = {
   body: 'deimos',
   provider: 'NOXIA (synthetic; not an observed DEM)',
   datasetName: 'Deimos Synthetic Low-Relief Heightfield v1',
-  datasetVersion: '2026-09-25',
+  datasetVersion: '2026-09-27',
   datasetKind: 'dem',
   resolutionM: null,
   horizontalReference: 'DEIMOS_PLANETOCENTRIC',
@@ -124,8 +126,12 @@ export const DEIMOS_SYNTHETIC_DATASET: TerrainDatasetDescriptor = {
     provenance: 'synthetic',
     generator: 'deimosTerrainAdapter.syntheticDeimosElevationM',
     real_reference_features: ['Voltaire', 'Swift'],
-    real_reference_note: 'Named-feature positions are reference anchors; crater depth/profile are invented for gameplay and are not observations.',
+    real_reference_source: 'IAU/USGS Gazetteer of Planetary Nomenclature',
+    real_reference_note: 'Names, center positions and nominal diameters are nomenclature anchors; crater depth/profile and the surrounding heightfield are invented for gameplay and are not observations.',
+    real_reference_coordinate_note: 'Gazetteer +West longitudes converted to NOXIA +East: Swift 358.2W -> 1.8E; Voltaire 3.5W -> -3.5E.',
+    real_reference_nominal_diameter_km: { Swift: 1.0, Voltaire: 1.9 },
     adopted_mean_radius_m: DEIMOS_MEAN_RADIUS_M,
     invented_at: '2026-09-25',
+    reference_corrected_at: '2026-09-27',
   },
 }
