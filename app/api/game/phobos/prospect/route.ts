@@ -1,9 +1,17 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import {
+  beginLoadingTransportJob,
+  createTransportJob,
+  startTransportJob,
+} from '@/lib/game/core/logistics'
 
 const DEFAULT_RADIUS_M = 180
 const MAX_RADIUS_M = 600
 const CHANCE: Record<string, number> = { trace: 0.45, viable: 0.72, rich: 0.9, exceptional: 0.97 }
+const ROVER_YARD = { xM: 48, yM: -26 }
+const BASE_DEPOT = { xM: 22, yM: 2 }
 
 async function userFromRequest(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -18,7 +26,7 @@ function finite(value: unknown, fallback: number) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function dto(row: any) {
+function dto(row: any, sample?: { cacheInventoryId?: string | null; sampleAvailable?: boolean }) {
   const props = row.properties ?? {}
   return {
     id: row.id,
@@ -31,11 +39,13 @@ function dto(row: any) {
     provenance: props.provenance ?? null,
     discoveredAt: row.discovered_at,
     discoveredVia: row.discovered_via,
+    sampledAt: props.sampled_at ?? null,
+    cacheInventoryId: sample?.cacheInventoryId ?? null,
+    sampleAvailable: sample?.sampleAvailable ?? false,
   }
 }
 
-async function candidates() {
-  const supabase = createServiceClient()
+async function candidates(supabase = createServiceClient()) {
   const { data, error } = await supabase
     .from('region_resources')
     .select('id,resource_type,x_m,y_m,abundance,properties,discovered_at,discovered_via')
@@ -44,21 +54,94 @@ async function candidates() {
   return data ?? []
 }
 
+async function phobosLocationId(supabase: ReturnType<typeof createServiceClient>) {
+  const { data, error } = await supabase.from('locations').select('id').eq('slug', 'phobos').maybeSingle()
+  if (error || !data?.id) throw new Error(error?.message ?? 'Phobos location missing')
+  return data.id as string
+}
+
+async function ensureProspectCache(supabase: ReturnType<typeof createServiceClient>, row: any) {
+  const { data: existing, error: lookupError } = await supabase
+    .from('logistics_inventories')
+    .select('id')
+    .eq('storage_kind', 'native')
+    .eq('subject_type', 'region_resource')
+    .eq('subject_id', row.id)
+    .maybeSingle()
+  if (lookupError) throw new Error(lookupError.message)
+  if (existing?.id) return existing.id as string
+
+  const locationId = await phobosLocationId(supabase)
+  const { data, error } = await supabase
+    .from('logistics_inventories')
+    .insert({
+      owner_profile_id: null,
+      location_id: locationId,
+      inventory_kind: 'facility',
+      storage_kind: 'native',
+      subject_type: 'region_resource',
+      subject_id: row.id,
+      label: `Stickney Prospect · ${String(row.resource_type).replaceAll('_', ' ')}`,
+      capacity: 4,
+      public_deposit: false,
+      public_withdraw: true,
+      active: true,
+      metadata: {
+        role: 'prospect_sample_cache',
+        body: 'phobos',
+        surfaceHub: 'stickney-alpha',
+        prospectId: row.id,
+        resourceType: row.resource_type,
+        xM: row.x_m,
+        yM: row.y_m,
+        provenance: row.properties?.provenance ?? 'derived-gameplay-model',
+      },
+    })
+    .select('id')
+    .single()
+  if (error) {
+    const { data: raced } = await supabase
+      .from('logistics_inventories')
+      .select('id')
+      .eq('storage_kind', 'native')
+      .eq('subject_type', 'region_resource')
+      .eq('subject_id', row.id)
+      .maybeSingle()
+    if (raced?.id) return raced.id as string
+    throw new Error(error.message)
+  }
+  return data.id as string
+}
+
+async function annotateSamples(supabase: ReturnType<typeof createServiceClient>, rows: any[]) {
+  const discovered = rows.filter(row => row.discovered_at)
+  if (!discovered.length) return []
+  const cacheRows = await Promise.all(discovered.map(async row => ({ row, cacheId: await ensureProspectCache(supabase, row) })))
+  const cacheIds = cacheRows.map(item => item.cacheId)
+  const { data: sampleRows, error } = await supabase
+    .from('logistics_inventory_items')
+    .select('inventory_id,amount')
+    .in('inventory_id', cacheIds)
+    .eq('resource', 'research_sample')
+  if (error) throw new Error(error.message)
+  const available = new Map((sampleRows ?? []).map(item => [item.inventory_id, Number(item.amount ?? 0) > 0]))
+  return cacheRows.map(({ row, cacheId }) => dto(row, { cacheInventoryId: cacheId, sampleAvailable: available.get(cacheId) === true }))
+}
+
+async function requirePhobosPresence(supabase: ReturnType<typeof createServiceClient>, userId: string) {
+  const { data: profile } = await supabase.from('profiles').select('current_location').eq('id', userId).maybeSingle()
+  return profile?.current_location === 'phobos'
+}
+
 export async function GET(req: NextRequest) {
   const user = await userFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
-  const { data: profile } = await supabase.from('profiles').select('current_location').eq('id', user.id).maybeSingle()
-  if (profile?.current_location !== 'phobos') return NextResponse.json({ error: 'Prospektion ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
+  if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ error: 'Prospektion ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
 
   try {
-    const rows = await candidates()
-    return NextResponse.json({
-      ok: true,
-      body: 'phobos',
-      hub: 'stickney-alpha',
-      discoveries: rows.filter((row: any) => row.discovered_at).map(dto),
-    })
+    const rows = await candidates(supabase)
+    return NextResponse.json({ ok: true, body: 'phobos', hub: 'stickney-alpha', discoveries: await annotateSamples(supabase, rows) })
   } catch {
     return NextResponse.json({ error: 'Prospektionsdaten nicht verfügbar.' }, { status: 503 })
   }
@@ -68,16 +151,86 @@ export async function POST(req: NextRequest) {
   const user = await userFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
-  const { data: profile } = await supabase.from('profiles').select('current_location').eq('id', user.id).maybeSingle()
-  if (profile?.current_location !== 'phobos') return NextResponse.json({ error: 'Prospektion ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
+  if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ error: 'Prospektion ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
 
   const body = await req.json().catch(() => ({}))
-  const xM = finite(body.xM, 0)
-  const yM = finite(body.yM, 0)
-  const radiusM = Math.min(MAX_RADIUS_M, Math.max(25, finite(body.radiusM, DEFAULT_RADIUS_M)))
+  const action = typeof body.action === 'string' ? body.action : 'scan'
 
   try {
-    const rows = await candidates()
+    const rows = await candidates(supabase)
+
+    if (action === 'collect-sample') {
+      const row = rows.find((candidate: any) => candidate.id === body.prospectId && candidate.discovered_at)
+      if (!row) return NextResponse.json({ error: 'Entdecktes Prospektionsziel nicht gefunden.' }, { status: 404 })
+      const props = row.properties ?? {}
+      if (props.sampled_at) return NextResponse.json({ error: 'An diesem Ziel wurde bereits eine Referenzprobe entnommen.' }, { status: 409 })
+      const cacheId = await ensureProspectCache(supabase, row)
+      const sampledAt = new Date().toISOString()
+      const { error: itemError } = await supabase
+        .from('logistics_inventory_items')
+        .upsert({ inventory_id: cacheId, resource: 'research_sample', amount: 1, updated_at: sampledAt }, { onConflict: 'inventory_id,resource' })
+      if (itemError) throw new Error(itemError.message)
+      const { data: updated, error: updateError } = await supabase
+        .from('region_resources')
+        .update({ properties: { ...props, sampled_at: sampledAt, sampled_by: user.id, sample_kind: 'regolith_reference' } })
+        .eq('id', row.id)
+        .select('id,resource_type,x_m,y_m,abundance,properties,discovered_at,discovered_via')
+        .single()
+      if (updateError) throw new Error(updateError.message)
+      return NextResponse.json({ ok: true, action, prospect: dto(updated, { cacheInventoryId: cacheId, sampleAvailable: true }) })
+    }
+
+    if (action === 'return-sample') {
+      const row = rows.find((candidate: any) => candidate.id === body.prospectId && candidate.discovered_at)
+      if (!row) return NextResponse.json({ error: 'Entdecktes Prospektionsziel nicht gefunden.' }, { status: 404 })
+      const cacheId = await ensureProspectCache(supabase, row)
+      const { data: sampleItem, error: sampleError } = await supabase
+        .from('logistics_inventory_items')
+        .select('amount')
+        .eq('inventory_id', cacheId)
+        .eq('resource', 'research_sample')
+        .maybeSingle()
+      if (sampleError) throw new Error(sampleError.message)
+      if (Number(sampleItem?.amount ?? 0) < 1) return NextResponse.json({ error: 'Am Prospektionspunkt liegt keine Probe zum Rücktransport bereit.' }, { status: 409 })
+
+      const { data: depot, error: depotError } = await supabase
+        .from('logistics_inventories')
+        .select('id,location_id')
+        .contains('metadata', { role: 'stickney_depot' })
+        .eq('active', true)
+        .limit(1)
+        .maybeSingle()
+      if (depotError || !depot?.id || !depot.location_id) throw new Error(depotError?.message ?? 'Stickney depot missing')
+
+      const start = { xM: Number(row.x_m), yM: Number(row.y_m) }
+      const distanceM = Math.hypot(start.xM - ROVER_YARD.xM, start.yM - ROVER_YARD.yM) + Math.hypot(ROVER_YARD.xM - BASE_DEPOT.xM, ROVER_YARD.yM - BASE_DEPOT.yM)
+      const etaSeconds = Math.max(60, Math.ceil(distanceM / 1.2))
+      const job = await createTransportJob({
+        commandId: randomUUID(),
+        actorProfileId: user.id,
+        locationId: depot.location_id,
+        domain: 'surface',
+        sourceInventoryId: cacheId,
+        destinationInventoryId: depot.id,
+        vehicleRole: 'Tether Rover 01',
+        resource: 'research_sample' as any,
+        amount: 1,
+        routeSnapshot: {
+          passable: true,
+          etaSeconds,
+          routeKind: 'prospect-sample-return',
+          prospectId: row.id,
+          points: [start, ROVER_YARD, BASE_DEPOT],
+        },
+      })
+      await beginLoadingTransportJob(user.id, job.id)
+      const started = await startTransportJob(user.id, job.id)
+      return NextResponse.json({ ok: true, action, job: started, etaSeconds })
+    }
+
+    const xM = finite(body.xM, 0)
+    const yM = finite(body.yM, 0)
+    const radiusM = Math.min(MAX_RADIUS_M, Math.max(25, finite(body.radiusM, DEFAULT_RADIUS_M)))
     const inRange = rows.filter((row: any) => {
       const x = Number(row.x_m), y = Number(row.y_m)
       return Number.isFinite(x) && Number.isFinite(y) && Math.hypot(x - xM, y - yM) <= radiusM
@@ -100,7 +253,10 @@ export async function POST(req: NextRequest) {
         .select('id,resource_type,x_m,y_m,abundance,properties,discovered_at,discovered_via')
         .maybeSingle()
       if (error) throw new Error(error.message)
-      if (updated) newlyDiscovered.push(updated)
+      if (updated) {
+        await ensureProspectCache(supabase, updated)
+        newlyDiscovered.push(updated)
+      }
     }
 
     return NextResponse.json({
@@ -109,11 +265,12 @@ export async function POST(req: NextRequest) {
       hub: 'stickney-alpha',
       xM, yM, radiusM,
       scannedTargets: inRange.length,
-      alreadyKnown: alreadyKnown.map(dto),
-      newlyDiscovered: newlyDiscovered.map(dto),
+      alreadyKnown: await annotateSamples(supabase, alreadyKnown),
+      newlyDiscovered: await annotateSamples(supabase, newlyDiscovered),
       missedTargets: Math.max(0, undiscovered.length - newlyDiscovered.length),
     })
-  } catch {
-    return NextResponse.json({ error: 'Prospektionslauf fehlgeschlagen.' }, { status: 503 })
+  } catch (error) {
+    console.error('phobos prospect operation failed:', error)
+    return NextResponse.json({ error: 'Stickney-Operation fehlgeschlagen.' }, { status: 503 })
   }
 }
