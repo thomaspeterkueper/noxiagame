@@ -28,6 +28,12 @@ const MODELED_MATERIALS=['Tonstein','Sandstein','Schluffstein','Kieslage','verwi
 function rigWear(rig:DrillRig,depthM:number){return Math.max(2,Math.ceil(2+6*(depthM/rig.maxDepthM)))}
 function effectivePreset(preset:DepthPreset,rig:DrillRig){return {...preset,energyCost:Math.ceil(preset.energyCost*rig.energyMultiplier),durationSeconds:Math.ceil(preset.durationSeconds*rig.durationMultiplier),wearCost:rigWear(rig,preset.depthM)}}
 function serviceCost(rig:DrillRig,condition:number){return condition>=100?0:Math.max(1,Math.ceil((100-condition)/25))*rig.serviceFactor}
+function publicCoreJob(job:any){
+ const result=job?.result&&typeof job.result==='object'?{...job.result}:job?.result
+ if(result&&typeof result==='object')delete result.abundance
+ const {region_resource_id:_hiddenResourceId,...publicJob}=job??{}
+ return {...publicJob,result}
+}
 
 async function authenticatedUser(req:NextRequest){const token=req.headers.get('authorization')?.split(' ')[1];if(!token)return null;const supabase=createServiceClient();const{data:{user}}=await supabase.auth.getUser(token);return user??null}
 async function findRegionFor(supabase:ReturnType<typeof createServiceClient>,lat:number,lon:number){const{data:regions}=await supabase.from('celestial_regions').select('id,slug,bounds');for(const region of regions??[]){const b=region.bounds as {south:number;west:number;north:number;east:number};if(b&&lat>=b.south&&lat<=b.north&&lon>=b.west&&lon<=b.east)return region}return null}
@@ -84,7 +90,7 @@ async function resolveDueJobs(supabase:ReturnType<typeof createServiceClient>,pr
   if(!hit){await supabase.from('core_sample_jobs').update({status:'completed',completed_at:now,result:{...(job.result??{}),...common,empty:true,conclusion:'no_resource_intersection_in_sample'}}).eq('id',job.id);continue}
   const tier=(hit.properties?.tier??'trace') as ResourceTier;const evidence=`Direkte Bohrkernprobe bis ${targetDepthM} m; modellierte Lagerstättentiefe ${hit.modeledDepthM} m; horizontale Abweichung ${Math.round(hit.distanceKm*1000)} m.`
   await supabase.from('scanner_discoveries').upsert({discovered_by_profile_id:profileId,location_id:locationId,ground_truth_key:`resource:${hit.id}`,region_resource_id:hit.id,lat:Number(hit.lat),lon:Number(hit.lon),resource_type:hit.resource_type,abundance_tier:tier,evidence_kind:'core_sample_confirmed',signal_kind:'resource_deposit',source_type:hit.resource_type,interpretation_label:`Bohrkern bestätigt: ${hit.resource_type}`,confidence:'high',evidence,last_measured_at:now},{onConflict:'location_id,ground_truth_key',ignoreDuplicates:false})
-  await supabase.from('core_sample_jobs').update({status:'completed',completed_at:now,region_resource_id:hit.id,result:{...(job.result??{}),...common,empty:false,resource_type:hit.resource_type,abundance:Number(hit.abundance),abundance_tier:tier,distance_m:Math.round(hit.distanceKm*1000),modeled_resource_depth_m:hit.modeledDepthM,evidence_kind:'core_sample_confirmed',confidence:'high'}}).eq('id',job.id)
+  await supabase.from('core_sample_jobs').update({status:'completed',completed_at:now,region_resource_id:hit.id,result:{...(job.result??{}),...common,empty:false,resource_type:hit.resource_type,abundance_tier:tier,distance_m:Math.round(hit.distanceKm*1000),modeled_resource_depth_m:hit.modeledDepthM,evidence_kind:'core_sample_confirmed',confidence:'high'}}).eq('id',job.id)
  }
 }
 
@@ -93,7 +99,7 @@ export async function GET(req:NextRequest){
  const supabase=createServiceClient();const{data:location}=await supabase.from('locations').select('id,slug').eq('slug',locationSlug).maybeSingle();if(!location)return NextResponse.json({error:'location_not_found'},{status:404});await resolveDueJobs(supabase,user.id,location.id)
  const[{data:jobs},{data:ownedRows},{data:stateRows}]=await Promise.all([supabase.from('core_sample_jobs').select('*').eq('profile_id',user.id).eq('location_id',location.id).order('created_at',{ascending:false}).limit(20),supabase.from('player_instruments').select('instrument_id').eq('profile_id',user.id).in('instrument_id',Object.keys(DRILL_RIGS)),supabase.from('player_instrument_state').select('instrument_id,condition_percent').eq('profile_id',user.id).in('instrument_id',Object.keys(DRILL_RIGS))])
  const owned=new Set((ownedRows??[]).map((r:any)=>r.instrument_id));const condition=new Map((stateRows??[]).map((r:any)=>[r.instrument_id,Number(r.condition_percent)]));const rigs=Object.values(DRILL_RIGS).map(r=>{const c=owned.has(r.id)?(condition.get(r.id)??100):null;return{...r,owned:owned.has(r.id),conditionPercent:c,serviceComponentCost:c===null?null:serviceCost(r,c)}})
- return NextResponse.json({owned:owned.has('core_sample'),sampleRadiusM:5,depthPresets:Object.values(DEPTH_PRESETS),drillRigs:rigs,depthModel:'noxia_modeled_depth_v1',stratigraphyModel:'noxia_stratigraphy_v1',jobs:jobs??[]})
+ return NextResponse.json({owned:owned.has('core_sample'),sampleRadiusM:5,depthPresets:Object.values(DEPTH_PRESETS),drillRigs:rigs,depthModel:'noxia_modeled_depth_v1',stratigraphyModel:'noxia_stratigraphy_v1',jobs:(jobs??[]).map(publicCoreJob)})
 }
 
 export async function POST(req:NextRequest){
@@ -109,5 +115,5 @@ export async function POST(req:NextRequest){
  const lat=Number(body.lat),lon=Number(body.lon);const preset=DEPTH_PRESETS[(typeof body.depthPreset==='string'?body.depthPreset:'shallow') as DepthPresetId];if(!preset)return NextResponse.json({error:'invalid_depth_preset'},{status:400});if(preset.depthM>rig.maxDepthM)return NextResponse.json({error:'drill_rig_depth_exceeded'},{status:400});if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return NextResponse.json({error:'invalid_coordinates'},{status:400});if(!await findRegionFor(supabase,lat,lon))return NextResponse.json({error:'no_region_at_sample_position'},{status:400})
  const effective=effectivePreset(preset,rig);const{data:jobId,error}=await supabase.rpc('start_core_sample_job_v2',{p_profile_id:user.id,p_location_id:location.id,p_latitude_deg:lat,p_longitude_deg:lon,p_target_depth_m:preset.depthM,p_rig_id:rig.id,p_wear_cost:effective.wearCost,p_energy_cost:effective.energyCost,p_component_cost:effective.componentCost,p_duration_seconds:effective.durationSeconds})
  if(error){const message=error.message||'core_sample_start_failed';const known=['core_sample_not_owned','drill_rig_not_owned','drill_rig_requires_service','insufficient_energy','insufficient_components','invalid_coordinates','invalid_depth'];const code=known.find(v=>message.includes(v))??'core_sample_start_failed';return NextResponse.json({error:code},{status:code.startsWith('insufficient_')||code==='drill_rig_requires_service'?409:400})}
- const{data:job}=await supabase.from('core_sample_jobs').select('*').eq('id',jobId).single();return NextResponse.json({ok:true,job,preset:effective,rig,depthModel:'noxia_modeled_depth_v1',stratigraphyModel:'noxia_stratigraphy_v1'})
+ const{data:job}=await supabase.from('core_sample_jobs').select('*').eq('id',jobId).single();return NextResponse.json({ok:true,job:publicCoreJob(job),preset:effective,rig,depthModel:'noxia_modeled_depth_v1',stratigraphyModel:'noxia_stratigraphy_v1'})
 }
