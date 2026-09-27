@@ -2,196 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const TARGET_MASS_KG = 50
-const ENERGY_COST = 18
+const ENERGY_COST = 22
 const COMPONENT_COST = 1
-const WEAR_COST = 6
 const DURATION_SECONDS = 6 * 60
-const ROBOT_FRAME_ID = 'PHOBOS-EXCAVATOR-MR1'
-const ROBOT_LABEL = 'Stickney Excavation Robot 01'
+const MAINTENANCE_ENERGY_COST = 8
+const MAINTENANCE_COMPONENT_COST = 1
+const YARD_X_M = 48
+const YARD_Y_M = -26
 
-async function userFromRequest(req: NextRequest) {
-  const token = req.headers.get('authorization')?.split(' ')[1]
-  if (!token) return null
-  const supabase = createServiceClient()
-  const { data: { user } } = await supabase.auth.getUser(token)
-  return user ?? null
-}
+type RobotRole = 'prospector' | 'excavator' | 'hauler' | 'maintenance'
+type RobotSpec = { role: RobotRole; canonicalPrefix: string; frameId: string; label: string; cargoCapacityT: number; modules: string[]; nominalWear: number }
 
-async function phobosLocation(supabase: ReturnType<typeof createServiceClient>) {
-  const { data, error } = await supabase.from('locations').select('id,slug').eq('slug', 'phobos').maybeSingle()
-  if (error || !data) throw new Error(error?.message ?? 'Phobos location missing')
-  return data
-}
+const ROBOT_SPECS: RobotSpec[] = [
+  { role: 'prospector', canonicalPrefix: 'phobos-stickney-prospector', frameId: 'PHOBOS-PROSPECTOR-PR1', label: 'Stickney Prospector Robot 01', cargoCapacityT: 0.1, nominalWear: 2, modules: ['microgravity-anchor-spikes','spectrometer-pack','ground-imaging-radar','tether-reel','autonomy-pack'] },
+  { role: 'excavator', canonicalPrefix: 'phobos-stickney-excavator', frameId: 'PHOBOS-EXCAVATOR-MR1', label: 'Stickney Excavation Robot 01', cargoCapacityT: 0.3, nominalWear: 6, modules: ['microgravity-anchor-spikes','regolith-bucket','reaction-canceling-auger','tether-reel','autonomy-pack'] },
+  { role: 'hauler', canonicalPrefix: 'phobos-stickney-hauler', frameId: 'PHOBOS-HAULER-HR1', label: 'Stickney Hauler Robot 01', cargoCapacityT: 0.2, nominalWear: 4, modules: ['microgravity-anchor-spikes','sealed-sample-hopper','mass-balance-cell','tether-reel','autonomy-pack'] },
+  { role: 'maintenance', canonicalPrefix: 'phobos-stickney-maintenance', frameId: 'PHOBOS-MAINT-MR1', label: 'Stickney Maintenance Robot 01', cargoCapacityT: 0.2, nominalWear: 2, modules: ['microgravity-anchor-spikes','tool-changer','inspection-camera','spares-rack','tether-reel','autonomy-pack'] },
+]
 
-async function requirePresence(supabase: ReturnType<typeof createServiceClient>, userId: string) {
-  const { data } = await supabase.from('profiles').select('current_location').eq('id', userId).maybeSingle()
-  return data?.current_location === 'phobos'
-}
+async function userFromRequest(req: NextRequest) { const token=req.headers.get('authorization')?.split(' ')[1]; if(!token)return null; const s=createServiceClient(); const {data:{user}}=await s.auth.getUser(token); return user??null }
+async function phobosLocation(s: ReturnType<typeof createServiceClient>){const {data,error}=await s.from('locations').select('id,slug').eq('slug','phobos').maybeSingle();if(error||!data)throw new Error(error?.message??'Phobos location missing');return data}
+async function requirePresence(s: ReturnType<typeof createServiceClient>, userId:string){const {data}=await s.from('profiles').select('current_location').eq('id',userId).maybeSingle();return data?.current_location==='phobos'}
+async function prospectById(s:ReturnType<typeof createServiceClient>,id:string){const {data,error}=await s.from('region_resources').select('id,resource_type,x_m,y_m,abundance,properties,discovered_at').eq('id',id).maybeSingle();if(error)throw new Error(error.message);if(!data||data.properties?.body!=='phobos'||data.properties?.surface_hub!=='stickney-alpha')return null;return data}
+async function coreEvidence(s:ReturnType<typeof createServiceClient>,userId:string,prospectId:string){const {data:sample,error}=await s.from('research_samples').select('id,status').eq('prospect_id',prospectId).eq('owner_profile_id',userId).eq('sample_kind','drill_core').maybeSingle();if(error)throw new Error(error.message);if(!sample)return null;const {data:analysis,error:ae}=await s.from('sample_analyses').select('id,quality_score,finding,development_status,measured_signal_index').eq('sample_id',sample.id).maybeSingle();if(ae)throw new Error(ae.message);return analysis??null}
+async function roverYardInventory(s:ReturnType<typeof createServiceClient>,locationId:string){const {data,error}=await s.from('logistics_inventories').select('id').eq('location_id',locationId).contains('metadata',{role:'surface_rover'}).eq('active',true).limit(1).maybeSingle();if(error||!data?.id)throw new Error(error?.message??'Phobos rover yard missing');return data.id as string}
 
-async function prospectById(supabase: ReturnType<typeof createServiceClient>, prospectId: string) {
-  const { data, error } = await supabase.from('region_resources').select('id,resource_type,x_m,y_m,abundance,properties,discovered_at').eq('id', prospectId).maybeSingle()
-  if (error) throw new Error(error.message)
-  if (!data || data.properties?.body !== 'phobos' || data.properties?.surface_hub !== 'stickney-alpha') return null
-  return data
+async function ensureFleet(s:ReturnType<typeof createServiceClient>,userId:string,locationId:string){
+ const yardId=await roverYardInventory(s,locationId), robots:any[]=[]
+ for(const spec of ROBOT_SPECS){const canonicalKey=`${spec.canonicalPrefix}:${userId}`;const {data:existing,error}=await s.from('vehicle_instances').select('*').eq('canonical_key',canonicalKey).maybeSingle();if(error)throw new Error(error.message);if(existing){robots.push(existing);continue}const {data,error:ie}=await s.from('vehicle_instances').insert({canonical_key:canonicalKey,frame_id:spec.frameId,label:spec.label,owner_profile_id:userId,location_id:locationId,current_node_inventory_id:yardId,status:'ready',condition:100,wear:0,cargo_capacity_t:spec.cargoCapacityT,energy:[{carrier:'battery',stateOfCharge:1,nominalKWh:spec.role==='excavator'?24:14}],crew_ids:[],modules:spec.modules,modifications:{surfaceHub:'stickney-alpha',tetherRequired:true,autonomyLevel:'supervised-autonomy',fleetRole:spec.role},emergent_state:{duty:'pilot-extraction-fleet',fleetRole:spec.role,xM:YARD_X_M,yM:YARD_Y_M}}).select('*').single();if(ie||!data)throw new Error(ie?.message??`Robot provisioning failed: ${spec.role}`);robots.push(data)}
+ return robots
 }
+function roleOf(robot:any):RobotRole{const role=robot?.modifications?.fleetRole;return ROBOT_SPECS.some(s=>s.role===role)?role:'excavator'}
+function fleetReadiness(robots:any[]){return robots.map(r=>({id:r.id,role:roleOf(r),label:r.label,status:r.status,condition:Number(r.condition??0),wear:Number(r.wear??100),ready:r.status==='ready'&&Number(r.condition??0)>=35&&Number(r.wear??100)<=75}))}
+function legacyFleetSummary(robots:any[]){const readiness=fleetReadiness(robots);const allReady=readiness.length===4&&readiness.every(r=>r.ready);return{id:'stickney-robot-fleet',frame_id:'PHOBOS-FLEET-4R',label:'Stickney Robot Fleet · 4 Einheiten',status:allReady?'ready':robots.some(r=>r.status==='in_transit')?'in_transit':'maintenance',condition:readiness.length?Math.round(readiness.reduce((a,r)=>a+r.condition,0)/readiness.length):0,wear:readiness.length?Math.max(...readiness.map(r=>r.wear)):0}}
 
-async function coreEvidence(supabase: ReturnType<typeof createServiceClient>, userId: string, prospectId: string) {
-  const { data: sample, error } = await supabase.from('research_samples').select('id,status').eq('prospect_id', prospectId).eq('owner_profile_id', userId).eq('sample_kind', 'drill_core').maybeSingle()
-  if (error) throw new Error(error.message)
-  if (!sample) return null
-  const { data: analysis, error: analysisError } = await supabase.from('sample_analyses').select('id,quality_score,finding,development_status,measured_signal_index').eq('sample_id', sample.id).maybeSingle()
-  if (analysisError) throw new Error(analysisError.message)
-  return analysis ?? null
+async function resolveDueJobs(s:ReturnType<typeof createServiceClient>,userId:string,locationId:string){
+ const now=new Date().toISOString();const {data:due,error}=await s.from('pilot_extraction_jobs').select('*').eq('profile_id',userId).eq('location_id',locationId).eq('status','running').lte('completes_at',now);if(error)throw new Error(error.message)
+ for(const job of due??[]){const prospect=await prospectById(s,job.prospect_id),analysis=await coreEvidence(s,userId,job.prospect_id);const fleetIds=Array.isArray(job.result?.fleet_vehicle_ids)?job.result.fleet_vehicle_ids:[job.robot_vehicle_id];const {data:robots,error:re}=await s.from('vehicle_instances').select('*').in('id',fleetIds);if(re)throw new Error(re.message);if(!prospect||!analysis||analysis.development_status!=='extraction_candidate'||!robots?.length){await s.from('pilot_extraction_jobs').update({status:'failed',completed_at:now,updated_at:now,result:{...(job.result??{}),error:'evidence_or_fleet_no_longer_sufficient'}}).eq('id',job.id);if(fleetIds.length)await s.from('vehicle_instances').update({status:'ready',updated_at:now}).in('id',fleetIds);continue}
+  const abundance=Math.max(0,Math.min(1,Number(prospect.abundance??0))),quality=Math.max(0,Math.min(1,Number(analysis.quality_score??0))),avgCondition=robots.reduce((sum,r)=>sum+Number(r.condition??100),0)/Math.max(1,robots.length)/100,prospector=robots.find(r=>roleOf(r)==='prospector'),hauler=robots.find(r=>roleOf(r)==='hauler');const efficiency=Math.max(.25,Math.min(.95,.38+abundance*.36+quality*.15+avgCondition*.045+(prospector?.035:0)+(hauler?.025:0))),mass=Number((Number(job.target_mass_kg)*efficiency).toFixed(2)),energyPerKg=Number((Number(job.energy_cost)/Math.max(.1,mass)).toFixed(3)),verdict=mass>=35&&energyPerKg<=.68&&quality>=.78?'viable':mass>=25&&energyPerKg<=.95?'marginal':'rejected',yardId=await roverYardInventory(s,locationId),telemetry:Record<string,unknown>={}
+  for(const robot of robots){const role=roleOf(robot),spec=ROBOT_SPECS.find(x=>x.role===role)??ROBOT_SPECS[1],addedWear=spec.nominalWear,nextWear=Math.min(100,Number(robot.wear??0)+addedWear),nextCondition=Math.max(0,Number(robot.condition??100)-Math.ceil(addedWear*.45));telemetry[role]={vehicleId:robot.id,label:robot.label,wearAdded:addedWear,wearAfter:nextWear,conditionAfter:nextCondition};await s.from('vehicle_instances').update({status:nextCondition<=20?'maintenance':'ready',condition:nextCondition,wear:nextWear,current_node_inventory_id:yardId,emergent_state:{duty:'pilot-extraction-fleet',fleetRole:role,xM:YARD_X_M,yM:YARD_Y_M,lastPilotJobId:job.id,lastVerdict:verdict},updated_at:now}).eq('id',robot.id)}
+  const result={...(job.result??{}),recovered_mass_kg:mass,recovery_efficiency:Number(efficiency.toFixed(3)),energy_per_kg:energyPerKg,pilot_verdict:verdict,resource_type:prospect.resource_type,evidence_quality:quality,fleet_telemetry:telemetry,commercial_inventory_credit:false,interpretation:'In-world cooperative robotic pilot extraction result; test mass is not yet commercial production.'};await s.from('pilot_extraction_jobs').update({status:'completed',recovered_mass_kg:mass,completed_at:now,result,updated_at:now}).eq('id',job.id);await s.from('region_resources').update({properties:{...(prospect.properties??{}),pilot_extraction_status:verdict,pilot_recovered_mass_kg:mass,pilot_energy_per_kg:energyPerKg,pilot_completed_at:now,pilot_robotics_mode:'cooperative_four_robot_fleet',commercial_extraction_status:verdict==='viable'?'pilot_viable_pending_scaleup':'blocked'}}).eq('id',prospect.id)
+ }
 }
+async function resourceRows(s:ReturnType<typeof createServiceClient>,locationId:string){const [{data:energyRow,error:ee},{data:componentRow,error:ce}]=await Promise.all([s.from('resources').select('id,stock').eq('location_id',locationId).eq('resource','energy').single(),s.from('resources').select('id,stock').eq('location_id',locationId).eq('resource','components').single()]);if(ee||!energyRow)throw new Error(ee?.message??'Energy resource row missing');if(ce||!componentRow)throw new Error(ce?.message??'Component resource row missing');return{energyRow,componentRow}}
 
-async function roverYardInventory(supabase: ReturnType<typeof createServiceClient>, locationId: string) {
-  const { data, error } = await supabase.from('logistics_inventories').select('id').eq('location_id', locationId).contains('metadata', { role: 'surface_rover' }).eq('active', true).limit(1).maybeSingle()
-  if (error || !data?.id) throw new Error(error?.message ?? 'Phobos rover yard missing')
-  return data.id as string
-}
+export async function GET(req:NextRequest){const user=await userFromRequest(req);if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const s=createServiceClient();if(!await requirePresence(s,user.id))return NextResponse.json({error:'Robotikbetrieb ist nur vor Ort auf Phobos verfügbar.'},{status:409});try{const location=await phobosLocation(s);await resolveDueJobs(s,user.id,location.id);const robots=await ensureFleet(s,user.id,location.id);const {data:jobs,error}=await s.from('pilot_extraction_jobs').select('*').eq('profile_id',user.id).eq('location_id',location.id).order('created_at',{ascending:false}).limit(20);if(error)throw new Error(error.message);return NextResponse.json({ok:true,robot:legacyFleetSummary(robots),robots,fleetReadiness:fleetReadiness(robots),jobs:jobs??[]})}catch(error){console.error('phobos robotic fleet lookup failed:',error);return NextResponse.json({error:'Robotikflotte nicht verfügbar.'},{status:503})}}
 
-async function ensureRobot(supabase: ReturnType<typeof createServiceClient>, userId: string, locationId: string) {
-  const canonicalKey = `phobos-stickney-excavator:${userId}`
-  const { data: existing, error } = await supabase.from('vehicle_instances').select('*').eq('canonical_key', canonicalKey).maybeSingle()
-  if (error) throw new Error(error.message)
-  if (existing) return existing
-  const nodeId = await roverYardInventory(supabase, locationId)
-  const { data, error: insertError } = await supabase.from('vehicle_instances').insert({
-    canonical_key: canonicalKey,
-    frame_id: ROBOT_FRAME_ID,
-    label: ROBOT_LABEL,
-    owner_profile_id: userId,
-    location_id: locationId,
-    current_node_inventory_id: nodeId,
-    status: 'ready',
-    condition: 100,
-    wear: 0,
-    cargo_capacity_t: 1,
-    energy: [{ carrier: 'battery', stateOfCharge: 1, nominalKWh: 24 }],
-    crew_ids: [],
-    modules: ['microgravity-anchor-spikes', 'regolith-bucket', 'tether-reel', 'autonomy-pack', 'sample-weighing-cell'],
-    modifications: { surfaceHub: 'stickney-alpha', tetherRequired: true, autonomyLevel: 'supervised-autonomy' },
-    emergent_state: { duty: 'pilot-extraction', xM: 48, yM: -26 },
-  }).select('*').single()
-  if (insertError || !data) throw new Error(insertError?.message ?? 'Robot provisioning failed')
-  return data
-}
-
-async function resolveDueJobs(supabase: ReturnType<typeof createServiceClient>, userId: string, locationId: string) {
-  const now = new Date().toISOString()
-  const { data: due, error } = await supabase.from('pilot_extraction_jobs').select('*').eq('profile_id', userId).eq('location_id', locationId).eq('status', 'running').lte('completes_at', now)
-  if (error) throw new Error(error.message)
-  for (const job of due ?? []) {
-    const prospect = await prospectById(supabase, job.prospect_id)
-    const analysis = await coreEvidence(supabase, userId, job.prospect_id)
-    if (!prospect || !analysis || analysis.development_status !== 'extraction_candidate') {
-      await supabase.from('pilot_extraction_jobs').update({ status: 'failed', completed_at: now, updated_at: now, result: { ...(job.result ?? {}), error: 'evidence_no_longer_sufficient' } }).eq('id', job.id)
-      await supabase.from('vehicle_instances').update({ status: 'ready', updated_at: now }).eq('id', job.robot_vehicle_id)
-      continue
-    }
-    const { data: robot, error: robotError } = await supabase.from('vehicle_instances').select('condition,wear').eq('id', job.robot_vehicle_id).single()
-    if (robotError || !robot) throw new Error(robotError?.message ?? 'Robot state missing')
-    const abundance = Math.max(0, Math.min(1, Number(prospect.abundance ?? 0)))
-    const quality = Math.max(0, Math.min(1, Number(analysis.quality_score ?? 0)))
-    const condition = Math.max(0, Math.min(100, Number(robot.condition ?? 100))) / 100
-    const recoveryEfficiency = Math.max(0.25, Math.min(0.95, 0.42 + abundance * 0.38 + quality * 0.15 + condition * 0.05))
-    const recoveredMassKg = Number((Number(job.target_mass_kg) * recoveryEfficiency).toFixed(2))
-    const energyPerKg = Number((Number(job.energy_cost) / Math.max(0.1, recoveredMassKg)).toFixed(3))
-    const specificWear = Number((Number(job.wear_cost) / Math.max(0.1, recoveredMassKg)).toFixed(3))
-    const verdict = recoveredMassKg >= 35 && energyPerKg <= 0.6 && quality >= 0.78 ? 'viable' : recoveredMassKg >= 25 && energyPerKg <= 0.9 ? 'marginal' : 'rejected'
-    const nextWear = Math.min(100, Number(robot.wear ?? 0) + Number(job.wear_cost))
-    const nextCondition = Math.max(0, Number(robot.condition ?? 100) - Math.ceil(Number(job.wear_cost) * 0.5))
-    const result = {
-      ...(job.result ?? {}),
-      recovered_mass_kg: recoveredMassKg,
-      recovery_efficiency: Number(recoveryEfficiency.toFixed(3)),
-      energy_per_kg: energyPerKg,
-      wear_per_kg: specificWear,
-      pilot_verdict: verdict,
-      resource_type: prospect.resource_type,
-      evidence_quality: quality,
-      robot_condition_after: nextCondition,
-      robot_wear_after: nextWear,
-      commercial_inventory_credit: false,
-      interpretation: 'In-world robotic pilot extraction result; test mass is not yet commercial production.',
-    }
-    await supabase.from('pilot_extraction_jobs').update({ status: 'completed', recovered_mass_kg: recoveredMassKg, completed_at: now, result, updated_at: now }).eq('id', job.id)
-    const yardId = await roverYardInventory(supabase, locationId)
-    await supabase.from('vehicle_instances').update({
-      status: nextCondition <= 20 ? 'maintenance' : 'ready', condition: nextCondition, wear: nextWear, current_node_inventory_id: yardId,
-      emergent_state: { duty: 'pilot-extraction', xM: 48, yM: -26, lastPilotJobId: job.id, lastVerdict: verdict }, updated_at: now,
-    }).eq('id', job.robot_vehicle_id)
-    await supabase.from('region_resources').update({ properties: {
-      ...(prospect.properties ?? {}), pilot_extraction_status: verdict, pilot_recovered_mass_kg: recoveredMassKg,
-      pilot_energy_per_kg: energyPerKg, pilot_robot_wear: Number(job.wear_cost), pilot_completed_at: now,
-      commercial_extraction_status: verdict === 'viable' ? 'pilot_viable_pending_scaleup' : 'blocked',
-    } }).eq('id', prospect.id)
-  }
-}
-
-export async function GET(req: NextRequest) {
-  const user = await userFromRequest(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const supabase = createServiceClient()
-  if (!await requirePresence(supabase, user.id)) return NextResponse.json({ error: 'Pilotabbau ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
-  try {
-    const location = await phobosLocation(supabase)
-    await resolveDueJobs(supabase, user.id, location.id)
-    const robot = await ensureRobot(supabase, user.id, location.id)
-    const { data: jobs, error } = await supabase.from('pilot_extraction_jobs').select('*').eq('profile_id', user.id).eq('location_id', location.id).order('created_at', { ascending: false }).limit(20)
-    if (error) throw new Error(error.message)
-    return NextResponse.json({ ok: true, robot, jobs: jobs ?? [] })
-  } catch (error) {
-    console.error('phobos pilot extraction lookup failed:', error)
-    return NextResponse.json({ error: 'Robotischer Pilotabbau nicht verfügbar.' }, { status: 503 })
-  }
-}
-
-export async function POST(req: NextRequest) {
-  const user = await userFromRequest(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const supabase = createServiceClient()
-  if (!await requirePresence(supabase, user.id)) return NextResponse.json({ error: 'Pilotabbau ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
-  const body = await req.json().catch(() => ({}))
-  const prospectId = typeof body.prospectId === 'string' ? body.prospectId : ''
-  if (!prospectId) return NextResponse.json({ error: 'prospectId erforderlich' }, { status: 400 })
-  try {
-    const location = await phobosLocation(supabase)
-    await resolveDueJobs(supabase, user.id, location.id)
-    const prospect = await prospectById(supabase, prospectId)
-    if (!prospect?.discovered_at) return NextResponse.json({ error: 'Prospektionsziel nicht verfügbar.' }, { status: 404 })
-    const analysis = await coreEvidence(supabase, user.id, prospectId)
-    if (!analysis || analysis.development_status !== 'extraction_candidate') return NextResponse.json({ error: 'Direkte Bohrkern-Evidenz reicht für einen Pilotabbau noch nicht aus.' }, { status: 409 })
-    const robot = await ensureRobot(supabase, user.id, location.id)
-    if (robot.status !== 'ready') return NextResponse.json({ error: 'Der Abbauroboter ist derzeit nicht einsatzbereit.' }, { status: 409 })
-    if (Number(robot.condition ?? 0) < 35 || Number(robot.wear ?? 100) > 75) return NextResponse.json({ error: 'Der Abbauroboter benötigt vor dem Einsatz Wartung.' }, { status: 409 })
-    const { data: active } = await supabase.from('pilot_extraction_jobs').select('id').eq('profile_id', user.id).eq('prospect_id', prospectId).eq('status', 'running').maybeSingle()
-    if (active) return NextResponse.json({ ok: true, idempotent: true, jobId: active.id })
-    const [{ data: energyRow, error: energyError }, { data: componentRow, error: componentError }] = await Promise.all([
-      supabase.from('resources').select('id,stock').eq('location_id', location.id).eq('resource', 'energy').single(),
-      supabase.from('resources').select('id,stock').eq('location_id', location.id).eq('resource', 'components').single(),
-    ])
-    if (energyError || !energyRow) throw new Error(energyError?.message ?? 'Energy resource row missing')
-    if (componentError || !componentRow) throw new Error(componentError?.message ?? 'Component resource row missing')
-    if (Number(energyRow.stock ?? 0) < ENERGY_COST) return NextResponse.json({ error: 'Nicht genug Energie für den Pilotabbau.' }, { status: 409 })
-    if (Number(componentRow.stock ?? 0) < COMPONENT_COST) return NextResponse.json({ error: 'Nicht genug Komponenten für Verschleißteile.' }, { status: 409 })
-    const now = new Date()
-    const completesAt = new Date(now.getTime() + DURATION_SECONDS * 1000).toISOString()
-    const { data: job, error } = await supabase.from('pilot_extraction_jobs').insert({
-      profile_id: user.id, location_id: location.id, prospect_id: prospectId, robot_vehicle_id: robot.id,
-      status: 'running', target_mass_kg: TARGET_MASS_KG, energy_cost: ENERGY_COST, component_cost: COMPONENT_COST, wear_cost: WEAR_COST,
-      started_at: now.toISOString(), completes_at: completesAt,
-      result: { operation: 'stickney_robotic_pilot_extraction', targetX_m: prospect.x_m, targetY_m: prospect.y_m, autonomy: 'supervised-autonomy', tetherRequired: true },
-    }).select('*').single()
-    if (error || !job) throw new Error(error?.message ?? 'Pilot extraction job insert failed')
-    await Promise.all([
-      supabase.from('resources').update({ stock: Number(energyRow.stock) - ENERGY_COST, updated_at: now.toISOString() }).eq('id', energyRow.id),
-      supabase.from('resources').update({ stock: Number(componentRow.stock) - COMPONENT_COST, updated_at: now.toISOString() }).eq('id', componentRow.id),
-      supabase.from('vehicle_instances').update({ status: 'in_transit', emergent_state: { duty: 'pilot-extraction', pilotJobId: job.id, xM: prospect.x_m, yM: prospect.y_m, phase: 'deploy-and-extract' }, updated_at: now.toISOString() }).eq('id', robot.id),
-    ])
-    return NextResponse.json({ ok: true, job, robot, durationSeconds: DURATION_SECONDS })
-  } catch (error) {
-    console.error('phobos pilot extraction failed:', error)
-    return NextResponse.json({ error: 'Pilotabbau konnte nicht gestartet werden.' }, { status: 503 })
-  }
-}
+export async function POST(req:NextRequest){const user=await userFromRequest(req);if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const s=createServiceClient();if(!await requirePresence(s,user.id))return NextResponse.json({error:'Robotikbetrieb ist nur vor Ort auf Phobos verfügbar.'},{status:409});const body=await req.json().catch(()=>({})),action=typeof body.action==='string'?body.action:'start-pilot',prospectId=typeof body.prospectId==='string'?body.prospectId:''
+ try{const location=await phobosLocation(s);await resolveDueJobs(s,user.id,location.id);const robots=await ensureFleet(s,user.id,location.id)
+  if(action==='maintain-fleet'){if(robots.some(r=>['in_transit','loading','unloading','reserved'].includes(String(r.status))))return NextResponse.json({error:'Wartung ist während eines Flotteneinsatzes nicht möglich.'},{status:409});const {energyRow,componentRow}=await resourceRows(s,location.id);if(Number(energyRow.stock??0)<MAINTENANCE_ENERGY_COST||Number(componentRow.stock??0)<MAINTENANCE_COMPONENT_COST)return NextResponse.json({error:'Nicht genug Energie oder Ersatzteile für Flottenwartung.'},{status:409});const now=new Date().toISOString();await Promise.all([s.from('resources').update({stock:Number(energyRow.stock)-MAINTENANCE_ENERGY_COST,updated_at:now}).eq('id',energyRow.id),s.from('resources').update({stock:Number(componentRow.stock)-MAINTENANCE_COMPONENT_COST,updated_at:now}).eq('id',componentRow.id)]);for(const robot of robots){const role=roleOf(robot),gain=role==='maintenance'?4:10,reduction=role==='maintenance'?6:14;await s.from('vehicle_instances').update({status:'ready',condition:Math.min(100,Number(robot.condition??0)+gain),wear:Math.max(0,Number(robot.wear??0)-reduction),emergent_state:{...(robot.emergent_state??{}),duty:'pilot-extraction-fleet',fleetRole:role,maintenanceAt:now,maintenanceBy:'maintenance'},updated_at:now}).eq('id',robot.id)}const refreshed=await ensureFleet(s,user.id,location.id);return NextResponse.json({ok:true,action,robot:legacyFleetSummary(refreshed),robots:refreshed})}
+  if(!prospectId)return NextResponse.json({error:'prospectId erforderlich'},{status:400});const prospect=await prospectById(s,prospectId);if(!prospect?.discovered_at)return NextResponse.json({error:'Prospektionsziel nicht verfügbar.'},{status:404});const analysis=await coreEvidence(s,user.id,prospectId);if(!analysis||analysis.development_status!=='extraction_candidate')return NextResponse.json({error:'Direkte Bohrkern-Evidenz reicht für einen Pilotabbau noch nicht aus.'},{status:409});const readiness=fleetReadiness(robots),unavailable=readiness.filter(x=>!x.ready);if(unavailable.length)return NextResponse.json({error:`Flotte nicht vollständig einsatzbereit: ${unavailable.map(x=>x.label).join(', ')}`},{status:409});const {data:active}=await s.from('pilot_extraction_jobs').select('id').eq('profile_id',user.id).eq('prospect_id',prospectId).eq('status','running').maybeSingle();if(active)return NextResponse.json({ok:true,idempotent:true,jobId:active.id,robot:legacyFleetSummary(robots),robots});const {energyRow,componentRow}=await resourceRows(s,location.id);if(Number(energyRow.stock??0)<ENERGY_COST)return NextResponse.json({error:'Nicht genug Energie für den Flotteneinsatz.'},{status:409});if(Number(componentRow.stock??0)<COMPONENT_COST)return NextResponse.json({error:'Nicht genug Komponenten für Verschleißteile.'},{status:409});const excavator=robots.find(r=>roleOf(r)==='excavator');if(!excavator)throw new Error('Excavator missing from fleet');const now=new Date(),completesAt=new Date(now.getTime()+DURATION_SECONDS*1000).toISOString(),fleetVehicleIds=robots.map(r=>r.id);const {data:job,error}=await s.from('pilot_extraction_jobs').insert({profile_id:user.id,location_id:location.id,prospect_id:prospectId,robot_vehicle_id:excavator.id,status:'running',target_mass_kg:TARGET_MASS_KG,energy_cost:ENERGY_COST,component_cost:COMPONENT_COST,wear_cost:ROBOT_SPECS.reduce((sum,x)=>sum+x.nominalWear,0),started_at:now.toISOString(),completes_at:completesAt,result:{operation:'stickney_robotic_pilot_extraction',roboticsMode:'cooperative_four_robot_fleet',fleet_vehicle_ids:fleetVehicleIds,targetX_m:prospect.x_m,targetY_m:prospect.y_m,autonomy:'supervised-autonomy',tetherRequired:true,roleSequence:['prospector','excavator','hauler','maintenance']}}).select('*').single();if(error||!job)throw new Error(error?.message??'Pilot extraction job insert failed');await Promise.all([s.from('resources').update({stock:Number(energyRow.stock)-ENERGY_COST,updated_at:now.toISOString()}).eq('id',energyRow.id),s.from('resources').update({stock:Number(componentRow.stock)-COMPONENT_COST,updated_at:now.toISOString()}).eq('id',componentRow.id)]);for(const robot of robots){const role=roleOf(robot);await s.from('vehicle_instances').update({status:'in_transit',emergent_state:{duty:'pilot-extraction-fleet',fleetRole:role,pilotJobId:job.id,xM:prospect.x_m,yM:prospect.y_m,phase:role==='prospector'?'survey':role==='excavator'?'excavate':role==='hauler'?'haul-test-mass':'field-support'},updated_at:now.toISOString()}).eq('id',robot.id)}return NextResponse.json({ok:true,job,robot:{...legacyFleetSummary(robots),status:'in_transit'},robots,fleetReadiness:readiness,durationSeconds:DURATION_SECONDS})
+ }catch(error){console.error('phobos robotic fleet operation failed:',error);return NextResponse.json({error:'Robotischer Flotteneinsatz konnte nicht ausgeführt werden.'},{status:503})}}
