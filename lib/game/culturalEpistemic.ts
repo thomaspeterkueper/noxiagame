@@ -76,3 +76,65 @@ export function resolveCesQuestion<T>(question: CesQuestion<T>): T | undefined {
   if (question.ontology === 'open') return undefined
   return question.value
 }
+
+export type CesReceptionRelation =
+  | 'interprets'
+  | 'transmits'
+  | 'endorses'
+  | 'rejects'
+  | 'remembers_as'
+  | 'attributes_to'
+  | 'revises'
+
+export interface CesReceptionNode {
+  id: string
+  role: CesSemanticRole
+  label: string
+  sourceRef?: string
+  createdTick?: number
+}
+
+export interface CesReceptionEdge {
+  fromId: string
+  toId: string
+  relation: CesReceptionRelation
+  confidence: number
+  sourceRef: string
+}
+
+export interface CesReceptionGraph {
+  nodes: CesReceptionNode[]
+  edges: CesReceptionEdge[]
+}
+
+export interface CesMemoryClaim {
+  id: string
+  text: string
+  attributedSourceId?: string
+  provenanceSourceId?: string
+  confidence: number
+}
+
+export function validateCesReceptionGraph(graph: CesReceptionGraph): string[] {
+  const errors: string[] = []
+  const ids = new Set<string>()
+  for (const node of graph.nodes) {
+    if (ids.has(node.id)) errors.push(`duplicate node id: ${node.id}`)
+    ids.add(node.id)
+  }
+  for (const edge of graph.edges) {
+    if (!ids.has(edge.fromId)) errors.push(`missing from node: ${edge.fromId}`)
+    if (!ids.has(edge.toId)) errors.push(`missing to node: ${edge.toId}`)
+    if (!edge.sourceRef.trim()) errors.push(`missing provenance: ${edge.fromId}->${edge.toId}`)
+  }
+  return errors
+}
+
+export function classifyCesMemoryClaim(
+  claim: CesMemoryClaim,
+): 'unattributed' | 'aligned' | 'contested_attribution' {
+  if (!claim.attributedSourceId || !claim.provenanceSourceId) return 'unattributed'
+  return claim.attributedSourceId === claim.provenanceSourceId
+    ? 'aligned'
+    : 'contested_attribution'
+}
