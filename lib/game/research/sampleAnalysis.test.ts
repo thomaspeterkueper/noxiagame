@@ -7,7 +7,13 @@ function check(condition: boolean, message: string) {
 const strongMetal = deriveSampleAnalysis({ resourceType: 'metal', abundance: 0.44, tier: 'viable', confidence: 'low' })
 check(strongMetal.capability.sufficient, 'field lab should satisfy metallic-regolith requirement')
 check(strongMetal.finding === 'confirmed', 'strong metal prospect should confirm')
-check(strongMetal.developmentStatus === 'drilling_authorized', 'confirmed metal prospect should authorize drilling only')
+check(strongMetal.developmentStatus === 'drilling_authorized', 'confirmed reference sample should authorize drilling only')
+
+const coreMetal = deriveSampleAnalysis({ resourceType: 'metal', abundance: 0.44, tier: 'viable', confidence: 'low', sampleKind: 'drill_core' })
+check(coreMetal.capability.sufficient, 'core lab should satisfy direct-core requirement')
+check(coreMetal.evidenceClass === 'direct_core', 'drill core must be direct evidence class')
+check(coreMetal.quality > strongMetal.quality, 'direct core analysis should improve evidence quality')
+check(coreMetal.developmentStatus === 'extraction_candidate', 'confirmed high-quality drill core may promote the prospect to extraction candidate')
 
 const weakMetal = deriveSampleAnalysis({ resourceType: 'metal', abundance: 0.26, tier: 'trace', confidence: 'low' })
 check(weakMetal.finding === 'inconclusive', 'weak metal prospect should remain inconclusive')
