@@ -1,5 +1,10 @@
 // lib/game/stationProfiles.ts
 // Canonical gameplay-facing station roles and service semantics.
+//
+// This file intentionally does NOT implement inventories, docking state or
+// market transactions. It tells UI and orchestration layers what a station is
+// allowed to expose while the shared Core remains responsible for persistence
+// and commands.
 
 export type StationRole =
   | 'habitat-transfer-station'
@@ -22,6 +27,11 @@ export interface StationServiceProfile {
   summary: string
 }
 
+/**
+ * Explicit station profiles. Unknown station slugs receive a conservative
+ * generic profile so existing stations keep working without silently becoming
+ * Free Ports.
+ */
 export const STATION_SERVICE_PROFILES: Readonly<Record<string, StationServiceProfile>> = {
   phobos: {
     slug: 'phobos',
@@ -47,6 +57,7 @@ export const STATION_SERVICE_PROFILES: Readonly<Record<string, StationServicePro
     onwardTransfer: false,
     summary: 'Kleine Forschungsaussenstelle mit Mini-Habitat und Anlegestelle fuer Shuttles/Versorgungsschiffe. Kein Markt, kein Weitertransport -- reine Endstation.',
   },
+  // `prometheus` is the current legacy runtime slug for Kepler Station.
   prometheus: {
     slug: 'prometheus',
     role: 'habitat-transfer-station',
