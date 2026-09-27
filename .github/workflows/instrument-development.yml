@@ -1,0 +1,17 @@
+name: Instrument development contract
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/instrumentDevelopment.ts'
+      - 'lib/game/population/instrumentDevelopment.test.ts'
+      - '.github/workflows/instrument-development.yml'
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/population/instrumentDevelopment.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .instrument-development-test
+      - run: node .instrument-development-test/game/population/instrumentDevelopment.test.js
