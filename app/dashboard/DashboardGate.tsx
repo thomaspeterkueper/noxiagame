@@ -19,6 +19,7 @@ import DashboardFeedOverlay from './DashboardFeedOverlay'
 import DashboardWorldDevelopmentOverlay from './DashboardWorldDevelopmentOverlay'
 import DashboardMoonSurface from './DashboardMoonSurface'
 import DashboardPhobosSurface from './DashboardPhobosSurface'
+import DashboardDeimosSurface from './DashboardDeimosSurface'
 import DashboardProfileBridge from './DashboardProfileBridge'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
@@ -49,8 +50,6 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   useEffect(() => {
     loadFromServer()
     ;(async () => {
-      // Direkt nach einem harten Reload kann die Supabase-Session kurz fehlen.
-      // Nicht vorschnell erneut ins Onboarding schicken.
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const token = await getToken()
@@ -61,9 +60,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
             setExistingUsername(data.profile.username || undefined)
             return
           }
-        } catch {
-          // weiter zum nächsten Versuch
-        }
+        } catch {}
         await new Promise(r => setTimeout(r, 400))
       }
       setOnboarded(true)
@@ -82,6 +79,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardClient locations={locations} prices={prices} orders={orders} autoOpenJourney={autoOpenJourney} />
     <DashboardMoonSurface locations={locations} prices={prices} orders={orders} />
     <DashboardPhobosSurface locations={locations} prices={prices} orders={orders} />
+    <DashboardDeimosSurface locations={locations} prices={prices} orders={orders} />
     <DashboardProfileBridge />
     <DashboardHudManager />
     <DashboardLocationDockManager />
