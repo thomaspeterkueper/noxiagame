@@ -1,5 +1,9 @@
 // lib/game/logisticsNodes.ts
 // NOXIA-owned semantic boundary between gameplay location slugs and physical missions.
+//
+// A location slug is not automatically the exact endpoint of an intersolar burn.
+// Planetary/lunar surface operations are intentionally separable from the deep-space
+// transfer so intersolar ships never implicitly become landers.
 
 import type { SurfacePortRole } from './transportDomains'
 
@@ -18,15 +22,34 @@ export type SurfaceAccessMode = 'transfer-shuttle' | 'none'
 
 export interface LogisticsNodeSemantics {
   id: CanonicalLogisticsNodeId
-  transferEndpoint: TransferEndpointKind
   domainMeaning: LogisticsDomainMeaning
+  /** Endpoint of the intersolar/inter-node leg, never an implicit planetary landing. */
+  transferEndpoint: TransferEndpointKind
   surfaceLegSeparate: boolean
+  /** How cargo/crew continue between an orbital interface and a planetary surface. */
   surfaceAccessMode: SurfaceAccessMode
+  /** Planetary surface terminals are shuttle ports, not intersolar ship terminals. */
   surfacePortRole: SurfacePortRole | null
+  /** Celestial-body slug used by the current world model. */
   celestialBodySlug: 'earth' | 'moon' | 'mars' | 'phobos' | 'deimos'
+  /** Stable engineering-facing explanation. Not a balancing value. */
   note: string
 }
 
+/**
+ * Canonical NOXIA logistics-node semantics.
+ *
+ * Physical rule:
+ * - intersolar ships terminate at an orbital interface or an orbital transfer node;
+ * - planetary Raumhäfen are shuttle ports;
+ * - surface ↔ orbital-interface movement is performed by transfer shuttles such as
+ *   the ASCE 0.3P, never by the intersolar vessel itself.
+ *
+ * Compatibility rule: existing runtime fields such as ships.location may continue
+ * to store the legacy slug. This table defines what that slug means physically;
+ * it does not by itself split an already-running journey into additional gameplay
+ * steps or change travel times.
+ */
 export const LOGISTICS_NODES: Record<CanonicalLogisticsNodeId, LogisticsNodeSemantics> = {
   earth: {
     id: 'earth',
