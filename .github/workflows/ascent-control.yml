@@ -8,6 +8,7 @@ on:
       - 'lib/game/ascentTargets.ts'
       - 'lib/game/ascentPersistence.contract.test.ts'
       - 'lib/game/ascentReadiness.contract.test.ts'
+      - 'lib/game/lunarAscentReadiness.contract.test.ts'
       - 'lib/game/ascentExecution.contract.test.ts'
       - 'lib/game/orbitalPresence.contract.test.ts'
       - 'lib/game/core/ascentPersistence.ts'
@@ -16,6 +17,7 @@ on:
       - 'lib/game/core/ascentCrew.ts'
       - 'lib/game/core/ascentFlightArticle.ts'
       - 'lib/game/core/earthAscentEngineeringAuthority.ts'
+      - 'lib/game/core/lunarAscentEngineeringAuthority.ts'
       - 'lib/game/core/orbitalPresence.ts'
       - 'app/api/game/ascent/route.ts'
       - 'app/api/game/ascent/readiness/route.ts'
@@ -27,6 +29,7 @@ on:
       - 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'
       - 'supabase/migrations/20260925001000_spacecraft_flight_articles.sql'
       - 'supabase/migrations/20260925002500_asce_reference_vehicle_binding.sql'
+      - 'supabase/migrations/20260927194500_lunar_flight_article_state.sql'
       - '.github/workflows/ascent-control.yml'
   push:
     paths:
@@ -35,6 +38,7 @@ on:
       - 'lib/game/ascentTargets.ts'
       - 'lib/game/ascentPersistence.contract.test.ts'
       - 'lib/game/ascentReadiness.contract.test.ts'
+      - 'lib/game/lunarAscentReadiness.contract.test.ts'
       - 'lib/game/ascentExecution.contract.test.ts'
       - 'lib/game/orbitalPresence.contract.test.ts'
       - 'lib/game/core/ascentPersistence.ts'
@@ -43,6 +47,7 @@ on:
       - 'lib/game/core/ascentCrew.ts'
       - 'lib/game/core/ascentFlightArticle.ts'
       - 'lib/game/core/earthAscentEngineeringAuthority.ts'
+      - 'lib/game/core/lunarAscentEngineeringAuthority.ts'
       - 'lib/game/core/orbitalPresence.ts'
       - 'app/api/game/ascent/route.ts'
       - 'app/api/game/ascent/readiness/route.ts'
@@ -54,6 +59,7 @@ on:
       - 'supabase/migrations/20260919184500_ascent_player_crew_manifest.sql'
       - 'supabase/migrations/20260925001000_spacecraft_flight_articles.sql'
       - 'supabase/migrations/20260925002500_asce_reference_vehicle_binding.sql'
+      - 'supabase/migrations/20260927194500_lunar_flight_article_state.sql'
       - '.github/workflows/ascent-control.yml'
 
 jobs:
@@ -76,6 +82,7 @@ jobs:
             lib/game/ascentControl.test.ts \
             lib/game/ascentPersistence.contract.test.ts \
             lib/game/ascentReadiness.contract.test.ts \
+            lib/game/lunarAscentReadiness.contract.test.ts \
             lib/game/ascentExecution.contract.test.ts \
             lib/game/orbitalPresence.contract.test.ts \
             --target ES2022 --module commonjs --moduleResolution node \
@@ -83,5 +90,6 @@ jobs:
           node .ascent-control-test/game/ascentControl.test.js
           node .ascent-control-test/game/ascentPersistence.contract.test.js
           node .ascent-control-test/game/ascentReadiness.contract.test.js
+          node .ascent-control-test/game/lunarAscentReadiness.contract.test.js
           node .ascent-control-test/game/ascentExecution.contract.test.js
           node .ascent-control-test/game/orbitalPresence.contract.test.js
