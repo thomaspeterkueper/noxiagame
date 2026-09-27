@@ -154,3 +154,59 @@ export function shouldEscalateControversy(input: { finding: ResearchFinding; cha
   const independentGroups = new Set(strong.map((c) => c.challengerGroupId))
   return input.finding.confidence >= 0.7 && independentGroups.size >= 2
 }
+
+
+export interface ControversyEvidenceEvent {
+  id: string
+  controversyId: string
+  groupId: string
+  evidenceRefs: string[]
+  direction: 'supports_finding' | 'supports_challenge'
+  confidence: number
+  occurredAtTick: number
+}
+
+export interface ControversyRevision {
+  id: string
+  controversyId: string
+  revision: number
+  atTick: number
+  supportForFinding: number
+  supportForChallenge: number
+  participantGroupIds: string[]
+  status: 'open' | 'resolved_finding_supported' | 'resolved_finding_revised'
+  reason: 'new_evidence' | 'convergence'
+}
+
+export function reviseControversy(input: {
+  controversy: ScientificControversy
+  history: ControversyRevision[]
+  events: ControversyEvidenceEvent[]
+}): ControversyRevision {
+  const clamp = (n:number) => Math.max(0,Math.min(1,n))
+  const weighted = (direction:ControversyEvidenceEvent['direction']) => {
+    const relevant=input.events.filter(e=>e.direction===direction)
+    return relevant.length ? relevant.reduce((s,e)=>s+clamp(e.confidence),0)/relevant.length : 0
+  }
+  const supportForFinding=weighted('supports_finding')
+  const supportForChallenge=weighted('supports_challenge')
+  const delta=supportForFinding-supportForChallenge
+  const status:ControversyRevision['status'] =
+    input.events.length>=3 && delta>=0.35 ? 'resolved_finding_supported' :
+    input.events.length>=3 && delta<=-0.35 ? 'resolved_finding_revised' : 'open'
+  const participants=Array.from(new Set([
+    ...input.controversy.participantGroupIds,
+    ...input.events.map(e=>e.groupId),
+  ]))
+  return {
+    id:'controversy-revision:'+input.controversy.id+':'+(input.history.length+1),
+    controversyId:input.controversy.id,
+    revision:input.history.length+1,
+    atTick:Math.max(input.controversy.openedAtTick,...input.events.map(e=>e.occurredAtTick)),
+    supportForFinding,
+    supportForChallenge,
+    participantGroupIds:participants,
+    status,
+    reason:status==='open'?'new_evidence':'convergence',
+  }
+}

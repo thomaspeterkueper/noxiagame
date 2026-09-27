@@ -1,4 +1,4 @@
-import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, type ResearchGroup } from './researchExchange'
+import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, reviseControversy, type ResearchGroup } from './researchExchange'
 import type { ProtocolRevision } from './runtime'
 
 let failures = 0
@@ -28,6 +28,18 @@ check(controversy.status==='open' && controversy.participantGroupIds.length===2,
 check(!shouldEscalateControversy({finding,challenges:[plantChallenge]}),'one independent challenge stays within deterministic research loop')
 const lifeChallenge=challengeFinding({groupId:'life',finding,evidenceRefs:['experiment:life-support-side-effect'],confidence:0.76,reasonCode:'side_effect',atTick:132})
 check(shouldEscalateControversy({finding,challenges:[plantChallenge,lifeChallenge]}),'two independent strong challenges justify higher cognitive escalation')
+
+const history1=reviseControversy({controversy,history:[],events:[
+  {id:'ce1',controversyId:controversy.id,groupId:'plants',evidenceRefs:['rep:1'],direction:'supports_challenge',confidence:0.82,occurredAtTick:140},
+  {id:'ce2',controversyId:controversy.id,groupId:'life',evidenceRefs:['rep:2'],direction:'supports_challenge',confidence:0.76,occurredAtTick:145},
+]})
+check(history1.status==='open' && history1.revision===1,'early conflicting evidence keeps controversy historically open')
+const history2=reviseControversy({controversy,history:[history1],events:[
+  {id:'ce3',controversyId:controversy.id,groupId:'plants',evidenceRefs:['rep:3'],direction:'supports_challenge',confidence:0.9,occurredAtTick:160},
+  {id:'ce4',controversyId:controversy.id,groupId:'life',evidenceRefs:['rep:4'],direction:'supports_challenge',confidence:0.85,occurredAtTick:165},
+  {id:'ce5',controversyId:controversy.id,groupId:'chrono-2',evidenceRefs:['rep:5'],direction:'supports_challenge',confidence:0.8,occurredAtTick:170},
+]})
+check(history2.status==='resolved_finding_revised' && history2.revision===2,'later convergent evidence can revise the original finding without erasing history')
 
 if(failures) throw new Error(String(failures)+' research exchange test(s) failed')
 console.log('Research exchange: tests passed; cross-group reuse requires no LLM call')
