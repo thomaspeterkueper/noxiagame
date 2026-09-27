@@ -32,6 +32,9 @@ const LANDMARK_GEO: Readonly<Record<string, GeoPoint>> = {
   'earth-de-darmstadt-eumetsat': { lat: 49.8627, lon: 8.6276 },
   'earth-de-cologne-eac': { lat: 50.852, lon: 7.126 },
   'earth-de-oberpfaffenhofen-dlr': { lat: 48.083, lon: 11.283 },
+  'earth-de-frankfurt-senckenberg': { lat: 50.1175, lon: 8.6517 },
+  // City-level presentation point only until the Camaleo Artlounge locator is canonically resolved.
+  'earth-de-frankfurt-camaleo-artlounge': { lat: 50.1109, lon: 8.6821 },
   'earth-in-dwarka': { lat: 22.244, lon: 68.968 },
   'earth-gr-phaistos': { lat: 35.051, lon: 24.814 },
   'earth-eg-alexandria': { lat: 31.2001, lon: 29.9187 },
@@ -142,7 +145,7 @@ export default function EarthLandmarkMap() {
       {!markers.length && <div className="empty">In dieser Kombination aus Ansicht und Layer sind noch keine Landmark-Einträge vorhanden.</div>}
     </div>
 
-    <div className="legend"><span><i className="space" /> Raumfahrt / Wissenschaft</span><span><i className="science" /> Wissenschaft</span><span><i className="cross" /> Cross-Universe</span><span className="note">Marker = Earth-Regionalfokus; keine simulierte Reise. Kanonische Ortsidentität bleibt adressbasiert.</span></div>
+    <div className="legend"><span><i className="space" /> Raumfahrt / Wissenschaft</span><span><i className="science" /> Wissenschaft</span><span><i className="cross" /> Cross-Universe</span><span className="note">Marker = Earth-Regionalfokus; keine simulierte Reise. Kanonische Ortsidentität bleibt Registry-basiert; Kartenpunkte sind nur View-Koordinaten.</span></div>
 
     {selected && <div id="earth-landmark-region-focus"><EarthLandmarkRegionFocus landmark={selected.landmark} point={selected.point} onClose={closeRegionalFocus} /></div>}
 
