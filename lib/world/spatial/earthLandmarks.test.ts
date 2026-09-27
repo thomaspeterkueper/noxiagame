@@ -33,7 +33,7 @@ const crossUniverse = getCrossUniverseEarthLandmarks()
 assert.deepEqual(
   crossUniverse.map(landmark => landmark.id).sort(),
   [
-    'earth-ch-swiss-jura-book-region',
+    'earth-ch-vuiteboeuf',
     'earth-de-frankfurt-camaleo-artlounge',
     'earth-de-frankfurt-senckenberg',
     'earth-de-north-sea-book-village',
