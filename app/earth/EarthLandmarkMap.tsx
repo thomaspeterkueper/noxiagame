@@ -38,7 +38,7 @@ const LANDMARK_GEO: Readonly<Record<string, GeoPoint>> = {
   'earth-mt-hal-saflieni': { lat: 35.8698, lon: 14.5069 },
   'earth-tr-istanbul-bosphorus': { lat: 41.0082, lon: 28.9784 },
   // Regional presentation points only until the literary sites are canonically resolved.
-  'earth-ch-swiss-jura-book-region': { lat: 47.35, lon: 7.15 },
+  'earth-ch-vuiteboeuf': { lat: 46.808, lon: 6.549 },
   'earth-de-north-sea-book-village': { lat: 54.2, lon: 8.7 },
   'earth-pe-chavin-de-huantar': { lat: -9.5928, lon: -77.1785 },
   'earth-in-dwarka': { lat: 22.244, lon: 68.968 },
