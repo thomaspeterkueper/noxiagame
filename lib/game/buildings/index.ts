@@ -115,6 +115,41 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     allowedLocations: ['earth'],
   },
 
+
+  // ─────────────────────────────────────────────────────────────
+  // Cultural / civic places — physical hosts for CES institutions.
+  // These buildings do not encode a belief as true and do not
+  // produce generic happiness/ideology modifiers.
+  // ─────────────────────────────────────────────────────────────
+
+  resonance_centre: {
+    id: 'resonance_centre', name: 'Resonanzzentrum', category: 'service',
+    description: 'Pluraler Ort für Dialog, Reflexion, Archive, Meditation und öffentliche Debatten',
+    cost: 3200, buildTimeTicks: 3,
+    allowedLocations: ['earth', 'moon', 'mars', 'phobos', 'deimos'],
+  },
+
+  community_hall: {
+    id: 'community_hall', name: 'Gemeinschaftshaus', category: 'service',
+    description: 'Weltanschaulich neutraler Treffpunkt für Versammlungen, Feiern, Beratung und lokale Initiativen',
+    cost: 2200, buildTimeTicks: 2,
+    allowedLocations: ['earth', 'moon', 'mars', 'phobos', 'deimos'],
+  },
+
+  archive_library: {
+    id: 'archive_library', name: 'Archiv & Bibliothek', category: 'service',
+    description: 'Bewahrt Quellen und Überlieferungen; unterstützt Provenienz, historische Recherche und öffentliches Gedächtnis',
+    cost: 3000, buildTimeTicks: 3,
+    allowedLocations: ['earth', 'moon', 'mars', 'phobos', 'deimos'],
+  },
+
+  sacred_space: {
+    id: 'sacred_space', name: 'Sakralraum', category: 'service',
+    description: 'Konfigurierbarer religiöser Versammlungs- und Ritualort; Tradition und Nutzung gehören zur Institution, nicht zum Gebäudetyp',
+    cost: 2800, buildTimeTicks: 3,
+    allowedLocations: ['earth', 'moon', 'mars', 'phobos', 'deimos'],
+  },
+
   smelter: {
     id: 'smelter', name: 'Schmelze', category: 'production',
     description: 'Metall → Bauteile (Produktionskette)',
