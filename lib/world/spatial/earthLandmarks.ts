@@ -5,6 +5,7 @@ export type EarthLandmarkTag =
   | 'climate'
   | 'archaeology'
   | 'history-of-science'
+  | 'culture'
   | 'cross-universe'
 
 export type EarthLandmarkProjectRelation = 'setting' | 'reference' | 'research-anchor' | 'worldbuilding-anchor'
@@ -109,6 +110,36 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
     sourceProjects: [{ project: 'NOXIA', relation: 'worldbuilding-anchor' }],
     externalUrl: 'https://www.dlr.de/de/das-dlr/standorte-und-bueros/oberpfaffenhofen',
     externalLinkLabel: 'DLR Oberpfaffenhofen außerhalb von NOXIA öffnen',
+  },
+  {
+    id: 'earth-de-frankfurt-senckenberg',
+    name: 'Senckenberg · Forschungsinstitut und Naturmuseum',
+    countryCode: 'DE',
+    locality: 'Frankfurt am Main',
+    locator: { kind: 'address', value: 'Senckenberganlage 25, 60325 Frankfurt am Main, Germany' },
+    tags: ['real-science', 'history-of-science', 'cross-universe'],
+    presentDayRole: 'Naturforschungs- und Sammlungsstandort in Frankfurt; die Senckenberg Gesellschaft unterhält dort Forschungsinstitut und Naturmuseum.',
+    noxiaRole: 'Frankfurter Wissensanker für Naturarchive, Sammlungsprovenienz und die langfristige Entwicklung wissenschaftlicher Archive.',
+    sourceProjects: [
+      { project: 'YIN HUA / Senckenberg-Zyklus', relation: 'setting', note: 'Zentraler Frankfurter Schauplatz; fiktionale Handlung und reale Institution bleiben getrennte Ebenen.' },
+      { project: 'NOXIA', relation: 'research-anchor', note: 'Naturarchive, Sammlungen und Wissenschaftsgeschichte.' },
+    ],
+    externalUrl: 'https://www.senckenberg.de/',
+    externalLinkLabel: 'Senckenberg außerhalb von NOXIA öffnen',
+  },
+  {
+    id: 'earth-de-frankfurt-camaleo-artlounge',
+    name: 'Camaleo Artlounge',
+    countryCode: 'DE',
+    locality: 'Frankfurt am Main',
+    locator: { kind: 'address', value: 'Frankfurt am Main, Germany' },
+    tags: ['culture', 'cross-universe'],
+    presentDayRole: 'Kanonischer Frankfurter Kulturort des KUEPER-Werkverbunds. Eine belastbare öffentliche Straßenadresse ist derzeit nicht hinterlegt; deshalb bleibt der Locator bewusst auf Stadtebene.',
+    noxiaRole: 'Kleiner kultureller Begegnungsort im Frankfurter NOXIA-Slice: Ausstellungen, Künstler-NPCs, Gespräche und Werkverbindungen statt generischer Sehenswürdigkeiten.',
+    sourceProjects: [
+      { project: 'KUEPER-Werkverbund', relation: 'setting', note: 'Literarischer/kultureller Frankfurt-Anker; keine unbelegte reale Institutionsgeschichte wird behauptet.' },
+      { project: 'NOXIA', relation: 'worldbuilding-anchor', note: 'Kultur, soziale Begegnung und Cross-Universe-Lore.' },
+    ],
   },
   {
     id: 'earth-in-dwarka',
