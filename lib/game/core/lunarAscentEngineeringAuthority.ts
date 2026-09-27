@@ -20,6 +20,7 @@ export const LUNAR_ASCENT_AUTHORITY_R1 = {
 export type LunarAscentEngineeringResult =
   | 'authorized'
   | 'frame-unmapped'
+  | 'authority-mismatch'
   | 'over-mass'
   | 'payload-over-envelope'
   | 'insufficient-propellant'
@@ -29,10 +30,6 @@ export type LunarAscentEngineeringResult =
   | 'not-applicable'
   | 'unavailable'
 
-/**
- * Trusted NOXIA flight-article state. These values must come from persisted
- * spacecraft/configuration state; gameplay labels are not Engineering frame IDs.
- */
 export interface LunarAscentPhysicalState {
   engineeringFrameId: string | null
   actualLiftoffMassKg: number | null
@@ -50,6 +47,7 @@ export interface LunarAscentEngineeringAssessment {
 }
 
 export function resolveLunarAscentEngineeringAuthority(input: {
+  engineeringAuthorityRef: string | null
   departureSurfaceSlug: string
   target: ResolvedAscentOrbitNode | null
   physicalState: LunarAscentPhysicalState | null
@@ -61,6 +59,14 @@ export function resolveLunarAscentEngineeringAuthority(input: {
     return {
       result: 'not-applicable', authority: null,
       blockers: ['departure-body-not-moon'],
+      authorityId: a.authorityId, engineeringFrameId: a.engineeringFrameId,
+    }
+  }
+
+  if (input.engineeringAuthorityRef !== a.authorityId) {
+    return {
+      result: 'authority-mismatch', authority: null,
+      blockers: ['flight-article-authority-not-eng-lunar-ascent-r1'],
       authorityId: a.authorityId, engineeringFrameId: a.engineeringFrameId,
     }
   }
@@ -93,35 +99,25 @@ export function resolveLunarAscentEngineeringAuthority(input: {
     }
   }
 
-  if (state.actualLiftoffMassKg == null || !Number.isFinite(state.actualLiftoffMassKg)) {
-    blockers.push('liftoff-mass-unresolved')
-  } else if (state.actualLiftoffMassKg > a.maxLiftoffMassKg) {
-    blockers.push('liftoff-mass-exceeds-14000-kg')
-  }
+  if (state.actualLiftoffMassKg == null || !Number.isFinite(state.actualLiftoffMassKg)) blockers.push('liftoff-mass-unresolved')
+  else if (state.actualLiftoffMassKg > a.maxLiftoffMassKg) blockers.push('liftoff-mass-exceeds-14000-kg')
 
-  if (state.crewCargoMissionEquipmentKg == null || !Number.isFinite(state.crewCargoMissionEquipmentKg)) {
-    blockers.push('mission-payload-mass-unresolved')
-  } else if (state.crewCargoMissionEquipmentKg > a.maxCrewCargoMissionEquipmentKg) {
-    blockers.push('crew-cargo-mission-equipment-exceeds-2000-kg')
-  }
+  if (state.crewCargoMissionEquipmentKg == null || !Number.isFinite(state.crewCargoMissionEquipmentKg)) blockers.push('mission-payload-mass-unresolved')
+  else if (state.crewCargoMissionEquipmentKg > a.maxCrewCargoMissionEquipmentKg) blockers.push('crew-cargo-mission-equipment-exceeds-2000-kg')
 
-  if (state.usableAscentPropellantKg == null || !Number.isFinite(state.usableAscentPropellantKg)) {
-    blockers.push('usable-ascent-propellant-unresolved')
-  } else if (state.usableAscentPropellantKg < a.referenceUsableAscentPropellantKg) {
-    blockers.push('usable-ascent-propellant-below-reference-5500-kg')
-  }
+  if (state.usableAscentPropellantKg == null || !Number.isFinite(state.usableAscentPropellantKg)) blockers.push('usable-ascent-propellant-unresolved')
+  else if (state.usableAscentPropellantKg < a.referenceUsableAscentPropellantKg) blockers.push('usable-ascent-propellant-below-reference-5500-kg')
 
   if (!state.targetPlaneResolved) blockers.push('target-plane-unresolved')
 
   if (blockers.length) {
     let result: LunarAscentEngineeringResult = 'unavailable'
-    if (blockers.some(b => b.startsWith('target-'))) result = 'unsupported-orbit'
+    if (blockers.some(b => b.startsWith('target-')) || blockers.includes('target-plane-unresolved')) result = 'unsupported-orbit'
     else if (blockers.includes('liftoff-mass-unresolved') || blockers.includes('mission-payload-mass-unresolved')) result = 'mass-unresolved'
     else if (blockers.includes('liftoff-mass-exceeds-14000-kg')) result = 'over-mass'
     else if (blockers.includes('crew-cargo-mission-equipment-exceeds-2000-kg')) result = 'payload-over-envelope'
     else if (blockers.includes('usable-ascent-propellant-unresolved')) result = 'propellant-unresolved'
     else if (blockers.includes('usable-ascent-propellant-below-reference-5500-kg')) result = 'insufficient-propellant'
-
     return { result, authority: null, blockers, authorityId: a.authorityId, engineeringFrameId: a.engineeringFrameId }
   }
 

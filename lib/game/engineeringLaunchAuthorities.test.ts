@@ -20,7 +20,17 @@ const legacyMoon = resolveAscentOrbitNode('moon')
 assert.ok(legacyMoon)
 assert.equal(legacyMoon.orbitClass, 'legacy-orbit-node')
 
+const mismatchedLunarAuthority = resolveLunarAscentEngineeringAuthority({
+  engineeringAuthorityRef: 'ENG-OTHER-AUTHORITY',
+  departureSurfaceSlug: 'moon',
+  target: lunarTarget,
+  physicalState: null,
+})
+assert.equal(mismatchedLunarAuthority.result, 'authority-mismatch')
+assert.equal(mismatchedLunarAuthority.authority, null)
+
 const unresolvedLunar = resolveLunarAscentEngineeringAuthority({
+  engineeringAuthorityRef: LUNAR_ASCENT_AUTHORITY_R1.authorityId,
   departureSurfaceSlug: 'moon',
   target: lunarTarget,
   physicalState: null,
@@ -29,6 +39,7 @@ assert.equal(unresolvedLunar.result, 'unavailable')
 assert.equal(unresolvedLunar.authority, null)
 
 const wrongLunarFrame = resolveLunarAscentEngineeringAuthority({
+  engineeringAuthorityRef: LUNAR_ASCENT_AUTHORITY_R1.authorityId,
   departureSurfaceSlug: 'moon',
   target: lunarTarget,
   physicalState: {
@@ -43,6 +54,7 @@ assert.equal(wrongLunarFrame.result, 'frame-unmapped')
 assert.equal(wrongLunarFrame.authority, null)
 
 const approvedLunar = resolveLunarAscentEngineeringAuthority({
+  engineeringAuthorityRef: LUNAR_ASCENT_AUTHORITY_R1.authorityId,
   departureSurfaceSlug: 'moon',
   target: lunarTarget,
   physicalState: {
