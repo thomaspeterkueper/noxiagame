@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="dHull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c7ccd1"/><stop offset="1" stop-color="#7d838a"/></linearGradient>
+    <filter id="dSh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".5"/></filter>
+  </defs>
+  <ellipse cx="360" cy="430" rx="230" ry="80" fill="#000" opacity=".3"/>
+  <g filter="url(#dSh)" transform="translate(360 400)">
+    <ellipse cx="0" cy="30" rx="210" ry="70" fill="#2a2d30" opacity=".55"/>
+    <g stroke="#7d838a" stroke-width="6" fill="none" opacity=".9"><path d="M-190 20 -100 60"/><path d="M190 20 100 60"/><path d="M-190 40 0 90"/><path d="M190 40 0 90"/></g>
+    <g stroke="#eab04a" stroke-width="5" fill="none" opacity=".85" stroke-dasharray="14 10"><path d="M-190 30 190 30"/></g>
+    <circle cx="0" cy="30" r="42" fill="url(#dHull)" stroke="#3b3f43" stroke-width="6"/>
+    <circle cx="0" cy="30" r="20" fill="#20242a" stroke="#eab04a" stroke-width="4"/>
+    <circle cx="0" cy="30" r="5" fill="#eab04a"/>
+    <circle cx="-190" cy="20" r="6" fill="#e35b4a"/><circle cx="190" cy="20" r="6" fill="#4ad06a"/>
+  </g>
+</svg>
