@@ -1,4 +1,4 @@
-import { memoryFromPopulationEvent, projectRelationship } from './personSocialMemory'
+import { deriveEmergentGoals, memoryFromPopulationEvent, projectRelationship, type PersonMemory } from './personSocialMemory'
 import type { PopulationEvent } from './population/types'
 
 let fails = 0
@@ -20,3 +20,11 @@ check(overridden?.salience === 1 && overridden?.valence === -1 && overridden?.tr
 check(overridden?.summary === 'konkrete Erfahrung', 'explicit summary is retained')
 if (fails) throw new Error(`${fails} social-memory test(s) failed`)
 console.log('Social Memory v1: deterministic projection tests passed')
+
+const socialMemories: PersonMemory[] = [1,2,3].map((n) => ({ id: `m${n}`, personId: 'a', otherPersonId: 'b', locationId: 'mars-alpha', kind: n === 2 ? 'assistance' : 'interaction', tick: 50 + n, salience: 0.7, valence: 0.5, trustDelta: 0.08, summary: 'positive contact', sourceEventId: `e${n}` }))
+const emergent = deriveEmergentGoals(socialMemories)
+check(emergent.some((g) => g.code === 'strengthen_social_bonds' && g.subjectRef === 'b'), 'repeated positive social memories derive a bounded social goal')
+check((emergent[0]?.priority ?? 0) <= 0.92, 'emergent goal priority remains bounded')
+check(deriveEmergentGoals(socialMemories.slice(0, 2)).length === 0, 'single or sparse positive contact does not invent a long-term goal')
+const conflictMemories: PersonMemory[] = [1,2].map((n) => ({ id: `c${n}`, personId: 'a', otherPersonId: 'c', locationId: 'mars-alpha', kind: 'conflict', tick: 60 + n, salience: 0.8, valence: -0.7, trustDelta: -0.15, summary: 'conflict', sourceEventId: `ce${n}` }))
+check(deriveEmergentGoals(conflictMemories).some((g) => g.code === 'repair_social_trust' && g.subjectRef === 'c'), 'repeated conflict can derive a repair goal without ideology hardcoding')
