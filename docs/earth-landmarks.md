@@ -40,7 +40,7 @@ Dafür trennt die Registry ausdrücklich:
 - Alexandria — `Alexandria / Kalender-Roman`
 - Malta · Ħal Saflieni — Resonanz-/Archäoakustik-Anker
 - Istanbul · Bosporus — kompakter urbaner Werkverbund-Knoten
-- Schweizer Jura — zunächst regionaler Book-World-Anker, bis der konkrete Romanort kanonisch aufgelöst ist
+- Vuiteboeuf (Jura-Nord vaudois) — konkreter Book-World-Ort unterhalb von Sainte-Croix; mit historischer Jura-Querung und Verbindung zur Covatannaz-Landschaft
 - Deutsche Nordseeküste — zunächst regionaler Platzhalter für das kanonische Nordsee-Dorf
 - Chavín de Huántar — peruanischer Anden-/Archäologie-Anker
 
