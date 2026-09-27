@@ -16,23 +16,27 @@ const MISSIONS: Mission[] = [
   { id:'m_moon_basis',title:'Die erste Mondbasis',theme:'Kolonisation',summary:'Verbinden Sie Raumfahrt, Versorgung und Bau zu einer dauerhaften Präsenz auf dem Mond.',reward:'+ Mondprogramm',steps:[{id:'moon_reached',title:'Mond erreichen',description:'Fliegen Sie zum Mond oder besitzen Sie dort ein erstes Gebäude.',action:'travel'},{id:'moon_power',title:'Energie auf dem Mond sichern',description:'Bauen Sie ein Solarfeld oder eine andere Energiequelle auf dem Mond.',action:'grid'},{id:'moon_water',title:'Wasser oder Eis sichern',description:'Bauen Sie einen Eisbohrer oder Wasserextraktor auf dem Mond.',action:'grid'}]},
   {
     id:'m_phobos_stickney',title:'Stickney-Einsatz',theme:'Phobos · Mikrogravitation',
-    summary:'Nehmen Sie Base Alpha wissenschaftlich in Betrieb: Tether-Versorgung, Prospektion, Referenzprobe, Rücktransport und Feldlabor-Auswertung.',
-    reward:'+ Stickney-Operationen',
+    summary:'Nehmen Sie Base Alpha wissenschaftlich in Betrieb: Versorgung, Prospektion, Referenzanalyse, autorisierte Bohrung und direkte Bohrkern-Evidenz.',
+    reward:'+ Stickney-Feldforschung',
     steps:[
       {id:'phobos_reached',title:'Phobos erreichen',description:'Bringen Sie Ihr aktives Schiff nach Phobos und übernehmen Sie Base Alpha.',action:'travel'},
-      {id:'phobos_supply',title:'Tether-Versorgung fahren',description:'Führen Sie einen Oberflächentransport vom Stickney Anchor Field zum Base-Alpha-Depot durch.',action:'grid'},
+      {id:'phobos_supply',title:'Tether-Versorgung fahren',description:'Führen Sie den Versorgungstransport vom Stickney Anchor Field zum Base-Alpha-Depot durch.',action:'grid'},
       {id:'phobos_prospect',title:'Stickney prospektieren',description:'Erfassen Sie mindestens ein modelliertes Vorkommen.',action:'grid'},
       {id:'phobos_sample_return',title:'Referenzprobe zurückbringen',description:'Entnehmen Sie eine Referenzprobe und bringen Sie sie mit Tether Rover 01 zum Base-Alpha-Depot.',action:'grid'},
-      {id:'phobos_sample_analysis',title:'Probe wissenschaftlich auswerten',description:'Analysieren Sie die zurückgebrachte Probe im Base-Alpha-Feldlabor und erhalten Sie eine bestätigte, unklare oder verworfene Ressourcenaussage.',action:'grid'},
+      {id:'phobos_sample_analysis',title:'Referenzprobe auswerten',description:'Analysieren Sie die zurückgebrachte Probe und erhalten Sie gegebenenfalls eine wissenschaftliche Bohrfreigabe.',action:'grid'},
+      {id:'phobos_drill_deploy',title:'Bohrgerät ausrücken',description:'Bringen Sie Bohrgerät und Verbrauchsmaterial zu einem wissenschaftlich freigegebenen Prospektionsziel.',action:'grid'},
+      {id:'phobos_core_collect',title:'Bohrkern gewinnen',description:'Führen Sie die autorisierte 10-m-Bohrung aus und gewinnen Sie einen direkten Bohrkern.',action:'grid'},
+      {id:'phobos_core_return',title:'Bohrkern zurückbringen',description:'Bringen Sie den Bohrkern mit Tether Rover 01 zurück in das Base-Alpha-Kernlabor.',action:'grid'},
+      {id:'phobos_core_analysis',title:'Bohrkern auswerten',description:'Führen Sie die hochauflösende Kernanalyse durch. Erst diese Evidenzstufe kann einen Abbaukandidaten erzeugen.',action:'grid'},
     ],
   },
 ]
 
 async function getUserFromRequest(req: NextRequest){const h=req.headers.get('authorization');if(!h?.startsWith('Bearer '))return null;const s=createServiceClient();const {data:{user}}=await s.auth.getUser(h.split(' ')[1]);return user}
 function isProductionEntity(id:string){return ['solar','solar_field','mine','ice_drill','water_extractor','power_plant'].includes(id)}
-type MissionContext={ships:any[];entities:any[];trades:any[];profile:any;knowledge:number;cargoUsed:number;phobosJobs:any[];phobosScanCount:number;phobosAnalysisCount:number}
+type MissionContext={ships:any[];entities:any[];trades:any[];profile:any;knowledge:number;cargoUsed:number;phobosJobs:any[];phobosScanCount:number;referenceSamples:any[];coreSamples:any[]}
 function completedStepIds(stepId:string,ctx:MissionContext){switch(stepId){
- case'ship_owned':return ctx.ships.length>0;case'cargo_ready':return ctx.cargoUsed>0||(ctx.trades?.length??0)>0;case'trade_done':return(ctx.trades?.length??0)>0;case'flight_done':return(ctx.profile?.flight_count??0)>0||ctx.profile?.current_location!=='earth';case'production_built':return ctx.entities.some(e=>isProductionEntity(e.entity_id));case'knowledge_gained':return ctx.knowledge>0;case'moon_reached':return ctx.profile?.current_location==='moon'||ctx.entities.some(e=>e.locations?.slug==='moon');case'moon_power':return ctx.entities.some(e=>e.locations?.slug==='moon'&&['solar','solar_field','power_plant'].includes(e.entity_id));case'moon_water':return ctx.entities.some(e=>e.locations?.slug==='moon'&&['ice_drill','water_extractor'].includes(e.entity_id));case'phobos_reached':return ctx.profile?.current_location==='phobos';case'phobos_supply':return ctx.phobosJobs.some(j=>j.domain==='surface'&&j.status==='completed'&&j.vehicle_role==='Tether Rover 01'&&j.resource!=='research_sample');case'phobos_prospect':return ctx.phobosScanCount>0;case'phobos_sample_return':return ctx.phobosJobs.some(j=>j.domain==='surface'&&j.status==='completed'&&j.vehicle_role==='Tether Rover 01'&&j.resource==='research_sample');case'phobos_sample_analysis':return ctx.phobosAnalysisCount>0;default:return false}}
+ case'ship_owned':return ctx.ships.length>0;case'cargo_ready':return ctx.cargoUsed>0||(ctx.trades?.length??0)>0;case'trade_done':return(ctx.trades?.length??0)>0;case'flight_done':return(ctx.profile?.flight_count??0)>0||ctx.profile?.current_location!=='earth';case'production_built':return ctx.entities.some(e=>isProductionEntity(e.entity_id));case'knowledge_gained':return ctx.knowledge>0;case'moon_reached':return ctx.profile?.current_location==='moon'||ctx.entities.some(e=>e.locations?.slug==='moon');case'moon_power':return ctx.entities.some(e=>e.locations?.slug==='moon'&&['solar','solar_field','power_plant'].includes(e.entity_id));case'moon_water':return ctx.entities.some(e=>e.locations?.slug==='moon'&&['ice_drill','water_extractor'].includes(e.entity_id));case'phobos_reached':return ctx.profile?.current_location==='phobos';case'phobos_supply':return ctx.phobosJobs.some(j=>j.domain==='surface'&&j.status==='completed'&&j.route_snapshot?.routeKind==='anchor-tether');case'phobos_prospect':return ctx.phobosScanCount>0;case'phobos_sample_return':return ctx.phobosJobs.some(j=>j.domain==='surface'&&j.status==='completed'&&j.route_snapshot?.routeKind==='prospect-sample-return');case'phobos_sample_analysis':return ctx.referenceSamples.some(s=>s.status==='analyzed'||Boolean(s.analyzed_at));case'phobos_drill_deploy':return ctx.phobosJobs.some(j=>j.domain==='surface'&&j.status==='completed'&&j.route_snapshot?.routeKind==='prospect-drill-deployment');case'phobos_core_collect':return ctx.coreSamples.length>0;case'phobos_core_return':return ctx.coreSamples.some(s=>s.status==='returned'||s.status==='analyzed');case'phobos_core_analysis':return ctx.coreSamples.some(s=>s.status==='analyzed'||Boolean(s.analyzed_at));default:return false}}
 
 export async function GET(req:NextRequest){
  const user=await getUserFromRequest(req);if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const s=createServiceClient()
@@ -41,12 +45,13 @@ export async function GET(req:NextRequest){
  ])
  const ships=shipsR.data??[],entities=entitiesR.data??[],trades=tradesR.data??[],profile=profileR.data??{},knowledge=knowledgeR.data?.knowledge_points??0,activeShip=ships.find((x:any)=>x.is_active)??ships[0]
  const {data:cargoRows}=activeShip?.id?await s.from('ship_cargo').select('amount').eq('ship_id',activeShip.id):{data:[]};const cargoUsed=(cargoRows??[]).reduce((sum:number,row:any)=>sum+Number(row.amount??0),0),phobosId=phobosLocationR.data?.id??null
- const [jobsR,scansR,analysisR]=await Promise.all([
-  phobosId?s.from('transport_jobs').select('id,domain,status,vehicle_role,resource').eq('actor_profile_id',user.id).eq('location_id',phobosId).limit(100):Promise.resolve({data:[] as any[]}),
-  s.from('region_resources').select('id').contains('properties',{body:'phobos',discovered_by:user.id}).not('discovered_at','is',null).limit(10),
-  s.from('sample_analyses').select('id').eq('analyst_profile_id',user.id).limit(10),
+ const [jobsR,scansR,referenceR,coreR]=await Promise.all([
+  phobosId?s.from('transport_jobs').select('id,domain,status,vehicle_role,resource,route_snapshot').eq('actor_profile_id',user.id).eq('location_id',phobosId).limit(150):Promise.resolve({data:[] as any[]}),
+  s.from('region_resources').select('id').contains('properties',{body:'phobos',discovered_by:user.id}).not('discovered_at','is',null).limit(20),
+  s.from('research_samples').select('id,status,analyzed_at').eq('owner_profile_id',user.id).neq('sample_kind','drill_core').limit(20),
+  s.from('research_samples').select('id,status,analyzed_at').eq('owner_profile_id',user.id).eq('sample_kind','drill_core').limit(20),
  ])
- const ctx:MissionContext={ships,entities,trades,profile,knowledge,cargoUsed,phobosJobs:jobsR.data??[],phobosScanCount:(scansR.data??[]).length,phobosAnalysisCount:(analysisR.data??[]).length}
+ const ctx:MissionContext={ships,entities,trades,profile,knowledge,cargoUsed,phobosJobs:jobsR.data??[],phobosScanCount:(scansR.data??[]).length,referenceSamples:referenceR.data??[],coreSamples:coreR.data??[]}
  const missions=MISSIONS.map(m=>{const steps=m.steps.map(step=>({...step,completed:completedStepIds(step.id,ctx)})),completed=steps.filter(x=>x.completed).length,total=steps.length;return{...m,steps,completed,total,progress_percent:Math.round(completed/Math.max(1,total)*100),status:completed>=total?'completed':'active',nextStep:steps.find(x=>!x.completed)??null}})
  return NextResponse.json({missions})
 }

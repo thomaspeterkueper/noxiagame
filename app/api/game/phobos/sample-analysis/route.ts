@@ -84,12 +84,18 @@ export async function POST(req: NextRequest) {
   if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ error: 'Probenanalyse ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
   const body = await req.json().catch(() => ({}))
   const prospectId = typeof body.prospectId === 'string' ? body.prospectId : ''
+  const sampleKind = body.sampleKind === 'drill_core' ? 'drill_core' : 'regolith_reference'
   if (!prospectId) return NextResponse.json({ error: 'prospectId erforderlich' }, { status: 400 })
 
   try {
-    const { data: sample, error: sampleError } = await supabase.from('research_samples').select('*').eq('prospect_id', prospectId).maybeSingle()
+    const { data: sample, error: sampleError } = await supabase
+      .from('research_samples')
+      .select('*')
+      .eq('prospect_id', prospectId)
+      .eq('sample_kind', sampleKind)
+      .maybeSingle()
     if (sampleError) throw new Error(sampleError.message)
-    if (!sample) return NextResponse.json({ error: 'Keine registrierte Referenzprobe für dieses Ziel.' }, { status: 404 })
+    if (!sample) return NextResponse.json({ error: sampleKind === 'drill_core' ? 'Noch kein Bohrkern für dieses Ziel registriert.' : 'Keine registrierte Referenzprobe für dieses Ziel.' }, { status: 404 })
     if (sample.owner_profile_id && sample.owner_profile_id !== user.id) return NextResponse.json({ error: 'Diese Probe gehört zu einem anderen Einsatz.' }, { status: 403 })
 
     const { data: existing, error: existingError } = await supabase.from('sample_analyses').select('*').eq('sample_id', sample.id).maybeSingle()
@@ -104,7 +110,7 @@ export async function POST(req: NextRequest) {
         await supabase.from('research_samples').update({ status: 'returned', returned_at: job.completed_at ?? new Date().toISOString(), destination_inventory_id: job.destination_inventory_id, updated_at: new Date().toISOString() }).eq('id', sample.id)
       }
     }
-    if (!returned) return NextResponse.json({ error: 'Die Probe muss zuerst vollständig zu Base Alpha zurückgebracht werden.' }, { status: 409 })
+    if (!returned) return NextResponse.json({ error: sampleKind === 'drill_core' ? 'Der Bohrkern muss zuerst vollständig zu Base Alpha zurückgebracht werden.' : 'Die Probe muss zuerst vollständig zu Base Alpha zurückgebracht werden.' }, { status: 409 })
 
     const { data: depot, error: depotError } = await supabase.from('logistics_inventories').select('id').contains('metadata', { role: 'stickney_depot' }).eq('active', true).limit(1).maybeSingle()
     if (depotError || !depot?.id) throw new Error(depotError?.message ?? 'Stickney depot missing')
@@ -122,7 +128,7 @@ export async function POST(req: NextRequest) {
     const resourceType = String(prospect.resource_type)
     const tier = String(prospect.properties?.tier ?? 'trace')
     const confidence = String(prospect.properties?.confidence ?? 'very-low')
-    const derived = deriveSampleAnalysis({ resourceType, abundance: Number(prospect.abundance ?? 0), tier, confidence })
+    const derived = deriveSampleAnalysis({ resourceType, abundance: Number(prospect.abundance ?? 0), tier, confidence, sampleKind })
     const now = new Date().toISOString()
     const { data: analysis, error: insertError } = await supabase.from('sample_analyses').insert({
       sample_id: sample.id,
@@ -137,7 +143,9 @@ export async function POST(req: NextRequest) {
       development_status: derived.developmentStatus,
       provenance: {
         source_prospect_provenance: prospect.properties?.provenance ?? 'derived-gameplay-model',
-        analysis_model: 'noxia-stickney-field-lab-v2',
+        sample_kind: sampleKind,
+        evidence_class: derived.evidenceClass,
+        analysis_model: sampleKind === 'drill_core' ? 'noxia-stickney-core-lab-v1' : 'noxia-stickney-field-lab-v3',
         instrument_capability: derived.capability,
         observed_deposit: false,
         interpretation: 'in-world gameplay analysis; not a claim about a real Phobos deposit',
@@ -145,9 +153,28 @@ export async function POST(req: NextRequest) {
     }).select('*').single()
     if (insertError) throw new Error(insertError.message)
     await supabase.from('research_samples').update({ status: 'analyzed', analyzed_at: now, updated_at: now }).eq('id', sample.id)
-    await supabase.from('region_resources').update({ properties: { ...prospect.properties, analysis_finding: derived.finding, development_status: derived.developmentStatus, analysis_quality: derived.quality, instrument_capability_sufficient: derived.capability.sufficient, instrument_capability_gaps: derived.capability.gaps, analyzed_at: now } }).eq('id', prospectId)
+    const resultProperties = sampleKind === 'drill_core'
+      ? {
+          ...prospect.properties,
+          core_analysis_finding: derived.finding,
+          core_analysis_quality: derived.quality,
+          core_instrument_capability_sufficient: derived.capability.sufficient,
+          core_instrument_capability_gaps: derived.capability.gaps,
+          core_analyzed_at: now,
+          development_status: derived.developmentStatus,
+        }
+      : {
+          ...prospect.properties,
+          analysis_finding: derived.finding,
+          analysis_quality: derived.quality,
+          instrument_capability_sufficient: derived.capability.sufficient,
+          instrument_capability_gaps: derived.capability.gaps,
+          analyzed_at: now,
+          development_status: derived.developmentStatus,
+        }
+    await supabase.from('region_resources').update({ properties: resultProperties }).eq('id', prospectId)
 
-    return NextResponse.json({ ok: true, analysis })
+    return NextResponse.json({ ok: true, sampleKind, analysis })
   } catch (error) {
     console.error('phobos sample analysis failed:', error)
     return NextResponse.json({ error: 'Probenanalyse fehlgeschlagen.' }, { status: 503 })
