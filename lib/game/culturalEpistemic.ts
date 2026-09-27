@@ -138,3 +138,77 @@ export function classifyCesMemoryClaim(
     ? 'aligned'
     : 'contested_attribution'
 }
+
+export type CesInstitutionKind =
+  | 'resonance_centre'
+  | 'church'
+  | 'mosque'
+  | 'synagogue'
+  | 'temple'
+  | 'meditation_centre'
+  | 'secular_association'
+  | 'philosophical_society'
+  | 'other'
+
+export interface CesInstitution {
+  id: string
+  kind: CesInstitutionKind
+  name: string
+  locationId?: string
+  traditionTags: string[]
+  activityTags: string[]
+  pluralUse: boolean
+}
+
+export interface CesCommunity {
+  id: string
+  name: string
+  memberActorIds: string[]
+  institutionIds: string[]
+  traditionTags: string[]
+}
+
+export interface CesControversyPosition {
+  id: string
+  label: string
+  sourceRef: string
+  institutionIds?: string[]
+  communityIds?: string[]
+}
+
+export interface CesControversy {
+  id: string
+  subjectRef: string
+  positionIds: string[]
+  salience: number
+  openedByEventRef: string
+  resolvedByEventRef?: string
+}
+
+export function validateCesInstitution(institution: CesInstitution): string[] {
+  const errors: string[] = []
+  if (!institution.id.trim()) errors.push('institution id required')
+  if (!institution.name.trim()) errors.push('institution name required')
+  if (institution.kind === 'resonance_centre' && !institution.pluralUse) {
+    errors.push('resonance centre must default to plural use')
+  }
+  return errors
+}
+
+export function validateCesControversy(
+  controversy: CesControversy,
+  positions: CesControversyPosition[],
+): string[] {
+  const errors: string[] = []
+  const ids = new Set(positions.map(position => position.id))
+  if (controversy.positionIds.length < 2) errors.push('controversy requires at least two positions')
+  for (const id of controversy.positionIds) {
+    if (!ids.has(id)) errors.push(`missing controversy position: ${id}`)
+  }
+  if (!controversy.openedByEventRef.trim()) errors.push('controversy requires opening event provenance')
+  return errors
+}
+
+export function normalizeCesControversy(controversy: CesControversy): CesControversy {
+  return { ...controversy, salience: clampCesUnit(controversy.salience) }
+}
