@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="hHull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d7dade"/><stop offset="1" stop-color="#8f959b"/></linearGradient>
+    <filter id="hSh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".45"/></filter>
+  </defs>
+  <ellipse cx="360" cy="560" rx="150" ry="34" fill="#000" opacity=".35"/>
+  <g filter="url(#hSh)" transform="translate(360 460)">
+    <!-- kein Zierrat: schlichter rechteckiger Modulkoerper, sichtbare Rahmenstreben, kein Fensterband -->
+    <rect x="-130" y="-90" width="260" height="130" rx="4" fill="url(#hHull)" stroke="#3b3f43" stroke-width="5"/>
+    <g stroke="#5c6266" stroke-width="3"><path d="M-95 -90 -95 40"/><path d="M-30 -90 -30 40"/><path d="M35 -90 35 40"/><path d="M100 -90 100 40"/></g>
+    <rect x="-130" y="40" width="260" height="18" fill="#5c6266" stroke="#3b3f43" stroke-width="3"/>
+    <!-- Luke statt Fenster -->
+    <circle cx="0" cy="-30" r="16" fill="#20242a" stroke="#3b3f43" stroke-width="4"/>
+    <circle cx="0" cy="-30" r="16" fill="none" stroke="#eab04a" stroke-width="2" stroke-dasharray="3 4"/>
+    <!-- exponierte Leitung zum Boden -->
+    <path d="M-110 40 -110 90" stroke="#3b3f43" stroke-width="6" fill="none"/>
+    <path d="M110 40 110 90" stroke="#3b3f43" stroke-width="6" fill="none"/>
+    <!-- Warnstreifen an der Ecke -->
+    <rect x="-130" y="-90" width="14" height="130" fill="#eab04a" opacity=".8"/>
+  </g>
+</svg>

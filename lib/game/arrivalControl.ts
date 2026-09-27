@@ -78,6 +78,16 @@ export const STATION_HOLDING_ZONES: Readonly<Record<string, readonly HoldingZone
       note: 'Separater Heavy-Traffic-Holding-Korridor für große Frachter und Pioneer-Rahmen.',
     },
   ],
+  deimos: [
+    {
+      id: 'deimos-h-light',
+      stationSlug: 'deimos',
+      label: 'H-LIGHT',
+      zoneClass: 'light-traffic',
+      maxConcurrent: 2,
+      note: 'Kleiner Rendezvous-Korridor vor der einzigen Shuttle-Anlegestelle der Forschungsstation.',
+    },
+  ],
   prometheus: [
     {
       id: 'kepler-h-standard',

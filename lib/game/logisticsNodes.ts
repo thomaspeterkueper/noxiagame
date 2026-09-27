@@ -7,7 +7,7 @@
 
 import type { SurfacePortRole } from './transportDomains'
 
-export type CanonicalLogisticsNodeId = 'earth' | 'moon' | 'mars' | 'phobos' | 'prometheus'
+export type CanonicalLogisticsNodeId = 'earth' | 'moon' | 'mars' | 'phobos' | 'deimos' | 'prometheus'
 
 export type LogisticsDomainMeaning =
   | 'aggregated-logistics-domain'
@@ -31,7 +31,7 @@ export interface LogisticsNodeSemantics {
   /** Planetary surface terminals are shuttle ports, not intersolar ship terminals. */
   surfacePortRole: SurfacePortRole | null
   /** Celestial-body slug used by the current world model. */
-  celestialBodySlug: 'earth' | 'moon' | 'mars' | 'phobos'
+  celestialBodySlug: 'earth' | 'moon' | 'mars' | 'phobos' | 'deimos'
   /** Stable engineering-facing explanation. Not a balancing value. */
   note: string
 }
@@ -90,6 +90,16 @@ export const LOGISTICS_NODES: Record<CanonicalLogisticsNodeId, LogisticsNodeSema
     surfacePortRole: null,
     celestialBodySlug: 'phobos',
     note: 'Phobos is the station/free-port logistics endpoint associated with the Phobos moon; arrival completes the intersolar/inter-node leg and no planetary surface shuttle leg is implied.',
+  },
+  deimos: {
+    id: 'deimos',
+    domainMeaning: 'orbital-station',
+    transferEndpoint: 'node-itself',
+    surfaceLegSeparate: false,
+    surfaceAccessMode: 'none',
+    surfacePortRole: null,
+    celestialBodySlug: 'deimos',
+    note: 'Deimos ist die kleine Forschungsstation/Anlegestelle selbst; Ankunft schliesst die Reise ab, kein separater Oberflaechen-Shuttle-Leg noetig.',
   },
   prometheus: {
     id: 'prometheus',

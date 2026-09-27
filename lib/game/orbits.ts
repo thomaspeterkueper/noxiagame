@@ -62,6 +62,7 @@ export const ORBITS: Record<string, OrbitParams> = {
   prometheus: KEPLER_L5,
   mars:       { parent: null,    radius: 150, period: 188, phase: 0            },
   phobos:     { parent: 'mars',  radius: 3,   period: 2,   phase: 0            },
+  deimos:     { parent: 'mars',  radius: 5,   period: 4,   phase: Math.PI      },
 }
 
 // ── Tuning ────────────────────────────────────────────────────────────────────

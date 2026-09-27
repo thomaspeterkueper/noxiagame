@@ -1,8 +1,8 @@
 'use client'
 
 // SolarSystem.tsx
-// Aktualisiert: 10.09.2026 — Kepler Station ersetzt Prometheus als kanonische L5-Identität
-// Version:      0.2.1
+// Aktualisiert: 27.09.2026 — Deimos als spielbarer Marsmond ergänzt
+// Version:      0.2.2
 // app/dashboard/SolarSystem.tsx
 //
 // Sonnensystem-Screen — reiner Konsument der Orbital-Engine (lib/game/orbits).
@@ -10,7 +10,7 @@
 // Erreichbarkeits-Check basiert auf currentLocation des Spielers.
 //
 // Orte: Erde, Mond (klebt an Erde), Kepler Station (L5, 60° hinter Erde),
-//        Mars, Phobos (klebt an Mars, schematisch herausgezogen).
+//        Mars, Phobos und Deimos (schematisch herausgezogen).
 
 import { useState, type CSSProperties } from 'react'
 import { position, ORBITS, orbitalBaseSeconds } from '@/lib/game/orbits'
@@ -22,7 +22,7 @@ const SYNODIC = 214
 
 const SCENE = {
   space: '#070b14', ring: '#1d2a3d', sun: '#e9cf8f', glow: '#c9a961',
-  earth: '#3a7abf', moon: '#cdd6e0', mars: '#c0563f', phobos: '#8893a3',
+  earth: '#3a7abf', moon: '#cdd6e0', mars: '#c0563f', phobos: '#8893a3', deimos: '#a09590',
   kepler: '#c9a961',
   open: '#2f9e6b', blocked: '#c0563f', openTxt: '#7fd9b0', blkTxt: '#e79a8b',
   label: '#7a8a9a', labelGold: '#c9a961', star: '#aab8cc',
@@ -45,6 +45,12 @@ function dispPhobos(tick: number) {
   const m = position('mars', tick), o = ORBITS.phobos
   const th = o.phase + TAU * (tick / o.period)
   return { x: CX + m.x * S + 18 * Math.cos(th), y: CY + m.y * S + 18 * Math.sin(th) }
+}
+
+function dispDeimos(tick: number) {
+  const m = position('mars', tick), o = ORBITS.deimos
+  const th = o.phase + TAU * (tick / o.period)
+  return { x: CX + m.x * S + 26 * Math.cos(th), y: CY + m.y * S + 26 * Math.sin(th) }
 }
 
 function dispMoon(tick: number) {
@@ -84,6 +90,7 @@ export default function SolarSystem({
   const kp = disp('kepler', tick)
   const ma = disp('mars', tick)
   const ph = dispPhobos(tick)
+  const de = dispDeimos(tick)
 
   const t_ea_mo = orbitalBaseSeconds('earth', 'moon', tick)
   const t_ea_kp = orbitalBaseSeconds('earth', 'kepler', tick)
@@ -91,6 +98,7 @@ export default function SolarSystem({
   const t_mo_ma = orbitalBaseSeconds('moon', 'mars', tick)
   const t_kp_ma = orbitalBaseSeconds('kepler', 'mars', tick)
   const t_ma_ph = orbitalBaseSeconds('mars', 'phobos', tick)
+  const t_ma_de = orbitalBaseSeconds('mars', 'deimos', tick)
 
   const reachable = (to: string) => {
     const secs = orbitalBaseSeconds(currentLocation, to, tick)
@@ -139,6 +147,7 @@ export default function SolarSystem({
             const from = currentLocation === 'moon' ? mo
                        : currentLocation === 'kepler' || currentLocation === 'prometheus' ? kp
                        : currentLocation === 'phobos' ? ph
+                       : currentLocation === 'deimos' ? de
                        : currentLocation === 'mars' ? ma
                        : ea
             const lineColor = marsOpen ? SCENE.open : SCENE.blocked
@@ -148,12 +157,15 @@ export default function SolarSystem({
                 stroke={lineColor} strokeWidth={1.5}
                 strokeDasharray={marsOpen ? 'none' : '4 4'} opacity={0.7} />
               <text x={midX} y={midY} fill={marsOpen ? SCENE.openTxt : SCENE.blkTxt}
-                fontSize={11} textAnchor="middle">{t_mo_ma}s</text>
+                fontSize={11} textAnchor="middle">{orbitalBaseSeconds(currentLocation, 'mars', tick)}s</text>
             </>
           })()}
 
           <circle cx={ph.x} cy={ph.y} r={3} fill={SCENE.phobos} />
           <text x={ph.x + 6} y={ph.y + 4} fill={SCENE.label} fontSize={9}>Phobos</text>
+
+          <circle cx={de.x} cy={de.y} r={3} fill={SCENE.deimos} />
+          <text x={de.x + 6} y={de.y + 4} fill={SCENE.label} fontSize={9}>Deimos</text>
 
           <circle cx={ma.x} cy={ma.y} r={9} fill={SCENE.mars} />
           <text x={ma.x} y={ma.y - 14} fill={SCENE.label} fontSize={11} textAnchor="middle">Mars</text>
@@ -175,6 +187,7 @@ export default function SolarSystem({
         <span><span style={{ color: SCENE.kepler }}>●</span> Kepler Station · L5</span>
         <span><span style={{ color: SCENE.mars }}>●</span> Mars</span>
         <span><span style={{ color: SCENE.phobos }}>●</span> Phobos (schematisch)</span>
+        <span><span style={{ color: SCENE.deimos }}>●</span> Deimos (schematisch)</span>
       </div>
 
       {explore && (
@@ -193,6 +206,7 @@ export default function SolarSystem({
         <RouteCard label="Mond ↔ Mars" seconds={t_mo_ma} />
         <RouteCard label="Kepler ↔ Mars" seconds={t_kp_ma} />
         <RouteCard label="Mars ↔ Phobos" seconds={t_ma_ph} />
+        <RouteCard label="Mars ↔ Deimos" seconds={t_ma_de} />
       </div>
 
       <div style={{ fontSize: 14, fontWeight: 600, color: marsOpen ? T.green : T.red }}>

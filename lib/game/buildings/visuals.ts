@@ -20,13 +20,12 @@ function profile(asset: string, location: string, mapScale: number, notes: strin
   }
 }
 
-// Building visuals are location-aware so shared gameplay types can deliberately
-// reuse an asset or use a body-specific one without changing the entity id.
 export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfile>> = {
   habitat: {
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.65, 'NOXIA Earth Core V1 style anchor: compact residential/operations building.'),
     moon: profile('habitat/moon/style-anchor.svg', 'moon', 1.7, 'Eigenes Habitat-Asset: halb im Regolith vergrabener Zylinder mit Abdeckwall und warmem Fensterlicht.'),
     phobos: profile('habitat/phobos/style-anchor.svg', 'phobos', 1.7, 'Eigene Phobos-Bildsprache: dunkles kohlenstoffreiches Regolith, Habitat per Ankerseilen an Bodenbolzen gesichert (Mikrogravitation).'),
+    deimos: profile('habitat/deimos/style-anchor.svg', 'deimos', 1.45, 'Sehr funktionales Mini-Habitat: schlichter Modulkoerper, Luke statt Fenster, exponierte Leitungen, keine Zierelemente.'),
   },
   residential_block: {
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.85, 'Earth residential block currently reuses the habitat visual language until its own anchor exists.'),
@@ -78,6 +77,12 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
   },
   landing_pad_phobos: {
     phobos: profile('landing_pad_phobos/phobos/style-anchor.svg', 'phobos', 2.1, 'Eigenes Andock-/Verankerungsfeld statt Landebahn: Ankerseile laufen sternfoermig zu einem zentralen Andockkragen (Mikrogravitation, keine klassische Landung).'),
+  },
+  research_station: {
+    deimos: profile('research_station/deimos/style-anchor.svg', 'deimos', 1.9, 'Sehr funktionaler Flachbau: exponierte Leitungsbruecke, kleine Parabolantenne, Sensormast -- kein Repraesentationsbau.'),
+  },
+  shuttle_dock_deimos: {
+    deimos: profile('shuttle_dock_deimos/deimos/style-anchor.svg', 'deimos', 2.0, 'Offenes Andockgeruest statt Landebahn: nackte Rahmenstruktur mit Warnstreifen und zentralem Andockkragen fuer Shuttles/Kleinfrachter.'),
   },
   ssf_headquarters_sundern: {
     earth: profile('ssf_headquarters_sundern/earth/style-anchor.svg', 'earth', 2.05, 'Unique 1971 SSF Foundation House at Bogenstraße 15: hipped-roof bungalow, detached garage along the long side, side entrance facing the garage.'),

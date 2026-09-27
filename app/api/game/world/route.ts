@@ -105,7 +105,7 @@ export async function GET() {
   const news: { type: string; text: string; icon: string }[] = []
   for (const loc of liveLocations) {
     const name = loc.name ?? (loc.slug === 'moon' ? 'Mond' : loc.slug === 'mars' ? 'Mars' : loc.slug)
-    const icon = loc.slug === 'moon' ? '🌙' : loc.slug === 'mars' ? '🔴' : loc.slug === 'phobos' ? '🪨' : '🪐'
+    const icon = loc.slug === 'moon' ? '🌙' : loc.slug === 'mars' ? '🔴' : loc.slug === 'phobos' ? '🪨' : loc.slug === 'deimos' ? '🛰️' : '🪐'
     if (!loc.is_supplied) {
       news.push({ type: 'danger', icon, text: `${name} meldet Versorgungsengpass` })
     }

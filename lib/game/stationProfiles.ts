@@ -45,6 +45,18 @@ export const STATION_SERVICE_PROFILES: Readonly<Record<string, StationServicePro
     onwardTransfer: true,
     summary: 'Neutraler orbitaler Umschlagknoten mit persistentem Depot, lokalem Markt und Weitertransport. Docking und Frachttransfer bleiben getrennte Vorgänge.',
   },
+  deimos: {
+    slug: 'deimos',
+    role: 'habitat-transfer-station',
+    roleLabel: 'FORSCHUNGSSTATION · ANLEGESTELLE',
+    freePort: false,
+    docking: true,
+    cargoTransfer: true,
+    depotMode: 'station-storage',
+    marketMode: 'none',
+    onwardTransfer: false,
+    summary: 'Kleine Forschungsaussenstelle mit Mini-Habitat und Anlegestelle fuer Shuttles/Versorgungsschiffe. Kein Markt, kein Weitertransport -- reine Endstation.',
+  },
   // `prometheus` is the current legacy runtime slug for Kepler Station.
   prometheus: {
     slug: 'prometheus',

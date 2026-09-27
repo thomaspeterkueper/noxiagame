@@ -63,6 +63,30 @@ export const STATION_DOCKING_TOPOLOGIES: Readonly<Record<string, StationDockingT
       },
     ],
   },
+  deimos: {
+    stationSlug: 'deimos',
+    topologyLabel: 'DEIMOS FORSCHUNGSSTATION · ANLEGESTELLE',
+    ports: [
+      {
+        id: 'deimos-a1',
+        label: 'A1 Shuttle Anlegestelle',
+        portClass: 'shuttle',
+        role: 'shuttle-handover',
+        cargoEnabled: true,
+        crewEnabled: true,
+        note: 'Einzige Andockstelle der Aussenstelle: Versorgungs-Shuttles und kleine Frachter.',
+      },
+      {
+        id: 'deimos-s1',
+        label: 'S1 Service Dock',
+        portClass: 'service',
+        role: 'service-maintenance',
+        cargoEnabled: false,
+        crewEnabled: true,
+        note: 'Wartungs- und Inspektionsplatz. Kein kommerzieller Frachttransfer.',
+      },
+    ],
+  },
   phobos: {
     stationSlug: 'phobos',
     topologyLabel: 'PHOBOS FREE PORT · PORT RING A',
