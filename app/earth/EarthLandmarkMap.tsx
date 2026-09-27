@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EARTH_LANDMARKS, type EarthLandmark } from '@/lib/world/spatial/earthLandmarks'
 import EarthLandmarkRegionFocus from './EarthLandmarkRegionFocus'
 
-type ViewKey = 'world' | 'europe' | 'germany' | 'mediterranean'
+type ViewKey = 'world' | 'europe' | 'germany' | 'mediterranean' | 'andes'
 type FilterKey = 'all' | 'science' | 'cross-universe'
 
 type GeoPoint = { lat: number; lon: number }
@@ -51,6 +51,7 @@ const VIEWS: Record<ViewKey, ViewBox> = {
   europe: { west: -15, east: 45, south: 30, north: 62, label: 'Europa' },
   germany: { west: 5, east: 15.8, south: 47, north: 55.3, label: 'Deutschland' },
   mediterranean: { west: -10, east: 45, south: 20, north: 46, label: 'Mittelmeerraum' },
+  andes: { west: -82, east: -68, south: -20, north: 2, label: 'Anden' },
 }
 
 function inView(point: GeoPoint, view: ViewBox) {
