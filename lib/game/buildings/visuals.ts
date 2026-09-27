@@ -27,6 +27,18 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     phobos: profile('habitat/phobos/style-anchor.svg', 'phobos', 1.7, 'Eigene Phobos-Bildsprache: dunkles kohlenstoffreiches Regolith, Habitat per Ankerseilen an Bodenbolzen gesichert (Mikrogravitation).'),
     deimos: profile('habitat/deimos/style-anchor.svg', 'deimos', 1.45, 'Sehr funktionales Mini-Habitat: schlichter Modulkoerper, Luke statt Fenster, exponierte Leitungen, keine Zierelemente.'),
   },
+  apartment_house: {
+    earth: profile('apartment_house/earth/style-anchor.svg', 'earth', 1.8, 'Distinct civilian multi-family housing asset for Earth settlements.'),
+  },
+  community_center: {
+    earth: profile('community_center/earth/style-anchor.svg', 'earth', 1.7, 'Low civic/community building with a clearly readable public-use silhouette.'),
+  },
+  local_workshop: {
+    earth: profile('local_workshop/earth/style-anchor.svg', 'earth', 1.8, 'Small terrestrial craft and repair workshop, distinct from industrial factory buildings.'),
+  },
+  mobility_hub: {
+    earth: profile('mobility_hub/earth/style-anchor.svg', 'earth', 1.75, 'Civilian mobility interchange with forecourt and transport marker.'),
+  },
   residential_block: {
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.85, 'Earth residential block currently reuses the habitat visual language until its own anchor exists.'),
   },
