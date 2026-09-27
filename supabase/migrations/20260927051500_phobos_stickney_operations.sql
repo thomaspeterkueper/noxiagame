@@ -3,8 +3,6 @@
 
 set search_path to public;
 
--- The existing Phobos docking ports are real generic docking-core ports. Give
--- them the micro-gravity / tether semantics needed by the Stickney surface.
 update docking_ports
 set
   label = case id
@@ -17,16 +15,13 @@ set
     else label
   end,
   metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
-    'bodySlug','phobos',
-    'surfaceHub','stickney-alpha',
-    'interface','microgravity-anchor-field',
-    'tetherRequired',true,
+    'bodySlug','phobos','surfaceHub','stickney-alpha',
+    'interface','microgravity-anchor-field','tetherRequired',true,
     'landingMode','dock-and-anchor'
   ),
   updated_at = now()
 where station_slug = 'phobos';
 
--- Dedicated cargo handover at the Base Alpha anchoring field.
 insert into logistics_inventories (
   id, owner_profile_id, location_id, inventory_kind, storage_kind,
   subject_type, subject_id, label, capacity,
@@ -37,12 +32,9 @@ select
   'tile_entity', te.id, 'Stickney Anchor Field · Cargo', 180,
   true, true, true,
   jsonb_build_object(
-    'role','stickney_anchor_field',
-    'ownerClass','STATE',
-    'buildingType','landing_pad_phobos',
-    'xM',te.x_m,'yM',te.y_m,
-    'tetherRequired',true,
-    'provisioning','phobos_ops_v1'
+    'role','stickney_anchor_field','ownerClass','STATE',
+    'buildingType','landing_pad_phobos','xM',te.x_m,'yM',te.y_m,
+    'tetherRequired',true,'provisioning','phobos_ops_v1'
   )
 from tile_entities te
 where te.entity_id='landing_pad_phobos'
@@ -52,9 +44,6 @@ where te.entity_id='landing_pad_phobos'
     where li.storage_kind='native' and li.subject_type='tile_entity' and li.subject_id=te.id
   );
 
--- The rover yard acts as the public dispatch/vehicle node. The first gameplay
--- slice models the rover role through the transport job, while the inventory
--- represents its local staging capacity.
 insert into logistics_inventories (
   id, owner_profile_id, location_id, inventory_kind, storage_kind,
   subject_type, subject_id, label, capacity,
@@ -65,13 +54,9 @@ select
   'tile_entity', te.id, 'Tether Rover 01 · Staging', 40,
   true, true, true,
   jsonb_build_object(
-    'role','surface_rover',
-    'ownerClass','STATE',
-    'vehicleClass','phobos_tether_rover',
-    'xM',te.x_m,'yM',te.y_m,
-    'nominalSpeedMps',1.2,
-    'tetherCapable',true,
-    'provisioning','phobos_ops_v1'
+    'role','surface_rover','ownerClass','STATE',
+    'vehicleClass','phobos_tether_rover','xM',te.x_m,'yM',te.y_m,
+    'nominalSpeedMps',1.2,'tetherCapable',true,'provisioning','phobos_ops_v1'
   )
 from tile_entities te
 where te.entity_id='rover_yard'
@@ -81,13 +66,9 @@ where te.entity_id='rover_yard'
     where li.storage_kind='native' and li.subject_type='tile_entity' and li.subject_id=te.id
   );
 
--- Attach metric coordinates and an explicit role to the Base Alpha warehouse
--- inventory provisioned by the generic facility policy.
 update logistics_inventories li
 set metadata = coalesce(li.metadata,'{}'::jsonb) || jsonb_build_object(
-      'role','stickney_depot',
-      'xM',te.x_m,'yM',te.y_m,
-      'surfaceHub','stickney-alpha'
+      'role','stickney_depot','xM',te.x_m,'yM',te.y_m,'surfaceHub','stickney-alpha'
     ),
     updated_at = now()
 from tile_entities te
@@ -96,8 +77,6 @@ where li.subject_type='tile_entity'
   and te.entity_id='warehouse'
   and te.spatial_region_id='phobos-stickney-alpha';
 
--- Starter cargo: enough for the first anchored rover supply run, but not a
--- large free stockpile.
 with anchor_inventory as (
   select li.id
   from logistics_inventories li
@@ -105,8 +84,7 @@ with anchor_inventory as (
   where li.subject_type='tile_entity'
     and te.entity_id='landing_pad_phobos'
     and te.spatial_region_id='phobos-stickney-alpha'
-  order by li.created_at
-  limit 1
+  order by li.created_at limit 1
 )
 insert into logistics_inventory_items (inventory_id,resource,amount)
 select id,'components'::resource_type,24 from anchor_inventory
@@ -120,32 +98,37 @@ with anchor_inventory as (
   where li.subject_type='tile_entity'
     and te.entity_id='landing_pad_phobos'
     and te.spatial_region_id='phobos-stickney-alpha'
-  order by li.created_at
-  limit 1
+  order by li.created_at limit 1
 )
 insert into logistics_inventory_items (inventory_id,resource,amount)
 select id,'water'::resource_type,12 from anchor_inventory
 on conflict (inventory_id,resource) do update
 set amount=greatest(logistics_inventory_items.amount,excluded.amount), updated_at=now();
 
--- Local prospecting targets. These are explicitly modelled gameplay geology,
--- not claimed observations. Exact abundance is hidden until a successful scan.
+-- region_resources requires a celestial_regions parent. This local region is
+-- explicitly derived from the documented Stickney Base Alpha frame.
+insert into celestial_regions (body,slug,label,center_lat,center_lon,radius_km,bounds,source,imported_at)
+select
+  'phobos','phobos-stickney-alpha','Phobos · Stickney Alpha',24.235,-49.0,0.7,
+  jsonb_build_object('localFrame','PHOBOS_PLANETOCENTRIC','originStatus','derived'),
+  'noxia:derived-gameplay-model',now()
+where not exists (select 1 from celestial_regions where slug='phobos-stickney-alpha');
+
 insert into region_resources (id,region_id,resource_type,lat,lon,x_m,y_m,abundance,properties)
-select gen_random_uuid(), null, v.resource_type, null, null, v.x_m, v.y_m, v.abundance,
-       jsonb_build_object(
-         'body','phobos',
-         'surface_hub','stickney-alpha',
-         'seed_key',v.seed_key,
-         'tier',v.tier,
-         'provenance','derived-gameplay-model',
-         'confidence',v.confidence,
-         'notes',v.notes
-       )
-from (values
-  ('phobos-stickney-metal-a','metal'::text, 180.0,  90.0,0.44,'viable'::text,'low'::text,'Regolith metal-bearing prospect; not an observed ore body.'::text),
-  ('phobos-stickney-metal-b','metal'::text,-145.0, 165.0,0.26,'trace'::text,'low'::text,'Secondary regolith prospect; model-derived.'::text),
-  ('phobos-stickney-water-a','water'::text, 260.0,-110.0,0.12,'trace'::text,'very-low'::text,'Hydrated-material prospect only; not confirmed accessible water.'::text)
+select
+  gen_random_uuid(),cr.id,v.resource_type,null,null,v.x_m,v.y_m,v.abundance,
+  jsonb_build_object(
+    'body','phobos','surface_hub','stickney-alpha','seed_key',v.seed_key,
+    'tier',v.tier,'provenance','derived-gameplay-model',
+    'confidence',v.confidence,'notes',v.notes
+  )
+from celestial_regions cr
+cross join (values
+  ('phobos-stickney-metal-a','metal'::text,180.0,90.0,0.44,'viable'::text,'low'::text,'Regolith metal-bearing prospect; not an observed ore body.'::text),
+  ('phobos-stickney-metal-b','metal'::text,-145.0,165.0,0.26,'trace'::text,'low'::text,'Secondary regolith prospect; model-derived.'::text),
+  ('phobos-stickney-water-a','water'::text,260.0,-110.0,0.12,'trace'::text,'very-low'::text,'Hydrated-material prospect only; not confirmed accessible water.'::text)
 ) as v(seed_key,resource_type,x_m,y_m,abundance,tier,confidence,notes)
-where not exists (
-  select 1 from region_resources rr where rr.properties->>'seed_key'=v.seed_key
-);
+where cr.slug='phobos-stickney-alpha'
+  and not exists (
+    select 1 from region_resources rr where rr.properties->>'seed_key'=v.seed_key
+  );
