@@ -39,3 +39,44 @@ export function relationshipDecisionFactors(relationships: PersonRelationship[],
   const activeGoals = goals.filter((g) => g.status === 'active').sort((a, b) => (b.priority - a.priority) || a.id.localeCompare(b.id)).slice(0, 5).map((g) => ({ id: g.id, code: g.code, priority: clamp(g.priority, 0, 1), progress: clamp(g.progress, 0, 1), subjectType: g.subjectType ?? null, subjectRef: g.subjectRef ?? null }))
   return { trusted, activeGoals }
 }
+
+
+export interface EmergentGoalCandidate {
+  code: string
+  subjectType: string | null
+  subjectRef: string | null
+  priority: number
+  evidenceCount: number
+  latestTick: number
+}
+
+/** Pure deterministic pattern projection. Goals emerge only from repeated salient experience. */
+export function deriveEmergentGoals(memories: PersonMemory[]): EmergentGoalCandidate[] {
+  const social = memories.filter((m) => Boolean(m.otherPersonId) && ['interaction','assistance','shared_work','conflict'].includes(m.kind))
+  const byPerson = new Map<string, PersonMemory[]>()
+  for (const memory of social) {
+    const key = memory.otherPersonId!
+    byPerson.set(key, [...(byPerson.get(key) ?? []), memory])
+  }
+  const candidates: EmergentGoalCandidate[] = []
+  for (const [otherPersonId, group] of byPerson) {
+    const ordered = [...group].sort((a, b) => (a.tick - b.tick) || a.sourceEventId.localeCompare(b.sourceEventId))
+    const positive = ordered.filter((m) => m.valence > 0.1 || m.trustDelta > 0.02)
+    const negative = ordered.filter((m) => m.valence < -0.2 || m.trustDelta < -0.05)
+    if (positive.length >= 3 && positive.length > negative.length) {
+      const strength = positive.reduce((sum, m) => sum + m.salience * Math.max(0.1, m.valence + m.trustDelta), 0) / positive.length
+      candidates.push({ code: 'strengthen_social_bonds', subjectType: 'person', subjectRef: otherPersonId, priority: clamp(0.35 + strength * 0.45 + Math.min(positive.length, 6) * 0.035, 0, 0.9), evidenceCount: positive.length, latestTick: positive[positive.length - 1].tick })
+    }
+    if (negative.length >= 2 && negative.length >= positive.length) {
+      const strength = negative.reduce((sum, m) => sum + m.salience * Math.max(0.1, Math.abs(m.valence) + Math.abs(Math.min(0, m.trustDelta))), 0) / negative.length
+      candidates.push({ code: 'repair_social_trust', subjectType: 'person', subjectRef: otherPersonId, priority: clamp(0.4 + strength * 0.4 + Math.min(negative.length, 5) * 0.04, 0, 0.92), evidenceCount: negative.length, latestTick: negative[negative.length - 1].tick })
+    }
+  }
+  const crises = memories.filter((m) => m.kind === 'crisis' && m.salience >= 0.6)
+  if (crises.length >= 2) {
+    const latest = [...crises].sort((a, b) => b.tick - a.tick || a.sourceEventId.localeCompare(b.sourceEventId))[0]
+    const avg = crises.reduce((sum, m) => sum + m.salience, 0) / crises.length
+    candidates.push({ code: 'increase_resilience', subjectType: latest.locationId ? 'location' : null, subjectRef: latest.locationId ?? null, priority: clamp(0.4 + avg * 0.4 + Math.min(crises.length, 5) * 0.035, 0, 0.92), evidenceCount: crises.length, latestTick: latest.tick })
+  }
+  return candidates.sort((a, b) => (b.priority - a.priority) || a.code.localeCompare(b.code) || String(a.subjectRef ?? '').localeCompare(String(b.subjectRef ?? '')))
+}
