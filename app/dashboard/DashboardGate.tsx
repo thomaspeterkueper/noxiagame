@@ -50,6 +50,8 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   useEffect(() => {
     loadFromServer()
     ;(async () => {
+      // Direkt nach einem harten Reload kann die Supabase-Session kurz fehlen.
+      // Nicht vorschnell erneut ins Onboarding schicken.
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const token = await getToken()
@@ -60,7 +62,9 @@ export default function DashboardGate({ locations, prices, orders }: { locations
             setExistingUsername(data.profile.username || undefined)
             return
           }
-        } catch {}
+        } catch {
+          // weiter zum nächsten Versuch
+        }
         await new Promise(r => setTimeout(r, 400))
       }
       setOnboarded(true)
