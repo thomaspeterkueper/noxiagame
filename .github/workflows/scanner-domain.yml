@@ -5,6 +5,8 @@ on:
     paths:
       - 'lib/game/scanning.ts'
       - 'lib/game/scanning.test.ts'
+      - 'lib/game/resourceScanning.ts'
+      - 'lib/game/resourceScanning.test.ts'
       - 'app/api/game/scanner/**'
       - 'app/scanner/**'
       - 'app/dashboard/ScannerMicroScene.tsx'
@@ -44,5 +46,9 @@ jobs:
         run: npx tsc lib/game/scanning.ts lib/game/scanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .scanner-test
       - name: Run scanner domain test
         run: node .scanner-test/scanning.test.js
+      - name: Compile resource prospecting test
+        run: npx tsc lib/game/resourceScanning.ts lib/game/resourceScanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .resource-scanning-test
+      - name: Run resource prospecting test
+        run: node .resource-scanning-test/resourceScanning.test.js
       - name: Verify application build
         run: npm run build
