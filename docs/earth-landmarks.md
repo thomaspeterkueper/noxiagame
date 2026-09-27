@@ -33,11 +33,13 @@ Dafür trennt die Registry ausdrücklich:
 
 ### Cross-Universe
 
+- Frankfurt · Senckenberg — `YIN HUA / Senckenberg-Zyklus`
+- Frankfurt · Camaleo Artlounge — kultureller Cross-Universe-Anker; bis zur kanonischen Adressauflösung nur auf Stadtebene lokalisiert
 - Dvārakā / Dwarka — `Dvārakā / Baumeister-Zyklus`
 - Phaistos — `Dvārakā / Baumeister-Zyklus`
 - Alexandria — `Alexandria / Kalender-Roman`
 
-Diese drei Cross-Universe-Orte bilden bewusst unterschiedliche Verbindungstypen ab: Schauplatz, Artefakt-/Erkenntnisreferenz und Wissenschafts-/Zeitgeschichte.
+Diese erste Cross-Universe-Welle bildet bewusst unterschiedliche Verbindungstypen ab: Roman-Schauplatz, Kulturort, Artefakt-/Erkenntnisreferenz und Wissenschafts-/Zeitgeschichte. Frankfurt dient dabei als erster kompakter Book-World-Slice statt als generische Sehenswürdigkeiten-Sammlung.
 
 ## Darstellung im Spiel
 
