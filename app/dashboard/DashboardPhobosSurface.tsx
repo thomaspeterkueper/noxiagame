@@ -10,6 +10,7 @@ import {
 } from '@/lib/game/seeds/phobosBaseAlphaSeed'
 import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
+import PhobosRobotFleetPanel from './PhobosRobotFleetPanel'
 import ShipyardOverlay from './ShipyardOverlay'
 import SolarSystem from './SolarSystem'
 import SpaceportOverlay from './SpaceportOverlay'
@@ -54,6 +55,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
 
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
     <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>rekonstruiertes lokales Terrain · gemeinsamer Planetary-Surface-Renderer</span></div>
+    <PhobosRobotFleetPanel />
     <PlanetarySurfaceMap
       locationSlug="phobos"
       body="phobos"
