@@ -15,8 +15,6 @@ import SpaceportOverlay from './SpaceportOverlay'
 
 type Props = { locations: any[]; prices: any[]; orders: any[] }
 
-// Nur eine Anlegestelle, keine Werft/kein Warenhaus -- die Aussenstelle ist
-// bewusst ein Sackbahnhof, kein Umschlagknoten.
 const DEIMOS_CORRIDORS: PreparedCorridor[] = (() => {
   const nodes = new Map(DEIMOS_OUTPOST_ALPHA_NODES.map(node => [node.id, node]))
   const seen = new Set<string>()
@@ -35,16 +33,18 @@ const DEIMOS_CORRIDORS: PreparedCorridor[] = (() => {
 })()
 
 export default function DashboardDeimosSurface({ locations }: Props) {
-  const location = useGameStore(s => s.location), shipRange = useGameStore(s => s.shipRange)
+  const location = useGameStore(s => s.location)
+  const locationSlug = location as string
+  const shipRange = useGameStore(s => s.shipRange)
   const [interiorEntity, setInteriorEntity] = useState<PlanetarySurfaceEntity | null>(null)
   const [dockEntity, setDockEntity] = useState<PlanetarySurfaceEntity | null>(null)
   const [navigationOpen, setNavigationOpen] = useState(false)
   const [tick, setTick] = useState(0)
   const deimosLocation = useMemo(() => locations.find((item: any) => item.slug === 'deimos') ?? null, [locations])
 
-  useEffect(() => { if (location !== 'deimos') return; let cancelled = false; fetch('/api/game/world', { cache: 'no-store' }).then(r => r.json()).then(p => { if (!cancelled) setTick(Number(p?.stats?.tickNumber ?? 0)) }).catch(() => {}); return () => { cancelled = true } }, [location])
-  useEffect(() => { if (location !== 'deimos') return; let cancelled = false; (async () => { try { const token = await getToken(); if (!token || cancelled) return; await fetch('/api/game/build/spatial/terrain-sync', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'deimos' }) }) } catch {} })(); return () => { cancelled = true } }, [location])
-  if (location !== 'deimos') return null
+  useEffect(() => { if (locationSlug !== 'deimos') return; let cancelled = false; fetch('/api/game/world', { cache: 'no-store' }).then(r => r.json()).then(p => { if (!cancelled) setTick(Number(p?.stats?.tickNumber ?? 0)) }).catch(() => {}); return () => { cancelled = true } }, [locationSlug])
+  useEffect(() => { if (locationSlug !== 'deimos') return; let cancelled = false; (async () => { try { const token = await getToken(); if (!token || cancelled) return; await fetch('/api/game/build/spatial/terrain-sync', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'deimos' }) }) } catch {} })(); return () => { cancelled = true } }, [locationSlug])
+  if (locationSlug !== 'deimos') return null
 
   const openWorldObject = (entity: PlanetarySurfaceEntity) => {
     const id = entity.entity_id ?? ''
