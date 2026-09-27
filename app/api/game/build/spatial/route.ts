@@ -137,7 +137,7 @@ function toWorldFrame(row: any): WorldFrame {
 }
 
 async function terrainResolution(frame: any, dataset: any, xM = 0, yM = 0) {
-  if (!frame || frame.origin_status !== 'verified' || frame.origin_lat_deg == null || frame.origin_lon_deg == null || frame.origin_alt_m == null) {
+  if (!frame || frame.origin_status === 'pending' || frame.origin_lat_deg == null || frame.origin_lon_deg == null || frame.origin_alt_m == null) {
     return { status: 'origin_pending' as const, zM: null }
   }
   if (!dataset || dataset.status !== 'ready') {

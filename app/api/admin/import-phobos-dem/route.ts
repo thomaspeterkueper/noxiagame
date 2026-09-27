@@ -147,6 +147,12 @@ export async function GET(req: NextRequest) {
       metadata: { stored_scale: 1, stored_offset: 0, whole_body: true, source_was_projected_meters: looksLikeMeters, min_elevation_m: Number.isFinite(min) ? min : null, max_elevation_m: Number.isFinite(max) ? max : null },
     })
 
+    const { error: datasetReadyError } = await supabase
+      .from('terrain_datasets')
+      .update({ status: 'ready' })
+      .eq('id', DATASET_ID)
+    if (datasetReadyError) throw new Error(`Phobos terrain dataset readiness update failed: ${datasetReadyError.message}`)
+
     return NextResponse.json({
       ok: true,
       manifest: { tileKey: manifest.tileKey, bounds: { minLatDeg: manifest.minLatDeg, minLonDeg: manifest.minLonDeg, maxLatDeg: manifest.maxLatDeg, maxLonDeg: manifest.maxLonDeg }, rasterWidth: manifest.rasterWidth, rasterHeight: manifest.rasterHeight, byteSize: manifest.byteSize, checksum: manifest.checksum },
