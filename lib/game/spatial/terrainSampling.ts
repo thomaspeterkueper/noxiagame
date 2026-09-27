@@ -43,8 +43,11 @@ export interface TerrainFootprintResolution {
 
 export function assertTerrainSamplingReady(context: TerrainSampleContext) {
   const { frame, dataset } = context
-  if (frame.originStatus !== 'verified') {
-    throw new Error('Terrain sampling requires a verified world-frame origin')
+  // `derived` is a deliberate, documented planetary origin computed from a
+  // real reference feature and is sampling-ready. Only an actually pending
+  // origin must block terrain resolution.
+  if (frame.originStatus === 'pending') {
+    throw new Error('Terrain sampling requires a resolved world-frame origin')
   }
   if (frame.originLatDeg == null || frame.originLonDeg == null || frame.originAltM == null) {
     throw new Error('Terrain sampling requires complete world-frame origin coordinates')
