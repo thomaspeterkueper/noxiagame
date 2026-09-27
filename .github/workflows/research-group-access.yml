@@ -1,0 +1,19 @@
+name: Research group access
+on:
+  pull_request:
+    paths:
+      - 'lib/game/cognition/researchGroupAccess.ts'
+      - 'lib/game/cognition/researchGroupAccess.test.ts'
+      - 'lib/game/cognition/researchSupabaseStore.ts'
+      - 'supabase/migrations/*cognitive_research_group_access.sql'
+      - '.github/workflows/research-group-access.yml'
+jobs:
+  access:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/cognition/researchGroupAccess.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .research-access-test
+      - run: node .research-access-test/game/cognition/researchGroupAccess.test.js
