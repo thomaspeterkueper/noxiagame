@@ -73,7 +73,7 @@ async function ensureRobot(supabase: ReturnType<typeof createServiceClient>, use
     modifications: { surfaceHub: 'stickney-alpha', tetherRequired: true, autonomyLevel: 'supervised-autonomy' },
     emergent_state: { duty: 'pilot-extraction', xM: 48, yM: -26 },
   }).select('*').single()
-  if (insertError) throw new Error(insertError.message)
+  if (insertError || !data) throw new Error(insertError?.message ?? 'Robot provisioning failed')
   return data
 }
 
@@ -89,17 +89,18 @@ async function resolveDueJobs(supabase: ReturnType<typeof createServiceClient>, 
       await supabase.from('vehicle_instances').update({ status: 'ready', updated_at: now }).eq('id', job.robot_vehicle_id)
       continue
     }
-    const { data: robot } = await supabase.from('vehicle_instances').select('condition,wear').eq('id', job.robot_vehicle_id).single()
+    const { data: robot, error: robotError } = await supabase.from('vehicle_instances').select('condition,wear').eq('id', job.robot_vehicle_id).single()
+    if (robotError || !robot) throw new Error(robotError?.message ?? 'Robot state missing')
     const abundance = Math.max(0, Math.min(1, Number(prospect.abundance ?? 0)))
     const quality = Math.max(0, Math.min(1, Number(analysis.quality_score ?? 0)))
-    const condition = Math.max(0, Math.min(100, Number(robot?.condition ?? 100))) / 100
+    const condition = Math.max(0, Math.min(100, Number(robot.condition ?? 100))) / 100
     const recoveryEfficiency = Math.max(0.25, Math.min(0.95, 0.42 + abundance * 0.38 + quality * 0.15 + condition * 0.05))
     const recoveredMassKg = Number((Number(job.target_mass_kg) * recoveryEfficiency).toFixed(2))
     const energyPerKg = Number((Number(job.energy_cost) / Math.max(0.1, recoveredMassKg)).toFixed(3))
     const specificWear = Number((Number(job.wear_cost) / Math.max(0.1, recoveredMassKg)).toFixed(3))
     const verdict = recoveredMassKg >= 35 && energyPerKg <= 0.6 && quality >= 0.78 ? 'viable' : recoveredMassKg >= 25 && energyPerKg <= 0.9 ? 'marginal' : 'rejected'
-    const nextWear = Math.min(100, Number(robot?.wear ?? 0) + Number(job.wear_cost))
-    const nextCondition = Math.max(0, Number(robot?.condition ?? 100) - Math.ceil(Number(job.wear_cost) * 0.5))
+    const nextWear = Math.min(100, Number(robot.wear ?? 0) + Number(job.wear_cost))
+    const nextCondition = Math.max(0, Number(robot.condition ?? 100) - Math.ceil(Number(job.wear_cost) * 0.5))
     const result = {
       ...(job.result ?? {}),
       recovered_mass_kg: recoveredMassKg,
@@ -162,16 +163,18 @@ export async function POST(req: NextRequest) {
     const analysis = await coreEvidence(supabase, user.id, prospectId)
     if (!analysis || analysis.development_status !== 'extraction_candidate') return NextResponse.json({ error: 'Direkte Bohrkern-Evidenz reicht für einen Pilotabbau noch nicht aus.' }, { status: 409 })
     const robot = await ensureRobot(supabase, user.id, location.id)
-    if (!['ready'].includes(String(robot.status))) return NextResponse.json({ error: 'Der Abbauroboter ist derzeit nicht einsatzbereit.' }, { status: 409 })
+    if (robot.status !== 'ready') return NextResponse.json({ error: 'Der Abbauroboter ist derzeit nicht einsatzbereit.' }, { status: 409 })
     if (Number(robot.condition ?? 0) < 35 || Number(robot.wear ?? 100) > 75) return NextResponse.json({ error: 'Der Abbauroboter benötigt vor dem Einsatz Wartung.' }, { status: 409 })
     const { data: active } = await supabase.from('pilot_extraction_jobs').select('id').eq('profile_id', user.id).eq('prospect_id', prospectId).eq('status', 'running').maybeSingle()
     if (active) return NextResponse.json({ ok: true, idempotent: true, jobId: active.id })
-    const [{ data: energyRow }, { data: componentRow }] = await Promise.all([
+    const [{ data: energyRow, error: energyError }, { data: componentRow, error: componentError }] = await Promise.all([
       supabase.from('resources').select('id,stock').eq('location_id', location.id).eq('resource', 'energy').single(),
       supabase.from('resources').select('id,stock').eq('location_id', location.id).eq('resource', 'components').single(),
     ])
-    if (Number(energyRow?.stock ?? 0) < ENERGY_COST) return NextResponse.json({ error: 'Nicht genug Energie für den Pilotabbau.' }, { status: 409 })
-    if (Number(componentRow?.stock ?? 0) < COMPONENT_COST) return NextResponse.json({ error: 'Nicht genug Komponenten für Verschleißteile.' }, { status: 409 })
+    if (energyError || !energyRow) throw new Error(energyError?.message ?? 'Energy resource row missing')
+    if (componentError || !componentRow) throw new Error(componentError?.message ?? 'Component resource row missing')
+    if (Number(energyRow.stock ?? 0) < ENERGY_COST) return NextResponse.json({ error: 'Nicht genug Energie für den Pilotabbau.' }, { status: 409 })
+    if (Number(componentRow.stock ?? 0) < COMPONENT_COST) return NextResponse.json({ error: 'Nicht genug Komponenten für Verschleißteile.' }, { status: 409 })
     const now = new Date()
     const completesAt = new Date(now.getTime() + DURATION_SECONDS * 1000).toISOString()
     const { data: job, error } = await supabase.from('pilot_extraction_jobs').insert({
@@ -180,7 +183,7 @@ export async function POST(req: NextRequest) {
       started_at: now.toISOString(), completes_at: completesAt,
       result: { operation: 'stickney_robotic_pilot_extraction', targetX_m: prospect.x_m, targetY_m: prospect.y_m, autonomy: 'supervised-autonomy', tetherRequired: true },
     }).select('*').single()
-    if (error) throw new Error(error.message)
+    if (error || !job) throw new Error(error?.message ?? 'Pilot extraction job insert failed')
     await Promise.all([
       supabase.from('resources').update({ stock: Number(energyRow.stock) - ENERGY_COST, updated_at: now.toISOString() }).eq('id', energyRow.id),
       supabase.from('resources').update({ stock: Number(componentRow.stock) - COMPONENT_COST, updated_at: now.toISOString() }).eq('id', componentRow.id),
