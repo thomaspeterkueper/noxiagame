@@ -3,6 +3,8 @@ import {
   evaluateCesActivation,
   normalizeBeliefState,
   resolveCesQuestion,
+  classifyCesMemoryClaim,
+  validateCesReceptionGraph,
 } from './culturalEpistemic'
 
 describe('CES foundation', () => {
@@ -51,5 +53,43 @@ describe('CES foundation', () => {
       ontology: 'determinate',
       value: true,
     })).toBe(true)
+  })
+  it('detects contested public attribution without rewriting the source', () => {
+    expect(classifyCesMemoryClaim({
+      id: 'quote-1',
+      text: 'A later famous formulation',
+      attributedSourceId: 'source-kuper-2032',
+      provenanceSourceId: 'pamphlet-2091',
+      confidence: 0.8,
+    })).toBe('contested_attribution')
+  })
+
+  it('fails closed on dangling reception relations', () => {
+    expect(validateCesReceptionGraph({
+      nodes: [{ id: 'source-1', role: 'source_object', label: 'Archive source' }],
+      edges: [{
+        fromId: 'missing-interpretation',
+        toId: 'source-1',
+        relation: 'interprets',
+        confidence: 0.7,
+        sourceRef: 'event:test',
+      }],
+    })).toContain('missing from node: missing-interpretation')
+  })
+
+  it('requires provenance for reception relations', () => {
+    expect(validateCesReceptionGraph({
+      nodes: [
+        { id: 'source-1', role: 'source_object', label: 'Archive source' },
+        { id: 'memory-1', role: 'public_memory', label: 'Public memory' },
+      ],
+      edges: [{
+        fromId: 'memory-1',
+        toId: 'source-1',
+        relation: 'attributes_to',
+        confidence: 0.9,
+        sourceRef: '',
+      }],
+    })).toContain('missing provenance: memory-1->source-1')
   })
 })
