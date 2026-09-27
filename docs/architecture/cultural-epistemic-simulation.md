@@ -124,3 +124,15 @@ Do not create a CES clock or duplicate knowledge table.
 4. no database migration;
 5. no LLM/API call in the tick path;
 6. later consumers must demonstrate a concrete causal/gameplay need before persistence is added.
+
+## Institutions, communities and controversies
+
+CES distinguishes buildings/places, institutions and communities. A place can host several institutions or communities over time; a community can use several places. This avoids equating architecture with belief.
+
+Institution kinds include Resonance Centres and established religious, philosophical and secular organizations. The registry is descriptive rather than exhaustive.
+
+A Resonance Centre is plural-use by contract in the initial NOXIA model. An historical institution may advocate an Omnizedenz interpretation there, but the place type itself does not confer doctrinal ownership or truth.
+
+A controversy is a provenance-bearing event-linked object with at least two documented positions. CES stores positions, affiliations and salience; it does not store a `winner` or `correctPositionId`. Outcomes such as law, allocation, schism, reconciliation or institutional closure are separate historical events and may themselves become contested in public memory.
+
+This keeps political, religious and philosophical disagreement inside the same epistemic boundary as scientific disagreement: actors can advocate positions; the simulation records consequences; the engine does not convert advocacy into metaphysical truth.
