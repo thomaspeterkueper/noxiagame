@@ -58,3 +58,8 @@ export function acquisitionIntentsForResearch(option:ExecutableResearchOption, a
   }
   return out
 }
+
+
+import type { PopulationActionIntent } from './actionIntent'
+/** Projects epistemic blockers into the shared population intent boundary; still no authority or mutation. */
+export function populationActionIntentsForResearch(option:ExecutableResearchOption,actor:ResearchActorResources):PopulationActionIntent[]{return acquisitionIntentsForResearch(option,actor).map((i):PopulationActionIntent=>{if(i.kind==='acquire_tool')return {kind:'acquire_tool',personId:i.personId,toolType:i.toolType,purpose:'research'};if(i.kind==='gain_capability')return {kind:'gain_capability',personId:i.personId,capability:i.capability,minLevel:i.minLevel,purpose:'research'};return {kind:'secure_resource',personId:i.personId,resource:i.resource,amount:i.amount,purpose:'research'}})}
