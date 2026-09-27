@@ -22,6 +22,8 @@ export interface KnownLocalProblem {
   reportable?: boolean
 }
 
+export interface PopulationGoalFactor { code: string; priority: number; progress: number; subjectType?: string | null; subjectRef?: string | null }
+
 export interface PopulationDecisionContext {
   person: Person
   needs: PersonNeed[]
@@ -29,6 +31,8 @@ export interface PopulationDecisionContext {
   skills: PersonSkill[]
   relationships: PersonRelationship[]
   knowledge: PersonKnowledge[]
+  /** Persisted long-term goals, reduced to bounded deterministic decision factors. */
+  goals?: PopulationGoalFactor[]
   localProblems?: KnownLocalProblem[]
   /** 0..1. 1 bedeutet: Arbeit ist in diesem Tick stark fällig. */
   workObligation?: number
@@ -116,6 +120,15 @@ function socialOpportunity(context: PopulationDecisionContext): number {
   }, 0)
 }
 
+function goalFactors(context: PopulationDecisionContext) {
+  const active = [...(context.goals ?? [])]
+    .map((goal) => ({ ...goal, priority: clampUnit(goal.priority), progress: clampUnit(goal.progress) }))
+    .sort((a, b) => (b.priority - a.priority) || a.code.localeCompare(b.code) || String(a.subjectRef ?? '').localeCompare(String(b.subjectRef ?? '')))
+  const strongest = active[0] ?? null
+  const drive = strongest ? strongest.priority * (0.55 + 0.45 * (1 - strongest.progress)) : 0
+  return { strongest, drive: roundScore(drive) }
+}
+
 function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
   const home = activeAssignment(context.assignments, 'home')
   const work = activeAssignment(context.assignments, 'work')
@@ -132,6 +145,7 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
   const problemSeverity = problem ? clampUnit(problem.severity) : 0
   const problemSkill = problem ? bestSkillLevel(context.skills, problem.requiredSkill) : 0
   const relationshipOpportunity = socialOpportunity(context)
+  const goal = goalFactors(context)
 
   const basicNeedPressure = Math.max(
     sustenancePressure * NEED_WEIGHT.sustenance,
@@ -152,9 +166,9 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
     {
       action: 'work',
       score: work
-        ? 0.1 + workObligation * 0.72 + purposePressure * 0.28 + (atWork ? 0.15 : -0.18)
+        ? 0.1 + workObligation * 0.72 + purposePressure * 0.28 + goal.drive * 0.12 + (atWork ? 0.15 : -0.18)
         : -1,
-      factors: { hasWork: Boolean(work), workObligation, purposePressure, atWork },
+      factors: { hasWork: Boolean(work), workObligation, purposePressure, atWork, goalDrive: goal.drive, goalCode: goal.strongest?.code ?? '' },
     },
     {
       action: 'travel_work',
@@ -185,9 +199,9 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
     {
       action: 'social_interaction',
       score: context.relationships.length > 0
-        ? 0.05 + socialPressure * 0.7 + relationshipOpportunity * 0.24
+        ? 0.05 + socialPressure * 0.7 + relationshipOpportunity * 0.24 + (goal.strongest?.code === 'strengthen_social_bonds' ? goal.drive * 0.18 : 0)
         : -1,
-      factors: { socialPressure, relationshipOpportunity, hasRelationship: context.relationships.length > 0 },
+      factors: { socialPressure, relationshipOpportunity, hasRelationship: context.relationships.length > 0, goalDrive: goal.drive, goalCode: goal.strongest?.code ?? '' },
     },
     {
       action: 'inspect_problem',

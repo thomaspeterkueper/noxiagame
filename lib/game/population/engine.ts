@@ -106,12 +106,13 @@ async function updateNeedsForAction(supabase: SupabaseLike, personId: string, ac
 }
 
 async function decideBackgroundPerson(supabase: SupabaseLike, person: any, tick: number) {
-  const [{ data: assignmentRows }, { data: needRows }, { data: skillRows }, { data: relationRows }, { data: knowledgeRows }] = await Promise.all([
+  const [{ data: assignmentRows }, { data: needRows }, { data: skillRows }, { data: relationRows }, { data: knowledgeRows }, { data: goalRows }] = await Promise.all([
     supabase.from('person_assignments').select('*').eq('person_id', person.id).eq('is_active', true),
     supabase.from('person_needs').select('*').eq('person_id', person.id),
     supabase.from('person_skills').select('*').eq('person_id', person.id),
     supabase.from('person_relationships').select('*').eq('person_id', person.id),
     supabase.from('person_knowledge').select('*').eq('person_id', person.id),
+    supabase.from('person_goals').select('goal_code, subject_type, subject_ref, priority, progress').eq('person_id', person.id).eq('status', 'active'),
   ])
   const knowledge = (knowledgeRows ?? []).map((r: any) => ({ id: r.id, personId: person.id, subjectType: r.subject_type, subjectRef: r.subject_ref, knowledgeType: r.knowledge_type, confidence: Number(r.confidence), learnedTick: Number(r.learned_tick), sourceEventId: r.source_event_id ?? null, details: r.details ?? {} }))
   const context: PopulationDecisionContext = {
@@ -121,6 +122,7 @@ async function decideBackgroundPerson(supabase: SupabaseLike, person: any, tick:
     skills: (skillRows ?? []).map((r: any) => ({ personId: person.id, skillCode: r.skill_code, level: Number(r.level), experience: Number(r.experience), updatedTick: r.updated_tick ?? null })),
     relationships: (relationRows ?? []).map(relationshipFromRow),
     knowledge,
+    goals: (goalRows ?? []).map((g: any) => ({ code: g.goal_code, subjectType: g.subject_type ?? null, subjectRef: g.subject_ref ?? null, priority: Number(g.priority), progress: Number(g.progress) })),
     localProblems: knowledge.filter((k: any) => k.knowledgeType === 'observed_failure' || k.knowledgeType === 'known_problem').map((k: any) => ({ subjectType: k.subjectType, subjectRef: k.subjectRef, severity: Number(k.details?.severity ?? k.confidence), requiredSkill: k.details?.requiredSkill ?? null, reportable: k.details?.reportable !== false })),
     workObligation: (assignmentRows ?? []).some((r: any) => r.assignment_type === 'work') ? (Math.abs(tick) % 4 === 3 ? 0.35 : 0.85) : 0,
     travelCostHome: 0.1,
