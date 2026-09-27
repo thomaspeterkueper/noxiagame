@@ -13,6 +13,12 @@ import {
   type EarthAscentEngineeringAssessment,
 } from '@/lib/game/core/earthAscentEngineeringAuthority'
 import {
+  LUNAR_ASCENT_AUTHORITY_R1,
+  resolveLunarAscentEngineeringAuthority,
+  type LunarAscentEngineeringAssessment,
+} from '@/lib/game/core/lunarAscentEngineeringAuthority'
+import {
+  flightArticleLunarPhysicalState,
   flightArticlePhysicalState,
   getSpacecraftFlightArticle,
   type PersistedSpacecraftFlightArticle,
@@ -47,17 +53,15 @@ export interface AscentReadinessEvidence {
   engineering: AscentReadinessEvidenceState
 }
 
-export interface AscentCrewEvidence {
-  boarded: boolean
-  role: string | null
-}
-
+export interface AscentCrewEvidence { boarded: boolean; role: string | null }
 export interface AscentCargoEvidence {
   empty: boolean
   totalLegacyAmount: number
   unresolvedResources: string[]
   rationale: string
 }
+
+type AscentEngineeringAssessment = EarthAscentEngineeringAssessment | LunarAscentEngineeringAssessment
 
 export interface ResolvedAscentReadiness {
   ship: ShipRow | null
@@ -70,7 +74,7 @@ export interface ResolvedAscentReadiness {
   cargo: AscentCargoEvidence
   engineeringRequest: string
   engineeringAuthorityRef: string | null
-  engineeringAssessment: EarthAscentEngineeringAssessment | null
+  engineeringAssessment: AscentEngineeringAssessment | null
   flightArticle: PersistedSpacecraftFlightArticle | null
 }
 
@@ -90,14 +94,6 @@ export function engineeringRequestForDeparture(departureSurfaceSlug: string): st
     : LUNAR_ASCENT_ENGINEERING_REQUEST
 }
 
-/**
- * Resolve authoritative server-side ascent facts.
- *
- * Crew comes from the explicit spacecraft crew manifest. Empty legacy cargo is
- * a resolved gameplay payload of 0, while Engineering mass readiness comes only
- * from a persisted spacecraft_flight_articles row. A ship name or legacy
- * ship_type_id can never promote a craft to ENG-SCV-0003.
- */
 export async function resolveAscentReadiness(
   actorProfileId: string,
   shipId: string,
@@ -120,12 +116,7 @@ export async function resolveAscentReadiness(
   const ship = shipData as unknown as ShipRow | null
   const spacecraftResolved = Boolean(ship)
   const actorAuthorized = Boolean(ship && ship.profile_id === actorProfileId)
-  const onDepartureSurface = Boolean(
-    ship
-    && sameSlug(ship.location, normalizedDeparture)
-    && ship.status !== 'transit',
-  )
-
+  const onDepartureSurface = Boolean(ship && sameSlug(ship.location, normalizedDeparture) && ship.status !== 'transit')
   const destinationOrbitResolved = Boolean(target)
 
   let noActiveDockingConnection = false
@@ -140,32 +131,10 @@ export async function resolveAscentReadiness(
       { data: crew, error: crewError },
       { data: cargo, error: cargoError },
     ] = await Promise.all([
-      supabase
-        .from('docking_connections')
-        .select('id')
-        .eq('ship_id', ship.id)
-        .eq('status', 'docked')
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('ascent_missions')
-        .select('id')
-        .eq('ship_id', ship.id)
-        .eq('status', 'active')
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('ship_crew_manifest')
-        .select('role,active')
-        .eq('ship_id', ship.id)
-        .eq('profile_id', actorProfileId)
-        .eq('active', true)
-        .maybeSingle(),
-      supabase
-        .from('ship_cargo')
-        .select('resource,amount')
-        .eq('ship_id', ship.id)
-        .gt('amount', 0),
+      supabase.from('docking_connections').select('id').eq('ship_id', ship.id).eq('status', 'docked').limit(1).maybeSingle(),
+      supabase.from('ascent_missions').select('id').eq('ship_id', ship.id).eq('status', 'active').limit(1).maybeSingle(),
+      supabase.from('ship_crew_manifest').select('role,active').eq('ship_id', ship.id).eq('profile_id', actorProfileId).eq('active', true).maybeSingle(),
+      supabase.from('ship_cargo').select('resource,amount').eq('ship_id', ship.id).gt('amount', 0),
     ])
     if (dockingError) throw new Error(`ascent readiness docking lookup failed: ${dockingError.message}`)
     if (missionError) throw new Error(`ascent readiness mission lookup failed: ${missionError.message}`)
@@ -177,35 +146,38 @@ export async function resolveAscentReadiness(
     cargoRows = (cargo ?? []).map(row => ({ resource: String(row.resource), amount: Number(row.amount) }))
   }
 
-  const canonicalCrewReady = Boolean(
-    crewRow?.active
-    && (crewRow.role === 'commander' || crewRow.role === 'pilot'),
-  )
+  const canonicalCrewReady = Boolean(crewRow?.active && (crewRow.role === 'commander' || crewRow.role === 'pilot'))
   const cargoEmpty = cargoRows.length === 0
   const totalLegacyAmount = cargoRows.reduce((sum, row) => sum + Math.max(0, row.amount), 0)
   const unresolvedResources = [...new Set(cargoRows.map(row => row.resource))]
   const canonicalCargoReady = cargoEmpty
-
   const crewReady = options.crewReady == null ? canonicalCrewReady : options.crewReady === true
   const cargoReady = options.cargoReady == null ? canonicalCargoReady : options.cargoReady === true
 
-  const flightArticle = normalizedDeparture === 'earth' && actorAuthorized
+  const supportsPersistedFlightArticle = normalizedDeparture === 'earth' || normalizedDeparture === 'moon'
+  const flightArticle = supportsPersistedFlightArticle && actorAuthorized
     ? await getSpacecraftFlightArticle(actorProfileId, shipId)
     : null
 
-  const engineeringAssessment = normalizedDeparture === 'earth'
-    ? resolveEarthAscentEngineeringAuthority({
+  let engineeringAssessment: AscentEngineeringAssessment | null = null
+  if (normalizedDeparture === 'earth') {
+    engineeringAssessment = resolveEarthAscentEngineeringAuthority({
       engineeringFrameId: flightArticle?.engineering_frame_id ?? null,
       engineeringAuthorityRef: flightArticle?.engineering_authority_ref ?? null,
       departureSurfaceSlug: normalizedDeparture,
       target,
       physicalState: flightArticlePhysicalState(flightArticle),
     })
-    : null
+  } else if (normalizedDeparture === 'moon') {
+    engineeringAssessment = resolveLunarAscentEngineeringAuthority({
+      engineeringAuthorityRef: flightArticle?.engineering_authority_ref ?? null,
+      departureSurfaceSlug: normalizedDeparture,
+      target,
+      physicalState: flightArticleLunarPhysicalState(flightArticle),
+    })
+  }
 
-  const engineering = options.engineering !== undefined
-    ? options.engineering
-    : engineeringAssessment?.authority ?? null
+  const engineering = options.engineering !== undefined ? options.engineering : engineeringAssessment?.authority ?? null
 
   const readiness: SurfaceToOrbitAscentReadiness = {
     spacecraftResolved,
@@ -219,13 +191,13 @@ export async function resolveAscentReadiness(
     engineering,
   }
 
+  const blockedEngineeringResults = new Set([
+    'frame-unmapped', 'authority-mismatch', 'unsupported-launch-site', 'unsupported-orbit',
+    'over-mass', 'payload-over-envelope', 'insufficient-propellant', 'insufficient-release-speed',
+  ])
   const engineeringEvidence: AscentReadinessEvidenceState = engineering
     ? 'ready'
-    : engineeringAssessment?.result === 'frame-unmapped'
-      || engineeringAssessment?.result === 'unsupported-launch-site'
-      || engineeringAssessment?.result === 'unsupported-orbit'
-      || engineeringAssessment?.result === 'over-mass'
-      || engineeringAssessment?.result === 'insufficient-release-speed'
+    : engineeringAssessment && blockedEngineeringResults.has(engineeringAssessment.result)
       ? 'blocked'
       : 'unresolved'
 
@@ -236,12 +208,8 @@ export async function resolveAscentReadiness(
     destinationOrbit: destinationOrbitResolved ? 'ready' : 'blocked',
     docking: ship ? (noActiveDockingConnection ? 'ready' : 'blocked') : 'unresolved',
     missionConflict: ship ? (noConflictingMission ? 'ready' : 'blocked') : 'unresolved',
-    crew: options.crewReady == null
-      ? canonicalCrewReady ? 'ready' : 'blocked'
-      : crewReady ? 'ready' : 'blocked',
-    cargo: options.cargoReady == null
-      ? cargoEmpty ? 'ready' : 'unresolved'
-      : cargoReady ? 'ready' : 'blocked',
+    crew: options.crewReady == null ? (canonicalCrewReady ? 'ready' : 'blocked') : (crewReady ? 'ready' : 'blocked'),
+    cargo: options.cargoReady == null ? (cargoEmpty ? 'ready' : 'unresolved') : (cargoReady ? 'ready' : 'blocked'),
     engineering: engineeringEvidence,
   }
 
@@ -252,10 +220,7 @@ export async function resolveAscentReadiness(
     readiness,
     assessment: assessSurfaceToOrbitAscentReadiness(readiness),
     evidence,
-    crew: {
-      boarded: canonicalCrewReady,
-      role: crewRow?.role ?? null,
-    },
+    crew: { boarded: canonicalCrewReady, role: crewRow?.role ?? null },
     cargo: {
       empty: cargoEmpty,
       totalLegacyAmount,
@@ -267,7 +232,9 @@ export async function resolveAscentReadiness(
     engineeringRequest: engineeringRequestForDeparture(normalizedDeparture),
     engineeringAuthorityRef: normalizedDeparture === 'earth'
       ? EARTH_LEO_ASCENT_AUTHORITY_R1.authorityId
-      : null,
+      : normalizedDeparture === 'moon'
+        ? LUNAR_ASCENT_AUTHORITY_R1.authorityId
+        : null,
     engineeringAssessment,
     flightArticle,
   }
