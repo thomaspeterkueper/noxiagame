@@ -38,6 +38,11 @@ Dafür trennt die Registry ausdrücklich:
 - Dvārakā / Dwarka — `Dvārakā / Baumeister-Zyklus`
 - Phaistos — `Dvārakā / Baumeister-Zyklus`
 - Alexandria — `Alexandria / Kalender-Roman`
+- Malta · Ħal Saflieni — Resonanz-/Archäoakustik-Anker
+- Istanbul · Bosporus — kompakter urbaner Werkverbund-Knoten
+- Schweizer Jura — zunächst regionaler Book-World-Anker, bis der konkrete Romanort kanonisch aufgelöst ist
+- Deutsche Nordseeküste — zunächst regionaler Platzhalter für das kanonische Nordsee-Dorf
+- Chavín de Huántar — peruanischer Anden-/Archäologie-Anker
 
 Diese erste Cross-Universe-Welle bildet bewusst unterschiedliche Verbindungstypen ab: Roman-Schauplatz, Kulturort, Artefakt-/Erkenntnisreferenz und Wissenschafts-/Zeitgeschichte. Frankfurt dient dabei als erster kompakter Book-World-Slice statt als generische Sehenswürdigkeiten-Sammlung.
 
