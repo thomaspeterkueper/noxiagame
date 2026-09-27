@@ -1,0 +1,21 @@
+name: Cognitive persistence
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/cognition/researchPersistence.ts'
+      - 'lib/game/cognition/researchPersistence.test.ts'
+      - 'lib/game/cognition/researchExchange.ts'
+      - 'supabase/migrations/*cognitive_research_artifacts.sql'
+      - '.github/workflows/cognitive-persistence.yml'
+
+jobs:
+  cognitive-persistence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/cognition/researchPersistence.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .cognitive-persistence-test
+      - run: node .cognitive-persistence-test/game/cognition/researchPersistence.test.js
