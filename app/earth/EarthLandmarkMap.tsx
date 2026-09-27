@@ -35,6 +35,12 @@ const LANDMARK_GEO: Readonly<Record<string, GeoPoint>> = {
   'earth-de-frankfurt-senckenberg': { lat: 50.1175, lon: 8.6517 },
   // City-level presentation point only until the Camaleo Artlounge locator is canonically resolved.
   'earth-de-frankfurt-camaleo-artlounge': { lat: 50.1109, lon: 8.6821 },
+  'earth-mt-hal-saflieni': { lat: 35.8698, lon: 14.5069 },
+  'earth-tr-istanbul-bosphorus': { lat: 41.0082, lon: 28.9784 },
+  // Regional presentation points only until the literary sites are canonically resolved.
+  'earth-ch-swiss-jura-book-region': { lat: 47.35, lon: 7.15 },
+  'earth-de-north-sea-book-village': { lat: 54.2, lon: 8.7 },
+  'earth-pe-chavin-de-huantar': { lat: -9.5928, lon: -77.1785 },
   'earth-in-dwarka': { lat: 22.244, lon: 68.968 },
   'earth-gr-phaistos': { lat: 35.051, lon: 24.814 },
   'earth-eg-alexandria': { lat: 31.2001, lon: 29.9187 },
