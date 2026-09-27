@@ -47,7 +47,7 @@ BEGIN
     '{"observant":true,"patient":true,"independent":true,"canon_status":"working"}'::jsonb,
     'noxia:character:tirin-kal'
   )
-  ON CONFLICT (person_key) DO UPDATE SET
+  ON CONFLICT (person_key) WHERE person_key IS NOT NULL DO UPDATE SET
     display_name = EXCLUDED.display_name,
     current_location_id = EXCLUDED.current_location_id,
     simulation_tier = EXCLUDED.simulation_tier,
