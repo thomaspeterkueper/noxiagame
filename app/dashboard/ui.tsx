@@ -8,8 +8,8 @@ import React from 'react'
 export const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall', components: 'Bauteile' }
 export const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️', components: '🧱' }
 // `prometheus` bleibt vorerst als Legacy-Slug erhalten, bis DB- und Reise-Referenzen atomar migriert sind.
-export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨', prometheus: '🛸', kepler: '🛸' }
-export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', prometheus: 'Kepler Station', kepler: 'Kepler Station' }
+export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨', deimos: '🛰️', prometheus: '🛸', kepler: '🛸' }
+export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', deimos: 'Deimos', prometheus: 'Kepler Station', kepler: 'Kepler Station' }
 
 export const T = {
   ink:      '#1b2733',
