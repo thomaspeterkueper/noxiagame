@@ -292,3 +292,67 @@ export function narrativeCandidateFromDecision(input: {
     status:'candidate',
   }
 }
+
+
+export interface NarrativeReview {
+  id: string
+  candidateId: string
+  reviewerId: string
+  reviewedAtTick: number
+  decision: 'approve' | 'reject' | 'revise'
+  rationaleCodes: string[]
+  evidenceRefs: string[]
+}
+
+export interface CanonizationRecord {
+  id: string
+  candidateId: string
+  approvedReviewIds: string[]
+  canonizedBy: string
+  canonizedAtTick: number
+  canonRef: string
+  status: 'canonized'
+}
+
+export function reviewNarrativeCandidate(input: {
+  candidate: NarrativeCandidate
+  reviewerId: string
+  atTick: number
+  decision: NarrativeReview['decision']
+  rationaleCodes: string[]
+}): NarrativeReview {
+  return {
+    id:'narrative-review:'+input.candidate.id+':'+input.reviewerId,
+    candidateId:input.candidate.id,
+    reviewerId:input.reviewerId,
+    reviewedAtTick:input.atTick,
+    decision:input.decision,
+    rationaleCodes:[...input.rationaleCodes],
+    evidenceRefs:[...input.candidate.evidenceRefs],
+  }
+}
+
+export function canonizeNarrativeCandidate(input: {
+  candidate: NarrativeCandidate
+  reviews: NarrativeReview[]
+  canonizedBy: string
+  canonizedAtTick: number
+  canonRef: string
+  requiredApprovals?: number
+}): CanonizationRecord | null {
+  const relevant=input.reviews.filter(r=>r.candidateId===input.candidate.id)
+  if(relevant.some(r=>r.decision==='reject' || r.decision==='revise')) return null
+  const approvals=relevant.filter(r=>r.decision==='approve')
+  const distinctReviewers=new Set(approvals.map(r=>r.reviewerId))
+  if(distinctReviewers.size < (input.requiredApprovals ?? 1)) return null
+  if(!input.canonizedBy.trim() || !input.canonRef.trim()) return null
+  return {
+    id:'canonization:'+input.candidate.id,
+    candidateId:input.candidate.id,
+    approvedReviewIds:approvals.map(r=>r.id),
+    canonizedBy:input.canonizedBy,
+    canonizedAtTick:input.canonizedAtTick,
+    canonRef:input.canonRef,
+    status:'canonized',
+  }
+}

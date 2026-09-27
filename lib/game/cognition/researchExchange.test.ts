@@ -1,4 +1,4 @@
-import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, reviseControversy, decisionFromResolvedControversy, narrativeCandidateFromDecision, type ResearchGroup } from './researchExchange'
+import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, reviseControversy, decisionFromResolvedControversy, narrativeCandidateFromDecision, reviewNarrativeCandidate, canonizeNarrativeCandidate, type ResearchGroup } from './researchExchange'
 import type { ProtocolRevision } from './runtime'
 
 let failures = 0
@@ -54,6 +54,15 @@ const candidate=decision ? narrativeCandidateFromDecision({decision,affectedPopu
 check(candidate!==null && candidate.reasonCodes.includes('cross_domain_effect'),'large durable cross-domain consequence becomes narrative candidate')
 const trivial=decision ? narrativeCandidateFromDecision({decision,affectedPopulation:20,durationTicks:5,crossDomainEffects:0}) : null
 check(trivial===null,'routine decision does not pollute narrative candidate stream')
+
+if(candidate){
+  check(canonizeNarrativeCandidate({candidate,reviews:[],canonizedBy:'canon-editor',canonizedAtTick:200,canonRef:'ore:event:2187-chrono'})===null,'simulation candidate cannot canonize itself without review')
+  const review=reviewNarrativeCandidate({candidate,reviewerId:'canon-editor',atTick:190,decision:'approve',rationaleCodes:['historically_significant','provenance_complete']})
+  const canon=canonizeNarrativeCandidate({candidate,reviews:[review],canonizedBy:'canon-editor',canonizedAtTick:200,canonRef:'ore:event:2187-chrono'})
+  check(canon?.status==='canonized' && canon.approvedReviewIds.includes(review.id),'explicit approved review can cross canon boundary')
+  const revise=reviewNarrativeCandidate({candidate,reviewerId:'continuity-review',atTick:191,decision:'revise',rationaleCodes:['continuity_conflict']})
+  check(canonizeNarrativeCandidate({candidate,reviews:[review,revise],canonizedBy:'canon-editor',canonizedAtTick:200,canonRef:'ore:event:2187-chrono'})===null,'revise or reject blocks canonization')
+}
 
 if(failures) throw new Error(String(failures)+' research exchange test(s) failed')
 console.log('Research exchange: tests passed; cross-group reuse requires no LLM call')
