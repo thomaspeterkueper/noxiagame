@@ -210,3 +210,85 @@ export function reviseControversy(input: {
     reason:status==='open'?'new_evidence':'convergence',
   }
 }
+
+
+export type SocietalImpactDomain = 'technical_standard' | 'station_operations' | 'economic_policy' | 'governance'
+
+export interface EvidenceBackedDecision {
+  id: string
+  authorityId: string
+  subjectRef: string
+  domain: SocietalImpactDomain
+  decisionType: string
+  evidenceRefs: string[]
+  controversyRevisionId: string
+  effectiveAtTick: number
+  reversible: boolean
+  status: 'proposed' | 'adopted' | 'withdrawn'
+}
+
+export interface NarrativeCandidate {
+  id: string
+  sourceDecisionId: string
+  subjectRef: string
+  occurredAtTick: number
+  significance: number
+  reasonCodes: string[]
+  evidenceRefs: string[]
+  status: 'candidate'
+}
+
+export function decisionFromResolvedControversy(input: {
+  authorityId: string
+  controversy: ScientificControversy
+  revision: ControversyRevision
+  domain: SocietalImpactDomain
+  decisionType: string
+  effectiveAtTick: number
+  reversible: boolean
+}): EvidenceBackedDecision | null {
+  if (input.revision.controversyId !== input.controversy.id || input.revision.status === 'open') return null
+  return {
+    id:'evidence-decision:'+input.authorityId+':'+input.revision.id,
+    authorityId:input.authorityId,
+    subjectRef:input.controversy.subjectRef,
+    domain:input.domain,
+    decisionType:input.decisionType,
+    evidenceRefs:[input.revision.id,...input.controversy.findingIds,...input.controversy.challengeIds],
+    controversyRevisionId:input.revision.id,
+    effectiveAtTick:input.effectiveAtTick,
+    reversible:input.reversible,
+    status:'proposed',
+  }
+}
+
+export function narrativeCandidateFromDecision(input: {
+  decision: EvidenceBackedDecision
+  affectedPopulation: number
+  durationTicks: number
+  crossDomainEffects: number
+}): NarrativeCandidate | null {
+  const population=Math.max(0,input.affectedPopulation)
+  const duration=Math.max(0,input.durationTicks)
+  const domains=Math.max(0,input.crossDomainEffects)
+  const significance=Math.min(1,
+    Math.min(1,population/1000)*0.4 +
+    Math.min(1,duration/365)*0.3 +
+    Math.min(1,domains/3)*0.3
+  )
+  if(significance<0.55) return null
+  const reasonCodes:string[]=[]
+  if(population>=500) reasonCodes.push('population_scale')
+  if(duration>=180) reasonCodes.push('long_duration')
+  if(domains>=2) reasonCodes.push('cross_domain_effect')
+  return {
+    id:'narrative-candidate:'+input.decision.id,
+    sourceDecisionId:input.decision.id,
+    subjectRef:input.decision.subjectRef,
+    occurredAtTick:input.decision.effectiveAtTick,
+    significance,
+    reasonCodes,
+    evidenceRefs:[...input.decision.evidenceRefs],
+    status:'candidate',
+  }
+}

@@ -1,4 +1,4 @@
-import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, reviseControversy, type ResearchGroup } from './researchExchange'
+import { publishProtocolFinding, routeFinding, adoptProtocolFromFinding, challengeFinding, openControversy, shouldEscalateControversy, reviseControversy, decisionFromResolvedControversy, narrativeCandidateFromDecision, type ResearchGroup } from './researchExchange'
 import type { ProtocolRevision } from './runtime'
 
 let failures = 0
@@ -40,6 +40,20 @@ const history2=reviseControversy({controversy,history:[history1],events:[
   {id:'ce5',controversyId:controversy.id,groupId:'chrono-2',evidenceRefs:['rep:5'],direction:'supports_challenge',confidence:0.8,occurredAtTick:170},
 ]})
 check(history2.status==='resolved_finding_revised' && history2.revision===2,'later convergent evidence can revise the original finding without erasing history')
+
+const decision=decisionFromResolvedControversy({
+  authorityId:'station-council-a',controversy,revision:history2,domain:'station_operations',
+  decisionType:'revise_greenhouse_temporal_standard',effectiveAtTick:175,reversible:true,
+})
+check(decision?.status==='proposed' && decision.controversyRevisionId===history2.id,'resolved science can become an auditable societal decision')
+check(decisionFromResolvedControversy({
+  authorityId:'station-council-a',controversy,revision:history1,domain:'station_operations',
+  decisionType:'premature_change',effectiveAtTick:150,reversible:true,
+})===null,'open controversy cannot silently become policy')
+const candidate=decision ? narrativeCandidateFromDecision({decision,affectedPopulation:850,durationTicks:240,crossDomainEffects:3}) : null
+check(candidate!==null && candidate.reasonCodes.includes('cross_domain_effect'),'large durable cross-domain consequence becomes narrative candidate')
+const trivial=decision ? narrativeCandidateFromDecision({decision,affectedPopulation:20,durationTicks:5,crossDomainEffects:0}) : null
+check(trivial===null,'routine decision does not pollute narrative candidate stream')
 
 if(failures) throw new Error(String(failures)+' research exchange test(s) failed')
 console.log('Research exchange: tests passed; cross-group reuse requires no LLM call')
