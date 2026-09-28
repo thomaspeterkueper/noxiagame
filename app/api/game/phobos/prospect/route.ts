@@ -6,12 +6,28 @@ import {
   createTransportJob,
   startTransportJob,
 } from '@/lib/game/core/logistics'
+import {
+  observationSeriesConfidence,
+  prospectGroundTruthKey,
+  prospectObservationDescriptor,
+} from '@/lib/game/science/prospectObservationSeries'
 
 const DEFAULT_RADIUS_M = 180
 const MAX_RADIUS_M = 600
 const CHANCE: Record<string, number> = { trace: 0.45, viable: 0.72, rich: 0.9, exceptional: 0.97 }
 const ROVER_YARD = { xM: 48, yM: -26 }
 const BASE_DEPOT = { xM: 22, yM: 2 }
+
+type ObservationSnapshot = {
+  signalKind?: string | null
+  sourceType?: string | null
+  interpretationLabel?: string | null
+  confidence?: string | null
+  measurementCount?: number | null
+  lastMeasuredAt?: string | null
+  evidenceKind?: string | null
+  evidence?: Record<string, unknown> | null
+}
 
 async function userFromRequest(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -26,7 +42,7 @@ function finite(value: unknown, fallback: number) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function dto(row: any, sample?: { cacheInventoryId?: string | null; sampleAvailable?: boolean }) {
+function dto(row: any, sample?: { cacheInventoryId?: string | null; sampleAvailable?: boolean }, observation?: ObservationSnapshot | null) {
   const props = row.properties ?? {}
   return {
     id: row.id,
@@ -42,6 +58,7 @@ function dto(row: any, sample?: { cacheInventoryId?: string | null; sampleAvaila
     sampledAt: props.sampled_at ?? null,
     cacheInventoryId: sample?.cacheInventoryId ?? null,
     sampleAvailable: sample?.sampleAvailable ?? false,
+    observation: observation ?? null,
   }
 }
 
@@ -113,24 +130,121 @@ async function ensureProspectCache(supabase: ReturnType<typeof createServiceClie
   return data.id as string
 }
 
+function observationSnapshot(row: any): ObservationSnapshot {
+  return {
+    signalKind: row.signal_kind ?? null,
+    sourceType: row.source_type ?? null,
+    interpretationLabel: row.interpretation_label ?? null,
+    confidence: row.confidence ?? null,
+    measurementCount: Number(row.measurement_count ?? 0),
+    lastMeasuredAt: row.last_measured_at ?? null,
+    evidenceKind: row.evidence_kind ?? null,
+    evidence: row.evidence ?? null,
+  }
+}
+
+async function observationMap(supabase: ReturnType<typeof createServiceClient>, resourceIds: string[]) {
+  if (!resourceIds.length) return new Map<string, ObservationSnapshot>()
+  const { data, error } = await supabase
+    .from('scanner_discoveries')
+    .select('region_resource_id,signal_kind,source_type,interpretation_label,confidence,evidence,last_measured_at,measurement_count,evidence_kind')
+    .in('region_resource_id', resourceIds)
+  if (error) throw new Error(error.message)
+  return new Map((data ?? []).filter(row => row.region_resource_id).map(row => [String(row.region_resource_id), observationSnapshot(row)]))
+}
+
 async function annotateSamples(supabase: ReturnType<typeof createServiceClient>, rows: any[]) {
   const discovered = rows.filter(row => row.discovered_at)
   if (!discovered.length) return []
   const cacheRows = await Promise.all(discovered.map(async row => ({ row, cacheId: await ensureProspectCache(supabase, row) })))
   const cacheIds = cacheRows.map(item => item.cacheId)
-  const { data: sampleRows, error } = await supabase
-    .from('logistics_inventory_items')
-    .select('inventory_id,amount')
-    .in('inventory_id', cacheIds)
-    .eq('resource', 'research_sample')
-  if (error) throw new Error(error.message)
-  const available = new Map((sampleRows ?? []).map(item => [item.inventory_id, Number(item.amount ?? 0) > 0]))
-  return cacheRows.map(({ row, cacheId }) => dto(row, { cacheInventoryId: cacheId, sampleAvailable: available.get(cacheId) === true }))
+  const [sampleResult, observations] = await Promise.all([
+    supabase
+      .from('logistics_inventory_items')
+      .select('inventory_id,amount')
+      .in('inventory_id', cacheIds)
+      .eq('resource', 'research_sample'),
+    observationMap(supabase, discovered.map(row => String(row.id))),
+  ])
+  if (sampleResult.error) throw new Error(sampleResult.error.message)
+  const available = new Map((sampleResult.data ?? []).map(item => [item.inventory_id, Number(item.amount ?? 0) > 0]))
+  return cacheRows.map(({ row, cacheId }) => dto(
+    row,
+    { cacheInventoryId: cacheId, sampleAvailable: available.get(cacheId) === true },
+    observations.get(String(row.id)) ?? null,
+  ))
 }
 
 async function requirePhobosPresence(supabase: ReturnType<typeof createServiceClient>, userId: string) {
   const { data: profile } = await supabase.from('profiles').select('current_location').eq('id', userId).maybeSingle()
   return profile?.current_location === 'phobos'
+}
+
+async function recordProspectObservation(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  locationId: string,
+  row: any,
+  measuredAt: string,
+) {
+  const descriptor = prospectObservationDescriptor(String(row.resource_type))
+  const groundTruthKey = prospectGroundTruthKey(String(row.id))
+  const { data: existing, error: lookupError } = await supabase
+    .from('scanner_discoveries')
+    .select('id,measurement_count,first_discovered_at,discovered_by_profile_id')
+    .eq('location_id', locationId)
+    .eq('ground_truth_key', groundTruthKey)
+    .maybeSingle()
+  if (lookupError) throw new Error(lookupError.message)
+
+  const measurementCount = Number(existing?.measurement_count ?? 0) + 1
+  const confidence = observationSeriesConfidence(measurementCount)
+  const evidence = {
+    body: 'phobos',
+    surfaceHub: 'stickney-alpha',
+    observables: descriptor.observables,
+    measurementSeries: 'stickney_surface_prospect_v1',
+    modelProvenance: row.properties?.provenance ?? 'derived-gameplay-model',
+    note: 'In-world indirect observation tied to a modelled prospect; not evidence of a real Phobos deposit.',
+  }
+  const shared = {
+    signal_kind: descriptor.signalKind,
+    source_type: descriptor.sourceType,
+    interpretation_label: descriptor.interpretationLabel,
+    confidence,
+    evidence,
+    last_measured_at: measuredAt,
+    measurement_count: measurementCount,
+    region_resource_id: row.id,
+    resource_type: row.resource_type,
+    abundance_tier: row.properties?.tier ?? null,
+    evidence_kind: descriptor.evidenceKind,
+  }
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('scanner_discoveries')
+      .update(shared)
+      .eq('id', existing.id)
+      .select('id,signal_kind,source_type,interpretation_label,confidence,evidence,last_measured_at,measurement_count,evidence_kind')
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  const { data, error } = await supabase
+    .from('scanner_discoveries')
+    .insert({
+      ...shared,
+      discovered_by_profile_id: userId,
+      location_id: locationId,
+      ground_truth_key: groundTruthKey,
+      first_discovered_at: measuredAt,
+    })
+    .select('id,signal_kind,source_type,interpretation_label,confidence,evidence,last_measured_at,measurement_count,evidence_kind')
+    .single()
+  if (error) throw new Error(error.message)
+  return data
 }
 
 export async function GET(req: NextRequest) {
@@ -240,6 +354,7 @@ export async function POST(req: NextRequest) {
     const locationId = await phobosLocationId(supabase)
     const now = new Date().toISOString()
     const newlyDiscovered: any[] = []
+    const observations: any[] = []
 
     const { error: scanEventError } = await supabase.from('events').insert({
       profile_id: user.id,
@@ -257,6 +372,10 @@ export async function POST(req: NextRequest) {
     })
     if (scanEventError) throw new Error(scanEventError.message)
 
+    for (const row of alreadyKnown) {
+      observations.push(await recordProspectObservation(supabase, user.id, locationId, row, now))
+    }
+
     for (const row of undiscovered) {
       const props = row.properties ?? {}
       const chance = CHANCE[String(props.tier ?? 'trace')] ?? CHANCE.trace
@@ -264,13 +383,14 @@ export async function POST(req: NextRequest) {
       const nextProperties = { ...props, discovered_from_x_m: xM, discovered_from_y_m: yM }
       const { data: updated, error } = await supabase
         .from('region_resources')
-        .update({ discovered_at: now, discovered_via: 'phobos_rover_scan', properties: nextProperties })
+        .update({ discovered_at: now, discovered_via: 'phobos_rover_observation', properties: nextProperties })
         .eq('id', row.id)
         .is('discovered_at', null)
         .select('id,resource_type,x_m,y_m,abundance,properties,discovered_at,discovered_via')
         .maybeSingle()
       if (error) throw new Error(error.message)
       if (updated) {
+        observations.push(await recordProspectObservation(supabase, user.id, locationId, updated, now))
         await ensureProspectCache(supabase, updated)
         newlyDiscovered.push(updated)
       }
@@ -282,6 +402,7 @@ export async function POST(req: NextRequest) {
       hub: 'stickney-alpha',
       xM, yM, radiusM,
       scannedTargets: inRange.length,
+      recordedMeasurements: observations.length,
       alreadyKnown: await annotateSamples(supabase, alreadyKnown),
       newlyDiscovered: await annotateSamples(supabase, newlyDiscovered),
       missedTargets: Math.max(0, undiscovered.length - newlyDiscovered.length),
