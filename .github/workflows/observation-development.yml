@@ -1,0 +1,28 @@
+name: Observation development bridge
+on:
+  push:
+    paths:
+      - 'lib/game/population/observationCapability.ts'
+      - 'lib/game/population/instrumentDevelopment.ts'
+      - 'lib/game/population/technologySolutionSpace.ts'
+      - 'lib/game/population/observationDevelopment.ts'
+      - 'lib/game/population/observationDevelopment.test.ts'
+      - '.github/workflows/observation-development.yml'
+  pull_request:
+    paths:
+      - 'lib/game/population/observationCapability.ts'
+      - 'lib/game/population/instrumentDevelopment.ts'
+      - 'lib/game/population/technologySolutionSpace.ts'
+      - 'lib/game/population/observationDevelopment.ts'
+      - 'lib/game/population/observationDevelopment.test.ts'
+      - '.github/workflows/observation-development.yml'
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/population/observationDevelopment.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .observation-development-test
+      - run: node .observation-development-test/game/population/observationDevelopment.test.js
