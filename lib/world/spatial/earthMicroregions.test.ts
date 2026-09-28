@@ -26,6 +26,12 @@ assert.equal(sauerland.anchorLandmarkId, 'earth-de-menden-hexenteich')
 assert.deepEqual(sauerland.nodes.map(node => node.id), ['hexenteich', 'felsenmeer-hemer', 'reckenhoehle', 'ebberg', 'bilsteinhoehle'])
 assert.equal(getEarthMicroregionByLandmark('earth-de-menden-hexenteich')?.id, sauerland.id)
 
+const cyrenaica = getEarthMicroregion('earth-microregion-apollonia-cyrene')
+assert.ok(cyrenaica)
+assert.equal(cyrenaica.anchorLandmarkId, 'earth-ly-cyrene')
+assert.deepEqual(cyrenaica.nodes.map(node => node.id), ['apollonia-susa', 'cyrene-road-transition', 'cyrene'])
+assert.equal(getEarthMicroregionByLandmark('earth-ly-cyrene')?.id, cyrenaica.id)
+
 const malta = getEarthMicroregion('earth-microregion-malta-hypogeum')
 assert.ok(malta)
 assert.equal(malta.anchorLandmarkId, 'earth-mt-hal-saflieni')
