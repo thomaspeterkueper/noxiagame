@@ -70,6 +70,7 @@ type Props = {
   minimumWorldSpanM?: number
   corridors?: PreparedCorridor[]
   mobileObjects?: MobileSurfaceObject[]
+  onOpenMobileObject?: (object: MobileSurfaceObject) => void
   onOpenWorldObject?: (entity: PlanetarySurfaceEntity) => void
 }
 
@@ -105,7 +106,7 @@ function topographicSuitability(slopeDeg: number, reliefM: number) {
   return { label: 'Steil', className: 'critical', note: 'Topographisch kritisch; alternativen Bauplatz prüfen.' }
 }
 
-export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terrainLabel, minimumWorldSpanM = 600, corridors = [], mobileObjects = [], onOpenWorldObject }: Props) {
+export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terrainLabel, minimumWorldSpanM = 600, corridors = [], mobileObjects = [], onOpenMobileObject, onOpenWorldObject }: Props) {
   const [spatial, setSpatial] = useState<SpatialPayload | null>(null)
   const [inventories, setInventories] = useState<Inventory[]>([])
   const [jobs, setJobs] = useState<TransportJob[]>([])
@@ -262,7 +263,7 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
             return <g key={corridor.id} pointerEvents="none"><polyline points={points} fill="none" stroke="#252723" strokeWidth={(road ? 12 : 7) / zoom} strokeLinecap="round" strokeLinejoin="round" opacity=".42"/><polyline points={points} fill="none" stroke={road ? '#a59e8b' : '#8a8577'} strokeWidth={(road ? 7 : 4) / zoom} strokeLinecap="round" strokeLinejoin="round" opacity=".78"/></g>
           })}
           {layers.routes && routes.map(route => { const points = route.geometry.points.map(point => { const p = project(point); return `${p.x},${p.y}` }).join(' '), vehicle = project(route.vehiclePoint); return <g key={route.job.id}><polyline points={points} fill="none" stroke="#c09a3a" strokeWidth={3 / zoom} strokeDasharray={`${7 / zoom} ${5 / zoom}`} opacity=".75"/><circle cx={vehicle.x} cy={vehicle.y} r={7 / zoom} fill="#d7b44d" stroke="#fff5c9" strokeWidth={2 / zoom} filter={`url(#planetary-glow-${body})`}/></g> })}
-          {layers.logistics && mobileObjects.map(object => { const p=project({xM:object.xM,yM:object.yM}), accent=object.accent??'#72c8d5', role=(object.role??'R').slice(0,1).toUpperCase(); return <g key={`mobile-${object.id}`} transform={`translate(${p.x} ${p.y})`} pointerEvents="none"><circle r={10/zoom} fill="#081319" fillOpacity=".88" stroke={accent} strokeWidth={2.2/zoom} filter={`url(#planetary-glow-${body})`}/><circle r={4.5/zoom} fill={accent}/><text x={12/zoom} y={-7/zoom} fill="#f5f2e8" fontSize={9/zoom} fontWeight="800" stroke="#071014" strokeWidth={2.5/zoom} paintOrder="stroke">{role} · {object.label.replace('Stickney ','').replace(' Robot 01','')}</text><text x={12/zoom} y={4/zoom} fill={accent} fontSize={7/zoom} fontWeight="700" stroke="#071014" strokeWidth={2/zoom} paintOrder="stroke">{object.phase??object.status??''}</text><title>{`${object.label} · ${object.phase??object.status??''}`}</title></g> })}
+          {layers.logistics && mobileObjects.map(object => { const p=project({xM:object.xM,yM:object.yM}), accent=object.accent??'#72c8d5', role=(object.role??'R').slice(0,1).toUpperCase(); return <g key={`mobile-${object.id}`} role="button" aria-label={`${object.label} öffnen`} transform={`translate(${p.x} ${p.y})`} onPointerDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();onOpenMobileObject?.(object)}} style={{cursor:onOpenMobileObject?'pointer':'default'}}><circle r={10/zoom} fill="#081319" fillOpacity=".88" stroke={accent} strokeWidth={2.2/zoom} filter={`url(#planetary-glow-${body})`}/><circle r={4.5/zoom} fill={accent}/><text x={12/zoom} y={-7/zoom} fill="#f5f2e8" fontSize={9/zoom} fontWeight="800" stroke="#071014" strokeWidth={2.5/zoom} paintOrder="stroke">{role} · {object.label.replace('Stickney ','').replace(' Robot 01','')}</text><text x={12/zoom} y={4/zoom} fill={accent} fontSize={7/zoom} fontWeight="700" stroke="#071014" strokeWidth={2/zoom} paintOrder="stroke">{object.phase??object.status??''}</text><title>{`${object.label} · ${object.phase??object.status??''}`}</title></g> })}
           {layers.noxia && entities.map(entity => {
             const xM = finite(entity.x_m), yM = finite(entity.y_m); if (xM == null || yM == null) return null
             const p = project({ xM, yM }), width = Math.max(10 / zoom, Number(entity.footprint_width_m ?? 20) * baseScale), depth = Math.max(10 / zoom, Number(entity.footprint_depth_m ?? 20) * baseScale)
