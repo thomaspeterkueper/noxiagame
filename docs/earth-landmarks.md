@@ -142,3 +142,15 @@ Die nächste Landmark-Welle erweitert den Earth-Registry um mehrere bereits kano
 - **Menden / Hexenteich** — Ortsanker für *Die Kette vom Hexenteich*
 
 Beim Hexenteich bleibt der Locator absichtlich auf Menden-Ebene, bis eine belastbare kanonische Georeferenz vorliegt. Die Registry darf aus einem literarischen Ortsnamen keine vermeintlich reale Straßen- oder Gewässeradresse ableiten.
+
+
+## Zweite Buchwelt-Ortswelle
+
+Weitere stabile Earth-Anker:
+- **Seoul** — NALGAE-Herkunftsraum; vorerst bewusst nur Stadt-Ebene.
+- **Frankfurt/Sachsenhausen** — NALGAE-Wohn- und Alltagsraum; keine erfundene WG-Adresse.
+- **Städel Museum** — realer Kunstanker am Schaumainkai; reale Institution und fiktionale Figurenbezüge bleiben getrennt.
+- **Hamburg/Altona** — TRAILERS-WG-/Jugendkulturraum und Teil des Hamburger OTJIZE-Kontexts; vorerst Stadtteil-Ebene.
+- **Menden/Hexenteich** — realer Landschaftsort am Oesberner Weg und Anker für *Die Kette vom Hexenteich*. Visionen, Kette und Kondenskreis sind Romanebene und keine Aussagen über den realen Ort.
+
+Wie bei den bisherigen Buchwelt-Orten gilt: Eine präzisere fiktionale Adresse wird erst gespeichert, wenn sie im jeweiligen Werk kanonisch festgelegt ist.
