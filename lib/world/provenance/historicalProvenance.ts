@@ -24,6 +24,8 @@ export type ProvenanceRelation =
   | 'transmits'
   | 'inspires'
   | 'fictionalizes'
+  | 'held-by'
+  | 'derived-from'
 
 export type ProvenanceAssertion = {
   id: string
@@ -115,5 +117,123 @@ export const DWARKA_PROVENANCE: ProvenanceGraph = {
     { from: 'dwarka:tradition', to: 'dwarka:site:modern', relation: 'transmits' },
     { from: 'dwarka:fiction', to: 'dwarka:observation:offshore', relation: 'inspires' },
     { from: 'dwarka:fiction', to: 'dwarka:tradition', relation: 'fictionalizes' },
+  ],
+}
+
+
+export const PHAISTOS_PROVENANCE: ProvenanceGraph = {
+  id: 'prov:earth:phaistos',
+  assertions: [
+    {
+      id: 'phaistos:site',
+      layer: 'site',
+      subjectId: 'earth-gr-phaistos',
+      sourceRef: 'NOXIA:earth-landmarks',
+      summary: 'Phaistos is the archaeological site anchor on Crete.',
+      confidence: 'documented',
+    },
+    {
+      id: 'phaistos:artifact:disc',
+      layer: 'artifact',
+      subjectId: 'artifact:phaistos-disc',
+      sourceRef: 'Heraklion-Archaeological-Museum:Phaistos-Disc',
+      summary: 'The Phaistos Disc is a real archaeological artifact associated with Phaistos and held by the Heraklion Archaeological Museum.',
+      confidence: 'documented',
+    },
+    {
+      id: 'phaistos:observation:signs',
+      layer: 'observation',
+      subjectId: 'artifact:phaistos-disc',
+      sourceRef: 'Heraklion-Archaeological-Museum:Phaistos-Disc',
+      summary: 'The artifact carries a spiral arrangement of impressed signs; the observation is distinct from any proposed decipherment.',
+      confidence: 'documented',
+    },
+    {
+      id: 'phaistos:dating:museum-context',
+      layer: 'dating',
+      subjectId: 'artifact:phaistos-disc',
+      sourceRef: 'Heraklion-Archaeological-Museum:Phaistos-Disc',
+      summary: 'Dating/context claims belong to a separate assertion layer and may be refined without changing artifact identity.',
+      confidence: 'documented',
+    },
+    {
+      id: 'phaistos:interpretation:decipherment',
+      layer: 'interpretation',
+      subjectId: 'artifact:phaistos-disc',
+      sourceRef: 'NOXIA:interpretation-boundary',
+      summary: 'Proposed readings or decipherments are interpretations and are not promoted to archaeological ground truth.',
+      confidence: 'contested',
+    },
+    {
+      id: 'phaistos:fiction:mishkenaz',
+      layer: 'fiction-canon',
+      subjectId: 'artifact:phaistos-disc',
+      sourceRef: 'KUEPER:MISHKENAZ',
+      summary: 'MISHKENAZ may construct a fictional conservation/linguistic history around the disc while remaining explicitly fiction canon.',
+    },
+    {
+      id: 'phaistos:fiction:vladikavkaz-fragment',
+      layer: 'fiction-canon',
+      subjectId: 'artifact:mishkenaz-vladikavkaz-fragment',
+      sourceRef: 'KUEPER:MISHKENAZ',
+      summary: 'The Vladikavkaz fragment and its disappearance are MISHKENAZ canon, not a real archaeological claim.',
+    },
+  ],
+  edges: [
+    { from: 'phaistos:artifact:disc', to: 'phaistos:site', relation: 'recovered-from' },
+    { from: 'phaistos:observation:signs', to: 'phaistos:artifact:disc', relation: 'observes' },
+    { from: 'phaistos:dating:museum-context', to: 'phaistos:artifact:disc', relation: 'dates' },
+    { from: 'phaistos:interpretation:decipherment', to: 'phaistos:observation:signs', relation: 'interprets' },
+    { from: 'phaistos:fiction:mishkenaz', to: 'phaistos:artifact:disc', relation: 'fictionalizes' },
+    { from: 'phaistos:fiction:vladikavkaz-fragment', to: 'phaistos:fiction:mishkenaz', relation: 'derived-from' },
+  ],
+}
+
+export const SENCKENBERG_YIN_HUA_PROVENANCE: ProvenanceGraph = {
+  id: 'prov:earth:senckenberg-yin-hua',
+  assertions: [
+    {
+      id: 'senckenberg:site',
+      layer: 'site',
+      subjectId: 'earth-de-frankfurt-senckenberg',
+      sourceRef: 'Senckenberg:official',
+      summary: 'The Senckenberg institution/museum in Frankfurt is the real-world geographic and institutional anchor.',
+      confidence: 'documented',
+    },
+    {
+      id: 'yinhua:fiction:adar-collection',
+      layer: 'fiction-canon',
+      subjectId: 'fiction:YIN-HUA:Adar-collection',
+      sourceRef: 'KUEPER:YIN-HUA',
+      summary: 'The Adar collection is a fictional archive collection in the YIN HUA canon and is not asserted to be a real Senckenberg holding.',
+    },
+    {
+      id: 'yinhua:fiction:bronze-key',
+      layer: 'fiction-canon',
+      subjectId: 'fiction:YIN-HUA:bronze-key',
+      sourceRef: 'KUEPER:YIN-HUA',
+      summary: 'The bronze key is a fictional artifact within the Adar-collection narrative.',
+    },
+    {
+      id: 'yinhua:fiction:nameless-score',
+      layer: 'fiction-canon',
+      subjectId: 'fiction:YIN-HUA:nameless-score',
+      sourceRef: 'KUEPER:YIN-HUA',
+      summary: 'Die Namenlose Partitur is a fictional musical/documentary object in YIN HUA canon.',
+    },
+    {
+      id: 'yinhua:fiction:archaeoacoustics',
+      layer: 'interpretation',
+      subjectId: 'fiction:YIN-HUA:nameless-score',
+      sourceRef: 'KUEPER:YIN-HUA',
+      summary: 'Archaeoacoustic conclusions inside the novel are character/research interpretations unless independently backed by real-world evidence.',
+      confidence: 'provisional',
+    },
+  ],
+  edges: [
+    { from: 'yinhua:fiction:adar-collection', to: 'senckenberg:site', relation: 'fictionalizes' },
+    { from: 'yinhua:fiction:bronze-key', to: 'yinhua:fiction:adar-collection', relation: 'held-by' },
+    { from: 'yinhua:fiction:nameless-score', to: 'yinhua:fiction:adar-collection', relation: 'held-by' },
+    { from: 'yinhua:fiction:archaeoacoustics', to: 'yinhua:fiction:nameless-score', relation: 'interprets' },
   ],
 }
