@@ -21,7 +21,7 @@ const MISSIONS: Mission[] = [
     steps:[
       {id:'phobos_reached',title:'Phobos erreichen',description:'Bringen Sie Ihr aktives Schiff nach Phobos und übernehmen Sie Base Alpha.',action:'travel'},
       {id:'phobos_supply',title:'Tether-Versorgung fahren',description:'Führen Sie den Versorgungstransport vom Stickney Anchor Field zum Base-Alpha-Depot durch.',action:'grid'},
-      {id:'phobos_prospect',title:'Stickney prospektieren',description:'Erfassen Sie mindestens ein modelliertes Vorkommen.',action:'grid'},
+      {id:'phobos_prospect',title:'Stickney prospektieren',description:'Führen Sie einen lokalen Prospektionsscan durch. Entdeckte Ziele gehen in den gemeinsamen Weltzustand ein; Ihre Teilnahme wird separat protokolliert.',action:'grid'},
       {id:'phobos_sample_return',title:'Referenzprobe zurückbringen',description:'Entnehmen Sie eine Referenzprobe und bringen Sie sie mit Tether Rover 01 zum Base-Alpha-Depot.',action:'grid'},
       {id:'phobos_sample_analysis',title:'Referenzprobe auswerten',description:'Analysieren Sie die zurückgebrachte Probe und erhalten Sie gegebenenfalls eine wissenschaftliche Bohrfreigabe.',action:'grid'},
       {id:'phobos_drill_deploy',title:'Bohrgerät ausrücken',description:'Bringen Sie Bohrgerät und Verbrauchsmaterial zu einem wissenschaftlich freigegebenen Prospektionsziel.',action:'grid'},
@@ -48,7 +48,7 @@ export async function GET(req:NextRequest){
  const {data:cargoRows}=activeShip?.id?await s.from('ship_cargo').select('amount').eq('ship_id',activeShip.id):{data:[]};const cargoUsed=(cargoRows??[]).reduce((sum:number,row:any)=>sum+Number(row.amount??0),0),phobosId=phobosLocationR.data?.id??null
  const [jobsR,scansR,referenceR,coreR,pilotR]=await Promise.all([
   phobosId?s.from('transport_jobs').select('id,domain,status,vehicle_role,resource,route_snapshot').eq('actor_profile_id',user.id).eq('location_id',phobosId).limit(150):Promise.resolve({data:[] as any[]}),
-  s.from('region_resources').select('id').contains('properties',{body:'phobos',discovered_by:user.id}).not('discovered_at','is',null).limit(20),
+  phobosId?s.from('events').select('id').eq('profile_id',user.id).eq('location_id',phobosId).eq('type','phobos_prospect_scan').limit(20):Promise.resolve({data:[] as any[]}),
   s.from('research_samples').select('id,status,analyzed_at').eq('owner_profile_id',user.id).neq('sample_kind','drill_core').limit(20),
   s.from('research_samples').select('id,status,analyzed_at').eq('owner_profile_id',user.id).eq('sample_kind','drill_core').limit(20),
   phobosId?s.from('pilot_extraction_jobs').select('id,status,result').eq('profile_id',user.id).eq('location_id',phobosId).limit(20):Promise.resolve({data:[] as any[]}),
