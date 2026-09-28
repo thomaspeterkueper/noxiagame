@@ -15,11 +15,23 @@ for (const region of EARTH_MICROREGIONS) {
   }
 }
 
+const frankfurt = getEarthMicroregion('earth-microregion-frankfurt-book-world')
+assert.ok(frankfurt)
+assert.equal(frankfurt.anchorLandmarkId, 'earth-de-frankfurt-senckenberg')
+assert.deepEqual(frankfurt.nodes.map(node => node.id), ['frankfurt-hbf', 'senckenberg', 'camaleo-artlounge'])
+
+const malta = getEarthMicroregion('earth-microregion-malta-hypogeum')
+assert.ok(malta)
+assert.equal(malta.anchorLandmarkId, 'earth-mt-hal-saflieni')
+assert.deepEqual(malta.nodes.map(node => node.id), ['paola', 'hal-saflieni', 'national-museum-archaeology'])
+
 const jura = getEarthMicroregion('earth-microregion-vuiteboeuf-sainte-croix')
 assert.ok(jura)
 assert.equal(jura.anchorLandmarkId, 'earth-ch-vuiteboeuf')
 assert.deepEqual(jura.nodes.map(node => node.id), ['vuiteboeuf', 'covatannaz', 'sainte-croix'])
 assert.equal(getEarthMicroregionByLandmark('earth-ch-vuiteboeuf')?.id, jura.id)
+assert.equal(getEarthMicroregionByLandmark('earth-de-frankfurt-senckenberg')?.id, frankfurt.id)
+assert.equal(getEarthMicroregionByLandmark('earth-mt-hal-saflieni')?.id, malta.id)
 assert.equal(getEarthMicroregion('does-not-exist'), undefined)
 
 console.log('earth microregion tests passed')
