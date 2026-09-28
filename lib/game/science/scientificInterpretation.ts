@@ -22,6 +22,8 @@ const METAL_TYPES = new Set(['metal','iron_ore','copper_ore','nickel','cobalt','
 const WATER_TYPES = new Set(['water','groundwater','ice'])
 
 export function observablesForResource(resourceType: string): ProspectingObservable[] {
+  if (METAL_TYPES.has(resourceType)) return ['density_contrast', 'magnetic_field_anomaly']
+  if (WATER_TYPES.has(resourceType)) return ['spectral_reflectance', 'subsurface_structure']
   const method = resourceMethod(resourceType)
   if (method === 'density') return ['density_contrast', 'magnetic_field_anomaly']
   if (method === 'spectral') return ['spectral_reflectance']
