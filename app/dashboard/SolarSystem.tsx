@@ -1,19 +1,19 @@
 'use client'
 
 // SolarSystem.tsx
-// Aktualisiert: 27.09.2026 — Deimos als spielbarer Marsmond ergänzt
-// Version:      0.2.2
+// Aktualisiert: 28.09.2026 — Navigationsraum kann Flüge tatsächlich starten
+// Version:      0.3.0
 // app/dashboard/SolarSystem.tsx
 //
-// Sonnensystem-Screen — reiner Konsument der Orbital-Engine (lib/game/orbits).
+// Sonnensystem-Screen — Konsument der Orbital-Engine (lib/game/orbits).
 // Zeichnet Sonne, Orbit-Ringe und aktuelle Positionen aller Orte.
 // Erreichbarkeits-Check basiert auf currentLocation des Spielers.
-//
-// Orte: Erde, Mond (klebt an Erde), Kepler Station (L5, 60° hinter Erde),
-//        Mars, Phobos und Deimos (schematisch herausgezogen).
+// Zusätzlich bietet der Screen jetzt echte, serverautoritative Reiseziele an.
 
 import { useState, type CSSProperties } from 'react'
 import { position, ORBITS, orbitalBaseSeconds } from '@/lib/game/orbits'
+import { flightEnergyCost } from '@/lib/game/ships'
+import { useGameStore, type LocationSlug } from '@/lib/store/gameStore'
 import { T } from './ui'
 
 const CX = 340, CY = 240, TAU = Math.PI * 2
@@ -76,6 +76,14 @@ interface Props {
   currentLocation?: string
 }
 
+const DESTINATIONS: Array<{ slug: LocationSlug; label: string; icon: string }> = [
+  { slug: 'earth', label: 'Erde', icon: '🌍' },
+  { slug: 'moon', label: 'Mond', icon: '🌙' },
+  { slug: 'mars', label: 'Mars', icon: '🔴' },
+  { slug: 'phobos', label: 'Phobos', icon: '◻' },
+  { slug: 'deimos', label: 'Deimos', icon: '◽' },
+]
+
 export default function SolarSystem({
   currentTick = 0,
   shipRange = 250,
@@ -83,6 +91,10 @@ export default function SolarSystem({
 }: Props) {
   const [explore, setExplore] = useState(false)
   const [scrubTick, setScrubTick] = useState(currentTick)
+  const [launching, setLaunching] = useState<LocationSlug | null>(null)
+  const travel = useGameStore(s => s.travel)
+  const inTransit = useGameStore(s => s.inTransit)
+  const cargoEnergy = useGameStore(s => s.cargo.energy)
   const tick = explore ? scrubTick : currentTick
 
   const ea = disp('earth', tick)
@@ -101,6 +113,7 @@ export default function SolarSystem({
   const t_ma_de = orbitalBaseSeconds('mars', 'deimos', tick)
 
   const reachable = (to: string) => {
+    if (!ORBITS[currentLocation] || !ORBITS[to]) return false
     const secs = orbitalBaseSeconds(currentLocation, to, tick)
     return secs <= shipRange
   }
@@ -111,6 +124,19 @@ export default function SolarSystem({
   void moonOpen
   void keplerOpen
 
+  async function startTravel(dest: LocationSlug) {
+    if (inTransit || launching || dest === currentLocation || !reachable(dest)) return
+    setLaunching(dest)
+    await travel(dest, tick)
+    setLaunching(null)
+
+    // Der Navigationsraum lebt als lokales Dashboard-Overlay. Nach erfolgreichem
+    // Start laden wir den serverautoritativen Transit-State neu; dadurch wird das
+    // Overlay geschlossen und TransitPanel sofort sichtbar. Fehler bleiben im
+    // travel()-Pfad und lassen den Navigationsraum offen.
+    if (useGameStore.getState().inTransit) window.location.assign('/dashboard')
+  }
+
   const btn: CSSProperties = {
     padding: '0.45rem 0.85rem', border: `1px solid ${T.gold}`, background: 'none',
     color: T.blue, borderRadius: T.radius, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
@@ -119,12 +145,14 @@ export default function SolarSystem({
   const R_EARTH_MOON = 45 * S
   const R_MARS = 150 * S
 
+  const destinations = DESTINATIONS.filter(d => d.slug !== currentLocation)
+
   return (
     <div style={{ maxWidth: 680, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.75rem', gap: '1rem' }}>
         <div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: T.blue }}>Sonnensystem</div>
-          <div style={{ fontSize: '0.8rem', color: T.inkFaint }}>Reisezeiten folgen der Himmelsgeometrie — frisch aus dem Tick berechnet.</div>
+          <div style={{ fontSize: '0.8rem', color: T.inkFaint }}>Reisezeiten folgen der Himmelsgeometrie — Ziele können direkt gestartet werden.</div>
         </div>
         <button onClick={() => { if (!explore) setScrubTick(currentTick); setExplore(!explore) }} style={btn}>
           {explore ? 'Zurück zu jetzt' : 'Zeit erkunden'}
@@ -157,7 +185,7 @@ export default function SolarSystem({
                 stroke={lineColor} strokeWidth={1.5}
                 strokeDasharray={marsOpen ? 'none' : '4 4'} opacity={0.7} />
               <text x={midX} y={midY} fill={marsOpen ? SCENE.openTxt : SCENE.blkTxt}
-                fontSize={11} textAnchor="middle">{orbitalBaseSeconds(currentLocation, 'mars', tick)}s</text>
+                fontSize={11} textAnchor="middle">{ORBITS[currentLocation] ? orbitalBaseSeconds(currentLocation, 'mars', tick) : '–'}s</text>
             </>
           })()}
 
@@ -209,7 +237,54 @@ export default function SolarSystem({
         <RouteCard label="Mars ↔ Deimos" seconds={t_ma_de} />
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: 600, color: marsOpen ? T.green : T.red }}>
+      <div style={{ marginTop: '0.9rem', paddingTop: '0.85rem', borderTop: `1px solid ${T.line}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue }}>Reiseziel wählen</div>
+            <div style={{ fontSize: 11, color: T.inkFaint }}>Energie an Bord: {cargoEnergy} t · Reichweite: {shipRange}</div>
+          </div>
+          {inTransit && <div style={{ fontSize: 11, color: T.gold }}>Transit läuft</div>}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+          {destinations.map(dest => {
+            const canReach = reachable(dest.slug)
+            const seconds = ORBITS[currentLocation] && ORBITS[dest.slug]
+              ? orbitalBaseSeconds(currentLocation, dest.slug, tick)
+              : null
+            const energy = flightEnergyCost(currentLocation, dest.slug)
+            const hasEnergy = cargoEnergy >= energy
+            const disabled = inTransit || !!launching || !canReach || !hasEnergy
+            return (
+              <button
+                key={dest.slug}
+                onClick={() => void startTravel(dest.slug)}
+                disabled={disabled}
+                title={!canReach ? 'Außer Reichweite' : !hasEnergy ? `Benötigt ${energy} t Energie` : `Flug nach ${dest.label}`}
+                style={{
+                  border: `1px solid ${disabled ? T.line : T.gold}`,
+                  background: disabled ? T.bg : T.surface,
+                  color: disabled ? T.inkFaint : T.blue,
+                  borderRadius: T.radius,
+                  padding: '0.7rem 0.8rem',
+                  textAlign: 'left',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.65 : 1,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{dest.icon} {dest.label}</div>
+                <div style={{ fontSize: 10, marginTop: 3, fontFamily: MONO }}>
+                  {launching === dest.slug ? 'Start wird freigegeben …' : `${seconds ?? '–'}s · ${energy}t Energie`}
+                </div>
+                {!canReach && <div style={{ fontSize: 10, color: T.red, marginTop: 2 }}>außer Reichweite</div>}
+                {canReach && !hasEnergy && <div style={{ fontSize: 10, color: T.red, marginTop: 2 }}>Energie fehlt</div>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginTop: '0.75rem', fontSize: 14, fontWeight: 600, color: marsOpen ? T.green : T.red }}>
         {marsOpen
           ? 'Mars erreichbar — Startfenster offen'
           : 'Mars außer Reichweite — Startfenster zu'}
