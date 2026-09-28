@@ -129,3 +129,16 @@ Neue Anker:
 - Cádiz — westlicher Hafen- und Übergangsknoten Mittelmeer/Atlantik
 
 Alexandria und Malta waren bereits im Registry-Bestand und werden in denselben Korridor eingebunden.
+
+
+## Weitere Romanwelt-Anker
+
+Die nächste Landmark-Welle erweitert den Earth-Registry um mehrere bereits kanonisch belegte Romanräume:
+
+- **Seoul** — Herkunftsanker für Hana in *NALGAE – Zwischen den Welten*
+- **Frankfurt-Sachsenhausen** — WG-/Alltagsraum von Hana
+- **Städel Museum** — realer Kulturanker des Städel-/Margarethe-Strangs
+- **Hamburg-Altona** — WG-/Lebensraum für *TRAILERS* und erster Hamburger Stadtanker für *OTJIZE*
+- **Menden / Hexenteich** — Ortsanker für *Die Kette vom Hexenteich*
+
+Beim Hexenteich bleibt der Locator absichtlich auf Menden-Ebene, bis eine belastbare kanonische Georeferenz vorliegt. Die Registry darf aus einem literarischen Ortsnamen keine vermeintlich reale Straßen- oder Gewässeradresse ableiten.
