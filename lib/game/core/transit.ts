@@ -2,8 +2,8 @@ import 'server-only'
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { DOCKING_IDLE_EXPIRE_HOURS } from '@/lib/game/config'
-import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
-import { distance, ORBITS } from '@/lib/game/orbits'
+import { ORBITS } from '@/lib/game/orbits'
+import { transferQuote } from '@/lib/game/transfer'
 import {
   completeTransitCommand,
   startTransitCommand,
@@ -114,25 +114,29 @@ export async function startPlayerTransit(profileId: string, destination: string)
     throw new Error(`NOXIA_TRANSIT_SPEED_INVALID:${speedMult}`)
   }
 
-  const routeDistance = distance(ship.location, destination, tick)
-  const rangeDistance = Number((shipType as any)?.range_distance ?? Number.POSITIVE_INFINITY)
-  if (Number.isFinite(rangeDistance) && routeDistance > rangeDistance) {
-    throw new Error(`NOXIA_TRANSIT_OUT_OF_RANGE:${routeDistance}:${rangeDistance}`)
-  }
-
-  const baseDuration = baseTravelSeconds(ship.location as any, destination as any, tick)
-  if (baseDuration == null) {
+  // Knowledge/learning integration seam: the transfer model already accepts a
+  // 0..1 navigation proficiency. Until the player knowledge layer exposes a
+  // canonical value, server execution stays at zero rather than trusting a
+  // client-supplied discount.
+  const navigationProficiency = 0
+  const quote = transferQuote(ship.location, destination, tick, {
+    speedMult,
+    navigationProficiency,
+  })
+  if (!quote) {
     throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${ship.location}:${destination}`)
   }
 
-  const durationSeconds = Math.max(1, Math.round(baseDuration / speedMult))
-  const energyNeeded = flightEnergyCost(ship.location, destination)
+  const rangeDistance = Number((shipType as any)?.range_distance ?? Number.POSITIVE_INFINITY)
+  if (Number.isFinite(rangeDistance) && quote.distance > rangeDistance) {
+    throw new Error(`NOXIA_TRANSIT_OUT_OF_RANGE:${quote.distance}:${rangeDistance}`)
+  }
 
   return startTransitCommand({
     profileId,
     destination,
-    durationSeconds,
-    energyNeeded,
+    durationSeconds: quote.durationSeconds,
+    energyNeeded: quote.energy,
     dockingIdleHours: DOCKING_IDLE_EXPIRE_HOURS,
   })
 }
