@@ -106,6 +106,43 @@ export const EARTH_MICROREGIONS: readonly EarthMicroregion[] = [
     ],
   },
   {
+    id: 'earth-microregion-crete-phaistos',
+    name: 'Kreta · Heraklion / Phaistos',
+    anchorLandmarkId: 'earth-gr-phaistos',
+    sourceProjects: ['MISHKENAZ', 'KUEPER-Werkverbund', 'NOXIA'],
+    nodes: [
+      {
+        id: 'heraklion',
+        name: 'Heraklion',
+        kind: 'arrival',
+        locality: 'Heraklion, Crete',
+        locator: 'Heraklion, Crete, Greece',
+        role: 'Primärer Arrival Node der Mikroregion und urbaner Übergang zur Messara-/Phaistos-Landschaft.',
+      },
+      {
+        id: 'heraklion-archaeological-museum',
+        name: 'Heraklion Archaeological Museum',
+        kind: 'research',
+        locality: 'Heraklion, Crete',
+        locator: 'Xanthoudidou & Hatzidaki 1, 712 02 Heraklion, Crete, Greece',
+        role: 'Sammlungs-, Provenienz- und Forschungsknoten; reale museale Überlieferung der Phaistos-Scheibe bleibt von MISHKENAZ-Deutungen getrennt.',
+      },
+      {
+        id: 'phaistos',
+        name: 'Phaistos',
+        kind: 'research',
+        locality: 'Heraklion regional unit, Crete',
+        locator: 'Archaeological Site of Phaistos, Crete, Greece',
+        role: 'Archäologischer Fund-/Landschaftsknoten und zentraler MISHKENAZ-Anker der Mikroregion.',
+      },
+    ],
+    links: [
+      { from: 'heraklion', to: 'heraklion-archaeological-museum', relation: 'road', note: 'Lokale Stadtbeziehung; operative Route bleibt Earth/World-owned.' },
+      { from: 'heraklion', to: 'phaistos', relation: 'road', note: 'Regionale Arrival-Beziehung Richtung Phaistos; keine Fahrzeit wird hier kanonisiert.' },
+      { from: 'phaistos', to: 'heraklion-archaeological-museum', relation: 'road', note: 'Zusätzlich semantische Fundort–Sammlung-/Provenienzbeziehung; nicht als reine Verkehrsrelation zu lesen.' },
+    ],
+  },
+  {
     id: 'earth-microregion-vuiteboeuf-sainte-croix',
     name: 'Vuiteboeuf · Covatannaz · Sainte-Croix',
     anchorLandmarkId: 'earth-ch-vuiteboeuf',
