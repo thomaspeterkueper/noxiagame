@@ -1,0 +1,48 @@
+name: tmp-phobos-robot-controls
+on:
+  push:
+    branches: [feat/phobos-robot-controls]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/phobos-robot-controls
+      - name: Patch selection wiring
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('app/components/PlanetarySurfaceMap.tsx')
+          s = p.read_text()
+          s = s.replace("  mobileObjects?: MobileSurfaceObject[]\n  onOpenWorldObject?: (entity: PlanetarySurfaceEntity) => void\n", "  mobileObjects?: MobileSurfaceObject[]\n  onOpenMobileObject?: (object: MobileSurfaceObject) => void\n  onOpenWorldObject?: (entity: PlanetarySurfaceEntity) => void\n")
+          s = s.replace("export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terrainLabel, minimumWorldSpanM = 600, corridors = [], mobileObjects = [], onOpenWorldObject }: Props)", "export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terrainLabel, minimumWorldSpanM = 600, corridors = [], mobileObjects = [], onOpenMobileObject, onOpenWorldObject }: Props)")
+          old = "{layers.logistics && mobileObjects.map(object => { const p=project({xM:object.xM,yM:object.yM}), accent=object.accent??'#72c8d5', role=(object.role??'R').slice(0,1).toUpperCase(); return <g key={`mobile-${object.id}`} transform={`translate(${p.x} ${p.y})`} pointerEvents=\"none\"><circle"
+          new = "{layers.logistics && mobileObjects.map(object => { const p=project({xM:object.xM,yM:object.yM}), accent=object.accent??'#72c8d5', role=(object.role??'R').slice(0,1).toUpperCase(); return <g key={`mobile-${object.id}`} role=\"button\" aria-label={`${object.label} öffnen`} transform={`translate(${p.x} ${p.y})`} onPointerDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();onOpenMobileObject?.(object)}} style={{cursor:onOpenMobileObject?'pointer':'default'}}><circle"
+          if old not in s:
+              raise SystemExit('mobile marker pattern not found')
+          s = s.replace(old, new)
+          p.write_text(s)
+
+          p = Path('app/dashboard/DashboardPhobosSurface.tsx')
+          s = p.read_text()
+          anchor = "  const [fleetRobots,setFleetRobots]=useState<any[]>([]),[fleetJobs,setFleetJobs]=useState<any[]>([]),[fleetNow,setFleetNow]=useState(()=>Date.now())\n"
+          if anchor not in s:
+              raise SystemExit('fleet state anchor not found')
+          s = s.replace(anchor, anchor + "  const [selectedRobotId,setSelectedRobotId]=useState<string|null>(null)\n")
+          s = s.replace("    <PhobosRobotFleetPanel />", "    <PhobosRobotFleetPanel selectedRobotId={selectedRobotId} onSelectedRobotChange={setSelectedRobotId}/>")
+          s = s.replace("      mobileObjects={robotMapObjects}\n      onOpenWorldObject={openWorldObject}", "      mobileObjects={robotMapObjects}\n      onOpenMobileObject={object=>setSelectedRobotId(object.id)}\n      onOpenWorldObject={openWorldObject}")
+          p.write_text(s)
+
+          Path('.github/workflows/tmp-phobos-robot-controls.yml').unlink()
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(phobos): connect robot markers to detail controls"
+          git push origin HEAD:feat/phobos-robot-controls
