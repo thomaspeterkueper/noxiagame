@@ -68,3 +68,19 @@ Weitere reale Orte aus Romanen und Weltbauprojekten werden nicht automatisch kan
 - Ist der Ort präzise genug lokalisierbar, ohne spekulative Koordinaten zu erfinden?
 
 Damit kann die Registry schrittweise wachsen, ohne die Earth-Oberfläche mit bedeutungslosen Markern zu überladen.
+
+
+## Mikroregionen
+
+Landmarks bleiben die stabilen kanonischen Weltanker. Für Orte, die mehr als einen Marker benötigen, gibt es ergänzend kleine `EarthMicroregion`-Slices in `lib/world/spatial/earthMicroregions.ts`.
+
+Eine Mikroregion ist ausdrücklich **keine vollständige Stadt- oder Regionssimulation**. Sie enthält nur wenige für Gameplay, Atmosphäre und Werkbezug relevante Nodes sowie ihre semantischen Verbindungen. Routing-Geometrie, Reisezeit und operative Mobilität bleiben bei den bestehenden Earth-/World-Systemen.
+
+Erste Referenz ist **Vuiteboeuf · Covatannaz · Sainte-Croix**:
+
+- Vuiteboeuf — Talort und Arrival Node
+- Covatannaz — Landschafts-/Passage-Knoten
+- Sainte-Croix — Hochort
+- Vuiteboeuf ↔ Sainte-Croix — zusätzlich als Verkehrsrelation modellierbar, ohne hier Fahrplan oder Fahrzeit zu erfinden
+
+Dieses Muster soll als nächstes für Frankfurt und Malta wiederverwendet werden.
