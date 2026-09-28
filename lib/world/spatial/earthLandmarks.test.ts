@@ -38,6 +38,11 @@ assert.deepEqual(
     'earth-de-frankfurt-senckenberg',
     'earth-de-north-sea-book-village',
     'earth-eg-alexandria',
+    'earth-eg-cairo',
+    'earth-tn-carthage-tunis',
+    'earth-ly-cyrene',
+    'earth-it-pantelleria',
+    'earth-es-cadiz',
     'earth-gr-phaistos',
     'earth-in-dwarka',
     'earth-mt-hal-saflieni',
@@ -50,6 +55,11 @@ assert.ok(getEarthLandmarksByTag('spaceflight').length >= 3)
 assert.ok(getEarthLandmarksByTag('culture').some(landmark => landmark.id === 'earth-de-frankfurt-camaleo-artlounge'))
 assert.equal(getEarthLandmark('earth-de-frankfurt-senckenberg')?.locality, 'Frankfurt am Main')
 assert.equal(getEarthLandmark('earth-pe-chavin-de-huantar')?.countryCode, 'PE')
+assert.equal(getEarthLandmark('earth-eg-cairo')?.countryCode, 'EG')
+assert.equal(getEarthLandmark('earth-tn-carthage-tunis')?.countryCode, 'TN')
+assert.equal(getEarthLandmark('earth-ly-cyrene')?.countryCode, 'LY')
+assert.equal(getEarthLandmark('earth-it-pantelleria')?.countryCode, 'IT')
+assert.equal(getEarthLandmark('earth-es-cadiz')?.countryCode, 'ES')
 assert.ok(getEarthLandmark('earth-mt-hal-saflieni')?.tags.includes('archaeology'))
 assert.ok(getEarthLandmarksByTag('real-science').some(landmark => landmark.id === 'earth-de-darmstadt-esoc'))
 assert.equal(getEarthLandmark('does-not-exist'), undefined)
