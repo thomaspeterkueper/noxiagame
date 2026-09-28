@@ -39,6 +39,11 @@ assert.deepEqual(
     'earth-de-north-sea-book-village',
     'earth-eg-alexandria',
     'earth-eg-cairo',
+    'earth-kr-seoul',
+    'earth-de-frankfurt-sachsenhausen',
+    'earth-de-frankfurt-staedel',
+    'earth-de-hamburg-altona',
+    'earth-de-menden-hexenteich',
     'earth-tn-carthage-tunis',
     'earth-ly-cyrene',
     'earth-it-pantelleria',
@@ -56,6 +61,10 @@ assert.ok(getEarthLandmarksByTag('culture').some(landmark => landmark.id === 'ea
 assert.equal(getEarthLandmark('earth-de-frankfurt-senckenberg')?.locality, 'Frankfurt am Main')
 assert.equal(getEarthLandmark('earth-pe-chavin-de-huantar')?.countryCode, 'PE')
 assert.equal(getEarthLandmark('earth-eg-cairo')?.countryCode, 'EG')
+assert.equal(getEarthLandmark('earth-kr-seoul')?.countryCode, 'KR')
+assert.equal(getEarthLandmark('earth-de-frankfurt-staedel')?.locality, 'Frankfurt am Main')
+assert.equal(getEarthLandmark('earth-de-hamburg-altona')?.locality, 'Hamburg')
+assert.equal(getEarthLandmark('earth-de-menden-hexenteich')?.locator.value, 'Menden (Sauerland), Germany')
 assert.equal(getEarthLandmark('earth-tn-carthage-tunis')?.countryCode, 'TN')
 assert.equal(getEarthLandmark('earth-ly-cyrene')?.countryCode, 'LY')
 assert.equal(getEarthLandmark('earth-it-pantelleria')?.countryCode, 'IT')
