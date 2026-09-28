@@ -83,4 +83,9 @@ Erste Referenz ist **Vuiteboeuf · Covatannaz · Sainte-Croix**:
 - Sainte-Croix — Hochort
 - Vuiteboeuf ↔ Sainte-Croix — zusätzlich als Verkehrsrelation modellierbar, ohne hier Fahrplan oder Fahrzeit zu erfinden
 
-Dieses Muster soll als nächstes für Frankfurt und Malta wiederverwendet werden.
+Das Muster wird inzwischen auch für Frankfurt und Malta verwendet:
+
+- **Frankfurt · Buchwelt** — Frankfurt Hbf als neutraler Arrival Node, Senckenberg als Forschungs-/Archivknoten und Camaleo Artlounge als Kulturknoten. Camaleo bleibt bis zur kanonischen Adressauflösung auf Stadtebene.
+- **Malta · Paola / Valletta** — Paola als lokaler Arrival Node, Ħal Saflieni als Archäologie-/Konservierungsknoten und das National Museum of Archaeology in Valletta als Sammlungs-/Provenienzknoten.
+
+Damit wird ein Book-World-Ort nicht durch möglichst viele POIs definiert, sondern durch wenige funktional und narrativ unterschiedliche Knoten.
