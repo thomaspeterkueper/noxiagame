@@ -35,6 +35,11 @@ assert.deepEqual(
   [
     'earth-ch-vuiteboeuf',
     'earth-kr-seoul',
+    'earth-it-palermo',
+    'earth-cy-cyprus',
+    'earth-gr-rhodes',
+    'earth-ly-tripolitania',
+    'earth-de-frankfurt-schwanheimer-duene',
     'earth-de-frankfurt-sachsenhausen',
     'earth-de-frankfurt-staedel',
     'earth-de-hamburg-altona',
@@ -67,6 +72,11 @@ assert.equal(getEarthLandmark('earth-de-frankfurt-senckenberg')?.locality, 'Fran
 assert.equal(getEarthLandmark('earth-pe-chavin-de-huantar')?.countryCode, 'PE')
 assert.equal(getEarthLandmark('earth-eg-cairo')?.countryCode, 'EG')
 assert.equal(getEarthLandmark('earth-kr-seoul')?.countryCode, 'KR')
+assert.equal(getEarthLandmark('earth-it-palermo')?.countryCode, 'IT')
+assert.equal(getEarthLandmark('earth-cy-cyprus')?.countryCode, 'CY')
+assert.equal(getEarthLandmark('earth-gr-rhodes')?.countryCode, 'GR')
+assert.equal(getEarthLandmark('earth-ly-tripolitania')?.countryCode, 'LY')
+assert.equal(getEarthLandmark('earth-de-frankfurt-schwanheimer-duene')?.locality, 'Frankfurt am Main')
 assert.equal(getEarthLandmark('earth-de-frankfurt-staedel')?.locator.value, 'Schaumainkai 63, 60596 Frankfurt am Main, Germany')
 assert.equal(getEarthLandmark('earth-de-menden-hexenteich')?.locality, 'Menden (Sauerland)')
 assert.equal(getEarthLandmark('earth-kr-seoul')?.countryCode, 'KR')
