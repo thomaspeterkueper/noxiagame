@@ -19,6 +19,7 @@ import SurfaceLogisticsOverlay from './SurfaceLogisticsOverlay'
 import WarehouseOverlay from './WarehouseOverlay'
 
 type Props = { locations: any[]; prices: any[]; orders: any[] }
+type ProspectMarker = { id:string; resourceType:string; xM:number; yM:number; tier:string|null; confidence:string|null; provenance?:string|null; discoveredAt?:string|null }
 const INTERIOR_ALIAS: Record<string, string> = { landing_pad_phobos: 'landing_pad', surface_workshop: 'shipyard', surface_comms: 'command_center' }
 
 // Anchor/tether corridors -- Phobos has no driven roads in this micro-gravity
@@ -44,23 +45,26 @@ const PHOBOS_CORRIDORS: PreparedCorridor[] = (() => {
 export default function DashboardPhobosSurface({ locations, prices, orders }: Props) {
   const location=useGameStore(s=>s.location),credits=useGameStore(s=>s.credits),cargo=useGameStore(s=>s.cargo),cargoMax=useGameStore(s=>s.cargoMax),shipTypeId=useGameStore(s=>s.shipTypeId),shipRange=useGameStore(s=>s.shipRange),buy=useGameStore(s=>s.buy),sell=useGameStore(s=>s.sell),loadFromServer=useGameStore(s=>s.loadFromServer)
   const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null),[dockEntity,setDockEntity]=useState<PlanetarySurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
-  const [fleetRobots,setFleetRobots]=useState<any[]>([]),[fleetJobs,setFleetJobs]=useState<any[]>([]),[fleetNow,setFleetNow]=useState(()=>Date.now())
+  const [fleetRobots,setFleetRobots]=useState<any[]>([]),[fleetJobs,setFleetJobs]=useState<any[]>([]),[fleetProspects,setFleetProspects]=useState<ProspectMarker[]>([]),[fleetNow,setFleetNow]=useState(()=>Date.now())
   const [selectedRobotId,setSelectedRobotId]=useState<string|null>(null)
   const phobosLocation=useMemo(()=>locations.find((item:any)=>item.slug==='phobos')??null,[locations]),phobosOrders=useMemo(()=>orders.filter((item:any)=>item.locations?.slug==='phobos'),[orders])
   useEffect(()=>{if(location!=='phobos')return;let cancelled=false;fetch('/api/game/world',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(!cancelled)setTick(Number(p?.stats?.tickNumber??0))}).catch(()=>{});return()=>{cancelled=true}},[location])
   useEffect(()=>{if(location!=='phobos')return;let cancelled=false;(async()=>{try{const token=await getToken();if(!token||cancelled)return;await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({location:'phobos'})})}catch{}})();return()=>{cancelled=true}},[location])
-  useEffect(()=>{if(location!=='phobos')return;let cancelled=false;const loadFleet=async()=>{try{const token=await getToken();if(!token||cancelled)return;const response=await fetch('/api/game/phobos/pilot-extraction',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});const payload=await response.json();if(!cancelled&&response.ok){setFleetRobots(Array.isArray(payload.robots)?payload.robots:[]);setFleetJobs(Array.isArray(payload.jobs)?payload.jobs:[])}}catch{}};void loadFleet();const timer=window.setInterval(()=>void loadFleet(),15000);return()=>{cancelled=true;window.clearInterval(timer)}},[location])
+  useEffect(()=>{if(location!=='phobos')return;let cancelled=false;const loadFleet=async()=>{try{const token=await getToken();if(!token||cancelled)return;const headers={Authorization:`Bearer ${token}`};const [fleetResponse,prospectResponse]=await Promise.all([fetch('/api/game/phobos/pilot-extraction',{headers,cache:'no-store'}),fetch('/api/game/phobos/prospect',{headers,cache:'no-store'})]);const [fleetPayload,prospectPayload]=await Promise.all([fleetResponse.json(),prospectResponse.json()]);if(cancelled)return;if(fleetResponse.ok){setFleetRobots(Array.isArray(fleetPayload.robots)?fleetPayload.robots:[]);setFleetJobs(Array.isArray(fleetPayload.jobs)?fleetPayload.jobs:[])}if(prospectResponse.ok)setFleetProspects(Array.isArray(prospectPayload.discoveries)?prospectPayload.discoveries:[])}catch{}};void loadFleet();const timer=window.setInterval(()=>void loadFleet(),15000);return()=>{cancelled=true;window.clearInterval(timer)}},[location])
   useEffect(()=>{if(location!=='phobos')return;const timer=window.setInterval(()=>setFleetNow(Date.now()),1000);return()=>window.clearInterval(timer)},[location])
   const robotMapObjects=useMemo<MobileSurfaceObject[]>(()=>deriveStickneyFleetMapMarkers(fleetRobots,fleetJobs,fleetNow),[fleetRobots,fleetJobs,fleetNow])
+  const prospectMapObjects=useMemo<MobileSurfaceObject[]>(()=>fleetProspects.filter(item=>item.discoveredAt&&Number.isFinite(Number(item.xM))&&Number.isFinite(Number(item.yM))).map(item=>({id:`prospect:${item.id}`,label:`Prospekt ${String(item.resourceType).replaceAll('_',' ')}`,role:'prospect',status:item.provenance??'derived-gameplay-model',phase:`${item.tier??'unbekannt'} · Vertrauen ${item.confidence??'n/a'}`,xM:Number(item.xM),yM:Number(item.yM),accent:'#d7b55d'})),[fleetProspects])
+  const surfaceMapObjects=useMemo<MobileSurfaceObject[]>(()=>[...robotMapObjects,...prospectMapObjects],[robotMapObjects,prospectMapObjects])
   if(location!=='phobos')return null
 
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_phobos'){setDockEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
+  const openSurfaceObject=(object:MobileSurfaceObject)=>{if(object.id.startsWith('prospect:')){setLogisticsOpen(true);return}setSelectedRobotId(object.id)}
   const handleInteriorAction=(kind:'market'|'shipyard'|'navigation'|'ship'|'parts'|null)=>{if(kind==='market')setWarehouseOpen(true);if(kind==='shipyard'||kind==='parts'||kind==='ship')setShipyardOpen(true);if(kind==='navigation')setNavigationOpen(true);if(kind)setInteriorEntity(null)}
   const currentResources=phobosLocation?.location_resources??[],dockName=dockEntity?.name??dockEntity?.entity_id??'Andock- und Cargo-Zone'
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Anlage'
 
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
-    <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>rekonstruiertes lokales Terrain · gemeinsamer Planetary-Surface-Renderer</span></div>
+    <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>rekonstruiertes lokales Terrain · gemeinsame Funde · {fleetProspects.length} bekannte Prospekte</span></div>
     <PhobosRobotFleetPanel selectedRobotId={selectedRobotId} onSelectedRobotChange={setSelectedRobotId}/>
     <PlanetarySurfaceMap
       locationSlug="phobos"
@@ -69,8 +73,8 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
       terrainLabel="MEX / HRSC DEM"
       minimumWorldSpanM={400}
       corridors={PHOBOS_CORRIDORS}
-      mobileObjects={robotMapObjects}
-      onOpenMobileObject={object=>setSelectedRobotId(object.id)}
+      mobileObjects={surfaceMapObjects}
+      onOpenMobileObject={openSurfaceObject}
       onOpenWorldObject={openWorldObject}
     />
 
