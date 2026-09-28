@@ -177,6 +177,42 @@ export const EARTH_MICROREGIONS: readonly EarthMicroregion[] = [
     ],
   },
   {
+    id: 'earth-microregion-apollonia-cyrene',
+    name: 'Kyrenaika · Apollonia / Kyrene',
+    anchorLandmarkId: 'earth-ly-cyrene',
+    sourceProjects: ['Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', 'NOXIA'],
+    nodes: [
+      {
+        id: 'apollonia-susa',
+        name: 'Apollonia / Susa',
+        kind: 'arrival',
+        locality: 'Susa, Cyrenaica, Libya',
+        locator: 'Apollonia archaeological area, Susa, Libya',
+        role: 'Historischer Hafen- und Ankunftsraum von Kyrene; im Roman Küstenankunft des Kartografen.',
+      },
+      {
+        id: 'cyrene-road-transition',
+        name: 'Apollonia–Kyrene Übergang',
+        kind: 'passage',
+        locality: 'Jabal al Akhdar, Cyrenaica, Libya',
+        locator: 'Susa–Shahhat corridor, Libya',
+        role: 'Semantischer Küste–Hochland-Übergang. Er bildet die historische Verbindung von Hafen und Stadt ab, ohne eine heutige Route oder Reisezeit zu kanonisieren.',
+      },
+      {
+        id: 'cyrene',
+        name: 'Kyrene / Cyrene',
+        kind: 'research',
+        locality: 'Shahhat, Libya',
+        locator: 'Archaeological Site of Cyrene, Shahhat, Libya',
+        role: 'Realer archäologischer Ruinen- und Forschungsknoten sowie kanonischer Kartografen-Schauplatz.',
+      },
+    ],
+    links: [
+      { from: 'apollonia-susa', to: 'cyrene-road-transition', relation: 'landscape-transition', note: 'Historische Hafen–Hochland-Beziehung; Routing bleibt Earth/World-owned.' },
+      { from: 'cyrene-road-transition', to: 'cyrene', relation: 'landscape-transition', note: 'Übergang zum Hochplateau von Kyrene; keine Fahrzeit oder konkrete moderne Straßenführung wird kanonisiert.' },
+    ],
+  },
+  {
     id: 'earth-microregion-malta-hypogeum',
     name: 'Malta · Paola / Valletta',
     anchorLandmarkId: 'earth-mt-hal-saflieni',
