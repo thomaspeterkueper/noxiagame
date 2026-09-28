@@ -237,14 +237,31 @@ export async function POST(req: NextRequest) {
     })
     const alreadyKnown = inRange.filter((row: any) => row.discovered_at)
     const undiscovered = inRange.filter((row: any) => !row.discovered_at)
+    const locationId = await phobosLocationId(supabase)
     const now = new Date().toISOString()
     const newlyDiscovered: any[] = []
+
+    const { error: scanEventError } = await supabase.from('events').insert({
+      profile_id: user.id,
+      location_id: locationId,
+      type: 'phobos_prospect_scan',
+      payload: {
+        body: 'phobos',
+        surfaceHub: 'stickney-alpha',
+        xM,
+        yM,
+        radiusM,
+        scannedTargetIds: inRange.map((row: any) => row.id),
+        knownTargetIds: alreadyKnown.map((row: any) => row.id),
+      },
+    })
+    if (scanEventError) throw new Error(scanEventError.message)
 
     for (const row of undiscovered) {
       const props = row.properties ?? {}
       const chance = CHANCE[String(props.tier ?? 'trace')] ?? CHANCE.trace
       if (Math.random() >= chance) continue
-      const nextProperties = { ...props, discovered_by: user.id, discovered_from_x_m: xM, discovered_from_y_m: yM }
+      const nextProperties = { ...props, discovered_from_x_m: xM, discovered_from_y_m: yM }
       const { data: updated, error } = await supabase
         .from('region_resources')
         .update({ discovered_at: now, discovered_via: 'phobos_rover_scan', properties: nextProperties })
