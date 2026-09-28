@@ -100,3 +100,14 @@ Die Phaistos-Mikroregion folgt demselben Minimalprinzip:
 - Phaistos — archäologischer Fund-/Landschaftsknoten und MISHKENAZ-Anker
 
 Die Relation Phaistos ↔ Museum ist ausdrücklich mehr als Verkehr: Sie repräsentiert auch Fundort ↔ Sammlung/Überlieferung. MISHKENAZ-Interpretationen werden nicht als reale archäologische Aussagen in die Present-Day-Rolle zurückgeschrieben.
+
+
+### Dwarka · Küste / Unterwasserarchäologie
+
+Die Dvārakā-Mikroregion trennt drei Ebenen, die nicht kanonisch miteinander verschmolzen werden dürfen:
+
+- Dwarka — heutiger Küstenort und Arrival Node
+- Dwarka Offshore Archaeology — Evidenzknoten für dokumentierte marine archäologische Befunde
+- Bet Dwarka — separater Insel-/Archäologieknoten mit eigener Siedlungssequenz
+
+Der Roman **Dvārakā / Baumeister-Zyklus** darf diese reale Evidenz als Forschungs- und Weltbauanker nutzen. Die NOXIA-Present-Day-Schicht behauptet daraus jedoch weder die Identität einzelner Unterwasserstrukturen mit dem literarischen Dvārakā noch eine geschlossene Rekonstruktion der versunkenen Stadt. Fundort, Datierung, Interpretation und Fiktion bleiben getrennte Ebenen.
