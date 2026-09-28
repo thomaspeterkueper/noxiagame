@@ -18,7 +18,13 @@ for (const region of EARTH_MICROREGIONS) {
 const frankfurt = getEarthMicroregion('earth-microregion-frankfurt-book-world')
 assert.ok(frankfurt)
 assert.equal(frankfurt.anchorLandmarkId, 'earth-de-frankfurt-senckenberg')
-assert.deepEqual(frankfurt.nodes.map(node => node.id), ['frankfurt-hbf', 'senckenberg', 'camaleo-artlounge'])
+assert.deepEqual(frankfurt.nodes.map(node => node.id), ['frankfurt-hbf', 'senckenberg', 'camaleo-artlounge', 'sachsenhausen', 'staedel', 'bornheim', 'paulskirche', 'roemerberg', 'schwanheimer-duene'])
+
+const sauerland = getEarthMicroregion('earth-microregion-sauerland-hexenteich')
+assert.ok(sauerland)
+assert.equal(sauerland.anchorLandmarkId, 'earth-de-menden-hexenteich')
+assert.deepEqual(sauerland.nodes.map(node => node.id), ['hexenteich', 'felsenmeer-hemer', 'reckenhoehle', 'ebberg', 'bilsteinhoehle'])
+assert.equal(getEarthMicroregionByLandmark('earth-de-menden-hexenteich')?.id, sauerland.id)
 
 const malta = getEarthMicroregion('earth-microregion-malta-hypogeum')
 assert.ok(malta)
