@@ -1,5 +1,7 @@
 import type { AtmosphericState, GeometricDirection, PhysicalObservation, SpectralBand } from './types.ts'
 
+export const ATMOSPHERIC_REFRACTION_KG_MODEL_ID = 'MOD:L2:bennett-atmosphaerische-refraktion' as const
+
 const DEG = Math.PI / 180
 
 // Bennett-style near-horizon approximation, scaled by local pressure/temperature.
@@ -43,6 +45,6 @@ export function observeThroughAtmosphere(opts: {
     refractionDeg,
     medium: 'atmosphere',
     spectralBand: band,
-    model: 'bennett-scaled-v0.1',
+    model: ATMOSPHERIC_REFRACTION_KG_MODEL_ID,
   }
 }
