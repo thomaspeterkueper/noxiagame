@@ -47,12 +47,21 @@ export type SsfInteractiveParams = {
   constants: { G: number }
 }
 
+export type SsfExternalSimulatorInteractive = {
+  type: 'external_simulator'
+  simulatorId: string
+  title: string
+  instruction: string
+  fallback: string
+}
+
 export type SsfModuleSection =
   | { type: 'heading'; text: string }
   | { type: 'text'; text: string }
   | { type: 'key_point'; text: string }
   | { type: 'example'; title: string; text: string }
   | { type: 'task'; prompt: string; hint?: string }
+  | SsfExternalSimulatorInteractive
   | {
       type: 'interactive'
       interactiveId: string
