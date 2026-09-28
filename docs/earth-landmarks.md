@@ -89,3 +89,14 @@ Das Muster wird inzwischen auch für Frankfurt und Malta verwendet:
 - **Malta · Paola / Valletta** — Paola als lokaler Arrival Node, Ħal Saflieni als Archäologie-/Konservierungsknoten und das National Museum of Archaeology in Valletta als Sammlungs-/Provenienzknoten.
 
 Damit wird ein Book-World-Ort nicht durch möglichst viele POIs definiert, sondern durch wenige funktional und narrativ unterschiedliche Knoten.
+
+
+### Kreta · Heraklion / Phaistos
+
+Die Phaistos-Mikroregion folgt demselben Minimalprinzip:
+
+- Heraklion — Arrival Node
+- Heraklion Archaeological Museum — Sammlung, Provenienz und Forschung; dort wird die reale Phaistos-Scheibe museal überliefert
+- Phaistos — archäologischer Fund-/Landschaftsknoten und MISHKENAZ-Anker
+
+Die Relation Phaistos ↔ Museum ist ausdrücklich mehr als Verkehr: Sie repräsentiert auch Fundort ↔ Sammlung/Überlieferung. MISHKENAZ-Interpretationen werden nicht als reale archäologische Aussagen in die Present-Day-Rolle zurückgeschrieben.
