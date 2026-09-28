@@ -111,3 +111,21 @@ Die Dvārakā-Mikroregion trennt drei Ebenen, die nicht kanonisch miteinander ve
 - Bet Dwarka — separater Insel-/Archäologieknoten mit eigener Siedlungssequenz
 
 Der Roman **Dvārakā / Baumeister-Zyklus** darf diese reale Evidenz als Forschungs- und Weltbauanker nutzen. Die NOXIA-Present-Day-Schicht behauptet daraus jedoch weder die Identität einzelner Unterwasserstrukturen mit dem literarischen Dvārakā noch eine geschlossene Rekonstruktion der versunkenen Stadt. Fundort, Datierung, Interpretation und Fiktion bleiben getrennte Ebenen.
+
+
+## Kartografen-Korridor · Mittelmeer bis Atlantik
+
+Für **Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr** ist nun der erste großräumige Earth-Korridor als Landmark-Folge angelegt:
+
+`Kairo → Alexandria → Karthago/Tunis → Kyrene → Malta/Pantelleria → Cádiz/Andalusien`
+
+Die Landmark-Folge ist keine kanonisierte Reiseroute und legt weder Reihenfolge einzelner Etappen noch Reisezeiten fest. Sie schafft stabile geografische Anker, aus denen später kleine Mikroregionen und historische Reisebeziehungen aufgebaut werden können.
+
+Neue Anker:
+- Kairo — Herkunft, Vermessung und Kartografie
+- Karthago/Tunis — Hafen-/Küstenschichten und Station I
+- Kyrene — Ruinen- und Händlerraum
+- Pantelleria — Insel-/Kreuzungsknoten im zentralen Mittelmeer
+- Cádiz — westlicher Hafen- und Übergangsknoten Mittelmeer/Atlantik
+
+Alexandria und Malta waren bereits im Registry-Bestand und werden in denselben Korridor eingebunden.
