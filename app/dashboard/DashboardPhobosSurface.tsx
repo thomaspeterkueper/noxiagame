@@ -45,6 +45,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
   const location=useGameStore(s=>s.location),credits=useGameStore(s=>s.credits),cargo=useGameStore(s=>s.cargo),cargoMax=useGameStore(s=>s.cargoMax),shipTypeId=useGameStore(s=>s.shipTypeId),shipRange=useGameStore(s=>s.shipRange),buy=useGameStore(s=>s.buy),sell=useGameStore(s=>s.sell),loadFromServer=useGameStore(s=>s.loadFromServer)
   const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null),[dockEntity,setDockEntity]=useState<PlanetarySurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
   const [fleetRobots,setFleetRobots]=useState<any[]>([]),[fleetJobs,setFleetJobs]=useState<any[]>([]),[fleetNow,setFleetNow]=useState(()=>Date.now())
+  const [selectedRobotId,setSelectedRobotId]=useState<string|null>(null)
   const phobosLocation=useMemo(()=>locations.find((item:any)=>item.slug==='phobos')??null,[locations]),phobosOrders=useMemo(()=>orders.filter((item:any)=>item.locations?.slug==='phobos'),[orders])
   useEffect(()=>{if(location!=='phobos')return;let cancelled=false;fetch('/api/game/world',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(!cancelled)setTick(Number(p?.stats?.tickNumber??0))}).catch(()=>{});return()=>{cancelled=true}},[location])
   useEffect(()=>{if(location!=='phobos')return;let cancelled=false;(async()=>{try{const token=await getToken();if(!token||cancelled)return;await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({location:'phobos'})})}catch{}})();return()=>{cancelled=true}},[location])
@@ -60,7 +61,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
 
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
     <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>rekonstruiertes lokales Terrain · gemeinsamer Planetary-Surface-Renderer</span></div>
-    <PhobosRobotFleetPanel />
+    <PhobosRobotFleetPanel selectedRobotId={selectedRobotId} onSelectedRobotChange={setSelectedRobotId}/>
     <PlanetarySurfaceMap
       locationSlug="phobos"
       body="phobos"
@@ -69,6 +70,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
       minimumWorldSpanM={400}
       corridors={PHOBOS_CORRIDORS}
       mobileObjects={robotMapObjects}
+      onOpenMobileObject={object=>setSelectedRobotId(object.id)}
       onOpenWorldObject={openWorldObject}
     />
 
