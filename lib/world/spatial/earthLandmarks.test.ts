@@ -34,6 +34,11 @@ assert.deepEqual(
   crossUniverse.map(landmark => landmark.id).sort(),
   [
     'earth-ch-vuiteboeuf',
+    'earth-kr-seoul',
+    'earth-de-frankfurt-sachsenhausen',
+    'earth-de-frankfurt-staedel',
+    'earth-de-hamburg-altona',
+    'earth-de-menden-hexenteich',
     'earth-de-frankfurt-camaleo-artlounge',
     'earth-de-frankfurt-senckenberg',
     'earth-de-north-sea-book-village',
@@ -61,6 +66,9 @@ assert.ok(getEarthLandmarksByTag('culture').some(landmark => landmark.id === 'ea
 assert.equal(getEarthLandmark('earth-de-frankfurt-senckenberg')?.locality, 'Frankfurt am Main')
 assert.equal(getEarthLandmark('earth-pe-chavin-de-huantar')?.countryCode, 'PE')
 assert.equal(getEarthLandmark('earth-eg-cairo')?.countryCode, 'EG')
+assert.equal(getEarthLandmark('earth-kr-seoul')?.countryCode, 'KR')
+assert.equal(getEarthLandmark('earth-de-frankfurt-staedel')?.locator.value, 'Schaumainkai 63, 60596 Frankfurt am Main, Germany')
+assert.equal(getEarthLandmark('earth-de-menden-hexenteich')?.locality, 'Menden (Sauerland)')
 assert.equal(getEarthLandmark('earth-kr-seoul')?.countryCode, 'KR')
 assert.equal(getEarthLandmark('earth-de-frankfurt-staedel')?.locality, 'Frankfurt am Main')
 assert.equal(getEarthLandmark('earth-de-hamburg-altona')?.locality, 'Hamburg')
