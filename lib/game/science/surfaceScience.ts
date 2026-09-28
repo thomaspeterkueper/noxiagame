@@ -1,3 +1,5 @@
+import { deriveScientificInterpretations, observablesForResource, type ScientificInterpretation } from './scientificInterpretation'
+
 export type SurfaceScienceEvidenceStage =
   | 'prospect'
   | 'reference_sample'
@@ -25,6 +27,8 @@ export type SurfaceScienceObject = {
   developmentStatus: string
   finding: string | null
   qualityScore: number | null
+  observationNeeds: string[]
+  interpretations: ScientificInterpretation[]
 }
 
 type Prospect = {
@@ -69,6 +73,7 @@ export function deriveSurfaceScienceObjects(args:{prospects:Prospect[];samples:S
     if(core?.analysis)evidenceStage='core_analysis',evidenceClass='direct'
     if(pilot?.status==='running'||pilot?.status==='completed')evidenceStage='pilot_extraction',evidenceClass='engineering'
     const analysis=core?.analysis??reference?.analysis??null
+    const finding=analysis?.finding??null
     return {
       id:prospect.id,
       label:`Prospekt ${String(prospect.resourceType).replaceAll('_',' ')}`,
@@ -77,8 +82,10 @@ export function deriveSurfaceScienceObjects(args:{prospects:Prospect[];samples:S
       evidenceStage,evidenceLabel:STAGE_LABEL[evidenceStage],evidenceClass,
       sampleStatus:reference?.status??(prospect.sampledAt?'collected':'none'),
       coreStatus:core?.status??'none',missionStatus:pilot?.status??drill?.status??'idle',
-      developmentStatus:analysis?.developmentStatus??'blocked',finding:analysis?.finding??null,
+      developmentStatus:analysis?.developmentStatus??'blocked',finding,
       qualityScore:Number.isFinite(Number(analysis?.qualityScore))?Number(analysis?.qualityScore):null,
+      observationNeeds:observablesForResource(prospect.resourceType),
+      interpretations:deriveScientificInterpretations({resourceType:prospect.resourceType,evidenceClass,finding}),
     }
   })
 }
