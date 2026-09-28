@@ -25,6 +25,12 @@ assert.ok(malta)
 assert.equal(malta.anchorLandmarkId, 'earth-mt-hal-saflieni')
 assert.deepEqual(malta.nodes.map(node => node.id), ['paola', 'hal-saflieni', 'national-museum-archaeology'])
 
+const dwarka = getEarthMicroregion('earth-microregion-dwarka-coast')
+assert.ok(dwarka)
+assert.equal(dwarka.anchorLandmarkId, 'earth-in-dwarka')
+assert.deepEqual(dwarka.nodes.map(node => node.id), ['dwarka', 'dwarka-offshore-archaeology', 'bet-dwarka'])
+assert.equal(getEarthMicroregionByLandmark('earth-in-dwarka')?.id, dwarka.id)
+
 const crete = getEarthMicroregion('earth-microregion-crete-phaistos')
 assert.ok(crete)
 assert.equal(crete.anchorLandmarkId, 'earth-gr-phaistos')
