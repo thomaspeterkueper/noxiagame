@@ -106,6 +106,43 @@ export const EARTH_MICROREGIONS: readonly EarthMicroregion[] = [
     ],
   },
   {
+    id: 'earth-microregion-dwarka-coast',
+    name: 'Dwarka · Küste / Unterwasserarchäologie',
+    anchorLandmarkId: 'earth-in-dwarka',
+    sourceProjects: ['Dvārakā / Baumeister-Zyklus', 'NOXIA'],
+    nodes: [
+      {
+        id: 'dwarka',
+        name: 'Dwarka',
+        kind: 'arrival',
+        locality: 'Dwarka, Gujarat',
+        locator: 'Dwarka, Gujarat, India',
+        role: 'Heutiger Küstenort und Arrival Node. Der moderne Ort wird nicht mit dem literarischen Dvārakā gleichgesetzt.',
+      },
+      {
+        id: 'dwarka-offshore-archaeology',
+        name: 'Dwarka Offshore Archaeology',
+        kind: 'research',
+        locality: 'Arabian Sea off Dwarka, Gujarat',
+        locator: 'Dwarka coast, Gujarat, India',
+        role: 'Evidenzknoten für dokumentierte marine archäologische Untersuchungen, Steinstrukturen und Anker; keine pauschale Identifikation mit dem Romanort.',
+      },
+      {
+        id: 'bet-dwarka',
+        name: 'Bet Dwarka',
+        kind: 'research',
+        locality: 'Okhamandal, Gujarat',
+        locator: 'Bet Dwarka, Gujarat, India',
+        role: 'Separater Küsten-/Inselknoten mit eigener archäologischer Sequenz und maritimer Nutzung; dient dem Vergleich statt einer Verschmelzung mit Dwarka.',
+      },
+    ],
+    links: [
+      { from: 'dwarka', to: 'dwarka-offshore-archaeology', relation: 'landscape-transition', note: 'Land–Meer-Evidenzrelation; operative Tauch-/Bootsroute bleibt außerhalb der Mikroregion.' },
+      { from: 'dwarka', to: 'bet-dwarka', relation: 'road', note: 'Regionale Okhamandal-Beziehung; konkrete multimodale Route und Fahrzeit bleiben Earth/World-owned.' },
+      { from: 'bet-dwarka', to: 'dwarka-offshore-archaeology', relation: 'landscape-transition', note: 'Vergleichende marine Archäologie; Befunde beider Orte bleiben provenienzseitig getrennt.' },
+    ],
+  },
+  {
     id: 'earth-microregion-crete-phaistos',
     name: 'Kreta · Heraklion / Phaistos',
     anchorLandmarkId: 'earth-gr-phaistos',
