@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { DOCKING_IDLE_EXPIRE_HOURS } from '@/lib/game/config'
 import { ORBITS } from '@/lib/game/orbits'
 import { transferQuote } from '@/lib/game/transfer'
+import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
+import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
 import {
   completeTransitCommand,
   startTransitCommand,
@@ -114,11 +116,11 @@ export async function startPlayerTransit(profileId: string, destination: string)
     throw new Error(`NOXIA_TRANSIT_SPEED_INVALID:${speedMult}`)
   }
 
-  // Knowledge/learning integration seam: the transfer model already accepts a
-  // 0..1 navigation proficiency. Until the player knowledge layer exposes a
-  // canonical value, server execution stays at zero rather than trusting a
-  // client-supplied discount.
-  const navigationProficiency = 0
+  // Navigation knowledge is read from persisted player_unlocks on the server.
+  // Client values can preview the quote, but can never grant themselves a
+  // cheaper transfer. Missing/failed unlock lookup naturally fails closed to 0.
+  const playerUnlocks = await getPlayerUnlocks(profileId)
+  const navigationProficiency = navigationProficiencyFromUnlocks(playerUnlocks)
   const quote = transferQuote(ship.location, destination, tick, {
     speedMult,
     navigationProficiency,
