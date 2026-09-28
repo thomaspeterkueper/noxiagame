@@ -28,9 +28,22 @@ export type SurfaceScienceObject = {
   finding: string | null
   qualityScore: number | null
   observationNeeds: string[]
+  measurementSignal: string | null
+  measurementSource: string | null
+  measurementConfidence: string | null
+  measurementCount: number
+  lastMeasuredAt: string | null
   interpretations: ScientificInterpretation[]
 }
 
+type ProspectObservation = {
+  signalKind?:string|null
+  sourceType?:string|null
+  confidence?:string|null
+  measurementCount?:number|null
+  lastMeasuredAt?:string|null
+  evidence?:{observables?:string[]}|null
+}
 type Prospect = {
   id:string
   resourceType:string
@@ -41,6 +54,7 @@ type Prospect = {
   provenance?:string|null
   discoveredAt?:string|null
   sampledAt?:string|null
+  observation?:ProspectObservation|null
 }
 type Analysis = { finding?:string|null;qualityScore?:number|null;developmentStatus?:string|null }
 type Sample = { prospectId:string;sampleKind:string;status:string;analysis?:Analysis|null }
@@ -74,6 +88,8 @@ export function deriveSurfaceScienceObjects(args:{prospects:Prospect[];samples:S
     if(pilot?.status==='running'||pilot?.status==='completed')evidenceStage='pilot_extraction',evidenceClass='engineering'
     const analysis=core?.analysis??reference?.analysis??null
     const finding=analysis?.finding??null
+    const observation=prospect.observation??null
+    const observedNeeds=Array.isArray(observation?.evidence?.observables)?observation!.evidence!.observables!.filter(value=>typeof value==='string'):[]
     return {
       id:prospect.id,
       label:`Prospekt ${String(prospect.resourceType).replaceAll('_',' ')}`,
@@ -84,7 +100,12 @@ export function deriveSurfaceScienceObjects(args:{prospects:Prospect[];samples:S
       coreStatus:core?.status??'none',missionStatus:pilot?.status??drill?.status??'idle',
       developmentStatus:analysis?.developmentStatus??'blocked',finding,
       qualityScore:Number.isFinite(Number(analysis?.qualityScore))?Number(analysis?.qualityScore):null,
-      observationNeeds:observablesForResource(prospect.resourceType),
+      observationNeeds:observedNeeds.length?observedNeeds:observablesForResource(prospect.resourceType),
+      measurementSignal:observation?.signalKind??null,
+      measurementSource:observation?.sourceType??null,
+      measurementConfidence:observation?.confidence??null,
+      measurementCount:Number.isFinite(Number(observation?.measurementCount))?Number(observation?.measurementCount):0,
+      lastMeasuredAt:observation?.lastMeasuredAt??null,
       interpretations:deriveScientificInterpretations({resourceType:prospect.resourceType,evidenceClass,finding}),
     }
   })
