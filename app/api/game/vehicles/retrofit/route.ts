@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { isRobotFleetRole, robotRetrofitProfile } from '@/lib/game/vehicles/robotRetrofit'
+import { ROBOT_FLEET_ROLES, ROBOT_RETROFIT_PROFILES, isRobotFleetRole, robotRetrofitProfile } from '@/lib/game/vehicles/robotRetrofit'
 
 async function userFromRequest(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -32,6 +32,22 @@ async function resourceRows(s: ReturnType<typeof createServiceClient>, locationI
   return { energy, components }
 }
 
+async function reconcileStickneyConfiguration(s: ReturnType<typeof createServiceClient>, userId: string, locationId: string, changedRobotId: string) {
+  const { data: fleet, error } = await s.from('vehicle_instances').select('id,status,modifications').eq('owner_profile_id', userId).eq('location_id', locationId)
+  if (error) throw new Error(error.message)
+  const stickney = (fleet ?? []).filter(robot => robot.modifications?.surfaceHub === 'stickney-alpha')
+  const roleSet = new Set(stickney.map(robot => robot.modifications?.fleetRole).filter(isRobotFleetRole))
+  const complete = ROBOT_FLEET_ROLES.every(role => roleSet.has(role))
+  const now = new Date().toISOString()
+  if (complete) {
+    const configurationIds = stickney.filter(robot => robot.status === 'configuration').map(robot => robot.id)
+    if (configurationIds.length) await s.from('vehicle_instances').update({ status: 'ready', updated_at: now }).in('id', configurationIds)
+  } else {
+    await s.from('vehicle_instances').update({ status: 'configuration', updated_at: now }).eq('id', changedRobotId)
+  }
+  return { complete, roleSet: [...roleSet] }
+}
+
 export async function GET(req: NextRequest) {
   const user = await userFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -42,8 +58,7 @@ export async function GET(req: NextRequest) {
     const { data: robot, error } = await s.from('vehicle_instances').select('*').eq('id', robotId).eq('owner_profile_id', user.id).maybeSingle()
     if (error) throw new Error(error.message)
     if (!robot) return NextResponse.json({ error: 'Fahrzeug nicht gefunden.' }, { status: 404 })
-    const profiles = Object.values(await import('@/lib/game/vehicles/robotRetrofit').then(m => m.ROBOT_RETROFIT_PROFILES))
-    return NextResponse.json({ ok: true, robot, profiles })
+    return NextResponse.json({ ok: true, robot, profiles: Object.values(ROBOT_RETROFIT_PROFILES) })
   } catch (error) {
     console.error('robot retrofit lookup failed:', error)
     return NextResponse.json({ error: 'Umbauprofile nicht verfügbar.' }, { status: 503 })
@@ -67,7 +82,7 @@ export async function POST(req: NextRequest) {
     if (error) throw new Error(error.message)
     if (!robot) return NextResponse.json({ error: 'Fahrzeug nicht gefunden.' }, { status: 404 })
     if (!String(robot.frame_id ?? '').startsWith('PHOBOS-') || robot.modifications?.surfaceHub !== 'stickney-alpha') return NextResponse.json({ error: 'Dieses Fahrzeug unterstützt den Stickney-Modulumbau nicht.' }, { status: 409 })
-    if (robot.status !== 'ready') return NextResponse.json({ error: 'Umbau ist nur bei stillstehendem, einsatzbereitem Fahrzeug möglich.' }, { status: 409 })
+    if (!['ready', 'configuration'].includes(String(robot.status))) return NextResponse.json({ error: 'Umbau ist nur bei stillstehendem Fahrzeug möglich.' }, { status: 409 })
 
     const { data: active } = await s.from('pilot_extraction_jobs').select('id').eq('profile_id', user.id).eq('location_id', location.id).eq('status', 'running').limit(1).maybeSingle()
     if (active) return NextResponse.json({ error: 'Umbau ist während eines laufenden Flotteneinsatzes gesperrt.' }, { status: 409 })
@@ -107,7 +122,10 @@ export async function POST(req: NextRequest) {
     ])
     if (e1 || e2 || ue || !updated) throw new Error(e1?.message ?? e2?.message ?? ue?.message ?? 'Retrofit failed')
 
-    return NextResponse.json({ ok: true, robot: updated, profile, cost: { energy: profile.energyCost, components: profile.componentCost } })
+    const configuration = await reconcileStickneyConfiguration(s, user.id, location.id, updated.id)
+    const { data: refreshed, error: re } = await s.from('vehicle_instances').select('*').eq('id', updated.id).single()
+    if (re || !refreshed) throw new Error(re?.message ?? 'Refreshed vehicle missing')
+    return NextResponse.json({ ok: true, robot: refreshed, profile, configuration, cost: { energy: profile.energyCost, components: profile.componentCost } })
   } catch (error) {
     console.error('robot retrofit failed:', error)
     return NextResponse.json({ error: 'Modulumbau konnte nicht durchgeführt werden.' }, { status: 503 })
