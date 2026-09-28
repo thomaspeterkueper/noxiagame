@@ -23,6 +23,15 @@ const serviceClient = createClient(
 
 const EARTH_VIEW_HALF_SPAN_M = 250_000
 const EARTH_COLLISION_LAT_SPAN_DEG = .03
+// Temporary first-loop presentation gate. Existing/persisted builds and POST
+// authority remain untouched; later progression can replace this allow-list.
+const EARTH_STARTER_BUILDABLE_IDS = new Set([
+  'solar',
+  'apartment_house',
+  'community_center',
+  'local_workshop',
+  'mobility_hub',
+])
 
 type StartBody = {
   buildableId?: string
@@ -329,6 +338,7 @@ export async function GET(req: NextRequest) {
 
   const available = [...catalog.values()]
     .filter(def => !def.allowedLocations?.length || def.allowedLocations.includes(locationSlug))
+    .filter(def => locationSlug !== 'earth' || EARTH_STARTER_BUILDABLE_IDS.has(def.id))
     .map(def => {
       const requirement = buildRequirement(def.id, locationSlug, knowledge)
       const creditsOk = credits >= def.cost

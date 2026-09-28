@@ -66,6 +66,35 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     populationBonus: 25,
   },
 
+  apartment_house: {
+    id: 'apartment_house', name: 'Mehrfamilienhaus', category: 'housing',
+    description: '+40 max. Bevölkerung · ziviler Earth-Wohnungsbau',
+    cost: 2600, buildTimeTicks: 3,
+    populationBonus: 40,
+    allowedLocations: ['earth'],
+  },
+
+  community_center: {
+    id: 'community_center', name: 'Gemeinschaftshaus', category: 'service',
+    description: 'Ziviler Treffpunkt und lokale Gemeinschaftsinfrastruktur',
+    cost: 2200, buildTimeTicks: 2,
+    allowedLocations: ['earth'],
+  },
+
+  local_workshop: {
+    id: 'local_workshop', name: 'Werkstattbetrieb', category: 'production',
+    description: 'Lokaler Handwerks- und Reparaturbetrieb',
+    cost: 2800, buildTimeTicks: 3,
+    allowedLocations: ['earth'],
+  },
+
+  mobility_hub: {
+    id: 'mobility_hub', name: 'Mobilitätsstation', category: 'infrastructure',
+    description: 'Lokaler Umstieg, Fahrzeuge und Anschluss an regionale Mobilität',
+    cost: 2400, buildTimeTicks: 2,
+    allowedLocations: ['earth'],
+  },
+
   residential_block: {
     id: 'residential_block', name: 'Wohnblock', category: 'housing',
     description: '+75 max. Bevölkerung',
