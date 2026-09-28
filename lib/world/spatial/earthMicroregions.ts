@@ -32,6 +32,80 @@ export type EarthMicroregion = {
  */
 export const EARTH_MICROREGIONS: readonly EarthMicroregion[] = [
   {
+    id: 'earth-microregion-frankfurt-book-world',
+    name: 'Frankfurt · Buchwelt',
+    anchorLandmarkId: 'earth-de-frankfurt-senckenberg',
+    sourceProjects: ['YIN HUA / Senckenberg-Zyklus', 'NALGAE – Zwischen den Welten', 'KUEPER-Werkverbund', 'NOXIA'],
+    nodes: [
+      {
+        id: 'frankfurt-hbf',
+        name: 'Frankfurt (Main) Hauptbahnhof',
+        kind: 'arrival',
+        locality: 'Frankfurt am Main',
+        locator: 'Frankfurt (Main) Hauptbahnhof, Im Hauptbahnhof, 60329 Frankfurt am Main, Germany',
+        role: 'Neutraler überregionaler Arrival Node; verbindet die Buchwelt-Orte, ohne selbst zum literarischen Hauptschauplatz zu werden.',
+      },
+      {
+        id: 'senckenberg',
+        name: 'Senckenberg',
+        kind: 'research',
+        locality: 'Frankfurt am Main',
+        locator: 'Senckenberganlage 25, 60325 Frankfurt am Main, Germany',
+        role: 'Wissenschafts-, Archiv- und YIN-HUA-Knoten der Mikroregion.',
+      },
+      {
+        id: 'camaleo-artlounge',
+        name: 'Camaleo Artlounge',
+        kind: 'culture',
+        locality: 'Frankfurt am Main',
+        locator: 'Frankfurt am Main, Germany',
+        role: 'Kultureller Begegnungs- und Werkverbund-Knoten; die Straßenadresse bleibt bis zur kanonischen Auflösung bewusst offen.',
+      },
+    ],
+    links: [
+      { from: 'frankfurt-hbf', to: 'senckenberg', relation: 'rail', note: 'Semantische ÖPNV-/Stadtverbindung; kein Fahrplan wird hier kanonisiert.' },
+      { from: 'frankfurt-hbf', to: 'camaleo-artlounge', relation: 'road', note: 'Städtische Erreichbarkeit; konkrete Route bleibt Earth/World-owned.' },
+      { from: 'senckenberg', to: 'camaleo-artlounge', relation: 'road', note: 'Narrative Stadtbeziehung zwischen Wissenschafts- und Kulturknoten.' },
+    ],
+  },
+  {
+    id: 'earth-microregion-malta-hypogeum',
+    name: 'Malta · Paola / Valletta',
+    anchorLandmarkId: 'earth-mt-hal-saflieni',
+    sourceProjects: ['KUEPER-Resonanzwelt', 'NOXIA'],
+    nodes: [
+      {
+        id: 'paola',
+        name: 'Paola / Raħal Ġdid',
+        kind: 'arrival',
+        locality: 'Malta',
+        locator: 'Paola, Malta',
+        role: 'Lokaler Arrival- und Siedlungsknoten für den Hypogeum-Slice.',
+      },
+      {
+        id: 'hal-saflieni',
+        name: 'Ħal Saflieni Hypogeum',
+        kind: 'research',
+        locality: 'Paola, Malta',
+        locator: 'Triq iċ-Ċimiterju, Paola, Malta',
+        role: 'Archäologie-, Konservierungs- und Resonanzknoten; reale Stätte und fiktionale Interpretation bleiben getrennt.',
+      },
+      {
+        id: 'national-museum-archaeology',
+        name: 'National Museum of Archaeology',
+        kind: 'research',
+        locality: 'Valletta, Malta',
+        locator: 'Auberge de Provence, Republic Street, Valletta, Malta',
+        role: 'Sammlungs- und Provenienzknoten für Artefakte aus Maltas Vor- und Frühgeschichte.',
+      },
+    ],
+    links: [
+      { from: 'paola', to: 'hal-saflieni', relation: 'road', note: 'Lokale Erreichbarkeit innerhalb Paolas; operative Route bleibt Earth/World-owned.' },
+      { from: 'paola', to: 'national-museum-archaeology', relation: 'road', note: 'Paola–Valletta als semantische regionale Verbindung; keine Fahrzeit wird kanonisiert.' },
+      { from: 'hal-saflieni', to: 'national-museum-archaeology', relation: 'road', note: 'Archäologische Provenienzbeziehung zwischen Fundort und Sammlung, nicht nur Verkehrsrelation.' },
+    ],
+  },
+  {
     id: 'earth-microregion-vuiteboeuf-sainte-croix',
     name: 'Vuiteboeuf · Covatannaz · Sainte-Croix',
     anchorLandmarkId: 'earth-ch-vuiteboeuf',
