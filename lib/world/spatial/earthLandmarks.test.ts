@@ -36,6 +36,10 @@ assert.deepEqual(
     'earth-ch-vuiteboeuf',
     'earth-kr-seoul',
     'earth-it-palermo',
+    'earth-gr-delphi',
+    'earth-gb-stonehenge',
+    'earth-cn-huashan',
+    'earth-de-frankfurt-bornheim',
     'earth-cy-cyprus',
     'earth-gr-rhodes',
     'earth-ly-tripolitania',
@@ -73,6 +77,10 @@ assert.equal(getEarthLandmark('earth-pe-chavin-de-huantar')?.countryCode, 'PE')
 assert.equal(getEarthLandmark('earth-eg-cairo')?.countryCode, 'EG')
 assert.equal(getEarthLandmark('earth-kr-seoul')?.countryCode, 'KR')
 assert.equal(getEarthLandmark('earth-it-palermo')?.countryCode, 'IT')
+assert.equal(getEarthLandmark('earth-gr-delphi')?.countryCode, 'GR')
+assert.equal(getEarthLandmark('earth-gb-stonehenge')?.countryCode, 'GB')
+assert.equal(getEarthLandmark('earth-cn-huashan')?.countryCode, 'CN')
+assert.equal(getEarthLandmark('earth-de-frankfurt-bornheim')?.locality, 'Frankfurt am Main')
 assert.equal(getEarthLandmark('earth-cy-cyprus')?.countryCode, 'CY')
 assert.equal(getEarthLandmark('earth-gr-rhodes')?.countryCode, 'GR')
 assert.equal(getEarthLandmark('earth-ly-tripolitania')?.countryCode, 'LY')
