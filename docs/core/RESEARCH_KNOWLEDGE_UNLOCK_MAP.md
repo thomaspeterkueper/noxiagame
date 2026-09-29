@@ -76,3 +76,11 @@ If research projects, experiments or discoveries become first-class unlock sourc
 `measurement -> interpretation -> validated discovery -> progression evidence -> NOXIA unlock candidate -> prerequisite resolution -> persisted unlock`
 
 That extension must preserve the same rule: evidence can justify authority, but evidence is not authority by itself.
+
+## Scientific sample provenance boundary
+
+Scientific sampling now has an explicit pre-measurement provenance layer. A source environment can be transformed by sampling physics before an instrument observes it. The canonical chain is therefore refined to:
+
+`source environment -> sample formation/transformation -> collected sample -> measurement -> interpretation -> validated discovery -> progression evidence -> NOXIA unlock candidate -> prerequisite resolution -> persisted unlock`
+
+The first implementation is the Enceladus plume fractionation model in `lib/science/`. This refinement does not change unlock authority: sample composition, measurement and interpretation remain evidence, not entitlement.
