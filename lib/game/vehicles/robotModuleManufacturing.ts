@@ -1,7 +1,6 @@
+import { PRECISION_INSTRUMENTATION_UNLOCK, ROBOT_FABRICATION_UNLOCK } from '@/lib/knowledge/unlocks'
 import { ROBOT_MODULE_DEFINITIONS } from './robotRetrofit'
 
-export const ROBOT_FABRICATION_UNLOCK = 'UNL:NOX:ENG:ROBOT-FABRICATION'
-export const PRECISION_INSTRUMENTATION_UNLOCK = 'UNL:NOX:ENG:PRECISION-INSTRUMENTATION'
 export const SPECTRAL_SENSOR_UNLOCK = 'UNL:NOX:SENSOR:SPECTRAL'
 
 export type RobotModuleRecipe = {
@@ -25,16 +24,7 @@ function recipe(
 ): RobotModuleRecipe {
   const definition = ROBOT_MODULE_DEFINITIONS[equipmentKey]
   if (!definition) throw new Error(`Unknown robot module: ${equipmentKey}`)
-  return {
-    equipmentKey,
-    label: definition.label,
-    requiredUnlocks,
-    metalCost,
-    componentCost,
-    energyCost,
-    durationSeconds,
-    recipeVersion: 'stickney-module-fabrication-v1',
-  }
+  return { equipmentKey, label: definition.label, requiredUnlocks, metalCost, componentCost, energyCost, durationSeconds, recipeVersion: 'stickney-module-fabrication-v1' }
 }
 
 export const ROBOT_MODULE_RECIPES: Record<string, RobotModuleRecipe> = {
@@ -50,11 +40,7 @@ export const ROBOT_MODULE_RECIPES: Record<string, RobotModuleRecipe> = {
 }
 
 export const ROBOT_MODULE_RECIPE_KEYS = Object.keys(ROBOT_MODULE_RECIPES)
-
-export function robotModuleRecipe(key: string) {
-  return ROBOT_MODULE_RECIPES[key] ?? null
-}
-
+export function robotModuleRecipe(key: string) { return ROBOT_MODULE_RECIPES[key] ?? null }
 export function missingRecipeUnlocks(recipe: RobotModuleRecipe, unlocks: readonly string[]) {
   const owned = new Set(unlocks)
   return recipe.requiredUnlocks.filter(unlock => !owned.has(unlock))
