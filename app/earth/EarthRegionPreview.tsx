@@ -33,7 +33,8 @@ const BUILD_PLAN_VISIBLE_WIDTH_M=300
 const LOCAL_DETAIL_RADIUS_KM=.65
 const EARTH_OVERVIEW_RADIUS_KM=10
 const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
-const EARTH_DATA_VERSION='20260906-local-detail-1'
+const EARTH_DATA_VERSION='20260929-earth-view-forest-1'
+const EARTH_VIEW_LABEL_COOKIE='noxia-earth-view-label'
 
 function styleFor(type:string,tags:Record<string,string>){
   switch(type){
