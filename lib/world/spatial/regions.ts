@@ -47,3 +47,20 @@ export const EARTH_REGIONS: Record<string, EarthRegionAnchor> = {
 export function getEarthRegion(id: string): EarthRegionAnchor | null {
   return EARTH_REGIONS[id] ?? null
 }
+
+
+/**
+ * Creates a technical local projection/streaming anchor around any Earth view.
+ * This is not a named gameplay region and must never become navigation state.
+ */
+export function createEarthViewAnchor(origin: EarthRegionAnchor['origin']): EarthRegionAnchor {
+  const lat = Number(origin.lat.toFixed(6))
+  const lon = Number(origin.lon.toFixed(6))
+  return {
+    id: `earth-view-${lat}-${lon}`,
+    name: 'Earth · local view',
+    origin: { lat, lon },
+    chunkSizeM: EARTH_CHUNK_SIZE_M,
+    cellSizeM: EARTH_CELL_SIZE_M,
+  }
+}
