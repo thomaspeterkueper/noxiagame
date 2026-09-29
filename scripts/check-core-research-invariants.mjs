@@ -21,6 +21,7 @@ const requirements = read('lib/knowledge/buildRequirements.ts');
 const knowledgeRoute = read('app/api/game/knowledge/route.ts');
 const buildRoute = read('app/api/game/build/route.ts');
 const unlocks = read('lib/knowledge/unlocks.ts');
+const researchCapability = read('lib/knowledge/researchCapability.ts');
 const finance = read('supabase/migrations/20260910090000_atomic_finance_asset_commands.sql');
 
 check(
@@ -66,6 +67,13 @@ check(
   'unlock prerequisite resolution remains fail-closed',
   hasAll(registry, ['getMissingUnlockPrerequisites(id, unlocked).length === 0', 'const blocked: BlockedUnlock[] = pending.map']),
   'candidate unlocks can bypass prerequisite resolution',
+);
+
+check(
+  'magnetobiology learning gates research design without asserting findings',
+  hasAll(registry, ["'UNL:NOX:research:magnetobiology-experiment-design'", "'ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN'"]) &&
+    hasAll(researchCapability, ["'ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN'", "'UNL:NOX:research:magnetobiology-experiment-design'", 'progress.unlocked.includes(requiredUnlock)', '/academy/learn?unlock=']),
+  'magnetobiology research action is no longer explicitly gated by its learning unlock',
 );
 
 check(
