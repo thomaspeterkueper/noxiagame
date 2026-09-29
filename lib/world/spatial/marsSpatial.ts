@@ -1,4 +1,5 @@
 import { PLANETARY_REFERENCES, localEnuToPlanetary, planetaryToLocalEnu } from '../../game/spatial/planetary'
+import { createPlanetaryViewAnchor } from '../../game/spatial/planetaryView'
 
 export type MarsGeoPoint = { lat: number; lon: number; elevationM?: number | null }
 export type MarsLocalMetricPoint = { eastM: number; northM: number; upM?: number }
@@ -22,13 +23,9 @@ export function validateMarsGeoPoint(point: MarsGeoPoint): MarsGeoPoint {
 }
 
 export function createMarsRegionAnchor(id: string, name: string, origin: MarsGeoPoint, options: { chunkSizeM?: number; cellSizeM?: number } = {}): MarsRegionAnchor {
-  return {
-    id,
-    name,
-    origin: validateMarsGeoPoint(origin),
-    chunkSizeM: options.chunkSizeM ?? MARS_CHUNK_SIZE_M,
-    cellSizeM: options.cellSizeM ?? MARS_CELL_SIZE_M,
-  }
+  const validated=validateMarsGeoPoint(origin)
+  const view=createPlanetaryViewAnchor('mars',{latDeg:validated.lat,lonDeg:validated.lon,elevationM:validated.elevationM??undefined},{name,chunkSizeM:options.chunkSizeM??MARS_CHUNK_SIZE_M,cellSizeM:options.cellSizeM??MARS_CELL_SIZE_M})
+  return {id,name:view.name,origin:{lat:view.origin.latDeg,lon:view.origin.lonDeg,elevationM:view.origin.elevationM},chunkSizeM:view.chunkSizeM,cellSizeM:view.cellSizeM}
 }
 
 export function marsGeoToLocalMeters(point: MarsGeoPoint, anchor: MarsGeoPoint): MarsLocalMetricPoint {
