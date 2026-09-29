@@ -47,6 +47,125 @@ export interface ExperimentPlan {
   status: 'planned' | 'running' | 'completed' | 'cancelled'
 }
 
+
+export interface ResearchFinding {
+  id: string
+  experimentId: string
+  hypothesisId: string
+  subjectRef: string
+  outcome: 'supports' | 'contradicts' | 'null' | 'inconclusive'
+  measurementRefs: string[]
+  effectEstimate?: number | null
+  uncertainty: number
+  context: Record<string, unknown>
+  createdAtTick: number
+}
+
+export interface EvidenceAssessment {
+  id: string
+  hypothesisId: string
+  findingIds: string[]
+  status: 'insufficient' | 'provisional' | 'replicated' | 'contradicted'
+  confidence: number
+  replicationCount: number
+  allowsProtocolRevision: boolean
+}
+
+export interface MagnetobiologyExperimentInput {
+  subjectRef: string
+  groupId: string
+  organismContext: string
+  baselineMicrotesla: number
+  exposureMicrotesla: number
+  durationTicks: number
+  measurements: string[]
+  evidenceRefs: string[]
+}
+
+export function createMagnetobiologyExperiment(input: MagnetobiologyExperimentInput): { hypothesis: Hypothesis; experiment: ExperimentPlan } {
+  const key = input.subjectRef + ':' + input.organismContext + ':' + input.exposureMicrotesla
+  const hypothesis: Hypothesis = {
+    id: 'hypothesis:magnetobiology:' + key,
+    groupId: input.groupId,
+    subjectRef: input.subjectRef,
+    claimType: 'magnetic_environment_affects_measured_biological_endpoint',
+    evidenceFor: [...input.evidenceRefs],
+    evidenceAgainst: [],
+    confidence: 0.35,
+    status: 'testing',
+  }
+  return {
+    hypothesis,
+    experiment: {
+      id: 'experiment:magnetobiology:' + key,
+      hypothesisId: hypothesis.id,
+      intervention: {
+        magneticFluxDensityMicrotesla: input.exposureMicrotesla,
+        organismContext: input.organismContext,
+      },
+      baseline: {
+        magneticFluxDensityMicrotesla: input.baselineMicrotesla,
+        organismContext: input.organismContext,
+      },
+      durationTicks: input.durationTicks,
+      measurements: [...input.measurements],
+      status: 'planned',
+    },
+  }
+}
+
+export function createResearchFinding(input: {
+  experiment: ExperimentPlan
+  subjectRef: string
+  outcome: ResearchFinding['outcome']
+  measurementRefs: string[]
+  effectEstimate?: number | null
+  uncertainty: number
+  context: Record<string, unknown>
+  createdAtTick: number
+}): ResearchFinding {
+  return {
+    id: 'finding:' + input.experiment.id + ':' + input.createdAtTick,
+    experimentId: input.experiment.id,
+    hypothesisId: input.experiment.hypothesisId,
+    subjectRef: input.subjectRef,
+    outcome: input.outcome,
+    measurementRefs: [...input.measurementRefs],
+    effectEstimate: input.effectEstimate ?? null,
+    uncertainty: unit(input.uncertainty),
+    context: { ...input.context },
+    createdAtTick: input.createdAtTick,
+  }
+}
+
+export function assessResearchEvidence(hypothesis: Hypothesis, findings: ResearchFinding[]): EvidenceAssessment {
+  const relevant = findings.filter(f => f.hypothesisId === hypothesis.id)
+  const informative = relevant.filter(f => f.outcome !== 'inconclusive')
+  const support = informative.filter(f => f.outcome === 'supports').length
+  const contradict = informative.filter(f => f.outcome === 'contradicts').length
+  const replicationCount = Math.max(0, informative.length - 1)
+
+  let status: EvidenceAssessment['status'] = 'insufficient'
+  if (contradict > 0 && support > 0) status = 'contradicted'
+  else if (contradict > 0) status = 'contradicted'
+  else if (support >= 2) status = 'replicated'
+  else if (support === 1) status = 'provisional'
+
+  const meanCertainty = informative.length
+    ? informative.reduce((sum, finding) => sum + (1 - finding.uncertainty), 0) / informative.length
+    : 0
+
+  return {
+    id: 'evidence:' + hypothesis.id,
+    hypothesisId: hypothesis.id,
+    findingIds: relevant.map(f => f.id),
+    status,
+    confidence: unit(meanCertainty),
+    replicationCount,
+    allowsProtocolRevision: status === 'replicated',
+  }
+}
+
 export interface TemporalProtocol {
   id: string
   version: number
