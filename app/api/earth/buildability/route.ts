@@ -5,7 +5,7 @@ import type { EarthFeatureClass } from '@/lib/world/spatial/earthFeatureSource'
 import type { EarthFeatureRestrictionPolicy, EarthFeatureRestrictionRule } from '@/lib/world/spatial/earthUsageRestrictions'
 import { buildEarthBuildabilitySurface } from '@/lib/world/spatial/earthBuildabilitySurface'
 import { localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
-import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
+import { EARTH_SAUERLAND_REGION, createEarthViewAnchor, getEarthRegion } from '@/lib/world/spatial/regions'
 import { OpenMeteoElevationSource } from '@/lib/world/spatial/openMeteoElevationSource'
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
 
@@ -20,6 +20,12 @@ function finiteParam(params: URLSearchParams, key: string) {
   const value = Number(raw)
   if (!Number.isFinite(value)) throw new Error(`Invalid ${key}`)
   return value
+}
+
+function finiteCookieCoordinate(raw: string | undefined, min: number, max: number) {
+  if (raw == null || raw.trim() === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) && value >= min && value <= max ? value : null
 }
 
 function parseRule(raw: string): [EarthFeatureClass, EarthFeatureRestrictionRule] | null {
@@ -43,7 +49,10 @@ export async function GET(request: NextRequest) {
     const requestedRegionId = params.get('region')
       ?? request.cookies.get('noxia-earth-region')?.value
       ?? EARTH_SAUERLAND_REGION.id
-    const region = getEarthRegion(requestedRegionId) ?? EARTH_SAUERLAND_REGION
+    const legacyRegion = getEarthRegion(requestedRegionId) ?? EARTH_SAUERLAND_REGION
+    const viewLat = finiteCookieCoordinate(request.cookies.get('noxia-earth-view-lat')?.value, -90, 90)
+    const viewLon = finiteCookieCoordinate(request.cookies.get('noxia-earth-view-lon')?.value, -180, 180)
+    const region = viewLat != null && viewLon != null ? createEarthViewAnchor({ lat: viewLat, lon: viewLon }) : legacyRegion
 
     const minXM = finiteParam(params, 'minXM')
     const minYM = finiteParam(params, 'minYM')
