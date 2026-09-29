@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   const center = hasLocalCenter
     ? { lat: localLat, lon: localLon }
     : viewRegion.origin
-  const radiusKm = Math.min(6, Math.max(.2, Number(p.get('radiusKm') ?? (hasLocalCenter ? .6 : 3))))
+  const radiusKm = Math.min(15, Math.max(.2, Number(p.get('radiusKm') ?? (hasLocalCenter ? .6 : 10))))
   const latDelta = radiusKm / 111.32
   const cosLat = Math.max(.05, Math.abs(Math.cos(center.lat * Math.PI / 180)))
   const lonDelta = radiusKm / (111.32 * cosLat)
