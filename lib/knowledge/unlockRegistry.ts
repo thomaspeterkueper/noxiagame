@@ -93,6 +93,15 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
     ],
     grants: ['BLD:NOX:mars-habitat-1'], ssfMapping: 'module.unlocks[]', tier: 'integration',
   },
+  'UNL:NOX:research:magnetobiology-experiment-design': {
+    id: 'UNL:NOX:research:magnetobiology-experiment-design',
+    label: 'Magnetobiologie — Experimentdesign',
+    scope: 'Kontrollierte Magnetfeld-Expositionen als Forschungsvariable planen, inklusive Organismus-/Genotypkontext, Kontrollbedingungen, biologischen Endpunkten, Replikation und Nullbefunden. Keine Humanwirkung, Therapie oder Habitatwirkung wird vorausgesetzt.',
+    requiresUnlocks: [],
+    grants: ['ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN'],
+    ssfMapping: 'module.unlocks[]',
+    tier: 'foundation',
+  },
   'UNL:NOX:smelting': {
     id: 'UNL:NOX:smelting', label: 'Metallurgie I', scope: 'Thermische Metallgewinnung und Weiterverarbeitung.',
     requiresUnlocks: ['UNL:NOX:resource-extraction'], grants: ['BLD:NOX:schmelze-1'], ssfMapping: 'module.unlocks[]', tier: 'subsystem',
