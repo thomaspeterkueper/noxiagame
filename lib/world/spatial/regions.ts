@@ -1,5 +1,6 @@
 import type { EarthRegionAnchor } from './earthSpatial'
 import { EARTH_CELL_SIZE_M, EARTH_CHUNK_SIZE_M } from './earthSpatial'
+import { createPlanetaryViewAnchor } from '../../game/spatial/planetaryView'
 
 /**
  * Legacy named Earth streaming/import anchors.
@@ -56,13 +57,12 @@ export function getEarthRegion(id: string): EarthRegionAnchor | null {
  * This is not a named gameplay region and must never become navigation state.
  */
 export function createEarthViewAnchor(origin: EarthRegionAnchor['origin']): EarthRegionAnchor {
-  const lat = Number(origin.lat.toFixed(6))
-  const lon = Number(origin.lon.toFixed(6))
+  const view = createPlanetaryViewAnchor('earth', { latDeg: origin.lat, lonDeg: origin.lon, elevationM: origin.elevationM ?? undefined }, { name: 'Earth · local view', chunkSizeM: EARTH_CHUNK_SIZE_M, cellSizeM: EARTH_CELL_SIZE_M })
   return {
-    id: `earth-view-${lat}-${lon}`,
-    name: 'Earth · local view',
-    origin: { lat, lon },
-    chunkSizeM: EARTH_CHUNK_SIZE_M,
-    cellSizeM: EARTH_CELL_SIZE_M,
+    id: view.id,
+    name: view.name,
+    origin: { lat: view.origin.latDeg, lon: view.origin.lonDeg, elevationM: view.origin.elevationM },
+    chunkSizeM: view.chunkSizeM,
+    cellSizeM: view.cellSizeM,
   }
 }
