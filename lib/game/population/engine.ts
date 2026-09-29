@@ -7,6 +7,7 @@ import { derivePopulationEncounters, type PopulationEncounter } from './encounte
 import { projectEncounterRelationship } from './encounterProjection'
 import { resolvedPresenceCandidates } from './presence'
 import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
+import { persistObservableKnowledge } from './observableKnowledge'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
 type SupabaseLike = any
@@ -159,6 +160,7 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     const persistedEvent: PopulationEvent = { ...event, id: insertedEvent.id }
     const memoryResult = await persistPopulationEventMemory(supabase, persistedEvent, { projectRelationship: false })
     if (memoryResult.errors.length) throw new Error(memoryResult.errors.join('; '))
+    await persistObservableKnowledge(supabase, persistedEvent)
   }
 
   const { data: relationshipRow, error: relationshipError } = await supabase
