@@ -2,8 +2,10 @@ import type { EarthRegionAnchor } from './earthSpatial'
 import { EARTH_CELL_SIZE_M, EARTH_CHUNK_SIZE_M } from './earthSpatial'
 
 /**
- * NOXIA Earth streaming anchors.
+ * Legacy named Earth streaming/import anchors.
  *
+ * These anchors are backend cache/import conveniences, not player navigation modes.
+ * New arbitrary Earth views must use createEarthViewAnchor().
  * An anchor is deliberately not a map boundary and never owns an object's
  * canonical position. Earth persistence is global WGS84 latitude/longitude;
  * anchors only provide stable local metre projections for rendering,
