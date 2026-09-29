@@ -1,14 +1,15 @@
 'use client'
-import{useState}from'react'
+import{useEffect,useState}from'react'
 import{createClient}from'@/lib/supabase/client'
 
 type Question={id:string;title:string;question:string;learningPathId:string;requirement:{observable:string;environment:string;minRangeMeters?:number}}
 type Plan={question:Question;sufficientInstrumentIds:string[];nearestCandidates:{instrumentId:string;gaps:string[]}[];gap:{missingDimensions:string[];candidateInstrumentTypes:string[]}|null}
 const GAP:Record<string,string>={observable:'Messgröße',environment:'Messumgebung',range:'Reichweite',uncertainty:'Unsicherheit',detection_limit:'Nachweisgrenze',spatial_resolution:'räumliche Auflösung',temporal_resolution:'zeitliche Auflösung'}
-async function headers(){const sb=createClient(),{data:{session}}=await sb.auth.getSession();return session?{Authorization:`Bearer ${session.access_token}`}:{}}
+async function headers():Promise<Record<string,string>>{const sb=createClient(),{data:{session}}=await sb.auth.getSession();return session?{Authorization:`Bearer ${session.access_token}`}:{}}
 
 export default function ResearchPlanningPanel({location,questions,onUseInstrument}:{location:string;questions:Question[];onUseInstrument:(id:string)=>void}){
  const[selected,setSelected]=useState(questions[0]?.id??''),[plan,setPlan]=useState<Plan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('')
+ useEffect(()=>{if(!selected&&questions[0])setSelected(questions[0].id)},[questions,selected])
  const q=questions.find(x=>x.id===selected)
  async function assess(){if(!selected)return;setBusy(true);setError('');try{const h=await headers(),r=await fetch(`/api/game/scanner?location=${encodeURIComponent(location)}&researchQuestion=${encodeURIComponent(selected)}`,{headers:h}),d=await r.json();if(!r.ok)throw new Error(d.error||'research_plan_failed');setPlan(d.researchPlan??null)}catch(e){setError(e instanceof Error?e.message:'research_plan_failed')}finally{setBusy(false)}}
  if(!questions.length)return null
