@@ -58,6 +58,13 @@ function normalizeRotation(v:number){return((Math.round(v)%360)+360)%360}
 function payloadWidthM(payload:Payload){if(!payload.bounds)return null;const b=payload.bounds,lat=(b.south+b.north)/2;return distanceMeters({lat,lon:b.west},{lat,lon:b.east})}
 function terrainLabel(state:TerrainCell['state']){return state==='buildable'?'grundsätzlich bebaubar':state==='restricted'?'nur eingeschränkt geeignet':state==='invalid'?'für Standardbau ungeeignet':'noch nicht aufgelöst'}
 function worldStatusLabel(status:string){return status==='active'?'In Betrieb':status==='built'||status==='completed'?'Fertig':status||'Fertig'}
+function stableFeatureVariant(id:string){let hash=0;for(let i=0;i<id.length;i+=1)hash=(hash*31+id.charCodeAt(i))>>>0;return hash%3}
+function forestProfile(id:string,zoom:number){
+  const variant=stableFeatureVariant(id)
+  if(zoom<2)return{pattern:'earth-forest-canopy-wide',opacity:.42,edge:1.2}
+  if(zoom<8)return{pattern:variant===0?'earth-forest-canopy-open':'earth-forest-canopy',opacity:.7,edge:1.8}
+  return{pattern:variant===0?'earth-forest-canopy-open':variant===1?'earth-forest-canopy':'earth-forest-canopy-dense',opacity:.9,edge:2.4}
+}
 
 export default function EarthRegionPreview(){
   const[data,setData]=useState<Payload|null>(null)
@@ -253,11 +260,16 @@ export default function EarthRegionPreview(){
       onPointerUp={e=>{suppressMapClick.current=Boolean(drag.current?.moved);drag.current=null;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}}}
       onClick={chooseMapSpot}>
       <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
-        <defs><pattern id="earth-forest-canopy" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="4" cy="5" r="2.2" fill="#536c49" opacity=".52"/><circle cx="13" cy="11" r="2.8" fill="#789067" opacity=".46"/><circle cx="7" cy="16" r="1.8" fill="#455f40" opacity=".4"/></pattern></defs>
+        <defs>
+          <pattern id="earth-forest-canopy-wide" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="7" cy="8" r="3" fill="#536c49" opacity=".42"/><circle cx="21" cy="19" r="3.6" fill="#789067" opacity=".36"/></pattern>
+          <pattern id="earth-forest-canopy-open" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="5" cy="6" r="2.4" fill="#536c49" opacity=".5"/><circle cx="18" cy="15" r="3" fill="#789067" opacity=".44"/></pattern>
+          <pattern id="earth-forest-canopy" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="4" cy="5" r="2.2" fill="#536c49" opacity=".52"/><circle cx="13" cy="11" r="2.8" fill="#789067" opacity=".46"/><circle cx="7" cy="16" r="1.8" fill="#455f40" opacity=".4"/></pattern>
+          <pattern id="earth-forest-canopy-dense" width="13" height="13" patternUnits="userSpaceOnUse"><circle cx="3" cy="4" r="2.4" fill="#455f40" opacity=".58"/><circle cx="9" cy="7" r="2.8" fill="#607b52" opacity=".55"/><circle cx="5" cy="12" r="2" fill="#789067" opacity=".46"/></pattern>
+        </defs>
         <rect width="1000" height="1000" fill="#9caf78"/>
         <g ref={mapGroupRef} transform={`translate(${offset.x} ${offset.y}) scale(${zoom})`}>
           {layers.relief&&terrainOverlay.map(c=><rect key={`relief-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w*1.08} height={c.h*1.08} fill={c.shade} opacity={c.shadeOpacity}/>) }
-          {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}return <g key={f.id}><path d={f.d} fill={s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>{f.featureType==='forest'&&<path d={f.d} fill="url(#earth-forest-canopy)" stroke="none" opacity={zoom<2?.55:zoom<8?.72:.9}/>}</g>})}
+          {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}const forest=f.featureType==='forest'?forestProfile(String(f.id),zoom):null;return <g key={f.id}><path d={f.d} fill={s.fill} stroke={forest?'#536447':s.stroke} strokeWidth={(forest?forest.edge:s.width)/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>{forest&&<path d={f.d} fill={`url(#${forest.pattern})`} stroke="none" opacity={forest.opacity}/>}</g>})}
           {layers.buildability&&terrainOverlay.map(c=><rect key={`build-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill={c.buildFill} opacity={.28} stroke={c.buildFill} strokeWidth={.25/zoom}/>)}
           {layers.slope&&terrainOverlay.map(c=><rect key={`slope-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill="#351d18" opacity={c.slopeOpacity}/>)}
 
