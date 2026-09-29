@@ -10,6 +10,8 @@ on:
       - 'lib/game/resourceObservationPlanning.ts'
       - 'lib/game/resourceObservationPlanning.test.ts'
       - 'lib/game/prospectingResearchQuestions.ts'
+      - 'lib/game/prospectingDevelopmentOrder.ts'
+      - 'lib/game/prospectingDevelopmentOrder.ts'
       - 'lib/game/prospectingResearchQuestions.test.ts'
       - 'app/scanner/ResearchPlanningPanel.tsx'
       - 'app/scanner/ScannerWorkspace.tsx'
