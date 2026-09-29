@@ -14,6 +14,7 @@ import {
   type ResourceTier,
   type ScannerCapability,
 } from '@/lib/game/resourceScanning'
+import { PROSPECTING_RESEARCH_QUESTIONS, planProspectingQuestion } from '@/lib/game/prospectingResearchQuestions'
 
 async function authenticatedUser(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -327,16 +328,22 @@ export async function GET(req: NextRequest) {
   }
 
   if (!worldScanner) return NextResponse.json({ location: locationSlug, mode: 'resource', scanner: null, discoveries: [] })
-  const requestedInstrument = new URL(req.url).searchParams.get('instrument')
+  const url = new URL(req.url)
+  const requestedInstrument = url.searchParams.get('instrument')
+  const researchQuestionId = url.searchParams.get('researchQuestion')
   const capability = await capabilityFor(supabase, user.id, worldScanner, requestedInstrument)
   const { data: ownedInstrumentRows } = await supabase.from('player_instruments').select('instrument_id').eq('profile_id', user.id)
+  const ownedInstruments = (ownedInstrumentRows ?? []).map((r: any) => r.instrument_id)
+  const researchPlan = researchQuestionId ? planProspectingQuestion(researchQuestionId, ownedInstruments) : null
   return NextResponse.json({
     location: locationSlug,
     mode: 'resource',
     scanner: { id: worldScanner.id, lat: Number(worldScanner.latitude_deg), lon: Number(worldScanner.longitude_deg), hardwareLevel: capability.hardwareLevel },
     capability,
     availableInstruments: INSTRUMENTS,
-    ownedInstruments: (ownedInstrumentRows ?? []).map((r: any) => r.instrument_id),
+    ownedInstruments,
+    researchQuestions: PROSPECTING_RESEARCH_QUESTIONS,
+    researchPlan,
     discoveries: (data ?? []).filter((row: any) => row.region_resource_id).map((row: any) => resourceDiscoveryDto(row, capability)),
   })
 }
