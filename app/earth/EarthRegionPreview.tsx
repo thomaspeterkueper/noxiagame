@@ -7,7 +7,6 @@ import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/gam
 import { constructionState } from '@/lib/game/constructionProgress'
 import { isEarthMapSurfaceTarget, shouldChooseEarthMapSpot } from '@/lib/world/spatial/earthMapInteraction'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
-import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { createSpaceportPlanningOverlay } from '@/lib/world/spatial/spaceportPlanningOverlay'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
