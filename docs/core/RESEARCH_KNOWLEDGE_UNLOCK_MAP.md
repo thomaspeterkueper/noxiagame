@@ -76,3 +76,24 @@ If research projects, experiments or discoveries become first-class unlock sourc
 `measurement -> interpretation -> validated discovery -> progression evidence -> NOXIA unlock candidate -> prerequisite resolution -> persisted unlock`
 
 That extension must preserve the same rule: evidence can justify authority, but evidence is not authority by itself.
+
+
+## Magnetobiology research capability
+
+The magnetobiology learning path is the first explicit learning-to-research-action bridge.
+
+Canonical chain:
+
+`OTA-SCI-0096 -> KG-0025 -> PATH:NOXIA:MAGNETOBIOLOGY-RESEARCH -> UNL:NOX:research:magnetobiology-experiment-design -> ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN`
+
+The unlock authorizes experiment **design/attempt only**. It does not create a positive finding, human-health effect, ageing modifier, habitat protocol, therapeutic effect or X-technology capability.
+
+The action gate is implemented in `lib/knowledge/researchCapability.ts`. A denied action returns the required unlock and an Academy lookup URL, preserving the existing learn-from-game loop.
+
+The magnetic-environment sensing concept from the learning path remains a knowledge/sensor-semantic target until a concrete NOXIA sensor capability is registered. It must not be persisted as an unknown unlock merely because SSF names it.
+
+A future executable research command must apply the gate server-side before creating an ExperimentPlan and must preserve:
+
+`observation -> hypothesis -> experiment -> finding (including null) -> replication/evidence assessment -> protocol revision or rejection`
+
+No step may silently convert model-organism evidence into human or habitat effects.
