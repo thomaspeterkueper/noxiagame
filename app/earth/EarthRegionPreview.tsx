@@ -31,6 +31,7 @@ const layerOrder=['farmland','forest','urban','water','industrial','public','bui
 const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,sites:true,corridor:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=300
 const LOCAL_DETAIL_RADIUS_KM=.65
+const EARTH_OVERVIEW_RADIUS_KM=10
 const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
 const EARTH_DATA_VERSION='20260906-local-detail-1'
 
@@ -92,28 +93,20 @@ export default function EarthRegionPreview(){
   useEffect(()=>{
     const load=async()=>{
       try{
-        const response=await fetch(`/api/earth/region?radiusKm=3&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
+        const response=await fetch(`/api/earth/region?radiusKm=${EARTH_OVERVIEW_RADIUS_KM}&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
         const json=await response.json() as Payload
         setData(json)
         if(json.ok){
           setOverviewData(json)
-          // 16.09.2026: Testspieler waren mit dem grossen Massstab (3km-
-          // Uebersicht als Startansicht) ueberfordert. Default ist jetzt ein
-          // konkreter, kleiner Ausschnitt auf Bauplan-Zoom -- fuer Sauerland
-          // der bebaute Referenzstandort Selmecke, fuer andere Regionen
-          // (aktuell Namibia/Erongo, kuenftig auch neue) deren definierter
-          // Ursprungspunkt. Dass die Welt groesser ist, erschliesst sich
-          // ueber "Uebersicht" (auszoomen), nicht als erzwungener erster
-          // Eindruck.
-          const isSauerland=Boolean(json.region?.name?.includes('Sauerland'))
-          const defaultFocus=isSauerland?SELMECKE_DEFAULT_FOCUS:(json.region?.origin??SELMECKE_DEFAULT_FOCUS)
-          const defaultFocusLabel=isSauerland?'Selmecke':(json.region?.name??'Regionsansicht')
-          void focusGeoPoint(defaultFocus,defaultFocusLabel)
+          // Keep the resolved region/search centre visible. Selmecke is a
+          // reference site inside the Sauerland dataset, not a camera target.
+          // An explicit settlement/search selection may call focusGeoPoint(),
+          // but initialization must never overwrite that choice.
         }
       }catch(e){setData({ok:false,error:String(e)})}
     }
     void load()
-    fetch('/api/earth/spaceport-candidates?radiusKm=3').then(r=>r.json()).then(setCandidateData).catch(e=>setCandidateData({ok:false,error:String(e)}))
+    fetch(`/api/earth/spaceport-candidates?radiusKm=${EARTH_OVERVIEW_RADIUS_KM}`).then(r=>r.json()).then(setCandidateData).catch(e=>setCandidateData({ok:false,error:String(e)}))
     void loadSpatial()
   },[])
 
@@ -259,10 +252,11 @@ export default function EarthRegionPreview(){
       onPointerUp={e=>{suppressMapClick.current=Boolean(drag.current?.moved);drag.current=null;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}}}
       onClick={chooseMapSpot}>
       <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+        <defs><pattern id="earth-forest-canopy" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="4" cy="5" r="2.2" fill="#536c49" opacity=".52"/><circle cx="13" cy="11" r="2.8" fill="#789067" opacity=".46"/><circle cx="7" cy="16" r="1.8" fill="#455f40" opacity=".4"/></pattern></defs>
         <rect width="1000" height="1000" fill="#9caf78"/>
         <g ref={mapGroupRef} transform={`translate(${offset.x} ${offset.y}) scale(${zoom})`}>
           {layers.relief&&terrainOverlay.map(c=><rect key={`relief-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w*1.08} height={c.h*1.08} fill={c.shade} opacity={c.shadeOpacity}/>) }
-          {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}return <path key={f.id} d={f.d} fill={s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>})}
+          {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}return <g key={f.id}><path d={f.d} fill={s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>{f.featureType==='forest'&&<path d={f.d} fill="url(#earth-forest-canopy)" stroke="none" opacity={zoom<2?.55:zoom<8?.72:.9}/>}</g>})}
           {layers.buildability&&terrainOverlay.map(c=><rect key={`build-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill={c.buildFill} opacity={.28} stroke={c.buildFill} strokeWidth={.25/zoom}/>)}
           {layers.slope&&terrainOverlay.map(c=><rect key={`slope-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill="#351d18" opacity={c.slopeOpacity}/>)}
 
