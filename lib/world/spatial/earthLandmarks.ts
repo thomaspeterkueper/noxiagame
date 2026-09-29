@@ -537,7 +537,7 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
     presentDayRole: 'Metropole am Nil mit vielschichtiger islamischer, wissenschaftlicher und handwerklicher Geschichte.',
     noxiaRole: 'Cross-Universe-Anker für Vermessung, Kartografie, Wissensüberlieferung und urbane Langzeitentwicklung.',
     sourceProjects: [
-      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Herkunftsort des Kartografen und seiner Vermesser-Familienlinie.' },
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'reference', note: 'Älterer Werkstatt-/Planungsanker; die aktuelle Manuskript-Stationsfolge beginnt in Alexandria und führt Kairo nicht als Station.' },
       { project: 'NOXIA', relation: 'research-anchor', note: 'Kartografie, Vermessung und Wissensüberlieferung.' },
     ],
   },
@@ -593,7 +593,7 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
     presentDayRole: 'Historische Atlantik- und Hafenstadt in Andalusien mit sehr langer maritimer Siedlungsgeschichte.',
     noxiaRole: 'Cross-Universe-Anker für den Übergang Mittelmeer–Atlantik, Navigation, Hafenlogistik und Kartografie.',
     sourceProjects: [
-      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Spätere westliche Station des Kartografen in Andalusien.' },
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'reference', note: 'Legacy-Planungsanker einer älteren Routenfassung; Cádiz gehört nicht zur aktuellen neun Stationen umfassenden Manuskriptfolge.' },
       { project: 'NOXIA', relation: 'research-anchor', note: 'Navigation, Kartografie und maritime Übergangsräume.' },
     ],
   },
