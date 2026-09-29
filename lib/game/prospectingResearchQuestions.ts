@@ -1,6 +1,7 @@
 import type { ObservationEnvironment,ObservationRequirement } from './population/observationCapability'
 import { prospectingObservationCatalog } from './resourceObservationPlanning'
 import { instrumentsForObservation,observationTechnologyGap } from './population/observationCapability'
+import { prospectingDevelopmentOrder } from './prospectingDevelopmentOrder'
 
 export interface ProspectingResearchQuestion{
  id:string
@@ -24,10 +25,12 @@ export function planProspectingQuestion(questionId:string,ownedInstrumentIds:rea
  const catalog=prospectingObservationCatalog(ownedInstrumentIds)
  const matches=instrumentsForObservation(catalog,question.requirement)
  const gap=observationTechnologyGap(catalog,question.requirement)
+ const developmentOrder=gap?prospectingDevelopmentOrder({questionId:question.id,learningPathId:question.learningPathId,gap}):null
  return {
   question,
   sufficientInstrumentIds:matches.filter(m=>m.sufficient).map(m=>m.profile.instrumentType),
   nearestCandidates:matches.slice(0,3).map(m=>({instrumentId:m.profile.instrumentType,gaps:m.gaps})),
   gap:gap?{missingDimensions:gap.missingDimensions,candidateInstrumentTypes:gap.candidateInstrumentTypes}:null,
+  developmentOrder,
  }
 }
