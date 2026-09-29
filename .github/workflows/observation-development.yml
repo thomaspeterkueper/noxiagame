@@ -9,6 +9,16 @@ on:
       - 'lib/game/population/observationDevelopment.test.ts'
       - 'lib/game/resourceObservationPlanning.ts'
       - 'lib/game/resourceObservationPlanning.test.ts'
+      - 'lib/game/prospectingResearchQuestions.ts'
+      - 'lib/game/prospectingResearchQuestions.test.ts'
+      - 'app/scanner/ResearchPlanningPanel.tsx'
+      - 'app/scanner/ScannerWorkspace.tsx'
+      - 'app/api/game/scanner/route.ts'
+      - 'lib/game/prospectingResearchQuestions.ts'
+      - 'lib/game/prospectingResearchQuestions.test.ts'
+      - 'app/scanner/ResearchPlanningPanel.tsx'
+      - 'app/scanner/ScannerWorkspace.tsx'
+      - 'app/api/game/scanner/route.ts'
       - 'lib/game/resourceObservationPlanning.ts'
       - 'lib/game/resourceObservationPlanning.test.ts'
       - '.github/workflows/observation-development.yml'
@@ -32,3 +42,5 @@ jobs:
       - run: node .observation-development-test/game/population/observationDevelopment.test.js
       - run: npx tsc lib/game/resourceObservationPlanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .resource-observation-test
       - run: node .resource-observation-test/game/resourceObservationPlanning.test.js
+      - run: npx tsc lib/game/prospectingResearchQuestions.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .prospecting-research-test
+      - run: node .prospecting-research-test/game/prospectingResearchQuestions.test.js
