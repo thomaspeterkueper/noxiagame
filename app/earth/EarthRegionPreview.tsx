@@ -146,14 +146,14 @@ export default function EarthRegionPreview(){
   useEffect(()=>{
     if(!(spatial?.builds?.length))return
     const clock=window.setInterval(()=>setNow(Date.now()),1000)
-    const refresh=window.setInterval(()=>void loadSpatial(),15000)
+    const refresh=window.setInterval(()=>{if(!hasCustomView)void loadSpatial()},15000)
     return()=>{window.clearInterval(clock);window.clearInterval(refresh)}
   },[spatial?.builds?.length])
 
-  const projection=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds;return{x:(lon:number)=>((lon-b.west)/(b.east-b.west))*1000,y:(lat:number)=>((b.north-lat)/(b.north-b.south))*1000,lon:(x:number)=>b.west+x/1000*(b.east-b.west),lat:(y:number)=>b.north-y/1000*(b.north-b.south)}},[data])
+  const projection=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds;return{x:(lon:number)=>((lon-b.west)/(b.east-b.west))*1000,y:(lat:number)=>((b.north-lat)/(b.north-b.south))*1000,lon:(x:number)=>b.west+x/1000*(b.east-b.west),lat:(y:number)=>b.north-y/1000*(b.north-b.south)}},[data,customEarthView])
   const mapMetrics=useMemo(()=>{if(!data?.bounds)return null;const b=data.bounds,midLat=(b.south+b.north)/2,midLon=(b.west+b.east)/2;return{widthM:distanceMeters({lat:midLat,lon:b.west},{lat:midLat,lon:b.east}),heightM:distanceMeters({lat:b.south,lon:midLon},{lat:b.north,lon:midLon})}},[data])
 
-  useEffect(()=>{if(!data?.bounds||!data.region?.origin)return;const origin=data.region.origin,b=data.bounds,nw=geoToLocalMeters({lat:b.north,lon:b.west},origin),se=geoToLocalMeters({lat:b.south,lon:b.east},origin);const q=new URLSearchParams({minXM:String(Math.min(nw.eastM,se.eastM)),minYM:String(Math.min(nw.northM,se.northM)),maxXM:String(Math.max(nw.eastM,se.eastM)),maxYM:String(Math.max(nw.northM,se.northM)),maxBuildableSlopeDeg:'5',maxRestrictedSlopeDeg:'12',resolutionM:data.detail?'30':'120'});fetch(`/api/earth/buildability?${q}`).then(r=>r.json()).then(setTerrain).catch(e=>setTerrain({ok:false,error:String(e)}))},[data])
+  useEffect(()=>{if(customEarthView){setTerrain(null);return}if(!data?.bounds||!data.region?.origin)return;const origin=data.region.origin,b=data.bounds,nw=geoToLocalMeters({lat:b.north,lon:b.west},origin),se=geoToLocalMeters({lat:b.south,lon:b.east},origin);const q=new URLSearchParams({minXM:String(Math.min(nw.eastM,se.eastM)),minYM:String(Math.min(nw.northM,se.northM)),maxXM:String(Math.max(nw.eastM,se.eastM)),maxYM:String(Math.max(nw.northM,se.northM)),maxBuildableSlopeDeg:'5',maxRestrictedSlopeDeg:'12',resolutionM:data.detail?'30':'120'});fetch(`/api/earth/buildability?${q}`).then(r=>r.json()).then(setTerrain).catch(e=>setTerrain({ok:false,error:String(e)}))},[data])
 
   const projected=useMemo(()=>{if(!projection||!data?.features)return[];return[...data.features].sort((a,b)=>layerOrder.indexOf(a.featureType)-layerOrder.indexOf(b.featureType)).map(f=>f.geometry.kind==='point'?{...f,p:[projection.x(f.geometry.coordinates.lon),projection.y(f.geometry.coordinates.lat)]as[number,number]}:{...f,d:f.geometry.coordinates.map((p,i)=>`${i?'L':'M'}${projection.x(p.lon).toFixed(2)} ${projection.y(p.lat).toFixed(2)}`).join(' ')+(f.geometry.kind==='polygon'?' Z':'')})},[data,projection])
   const candidates=useMemo(()=>projection?(candidateData?.candidates??[]).map((c,i)=>({...c,index:i,x:projection.x(c.lon),y:projection.y(c.lat)})):[],[candidateData,projection])
