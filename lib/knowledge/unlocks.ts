@@ -1,14 +1,16 @@
 // lib/knowledge/unlocks.ts
 // Erstellt:     19.07.2026
-// Aktualisiert: 2026-07-21 — canFoundColony/Station/Scout/Pioneer Gates
-// Version:      1.1.0
+// Aktualisiert: 2026-09-29 — Robotikfertigung und Präzisionsinstrumentierung
+// Version:      1.2.0
 //
 // Lädt player_unlocks aus der DB und prüft Feature-Gates.
-// Verwendet von: BankOverlay, ColonyGrid, SchoolOverlay
+// Verwendet von: BankOverlay, ColonyGrid, SchoolOverlay, Robotikfertigung
 
 import { createServiceClient } from '@/lib/supabase/service'
 
-// ── Alle Unlocks eines Spielers laden ────────────────────────────────────────
+export const ROBOT_FABRICATION_UNLOCK = 'UNL:NOX:ENG:ROBOT-FABRICATION'
+export const PRECISION_INSTRUMENTATION_UNLOCK = 'UNL:NOX:ENG:PRECISION-INSTRUMENTATION'
+
 export async function getPlayerUnlocks(profileId: string): Promise<string[]> {
   const supabase = createServiceClient()
   const { data } = await supabase
@@ -18,71 +20,37 @@ export async function getPlayerUnlocks(profileId: string): Promise<string[]> {
   return (data ?? []).map((u: any) => u.unlock_id as string)
 }
 
-// ── Feature-Gate Checks ───────────────────────────────────────────────────────
 export function hasUnlock(unlocks: string[], unlockId: string): boolean {
   return unlocks.includes(unlockId)
 }
 
-// Bank-Kredit freigeschalten?
-export function canAccessBankCredit(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:bank-credit')
-}
+export function canAccessBankCredit(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:bank-credit') }
+export function canAccessBankCompound(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:bank-compound') }
+export function canUseSpectralSensor(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:SENSOR:SPECTRAL') }
+export function canUseOrbitalNav(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:NAV:ORBITAL') }
+export function canStartObservationDeck(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:MISSION:OBSERVATION-DECK') }
+export function canFoundColony(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:COLONY:FOUND') }
+export function canFoundStation(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:STATION:FOUND') }
+export function canBuildScout(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:SHIP:SCOUT') }
+export function canBuildPioneer(unlocks: string[]): boolean { return hasUnlock(unlocks, 'UNL:NOX:SHIP:PIONEER') }
 
-// Zinseszins-Vorschau freigeschalten?
-export function canAccessBankCompound(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:bank-compound')
-}
+// SSF/KG capability gates. These helpers never grant knowledge; they only read persisted player_unlocks.
+export function canFabricateRobotModules(unlocks: string[]): boolean { return hasUnlock(unlocks, ROBOT_FABRICATION_UNLOCK) }
+export function canFabricatePrecisionInstruments(unlocks: string[]): boolean { return hasUnlock(unlocks, PRECISION_INSTRUMENTATION_UNLOCK) }
 
-// Spektral-Sensor freigeschalten?
-export function canUseSpectralSensor(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:SENSOR:SPECTRAL')
-}
-
-// Orbitale Navigation freigeschalten?
-export function canUseOrbitalNav(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:NAV:ORBITAL')
-}
-
-// Beobachtungsdeck-Mission freigeschalten?
-export function canStartObservationDeck(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:MISSION:OBSERVATION-DECK')
-}
-
-// Kolonie gründen freigeschaltet? (SSF: ENG-COLONY-FOUND-0001)
-export function canFoundColony(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:COLONY:FOUND')
-}
-
-// Station gründen freigeschaltet? (SSF: ENG-STATION-FOUND-0001)
-export function canFoundStation(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:STATION:FOUND')
-}
-
-// Scout-Schiff freigeschaltet? (SSF: AST-SONNENSYSTEM-0001)
-export function canBuildScout(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:SHIP:SCOUT')
-}
-
-// Pioneer-Schiff freigeschaltet? (SSF: ENG-COLONY/STATION-FOUND)
-export function canBuildPioneer(unlocks: string[]): boolean {
-  return hasUnlock(unlocks, 'UNL:NOX:SHIP:PIONEER')
-}
-
-// Alle Gate-Checks als Objekt (für Client-seitige Nutzung)
 export function getFeatureGates(unlocks: string[]) {
   return {
-    bankCredit:        canAccessBankCredit(unlocks),
-    bankCompound:      canAccessBankCompound(unlocks),
-    spectralSensor:    canUseSpectralSensor(unlocks),
-    orbitalNav:        canUseOrbitalNav(unlocks),
-    observationDeck:   canStartObservationDeck(unlocks),
-    // Wasser-Physik
-    phaseAnalysis:     hasUnlock(unlocks, 'UNL:NOX:PHY:PHASE-DIAGRAM'),
-    surfaceTension:    hasUnlock(unlocks, 'UNL:NOX:PHY:SURFACE-TENSION'),
-    // Chemie
-    waterChemistry:    hasUnlock(unlocks, 'UNL:NOX:CHEM:WATER-MOLECULE'),
-    solubility:        hasUnlock(unlocks, 'UNL:NOX:CHEM:SOLUBILITY'),
-    // Navigation
-    curvature:         hasUnlock(unlocks, 'UNL:NOX:NAV:CURVATURE'),
+    bankCredit: canAccessBankCredit(unlocks),
+    bankCompound: canAccessBankCompound(unlocks),
+    spectralSensor: canUseSpectralSensor(unlocks),
+    orbitalNav: canUseOrbitalNav(unlocks),
+    observationDeck: canStartObservationDeck(unlocks),
+    robotFabrication: canFabricateRobotModules(unlocks),
+    precisionInstrumentation: canFabricatePrecisionInstruments(unlocks),
+    phaseAnalysis: hasUnlock(unlocks, 'UNL:NOX:PHY:PHASE-DIAGRAM'),
+    surfaceTension: hasUnlock(unlocks, 'UNL:NOX:PHY:SURFACE-TENSION'),
+    waterChemistry: hasUnlock(unlocks, 'UNL:NOX:CHEM:WATER-MOLECULE'),
+    solubility: hasUnlock(unlocks, 'UNL:NOX:CHEM:SOLUBILITY'),
+    curvature: hasUnlock(unlocks, 'UNL:NOX:NAV:CURVATURE'),
   }
 }

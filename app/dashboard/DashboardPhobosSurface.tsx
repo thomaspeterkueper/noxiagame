@@ -13,6 +13,7 @@ import {
 } from '@/lib/game/seeds/phobosBaseAlphaSeed'
 import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
+import PhobosModuleWorkshopPanel from './PhobosModuleWorkshopPanel'
 import PhobosRobotFleetPanel from './PhobosRobotFleetPanel'
 import ShipyardOverlay from './ShipyardOverlay'
 import SolarSystem from './SolarSystem'
@@ -33,11 +34,7 @@ const PHOBOS_CORRIDORS: PreparedCorridor[] = (() => {
     const physicalKey = [edge.from, edge.to].sort().join('::')
     if (seen.has(physicalKey)) return []
     seen.add(physicalKey)
-    return [{
-      id: `phobos-corridor-${index}`,
-      kind: edge.corridor === 'anchor-tether' ? 'prepared-track' : 'hardened-road',
-      points: [{ xM: from.xM, yM: from.yM }, { xM: to.xM, yM: to.yM }],
-    }]
+    return [{ id:`phobos-corridor-${index}`, kind:edge.corridor==='anchor-tether'?'prepared-track':'hardened-road', points:[{xM:from.xM,yM:from.yM},{xM:to.xM,yM:to.yM}] }]
   })
 })()
 
@@ -68,18 +65,9 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
     <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>rekonstruiertes lokales Terrain · gemeinsame Funde · {scienceObjects.length} wissenschaftliche Objekte</span></div>
     <PhobosRobotFleetPanel selectedRobotId={selectedRobotId} onSelectedRobotChange={setSelectedRobotId}/>
+    <PhobosModuleWorkshopPanel/>
     <SurfaceScienceLayerPanel enabled={scienceLayerEnabled} onToggle={()=>{setScienceLayerEnabled(value=>!value);if(scienceLayerEnabled)setSelectedScienceId(null)}} objects={scienceObjects} selectedId={selectedScienceId} onSelect={setSelectedScienceId} onOpenOperations={()=>setLogisticsOpen(true)}/>
-    <PlanetarySurfaceMap
-      locationSlug="phobos"
-      body="phobos"
-      mapLabel="Spielbare Phobos-Karte (Stickney)"
-      terrainLabel="MEX / HRSC DEM"
-      minimumWorldSpanM={400}
-      corridors={PHOBOS_CORRIDORS}
-      mobileObjects={surfaceMapObjects}
-      onOpenMobileObject={openSurfaceObject}
-      onOpenWorldObject={openWorldObject}
-    />
+    <PlanetarySurfaceMap locationSlug="phobos" body="phobos" mapLabel="Spielbare Phobos-Karte (Stickney)" terrainLabel="MEX / HRSC DEM" minimumWorldSpanM={400} corridors={PHOBOS_CORRIDORS} mobileObjects={surfaceMapObjects} onOpenMobileObject={openSurfaceObject} onOpenWorldObject={openWorldObject}/>
 
     {dockEntity&&<SpaceportOverlay buildingTypeId="landing_pad_phobos" buildingName={dockName} onClose={()=>setDockEntity(null)} onOpenNavigation={()=>{setDockEntity(null);setNavigationOpen(true)}} onOpenMaintenance={()=>{setDockEntity(null);setShipyardOpen(true)}} onOpenCargo={()=>{setDockEntity(null);setWarehouseOpen(true)}}/>}
     {navigationOpen&&<BuildingOverlayShell eyebrow="GEBÄUDE · NAVIGATION" title="Stickney Navigation" subtitle="Sonnensystem, Reichweite und Flugplanung" onClose={()=>setNavigationOpen(false)} width={1080}><div className="navigation-body"><SolarSystem currentTick={tick} shipRange={shipRange} currentLocation="phobos"/></div></BuildingOverlayShell>}
