@@ -25,6 +25,9 @@ type QuotePayload = {
 const EARTH_REGION_COOKIE = 'noxia-earth-region'
 const SAUERLAND_REGION = 'earth-sauerland'
 const NAMIBIA_REGION = 'earth-namibia-erongo'
+const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
+const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
+const EARTH_VIEW_LABEL_COOKIE = 'noxia-earth-view-label'
 
 function readEarthRegion() {
   if (typeof document === 'undefined') return SAUERLAND_REGION
@@ -35,7 +38,14 @@ function readEarthRegion() {
   return value === NAMIBIA_REGION ? NAMIBIA_REGION : SAUERLAND_REGION
 }
 
+function clearCookie(name: string) {
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`
+}
+
 function selectEarthRegion(regionId: string) {
+  clearCookie(EARTH_VIEW_LAT_COOKIE)
+  clearCookie(EARTH_VIEW_LON_COOKIE)
+  clearCookie(EARTH_VIEW_LABEL_COOKIE)
   document.cookie = `${EARTH_REGION_COOKIE}=${encodeURIComponent(regionId)}; Path=/; Max-Age=31536000; SameSite=Lax`
   window.location.reload()
 }
@@ -82,6 +92,8 @@ export default function EarthInteractionManager() {
       if (!actions || !head) return
 
       const current = readEarthRegion()
+      const customEarthView = Boolean(document.cookie.split('; ').find(row => row.startsWith(`${EARTH_VIEW_LAT_COOKIE}=`)))
+        && Boolean(document.cookie.split('; ').find(row => row.startsWith(`${EARTH_VIEW_LON_COOKIE}=`)))
       let switcher = actions.querySelector<HTMLElement>('[data-noxia-earth-region-switcher]')
       if (!switcher) {
         switcher = document.createElement('div')
@@ -106,7 +118,7 @@ export default function EarthInteractionManager() {
       }
 
       for (const button of Array.from(switcher.querySelectorAll<HTMLButtonElement>('button[data-region-id]'))) {
-        const active = button.dataset.regionId === current
+        const active = !customEarthView && button.dataset.regionId === current
         button.style.background = active ? '#173f4d' : 'transparent'
         button.style.color = active ? '#fffaf0' : '#52666d'
       }
@@ -114,7 +126,7 @@ export default function EarthInteractionManager() {
       const eyebrow = head.querySelector<HTMLElement>('small')
       const title = head.querySelector<HTMLElement>('h1')
       const copy = head.querySelector<HTMLElement>('p')
-      if (current === NAMIBIA_REGION) {
+      if (!customEarthView && current === NAMIBIA_REGION) {
         if (eyebrow && eyebrow.textContent !== 'NOXIA EARTH · NAMIBIA 2086') eyebrow.textContent = 'NOXIA EARTH · NAMIBIA 2086'
         if (title && title.textContent !== 'Erongo-Korridor · Walvis Bay') title.textContent = 'Erongo-Korridor · Walvis Bay'
         const namibiaCopy = 'Reale OSM- und Geländedaten im globalen WGS84-Erdraum. Lokale Meterprojektion für Analyse und Bauen.'
@@ -122,7 +134,7 @@ export default function EarthInteractionManager() {
       }
 
       let badge = actions.querySelector<HTMLElement>('[data-noxia-earth-analysis-mode]')
-      if (current === NAMIBIA_REGION) {
+      if (!customEarthView && current === NAMIBIA_REGION) {
         if (!badge) {
           badge = document.createElement('div')
           badge.dataset.noxiaEarthAnalysisMode = '1'
