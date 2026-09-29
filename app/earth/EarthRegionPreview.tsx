@@ -32,9 +32,10 @@ const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:tru
 const BUILD_PLAN_VISIBLE_WIDTH_M=300
 const LOCAL_DETAIL_RADIUS_KM=.65
 const EARTH_OVERVIEW_RADIUS_KM=10
-const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
 const EARTH_DATA_VERSION='20260929-earth-view-forest-1'
 const EARTH_VIEW_LABEL_COOKIE='noxia-earth-view-label'
+const EARTH_VIEW_LAT_COOKIE='noxia-earth-view-lat'
+const EARTH_VIEW_LON_COOKIE='noxia-earth-view-lon'
 
 function styleFor(type:string,tags:Record<string,string>){
   switch(type){
@@ -90,6 +91,7 @@ export default function EarthRegionPreview(){
   const[focusLabel,setFocusLabel]=useState<string|null>(null)
   const[focusLoading,setFocusLoading]=useState(false)
   const[focusError,setFocusError]=useState<string|null>(null)
+  const[customEarthView,setCustomEarthView]=useState(false)
 
   const drag=useRef<{x:number;y:number;ox:number;oy:number;moved:boolean}|null>(null)
   const suppressMapClick=useRef(false)
@@ -99,6 +101,11 @@ export default function EarthRegionPreview(){
   const loadSpatial=async()=>{const token=await getToken();if(!token){setSpatial({error:'Nicht angemeldet'});return}const response=await fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`}});setSpatial(await response.json())}
 
   useEffect(()=>{
+    const hasCookie=(name:string)=>document.cookie.split('; ').some(row=>row.startsWith(`${name}=`))
+    const hasCustomView=hasCookie(EARTH_VIEW_LAT_COOKIE)&&hasCookie(EARTH_VIEW_LON_COOKIE)
+    setCustomEarthView(hasCustomView)
+    const savedViewLabel=document.cookie.split('; ').find(row=>row.startsWith(`${EARTH_VIEW_LABEL_COOKIE}=`))
+    if(savedViewLabel)setFocusLabel(decodeURIComponent(savedViewLabel.slice(EARTH_VIEW_LABEL_COOKIE.length+1)))
     const load=async()=>{
       try{
         const response=await fetch(`/api/earth/region?radiusKm=${EARTH_OVERVIEW_RADIUS_KM}&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
@@ -114,8 +121,13 @@ export default function EarthRegionPreview(){
       }catch(e){setData({ok:false,error:String(e)})}
     }
     void load()
-    fetch(`/api/earth/spaceport-candidates?radiusKm=${EARTH_OVERVIEW_RADIUS_KM}`).then(r=>r.json()).then(setCandidateData).catch(e=>setCandidateData({ok:false,error:String(e)}))
-    void loadSpatial()
+    if(!hasCustomView){
+      fetch(`/api/earth/spaceport-candidates?radiusKm=${EARTH_OVERVIEW_RADIUS_KM}`).then(r=>r.json()).then(setCandidateData).catch(e=>setCandidateData({ok:false,error:String(e)}))
+      void loadSpatial()
+    }else{
+      setCandidateData(null)
+      setSpatial(null)
+    }
   },[])
 
   useEffect(()=>{
@@ -270,8 +282,8 @@ export default function EarthRegionPreview(){
         <g ref={mapGroupRef} transform={`translate(${offset.x} ${offset.y}) scale(${zoom})`}>
           {layers.relief&&terrainOverlay.map(c=><rect key={`relief-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w*1.08} height={c.h*1.08} fill={c.shade} opacity={c.shadeOpacity}/>) }
           {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}const forest=f.featureType==='forest'?forestProfile(String(f.id),zoom):null;return <g key={f.id}><path d={f.d} fill={s.fill} stroke={forest?'#536447':s.stroke} strokeWidth={(forest?forest.edge:s.width)/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>{forest&&<path d={f.d} fill={`url(#${forest.pattern})`} stroke="none" opacity={forest.opacity}/>}</g>})}
-          {layers.buildability&&terrainOverlay.map(c=><rect key={`build-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill={c.buildFill} opacity={.28} stroke={c.buildFill} strokeWidth={.25/zoom}/>)}
-          {layers.slope&&terrainOverlay.map(c=><rect key={`slope-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill="#351d18" opacity={c.slopeOpacity}/>)}
+          {!customEarthView&&layers.buildability&&terrainOverlay.map(c=><rect key={`build-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill={c.buildFill} opacity={.28} stroke={c.buildFill} strokeWidth={.25/zoom}/>)}
+          {!customEarthView&&layers.slope&&terrainOverlay.map(c=><rect key={`slope-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill="#351d18" opacity={c.slopeOpacity}/>)}
 
           {layers.corridor&&corridorOverlay&&<g className="earth-planning-corridor" pointerEvents="none" aria-label="Korridor B · Vorprüfung · nicht kanonisch">
             <line x1={corridorOverlay.startX} y1={corridorOverlay.startY} x2={corridorOverlay.endX} y2={corridorOverlay.endY} stroke="#f0c854" strokeWidth={5/zoom} strokeOpacity=".28"/>
@@ -280,7 +292,7 @@ export default function EarthRegionPreview(){
             <circle cx={corridorOverlay.endX} cy={corridorOverlay.endY} r={9/zoom} fill="#fff3bd" fillOpacity=".72" stroke="#70571b" strokeWidth={2/zoom} strokeDasharray={`${3/zoom} ${2/zoom}`}/>
           </g>}
 
-          {layers.noxia&&placed.map(b=>{
+          {!customEarthView&&layers.noxia&&placed.map(b=>{
             const visual=b.visual,spriteScale=visual?.mapScale??1.7,spriteW=Math.max(b.widthSvg*spriteScale,22/zoom),spriteH=Math.max(Math.max(b.depthSvg,b.widthSvg*.72)*spriteScale,18/zoom),isSelected=b.pending?b.id===selectedPendingBuildId:b.id===selectedWorldObjectId
             const hitW=Math.max(b.widthSvg,24/zoom),hitH=Math.max(b.depthSvg,20/zoom)
             return <g key={`noxia-${b.id}`} role="button" aria-label={`${b.name}${b.pending?' im Bau':' auswählen'}`} pointerEvents="auto" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();b.pending?choosePendingBuild(b.id):chooseWorldObject(b.id)}} style={{cursor:'pointer'}} transform={`translate(${b.mapX} ${b.mapY}) rotate(${b.rotation??0})`}>
@@ -294,7 +306,7 @@ export default function EarthRegionPreview(){
           })}
 
           {!data.detail&&layers.sites&&candidates.map(c=><circle key={`raw-${c.lat}-${c.lon}`} cx={c.x} cy={c.y} r={4/zoom} fill="#fff4be" stroke="#8d732e" strokeWidth={1/zoom} opacity=".45"/>)}
-          {!data.detail&&layers.sites&&shortlist.map(c=><g key={c.shortlistLabel} role="button" aria-label={`Prüfstandort ${c.shortlistLabel} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(c.shortlistLabel);void focusGeoPoint({lat:c.lat,lon:c.lon},`Prüfstandort ${c.shortlistLabel}`)}} style={{cursor:'pointer'}}><circle cx={c.x} cy={c.y} r={20/zoom} fill="transparent"/><circle cx={c.x} cy={c.y} r={15/zoom} fill={c.shortlistRank===1?'#efc34d':'#fff3bd'} stroke="#5d4300" strokeWidth={2.5/zoom}/><text pointerEvents="none" x={c.x} y={c.y+4/zoom} textAnchor="middle" fontSize={11/zoom} fontWeight="900" fill="#493500">{c.shortlistLabel}</text></g>)}
+          {!customEarthView&&!data.detail&&layers.sites&&shortlist.map(c=><g key={c.shortlistLabel} role="button" aria-label={`Prüfstandort ${c.shortlistLabel} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(c.shortlistLabel);void focusGeoPoint({lat:c.lat,lon:c.lon},`Prüfstandort ${c.shortlistLabel}`)}} style={{cursor:'pointer'}}><circle cx={c.x} cy={c.y} r={20/zoom} fill="transparent"/><circle cx={c.x} cy={c.y} r={15/zoom} fill={c.shortlistRank===1?'#efc34d':'#fff3bd'} stroke="#5d4300" strokeWidth={2.5/zoom}/><text pointerEvents="none" x={c.x} y={c.y+4/zoom} textAnchor="middle" fontSize={11/zoom} fontWeight="900" fill="#493500">{c.shortlistLabel}</text></g>)}
 
           {placementPreview&&selectedSpot&&<g transform={`translate(${selectedSpot.mapX} ${selectedSpot.mapY}) rotate(${rotationDeg})`} pointerEvents="none">
             <rect x={-placementPreview.clearanceWidthSvg/2} y={-placementPreview.clearanceDepthSvg/2} width={placementPreview.clearanceWidthSvg} height={placementPreview.clearanceDepthSvg} fill="#f5d75f" fillOpacity=".08" stroke="#8a6b21" strokeWidth={1.2/zoom} strokeDasharray={`${5/zoom} ${3/zoom}`}/>
