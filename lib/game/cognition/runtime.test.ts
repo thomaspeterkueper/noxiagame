@@ -1,5 +1,5 @@
 import { knowledgeFromObservation } from '../population/observation'
-import { assessChronobiologyKnowledge, createChronobiologyExperiment, lightingObservation, planTemporalResponse, reviseProtocol, type TemporalProtocol, type WorldEvent } from './runtime'
+import { assessChronobiologyKnowledge, assessResearchEvidence, createChronobiologyExperiment, createMagnetobiologyExperiment, createResearchFinding, lightingObservation, planTemporalResponse, reviseProtocol, type TemporalProtocol, type WorldEvent } from './runtime'
 
 let failures = 0
 function check(ok: boolean, label: string) { if (!ok) { failures++; console.error('FAIL: ' + label) } }
@@ -31,6 +31,60 @@ const research = createChronobiologyExperiment(novelObs,'chrono-team-a')
 check(research.hypothesis.status === 'testing' && research.experiment.status === 'planned', 'L2 creates structured research objects')
 const revised = reviseProtocol({ protocol, experiment:research.experiment, evidenceRefs:['experiment:'+research.experiment.id], approvedAtTick:120, uncertainty:0.18 })
 check(revised.version === 2 && revised.supersedes === 'tp-greenhouse@1', 'experiment can create versioned protocol revision')
+
+
+const magnetic = createMagnetobiologyExperiment({
+  subjectRef: 'station-a:bio-lab-1',
+  groupId: 'magbio-team-a',
+  organismContext: 'model-organism:controlled-line-a',
+  baselineMicrotesla: 45,
+  exposureMicrotesla: 0.005,
+  durationTicks: 48,
+  measurements: ['mitochondrial_respiration', 'superoxide_proxy'],
+  evidenceRefs: ['OTA-SCI-0096-2026-DE'],
+})
+check(magnetic.experiment.status === 'planned', 'magnetobiology experiment uses shared ExperimentPlan')
+check(magnetic.experiment.intervention.organismContext === magnetic.experiment.baseline.organismContext, 'organism context remains controlled')
+
+const nullFinding = createResearchFinding({
+  experiment: magnetic.experiment,
+  subjectRef: magnetic.hypothesis.subjectRef,
+  outcome: 'null',
+  measurementRefs: ['obs:magbio:run-1'],
+  effectEstimate: 0,
+  uncertainty: 0.2,
+  context: { organismContext: 'model-organism:controlled-line-a', exposureMicrotesla: 0.005 },
+  createdAtTick: 200,
+})
+const nullAssessment = assessResearchEvidence(magnetic.hypothesis, [nullFinding])
+check(nullAssessment.status === 'insufficient' && !nullAssessment.allowsProtocolRevision, 'null result is preserved and grants no protocol revision')
+
+const support1 = createResearchFinding({
+  experiment: magnetic.experiment,
+  subjectRef: magnetic.hypothesis.subjectRef,
+  outcome: 'supports',
+  measurementRefs: ['obs:magbio:run-2'],
+  effectEstimate: 0.18,
+  uncertainty: 0.18,
+  context: { organismContext: 'model-organism:controlled-line-a', exposureMicrotesla: 0.005 },
+  createdAtTick: 260,
+})
+const provisional = assessResearchEvidence(magnetic.hypothesis, [support1])
+check(provisional.status === 'provisional' && !provisional.allowsProtocolRevision, 'single positive finding remains provisional')
+
+const support2 = createResearchFinding({
+  experiment: magnetic.experiment,
+  subjectRef: magnetic.hypothesis.subjectRef,
+  outcome: 'supports',
+  measurementRefs: ['obs:magbio:replication-1'],
+  effectEstimate: 0.16,
+  uncertainty: 0.16,
+  context: { organismContext: 'model-organism:controlled-line-a', exposureMicrotesla: 0.005, replication: true },
+  createdAtTick: 320,
+})
+const replicated = assessResearchEvidence(magnetic.hypothesis, [support1, support2])
+check(replicated.status === 'replicated' && replicated.allowsProtocolRevision, 'replicated findings may enter protocol review')
+check(!('humanHealthEffect' in magnetic.experiment.intervention), 'model-organism experiment does not synthesize human effects')
 
 if (failures) throw new Error(String(failures)+' cognitive runtime test(s) failed')
 console.log('Cognitive runtime slice: tests passed; external_llm_calls=0')
