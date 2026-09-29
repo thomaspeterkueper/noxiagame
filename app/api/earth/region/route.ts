@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
-import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
+import { EARTH_SAUERLAND_REGION, createEarthViewAnchor, getEarthRegion } from '@/lib/world/spatial/regions'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { createServiceClient } from '@/lib/supabase/service'
 
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const requestedRegionId = p.get('region')
     ?? req.cookies.get('noxia-earth-region')?.value
     ?? EARTH_SAUERLAND_REGION.id
-  const viewRegion = getEarthRegion(requestedRegionId) ?? EARTH_SAUERLAND_REGION
+  const legacyRegion = getEarthRegion(requestedRegionId) ?? EARTH_SAUERLAND_REGION
 
   const queryLat = finiteCoordinate(p.get('lat'), -90, 90)
   const queryLon = finiteCoordinate(p.get('lon'), -180, 180)
@@ -55,7 +55,8 @@ export async function GET(req: NextRequest) {
   const hasLocalCenter = localLat != null && localLon != null
   const center = hasLocalCenter
     ? { lat: localLat, lon: localLon }
-    : viewRegion.origin
+    : legacyRegion.origin
+  const viewRegion = hasLocalCenter ? createEarthViewAnchor(center) : legacyRegion
   const radiusKm = Math.min(15, Math.max(.2, Number(p.get('radiusKm') ?? (hasLocalCenter ? .6 : 10))))
   const latDelta = radiusKm / 111.32
   const cosLat = Math.max(.05, Math.abs(Math.cos(center.lat * Math.PI / 180)))
