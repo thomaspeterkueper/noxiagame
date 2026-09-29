@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ROBOT_FLEET_ROLES, ROBOT_RETROFIT_PROFILES, isRobotFleetRole, robotRetrofitProfile } from '@/lib/game/vehicles/robotRetrofit'
+import {
+  ROBOT_FLEET_ROLES,
+  ROBOT_MODULE_DEFINITIONS,
+  ROBOT_RETROFIT_PROFILES,
+  isRobotFleetRole,
+  replaceableRobotModules,
+  robotRetrofitProfile,
+} from '@/lib/game/vehicles/robotRetrofit'
 
 async function userFromRequest(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -22,14 +29,36 @@ async function requirePresence(s: ReturnType<typeof createServiceClient>, userId
   return data?.current_location === slug
 }
 
-async function resourceRows(s: ReturnType<typeof createServiceClient>, locationId: string) {
-  const [{ data: energy, error: ee }, { data: components, error: ce }] = await Promise.all([
-    s.from('resources').select('id,stock').eq('location_id', locationId).eq('resource', 'energy').single(),
-    s.from('resources').select('id,stock').eq('location_id', locationId).eq('resource', 'components').single(),
-  ])
-  if (ee || !energy) throw new Error(ee?.message ?? 'Energy row missing')
-  if (ce || !components) throw new Error(ce?.message ?? 'Components row missing')
-  return { energy, components }
+async function workshopInventory(s: ReturnType<typeof createServiceClient>, locationId: string) {
+  const { data, error } = await s.from('logistics_inventories')
+    .select('id,label,location_id,metadata')
+    .eq('location_id', locationId)
+    .contains('metadata', { role: 'equipment_workshop' })
+    .eq('active', true)
+    .limit(1)
+    .maybeSingle()
+  if (error || !data?.id) throw new Error(error?.message ?? 'Equipment workshop missing')
+  return data
+}
+
+async function equipmentForWorkshop(s: ReturnType<typeof createServiceClient>, inventoryId: string) {
+  const { data, error } = await s.from('equipment_items')
+    .select('id,equipment_key,serial_number,status,condition,wear,owner_profile_id,metadata,updated_at')
+    .eq('inventory_id', inventoryId)
+    .order('equipment_key')
+    .order('condition', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+async function equipmentInstalledOnVehicle(s: ReturnType<typeof createServiceClient>, vehicleId: string) {
+  const { data, error } = await s.from('equipment_items')
+    .select('id,equipment_key,serial_number,status,condition,wear,metadata,updated_at')
+    .eq('installed_vehicle_id', vehicleId)
+    .eq('status', 'installed')
+    .order('equipment_key')
+  if (error) throw new Error(error.message)
+  return data ?? []
 }
 
 async function reconcileStickneyConfiguration(s: ReturnType<typeof createServiceClient>, userId: string, locationId: string, changedRobotId: string) {
@@ -48,6 +77,15 @@ async function reconcileStickneyConfiguration(s: ReturnType<typeof createService
   return { complete, roleSet: [...roleSet] }
 }
 
+function stockSummary(items: any[]) {
+  const counts: Record<string, number> = {}
+  for (const item of items) {
+    if (item.status !== 'stored' || Number(item.condition ?? 0) < 35 || Number(item.wear ?? 100) > 80) continue
+    counts[item.equipment_key] = (counts[item.equipment_key] ?? 0) + 1
+  }
+  return counts
+}
+
 export async function GET(req: NextRequest) {
   const user = await userFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -57,11 +95,23 @@ export async function GET(req: NextRequest) {
   try {
     const { data: robot, error } = await s.from('vehicle_instances').select('*').eq('id', robotId).eq('owner_profile_id', user.id).maybeSingle()
     if (error) throw new Error(error.message)
-    if (!robot) return NextResponse.json({ error: 'Fahrzeug nicht gefunden.' }, { status: 404 })
-    return NextResponse.json({ ok: true, robot, profiles: Object.values(ROBOT_RETROFIT_PROFILES) })
+    if (!robot?.location_id) return NextResponse.json({ error: 'Fahrzeug nicht gefunden.' }, { status: 404 })
+    const workshop = await workshopInventory(s, robot.location_id)
+    const [workshopEquipment, installedEquipment] = await Promise.all([
+      equipmentForWorkshop(s, workshop.id),
+      equipmentInstalledOnVehicle(s, robot.id),
+    ])
+    return NextResponse.json({
+      ok: true,
+      robot,
+      profiles: Object.values(ROBOT_RETROFIT_PROFILES),
+      moduleDefinitions: ROBOT_MODULE_DEFINITIONS,
+      workshop: { ...workshop, equipment: workshopEquipment, available: stockSummary(workshopEquipment) },
+      installedEquipment,
+    })
   } catch (error) {
     console.error('robot retrofit lookup failed:', error)
-    return NextResponse.json({ error: 'Umbauprofile nicht verfügbar.' }, { status: 503 })
+    return NextResponse.json({ error: 'Umbauprofile oder Modullager nicht verfügbar.' }, { status: 503 })
   }
 }
 
@@ -90,11 +140,22 @@ export async function POST(req: NextRequest) {
     const currentRole = robot.modifications?.fleetRole
     if (currentRole === targetRole) return NextResponse.json({ ok: true, idempotent: true, robot })
     const profile = robotRetrofitProfile(targetRole)
-    const { energy, components } = await resourceRows(s, location.id)
-    if (Number(energy.stock ?? 0) < profile.energyCost || Number(components.stock ?? 0) < profile.componentCost) return NextResponse.json({ error: 'Nicht genug Energie oder Komponenten für diesen Modulumbau.' }, { status: 409 })
+    const previousModules = Array.isArray(robot.modules) ? robot.modules.filter((m: unknown): m is string => typeof m === 'string') : []
+    const currentEquipmentKeys = replaceableRobotModules(previousModules)
+    const targetEquipmentKeys = replaceableRobotModules(profile.modules)
+    const workshop = await workshopInventory(s, location.id)
+    const workshopEquipment = await equipmentForWorkshop(s, workshop.id)
+    const available = stockSummary(workshopEquipment)
+    const alreadyInstalled = new Set(currentEquipmentKeys)
+    const missing = targetEquipmentKeys.filter(key => !alreadyInstalled.has(key) && (available[key] ?? 0) < 1)
+    if (missing.length) {
+      return NextResponse.json({
+        error: `Benötigtes Werkstattmodul fehlt: ${missing.map(key => ROBOT_MODULE_DEFINITIONS[key]?.label ?? key).join(', ')}`,
+        missingModules: missing,
+      }, { status: 409 })
+    }
 
     const now = new Date().toISOString()
-    const previousModules = Array.isArray(robot.modules) ? robot.modules : []
     const retrofitHistory = Array.isArray(robot.modifications?.retrofitHistory) ? robot.modifications.retrofitHistory : []
     const stateOfCharge = Math.max(0, Math.min(1, Number(robot.energy?.[0]?.stateOfCharge ?? 1)))
     const nextModifications = {
@@ -103,29 +164,58 @@ export async function POST(req: NextRequest) {
       fleetRole: targetRole,
       dryMassKg: profile.dryMassKg,
       peakPowerKw: profile.peakPowerKw,
+      payloadCapacityKg: profile.cargoCapacityT * 1000,
       capabilities: profile.capabilities,
       retrofitAt: now,
-      retrofitHistory: [...retrofitHistory.slice(-9), { at: now, fromRole: currentRole ?? null, toRole: targetRole, removedModules: previousModules.filter((m: string) => !profile.modules.includes(m)), installedModules: profile.modules.filter(m => !previousModules.includes(m)) }],
+      retrofitHistory: [...retrofitHistory.slice(-9), {
+        at: now,
+        fromRole: currentRole ?? null,
+        toRole: targetRole,
+        removedModules: currentEquipmentKeys.filter(m => !targetEquipmentKeys.includes(m)),
+        installedModules: targetEquipmentKeys.filter(m => !currentEquipmentKeys.includes(m)),
+        inventoryBacked: true,
+      }],
+    }
+    const nextEmergent = { ...(robot.emergent_state ?? {}), fleetRole: targetRole, phase: 'retrofit-complete', retrofitAt: now }
+    const { data: transaction, error: txError } = await s.rpc('noxia_retrofit_robot_equipment', {
+      p_profile_id: user.id,
+      p_vehicle_id: robot.id,
+      p_workshop_inventory_id: workshop.id,
+      p_target_role: targetRole,
+      p_current_equipment_keys: currentEquipmentKeys,
+      p_target_equipment_keys: targetEquipmentKeys,
+      p_vehicle_modules: profile.modules,
+      p_vehicle_energy: [{ carrier: 'battery', stateOfCharge, nominalKWh: profile.batteryKWh }],
+      p_cargo_capacity_t: profile.cargoCapacityT,
+      p_modifications: nextModifications,
+      p_emergent_state: nextEmergent,
+      p_energy_cost: profile.energyCost,
+      p_component_cost: profile.componentCost,
+    })
+    if (txError) {
+      const match = String(txError.message ?? '').match(/module_unavailable:([^\s]+)/)
+      if (match) return NextResponse.json({ error: `Werkstattmodul nicht verfügbar: ${ROBOT_MODULE_DEFINITIONS[match[1]]?.label ?? match[1]}` }, { status: 409 })
+      if (String(txError.message ?? '').includes('insufficient_resources')) return NextResponse.json({ error: 'Nicht genug Energie oder Komponenten für diesen Modulumbau.' }, { status: 409 })
+      throw new Error(txError.message)
     }
 
-    const [{ error: e1 }, { error: e2 }, { data: updated, error: ue }] = await Promise.all([
-      s.from('resources').update({ stock: Number(energy.stock) - profile.energyCost, updated_at: now }).eq('id', energy.id),
-      s.from('resources').update({ stock: Number(components.stock) - profile.componentCost, updated_at: now }).eq('id', components.id),
-      s.from('vehicle_instances').update({
-        modules: profile.modules,
-        cargo_capacity_t: profile.cargoCapacityT,
-        energy: [{ carrier: 'battery', stateOfCharge, nominalKWh: profile.batteryKWh }],
-        modifications: nextModifications,
-        emergent_state: { ...(robot.emergent_state ?? {}), fleetRole: targetRole, phase: 'retrofit-complete', retrofitAt: now },
-        updated_at: now,
-      }).eq('id', robot.id).select('*').single(),
-    ])
-    if (e1 || e2 || ue || !updated) throw new Error(e1?.message ?? e2?.message ?? ue?.message ?? 'Retrofit failed')
-
-    const configuration = await reconcileStickneyConfiguration(s, user.id, location.id, updated.id)
-    const { data: refreshed, error: re } = await s.from('vehicle_instances').select('*').eq('id', updated.id).single()
+    const configuration = await reconcileStickneyConfiguration(s, user.id, location.id, robot.id)
+    const { data: refreshed, error: re } = await s.from('vehicle_instances').select('*').eq('id', robot.id).single()
     if (re || !refreshed) throw new Error(re?.message ?? 'Refreshed vehicle missing')
-    return NextResponse.json({ ok: true, robot: refreshed, profile, configuration, cost: { energy: profile.energyCost, components: profile.componentCost } })
+    const [nextWorkshopEquipment, installedEquipment] = await Promise.all([
+      equipmentForWorkshop(s, workshop.id),
+      equipmentInstalledOnVehicle(s, robot.id),
+    ])
+    return NextResponse.json({
+      ok: true,
+      robot: refreshed,
+      profile,
+      transaction,
+      configuration,
+      cost: { energy: profile.energyCost, components: profile.componentCost },
+      workshop: { ...workshop, equipment: nextWorkshopEquipment, available: stockSummary(nextWorkshopEquipment) },
+      installedEquipment,
+    })
   } catch (error) {
     console.error('robot retrofit failed:', error)
     return NextResponse.json({ error: 'Modulumbau konnte nicht durchgeführt werden.' }, { status: 503 })
