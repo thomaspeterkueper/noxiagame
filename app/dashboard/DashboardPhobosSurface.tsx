@@ -34,7 +34,8 @@ const PHOBOS_CORRIDORS: PreparedCorridor[] = (() => {
     const physicalKey = [edge.from, edge.to].sort().join('::')
     if (seen.has(physicalKey)) return []
     seen.add(physicalKey)
-    return [{ id:`phobos-corridor-${index}`, kind:edge.corridor==='anchor-tether'?'prepared-track':'hardened-road', points:[{xM:from.xM,yM:from.yM},{xM:to.xM,yM:to.yM}] }]
+    const enclosed = edge.corridor === 'pressurized-corridor' || edge.corridor === 'cargo-transfer-link'
+    return [{ id:`phobos-corridor-${index}`, kind:enclosed?'hardened-road':'prepared-track', points:[{xM:from.xM,yM:from.yM},{xM:to.xM,yM:to.yM}] }]
   })
 })()
 
@@ -63,11 +64,11 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Anlage'
 
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
-    <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>rekonstruiertes lokales Terrain · gemeinsame Funde · {scienceObjects.length} wissenschaftliche Objekte</span></div>
+    <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>asymmetrisches Druck-/Tether-Netz · gemeinsame Funde · {scienceObjects.length} wissenschaftliche Objekte</span></div>
     <PhobosRobotFleetPanel selectedRobotId={selectedRobotId} onSelectedRobotChange={setSelectedRobotId}/>
     <PhobosModuleWorkshopPanel/>
     <SurfaceScienceLayerPanel enabled={scienceLayerEnabled} onToggle={()=>{setScienceLayerEnabled(value=>!value);if(scienceLayerEnabled)setSelectedScienceId(null)}} objects={scienceObjects} selectedId={selectedScienceId} onSelect={setSelectedScienceId} onOpenOperations={()=>setLogisticsOpen(true)}/>
-    <PlanetarySurfaceMap locationSlug="phobos" body="phobos" mapLabel="Spielbare Phobos-Karte (Stickney)" terrainLabel="MEX / HRSC DEM" minimumWorldSpanM={400} corridors={PHOBOS_CORRIDORS} mobileObjects={surfaceMapObjects} onOpenMobileObject={openSurfaceObject} onOpenWorldObject={openWorldObject}/>
+    <PlanetarySurfaceMap locationSlug="phobos" body="phobos" mapLabel="Spielbare Phobos-Karte (Stickney)" terrainLabel="MEX / HRSC DEM" minimumWorldSpanM={480} corridors={PHOBOS_CORRIDORS} mobileObjects={surfaceMapObjects} onOpenMobileObject={openSurfaceObject} onOpenWorldObject={openWorldObject}/>
 
     {dockEntity&&<SpaceportOverlay buildingTypeId="landing_pad_phobos" buildingName={dockName} onClose={()=>setDockEntity(null)} onOpenNavigation={()=>{setDockEntity(null);setNavigationOpen(true)}} onOpenMaintenance={()=>{setDockEntity(null);setShipyardOpen(true)}} onOpenCargo={()=>{setDockEntity(null);setWarehouseOpen(true)}}/>}
     {navigationOpen&&<BuildingOverlayShell eyebrow="GEBÄUDE · NAVIGATION" title="Stickney Navigation" subtitle="Sonnensystem, Reichweite und Flugplanung" onClose={()=>setNavigationOpen(false)} width={1080}><div className="navigation-body"><SolarSystem currentTick={tick} shipRange={shipRange} currentLocation="phobos"/></div></BuildingOverlayShell>}
@@ -81,6 +82,8 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
       .noxia-dashboard-phobos-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:radial-gradient(circle at 45% 32%,rgba(90,80,66,.14),transparent 48%),linear-gradient(180deg,#100d0a,#070605 76%);z-index:0}
       .phobos-context-label{position:fixed;z-index:2;left:18px;bottom:calc(var(--noxia-cockpit-clearance,76px) + 10px);display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid rgba(225,200,170,.18);border-radius:8px;background:rgba(15,10,6,.72);backdrop-filter:blur(8px);color:#e3d7c8;font:10px/1.25 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none}.phobos-context-label strong{color:#d99a4e;letter-spacing:.08em}.phobos-context-label span{color:#9c8a76}.navigation-body{min-height:520px;background:#070b14;border-radius:8px;overflow:hidden}
       .noxia-dashboard-phobos-surface :global(.planetary-shell){position:relative;z-index:1;height:100%;min-height:0;overflow:hidden}
+      .noxia-dashboard-phobos-surface :global(.planetary-map polyline[stroke="#a59e8b"]){stroke:#d8d1c3;stroke-width:5.5;opacity:.9}
+      .noxia-dashboard-phobos-surface :global(.planetary-map polyline[stroke="#8a8577"]){stroke:#b88950;stroke-width:2.2;stroke-dasharray:7 6;opacity:.82}
     `}</style>
   </section>
 }
