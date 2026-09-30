@@ -1,6 +1,5 @@
 // Shared settlement-layout primitives for planetary surfaces.
-// Keep this intentionally small: bodies may use different visual grammars while
-// sharing one invariant -- occupied module footprints must not overlap.
+// Bodies share collision/clearance rules, not one universal settlement shape.
 
 export type SurfaceLayoutArchetype =
   | 'earth-settlement'
@@ -8,6 +7,56 @@ export type SurfaceLayoutArchetype =
   | 'mars-industrial-clusters'
   | 'phobos-tether-cluster'
   | 'deimos-science-outpost'
+
+export type SurfaceConnectionFamily =
+  | 'road'
+  | 'service-path'
+  | 'pressurized-corridor'
+  | 'surface-tube'
+  | 'tether-corridor'
+  | 'anchor-line'
+  | 'cargo-transfer-link'
+  | 'eva-route'
+
+export type SurfaceLayoutGrammar = {
+  archetype: SurfaceLayoutArchetype
+  defaultConnections: readonly SurfaceConnectionFamily[]
+  settlementPattern: string
+  minimumModuleClearanceM: number
+}
+
+export const BODY_SURFACE_LAYOUT_GRAMMARS: Readonly<Record<'earth' | 'moon' | 'mars' | 'phobos' | 'deimos', SurfaceLayoutGrammar>> = {
+  earth: {
+    archetype: 'earth-settlement',
+    defaultConnections: ['road', 'service-path'],
+    settlementPattern: 'grown blocks, streets and open civic space',
+    minimumModuleClearanceM: 6,
+  },
+  moon: {
+    archetype: 'moon-compact-hub',
+    defaultConnections: ['pressurized-corridor', 'surface-tube', 'eva-route'],
+    settlementPattern: 'compact protected hub with a separated landing zone',
+    minimumModuleClearanceM: 10,
+  },
+  mars: {
+    archetype: 'mars-industrial-clusters',
+    defaultConnections: ['pressurized-corridor', 'cargo-transfer-link', 'service-path'],
+    settlementPattern: 'zoned habitation, industry, logistics and exposed utilities',
+    minimumModuleClearanceM: 12,
+  },
+  phobos: {
+    archetype: 'phobos-tether-cluster',
+    defaultConnections: ['pressurized-corridor', 'tether-corridor', 'anchor-line', 'cargo-transfer-link'],
+    settlementPattern: 'small pressure core plus asymmetric tethered utility/logistics clusters and remote dock',
+    minimumModuleClearanceM: 14,
+  },
+  deimos: {
+    archetype: 'deimos-science-outpost',
+    defaultConnections: ['pressurized-corridor', 'tether-corridor', 'eva-route'],
+    settlementPattern: 'tiny station core with sparse scientific field points rather than a settlement',
+    minimumModuleClearanceM: 14,
+  },
+}
 
 export type SurfaceLayoutFootprint = {
   id: string
