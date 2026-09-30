@@ -225,6 +225,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url)
   const locationSlug = url.searchParams.get('location') ?? 'earth'
+  const requestedTerrainSpanM = Math.max(300, Math.min(20_000, Number(url.searchParams.get('terrainSpanM') ?? 1_200)))
   const viewRegion = locationSlug === 'earth'
     ? earthRegion(req, url.searchParams.get('region'))
     : null
@@ -363,8 +364,12 @@ export async function GET(req: NextRequest) {
     try {
       const runtime = await resolveRuntimeTerrainSampler(serviceClient, activeTerrainDataset.id)
       if (runtime.sampler) {
-        const size = 11
-        const stepM = 60
+        // Body-independent view LOD: cover the requested visible span while
+        // keeping sampler work bounded. Source resolution remains provenance;
+        // this grid spacing is only the current presentation/sampling LOD.
+        const size = 17
+        const sourceResolutionM = Math.max(1, Number(activeTerrainDataset.resolution_m ?? 60))
+        const stepM = Math.max(sourceResolutionM, Math.ceil(requestedTerrainSpanM / (size - 1)))
         const half = Math.floor(size / 2)
         const ctx = { frame: toWorldFrame(frame), dataset: toDatasetDescriptor(activeTerrainDataset) }
         const values: (number | null)[] = []
