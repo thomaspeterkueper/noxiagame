@@ -15,6 +15,7 @@ import {
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { resolveRuntimeTerrainSampler } from '@/lib/game/spatial/runtimeTerrainSampler.server'
 import type { TerrainDatasetDescriptor, WorldFrame } from '@/lib/game/spatial/types'
+import { terrainViewLod } from '@/lib/game/spatial/terrainViewLod'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -367,9 +368,9 @@ export async function GET(req: NextRequest) {
         // Body-independent view LOD: cover the requested visible span while
         // keeping sampler work bounded. Source resolution remains provenance;
         // this grid spacing is only the current presentation/sampling LOD.
-        const size = 17
         const sourceResolutionM = Math.max(1, Number(activeTerrainDataset.resolution_m ?? 60))
-        const stepM = Math.max(sourceResolutionM, Math.ceil(requestedTerrainSpanM / (size - 1)))
+        const lod = terrainViewLod(requestedTerrainSpanM, sourceResolutionM)
+        const { size, stepM } = lod
         const half = Math.floor(size / 2)
         const ctx = { frame: toWorldFrame(frame), dataset: toDatasetDescriptor(activeTerrainDataset) }
         const values: (number | null)[] = []
