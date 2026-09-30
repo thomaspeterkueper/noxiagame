@@ -130,7 +130,8 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
       const token = await getToken()
       if (!token) throw new Error('Nicht angemeldet')
       const headers = { Authorization: `Bearer ${token}` }
-      const spatialResponse = await fetch(`/api/game/build/spatial?location=${encodeURIComponent(locationSlug)}`, { headers, cache: 'no-store' })
+      const terrainSpanM = Math.max(1_200, Math.min(20_000, minimumWorldSpanM * 2.4))
+      const spatialResponse = await fetch(`/api/game/build/spatial?location=${encodeURIComponent(locationSlug)}&terrainSpanM=${Math.round(terrainSpanM)}`, { headers, cache: 'no-store' })
       const nextSpatial = await spatialResponse.json() as SpatialPayload
       if (!spatialResponse.ok || !nextSpatial.location?.id) throw new Error(nextSpatial.error ?? 'Standort nicht verfügbar')
       const logisticsResponse = await fetch(`/api/game/logistics?locationId=${encodeURIComponent(nextSpatial.location.id)}`, { headers, cache: 'no-store' })
@@ -141,7 +142,7 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
       setJobs(logistics.jobs ?? [])
       setMessage(null)
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
-  }, [locationSlug])
+  }, [locationSlug, minimumWorldSpanM])
 
   useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 15_000); return () => window.clearInterval(timer) }, [load])
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
@@ -252,7 +253,7 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
         <rect width={viewport.width} height={viewport.height} fill={body === 'mars' ? '#705448' : body === 'earth' ? '#59625a' : '#4e504d'}/>
         <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
           {layers.relief && <PlanetaryTerrainLayer body={body} grid={terrainGrid} project={project} pixelsPerMeter={baseScale} zoom={zoom} showContours showSlope/>}
-          <rect width={viewport.width} height={viewport.height} fill={`url(#planetary-grid-${body})`} pointerEvents="none"/>
+          <rect width={viewport.width} height={viewport.height} fill={`url(#planetary-grid-${body})`} opacity={.32} pointerEvents="none"/>
           {layers.infrastructure && corridors.map(corridor => {
             const points = corridor.points.map(point => { const p = project(point); return `${p.x},${p.y}` }).join(' ')
             const road = corridor.kind === 'hardened-road'
