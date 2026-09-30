@@ -8,6 +8,7 @@
 -- Safety:
 --   * only canonical STATE-owned Phobos modules are moved
 --   * PLAYER-owned entities are intentionally excluded
+--   * legacy non-spatial compatibility rows (null footprint) are excluded
 --   * footprints are not resized here; the persisted physical dimensions stay
 --     authoritative for collision/build checks
 --
@@ -40,4 +41,6 @@ where te.location_id = phobos_location.id
   and te.entity_type = 'building'
   and te.is_state_owned is true
   and te.owner_class = 'STATE'
-  and te.entity_id = layout.entity_id;
+  and te.entity_id = layout.entity_id
+  and te.footprint_width_m is not null
+  and te.footprint_depth_m is not null;
