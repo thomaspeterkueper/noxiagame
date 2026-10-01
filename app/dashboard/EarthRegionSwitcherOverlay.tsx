@@ -50,7 +50,10 @@ function selectPoint(lat:number,lon:number,label:string,region:EarthRegionId=nea
 function selectTarget(result:SearchResult){selectPoint(result.lat,result.lon,result.label)}
 
 export default function EarthRegionSwitcherOverlay(){
-  const[visible,setVisible]=useState(false)
+  // DashboardGate mounts this component only while the player is on Earth.
+  // Therefore the navigation must not depend on .earth-map being present:
+  // failed geodata/Overpass responses deliberately render an error state
+  // without that element, and the player still needs a way out of that view.
   const[region,setRegion]=useState<EarthRegionId>(SAUERLAND_REGION)
   const[viewLabel,setViewLabel]=useState<string|null>(null)
   const[query,setQuery]=useState('')
@@ -59,14 +62,9 @@ export default function EarthRegionSwitcherOverlay(){
   const[error,setError]=useState<string|null>(null)
 
   useEffect(()=>{
-    const sync=()=>{setVisible(Boolean(document.querySelector('.earth-map')));setRegion(readRegion());setViewLabel(readCookie(EARTH_VIEW_LABEL_COOKIE))}
-    sync()
-    const observer=new MutationObserver(sync)
-    observer.observe(document.body,{childList:true,subtree:true})
-    return()=>observer.disconnect()
+    setRegion(readRegion())
+    setViewLabel(readCookie(EARTH_VIEW_LABEL_COOKIE))
   },[])
-
-  if(!visible)return null
 
   const buttonStyle=(id:EarthRegionId):React.CSSProperties=>({border:0,borderRadius:6,padding:'7px 9px',background:!viewLabel&&region===id?'#173f4d':'transparent',color:!viewLabel&&region===id?'#fffaf0':'#b7c9d0',font:'800 9px system-ui,sans-serif',letterSpacing:'.02em',cursor:'pointer',whiteSpace:'nowrap'})
   const selmeckeActive=Boolean(viewLabel?.startsWith('Selmecke'))
