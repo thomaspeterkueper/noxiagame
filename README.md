@@ -55,6 +55,16 @@ strategische Sicht | Overlay | persönliche Sicht
 
 Der Scanner ist der erste abgeschlossene Referenz-Vertical-Slice für dieses Prinzip.
 
+### Eine Benutzeroberfläche, kontextabhängige Funktionen
+
+Erde, Mond, Mars, Phobos, Deimos, Raumstationen und spätere Welten benutzen dieselbe noχ¹ᐃ-Dashboard-Shell und dieselben Interaktionskonventionen. Das gilt ebenso für Rover, Fahrzeuge, Shuttles und Raumschiffe.
+
+Die Umgebung unterscheidet sich durch Terrain, Beleuchtung, Gebäude, Infrastruktur, Fahrzeuge, lokale Daten und verfügbare Funktionen — **nicht** durch jeweils neu erfundene Dashboard-Themes.
+
+Funktionen wie Robotik, Wissenschaft, Mining, Logistik, Navigation, Cargo oder Wartung werden als gemeinsame Capabilities behandelt. Ein Kontext meldet, welche Capabilities verfügbar sind; nur diese Module werden eingeblendet. Fehlt eine Funktion, wird sie nicht angezeigt.
+
+Verbindliche Entscheidung: `docs/decisions/ADR-unified-contextual-dashboard.md`.
+
 ### Erweiterbare Gebäude
 
 Gebäude sind langfristig keine starren Einzelobjekte mit bloßen Level-Zahlen. Kapazität und Funktion können durch reale, persistierte Erweiterungen wachsen. Eine Erweiterung muss auf Makro- und Mikroebene dieselbe Infrastruktur darstellen.
@@ -74,6 +84,10 @@ Externe Evidenz oder Kanon-Mappings dürfen noχ¹ᐃ-Balancing nicht automatisc
 ## Wichtige Designdokumente
 
 - `docs/gamedesign.md` — Game-Design-Grundlage und Kernloop
+- `docs/architecture/map-first-dashboard.md` — gemeinsame Dashboard-/HUD-Shell
+- `docs/decisions/ADR-unified-contextual-dashboard.md` — ein UI-System, capability-getriebene Sichtbarkeit für Welten, Fahrzeuge und Raumschiffe
+- `docs/architecture/vehicle-domain-v1.md` — gemeinsames Fahrzeugmodell inkl. Dashboard-Capability-Vertrag
+- `docs/NOXIA-VISUAL-BIBLE.md` — gemeinsame visuelle Sprache
 - `docs/Spec-gebaeude-katalog.md` — Gebäudekatalog und Baubarkeitsprinzip
 - `docs/Spec:_InfrastrukturProgression.md` — Infrastruktur- und Prerequisite-Progression
 - `docs/design/walkable-colony.md` — persönliche Ebene als Linse auf die Simulation
