@@ -6,6 +6,7 @@ import { getToken } from '@/lib/supabase/auth'
 import { deriveStickneyFleetMapMarkers } from '@/lib/game/vehicles/stickneyFleetMotion'
 import { deriveSurfaceScienceObjects } from '@/lib/game/science/surfaceScience'
 import PlanetarySurfaceMap, { type MobileSurfaceObject, type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
+import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
 import SurfaceScienceLayerPanel from '@/app/components/SurfaceScienceLayerPanel'
 import {
   PHOBOS_BASE_ALPHA_LOGISTICS,
@@ -64,7 +65,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Anlage'
 
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
-    <div className="phobos-context-label"><strong>MEX/HRSC · Stickney-Nordrand</strong><span>asymmetrisches Druck-/Tether-Netz · gemeinsame Funde · {scienceObjects.length} wissenschaftliche Objekte</span></div>
+    <SurfaceContextBadge title="MEX/HRSC · Stickney-Nordrand" detail={`asymmetrisches Druck-/Tether-Netz · gemeinsame Funde · ${scienceObjects.length} wissenschaftliche Objekte`} />
     <PhobosRobotFleetPanel selectedRobotId={selectedRobotId} onSelectedRobotChange={setSelectedRobotId}/>
     <PhobosModuleWorkshopPanel/>
     <SurfaceScienceLayerPanel enabled={scienceLayerEnabled} onToggle={()=>{setScienceLayerEnabled(value=>!value);if(scienceLayerEnabled)setSelectedScienceId(null)}} objects={scienceObjects} selectedId={selectedScienceId} onSelect={setSelectedScienceId} onOpenOperations={()=>setLogisticsOpen(true)}/>
@@ -80,7 +81,7 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
     <style jsx>{`
       .noxia-dashboard-phobos-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:hidden;background:#0a0806;overscroll-behavior:contain}
       .noxia-dashboard-phobos-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:radial-gradient(circle at 45% 32%,rgba(90,80,66,.14),transparent 48%),linear-gradient(180deg,#100d0a,#070605 76%);z-index:0}
-      .phobos-context-label{position:fixed;z-index:2;left:18px;top:calc(var(--noxia-topbar-h,44px) + 58px);display:flex;flex-direction:column;gap:2px;max-width:min(560px,calc(100vw - 36px));padding:7px 10px;border:1px solid rgba(225,200,170,.18);border-radius:8px;background:rgba(15,10,6,.72);backdrop-filter:blur(8px);color:#e3d7c8;font:10px/1.25 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none}.phobos-context-label strong{color:#d99a4e;letter-spacing:.08em}.phobos-context-label span{color:#9c8a76}.navigation-body{min-height:520px;background:#070b14;border-radius:8px;overflow:hidden}
+      .navigation-body{min-height:520px;background:#070b14;border-radius:8px;overflow:hidden}
       .noxia-dashboard-phobos-surface :global(.planetary-shell){position:relative;z-index:1;height:100%;min-height:0;overflow:hidden}
       .noxia-dashboard-phobos-surface :global(.planetary-map polyline[stroke="#a59e8b"]){stroke:#d8d1c3;stroke-width:5.5;opacity:.9}
       .noxia-dashboard-phobos-surface :global(.planetary-map polyline[stroke="#8a8577"]){stroke:#b88950;stroke-width:2.2;stroke-dasharray:7 6;opacity:.82}
