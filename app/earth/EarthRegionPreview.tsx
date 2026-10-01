@@ -5,6 +5,7 @@ import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { constructionState } from '@/lib/game/constructionProgress'
+import { MAP_SCALE_DIVISIONS, SURFACE_LOCAL_CAMERA } from '@/lib/game/spatial/mapCameraPresets'
 import { isEarthMapSurfaceTarget, shouldChooseEarthMapSpot } from '@/lib/world/spatial/earthMapInteraction'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
@@ -29,8 +30,8 @@ type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slop
 
 const layerOrder=['farmland','forest','urban','water','industrial','public','building','waterway','rail','road','settlement']
 const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,sites:true,corridor:true}
-const BUILD_PLAN_VISIBLE_WIDTH_M=300
-const LOCAL_DETAIL_RADIUS_KM=.65
+const BUILD_PLAN_VISIBLE_WIDTH_M=SURFACE_LOCAL_CAMERA.visibleWidthM
+const LOCAL_DETAIL_RADIUS_KM=1.35
 const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
 const EARTH_DATA_VERSION='20260906-local-detail-1'
 
@@ -97,14 +98,6 @@ export default function EarthRegionPreview(){
         setData(json)
         if(json.ok){
           setOverviewData(json)
-          // 16.09.2026: Testspieler waren mit dem grossen Massstab (3km-
-          // Uebersicht als Startansicht) ueberfordert. Default ist jetzt ein
-          // konkreter, kleiner Ausschnitt auf Bauplan-Zoom -- fuer Sauerland
-          // der bebaute Referenzstandort Selmecke, fuer andere Regionen
-          // (aktuell Namibia/Erongo, kuenftig auch neue) deren definierter
-          // Ursprungspunkt. Dass die Welt groesser ist, erschliesst sich
-          // ueber "Uebersicht" (auszoomen), nicht als erzwungener erster
-          // Eindruck.
           const isSauerland=Boolean(json.region?.name?.includes('Sauerland'))
           const defaultFocus=isSauerland?SELMECKE_DEFAULT_FOCUS:(json.region?.origin??SELMECKE_DEFAULT_FOCUS)
           const defaultFocusLabel=isSauerland?'Selmecke':(json.region?.name??'Regionsansicht')
@@ -154,7 +147,7 @@ export default function EarthRegionPreview(){
   },[candidateData,projection])
   const active=selected?shortlist.find(c=>c.shortlistLabel===selected)??null:null
 
-  const scale=useMemo(()=>{if(!mapMetrics)return null;const visibleWidthM=mapMetrics.widthM/zoom,targetM=visibleWidthM/5,options=[2,5,10,20,50,100,200,500,1000,2000,5000,10000];const meters=options.reduce((best,n)=>Math.abs(n-targetM)<Math.abs(best-targetM)?n:best,options[0]);return{meters,pixels:meters/mapMetrics.widthM*1000*zoom}},[mapMetrics,zoom])
+  const scale=useMemo(()=>{if(!mapMetrics)return null;const visibleWidthM=mapMetrics.widthM/zoom,targetM=visibleWidthM/MAP_SCALE_DIVISIONS,options=[2,5,10,20,50,100,200,500,1000,2000,5000,10000];const meters=options.reduce((best,n)=>Math.abs(n-targetM)<Math.abs(best-targetM)?n:best,options[0]);return{meters,pixels:meters/mapMetrics.widthM*1000*zoom}},[mapMetrics,zoom])
 
   const terrainOverlay=useMemo(()=>{if(!terrain?.ok||!terrain.cells||!projection||!data?.region?.origin||!mapMetrics)return[];const cells=terrain.cells,byKey=new Map(cells.map(c=>[`${c.row}:${c.col}`,c]));const stepX=(terrain.sourceResolutionM??120)/mapMetrics.widthM*1000,stepY=(terrain.sourceResolutionM??120)/mapMetrics.heightM*1000;return cells.map(c=>{const geo=localMetersToGeo({eastM:c.xM,northM:c.yM},data.region!.origin),x=projection.x(geo.lon),y=projection.y(geo.lat),west=byKey.get(`${c.row}:${c.col-1}`),east=byKey.get(`${c.row}:${c.col+1}`),north=byKey.get(`${c.row-1}:${c.col}`),south=byKey.get(`${c.row+1}:${c.col}`),dx=(east?.elevationM??c.elevationM)-(west?.elevationM??c.elevationM),dy=(south?.elevationM??c.elevationM)-(north?.elevationM??c.elevationM),light=clamp(.52+(-dx+dy)*.012,.18,.82);return{...c,x,y,w:stepX,h:stepY,shade:light<.5?'#203026':'#fff7da',shadeOpacity:Math.abs(light-.5)*.42,buildFill:c.state==='buildable'?'#4ecb71':c.state==='restricted'?'#e6bc46':c.state==='invalid'?'#d85757':'#78818a',slopeOpacity:clamp((c.slopeDeg??0)/22,0,.55)}})},[terrain,projection,data,mapMetrics])
 
