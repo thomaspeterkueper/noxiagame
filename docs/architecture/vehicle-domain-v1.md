@@ -8,6 +8,8 @@ NOXIA needs one shared vehicle vocabulary for surface rovers, trucks, trains, ai
 
 The shared domain owns engineering-facing vehicle semantics. World domains own traversal policy. Game Core owns authoritative mutable state and transport jobs.
 
+Vehicle and spacecraft UI follows the same architectural principle: one shared NOXIA dashboard vocabulary, composed by capability. A rover, train, aircraft, shuttle and spacecraft may expose different functions, but they must not each invent an unrelated dashboard look-and-feel. See `docs/decisions/ADR-unified-contextual-dashboard.md`.
+
 ## Source-of-truth boundary
 
 ### Shared vehicle / engineering domain
@@ -31,9 +33,9 @@ Own:
 - road/rail/terrain/orbit interpretation;
 - local passability;
 - relative traversal penalties;
-- map/UI representation.
+- map/UI data representation for the local environment.
 
-A world domain may consume engineering limits, but it must not redefine them as world-local vehicle physics.
+A world domain may consume engineering limits, but it must not redefine them as world-local vehicle physics or use them as a reason to create a separate global UI language.
 
 ### Game Core
 
@@ -47,6 +49,38 @@ Owns authoritative persistence and atomic mutation for:
 - scheduler/tick execution.
 
 The shared vocabulary in `lib/game/vehicles` remains persistence-agnostic. Core binds that vocabulary to the authoritative runtime through `vehicle_instances`, the shared logistics inventory model and the transport-job state machine.
+
+## Dashboard capability contract
+
+Vehicle dashboards should be assembled from shared capability modules such as:
+
+- navigation / route
+- energy / propulsion
+- cargo
+- crew
+- robotics / remote systems
+- maintenance / engineering
+- science
+- docking
+- flight / orbital operations
+- communications
+- life support
+
+Unavailable capabilities are omitted. They are not represented by vehicle-class-specific disabled panels merely to preserve a bespoke layout.
+
+Examples:
+
+```text
+surface rover: navigation + energy + cargo + robotics + maintenance
+train:         navigation + energy + cargo + crew + maintenance
+shuttle:       flight + navigation + energy + cargo + crew + docking
+spacecraft:    navigation + propulsion + energy + cargo + crew + docking
+               + life support + engineering + science (when installed)
+```
+
+The vehicle frame, installed modules and current operating domain determine capability availability. The shared shell, control semantics, tooltip language, status colors and panel behavior remain NOXIA-wide.
+
+A specialized instrument may have a dedicated instrument view, but it opens within the common shell/overlay conventions rather than creating a new vehicle dashboard architecture.
 
 ## Implemented Core persistence
 
@@ -110,6 +144,8 @@ The current systems remain valid and are not force-migrated by v1:
 
 `vehicles/adapters.ts` exposes narrow read-only projections so these systems can migrate incrementally. Existing ships are already addressable through the shared logistics inventory adapter without requiring an immediate spacecraft-persistence rewrite.
 
+Existing vehicle-/ship-specific dashboards or panels should be treated as migration bridges. When reused or extended, generic capability UI should be extracted instead of cloning the panel for another vehicle type.
+
 ## Immediate consumer contract
 
 World routing supplies an assessed route; Core never derives world-specific terrain physics. For a surface transport the shared transport contract expects at least a passability result and, before start, a finite `routeSnapshot.etaSeconds`. Additional route facts such as distance, slope summary, energy multiplier, wear multiplier or route revision remain world-domain outputs and may be persisted in the snapshot.
@@ -127,4 +163,4 @@ The following are intentionally not invented by Core and require their owning do
 - migration of exploration-asset persistence into `vehicle_instances`;
 - route-progress geometry used to draw a moving vehicle between nodes.
 
-The persistence and atomic transport primitives are now shared. Remaining work should extend these primitives rather than introduce Earth-, Moon-, Mars- or Orbit-specific vehicle state stores.
+The persistence and atomic transport primitives are now shared. Remaining work should extend these primitives rather than introduce Earth-, Moon-, Mars- or Orbit-specific vehicle state stores or dashboard families.
