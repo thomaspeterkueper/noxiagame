@@ -7,17 +7,20 @@
 // Gazetteer-Kraterzentrum plus dokumentiertem Radius-Offset abgeleitet).
 //
 // Phobos hat ~1/1000 g Oberflaechenschwerkraft. Die Basis ist deshalb kein
-// irdisches Strassenraster: ein kleiner Druckkern, ein dreieckig aufgefaecherter
+// irdisches Strassenraster: ein kleiner Druckkern, ein aufgefaecherter
 // Utility-Bereich, ein separater Logistikcluster und ein weit abgesetztes Dock.
-// Dazwischen liegen Druckkorridore, Tether und Versorgungsumbilicals.
+// Die Stationsmodule folgen trotzdem einem 20-m-Strukturraster und stehen
+// ueberwiegend orthogonal. So bleibt die technische Lesbarkeit hoch, ohne aus
+// Stickney eine irdische Siedlung zu machen.
 
 import { assertSurfaceLayoutClearance, type SurfaceLayoutArchetype } from '@/lib/game/spatial/surfaceLayout'
 
 export const PHOBOS_BASE_ALPHA_ID = 'phobos_base_alpha'
 export const PHOBOS_BASE_ALPHA_FRAME = 'phobos_stickney_rim_enu_v1'
 export const PHOBOS_BASE_ALPHA_LAYOUT: SurfaceLayoutArchetype = 'phobos-tether-cluster'
-export const PHOBOS_BASE_ALPHA_LAYOUT_VARIANT = 'stickney_split_cluster_v3'
+export const PHOBOS_BASE_ALPHA_LAYOUT_VARIANT = 'stickney_structural_grid_v4'
 export const PHOBOS_BASE_ALPHA_MIN_CLEARANCE_M = 14
+export const PHOBOS_BASE_ALPHA_GRID_M = 20
 
 export type PhobosStarterZone = 'core' | 'utilities' | 'logistics' | 'landing'
 
@@ -69,26 +72,27 @@ export interface PhobosLogisticsEdge {
 }
 
 // Footprints mirror the canonical STATE modules currently persisted for Stickney.
-// Coordinates deliberately avoid a common diagonal/road-like spine.
+// Positions snap to a 20 m structural grid; rotations are orthogonal except where
+// a body-specific docking orientation is useful.
 export const PHOBOS_BASE_ALPHA_NODES: readonly PhobosStarterNode[] = [
-  { id: 'phobos_habitat_1', role: 'habitat', label: 'Habitat Stickney-1', zone: 'core', xM: 0, yM: 0, rotationDeg: 354, footprintWidthM: 26, footprintDepthM: 20, critical: true, catalogEntityId: 'habitat', purpose: 'Verankerter Wohn- und Aufenthaltskern; Ausgangspunkt des kurzen Druckkorridors zur Lebenserhaltung.' },
-  { id: 'phobos_life_support_1', role: 'life-support', label: 'Lebenserhaltung Stickney-1', zone: 'core', xM: 40, yM: 2, rotationDeg: 4, footprintWidthM: 22, footprintDepthM: 22, critical: true, catalogEntityId: 'life_support_hub', purpose: 'ECLSS-Knoten in kurzer druckbeaufschlagter Distanz zum Habitat, aber als eigenes Modul mit freiem Sicherheitsraum.' },
+  { id: 'phobos_habitat_1', role: 'habitat', label: 'Habitat Stickney-1', zone: 'core', xM: 0, yM: 0, rotationDeg: 0, footprintWidthM: 26, footprintDepthM: 20, critical: true, catalogEntityId: 'habitat', purpose: 'Verankerter Wohn- und Aufenthaltskern; Ausgangspunkt des kurzen Druckkorridors zur Lebenserhaltung.' },
+  { id: 'phobos_life_support_1', role: 'life-support', label: 'Lebenserhaltung Stickney-1', zone: 'core', xM: 40, yM: 0, rotationDeg: 0, footprintWidthM: 22, footprintDepthM: 22, critical: true, catalogEntityId: 'life_support_hub', purpose: 'ECLSS-Knoten in kurzer druckbeaufschlagter Distanz zum Habitat, aber als eigenes Modul mit freiem Sicherheitsraum.' },
 
-  { id: 'phobos_solar_1', role: 'power-generation', label: 'Solarfeld Stickney-1', zone: 'utilities', xM: -126, yM: 96, rotationDeg: 332, footprintWidthM: 46, footprintDepthM: 32, critical: true, catalogEntityId: 'solar', purpose: 'Exponierter Energiepunkt des nordwestlichen Utility-Faechers.' },
-  { id: 'phobos_battery_1', role: 'power-storage', label: 'Batteriespeicher Stickney-1', zone: 'utilities', xM: -58, yM: 66, rotationDeg: 348, footprintWidthM: 22, footprintDepthM: 22, critical: true, catalogEntityId: 'battery_storage', purpose: 'Pufferknoten zwischen Solarfeld und Kern; ueber leichte Versorgungsumbilicals angebunden.' },
-  { id: 'phobos_comms_1', role: 'communications', label: 'Kommunikationsmast Stickney-1', zone: 'utilities', xM: -108, yM: -28, rotationDeg: 14, footprintWidthM: 16, footprintDepthM: 16, critical: true, catalogEntityId: 'surface_comms', purpose: 'Freistehender Datenknoten; bildet mit Solar und Batterie bewusst keinen linearen Strang, sondern einen Utility-Faecher.' },
+  { id: 'phobos_solar_1', role: 'power-generation', label: 'Solarfeld Stickney-1', zone: 'utilities', xM: -120, yM: 100, rotationDeg: 0, footprintWidthM: 46, footprintDepthM: 32, critical: true, catalogEntityId: 'solar', purpose: 'Exponierter Energiepunkt des nordwestlichen Utility-Faechers.' },
+  { id: 'phobos_battery_1', role: 'power-storage', label: 'Batteriespeicher Stickney-1', zone: 'utilities', xM: -60, yM: 60, rotationDeg: 0, footprintWidthM: 22, footprintDepthM: 22, critical: true, catalogEntityId: 'battery_storage', purpose: 'Pufferknoten zwischen Solarfeld und Kern; ueber leichte Versorgungsumbilicals angebunden.' },
+  { id: 'phobos_comms_1', role: 'communications', label: 'Kommunikationsmast Stickney-1', zone: 'utilities', xM: -100, yM: -40, rotationDeg: 0, footprintWidthM: 16, footprintDepthM: 16, critical: true, catalogEntityId: 'surface_comms', purpose: 'Freistehender Datenknoten; bildet mit Solar und Batterie bewusst keinen linearen Strang, sondern einen Utility-Faecher.' },
 
-  { id: 'phobos_warehouse_1', role: 'warehouse', label: 'Warenhaus Stickney-1', zone: 'logistics', xM: 86, yM: 62, rotationDeg: 8, footprintWidthM: 32, footprintDepthM: 26, critical: true, catalogEntityId: 'warehouse', purpose: 'Primaerer Materialknoten eines eigenstaendigen oestlichen Logistikclusters.' },
-  { id: 'phobos_workshop_1', role: 'workshop', label: 'Werkstatt Stickney-1', zone: 'logistics', xM: 134, yM: 60, rotationDeg: 350, footprintWidthM: 28, footprintDepthM: 24, critical: false, catalogEntityId: 'surface_workshop', purpose: 'Wartungsmodul seitlich neben dem Warenhaus statt entlang einer Basis-Hauptachse.' },
-  { id: 'phobos_rover_yard_1', role: 'rover-yard', label: 'Fahrzeughof Stickney-1', zone: 'logistics', xM: 132, yM: 4, rotationDeg: 78, footprintWidthM: 34, footprintDepthM: 26, critical: false, catalogEntityId: 'rover_yard', purpose: 'Verankerter Robotik- und Fahrzeughof unterhalb des Logistikclusters.' },
+  { id: 'phobos_warehouse_1', role: 'warehouse', label: 'Warenhaus Stickney-1', zone: 'logistics', xM: 80, yM: 60, rotationDeg: 0, footprintWidthM: 32, footprintDepthM: 26, critical: true, catalogEntityId: 'warehouse', purpose: 'Primaerer Materialknoten eines eigenstaendigen oestlichen Logistikclusters.' },
+  { id: 'phobos_workshop_1', role: 'workshop', label: 'Werkstatt Stickney-1', zone: 'logistics', xM: 140, yM: 60, rotationDeg: 0, footprintWidthM: 28, footprintDepthM: 24, critical: false, catalogEntityId: 'surface_workshop', purpose: 'Wartungsmodul rasterparallel seitlich neben dem Warenhaus.' },
+  { id: 'phobos_rover_yard_1', role: 'rover-yard', label: 'Fahrzeughof Stickney-1', zone: 'logistics', xM: 140, yM: 0, rotationDeg: 90, footprintWidthM: 34, footprintDepthM: 26, critical: false, catalogEntityId: 'rover_yard', purpose: 'Verankerter Robotik- und Fahrzeughof unterhalb des Logistikclusters.' },
 
-  { id: 'phobos_landing_cargo_1', role: 'landing-cargo', label: 'Anlege- und Cargo-Zone Stickney-1', zone: 'landing', xM: 222, yM: -92, rotationDeg: 26, footprintWidthM: 70, footprintDepthM: 55, critical: true, catalogEntityId: 'landing_pad_phobos', purpose: 'Weit abgesetztes Andock- und Verankerungsfeld; kein Bestandteil des Stationskerns und nur ueber Cargo-/Tether-Verbindung angebunden.' },
+  { id: 'phobos_landing_cargo_1', role: 'landing-cargo', label: 'Anlege- und Cargo-Zone Stickney-1', zone: 'landing', xM: 220, yM: -100, rotationDeg: 0, footprintWidthM: 70, footprintDepthM: 55, critical: true, catalogEntityId: 'landing_pad_phobos', purpose: 'Weit abgesetztes Andock- und Verankerungsfeld; kein Bestandteil des Stationskerns und nur ueber Cargo-/Tether-Verbindung angebunden.' },
 ] as const
 
 assertSurfaceLayoutClearance(
   PHOBOS_BASE_ALPHA_NODES,
   PHOBOS_BASE_ALPHA_MIN_CLEARANCE_M,
-  'Phobos Stickney split-cluster v3',
+  'Phobos Stickney structural-grid v4',
 )
 
 export const PHOBOS_BASE_ALPHA_LOGISTICS: readonly PhobosLogisticsEdge[] = [
