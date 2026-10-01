@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
+import { MAP_SCALE_DIVISIONS, SURFACE_LOCAL_CAMERA, pixelsPerMeterForVisibleWidth } from '@/lib/game/spatial/mapCameraPresets'
 import { analyzeLocalTerrainAt, reconstructLocalTerrain } from '@/lib/game/spatial/terrainReconstruction'
 import { deriveSurfaceMissionProgress } from '@/lib/game/vehicles/surfaceProgress'
 import { parseSurfaceRouteGeometry, pointAlongSurfaceRoute, type SurfaceRouteGeometry, type SurfaceRoutePoint } from '@/lib/game/vehicles/surfaceRouteGeometry'
@@ -75,7 +76,6 @@ type Props = {
 }
 
 const ACTIVE = new Set(['reserved', 'loading', 'in_transit', 'arrived', 'unloading'])
-const PAD = 54
 const MIN_ZOOM = .7
 const MAX_ZOOM = 28
 const WORLD_FRAME_PADDING = 1.28
@@ -157,6 +157,16 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
   useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 15_000); return () => window.clearInterval(timer) }, [load])
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
   useEffect(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+    setSelectedSpot(null)
+    setSelectedWorldObjectId(null)
+    setBuildMenuOpen(false)
+    setSelectedBuildId('')
+    setRotationDeg(0)
+    setBuildMessage(null)
+  }, [locationSlug])
+  useEffect(() => {
     const map = mapRef.current
     if (!map) return
     const update = () => { const rect = map.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) setViewport({ width: Math.max(320, rect.width), height: Math.max(320, rect.height) }) }
@@ -204,7 +214,7 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
     return { centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2, spanX: Math.max(maxX - minX, minimumWorldSpanM) * WORLD_FRAME_PADDING, spanY: Math.max(maxY - minY, minimumWorldSpanM) * WORLD_FRAME_PADDING }
   }, [allPoints, minimumWorldSpanM])
-  const baseScale = useMemo(() => Math.min(Math.max(100, viewport.width - PAD * 2) / worldBounds.spanX, Math.max(100, viewport.height - PAD * 2) / worldBounds.spanY), [viewport, worldBounds])
+  const baseScale = useMemo(() => pixelsPerMeterForVisibleWidth(viewport.width, SURFACE_LOCAL_CAMERA.visibleWidthM), [viewport.width])
   const project = useCallback((point: SurfaceRoutePoint) => ({ x: viewport.width / 2 + (point.xM - worldBounds.centerX) * baseScale, y: viewport.height / 2 - (point.yM - worldBounds.centerY) * baseScale }), [viewport, worldBounds, baseScale])
   const unproject = useCallback((x: number, y: number) => ({ xM: worldBounds.centerX + (x - viewport.width / 2) / baseScale, yM: worldBounds.centerY - (y - viewport.height / 2) / baseScale }), [viewport, worldBounds, baseScale])
 
@@ -249,7 +259,7 @@ export default function PlanetarySurfaceMap({ locationSlug, body, mapLabel, terr
   }
 
   const visibleWidthM = Math.max(1, viewport.width / (baseScale * zoom))
-  const targetScaleM = visibleWidthM / 5
+  const targetScaleM = visibleWidthM / MAP_SCALE_DIVISIONS
   const scaleOptions = [1,2,5,10,20,50,100,200,500,1000,2000,5000]
   const scaleM = scaleOptions.reduce((best, value) => Math.abs(value - targetScaleM) < Math.abs(best - targetScaleM) ? value : best, 100)
 
