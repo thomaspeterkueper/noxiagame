@@ -8,6 +8,8 @@ The world surface is the primary workspace. The dashboard is a game viewport, no
 
 The lower cockpit floats above the world surface. It does not reserve document height and therefore does not reduce the renderer viewport.
 
+**Binding UI rule:** Earth, Moon, Mars, Phobos, Deimos, stations and later worlds use the same NOXIA dashboard shell and interaction language. Context differences come from terrain, buildings, infrastructure, assets, data and available capabilities—not from body-specific dashboard look-and-feel. See `docs/decisions/ADR-unified-contextual-dashboard.md`.
+
 ## Ownership boundary
 
 This document covers dashboard chrome, HUD, cockpit navigation and host-level sizing only.
@@ -33,8 +35,17 @@ The Dashboard/HUD workstream owns:
 - legal/information access inside the cockpit
 - z-index/layering contract for overlays
 - responsive dashboard behavior
+- shared capability-module presentation, visibility and placement conventions
 
 Neither workstream should silently absorb the other's responsibilities.
+
+## Capability-driven composition
+
+The shell is stable; available functions are contextual.
+
+A location exposes capabilities such as science, robotics, mining, logistics, warehouse/cargo, market, maintenance, shipyard, construction or navigation. Shared modules are rendered only when their capability exists in the current context. Missing functionality is simply omitted instead of being replaced by a body-specific dashboard variant.
+
+Robotik, Wissenschaft, Logistik and similar systems are therefore shared NOXIA capabilities, not Phobos-, Moon-, Mars- or Earth-specific UI concepts. Context-specific wrappers should provide data/actions/configuration while reusing the shared panel/overlay language.
 
 ## Desktop composition
 
@@ -140,6 +151,8 @@ The persistent shell is moving away from light admin-dashboard styling toward a 
 - temporary drawers are slightly translucent rather than opaque white cards
 - passive feed content floats as simple text over one uniformly blurred translucent surface
 - pale document-style cards are tolerated only as transition content inside temporary drawers, not as permanent map chrome
+
+The persistent shell is **not body-themed**. A Moon, Mars, Phobos or Earth location must not alter the shell palette, control placement, tooltip conventions or inspector language merely to look different. Environmental identity belongs to the world renderer and assets.
 
 ## Earth fullscreen embedding transition
 
