@@ -1,9 +1,12 @@
 import type { EarthRegionAnchor } from './earthSpatial'
 import { EARTH_CELL_SIZE_M, EARTH_CHUNK_SIZE_M } from './earthSpatial'
+import { createPlanetaryViewAnchor } from '../../game/spatial/planetaryView'
 
 /**
- * NOXIA Earth streaming anchors.
+ * Legacy named Earth streaming/import anchors.
  *
+ * These anchors are backend cache/import conveniences, not player navigation modes.
+ * New arbitrary Earth views must use createEarthViewAnchor().
  * An anchor is deliberately not a map boundary and never owns an object's
  * canonical position. Earth persistence is global WGS84 latitude/longitude;
  * anchors only provide stable local metre projections for rendering,
@@ -46,4 +49,20 @@ export const EARTH_REGIONS: Record<string, EarthRegionAnchor> = {
 
 export function getEarthRegion(id: string): EarthRegionAnchor | null {
   return EARTH_REGIONS[id] ?? null
+}
+
+
+/**
+ * Creates a technical local projection/streaming anchor around any Earth view.
+ * This is not a named gameplay region and must never become navigation state.
+ */
+export function createEarthViewAnchor(origin: EarthRegionAnchor['origin']): EarthRegionAnchor {
+  const view = createPlanetaryViewAnchor('earth', { latDeg: origin.lat, lonDeg: origin.lon, elevationM: origin.elevationM ?? undefined }, { name: 'Earth · local view', chunkSizeM: EARTH_CHUNK_SIZE_M, cellSizeM: EARTH_CELL_SIZE_M })
+  return {
+    id: view.id,
+    name: view.name,
+    origin: { lat: view.origin.latDeg, lon: view.origin.lonDeg, elevationM: view.origin.elevationM },
+    chunkSizeM: view.chunkSizeM,
+    cellSizeM: view.cellSizeM,
+  }
 }

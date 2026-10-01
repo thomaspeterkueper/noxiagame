@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EARTH_LANDMARKS, type EarthLandmark } from '@/lib/world/spatial/earthLandmarks'
 import EarthLandmarkRegionFocus from './EarthLandmarkRegionFocus'
 
-type ViewKey = 'world' | 'europe' | 'germany' | 'mediterranean'
+type ViewKey = 'world' | 'europe' | 'germany' | 'mediterranean' | 'andes'
 type FilterKey = 'all' | 'science' | 'cross-universe'
 
 type GeoPoint = { lat: number; lon: number }
@@ -32,6 +32,15 @@ const LANDMARK_GEO: Readonly<Record<string, GeoPoint>> = {
   'earth-de-darmstadt-eumetsat': { lat: 49.8627, lon: 8.6276 },
   'earth-de-cologne-eac': { lat: 50.852, lon: 7.126 },
   'earth-de-oberpfaffenhofen-dlr': { lat: 48.083, lon: 11.283 },
+  'earth-de-frankfurt-senckenberg': { lat: 50.1175, lon: 8.6517 },
+  // City-level presentation point only until the Camaleo Artlounge locator is canonically resolved.
+  'earth-de-frankfurt-camaleo-artlounge': { lat: 50.1109, lon: 8.6821 },
+  'earth-mt-hal-saflieni': { lat: 35.8698, lon: 14.5069 },
+  'earth-tr-istanbul-bosphorus': { lat: 41.0082, lon: 28.9784 },
+  // Regional presentation points only until the literary sites are canonically resolved.
+  'earth-ch-vuiteboeuf': { lat: 46.808, lon: 6.549 },
+  'earth-de-north-sea-book-village': { lat: 54.2, lon: 8.7 },
+  'earth-pe-chavin-de-huantar': { lat: -9.5928, lon: -77.1785 },
   'earth-in-dwarka': { lat: 22.244, lon: 68.968 },
   'earth-gr-phaistos': { lat: 35.051, lon: 24.814 },
   'earth-eg-alexandria': { lat: 31.2001, lon: 29.9187 },
@@ -42,6 +51,7 @@ const VIEWS: Record<ViewKey, ViewBox> = {
   europe: { west: -15, east: 45, south: 30, north: 62, label: 'Europa' },
   germany: { west: 5, east: 15.8, south: 47, north: 55.3, label: 'Deutschland' },
   mediterranean: { west: -10, east: 45, south: 20, north: 46, label: 'Mittelmeerraum' },
+  andes: { west: -82, east: -68, south: -20, north: 2, label: 'Anden' },
 }
 
 function inView(point: GeoPoint, view: ViewBox) {
@@ -142,7 +152,7 @@ export default function EarthLandmarkMap() {
       {!markers.length && <div className="empty">In dieser Kombination aus Ansicht und Layer sind noch keine Landmark-Einträge vorhanden.</div>}
     </div>
 
-    <div className="legend"><span><i className="space" /> Raumfahrt / Wissenschaft</span><span><i className="science" /> Wissenschaft</span><span><i className="cross" /> Cross-Universe</span><span className="note">Marker = Earth-Regionalfokus; keine simulierte Reise. Kanonische Ortsidentität bleibt adressbasiert.</span></div>
+    <div className="legend"><span><i className="space" /> Raumfahrt / Wissenschaft</span><span><i className="science" /> Wissenschaft</span><span><i className="cross" /> Cross-Universe</span><span className="note">Marker = Earth-Regionalfokus; keine simulierte Reise. Kanonische Ortsidentität bleibt Registry-basiert; Kartenpunkte sind nur View-Koordinaten.</span></div>
 
     {selected && <div id="earth-landmark-region-focus"><EarthLandmarkRegionFocus landmark={selected.landmark} point={selected.point} onClose={closeRegionalFocus} /></div>}
 

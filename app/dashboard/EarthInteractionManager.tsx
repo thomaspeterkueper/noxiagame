@@ -22,24 +22,6 @@ type QuotePayload = {
   childCount?: number
 }
 
-const EARTH_REGION_COOKIE = 'noxia-earth-region'
-const SAUERLAND_REGION = 'earth-sauerland'
-const NAMIBIA_REGION = 'earth-namibia-erongo'
-
-function readEarthRegion() {
-  if (typeof document === 'undefined') return SAUERLAND_REGION
-  const item = document.cookie
-    .split('; ')
-    .find(row => row.startsWith(`${EARTH_REGION_COOKIE}=`))
-  const value = item ? decodeURIComponent(item.slice(EARTH_REGION_COOKIE.length + 1)) : SAUERLAND_REGION
-  return value === NAMIBIA_REGION ? NAMIBIA_REGION : SAUERLAND_REGION
-}
-
-function selectEarthRegion(regionId: string) {
-  document.cookie = `${EARTH_REGION_COOKIE}=${encodeURIComponent(regionId)}; Path=/; Max-Age=31536000; SameSite=Lax`
-  window.location.reload()
-}
-
 function buttonStyle(kind: 'primary' | 'danger'): string {
   if (kind === 'danger') {
     return 'flex:1;border:1px solid #9a5750;background:#fff7f3;color:#8b332d;border-radius:7px;padding:8px 9px;font:800 10px system-ui;cursor:pointer'
@@ -75,65 +57,6 @@ export default function EarthInteractionManager() {
     let objectLookupSerial = 0
     const mapCleanups: Array<() => void> = []
     const controlCleanups: Array<() => void> = []
-
-    const enhanceRegionControls = () => {
-      const actions = document.querySelector<HTMLElement>('.earth-actions')
-      const head = document.querySelector<HTMLElement>('.earth-head')
-      if (!actions || !head) return
-
-      const current = readEarthRegion()
-      let switcher = actions.querySelector<HTMLElement>('[data-noxia-earth-region-switcher]')
-      if (!switcher) {
-        switcher = document.createElement('div')
-        switcher.dataset.noxiaEarthRegionSwitcher = '1'
-        switcher.style.cssText = 'display:flex;gap:4px;align-items:center;padding:3px;border:1px solid #9aa9a1;border-radius:8px;background:#f7f6ef'
-
-        const makeButton = (id: string, label: string) => {
-          const button = document.createElement('button')
-          button.type = 'button'
-          button.dataset.regionId = id
-          button.textContent = label
-          button.style.cssText = 'border:0;background:transparent;color:#52666d;border-radius:5px;padding:6px 8px;font:800 9px system-ui;cursor:pointer'
-          button.onclick = () => selectEarthRegion(id)
-          return button
-        }
-
-        switcher.append(
-          makeButton(SAUERLAND_REGION, 'Deutschland · Sauerland'),
-          makeButton(NAMIBIA_REGION, 'Namibia · Erongo'),
-        )
-        actions.prepend(switcher)
-      }
-
-      for (const button of Array.from(switcher.querySelectorAll<HTMLButtonElement>('button[data-region-id]'))) {
-        const active = button.dataset.regionId === current
-        button.style.background = active ? '#173f4d' : 'transparent'
-        button.style.color = active ? '#fffaf0' : '#52666d'
-      }
-
-      const eyebrow = head.querySelector<HTMLElement>('small')
-      const title = head.querySelector<HTMLElement>('h1')
-      const copy = head.querySelector<HTMLElement>('p')
-      if (current === NAMIBIA_REGION) {
-        if (eyebrow && eyebrow.textContent !== 'NOXIA EARTH · NAMIBIA 2086') eyebrow.textContent = 'NOXIA EARTH · NAMIBIA 2086'
-        if (title && title.textContent !== 'Erongo-Korridor · Walvis Bay') title.textContent = 'Erongo-Korridor · Walvis Bay'
-        const namibiaCopy = 'Reale OSM- und Geländedaten im globalen WGS84-Erdraum. Lokale Meterprojektion für Analyse und Bauen.'
-        if (copy && copy.textContent !== namibiaCopy) copy.textContent = namibiaCopy
-      }
-
-      let badge = actions.querySelector<HTMLElement>('[data-noxia-earth-analysis-mode]')
-      if (current === NAMIBIA_REGION) {
-        if (!badge) {
-          badge = document.createElement('div')
-          badge.dataset.noxiaEarthAnalysisMode = '1'
-          badge.style.cssText = 'padding:6px 8px;border:1px solid #68838a;border-radius:6px;background:#edf5f3;color:#35535d;font:800 8px system-ui;letter-spacing:.05em'
-          actions.appendChild(badge)
-        }
-        if (badge.textContent !== 'GLOBAL WGS84 · ERONGO-AUSSCHNITT') badge.textContent = 'GLOBAL WGS84 · ERONGO-AUSSCHNITT'
-      } else if (badge) {
-        badge.remove()
-      }
-    }
 
     const enhanceMapControlGuards = () => {
       const controls = document.querySelectorAll<HTMLElement>(
@@ -246,7 +169,6 @@ export default function EarthInteractionManager() {
     }
 
     const enhanceCandidate = () => {
-      if (readEarthRegion() !== SAUERLAND_REGION) return
       const panel = document.querySelector<HTMLElement>('.earth-candidate')
       if (!panel) return
 
@@ -398,7 +320,6 @@ export default function EarthInteractionManager() {
     }
 
     const enhance = () => {
-      enhanceRegionControls()
       enhanceMapControlGuards()
       enhanceMapClickBridge()
       enhanceCandidate()
