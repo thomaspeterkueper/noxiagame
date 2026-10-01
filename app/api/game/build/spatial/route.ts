@@ -80,9 +80,6 @@ async function definition(id: string): Promise<CatalogEntry | null> {
 }
 
 function buildRequirement(buildableId: string, locationSlug: string, knowledge: KnowledgeState) {
-  // Earth is currently the spatial-placement playtest. Geometry, collision,
-  // persistence and rendering must remain testable independently from the
-  // curriculum/SSF unlock chain. Other locations keep the canonical gate.
   if (locationSlug === 'earth') {
     return { id: null, ok: true, requiredUnlock: null, requiredLabel: null, learningUrl: null }
   }
@@ -178,6 +175,10 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null
 }
 
+function hasLocalWorldPosition(row: any) {
+  return finiteNumber(row.x_m) != null && finiteNumber(row.y_m) != null
+}
+
 function earthRegion(req: NextRequest, explicitRegionId?: string | null) {
   const regionId = explicitRegionId
     ?? req.cookies.get('noxia-earth-region')?.value
@@ -193,9 +194,6 @@ function canonicalEarthGeo(row: any): GeoPoint | null {
     catch { return null }
   }
 
-  // Transitional fallback for old rows that have not yet received canonical
-  // geodetic coordinates. Their x/y cache belongs to the recorded region, or
-  // to the original Sauerland frame when no affinity is present.
   const xM = finiteNumber(row.x_m)
   const yM = finiteNumber(row.y_m)
   if (xM == null || yM == null) return null
@@ -268,8 +266,6 @@ export async function GET(req: NextRequest) {
   const terrainDatasets = terrainDatasetsResult.data
   const credits = Number(profile?.credits ?? 0)
 
-  // The database catalog is authoritative when a definition exists there.
-  // Local definitions remain the fallback for code-only buildings.
   const catalog = localCatalog()
   for (const row of dbDefinitionsResult.data ?? []) {
     catalog.set(row.key, {
@@ -286,13 +282,13 @@ export async function GET(req: NextRequest) {
         const projected = projectEarthRow(row, viewRegion)
         return projected ? [projected] : []
       })
-    : rawEntities
+    : rawEntities.filter(hasLocalWorldPosition)
   const visibleBuilds = viewRegion
     ? rawBuilds.flatMap((row: any) => {
         const projected = projectEarthRow(row, viewRegion)
         return projected ? [projected] : []
       })
-    : rawBuilds
+    : rawBuilds.filter(hasLocalWorldPosition)
 
   const entities = visibleEntities.map((entity: any) => {
     const meta = catalog.get(entity.entity_id)
@@ -354,10 +350,6 @@ export async function GET(req: NextRequest) {
     : (sites ?? [])
 
   const terrainRes = await terrainResolution(frame, activeTerrainDataset)
-  // Kleines Raster fuer eine echte Terrain-Visualisierung auf der Karte
-  // (Hillshade/Relief), statt nur den Status anzuzeigen. Bewusst klein
-  // gehalten (11x11 = 121 Punkte, ~60m Abstand) -- jeder Punkt ist ein
-  // echter Sampler-Aufruf gegen die bereits geladene Kachel.
   let elevationGrid: { stepM: number; size: number; values: (number | null)[] } | null = null
   if (terrainRes.status === 'resolved' && activeTerrainDataset) {
     try {
@@ -474,7 +466,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Globale WGS84-Position fehlt oder ist ungültig' }, { status: 400 })
     }
 
-    // x/y are a cache in the currently selected local projection only.
     const local = geoToLocalMeters(canonicalGeo, selectedRegion.origin)
     xM = local.eastM
     yM = local.northM
