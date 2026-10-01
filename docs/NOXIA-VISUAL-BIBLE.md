@@ -4,6 +4,16 @@
 
 NOXIA soll als wissenschaftsorientierte Aufbau-, Wirtschafts- und Forschungssimulation visuell wie ein echtes Spiel-HUD wirken, nicht wie eine Webseite mit eingebettetem Grid. Die Kolonie ist der Hauptdarsteller; Navigation, Ressourcen, Forschung, Logistik und Bewohner liegen als kontextuelle HUD-Schichten darum.
 
+## Verbindliche UI-Leitlinie
+
+NOXIA besitzt **eine gemeinsame Benutzeroberfläche und Interaktionssprache** für Erde, Mond, Mars, Phobos, Deimos, Stationen und spätere Welten. Dasselbe Prinzip gilt für Rover, Fahrzeuge, Shuttles und Raumschiffe.
+
+Der unterschiedliche Charakter entsteht aus Umgebung, Terrain, Beleuchtung, Gebäuden, Infrastruktur, Fahrzeugen, Assets und verfügbaren Funktionen — nicht aus jeweils neu erfundenen Dashboard-Themes.
+
+Eine Funktion wie Robotik, Wissenschaft, Mining, Logistik oder Navigation ist eine NOXIA-Capability. Ist sie im aktuellen Kontext vorhanden, erscheint das gemeinsame Modul mit lokalen Daten und Aktionen. Ist sie nicht vorhanden, wird sie nicht eingeblendet.
+
+Verbindliche Architekturentscheidung: `docs/decisions/ADR-unified-contextual-dashboard.md`.
+
 ## Bildsprache
 
 - Near-Future statt Fantasy-Sci-Fi.
@@ -14,6 +24,8 @@ NOXIA soll als wissenschaftsorientierte Aufbau-, Wirtschafts- und Forschungssimu
 - Erde: sauberer, grüner, etablierter; stärker institutionell und zivil.
 - Phobos: rau, kleinräumig, felsig, provisorischer Charakter.
 - Stationen: modular, kompakt, druckbeaufschlagt, sichtbare technische Infrastruktur.
+
+Diese Unterschiede gelten für **Welt und Assets**, nicht für eine body-spezifische Neugestaltung der globalen NOXIA-Shell.
 
 ## Isometrische Außenassets
 
@@ -66,11 +78,29 @@ Technisches Zielformat ist bevorzugt Sprite-Strip/WebP oder APNG. GIF bleibt Fal
 ## HUD
 
 - Koloniefläche maximieren.
+- Globales Dashboard-Look-and-feel bleibt auf allen Himmelskörpern identisch.
+- Topbar, Cockpit, Kartenwerkzeuge, Tooltip-/Inspector-Stil, Eigentumsfarben und Overlay-Konventionen sind gemeinsame UI-Bausteine.
 - Ressourcen als kompakte Leiste direkt über der Welt.
 - Rechte Seite als kontextabhängiger Inspector statt statischer Dauerleiste.
 - Planen & Bauen als expliziter Modus/Drawer.
 - Innenraum, Bewohner, Baufortschritt und Wartung als kontextuelle Ansichten.
 - Primäre Weltaktionen bleiben immer sichtbar, sekundäre Informationen werden eingeklappt.
+- Capability-Module werden nur angezeigt, wenn sie im aktuellen Standort/Fahrzeug tatsächlich verfügbar sind.
+- Keine eigene Moon-, Mars-, Earth-, Phobos- oder Vehicle-Dashboard-Farbsprache ohne explizite Architekturentscheidung.
+
+## Fahrzeuge und Raumschiffe
+
+Auch Fahrzeuge erhalten keine jeweils eigenständig erfundene Dashboard-Familie. Ein Rover, Zug, Flugzeug, Shuttle oder Raumschiff nutzt dieselben NOXIA-Interaktionsmuster und setzt seine Ansicht aus vorhandenen Fähigkeiten zusammen.
+
+Unterschiede dürfen sichtbar werden durch:
+
+- Fahrzeug-/Schiffssilhouette und Schemata
+- reale Instrumentdaten
+- installierte Module
+- verfügbare Steuer- und Betriebsfunktionen
+- Betriebsumgebung und Missionskontext
+
+Nicht durch willkürlich wechselnde globale Navigation, Tooltip-Logik, Statusfarben oder Panel-Geometrie.
 
 ## Asset Governance
 
