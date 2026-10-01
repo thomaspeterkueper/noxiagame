@@ -18,6 +18,8 @@ Core | Gebäude & Innenräume | Fahrzeuge & Raumschiffe | Grafik / Assets
 
 Ein Mondrover ist daher kein eigenes Mond-System: Der Mond liefert Gelände, Gravitation und Umweltbedingungen; das Fahrzeugsystem liefert Fahrzeugzustand, Bewegung, Energie, Fracht und Wartung. Entsprechend bestimmt der Mond den Standort eines Habitats, während das Gebäude-/Innenraumsystem dessen Räume und Funktionen definiert.
 
+Dasselbe gilt für die Benutzeroberfläche: **kein Weltkörper und keine Fahrzeugklasse besitzt automatisch ein eigenes Dashboard-System.** Erde, Mond, Mars, Phobos, Deimos, Stationen, Fahrzeuge und Raumschiffe verwenden die gemeinsame noχ¹ᐃ-Shell und dieselben Interaktionskonventionen. Eine Funktion wird als gemeinsame Capability eingeblendet, wenn sie im jeweiligen Kontext vorhanden ist; fehlt sie, bleibt sie ausgeblendet. Verbindlich: `docs/decisions/ADR-unified-contextual-dashboard.md`.
+
 ## 1. noχ¹ᐃ · Core / Architektur / Backend
 
 Verantwortlich für alle systemweiten Grundlagen:
@@ -30,6 +32,7 @@ Verantwortlich für alle systemweiten Grundlagen:
 - globale Objektidentitäten
 - Reisen, Transfers und Zustandsübergänge
 - gemeinsame Koordinaten- und Projektionsabstraktionen
+- gemeinsame Dashboard-/Capability-Architektur und UI-Invarianten
 
 Änderungen gehören hierher, wenn sie mehrere Weltkörper oder Gameplay-Domänen betreffen.
 
@@ -47,6 +50,8 @@ Verantwortlich für die reale Erde als globalen WGS84-Koordinatenraum:
 - spätere aus Büchern bekannte reale oder fiktional erweiterte Orte
 
 Regionen wie Sauerland oder Namibia sind Ansichten beziehungsweise Daten-/Gameplay-Bereiche innerhalb derselben Erde und keine getrennten Welten.
+
+Die Erde darf für diese Unterschiede keine eigene Dashboard-Shell etablieren; sie liefert Weltinhalt und Earth-spezifische Daten an die gemeinsamen UI-Module.
 
 ## 3. noχ¹ᐃ · Mond
 
@@ -88,7 +93,7 @@ Verantwortlich für Mars-spezifische Oberflächen- und Geodäsiearbeit:
 - Mars-spezifische Bauphysik und Umweltbedingungen
 - Siedlungs- und Routennetz
 
-Das allgemeine Build-, Gebäude- und Fahrzeugsystem bleibt außerhalb dieses Bereichs.
+Das allgemeine Build-, Gebäude-, Dashboard- und Fahrzeugsystem bleibt außerhalb dieses Bereichs.
 
 ## 5. noχ¹ᐃ · Orbit / Raumstationen
 
@@ -102,7 +107,7 @@ Verantwortlich für räumliche Domänen ohne feste planetare Oberfläche:
 - orbitales Bauen
 - räumliche Beziehungen und Transfers zwischen Orbitalobjekten
 
-Innenräume von Stationsmodulen nutzen das gemeinsame Gebäude-/Innenraumsystem.
+Innenräume von Stationsmodulen nutzen das gemeinsame Gebäude-/Innenraumsystem. Stationsfunktionen verwenden dieselben Capability-Module wie planetare Standorte, sofern fachlich identisch.
 
 ## 6. noχ¹ᐃ · Gebäude & Innenräume
 
@@ -132,8 +137,9 @@ Weltkörperübergreifender Bereich für mobile Objekte:
 - Fracht
 - Wartung und Zustand
 - Navigation und Bewegung
+- gemeinsame Fahrzeug-/Raumschiff-Dashboard-Module und Capability-Komposition
 
-Weltkörper liefern Untergrund, Gravitation, Atmosphäre und lokale Restriktionen; das Fahrzeugmodell bleibt gemeinsam.
+Weltkörper liefern Untergrund, Gravitation, Atmosphäre und lokale Restriktionen; das Fahrzeugmodell bleibt gemeinsam. Rover, Zug, Flugzeug, Shuttle und Raumschiff dürfen unterschiedliche Fähigkeiten besitzen, aber keine jeweils neu erfundene globale UI-Shell.
 
 ## 8. noχ¹ᐃ · Grafik / Assets
 
@@ -142,12 +148,12 @@ Verantwortlich für die Darstellung, nicht für den Gameplay-Weltzustand:
 - Gebäude-Tiles und Gebäudeansichten
 - Terrain- und Landschaftsassets
 - Fahrzeuge und Raumschiffe
-- Cockpit-Elemente
+- Cockpit-Elemente der gemeinsamen NOXIA-UI
 - Kartenvisualisierung
 - Innenraumgrafik
 - Icons und UI-nahe Spielgrafik
 
-Grafik muss den persistierten Zustand darstellen und darf keinen parallelen Spielzustand erzeugen.
+Grafik muss den persistierten Zustand darstellen und darf keinen parallelen Spielzustand erzeugen. Welt- oder Fahrzeugcharakter soll primär über Umwelt, Assets und dargestellte Daten entstehen, nicht über inkompatible Dashboard-Themes.
 
 ## Optionaler Arbeitsbereich: noχ¹ᐃ · Release / QA / Testspieler
 
