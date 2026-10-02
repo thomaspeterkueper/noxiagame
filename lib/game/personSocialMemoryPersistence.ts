@@ -57,7 +57,7 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
   if (existing) { result.memoriesExisting++; return result }
 
   // Insert memory first. The DB unique constraint is the final concurrency guard.
-  const { error: memoryError } = await supabase.from('person_memories').insert(memoryRow(memory))
+  const { data: insertedMemory, error: memoryError } = await supabase.from('person_memories').insert(memoryRow(memory)).select('id').single()
   if (memoryError) {
     // A concurrent/replayed projector may have won after our lookup.
     if (String(memoryError.code ?? '') === '23505') { result.memoriesExisting++; return result }
@@ -65,6 +65,25 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
     return result
   }
   result.memoriesInserted++
+
+  // Creative processing is role-gated and remains downstream of persisted memory.
+  const { data: author } = await supabase.from('people').select('public_role').eq('id', memory.personId).maybeSingle()
+  if (author?.public_role === 'author_chronicler' && memory.salience >= 0.6) {
+    const traceKind = memory.kind === 'crisis' ? 'chronicle_seed' : memory.kind === 'interaction' ? 'scene_seed' : 'note'
+    const { error: traceError } = await supabase.from('person_creative_traces').upsert({
+      person_id: memory.personId,
+      source_memory_id: insertedMemory.id,
+      source_event_id: memory.sourceEventId,
+      trace_kind: traceKind,
+      subject_type: 'memory',
+      subject_ref: insertedMemory.id,
+      salience: memory.salience,
+      interpretation: memory.summary,
+      epistemic_status: 'subjective',
+      created_tick: memory.tick,
+    }, { onConflict: 'person_id,source_memory_id,trace_kind' })
+    if (traceError) result.errors.push(`creative trace: ${traceError.message ?? traceError}`)
+  }
 
   if (!memory.otherPersonId || options.projectRelationship === false) return result
   const { data: relationRow, error: relationError } = await supabase
