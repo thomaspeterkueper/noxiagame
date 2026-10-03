@@ -8,6 +8,7 @@ import { useColonyStateStore } from '@/lib/store/colonyStateStore'
 import WalkableColony from './WalkableColony'
 import ColonyConversationLayer from './ColonyConversationLayer'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
+import EarthWalkableSurface from '@/app/earth/EarthWalkableSurface'
 
 const chrome=<style>{`
 /*
@@ -58,7 +59,10 @@ export default function DashboardPrimaryColony(){
  // synthetic colony grid: that would preserve the label while changing the
  // physical world underneath the player. A future walkable Earth view must
  // project the same persisted WGS84/materialized place data.
- if(isEarth)return null
+ if(isEarth){
+   if(mode==='colony')return <EarthWalkableSurface residents={residents} onClose={enterPlanning}/>
+   return null
+ }
  if(isStation)return null
  if(mode==='planning')return <>{chrome}<button className="noxia-open-isometric" onClick={enterColony}>◇ Isometrische Ansicht öffnen</button></>
  if(loading||!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>{error?'SYNCHRONISIERUNG WIRD ERNEUT VERSUCHT …':'KOLONIE WIRD SYNCHRONISIERT …'}</span></div></div></div></>
