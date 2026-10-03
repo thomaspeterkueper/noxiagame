@@ -24,6 +24,8 @@ function readCookie(name:string){
 
 function setCookie(name:string,value:string){document.cookie=`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=31536000; SameSite=Lax`}
 
+function clearCookie(name:string){document.cookie=`${name}=; Path=/; Max-Age=0; SameSite=Lax`}
+
 function selectPoint(lat:number,lon:number,label:string,region?:EarthRegionId){
   const placeSlug=earthPlaceSlug({lat,lon})
   setCookie(EARTH_REGION_COOKIE,region??placeSlug)
