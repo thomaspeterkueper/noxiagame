@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   if (!action) {
     const { data: profile } = await serviceClient
       .from('profiles')
-      .select('id, username, avatar, onboarded, credits, flight_count, knowledge_level')
+      .select('id, username, avatar, onboarded, credits, flight_count, knowledge_level, current_location, home_location')
       .eq('id', user.id)
       .single()
 
@@ -73,7 +73,10 @@ export async function GET(req: NextRequest) {
 
     const { error: updErr } = await serviceClient
       .from('profiles')
-      .update({ username, avatar, onboarded: true, current_location: 'earth' })
+      // Heimatort (home_location) wird hier einmalig beim Onboarding auf den
+      // Startort gesetzt -- Aenderung spaeter nur ueber Registrierung an der
+      // Verwaltung des neuen Ortes (admin/route.ts, action=registerHome).
+      .update({ username, avatar, onboarded: true, current_location: 'earth', home_location: 'earth' })
       .eq('id', user.id)
 
     if (updErr) {

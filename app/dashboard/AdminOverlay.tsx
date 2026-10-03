@@ -77,6 +77,40 @@ export default function AdminOverlay({ locationSlug, onClose, userId, canSell, o
 
   const isGovernor = !!userId && !!data && userId === data.location.governorId
 
+  // Heimatort-Registrierung (03.10.2026): jeder Spieler kann seinen
+  // Heimatort hierher verlegen, aber nur waehrend er sich tatsaechlich an
+  // diesem Ort befindet (current_location === locationSlug, serverseitig
+  // geprueft in app/api/game/admin/route.ts, action=registerHome).
+  const [homeLocation, setHomeLocation] = useState<string | null>(null)
+  const [currentLocation, setCurrentLocation] = useState<string | null>(null)
+  const [registeringHome, setRegisteringHome] = useState(false)
+  const [homeMsg, setHomeMsg] = useState<string | null>(null)
+
+  async function loadHomeStatus() {
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/game/profile', { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      setHomeLocation(json?.profile?.home_location ?? null)
+      setCurrentLocation(json?.profile?.current_location ?? null)
+    } catch {}
+  }
+
+  async function registerHome() {
+    setRegisteringHome(true); setHomeMsg(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/game/admin?action=registerHome&location=${locationSlug}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const json = await res.json()
+      if (!res.ok) { setHomeMsg(json.error ?? 'Fehler bei der Registrierung'); setRegisteringHome(false); return }
+      setHomeLocation(json.homeLocation)
+      setHomeMsg('Heimatort aktualisiert.')
+    } catch { setHomeMsg('Fehler bei der Registrierung') }
+    setRegisteringHome(false)
+  }
+
   function reload() {
     setLoading(true)
     fetch(`/api/game/admin?location=${locationSlug}`)
@@ -93,6 +127,7 @@ export default function AdminOverlay({ locationSlug, onClose, userId, canSell, o
 
   useEffect(() => {
     reload()
+    if (userId) loadHomeStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationSlug])
 
@@ -236,6 +271,26 @@ export default function AdminOverlay({ locationSlug, onClose, userId, canSell, o
             >
               🏷️ Verkaufen
             </button>
+          )}
+
+          {/* Heimatort-Registrierung */}
+          {userId && homeLocation !== null && (
+            <div style={{ marginTop: '8px', fontSize: '0.68rem', color: '#5a7a9a' }}>
+              {homeLocation === locationSlug ? (
+                <span>🏠 Dein Heimatort</span>
+              ) : currentLocation === locationSlug ? (
+                <button
+                  onClick={registerHome}
+                  disabled={registeringHome}
+                  style={{ background: 'transparent', border: '1px solid #3a5a7a', color: '#8ab0d0', borderRadius: '6px', padding: '5px 12px', fontSize: '0.68rem', cursor: registeringHome ? 'default' : 'pointer' }}
+                >
+                  {registeringHome ? '…' : '🏠 Hier als Heimatort registrieren'}
+                </button>
+              ) : (
+                <span>Heimatort: {homeLocation} (nur änderbar, während du hier bist)</span>
+              )}
+              {homeMsg && <div style={{ marginTop: '4px', color: '#8ab0d0' }}>{homeMsg}</div>}
+            </div>
           )}
 
           {/* Status-Badges */}

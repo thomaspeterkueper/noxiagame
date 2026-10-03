@@ -38,6 +38,48 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'location fehlt' }, { status: 400 })
   }
 
+  // ── Heimatort-Registrierung: jeder Spieler, kein Gouverneur nötig ────────
+  // Heimatort (profiles.home_location) wird beim Onboarding auf den
+  // Startort gesetzt und lässt sich danach nur ändern, indem man sich an
+  // der Verwaltung des NEUEN Ortes registrieren lässt -- und dafür muss
+  // man dort auch tatsächlich sein (current_location === locationSlug).
+  if (action === 'registerHome') {
+    const user = await getUserFromRequest(req)
+    if (!user) return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 })
+
+    const { data: loc } = await supabase
+      .from('locations')
+      .select('id, slug')
+      .eq('slug', locationSlug)
+      .maybeSingle()
+    if (!loc) return NextResponse.json({ error: 'Kolonie nicht gefunden' }, { status: 404 })
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_location, home_location')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
+    if (profile.current_location !== locationSlug) {
+      return NextResponse.json({
+        error: `Du musst dafür in ${locationSlug} sein, nicht in ${profile.current_location ?? 'unbekannt'}.`,
+        code: 'NOT_AT_LOCATION',
+      }, { status: 409 })
+    }
+    if (profile.home_location === locationSlug) {
+      return NextResponse.json({ ok: true, homeLocation: locationSlug, alreadyHome: true })
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ home_location: locationSlug })
+      .eq('id', user.id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true, homeLocation: locationSlug })
+  }
+
   // ── Schreib-Aktionen: nur Gouverneur ─────────────────────────────────────
   if (action === 'setTaxRates' || action === 'withdraw') {
     const user = await getUserFromRequest(req)
