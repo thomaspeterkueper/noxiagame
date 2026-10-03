@@ -180,7 +180,7 @@ function queryFor(bounds: Bounds) {
   const box = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   // Deliberately no blanket [building] query. A materialized NOXIA city keeps
   // the real morphology while avoiding tens of thousands of irrelevant houses.
-  return `[out:json][timeout:25];(
+  return `[out:json][timeout:12];(
 way[natural=water](${box});way[water](${box});relation[natural=water](${box});
 way[waterway~"river|canal"](${box});
 way[landuse=forest](${box});way[natural=wood](${box});relation[landuse=forest](${box});relation[natural=wood](${box});
@@ -203,7 +203,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
   const query = queryFor(bounds)
   for (const endpoint of OVERPASS_ENDPOINTS) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 18_000)
+    const timer = setTimeout(() => controller.abort(), 10_000)
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
