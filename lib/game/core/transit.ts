@@ -7,11 +7,34 @@ import { transferQuote } from '@/lib/game/transfer'
 import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
 import {
+  completePassengerTransitCommand,
   completeTransitCommand,
+  startPassengerTransitCommand,
   startTransitCommand,
   type AtomicTransitCompletionResult,
   type AtomicTransitStartResult,
 } from '@/lib/game/core/commands'
+
+type PassengerProfile = {
+  current_location: string
+  transit_destination: string | null
+  transit_departed_at: string | null
+  transit_arrives_at: string | null
+}
+
+// Spieler ohne eigenes Schiff reisen ueber den Spediteur (Linienflug, s.
+// Migration 20261003190000_passenger_transit_without_ship.sql) -- Zustand
+// liegt auf profiles statt auf ships.
+async function passengerProfile(profileId: string): Promise<PassengerProfile | null> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('current_location, transit_destination, transit_departed_at, transit_arrives_at')
+    .eq('id', profileId)
+    .maybeSingle()
+  if (error) throw new Error(`passenger profile lookup failed: ${error.message}`)
+  return data ?? null
+}
 
 type ActiveShip = {
   id: string
@@ -82,10 +105,55 @@ async function arrivalStateForShip(shipId: string): Promise<StationArrivalState 
   return data as StationArrivalState
 }
 
+// Linienflug-Fahrpreis ohne eigenes Schiff: dieselbe Energie-Abstraktion wie
+// beim Schiffstransit (quote.energy, s. lib/game/transfer.ts), umgerechnet
+// in Credits statt in Treibstoff -- der Spediteur verlangt eine Pauschale,
+// kein eigener Energievorrat wird verbraucht.
+const PASSENGER_TICKET_CR_PER_ENERGY = 25
+
+async function startPlayerPassengerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
+  const supabase = createServiceClient()
+  const profile = await passengerProfile(profileId)
+  if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
+
+  if (!ORBITS[profile.current_location] || !ORBITS[destination]) {
+    throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${profile.current_location}:${destination}`)
+  }
+
+  const { data: tickRow } = await supabase
+    .from('tick_log')
+    .select('tick_number')
+    .order('tick_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const tick = Number(tickRow?.tick_number ?? 0)
+
+  const playerUnlocks = await getPlayerUnlocks(profileId)
+  const navigationProficiency = navigationProficiencyFromUnlocks(playerUnlocks)
+  // speedMult=1: Standard-Linienflug-Tempo, kein Bonus durch ein eigenes,
+  // schnelleres Schiff -- das bleibt ein Vorteil des Schiffsbesitzes.
+  const quote = transferQuote(profile.current_location, destination, tick, {
+    speedMult: 1,
+    navigationProficiency,
+  })
+  if (!quote) {
+    throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${profile.current_location}:${destination}`)
+  }
+
+  const ticketPrice = Math.round(quote.energy * PASSENGER_TICKET_CR_PER_ENERGY)
+
+  return startPassengerTransitCommand({
+    profileId,
+    destination,
+    durationSeconds: quote.durationSeconds,
+    ticketPrice,
+  })
+}
+
 export async function startPlayerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
   const supabase = createServiceClient()
   const ship = await activeShipForProfile(profileId)
-  if (!ship) throw new Error('NOXIA_SHIP_NOT_FOUND')
+  if (!ship) return startPlayerPassengerTransit(profileId, destination)
 
   if (ship.status === 'transit' && ship.dest_location !== destination) {
     throw new Error(`NOXIA_TRANSIT_ALREADY_ACTIVE:${ship.dest_location ?? '<unknown>'}`)
@@ -145,14 +213,24 @@ export async function startPlayerTransit(profileId: string, destination: string)
 
 export async function completePlayerTransit(profileId: string): Promise<AtomicTransitCompletionResult | null> {
   const ship = await activeShipForProfile(profileId)
-  if (!ship) throw new Error('NOXIA_SHIP_NOT_FOUND')
+  if (!ship) {
+    const profile = await passengerProfile(profileId)
+    if (!profile || !profile.transit_destination) return null
+    return completePassengerTransitCommand(profileId)
+  }
   if (ship.status !== 'transit') return null
   return completeTransitCommand(ship.id)
 }
 
 export async function settleDuePlayerTransit(profileId: string): Promise<AtomicTransitCompletionResult | null> {
   const ship = await activeShipForProfile(profileId)
-  if (!ship || ship.status !== 'transit' || !ship.arrives_at) return null
+  if (!ship) {
+    const profile = await passengerProfile(profileId)
+    if (!profile || !profile.transit_destination || !profile.transit_arrives_at) return null
+    if (new Date(profile.transit_arrives_at).getTime() > Date.now()) return null
+    return completePassengerTransitCommand(profileId)
+  }
+  if (ship.status !== 'transit' || !ship.arrives_at) return null
   if (new Date(ship.arrives_at).getTime() > Date.now()) return null
   return completeTransitCommand(ship.id)
 }
@@ -160,7 +238,45 @@ export async function settleDuePlayerTransit(profileId: string): Promise<AtomicT
 export async function getPlayerTransitState(profileId: string): Promise<PlayerTransitState | null> {
   await settleDuePlayerTransit(profileId)
   const ship = await activeShipForProfile(profileId)
-  if (!ship) return null
+
+  if (!ship) {
+    // Spediteur-Pfad ohne eigenes Schiff: Reisezustand liegt auf profiles.
+    const profile = await passengerProfile(profileId)
+    if (!profile) return null
+
+    if (!profile.transit_destination || !profile.transit_arrives_at) {
+      return {
+        shipId: 'passenger',
+        status: 'docked',
+        location: profile.current_location,
+        from: null,
+        to: null,
+        departedAt: null,
+        arrivesAt: null,
+        totalSeconds: 0,
+        remainingSeconds: 0,
+        arrival: null,
+      }
+    }
+
+    const arrivesMs = new Date(profile.transit_arrives_at).getTime()
+    const departedMs = profile.transit_departed_at ? new Date(profile.transit_departed_at).getTime() : Date.now()
+    const totalSeconds = Math.max(1, Math.round((arrivesMs - departedMs) / 1000))
+    const remainingSeconds = Math.max(0, Math.ceil((arrivesMs - Date.now()) / 1000))
+
+    return {
+      shipId: 'passenger',
+      status: 'transit',
+      location: profile.current_location,
+      from: profile.current_location,
+      to: profile.transit_destination,
+      departedAt: profile.transit_departed_at,
+      arrivesAt: profile.transit_arrives_at,
+      totalSeconds,
+      remainingSeconds,
+      arrival: null,
+    }
+  }
 
   if (ship.status !== 'transit' || !ship.dest_location || !ship.arrives_at) {
     const arrival = await arrivalStateForShip(ship.id)

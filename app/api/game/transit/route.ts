@@ -18,7 +18,18 @@ function transitError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
 
   if (message.includes('NOXIA_SHIP_NOT_FOUND')) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
+  if (message.includes('NOXIA_PROFILE_NOT_FOUND')) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
   if (message.includes('NOXIA_LOCATION_NOT_FOUND')) return NextResponse.json({ error: 'Zielort nicht gefunden' }, { status: 404 })
+  // Spediteur-Pfad ohne eigenes Schiff (s. Migration 20261003190000)
+  if (message.includes('NOXIA_PASSENGER_TICKET_INSUFFICIENT')) {
+    const match = message.match(/NOXIA_PASSENGER_TICKET_INSUFFICIENT:(\d+):(\d+)/)
+    return NextResponse.json({
+      error: match ? `Ticket kostet ${match[1]} Cr — nicht genug Credits (${match[2]} Cr vorhanden)` : 'Nicht genug Credits für das Ticket.',
+      ticketPrice: match ? Number(match[1]) : undefined,
+      credits: match ? Number(match[2]) : undefined,
+    }, { status: 400 })
+  }
+  if (message.includes('NOXIA_PASSENGER_HAS_SHIP')) return NextResponse.json({ error: 'Mit eigenem Schiff läuft die Reise über den normalen Transit.' }, { status: 409 })
   if (message.includes('NOXIA_TRANSIT_ROUTE_UNKNOWN')) return NextResponse.json({ error: 'Für diese Route liegt noch kein Transfermodell vor.', code: 'ROUTE_UNKNOWN' }, { status: 400 })
   if (message.includes('NOXIA_TRANSIT_OUT_OF_RANGE')) return NextResponse.json({ error: 'Ziel liegt außerhalb der aktuellen Schiffsreichweite.', code: 'OUT_OF_RANGE' }, { status: 400 })
   if (message.includes('NOXIA_TRANSIT_ENERGY_INSUFFICIENT')) {
@@ -89,6 +100,8 @@ export async function POST(req: NextRequest) {
           remainingSeconds: result.remaining_seconds,
         },
         shipId: result.ship_id,
+        isPassenger: Boolean(result.is_passenger),
+        ticketPrice: result.ticket_price ?? 0,
         energyUsed: result.energy_used,
         energyLeft: result.energy_left,
         landingFee: result.landing_fee,

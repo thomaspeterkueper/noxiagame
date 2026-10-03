@@ -102,7 +102,12 @@ export type AtomicShipPurchaseResult = {
 }
 
 export type AtomicTransitStartResult = {
-  ship_id: string
+  // ship_id ist null beim Linienflug-Pfad ohne eigenes Schiff (s.
+  // noxia_start_passenger_transit, Migration 20261003190000) -- is_passenger
+  // und ticket_price sagen dann, was stattdessen galt.
+  ship_id: string | null
+  is_passenger?: boolean
+  ticket_price?: number
   status: 'transit'
   from_location: string
   destination: string
@@ -120,7 +125,8 @@ export type AtomicTransitStartResult = {
 }
 
 export type AtomicTransitCompletionResult = {
-  ship_id: string
+  ship_id: string | null
+  is_passenger?: boolean
   completed: boolean
   idempotent: boolean
   status: 'transit' | 'docked'
@@ -285,5 +291,34 @@ export async function completeTransitCommand(shipId: string): Promise<AtomicTran
   const { data, error } = await supabase.rpc('noxia_complete_transit', { p_ship_id: shipId })
 
   if (error) throw commandError('noxia_complete_transit', error)
+  return data as AtomicTransitCompletionResult
+}
+
+// Linienflug-Pfad ohne eigenes Schiff (s. Migration
+// 20261003190000_passenger_transit_without_ship.sql) -- gleiche Ergebnisform
+// wie der Schiffs-Transit, aber ship_id ist immer null.
+export async function startPassengerTransitCommand(input: {
+  profileId: string
+  destination: string
+  durationSeconds: number
+  ticketPrice: number
+}): Promise<AtomicTransitStartResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_start_passenger_transit', {
+    p_profile_id: input.profileId,
+    p_destination: input.destination,
+    p_duration_seconds: input.durationSeconds,
+    p_ticket_price: input.ticketPrice,
+  })
+
+  if (error) throw commandError('noxia_start_passenger_transit', error)
+  return data as AtomicTransitStartResult
+}
+
+export async function completePassengerTransitCommand(profileId: string): Promise<AtomicTransitCompletionResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_complete_passenger_transit', { p_profile_id: profileId })
+
+  if (error) throw commandError('noxia_complete_passenger_transit', error)
   return data as AtomicTransitCompletionResult
 }
