@@ -40,6 +40,7 @@ export default function DashboardPrimaryColony(){
  },[location,refresh])
 
  const current=locations.find(l=>l.slug===location)
+ const isEarth=location==='earth'
  const isStation=current?.location_type==='station'||location==='prometheus'
  const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
  const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
@@ -51,7 +52,13 @@ export default function DashboardPrimaryColony(){
  ),[current?.location_resources,current?.population,localEntities])
 
  useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
+ useEffect(()=>{if(isEarth&&mode!=='planning')enterPlanning()},[isEarth,mode,enterPlanning])
 
+ // Earth uses persistent real-world geography. Never replace it with the
+ // synthetic colony grid: that would preserve the label while changing the
+ // physical world underneath the player. A future walkable Earth view must
+ // project the same persisted WGS84/materialized place data.
+ if(isEarth)return null
  if(isStation)return null
  if(mode==='planning')return <>{chrome}<button className="noxia-open-isometric" onClick={enterColony}>◇ Isometrische Ansicht öffnen</button></>
  if(loading||!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>{error?'SYNCHRONISIERUNG WIRD ERNEUT VERSUCHT …':'KOLONIE WIRD SYNCHRONISIERT …'}</span></div></div></div></>
