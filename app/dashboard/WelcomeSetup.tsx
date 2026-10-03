@@ -39,13 +39,29 @@ const CARDS = [
   { icon: '📈', title: 'Verkauf mit Gewinn', text: 'Und sieh zu, wie die Kolonie wächst. Sie wird sich erinnern.' },
 ]
 
+const AGE_RANGES = ['unter 12', '12–15', '16–18', '19–29', '30–49', '50+']
+
+type QuizQuestion = { domain: string; question: string; options: string[] }
+
 export default function WelcomeSetup({ initialUsername, onDone }: { initialUsername?: string; onDone: (opts?: { openJourney?: boolean }) => void }) {
-  const [step, setStep]       = useState<'setup' | 'cards'>('setup')
+  const [step, setStep]       = useState<'setup' | 'quiz' | 'cards'>('setup')
   const [name, setName]       = useState(initialUsername ?? '')
   const [avatar, setAvatar]   = useState<string | null>(null)
   const [cardIdx, setCardIdx] = useState(0)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
+
+  // ── Onboarding-Kalibrierungsquiz ──────────────────────────────────────────
+  // Rein diagnostisch (siehe app/api/game/onboarding-quiz/route.ts) — kalibriert
+  // nur profiles.knowledge_level, vergibt keine Unlocks. Jederzeit überspringbar.
+  const [quizLoading, setQuizLoading] = useState(false)
+  const [quizError, setQuizError]     = useState<string | null>(null)
+  const [attemptId, setAttemptId]     = useState<string | null>(null)
+  const [questions, setQuestions]     = useState<QuizQuestion[]>([])
+  const [qIdx, setQIdx]               = useState(0)
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([])
+  const [ageRange, setAgeRange]       = useState<string | null>(null)
+  const [quizSubmitting, setQuizSubmitting] = useState(false)
 
   const mono: React.CSSProperties = { fontFamily: "'Courier Prime', 'Courier New', monospace" }
   const canSave = name.trim().length >= 2 && avatar !== null
@@ -61,6 +77,59 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
     const data = await res.json()
     setSaving(false)
     if (data.error) { setError(data.error); return }
+    setStep('quiz')
+    loadQuiz()
+  }
+
+  async function loadQuiz() {
+    setQuizLoading(true); setQuizError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/game/onboarding-quiz', { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (data.error || !Array.isArray(data.questions)) {
+        setQuizError(data.error ?? 'Quiz nicht verfügbar.')
+      } else {
+        setAttemptId(data.attemptId)
+        setQuestions(data.questions)
+        setQuizAnswers(new Array(data.questions.length).fill(-1))
+        setQIdx(0)
+      }
+    } catch {
+      setQuizError('Quiz nicht verfügbar.')
+    }
+    setQuizLoading(false)
+  }
+
+  function answerQuiz(optionIdx: number) {
+    const next = [...quizAnswers]
+    next[qIdx] = optionIdx
+    setQuizAnswers(next)
+    if (qIdx < questions.length - 1) {
+      setQIdx(qIdx + 1)
+    } else {
+      submitQuiz(next)
+    }
+  }
+
+  async function submitQuiz(finalAnswers: number[]) {
+    if (!attemptId || quizSubmitting) { setStep('cards'); return }
+    setQuizSubmitting(true)
+    try {
+      const token = await getToken()
+      await fetch('/api/game/onboarding-quiz', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attemptId, answers: finalAnswers, ageRange }),
+      })
+    } catch {
+      // Diagnostisch, nicht blockierend — bei Fehler trotzdem weiter.
+    }
+    setQuizSubmitting(false)
+    setStep('cards')
+  }
+
+  function skipQuiz() {
     setStep('cards')
   }
 
@@ -144,6 +213,89 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
             >
               {saving ? '…' : 'Registrierung abschließen'}
             </button>
+          </div>
+        )}
+
+        {step === 'quiz' && (
+          <div style={{ background: C.panel, border: `1px solid ${C.line}`, padding: '1.8rem' }}>
+            <div style={{ ...mono, fontSize: 10, letterSpacing: '0.2em', color: C.dim, textTransform: 'uppercase', marginBottom: '0.9rem', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Kurzer Einstiegstest</span>
+              <button onClick={skipQuiz} style={{ ...mono, background: 'none', border: 'none', color: C.dim, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline' }}>
+                Überspringen →
+              </button>
+            </div>
+
+            {quizLoading && (
+              <div style={{ ...mono, fontSize: 13, color: C.dim }}>Fragen werden vorbereitet …</div>
+            )}
+
+            {!quizLoading && quizError && (
+              <div>
+                <div style={{ ...mono, fontSize: 12, color: C.dim, marginBottom: '1rem' }}>{quizError}</div>
+              </div>
+            )}
+
+            {!quizLoading && !quizError && questions.length > 0 && (
+              <>
+                {ageRange === null && qIdx === 0 && (
+                  <div style={{ marginBottom: '1.4rem' }}>
+                    <div style={{ ...mono, fontSize: 13, color: C.text, marginBottom: '0.8rem', lineHeight: 1.6 }}>
+                      Ein paar Fragen aus ganz unterschiedlichen Gebieten — hilft uns, die Akademie passend für dich einzustellen.
+                      Optional: in welcher Altersspanne bist du?
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {AGE_RANGES.map(r => (
+                        <button key={r} onClick={() => setAgeRange(r)} style={{
+                          ...mono, fontSize: 11, padding: '0.4rem 0.7rem',
+                          background: 'transparent', border: `1px solid ${C.line}`, color: C.dim,
+                          cursor: 'pointer',
+                        }}>{r}</button>
+                      ))}
+                      <button onClick={() => setAgeRange('—')} style={{
+                        ...mono, fontSize: 11, padding: '0.4rem 0.7rem',
+                        background: 'transparent', border: `1px solid ${C.line}`, color: C.dim,
+                        cursor: 'pointer', textDecoration: 'underline',
+                      }}>Lieber nicht angeben</button>
+                    </div>
+                  </div>
+                )}
+
+                {(ageRange !== null) && (
+                  <>
+                    <div style={{ ...mono, fontSize: 10, letterSpacing: '0.1em', color: C.dim, marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                      Frage {qIdx + 1} / {questions.length} · {questions[qIdx].domain}
+                    </div>
+                    <div style={{ ...mono, fontSize: 14, color: C.text, marginBottom: '1.2rem', lineHeight: 1.6 }}>
+                      {questions[qIdx].question}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {questions[qIdx].options.map((opt, i) => (
+                        <button
+                          key={i}
+                          disabled={quizSubmitting}
+                          onClick={() => answerQuiz(i)}
+                          style={{
+                            ...mono, textAlign: 'left', padding: '0.65rem 0.9rem',
+                            background: 'transparent', border: `1px solid ${C.line}`, color: C.text,
+                            fontSize: 13, cursor: quizSubmitting ? 'default' : 'pointer',
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '1.2rem' }}>
+                      {questions.map((_, i) => (
+                        <div key={i} style={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: i === qIdx ? C.gold : (i < qIdx ? C.blue : C.line),
+                        }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
 

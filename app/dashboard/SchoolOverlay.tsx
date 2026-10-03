@@ -460,6 +460,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [selected, setSelected] = useState<number | null>(null)
   const [result, setResult] = useState<'correct' | 'wrong' | null>(null)
   const [total, setTotal] = useState<number | null>(null)
+  const [knowledgeLevel, setKnowledgeLevel] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bg = ACADEMY_BG[locationSlug]
 
@@ -476,7 +477,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
 
   useEffect(() => {
     loadKnowledge()
-    generateTask()
+    loadKnowledgeLevel().then(lvl => generateTask(lvl))
     loadCompletedModules()
     fetch('/api/ssf/modules').then(r => r.json()).then((d: unknown) => {
       const list = Array.isArray(d) ? d : ((d as Record<string,unknown>).modules ?? [])
@@ -516,11 +517,29 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     } catch {}
   }
 
-  async function generateTask() {
+  // Liest profiles.knowledge_level (aus dem Onboarding-Kalibrierungsquiz,
+  // s. app/api/game/onboarding-quiz/route.ts) — Fallback Stufe 1, falls nicht
+  // kalibriert (Quiz übersprungen) oder der Request fehlschlägt.
+  async function loadKnowledgeLevel(): Promise<number> {
+    try {
+      const token = await jwt()
+      const data = await (await fetch('/api/game/profile', { headers: { Authorization: `Bearer ${token}` } })).json() as Record<string, any>
+      const lvl = data?.profile?.knowledge_level
+      const resolved = typeof lvl === 'number' && lvl >= 1 && lvl <= 6 ? lvl : 1
+      setKnowledgeLevel(resolved)
+      return resolved
+    } catch {
+      setKnowledgeLevel(1)
+      return 1
+    }
+  }
+
+  async function generateTask(levelOverride?: number) {
     setLoading(true); setResult(null); setAnswer(''); setSelected(null)
     try {
       const ctx = colonyContext ?? {} as Partial<ColonyContext>
-      const params = new URLSearchParams({ level: '1' })
+      const level = levelOverride ?? knowledgeLevel ?? 1
+      const params = new URLSearchParams({ level: String(level) })
       if (ctx.locationName != null) params.set('locationName', String(ctx.locationName))
       if (ctx.population   != null) params.set('population',   String(ctx.population))
       if (ctx.waterStock   != null) params.set('waterStock',   String(ctx.waterStock))
@@ -680,7 +699,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
               <div style={{ fontSize: '0.65rem', color: C.gold, fontWeight: 700, marginBottom: 10, fontFamily: MONO, textTransform: 'uppercase' as const, letterSpacing: '1px' }}>
                 ⚠ Diagnose-Modus — zeigt rohe Server-Antwort statt Aufgabe
               </div>
-              <button onClick={generateTask} disabled={loading} style={{ marginBottom: 10, padding: '0.5rem 1rem', background: C.accent, color: '#fff', border: 'none', borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+              <button onClick={() => generateTask()} disabled={loading} style={{ marginBottom: 10, padding: '0.5rem 1rem', background: C.accent, color: '#fff', border: 'none', borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}>
                 {loading ? 'Läuft …' : 'Anfrage erneut senden'}
               </button>
               <pre style={{
@@ -718,7 +737,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
                   )}
                   {result === 'correct' && <div style={{ background: C.greenLight, border: '1px solid #a0dcb8', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.green, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Richtig! +{task.points} Punkte</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
                   {result === 'wrong' && <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.red, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Nicht ganz.</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
-                  {result !== null && <button onClick={generateTask} style={{ width: '100%', marginTop: 12, padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: 'pointer' }}>Nächste Aufgabe →</button>}
+                  {result !== null && <button onClick={() => generateTask()} style={{ width: '100%', marginTop: 12, padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: 'pointer' }}>Nächste Aufgabe →</button>}
                   <div style={{ fontSize: '0.65rem', color: C.textFaint, textAlign: 'center' as const, marginTop: 10, fontFamily: MONO }}>{task.points} Punkte</div>
                 </>
                 </TaskErrorBoundary>
