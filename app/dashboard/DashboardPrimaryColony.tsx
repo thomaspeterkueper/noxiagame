@@ -53,7 +53,6 @@ export default function DashboardPrimaryColony(){
  ),[current?.location_resources,current?.population,localEntities])
 
  useEffect(()=>{if(mode==='interior'&&current&&userId&&!interior)enterColony()},[mode,current,userId,interior,enterColony])
- useEffect(()=>{if(isEarth&&mode!=='planning')enterPlanning()},[isEarth,mode,enterPlanning])
 
  // Earth uses persistent real-world geography. Never replace it with the
  // synthetic colony grid: that would preserve the label while changing the
