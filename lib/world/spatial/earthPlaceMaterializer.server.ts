@@ -8,6 +8,7 @@ type OverpassElement = {
   id?: number
   lat?: number
   lon?: number
+  center?: GeoPoint
   tags?: Tags
   geometry?: GeoPoint[]
   members?: Array<{ geometry?: GeoPoint[] }>
@@ -24,6 +25,7 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
 ]
 const MAX_POINTS_PER_FEATURE = 36
+export const EARTH_PLACE_MATERIALIZER_VERSION = 'noxia-place-v2-landmarks'
 
 export function earthPlaceBounds(lat: number, lon: number, radiusKm: number): Bounds {
   const latDelta = radiusKm / 111.32
@@ -69,6 +71,13 @@ function capPoints(points: GeoPoint[], polygon: boolean) {
 
 function classify(tags: Tags, isNode = false) {
   if (isNode && /^(city|town|village|hamlet|suburb)$/.test(tags.place ?? '')) return 'settlement'
+  if (tags.name && (
+    /^(museum|attraction|viewpoint|gallery)$/.test(tags.tourism ?? '')
+    || /^(castle|monument|memorial|archaeological_site|ruins|fort|city_gate)$/.test(tags.historic ?? '')
+    || /^(university|townhall|theatre|arts_centre|library|hospital)$/.test(tags.amenity ?? '')
+    || /^(station)$/.test(tags.railway ?? '')
+    || /^(tower|lighthouse|observatory)$/.test(tags.man_made ?? '')
+  )) return 'landmark'
   if (tags.highway && /^(motorway|trunk|primary|secondary|tertiary)$/.test(tags.highway)) return 'road'
   if (tags.railway && /^(rail|light_rail|tram)$/.test(tags.railway)) return 'rail'
   if (tags.waterway && /^(river|canal)$/.test(tags.waterway)) return 'waterway'
@@ -84,6 +93,7 @@ function visualClass(featureType: string, tags: Tags) {
   if (featureType === 'forest') return tags.natural === 'wood' ? 'wood' : 'forest'
   if (featureType === 'farmland') return tags.landuse ?? 'farmland'
   if (featureType === 'urban') return tags.landuse ?? 'urban'
+  if (featureType === 'landmark') return tags.tourism ?? tags.historic ?? tags.amenity ?? tags.railway ?? tags.man_made ?? 'landmark'
   return featureType
 }
 
@@ -132,6 +142,27 @@ function toFeatures(elements: OverpassElement[]) {
       })
       continue
     }
+    if (featureType === 'landmark') {
+      const raw = element.geometry ?? element.members?.flatMap(member => member.geometry ?? []) ?? []
+      const point = element.center ?? (raw.length
+        ? { lat: raw.reduce((sum, item) => sum + item.lat, 0) / raw.length, lon: raw.reduce((sum, item) => sum + item.lon, 0) / raw.length }
+        : null)
+      if (point && Number.isFinite(point.lat) && Number.isFinite(point.lon)) {
+        output.push({
+          feature_type: 'landmark',
+          geometry: { kind: 'point', coordinates: point },
+          properties: {
+            ...tags,
+            noxia_source: 'OpenStreetMap',
+            noxia_source_id: sourceId,
+            noxia_provenance: 'observed',
+            visual_seed: sourceId,
+            visual_class: visualClass('landmark', tags),
+          },
+        })
+      }
+      continue
+    }
     if (element.type === 'relation') {
       for (const [index, member] of (element.members ?? []).entries()) {
         const feature = geometryFeature(featureType, member.geometry ?? [], tags, `${sourceId}:member:${index}`)
@@ -159,7 +190,12 @@ way[landuse=industrial](${box});relation[landuse=industrial](${box});
 way[highway~"motorway|trunk|primary|secondary|tertiary"](${box});
 way[railway~"rail|light_rail|tram"](${box});
 node[place~"city|town|village|hamlet|suburb"](${box});
-);out geom;`
+nwr[name][tourism~"museum|attraction|viewpoint|gallery"](${box});
+nwr[name][historic~"castle|monument|memorial|archaeological_site|ruins|fort|city_gate"](${box});
+nwr[name][amenity~"university|townhall|theatre|arts_centre|library|hospital"](${box});
+nwr[name][railway=station](${box});
+nwr[name][man_made~"tower|lighthouse|observatory"](${box});
+);out center geom;`
 }
 
 async function loadNormalizedFeatures(bounds: Bounds) {
@@ -184,7 +220,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
         continue
       }
       const payload = await response.json() as { elements?: OverpassElement[] }
-      return { features: toFeatures(payload.elements ?? []), source: `overpass:${new URL(endpoint).host}` }
+      return { features: toFeatures(payload.elements ?? []), source: `overpass:${new URL(endpoint).host}:${EARTH_PLACE_MATERIALIZER_VERSION}` }
     } catch (error) {
       failures.push(`${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
@@ -210,7 +246,7 @@ export async function materializeEarthPlace(input: { slug: string; label: string
       .from('region_features')
       .select('id', { count: 'exact', head: true })
       .eq('region_id', existing.id)
-    if ((count ?? 0) > 0 && !String(existing.source ?? '').startsWith('noxia:materialization-failed')) {
+    if ((count ?? 0) > 0 && String(existing.source ?? '').includes(EARTH_PLACE_MATERIALIZER_VERSION)) {
       return { ok: true, status: 'ready' as const, slug: input.slug, regionId: existing.id, total: count ?? 0, source: existing.source }
     }
   }
