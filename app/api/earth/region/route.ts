@@ -3,7 +3,7 @@ import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/li
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
-import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
+import { EARTH_PLACE_MATERIALIZER_VERSION } from '@/lib/world/spatial/earthPlaceMaterializer.server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
         ...(containsSelmecke ? [SELMECKE_REFERENCE_FEATURE] : []),
       ]
       const materializationStatus = placeSlug
-        ? (features.length > 0 && !String(storedRegion.source ?? '').startsWith('noxia:')
+        ? (features.length > 0 && String(storedRegion.source ?? '').includes(EARTH_PLACE_MATERIALIZER_VERSION)
             ? 'ready'
             : String(storedRegion.source ?? '').includes('failed') ? 'failed' : 'pending')
         : null
