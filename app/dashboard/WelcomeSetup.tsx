@@ -39,8 +39,6 @@ const CARDS = [
   { icon: '📈', title: 'Verkauf mit Gewinn', text: 'Und sieh zu, wie die Kolonie wächst. Sie wird sich erinnern.' },
 ]
 
-const AGE_RANGES = ['unter 12', '12–15', '16–18', '19–29', '30–49', '50+']
-
 type QuizQuestion = { domain: string; question: string; options: string[] }
 
 export default function WelcomeSetup({ initialUsername, onDone }: { initialUsername?: string; onDone: (opts?: { openJourney?: boolean }) => void }) {
@@ -60,7 +58,6 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
   const [questions, setQuestions]     = useState<QuizQuestion[]>([])
   const [qIdx, setQIdx]               = useState(0)
   const [quizAnswers, setQuizAnswers] = useState<number[]>([])
-  const [ageRange, setAgeRange]       = useState<string | null>(null)
   const [quizSubmitting, setQuizSubmitting] = useState(false)
 
   const mono: React.CSSProperties = { fontFamily: "'Courier Prime', 'Courier New', monospace" }
@@ -120,7 +117,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
       await fetch('/api/game/onboarding-quiz', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attemptId, answers: finalAnswers, ageRange }),
+        body: JSON.stringify({ attemptId, answers: finalAnswers }),
       })
     } catch {
       // Diagnostisch, nicht blockierend — bei Fehler trotzdem weiter.
@@ -237,63 +234,42 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
 
             {!quizLoading && !quizError && questions.length > 0 && (
               <>
-                {ageRange === null && qIdx === 0 && (
-                  <div style={{ marginBottom: '1.4rem' }}>
-                    <div style={{ ...mono, fontSize: 13, color: C.text, marginBottom: '0.8rem', lineHeight: 1.6 }}>
-                      Ein paar Fragen aus ganz unterschiedlichen Gebieten — hilft uns, die Akademie passend für dich einzustellen.
-                      Optional: in welcher Altersspanne bist du?
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {AGE_RANGES.map(r => (
-                        <button key={r} onClick={() => setAgeRange(r)} style={{
-                          ...mono, fontSize: 11, padding: '0.4rem 0.7rem',
-                          background: 'transparent', border: `1px solid ${C.line}`, color: C.dim,
-                          cursor: 'pointer',
-                        }}>{r}</button>
-                      ))}
-                      <button onClick={() => setAgeRange('—')} style={{
-                        ...mono, fontSize: 11, padding: '0.4rem 0.7rem',
-                        background: 'transparent', border: `1px solid ${C.line}`, color: C.dim,
-                        cursor: 'pointer', textDecoration: 'underline',
-                      }}>Lieber nicht angeben</button>
-                    </div>
+                {qIdx === 0 && (
+                  <div style={{ ...mono, fontSize: 13, color: C.text, marginBottom: '1.4rem', lineHeight: 1.6 }}>
+                    Ein paar Fragen aus ganz unterschiedlichen Gebieten – hilft uns, die Akademie passend für dich einzustellen.
                   </div>
                 )}
 
-                {(ageRange !== null) && (
-                  <>
-                    <div style={{ ...mono, fontSize: 10, letterSpacing: '0.1em', color: C.dim, marginBottom: '0.6rem', textTransform: 'uppercase' }}>
-                      Frage {qIdx + 1} / {questions.length} · {questions[qIdx].domain}
-                    </div>
-                    <div style={{ ...mono, fontSize: 14, color: C.text, marginBottom: '1.2rem', lineHeight: 1.6 }}>
-                      {questions[qIdx].question}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {questions[qIdx].options.map((opt, i) => (
-                        <button
-                          key={i}
-                          disabled={quizSubmitting}
-                          onClick={() => answerQuiz(i)}
-                          style={{
-                            ...mono, textAlign: 'left', padding: '0.65rem 0.9rem',
-                            background: 'transparent', border: `1px solid ${C.line}`, color: C.text,
-                            fontSize: 13, cursor: quizSubmitting ? 'default' : 'pointer',
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '1.2rem' }}>
-                      {questions.map((_, i) => (
-                        <div key={i} style={{
-                          width: 7, height: 7, borderRadius: '50%',
-                          background: i === qIdx ? C.gold : (i < qIdx ? C.blue : C.line),
-                        }} />
-                      ))}
-                    </div>
-                  </>
-                )}
+                <div style={{ ...mono, fontSize: 10, letterSpacing: '0.1em', color: C.dim, marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                  Frage {qIdx + 1} / {questions.length} · {questions[qIdx].domain}
+                </div>
+                <div style={{ ...mono, fontSize: 14, color: C.text, marginBottom: '1.2rem', lineHeight: 1.6 }}>
+                  {questions[qIdx].question}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {questions[qIdx].options.map((opt, i) => (
+                    <button
+                      key={i}
+                      disabled={quizSubmitting}
+                      onClick={() => answerQuiz(i)}
+                      style={{
+                        ...mono, textAlign: 'left', padding: '0.65rem 0.9rem',
+                        background: 'transparent', border: `1px solid ${C.line}`, color: C.text,
+                        fontSize: 13, cursor: quizSubmitting ? 'default' : 'pointer',
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '1.2rem' }}>
+                  {questions.map((_, i) => (
+                    <div key={i} style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: i === qIdx ? C.gold : (i < qIdx ? C.blue : C.line),
+                    }} />
+                  ))}
+                </div>
               </>
             )}
           </div>

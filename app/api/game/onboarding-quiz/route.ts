@@ -12,7 +12,8 @@
 //      Loesung zurueck.
 // POST wertet einen Versuch aus: vergleicht die eingereichten Antworten mit
 //      der serverseitig gespeicherten Loesung, leitet eine Stufe 1-6 ab und
-//      schreibt sie nach profiles.knowledge_level (+ optional age_range).
+//      schreibt sie nach profiles.knowledge_level. Es wird bewusst kein Alter
+//      und keine Altersspanne erhoben oder gespeichert (Datenschutz).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -146,7 +147,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const attemptId = typeof body.attemptId === 'string' ? body.attemptId : null
   const answers: unknown = body.answers
-  const ageRange = typeof body.ageRange === 'string' && body.ageRange.trim() ? body.ageRange.trim() : null
 
   if (!attemptId || !Array.isArray(answers)) {
     return NextResponse.json({ error: 'Ungültige Anfrage.' }, { status: 400 })
@@ -177,10 +177,7 @@ export async function POST(req: NextRequest) {
     derived_level: level,
   }).eq('id', attemptId)
 
-  await supabase.from('profiles').update({
-    knowledge_level: level,
-    ...(ageRange ? { age_range: ageRange } : {}),
-  }).eq('id', user.id)
+  await supabase.from('profiles').update({ knowledge_level: level }).eq('id', user.id)
 
   return NextResponse.json({ score, total: questions.length, level })
 }
