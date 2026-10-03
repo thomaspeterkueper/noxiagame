@@ -11,6 +11,7 @@ import {
   localMetersToGeo,
   validateGeoPoint,
   type GeoPoint,
+  type EarthRegionAnchor,
 } from '@/lib/world/spatial/earthSpatial'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { resolveRuntimeTerrainSampler } from '@/lib/game/spatial/runtimeTerrainSampler.server'
@@ -179,11 +180,45 @@ function hasLocalWorldPosition(row: any) {
   return finiteNumber(row.x_m) != null && finiteNumber(row.y_m) != null
 }
 
-function earthRegion(req: NextRequest, explicitRegionId?: string | null) {
+async function earthRegion(req: NextRequest, explicitRegionId?: string | null): Promise<EarthRegionAnchor> {
   const regionId = explicitRegionId
     ?? req.cookies.get('noxia-earth-region')?.value
     ?? EARTH_SAUERLAND_REGION.id
-  return getEarthRegion(regionId) ?? EARTH_SAUERLAND_REGION
+  const configured = getEarthRegion(regionId)
+  if (configured) return configured
+
+  const { data: stored } = await serviceClient
+    .from('celestial_regions')
+    .select('slug,label,center_lat,center_lon')
+    .eq('slug', regionId)
+    .maybeSingle()
+
+  if (stored && Number.isFinite(Number(stored.center_lat)) && Number.isFinite(Number(stored.center_lon))) {
+    return {
+      id: stored.slug,
+      name: stored.label ?? stored.slug,
+      origin: { lat: Number(stored.center_lat), lon: Number(stored.center_lon) },
+      chunkSizeM: EARTH_SAUERLAND_REGION.chunkSizeM,
+      cellSizeM: EARTH_SAUERLAND_REGION.cellSizeM,
+    }
+  }
+
+  // A newly selected place can be rendered before its enrichment request has
+  // created the persistent row. Use the real selected WGS84 centre as a
+  // temporary projection anchor so buildings never fall back to Sauerland.
+  const cookieLat = Number(req.cookies.get('noxia-earth-view-lat')?.value)
+  const cookieLon = Number(req.cookies.get('noxia-earth-view-lon')?.value)
+  if (regionId.startsWith('earth-place-') && Number.isFinite(cookieLat) && Number.isFinite(cookieLon)) {
+    return {
+      id: regionId,
+      name: req.cookies.get('noxia-earth-view-label')?.value ?? regionId,
+      origin: { lat: cookieLat, lon: cookieLon },
+      chunkSizeM: EARTH_SAUERLAND_REGION.chunkSizeM,
+      cellSizeM: EARTH_SAUERLAND_REGION.cellSizeM,
+    }
+  }
+
+  return EARTH_SAUERLAND_REGION
 }
 
 function canonicalEarthGeo(row: any): GeoPoint | null {
@@ -202,7 +237,7 @@ function canonicalEarthGeo(row: any): GeoPoint | null {
   catch { return null }
 }
 
-function projectEarthRow(row: any, region: ReturnType<typeof earthRegion>) {
+function projectEarthRow(row: any, region: EarthRegionAnchor) {
   const geo = canonicalEarthGeo(row)
   if (!geo) return null
   const metric = geoToLocalMeters(geo, region.origin)
@@ -224,7 +259,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const locationSlug = url.searchParams.get('location') ?? 'earth'
   const viewRegion = locationSlug === 'earth'
-    ? earthRegion(req, url.searchParams.get('region'))
+    ? await earthRegion(req, url.searchParams.get('region'))
     : null
 
   const { data: location } = await serviceClient
@@ -445,7 +480,7 @@ export async function POST(req: NextRequest) {
   const rotation = ((Number(body.rotationDeg ?? 0) % 360) + 360) % 360
   if (!Number.isFinite(rotation)) return NextResponse.json({ error: 'Ungültige Rotation' }, { status: 400 })
 
-  const selectedRegion = locationSlug === 'earth' ? earthRegion(req, body.regionId) : null
+  const selectedRegion = locationSlug === 'earth' ? await earthRegion(req, body.regionId) : null
   let xM = finiteNumber(body.xM)
   let yM = finiteNumber(body.yM)
   let canonicalGeo: GeoPoint | null = null
