@@ -178,7 +178,7 @@ export default function EarthOrbitFlightPanel() {
   }
 
   return (
-    <div style={{ position: 'fixed', right: 14, bottom: 86, zIndex: 2290, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }}>
+    <div style={{ position: 'fixed', right: 14, bottom: 120, zIndex: 2290, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }}>
       {!open ? (
         <button
           type="button"
