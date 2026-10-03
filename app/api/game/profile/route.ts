@@ -80,6 +80,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Speichern fehlgeschlagen.' }, { status: 500 })
     }
 
+    // ── Grundorientierung (UNL:NOX:orientation) ──────────────────────────────
+    // Einziger Wurzel-Unlock im Wissensgraphen (lib/knowledge/unlockRegistry.ts);
+    // sechs Spezialisierungen (Rohstoffe, Energie, Wasser, Drucksysteme,
+    // Strahlenschutz, Magnetobiologie) haengen davon ab. Anders als Fach-Unlocks
+    // ist das kein SSF-Lerninhalt, sondern der Abschluss des Onboardings selbst
+    // -- NOXIA ist hierfuer eigene Autoritaet (siehe
+    // docs/core/RESEARCH_KNOWLEDGE_UNLOCK_MAP.md: "NOXIA owns ... persisted
+    // per-player unlock state"). Ohne diesen eigenstaendigen Grant kaeme der
+    // Unlock nie zustande, weil SSF die ID gar nicht kennt und player_unlocks
+    // sonst ausschliesslich ueber den SSF-Modulabschluss befuellt wird.
+    const { data: existingOrientation } = await serviceClient
+      .from('player_unlocks')
+      .select('profile_id')
+      .eq('profile_id', user.id)
+      .eq('unlock_id', 'UNL:NOX:orientation')
+      .limit(1)
+
+    if (!existingOrientation || existingOrientation.length === 0) {
+      await serviceClient.from('player_unlocks').insert({
+        profile_id:    user.id,
+        unlock_id:     'UNL:NOX:orientation',
+        granted_at:    new Date().toISOString(),
+        source_module: null,
+      })
+    }
+
     // ── Startpunkt Erde + Startenergie (20t Subvention) ──────────────────────
     const { data: playerShip } = await serviceClient
       .from('ships')
