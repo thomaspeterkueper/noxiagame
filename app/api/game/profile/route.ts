@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     const { error: updErr } = await serviceClient
       .from('profiles')
-      .update({ username, avatar, onboarded: true })
+      .update({ username, avatar, onboarded: true, current_location: 'earth' })
       .eq('id', user.id)
 
     if (updErr) {
@@ -106,27 +106,45 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // ── Startpunkt Erde + Startenergie (20t Subvention) ──────────────────────
+    // ── Startpunkt Erde, OHNE eigenes Schiff ─────────────────────────────────
+    // Spielerentscheidung (03.10.2026): "kein eigenes Schiff" ist ein
+    // eigenständiger, dauerhafter Spielweg (wie Handel ohne eigenes Flugzeug --
+    // man nutzt einen Transporteur, verdient dafür weniger). Neue Profile
+    // bekommen deshalb KEIN Schiff mehr automatisch zugewiesen; der Startort
+    // ('earth') ist eine reine Profil-Eigenschaft (profiles.current_location),
+    // nicht mehr an ein Schiff gebunden. Das Schiff selbst entsteht frueher
+    // ueber den DB-Trigger on_profile_created/handle_new_profile -- der wurde
+    // mit dieser Aenderung entfernt (siehe Migration
+    // 20261003160000_remove_auto_ship_on_profile_creation.sql).
+    //
+    // ACHTUNG fuer den naechsten Schritt (Spediteur/Transportschicht-Handel):
+    // noxia_spot_trade() (SQL) wirft aktuell NOXIA_SHIP_NOT_FOUND, wenn ein
+    // Profil kein Schiff hat -- Handel ist fuer schifflose Spieler also JETZT
+    // NOCH NICHT moeglich. Dieser Patch allein macht Neuanmeldungen ohne
+    // Schiff, aber den Handel fuer sie noch nicht spielbar. Vor einem Merge
+    // nach main sollte entweder die Spediteur-Mechanik (Schritt 2) direkt
+    // mitkommen, oder dieser Review-Branch bewusst offen gehalten werden --
+    // genau wie beim Orientation-Root-Grant vorher.
     const { data: playerShip } = await serviceClient
       .from('ships')
       .select('id')
       .eq('profile_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (playerShip) {
-      // Schiff auf Erde setzen + als aktives Schiff markieren
+      // Falls der Trigger (z.B. bei Altaccounts/noch nicht migrierten Pfaden)
+      // doch noch ein Schiff angelegt hat: wie bisher auf Erde setzen, damit
+      // nichts kaputtgeht, solange beide Pfade parallel existieren koennen.
       await serviceClient
         .from('ships')
         .update({ location: 'earth', is_active: true })
         .eq('id', playerShip.id)
 
-      // active_ship_id in profiles setzen
       await serviceClient
         .from('profiles')
         .update({ active_ship_id: playerShip.id })
         .eq('id', user.id)
 
-      // 20t Startenergie (Erdsubvention für ersten Flug Erde→Mond)
       await serviceClient.rpc('grant_starting_energy', { p_ship_id: playerShip.id })
     }
 
