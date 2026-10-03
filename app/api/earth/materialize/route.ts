@@ -38,13 +38,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ortsidentität stimmt nicht mit den Koordinaten überein' }, { status: 400 })
   }
 
-  const result = await materializeEarthPlace({
-    slug: canonicalSlug,
-    label,
-    lat,
-    lon,
-    radiusKm: body.radiusKm,
-  })
+  try {
+    const result = await materializeEarthPlace({
+      slug: canonicalSlug,
+      label,
+      lat,
+      lon,
+      radiusKm: body.radiusKm,
+    })
 
-  return NextResponse.json(result, { status: result.ok ? 200 : 202 })
+    return NextResponse.json(result, {
+      status: result.ok ? 200 : 202,
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+    })
+  } catch (error) {
+    console.error('earth place materialization request failed', {
+      slug: canonicalSlug,
+      label,
+      error,
+    })
+    return NextResponse.json({
+      ok: false,
+      status: 'failed',
+      slug: canonicalSlug,
+      error: error instanceof Error ? error.message : 'Ortsmaterialisierung fehlgeschlagen',
+    }, {
+      status: 500,
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+    })
+  }
 }
