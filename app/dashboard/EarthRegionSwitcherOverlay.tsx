@@ -2,11 +2,13 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
+import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 
 const EARTH_REGION_COOKIE = 'noxia-earth-region'
 const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
 const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
 const EARTH_VIEW_LABEL_COOKIE = 'noxia-earth-view-label'
+const EARTH_VIEW_PLACE_COOKIE = 'noxia-earth-view-place-slug'
 const SAUERLAND_REGION = 'earth-sauerland'
 const NAMIBIA_REGION = 'earth-namibia-erongo'
 const SELMECKE = { ...SELMECKE_REFERENCE_SITE.point, label: SELMECKE_REFERENCE_SITE.label }
@@ -29,7 +31,7 @@ function readRegion():EarthRegionId{
 
 function setCookie(name:string,value:string){document.cookie=`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=31536000; SameSite=Lax`}
 function clearCookie(name:string){document.cookie=`${name}=; Path=/; Max-Age=0; SameSite=Lax`}
-function clearCustomView(){clearCookie(EARTH_VIEW_LAT_COOKIE);clearCookie(EARTH_VIEW_LON_COOKIE);clearCookie(EARTH_VIEW_LABEL_COOKIE)}
+function clearCustomView(){clearCookie(EARTH_VIEW_LAT_COOKIE);clearCookie(EARTH_VIEW_LON_COOKIE);clearCookie(EARTH_VIEW_LABEL_COOKIE);clearCookie(EARTH_VIEW_PLACE_COOKIE)}
 function distanceScore(lat:number,lon:number,origin:{lat:number;lon:number}){const dx=(lon-origin.lon)*Math.cos((lat+origin.lat)*Math.PI/360);const dy=lat-origin.lat;return dx*dx+dy*dy}
 function nearestRegion(lat:number,lon:number):EarthRegionId{return distanceScore(lat,lon,NAMIBIA_ORIGIN)<distanceScore(lat,lon,SAUERLAND_ORIGIN)?NAMIBIA_REGION:SAUERLAND_REGION}
 
@@ -39,11 +41,14 @@ function selectRegion(region:EarthRegionId){
   window.location.reload()
 }
 
-function selectPoint(lat:number,lon:number,label:string,region:EarthRegionId=nearestRegion(lat,lon)){
-  setCookie(EARTH_REGION_COOKIE,region)
+function selectPoint(lat:number,lon:number,label:string,region?:EarthRegionId){
+  const placeSlug=earthPlaceSlug({lat,lon})
+  setCookie(EARTH_REGION_COOKIE,region??placeSlug)
   setCookie(EARTH_VIEW_LAT_COOKIE,String(lat))
   setCookie(EARTH_VIEW_LON_COOKIE,String(lon))
   setCookie(EARTH_VIEW_LABEL_COOKIE,label.slice(0,180))
+  if(region)clearCookie(EARTH_VIEW_PLACE_COOKIE)
+  else setCookie(EARTH_VIEW_PLACE_COOKIE,placeSlug)
   window.location.reload()
 }
 
