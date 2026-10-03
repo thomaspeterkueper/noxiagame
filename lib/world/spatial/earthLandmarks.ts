@@ -54,6 +54,52 @@ export type EarthLandmark = {
  */
 export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
   {
+    id: 'earth-de-menden-hexenteich',
+    name: 'Hexenteich und Skulpturenpark',
+    countryCode: 'DE',
+    locality: 'Menden (Sauerland)',
+    locator: { kind: 'address', value: 'Hexenteich und Skulpturenpark, Oesberner Weg, 58706 Menden, Germany' },
+    tags: ['cross-universe'],
+    presentDayRole: 'Realer Weiher und Naherholungsort am Oesberner Weg mit angrenzendem Skulpturenpark.',
+    noxiaRole: 'Realer, dauerhaft kuratierter Earth-Landmark; zusätzlich literarischer Schauplatz.',
+    sourceProjects: [
+      {
+        project: 'Die Kette vom Hexenteich',
+        relation: 'setting',
+        note: 'Realer Schauplatz in Menden; Mia findet hier die Kette.',
+        references: [
+          { kind: 'work', label: 'Die Kette vom Hexenteich' },
+          { kind: 'chapter', label: 'Kapitel 1' },
+        ],
+      },
+    ],
+    externalUrl: 'https://www.sauerland.com/de/neusta-pois/hexenteich-und-skulpturenpark',
+    externalLinkLabel: 'Hexenteich und Skulpturenpark öffnen',
+  },
+  {
+    id: 'earth-de-menden-gesamtschule',
+    name: 'Städtische Gesamtschule Menden',
+    countryCode: 'DE',
+    locality: 'Menden (Sauerland)',
+    locator: { kind: 'address', value: 'Windthorststraße 36, 58706 Menden, Germany' },
+    tags: ['cross-universe'],
+    presentDayRole: 'Reale weiterführende Schule im Mendener Schulzentrum.',
+    noxiaRole: 'Realer Earth-Landmark mit zusätzlichem Werkbezug; keine fiktionale Ersatzschule.',
+    sourceProjects: [
+      {
+        project: 'Die Kette vom Hexenteich',
+        relation: 'setting',
+        note: 'Realer Schulort; im Roman als Mias Gesamtschule verwendet.',
+        references: [
+          { kind: 'work', label: 'Die Kette vom Hexenteich' },
+          { kind: 'chapter', label: 'Kapitel 3' },
+        ],
+      },
+    ],
+    externalUrl: 'https://www.menden.de/leben-in-menden/kultur-bildung/schulen-neu/weiterfuehrende-schulen',
+    externalLinkLabel: 'Städtische Gesamtschule Menden öffnen',
+  },
+  {
     id: 'earth-de-sundern-ssf-hq',
     name: 'Solar Science Foundation · Hauptsitz',
     countryCode: 'DE',
