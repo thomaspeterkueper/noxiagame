@@ -9,14 +9,15 @@ import { MAP_SCALE_DIVISIONS, SURFACE_LOCAL_CAMERA } from '@/lib/game/spatial/ma
 import { isEarthMapSurfaceTarget, shouldChooseEarthMapSpot } from '@/lib/world/spatial/earthMapInteraction'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
-import { earthLandmarksInBounds } from '@/lib/world/spatial/earthLandmarkPresentation'
 import { createSpaceportPlanningOverlay } from '@/lib/world/spatial/spaceportPlanningOverlay'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
 type GeoPoint = { lat:number; lon:number }
 type Feature = { id:string; featureType:string; properties:Record<string,string>; geometry:{kind:'point';coordinates:GeoPoint}|{kind:'line'|'polygon';coordinates:GeoPoint[]} }
 type Materialization = { slug:string; label:string; lat:number; lon:number; radiusKm:number; status:'missing'|'pending'|'failed'|'ready'; source?:string|null }
-type Payload = { ok:boolean; region?:{id?:string;name:string;origin:GeoPoint}; queryCenter?:GeoPoint; detail?:boolean; bounds?:{south:number;west:number;north:number;east:number}; featureCount?:number; features?:Feature[]; materialization?:Materialization|null; attribution?:string; error?:string }
+type NarrativeProject = { project:string; relation:'setting'|'reference'|'research-anchor'|'worldbuilding-anchor'; note?:string }
+type NarrativeLandmark = { id:string; name:string; locality:string; countryCode:string; tags:string[]; presentDayRole:string; noxiaRole:string; sourceProjects:NarrativeProject[]; locator:{kind:'address';value:string}; point:GeoPoint&{precision:'real_location'|'approximate'|'fictionalized'} }
+type Payload = { ok:boolean; region?:{id?:string;name:string;origin:GeoPoint}; queryCenter?:GeoPoint; detail?:boolean; bounds?:{south:number;west:number;north:number;east:number}; featureCount?:number; features?:Feature[]; materialization?:Materialization|null; narrativeLandmarks?:NarrativeLandmark[]; attribution?:string; error?:string }
 type Candidate = GeoPoint & { elevationM:number; slopePercent:number; reliefM:number; score:number; roadDistanceM:number|null; railDistanceM:number|null; exclusionDistanceM:number|null; exclusionType:string|null; reasons:string[] }
 type ShortlistCandidate = Candidate & { shortlistRank:1|2|3; shortlistLabel:'A'|'B'|'C'; shortlistReason:string }
 type CandidatePayload = { ok:boolean; candidates?:Candidate[]; shortlist?:ShortlistCandidate[]; attribution?:string; error?:string }
@@ -204,9 +205,9 @@ export default function EarthRegionPreview(){
   },[candidateData,projection])
   const active=selected?shortlist.find(c=>c.shortlistLabel===selected)??null:null
   const landmarks=useMemo(()=>{
-    if(!data?.bounds||!projection)return[]
-    return earthLandmarksInBounds(data.bounds).map(item=>({...item,x:projection.x(item.point.lon),y:projection.y(item.point.lat)}))
-  },[data?.bounds,projection])
+    if(!projection)return[]
+    return (data?.narrativeLandmarks??[]).map(landmark=>({landmark,point:landmark.point,x:projection.x(landmark.point.lon),y:projection.y(landmark.point.lat)}))
+  },[data?.narrativeLandmarks,projection])
   const selectedLandmark=selectedLandmarkId?landmarks.find(item=>item.landmark.id===selectedLandmarkId)??null:null
   const realLandmarks=useMemo(()=>projected.filter((feature:any)=>feature.featureType==='landmark'&&feature.p),[projected])
   const selectedRealLandmark=selectedRealLandmarkId?realLandmarks.find((item:any)=>item.id===selectedRealLandmarkId)??null:null
