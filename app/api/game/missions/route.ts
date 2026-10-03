@@ -45,7 +45,9 @@ export async function GET(req:NextRequest){
   s.from('ships').select('*').eq('profile_id',user.id),s.from('tile_entities').select('*, locations(slug)').eq('profile_id',user.id),s.from('trade_transactions').select('id').eq('profile_id',user.id).limit(50),s.from('profiles').select('current_location, flight_count').eq('id',user.id).single(),s.from('player_knowledge').select('knowledge_points').eq('profile_id',user.id).single(),s.from('locations').select('id').eq('slug','phobos').maybeSingle(),
  ])
  const ships=shipsR.data??[],entities=entitiesR.data??[],trades=tradesR.data??[],profile=profileR.data??{},knowledge=knowledgeR.data?.knowledge_points??0,activeShip=ships.find((x:any)=>x.is_active)??ships[0]
- const {data:cargoRows}=activeShip?.id?await s.from('ship_cargo').select('amount').eq('ship_id',activeShip.id):{data:[]};const cargoUsed=(cargoRows??[]).reduce((sum:number,row:any)=>sum+Number(row.amount??0),0),phobosId=phobosLocationR.data?.id??null
+ // Ohne Schiff (Spediteur-Pfad) liegt die Ware in profile_cargo statt ship_cargo.
+ const {data:cargoRows}=activeShip?.id?await s.from('ship_cargo').select('amount').eq('ship_id',activeShip.id):await s.from('profile_cargo').select('amount').eq('profile_id',user.id)
+ const cargoUsed=(cargoRows??[]).reduce((sum:number,row:any)=>sum+Number(row.amount??0),0),phobosId=phobosLocationR.data?.id??null
  const [jobsR,scansR,referenceR,coreR,pilotR]=await Promise.all([
   phobosId?s.from('transport_jobs').select('id,domain,status,vehicle_role,resource,route_snapshot').eq('actor_profile_id',user.id).eq('location_id',phobosId).limit(150):Promise.resolve({data:[] as any[]}),
   phobosId?s.from('events').select('id').eq('profile_id',user.id).eq('location_id',phobosId).eq('type','phobos_prospect_scan').limit(20):Promise.resolve({data:[] as any[]}),

@@ -74,10 +74,11 @@ async function executeSpotTrade(userId: string, action: SpotTradeAction, resourc
       }
     }
 
-    const { data: cargoRows } = await serviceClient
-      .from('ship_cargo')
-      .select('resource, amount')
-      .eq('ship_id', result.ship_id)
+    // Ohne Schiff (Spediteur-Pfad, s. Migration 20261003170000) liegt die
+    // Ware in profile_cargo statt ship_cargo -- result.ship_id ist dann null.
+    const { data: cargoRows } = result.ship_id
+      ? await serviceClient.from('ship_cargo').select('resource, amount').eq('ship_id', result.ship_id)
+      : await serviceClient.from('profile_cargo').select('resource, amount').eq('profile_id', userId)
 
     const cargo: Record<string, number> = { water: 0, energy: 0, metal: 0 }
     for (const row of cargoRows ?? []) cargo[row.resource] = row.amount
@@ -89,6 +90,7 @@ async function executeSpotTrade(userId: string, action: SpotTradeAction, resourc
       unitPrice: result.unit_price,
       taxCharged: result.tax_charged,
       taxRate: result.tax_rate,
+      carrierFee: result.carrier_fee ?? 0,
       priceUpdate: result.price_changed
         ? { resource: result.resource, buyPrice: result.market_buy_price, sellPrice: result.market_sell_price }
         : null,
@@ -96,6 +98,7 @@ async function executeSpotTrade(userId: string, action: SpotTradeAction, resourc
       location: result.location,
       cargoMax: result.cargo_max,
       cargo,
+      hasShip: Boolean(result.has_ship),
       shipId: result.ship_id,
       shipTypeId: result.ship_type_id,
     })
@@ -134,7 +137,7 @@ export async function GET(req: NextRequest) {
 
     const { data: profile } = await serviceClient
       .from('profiles')
-      .select('credits')
+      .select('credits, current_location')
       .eq('id', user.id)
       .single()
 
@@ -150,9 +153,11 @@ export async function GET(req: NextRequest) {
       ? await serviceClient.from('ship_types').select('speed_mult, range_distance').eq('id', ship.ship_type_id).maybeSingle()
       : { data: null }
 
+    // Spediteur-Pfad (kein eigenes Schiff, s. Migration 20261003170000):
+    // Ware liegt in profile_cargo, Standort kommt vom Profil statt vom Schiff.
     const { data: cargoRows } = ship
       ? await serviceClient.from('ship_cargo').select('resource, amount').eq('ship_id', ship.id)
-      : { data: [] }
+      : await serviceClient.from('profile_cargo').select('resource, amount').eq('profile_id', user.id)
 
     const cargo: Record<string, number> = { water: 0, energy: 0, metal: 0 }
     for (const row of cargoRows ?? []) cargo[row.resource] = row.amount
@@ -162,11 +167,12 @@ export async function GET(req: NextRequest) {
       // BUGFIX 16.09.2026: Fallback war 'moon' — neue Accounts ohne Schiff
       // landeten dadurch auf der Mondoberfläche statt auf der Erde/im
       // Onboarding. Korrekter Startort ist 'earth'.
-      location: ship?.location ?? 'earth',
-      cargoMax: ship?.cargo_max ?? 100,
+      location: ship?.location ?? profile?.current_location ?? 'earth',
+      cargoMax: ship?.cargo_max ?? 40,
       cargo,
-      shipId: ship?.id,
-      shipTypeId: ship?.ship_type_id ?? 'freighter_mk1',
+      hasShip: Boolean(ship),
+      shipId: ship?.id ?? null,
+      shipTypeId: ship?.ship_type_id ?? null,
       speedMult: Number((shipType as any)?.speed_mult ?? 1.0),
       rangeDistance: Number((shipType as any)?.range_distance ?? 28),
       transit,

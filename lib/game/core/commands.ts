@@ -67,8 +67,14 @@ export type SpotTradeAction = 'buy' | 'sell'
 
 export type AtomicSpotTradeResult = {
   action: SpotTradeAction
-  ship_id: string
-  ship_type_id: string
+  // ship_id/ship_type_id sind null, wenn ohne eigenes Schiff ueber den
+  // Spediteur gehandelt wurde (s. Migration 20261003170000_carrier_trade_
+  // without_ship.sql) -- has_ship/carrier_fee sagen, ob und was dabei
+  // abgezogen wurde.
+  ship_id: string | null
+  ship_type_id: string | null
+  has_ship: boolean
+  carrier_fee: number
   location: string
   resource: string
   booked_amount: number
