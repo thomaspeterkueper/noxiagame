@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useMusicContext } from '../_components/MusicProvider'
 import { useGameStore } from '@/lib/store/gameStore'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
 
 type CockpitPanel = 'locations' | 'ship' | 'profile'
 type UtilityPanel = 'view' | 'actions' | 'music' | 'info'
@@ -98,6 +99,9 @@ function readAttribution() {
 export default function DashboardCockpit() {
   const { playing, volume, toggle: toggleMusic, setVolume } = useMusicContext()
   const location = useGameStore(state => state.location)
+  const mode = useGameModeStore(state => state.mode)
+  const enterColony = useGameModeStore(state => state.enterColony)
+  const enterPlanning = useGameModeStore(state => state.enterPlanning)
   const [targets, setTargets] = useState<Targets>({ actions: {} })
   const [active, setActive] = useState<CockpitPanel | null>(null)
   const [utilityOpen, setUtilityOpen] = useState<UtilityPanel | null>(null)
@@ -222,8 +226,8 @@ export default function DashboardCockpit() {
     {utilityOpen === 'view' && <aside className="noxia-cockpit-utility noxia-view-panel" aria-label="NOXIA Ansicht">
       <div className="noxia-utility-head"><div><small>NOXIA</small><strong>Ansicht</strong></div><button type="button" onClick={() => setUtilityOpen(null)} aria-label="Ansicht schließen">×</button></div>
       {location === 'earth' ? <div className="noxia-view-options">
-        <button type="button" className="active" onClick={() => setUtilityOpen(null)}><span>▦</span><b>Karte</b><small>Reale, persistierte Erdgeographie</small></button>
-        <button type="button" disabled title="Wird erst freigeschaltet, wenn die begehbare Ansicht dieselbe reale Geographie verwendet"><span>◇</span><b>Begehbar</b><small>Noch nicht freigegeben · muss dieselbe reale Geographie nutzen</small></button>
+        <button type="button" className={mode === 'planning' ? 'active' : ''} onClick={() => { enterPlanning(); setUtilityOpen(null) }}><span>▦</span><b>Karte</b><small>Reale, persistierte Erdgeographie</small></button>
+        <button type="button" className={mode === 'colony' ? 'active' : ''} onClick={() => { enterColony(); setUtilityOpen(null) }}><span>◇</span><b>Begehbar</b><small>Dieselbe reale Geographie · NPC-Interaktion aktiv</small></button>
       </div> : <div className="noxia-view-options">
         <button type="button" className="active" onClick={() => { setUtilityOpen(null); targets.isometric?.click() }}><span>◇</span><b>Ansicht wechseln</b><small>Zwischen Karten- und lokaler Ansicht wechseln</small></button>
       </div>}
