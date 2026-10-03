@@ -9,10 +9,21 @@ export type EarthLandmarkTag =
 
 export type EarthLandmarkProjectRelation = 'setting' | 'reference' | 'research-anchor' | 'worldbuilding-anchor'
 
+export type EarthLandmarkSourceReference = {
+  kind: 'work' | 'chapter' | 'scene'
+  label: string
+  sourcePath?: string
+}
+
 export type EarthLandmarkProjectLink = {
   project: string
   relation: EarthLandmarkProjectRelation
   note?: string
+  /**
+   * Optional precise editorial references. Leave empty rather than inventing
+   * chapter/scene positions that are not established in the source work.
+   */
+  references?: EarthLandmarkSourceReference[]
 }
 
 export type EarthLandmark = {
