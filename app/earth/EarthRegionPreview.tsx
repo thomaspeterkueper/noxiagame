@@ -15,7 +15,7 @@ import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 type GeoPoint = { lat:number; lon:number }
 type Feature = { id:string; featureType:string; properties:Record<string,string>; geometry:{kind:'point';coordinates:GeoPoint}|{kind:'line'|'polygon';coordinates:GeoPoint[]} }
 type Materialization = { slug:string; label:string; lat:number; lon:number; radiusKm:number; status:'missing'|'pending'|'failed'|'ready'; source?:string|null }
-type NarrativeProject = { project:string; relation:'setting'|'reference'|'research-anchor'|'worldbuilding-anchor'; note?:string }
+type NarrativeProject = { project:string; relation:'setting'|'reference'|'research-anchor'|'worldbuilding-anchor'; note?:string; references?:Array<{kind:'work'|'chapter'|'scene';label:string;sourcePath?:string}> }
 type NarrativeLandmark = { id:string; name:string; locality:string; countryCode:string; tags:string[]; presentDayRole:string; noxiaRole:string; sourceProjects:NarrativeProject[]; locator:{kind:'address';value:string}; point:GeoPoint&{precision:'real_location'|'approximate'|'fictionalized'} }
 type Payload = { ok:boolean; region?:{id?:string;name:string;origin:GeoPoint}; queryCenter?:GeoPoint; detail?:boolean; bounds?:{south:number;west:number;north:number;east:number}; featureCount?:number; features?:Feature[]; materialization?:Materialization|null; narrativeLandmarks?:NarrativeLandmark[]; attribution?:string; error?:string }
 type Candidate = GeoPoint & { elevationM:number; slopePercent:number; reliefM:number; score:number; roadDistanceM:number|null; railDistanceM:number|null; exclusionDistanceM:number|null; exclusionType:string|null; reasons:string[] }
@@ -31,7 +31,7 @@ type TerrainCell = { row:number;col:number;xM:number;yM:number;elevationM:number
 type TerrainPayload = { ok:boolean; sourceResolutionM?:number; sampledRows?:number; sampledCols?:number; cells?:TerrainCell[]; error?:string }
 type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slope'|'noxia'|'landmarks'|'sites'|'corridor'
 
-const layerOrder=['farmland','forest','urban','water','industrial','public','building','waterway','rail','road','settlement']
+const layerOrder=['farmland','vegetation','forest','urban','water','industrial','public','building','waterway','rail','road','settlement']
 const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,landmarks:true,sites:true,corridor:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=SURFACE_LOCAL_CAMERA.visibleWidthM
 const LOCAL_DETAIL_RADIUS_KM=1.35
@@ -41,6 +41,7 @@ const EARTH_DATA_VERSION='20260906-local-detail-1'
 function styleFor(type:string,tags:Record<string,string>){
   switch(type){
     case'forest':return{fill:'#6f875d',stroke:'#5f754f',width:.45}
+    case'vegetation':return{fill:'#88a36c',stroke:'#6f8958',width:.35}
     case'farmland':return{fill:'#c4b879',stroke:'#b1a46b',width:.35}
     case'urban':return{fill:'#aaa9a3',stroke:'#85847f',width:.45}
     case'water':return{fill:'#82b8d4',stroke:'#5b9cbe',width:.6}
@@ -66,6 +67,10 @@ function landusePatternId(feature:{id:string;featureType:string;properties?:Reco
   const seed=feature.properties?.visual_seed??feature.id
   const variant=stableVariant(seed)
   if(feature.featureType==='forest')return `earth-forest-${variant}`
+  if(feature.featureType==='vegetation'){
+    const kind=(feature.properties?.visual_class??'vegetation').toLowerCase()
+    return /trees|scrub/.test(kind)?`earth-forest-${variant}`:`earth-meadow-${variant}`
+  }
   if(feature.featureType==='farmland'){
     const kind=(feature.properties?.visual_class??feature.properties?.landuse??'farmland').toLowerCase()
     if(kind==='orchard')return `earth-orchard-${variant}`
@@ -157,7 +162,13 @@ export default function EarthRegionPreview(){
           const isSauerland=json.region?.id==='earth-sauerland'
           const defaultFocus=isSauerland?SELMECKE_DEFAULT_FOCUS:(json.region?.origin??SELMECKE_DEFAULT_FOCUS)
           const defaultFocusLabel=isSauerland?'Selmecke':(json.region?.name??'Regionsansicht')
-          void focusGeoPoint(defaultFocus,defaultFocusLabel)
+          if(isSauerland){
+            void focusGeoPoint(defaultFocus,defaultFocusLabel)
+          }else{
+            const widthM=payloadWidthM(json)??BUILD_PLAN_VISIBLE_WIDTH_M
+            const nextZoom=clamp(widthM/BUILD_PLAN_VISIBLE_WIDTH_M,.7,128)
+            setZoom(nextZoom);setOffset({x:500-500*nextZoom,y:500-500*nextZoom});setFocusLabel(defaultFocusLabel)
+          }
         }
       }catch(e){setData({ok:false,error:String(e)})}
     }
@@ -251,7 +262,7 @@ export default function EarthRegionPreview(){
     return{widthSvg,depthSvg,clearanceWidthSvg,clearanceDepthSvg}
   },[selectedSpot,selectedBuild,mapMetrics])
 
-  function featureVisible(type:string){if(type==='water'||type==='waterway')return layers.water;if(type==='forest'||type==='farmland'||type==='urban')return layers.landuse;if(type==='landmark')return layers.landmarks;if(type==='road'||type==='rail'||type==='industrial'||type==='public'||type==='building')return layers.infrastructure;return true}
+  function featureVisible(type:string){if(type==='water'||type==='waterway')return layers.water;if(type==='forest'||type==='vegetation'||type==='farmland'||type==='urban')return layers.landuse;if(type==='landmark')return layers.landmarks;if(type==='road'||type==='rail'||type==='industrial'||type==='public'||type==='building')return layers.infrastructure;return true}
   function toggleLayer(key:LayerKey){setLayers(v=>({...v,[key]:!v[key]}))}
   function setCamera(nextZoom:number,centerX:number,centerY:number){setZoom(nextZoom);setOffset({x:500-centerX*nextZoom,y:500-centerY*nextZoom})}
   function clearPlacement(){setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null)}
@@ -427,7 +438,7 @@ export default function EarthRegionPreview(){
           <div><span>Heute / Historie</span><b>{selectedLandmark.landmark.presentDayRole}</b></div>
           <div><span>NOXIA</span><b>{selectedLandmark.landmark.noxiaRole}</b></div>
         </div>
-        {selectedLandmark.landmark.sourceProjects.length>0&&<div className="earth-landmark-projects"><small>WERKBEZUG</small>{selectedLandmark.landmark.sourceProjects.map(project=><div key={`${project.project}-${project.relation}`}><b>{project.project}</b><span>{project.relation}{project.note?` · ${project.note}`:''}</span></div>)}</div>}
+        {selectedLandmark.landmark.sourceProjects.length>0&&<div className="earth-landmark-projects"><small>WERKBEZUG</small>{selectedLandmark.landmark.sourceProjects.map(project=><div key={`${project.project}-${project.relation}`}><b>{project.project}</b><span>{project.relation}{project.note?` · ${project.note}`:''}</span>{project.references?.length?<span>{project.references.map(ref=>ref.label).join(' · ')}</span>:null}</div>)}</div>}
       </div>}
 
       {selectedWorldObject&&<div className="earth-object-panel" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
