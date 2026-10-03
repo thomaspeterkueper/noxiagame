@@ -57,7 +57,7 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
   if (existing) { result.memoriesExisting++; return result }
 
   // Insert memory first. The DB unique constraint is the final concurrency guard.
-  const { error: memoryError } = await supabase.from('person_memories').insert(memoryRow(memory))
+  const { data: insertedMemory, error: memoryError } = await supabase.from('person_memories').insert(memoryRow(memory)).select('id').single()
   if (memoryError) {
     // A concurrent/replayed projector may have won after our lookup.
     if (String(memoryError.code ?? '') === '23505') { result.memoriesExisting++; return result }
@@ -65,6 +65,8 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
     return result
   }
   result.memoriesInserted++
+
+  // Creative work is an explicit future action, never an automatic memory side effect.
 
   if (!memory.otherPersonId || options.projectRelationship === false) return result
   const { data: relationRow, error: relationError } = await supabase
