@@ -459,9 +459,14 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
   const gesamt        = kompetenzen.flatMap(k => k.schwellen).length
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.75)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+    // alignItems 'flex-start' + paddingTop statt 'center': zentriert hätte das
+    // Overlay mit der oberen Statusleiste (Credits/Standort) und je nach
+    // Bildschirmhöhe auch mit der unteren Navigationsleiste überlappt. Mit
+    // festem Abstand von oben und reduzierter maxHeight bleibt oben und unten
+    // sichtbar Luft.
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.75)', zIndex: 1100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '1rem', paddingTop: '4.5rem', overflowY: 'auto' as const }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: C.bg, borderRadius: 14, width: 'min(480px, 95vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 48px rgba(0,0,0,0.4)', fontFamily: SANS, overflow: 'hidden' }}>
+      <div style={{ background: C.bg, borderRadius: 14, width: 'min(480px, 95vw)', maxHeight: '74vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 48px rgba(0,0,0,0.4)', fontFamily: SANS, overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{ padding: '1.25rem 1.4rem', background: C.accent, display: 'flex', gap: '1rem', alignItems: 'center', flexShrink: 0 }}>
@@ -515,6 +520,12 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
                 ? <div style={{ color: C.textMuted, textAlign: 'center' as const, padding: '2rem', fontSize: '0.8rem' }}>Lädt …</div>
                 : kompetenzen.map(k => <KompetenzCard key={k.id} k={k} />)
               }
+              {!loading && (
+                <div style={{ marginTop: '0.9rem', padding: '0.7rem 0.9rem', background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: '0.72rem', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1rem' }}>🎓</span>
+                  <span>Gehe zur Akademie an deinem Standort, um weiteres Wissen zu sammeln.</span>
+                </div>
+              )}
             </div>
           )}
           {tab === 'wissenskarte' && <WissenskarteTab />}
