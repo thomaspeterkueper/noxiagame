@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { EARTH_LANDMARKS, type EarthLandmark } from '@/lib/world/spatial/earthLandmarks'
+import { EARTH_LANDMARK_MAP_POINTS } from '@/lib/world/spatial/earthLandmarkPresentation'
 import EarthLandmarkRegionFocus from './EarthLandmarkRegionFocus'
 
 type ViewKey = 'world' | 'europe' | 'germany' | 'mediterranean'
@@ -20,22 +21,6 @@ type ViewBox = {
 const VIEW_W = 1200
 const VIEW_H = 620
 const PAD = 54
-
-/**
- * Presentation/view coordinates for the landmark overview and regional Earth focus.
- * Canonical landmark identity remains address-based in earthLandmarks.ts; these values
- * do not become persisted object or travel coordinates.
- */
-const LANDMARK_GEO: Readonly<Record<string, GeoPoint>> = {
-  'earth-de-sundern-ssf-hq': { lat: 51.328, lon: 8.004 },
-  'earth-de-darmstadt-esoc': { lat: 49.8728, lon: 8.6227 },
-  'earth-de-darmstadt-eumetsat': { lat: 49.8627, lon: 8.6276 },
-  'earth-de-cologne-eac': { lat: 50.852, lon: 7.126 },
-  'earth-de-oberpfaffenhofen-dlr': { lat: 48.083, lon: 11.283 },
-  'earth-in-dwarka': { lat: 22.244, lon: 68.968 },
-  'earth-gr-phaistos': { lat: 35.051, lon: 24.814 },
-  'earth-eg-alexandria': { lat: 31.2001, lon: 29.9187 },
-}
 
 const VIEWS: Record<ViewKey, ViewBox> = {
   world: { west: -180, east: 180, south: -60, north: 80, label: 'Welt' },
@@ -62,11 +47,11 @@ export default function EarthLandmarkMap() {
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('landmark')
-    if (id && EARTH_LANDMARKS.some(landmark => landmark.id === id) && LANDMARK_GEO[id]) setSelectedId(id)
+    if (id && EARTH_LANDMARKS.some(landmark => landmark.id === id) && EARTH_LANDMARK_MAP_POINTS[id]) setSelectedId(id)
   }, [])
 
   const markers = useMemo(() => EARTH_LANDMARKS.flatMap(landmark => {
-    const point = LANDMARK_GEO[landmark.id]
+    const point = EARTH_LANDMARK_MAP_POINTS[landmark.id]
     if (!point || !inView(point, view)) return []
     if (filter === 'cross-universe' && !landmark.tags.includes('cross-universe')) return []
     if (filter === 'science' && landmark.tags.includes('cross-universe')) return []
@@ -76,7 +61,7 @@ export default function EarthLandmarkMap() {
   const selected = useMemo(() => {
     if (!selectedId) return null
     const landmark = EARTH_LANDMARKS.find(item => item.id === selectedId)
-    const point = LANDMARK_GEO[selectedId]
+    const point = EARTH_LANDMARK_MAP_POINTS[selectedId]
     return landmark && point ? { landmark, point } : null
   }, [selectedId])
 
