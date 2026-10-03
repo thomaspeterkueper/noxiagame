@@ -237,7 +237,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
 }
 
 export async function materializeEarthPlace(input: { slug: string; label: string; lat: number; lon: number; radiusKm?: number }) {
-  const radiusKm = Math.min(2.5, Math.max(.6, input.radiusKm ?? 2.2))
+  const radiusKm = Math.min(2.5, Math.max(2.2, input.radiusKm ?? 2.2))
   const bounds = earthPlaceBounds(input.lat, input.lon, radiusKm)
   const supabase = createServiceClient()
 
