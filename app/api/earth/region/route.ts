@@ -4,6 +4,7 @@ import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFea
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { EARTH_PLACE_MATERIALIZER_VERSION } from '@/lib/world/spatial/earthPlaceMaterializer.server'
+import { earthLandmarksInBounds } from '@/lib/world/spatial/earthLandmarkPresentation'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
@@ -40,6 +41,21 @@ function finiteCoordinate(raw: string | null, min: number, max: number) {
   if (raw == null || raw.trim() === '') return null
   const value = Number(raw)
   return Number.isFinite(value) && value >= min && value <= max ? value : null
+}
+
+function narrativeLandmarksFor(bounds: { south:number; west:number; north:number; east:number }) {
+  return earthLandmarksInBounds(bounds).map(({ landmark, point }) => ({
+    id: landmark.id,
+    name: landmark.name,
+    locality: landmark.locality,
+    countryCode: landmark.countryCode,
+    tags: landmark.tags,
+    presentDayRole: landmark.presentDayRole,
+    noxiaRole: landmark.noxiaRole,
+    sourceProjects: landmark.sourceProjects,
+    locator: landmark.locator,
+    point,
+  }))
 }
 
 export async function GET(req: NextRequest) {
@@ -137,6 +153,7 @@ export async function GET(req: NextRequest) {
           status: materializationStatus,
           source: storedRegion.source,
         } : null,
+        narrativeLandmarks: narrativeLandmarksFor(storedBounds),
         attribution: '© OpenStreetMap contributors · ODbL · NOXIA materialized geography',
       }, {
         headers: { 'Cache-Control': 'private, max-age=60', 'Vary': 'Cookie' },
@@ -169,6 +186,7 @@ export async function GET(req: NextRequest) {
         status: 'missing',
         source: null,
       },
+      narrativeLandmarks: narrativeLandmarksFor(bounds),
       attribution: 'NOXIA place registry · Real-world enrichment pending',
     }, {
       headers: { 'Cache-Control': 'private, no-store, max-age=0', 'Vary': 'Cookie' },
@@ -198,6 +216,7 @@ export async function GET(req: NextRequest) {
       bounds,
       featureCount: features.length,
       features,
+      narrativeLandmarks: narrativeLandmarksFor(bounds),
       attribution: '© OpenStreetMap contributors · ODbL · NOXIA canonical sites',
     }, {
       // This response is selected by cookies as well as query parameters. Do not
