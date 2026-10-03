@@ -25,7 +25,7 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
 ]
 const MAX_POINTS_PER_FEATURE = 36
-export const EARTH_PLACE_MATERIALIZER_VERSION = 'noxia-place-v2-landmarks'
+export const EARTH_PLACE_MATERIALIZER_VERSION = 'noxia-place-v3-landscape'
 
 export function earthPlaceBounds(lat: number, lon: number, radiusKm: number): Bounds {
   const latDelta = radiusKm / 111.32
@@ -82,7 +82,8 @@ function classify(tags: Tags, isNode = false) {
   if (tags.railway && /^(rail|light_rail|tram)$/.test(tags.railway)) return 'rail'
   if (tags.waterway && /^(river|canal)$/.test(tags.waterway)) return 'waterway'
   if (tags.natural === 'water' || tags.water) return 'water'
-  if (tags.landuse === 'forest' || tags.natural === 'wood') return 'forest'
+  if (tags.landuse === 'forest' || tags.natural === 'wood' || tags.landcover === 'trees') return 'forest'
+  if (/^(scrub|grassland|heath|wetland)$/.test(tags.natural ?? '') || tags.landcover === 'grass' || /^(park|nature_reserve)$/.test(tags.leisure ?? '')) return 'vegetation'
   if (/^(farmland|farmyard|meadow|orchard|grass)$/.test(tags.landuse ?? '')) return 'farmland'
   if (/^(residential|commercial|retail)$/.test(tags.landuse ?? '')) return 'urban'
   if (tags.landuse === 'industrial') return 'industrial'
@@ -92,6 +93,7 @@ function classify(tags: Tags, isNode = false) {
 function visualClass(featureType: string, tags: Tags) {
   if (featureType === 'forest') return tags.natural === 'wood' ? 'wood' : 'forest'
   if (featureType === 'farmland') return tags.landuse ?? 'farmland'
+  if (featureType === 'vegetation') return tags.natural ?? tags.landcover ?? tags.leisure ?? 'vegetation'
   if (featureType === 'urban') return tags.landuse ?? 'urban'
   if (featureType === 'landmark') return tags.tourism ?? tags.historic ?? tags.amenity ?? tags.railway ?? tags.man_made ?? 'landmark'
   return featureType
@@ -184,6 +186,10 @@ function queryFor(bounds: Bounds) {
 way[natural=water](${box});way[water](${box});relation[natural=water](${box});
 way[waterway~"river|canal"](${box});
 way[landuse=forest](${box});way[natural=wood](${box});relation[landuse=forest](${box});relation[natural=wood](${box});
+way[landcover=trees](${box});relation[landcover=trees](${box});
+way[natural~"scrub|grassland|heath|wetland"](${box});relation[natural~"scrub|grassland|heath|wetland"](${box});
+way[landcover=grass](${box});relation[landcover=grass](${box});
+way[leisure~"park|nature_reserve"](${box});relation[leisure~"park|nature_reserve"](${box});
 way[landuse~"farmland|farmyard|meadow|orchard|grass"](${box});
 way[landuse~"residential|commercial|retail"](${box});relation[landuse~"residential|commercial|retail"](${box});
 way[landuse=industrial](${box});relation[landuse=industrial](${box});
@@ -231,7 +237,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
 }
 
 export async function materializeEarthPlace(input: { slug: string; label: string; lat: number; lon: number; radiusKm?: number }) {
-  const radiusKm = Math.min(1.2, Math.max(.35, input.radiusKm ?? .65))
+  const radiusKm = Math.min(2.5, Math.max(.6, input.radiusKm ?? 2.2))
   const bounds = earthPlaceBounds(input.lat, input.lon, radiusKm)
   const supabase = createServiceClient()
 
