@@ -130,6 +130,116 @@ function KompetenzCard({ k }: { k: Kompetenz; key?: string }) {
   )
 }
 
+// ── Wissenskarte-Tab ──────────────────────────────────────────────────────────
+// Keine starre Baumgrafik: zeigt den erreichten Bereich plus nur die direkt
+// angrenzenden, noch gesperrten Knoten ("eine Stufe weiter"). Jeder Spieler
+// sieht so seinen eigenen, tatsächlich erkundeten Ausschnitt des Wissensgraphen
+// (lib/knowledge/unlockRegistry.ts) statt eines für alle gleichen Tech-Baums.
+
+interface UnlockEntry { id: string; label: string; tier: string | null; grants: string[]; grantedAt?: string; sourceModule?: string }
+interface FrontierEntry { id: string; label: string; scope: string; tier: string; grants: string[]; missingUnlocks: { id: string; label: string }[] }
+
+const TIER_COLOR: Record<string, string> = {
+  foundation: C.gold, component: '#5aaeff', subsystem: '#6fcf97', integration: '#b48ce8',
+}
+const TIER_LABEL: Record<string, string> = {
+  foundation: 'Grundlage', component: 'Komponente', subsystem: 'Subsystem', integration: 'Integration',
+}
+
+function WissenskarteTab() {
+  const [unlocked, setUnlocked]   = useState<UnlockEntry[]>([])
+  const [frontier, setFrontier]   = useState<FrontierEntry[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const sb = createClient()
+        const { data: { session } } = await sb.auth.getSession()
+        const jwt = session?.access_token ?? ''
+        const res = await fetch('/api/game/knowledge?action=unlocks', { headers: { Authorization: `Bearer ${jwt}` } })
+        const data = await res.json() as { unlocked?: UnlockEntry[]; frontier?: FrontierEntry[]; error?: string }
+        if (cancelled) return
+        if (data.error) { setError(data.error); return }
+        setUnlocked(data.unlocked ?? [])
+        setFrontier(data.frontier ?? [])
+      } catch {
+        if (!cancelled) setError('Wissenskarte derzeit nicht verfügbar.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  const reachableNow = frontier.filter(f => f.missingUnlocks.length === 0)
+  const oneAway      = frontier.filter(f => f.missingUnlocks.length === 1)
+
+  if (loading) return <div style={{ color: C.textMuted, textAlign: 'center' as const, padding: '2rem', fontSize: '0.8rem' }}>Lädt …</div>
+  if (error)   return <div style={{ color: C.red, textAlign: 'center' as const, padding: '2rem', fontSize: '0.8rem' }}>{error}</div>
+
+  return (
+    <div style={{ padding: '1rem 1.25rem' }}>
+      <div style={{ fontSize: '0.7rem', color: C.textMuted, lineHeight: 1.6, marginBottom: '1.25rem' }}>
+        Dein eigener Ausschnitt des Wissensnetzes — kein fester Pfad, nur dein erreichter Bereich und der nächste Schritt davon aus.
+      </div>
+
+      {/* Erreichter Bereich */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ fontSize: '0.6rem', color: C.textMuted, textTransform: 'uppercase' as const, letterSpacing: '2px', marginBottom: '0.6rem', fontFamily: MONO }}>
+          Erreicht ({unlocked.length})
+        </div>
+        {unlocked.length === 0
+          ? <div style={{ fontSize: '0.75rem', color: C.textMuted }}>Noch nichts freigeschaltet — unten siehst du, wo du anfangen kannst.</div>
+          : (
+            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '0.5rem' }}>
+              {unlocked.map(u => (
+                <div key={u.id} title={u.id} style={{ padding: '0.45rem 0.7rem', borderRadius: 7, background: `${TIER_COLOR[u.tier ?? ''] ?? C.textMuted}1a`, border: `1px solid ${TIER_COLOR[u.tier ?? ''] ?? C.border}`, fontSize: '0.72rem', color: C.text }}>
+                  <span style={{ marginRight: 4 }}>✅</span>{u.label}
+                </div>
+              ))}
+            </div>
+          )}
+      </div>
+
+      {/* Jetzt erreichbar */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ fontSize: '0.6rem', color: C.green, textTransform: 'uppercase' as const, letterSpacing: '2px', marginBottom: '0.6rem', fontFamily: MONO }}>
+          Jetzt erreichbar ({reachableNow.length})
+        </div>
+        {reachableNow.length === 0
+          ? <div style={{ fontSize: '0.75rem', color: C.textMuted }}>Nichts direkt Erreichbares — siehe unten, was noch fehlt.</div>
+          : reachableNow.map(f => (
+            <div key={f.id} style={{ border: `1px solid #a0dcb8`, background: C.greenLight, borderRadius: 8, padding: '0.6rem 0.8rem', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: C.text }}>{f.label} <span style={{ fontSize: '0.58rem', color: C.textMuted, fontWeight: 400 }}>({TIER_LABEL[f.tier] ?? f.tier})</span></div>
+              <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 2 }}>{f.scope}</div>
+              <div style={{ fontSize: '0.62rem', color: C.green, marginTop: 3 }}>Alle Voraussetzungen erfüllt — nur noch die Erfahrung/Handlung selbst fehlt.</div>
+            </div>
+          ))}
+      </div>
+
+      {/* Eine Stufe weiter */}
+      <div>
+        <div style={{ fontSize: '0.6rem', color: C.textMuted, textTransform: 'uppercase' as const, letterSpacing: '2px', marginBottom: '0.6rem', fontFamily: MONO }}>
+          Eine Stufe weiter ({oneAway.length})
+        </div>
+        {oneAway.length === 0
+          ? <div style={{ fontSize: '0.75rem', color: C.textMuted }}>Nichts in Sichtweite.</div>
+          : oneAway.map(f => (
+            <div key={f.id} style={{ border: `1px solid ${C.border}`, background: C.bgWhite, borderRadius: 8, padding: '0.6rem 0.8rem', marginBottom: '0.5rem', opacity: 0.85 }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: C.text }}>🔒 {f.label} <span style={{ fontSize: '0.58rem', color: C.textMuted, fontWeight: 400 }}>({TIER_LABEL[f.tier] ?? f.tier})</span></div>
+              <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 2 }}>{f.scope}</div>
+              <div style={{ fontSize: '0.62rem', color: C.accent, marginTop: 3 }}>Dafür fehlt noch: {f.missingUnlocks.map(m => m.label).join(', ')}</div>
+            </div>
+          ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Einstellungen-Tab ─────────────────────────────────────────────────────────
 
 function EinstellungenTab({ username }: { username: string }) {
@@ -299,7 +409,7 @@ function EinstellungenTab({ username }: { username: string }) {
 
 // ── Hauptkomponente ───────────────────────────────────────────────────────────
 
-type Tab = 'kompetenzen' | 'einstellungen'
+type Tab = 'kompetenzen' | 'wissenskarte' | 'einstellungen'
 
 export default function ProfileOverlay({ username, avatar, credits, onClose }: ProfileOverlayProps) {
   const [tab, setTab]       = useState<Tab>('kompetenzen')
@@ -379,9 +489,9 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, background: C.bg, flexShrink: 0 }}>
-          {(['kompetenzen', 'einstellungen'] as const).map(t => (
+          {(['kompetenzen', 'wissenskarte', 'einstellungen'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: '0.6rem', border: 'none', borderBottom: tab === t ? `2px solid ${C.accent}` : '2px solid transparent', background: 'transparent', cursor: 'pointer', fontSize: '0.72rem', fontWeight: tab === t ? 700 : 400, color: tab === t ? C.accent : C.textMuted, fontFamily: MONO, textTransform: 'uppercase' as const, letterSpacing: '1.5px' }}>
-              {t === 'kompetenzen' ? 'Kompetenzen' : 'Einstellungen'}
+              {t === 'kompetenzen' ? 'Kompetenzen' : t === 'wissenskarte' ? 'Wissenskarte' : 'Einstellungen'}
             </button>
           ))}
         </div>
@@ -399,6 +509,7 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
               }
             </div>
           )}
+          {tab === 'wissenskarte' && <WissenskarteTab />}
           {tab === 'einstellungen' && <EinstellungenTab username={username} />}
         </div>
 

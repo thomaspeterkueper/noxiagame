@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { resolveGrantableUnlocks } from '@/lib/knowledge/unlockRegistry'
+import { resolveGrantableUnlocks, getMissingUnlockPrerequisites, UNLOCK_REGISTRY } from '@/lib/knowledge/unlockRegistry'
 
 async function getUserFromRequest(req: NextRequest) {
   const token = req.headers.get('authorization')?.split(' ')[1]
@@ -249,6 +249,51 @@ export async function GET(req: NextRequest) {
       unlocks_granted:  (grantedUnlocks ?? []).map((u: any) => u.unlock_id),
       unlocks_blocked:  blockedUnlocks,
     })
+  }
+
+  // ── Wissenskarte: erreichte Unlocks + direkt angrenzende, gesperrte Knoten ──
+  // Bewusst keine vollständige Baum-Ansicht: ein gesperrter Knoten taucht nur
+  // auf, wenn er entweder sofort erreichbar ist (alle Voraussetzungen erfüllt,
+  // es fehlt nur noch die Handlung/Erfahrung selbst) oder genau eine
+  // Voraussetzung fehlt ("eine Stufe weiter"). Alles Entferntere wird
+  // ausgeblendet, damit die Karte nicht wie ein kompletter Tech-Baum wirkt,
+  // den man erst durchschauen muss, bevor man sie nutzen kann.
+  if (action === 'unlocks') {
+    const { data: rows } = await supabase
+      .from('player_unlocks')
+      .select('unlock_id, granted_at, source_module')
+      .eq('profile_id', user.id)
+
+    const unlockedIds = new Set((rows ?? []).map((r: any) => r.unlock_id as string))
+
+    const unlocked = (rows ?? []).map((r: any) => {
+      const def = UNLOCK_REGISTRY[r.unlock_id]
+      return {
+        id: r.unlock_id,
+        label: def?.label ?? r.unlock_id,
+        tier: def?.tier ?? null,
+        grants: def?.grants ?? [],
+        grantedAt: r.granted_at,
+        sourceModule: r.source_module,
+      }
+    })
+
+    const frontier = Object.values(UNLOCK_REGISTRY)
+      .filter(def => !unlockedIds.has(def.id))
+      .map(def => ({
+        id: def.id,
+        label: def.label,
+        scope: def.scope,
+        tier: def.tier,
+        grants: def.grants,
+        missingUnlocks: getMissingUnlockPrerequisites(def.id, unlockedIds).map(id => ({
+          id,
+          label: UNLOCK_REGISTRY[id]?.label ?? id,
+        })),
+      }))
+      .filter(entry => entry.missingUnlocks.length <= 1)
+
+    return NextResponse.json({ unlocked, frontier })
   }
 
   return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
