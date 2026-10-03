@@ -87,7 +87,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
         {scene.polygons.map(feature=>{
           const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?'#bda96c':'#a9aaa0'
-          return <path key={feature.id} d={polygonD(feature.points)} fill={fill} stroke={feature.kind==='water'?'#4d8eae':'rgba(54,71,57,.5)'} strokeWidth="1" opacity={feature.kind==='urban'?.72:.88}/>
+          return <path key={feature.id} d={polygonD(feature.points)} fill={fill} stroke={feature.kind==='water'?'#4d8eae':'rgba(54,71,57,.5)'} strokeWidth="1" opacity={feature.kind==='urban' ? .72 : .88}/>
         })}
 
         {scene.paths.filter(path=>path.kind==='waterway').map(path=><path key={path.id} d={pathD(path.points)} fill="none" stroke="#5ca6c8" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>)}
