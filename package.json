@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:unit": "vitest run",
     "test:core-invariants": "node scripts/check-core-contract.mjs && node scripts/check-core-ownership-invariants.mjs && node scripts/check-core-location-invariants.mjs && node scripts/check-core-time-invariants.mjs && node scripts/check-core-resource-invariants.mjs && node scripts/check-core-research-invariants.mjs && node scripts/check-core-actor-invariants.mjs",
     "test:world-development": "tsc lib/game/worldDevelopment.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .world-development-test && node .world-development-test/worldDevelopment.test.js",
     "test:earth-planning": "tsc lib/game/buildings/earthBuildingAudit.test.ts lib/world/spatial/spaceportPlanningOverlay.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-planning-test && node .earth-planning-test/world/spatial/spaceportPlanningOverlay.test.js && node .earth-planning-test/game/buildings/earthBuildingAudit.test.js",
@@ -42,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   }
 }

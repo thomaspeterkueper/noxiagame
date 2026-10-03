@@ -5,16 +5,23 @@ import {
   surveyPlatformForExplorationAsset,
   validateSurveyObservation,
 } from './surveyPlatforms'
+import type { InstrumentId } from '../resourceScanning'
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 
+// Bewusst KEIN gültiger InstrumentId: Bohrkernentnahme ist ein Kontakt-
+// verfahren und gehört nicht zu den Fernerkundungs-Instrumenten. Der Test
+// prüft, dass solche Werte auf Survey-Plattformen fail-closed abgelehnt
+// werden – der Cast umgeht nur die Typprüfung, nicht die Laufzeitprüfung.
+const CORE_SAMPLE = 'core_sample' as unknown as InstrumentId
+
 const vex = surveyPlatformForExplorationAsset('vex_47')
 assert(vex?.id === 'vex_47', 'VEX-47 exploration asset must resolve to the canonical survey platform')
 assert(vex.availability === 'buildable', 'VEX-47 must remain buildable')
 assert(canMountSurveyInstrument(vex, 'hyperspectral'), 'VEX-47 should accept non-contact hyperspectral payloads')
-assert(!canMountSurveyInstrument(vex, 'core_sample'), 'VEX-47 must not silently act as a borehole sampler')
+assert(!canMountSurveyInstrument(vex, CORE_SAMPLE),'VEX-47 must not silently act as a borehole sampler')
 assert(!canMountSurveyInstrument(vex, 'orbital'), 'VEX-47 must not mount the orbital compatibility payload')
 
 assert(ORBITAL_SURVEY_PLATFORM_CONTRACT.availability === 'contract_only', 'satellite must remain contract-only until a concrete spacecraft profile exists')
@@ -37,7 +44,7 @@ const badVexObservation = validateSurveyObservation({
   id: 'obs-vex-2',
   platformProfileId: 'vex_47',
   platformInstanceId: 'vehicle-vex-1',
-  instrumentId: 'core_sample',
+  instrumentId: CORE_SAMPLE,
   measuredAt: '2026-09-18T09:00:00.000Z',
   footprint: { kind: 'radius', lat: 50.1, lon: 8.6, radiusKm: 0.01 },
   spatialResolutionM: null,
