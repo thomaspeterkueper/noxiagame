@@ -20,11 +20,20 @@ export type BlockedUnlock = {
 };
 
 export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
+  'UNL:NOX:orientation': {
+    id: 'UNL:NOX:orientation',
+    label: 'Grundorientierung',
+    scope: 'Einfuehrung in Lebenserhaltung, Sicherheit und Arbeitsweise unter extraterrestrischen/kolonialen Bedingungen -- der gemeinsame Ausgangspunkt, bevor eine fachliche Spezialisierung (Rohstoffe, Energie, Wasser, Drucksysteme, Strahlenschutz, Forschung) beginnt.',
+    requiresUnlocks: [],
+    grants: ['Voraussetzung fuer alle fachlichen Spezialisierungen'],
+    ssfMapping: 'module.unlocks[]',
+    tier: 'foundation',
+  },
   'UNL:NOX:resource-extraction': {
     id: 'UNL:NOX:resource-extraction',
     label: 'Rohstoffgewinnung I',
     scope: 'Grundlegende Prozesskette vom Deposit zum nutzbaren Rohstoff bzw. Handelsgut: Entnahme/Abbau, Zerkleinerung, Trennung/Anreicherung, Aufbereitung, Ausbeute, Reinheit, Energie-/Wasserbedarf und Reststoffe.',
-    requiresUnlocks: [],
+    requiresUnlocks: ['UNL:NOX:orientation'],
     grants: ['BLD:NOX:mine-1', 'Basale Rohstoffgewinnung aus Deposits'],
     ssfMapping: 'module.unlocks[]',
     tier: 'foundation',
@@ -33,7 +42,7 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
     id: 'UNL:NOX:power-generation',
     label: 'Energieerzeugung I',
     scope: 'Grundlagen elektrischer Energieerzeugung und ihrer Bereitstellung fuer technische Systeme.',
-    requiresUnlocks: [],
+    requiresUnlocks: ['UNL:NOX:orientation'],
     grants: ['BLD:NOX:solarfeld-1'],
     ssfMapping: 'module.unlocks[]',
     tier: 'foundation',
@@ -42,7 +51,7 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
     id: 'UNL:NOX:water-processing',
     label: 'Wasseraufbereitung I',
     scope: 'Rohwasser beurteilen und eine geeignete Aufbereitungskette aus mechanischer Trennung, Adsorption, Desinfektion sowie Verfahren fuer geloeste Stoffe/Salze zusammenstellen; einschliesslich Recycling- und extraterrestrischer Versorgung.',
-    requiresUnlocks: [],
+    requiresUnlocks: ['UNL:NOX:orientation'],
     grants: ['BLD:NOX:wasseraufbereitung-1', 'Basale Wasseraufbereitung und Recyclingwasser-Behandlung'],
     ssfMapping: 'module.unlocks[]',
     tier: 'foundation',
@@ -50,7 +59,7 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
   'UNL:NOX:pressure-systems': {
     id: 'UNL:NOX:pressure-systems', label: 'Drucksysteme I',
     scope: 'Druck, Gasverhalten, drucktragende und gasdichte Huelle sowie kontrollierter Druckraum.',
-    requiresUnlocks: [], grants: ['Voraussetzung fuer druckgekoppelte Mars-Infrastruktur'], ssfMapping: 'module.unlocks[]', tier: 'component',
+    requiresUnlocks: ['UNL:NOX:orientation'], grants: ['Voraussetzung fuer druckgekoppelte Mars-Infrastruktur'], ssfMapping: 'module.unlocks[]', tier: 'component',
   },
   'UNL:NOX:airlock': {
     id: 'UNL:NOX:airlock', label: 'Luftschleusen I',
@@ -71,7 +80,7 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
   'UNL:NOX:radiation-protection': {
     id: 'UNL:NOX:radiation-protection', label: 'Strahlenschutz I',
     scope: 'Grundlegende Schutzprinzipien gegen die fuer extraterrestrische Habitate relevanten ionisierenden Strahlungsfelder.',
-    requiresUnlocks: [], grants: ['Voraussetzung fuer den integrierten Mars-Habitatbetrieb'], ssfMapping: 'module.unlocks[]', tier: 'component',
+    requiresUnlocks: ['UNL:NOX:orientation'], grants: ['Voraussetzung fuer den integrierten Mars-Habitatbetrieb'], ssfMapping: 'module.unlocks[]', tier: 'component',
   },
   'UNL:NOX:environment-monitoring': {
     id: 'UNL:NOX:environment-monitoring', label: 'Umweltueberwachung I',
@@ -97,7 +106,7 @@ export const UNLOCK_REGISTRY: Record<string, UnlockDefinition> = {
     id: 'UNL:NOX:research:magnetobiology-experiment-design',
     label: 'Magnetobiologie — Experimentdesign',
     scope: 'Kontrollierte Magnetfeld-Expositionen als Forschungsvariable planen, inklusive Organismus-/Genotypkontext, Kontrollbedingungen, biologischen Endpunkten, Replikation und Nullbefunden. Keine Humanwirkung, Therapie oder Habitatwirkung wird vorausgesetzt.',
-    requiresUnlocks: [],
+    requiresUnlocks: ['UNL:NOX:orientation'],
     grants: ['ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN'],
     ssfMapping: 'module.unlocks[]',
     tier: 'foundation',
