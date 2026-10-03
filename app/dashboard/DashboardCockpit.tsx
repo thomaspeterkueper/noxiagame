@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from 'react'
 import { useMusicContext } from '../_components/MusicProvider'
+import { useGameStore } from '@/lib/store/gameStore'
 
 type CockpitPanel = 'locations' | 'ship' | 'profile'
-type UtilityPanel = 'actions' | 'music' | 'info'
+type UtilityPanel = 'view' | 'actions' | 'music' | 'info'
 type ActionId = 'briefing' | 'found' | 'friends' | 'logout'
 type LegalLink = { label: string; href: string }
 type Targets = Partial<Record<CockpitPanel, HTMLElement>> & {
@@ -96,6 +97,7 @@ function readAttribution() {
 
 export default function DashboardCockpit() {
   const { playing, volume, toggle: toggleMusic, setVolume } = useMusicContext()
+  const location = useGameStore(state => state.location)
   const [targets, setTargets] = useState<Targets>({ actions: {} })
   const [active, setActive] = useState<CockpitPanel | null>(null)
   const [utilityOpen, setUtilityOpen] = useState<UtilityPanel | null>(null)
@@ -217,6 +219,16 @@ export default function DashboardCockpit() {
       </div>
     </aside>}
 
+    {utilityOpen === 'view' && <aside className="noxia-cockpit-utility noxia-view-panel" aria-label="NOXIA Ansicht">
+      <div className="noxia-utility-head"><div><small>NOXIA</small><strong>Ansicht</strong></div><button type="button" onClick={() => setUtilityOpen(null)} aria-label="Ansicht schließen">×</button></div>
+      {location === 'earth' ? <div className="noxia-view-options">
+        <button type="button" className="active" onClick={() => setUtilityOpen(null)}><span>▦</span><b>Karte</b><small>Reale, persistierte Erdgeographie</small></button>
+        <button type="button" disabled title="Wird erst freigeschaltet, wenn die begehbare Ansicht dieselbe reale Geographie verwendet"><span>◇</span><b>Begehbar</b><small>Noch nicht freigegeben · muss dieselbe reale Geographie nutzen</small></button>
+      </div> : <div className="noxia-view-options">
+        <button type="button" className="active" onClick={() => { setUtilityOpen(null); targets.isometric?.click() }}><span>◇</span><b>Ansicht wechseln</b><small>Zwischen Karten- und lokaler Ansicht wechseln</small></button>
+      </div>}
+    </aside>}
+
     {utilityOpen === 'info' && <aside className="noxia-cockpit-utility noxia-info-panel" aria-label="NOXIA Informationen und Rechtliches">
       <div className="noxia-utility-head"><div><small>NOXIA</small><strong>Informationen</strong></div><button type="button" onClick={() => setUtilityOpen(null)} aria-label="Informationen schließen">×</button></div>
       <div className="noxia-info-copy">© 2026 Thomas Peter Küper · noχ¹ᐃ Alpha</div>
@@ -249,9 +261,15 @@ export default function DashboardCockpit() {
         <span className="ico">⊹</span><small>Standorte</small>
       </button>}
 
-      {targets.isometric && <button type="button" className="primary" onClick={() => targets.isometric?.click()} title="Ansicht wechseln">
+      <button type="button" className={utilityOpen === 'view' ? 'primary active' : 'primary'} onClick={() => {
+        if (location !== 'earth' && targets.isometric) {
+          targets.isometric.click()
+          return
+        }
+        toggleUtility('view')
+      }} title="Ansicht wechseln">
         <span className="ico">◇</span><small>Ansicht</small>
-      </button>}
+      </button>
 
       {hasActions && <button type="button" className={utilityOpen === 'actions' ? 'active' : ''} aria-pressed={utilityOpen === 'actions'} onClick={() => toggleUtility('actions')} title="Einweisung, Gründen, Freunde und Abmelden">
         <span className="ico">⋯</span><small>Aktionen</small>{friendBadge && <i className="noxia-cockpit-badge">{friendBadge}</i>}
@@ -475,6 +493,14 @@ const cockpitStyles = `
     background: rgba(255,255,255,.04); color: #adc8d5; cursor: pointer; font-size: 18px;
   }
 
+  .noxia-view-panel { width: min(430px, calc(100vw - 24px)); padding-bottom: 10px; }
+  .noxia-view-options { display: grid; gap: 6px; padding: 9px; }
+  .noxia-view-options > button { min-height: 58px; display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; column-gap: 9px; align-items: center; padding: 8px 10px; border: 1px solid rgba(90,141,168,.24); border-radius: 7px; background: rgba(255,255,255,.035); color: #c7dce5; text-align: left; cursor: pointer; }
+  .noxia-view-options > button > span { grid-row: 1 / 3; font-size: 20px; color: #d7b96e; text-align: center; }
+  .noxia-view-options > button b { font-size: 11px; }
+  .noxia-view-options > button small { color: #7896a5; font-size: 9px; text-transform: none; letter-spacing: 0; }
+  .noxia-view-options > button.active { border-color: rgba(83,181,225,.5); background: rgba(25,83,111,.22); }
+  .noxia-view-options > button:disabled { opacity: .5; cursor: not-allowed; }
   .noxia-actions-panel { width: min(460px, calc(100vw - 24px)); padding-bottom: 8px; }
   .noxia-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 7px; }
   .noxia-actions-grid > button {
