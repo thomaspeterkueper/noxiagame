@@ -154,7 +154,7 @@ export default function EarthRegionPreview(){
         if(json.ok&&json.materialization&&(json.materialization.status==='missing'||json.materialization.status==='pending'))void materializePlace(json.materialization)
         if(json.ok){
           setOverviewData(json)
-          const isSauerland=Boolean(json.region?.name?.includes('Sauerland'))
+          const isSauerland=json.region?.id==='earth-sauerland'
           const defaultFocus=isSauerland?SELMECKE_DEFAULT_FOCUS:(json.region?.origin??SELMECKE_DEFAULT_FOCUS)
           const defaultFocusLabel=isSauerland?'Selmecke':(json.region?.name??'Regionsansicht')
           void focusGeoPoint(defaultFocus,defaultFocusLabel)
@@ -262,7 +262,7 @@ export default function EarthRegionPreview(){
     if(focusLoading)return
     setFocusLoading(true);setFocusError(null);clearPlacement();setSelectedWorldObjectId(null);setSelectedPendingBuildId(null);setSelectedLandmarkId(null);setSelectedRealLandmarkId(null);setEntryRequest(null)
     try{
-      const q=new URLSearchParams({lat:String(point.lat),lon:String(point.lon),radiusKm:String(LOCAL_DETAIL_RADIUS_KM),v:EARTH_DATA_VERSION})
+      const q=new URLSearchParams({lat:String(point.lat),lon:String(point.lon),radiusKm:String(LOCAL_DETAIL_RADIUS_KM),v:EARTH_DATA_VERSION,place:'',label})
       const response=await fetch(`/api/earth/region?${q}`,{cache:'no-store'})
       const local=await response.json() as Payload
       if(!response.ok||!local.ok||!local.bounds)throw new Error(local.error??'Lokale Kartendaten konnten nicht geladen werden')
