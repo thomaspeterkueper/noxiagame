@@ -123,9 +123,19 @@ export default function EarthRegionPreview(){
         headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
         body:JSON.stringify({slug:spec.slug,label:spec.label,lat:spec.lat,lon:spec.lon,radiusKm:spec.radiusKm}),
       })
-      const result=await response.json()
+      const raw=await response.text()
+      let result:any=null
+      if(raw.trim()){
+        try{result=JSON.parse(raw)}
+        catch{
+          throw new Error(`Ortsanreicherung lieferte keine gültige JSON-Antwort (HTTP ${response.status}).`)
+        }
+      }
       if(response.ok&&result?.ok){window.location.reload();return}
-      throw new Error(result?.error??'Realweltdaten konnten noch nicht angereichert werden')
+      const serverError=result?.error
+        ??(raw.trim()?raw.slice(0,220):null)
+        ??`Ortsanreicherung ohne Antwort beendet (HTTP ${response.status}).`
+      throw new Error(serverError)
     }catch(error){
       setMaterializationError(error instanceof Error?error.message:String(error))
     }finally{
