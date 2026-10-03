@@ -14,7 +14,8 @@ import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 
 type GeoPoint = { lat:number; lon:number }
 type Feature = { id:string; featureType:string; properties:Record<string,string>; geometry:{kind:'point';coordinates:GeoPoint}|{kind:'line'|'polygon';coordinates:GeoPoint[]} }
-type Payload = { ok:boolean; region?:{name:string;origin:GeoPoint}; queryCenter?:GeoPoint; detail?:boolean; bounds?:{south:number;west:number;north:number;east:number}; featureCount?:number; features?:Feature[]; attribution?:string; error?:string }
+type Materialization = { slug:string; label:string; lat:number; lon:number; radiusKm:number; status:'missing'|'pending'|'failed'|'ready'; source?:string|null }
+type Payload = { ok:boolean; region?:{id?:string;name:string;origin:GeoPoint}; queryCenter?:GeoPoint; detail?:boolean; bounds?:{south:number;west:number;north:number;east:number}; featureCount?:number; features?:Feature[]; materialization?:Materialization|null; attribution?:string; error?:string }
 type Candidate = GeoPoint & { elevationM:number; slopePercent:number; reliefM:number; score:number; roadDistanceM:number|null; railDistanceM:number|null; exclusionDistanceM:number|null; exclusionType:string|null; reasons:string[] }
 type ShortlistCandidate = Candidate & { shortlistRank:1|2|3; shortlistLabel:'A'|'B'|'C'; shortlistReason:string }
 type CandidatePayload = { ok:boolean; candidates?:Candidate[]; shortlist?:ShortlistCandidate[]; attribution?:string; error?:string }
@@ -87,8 +88,29 @@ export default function EarthRegionPreview(){
   const suppressMapClick=useRef(false)
   const pointerStartedOnSurface=useRef(false)
   const mapGroupRef=useRef<SVGGElement|null>(null)
+  const materializingPlaces=useRef(new Set<string>())
 
   const loadSpatial=async()=>{const token=await getToken();if(!token){setSpatial({error:'Nicht angemeldet'});return}const response=await fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`}});setSpatial(await response.json())}
+
+  const materializePlace=async(spec:Materialization)=>{
+    if(spec.status==='ready'||materializingPlaces.current.has(spec.slug))return
+    materializingPlaces.current.add(spec.slug)
+    try{
+      const token=await getToken()
+      if(!token)return
+      const response=await fetch('/api/earth/materialize',{
+        method:'POST',
+        headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({slug:spec.slug,label:spec.label,lat:spec.lat,lon:spec.lon,radiusKm:spec.radiusKm}),
+      })
+      const result=await response.json()
+      if(response.ok&&result?.ok)window.location.reload()
+    }catch{
+      // The minimal place remains usable; a later visit retries enrichment.
+    }finally{
+      materializingPlaces.current.delete(spec.slug)
+    }
+  }
 
   useEffect(()=>{
     const load=async()=>{
@@ -96,6 +118,7 @@ export default function EarthRegionPreview(){
         const response=await fetch(`/api/earth/region?radiusKm=3&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
         const json=await response.json() as Payload
         setData(json)
+        if(json.ok&&json.materialization&&json.materialization.status!=='ready')void materializePlace(json.materialization)
         if(json.ok){
           setOverviewData(json)
           const isSauerland=Boolean(json.region?.name?.includes('Sauerland'))
