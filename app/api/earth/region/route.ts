@@ -3,6 +3,7 @@ import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/li
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
+import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
@@ -11,6 +12,8 @@ export const revalidate = 0
 
 const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
 const EARTH_VIEW_LON_COOKIE = 'noxia-earth-view-lon'
+const EARTH_VIEW_LABEL_COOKIE = 'noxia-earth-view-label'
+const EARTH_VIEW_PLACE_COOKIE = 'noxia-earth-view-place-slug'
 
 const SELMECKE_REFERENCE_FEATURE: ImportedEarthFeature = {
   id: SELMECKE_REFERENCE_SITE.id,
@@ -67,53 +70,109 @@ export async function GET(req: NextRequest) {
     east: center.lon + lonDelta,
   }
 
-  // BUGFIX/UMSTELLUNG 16.09.2026: Live-Overpass-Abfragen bei jedem
-  // Kartenaufruf waren unzuverlaessig (Rate-Limits, teils 10+MB-Antworten,
-  // 503er). Regionen, die per scripts/import-earth-region.mjs bzw.
-  // /api/admin/import-region vorab importiert wurden, werden jetzt aus
-  // celestial_regions/region_features gelesen. Nur wenn fuer die
-  // angefragte Region (noch) kein Import vorliegt, faellt die Route auf
-  // die alte Live-Abfrage zurueck, damit neue/unbekannte Standorte
-  // weiterhin funktionieren, bis sie importiert sind.
+  const placeSlug = hasLocalCenter
+    ? (p.get('place') ?? req.cookies.get(EARTH_VIEW_PLACE_COOKIE)?.value ?? null)
+    : null
+  const placeLabel = (p.get('label') ?? req.cookies.get(EARTH_VIEW_LABEL_COOKIE)?.value ?? viewRegion.name).slice(0, 240)
+  const storedSlug = placeSlug ?? requestedRegionId
+
+  // Runtime rendering never depends on a live Overpass request for arbitrary
+  // searched places. Once selected, a place is identified persistently and
+  // served from NOXIA storage. Until enrichment finishes, the renderer gets a
+  // valid real-world centre/bounds with zero features instead of a 504.
   const supabase = createServiceClient()
   const { data: storedRegion } = await supabase
     .from('celestial_regions')
-    .select('id, slug, bounds')
-    .eq('slug', requestedRegionId)
+    .select('id, slug, label, center_lat, center_lon, radius_km, bounds, source, imported_at')
+    .eq('slug', storedSlug)
     .maybeSingle()
 
-  if (storedRegion && !hasLocalCenter) {
+  if (storedRegion) {
     const { data: rows, error: featuresError } = await supabase
       .from('region_features')
       .select('id, feature_type, geometry, properties')
       .eq('region_id', storedRegion.id)
 
     if (!featuresError) {
+      const storedBounds = (storedRegion.bounds as typeof bounds) ?? bounds
       const containsSelmecke = SELMECKE_REFERENCE_FEATURE.geometry.kind === 'point'
-        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat >= bounds.south
-        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat <= bounds.north
-        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon >= bounds.west
-        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon <= bounds.east
-
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat >= storedBounds.south
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat <= storedBounds.north
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon >= storedBounds.west
+        && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon <= storedBounds.east
       const features = [
         ...(rows ?? []).map(r => ({ id: r.id, featureType: r.feature_type, properties: r.properties, geometry: r.geometry })),
         ...(containsSelmecke ? [SELMECKE_REFERENCE_FEATURE] : []),
       ]
+      const materializationStatus = placeSlug
+        ? (features.length > 0 && !String(storedRegion.source ?? '').startsWith('noxia:')
+            ? 'ready'
+            : String(storedRegion.source ?? '').includes('failed') ? 'failed' : 'pending')
+        : null
+      const runtimeRegion = placeSlug
+        ? {
+            id: storedRegion.slug,
+            name: storedRegion.label ?? placeLabel,
+            origin: { lat: Number(storedRegion.center_lat), lon: Number(storedRegion.center_lon) },
+            chunkSizeM: viewRegion.chunkSizeM,
+            cellSizeM: viewRegion.cellSizeM,
+          }
+        : viewRegion
 
       return NextResponse.json({
         ok: true,
-        region: viewRegion,
-        viewRegion,
+        region: runtimeRegion,
+        viewRegion: runtimeRegion,
         queryCenter: center,
         detail: hasLocalCenter,
-        bounds: (storedRegion.bounds as typeof bounds) ?? bounds,
+        bounds: storedBounds,
         featureCount: features.length,
         features,
-        attribution: '© OpenStreetMap contributors · ODbL · NOXIA canonical sites (vorimportiert)',
+        materialization: placeSlug ? {
+          slug: placeSlug,
+          label: storedRegion.label ?? placeLabel,
+          lat: Number(storedRegion.center_lat),
+          lon: Number(storedRegion.center_lon),
+          radiusKm: Number(storedRegion.radius_km ?? radiusKm),
+          status: materializationStatus,
+          source: storedRegion.source,
+        } : null,
+        attribution: '© OpenStreetMap contributors · ODbL · NOXIA materialized geography',
       }, {
         headers: { 'Cache-Control': 'private, max-age=60', 'Vary': 'Cookie' },
       })
     }
+  }
+
+  if (hasLocalCenter && placeSlug) {
+    return NextResponse.json({
+      ok: true,
+      region: {
+        id: placeSlug,
+        name: placeLabel,
+        origin: center,
+        chunkSizeM: viewRegion.chunkSizeM,
+        cellSizeM: viewRegion.cellSizeM,
+      },
+      viewRegion: viewRegion,
+      queryCenter: center,
+      detail: true,
+      bounds,
+      featureCount: 0,
+      features: [],
+      materialization: {
+        slug: placeSlug,
+        label: placeLabel,
+        lat: center.lat,
+        lon: center.lon,
+        radiusKm,
+        status: 'missing',
+        source: null,
+      },
+      attribution: 'NOXIA place registry · Real-world enrichment pending',
+    }, {
+      headers: { 'Cache-Control': 'private, no-store, max-age=0', 'Vary': 'Cookie' },
+    })
   }
 
   try {
