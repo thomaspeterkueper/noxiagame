@@ -236,73 +236,186 @@ async function loadNormalizedFeatures(bounds: Bounds) {
   throw new Error(`Kartennormalisierung fehlgeschlagen: ${failures.join('; ')}`)
 }
 
-export async function materializeEarthPlace(input: { slug: string; label: string; lat: number; lon: number; radiusKm?: number }) {
-  const radiusKm = Math.min(2.5, Math.max(2.2, input.radiusKm ?? 2.2))
-  const bounds = earthPlaceBounds(input.lat, input.lon, radiusKm)
+export async function materializeEarthPlace(input: {
+  slug: string
+  label: string
+  lat: number
+  lon: number
+  radiusKm?: number
+  refreshGeography?: boolean
+}) {
+  const requestedRadiusKm = Math.min(2.5, Math.max(2.2, input.radiusKm ?? 2.2))
   const supabase = createServiceClient()
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('celestial_regions')
-    .select('id, slug, source, imported_at')
+    .select('id, slug, source, imported_at, radius_km, bounds, geography_import_version, normalization_version, enrichment_version')
     .eq('slug', input.slug)
     .maybeSingle()
+  if (existingError) throw existingError
 
+  let existingFeatureIds: string[] = []
   if (existing) {
-    const { count } = await supabase
+    const { data: featureRows, error: featureError } = await supabase
       .from('region_features')
-      .select('id', { count: 'exact', head: true })
+      .select('id')
       .eq('region_id', existing.id)
-    if ((count ?? 0) > 0 && String(existing.source ?? '').includes(EARTH_PLACE_MATERIALIZER_VERSION)) {
-      return { ok: true, status: 'ready' as const, slug: input.slug, regionId: existing.id, total: count ?? 0, source: existing.source }
+    if (featureError) throw featureError
+    existingFeatureIds = (featureRows ?? []).map(row => String(row.id))
+
+    // Create once, persist, enrich incrementally. Existing geography is
+    // authoritative until an explicit geography refresh succeeds.
+    if (existingFeatureIds.length > 0 && !input.refreshGeography) {
+      const versionPatch: Record<string, unknown> = {}
+      if (Number(existing.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION) {
+        versionPatch.geography_import_version = EARTH_GEOGRAPHY_IMPORT_VERSION
+      }
+      if (Number(existing.normalization_version ?? 0) < EARTH_NORMALIZATION_VERSION) {
+        versionPatch.normalization_version = EARTH_NORMALIZATION_VERSION
+      }
+      if (Number(existing.enrichment_version ?? 0) < EARTH_ENRICHMENT_VERSION) {
+        versionPatch.enrichment_version = EARTH_ENRICHMENT_VERSION
+      }
+      if (String(existing.source ?? '') === 'noxia:materialization-failed') {
+        versionPatch.source = 'overpass:retained-snapshot'
+      }
+      if (Object.keys(versionPatch).length > 0) {
+        const { error } = await supabase.from('celestial_regions').update(versionPatch).eq('id', existing.id)
+        if (error) throw error
+      }
+      return {
+        ok: true,
+        status: 'ready' as const,
+        slug: input.slug,
+        regionId: existing.id,
+        total: existingFeatureIds.length,
+        source: versionPatch.source ?? existing.source,
+        persistedSnapshot: true,
+      }
     }
   }
 
-  const { data: region, error: regionError } = await supabase
-    .from('celestial_regions')
-    .upsert({
-      body: 'earth',
-      slug: input.slug,
-      label: input.label,
-      center_lat: input.lat,
-      center_lon: input.lon,
-      radius_km: radiusKm,
-      bounds,
-      source: 'noxia:materializing',
-      imported_at: new Date().toISOString(),
-    }, { onConflict: 'slug' })
-    .select('id')
-    .single()
-  if (regionError || !region) throw regionError ?? new Error('NOXIA-Ort konnte nicht angelegt werden')
+  const targetRadiusKm = input.refreshGeography && existing
+    ? Math.max(Number(existing.radius_km ?? 0), requestedRadiusKm)
+    : requestedRadiusKm
+  const targetBounds = earthPlaceBounds(input.lat, input.lon, targetRadiusKm)
+  let regionId = existing?.id as string | undefined
 
+  if (!regionId) {
+    const { data: region, error: regionError } = await supabase
+      .from('celestial_regions')
+      .upsert({
+        body: 'earth',
+        slug: input.slug,
+        label: input.label,
+        center_lat: input.lat,
+        center_lon: input.lon,
+        radius_km: targetRadiusKm,
+        bounds: targetBounds,
+        source: 'noxia:materializing',
+        imported_at: null,
+        source_checked_at: new Date().toISOString(),
+        geography_import_version: 0,
+        normalization_version: 0,
+        enrichment_version: EARTH_ENRICHMENT_VERSION,
+      }, { onConflict: 'slug' })
+      .select('id')
+      .single()
+    if (regionError || !region) throw regionError ?? new Error('NOXIA-Ort konnte nicht angelegt werden')
+    regionId = region.id
+  }
+
+  const checkedAt = new Date().toISOString()
   try {
-    const loaded = await loadNormalizedFeatures(bounds)
+    const loaded = await loadNormalizedFeatures(targetBounds)
     if (!loaded.features.length) throw new Error('Keine verwertbaren Realwelt-Features gefunden')
-    const rows = loaded.features.map(feature => ({ ...feature, region_id: region.id }))
+    const rows = loaded.features.map(feature => ({ ...feature, region_id: regionId }))
+    const insertedIds: string[] = []
 
-    const { error: deleteError } = await supabase.from('region_features').delete().eq('region_id', region.id)
-    if (deleteError) throw deleteError
-    for (let index = 0; index < rows.length; index += 400) {
-      const { error } = await supabase.from('region_features').insert(rows.slice(index, index + 400))
+    try {
+      for (let index = 0; index < rows.length; index += 400) {
+        const { data: inserted, error } = await supabase
+          .from('region_features')
+          .insert(rows.slice(index, index + 400))
+          .select('id')
+        if (error) throw error
+        insertedIds.push(...(inserted ?? []).map(row => String(row.id)))
+      }
+    } catch (insertError) {
+      for (let index = 0; index < insertedIds.length; index += 400) {
+        await supabase.from('region_features').delete().in('id', insertedIds.slice(index, index + 400))
+      }
+      throw insertError
+    }
+
+    // Replace the previous snapshot only after the new one was fully written.
+    for (let index = 0; index < existingFeatureIds.length; index += 400) {
+      const { error } = await supabase.from('region_features').delete().in('id', existingFeatureIds.slice(index, index + 400))
       if (error) throw error
     }
+
     const { error: updateError } = await supabase
       .from('celestial_regions')
-      .update({ source: loaded.source, imported_at: new Date().toISOString(), bounds, radius_km: radiusKm })
-      .eq('id', region.id)
+      .update({
+        label: input.label,
+        center_lat: input.lat,
+        center_lon: input.lon,
+        source: loaded.source,
+        imported_at: checkedAt,
+        source_checked_at: checkedAt,
+        bounds: targetBounds,
+        radius_km: targetRadiusKm,
+        geography_import_version: EARTH_GEOGRAPHY_IMPORT_VERSION,
+        normalization_version: EARTH_NORMALIZATION_VERSION,
+        enrichment_version: EARTH_ENRICHMENT_VERSION,
+      })
+      .eq('id', regionId)
     if (updateError) throw updateError
 
-    return { ok: true, status: 'ready' as const, slug: input.slug, regionId: region.id, total: rows.length, source: loaded.source }
+    return {
+      ok: true,
+      status: 'ready' as const,
+      slug: input.slug,
+      regionId,
+      total: rows.length,
+      source: loaded.source,
+      persistedSnapshot: true,
+    }
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    if (existingFeatureIds.length > 0 && existing) {
+      await supabase
+        .from('celestial_regions')
+        .update({ source_checked_at: checkedAt })
+        .eq('id', existing.id)
+      return {
+        ok: true,
+        status: 'ready' as const,
+        slug: input.slug,
+        regionId: existing.id,
+        total: existingFeatureIds.length,
+        source: existing.source,
+        persistedSnapshot: true,
+        refreshFailed: true,
+        refreshError: message,
+      }
+    }
+
     await supabase
       .from('celestial_regions')
-      .update({ source: 'noxia:materialization-failed', imported_at: new Date().toISOString() })
-      .eq('id', region.id)
+      .update({
+        source: 'noxia:materialization-failed',
+        source_checked_at: checkedAt,
+      })
+      .eq('id', regionId)
+
     return {
       ok: false,
       status: 'failed' as const,
       slug: input.slug,
-      regionId: region.id,
-      error: error instanceof Error ? error.message : String(error),
+      regionId,
+      error: message,
     }
   }
 }
