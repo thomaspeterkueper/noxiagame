@@ -22,19 +22,7 @@ function readCookie(name:string){
   return item?decodeURIComponent(item.slice(name.length+1)):null
 }
 
-function readRegion():EarthRegionId{
-  return SAUERLAND_REGION
-}
-
 function setCookie(name:string,value:string){document.cookie=`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=31536000; SameSite=Lax`}
-function clearCookie(name:string){document.cookie=`${name}=; Path=/; Max-Age=0; SameSite=Lax`}
-function clearCustomView(){clearCookie(EARTH_VIEW_LAT_COOKIE);clearCookie(EARTH_VIEW_LON_COOKIE);clearCookie(EARTH_VIEW_LABEL_COOKIE);clearCookie(EARTH_VIEW_PLACE_COOKIE)}
-
-function selectRegion(region:EarthRegionId){
-  clearCustomView()
-  setCookie(EARTH_REGION_COOKIE,region)
-  window.location.reload()
-}
 
 function selectPoint(lat:number,lon:number,label:string,region?:EarthRegionId){
   const placeSlug=earthPlaceSlug({lat,lon})
