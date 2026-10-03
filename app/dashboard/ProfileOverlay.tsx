@@ -422,17 +422,25 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
         const sb = createClient()
         const { data: { session } } = await sb.auth.getSession()
         const jwt = session?.access_token ?? ''
-        const [tradeRes, knowledgeRes] = await Promise.all([
+        const [tradeRes, knowledgeRes, profileRes] = await Promise.all([
           fetch('/api/game/trade?action=getTrades',    { headers: { Authorization: `Bearer ${jwt}` } }),
           fetch('/api/game/knowledge',                 { headers: { Authorization: `Bearer ${jwt}` } }),
+          fetch('/api/game/profile',                   { headers: { Authorization: `Bearer ${jwt}` } }),
         ])
         const tradeData     = await tradeRes.json() as Record<string, unknown>
         const knowledgeData = await knowledgeRes.json() as Record<string, unknown>
+        const profileData   = await profileRes.json() as Record<string, unknown>
         const trades        = (tradeData.trades as any[]) ?? []
         const gesamtgewinn  = trades.reduce((s: number, t: any) => s + (t.profit ?? 0), 0)
+        const profile       = (profileData.profile as { flight_count?: number } | null) ?? null
         setStats({
           transaktionen:  trades.length,
-          fluege:         trades.filter((t: any) => t.from_location !== t.to_location).length,
+          // flight_count ist der einzige verlässliche Flugzähler (wird beim
+          // tatsächlichen Flug in profiles.flight_count hochgezählt, siehe
+          // app/api/game/transit/route.ts). Vorher stand hier eine Ableitung
+          // aus Handelstransaktionen (from_location !== to_location), die bei
+          // Spielern ohne gezählte Transportfahrten fälschlich 0 zeigte.
+          fluege:         profile?.flight_count ?? 0,
           gebaeudeStunden: 0,
           wissenspunkte:  (knowledgeData.knowledge_points as number) ?? 0,
           gesamtgewinn,
