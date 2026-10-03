@@ -25,7 +25,10 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
 ]
 const MAX_POINTS_PER_FEATURE = 36
-export const EARTH_PLACE_MATERIALIZER_VERSION = 'noxia-place-v3-landscape'
+export const EARTH_GEOGRAPHY_IMPORT_VERSION = 1
+export const EARTH_NORMALIZATION_VERSION = 1
+export const EARTH_ENRICHMENT_VERSION = 1
+const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v1'
 
 export function earthPlaceBounds(lat: number, lon: number, radiusKm: number): Bounds {
   const latDelta = radiusKm / 111.32
@@ -226,7 +229,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
         continue
       }
       const payload = await response.json() as { elements?: OverpassElement[] }
-      return { features: toFeatures(payload.elements ?? []), source: `overpass:${new URL(endpoint).host}:${EARTH_PLACE_MATERIALIZER_VERSION}` }
+      return { features: toFeatures(payload.elements ?? []), source: `overpass:${new URL(endpoint).host}:${EARTH_IMPORT_PROFILE}` }
     } catch (error) {
       failures.push(`${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
