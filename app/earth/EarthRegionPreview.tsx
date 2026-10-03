@@ -58,6 +58,20 @@ function normalizeRotation(v:number){return((Math.round(v)%360)+360)%360}
 function payloadWidthM(payload:Payload){if(!payload.bounds)return null;const b=payload.bounds,lat=(b.south+b.north)/2;return distanceMeters({lat,lon:b.west},{lat,lon:b.east})}
 function terrainLabel(state:TerrainCell['state']){return state==='buildable'?'grundsätzlich bebaubar':state==='restricted'?'nur eingeschränkt geeignet':state==='invalid'?'für Standardbau ungeeignet':'noch nicht aufgelöst'}
 function worldStatusLabel(status:string){return status==='active'?'In Betrieb':status==='built'||status==='completed'?'Fertig':status||'Fertig'}
+function stableVariant(seed:string,count=4){let hash=2166136261;for(let i=0;i<seed.length;i++){hash^=seed.charCodeAt(i);hash=Math.imul(hash,16777619)}return Math.abs(hash>>>0)%count}
+function landusePatternId(feature:{id:string;featureType:string;properties?:Record<string,string>},detail:boolean){
+  if(!detail)return null
+  const seed=feature.properties?.visual_seed??feature.id
+  const variant=stableVariant(seed)
+  if(feature.featureType==='forest')return `earth-forest-${variant}`
+  if(feature.featureType==='farmland'){
+    const kind=(feature.properties?.visual_class??feature.properties?.landuse??'farmland').toLowerCase()
+    if(kind==='orchard')return `earth-orchard-${variant}`
+    if(kind==='meadow'||kind==='grass')return `earth-meadow-${variant}`
+    return `earth-farmland-${variant}`
+  }
+  return null
+}
 
 export default function EarthRegionPreview(){
   const[data,setData]=useState<Payload|null>(null)
@@ -83,6 +97,8 @@ export default function EarthRegionPreview(){
   const[focusLabel,setFocusLabel]=useState<string|null>(null)
   const[focusLoading,setFocusLoading]=useState(false)
   const[focusError,setFocusError]=useState<string|null>(null)
+  const[materializationBusy,setMaterializationBusy]=useState(false)
+  const[materializationError,setMaterializationError]=useState<string|null>(null)
 
   const drag=useRef<{x:number;y:number;ox:number;oy:number;moved:boolean}|null>(null)
   const suppressMapClick=useRef(false)
@@ -95,20 +111,23 @@ export default function EarthRegionPreview(){
   const materializePlace=async(spec:Materialization)=>{
     if(spec.status==='ready'||materializingPlaces.current.has(spec.slug))return
     materializingPlaces.current.add(spec.slug)
+    setMaterializationBusy(true);setMaterializationError(null)
     try{
       const token=await getToken()
-      if(!token)return
+      if(!token)throw new Error('Nicht angemeldet')
       const response=await fetch('/api/earth/materialize',{
         method:'POST',
         headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
         body:JSON.stringify({slug:spec.slug,label:spec.label,lat:spec.lat,lon:spec.lon,radiusKm:spec.radiusKm}),
       })
       const result=await response.json()
-      if(response.ok&&result?.ok)window.location.reload()
-    }catch{
-      // The minimal place remains usable; a later visit retries enrichment.
+      if(response.ok&&result?.ok){window.location.reload();return}
+      throw new Error(result?.error??'Realweltdaten konnten noch nicht angereichert werden')
+    }catch(error){
+      setMaterializationError(error instanceof Error?error.message:String(error))
     }finally{
       materializingPlaces.current.delete(spec.slug)
+      setMaterializationBusy(false)
     }
   }
 
@@ -118,7 +137,7 @@ export default function EarthRegionPreview(){
         const response=await fetch(`/api/earth/region?radiusKm=3&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
         const json=await response.json() as Payload
         setData(json)
-        if(json.ok&&json.materialization&&json.materialization.status!=='ready')void materializePlace(json.materialization)
+        if(json.ok&&json.materialization&&(json.materialization.status==='missing'||json.materialization.status==='pending'))void materializePlace(json.materialization)
         if(json.ok){
           setOverviewData(json)
           const isSauerland=Boolean(json.region?.name?.includes('Sauerland'))
@@ -171,6 +190,7 @@ export default function EarthRegionPreview(){
   const active=selected?shortlist.find(c=>c.shortlistLabel===selected)??null:null
 
   const scale=useMemo(()=>{if(!mapMetrics)return null;const visibleWidthM=mapMetrics.widthM/zoom,targetM=visibleWidthM/MAP_SCALE_DIVISIONS,options=[2,5,10,20,50,100,200,500,1000,2000,5000,10000];const meters=options.reduce((best,n)=>Math.abs(n-targetM)<Math.abs(best-targetM)?n:best,options[0]);return{meters,pixels:meters/mapMetrics.widthM*1000*zoom}},[mapMetrics,zoom])
+  const visualLanduseDetail=Boolean(data?.detail&&mapMetrics&&mapMetrics.widthM/zoom<=3500)
 
   const terrainOverlay=useMemo(()=>{if(!terrain?.ok||!terrain.cells||!projection||!data?.region?.origin||!mapMetrics)return[];const cells=terrain.cells,byKey=new Map(cells.map(c=>[`${c.row}:${c.col}`,c]));const stepX=(terrain.sourceResolutionM??120)/mapMetrics.widthM*1000,stepY=(terrain.sourceResolutionM??120)/mapMetrics.heightM*1000;return cells.map(c=>{const geo=localMetersToGeo({eastM:c.xM,northM:c.yM},data.region!.origin),x=projection.x(geo.lon),y=projection.y(geo.lat),west=byKey.get(`${c.row}:${c.col-1}`),east=byKey.get(`${c.row}:${c.col+1}`),north=byKey.get(`${c.row-1}:${c.col}`),south=byKey.get(`${c.row+1}:${c.col}`),dx=(east?.elevationM??c.elevationM)-(west?.elevationM??c.elevationM),dy=(south?.elevationM??c.elevationM)-(north?.elevationM??c.elevationM),light=clamp(.52+(-dx+dy)*.012,.18,.82);return{...c,x,y,w:stepX,h:stepY,shade:light<.5?'#203026':'#fff7da',shadeOpacity:Math.abs(light-.5)*.42,buildFill:c.state==='buildable'?'#4ecb71':c.state==='restricted'?'#e6bc46':c.state==='invalid'?'#d85757':'#78818a',slopeOpacity:clamp((c.slopeDeg??0)/22,0,.55)}})},[terrain,projection,data,mapMetrics])
 
@@ -275,10 +295,16 @@ export default function EarthRegionPreview(){
       onPointerUp={e=>{suppressMapClick.current=Boolean(drag.current?.moved);drag.current=null;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}}}
       onClick={chooseMapSpot}>
       <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          {[0,1,2,3].map(variant=><pattern key={`forest-${variant}`} id={`earth-forest-${variant}`} width="30" height="30" patternUnits="userSpaceOnUse" patternTransform={`translate(${variant*4} ${variant*3}) rotate(${variant*7-8})`}><rect width="30" height="30" fill="#70875e"/><circle cx="7" cy="9" r="4.2" fill="#536d49" opacity=".62"/><circle cx="20" cy="18" r="5.1" fill="#5d754f" opacity=".7"/><path d="M14 27 L18 20 L22 27 Z" fill="#455f40" opacity=".52"/></pattern>)}
+          {[0,1,2,3].map(variant=><pattern key={`meadow-${variant}`} id={`earth-meadow-${variant}`} width="28" height="28" patternUnits="userSpaceOnUse" patternTransform={`translate(${variant*3} ${variant*5})`}><rect width="28" height="28" fill="#b9bd78"/><path d="M5 23 q2 -7 4 0 M15 18 q2 -6 4 0 M23 25 q1.5 -5 3 0" fill="none" stroke="#81985d" strokeWidth="1.1" opacity=".55"/></pattern>)}
+          {[0,1,2,3].map(variant=><pattern key={`farmland-${variant}`} id={`earth-farmland-${variant}`} width="24" height="24" patternUnits="userSpaceOnUse" patternTransform={`rotate(${12+variant*11})`}><rect width="24" height="24" fill="#c5b879"/><path d="M0 5 H24 M0 13 H24 M0 21 H24" stroke="#9f9564" strokeWidth="1.3" opacity=".58"/></pattern>)}
+          {[0,1,2,3].map(variant=><pattern key={`orchard-${variant}`} id={`earth-orchard-${variant}`} width="26" height="26" patternUnits="userSpaceOnUse" patternTransform={`translate(${variant*2} ${variant*4}) rotate(${variant*4})`}><rect width="26" height="26" fill="#b9ae72"/><circle cx="6" cy="6" r="2.8" fill="#677a4a"/><circle cx="19" cy="6" r="2.8" fill="#677a4a"/><circle cx="6" cy="19" r="2.8" fill="#677a4a"/><circle cx="19" cy="19" r="2.8" fill="#677a4a"/></pattern>)}
+        </defs>
         <rect width="1000" height="1000" fill="#9caf78"/>
         <g ref={mapGroupRef} transform={`translate(${offset.x} ${offset.y}) scale(${zoom})`}>
           {layers.relief&&terrainOverlay.map(c=><rect key={`relief-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w*1.08} height={c.h*1.08} fill={c.shade} opacity={c.shadeOpacity}/>) }
-          {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}return <path key={f.id} d={f.d} fill={s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>})}
+          {projected.map((f:any)=>{if(!featureVisible(f.featureType))return null;const s=styleFor(f.featureType,f.properties||{});if(f.p){if(f.featureType!=='settlement')return null;const name=f.properties?.name||'';const point=f.geometry.coordinates as GeoPoint;return <g key={f.id} role="button" aria-label={`${name} auf Bauplan-Größe öffnen`} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void focusGeoPoint(point,name)}} style={{cursor:'pointer'}}><circle cx={f.p[0]} cy={f.p[1]} r={18/zoom} fill="transparent"/><circle cx={f.p[0]} cy={f.p[1]} r={4.5/zoom} fill="#344d59" stroke="#f4f1e6" strokeWidth={1.2/zoom}/><text pointerEvents="none" x={f.p[0]+7/zoom} y={f.p[1]-5/zoom} fontSize={10/zoom} fontWeight="700" fill="#17313c" paintOrder="stroke" stroke="#f4f1e6" strokeWidth={2.4/zoom}>{name}</text></g>}const patternId=f.geometry?.kind==='polygon'?landusePatternId(f,visualLanduseDetail):null;return <path key={f.id} d={f.d} fill={patternId?`url(#${patternId})`:s.fill} stroke={s.stroke} strokeWidth={s.width/zoom} vectorEffect="non-scaling-stroke" opacity={f.featureType==='building'?.9:1}/>})}
           {layers.buildability&&terrainOverlay.map(c=><rect key={`build-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill={c.buildFill} opacity={.28} stroke={c.buildFill} strokeWidth={.25/zoom}/>)}
           {layers.slope&&terrainOverlay.map(c=><rect key={`slope-${c.row}-${c.col}`} x={c.x-c.w/2} y={c.y-c.h/2} width={c.w} height={c.h} fill="#351d18" opacity={c.slopeOpacity}/>)}
 
@@ -320,6 +346,7 @@ export default function EarthRegionPreview(){
       {layers.corridor&&corridorOverlay&&<div className="earth-corridor-status"><b>Korridor B</b><span>Vorprüfung · nicht kanonisch</span></div>}
       {focusLoading&&<div className="earth-detail-status">Kartendetails werden geladen …</div>}
       {focusError&&<div className="earth-detail-status error">{focusError}</div>}
+      {data.materialization&&data.materialization.status!=='ready'&&<div className={`earth-materialization ${data.materialization.status==='failed'||materializationError?'error':''}`} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}><div><b>{materializationBusy?'Realweltdaten werden normalisiert …':data.materialization.status==='failed'||materializationError?'Realweltdaten noch nicht vollständig':'Ort wird aus realen Geodaten aufgebaut'}</b><span>{materializationError??'Die Karte bleibt benutzbar; Details werden persistent ergänzt.'}</span></div>{!materializationBusy&&(data.materialization.status==='failed'||materializationError)&&<button onClick={()=>void materializePlace(data.materialization!)}>Erneut versuchen</button>}</div>}
 
       {selectedSpot&&<div className="earth-site-panel" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
         <div className="earth-site-head"><div><small>AUSGEWÄHLTE STELLE</small><strong>{selectedTerrain?terrainLabel(selectedTerrain.state):'Geländedaten werden gesucht'}</strong></div><button onClick={clearPlacement}>×</button></div>
@@ -380,7 +407,7 @@ export default function EarthRegionPreview(){
       .earth-map-tools{position:absolute;left:16px;top:14px;display:flex;align-items:flex-start;gap:12px;color:#17313c;text-shadow:0 1px 2px #fff,0 0 7px #f4f1e6}.earth-compass,.earth-scale{pointer-events:none}.earth-compass{width:30px;height:38px;display:grid;place-items:center;position:relative;color:#17313c}.earth-compass span{position:absolute;top:0;font-size:10px;font-weight:900}.earth-compass b{font-size:26px;line-height:1;margin-top:8px}.earth-scale{min-width:72px;padding-top:2px;color:#17313c}.earth-scale span{display:block;font-size:10px;font-weight:900;margin-bottom:3px;text-align:center}.earth-scale i{display:block;height:7px;border-left:2px solid #17313c;border-right:2px solid #17313c;border-bottom:3px solid #17313c;box-sizing:border-box;filter:drop-shadow(0 1px 1px #fff)}.earth-focus{pointer-events:auto;border:1px solid #506b73;background:#f5f2e8dd;color:#17313c;border-radius:7px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;text-shadow:none;display:grid;gap:1px}.earth-focus small{font-size:8px;font-weight:700;color:#738087}
       .earth-layer-control{position:absolute;right:14px;top:14px;z-index:4}.earth-layer-trigger{border:1px solid #47616d;background:#102632dc;color:#e9f0ed;border-radius:7px;padding:7px 10px;font-size:10px;font-weight:800;cursor:pointer;backdrop-filter:blur(4px)}.earth-layer-menu{margin-top:6px;width:190px;background:#0b1c27ed;border:1px solid #405965;border-radius:9px;padding:6px;box-shadow:0 8px 28px #10202745;backdrop-filter:blur(8px)}.earth-layer-menu button{width:100%;display:flex;gap:8px;align-items:center;border:0;background:transparent;color:#9fb2b8;padding:7px 8px;text-align:left;font-size:10px;border-radius:5px;cursor:pointer}.earth-layer-menu button:hover,.earth-layer-menu button.active{background:#173746;color:#f2e7ba}.earth-layer-menu button span{width:12px;color:#d4ad43}.earth-layer-note{padding:7px 8px;color:#d8c98f;font-size:8px;line-height:1.35;border-top:1px solid #263b44;margin-top:4px}.earth-layer-disabled{padding:7px 8px;color:#64767c;font-size:9px;border-top:1px solid #263b44;margin-top:4px}
       .earth-corridor-status{position:absolute;right:14px;top:58px;z-index:3;display:grid;gap:1px;background:#fff8d9e8;border:1px dashed #8a6b21;border-radius:7px;padding:7px 10px;color:#594716;pointer-events:none;box-shadow:0 5px 18px #3b321524}.earth-corridor-status b{font-size:10px}.earth-corridor-status span{font-size:8px;letter-spacing:.04em}
-      .earth-detail-status{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:#102632e8;color:#f4f0dd;border:1px solid #58717a;border-radius:8px;padding:8px 12px;font-size:10px;font-weight:800}.earth-detail-status.error{background:#612f2fe8;border-color:#9c6262}
+      .earth-detail-status{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:#102632e8;color:#f4f0dd;border:1px solid #58717a;border-radius:8px;padding:8px 12px;font-size:10px;font-weight:800}.earth-detail-status.error{background:#612f2fe8;border-color:#9c6262}.earth-materialization{position:absolute;left:50%;top:52px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:10px;max-width:min(620px,calc(100% - 28px));padding:8px 10px;border:1px solid #6d8588;border-radius:8px;background:#102632e8;color:#e8efec;box-shadow:0 6px 20px #10202738;backdrop-filter:blur(8px);cursor:default}.earth-materialization>div{display:grid;gap:2px}.earth-materialization b{font-size:10px}.earth-materialization span{font-size:8px;color:#b9c9c9}.earth-materialization button{border:1px solid #9f7d2c;background:#c09530;color:#fffaf0;border-radius:6px;padding:6px 8px;font-size:9px;font-weight:850;cursor:pointer;white-space:nowrap}.earth-materialization.error{border-color:#9c6262;background:#492c2ce8}
       .earth-site-panel,.earth-object-panel{position:absolute;left:14px;bottom:44px;z-index:6;width:min(390px,calc(100% - 28px));max-height:calc(100% - 78px);overflow:auto;background:#fffaf0f4;border:1px solid #a8893d;border-radius:11px;padding:12px;box-sizing:border-box;box-shadow:0 10px 34px #2b341f40;cursor:default;backdrop-filter:blur(8px)}.earth-object-panel{border-color:#567986}.earth-site-head{display:flex;justify-content:space-between;gap:12px}.earth-site-head small{display:block;color:#89691b;font-size:9px;font-weight:900;letter-spacing:.12em}.earth-object-panel .earth-site-head small{color:#466b78}.earth-site-head strong{display:block;font-size:15px;margin-top:2px}.earth-site-head button{border:0;background:none;font-size:20px;cursor:pointer}.earth-analysis-level,.earth-object-state{display:flex;justify-content:space-between;align-items:center;margin:9px 0;padding:7px 8px;background:#edf0e8;border-radius:6px;font-size:10px}.earth-analysis-level span,.earth-object-state span{color:#68777e}.earth-analysis-level b,.earth-object-state b{color:#335360}.earth-site-facts{display:grid;gap:5px}.earth-site-facts>div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e4ddc8;padding:5px 2px;font-size:10px}.earth-site-facts span{color:#6c7879}.earth-site-facts b{text-align:right;font-weight:800}.earth-site-facts .locked-info b{color:#907f63}.earth-site-facts .unknown-info b{color:#826f55}.earth-build-message{margin-top:9px;padding:7px 8px;background:#f3e5b9;border-radius:6px;font-size:10px;font-weight:800;color:#725516}.earth-build-open{width:100%;margin-top:10px;border:1px solid #8a6b21;background:#c89d35;color:#fffaf0;border-radius:7px;padding:9px;font-weight:900;cursor:pointer}.earth-build-picker,.earth-placement-editor{margin-top:10px}.earth-build-picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.earth-build-picker-head button{border:0;background:none;color:#6d5a2a;text-decoration:underline;cursor:pointer}.earth-build-options{display:grid;gap:6px}.earth-build-option{border:1px solid #c5b581;background:#fffdf7;border-radius:7px;padding:8px;text-align:left;display:grid;grid-template-columns:1fr auto;gap:3px 8px;color:#243940;cursor:pointer}.earth-build-option:hover:not(:disabled){border-color:#8a6b21;background:#fff7dc}.earth-build-option.locked{background:#efeee8;color:#777;cursor:not-allowed}.build-name{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px}.build-name strong{font-size:11px}.build-name em{font-style:normal;font-weight:900;color:#9a7622}.build-meta{grid-column:1/-1;font-size:9px;color:#718087}.req-ok,.req-no{font-size:9px;font-weight:800}.req-ok{color:#39704e}.req-no{color:#9a4f45}.earth-terrain-note{display:block;margin-top:9px;color:#857a66;font-size:8px;line-height:1.35}
       .earth-placement-summary,.earth-rotation-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:6px 2px}.earth-placement-summary b,.earth-rotation-head b{color:#8a681b}.earth-rotation-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 7px}.earth-rotation-presets button,.earth-rotation-fine button,.earth-placement-actions button{border:1px solid #b9aa80;background:#fffdf7;color:#4b4a40;border-radius:6px;padding:7px;font-size:10px;font-weight:800;cursor:pointer}.earth-rotation-presets button.active{background:#d6ae45;color:#fffdf1;border-color:#8a681b}.earth-rotation-fine{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center}.earth-rotation-fine input{width:100%;accent-color:#a77f22}.earth-preview-note{display:block;margin-top:8px;color:#766b54;font-size:8px;line-height:1.35}.earth-placement-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:6px;margin-top:9px}.earth-placement-actions button.primary{background:#b88b27;color:#fffdf2;border-color:#805e18}.earth-placement-actions button:disabled{opacity:.55;cursor:wait}.earth-object-ready{margin-top:10px;padding:8px;background:#e8f0ef;border-radius:6px;color:#416069;font-size:9px;line-height:1.4}.earth-entry{margin-top:10px}.earth-enter-button{width:100%;border:1px solid #365e6c;background:#173f4d;color:#f5f1df;border-radius:8px;padding:10px 11px;display:grid;gap:2px;text-align:left;cursor:pointer;box-shadow:0 5px 14px #18384624}.earth-enter-button:hover{background:#205667}.earth-enter-button span{justify-self:end;color:#d7b85f;font-size:9px;font-weight:900;letter-spacing:.05em}.earth-enter-button strong{font-size:12px}.earth-enter-button small{color:#b9c8c8;font-size:9px;line-height:1.35}
       .earth-construction-panel{border-color:#b28525}.earth-progress-track{height:10px;margin:10px 0 5px;background:#d9d6c7;border:1px solid #b6aa82;border-radius:999px;overflow:hidden}.earth-progress-track i{display:block;height:100%;background:linear-gradient(90deg,#b88924,#e0bd58);transition:width .6s ease}.earth-progress-copy{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:10px}.earth-progress-copy b{color:#8a681b;font-size:14px}.earth-progress-copy span{color:#67777c}.earth-construction-lock{margin-top:10px;padding:8px;background:#f0e7cc;border-radius:6px;color:#6e5723;font-size:9px;font-weight:750;line-height:1.4}
