@@ -60,6 +60,6 @@ set
   rotation_deg=coalesce(te.rotation_deg,0),
   footprint_width_m=coalesce(te.footprint_width_m,legacy.next_width_m),
   footprint_depth_m=coalesce(te.footprint_depth_m,legacy.next_depth_m),
-  terrain_status=case when te.terrain_status='resolved' then te.terrain_status else 'pending' end
+  terrain_status=case when te.terrain_status='resolved' then te.terrain_status else 'unresolved' end
 from legacy
 where te.id=legacy.id;
