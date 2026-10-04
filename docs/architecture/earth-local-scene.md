@@ -1,14 +1,12 @@
-# Earth local scene architecture
+# Local surface scene architecture
 
 Status: accepted and implementation started 2026-10-03.
 
 ## Goal
 
-The Earth walkable view is not a map with player markers. It is a local,
-immersive 2.5D simulation scene derived from the same persistent geography as
-the strategic Earth map.
+The walkable surface view is a local immersive simulation scene, not a map with player markers. Earth derives it from persistent real geography; Moon, Mars, Phobos, Deimos and future bodies derive it from their metric surface frames, terrain, infrastructure and settlement data.
 
-The physical place must remain identical across views.
+All bodies use the same `LocalSurfaceScene` contract. The physical place must remain identical across views.
 
 ## View layers
 
@@ -21,7 +19,7 @@ Changing view changes presentation and simulation detail, never location.
 
 ## Local scene chunks
 
-Earth local scenes use metre-based chunks around the current WGS84 anchor.
+All local scenes use metre-based chunks. Earth converts WGS84 into a local metric frame; non-Earth surfaces already provide local metric `x_m/y_m` frames.
 The first implementation renders roughly a 520 m diameter area (260 m radius)
 around the current place centre.
 
@@ -71,3 +69,15 @@ contract rather than redefining Earth geography.
 
 > Map, local scene and future 3D engine are different views of the same
 > persistent physical world.
+
+## Cross-world adapter rule
+
+The shared scene contract lives in `lib/game/spatial/localSurfaceScene.ts`.
+
+Adapters are allowed to differ only at the source boundary:
+
+- Earth: WGS84 / materialized region features → local metres.
+- Moon / Mars / Phobos / Deimos: planetary frame `x_m/y_m`, terrain, corridors, entities and mobile objects → the same local scene.
+- Future bodies: provide another source adapter, not another local-scene model.
+
+NPC presence, walking, route graphs, buildings, vehicle routing, interaction nodes and the eventual renderer are shared mechanics. Body-specific code may supply terrain physics, atmosphere, gravity, connection types or visual assets, but must not fork the scene-state architecture.
