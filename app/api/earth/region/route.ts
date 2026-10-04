@@ -125,10 +125,10 @@ export async function GET(req: NextRequest) {
       let effectiveSource = storedRegion.source
       let inheritedFrom: string | null = null
 
-      // A searched Earth place may have no own geography yet while an existing
-      // persistent regional snapshot already covers it (e.g. Sundern inside
-      // earth-sauerland). Reuse that snapshot instead of calling Overpass.
-      if (placeSlug && effectiveRows.length === 0) {
+      // A searched Earth place can inherit a covering persistent regional
+      // snapshot and keep only local detail/enrichment rows itself. Merge both
+      // layers; never copy or re-import the whole regional geography.
+      if (placeSlug) {
         const { data: regionalCandidates } = await supabase
           .from('celestial_regions')
           .select('id, slug, bounds, source')
@@ -146,8 +146,15 @@ export async function GET(req: NextRequest) {
             .select('id, feature_type, geometry, properties')
             .eq('region_id', covering.id)
 
-          effectiveRows = (inheritedRows ?? []).filter(row => featureIntersectsBounds({ geometry: row.geometry }, bounds))
-          effectiveSource = covering.source
+          const inherited = (inheritedRows ?? []).filter(row => featureIntersectsBounds({ geometry: row.geometry }, bounds))
+          const seen = new Set(effectiveRows.map(row => String((row.properties as any)?.noxia_source_id ?? row.id)))
+          effectiveRows = [
+            ...effectiveRows,
+            ...inherited.filter(row => !seen.has(String((row.properties as any)?.noxia_source_id ?? row.id))),
+          ]
+          effectiveSource = effectiveRows.length > (rows?.length ?? 0)
+            ? String(storedRegion.source ?? 'local') + ' + ' + String(covering.source ?? 'regional')
+            : storedRegion.source
           inheritedFrom = covering.slug
         }
       }
