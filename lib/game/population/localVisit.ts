@@ -8,7 +8,7 @@ export interface LocalVisitRequest {
   personId: string
   locationId: string
   destinationTileEntityId: string
-  reason: 'medical_care' | 'social' | 'service' | 'inspection'
+  reason: 'medical_care' | 'social' | 'service' | 'inspection' | 'personal'
   subjectRef?: string | null
 }
 
