@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
+import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import { deriveStickneyFleetMapMarkers } from '@/lib/game/vehicles/stickneyFleetMotion'
 import { deriveSurfaceScienceObjects } from '@/lib/game/science/surfaceScience'
 import PlanetarySurfaceMap, { type MobileSurfaceObject, type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
@@ -44,6 +46,7 @@ const scienceAccent=(value:string)=>value==='engineering'?'#b18adf':value==='dir
 
 export default function DashboardPhobosSurface({ locations, prices, orders }: Props) {
   const location=useGameStore(s=>s.location),credits=useGameStore(s=>s.credits),cargo=useGameStore(s=>s.cargo),cargoMax=useGameStore(s=>s.cargoMax),shipTypeId=useGameStore(s=>s.shipTypeId),shipRange=useGameStore(s=>s.shipRange),buy=useGameStore(s=>s.buy),sell=useGameStore(s=>s.sell),loadFromServer=useGameStore(s=>s.loadFromServer)
+  const mode=useGameModeStore(s=>s.mode),enterPlanning=useGameModeStore(s=>s.enterPlanning)
   const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null),[dockEntity,setDockEntity]=useState<PlanetarySurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
   const [fleetRobots,setFleetRobots]=useState<any[]>([]),[fleetJobs,setFleetJobs]=useState<any[]>([]),[fleetProspects,setFleetProspects]=useState<ProspectMarker[]>([]),[fleetSamples,setFleetSamples]=useState<any[]>([]),[fleetDrillJobs,setFleetDrillJobs]=useState<any[]>([]),[fleetNow,setFleetNow]=useState(()=>Date.now())
   const [selectedRobotId,setSelectedRobotId]=useState<string|null>(null),[scienceLayerEnabled,setScienceLayerEnabled]=useState(true),[selectedScienceId,setSelectedScienceId]=useState<string|null>(null)
@@ -57,6 +60,8 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
   const scienceMapObjects=useMemo<MobileSurfaceObject[]>(()=>scienceObjects.map(item=>({id:`science:${item.id}`,label:item.label,role:item.evidenceClass,status:item.provenance,phase:`${item.evidenceLabel} · ${item.confidence}`,xM:item.xM,yM:item.yM,accent:scienceAccent(item.evidenceClass)})),[scienceObjects])
   const surfaceMapObjects=useMemo<MobileSurfaceObject[]>(()=>scienceLayerEnabled?[...robotMapObjects,...scienceMapObjects]:robotMapObjects,[robotMapObjects,scienceMapObjects,scienceLayerEnabled])
   if(location!=='phobos')return null
+
+  if(mode==='colony')return <PlanetaryWalkableSurface locationSlug="phobos" body="phobos" title="Stickney" corridors={PHOBOS_CORRIDORS} mobileObjects={surfaceMapObjects} onClose={enterPlanning}/>
 
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_phobos'){setDockEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
   const openSurfaceObject=(object:MobileSurfaceObject)=>{if(object.id.startsWith('science:')){setSelectedScienceId(object.id.slice(8));setSelectedRobotId(null);return}setSelectedRobotId(object.id);setSelectedScienceId(null)}
