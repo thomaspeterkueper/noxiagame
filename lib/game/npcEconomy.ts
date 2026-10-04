@@ -52,18 +52,33 @@ export async function runNpcPayrollTick(supabase: any, tick: number) {
     return { ok: true, due: false, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }
   }
 
-  const { data: syncData, error: syncError } = await supabase.rpc('sync_employer_economy', { p_tick: tick })
-  if (syncError) {
-    console.error('syncEmployerEconomy failed', { tick, code: syncError.code })
-  }
+  const [
+    { data: syncData, error: syncError },
+    { data: publicJobData, error: publicJobError },
+    { data: tenancyData, error: tenancyError },
+  ] = await Promise.all([
+    supabase.rpc('sync_employer_economy', { p_tick: tick }),
+    supabase.rpc('sync_public_unlocated_jobs', { p_tick: tick }),
+    supabase.rpc('sync_person_tenancies', { p_tick: tick }),
+  ])
 
-  const { data, error } = await supabase.rpc('run_npc_payroll', { p_tick: tick })
+  if (syncError) console.error('syncEmployerEconomy failed', { tick, code: syncError.code })
+  if (publicJobError) console.error('syncPublicUnlocatedJobs failed', { tick, code: publicJobError.code })
+  if (tenancyError) console.error('syncPersonTenancies failed', { tick, code: tenancyError.code })
+
+  const [{ data, error }, { data: rentData, error: rentError }] = await Promise.all([
+    supabase.rpc('run_npc_payroll', { p_tick: tick }),
+    supabase.rpc('run_npc_rent_settlement', { p_tick: tick }),
+  ])
   if (error) {
     console.error('runNpcPayrollTick failed', { tick, code: error.code })
     return {
       ok: false,
       due: true,
       employerSync: syncData ?? null,
+      publicJobSync: publicJobData ?? null,
+      tenancySync: tenancyData ?? null,
+      rent: rentData ?? null,
       paid: 0,
       duplicates: 0,
       insufficient: 0,
@@ -71,9 +86,14 @@ export async function runNpcPayrollTick(supabase: any, tick: number) {
     }
   }
 
+  if (rentError) console.error('runNpcRentSettlement failed', { tick, code: rentError.code })
+
   return {
     ...(data ?? { ok: true, due: true, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }),
     employerSync: syncData ?? null,
+    publicJobSync: publicJobData ?? null,
+    tenancySync: tenancyData ?? null,
+    rent: rentData ?? null,
   }
 }
 
