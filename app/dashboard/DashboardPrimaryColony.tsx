@@ -42,7 +42,7 @@ export default function DashboardPrimaryColony(){
 
  const current=locations.find(l=>l.slug===location)
  const isEarth=location==='earth'
- const isDedicatedSurface=location==='moon'
+ const isDedicatedSurface=['moon','phobos','deimos'].includes(location)
  const isStation=current?.location_type==='station'||location==='prometheus'
  const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
  const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
