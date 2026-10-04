@@ -49,12 +49,15 @@ export default function DashboardMoonSurface({ locations, prices, orders }: Prop
   useEffect(()=>{if(location!=='moon')return;let cancelled=false;(async()=>{try{const token=await getToken();if(!token||cancelled)return;await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({location:'moon'})})}catch{}})();return()=>{cancelled=true}},[location])
   if(location!=='moon')return null
 
-  if(mode==='colony')return <PlanetaryWalkableSurface locationSlug="moon" body="moon" title="Shackleton" corridors={SHACKLETON_CORRIDORS} onOpenWorldObject={(entity)=>{const id=entity.entity_id??'';if(id==='landing_pad_moon'){setSpaceportEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}} onClose={enterPlanning}/>
-
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_moon'){setSpaceportEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
   const handleInteriorAction=(kind:'market'|'shipyard'|'navigation'|'ship'|'parts'|null)=>{if(kind==='market')setWarehouseOpen(true);if(kind==='shipyard'||kind==='parts'||kind==='ship')setShipyardOpen(true);if(kind==='navigation')setNavigationOpen(true);if(kind)setInteriorEntity(null)}
   const currentResources=moonLocation?.location_resources??[],spaceportName=spaceportEntity?.name??spaceportEntity?.entity_id??'Lande- und Cargo-Zone'
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Anlage'
+
+  if(mode==='colony')return <>
+    <PlanetaryWalkableSurface locationSlug="moon" body="moon" title="Shackleton" corridors={SHACKLETON_CORRIDORS} onOpenWorldObject={setInteriorEntity} onClose={enterPlanning}/>
+    {interiorEntity&&<BuildingOverlayShell eyebrow="GEBÄUDE · INNENRAUM" title={interiorName} subtitle="Gemeinsamer Scene-/Interaction-Zugang" onClose={()=>setInteriorEntity(null)} width={1020}><BuildingInterior entity={{...interiorEntity,entity_id:INTERIOR_ALIAS[interiorEntity.entity_id??'']??interiorEntity.entity_id??'unknown',entity_type:'building',tile_row:0,tile_col:0,profile_id:interiorEntity.profile_id??null,owner_class:interiorEntity.owner_class??'STATE'} as any} userId="" locationResources={currentResources as any} credits={credits} population={Number(moonLocation?.population??0)} hasShipyard={Boolean(moonLocation?.has_shipyard)} currentTick={tick} shipRange={shipRange} currentLocationSlug="moon" onClose={()=>setInteriorEntity(null)} onAction={handleInteriorAction}/></BuildingOverlayShell>}
+  </>
 
   return <section className="noxia-dashboard-moon-surface" aria-label="Mondoberfläche Shackleton">
     <SurfaceContextBadge title="LOLA · Shackleton" detail="rekonstruiertes lokales Terrain · gemeinsamer Planetary-Surface-Renderer" />
