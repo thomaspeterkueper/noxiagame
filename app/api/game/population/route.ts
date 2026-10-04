@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 
 export async function GET(req: NextRequest) {
   const tileEntityId = req.nextUrl.searchParams.get('tileEntityId')
@@ -11,6 +12,9 @@ export async function GET(req: NextRequest) {
   const diagnostic = req.nextUrl.searchParams.get('diagnostic') === '1'
   const personId = req.nextUrl.searchParams.get('personId')
   const supabase = createServiceClient()
+  const authHeader = req.headers.get('authorization')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  const { data: { user } } = token ? await supabase.auth.getUser(token) : { data: { user: null } }
 
   if (personId) {
     const [{ data: needs }, { data: skills }, { data: events }] = await Promise.all([
@@ -62,24 +66,45 @@ export async function GET(req: NextRequest) {
 
   const { data: people, error: peopleError } = await supabase
     .from('people')
-    .select('id, person_key, display_name, birth_year, bio_short, public_role, traits, activity_state, last_action, last_decision_factors, last_tick')
+    .select('id, person_key, display_name, observable_description, birth_year, bio_short, public_role, traits, activity_state, last_action, last_decision_factors, last_tick')
     .in('id', personIds)
 
   if (peopleError) return NextResponse.json({ residents: [], unavailable: true, diagnostic: diagnostic ? { stage: 'people', ok: false, activeAssignments: personIds.length } : undefined })
 
+  const { data: identityRows } = user
+    ? await supabase
+      .from('player_person_identity_knowledge')
+      .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind')
+      .eq('profile_id', user.id)
+      .in('person_id', personIds)
+    : { data: [] }
+
+  const identityByPerson = new Map((identityRows ?? []).map((row: any) => [row.person_id, row]))
+
   const residents = (people ?? []).map(person => {
     const personAssignments = (assignments ?? []).filter(a => a.person_id === person.id)
+    const identity = identityByPerson.get(person.id) as any
+    const identityState = perceivedIdentityState(identity)
+    const observableDescription = person.observable_description?.trim() || 'Person'
+    const displayName = perceivedPersonLabel({
+      state: identityState,
+      observableDescription,
+      inferredName: identity?.inferred_name ?? null,
+      knownName: identity?.known_name ?? null,
+    })
     return {
       id: person.id,
       personKey: person.person_key,
-      displayName: person.display_name,
+      displayName,
+      identityState,
+      observableDescription,
       birthYear: person.birth_year,
-      bioShort: person.bio_short,
-      publicRole: person.public_role,
-      traits: person.traits ?? {},
+      bioShort: identityState === 'known' ? person.bio_short : null,
+      publicRole: identityState === 'known' ? person.public_role : null,
+      traits: identityState === 'known' ? (person.traits ?? {}) : {},
       activityState: person.activity_state,
       lastAction: person.last_action,
-      lastDecisionFactors: person.last_decision_factors ?? {},
+      lastDecisionFactors: identityState === 'known' ? (person.last_decision_factors ?? {}) : {},
       lastTick: person.last_tick,
       assignments: personAssignments.map(a => ({ type: a.assignment_type, roleCode: a.role_code, tileEntityId: a.tile_entity_id })),
     }
