@@ -207,7 +207,7 @@ export default function DashboardDeimosSurface({ locations }: Props) {
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(null), 3200); return () => window.clearTimeout(timer) }, [notice])
   if (locationSlug !== 'deimos') return null
 
-  if (mode === 'colony') return <PlanetaryWalkableSurface locationSlug="deimos" body="deimos" title="Swift-1" corridors={DEIMOS_CORRIDORS} mobileObjects={[...DEIMOS_FIELD_POINTS]} onClose={enterPlanning} />
+  if (mode === 'colony') return <PlanetaryWalkableSurface locationSlug="deimos" body="deimos" title="Swift-1" corridors={DEIMOS_CORRIDORS} mobileObjects={[...DEIMOS_FIELD_POINTS]} onOpenWorldObject={(entity)=>{const id=entity.entity_id??'';if(id==='shuttle_dock_deimos'){setDockEntity(entity);return}if(id==='research_station'){setScienceOpen(true);return}setInteriorEntity(entity)}} onOpenMobileObject={(object)=>{const point=DEIMOS_FIELD_POINTS.find(item=>item.id===object.id);if(point)setFieldPoint(point)}} onClose={enterPlanning} />
 
   const openWorldObject = (entity: PlanetarySurfaceEntity) => {
     const id = entity.entity_id ?? ''
