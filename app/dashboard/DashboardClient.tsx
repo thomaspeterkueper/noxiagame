@@ -141,11 +141,11 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   async function fetchBuilds() {
     try {
       const { token, userId: uid } = await getSessionInfo(); setUserId(uid)
-      const data = await (await fetch('/api/game/build', { headers: { Authorization: `Bearer ${token}` } })).json()
+      const data = await (await fetch(`/api/game/build?location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${token}` } })).json()
       setPlayerBuilds(data.builds ?? []); setTileEntities(data.entities ?? []); setColonyTax(data.colonyTax ?? {}); setEntityInfo(data.entityInfo ?? {})
     } catch {}
   }
-  useEffect(() => { fetchBuilds() }, [])
+  useEffect(() => { fetchBuilds() }, [location])
   useEffect(() => { fetchBuilds() }, [invalidations.builds])
 
   // Unlocks + Feature-Gates laden
@@ -226,32 +226,19 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   const locations = worldData?.locations ?? initialLocations
   const news = worldData?.news ?? []
   const stats = worldData?.stats
-  const worldEntities = (worldData?.entities ?? []).map((e: any) => ({
-    ...e,
-    actor_name: e.actors?.display_name ?? null,
-  }))
   const currentLocationData = locations.find((l: any) => l.slug === location)
   const currentPrices = prices.filter((p: any) => p.locations?.slug === location)
   const used = cargoUsed(); const cargoFree = cargoMax - used
   const attention = attentionItems(locations)
   const totalPop = stats?.totalPopulation ?? locations.reduce((s: number, l: any) => s + l.population, 0)
-  // Merge: worldEntities (alle Spieler, alle Standorte) für ColonyGrid
-  // tileEntities (build/route) bleibt für eigene pending builds
   const currentLocationId = currentLocationData?.id
-
-  // Merge: worldEntities (alle Spieler, alle Standorte) + tileEntities (eigene + STATE, immer verfügbar)
-  // tileEntities ist Basis — immer vorhanden. worldEntities ergänzt fremde Spieler.
-  const worldForLocation = worldEntities.filter((e: any) =>
+  // Shared entities are loaded context-locally by /api/game/build for the
+  // currently visible location. Own entities remain global for ownership/
+  // navigation summaries.
+  const allEntitiesForLocation = tileEntities.filter((e: any) =>
     e.locations?.slug === location ||
-    (e.location_id != null && e.location_id === currentLocationId)
+    e.location_id === currentLocationId
   )
-  // Merge: worldForLocation als Basis, tileEntities als Fallback wenn world noch leer
-  const allEntitiesForLocation = worldForLocation.length > 0
-    ? worldForLocation
-    : tileEntities.filter((e: any) =>
-        e.locations?.slug === location ||
-        e.location_id === currentLocationId
-      )
 
   const propertyByLocation: Record<string, number> = {}
   for (const e of tileEntities) { const slug = e.locations?.slug; if (slug && e.profile_id === userId) propertyByLocation[slug] = (propertyByLocation[slug] ?? 0) + 1 }
