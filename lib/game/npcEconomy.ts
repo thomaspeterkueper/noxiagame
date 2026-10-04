@@ -127,3 +127,17 @@ export async function fundPlayerCorp(input: {
   if (error) throw new Error(error.message)
   return data
 }
+
+
+export async function runNpcConsumptionTick(supabase: any, tick: number) {
+  if (tick % 6 !== 0) {
+    return { ok: true, due: false, bought: 0, no_money: 0, no_seller: 0, total_credits: 0 }
+  }
+
+  const { data, error } = await supabase.rpc('run_npc_consumption', { p_tick: tick })
+  if (error) {
+    console.error('runNpcConsumptionTick failed', { tick, code: error.code })
+    return { ok: false, due: true, bought: 0, no_money: 0, no_seller: 0, total_credits: 0 }
+  }
+  return data ?? { ok: true, due: true, bought: 0, no_money: 0, no_seller: 0, total_credits: 0 }
+}
