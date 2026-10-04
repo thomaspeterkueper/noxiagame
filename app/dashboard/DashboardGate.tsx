@@ -18,6 +18,7 @@ import DashboardContextManager from './DashboardContextManager'
 import DashboardFeedOverlay from './DashboardFeedOverlay'
 import DashboardWorldDevelopmentOverlay from './DashboardWorldDevelopmentOverlay'
 import DashboardMoonSurface from './DashboardMoonSurface'
+import DashboardMarsSurface from './DashboardMarsSurface'
 import DashboardPhobosSurface from './DashboardPhobosSurface'
 import DashboardDeimosSurface from './DashboardDeimosSurface'
 import DashboardProfileBridge from './DashboardProfileBridge'
@@ -82,6 +83,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   return <>
     <DashboardClient locations={locations} prices={prices} orders={orders} autoOpenJourney={autoOpenJourney} />
     <DashboardMoonSurface locations={locations} prices={prices} orders={orders} />
+    <DashboardMarsSurface />
     <DashboardPhobosSurface locations={locations} prices={prices} orders={orders} />
     <DashboardDeimosSurface locations={locations} prices={prices} orders={orders} />
     <DashboardProfileBridge />
