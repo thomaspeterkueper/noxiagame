@@ -37,6 +37,8 @@ export type ColonyBuild = {
 export type ColonyResident = {
   id: string
   displayName: string
+  identityState?: 'unknown' | 'inferred' | 'known'
+  observableDescription?: string
   birthYear: number | null
   activityState: string
   lastAction: string | null
@@ -110,7 +112,7 @@ export const useColonyStateStore = create<ColonyState>((set, get) => ({
       const [buildResponse, worldResponse, populationResponse] = await Promise.all([
         fetch('/api/game/build', { headers, cache: 'no-store' }),
         fetch('/api/game/world', { cache: 'no-store' }),
-        fetch(`/api/game/population?locationSlug=${encodeURIComponent(locationSlug)}`, { cache: 'no-store' }),
+        fetch(`/api/game/population?locationSlug=${encodeURIComponent(locationSlug)}`, { headers, cache: 'no-store' }),
       ])
 
       if (serial !== requestSerial) return
