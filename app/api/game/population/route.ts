@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
-import { appearanceFromRow } from '@/lib/game/population/personAppearance'
+import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 
 export async function GET(req: NextRequest) {
   const tileEntityId = req.nextUrl.searchParams.get('tileEntityId')
@@ -109,7 +109,8 @@ export async function GET(req: NextRequest) {
     const personAssignments = (assignments ?? []).filter(a => a.person_id === person.id)
     const identity = identityByPerson.get(person.id) as any
     const identityState = perceivedIdentityState(identity)
-    const observableDescription = person.observable_description?.trim() || 'Person'
+    const appearance = appearanceFromRow(appearanceByPerson.get(person.id))
+    const observableDescription = person.observable_description?.trim() || observableDescriptionFromAppearance(appearance)
     const displayName = perceivedPersonLabel({
       state: identityState,
       observableDescription,
@@ -123,7 +124,7 @@ export async function GET(req: NextRequest) {
       displayName,
       identityState,
       observableDescription,
-      appearance: appearanceFromRow(appearanceByPerson.get(person.id)),
+      appearance,
       birthYear: person.birth_year,
       bioShort: identityState === 'known' ? person.bio_short : null,
       publicRole: identityState === 'known' ? person.public_role : null,
