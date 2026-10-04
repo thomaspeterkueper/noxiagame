@@ -2,6 +2,7 @@ import type { InteriorTemplate, InteriorTemplateId } from './types'
 import { LABORATORY_STANDARD_INTERIOR } from './templates/laboratoryStandard'
 import { ORBITAL_TRANSFER_STATION_INTERIOR } from './templates/orbitalTransferStation'
 import { PRESSURIZED_HABITAT_CLUSTER_INTERIOR } from './templates/pressurizedHabitatCluster'
+import { CAFE_STANDARD_INTERIOR } from './templates/cafeStandard'
 
 export interface InteriorTemplateRegistry {
   byId: Readonly<Record<InteriorTemplateId, InteriorTemplate>>
@@ -14,10 +15,13 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [LABORATORY_STANDARD_INTERIOR.id]: LABORATORY_STANDARD_INTERIOR,
     [ORBITAL_TRANSFER_STATION_INTERIOR.id]: ORBITAL_TRANSFER_STATION_INTERIOR,
     [PRESSURIZED_HABITAT_CLUSTER_INTERIOR.id]: PRESSURIZED_HABITAT_CLUSTER_INTERIOR,
+    [CAFE_STANDARD_INTERIOR.id]: CAFE_STANDARD_INTERIOR,
   },
   byBuildingTypeId: {
     laboratory: LABORATORY_STANDARD_INTERIOR.id,
     habitat_cluster: PRESSURIZED_HABITAT_CLUSTER_INTERIOR.id,
+    cafe: CAFE_STANDARD_INTERIOR.id,
+    'café': CAFE_STANDARD_INTERIOR.id,
   },
   byStationRole: {
     'habitat-transfer-station': ORBITAL_TRANSFER_STATION_INTERIOR.id,
