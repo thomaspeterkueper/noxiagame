@@ -7,6 +7,7 @@ import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import { buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
 import { geoToLocalMeters } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
+import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
 
 type GeoPoint={lat:number;lon:number}
@@ -41,7 +42,10 @@ function pointsAttr(points:IsoPoint[],dy=0){return points.map(point=>`${point.x}
 
 export default function EarthWalkableSurface({residents,onClose}:Props){
   const[data,setData]=useState<Payload|null>(null)
-  const[player,setPlayer]=useState<ScenePoint>({xM:0,yM:0})
+  const player=useEarthPlayerPositionStore(s=>s.position)
+  const playerRegionId=useEarthPlayerPositionStore(s=>s.regionId)
+  const setSharedPlayerPosition=useEarthPlayerPositionStore(s=>s.setPosition)
+  const resetSharedPlayerPosition=useEarthPlayerPositionStore(s=>s.reset)
   const[selected,setSelected]=useState<ColonyResident|null>(null)
   const[message,setMessage]=useState('')
   const[reply,setReply]=useState('')
@@ -53,7 +57,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[hoveredBuilding,setHoveredBuilding]=useState<{x:number;y:number;name:string;detail:string;distanceM:number}|null>(null)
   const[navigationTargetId,setNavigationTargetId]=useState<string>('')
 
-  useEffect(()=>{let live=true;fetch('/api/earth/region?v=walkable-v2',{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live)setData(json)}).catch(()=>{if(live)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[])
+  useEffect(()=>{let live=true;fetch('/api/earth/region?v=walkable-v2',{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live)setData(json)}).catch(()=>{if(live)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[data?.region,player,setSharedPlayerPosition])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{if(live)setSpatialEntities(Array.isArray(json?.entities)?json.entities:[])}).catch(()=>{if(live)setSpatialEntities([])});return()=>{live=false}},[])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=80){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
@@ -78,6 +82,11 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
   const features=data?.features??[]
   const origin=data?.region?.origin
+  useEffect(()=>{
+    const regionId=(data?.region as any)?.id??null
+    if(regionId&&playerRegionId&&playerRegionId!==regionId)resetSharedPlayerPosition(regionId)
+    else if(regionId&&!playerRegionId)setSharedPlayerPosition(regionId,player)
+  },[data?.region,playerRegionId,player,resetSharedPlayerPosition,setSharedPlayerPosition])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
   const namedPoiTargets=useMemo(()=>origin?features.flatMap(feature=>{
@@ -186,7 +195,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }
   },[awarenessItems,npcPositions,player])
 
-  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();setPlayer(p=>({xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,p.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,p.yM+(key==='s'?step:key==='w'?-step:0)))}))};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[])
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();setSharedPlayerPosition((data?.region as any)?.id??null,{xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.yM+(key==='s'?step:key==='w'?-step:0)))})};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[])
 
   async function talk(){
     if(!selected||!message.trim()||sending)return
