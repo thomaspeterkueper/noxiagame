@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const MAX_PLAYER_CHARS = 80
-const MAX_HISTORY = 6
+const MAX_HISTORY_MESSAGES = 10
+const MAX_HISTORY_ENTRY_CHARS = 180
+const MAX_HISTORY_TOTAL_CHARS = 1200
+const MAX_REPLY_CHARS = 280
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -40,16 +43,26 @@ export async function POST(request: NextRequest) {
     : []
   if (!player) return NextResponse.json({ error: 'empty_message' }, { status: 400 })
 
-  const history = Array.isArray(body.history)
-    ? body.history.slice(-MAX_HISTORY).map((entry: any) => ({
+  const rawHistory = Array.isArray(body.history)
+    ? body.history.slice(-MAX_HISTORY_MESSAGES).map((entry: any) => ({
         role: entry?.role === 'assistant' ? 'assistant' : 'user',
-        content: clean(entry?.content, 240),
+        content: clean(entry?.content, MAX_HISTORY_ENTRY_CHARS),
       })).filter((entry: any) => entry.content)
     : []
 
+  let historyChars = 0
+  const history = rawHistory.reverse().filter((entry: any) => {
+    if (historyChars + entry.content.length > MAX_HISTORY_TOTAL_CHARS) return false
+    historyChars += entry.content.length
+    return true
+  }).reverse()
+
   const system = [
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
-    'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-3 Sätze.',
+    'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-2 kurze Sätze.',
+    'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
+    'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
+    'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
     headline ? `Belegte reale Meldung: ${headline}` : '',
     source ? `Quelle der Meldung: ${source}` : '',
@@ -70,7 +83,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
         messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
-        max_tokens: 180,
+        max_tokens: 100,
         temperature: 0.7,
         stream: false,
       }),
@@ -78,7 +91,7 @@ export async function POST(request: NextRequest) {
     })
     if (!response.ok) return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
     const data = await response.json()
-    const reply = clean(data?.choices?.[0]?.message?.content, 600)
+    const reply = clean(data?.choices?.[0]?.message?.content, MAX_REPLY_CHARS)
     if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
     return NextResponse.json({ reply, maxPlayerChars: MAX_PLAYER_CHARS })
   } catch {
