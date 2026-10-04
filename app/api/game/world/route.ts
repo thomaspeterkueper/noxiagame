@@ -56,20 +56,15 @@ export async function GET() {
     .select('*, location_resources(resource, stock, consumption, production)')
     .order('slug')
 
-  // Letzte Transaktionen
+  // Nur die jüngste Transaktion wird hier für den globalen News-Ticker benötigt.
+  // Historien/Statistiken werden über ihre eigenen Endpunkte geladen.
   const { data: rawTransactions } = await supabase
     .from('trade_transactions')
     .select('*, profiles(username)')
     .order('traded_at', { ascending: false })
-    .limit(40)
+    .limit(1)
 
   const transactions = groupTransactions(rawTransactions ?? [])
-
-  // ── celestial_bodies — alle Himmelskörper ────────────────────────────────────
-  const { data: celestialBodies } = await supabase
-    .from('celestial_bodies')
-    .select('*')
-    .order('orbit_radius_au', { ascending: true })
 
   // ── Multiplayer: tile_entities aller Spieler + Staatliche Gebäude ──────────
   const { data: allEntities } = await supabase
@@ -124,14 +119,20 @@ export async function GET() {
   return NextResponse.json({
     news:         news.slice(0, 5),
     locations:    locations ?? [],
-    transactions: transactions.slice(0, 10),
+    transactions: transactions.slice(0, 1),
     entities:     allEntities ?? [],
-    celestialBodies: celestialBodies ?? [],
     stats: {
       totalPopulation:  totalPop,
       suppliedColonies: suppliedCount,
       totalColonies:    liveLocations.length,
       tickNumber:       tickCount,
+    },
+  }, {
+    headers: {
+      // Globaler, nicht benutzerspezifischer Snapshot. Kurzes CDN-Caching
+      // verhindert, dass mehrere Tabs/Clients dieselben Tabellen gleichzeitig
+      // lesen. Ably bleibt für ereignisgetriebene Aktualisierungen zuständig.
+      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
     },
   })
 }
