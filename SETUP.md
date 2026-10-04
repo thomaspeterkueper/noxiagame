@@ -264,12 +264,15 @@ Aktuell erwartete Crons:
 ```json
 {
   "crons": [
-    { "path": "/api/cron/population", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/prices", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/orders", "schedule": "15 * * * *" }
+    { "path": "/api/cron/population", "schedule": "0 * * * *" },
+    { "path": "/api/cron/retention", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/builds", "schedule": "0 * * * *" },
+    { "path": "/api/cron/transits", "schedule": "* * * * *" }
   ]
 }
 ```
+
+`/api/cron/population` ist der autoritative vollständige Simulationstick und ruft `runDueTicks()` auf. Preis-, Auftrags-, Personen- und NPC-Logik laufen innerhalb dieses Ticks und werden deshalb nicht zusätzlich separat geplant. Die entsprechenden Routen bleiben als manuelle/diagnostische Pfade bestehen, sind aber nicht Teil des produktiven Cron-Schedules.
 
 ---
 
