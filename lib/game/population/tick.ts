@@ -102,6 +102,9 @@ export function runPopulationTick(input: PopulationTickInput): PopulationTickRes
     currentLocationId: input.person.currentLocationId,
     assignments: input.assignments,
     decision,
+    simulationTier: input.person.simulationTier,
+    relationships: input.relationships,
+    knowledge: input.knowledge,
   })
   const blocker = 'reason' in intent ? intent.reason : null
 
