@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { buildPlanetaryLocalScene } from '@/lib/game/spatial/planetaryLocalScene'
 import {
   isLocalScenePointWalkable,
@@ -45,16 +46,53 @@ function buildingTop(center:Point,widthM:number,depthM:number){return[
   {xM:center.xM-widthM/2,yM:center.yM+depthM/2},
 ].map(iso)}
 function attrs(points:Array<{x:number;y:number}>,dy=0){return points.map(p=>p.x+','+(p.y+dy)).join(' ')}
+function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function residentLabel(resident:ColonyResident){return resident.identityState==='known'?resident.displayName:(resident.observableDescription?.trim()||'Person')}
+function residentRole(resident:ColonyResident){return resident.assignments.find(item=>item.type==='work')?.roleCode??resident.activityState??'general'}
 
 export default function PlanetaryWalkableSurface({
   locationSlug,body,title,corridors=[],mobileObjects=[],onOpenWorldObject,onOpenMobileObject,onClose,
 }:Props){
+  const residents=useColonyStateStore(state=>state.residents)
   const[spatial,setSpatial]=useState<SpatialPayload|null>(null)
   const[error,setError]=useState<string|null>(null)
   const[player,setPlayer]=useState<Point>({xM:0,yM:0})
   const[selectedId,setSelectedId]=useState('')
+  const[motionTime,setMotionTime]=useState(0)
+  const[personPanelOpen,setPersonPanelOpen]=useState(false)
+  const[message,setMessage]=useState('')
+  const[sending,setSending]=useState(false)
+  const[conversationByNpc,setConversationByNpc]=useState<Record<string,Array<{role:'user'|'assistant';content:string}>>>({})
 
   useEffect(()=>{let live=true;(async()=>{try{const token=await getToken();if(!token)throw new Error('Nicht angemeldet');const response=await fetch('/api/game/build/spatial?location='+encodeURIComponent(locationSlug),{headers:{Authorization:'Bearer '+token},cache:'no-store'});const payload=await response.json();if(!response.ok)throw new Error(payload?.error??'Surface-Daten nicht verfügbar');if(live)setSpatial(payload)}catch(err){if(live)setError(err instanceof Error?err.message:String(err))}})();return()=>{live=false}},[locationSlug])
+  useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=160){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
+
+  const residentObjects=useMemo<MobileSurfaceObject[]>(()=>{
+    if(!corridors.length||!residents.length)return[]
+    return residents.slice(0,18).map((resident,index)=>{
+      const h=hash(resident.id)
+      const corridor=corridors[h%corridors.length]
+      const points=corridor?.points??[]
+      if(points.length<2)return{id:'resident:'+resident.id,label:residentLabel(resident),xM:-70+(h%140),yM:-55+((h>>>8)%110),role:'person:npc'}
+      const segments=points.slice(1).map((to,i)=>{const from=points[i];return{from,to,length:Math.hypot(to.xM-from.xM,to.yM-from.yM)}}).filter(item=>item.length>.01)
+      const total=segments.reduce((sum,item)=>sum+item.length,0)||1
+      const state=resident.activityState.toLowerCase()
+      const speed=/work|travel|move|commut|deliver|patrol/.test(state)?1.2:/idle|rest|sleep/.test(state)?.18:.65
+      const phase=(h%10000)/10000
+      const travelled=((phase*total)+(motionTime*speed))%total
+      let walked=0
+      let point=points[0]
+      for(const segment of segments){
+        if(travelled<=walked+segment.length){
+          const t=(travelled-walked)/segment.length
+          point={xM:segment.from.xM+(segment.to.xM-segment.from.xM)*t,yM:segment.from.yM+(segment.to.yM-segment.from.yM)*t}
+          break
+        }
+        walked+=segment.length
+      }
+      return{id:'resident:'+resident.id,label:residentLabel(resident),xM:point.xM+((index%3)-1)*1.8,yM:point.yM+((index%2)?1.6:-1.6),role:'person:npc'}
+    })
+  },[corridors,residents,motionTime])
 
   const scene=useMemo(()=>spatial?buildPlanetaryLocalScene({
     body,
@@ -62,8 +100,8 @@ export default function PlanetaryWalkableSurface({
     radiusM:300,
     entities:[...(spatial.entities??[]),...(spatial.builds??[])],
     corridors,
-    mobileObjects,
-  }):null,[spatial,body,corridors,mobileObjects])
+    mobileObjects:[...mobileObjects,...residentObjects],
+  }):null,[spatial,body,corridors,mobileObjects,residentObjects])
 
   const interactions=useMemo(()=>scene?localSceneInteractions(scene):[],[scene])
   const selected=interactions.find(item=>item.id===selectedId)??null
@@ -75,7 +113,10 @@ export default function PlanetaryWalkableSurface({
   const selectedMobile=selected?.mobileObject
     ? mobileObjects.find(object=>object.id===selected.mobileObject?.id)??null
     : null
-  const hasAction=Boolean((selectedEntity&&onOpenWorldObject)||(selectedMobile&&onOpenMobileObject))
+  const selectedResident=selected?.mobileObject?.id.startsWith('resident:')
+    ? residents.find(resident=>resident.id===selected.mobileObject?.id.slice('resident:'.length))??null
+    : null
+  const hasAction=Boolean(selectedResident||(selectedEntity&&onOpenWorldObject)||(selectedMobile&&onOpenMobileObject))
   const canInteract=Boolean(selected&&selectedDistance!==null&&selectedDistance<=Math.max(8,selected.rangeM)&&hasAction)
 
   useEffect(()=>{
@@ -87,9 +128,38 @@ export default function PlanetaryWalkableSurface({
 
   const interact=useCallback(()=>{
     if(!canInteract||!selected)return
+    if(selectedResident){setPersonPanelOpen(true);return}
     if(selectedEntity&&onOpenWorldObject){onOpenWorldObject(selectedEntity);return}
     if(selectedMobile&&onOpenMobileObject)onOpenMobileObject(selectedMobile)
-  },[canInteract,selected,selectedEntity,selectedMobile,onOpenWorldObject,onOpenMobileObject])
+  },[canInteract,selected,selectedResident,selectedEntity,selectedMobile,onOpenWorldObject,onOpenMobileObject])
+
+  async function talk(){
+    if(!selectedResident||!message.trim()||sending)return
+    const playerMessage=message.trim().slice(0,80)
+    const history=conversationByNpc[selectedResident.id]??[]
+    setSending(true)
+    try{
+      const token=await getToken()
+      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({
+        player:playerMessage,
+        npcId:selectedResident.id,
+        npcName:selectedResident.displayName,
+        npcRole:residentRole(selectedResident),
+        headline:'Lokales Gespräch in '+title,
+        source:'NOXIA '+body+' local scene',
+        locationName:title,
+        localFacts:[scene?`${scene.buildings.length} Gebäude und ${scene.paths.length} lokale Wege/Korridore`:'lokale Szene',`Himmelskörper: ${body}`],
+        nearbyPlaces:[],
+        history,
+      })})
+      const json=await response.json().catch(()=>({}))
+      const reply=response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.'
+      setConversationByNpc(current=>({...current,[selectedResident.id]:[...(current[selectedResident.id]??[]),{role:'user' as const,content:playerMessage},{role:'assistant' as const,content:reply}].slice(-10)}))
+      if(response.ok)setMessage('')
+    }catch{
+      setConversationByNpc(current=>({...current,[selectedResident.id]:[...(current[selectedResident.id]??[]),{role:'assistant' as const,content:'Gespräch derzeit nicht erreichbar.'}].slice(-10)}))
+    }finally{setSending(false)}
+  }
 
   useEffect(()=>{
     if(!scene)return
@@ -164,12 +234,19 @@ export default function PlanetaryWalkableSurface({
         <b>{selected.label}</b>
         <span>{Math.round(selectedDistance??0)} m entfernt · Weg {Math.round(route?.distanceM??0)} m</span>
         {hasAction
-          ? <button disabled={!canInteract} onClick={interact}>{canInteract?'INTERAGIEREN':'NÄHER HERANGEHEN'}</button>
+          ? <button disabled={!canInteract} onClick={interact}>{canInteract?(selectedResident?'SPRECHEN':'INTERAGIEREN'):'NÄHER HERANGEHEN'}</button>
           : <em>{selected.building&&!selectedEntity?'im Bau / noch nicht zugänglich':'keine lokale Aktion hinterlegt'}</em>}
       </div>
+
+      {selectedResident&&personPanelOpen&&<aside className="person-panel">
+        <div className="person-head"><div><small>PERSON · LOKALE SZENE</small><b>{residentLabel(selectedResident)}</b><span>{residentRole(selectedResident)}</span></div><button onClick={()=>setPersonPanelOpen(false)}>×</button></div>
+        <div className="person-facts"><span>Aktivität</span><b>{selectedResident.activityState}</b><span>Letzte Aktion</span><b>{selectedResident.lastAction??'–'}</b></div>
+        {(conversationByNpc[selectedResident.id]??[]).map((entry,index)=><p key={entry.role+'-'+index}><b>{entry.role==='user'?'Du':residentLabel(selectedResident)}:</b> „{entry.content}“</p>)}
+        <div className="person-chat"><input value={message} maxLength={80} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
+      </aside>}
     </div>
     <style jsx>{`
-      .planetary-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;background:#090b0c;color:#e8eef0;font-family:system-ui;overflow:hidden}.planetary-walkable header{height:46px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#07131dec;border-bottom:1px solid #394d59;position:relative;z-index:2}.planetary-walkable header>div:first-child{display:flex;align-items:baseline;gap:9px}.planetary-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.planetary-walkable header b{font-size:13px}.planetary-walkable header span{font-size:9px;color:#869ca7}.planetary-walkable .stats{display:flex;gap:10px;margin-left:auto;color:#8ba0aa;font-size:9px}.planetary-walkable header button,.target button{border:1px solid #466578;border-radius:6px;background:#102b3c;color:#e1edf1;padding:6px 9px;cursor:pointer}.target button:disabled{opacity:.45;cursor:not-allowed}.planetary-walkable .stage{position:absolute;inset:46px 0 0}.planetary-walkable svg{width:100%;height:100%;display:block}.planetary-walkable .hint{position:absolute;left:12px;top:12px;padding:6px 8px;border:1px solid #536973;border-radius:6px;background:#071521d9;color:#bdccd2;font:9px monospace}.target{position:absolute;right:14px;top:14px;min-width:230px;display:grid;gap:4px;padding:10px 12px;border:1px solid #6f7659;border-radius:8px;background:#101711e8;box-shadow:0 12px 30px #0007}.target small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.target b{font-size:12px}.target span,.target em{color:#9eada6;font-size:9px;font-style:normal}.planetary-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;display:grid;place-items:center;background:#080c0f;color:#c4d4da;font-family:monospace}@media(max-width:760px){.planetary-walkable .stats{display:none}.target{left:12px;right:12px;top:46px}}
+      .planetary-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;background:#090b0c;color:#e8eef0;font-family:system-ui;overflow:hidden}.planetary-walkable header{height:46px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#07131dec;border-bottom:1px solid #394d59;position:relative;z-index:2}.planetary-walkable header>div:first-child{display:flex;align-items:baseline;gap:9px}.planetary-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.planetary-walkable header b{font-size:13px}.planetary-walkable header span{font-size:9px;color:#869ca7}.planetary-walkable .stats{display:flex;gap:10px;margin-left:auto;color:#8ba0aa;font-size:9px}.planetary-walkable header button,.target button{border:1px solid #466578;border-radius:6px;background:#102b3c;color:#e1edf1;padding:6px 9px;cursor:pointer}.target button:disabled{opacity:.45;cursor:not-allowed}.planetary-walkable .stage{position:absolute;inset:46px 0 0}.planetary-walkable svg{width:100%;height:100%;display:block}.planetary-walkable .hint{position:absolute;left:12px;top:12px;padding:6px 8px;border:1px solid #536973;border-radius:6px;background:#071521d9;color:#bdccd2;font:9px monospace}.target{position:absolute;right:14px;top:14px;min-width:230px;display:grid;gap:4px;padding:10px 12px;border:1px solid #6f7659;border-radius:8px;background:#101711e8;box-shadow:0 12px 30px #0007}.target small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.target b{font-size:12px}.target span,.target em{color:#9eada6;font-size:9px;font-style:normal}.person-panel{position:absolute;right:14px;top:132px;width:360px;max-height:calc(100% - 150px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.person-head{display:flex;justify-content:space-between;gap:12px}.person-head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.person-head b{display:block;margin-top:3px}.person-head span{display:block;color:#8ba3ad;font-size:9px}.person-head button,.person-chat button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.person-facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.person-facts span{color:#7e98a3}.person-panel p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.person-chat{display:flex;gap:6px;margin-top:10px}.person-chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.planetary-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;display:grid;place-items:center;background:#080c0f;color:#c4d4da;font-family:monospace}@media(max-width:760px){.planetary-walkable .stats{display:none}.target{left:12px;right:12px;top:46px}.person-panel{left:12px;right:12px;top:auto;bottom:12px;width:auto;max-height:42vh}}
     `}</style>
   </section>
 }
