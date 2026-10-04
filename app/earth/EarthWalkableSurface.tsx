@@ -142,12 +142,12 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       for(let j=i+1;j<npcPositions.length;j++){
         const a=npcPositions[i],b=npcPositions[j]
         const pairDistance=Math.hypot(a.xM-b.xM,a.yM-b.yM)
-        if(pairDistance>11)continue
+        if(pairDistance>4)continue
         const playerDistance=Math.min(
           Math.hypot(a.xM-player.xM,a.yM-player.yM),
           Math.hypot(b.xM-player.xM,b.yM-player.yM),
         )
-        if(playerDistance>20)continue
+        if(playerDistance>9)continue
         if(!best||pairDistance+playerDistance*.25<best.pairDistance+best.playerDistance*.25)best={a,b,pairDistance,playerDistance}
       }
     }
