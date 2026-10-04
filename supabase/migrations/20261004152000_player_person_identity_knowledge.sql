@@ -38,6 +38,7 @@ drop policy if exists player_person_identity_service on public.player_person_ide
 create policy player_person_identity_service on public.player_person_identity_knowledge
   for all to service_role using (true) with check (true);
 
+revoke all on public.player_person_identity_knowledge from anon, authenticated;
 grant all on public.player_person_identity_knowledge to service_role;
 
 comment on column public.people.observable_description is
