@@ -28,6 +28,123 @@ insert into public.role_wage_rates(role_code,daily_credits) values
 on conflict (role_code) do update
 set daily_credits=excluded.daily_credits, updated_at=now();
 
+create or replace function public.pay_npc_wage(
+  p_employer_actor_id uuid,
+  p_person_id uuid,
+  p_assignment_id uuid,
+  p_amount integer,
+  p_tick bigint
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_employee_actor_id uuid;
+  v_person_name text;
+  v_location_id uuid;
+  v_employer_credits numeric;
+  v_employee_credits numeric;
+  v_ref text;
+begin
+  if p_amount is null or p_amount < 1 or p_amount > 10000 then
+    raise exception 'NOXIA_WAGE_AMOUNT_INVALID';
+  end if;
+
+  perform 1 from public.actors where id = p_employer_actor_id for update;
+  if not found then raise exception 'NOXIA_EMPLOYER_NOT_FOUND'; end if;
+
+  select p.display_name, pa.location_id
+    into v_person_name, v_location_id
+  from public.people p
+  join public.person_assignments pa on pa.person_id = p.id
+  where p.id = p_person_id
+    and pa.id = p_assignment_id
+    and pa.assignment_type = 'work'
+    and pa.is_active = true
+    and pa.employer_actor_id = p_employer_actor_id
+  for update of p, pa;
+
+  if not found then raise exception 'NOXIA_WORK_ASSIGNMENT_INVALID'; end if;
+
+  select coalesce(sum(credit_delta),0)
+    into v_employer_credits
+  from public.npc_ledger
+  where actor_id = p_employer_actor_id;
+
+  if v_employer_credits < p_amount then
+    raise exception 'NOXIA_EMPLOYER_CREDITS_INSUFFICIENT';
+  end if;
+
+  select actor_id into v_employee_actor_id
+  from public.person_economic_actors
+  where person_id = p_person_id;
+
+  if v_employee_actor_id is null then
+    insert into public.actors(kind, display_name, bio_short, personality, decision_weights)
+    values (
+      'npc_person',
+      v_person_name,
+      'Persönlicher Wirtschaftsakteur der Living Population.',
+      '{}'::jsonb,
+      '{}'::jsonb
+    )
+    returning id into v_employee_actor_id;
+
+    insert into public.person_economic_actors(person_id, actor_id)
+    values (p_person_id, v_employee_actor_id);
+  end if;
+
+  v_ref := 'assignment:' || p_assignment_id::text;
+
+  insert into public.npc_ledger(
+    actor_id, tick, kind, resource, goods_delta, credit_delta,
+    location_id, ref, note
+  ) values (
+    p_employer_actor_id, p_tick, 'wage', null, 0, -p_amount,
+    v_location_id, v_ref, 'Lohnzahlung an ' || v_person_name
+  )
+  on conflict do nothing;
+
+  if not found then
+    select coalesce(sum(credit_delta),0) into v_employee_credits
+    from public.npc_ledger where actor_id = v_employee_actor_id;
+    return jsonb_build_object(
+      'ok', true, 'duplicate', true, 'amount', 0,
+      'employee_actor_id', v_employee_actor_id,
+      'employee_credits', v_employee_credits,
+      'employer_credits', v_employer_credits
+    );
+  end if;
+
+  insert into public.npc_ledger(
+    actor_id, tick, kind, resource, goods_delta, credit_delta,
+    location_id, ref, note
+  ) values (
+    v_employee_actor_id, p_tick, 'wage', null, 0, p_amount,
+    v_location_id, v_ref, 'Lohn für Arbeitszuweisung'
+  )
+  on conflict do nothing;
+
+  select coalesce(sum(credit_delta),0) into v_employee_credits
+  from public.npc_ledger where actor_id = v_employee_actor_id;
+
+  return jsonb_build_object(
+    'ok', true,
+    'duplicate', false,
+    'amount', p_amount,
+    'employee_actor_id', v_employee_actor_id,
+    'employee_credits', v_employee_credits,
+    'employer_credits', v_employer_credits - p_amount
+  );
+end;
+$;
+
+revoke all on function public.pay_npc_wage(uuid,uuid,uuid,integer,bigint) from public;
+revoke all on function public.pay_npc_wage(uuid,uuid,uuid,integer,bigint) from anon;
+revoke all on function public.pay_npc_wage(uuid,uuid,uuid,integer,bigint) from authenticated;
+grant execute on function public.pay_npc_wage(uuid,uuid,uuid,integer,bigint) to service_role;
+
 create or replace function public.run_npc_payroll(p_tick bigint)
 returns jsonb
 language plpgsql
