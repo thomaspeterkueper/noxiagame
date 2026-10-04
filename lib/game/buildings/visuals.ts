@@ -28,6 +28,7 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     deimos: profile('habitat/deimos/style-anchor.svg', 'deimos', 1.45, 'Sehr funktionales Mini-Habitat: schlichter Modulkoerper, Luke statt Fenster, exponierte Leitungen, keine Zierelemente.'),
   },
   residential_block: {
+    mars: profile('residential_block/mars/style-anchor.svg', 'mars', 1.55, 'Mars-Wohnblock als druckbeaufschlagter Langbau.'),
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.85, 'Earth residential block currently reuses the habitat visual language until its own anchor exists.'),
   },
   laboratory: {
@@ -35,11 +36,13 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     moon: profile('laboratory/earth/style-anchor.svg', 'moon', 1.7, 'Mond-Labor leiht sich bis auf Weiteres das Earth-Labor-Asset.'),
   },
   warehouse: {
+    mars: profile('warehouse/mars/style-anchor.svg', 'mars', 1.5, 'Mars-Warenhaus als gewoelbter Frachtbunker.'),
     earth: profile('warehouse/earth/style-anchor.svg', 'earth', 1.85, 'NOXIA Earth Core V1 warehouse/logistics hall.'),
     moon: profile('warehouse/moon/style-anchor.svg', 'moon', 1.85, 'Eigenes Lager-Asset: niedriger regolith-uebererdeter Tonnengewoelbe-Bunker mit Aussenpaletten und Schleuse.'),
     phobos: profile('warehouse/phobos/style-anchor.svg', 'phobos', 1.28, 'Phobos-Lager: kompakte Kartendarstellung innerhalb der verankerten Grundflaeche; Mikrogravitations-Seile bleiben sichtbar.'),
   },
   admin: {
+    mars: profile('admin/mars/style-anchor.svg', 'mars', 1.45, 'Mars-Verwaltungsbau mit klarer zentraler Eingangsfassade.'),
     earth: profile('admin/earth/style-anchor.svg', 'earth', 1.7, 'Simple blue-gray Earth administration asset for placement and gameplay testing.'),
     moon: profile('admin/earth/style-anchor.svg', 'moon', 1.7, 'Mond-Verwaltung leiht sich bis auf Weiteres das Earth-Admin-Asset.'),
   },
@@ -52,9 +55,11 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     phobos: profile('surface_workshop/phobos/style-anchor.svg', 'phobos', 1.24, 'Phobos-Werkstatt: reduzierte Kartenueberhoehung, dunkles Regolith, oranger Funktionsakzent und Ankerseile.'),
   },
   factory: {
+    mars: profile('factory/mars/style-anchor.svg', 'mars', 1.55, 'Mars-Fabrik mit Saegezahndach und Abgas-/Prozessschacht.'),
     earth: profile('workshop/earth/style-anchor.svg', 'earth', 1.95, 'Factory uses the Earth workshop visual as an interim production-building anchor.'),
   },
   solar: {
+    mars: profile('solar/mars/style-anchor.svg', 'mars', 1.6, 'Mars-Solarfeld mit drei geneigten Paneelgruppen.'),
     earth: profile('solar/earth/style-anchor.svg', 'earth', 1.95, 'Test-first Earth solar field: deliberately blue/anthracite for immediate map readability.'),
     moon: profile('solar/moon/style-anchor.svg', 'moon', 1.85, 'Eigenes Energieturm-Asset: hoher Mast mit geneigtem Panel fuer die tief stehende Suedpol-Sonne.'),
     phobos: profile('solar/phobos/style-anchor.svg', 'phobos', 1.18, 'Phobos-Energieturm: bewusst kompakt auf der Karte; Mast, Panel und Mikrogravitations-Verankerung bleiben lesbar.'),
@@ -116,12 +121,14 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     moon: profile('spaceport_service/earth/style-anchor.svg', 'moon', 1.9, 'Mond-Shipyard leiht sich das Hangar-Asset des Erd-Raumhafen-Service.'),
   },
   landing_pad: {
+    mars: profile('landing_pad/mars/style-anchor.svg', 'mars', 1.75, 'Mars-Landepad mit Zielkreuz und Randlichtern.'),
     moon: profile('spaceport_pad/earth/style-anchor.svg', 'moon', 2.2, 'Mond-Landepad leiht sich dasselbe Landepad-Asset wie die Erde.'),
   },
   landing_pad_moon: {
     moon: profile('spaceport_pad/earth/style-anchor.svg', 'moon', 2.15, 'Shackleton Lande- und Cargo-Zone nutzt das vorhandene Landepad-Asset.'),
   },
   school: {
+    mars: profile('school/mars/style-anchor.svg', 'mars', 1.45, 'Mars-Schul-/Akademiebau mit zentralem Lernmodul.'),
     moon: profile('laboratory/earth/style-anchor.svg', 'moon', 1.6, 'Mond-Schule leiht vorerst das Labor-Asset, bis ein eigenes existiert.'),
   },
 }
