@@ -155,23 +155,17 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const navigationTarget=navigationTargets.find(target=>target.id===navigationTargetId)??null
   const targetDistance=navigationTarget?Math.hypot(navigationTarget.xM-player.xM,navigationTarget.yM-player.yM):null
 
-  const localFacts=useMemo(()=>{
+  const baseLocalFacts=useMemo(()=>{
     const facts:string[]=[]
     if(data?.region?.name)facts.push(`Ort: ${data.region.name}`)
     if(scene){
       facts.push(`${scene.roadGraph.length} lokale Straßensegmente im aktuellen Ausschnitt`)
       facts.push(`${scene.railGraph.length} lokale Schienensegmente im aktuellen Ausschnitt`)
-      facts.push(`${scene.buildings.length} Gebäude/Bebauungsmassen im aktuellen Ausschnitt`)
       if(scene.polygons.some(item=>item.kind==='water')||scene.paths.some(item=>item.kind==='waterway'))facts.push('Wasserlauf oder Wasserfläche im aktuellen Ausschnitt vorhanden')
       if(scene.polygons.some(item=>item.kind==='forest'||item.kind==='vegetation'))facts.push('Vegetations- bzw. Waldflächen im aktuellen Ausschnitt vorhanden')
     }
-    const named=features.filter(feature=>feature.geometry.kind==='point'&&feature.properties?.name).slice(0,10)
-    for(const feature of named){
-      const type=String(feature.properties?.visual_class??feature.featureType)
-      facts.push(`${String(feature.properties?.name)} · ${type}`)
-    }
     return facts
-  },[data?.region?.name,scene,features])
+  },[data?.region?.name,scene])
 
   const npcPositions=useMemo(()=>scene?residents.slice(0,18).map((resident,index)=>{
     const h=hash(resident.id)
@@ -221,6 +215,38 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,position.yM+((index%2)?2:-2))),
     }
   }):[],[scene,residents,motionTime,selected?.id,npcWorldActionById])
+
+  function perceivedLocalFactsForNpc(npcId:string){
+    const npc=npcPositions.find(item=>item.resident.id===npcId)
+    if(!npc)return baseLocalFacts
+    const MAX_VISIBLE_PLACE_M=45
+    const placeFacts=[
+      ...buildingTargets.map(target=>({
+        name:target.name,
+        kind:target.kind,
+        distance:Math.hypot(target.xM-npc.xM,target.yM-npc.yM),
+        status:String(target.entity?.status??'aktiv'),
+      })),
+      ...namedPoiTargets.map(target=>({
+        name:target.name,
+        kind:target.kind,
+        distance:Math.hypot(target.xM-npc.xM,target.yM-npc.yM),
+        status:'sichtbar',
+      })),
+      ...pendingTargets.map(target=>({
+        name:target.name,
+        kind:'Baustelle',
+        distance:Math.hypot(target.xM-npc.xM,target.yM-npc.yM),
+        status:'im Bau',
+      })),
+    ]
+      .filter(place=>place.distance<=MAX_VISIBLE_PLACE_M)
+      .sort((a,b)=>a.distance-b.distance||a.name.localeCompare(b.name,'de'))
+      .slice(0,10)
+      .map(place=>`In der Nähe: ${place.name} · ${place.kind} · ca. ${Math.max(1,Math.round(place.distance))} m entfernt · ${place.status}`)
+
+    return [...baseLocalFacts,...placeFacts].slice(0,16)
+  }
 
   const ambientConversation=useMemo(()=>{
     if(!awarenessItems.length||npcPositions.length<2)return null
@@ -278,7 +304,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     setSending(true)
     try{
       const{token}=await getSessionInfo()
-      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:playerMessage,npcId:selected.id,npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts,history})})
+      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:playerMessage,npcId:selected.id,npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts:perceivedLocalFactsForNpc(selected.id),history})})
       const json=await response.json().catch(()=>({}))
       const npcReply=response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.'
       if(response.ok){
