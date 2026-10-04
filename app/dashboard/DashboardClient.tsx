@@ -116,7 +116,27 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   useEffect(() => { loadFromServer() }, [])
   const prevLocationRef = React.useRef(location)
   useEffect(() => { if (prevLocationRef.current !== location) { prevLocationRef.current = location; loadFromServer() } }, [location])
-  useEffect(() => { async function fetchWorld() { try { setWorldData(await (await fetch('/api/game/world')).json()) } catch {} } fetchWorld(); const iv = setInterval(fetchWorld, 30000); return () => clearInterval(iv) }, [])
+  useEffect(() => {
+    async function fetchWorld() {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const response = await fetch('/api/game/world')
+        if (response.ok) setWorldData(await response.json())
+      } catch {}
+    }
+
+    fetchWorld()
+    const iv = window.setInterval(fetchWorld, 120_000)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void fetchWorld()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.clearInterval(iv)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [])
 
   async function fetchBuilds() {
     try {
