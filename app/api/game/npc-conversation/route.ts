@@ -6,7 +6,8 @@ const MAX_HISTORY_MESSAGES = 10
 const MAX_HISTORY_ENTRY_CHARS = 180
 const MAX_HISTORY_TOTAL_CHARS = 1200
 const MAX_REPLY_CHARS = 280
-const MAX_PERSISTED_EXCHANGES = 6
+const MIN_PERSISTED_EXCHANGES = 6
+const MAX_PERSISTED_EXCHANGES = 18
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const serviceClient = createClient(
@@ -37,8 +38,11 @@ export async function POST(request: NextRequest) {
   const player = clean(body.player)
   const npcIdRaw = clean(body.npcId, 64)
   const npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
-  const npcName = clean(body.npcName, 48) || 'Bewohner'
-  const npcRole = clean(body.npcRole, 48) || 'Kolonist'
+  const perceivedNpcName = clean(body.npcName, 48) || 'Bewohner'
+  const perceivedNpcRole = clean(body.npcRole, 48) || 'Kolonist'
+  let npcName = perceivedNpcName
+  let npcRole = perceivedNpcRole
+  let identityState: 'unknown' | 'inferred' | 'known' = 'unknown'
   const headline = clean(body.headline, 180)
   const source = clean(body.source, 80)
   const locationName = clean(body.locationName, 100)
@@ -62,14 +66,36 @@ export async function POST(request: NextRequest) {
   }).reverse()
 
   let persistedMemory: any = null
+  let canonicalNpc: any = null
   if (npcId) {
-    const { data } = await serviceClient
-      .from('npc_player_conversation_memory')
-      .select('encounter_count, recent_exchanges, last_location, last_interaction_at')
-      .eq('npc_person_id', npcId)
-      .eq('player_profile_id', user.id)
-      .maybeSingle()
-    persistedMemory = data ?? null
+    const [{ data: memoryData }, { data: personData }, { data: identityData }] = await Promise.all([
+      serviceClient
+        .from('npc_player_conversation_memory')
+        .select('encounter_count, recent_exchanges, last_location, last_interaction_at, recent_encounter_score, last_encounter_at')
+        .eq('npc_person_id', npcId)
+        .eq('player_profile_id', user.id)
+        .maybeSingle(),
+      serviceClient
+        .from('people')
+        .select('id, display_name, public_role')
+        .eq('id', npcId)
+        .maybeSingle(),
+      serviceClient
+        .from('player_person_identity_knowledge')
+        .select('identity_state')
+        .eq('profile_id', user.id)
+        .eq('person_id', npcId)
+        .maybeSingle(),
+    ])
+    persistedMemory = memoryData ?? null
+    canonicalNpc = personData ?? null
+    if (canonicalNpc?.display_name) npcName = clean(canonicalNpc.display_name, 48)
+    if (canonicalNpc?.public_role) npcRole = clean(canonicalNpc.public_role, 48)
+    identityState = identityData?.identity_state === 'known'
+      ? 'known'
+      : identityData?.identity_state === 'inferred'
+        ? 'inferred'
+        : 'unknown'
   }
 
   const priorEncounterLines = history.length === 0 && Array.isArray(persistedMemory?.recent_exchanges)
@@ -85,6 +111,9 @@ export async function POST(request: NextRequest) {
 
   const system = [
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
+    identityState === 'known'
+      ? `Der Spieler kennt deinen Namen bereits als ${npcName}.`
+      : `Der Spieler kennt deinen Namen noch nicht sicher. Verwende deinen echten Namen nicht beiläufig als bereits bekannt. Wenn du dich natürlich vorstellst oder nach deinem Namen gefragt wirst, sage klar „Ich bin ${npcName}“ oder „Mein Name ist ${npcName}“.`,
     'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-2 kurze Sätze.',
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
