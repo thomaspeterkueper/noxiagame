@@ -131,6 +131,61 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     mars: profile('school/mars/style-anchor.svg', 'mars', 1.45, 'Mars-Schul-/Akademiebau mit zentralem Lernmodul.'),
     moon: profile('laboratory/earth/style-anchor.svg', 'moon', 1.6, 'Mond-Schule leiht vorerst das Labor-Asset, bis ein eigenes existiert.'),
   },
+
+  bank: {
+    mars: profile('bank/mars/style-anchor.svg', 'mars', 1.4, 'Mars-Bank als kompakter institutioneller Modulbau.'),
+  },
+  water_recycler: {
+    mars: profile('water_recycler/mars/style-anchor.svg', 'mars', 1.45, 'Mars-Wasserrecycler mit zwei Prozessbehaeltern.'),
+  },
+  habitat_cluster: {
+    mars: profile('habitat_cluster/mars/style-anchor.svg', 'mars', 1.7, 'Mars-Habitatcluster mit druckbeaufschlagten Kuppelmodulen.'),
+  },
+  eclss_hub: {
+    mars: profile('eclss_hub/mars/style-anchor.svg', 'mars', 1.55, 'Mars-ECLSS-Hub mit zentraler Utility-Kuppel.'),
+  },
+  reactor_module: {
+    mars: profile('reactor_module/mars/style-anchor.svg', 'mars', 1.45, 'Mars-Reaktormodul mit geschuetztem Kern.'),
+  },
+  black_start: {
+    mars: profile('black_start/mars/style-anchor.svg', 'mars', 1.35, 'Black-Start-Speicherblock mit sichtbaren Energiezellen.'),
+  },
+  water_isru: {
+    mars: profile('water_isru/mars/style-anchor.svg', 'mars', 1.55, 'Mars-Wasser-ISRU mit Prozess- und Puffertanks.'),
+  },
+  radiator_field: {
+    mars: profile('radiator_field/mars/style-anchor.svg', 'mars', 1.6, 'Mars-Radiatorfeld mit thermischen Paneelgruppen.'),
+  },
+  medical_core: {
+    mars: profile('medical_core/mars/style-anchor.svg', 'mars', 1.5, 'Mars-Medical-Core mit klarer medizinischer Kennzeichnung.'),
+  },
+  medical_annex: {
+    mars: profile('medical_annex/mars/style-anchor.svg', 'mars', 1.4, 'Kompakter medizinischer Annex.'),
+  },
+  reserve_depot: {
+    mars: profile('reserve_depot/mars/style-anchor.svg', 'mars', 1.45, 'Mars-Reserve-Depot als druckgeschuetzter Lagerbunker.'),
+  },
+  logistics_hub: {
+    mars: profile('logistics_hub/mars/style-anchor.svg', 'mars', 1.55, 'Mars-Logistik-Hub mit Frachtportalen.'),
+  },
+  workshop_clean: {
+    mars: profile('workshop_clean/mars/style-anchor.svg', 'mars', 1.45, 'Saubere Mars-Werkstatt fuer Praezisionsarbeit.'),
+  },
+  workshop_heavy: {
+    mars: profile('workshop_heavy/mars/style-anchor.svg', 'mars', 1.55, 'Schwere Mars-Werkstatt mit Kranstruktur.'),
+  },
+  material_complex: {
+    mars: profile('material_complex/mars/style-anchor.svg', 'mars', 1.5, 'Mars-Materialkomplex mit getrennten Prozessbehaeltern.'),
+  },
+  command_node: {
+    mars: profile('command_node/mars/style-anchor.svg', 'mars', 1.4, 'Mars-Command-Knoten mit Kommunikationsmast.'),
+  },
+  surface_relay: {
+    mars: profile('surface_relay/mars/style-anchor.svg', 'mars', 1.2, 'Mars-Oberflaechenrelay mit Navigationsmast.'),
+  },
+  longrange_comms: {
+    mars: profile('longrange_comms/mars/style-anchor.svg', 'mars', 1.35, 'Mars-Langstreckenkommunikation mit Richtantenne.'),
+  },
 }
 
 export function getBuildingVisual(buildingId: string, location: string) {
