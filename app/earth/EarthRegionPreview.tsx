@@ -112,6 +112,7 @@ export default function EarthRegionPreview(){
   const[materializationError,setMaterializationError]=useState<string|null>(null)
   const earthPlayerPosition=useEarthPlayerPositionStore(s=>s.position)
   const earthPlayerRegionId=useEarthPlayerPositionStore(s=>s.regionId)
+  const earthPlayerGeo=useEarthPlayerPositionStore(s=>s.geo)
 
   const drag=useRef<{x:number;y:number;ox:number;oy:number;moved:boolean}|null>(null)
   const suppressMapClick=useRef(false)
@@ -227,13 +228,10 @@ export default function EarthRegionPreview(){
   const realLandmarks=useMemo(()=>projected.filter((feature:any)=>feature.featureType==='landmark'&&feature.p),[projected])
   const selectedRealLandmark=selectedRealLandmarkId?realLandmarks.find((item:any)=>item.id===selectedRealLandmarkId)??null:null
   const playerMapPosition=useMemo(()=>{
-    if(!projection||!data?.region?.origin)return null
-    const regionId=data.region.id??null
-    if(earthPlayerRegionId&&regionId&&earthPlayerRegionId!==regionId)return null
-    const geo=localMetersToGeo({eastM:earthPlayerPosition.xM,northM:earthPlayerPosition.yM},data.region.origin)
-    if(data.bounds&&(geo.lat<data.bounds.south||geo.lat>data.bounds.north||geo.lon<data.bounds.west||geo.lon>data.bounds.east))return null
-    return{geo,mapX:projection.x(geo.lon),mapY:projection.y(geo.lat)}
-  },[projection,data?.region,data?.bounds,earthPlayerPosition,earthPlayerRegionId])
+    if(!projection||!earthPlayerGeo)return null
+    if(data?.bounds&&(earthPlayerGeo.lat<data.bounds.south||earthPlayerGeo.lat>data.bounds.north||earthPlayerGeo.lon<data.bounds.west||earthPlayerGeo.lon>data.bounds.east))return null
+    return{geo:earthPlayerGeo,mapX:projection.x(earthPlayerGeo.lon),mapY:projection.y(earthPlayerGeo.lat)}
+  },[projection,data?.bounds,earthPlayerGeo])
 
   const scale=useMemo(()=>{if(!mapMetrics)return null;const visibleWidthM=mapMetrics.widthM/zoom,targetM=visibleWidthM/MAP_SCALE_DIVISIONS,options=[2,5,10,20,50,100,200,500,1000,2000,5000,10000];const meters=options.reduce((best,n)=>Math.abs(n-targetM)<Math.abs(best-targetM)?n:best,options[0]);return{meters,pixels:meters/mapMetrics.widthM*1000*zoom}},[mapMetrics,zoom])
   const visualLanduseDetail=Boolean(data?.detail&&mapMetrics&&mapMetrics.widthM/zoom<=3500)
@@ -298,6 +296,19 @@ export default function EarthRegionPreview(){
 
   function resetOverview(){if(overviewData)setData(overviewData);setZoom(1);setOffset({x:0,y:0});setFocusLabel(null);setFocusError(null);setSelected(null);clearPlacement();setSelectedWorldObjectId(null);setSelectedPendingBuildId(null);setSelectedLandmarkId(null);setSelectedRealLandmarkId(null);setEntryRequest(null)}
   function zoomAroundCenter(direction:1|-1){const factor=direction>0?1.15:.87,nextZoom=clamp(zoom*factor,.7,128),centerX=(500-offset.x)/zoom,centerY=(500-offset.y)/zoom;setCamera(nextZoom,centerX,centerY)}
+  async function centerOnPlayer(){
+    if(!earthPlayerGeo)return
+    clearPlacement()
+    setSelectedWorldObjectId(null);setSelectedPendingBuildId(null);setSelectedLandmarkId(null);setSelectedRealLandmarkId(null);setEntryRequest(null)
+    if(data?.bounds&&earthPlayerGeo.lat>=data.bounds.south&&earthPlayerGeo.lat<=data.bounds.north&&earthPlayerGeo.lon>=data.bounds.west&&earthPlayerGeo.lon<=data.bounds.east&&projection){
+      const centerX=projection.x(earthPlayerGeo.lon),centerY=projection.y(earthPlayerGeo.lat)
+      const nextZoom=Math.max(zoom,clamp((payloadWidthM(data)??BUILD_PLAN_VISIBLE_WIDTH_M)/BUILD_PLAN_VISIBLE_WIDTH_M,.7,128))
+      setCamera(nextZoom,centerX,centerY)
+      setFocusLabel('Aktuelle Position')
+      return
+    }
+    await focusGeoPoint(earthPlayerGeo,'Aktuelle Position')
+  }
 
   function pointerToSpot(e:{clientX:number;clientY:number}){if(!projection||!data?.region?.origin||!mapGroupRef.current)return null;const svg=mapGroupRef.current.ownerSVGElement,ctm=mapGroupRef.current.getScreenCTM();if(!svg||!ctm)return null;const point=svg.createSVGPoint();point.x=e.clientX;point.y=e.clientY;const local=point.matrixTransform(ctm.inverse()),geo={lon:projection.lon(local.x),lat:projection.lat(local.y)},metric=geoToLocalMeters(geo,data.region.origin);return{mapX:local.x,mapY:local.y,xM:metric.eastM,yM:metric.northM}}
 
@@ -414,7 +425,7 @@ export default function EarthRegionPreview(){
         </g>
       </svg>
 
-      <div className="earth-map-tools"><div className="earth-compass" aria-label="Karte ist nach Norden ausgerichtet"><span>N</span><b>↑</b></div>{scale&&<div className="earth-scale"><span>{scale.meters>=1000?`${scale.meters/1000} km`:`${scale.meters} m`}</span><i style={{width:`${Math.max(26,Math.min(150,scale.pixels))}px`}}/></div>}</div>
+      <div className="earth-map-tools"><div className="earth-compass" aria-label="Karte ist nach Norden ausgerichtet"><span>N</span><b>↑</b></div>{scale&&<div className="earth-scale"><span>{scale.meters>=1000?`${scale.meters/1000} km`:`${scale.meters} m`}</span><i style={{width:`${Math.max(26,Math.min(150,scale.pixels))}px`}}/></div>}<button className="earth-center-player" disabled={!earthPlayerGeo} onClick={()=>void centerOnPlayer()}>{earthPlayerGeo?'◎ Zentrieren':'◎ Position unbekannt'}</button></div>
       <div className="earth-layer-control"><button className="earth-layer-trigger" onClick={()=>setLayersOpen(v=>!v)}>☷ Layer</button>{layersOpen&&<div className="earth-layer-menu">{([['relief','Relief / DEM'],['landuse','Landnutzung'],['water','Wasser'],['infrastructure','Infrastruktur'],['buildability','Bebaubarkeit'],['slope','Neigung'],['noxia','NOXIA-Bauten'],['landmarks','Landmarks / Werkbezug'],['sites','Prüfstandorte'],['corridor','Korridor B · Vorprüfung']] as [LayerKey,string][]).map(([key,label])=><button key={key} className={layers[key]?'active':''} onClick={()=>toggleLayer(key)}><span>{layers[key]?'●':'○'}</span>{label}</button>)}<div className="earth-layer-note">Planungsebene · nicht kanonisch · kein Bauauftrag</div><div className="earth-layer-disabled">○ Ressourcen · Daten folgen</div></div>}</div>
       {layers.corridor&&corridorOverlay&&<div className="earth-corridor-status"><b>Korridor B</b><span>Vorprüfung · nicht kanonisch</span></div>}
       {focusLoading&&<div className="earth-detail-status">Kartendetails werden geladen …</div>}
