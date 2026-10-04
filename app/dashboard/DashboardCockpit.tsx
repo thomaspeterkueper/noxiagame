@@ -225,9 +225,9 @@ export default function DashboardCockpit() {
 
     {utilityOpen === 'view' && <aside className="noxia-cockpit-utility noxia-view-panel" aria-label="NOXIA Ansicht">
       <div className="noxia-utility-head"><div><small>NOXIA</small><strong>Ansicht</strong></div><button type="button" onClick={() => setUtilityOpen(null)} aria-label="Ansicht schließen">×</button></div>
-      {location === 'earth' ? <div className="noxia-view-options">
-        <button type="button" className={mode === 'planning' ? 'active' : ''} onClick={() => { enterPlanning(); setUtilityOpen(null) }}><span>▦</span><b>Karte</b><small>Reale, persistierte Erdgeographie</small></button>
-        <button type="button" className={mode === 'colony' ? 'active' : ''} onClick={() => { enterColony(); setUtilityOpen(null) }}><span>◇</span><b>Begehbar</b><small>Dieselbe reale Geographie · NPC-Interaktion aktiv</small></button>
+      {['earth','moon'].includes(location) ? <div className="noxia-view-options">
+        <button type="button" className={mode === 'planning' ? 'active' : ''} onClick={() => { enterPlanning(); setUtilityOpen(null) }}><span>▦</span><b>Karte</b><small>{location==='earth'?'Reale, persistierte Erdgeographie':'Gemeinsame planetare Surface-Karte'}</small></button>
+        <button type="button" className={mode === 'colony' ? 'active' : ''} onClick={() => { enterColony(); setUtilityOpen(null) }}><span>◇</span><b>Begehbar</b><small>Dieselbe Surface-Geometrie · lokale Interaktionen</small></button>
       </div> : <div className="noxia-view-options">
         <button type="button" className="active" onClick={() => { setUtilityOpen(null); targets.isometric?.click() }}><span>◇</span><b>Ansicht wechseln</b><small>Zwischen Karten- und lokaler Ansicht wechseln</small></button>
       </div>}
@@ -266,7 +266,7 @@ export default function DashboardCockpit() {
       </button>}
 
       <button type="button" className={utilityOpen === 'view' ? 'primary active' : 'primary'} onClick={() => {
-        if (location !== 'earth' && targets.isometric) {
+        if (!['earth','moon'].includes(location) && targets.isometric) {
           targets.isometric.click()
           return
         }
