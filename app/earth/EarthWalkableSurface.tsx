@@ -5,7 +5,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import { buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
-import { geoToLocalMeters } from '@/lib/world/spatial/earthSpatial'
+import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
@@ -44,6 +44,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[data,setData]=useState<Payload|null>(null)
   const player=useEarthPlayerPositionStore(s=>s.position)
   const playerRegionId=useEarthPlayerPositionStore(s=>s.regionId)
+  const playerGeo=useEarthPlayerPositionStore(s=>s.geo)
   const setSharedPlayerPosition=useEarthPlayerPositionStore(s=>s.setPosition)
   const resetSharedPlayerPosition=useEarthPlayerPositionStore(s=>s.reset)
   const[selected,setSelected]=useState<ColonyResident|null>(null)
@@ -81,12 +82,22 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   });return()=>{live=false}},[])
 
   const features=data?.features??[]
-  const origin=data?.region?.origin
+  const origin=data?.queryCenter??data?.region?.origin
   useEffect(()=>{
     const regionId=(data?.region as any)?.id??null
-    if(regionId&&playerRegionId&&playerRegionId!==regionId)resetSharedPlayerPosition(regionId)
-    else if(regionId&&!playerRegionId)setSharedPlayerPosition(regionId,player)
-  },[data?.region,playerRegionId,player,resetSharedPlayerPosition,setSharedPlayerPosition])
+    if(!origin)return
+    if(regionId&&playerRegionId&&playerRegionId!==regionId){
+      resetSharedPlayerPosition(regionId,origin)
+      return
+    }
+    if(!playerRegionId){
+      setSharedPlayerPosition(regionId,player,playerGeo??localMetersToGeo({eastM:player.xM,northM:player.yM},origin))
+      return
+    }
+    if(!playerGeo){
+      setSharedPlayerPosition(regionId,player,localMetersToGeo({eastM:player.xM,northM:player.yM},origin))
+    }
+  },[data?.region,origin,playerRegionId,player,playerGeo,resetSharedPlayerPosition,setSharedPlayerPosition])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
   const namedPoiTargets=useMemo(()=>origin?features.flatMap(feature=>{
@@ -195,7 +206,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }
   },[awarenessItems,npcPositions,player])
 
-  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();setSharedPlayerPosition((data?.region as any)?.id??null,{xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.yM+(key==='s'?step:key==='w'?-step:0)))})};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,player,setSharedPlayerPosition])
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();(()=>{const next={xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.yM+(key==='s'?step:key==='w'?-step:0)))};setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,setSharedPlayerPosition])
 
   async function talk(){
     if(!selected||!message.trim()||sending)return
