@@ -212,14 +212,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       if(response.ok){
         setConversationByNpc(current=>({
           ...current,
-          [selected.id]:[...(current[selected.id]??[]),{role:'user',content:playerMessage},{role:'assistant',content:npcReply}].slice(-10),
+          [selected.id]:[...(current[selected.id]??[]),{role:'user' as const,content:playerMessage},{role:'assistant' as const,content:npcReply}].slice(-10),
         }))
         setMessage('')
       }
     }catch{
       setConversationByNpc(current=>({
         ...current,
-        [selected.id]:[...(current[selected.id]??[]),{role:'assistant',content:'Gespräch derzeit nicht erreichbar.'}].slice(-10),
+        [selected.id]:[...(current[selected.id]??[]),{role:'assistant' as const,content:'Gespräch derzeit nicht erreichbar.'}].slice(-10),
       }))
     }finally{setSending(false)}
   }
