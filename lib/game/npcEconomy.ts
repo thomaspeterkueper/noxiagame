@@ -141,3 +141,17 @@ export async function runNpcConsumptionTick(supabase: any, tick: number) {
   }
   return data ?? { ok: true, due: true, bought: 0, no_money: 0, no_seller: 0, total_credits: 0 }
 }
+
+
+export async function runNpcPropertyMarketTick(supabase: any, tick: number) {
+  if (tick % 24 !== 0) {
+    return { ok: true, due: false, bought: 0, no_offer: 0, no_money: 0, total_credits: 0 }
+  }
+
+  const { data, error } = await supabase.rpc('run_npc_property_market', { p_tick: tick })
+  if (error) {
+    console.error('runNpcPropertyMarketTick failed', { tick, code: error.code })
+    return { ok: false, due: true, bought: 0, no_offer: 0, no_money: 0, total_credits: 0 }
+  }
+  return data ?? { ok: true, due: true, bought: 0, no_offer: 0, no_money: 0, total_credits: 0 }
+}
