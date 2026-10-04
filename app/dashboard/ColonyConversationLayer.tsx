@@ -132,7 +132,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
       })
       const data=await response.json().catch(()=>({}))
       if(!response.ok||!data.reply)throw new Error(data.error||'conversation_failed')
-      setHistory(current=>[...current,{role:'user' as const,content:player},{role:'assistant' as const,content:String(data.reply)}].slice(-6))
+      setHistory(current=>[...current,{role:'user' as const,content:player},{role:'assistant' as const,content:String(data.reply)}].slice(-10))
       setMessage('')
     }catch(error){
       const code=error instanceof Error?error.message:''
