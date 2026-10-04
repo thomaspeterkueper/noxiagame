@@ -2,15 +2,22 @@
 
 import React from 'react'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const preset = searchParams.get('email')?.trim().toLowerCase()
+    if (preset) setEmail(preset)
+  }, [searchParams])
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
@@ -18,7 +25,8 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const normalizedEmail = email.trim().toLowerCase()
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${window.location.origin}/auth/update-password`,
     })
 
@@ -54,7 +62,7 @@ export default function ResetPasswordPage() {
         {sent ? (
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: '0.85rem', color: '#2a4e7a', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-              ✓ Link gesendet. Bitte prüfe dein Postfach und klicke auf den Reset-Link.
+              Falls ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link angefordert. Bitte prüfe dein Postfach.
             </p>
             <Link href="/auth/login" style={{ fontSize: '0.75rem', color: '#94a3b8', textDecoration: 'none' }}>
               Zurück zum Login

@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [visible, setVisible]   = useState(false)
+  const [loginFailed, setLoginFailed] = useState(false)
 
   // Fade-in nach Mount
   useEffect(() => { setTimeout(() => setVisible(true), 50) }, [])
@@ -23,13 +24,32 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setLoginFailed(false)
     setLoading(true)
 
     const supabase = createClient()
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const normalizedEmail = email.trim().toLowerCase()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    })
 
     if (error || !data.session || !data.user) {
-      setError('Email oder Passwort falsch.')
+      // Supabase intentionally keeps invalid-credential errors generic. Do not
+      // expose whether a specific account exists. Operational failures get a
+      // separate message so infrastructure errors no longer masquerade as a
+      // wrong password.
+      if (error?.code && error.code !== 'invalid_credentials') {
+        console.error('[auth/login] signInWithPassword failed', {
+          code: error.code,
+          status: error.status,
+          message: error.message,
+        })
+        setError('Anmeldung derzeit nicht möglich. Bitte versuche es erneut.')
+      } else {
+        setError('Email oder Passwort falsch.')
+      }
+      setLoginFailed(true)
       setLoading(false)
       return
     }
@@ -107,6 +127,26 @@ export default function LoginPage() {
         {error && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#c0392b', marginBottom: '1rem' }}>
             {error}
+            {loginFailed && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <Link
+                  href={`/auth/reset-password?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+                  style={{
+                    display: 'inline-block',
+                    background: '#fff',
+                    border: '1px solid #c0392b',
+                    borderRadius: '5px',
+                    padding: '0.5rem 0.7rem',
+                    color: '#a52f24',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Passwort zurücksetzen
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -118,6 +158,7 @@ export default function LoginPage() {
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="pilot@noxia.space" required autoFocus
+              autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               style={{ width: '100%', border: '1px solid #e2ddd4', borderRadius: '6px', padding: '0.65rem 0.9rem', fontSize: '0.95rem', outline: 'none', background: '#fafaf8', color: '#1e2a36', boxSizing: 'border-box' as const, transition: 'border-color 0.2s' }}
               onFocus={e => e.target.style.borderColor = '#2a4e7a'}
               onBlur={e => e.target.style.borderColor = '#e2ddd4'}
@@ -129,7 +170,7 @@ export default function LoginPage() {
             </label>
             <input
               type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••" required
+              placeholder="••••••••" required autoComplete="current-password"
               style={{ width: '100%', border: '1px solid #e2ddd4', borderRadius: '6px', padding: '0.65rem 0.9rem', fontSize: '0.95rem', outline: 'none', background: '#fafaf8', color: '#1e2a36', boxSizing: 'border-box' as const, transition: 'border-color 0.2s' }}
               onFocus={e => e.target.style.borderColor = '#2a4e7a'}
               onBlur={e => e.target.style.borderColor = '#e2ddd4'}
