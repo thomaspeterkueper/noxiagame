@@ -1,17 +1,22 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
 import { getToken } from '@/lib/supabase/auth'
-import PlanetarySurfaceMap from '@/app/components/PlanetarySurfaceMap'
+import PlanetarySurfaceMap, { type PlanetarySurfaceEntity } from '@/app/components/PlanetarySurfaceMap'
 import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
+import BuildingInterior from './BuildingInterior'
+import BuildingOverlayShell from './BuildingOverlayShell'
 
 export default function DashboardMarsSurface(){
   const location=useGameStore(state=>state.location)
+  const credits=useGameStore(state=>state.credits)
+  const shipRange=useGameStore(state=>state.shipRange)
   const mode=useGameModeStore(state=>state.mode)
   const enterPlanning=useGameModeStore(state=>state.enterPlanning)
+  const[interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null)
 
   useEffect(()=>{
     if(location!=='mars')return
@@ -28,12 +33,18 @@ export default function DashboardMarsSurface(){
 
   if(location!=='mars')return null
 
-  if(mode==='colony')return <PlanetaryWalkableSurface
-    locationSlug="mars"
-    body="mars"
-    title="Tharsis Hub"
-    onClose={enterPlanning}
-  />
+  if(mode==='colony')return <>
+    <PlanetaryWalkableSurface
+      locationSlug="mars"
+      body="mars"
+      title="Tharsis Hub"
+      onOpenWorldObject={setInteriorEntity}
+      onClose={enterPlanning}
+    />
+    {interiorEntity&&<BuildingOverlayShell eyebrow="GEBÄUDE · INNENRAUM" title={interiorEntity.name??interiorEntity.entity_id??'Mars-Anlage'} subtitle="Gemeinsamer begehbarer Gebäudezugang" onClose={()=>setInteriorEntity(null)} width={1020}>
+      <BuildingInterior entity={{...interiorEntity,entity_type:'building',tile_row:0,tile_col:0,profile_id:interiorEntity.profile_id??null,owner_class:interiorEntity.owner_class??'STATE'} as any} userId="" locationResources={[]} credits={credits} population={0} hasShipyard={false} currentTick={0} shipRange={shipRange} currentLocationSlug="mars" onClose={()=>setInteriorEntity(null)}/>
+    </BuildingOverlayShell>}
+  </>
 
   return <section className="noxia-dashboard-mars-surface" aria-label="Marsoberfläche Tharsis">
     <SurfaceContextBadge title="MOLA · Tharsis Hub" detail="planetozentrischer Mars-Frame · MOLA-Terrain · gemeinsamer Planetary-Surface-Renderer"/>
