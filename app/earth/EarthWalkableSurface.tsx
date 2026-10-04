@@ -284,7 +284,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
         {navigationTarget&&(()=>{const from=iso(player),to=iso({xM:navigationTarget.xM,yM:navigationTarget.yM});return <g pointerEvents="none"><line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#f1d57a" strokeWidth="1.4" strokeDasharray="7 5" opacity=".85"/><circle cx={to.x} cy={to.y} r="8" fill="none" stroke="#f1d57a" strokeWidth="2"/></g>})()}
 
-        {npcPositions.map(({resident,xM,yM})=>{const p=iso({xM,yM});const name=resident.displayName;const selectedNpc=selected?.id===resident.id;const labelWidth=Math.max(42,Math.min(112,name.length*6.1+14));return <g key={resident.id} transform={`translate(${p.x} ${p.y-8})`} onClick={()=>{setSelected(resident);setMessage('');setReply('')}} style={{cursor:'pointer'}}>
+        {npcPositions.map(({resident,xM,yM})=>{const p=iso({xM,yM});const name=resident.displayName;const selectedNpc=selected?.id===resident.id;const labelWidth=Math.max(42,Math.min(112,name.length*6.1+14));return <g key={resident.id} transform={`translate(${p.x} ${p.y-8})`} onClick={()=>{setSelected(resident);setMessage('')}} style={{cursor:'pointer'}}>
           <ellipse cy="10" rx="7" ry="3" fill="#000" opacity=".25"/>
           <circle cy="-3" r="4" fill="#efc39d" stroke="#173845" strokeWidth="1"/>
           <path d="M-5 11 Q0 1 5 11 L4 18 L-4 18 Z" fill={selectedNpc?'#e4bd4b':'#2e6274'} stroke="#173845" strokeWidth="1"/>
