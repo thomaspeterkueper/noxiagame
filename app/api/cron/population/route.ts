@@ -2,13 +2,12 @@
 // Aktualisiert: 04.07.2026 — Header ergänzt; Lazy-Tick-Fallback
 // Version:      0.3.0
 // app/api/cron/population/route.ts
-// Fallback-Herzschlag der Lazy-Tick-Engine.
+// Autoritativer Herzschlag der Tick-Engine.
 //
-// Der eigentliche Herzschlag kommt aus der world-Route (vom Dashboard alle 30s
-// gepollt). Dieser Cron rechnet nur nach, falls lange niemand online war.
-// Ein vollständiger Tick (Population + Preise + Aufträge) lebt in
-// lib/game/tick.ts; claim_due_ticks() schützt vor Doppelausführung.
-// Läuft eh schon jemand, sind 0 Ticks fällig — harmlos.
+// Weltzustand wird ausschließlich hier fortgeschrieben. Lese-Endpunkte wie
+// /api/game/world dürfen keine Simulation auslösen. Ein vollständiger Tick
+// (Population + Living Population + NPCs + Preise + Aufträge usw.) lebt in
+// lib/game/tick.ts; claim_due_ticks() schützt vor Doppelausführung und Catch-up.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'

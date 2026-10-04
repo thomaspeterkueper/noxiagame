@@ -55,7 +55,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     const road=scene.roadGraph.length?scene.roadGraph[h%scene.roadGraph.length]:null
     const roadPoint=road?.points[(h>>>8)%Math.max(1,road.points.length)]
     const base=roadPoint??{xM:-90+(h%180),yM:-70+((h>>>9)%140)}
-    return{resident,xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,base.xM+((index%3)-1)*7)),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,base.yM+((index%2)?6:-6))}
+    return{resident,xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,base.xM+((index%3)-1)*7)),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,base.yM+((index%2)?6:-6)))}
   }):[],[scene,residents])
 
   useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();setPlayer(p=>({xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,p.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,p.yM+(key==='s'?step:key==='w'?-step:0)))}))};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[])

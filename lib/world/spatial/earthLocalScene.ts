@@ -35,9 +35,13 @@ function hash(value:string){
   return h>>>0
 }
 function inside(point:ScenePoint,radiusM:number){return Math.abs(point.xM)<=radiusM&&Math.abs(point.yM)<=radiusM}
-function pointsOf(feature:EarthSceneFeature,origin:GeoPoint){
-  if(feature.geometry.kind==='point')return [geoToLocalMeters(feature.geometry.coordinates as GeoPoint,origin)]
-  return (feature.geometry.coordinates as GeoPoint[]).map(point=>geoToLocalMeters(point,origin))
+function toScenePoint(point: GeoPoint, origin: GeoPoint): ScenePoint {
+  const local = geoToLocalMeters(point, origin)
+  return { xM: local.eastM, yM: local.northM }
+}
+function pointsOf(feature:EarthSceneFeature,origin:GeoPoint): ScenePoint[]{
+  if(feature.geometry.kind==='point')return [toScenePoint(feature.geometry.coordinates as GeoPoint,origin)]
+  return (feature.geometry.coordinates as GeoPoint[]).map(point=>toScenePoint(point,origin))
 }
 function polygonBounds(points:ScenePoint[]){
   const xs=points.map(p=>p.xM),ys=points.map(p=>p.yM)

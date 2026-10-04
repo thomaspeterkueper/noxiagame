@@ -12,8 +12,6 @@
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { runDueTicks } from '@/lib/game/tick'
-import { runPopulationTick } from '@/lib/game/population'
 
 const GROUP_WINDOW_MS = 60_000  // 60 Sekunden
 
@@ -43,15 +41,6 @@ function groupTransactions(rows: any[]): any[] {
 export async function GET() {
   const supabase = createServiceClient()
 
-  // ── HERZSCHLAG: fällige Ticks nachrechnen, BEVOR Daten geladen werden ──────
-  // Idempotent & serialisiert (claim_due_ticks via Advisory Lock). Schlägt der
-  // Tick fehl, liefern wir trotzdem die (alten) Weltdaten aus statt 500.
-  try {
-    await runDueTicks(supabase)
-  } catch (err) {
-    console.error('runDueTicks (world heartbeat) error:', err)
-  }
-
   // Aktuelle Tick-Nummer aus tick_log (nicht mehr simulation_ticks)
   const { data: lastTickRow } = await supabase
     .from('tick_log')
@@ -60,14 +49,6 @@ export async function GET() {
     .limit(1)
     .maybeSingle()
   const tickCount = Number(lastTickRow?.tick_number ?? 0)
-
-  // Living Population läuft auf demselben Welt-Herzschlag. Ein Fehler darf
-  // niemals den restlichen Dashboard-Load blockieren.
-  try {
-    await runPopulationTick(supabase, tickCount)
-  } catch (err) {
-    console.error('runPopulationTick (world heartbeat) error:', err)
-  }
 
   // Aktuelle Koloniedaten
   const { data: locations } = await supabase
