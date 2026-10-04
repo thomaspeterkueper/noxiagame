@@ -60,6 +60,7 @@ export default function PlanetaryWalkableSurface({
   const[selectedId,setSelectedId]=useState('')
   const[motionTime,setMotionTime]=useState(0)
   const[personPanelOpen,setPersonPanelOpen]=useState(false)
+  const[objectPanelOpen,setObjectPanelOpen]=useState(false)
   const[message,setMessage]=useState('')
   const[sending,setSending]=useState(false)
   const[conversationByNpc,setConversationByNpc]=useState<Record<string,Array<{role:'user'|'assistant';content:string}>>>({})
@@ -116,7 +117,7 @@ export default function PlanetaryWalkableSurface({
   const selectedResident=selected?.mobileObject?.id.startsWith('resident:')
     ? residents.find(resident=>resident.id===selected.mobileObject?.id.slice('resident:'.length))??null
     : null
-  const hasAction=Boolean(selectedResident||(selectedEntity&&onOpenWorldObject)||(selectedMobile&&onOpenMobileObject))
+  const hasAction=Boolean(selectedResident||(selectedEntity&&onOpenWorldObject)||selectedMobile)
   const canInteract=Boolean(selected&&selectedDistance!==null&&selectedDistance<=Math.max(8,selected.rangeM)&&hasAction)
 
   useEffect(()=>{
@@ -128,9 +129,9 @@ export default function PlanetaryWalkableSurface({
 
   const interact=useCallback(()=>{
     if(!canInteract||!selected)return
-    if(selectedResident){setPersonPanelOpen(true);return}
+    if(selectedResident){setPersonPanelOpen(true);setObjectPanelOpen(false);return}
     if(selectedEntity&&onOpenWorldObject){onOpenWorldObject(selectedEntity);return}
-    if(selectedMobile&&onOpenMobileObject)onOpenMobileObject(selectedMobile)
+    if(selectedMobile){setObjectPanelOpen(true);setPersonPanelOpen(false);onOpenMobileObject?.(selectedMobile)}
   },[canInteract,selected,selectedResident,selectedEntity,selectedMobile,onOpenWorldObject,onOpenMobileObject])
 
   async function talk(){
@@ -238,6 +239,11 @@ export default function PlanetaryWalkableSurface({
           : <em>{selected.building&&!selectedEntity?'im Bau / noch nicht zugänglich':'keine lokale Aktion hinterlegt'}</em>}
       </div>
 
+      {selectedMobile&&objectPanelOpen&&<aside className="object-panel">
+        <div className="person-head"><div><small>{(selected?.kind??'object').toUpperCase()} · LOKALE SZENE</small><b>{selectedMobile.label}</b><span>{selectedMobile.role??'Objekt'}</span></div><button onClick={()=>setObjectPanelOpen(false)}>×</button></div>
+        <div className="person-facts"><span>Status</span><b>{selectedMobile.status??'aktiv'}</b><span>Phase</span><b>{selectedMobile.phase??'–'}</b><span>Position</span><b>{Math.round(selectedMobile.xM)} m E · {Math.round(selectedMobile.yM)} m N</b></div>
+      </aside>}
+
       {selectedResident&&personPanelOpen&&<aside className="person-panel">
         <div className="person-head"><div><small>PERSON · LOKALE SZENE</small><b>{residentLabel(selectedResident)}</b><span>{residentRole(selectedResident)}</span></div><button onClick={()=>setPersonPanelOpen(false)}>×</button></div>
         <div className="person-facts"><span>Aktivität</span><b>{selectedResident.activityState}</b><span>Letzte Aktion</span><b>{selectedResident.lastAction??'–'}</b></div>
@@ -246,7 +252,7 @@ export default function PlanetaryWalkableSurface({
       </aside>}
     </div>
     <style jsx>{`
-      .planetary-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;background:#090b0c;color:#e8eef0;font-family:system-ui;overflow:hidden}.planetary-walkable header{height:46px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#07131dec;border-bottom:1px solid #394d59;position:relative;z-index:2}.planetary-walkable header>div:first-child{display:flex;align-items:baseline;gap:9px}.planetary-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.planetary-walkable header b{font-size:13px}.planetary-walkable header span{font-size:9px;color:#869ca7}.planetary-walkable .stats{display:flex;gap:10px;margin-left:auto;color:#8ba0aa;font-size:9px}.planetary-walkable header button,.target button{border:1px solid #466578;border-radius:6px;background:#102b3c;color:#e1edf1;padding:6px 9px;cursor:pointer}.target button:disabled{opacity:.45;cursor:not-allowed}.planetary-walkable .stage{position:absolute;inset:46px 0 0}.planetary-walkable svg{width:100%;height:100%;display:block}.planetary-walkable .hint{position:absolute;left:12px;top:12px;padding:6px 8px;border:1px solid #536973;border-radius:6px;background:#071521d9;color:#bdccd2;font:9px monospace}.target{position:absolute;right:14px;top:14px;min-width:230px;display:grid;gap:4px;padding:10px 12px;border:1px solid #6f7659;border-radius:8px;background:#101711e8;box-shadow:0 12px 30px #0007}.target small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.target b{font-size:12px}.target span,.target em{color:#9eada6;font-size:9px;font-style:normal}.person-panel{position:absolute;right:14px;top:132px;width:360px;max-height:calc(100% - 150px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.person-head{display:flex;justify-content:space-between;gap:12px}.person-head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.person-head b{display:block;margin-top:3px}.person-head span{display:block;color:#8ba3ad;font-size:9px}.person-head button,.person-chat button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.person-facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.person-facts span{color:#7e98a3}.person-panel p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.person-chat{display:flex;gap:6px;margin-top:10px}.person-chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.planetary-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;display:grid;place-items:center;background:#080c0f;color:#c4d4da;font-family:monospace}@media(max-width:760px){.planetary-walkable .stats{display:none}.target{left:12px;right:12px;top:46px}.person-panel{left:12px;right:12px;top:auto;bottom:12px;width:auto;max-height:42vh}}
+      .planetary-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;background:#090b0c;color:#e8eef0;font-family:system-ui;overflow:hidden}.planetary-walkable header{height:46px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#07131dec;border-bottom:1px solid #394d59;position:relative;z-index:2}.planetary-walkable header>div:first-child{display:flex;align-items:baseline;gap:9px}.planetary-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.planetary-walkable header b{font-size:13px}.planetary-walkable header span{font-size:9px;color:#869ca7}.planetary-walkable .stats{display:flex;gap:10px;margin-left:auto;color:#8ba0aa;font-size:9px}.planetary-walkable header button,.target button{border:1px solid #466578;border-radius:6px;background:#102b3c;color:#e1edf1;padding:6px 9px;cursor:pointer}.target button:disabled{opacity:.45;cursor:not-allowed}.planetary-walkable .stage{position:absolute;inset:46px 0 0}.planetary-walkable svg{width:100%;height:100%;display:block}.planetary-walkable .hint{position:absolute;left:12px;top:12px;padding:6px 8px;border:1px solid #536973;border-radius:6px;background:#071521d9;color:#bdccd2;font:9px monospace}.target{position:absolute;right:14px;top:14px;min-width:230px;display:grid;gap:4px;padding:10px 12px;border:1px solid #6f7659;border-radius:8px;background:#101711e8;box-shadow:0 12px 30px #0007}.target small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.target b{font-size:12px}.target span,.target em{color:#9eada6;font-size:9px;font-style:normal}.person-panel,.object-panel{position:absolute;right:14px;top:132px;width:360px;max-height:calc(100% - 150px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.object-panel{max-height:300px}.person-head{display:flex;justify-content:space-between;gap:12px}.person-head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.person-head b{display:block;margin-top:3px}.person-head span{display:block;color:#8ba3ad;font-size:9px}.person-head button,.person-chat button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.person-facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.person-facts span{color:#7e98a3}.person-panel p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.person-chat{display:flex;gap:6px;margin-top:10px}.person-chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.planetary-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1500;display:grid;place-items:center;background:#080c0f;color:#c4d4da;font-family:monospace}@media(max-width:760px){.planetary-walkable .stats{display:none}.target{left:12px;right:12px;top:46px}.person-panel,.object-panel{left:12px;right:12px;top:auto;bottom:12px;width:auto;max-height:42vh}}
     `}</style>
   </section>
 }
