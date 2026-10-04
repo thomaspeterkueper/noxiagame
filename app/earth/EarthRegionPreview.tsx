@@ -12,6 +12,7 @@ import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites
 import { createSpaceportPlanningOverlay } from '@/lib/world/spatial/spaceportPlanningOverlay'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
+import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 
 type GeoPoint = { lat:number; lon:number }
 type Feature = { id:string; featureType:string; properties:Record<string,string>; geometry:{kind:'point';coordinates:GeoPoint}|{kind:'line'|'polygon';coordinates:GeoPoint[]} }
@@ -109,6 +110,8 @@ export default function EarthRegionPreview(){
   const[focusError,setFocusError]=useState<string|null>(null)
   const[materializationBusy,setMaterializationBusy]=useState(false)
   const[materializationError,setMaterializationError]=useState<string|null>(null)
+  const earthPlayerPosition=useEarthPlayerPositionStore(s=>s.position)
+  const earthPlayerRegionId=useEarthPlayerPositionStore(s=>s.regionId)
 
   const drag=useRef<{x:number;y:number;ox:number;oy:number;moved:boolean}|null>(null)
   const suppressMapClick=useRef(false)
@@ -223,6 +226,14 @@ export default function EarthRegionPreview(){
   const selectedLandmark=selectedLandmarkId?landmarks.find(item=>item.landmark.id===selectedLandmarkId)??null:null
   const realLandmarks=useMemo(()=>projected.filter((feature:any)=>feature.featureType==='landmark'&&feature.p),[projected])
   const selectedRealLandmark=selectedRealLandmarkId?realLandmarks.find((item:any)=>item.id===selectedRealLandmarkId)??null:null
+  const playerMapPosition=useMemo(()=>{
+    if(!projection||!data?.region?.origin)return null
+    const regionId=data.region.id??null
+    if(earthPlayerRegionId&&regionId&&earthPlayerRegionId!==regionId)return null
+    const geo=localMetersToGeo({eastM:earthPlayerPosition.xM,northM:earthPlayerPosition.yM},data.region.origin)
+    if(data.bounds&&(geo.lat<data.bounds.south||geo.lat>data.bounds.north||geo.lon<data.bounds.west||geo.lon>data.bounds.east))return null
+    return{geo,mapX:projection.x(geo.lon),mapY:projection.y(geo.lat)}
+  },[projection,data?.region,data?.bounds,earthPlayerPosition,earthPlayerRegionId])
 
   const scale=useMemo(()=>{if(!mapMetrics)return null;const visibleWidthM=mapMetrics.widthM/zoom,targetM=visibleWidthM/MAP_SCALE_DIVISIONS,options=[2,5,10,20,50,100,200,500,1000,2000,5000,10000];const meters=options.reduce((best,n)=>Math.abs(n-targetM)<Math.abs(best-targetM)?n:best,options[0]);return{meters,pixels:meters/mapMetrics.widthM*1000*zoom}},[mapMetrics,zoom])
   const visualLanduseDetail=Boolean(data?.detail&&mapMetrics&&mapMetrics.widthM/zoom<=3500)
@@ -368,6 +379,14 @@ export default function EarthRegionPreview(){
               {zoom>=2&&<text pointerEvents="none" x={11/zoom} y={-7/zoom} fontSize={8.5/zoom} fontWeight="800" fill="#17313c" paintOrder="stroke" stroke="#f6f1e4" strokeWidth={2/zoom}>{item.landmark.name}</text>}
             </g>
           })}
+
+          {playerMapPosition&&<g transform={`translate(${playerMapPosition.mapX} ${playerMapPosition.mapY})`} pointerEvents="none" aria-label="Deine aktuelle Position">
+            <circle r={14/zoom} fill="#fff8d8" fillOpacity=".9" stroke="#173845" strokeWidth={3/zoom}/>
+            <circle r={5/zoom} fill="#d4ad43" stroke="#5a4515" strokeWidth={1.4/zoom}/>
+            <path d={`M 0 ${-20/zoom} L ${-5/zoom} ${-11/zoom} L ${5/zoom} ${-11/zoom} Z`} fill="#173845"/>
+            <text x={18/zoom} y={4/zoom} fontSize={10/zoom} fontWeight="900" fill="#17313c" paintOrder="stroke" stroke="#fff8e2" strokeWidth={2.5/zoom}>DU</text>
+            <title>Deine aktuelle Position · {Math.round(earthPlayerPosition.xM)} m E · {Math.round(earthPlayerPosition.yM)} m N</title>
+          </g>}
 
           {layers.noxia&&placed.map(b=>{
             const visual=b.visual,spriteScale=visual?.mapScale??1.7,spriteW=Math.max(b.widthSvg*spriteScale,22/zoom),spriteH=Math.max(Math.max(b.depthSvg,b.widthSvg*.72)*spriteScale,18/zoom),isSelected=b.pending?b.id===selectedPendingBuildId:b.id===selectedWorldObjectId
