@@ -9,6 +9,7 @@ const MAX_HISTORY_TOTAL_CHARS = 1200
 const MAX_REPLY_CHARS = 280
 const ACTION_MARKER = '[[ACTION:LEAD_WALK]]'
 const CREDIT_ACTION_MARKER = '[[ACTION:ACCEPT_CREDITS]]'
+const VISIT_PLACE_ACTION_RE = /\[\[ACTION:VISIT_PLACE:(p\d{1,2})\]\]/g
 const MIN_PERSISTED_EXCHANGES = 6
 const MAX_PERSISTED_EXCHANGES = 18
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -76,6 +77,15 @@ export async function POST(request: NextRequest) {
   const locationName = clean(body.locationName, 100)
   const localFacts = Array.isArray(body.localFacts)
     ? body.localFacts.slice(0, 16).map((value: unknown) => clean(value, 140)).filter(Boolean)
+    : []
+  const nearbyPlaces = Array.isArray(body.nearbyPlaces)
+    ? body.nearbyPlaces.slice(0, 10).map((value: any, index: number) => ({
+        key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
+        targetRef: clean(value?.targetRef, 96),
+        name: clean(value?.name, 80),
+        kind: clean(value?.kind, 48),
+        distanceM: Math.max(0, Math.min(100, Number(value?.distanceM ?? 0))),
+      })).filter((place: any) => place.targetRef && place.name && Number.isFinite(place.distanceM) && place.distanceM <= 45)
     : []
   if (!player) return NextResponse.json({ error: 'empty_message' }, { status: 400 })
 
@@ -146,7 +156,9 @@ export async function POST(request: NextRequest) {
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
-    'Du kannst zwei ausdrücklich erlaubte Aktionsmarker verwenden. Wenn du dich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge am Ende [[ACTION:LEAD_WALK]] an.',
+    'Du kannst ausdrücklich erlaubte Aktionsmarker verwenden. Wenn du dich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge am Ende [[ACTION:LEAD_WALK]] an.',
+    nearbyPlaces.length ? `Verifizierte nahe Ziele, die du aktuell wahrnehmen kannst:\n- ${nearbyPlaces.map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.max(1,Math.round(place.distanceM))} m`).join('\n- ')}` : '',
+    nearbyPlaces.length ? 'Wenn der Spieler eine konkrete gemeinsame Aktivität an einem dieser nahen Ziele vorschlägt und du zustimmst, kannst du genau dieses Ziel mit [[ACTION:VISIT_PLACE:pN]] auswählen. Verwende nur einen oben aufgeführten pN-Schlüssel und nur wenn das Ziel inhaltlich zum Vorschlag passt.' : '',
     'Wenn der Spieler dir ausdrücklich Credits anbietet oder eine unmittelbar vorherige konkrete Credit-Bitte von dir klar bestätigt, darfst du die Annahme mit [[ACTION:ACCEPT_CREDITS]] markieren. Der Marker bedeutet nur „annehmen“; Betrag und Berechtigung werden ausschließlich serverseitig aus dem Gespräch geprüft. Fordere mit diesem Marker niemals selbst eine Abbuchung an.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
     headline ? `Belegte reale Meldung: ${headline}` : '',
@@ -182,23 +194,37 @@ export async function POST(request: NextRequest) {
     const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
     const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
     const requestedCreditAcceptance = rawReply.includes(CREDIT_ACTION_MARKER)
+    const visitMatches = [...rawReply.matchAll(VISIT_PLACE_ACTION_RE)]
+    const requestedVisitKey = visitMatches[0]?.[1] ?? null
+    const requestedVisitPlace = requestedVisitKey
+      ? nearbyPlaces.find((place: any) => place.key === requestedVisitKey) ?? null
+      : null
     const reply = clean(
       rawReply
         .replaceAll(ACTION_MARKER, '')
-        .replaceAll(CREDIT_ACTION_MARKER, ''),
+        .replaceAll(CREDIT_ACTION_MARKER, '')
+        .replace(VISIT_PLACE_ACTION_RE, ''),
       MAX_REPLY_CHARS,
     )
     if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
     const playerLower = player.toLocaleLowerCase('de-DE')
     const followConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
-    const worldAction = requestedLeadWalk
+    const worldAction = requestedVisitPlace
       ? {
-          type: 'lead_walk' as const,
-          durationSeconds: 30,
-          maxDistanceMeters: 45,
+          type: 'visit_place' as const,
+          targetRef: requestedVisitPlace.targetRef,
+          targetName: requestedVisitPlace.name,
+          durationSeconds: Math.max(4, Math.min(35, Math.round(requestedVisitPlace.distanceM / 1.4))),
           playerFollows: followConsent,
         }
-      : null
+      : requestedLeadWalk
+        ? {
+            type: 'lead_walk' as const,
+            durationSeconds: 30,
+            maxDistanceMeters: 45,
+            playerFollows: followConsent,
+          }
+        : null
 
     let creditTransfer: null | {
       amount: number
