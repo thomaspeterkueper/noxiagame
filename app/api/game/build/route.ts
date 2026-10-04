@@ -206,67 +206,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const allDefs = await loadAllBuildingDefs()
-    const entityInfo: Record<string, { ertragswert: number; produktion: number | null; ressource: string | null; resourceSellPrice: number | null }> = {}
-
-    // Batch quote inputs once per request. The previous implementation called
-    // getQuoteForEntity() for every building, producing one locations query and
-    // often one market_prices query per entity (classic N+1 fan-out).
-    const buildingEntities = entities.filter((e: any) => e.entity_type === 'building' && allDefs.has(e.entity_id))
-    const quoteLocationIds = [...new Set(buildingEntities.map((e: any) => e.location_id).filter(Boolean))]
-    const quoteResources = [...new Set(buildingEntities
-      .map((e: any) => allDefs.get(e.entity_id)?.production[0]?.resource)
-      .filter(Boolean))] as string[]
-
-    const [{ data: quoteLocations }, { data: quotePrices }] = await Promise.all([
-      quoteLocationIds.length
-        ? serviceClient
-            .from('locations')
-            .select('id, slug, name, population, population_max')
-            .in('id', quoteLocationIds)
-        : Promise.resolve({ data: [] as any[] }),
-      quoteLocationIds.length && quoteResources.length
-        ? serviceClient
-            .from('market_prices')
-            .select('location_id, resource, sell_price, avg_sell_7')
-            .in('location_id', quoteLocationIds)
-            .in('resource', quoteResources)
-        : Promise.resolve({ data: [] as any[] }),
-    ])
-
-    const locationById = new Map((quoteLocations ?? []).map((row: any) => [row.id, row]))
-    const priceByLocationResource = new Map(
-      (quotePrices ?? []).map((row: any) => [`${row.location_id}:${row.resource}`, row]),
-    )
-
-    for (const e of buildingEntities) {
-      const def = allDefs.get(e.entity_id)
-      if (!def) continue
-      const location = locationById.get(e.location_id)
-      if (!location) continue
-
-      const primaryProduction = def.production[0] ?? null
-      const price = primaryProduction
-        ? priceByLocationResource.get(`${location.id}:${primaryProduction.resource}`)
-        : null
-      const resourceSellPrice = price?.avg_sell_7 ?? price?.sell_price ?? null
-      const quote = getSaleQuote({
-        buildableId: e.entity_id,
-        def,
-        resourceSellPrice,
-        population: location.population,
-        populationMax: location.population_max,
-      })
-
-      entityInfo[e.id] = {
-        ertragswert: quote.ertragswert,
-        produktion: primaryProduction?.amount ?? null,
-        ressource: primaryProduction?.resource ?? null,
-        resourceSellPrice,
-      }
-    }
-
-    return NextResponse.json({ builds: active ?? [], entities: entities ?? [], colonyTax, entityInfo })
+    // Economic valuation is intentionally not part of the general build snapshot.
+    // Market-linked building values are calculated lazily for explicit valuation
+    // use cases (sell quote, financing/credit assessment, etc.). This keeps the
+    // hot dashboard path independent from market-price reads.
+    return NextResponse.json({ builds: active ?? [], entities: entities ?? [], colonyTax })
   }
 
   if (action === 'start') {
