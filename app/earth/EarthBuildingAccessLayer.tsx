@@ -15,6 +15,7 @@ import BankOverlay from '@/app/dashboard/BankOverlay'
 import { getToken } from '@/lib/supabase/auth'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import type { BuildingEntryRequest } from '@/lib/game/buildings/entry'
+import CafeWalkableInterior from './CafeWalkableInterior'
 
 type ResourceRow = { resource: string; stock: number; consumption: number; production: number }
 type AccessData = {
@@ -266,23 +267,11 @@ export default function EarthBuildingAccessLayer({
 
   if (request.kind === 'hospitality') {
     return (
-      <FacilityPanel
-        eyebrow="GASTRONOMIE"
-        title={request.buildingName}
-        copy="Du bist im Gebäude. Der begehbare Innenraum wird auf derselben Personen- und Interaktionslogik wie die Außenwelt aufgebaut."
+      <CafeWalkableInterior
+        entityId={request.entityId}
+        buildingName={request.buildingName}
         onClose={onClose}
-      >
-        <div style={{ display: 'grid', gap: 8, fontSize: 11 }}>
-          <div style={{ padding: 10, border: '1px solid #ccd4d1', borderRadius: 8, background: '#f8faf6' }}>
-            <b>Innenraum aktiv</b>
-            <span style={{ display: 'block', marginTop: 3, color: '#65767b' }}>Aufenthalt, Gespräche und gemeinsame Café-Handlungen können hier stattfinden.</span>
-          </div>
-          <div style={{ padding: 10, border: '1px solid #ccd4d1', borderRadius: 8, background: '#f8faf6' }}>
-            <b>Nächster Ausbau</b>
-            <span style={{ display: 'block', marginTop: 3, color: '#65767b' }}>Tische, Sitzplätze, Bedienung, Bestellungen und tatsächliche Innenraumbewegung werden als räumliche Objekte ergänzt.</span>
-          </div>
-        </div>
-      </FacilityPanel>
+      />
     )
   }
 
