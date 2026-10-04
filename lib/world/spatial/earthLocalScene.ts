@@ -1,4 +1,5 @@
 import { geoToLocalMeters, type GeoPoint } from './earthSpatial'
+import { buildLocalSurfaceScene, type LocalSurfaceBuilding, type LocalSurfacePath, type LocalSurfacePoint, type LocalSurfacePolygon, type LocalSurfaceScene } from '@/lib/game/spatial/localSurfaceScene'
 
 export type EarthSceneFeature = {
   id: string
@@ -7,34 +8,18 @@ export type EarthSceneFeature = {
   properties?: Record<string, unknown>
 }
 
-export type ScenePoint = { xM:number; yM:number }
-export type ScenePath = { id:string; kind:'road'|'rail'|'waterway'; points:ScenePoint[]; className?:string }
-export type ScenePolygon = { id:string; kind:'water'|'forest'|'vegetation'|'farmland'|'urban'; points:ScenePoint[] }
-export type SceneBuilding = {
-  id:string
-  center:ScenePoint
-  widthM:number
-  depthM:number
-  rotationDeg:number
-  provenance:'observed'|'derived'
-  label?:string
-}
-export type EarthLocalScene = {
-  origin: GeoPoint
-  radiusM: number
-  paths: ScenePath[]
-  polygons: ScenePolygon[]
-  buildings: SceneBuilding[]
-  roadGraph: ScenePath[]
-  railGraph: ScenePath[]
-}
+export type ScenePoint = LocalSurfacePoint
+export type ScenePath = LocalSurfacePath
+export type ScenePolygon = LocalSurfacePolygon
+export type SceneBuilding = LocalSurfaceBuilding
+export type EarthLocalScene = LocalSurfaceScene & { origin: GeoPoint }
 
 function hash(value:string){
   let h=2166136261
   for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}
   return h>>>0
 }
-function inside(point:ScenePoint,radiusM:number){return Math.abs(point.xM)<=radiusM&&Math.abs(point.yM)<=radiusM}
+function inside(point:LocalSurfacePoint,radiusM:number){return Math.abs(point.xM)<=radiusM&&Math.abs(point.yM)<=radiusM}
 function toScenePoint(point: GeoPoint, origin: GeoPoint): ScenePoint {
   const local = geoToLocalMeters(point, origin)
   return { xM: local.eastM, yM: local.northM }
@@ -43,7 +28,7 @@ function pointsOf(feature:EarthSceneFeature,origin:GeoPoint): ScenePoint[]{
   if(feature.geometry.kind==='point')return [toScenePoint(feature.geometry.coordinates as GeoPoint,origin)]
   return (feature.geometry.coordinates as GeoPoint[]).map(point=>toScenePoint(point,origin))
 }
-function polygonBounds(points:ScenePoint[]){
+function polygonBounds(points:LocalSurfacePoint[]){
   const xs=points.map(p=>p.xM),ys=points.map(p=>p.yM)
   return {minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys)}
 }
@@ -54,9 +39,9 @@ export function buildEarthLocalScene(input:{
   radiusM?:number
 }):EarthLocalScene{
   const radiusM=input.radiusM??260
-  const paths:ScenePath[]=[]
-  const polygons:ScenePolygon[]=[]
-  const buildings:SceneBuilding[]=[]
+  const paths:LocalSurfacePath[]=[]
+  const polygons:LocalSurfacePolygon[]=[]
+  const buildings:LocalSurfaceBuilding[]=[]
 
   for(const feature of input.features){
     const points=pointsOf(feature,input.origin)
@@ -73,7 +58,7 @@ export function buildEarthLocalScene(input:{
     }
 
     if(['water','forest','vegetation','farmland','urban'].includes(feature.featureType)&&feature.geometry.kind==='polygon'&&points.length>=3){
-      polygons.push({id:feature.id,kind:feature.featureType as ScenePolygon['kind'],points})
+      polygons.push({id:feature.id,kind:feature.featureType as LocalSurfacePolygon['kind'],points,provenance:'observed'})
       if(feature.featureType==='urban'){
         // Until real building footprints are available, derive sparse visual
         // massing from observed urban polygons. These objects are explicitly
@@ -117,12 +102,14 @@ export function buildEarthLocalScene(input:{
   }
 
   return {
+    ...buildLocalSurfaceScene({
+      body:'earth',
+      frameId:'earth-wgs84-local-enu',
+      radiusM,
+      paths,
+      polygons,
+      buildings,
+    }),
     origin:input.origin,
-    radiusM,
-    paths,
-    polygons,
-    buildings,
-    roadGraph:paths.filter(path=>path.kind==='road'),
-    railGraph:paths.filter(path=>path.kind==='rail'),
   }
 }
