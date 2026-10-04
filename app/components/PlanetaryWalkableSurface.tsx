@@ -237,7 +237,7 @@ export default function PlanetaryWalkableSurface({
         {hasAction
           ? <button disabled={!canInteract} onClick={interact}>{canInteract?(selectedResident?'SPRECHEN':'INTERAGIEREN'):'NÄHER HERANGEHEN'}</button>
           : <em>{selected.building&&!selectedEntity?'im Bau / noch nicht zugänglich':'keine lokale Aktion hinterlegt'}</em>}
-      </div>
+      </div>}
 
       {selectedMobile&&objectPanelOpen&&<aside className="object-panel">
         <div className="person-head"><div><small>{(selected?.kind??'object').toUpperCase()} · LOKALE SZENE</small><b>{selectedMobile.label}</b><span>{selectedMobile.role??'Objekt'}</span></div><button onClick={()=>setObjectPanelOpen(false)}>×</button></div>
