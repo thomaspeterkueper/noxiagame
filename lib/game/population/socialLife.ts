@@ -180,7 +180,9 @@ async function updateFamilyDemand(supabase: SB, tick: number) {
     supabase.from('locations').select('id'),
   ])
 
-  const personLocation = new Map((people ?? []).map((row: any) => [row.id, row.current_location_id]))
+  const personLocation = new Map<string, string>(
+    (people ?? []).map((row: any) => [String(row.id), String(row.current_location_id)] as [string, string]),
+  )
   const demand = new Map<string, { a: number; b: number; c: number }>()
   for (const state of lifeStates ?? []) {
     if (state.life_stage !== 'child') continue
@@ -227,9 +229,9 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
     supabase.from('locations').select('id, is_supplied, population, population_max'),
   ])
 
-  const peopleById = new Map((people ?? []).map((row: any) => [row.id, row]))
-  const lifeById = new Map((lifeRows ?? []).map((row: any) => [row.person_id, row]))
-  const locationById = new Map((locations ?? []).map((row: any) => [row.id, row]))
+  const peopleById = new Map<string, any>((people ?? []).map((row: any) => [String(row.id), row] as [string, any]))
+  const lifeById = new Map<string, any>((lifeRows ?? []).map((row: any) => [String(row.person_id), row] as [string, any]))
+  const locationById = new Map<string, any>((locations ?? []).map((row: any) => [String(row.id), row] as [string, any]))
 
   const missingLifeRows = (people ?? []).filter((person: any) => !lifeById.has(person.id)).map((person: any) => ({
     person_id: person.id,
