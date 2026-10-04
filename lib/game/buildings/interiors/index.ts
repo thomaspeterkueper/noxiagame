@@ -16,3 +16,5 @@ export * from './functions/invocation'
 export * from './templates/laboratoryStandard'
 export * from './templates/orbitalTransferStation'
 export * from './templates/pressurizedHabitatCluster'
+
+export * from './templates/cafeStandard'
