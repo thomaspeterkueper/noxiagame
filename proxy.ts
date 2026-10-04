@@ -33,6 +33,18 @@ export async function proxy(request: NextRequest) {
     request: { headers: requestHeaders },
   })
 
+  // API routes authenticate themselves where needed. Calling Auth here as well
+  // would add one /auth/v1/user request to every API request for no routing
+  // benefit. Cron header normalization above still applies.
+  if (
+    pathname.startsWith('/api/')
+    || pathname.startsWith('/audio/')
+    || pathname.startsWith('/assets/')
+    || pathname === '/robots.txt'
+  ) {
+    return nextResponse()
+  }
+
   let supabaseResponse = nextResponse()
 
   const supabase = createServerClient(
