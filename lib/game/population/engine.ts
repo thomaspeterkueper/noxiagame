@@ -98,18 +98,22 @@ function relationshipFromRow(row: any): PersonRelationship {
   }
 }
 
-async function updateNeedsForAction(supabase: SupabaseLike, personId: string, action: PopulationAction, tick: number) {
-  const { data: needs } = await supabase.from('person_needs').select('need_code, satisfaction').eq('person_id', personId)
-  for (const need of needs ?? []) {
+async function updateNeedsForAction(
+  supabase: SupabaseLike,
+  personId: string,
+  needs: any[],
+  action: PopulationAction,
+  tick: number,
+) {
+  for (const need of needs) {
     const next = Math.max(0, Math.min(1, Number(need.satisfaction ?? 1) + needDelta(action, need.need_code)))
     await supabase.from('person_needs').update({ satisfaction: next, updated_tick: tick, updated_at: new Date().toISOString() }).eq('person_id', personId).eq('need_code', need.need_code)
   }
 }
 
-async function decideBackgroundPerson(supabase: SupabaseLike, person: any, tick: number) {
-  const [{ data: assignmentRows }, { data: needRows }, { data: skillRows }, { data: relationRows }, { data: knowledgeRows }] = await Promise.all([
+async function decideBackgroundPerson(supabase: SupabaseLike, person: any, tick: number, needRows: any[]) {
+  const [{ data: assignmentRows }, { data: skillRows }, { data: relationRows }, { data: knowledgeRows }] = await Promise.all([
     supabase.from('person_assignments').select('*').eq('person_id', person.id).eq('is_active', true),
-    supabase.from('person_needs').select('*').eq('person_id', person.id),
     supabase.from('person_skills').select('*').eq('person_id', person.id),
     supabase.from('person_relationships').select('*').eq('person_id', person.id),
     supabase.from('person_knowledge').select('*').eq('person_id', person.id),
@@ -214,6 +218,23 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     assignmentRows = data ?? []
   }
   const assignments = assignmentRows.map(assignmentFromRow)
+
+  let needRows: any[] = []
+  if (personIds.length) {
+    const { data, error } = await supabase
+      .from('person_needs')
+      .select('person_id, need_code, satisfaction, updated_tick')
+      .in('person_id', personIds)
+    if (error) throw error
+    needRows = data ?? []
+  }
+  const needsByPerson = new Map<string, any[]>()
+  for (const row of needRows) {
+    const rows = needsByPerson.get(row.person_id) ?? []
+    rows.push(row)
+    needsByPerson.set(row.person_id, rows)
+  }
+
   const previousPeople: Person[] = peopleRows.map(personFromRow)
   const currentPeople = new Map<string, Person>(previousPeople.map(person => [person.id, person] as const))
   const previousCandidates = resolvedPresenceCandidates(previousPeople, assignments)
@@ -223,14 +244,15 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
   for (const person of peopleRows) {
     if (Number(person.last_tick ?? -1) >= tick) continue
     if (person.person_key) {
-      await updateNeedsForAction(supabase, person.id, actionFromNamedActivity(person.activity_state), tick)
+      await updateNeedsForAction(supabase, person.id, needsByPerson.get(person.id) ?? [], actionFromNamedActivity(person.activity_state), tick)
       namedNeedsAdvanced += 1
       continue
     }
-    const decision = await decideBackgroundPerson(supabase, person, tick)
+    const personNeeds = needsByPerson.get(person.id) ?? []
+    const decision = await decideBackgroundPerson(supabase, person, tick, personNeeds)
     const nextActivity = activityForAction(decision.action)
     await supabase.from('people').update({ activity_state: nextActivity, last_action: decision.action, last_decision_factors: { ...decision.factors, score: decision.score }, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
-    await updateNeedsForAction(supabase, person.id, decision.action, tick)
+    await updateNeedsForAction(supabase, person.id, personNeeds, decision.action, tick)
     await supabase.from('population_events').insert({ tick, event_type: `npc_${decision.action}`, actor_person_id: person.id, location_id: person.current_location_id, subject_type: typeof decision.factors.subjectRef === 'string' && decision.factors.subjectRef ? 'problem' : null, subject_ref: typeof decision.factors.subjectRef === 'string' && decision.factors.subjectRef ? decision.factors.subjectRef : null, payload: { action: decision.action, score: decision.score, factors: decision.factors } })
     currentPeople.set(person.id, {
       ...personFromRow(person),

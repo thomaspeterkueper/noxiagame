@@ -102,17 +102,44 @@ export async function runPersonTick(supabase: any, tick: number, pressuresByLoca
   const result: PersonTickResult = { processed: 0, decisions: 0, events: 0, errors: [] }
   const { data: people, error } = await supabase.from('people').select('id, person_key, public_role, traits, current_location_id, simulation_tier, activity_state, last_action, last_tick').eq('simulation_tier', 'active').not('person_key', 'is', null)
   if (error) return { ...result, errors: [`people load: ${error.message ?? error}`] }
+
+  const personIds = (people ?? []).map((person: any) => person.id)
+  const [{ data: allNeeds, error: needsError }, { data: allSkills, error: skillsError }, { data: allWork, error: workError }] = personIds.length
+    ? await Promise.all([
+        supabase.from('person_needs').select('person_id, need_code, satisfaction').in('person_id', personIds),
+        supabase.from('person_skills').select('person_id, skill_code, level').in('person_id', personIds),
+        supabase.from('person_assignments').select('person_id, role_code').in('person_id', personIds).eq('assignment_type', 'work').eq('is_active', true),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }]
+
+  if (needsError) result.errors.push(`needs load: ${needsError.message ?? needsError}`)
+  if (skillsError) result.errors.push(`skills load: ${skillsError.message ?? skillsError}`)
+  if (workError) result.errors.push(`work load: ${workError.message ?? workError}`)
+
+  const needsByPerson = new Map<string, any[]>()
+  for (const row of allNeeds ?? []) {
+    const rows = needsByPerson.get(row.person_id) ?? []
+    rows.push(row)
+    needsByPerson.set(row.person_id, rows)
+  }
+  const skillsByPerson = new Map<string, any[]>()
+  for (const row of allSkills ?? []) {
+    const rows = skillsByPerson.get(row.person_id) ?? []
+    rows.push(row)
+    skillsByPerson.set(row.person_id, rows)
+  }
+  const workByPerson = new Map<string, any>()
+  for (const row of allWork ?? []) workByPerson.set(row.person_id, row)
+
   for (const person of people ?? []) {
     try {
-      const [{ data: needsRows }, { data: skillsRows }, { data: work }] = await Promise.all([
-        supabase.from('person_needs').select('need_code, satisfaction').eq('person_id', person.id),
-        supabase.from('person_skills').select('skill_code, level').eq('person_id', person.id),
-        supabase.from('person_assignments').select('role_code').eq('person_id', person.id).eq('assignment_type', 'work').eq('is_active', true).maybeSingle(),
-      ])
+      const needsRows = needsByPerson.get(person.id) ?? []
+      const skillsRows = skillsByPerson.get(person.id) ?? []
+      const work = workByPerson.get(person.id)
       const needs: PersonNeedState = {}
-      for (const n of needsRows ?? []) (needs as any)[n.need_code] = Number(n.satisfaction)
+      for (const n of needsRows) (needs as any)[n.need_code] = Number(n.satisfaction)
       const skills: PersonSkillState = {}
-      for (const s of skillsRows ?? []) skills[s.skill_code] = Number(s.level)
+      for (const s of skillsRows) skills[s.skill_code] = Number(s.level)
       const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick })
       await supabase.from('people').update({ activity_state: decision.activity, last_action: decision.actionCode, last_decision_factors: decision.factors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
       result.decisions++
