@@ -151,34 +151,106 @@ export async function POST(request: NextRequest) {
     const reply = clean(data?.choices?.[0]?.message?.content, MAX_REPLY_CHARS)
     if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
 
+    let identityLearned = false
     if (npcId) {
+      const now = new Date()
+      const isNewEncounter = history.length === 0
+      const previousScore = Number(persistedMemory?.recent_encounter_score ?? 0)
+      const lastEncounterMs = persistedMemory?.last_encounter_at ? Date.parse(persistedMemory.last_encounter_at) : NaN
+      const gapHours = Number.isFinite(lastEncounterMs)
+        ? Math.max(0, (now.getTime() - lastEncounterMs) / 3_600_000)
+        : Number.POSITIVE_INFINITY
+      const encounterGain = gapHours <= 24 ? 0.24 : gapHours <= 168 ? 0.12 : 0.05
+      const encounterRetention = gapHours <= 168 ? 0.86 : 0.5
+      const recentEncounterScore = isNewEncounter
+        ? Math.max(0, Math.min(1, previousScore * encounterRetention + encounterGain))
+        : previousScore
+      const encounterCount = Number(persistedMemory?.encounter_count ?? 0) + (isNewEncounter ? 1 : 0)
+      const memoryLimit = Math.min(
+        MAX_PERSISTED_EXCHANGES,
+        MIN_PERSISTED_EXCHANGES + Math.round(
+          recentEncounterScore * (MAX_PERSISTED_EXCHANGES - MIN_PERSISTED_EXCHANGES),
+        ),
+      )
+
       const previous = Array.isArray(persistedMemory?.recent_exchanges) ? persistedMemory.recent_exchanges : []
       const recentExchanges = [
         ...previous,
         {
           player,
           npc: reply,
-          at: new Date().toISOString(),
+          at: now.toISOString(),
           location: locationName || null,
         },
-      ].slice(-MAX_PERSISTED_EXCHANGES)
+      ].slice(-memoryLimit)
 
       const { error: memoryError } = await serviceClient
         .from('npc_player_conversation_memory')
         .upsert({
           npc_person_id: npcId,
           player_profile_id: user.id,
-          encounter_count: Number(persistedMemory?.encounter_count ?? 0) + 1,
+          encounter_count: encounterCount,
+          recent_encounter_score: recentEncounterScore,
+          last_encounter_at: isNewEncounter
+            ? now.toISOString()
+            : persistedMemory?.last_encounter_at ?? now.toISOString(),
           recent_exchanges: recentExchanges,
           last_location: locationName || null,
-          last_interaction_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          last_interaction_at: now.toISOString(),
+          updated_at: now.toISOString(),
         }, { onConflict: 'npc_person_id,player_profile_id' })
 
-      if (memoryError) console.error('npc conversation memory write failed', { npcId, userId: user.id, code: memoryError.code })
+      if (memoryError) {
+        console.error('npc conversation memory write failed', {
+          npcId,
+          userId: user.id,
+          code: memoryError.code,
+        })
+      }
+
+      if (canonicalNpc?.display_name && identityState !== 'known') {
+        const normalizedReply = reply.toLocaleLowerCase('de-DE')
+        const normalizedName = String(canonicalNpc.display_name).toLocaleLowerCase('de-DE')
+        const selfIntroduction =
+          normalizedReply.includes('ich bin ' + normalizedName)
+          || normalizedReply.includes('mein name ist ' + normalizedName)
+          || normalizedReply.includes('ich heiße ' + normalizedName)
+          || normalizedReply.includes('ich heisse ' + normalizedName)
+
+        if (selfIntroduction) {
+          const { data: tickRow } = await serviceClient
+            .from('tick_log')
+            .select('tick_number')
+            .order('tick_number', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          const { error: identityError } = await serviceClient
+            .from('player_person_identity_knowledge')
+            .upsert({
+              profile_id: user.id,
+              person_id: npcId,
+              identity_state: 'known',
+              inferred_name: null,
+              known_name: canonicalNpc.display_name,
+              confidence: 1,
+              source_kind: 'self_introduction',
+              source_ref: 'npc-conversation',
+              learned_tick: tickRow?.tick_number ?? null,
+              updated_at: now.toISOString(),
+            }, { onConflict: 'profile_id,person_id' })
+
+          if (!identityError) identityLearned = true
+        }
+      }
     }
 
-    return NextResponse.json({ reply, maxPlayerChars: MAX_PLAYER_CHARS })
+    return NextResponse.json({
+      reply,
+      maxPlayerChars: MAX_PLAYER_CHARS,
+      identityLearned,
+      learnedName: identityLearned ? canonicalNpc?.display_name ?? null : null,
+    })
   } catch {
     return NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })
   }
