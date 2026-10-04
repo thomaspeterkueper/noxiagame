@@ -49,6 +49,23 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const origin=data?.region?.origin
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
+  const localFacts=useMemo(()=>{
+    const facts:string[]=[]
+    if(data?.region?.name)facts.push(`Ort: ${data.region.name}`)
+    if(scene){
+      facts.push(`${scene.roadGraph.length} lokale Straßensegmente im aktuellen Ausschnitt`)
+      facts.push(`${scene.railGraph.length} lokale Schienensegmente im aktuellen Ausschnitt`)
+      facts.push(`${scene.buildings.length} Gebäude/Bebauungsmassen im aktuellen Ausschnitt`)
+      if(scene.polygons.some(item=>item.kind==='water')||scene.paths.some(item=>item.kind==='waterway'))facts.push('Wasserlauf oder Wasserfläche im aktuellen Ausschnitt vorhanden')
+      if(scene.polygons.some(item=>item.kind==='forest'||item.kind==='vegetation'))facts.push('Vegetations- bzw. Waldflächen im aktuellen Ausschnitt vorhanden')
+    }
+    const named=features.filter(feature=>feature.geometry.kind==='point'&&feature.properties?.name).slice(0,10)
+    for(const feature of named){
+      const type=String(feature.properties?.visual_class??feature.featureType)
+      facts.push(`${String(feature.properties?.name)} · ${type}`)
+    }
+    return facts
+  },[data?.region?.name,scene,features])
 
   const npcPositions=useMemo(()=>scene?residents.slice(0,18).map((resident,index)=>{
     const h=hash(resident.id)
@@ -65,7 +82,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     setSending(true);setReply('')
     try{
       const{token}=await getSessionInfo()
-      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:message.trim().slice(0,120),npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',history:[]})})
+      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:message.trim().slice(0,120),npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts,history:[]})})
       const json=await response.json().catch(()=>({}))
       setReply(response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.')
     }catch{setReply('Gespräch derzeit nicht erreichbar.')}finally{setSending(false)}
