@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
+import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import PlanetarySurfaceMap, { type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
 import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
 import {
@@ -40,11 +42,14 @@ const SHACKLETON_CORRIDORS: PreparedCorridor[] = (() => {
 
 export default function DashboardMoonSurface({ locations, prices, orders }: Props) {
   const location=useGameStore(s=>s.location),credits=useGameStore(s=>s.credits),cargo=useGameStore(s=>s.cargo),cargoMax=useGameStore(s=>s.cargoMax),shipTypeId=useGameStore(s=>s.shipTypeId),shipRange=useGameStore(s=>s.shipRange),buy=useGameStore(s=>s.buy),sell=useGameStore(s=>s.sell),loadFromServer=useGameStore(s=>s.loadFromServer)
+  const mode=useGameModeStore(s=>s.mode),enterPlanning=useGameModeStore(s=>s.enterPlanning)
   const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null),[spaceportEntity,setSpaceportEntity]=useState<PlanetarySurfaceEntity|null>(null),[navigationOpen,setNavigationOpen]=useState(false),[shipyardOpen,setShipyardOpen]=useState(false),[warehouseOpen,setWarehouseOpen]=useState(false),[logisticsOpen,setLogisticsOpen]=useState(false),[tick,setTick]=useState(0)
   const moonLocation=useMemo(()=>locations.find((item:any)=>item.slug==='moon')??null,[locations]),moonOrders=useMemo(()=>orders.filter((item:any)=>item.locations?.slug==='moon'),[orders])
   useEffect(()=>{if(location!=='moon')return;let cancelled=false;fetch('/api/game/world',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(!cancelled)setTick(Number(p?.stats?.tickNumber??0))}).catch(()=>{});return()=>{cancelled=true}},[location])
   useEffect(()=>{if(location!=='moon')return;let cancelled=false;(async()=>{try{const token=await getToken();if(!token||cancelled)return;await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({location:'moon'})})}catch{}})();return()=>{cancelled=true}},[location])
   if(location!=='moon')return null
+
+  if(mode==='colony')return <PlanetaryWalkableSurface locationSlug="moon" body="moon" title="Shackleton" corridors={SHACKLETON_CORRIDORS} onClose={enterPlanning}/>
 
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_moon'){setSpaceportEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
   const handleInteriorAction=(kind:'market'|'shipyard'|'navigation'|'ship'|'parts'|null)=>{if(kind==='market')setWarehouseOpen(true);if(kind==='shipyard'||kind==='parts'||kind==='ship')setShipyardOpen(true);if(kind==='navigation')setNavigationOpen(true);if(kind)setInteriorEntity(null)}
