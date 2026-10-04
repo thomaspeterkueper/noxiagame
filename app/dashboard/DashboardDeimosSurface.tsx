@@ -207,8 +207,6 @@ export default function DashboardDeimosSurface({ locations }: Props) {
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(null), 3200); return () => window.clearTimeout(timer) }, [notice])
   if (locationSlug !== 'deimos') return null
 
-  if (mode === 'colony') return <PlanetaryWalkableSurface locationSlug="deimos" body="deimos" title="Swift-1" corridors={DEIMOS_CORRIDORS} mobileObjects={[...DEIMOS_FIELD_POINTS]} onOpenWorldObject={(entity)=>{const id=entity.entity_id??'';if(id==='shuttle_dock_deimos'){setDockEntity(entity);return}if(id==='research_station'){setScienceOpen(true);return}setInteriorEntity(entity)}} onOpenMobileObject={(object)=>{const point=DEIMOS_FIELD_POINTS.find(item=>item.id===object.id);if(point)setFieldPoint(point)}} onClose={enterPlanning} />
-
   const openWorldObject = (entity: PlanetarySurfaceEntity) => {
     const id = entity.entity_id ?? ''
     if (id === 'shuttle_dock_deimos') { setDockEntity(entity); return }
@@ -223,6 +221,11 @@ export default function DashboardDeimosSurface({ locations }: Props) {
 
   const dockName = dockEntity?.name ?? dockEntity?.entity_id ?? 'Anlegestelle'
   const interiorName = interiorEntity?.name ?? interiorEntity?.entity_id ?? 'Anlage'
+
+  if (mode === 'colony') return <>
+    <PlanetaryWalkableSurface locationSlug="deimos" body="deimos" title="Swift-1" corridors={DEIMOS_CORRIDORS} mobileObjects={[...DEIMOS_FIELD_POINTS]} onOpenWorldObject={setInteriorEntity} onClose={enterPlanning} />
+    {interiorEntity && <BuildingOverlayShell eyebrow="GEBÄUDE · INNENRAUM" title={interiorName} subtitle="Gemeinsamer Scene-/Interaction-Zugang" onClose={() => setInteriorEntity(null)} width={1020}><BuildingInterior entity={{ ...interiorEntity, entity_type: 'building', tile_row: 0, tile_col: 0, profile_id: interiorEntity.profile_id ?? null, owner_class: interiorEntity.owner_class ?? 'STATE' } as any} userId="" locationResources={currentResources as any} credits={credits} population={Number(deimosLocation?.population ?? 0)} hasShipyard={false} currentTick={tick} shipRange={shipRange} currentLocationSlug="deimos" onClose={() => setInteriorEntity(null)} /></BuildingOverlayShell>}
+  </>
 
   return <section className="noxia-dashboard-deimos-surface" aria-label="Deimos-Oberfläche Swift">
     <div className="deimos-context-label"><strong>SYNTHETISCH · Swift-Nordrand</strong><span>reale Nomenklatur · erfundenes lokales Terrain · Forschungsaußenstelle Swift-1</span></div>
