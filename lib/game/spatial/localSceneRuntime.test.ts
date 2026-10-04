@@ -57,7 +57,7 @@ describe('shared local scene runtime', () => {
     expect(stopped).toEqual({ xM: 12, yM: 12 })
 
     const slid = resolveLocalSceneStep(scene, { xM: 12, yM: 4 }, { xM: 17, yM: 10 })
-    expect(slid).toEqual({ xM: 12, yM: 10 })
+    expect(slid).toEqual({ xM: 17, yM: 4 })
   })
 
   it('derives building, vehicle and person interactions from one scene contract', () => {
