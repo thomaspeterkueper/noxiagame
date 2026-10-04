@@ -10,6 +10,7 @@ import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
 import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
+import { THARSIS_HUB_SURFACE_CORRIDORS } from '@/lib/game/seeds/tharsisHubSurfaceCorridors'
 
 export default function DashboardMarsSurface(){
   const location=useGameStore(state=>state.location)
@@ -49,6 +50,7 @@ export default function DashboardMarsSurface(){
       locationSlug="mars"
       body="mars"
       title="Tharsis Hub"
+      corridors={THARSIS_HUB_SURFACE_CORRIDORS}
       onOpenWorldObject={openWorldObject}
       onClose={enterPlanning}
     />
@@ -76,6 +78,7 @@ export default function DashboardMarsSurface(){
       mapLabel="Spielbare Mars-Karte (Tharsis Hub)"
       terrainLabel="MGS / MOLA"
       minimumWorldSpanM={700}
+      corridors={THARSIS_HUB_SURFACE_CORRIDORS}
       onOpenWorldObject={openWorldObject}
     />
     {interiorEntity&&<BuildingOverlayShell eyebrow="MARS · INNENRAUM" title={interiorName} subtitle="Persistentes Weltgebäude · gemeinsamer Interior-Pfad" onClose={()=>setInteriorEntity(null)} width={1020}>
@@ -92,7 +95,7 @@ export default function DashboardMarsSurface(){
         onClose={()=>setInteriorEntity(null)}
       />
     </BuildingOverlayShell>}
-    <div className="mars-migration-note">Legacy-Straßentiles werden nicht mehr als eigener Spielraum verwendet; begehbare Wege und Gebäude kommen aus derselben planetaren Surface-Geometrie.</div>
+    <div className="mars-migration-note">Tharsis-Wege und Gebäude laufen jetzt über dieselbe metrische planetare Surface-Geometrie.</div>
     <style jsx>{`
       .noxia-dashboard-mars-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:hidden;background:#170d09;overscroll-behavior:contain}
       .noxia-dashboard-mars-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:radial-gradient(circle at 45% 32%,rgba(142,82,57,.18),transparent 48%),linear-gradient(180deg,#25130d,#100906 76%);z-index:0}
