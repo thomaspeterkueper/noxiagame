@@ -123,7 +123,9 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
         headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},
         body:JSON.stringify({
           player,
+          npcId:scene.first.id,
           npcName:scene.first.displayName,
+          locationName:locationSlug,
           npcRole:residentRole(scene.first),
           headline:scene.conversation.item.title,
           source:scene.source?.name??scene.conversation.item.sourceId,
