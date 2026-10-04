@@ -74,6 +74,24 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     allowedLocations: ['earth', 'mars'],
   },
 
+  kindergarten: {
+    id: 'kindergarten', name: 'Kindergarten', category: 'service',
+    description: 'Betreuung für junge Kinder · Bedarf wird aus der Living Population abgeleitet',
+    cost: 2200, buildTimeTicks: 2,
+  },
+
+  playground: {
+    id: 'playground', name: 'Spielplatz', category: 'service',
+    description: 'Freizeit- und Sozialraum für Kinder · unterstützt familienfreundliche Siedlungen',
+    cost: 900, buildTimeTicks: 1,
+  },
+
+  basic_school: {
+    id: 'basic_school', name: 'Schule', category: 'service',
+    description: 'Grund- und weiterführende Bildung für Kinder und Jugendliche',
+    cost: 4200, buildTimeTicks: 4,
+  },
+
   road: {
     id: 'road', name: 'Straße', category: 'infrastructure',
     description: 'Erschließt benachbarte Kacheln · Voraussetzung für Habitate',

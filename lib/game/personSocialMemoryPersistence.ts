@@ -71,7 +71,7 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
   if (!memory.otherPersonId || options.projectRelationship === false) return result
   const { data: relationRow, error: relationError } = await supabase
     .from('person_relationships')
-    .select('id, person_id, other_person_id, relationship_type, familiarity, trust, affinity, last_interaction_tick')
+    .select('id, person_id, other_person_id, relationship_type, familiarity, trust, affinity, last_interaction_tick, encounter_count_total, recent_encounter_score, relationship_updated_tick')
     .eq('person_id', memory.personId)
     .eq('other_person_id', memory.otherPersonId)
     .maybeSingle()
@@ -79,6 +79,15 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
 
   const projected = projectRelationship(relationshipFromRow(relationRow), memory)
   if (!projected) return result
+  const previousInteractionTick = relationRow?.last_interaction_tick == null
+    ? null
+    : Number(relationRow.last_interaction_tick)
+  const gap = previousInteractionTick == null ? Number.POSITIVE_INFINITY : Math.max(0, memory.tick - previousInteractionTick)
+  const previousRecent = Number(relationRow?.recent_encounter_score ?? 0)
+  const recencyGain = gap <= 24 ? 0.22 : gap <= 72 ? 0.12 : 0.05
+  const recencyRetention = gap <= 72 ? 0.88 : 0.55
+  const recentEncounterScore = Math.max(0, Math.min(1, previousRecent * recencyRetention + recencyGain))
+
   const row = {
     id: projected.id,
     person_id: projected.personId,
@@ -88,6 +97,10 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
     trust: projected.trust,
     affinity: projected.affinity,
     last_interaction_tick: projected.lastInteractionTick,
+    encounter_count_total: Number(relationRow?.encounter_count_total ?? 0) + 1,
+    recent_encounter_score: recentEncounterScore,
+    relationship_updated_tick: memory.tick,
+    updated_at: new Date().toISOString(),
   }
   const { error: upsertError } = await supabase.from('person_relationships').upsert(row, { onConflict: 'person_id,other_person_id' })
   if (upsertError) result.errors.push(`relationship upsert: ${upsertError.message ?? upsertError}`)
