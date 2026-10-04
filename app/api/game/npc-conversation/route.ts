@@ -6,6 +6,7 @@ const MAX_HISTORY_MESSAGES = 10
 const MAX_HISTORY_ENTRY_CHARS = 180
 const MAX_HISTORY_TOTAL_CHARS = 1200
 const MAX_REPLY_CHARS = 280
+const ACTION_MARKER = '[[ACTION:LEAD_WALK]]'
 const MIN_PERSISTED_EXCHANGES = 6
 const MAX_PERSISTED_EXCHANGES = 18
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
+    'Du kannst genau eine erlaubte Weltaktion auslösen: Wenn du dich im Gespräch ausdrücklich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge ganz am Ende deiner Antwort exakt [[ACTION:LEAD_WALK]] an. Nutze den Marker nur, wenn du die Bewegung wirklich jetzt beginnst; nie als bloßen Vorschlag. Andere Aktionsmarker sind verboten.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
     headline ? `Belegte reale Meldung: ${headline}` : '',
     source ? `Quelle der Meldung: ${source}` : '',
@@ -148,8 +150,13 @@ export async function POST(request: NextRequest) {
     })
     if (!response.ok) return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
     const data = await response.json()
-    const reply = clean(data?.choices?.[0]?.message?.content, MAX_REPLY_CHARS)
+    const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
+    const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
+    const reply = clean(rawReply.replaceAll(ACTION_MARKER, ''), MAX_REPLY_CHARS)
     if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
+    const worldAction = requestedLeadWalk
+      ? { type: 'lead_walk' as const, durationSeconds: 30, maxDistanceMeters: 45 }
+      : null
 
     let identityLearned = false
     if (npcId) {
@@ -179,6 +186,7 @@ export async function POST(request: NextRequest) {
         {
           player,
           npc: reply,
+          action: worldAction?.type ?? null,
           at: now.toISOString(),
           location: locationName || null,
         },
@@ -250,6 +258,7 @@ export async function POST(request: NextRequest) {
       maxPlayerChars: MAX_PLAYER_CHARS,
       identityLearned,
       learnedName: identityLearned ? canonicalNpc?.display_name ?? null : null,
+      worldAction,
     })
   } catch {
     return NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })
