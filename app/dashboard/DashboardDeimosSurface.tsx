@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
+import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import PlanetarySurfaceMap, { type MobileSurfaceObject, type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
 import {
   DEIMOS_OUTPOST_ALPHA_LOGISTICS,
@@ -188,6 +190,8 @@ export default function DashboardDeimosSurface({ locations }: Props) {
   const locationSlug = location as string
   const shipRange = useGameStore(s => s.shipRange)
   const credits = useGameStore(s => s.credits)
+  const mode = useGameModeStore(s => s.mode)
+  const enterPlanning = useGameModeStore(s => s.enterPlanning)
   const [interiorEntity, setInteriorEntity] = useState<PlanetarySurfaceEntity | null>(null)
   const [dockEntity, setDockEntity] = useState<PlanetarySurfaceEntity | null>(null)
   const [navigationOpen, setNavigationOpen] = useState(false)
@@ -202,6 +206,8 @@ export default function DashboardDeimosSurface({ locations }: Props) {
   useEffect(() => { if (locationSlug !== 'deimos') return; let cancelled = false; (async () => { try { const token = await getToken(); if (!token || cancelled) return; await fetch('/api/game/build/spatial/terrain-sync', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'deimos' }) }) } catch {} })(); return () => { cancelled = true } }, [locationSlug])
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(null), 3200); return () => window.clearTimeout(timer) }, [notice])
   if (locationSlug !== 'deimos') return null
+
+  if (mode === 'colony') return <PlanetaryWalkableSurface locationSlug="deimos" body="deimos" title="Swift-1" corridors={DEIMOS_CORRIDORS} mobileObjects={[...DEIMOS_FIELD_POINTS]} onClose={enterPlanning} />
 
   const openWorldObject = (entity: PlanetarySurfaceEntity) => {
     const id = entity.entity_id ?? ''
