@@ -1,17 +1,28 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
+import { useColonyStateStore } from '@/lib/store/colonyStateStore'
 import { getToken } from '@/lib/supabase/auth'
-import PlanetarySurfaceMap from '@/app/components/PlanetarySurfaceMap'
+import PlanetarySurfaceMap, { type PlanetarySurfaceEntity } from '@/app/components/PlanetarySurfaceMap'
 import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
+import BuildingInterior from './BuildingInterior'
+import BuildingOverlayShell from './BuildingOverlayShell'
 
 export default function DashboardMarsSurface(){
   const location=useGameStore(state=>state.location)
+  const credits=useGameStore(state=>state.credits)
+  const shipRange=useGameStore(state=>state.shipRange)
   const mode=useGameModeStore(state=>state.mode)
   const enterPlanning=useGameModeStore(state=>state.enterPlanning)
+  const locations=useColonyStateStore(state=>state.locations)
+  const userId=useColonyStateStore(state=>state.userId)
+  const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null)
+
+  const marsLocation=useMemo(()=>locations.find(item=>item.slug==='mars')??null,[locations])
+  const currentResources=Array.isArray(marsLocation?.location_resources)?marsLocation.location_resources:[]
 
   useEffect(()=>{
     if(location!=='mars')return
@@ -26,14 +37,36 @@ export default function DashboardMarsSurface(){
     return()=>{cancelled=true}
   },[location])
 
+  useEffect(()=>{if(location!=='mars')setInteriorEntity(null)},[location])
+
   if(location!=='mars')return null
 
-  if(mode==='colony')return <PlanetaryWalkableSurface
-    locationSlug="mars"
-    body="mars"
-    title="Tharsis Hub"
-    onClose={enterPlanning}
-  />
+  const openWorldObject=(entity:PlanetarySurfaceEntity)=>setInteriorEntity(entity)
+  const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Mars-Anlage'
+
+  if(mode==='colony')return <>
+    <PlanetaryWalkableSurface
+      locationSlug="mars"
+      body="mars"
+      title="Tharsis Hub"
+      onOpenWorldObject={openWorldObject}
+      onClose={enterPlanning}
+    />
+    {interiorEntity&&<BuildingOverlayShell eyebrow="MARS · INNENRAUM" title={interiorName} subtitle="Persistentes Weltgebäude · gemeinsamer Interior-Pfad" onClose={()=>setInteriorEntity(null)} width={1020}>
+      <BuildingInterior
+        entity={{...interiorEntity,entity_type:'building',tile_row:0,tile_col:0,profile_id:interiorEntity.profile_id??null,owner_class:interiorEntity.owner_class??'STATE'} as any}
+        userId={userId??''}
+        locationResources={currentResources as any}
+        credits={credits}
+        population={Number(marsLocation?.population??0)}
+        hasShipyard={Boolean((marsLocation as any)?.has_shipyard)}
+        currentTick={0}
+        shipRange={shipRange}
+        currentLocationSlug="mars"
+        onClose={()=>setInteriorEntity(null)}
+      />
+    </BuildingOverlayShell>}
+  </>
 
   return <section className="noxia-dashboard-mars-surface" aria-label="Marsoberfläche Tharsis">
     <SurfaceContextBadge title="MOLA · Tharsis Hub" detail="planetozentrischer Mars-Frame · MOLA-Terrain · gemeinsamer Planetary-Surface-Renderer"/>
@@ -43,8 +76,23 @@ export default function DashboardMarsSurface(){
       mapLabel="Spielbare Mars-Karte (Tharsis Hub)"
       terrainLabel="MGS / MOLA"
       minimumWorldSpanM={700}
+      onOpenWorldObject={openWorldObject}
     />
-    <div className="mars-migration-note">Legacy-Straßentiles werden erst nach ENU-Migration als begehbare Routen eingeblendet.</div>
+    {interiorEntity&&<BuildingOverlayShell eyebrow="MARS · INNENRAUM" title={interiorName} subtitle="Persistentes Weltgebäude · gemeinsamer Interior-Pfad" onClose={()=>setInteriorEntity(null)} width={1020}>
+      <BuildingInterior
+        entity={{...interiorEntity,entity_type:'building',tile_row:0,tile_col:0,profile_id:interiorEntity.profile_id??null,owner_class:interiorEntity.owner_class??'STATE'} as any}
+        userId={userId??''}
+        locationResources={currentResources as any}
+        credits={credits}
+        population={Number(marsLocation?.population??0)}
+        hasShipyard={Boolean((marsLocation as any)?.has_shipyard)}
+        currentTick={0}
+        shipRange={shipRange}
+        currentLocationSlug="mars"
+        onClose={()=>setInteriorEntity(null)}
+      />
+    </BuildingOverlayShell>}
+    <div className="mars-migration-note">Legacy-Straßentiles werden nicht mehr als eigener Spielraum verwendet; begehbare Wege und Gebäude kommen aus derselben planetaren Surface-Geometrie.</div>
     <style jsx>{`
       .noxia-dashboard-mars-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:hidden;background:#170d09;overscroll-behavior:contain}
       .noxia-dashboard-mars-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:radial-gradient(circle at 45% 32%,rgba(142,82,57,.18),transparent 48%),linear-gradient(180deg,#25130d,#100906 76%);z-index:0}
