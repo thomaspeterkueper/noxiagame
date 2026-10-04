@@ -24,6 +24,7 @@ import { runPopulationTick as runPersonPopulationTick } from './population/engin
 import { runPersonTick } from './personBrain'
 import { persistPopulationEncounters } from './population/encounterRuntime'
 import { runSocialLifeTick } from './population/socialLife'
+import { runNpcPayrollTick } from './npcEconomy'
 
 export const TICK_INTERVAL_SECONDS = 3600
 export const TICK_MAX_CATCHUP      = 48
@@ -594,11 +595,12 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const encounters = await persistPopulationEncounters(supabase, tickNumber)
   const socialLife = await runSocialLifeTick(supabase, tickNumber)
   const npc = await runNpcTick(supabase, tickNumber)
+  const payroll = await runNpcPayrollTick(supabase, tickNumber)
   const prices = await runPriceTick(supabase, tickNumber)
   const orders  = await runOrderTick(supabase)
   const bank      = await runBankInterestTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase)
-  return { tickNumber, population, livingPopulation, namedPeople, encounters, socialLife, prices, npc, orders, bank, landValues }
+  return { tickNumber, population, livingPopulation, namedPeople, encounters, socialLife, prices, npc, payroll, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {

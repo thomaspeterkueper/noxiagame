@@ -45,3 +45,13 @@ export async function transferPlayerToNpcCredits(input: {
   if (error) throw new Error(error.message)
   return data as NpcCreditTransferResult
 }
+
+
+export async function runNpcPayrollTick(supabase: any, tick: number) {
+  const { data, error } = await supabase.rpc('run_npc_payroll', { p_tick: tick })
+  if (error) {
+    console.error('runNpcPayrollTick failed', { tick, code: error.code })
+    return { ok: false, due: tick % 24 === 0, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }
+  }
+  return data ?? { ok: true, due: false, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }
+}

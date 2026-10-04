@@ -33,6 +33,16 @@ export interface SpatialResident {
   displayName: string
   identityState?: 'unknown' | 'inferred' | 'known'
   observableDescription?: string
+  appearance?: {
+    genderPresentation: 'feminine' | 'masculine' | 'androgynous'
+    bodyFrame: 'slender' | 'average' | 'broad'
+    skinToneCode: string
+    hairStyleCode: string
+    hairColorCode: string
+    facialHairCode: string
+    visibleAgeBand: 'child' | 'teen' | 'young_adult' | 'adult' | 'older'
+    clothingProfile?: Record<string, unknown>
+  }
   birthYear: number | null
   activityState: string
   lastAction: string | null
