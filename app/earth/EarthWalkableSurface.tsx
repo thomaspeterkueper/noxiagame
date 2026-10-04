@@ -19,7 +19,7 @@ type SpatialBuild={id:string;buildable_id:string;name?:string;x_m?:number|null;y
 type Props={residents:ColonyResident[];onClose:()=>void}
 type IsoPoint={x:number;y:number}
 type ChatEntry={role:'user'|'assistant';content:string}
-type NpcWorldAction={type:'lead_walk';startedAt:number;durationSeconds:number;maxDistanceMeters:number}
+type NpcWorldAction={type:'lead_walk';startedAt:number;durationSeconds:number;maxDistanceMeters:number;playerFollows:boolean}
 
 const VIEW_W=1200
 const VIEW_H=760
@@ -231,7 +231,24 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }
   },[awarenessItems,npcPositions,player])
 
-  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();(()=>{const next={xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.yM+(key==='s'?step:key==='w'?-step:0)))};setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,setSharedPlayerPosition])
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();setNpcWorldActionById(current=>Object.fromEntries(Object.entries(current).map(([id,action])=>[id,{...action,playerFollows:false}])));(()=>{const next={xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,player.yM+(key==='s'?step:key==='w'?-step:0)))};setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,setSharedPlayerPosition])
+
+  useEffect(()=>{
+    const entry=Object.entries(npcWorldActionById).find(([,action])=>action.type==='lead_walk'&&action.playerFollows&&motionTime-action.startedAt>=0&&motionTime-action.startedAt<action.durationSeconds)
+    if(!entry||!origin)return
+    const [npcId]=entry
+    const npc=npcPositions.find(item=>item.resident.id===npcId)
+    if(!npc)return
+    const dx=npc.xM-player.xM,dy=npc.yM-player.yM
+    const distance=Math.hypot(dx,dy)
+    if(distance<=5||distance===0)return
+    const step=Math.min(1.8,distance-5)
+    const next={xM:player.xM+dx/distance*step,yM:player.yM+dy/distance*step}
+    setSharedPlayerPosition((data?.region as any)?.id??null,next,localMetersToGeo({eastM:next.xM,northM:next.yM},origin))
+  },[motionTime,npcWorldActionById,npcPositions,player,origin,data?.region,setSharedPlayerPosition])
+
+  const activeActionForSelected=selected?npcWorldActionById[selected.id]:null
+  const selectedActionActive=Boolean(activeActionForSelected&&motionTime-activeActionForSelected.startedAt>=0&&motionTime-activeActionForSelected.startedAt<activeActionForSelected.durationSeconds)
 
   async function talk(){
     if(!selected||!message.trim()||sending)return
@@ -258,6 +275,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
               startedAt:motionTime,
               durationSeconds:Math.max(5,Math.min(60,Number(action.durationSeconds??30))),
               maxDistanceMeters:Math.max(5,Math.min(80,Number(action.maxDistanceMeters??45))),
+              playerFollows:Boolean(action.playerFollows),
             },
           }))
         }
@@ -394,7 +412,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <span>{ambientConversation.conversation.item.kind==='colony'?'NOXIA-Weltgeschehen':`Reale Meldung · ${ambientConversation.source?.name??ambientConversation.conversation.item.sourceId}`} · ca. {Math.round(ambientConversation.playerDistance)} m entfernt</span>
       </div>}
 
-      {selected&&<aside><div className="head"><div><small>NPC · LOKAL</small><b>{selected.displayName}</b><span>{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{npcWorldActionById[selected.id]?.type==='lead_walk'?'geht voraus':selected.activityState}</b><span>Letzte Aktion</span><b>{npcWorldActionById[selected.id]?.type==='lead_walk'?'führt den Weg entlang':selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}<div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></aside>}
+      {selected&&<aside><div className="head"><div><small>NPC · LOKAL</small><b>{selected.displayName}</b><span>{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selectedActionActive?'geht voraus':selected.activityState}</b><span>Letzte Aktion</span><b>{selectedActionActive?(activeActionForSelected?.playerFollows?'führt dich den Weg entlang':'geht den Weg entlang'):selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}<div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></aside>}
     </div>
     <style jsx>{`
       .earth-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;background:#0b1115;color:#e7eef0;font-family:system-ui;overflow:hidden}.earth-walkable header{height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;background:#081723ef;border-bottom:1px solid #38546b;position:relative;z-index:3}.earth-walkable header>div:first-child{display:flex;align-items:baseline;gap:10px;min-width:0}.earth-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.earth-walkable header b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.earth-walkable header span{font-size:9px;color:#8ea4af}.earth-walkable header .meta{display:flex;gap:10px;margin-left:auto}.earth-walkable header button,.earth-walkable aside button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.earth-walkable-stage{position:absolute;inset:46px 0 0;overflow:hidden}.earth-walkable-stage svg{width:100%;height:100%;display:block}.earth-orientation{position:absolute;right:16px;top:16px;z-index:4;display:flex;gap:10px;align-items:center;padding:9px 11px;border:1px solid #536f7d;border-radius:8px;background:#071521df;backdrop-filter:blur(7px);font-size:9px}.earth-orientation>div:first-child{display:grid;gap:1px}.earth-orientation small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.earth-orientation b{font-size:11px}.earth-orientation span{color:#89a1ac}.earth-orientation label{display:grid;gap:2px;min-width:180px}.earth-orientation select{max-width:220px;border:1px solid #476476;border-radius:5px;background:#06111a;color:#e7eff2;padding:5px 7px;font-size:9px}.earth-target{display:grid;gap:1px;padding-left:9px;border-left:1px solid #425b67}.earth-construction-hint{position:absolute;left:12px;top:76px;padding:5px 7px;border:1px solid #8a6a20;border-radius:5px;background:#2a220ed9;color:#ead59a;font:8px monospace}.earth-building-tooltip{position:fixed;z-index:5000;pointer-events:none;display:grid;gap:2px;min-width:150px;max-width:240px;padding:7px 9px;border:1px solid #6b8793;border-radius:6px;background:#06131df2;color:#ecf3f5;box-shadow:0 8px 24px #0007;font-size:9px}.earth-building-tooltip b{font-size:10px}.earth-building-tooltip span,.earth-building-tooltip small{color:#90a6af}
