@@ -120,6 +120,7 @@ export default function EarthRegionPreview(){
   const pointerStartedOnSurface=useRef(false)
   const mapGroupRef=useRef<SVGGElement|null>(null)
   const materializingPlaces=useRef(new Set<string>())
+  const resolvingArrival=useRef(false)
 
   const loadSpatial=async()=>{const token=await getToken();if(!token){setSpatial({error:'Nicht angemeldet'});return}const response=await fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`}});setSpatial(await response.json())}
 
@@ -184,7 +185,40 @@ export default function EarthRegionPreview(){
   },[])
 
   useEffect(()=>{
-    if(!data?.ok||earthPlayerGeo)return
+    if(!data?.ok||resolvingArrival.current)return
+    let raw:string|null=null
+    try{raw=localStorage.getItem('noxia-earth-arrival-request-v1')}catch{}
+    if(raw){
+      resolvingArrival.current=true
+      void (async()=>{
+        let request:{lat:number;lon:number;label:string;placeSlug:string}|null=null
+        try{request=JSON.parse(raw!)}catch{}
+        if(!request||!Number.isFinite(request.lat)||!Number.isFinite(request.lon)){
+          try{localStorage.removeItem('noxia-earth-arrival-request-v1')}catch{}
+          resolvingArrival.current=false
+          return
+        }
+        try{
+          const token=await getToken()
+          if(!token)throw new Error('Nicht angemeldet')
+          const q=new URLSearchParams({lat:String(request.lat),lon:String(request.lon),label:request.label,place:request.placeSlug})
+          const response=await fetch(`/api/earth/arrival?${q}`,{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})
+          const payload=await response.json()
+          const point=payload?.arrival?.point
+          if(!response.ok||!payload?.ok||!point)throw new Error(payload?.error??'Ankunftsknoten nicht verfügbar')
+          await focusGeoPoint({lat:Number(point.lat),lon:Number(point.lon)},`Ankunft · ${String(payload.arrival.name??request.label)}`)
+          setEarthPlayerPosition(data.region?.id??request.placeSlug,{xM:0,yM:0},{lat:Number(point.lat),lon:Number(point.lon)})
+        }catch{
+          await focusGeoPoint({lat:request.lat,lon:request.lon},`Ankunft · ${request.label}`)
+          setEarthPlayerPosition(data.region?.id??request.placeSlug,{xM:0,yM:0},{lat:request.lat,lon:request.lon})
+        }finally{
+          try{localStorage.removeItem('noxia-earth-arrival-request-v1')}catch{}
+          resolvingArrival.current=false
+        }
+      })()
+      return
+    }
+    if(earthPlayerGeo)return
     const start=data.queryCenter??data.region?.origin
     if(!start)return
     setEarthPlayerPosition(data.region?.id??null,{xM:0,yM:0},start)
