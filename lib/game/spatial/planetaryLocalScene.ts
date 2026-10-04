@@ -1,4 +1,3 @@
-import type { PlanetarySurfaceEntity, PreparedCorridor, MobileSurfaceObject } from '@/app/components/PlanetarySurfaceMap'
 import { buildLocalSurfaceScene, type LocalSurfaceBuilding, type LocalSurfaceMobileObject, type LocalSurfacePath, type LocalSurfaceScene } from './localSurfaceScene'
 
 function finite(value:unknown){
@@ -6,13 +5,17 @@ function finite(value:unknown){
   return Number.isFinite(n)?n:null
 }
 
+type PlanetarySceneEntity={id:string;entity_id?:string|null;name?:string|null;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null}
+type PlanetarySceneCorridor={id:string;points:Array<{xM:number;yM:number}>;kind?:'prepared-track'|'hardened-road'}
+type PlanetarySceneMobileObject={id:string;label:string;xM:number;yM:number;role?:string}
+
 export function buildPlanetaryLocalScene(input:{
   body:string
   frameId:string
   radiusM:number
-  entities?:PlanetarySurfaceEntity[]
-  corridors?:PreparedCorridor[]
-  mobileObjects?:MobileSurfaceObject[]
+  entities?:PlanetarySceneEntity[]
+  corridors?:PlanetarySceneCorridor[]
+  mobileObjects?:PlanetarySceneMobileObject[]
 }):LocalSurfaceScene{
   const buildings:LocalSurfaceBuilding[]=(input.entities??[]).flatMap(entity=>{
     const x=finite(entity.x_m),y=finite(entity.y_m)
