@@ -40,6 +40,7 @@ export type RoomKind =
   | 'habitation'
   | 'utility'
   | 'service'
+  | 'hospitality'
   | 'other'
 
 export interface InteriorLevelDef {
