@@ -191,7 +191,7 @@ export default function EarthRegionPreview(){
     if(raw){
       resolvingArrival.current=true
       void (async()=>{
-        let request:{lat:number;lon:number;label:string;placeSlug:string}|null=null
+        let request:{lat:number;lon:number;label:string;placeSlug:string;targetRegion?:string}|null=null
         try{request=JSON.parse(raw!)}catch{}
         if(!request||!Number.isFinite(request.lat)||!Number.isFinite(request.lon)){
           try{localStorage.removeItem('noxia-earth-arrival-request-v1')}catch{}
@@ -207,10 +207,10 @@ export default function EarthRegionPreview(){
           const point=payload?.arrival?.point
           if(!response.ok||!payload?.ok||!point)throw new Error(payload?.error??'Ankunftsknoten nicht verfügbar')
           await focusGeoPoint({lat:Number(point.lat),lon:Number(point.lon)},`Ankunft · ${String(payload.arrival.name??request.label)}`)
-          setEarthPlayerPosition(data.region?.id??request.placeSlug,{xM:0,yM:0},{lat:Number(point.lat),lon:Number(point.lon)})
+          setEarthPlayerPosition(request.targetRegion??data.region?.id??request.placeSlug,{xM:0,yM:0},{lat:Number(point.lat),lon:Number(point.lon)})
         }catch{
           await focusGeoPoint({lat:request.lat,lon:request.lon},`Ankunft · ${request.label}`)
-          setEarthPlayerPosition(data.region?.id??request.placeSlug,{xM:0,yM:0},{lat:request.lat,lon:request.lon})
+          setEarthPlayerPosition(request.targetRegion??data.region?.id??request.placeSlug,{xM:0,yM:0},{lat:request.lat,lon:request.lon})
         }finally{
           try{localStorage.removeItem('noxia-earth-arrival-request-v1')}catch{}
           resolvingArrival.current=false
