@@ -124,7 +124,7 @@ export async function GET() {
       // Globaler, nicht benutzerspezifischer Snapshot. Kurzes CDN-Caching
       // verhindert, dass mehrere Tabs/Clients dieselben Tabellen gleichzeitig
       // lesen. Ably bleibt für ereignisgetriebene Aktualisierungen zuständig.
-      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+      'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
     },
   })
 }

@@ -46,7 +46,7 @@ export default function BuildingResidentsCard({ tileEntityId, locationSlug }: { 
     let cancelled = false
     setLoading(true)
     const query = tileEntityId ? `tileEntityId=${encodeURIComponent(tileEntityId)}` : `locationSlug=${encodeURIComponent(locationSlug!)}`
-    fetch(`/api/game/population?${query}`, { cache: 'no-store' })
+    fetch(`/api/game/population?${query}`)
       .then(r => r.json())
       .then(data => { if (!cancelled) setResidents(Array.isArray(data.residents) ? data.residents : []) })
       .catch(() => { if (!cancelled) setResidents([]) })

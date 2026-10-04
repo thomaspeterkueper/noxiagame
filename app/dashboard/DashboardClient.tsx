@@ -141,12 +141,12 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   async function fetchBuilds() {
     try {
       const { token, userId: uid } = await getSessionInfo(); setUserId(uid)
+      if (!token) return
       const data = await (await fetch(`/api/game/build?location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${token}` } })).json()
       setPlayerBuilds(data.builds ?? []); setTileEntities(data.entities ?? []); setColonyTax(data.colonyTax ?? {}); setEntityInfo(data.entityInfo ?? {})
     } catch {}
   }
-  useEffect(() => { fetchBuilds() }, [location])
-  useEffect(() => { fetchBuilds() }, [invalidations.builds])
+  useEffect(() => { fetchBuilds() }, [location, invalidations.builds])
 
   // Unlocks + Feature-Gates laden
   useEffect(() => {

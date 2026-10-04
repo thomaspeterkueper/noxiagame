@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         occurredAt: e.occurred_at,
       })),
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120' },
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     })
   }
 
@@ -89,6 +89,6 @@ export async function GET(req: NextRequest) {
     residents,
     diagnostic: diagnostic ? { ok: true, locationFound: true, activeAssignments: (assignments ?? []).length, people: residents.length } : undefined,
   }, {
-    headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120' },
+    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
   })
 }
