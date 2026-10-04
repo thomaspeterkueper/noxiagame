@@ -71,15 +71,29 @@ export async function GET(req: NextRequest) {
 
   if (peopleError) return NextResponse.json({ residents: [], unavailable: true, diagnostic: diagnostic ? { stage: 'people', ok: false, activeAssignments: personIds.length } : undefined })
 
-  const { data: identityRows } = user
-    ? await supabase
-      .from('player_person_identity_knowledge')
-      .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind')
-      .eq('profile_id', user.id)
-      .in('person_id', personIds)
-    : { data: [] }
+  const [identityResult, lifeResult, familyDemandResult] = await Promise.all([
+    user
+      ? supabase
+        .from('player_person_identity_knowledge')
+        .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind')
+        .eq('profile_id', user.id)
+        .in('person_id', personIds)
+      : Promise.resolve({ data: [] as any[] }),
+    supabase
+      .from('person_life_state')
+      .select('person_id, life_stage, age_ticks')
+      .in('person_id', personIds),
+    locationId
+      ? supabase
+        .from('location_family_demand')
+        .select('children_0_5, children_6_11, children_12_17, kindergarten_slots_needed, playground_units_needed, school_slots_needed, updated_tick')
+        .eq('location_id', locationId)
+        .maybeSingle()
+      : Promise.resolve({ data: null as any }),
+  ])
 
-  const identityByPerson = new Map((identityRows ?? []).map((row: any) => [row.person_id, row]))
+  const identityByPerson = new Map((identityResult.data ?? []).map((row: any) => [row.person_id, row]))
+  const lifeByPerson = new Map((lifeResult.data ?? []).map((row: any) => [row.person_id, row]))
 
   const residents = (people ?? []).map(person => {
     const personAssignments = (assignments ?? []).filter(a => a.person_id === person.id)
@@ -95,6 +109,7 @@ export async function GET(req: NextRequest) {
     return {
       id: person.id,
       personKey: person.person_key,
+      lifeStage: (lifeByPerson.get(person.id) as any)?.life_stage ?? 'adult',
       displayName,
       identityState,
       observableDescription,
@@ -112,6 +127,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     residents,
+    familyDemand: familyDemandResult.data ?? null,
     diagnostic: diagnostic ? { ok: true, locationFound: true, activeAssignments: (assignments ?? []).length, people: residents.length } : undefined,
   }, {
     headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
