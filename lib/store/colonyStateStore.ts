@@ -37,6 +37,7 @@ export type ColonyBuild = {
 export type ColonyResident = {
   id: string
   displayName: string
+  lifeStage?: 'child' | 'adult'
   identityState?: 'unknown' | 'inferred' | 'known'
   observableDescription?: string
   birthYear: number | null
