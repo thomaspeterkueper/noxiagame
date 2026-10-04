@@ -8,6 +8,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 type Props = {
   entityId: string
   buildingName: string
+  companion?: ColonyResident | null
   onClose: () => void
 }
 
@@ -40,7 +41,7 @@ function blocked(p:Point){
   return furniture.some(item=>p.x+PLAYER_R>item.x&&p.x-PLAYER_R<item.x+item.w&&p.y+PLAYER_R>item.y&&p.y-PLAYER_R<item.y+item.h)
 }
 
-export default function CafeWalkableInterior({entityId,buildingName,onClose}:Props){
+export default function CafeWalkableInterior({entityId,buildingName,companion=null,onClose}:Props){
   const[pos,setPos]=useState<Point>(START)
   const[residents,setResidents]=useState<ColonyResident[]>([])
   const[selected,setSelected]=useState<ColonyResident|null>(null)
@@ -56,11 +57,14 @@ export default function CafeWalkableInterior({entityId,buildingName,onClose}:Pro
         const{token}=await getSessionInfo()
         const response=await fetch('/api/game/population?tileEntityId='+encodeURIComponent(entityId),{headers:{Authorization:'Bearer '+token},cache:'no-store'})
         const data=await response.json()
-        if(live&&response.ok)setResidents(Array.isArray(data.residents)?data.residents:[])
+        if(live&&response.ok){
+          const loaded=Array.isArray(data.residents)?data.residents:[]
+          setResidents(companion&&!loaded.some((item:ColonyResident)=>item.id===companion.id)?[companion,...loaded]:loaded)
+        }
       }catch{if(live)setResidents([])}
     })()
     return()=>{live=false}
-  },[entityId])
+  },[entityId,companion?.id])
 
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
