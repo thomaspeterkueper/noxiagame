@@ -123,7 +123,7 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
       })
       const data=await response.json().catch(()=>({}))
       const reply=response.ok&&data.reply?String(data.reply):'Die Person antwortet gerade nicht.'
-      setHistory(current=>[...current,{role:'user',content:text},{role:'assistant',content:reply}].slice(-10))
+      setHistory(current=>[...current,{role:'user' as const,content:text},{role:'assistant' as const,content:reply}].slice(-10))
       setMessage('')
     }finally{setSending(false)}
   }
