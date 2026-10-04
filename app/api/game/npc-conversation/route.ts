@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY_MESSAGES = 10
@@ -7,6 +8,7 @@ const MAX_HISTORY_ENTRY_CHARS = 180
 const MAX_HISTORY_TOTAL_CHARS = 1200
 const MAX_REPLY_CHARS = 280
 const ACTION_MARKER = '[[ACTION:LEAD_WALK]]'
+const CREDIT_ACTION_MARKER = '[[ACTION:ACCEPT_CREDITS]]'
 const MIN_PERSISTED_EXCHANGES = 6
 const MAX_PERSISTED_EXCHANGES = 18
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -18,6 +20,31 @@ const serviceClient = createClient(
 
 function clean(value: unknown, max = MAX_PLAYER_CHARS) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function extractCreditAmount(text: string) {
+  const numeric = text.match(/\b(\d{1,4})\s*(?:cr|credit|credits)\b/i)
+  if (numeric) {
+    const amount = Number.parseInt(numeric[1], 10)
+    if (amount >= 1 && amount <= 1000) return amount
+  }
+  if (/\b(?:ein|eine|einen|einem|nen|1)\s*(?:cr|credit|credits)\b/i.test(text)) return 1
+  return null
+}
+
+function creditConsentFromConversation(player: string, history: Array<{ role: string; content: string }>) {
+  const explicitOffer = /\b(?:geb|gebe|gib|schenk|schenke|nimm|kriegst|bekommst|kannst.*haben|hier)\b/i.test(player)
+  const shortConsent = /^(?:ja|jep|jo|okay|ok|klar|gern|gerne|natürlich|sicher|mach(?:en wir)?)(?:[.! ]*)$/i.test(player.trim())
+  const currentAmount = extractCreditAmount(player)
+  const previousAssistant = [...history].reverse().find(entry => entry.role === 'assistant')?.content ?? ''
+  const previousRequest = /\bcredit(?:s)?\b/i.test(previousAssistant)
+    && /\b(?:hast du|hättest du|kannst du|gibst du|leihst du|einen|ein|nen)\b/i.test(previousAssistant)
+  const previousAmount = previousRequest ? extractCreditAmount(previousAssistant) : null
+  const amount = currentAmount ?? (shortConsent && previousRequest ? previousAmount : null)
+  return {
+    allowed: Boolean(amount && (explicitOffer || (shortConsent && previousRequest))),
+    amount,
+  }
 }
 
 async function getUserFromRequest(request: NextRequest) {
@@ -119,7 +146,8 @@ export async function POST(request: NextRequest) {
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
-    'Du kannst genau eine erlaubte Weltaktion auslösen: Wenn du dich im Gespräch ausdrücklich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge ganz am Ende deiner Antwort exakt [[ACTION:LEAD_WALK]] an. Nutze den Marker nur, wenn du die Bewegung wirklich jetzt beginnst; nie als bloßen Vorschlag. Andere Aktionsmarker sind verboten.',
+    'Du kannst zwei ausdrücklich erlaubte Aktionsmarker verwenden. Wenn du dich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge am Ende [[ACTION:LEAD_WALK]] an.',
+    'Wenn der Spieler dir ausdrücklich Credits anbietet oder eine unmittelbar vorherige konkrete Credit-Bitte von dir klar bestätigt, darfst du die Annahme mit [[ACTION:ACCEPT_CREDITS]] markieren. Der Marker bedeutet nur „annehmen“; Betrag und Berechtigung werden ausschließlich serverseitig aus dem Gespräch geprüft. Fordere mit diesem Marker niemals selbst eine Abbuchung an.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
     headline ? `Belegte reale Meldung: ${headline}` : '',
     source ? `Quelle der Meldung: ${source}` : '',
@@ -153,7 +181,13 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
     const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
-    const reply = clean(rawReply.replaceAll(ACTION_MARKER, ''), MAX_REPLY_CHARS)
+    const requestedCreditAcceptance = rawReply.includes(CREDIT_ACTION_MARKER)
+    const reply = clean(
+      rawReply
+        .replaceAll(ACTION_MARKER, '')
+        .replaceAll(CREDIT_ACTION_MARKER, ''),
+      MAX_REPLY_CHARS,
+    )
     if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
     const playerLower = player.toLocaleLowerCase('de-DE')
     const followConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
@@ -165,6 +199,34 @@ export async function POST(request: NextRequest) {
           playerFollows: followConsent,
         }
       : null
+
+    let creditTransfer: null | {
+      amount: number
+      playerCredits: number
+      npcCredits: number
+    } = null
+    const creditConsent = creditConsentFromConversation(player, history)
+    if (requestedCreditAcceptance && npcId && creditConsent.allowed && creditConsent.amount) {
+      try {
+        const transfer = await transferPlayerToNpcCredits({
+          profileId: user.id,
+          personId: npcId,
+          amount: creditConsent.amount,
+          note: `Geschenk im Gespräch mit ${npcName}`,
+        })
+        creditTransfer = {
+          amount: transfer.amount,
+          playerCredits: transfer.player_credits,
+          npcCredits: transfer.npc_credits,
+        }
+      } catch (transferError) {
+        console.error('npc conversation credit transfer failed', {
+          npcId,
+          userId: user.id,
+          error: transferError instanceof Error ? transferError.message : String(transferError),
+        })
+      }
+    }
 
     let identityLearned = false
     if (npcId) {
@@ -194,7 +256,8 @@ export async function POST(request: NextRequest) {
         {
           player,
           npc: reply,
-          action: worldAction?.type ?? null,
+          action: creditTransfer ? 'transfer_credits' : worldAction?.type ?? null,
+          amount: creditTransfer?.amount ?? null,
           at: now.toISOString(),
           location: locationName || null,
         },
@@ -267,6 +330,7 @@ export async function POST(request: NextRequest) {
       identityLearned,
       learnedName: identityLearned ? canonicalNpc?.display_name ?? null : null,
       worldAction,
+      creditTransfer,
     })
   } catch {
     return NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })
