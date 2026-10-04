@@ -206,18 +206,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const allDefs = await loadAllBuildingDefs()
-    const entityInfo: Record<string, { ertragswert: number; produktion: number | null; ressource: string | null; resourceSellPrice: number | null }> = {}
-    await Promise.all(entities.map(async (e: any) => {
-      if (e.entity_type !== 'building') return
-      const def = allDefs.get(e.entity_id)
-      if (!def) return
-      const result = await getQuoteForEntity(e, def)
-      if ('error' in result) return
-      entityInfo[e.id] = { ertragswert: result.quote.ertragswert, produktion: def.production[0]?.amount ?? null, ressource: def.production[0]?.resource ?? null, resourceSellPrice: result.resourceSellPrice }
-    }))
-
-    return NextResponse.json({ builds: active ?? [], entities: entities ?? [], colonyTax, entityInfo })
+    // Economic valuation is intentionally not part of the general build snapshot.
+    // Market-linked building values are calculated lazily for explicit valuation
+    // use cases (sell quote, financing/credit assessment, etc.). This keeps the
+    // hot dashboard path independent from market-price reads.
+    return NextResponse.json({ builds: active ?? [], entities: entities ?? [], colonyTax })
   }
 
   if (action === 'start') {
