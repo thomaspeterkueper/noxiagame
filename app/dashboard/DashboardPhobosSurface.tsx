@@ -61,13 +61,16 @@ export default function DashboardPhobosSurface({ locations, prices, orders }: Pr
   const surfaceMapObjects=useMemo<MobileSurfaceObject[]>(()=>scienceLayerEnabled?[...robotMapObjects,...scienceMapObjects]:robotMapObjects,[robotMapObjects,scienceMapObjects,scienceLayerEnabled])
   if(location!=='phobos')return null
 
-  if(mode==='colony')return <PlanetaryWalkableSurface locationSlug="phobos" body="phobos" title="Stickney" corridors={PHOBOS_CORRIDORS} mobileObjects={surfaceMapObjects} onClose={enterPlanning}/>
-
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>{const id=entity.entity_id??'';if(id==='landing_pad_phobos'){setDockEntity(entity);return}if(id==='warehouse'){setWarehouseOpen(true);return}if(id==='surface_workshop'){setShipyardOpen(true);return}if(id==='surface_comms'){setNavigationOpen(true);return}if(id==='rover_yard'){setLogisticsOpen(true);return}setInteriorEntity(entity)}
   const openSurfaceObject=(object:MobileSurfaceObject)=>{if(object.id.startsWith('science:')){setSelectedScienceId(object.id.slice(8));setSelectedRobotId(null);return}setSelectedRobotId(object.id);setSelectedScienceId(null)}
   const handleInteriorAction=(kind:'market'|'shipyard'|'navigation'|'ship'|'parts'|null)=>{if(kind==='market')setWarehouseOpen(true);if(kind==='shipyard'||kind==='parts'||kind==='ship')setShipyardOpen(true);if(kind==='navigation')setNavigationOpen(true);if(kind)setInteriorEntity(null)}
   const currentResources=phobosLocation?.location_resources??[],dockName=dockEntity?.name??dockEntity?.entity_id??'Andock- und Cargo-Zone'
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Anlage'
+
+  if(mode==='colony')return <>
+    <PlanetaryWalkableSurface locationSlug="phobos" body="phobos" title="Stickney" corridors={PHOBOS_CORRIDORS} mobileObjects={surfaceMapObjects} onOpenWorldObject={setInteriorEntity} onClose={enterPlanning}/>
+    {interiorEntity&&<BuildingOverlayShell eyebrow="GEBÄUDE · INNENRAUM" title={interiorName} subtitle="Gemeinsamer Scene-/Interaction-Zugang" onClose={()=>setInteriorEntity(null)} width={1020}><BuildingInterior entity={{...interiorEntity,entity_id:INTERIOR_ALIAS[interiorEntity.entity_id??'']??interiorEntity.entity_id??'unknown',entity_type:'building',tile_row:0,tile_col:0,profile_id:interiorEntity.profile_id??null,owner_class:interiorEntity.owner_class??'STATE'} as any} userId="" locationResources={currentResources as any} credits={credits} population={Number(phobosLocation?.population??0)} hasShipyard={Boolean(phobosLocation?.has_shipyard)} currentTick={tick} shipRange={shipRange} currentLocationSlug="phobos" onClose={()=>setInteriorEntity(null)} onAction={handleInteriorAction}/></BuildingOverlayShell>}
+  </>
 
   return <section className="noxia-dashboard-phobos-surface" aria-label="Phobos-Oberfläche Stickney">
     <SurfaceContextBadge title="MEX/HRSC · Stickney-Nordrand" detail={`asymmetrisches Druck-/Tether-Netz · gemeinsame Funde · ${scienceObjects.length} wissenschaftliche Objekte`} />
