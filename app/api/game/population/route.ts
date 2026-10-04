@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
   const locationSlug = req.nextUrl.searchParams.get('locationSlug')
   const diagnostic = req.nextUrl.searchParams.get('diagnostic') === '1'
   const personId = req.nextUrl.searchParams.get('personId')
+  const includeLifeState = req.nextUrl.searchParams.get('includeLifeState') === '1'
+  const includeFamilyDemand = req.nextUrl.searchParams.get('includeFamilyDemand') === '1'
   const supabase = createServiceClient()
   const authHeader = req.headers.get('authorization')
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -79,11 +81,13 @@ export async function GET(req: NextRequest) {
         .eq('profile_id', user.id)
         .in('person_id', personIds)
       : Promise.resolve({ data: [] as any[] }),
-    supabase
-      .from('person_life_state')
-      .select('person_id, life_stage, age_ticks')
-      .in('person_id', personIds),
-    locationId
+    includeLifeState
+      ? supabase
+        .from('person_life_state')
+        .select('person_id, life_stage, age_ticks')
+        .in('person_id', personIds)
+      : Promise.resolve({ data: [] as any[] }),
+    includeFamilyDemand && locationId
       ? supabase
         .from('location_family_demand')
         .select('children_0_5, children_6_11, children_12_17, kindergarten_slots_needed, playground_units_needed, school_slots_needed, updated_tick')
@@ -109,7 +113,7 @@ export async function GET(req: NextRequest) {
     return {
       id: person.id,
       personKey: person.person_key,
-      lifeStage: (lifeByPerson.get(person.id) as any)?.life_stage ?? 'adult',
+      ...(includeLifeState ? { lifeStage: (lifeByPerson.get(person.id) as any)?.life_stage ?? 'adult' } : {}),
       displayName,
       identityState,
       observableDescription,
@@ -127,7 +131,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     residents,
-    familyDemand: familyDemandResult.data ?? null,
+    ...(includeFamilyDemand ? { familyDemand: familyDemandResult.data ?? null } : {}),
     diagnostic: diagnostic ? { ok: true, locationFound: true, activeAssignments: (assignments ?? []).length, people: residents.length } : undefined,
   }, {
     headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
