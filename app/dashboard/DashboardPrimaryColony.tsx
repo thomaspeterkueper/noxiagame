@@ -42,6 +42,7 @@ export default function DashboardPrimaryColony(){
 
  const current=locations.find(l=>l.slug===location)
  const isEarth=location==='earth'
+ const isDedicatedSurface=location==='moon'
  const isStation=current?.location_type==='station'||location==='prometheus'
  const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
  const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])
@@ -62,6 +63,7 @@ export default function DashboardPrimaryColony(){
    if(mode==='colony')return <EarthWalkableSurface residents={residents} onClose={enterPlanning}/>
    return null
  }
+ if(isDedicatedSurface)return null
  if(isStation)return null
  if(mode==='planning')return <>{chrome}<button className="noxia-open-isometric" onClick={enterColony}>◇ Isometrische Ansicht öffnen</button></>
  if(loading||!current||!userId)return <>{chrome}<div className="noxia-primary-colony"><div className="noxia-primary-loading"><div><b>NOXIA · {location.toUpperCase()}</b><span>{error?'SYNCHRONISIERUNG WIRD ERNEUT VERSUCHT …':'KOLONIE WIRD SYNCHRONISIERT …'}</span></div></div></div></>
