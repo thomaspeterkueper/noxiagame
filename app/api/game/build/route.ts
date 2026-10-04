@@ -141,6 +141,11 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get('action')
 
   if (!action) {
+    const currentLocationSlug = searchParams.get('location')
+    const { data: currentLocation } = currentLocationSlug
+      ? await serviceClient.from('locations').select('id, slug').eq('slug', currentLocationSlug).maybeSingle()
+      : { data: null }
+
     const { data: due } = await serviceClient
       .from('player_builds')
       .select('*')
@@ -166,28 +171,33 @@ export async function GET(req: NextRequest) {
       .eq('profile_id', user.id)
       .in('entity_type', ['building', 'module'])
 
-    const { data: stateEntities } = await serviceClient
-      .from('tile_entities')
-      .select('*, locations(slug, name)')
-      .in('owner_class', ['STATE', 'CORPORATION'])
-      .in('entity_type', ['building', 'module'])
+    const { data: stateEntities } = currentLocation?.id
+      ? await serviceClient
+          .from('tile_entities')
+          .select('*, locations(slug, name)')
+          .in('owner_class', ['STATE', 'CORPORATION'])
+          .eq('location_id', currentLocation.id)
+          .in('entity_type', ['building', 'module'])
+      : { data: [] }
 
-    const { data: npcEntities } = await serviceClient
-      .from('tile_entities')
-      .select('*, locations(slug, name), actors(display_name)')
-      .not('actor_id', 'is', null)
+    const { data: npcEntities } = currentLocation?.id
+      ? await serviceClient
+          .from('tile_entities')
+          .select('*, locations(slug, name), actors(display_name)')
+          .eq('location_id', currentLocation.id)
+          .not('actor_id', 'is', null)
+      : { data: [] }
 
     const npcNormalized = (npcEntities ?? []).map((e: any) => ({ ...e, username: e.actors?.display_name ?? null, actors: undefined }))
-    const ownLocationIds = [...new Set([...(ownEntities ?? []).map((e: any) => e.location_id), ...(stateEntities ?? []).map((e: any) => e.location_id)])].filter(Boolean)
 
-    const { data: otherEntities } = ownLocationIds.length > 0
+    const { data: otherEntities } = currentLocation?.id
       ? await serviceClient
           .from('tile_entities')
           .select('*, locations(slug, name), profiles(username)')
           .neq('profile_id', user.id)
           .is('actor_id', null)
           .eq('owner_class', 'PLAYER')
-          .in('location_id', ownLocationIds)
+          .eq('location_id', currentLocation.id)
           .in('entity_type', ['building'])
       : { data: [] }
 
