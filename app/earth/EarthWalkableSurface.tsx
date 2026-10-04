@@ -16,6 +16,7 @@ type Payload={ok:boolean;region?:{name:string;origin:GeoPoint};bounds?:{south:nu
 type SpatialEntity={id:string;entity_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;ownerLabel?:string;isOwn?:boolean;status?:string;latitude_deg?:number|null;longitude_deg?:number|null}
 type Props={residents:ColonyResident[];onClose:()=>void}
 type IsoPoint={x:number;y:number}
+type ChatEntry={role:'user'|'assistant';content:string}
 
 const VIEW_W=1200
 const VIEW_H=760
@@ -49,7 +50,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const resetSharedPlayerPosition=useEarthPlayerPositionStore(s=>s.reset)
   const[selected,setSelected]=useState<ColonyResident|null>(null)
   const[message,setMessage]=useState('')
-  const[reply,setReply]=useState('')
+  const[conversationByNpc,setConversationByNpc]=useState<Record<string,ChatEntry[]>>({})
   const[sending,setSending]=useState(false)
   const[playerName,setPlayerName]=useState('Du')
   const[motionTime,setMotionTime]=useState(0)
@@ -210,14 +211,28 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
   async function talk(){
     if(!selected||!message.trim()||sending)return
-    setSending(true);setReply('')
+    const playerMessage=message.trim().slice(0,80)
+    if(!playerMessage)return
+    const history=conversationByNpc[selected.id]??[]
+    setSending(true)
     try{
       const{token}=await getSessionInfo()
-      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:message.trim().slice(0,120),npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts,history:[]})})
+      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:playerMessage,npcId:selected.id,npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts,history})})
       const json=await response.json().catch(()=>({}))
-      setReply(response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.')
-      if(response.ok)setMessage('')
-    }catch{setReply('Gespräch derzeit nicht erreichbar.')}finally{setSending(false)}
+      const npcReply=response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.'
+      if(response.ok){
+        setConversationByNpc(current=>({
+          ...current,
+          [selected.id]:[...(current[selected.id]??[]),{role:'user' as const,content:playerMessage},{role:'assistant' as const,content:npcReply}].slice(-10),
+        }))
+        setMessage('')
+      }
+    }catch{
+      setConversationByNpc(current=>({
+        ...current,
+        [selected.id]:[...(current[selected.id]??[]),{role:'assistant' as const,content:'Gespräch derzeit nicht erreichbar.'}].slice(-10),
+      }))
+    }finally{setSending(false)}
   }
 
   if(!data)return <div className="earth-walkable-loading">Lokale Earth-Szene wird aufgebaut …</div>
@@ -280,7 +295,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
         {navigationTarget&&(()=>{const from=iso(player),to=iso({xM:navigationTarget.xM,yM:navigationTarget.yM});return <g pointerEvents="none"><line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#f1d57a" strokeWidth="1.4" strokeDasharray="7 5" opacity=".85"/><circle cx={to.x} cy={to.y} r="8" fill="none" stroke="#f1d57a" strokeWidth="2"/></g>})()}
 
-        {npcPositions.map(({resident,xM,yM})=>{const p=iso({xM,yM});const name=resident.displayName;const selectedNpc=selected?.id===resident.id;const labelWidth=Math.max(42,Math.min(112,name.length*6.1+14));return <g key={resident.id} transform={`translate(${p.x} ${p.y-8})`} onClick={()=>{setSelected(resident);setMessage('');setReply('')}} style={{cursor:'pointer'}}>
+        {npcPositions.map(({resident,xM,yM})=>{const p=iso({xM,yM});const name=resident.displayName;const selectedNpc=selected?.id===resident.id;const labelWidth=Math.max(42,Math.min(112,name.length*6.1+14));return <g key={resident.id} transform={`translate(${p.x} ${p.y-8})`} onClick={()=>{setSelected(resident);setMessage('')}} style={{cursor:'pointer'}}>
           <ellipse cy="10" rx="7" ry="3" fill="#000" opacity=".25"/>
           <circle cy="-3" r="4" fill="#efc39d" stroke="#173845" strokeWidth="1"/>
           <path d="M-5 11 Q0 1 5 11 L4 18 L-4 18 Z" fill={selectedNpc?'#e4bd4b':'#2e6274'} stroke="#173845" strokeWidth="1"/>
@@ -325,7 +340,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <span>{ambientConversation.conversation.item.kind==='colony'?'NOXIA-Weltgeschehen':`Reale Meldung · ${ambientConversation.source?.name??ambientConversation.conversation.item.sourceId}`} · ca. {Math.round(ambientConversation.playerDistance)} m entfernt</span>
       </div>}
 
-      {selected&&<aside><div className="head"><div><small>NPC · LOKAL</small><b>{selected.displayName}</b><span>{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selected.activityState}</b><span>Letzte Aktion</span><b>{selected.lastAction??'–'}</b></div><div className="chat"><input value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Ansprechen …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>{reply&&<p>{reply}</p>}</aside>}
+      {selected&&<aside><div className="head"><div><small>NPC · LOKAL</small><b>{selected.displayName}</b><span>{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selected.activityState}</b><span>Letzte Aktion</span><b>{selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}<div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></aside>}
     </div>
     <style jsx>{`
       .earth-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;background:#0b1115;color:#e7eef0;font-family:system-ui;overflow:hidden}.earth-walkable header{height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;background:#081723ef;border-bottom:1px solid #38546b;position:relative;z-index:3}.earth-walkable header>div:first-child{display:flex;align-items:baseline;gap:10px;min-width:0}.earth-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.earth-walkable header b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.earth-walkable header span{font-size:9px;color:#8ea4af}.earth-walkable header .meta{display:flex;gap:10px;margin-left:auto}.earth-walkable header button,.earth-walkable aside button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.earth-walkable-stage{position:absolute;inset:46px 0 0;overflow:hidden}.earth-walkable-stage svg{width:100%;height:100%;display:block}.earth-orientation{position:absolute;right:16px;top:16px;z-index:4;display:flex;gap:10px;align-items:center;padding:9px 11px;border:1px solid #536f7d;border-radius:8px;background:#071521df;backdrop-filter:blur(7px);font-size:9px}.earth-orientation>div:first-child{display:grid;gap:1px}.earth-orientation small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.earth-orientation b{font-size:11px}.earth-orientation span{color:#89a1ac}.earth-orientation label{display:grid;gap:2px;min-width:180px}.earth-orientation select{max-width:220px;border:1px solid #476476;border-radius:5px;background:#06111a;color:#e7eff2;padding:5px 7px;font-size:9px}.earth-target{display:grid;gap:1px;padding-left:9px;border-left:1px solid #425b67}.earth-building-tooltip{position:fixed;z-index:5000;pointer-events:none;display:grid;gap:2px;min-width:150px;max-width:240px;padding:7px 9px;border:1px solid #6b8793;border-radius:6px;background:#06131df2;color:#ecf3f5;box-shadow:0 8px 24px #0007;font-size:9px}.earth-building-tooltip b{font-size:10px}.earth-building-tooltip span,.earth-building-tooltip small{color:#90a6af}

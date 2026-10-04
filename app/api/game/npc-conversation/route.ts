@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const MAX_PLAYER_CHARS = 80
-const MAX_HISTORY = 6
+const MAX_HISTORY_MESSAGES = 10
+const MAX_HISTORY_ENTRY_CHARS = 180
+const MAX_HISTORY_TOTAL_CHARS = 1200
+const MAX_REPLY_CHARS = 280
+const MAX_PERSISTED_EXCHANGES = 6
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -30,6 +35,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const player = clean(body.player)
+  const npcIdRaw = clean(body.npcId, 64)
+  const npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
   const npcName = clean(body.npcName, 48) || 'Bewohner'
   const npcRole = clean(body.npcRole, 48) || 'Kolonist'
   const headline = clean(body.headline, 180)
@@ -40,20 +47,54 @@ export async function POST(request: NextRequest) {
     : []
   if (!player) return NextResponse.json({ error: 'empty_message' }, { status: 400 })
 
-  const history = Array.isArray(body.history)
-    ? body.history.slice(-MAX_HISTORY).map((entry: any) => ({
+  const rawHistory = Array.isArray(body.history)
+    ? body.history.slice(-MAX_HISTORY_MESSAGES).map((entry: any) => ({
         role: entry?.role === 'assistant' ? 'assistant' : 'user',
-        content: clean(entry?.content, 240),
+        content: clean(entry?.content, MAX_HISTORY_ENTRY_CHARS),
       })).filter((entry: any) => entry.content)
+    : []
+
+  let historyChars = 0
+  const history = rawHistory.reverse().filter((entry: any) => {
+    if (historyChars + entry.content.length > MAX_HISTORY_TOTAL_CHARS) return false
+    historyChars += entry.content.length
+    return true
+  }).reverse()
+
+  let persistedMemory: any = null
+  if (npcId) {
+    const { data } = await serviceClient
+      .from('npc_player_conversation_memory')
+      .select('encounter_count, recent_exchanges, last_location, last_interaction_at')
+      .eq('npc_person_id', npcId)
+      .eq('player_profile_id', user.id)
+      .maybeSingle()
+    persistedMemory = data ?? null
+  }
+
+  const priorEncounterLines = history.length === 0 && Array.isArray(persistedMemory?.recent_exchanges)
+    ? persistedMemory.recent_exchanges.slice(-3).flatMap((exchange: any) => {
+        const previousPlayer = clean(exchange?.player, MAX_PLAYER_CHARS)
+        const previousNpc = clean(exchange?.npc, MAX_REPLY_CHARS)
+        return [
+          previousPlayer ? `Spieler sagte: ${previousPlayer}` : '',
+          previousNpc ? `Du antwortetest: ${previousNpc}` : '',
+        ].filter(Boolean)
+      })
     : []
 
   const system = [
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
-    'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-3 Sätze.',
+    'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-2 kurze Sätze.',
+    'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
+    'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
+    'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
     headline ? `Belegte reale Meldung: ${headline}` : '',
     source ? `Quelle der Meldung: ${source}` : '',
     locationName ? `Aktueller Ort: ${locationName}` : '',
+    priorEncounterLines.length ? `Erinnerung an frühere Begegnungen mit genau diesem Spieler:\n- ${priorEncounterLines.join('\n- ')}` : '',
+    priorEncounterLines.length ? 'Nutze diese Erinnerungen nur, wenn sie natürlich zum aktuellen Gespräch passen. Behaupte keine Details, die dort nicht stehen.' : '',
     localFacts.length ? `Verifizierte lokale Fakten:\n- ${localFacts.join('\n- ')}` : 'Es liegen keine verifizierten lokalen Infrastruktur-Fakten vor.',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',
@@ -70,7 +111,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
         messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
-        max_tokens: 180,
+        max_tokens: 100,
         temperature: 0.7,
         stream: false,
       }),
@@ -78,8 +119,36 @@ export async function POST(request: NextRequest) {
     })
     if (!response.ok) return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
     const data = await response.json()
-    const reply = clean(data?.choices?.[0]?.message?.content, 600)
+    const reply = clean(data?.choices?.[0]?.message?.content, MAX_REPLY_CHARS)
     if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
+
+    if (npcId) {
+      const previous = Array.isArray(persistedMemory?.recent_exchanges) ? persistedMemory.recent_exchanges : []
+      const recentExchanges = [
+        ...previous,
+        {
+          player,
+          npc: reply,
+          at: new Date().toISOString(),
+          location: locationName || null,
+        },
+      ].slice(-MAX_PERSISTED_EXCHANGES)
+
+      const { error: memoryError } = await serviceClient
+        .from('npc_player_conversation_memory')
+        .upsert({
+          npc_person_id: npcId,
+          player_profile_id: user.id,
+          encounter_count: Number(persistedMemory?.encounter_count ?? 0) + 1,
+          recent_exchanges: recentExchanges,
+          last_location: locationName || null,
+          last_interaction_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'npc_person_id,player_profile_id' })
+
+      if (memoryError) console.error('npc conversation memory write failed', { npcId, userId: user.id, code: memoryError.code })
+    }
+
     return NextResponse.json({ reply, maxPlayerChars: MAX_PLAYER_CHARS })
   } catch {
     return NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })

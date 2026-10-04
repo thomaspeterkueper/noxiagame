@@ -31,6 +31,8 @@ export interface NpcSkill {
 export interface SpatialResident {
   id: string
   displayName: string
+  identityState?: 'unknown' | 'inferred' | 'known'
+  observableDescription?: string
   birthYear: number | null
   activityState: string
   lastAction: string | null
