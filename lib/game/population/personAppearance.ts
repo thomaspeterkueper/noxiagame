@@ -27,3 +27,27 @@ export function appearanceFromRow(row: any): PersonAppearance {
     clothingProfile: row?.clothing_profile ?? {},
   }
 }
+
+
+export function observableDescriptionFromAppearance(appearance: PersonAppearance): string {
+  if (appearance.visibleAgeBand === 'child') return 'Kind'
+  const noun = appearance.genderPresentation === 'feminine'
+    ? 'Frau'
+    : appearance.genderPresentation === 'masculine'
+      ? 'Mann'
+      : 'Person'
+  if (appearance.visibleAgeBand === 'teen') {
+    return appearance.genderPresentation === 'feminine'
+      ? 'Jugendliche'
+      : appearance.genderPresentation === 'masculine'
+        ? 'Jugendlicher'
+        : 'jugendliche Person'
+  }
+  if (appearance.visibleAgeBand === 'young_adult') return 'junge ' + noun
+  if (appearance.visibleAgeBand === 'older') return appearance.genderPresentation === 'feminine'
+    ? 'ältere Frau'
+    : appearance.genderPresentation === 'masculine'
+      ? 'älterer Mann'
+      : 'ältere Person'
+  return noun
+}
