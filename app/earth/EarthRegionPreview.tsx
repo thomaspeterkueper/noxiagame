@@ -113,6 +113,7 @@ export default function EarthRegionPreview(){
   const earthPlayerPosition=useEarthPlayerPositionStore(s=>s.position)
   const earthPlayerRegionId=useEarthPlayerPositionStore(s=>s.regionId)
   const earthPlayerGeo=useEarthPlayerPositionStore(s=>s.geo)
+  const setEarthPlayerPosition=useEarthPlayerPositionStore(s=>s.setPosition)
 
   const drag=useRef<{x:number;y:number;ox:number;oy:number;moved:boolean}|null>(null)
   const suppressMapClick=useRef(false)
@@ -181,6 +182,13 @@ export default function EarthRegionPreview(){
     fetch('/api/earth/spaceport-candidates?radiusKm=3').then(r=>r.json()).then(setCandidateData).catch(e=>setCandidateData({ok:false,error:String(e)}))
     void loadSpatial()
   },[])
+
+  useEffect(()=>{
+    if(!data?.ok||earthPlayerGeo)return
+    const start=data.queryCenter??data.region?.origin
+    if(!start)return
+    setEarthPlayerPosition(data.region?.id??null,{xM:0,yM:0},start)
+  },[data?.ok,data?.queryCenter,data?.region,earthPlayerGeo,setEarthPlayerPosition])
 
   useEffect(()=>{
     const cancel=(e:KeyboardEvent)=>{
