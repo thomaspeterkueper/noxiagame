@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
+import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 
 const EARTH_REGION_COOKIE = 'noxia-earth-region'
 const EARTH_VIEW_LAT_COOKIE = 'noxia-earth-view-lat'
@@ -28,13 +29,20 @@ function clearCookie(name:string){document.cookie=`${name}=; Path=/; Max-Age=0; 
 
 function selectPoint(lat:number,lon:number,label:string,region?:EarthRegionId){
   const placeSlug=earthPlaceSlug({lat,lon})
-  setCookie(EARTH_REGION_COOKIE,region??placeSlug)
+  const targetRegion=region??placeSlug
+  setCookie(EARTH_REGION_COOKIE,targetRegion)
   setCookie(EARTH_VIEW_LAT_COOKIE,String(lat))
   setCookie(EARTH_VIEW_LON_COOKIE,String(lon))
   setCookie(EARTH_VIEW_LABEL_COOKIE,label.slice(0,180))
   if(region)clearCookie(EARTH_VIEW_PLACE_COOKIE)
   else setCookie(EARTH_VIEW_PLACE_COOKIE,placeSlug)
-  try{localStorage.setItem('noxia-earth-arrival-request-v1',JSON.stringify({lat,lon,label,placeSlug}))}catch{}
+
+  // Travel is a world-state change, not just a camera change. Move the player
+  // to the destination immediately so reloads can never leave map and player
+  // on different Earth locations. The arrival resolver refines this to the
+  // best transport hub after the destination has loaded.
+  useEarthPlayerPositionStore.getState().setPosition(targetRegion,{xM:0,yM:0},{lat,lon})
+  try{localStorage.setItem('noxia-earth-arrival-request-v1',JSON.stringify({lat,lon,label,placeSlug,targetRegion}))}catch{}
   window.location.reload()
 }
 
