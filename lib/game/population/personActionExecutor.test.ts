@@ -25,6 +25,7 @@ describe('person action executor routing', () => {
       relatedPersonId: null,
     }, 1)
     expect(value.executed).toBe(false)
-    expect(value.reason).toBe('missing_social_target')
+    if ('reason' in value) expect(value.reason).toBe('missing_social_target')
+    else throw new Error('expected missing_social_target result')
   })
 })
