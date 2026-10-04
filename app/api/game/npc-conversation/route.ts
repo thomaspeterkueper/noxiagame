@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
         {
           player,
           npc: reply,
+          action: worldAction?.type ?? null,
           at: now.toISOString(),
           location: locationName || null,
         },
