@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [visible, setVisible]   = useState(false)
+  const [loginFailed, setLoginFailed] = useState(false)
 
   // Fade-in nach Mount
   useEffect(() => { setTimeout(() => setVisible(true), 50) }, [])
@@ -23,6 +24,7 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setLoginFailed(false)
     setLoading(true)
 
     const supabase = createClient()
@@ -47,6 +49,7 @@ export default function LoginPage() {
       } else {
         setError('Email oder Passwort falsch.')
       }
+      setLoginFailed(true)
       setLoading(false)
       return
     }
@@ -124,6 +127,26 @@ export default function LoginPage() {
         {error && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#c0392b', marginBottom: '1rem' }}>
             {error}
+            {loginFailed && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <Link
+                  href={`/auth/reset-password?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+                  style={{
+                    display: 'inline-block',
+                    background: '#fff',
+                    border: '1px solid #c0392b',
+                    borderRadius: '5px',
+                    padding: '0.5rem 0.7rem',
+                    color: '#a52f24',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Passwort zurücksetzen
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
