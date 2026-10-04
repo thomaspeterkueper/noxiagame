@@ -66,13 +66,6 @@ export async function GET() {
 
   const transactions = groupTransactions(rawTransactions ?? [])
 
-  // ── Multiplayer: tile_entities aller Spieler + Staatliche Gebäude ──────────
-  const { data: allEntities } = await supabase
-    .from('tile_entities')
-    .select('id, profile_id, owner_class, owner_id, actor_id, occupant_id, entity_type, entity_id, tile_level, tile_row, tile_col, location_id, built_at, asking_price, lease_price, profiles(username), locations(id, slug, name), actors(display_name)')
-    .eq('entity_type', 'building')
-    .order('built_at', { ascending: true })
-
   // Nur tatsächlich simulierte Siedlungen gehören in Live-Statistik und Feed.
   // Referenzorte wie Erde dürfen weder die Einwohnerzahl verfälschen noch
   // Versorgungswarnungen erzeugen.
@@ -120,7 +113,6 @@ export async function GET() {
     news:         news.slice(0, 5),
     locations:    locations ?? [],
     transactions: transactions.slice(0, 1),
-    entities:     allEntities ?? [],
     stats: {
       totalPopulation:  totalPop,
       suppliedColonies: suppliedCount,
