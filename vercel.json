@@ -5,28 +5,12 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/cron/prices",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/orders",
-      "schedule": "15 * * * *"
-    },
-    {
       "path": "/api/cron/retention",
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/npc",
-      "schedule": "30 8 * * *"
-    },
-    {
       "path": "/api/cron/builds",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/persons",
-      "schedule": "5 * * * *"
     },
     {
       "path": "/api/cron/transits",
