@@ -42,6 +42,18 @@ function finiteCoordinate(raw: string | null, min: number, max: number) {
   return Number.isFinite(value) && value >= min && value <= max ? value : null
 }
 
+function pointInBounds(point: { lat:number; lon:number }, bounds: { south:number; west:number; north:number; east:number }) {
+  return point.lat >= bounds.south && point.lat <= bounds.north && point.lon >= bounds.west && point.lon <= bounds.east
+}
+
+function featureIntersectsBounds(feature: any, bounds: { south:number; west:number; north:number; east:number }) {
+  const geometry = feature?.geometry
+  if (!geometry) return false
+  if (geometry.kind === 'point') return pointInBounds(geometry.coordinates, bounds)
+  const points = Array.isArray(geometry.coordinates) ? geometry.coordinates : []
+  return points.some((point: any) => pointInBounds(point, bounds))
+}
+
 function narrativeLandmarksFor(bounds: { south:number; west:number; north:number; east:number }) {
   return earthLandmarksInBounds(bounds).map(({ landmark, point }) => ({
     id: landmark.id,
@@ -109,6 +121,37 @@ export async function GET(req: NextRequest) {
       .eq('region_id', storedRegion.id)
 
     if (!featuresError) {
+      let effectiveRows = rows ?? []
+      let effectiveSource = storedRegion.source
+      let inheritedFrom: string | null = null
+
+      // A searched Earth place may have no own geography yet while an existing
+      // persistent regional snapshot already covers it (e.g. Sundern inside
+      // earth-sauerland). Reuse that snapshot instead of calling Overpass.
+      if (placeSlug && effectiveRows.length === 0) {
+        const { data: regionalCandidates } = await supabase
+          .from('celestial_regions')
+          .select('id, slug, bounds, source')
+          .eq('body', 'earth')
+          .neq('slug', storedRegion.slug)
+
+        const covering = (regionalCandidates ?? []).find(candidate => {
+          const candidateBounds = candidate.bounds as typeof bounds | null
+          return candidateBounds && pointInBounds(center, candidateBounds)
+        })
+
+        if (covering) {
+          const { data: inheritedRows } = await supabase
+            .from('region_features')
+            .select('id, feature_type, geometry, properties')
+            .eq('region_id', covering.id)
+
+          effectiveRows = (inheritedRows ?? []).filter(row => featureIntersectsBounds({ geometry: row.geometry }, bounds))
+          effectiveSource = covering.source
+          inheritedFrom = covering.slug
+        }
+      }
+
       const storedBounds = (storedRegion.bounds as typeof bounds) ?? bounds
       const containsSelmecke = SELMECKE_REFERENCE_FEATURE.geometry.kind === 'point'
         && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lat >= storedBounds.south
@@ -116,7 +159,7 @@ export async function GET(req: NextRequest) {
         && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon >= storedBounds.west
         && SELMECKE_REFERENCE_FEATURE.geometry.coordinates.lon <= storedBounds.east
       const features = [
-        ...(rows ?? []).map(r => ({ id: r.id, featureType: r.feature_type, properties: r.properties, geometry: r.geometry })),
+        ...effectiveRows.map(r => ({ id: r.id, featureType: r.feature_type, properties: r.properties, geometry: r.geometry })),
         ...(containsSelmecke ? [SELMECKE_REFERENCE_FEATURE] : []),
       ]
       const materializationStatus = placeSlug
@@ -150,10 +193,13 @@ export async function GET(req: NextRequest) {
           lon: Number(storedRegion.center_lon),
           radiusKm: Number(storedRegion.radius_km ?? radiusKm),
           status: materializationStatus,
-          source: storedRegion.source,
+          source: effectiveSource,
+          inheritedFrom,
         } : null,
         narrativeLandmarks: narrativeLandmarksFor(storedBounds),
-        attribution: '© OpenStreetMap contributors · ODbL · NOXIA materialized geography',
+        attribution: inheritedFrom
+          ? `© OpenStreetMap contributors · ODbL · NOXIA inherited geography (${inheritedFrom})`
+          : '© OpenStreetMap contributors · ODbL · NOXIA materialized geography',
       }, {
         headers: { 'Cache-Control': 'private, max-age=60', 'Vary': 'Cookie' },
       })
