@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
+import { appearanceFromRow } from '@/lib/game/population/personAppearance'
 
 export async function GET(req: NextRequest) {
   const tileEntityId = req.nextUrl.searchParams.get('tileEntityId')
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
 
   if (peopleError) return NextResponse.json({ residents: [], unavailable: true, diagnostic: diagnostic ? { stage: 'people', ok: false, activeAssignments: personIds.length } : undefined })
 
-  const [identityResult, lifeResult, familyDemandResult] = await Promise.all([
+  const [identityResult, appearanceResult, lifeResult, familyDemandResult] = await Promise.all([
     user
       ? supabase
         .from('player_person_identity_knowledge')
@@ -81,6 +82,10 @@ export async function GET(req: NextRequest) {
         .eq('profile_id', user.id)
         .in('person_id', personIds)
       : Promise.resolve({ data: [] as any[] }),
+    supabase
+      .from('person_appearance')
+      .select('person_id, gender_presentation, body_frame, skin_tone_code, hair_style_code, hair_color_code, facial_hair_code, visible_age_band, clothing_profile')
+      .in('person_id', personIds),
     includeLifeState
       ? supabase
         .from('person_life_state')
@@ -97,6 +102,7 @@ export async function GET(req: NextRequest) {
   ])
 
   const identityByPerson = new Map((identityResult.data ?? []).map((row: any) => [row.person_id, row]))
+  const appearanceByPerson = new Map((appearanceResult.data ?? []).map((row: any) => [row.person_id, row]))
   const lifeByPerson = new Map((lifeResult.data ?? []).map((row: any) => [row.person_id, row]))
 
   const residents = (people ?? []).map(person => {
@@ -117,6 +123,7 @@ export async function GET(req: NextRequest) {
       displayName,
       identityState,
       observableDescription,
+      appearance: appearanceFromRow(appearanceByPerson.get(person.id)),
       birthYear: person.birth_year,
       bioShort: identityState === 'known' ? person.bio_short : null,
       publicRole: identityState === 'known' ? person.public_role : null,
