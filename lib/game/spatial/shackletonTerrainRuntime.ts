@@ -28,6 +28,8 @@ export interface ShackletonTerrainRuntime {
   status: ShackletonTerrainRuntimeStatus
 }
 
+const MAX_RUNTIME_TERRAIN_TILE_BYTES = 2 * 1024 * 1024
+
 const TILE_SELECT = [
   'dataset_id', 'tile_key', 'min_lat', 'min_lon', 'max_lat', 'max_lon',
   'raster_width', 'raster_height', 'pixel_size_m', 'storage_bucket', 'storage_path',
@@ -74,6 +76,13 @@ export async function loadShackletonTerrainRuntime(
     const resolution = resolvePersistedTerrainTileManifest(row)
     if (resolution.ok === false) {
       rejectedTiles.push({ tileKey: row.tile_key, details: resolution.details })
+      continue
+    }
+    if (resolution.manifest.byteSize > MAX_RUNTIME_TERRAIN_TILE_BYTES) {
+      rejectedTiles.push({
+        tileKey: resolution.manifest.tileKey,
+        details: [`runtime tile exceeds ${MAX_RUNTIME_TERRAIN_TILE_BYTES} byte safety limit; prepare a smaller runtime patch instead of loading the source GeoTIFF`],
+      })
       continue
     }
     try {
