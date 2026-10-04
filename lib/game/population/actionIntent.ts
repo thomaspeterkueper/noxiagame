@@ -32,6 +32,7 @@ export type PopulationActionIntent =
       personId: string
       action: Exclude<PopulationDecision['action'], 'travel_home' | 'travel_work' | 'work'>
       subjectRef: string | null
+      relatedPersonId?: string | null
     }
 
 export type PopulationIntentBlocker = 'missing_home_assignment' | 'missing_work_assignment' | 'work_location_mismatch' | PersonActionAffordanceBlocker
@@ -142,6 +143,13 @@ export function actionIntentForDecision(input: {
     }
   }
 
+  const relatedPersonId = decision.action === 'social_interaction'
+    ? relationships
+      .slice()
+      .sort((a, b) => (b.familiarity + b.trust + b.affinity) - (a.familiarity + a.trust + a.affinity)
+        || a.otherPersonId.localeCompare(b.otherPersonId))[0]?.otherPersonId ?? null
+    : null
+
   return {
     ok: true,
     intent: {
@@ -149,6 +157,7 @@ export function actionIntentForDecision(input: {
       personId,
       action: decision.action,
       subjectRef: subjectRef(decision),
+      relatedPersonId,
     },
   }
 }
