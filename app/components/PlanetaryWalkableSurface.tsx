@@ -213,9 +213,9 @@ export default function PlanetaryWalkableSurface({
           const spriteW=Math.max(46,Math.max(building.widthM,building.depthM)*2.1*spriteScale)
           const spriteH=spriteW*.75
           return <g key={building.id} onPointerEnter={()=>setHoveredBuildingId(building.id)} onPointerLeave={()=>setHoveredBuildingId(current=>current===building.id?null:current)} onClick={()=>setSelectedId(interactionId)} style={{cursor:'pointer'}}>
-            <polygon points={attrs(right)} fill="#59615f" stroke="#272d2d" opacity={visual?.mapAsset?.8:1}/>
+            <polygon points={attrs(right)} fill="#59615f" stroke="#272d2d" opacity={visual?.mapAsset ? .8 : 1}/>
             <polygon points={attrs(front)} fill="#444d4d" stroke="#272d2d" opacity={visual?.mapAsset?.8:1}/>
-            <polygon points={attrs(top)} fill={active?'#e0c05e':isMoon?'#b6b4a9':'#a88c7c'} stroke={active?'#fff0a8':'#2d3535'} strokeWidth={active?2:1.4} opacity={visual?.mapAsset?.35:1}/>
+            <polygon points={attrs(top)} fill={active?'#e0c05e':isMoon?'#b6b4a9':'#a88c7c'} stroke={active?'#fff0a8':'#2d3535'} strokeWidth={active?2:1.4} opacity={visual?.mapAsset ? .35 : 1}/>
             {visual?.mapAsset&&<image href={visual.mapAsset} x={center.x-spriteW/2} y={center.y-spriteH+8} width={spriteW} height={spriteH} preserveAspectRatio="xMidYMax meet" pointerEvents="none"/>}
             <rect x={center.x-Math.max(18,building.widthM)} y={center.y-Math.max(20,building.depthM)} width={Math.max(36,building.widthM*2)} height={Math.max(38,building.depthM*2)} fill="transparent" pointerEvents="all"/>
             <title>{building.label??building.entityId??'Gebäude'}</title>
