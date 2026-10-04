@@ -3,6 +3,8 @@
 // Named people remain owned by personBrain; unnamed people use decision.ts.
 
 import { decidePopulationAction as decideFromState, type PopulationDecisionContext } from './decision'
+import { actionIntentForDecision } from './actionIntent'
+import { executePopulationActionIntent } from './personActionExecutor'
 import { derivePopulationEncounters, type PopulationEncounter } from './encounters'
 import { projectEncounterRelationship } from './encounterProjection'
 import { resolvedPresenceCandidates } from './presence'
@@ -131,7 +133,7 @@ async function decideBackgroundPerson(supabase: SupabaseLike, person: any, tick:
     travelCostHome: 0.1,
     travelCostWork: 0.1,
   }
-  return decideFromState(context)
+  return { decision: decideFromState(context), context }
 }
 
 async function persistEncounterDirection(supabase: SupabaseLike, event: PopulationEvent): Promise<boolean> {
@@ -249,16 +251,52 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       continue
     }
     const personNeeds = needsByPerson.get(person.id) ?? []
-    const decision = await decideBackgroundPerson(supabase, person, tick, personNeeds)
+    const { decision, context } = await decideBackgroundPerson(supabase, person, tick, personNeeds)
+    const intent = actionIntentForDecision({
+      personId: person.id,
+      currentLocationId: person.current_location_id,
+      assignments: context.assignments,
+      decision,
+      simulationTier: context.person.simulationTier,
+      relationships: context.relationships,
+      knowledge: context.knowledge,
+    })
+    const execution = intent.ok
+      ? await executePopulationActionIntent(supabase, intent.intent, tick)
+      : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
+
     const nextActivity = activityForAction(decision.action)
-    await supabase.from('people').update({ activity_state: nextActivity, last_action: decision.action, last_decision_factors: { ...decision.factors, score: decision.score }, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
+    const lastAction = execution.executed && execution.kind === 'social_visit' ? 'visit:social' : decision.action
+    const decisionFactors = {
+      ...decision.factors,
+      score: decision.score,
+      intent: intent.ok ? intent.intent.kind : null,
+      intentBlocker: intent.ok ? null : intent.reason,
+      execution: execution.executed ? execution.kind : null,
+    }
+    await supabase.from('people').update({ activity_state: nextActivity, last_action: lastAction, last_decision_factors: decisionFactors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
     await updateNeedsForAction(supabase, person.id, personNeeds, decision.action, tick)
-    await supabase.from('population_events').insert({ tick, event_type: `npc_${decision.action}`, actor_person_id: person.id, location_id: person.current_location_id, subject_type: typeof decision.factors.subjectRef === 'string' && decision.factors.subjectRef ? 'problem' : null, subject_ref: typeof decision.factors.subjectRef === 'string' && decision.factors.subjectRef ? decision.factors.subjectRef : null, payload: { action: decision.action, score: decision.score, factors: decision.factors } })
+    await supabase.from('population_events').insert({
+      tick,
+      event_type: intent.ok ? `npc_${decision.action}` : 'npc_action_blocked',
+      actor_person_id: person.id,
+      location_id: person.current_location_id,
+      subject_type: typeof decision.factors.subjectRef === 'string' && decision.factors.subjectRef ? 'problem' : null,
+      subject_ref: typeof decision.factors.subjectRef === 'string' && decision.factors.subjectRef ? decision.factors.subjectRef : null,
+      payload: {
+        action: decision.action,
+        score: decision.score,
+        factors: decision.factors,
+        intent: intent.ok ? intent.intent : null,
+        blocker: intent.ok ? null : intent.reason,
+        execution,
+      },
+    })
     currentPeople.set(person.id, {
       ...personFromRow(person),
       activityState: nextActivity,
-      lastAction: decision.action,
-      lastDecisionFactors: { ...decision.factors, score: decision.score },
+      lastAction,
+      lastDecisionFactors: decisionFactors,
       lastTick: tick,
     })
     processed += 1
