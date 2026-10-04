@@ -5,8 +5,8 @@ import { createPersonActionRequest } from './personActionRequest'
 type SupabaseLike = any
 
 export type PopulationIntentExecutionResult =
-  | { executed: true; kind: 'social_visit'; detail: Awaited<ReturnType<typeof startSocialVisit>> }
-  | { executed: true; kind: 'person_action_request'; detail: Awaited<ReturnType<typeof createPersonActionRequest>> }
+  | { executed: boolean; kind: 'social_visit'; detail: Awaited<ReturnType<typeof startSocialVisit>> }
+  | { executed: boolean; kind: 'person_action_request'; detail: Awaited<ReturnType<typeof createPersonActionRequest>> }
   | { executed: false; kind: PopulationActionIntent['kind']; reason: 'not_executed_here' | 'missing_social_target' }
 
 /**
@@ -25,7 +25,7 @@ export async function executePopulationActionIntent(
       return { executed: false, kind: 'local', reason: 'missing_social_target' }
     }
     const detail = await startSocialVisit(supabase, intent.personId, intent.relatedPersonId, tick)
-    return { executed: detail.ok, kind: 'social_visit', detail } as PopulationIntentExecutionResult
+    return { executed: detail.ok, kind: 'social_visit', detail }
   }
 
   if (intent.kind === 'acquire_tool') {
