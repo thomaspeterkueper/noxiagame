@@ -68,10 +68,10 @@ export default function PlanetaryWalkableSurface({
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=160){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
 
   const residentObjects=useMemo<MobileSurfaceObject[]>(()=>{
-    if(!corridors.length||!residents.length)return[]
+    if(!residents.length)return[]
     return residents.slice(0,18).map((resident,index)=>{
       const h=hash(resident.id)
-      const corridor=corridors[h%corridors.length]
+      const corridor=corridors.length?corridors[h%corridors.length]:null
       const points=corridor?.points??[]
       if(points.length<2)return{id:'resident:'+resident.id,label:residentLabel(resident),xM:-70+(h%140),yM:-55+((h>>>8)%110),role:'person:npc'}
       const segments=points.slice(1).map((to,i)=>{const from=points[i];return{from,to,length:Math.hypot(to.xM-from.xM,to.yM-from.yM)}}).filter(item=>item.length>.01)
