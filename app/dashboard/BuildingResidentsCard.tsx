@@ -39,6 +39,7 @@ export default function BuildingResidentsCard({ tileEntityId, locationSlug }: { 
   const [residents, setResidents] = useState<Resident[]>([])
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [detailsById, setDetailsById] = useState<Record<string, { needs: Resident['needs']; skills: Resident['skills']; history: HistoryItem[] }>>({})
 
   useEffect(() => {
     if (!tileEntityId && !locationSlug) return
@@ -52,6 +53,25 @@ export default function BuildingResidentsCard({ tileEntityId, locationSlug }: { 
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [tileEntityId, locationSlug])
+
+  async function togglePerson(person: Resident) {
+    const nextOpen = openId === person.id ? null : person.id
+    setOpenId(nextOpen)
+    if (!nextOpen || detailsById[person.id]) return
+    try {
+      const response = await fetch(`/api/game/population?personId=${encodeURIComponent(person.id)}`)
+      if (!response.ok) return
+      const data = await response.json()
+      setDetailsById(current => ({
+        ...current,
+        [person.id]: {
+          needs: Array.isArray(data.needs) ? data.needs : [],
+          skills: Array.isArray(data.skills) ? data.skills : [],
+          history: Array.isArray(data.history) ? data.history : [],
+        },
+      }))
+    } catch {}
+  }
 
   if (loading) return <div style={{ padding: '6px 10px', background: '#0a0a08', color: '#5f6c5a', fontSize: '0.58rem' }}>Personen werden ermittelt …</div>
   if (residents.length === 0) return null
@@ -67,11 +87,12 @@ export default function BuildingResidentsCard({ tileEntityId, locationSlug }: { 
           const home = person.assignments.find(a => a.type === 'home')
           const assignment = work ?? home
           const expanded = openId === person.id
-          const rest = person.needs.find(n => n.code === 'rest')?.satisfaction
-          const safety = person.needs.find(n => n.code === 'safety')?.satisfaction
-          const topSkills = [...person.skills].sort((a, b) => b.level - a.level).slice(0, 4)
+          const details = detailsById[person.id]
+          const rest = details?.needs.find(n => n.code === 'rest')?.satisfaction
+          const safety = details?.needs.find(n => n.code === 'safety')?.satisfaction
+          const topSkills = [...(details?.skills ?? [])].sort((a, b) => b.level - a.level).slice(0, 4)
           return (
-            <button key={person.id} onClick={() => setOpenId(expanded ? null : person.id)} style={{ width: '100%', textAlign: 'left', padding: '7px 8px', background: expanded ? '#15150f' : '#10100d', border: `1px solid ${expanded ? '#6d6330' : '#242419'}`, borderRadius: 5, cursor: 'pointer', color: 'inherit' }}>
+            <button key={person.id} onClick={() => void togglePerson(person)} style={{ width: '100%', textAlign: 'left', padding: '7px 8px', background: expanded ? '#15150f' : '#10100d', border: `1px solid ${expanded ? '#6d6330' : '#242419'}`, borderRadius: 5, cursor: 'pointer', color: 'inherit' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'start' }}>
                 <div>
                   <div style={{ color: '#e2dfc6', fontSize: '0.65rem', fontWeight: 700 }}>{person.displayName}</div>
@@ -95,9 +116,10 @@ export default function BuildingResidentsCard({ tileEntityId, locationSlug }: { 
                     <div style={{ color: '#6f765f', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Kompetenzen</div>
                     <div style={{ color: '#a8b297', fontSize: '0.53rem', lineHeight: 1.45 }}>{topSkills.map(s => `${s.code.replaceAll('_', ' ')} ${Math.round(s.level * 100)}%`).join(' · ')}</div>
                   </div>}
-                  {(person.history?.length ?? 0) > 0 && <div>
+                  {!details && <div style={{ color: '#6f765f', fontSize: '0.52rem' }}>Details werden geladen …</div>}
+                  {(details?.history?.length ?? 0) > 0 && <div>
                     <div style={{ color: '#6f765f', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Letzte Ereignisse</div>
-                    {(person.history ?? []).slice(0, 3).map(h => <div key={h.id} style={{ color: '#8d977f', fontSize: '0.52rem', lineHeight: 1.4 }}>Tick {h.tick}: {h.payload?.reason || h.payload?.action_code || h.type}</div>)}
+                    {(details?.history ?? []).slice(0, 3).map(h => <div key={h.id} style={{ color: '#8d977f', fontSize: '0.52rem', lineHeight: 1.4 }}>Tick {h.tick}: {h.payload?.reason || h.payload?.action_code || h.type}</div>)}
                   </div>}
                 </div>
               )}
