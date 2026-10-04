@@ -34,6 +34,7 @@ function selectPoint(lat:number,lon:number,label:string,region?:EarthRegionId){
   setCookie(EARTH_VIEW_LABEL_COOKIE,label.slice(0,180))
   if(region)clearCookie(EARTH_VIEW_PLACE_COOKIE)
   else setCookie(EARTH_VIEW_PLACE_COOKIE,placeSlug)
+  try{localStorage.setItem('noxia-earth-arrival-request-v1',JSON.stringify({lat,lon,label,placeSlug}))}catch{}
   window.location.reload()
 }
 
