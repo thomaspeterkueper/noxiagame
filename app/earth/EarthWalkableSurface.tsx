@@ -206,7 +206,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     setSending(true)
     try{
       const{token}=await getSessionInfo()
-      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:playerMessage,npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts,history})})
+      const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:playerMessage,npcId:selected.id,npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts,history})})
       const json=await response.json().catch(()=>({}))
       const npcReply=response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.'
       if(response.ok){
