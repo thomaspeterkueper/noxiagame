@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
@@ -63,8 +63,28 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[spatialBuilds,setSpatialBuilds]=useState<SpatialBuild[]>([])
   const[hoveredBuilding,setHoveredBuilding]=useState<{x:number;y:number;name:string;detail:string;distanceM:number}|null>(null)
   const[navigationTargetId,setNavigationTargetId]=useState<string>('')
+  const localEnrichmentAttempted=useRef(new Set<string>())
 
   useEffect(()=>{let live=true;fetch('/api/earth/region?v=walkable-v2',{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live)setData(json)}).catch(()=>{if(live)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[])
+  useEffect(()=>{
+    const regionId=String((data?.region as any)?.id??'')
+    const originPoint=data?.queryCenter??data?.region?.origin
+    if(!data?.ok||!regionId.startsWith('earth-place-')||!originPoint)return
+    const alreadyEnriched=(data.features??[]).some(feature=>feature.properties?.noxia_enrichment==='local-scene-v1')
+    if(alreadyEnriched||localEnrichmentAttempted.current.has(regionId))return
+    localEnrichmentAttempted.current.add(regionId)
+    let live=true
+    ;(async()=>{
+      try{
+        const {token}=await getSessionInfo()
+        const response=await fetch('/api/earth/local-enrich',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({slug:regionId,lat:originPoint.lat,lon:originPoint.lon,radiusKm:.34})})
+        if(!response.ok)return
+        const refreshed=await fetch('/api/earth/region?v=walkable-v3',{cache:'no-store'}).then(result=>result.json())
+        if(live&&refreshed?.ok)setData(refreshed)
+      }catch{}
+    })()
+    return()=>{live=false}
+  },[data?.ok,data?.region,data?.queryCenter,data?.features])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{if(!live)return;setSpatialEntities(Array.isArray(json?.entities)?json.entities:[]);setSpatialBuilds(Array.isArray(json?.builds)?json.builds:[])}).catch(()=>{if(live){setSpatialEntities([]);setSpatialBuilds([])}});return()=>{live=false}},[])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=80){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
