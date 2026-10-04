@@ -48,10 +48,62 @@ export async function transferPlayerToNpcCredits(input: {
 
 
 export async function runNpcPayrollTick(supabase: any, tick: number) {
+  if (tick % 24 !== 0) {
+    return { ok: true, due: false, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }
+  }
+
+  const { data: syncData, error: syncError } = await supabase.rpc('sync_employer_economy', { p_tick: tick })
+  if (syncError) {
+    console.error('syncEmployerEconomy failed', { tick, code: syncError.code })
+  }
+
   const { data, error } = await supabase.rpc('run_npc_payroll', { p_tick: tick })
   if (error) {
     console.error('runNpcPayrollTick failed', { tick, code: error.code })
-    return { ok: false, due: tick % 24 === 0, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }
+    return {
+      ok: false,
+      due: true,
+      employerSync: syncData ?? null,
+      paid: 0,
+      duplicates: 0,
+      insufficient: 0,
+      total_credits: 0,
+    }
   }
-  return data ?? { ok: true, due: false, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }
+
+  return {
+    ...(data ?? { ok: true, due: true, paid: 0, duplicates: 0, insufficient: 0, total_credits: 0 }),
+    employerSync: syncData ?? null,
+  }
+}
+
+export async function fundPlayerCorp(input: {
+  profileId: string
+  amount: number
+  requestId: string
+  note?: string
+}) {
+  const amount = Number.parseInt(String(input.amount), 10)
+  if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
+    throw new Error('NOXIA_CORP_FUND_AMOUNT_INVALID')
+  }
+
+  const supabase = createServiceClient()
+  const { data: tickRow } = await supabase
+    .from('tick_log')
+    .select('tick_number')
+    .order('tick_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data, error } = await supabase.rpc('fund_player_corp', {
+    p_profile_id: input.profileId,
+    p_amount: amount,
+    p_tick: tickRow?.tick_number ?? 0,
+    p_request_id: input.requestId,
+    p_note: String(input.note ?? 'Einlage des Eigentümers').slice(0, 240),
+  })
+
+  if (error) throw new Error(error.message)
+  return data
 }
