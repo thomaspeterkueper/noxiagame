@@ -186,6 +186,7 @@ export default function DashboardCockpit() {
   function showMap() {
     setActive(null)
     setUtilityOpen(null)
+    if (['earth','moon','mars','phobos','deimos'].includes(location)) enterPlanning()
   }
 
   function invokeAction(id: ActionId) {
