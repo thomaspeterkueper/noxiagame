@@ -9,6 +9,7 @@ export type BuildingEntryKind =
   | 'production'
   | 'residents'
   | 'foundation'
+  | 'hospitality'
 
 export type BuildingEntryDefinition = {
   kind: BuildingEntryKind
@@ -33,6 +34,16 @@ const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
     kind: 'warehouse',
     label: 'Warenhaus betreten',
     hint: 'Handel, Marktpreise und Aufträge öffnen',
+  },
+  cafe: {
+    kind: 'hospitality',
+    label: 'Café betreten',
+    hint: 'Innenraum, Begegnungen und Aufenthalt öffnen',
+  },
+  café: {
+    kind: 'hospitality',
+    label: 'Café betreten',
+    hint: 'Innenraum, Begegnungen und Aufenthalt öffnen',
   },
   warehouse_storage: {
     kind: 'warehouse',
