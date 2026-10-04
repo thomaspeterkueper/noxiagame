@@ -53,7 +53,7 @@ export default function PlanetaryWalkableSurface({locationSlug,body,title,corrid
     mobileObjects,
   }):null,[spatial,body,corridors,mobileObjects])
 
-  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();const step=event.shiftKey?8:4;setPlayer(current=>({xM:Math.max(-300,Math.min(300,current.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-300,Math.min(300,current.yM+(key==='s'?step:key==='w'?-step:0))) }))};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[])
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;if(event.key==='Escape'){event.preventDefault();onClose();return}const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key))return;event.preventDefault();const step=event.shiftKey?8:4;setPlayer(current=>({xM:Math.max(-300,Math.min(300,current.xM+(key==='d'?step:key==='a'?-step:0))),yM:Math.max(-300,Math.min(300,current.yM+(key==='s'?step:key==='w'?-step:0))) }))};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[onClose])
 
   if(error)return <div className="planetary-walkable-loading">{error}</div>
   if(!scene)return <div className="planetary-walkable-loading">Lokale Surface-Szene wird aufgebaut …</div>
