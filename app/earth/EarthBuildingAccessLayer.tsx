@@ -16,6 +16,7 @@ import { getToken } from '@/lib/supabase/auth'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import type { BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import CafeWalkableInterior from './CafeWalkableInterior'
+import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type ResourceRow = { resource: string; stock: number; consumption: number; production: number }
 type AccessData = {
@@ -98,9 +99,11 @@ const actionButton: React.CSSProperties = {
 export default function EarthBuildingAccessLayer({
   request,
   onClose,
+  companion,
 }: {
   request: BuildingEntryRequest | null
   onClose: () => void
+  companion?: ColonyResident | null
 }) {
   const {
     credits, cargo, cargoMax, buy, sell, loadFromServer,
@@ -270,6 +273,7 @@ export default function EarthBuildingAccessLayer({
       <CafeWalkableInterior
         entityId={request.entityId}
         buildingName={request.buildingName}
+        companion={companion}
         onClose={onClose}
       />
     )
