@@ -299,7 +299,7 @@ export async function settleDueTransportJobs(limit = 100): Promise<SettleDueTran
   const { data: candidateRows, error: candidateError } = await supabase
     .from('transport_jobs')
     .select('id,actor_profile_id,status,arrives_at,updated_at')
-    .in('status', ['in_transit', 'arrived', 'unloading'])
+    .or(`status.eq.arrived,status.eq.unloading,and(status.eq.in_transit,arrives_at.lte.${now})`)
     .order('updated_at', { ascending: true })
     .limit(boundedLimit)
 
