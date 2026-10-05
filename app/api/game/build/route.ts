@@ -8,6 +8,7 @@ import { BUILDINGS } from '@/lib/game/buildings'
 import { completeBuildCommand, completeSaleCommand, startBuildCommand } from '@/lib/game/core/commands'
 import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
+import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 
 const WORLD_COLS = 32
 const WORLD_ROWS = 24
@@ -29,11 +30,8 @@ const MODULE_COSTS: Record<string, { cost: number; buildTicks: number }> = {
 }
 
 async function getUserFromRequest(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.split(' ')[1]
-  const { data: { user } } = await serviceClient.auth.getUser(token)
-  return user
+  const id = await verifiedBearerUserId(req)
+  return id ? { id } : null
 }
 
 function localBuildingDef(key: string): (DBBuildingDef & { name: string; allowed_locations: string[] | null; build_time_ticks: number }) | null {
@@ -142,22 +140,15 @@ export async function GET(req: NextRequest) {
 
   if (!action) {
     const currentLocationSlug = searchParams.get('location')
-    const { data: currentLocation } = currentLocationSlug
-      ? await serviceClient.from('locations').select('id, slug').eq('slug', currentLocationSlug).maybeSingle()
-      : { data: null }
+    const currentLocationId = searchParams.get('locationId')
+    const { data: currentLocation } = currentLocationId
+      ? { data: { id: currentLocationId, slug: currentLocationSlug ?? '' } }
+      : currentLocationSlug
+        ? await serviceClient.from('locations').select('id, slug').eq('slug', currentLocationSlug).maybeSingle()
+        : { data: null }
 
-    const { data: due } = await serviceClient
-      .from('player_builds')
-      .select('*')
-      .eq('profile_id', user.id)
-      .in('status', ['building', 'selling'])
-      .lte('completes_at', new Date().toISOString())
-
-    for (const build of due ?? []) {
-      if (build.status === 'building') await completeBuild(build)
-      if (build.status === 'selling') await completeSale(build)
-    }
-
+    // Build/sale completion is owned by /api/cron/builds. GET is a read-only
+    // snapshot and must never mutate or pre-scan due work.
     const { data: active } = await serviceClient
       .from('player_builds')
       .select('*, locations(slug, name)')
@@ -220,7 +211,10 @@ export async function GET(req: NextRequest) {
     // Market-linked building values are calculated lazily for explicit valuation
     // use cases (sell quote, financing/credit assessment, etc.). This keeps the
     // hot dashboard path independent from market-price reads.
-    return NextResponse.json({ builds: active ?? [], entities: entities ?? [], colonyTax })
+    return NextResponse.json(
+      { builds: active ?? [], entities: entities ?? [], colonyTax },
+      { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=60' } },
+    )
   }
 
   if (action === 'start') {
