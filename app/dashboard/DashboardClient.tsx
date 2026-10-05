@@ -142,7 +142,10 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
     try {
       const { token, userId: uid } = await getSessionInfo(); setUserId(uid)
       if (!token) return
-      const data = await (await fetch(`/api/game/build?location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${token}` } })).json()
+      const knownLocationId = initialLocations.find((item: any) => item.slug === location)?.id
+      const qs = new URLSearchParams({ location })
+      if (knownLocationId) qs.set('locationId', knownLocationId)
+      const data = await (await fetch(`/api/game/build?${qs.toString()}`, { headers: { Authorization: `Bearer ${token}` } })).json()
       setPlayerBuilds(data.builds ?? []); setTileEntities(data.entities ?? []); setColonyTax(data.colonyTax ?? {}); setEntityInfo(data.entityInfo ?? {})
     } catch {}
   }
