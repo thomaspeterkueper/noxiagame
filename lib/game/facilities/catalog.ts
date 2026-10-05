@@ -159,6 +159,50 @@ const FACILITIES: Record<string, FacilityDefinition> = {
       planned('talk-science', 'Mit Forschenden sprechen', 'conversation', 'Mit Wissenschaftlern über Messungen und Hypothesen sprechen.'),
     ],
   },
+  medical: {
+    id: 'medical',
+    label: 'Medizinisches Zentrum',
+    description: 'Aufnahme, Behandlung, Diagnostik und medizinische Versorgung.',
+    zones: [
+      { id: 'reception', label: 'Aufnahme', kind: 'access', description: 'Anmeldung, Triage und Erstkontakt.', interactionIds: ['talk-medical'] },
+      { id: 'treatment', label: 'Behandlung', kind: 'technical', description: 'Versorgung, Stabilisierung und Behandlung.', interactionIds: [] },
+      { id: 'diagnostics', label: 'Diagnostik', kind: 'research', description: 'Untersuchung, Scan und medizinische Analyse.', interactionIds: ['research-medical'] },
+      { id: 'staff', label: 'Personalbereich', kind: 'social', description: 'Arbeits- und Übergabebereich des medizinischen Teams.', interactionIds: ['talk-medical'] },
+    ],
+    interactions: [
+      planned('talk-medical', 'Mit medizinischem Personal sprechen', 'conversation', 'Mit dem medizinischen Team sprechen.'),
+      planned('research-medical', 'Diagnostik öffnen', 'research', 'Medizinische Diagnose- und Analysefunktionen öffnen.'),
+    ],
+  },
+  administration: {
+    id: 'administration',
+    label: 'Verwaltung',
+    description: 'Öffentlicher Service, Planung, Akten und Besprechungen.',
+    zones: [
+      { id: 'entry', label: 'Foyer', kind: 'access', description: 'Öffentlicher Eingang und Orientierung.', interactionIds: [] },
+      { id: 'service', label: 'Servicebereich', kind: 'operations', description: 'Anträge, Auskünfte und öffentliche Dienste.', interactionIds: ['talk-admin'] },
+      { id: 'operations', label: 'Verwaltung', kind: 'operations', description: 'Planung, Koordination und Aktenführung.', interactionIds: [] },
+      { id: 'meeting', label: 'Besprechung', kind: 'social', description: 'Gespräche, Sitzungen und Verhandlungen.', interactionIds: ['talk-admin'] },
+    ],
+    interactions: [
+      planned('talk-admin', 'Mit Verwaltung sprechen', 'conversation', 'Mit Mitarbeitenden der Verwaltung sprechen.'),
+    ],
+  },
+  academy: {
+    id: 'academy',
+    label: 'Schule / Akademie',
+    description: 'Lernen, Lehre, Übungen und wissenschaftliche Grundausbildung.',
+    zones: [
+      { id: 'entry', label: 'Foyer', kind: 'access', description: 'Eingang und Orientierung.', interactionIds: [] },
+      { id: 'classroom', label: 'Lernraum', kind: 'research', description: 'Unterricht und gemeinsames Lernen.', interactionIds: ['research'] },
+      { id: 'lab', label: 'Übungslabor', kind: 'research', description: 'Praktische Übungen und Experimente.', interactionIds: ['research','talk-science'] },
+      { id: 'office', label: 'Lehrbereich', kind: 'operations', description: 'Vorbereitung und Gespräche mit Lehrenden.', interactionIds: ['talk-science'] },
+    ],
+    interactions: [
+      planned('research', 'Lernen / Experiment', 'research', 'Lern- und Experimentierlogik öffnen.'),
+      planned('talk-science', 'Mit Lehrenden sprechen', 'conversation', 'Mit Lehrenden oder Forschenden sprechen.'),
+    ],
+  },
   solar: {
     id: 'solar',
     label: 'Energieanlage',
@@ -172,6 +216,24 @@ const FACILITIES: Record<string, FacilityDefinition> = {
 }
 
 const ALIASES: Record<string, string> = {
+  residential_block: 'habitat',
+  habitat_cluster: 'habitat',
+  medical_core: 'medical',
+  medical_annex: 'medical',
+  factory: 'shipyard',
+  workshop_clean: 'shipyard',
+  workshop_heavy: 'shipyard',
+  logistics_hub: 'warehouse',
+  reserve_depot: 'warehouse',
+  admin: 'administration',
+  bank: 'administration',
+  command_node: 'administration',
+  reactor_module: 'solar',
+  black_start: 'solar',
+  water_recycler: 'solar',
+  water_isru: 'solar',
+  radiator_field: 'solar',
+  eclss_hub: 'habitat',
   landing_pad_moon: 'landing_pad',
   spaceport_pad_standard: 'landing_pad',
   spaceport_pad_mini: 'landing_pad',
@@ -181,7 +243,7 @@ const ALIASES: Record<string, string> = {
   rover_yard: 'warehouse',
   life_support_hub: 'habitat',
   battery_storage: 'solar',
-  school: 'laboratory',
+  school: 'academy',
 }
 
 const FALLBACK: FacilityDefinition = {
