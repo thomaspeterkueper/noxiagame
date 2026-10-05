@@ -294,35 +294,20 @@ export async function settleDueTransportJobs(limit = 100): Promise<SettleDueTran
   const boundedLimit = Math.min(Math.max(limit, 1), 250)
   const now = new Date().toISOString()
 
-  const [dueResult, arrivedResult, unloadingResult] = await Promise.all([
-    supabase
-      .from('transport_jobs')
-      .select('id,actor_profile_id,status')
-      .eq('status', 'in_transit')
-      .lte('arrives_at', now)
-      .order('arrives_at', { ascending: true })
-      .limit(boundedLimit),
-    supabase
-      .from('transport_jobs')
-      .select('id,actor_profile_id,status')
-      .eq('status', 'arrived')
-      .order('arrived_at', { ascending: true })
-      .limit(boundedLimit),
-    supabase
-      .from('transport_jobs')
-      .select('id,actor_profile_id,status')
-      .eq('status', 'unloading')
-      .order('updated_at', { ascending: true })
-      .limit(boundedLimit),
-  ])
+  // One bounded candidate read replaces three per-status queries. Future
+  // in_transit rows are ignored below; arrived/unloading remain immediately due.
+  const { data: candidateRows, error: candidateError } = await supabase
+    .from('transport_jobs')
+    .select('id,actor_profile_id,status,arrives_at,updated_at')
+    .or(`status.eq.arrived,status.eq.unloading,and(status.eq.in_transit,arrives_at.lte.${now})`)
+    .order('updated_at', { ascending: true })
+    .limit(boundedLimit)
 
-  if (dueResult.error) throw commandError('due transport job query', dueResult.error)
-  if (arrivedResult.error) throw commandError('arrived transport job query', arrivedResult.error)
-  if (unloadingResult.error) throw commandError('unloading transport job query', unloadingResult.error)
+  if (candidateError) throw commandError('transport settlement candidate query', candidateError)
 
   const candidates = new Map<string, { id: string; actor_profile_id: string; status: string }>()
-  for (const row of [...(dueResult.data ?? []), ...(arrivedResult.data ?? []), ...(unloadingResult.data ?? [])]) {
-    if (candidates.size >= boundedLimit) break
+  for (const row of candidateRows ?? []) {
+    if (row.status === 'in_transit' && (!row.arrives_at || row.arrives_at > now)) continue
     candidates.set(row.id, row)
   }
 
