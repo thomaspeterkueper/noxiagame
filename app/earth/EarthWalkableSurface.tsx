@@ -13,7 +13,7 @@ import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worl
 import { constructionState } from '@/lib/game/constructionProgress'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
-import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePointsAttr as pointsAttr } from '@/app/components/WalkableSurfaceRenderer'
+import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr } from '@/app/components/WalkableSurfaceRenderer'
 
 type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
