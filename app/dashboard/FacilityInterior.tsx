@@ -3,6 +3,8 @@
 import { useMemo, useState, type ComponentProps } from 'react'
 import LegacyBuildingInterior from './LegacyBuildingInterior'
 import { getFacilityDefinition, type FacilityInteractionDef } from '@/lib/game/facilities/catalog'
+import { getInteriorTemplateForBuildingType } from '@/lib/game/buildings/interiors/registry'
+import InteriorTopologyScene from './InteriorTopologyScene'
 
 type Props = ComponentProps<typeof LegacyBuildingInterior>
 type LegacyAction = NonNullable<Props['onAction']> extends (kind: infer K) => void ? K : never
@@ -45,8 +47,11 @@ function InteractionButton({ interaction, onRun }: { interaction: FacilityIntera
 
 export default function FacilityInterior(props: Props) {
   const facility = useMemo(() => getFacilityDefinition(props.entity.entity_id), [props.entity.entity_id])
+  const template = useMemo(() => getInteriorTemplateForBuildingType(props.entity.entity_id), [props.entity.entity_id])
   const [zoneId, setZoneId] = useState(facility.zones[0]?.id ?? 'entry')
-  const zone = facility.zones.find(item => item.id === zoneId) ?? facility.zones[0]
+  const [roomId, setRoomId] = useState(template?.rooms[0]?.id ?? facility.zones[0]?.id ?? 'entry')
+  const roomMatchedZone = facility.zones.find(item => item.id === roomId)
+  const zone = roomMatchedZone ?? facility.zones.find(item => item.id === zoneId) ?? facility.zones[0]
   const interactions = useMemo(() => {
     if (!zone) return []
     const ids = new Set(zone.interactionIds)
@@ -63,7 +68,7 @@ export default function FacilityInterior(props: Props) {
     <aside className="facility-zones" aria-label="Gebäudebereiche">
       <div className="facility-id"><small>FACILITY</small><strong>{facility.label}</strong><span>{facility.description}</span></div>
       <nav>
-        {facility.zones.map(item => <button key={item.id} type="button" className={item.id === zone?.id ? 'selected' : ''} onClick={() => setZoneId(item.id)}>
+        {facility.zones.map(item => <button key={item.id} type="button" className={item.id === zone?.id ? 'selected' : ''} onClick={() => { setZoneId(item.id); if (template?.rooms.some(room => room.id === item.id)) setRoomId(item.id) }}>
           <i>{zoneIcon(item.kind)}</i><span><strong>{item.label}</strong><small>{item.kind}</small></span>
         </button>)}
       </nav>
@@ -75,12 +80,19 @@ export default function FacilityInterior(props: Props) {
         <div className="facility-status"><span>Weltobjekt</span><b>persistent</b></div>
       </header>
 
-      <section className="facility-scene" aria-label={`${zone?.label ?? facility.label} Innenraum`}>
+      {template ? <InteriorTopologyScene
+        template={template}
+        roomId={roomId}
+        onRoomChange={nextRoomId => {
+          setRoomId(nextRoomId)
+          if (facility.zones.some(item => item.id === nextRoomId)) setZoneId(nextRoomId)
+        }}
+      /> : <section className="facility-scene" aria-label={`${zone?.label ?? facility.label} Innenraum`}>
         <div className="facility-depth back" />
         <div className="facility-depth mid" />
         <div className="facility-floor" />
-        <div className="facility-room-label"><small>BEREICH</small><strong>{zone?.label ?? facility.label}</strong><span>Dieser Bereich ist bereits als eigener Facility-Zustand adressierbar. Eine spätere begehbare Szene kann dieselbe Zone-ID übernehmen.</span></div>
-      </section>
+        <div className="facility-room-label"><small>BEREICH</small><strong>{zone?.label ?? facility.label}</strong><span>Für diesen Gebäudetyp ist noch keine gemeinsame Topologie hinterlegt.</span></div>
+      </section>}
 
       <section className="facility-actions">
         <div className="facility-section-head"><small>INTERAKTIONSPUNKTE</small><span>{interactions.length ? `${interactions.length} in diesem Bereich` : 'noch keine direkte Aktion'}</span></div>
