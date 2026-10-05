@@ -13,6 +13,7 @@ import {
   routeAcrossLocalScene,
 } from '@/lib/game/spatial/localSceneRuntime'
 import type { PreparedCorridor, PlanetarySurfaceEntity, MobileSurfaceObject } from '@/app/components/PlanetarySurfaceMap'
+import { WALKABLE_VIEW, WalkableActor, WalkableObject, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingTop, surfacePathD as pathD, surfacePointsAttr as attrs } from '@/app/components/WalkableSurfaceRenderer'
 
 type SpatialPayload={
   frame?:{body?:string;origin_status?:string|null;terrain_dataset_id?:string|null}|null
@@ -38,15 +39,6 @@ const ISO_X=.95
 const ISO_Y=.48
 const BUILDING_H=16
 
-function iso(point:Point){return{x:VIEW_W/2+(point.xM-point.yM)*ISO_X,y:VIEW_H/2+(point.xM+point.yM)*ISO_Y}}
-function pathD(points:Point[]){return points.map((point,index)=>{const p=iso(point);return (index?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)}).join(' ')}
-function buildingTop(center:Point,widthM:number,depthM:number){return[
-  {xM:center.xM-widthM/2,yM:center.yM-depthM/2},
-  {xM:center.xM+widthM/2,yM:center.yM-depthM/2},
-  {xM:center.xM+widthM/2,yM:center.yM+depthM/2},
-  {xM:center.xM-widthM/2,yM:center.yM+depthM/2},
-].map(iso)}
-function attrs(points:Array<{x:number;y:number}>,dy=0){return points.map(p=>p.x+','+(p.y+dy)).join(' ')}
 function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function residentLabel(resident:ColonyResident){return resident.identityState==='known'?resident.displayName:(resident.observableDescription?.trim()||'Person')}
 function residentRole(resident:ColonyResident){return resident.assignments.find(item=>item.type==='work')?.roleCode??resident.activityState??'general'}
@@ -186,20 +178,16 @@ export default function PlanetaryWalkableSurface({
   if(error)return <div className="planetary-walkable-loading">{error}</div>
   if(!scene)return <div className="planetary-walkable-loading">Lokale Surface-Szene wird aufgebaut …</div>
 
-  const playerIso=iso(player)
   const isMoon=body==='moon'
   return <section className={'planetary-walkable '+body}>
     <header><div><small>{body.toUpperCase()} · LOCAL SCENE</small><b>{title}</b><span>{scene.frameId}</span></div><div className="stats"><span>{scene.buildings.length} Gebäude</span><span>{scene.paths.length} Wege/Korridore</span><span>{scene.mobileObjects.length} Akteure/Objekte</span></div><button onClick={onClose}>← Karte</button></header>
     <div className="stage">
-      <svg viewBox={'0 0 '+VIEW_W+' '+VIEW_H} preserveAspectRatio="xMidYMid slice">
+      <WalkableSurfaceSvg>
         <defs><radialGradient id={'ground-'+body} cx="45%" cy="38%"><stop offset="0%" stopColor={isMoon?'#777872':'#795b50'}/><stop offset="100%" stopColor={isMoon?'#343735':'#3e2f2b'}/></radialGradient></defs>
         <rect width={VIEW_W} height={VIEW_H} fill={'url(#ground-'+body+')'}/>
         {scene.paths.map(path=><g key={path.id}><path d={pathD(path.points)} fill="none" stroke="#20231f" strokeWidth="13" strokeLinecap="round" opacity=".45"/><path d={pathD(path.points)} fill="none" stroke={path.kind==='road'?'#aaa28f':'#8d887a'} strokeWidth={path.kind==='road'?8:5} strokeLinecap="round"/></g>)}
 
-        {route&&selected&&<g pointerEvents="none">
-          <path d={pathD(route.points)} fill="none" stroke="#f1d57a" strokeWidth="2.2" strokeDasharray="7 5" strokeLinecap="round"/>
-          <circle cx={iso(selected.point).x} cy={iso(selected.point).y} r="10" fill="none" stroke="#f1d57a" strokeWidth="2"/>
-        </g>}
+        {route&&selected&&<WalkableRoute points={route.points} target={selected.point}/>}
 
         {scene.buildings.map(building=>{
           const top=buildingTop(building.center,building.widthM,building.depthM)
@@ -223,19 +211,15 @@ export default function PlanetaryWalkableSurface({
         })}
 
         {scene.mobileObjects.map(object=>{
-          const p=iso(object.point)
           const interaction=interactions.find(item=>item.id==='mobile:'+object.id)
           const active=selectedId==='mobile:'+object.id
           const person=interaction?.kind==='person'
-          return <g key={object.id} transform={'translate('+p.x+' '+p.y+')'} onClick={()=>setSelectedId('mobile:'+object.id)} style={{cursor:'pointer'}}>
-            <ellipse cy="8" rx="8" ry="3" fill="#000" opacity=".28"/>
-            {person?<><circle cy="-5" r="4.5" fill="#e8c39e" stroke={active?'#fff0a8':'#283133'}/><path d="M-6 12 Q0 0 6 12 L5 19 L-5 19 Z" fill={active?'#e0c05e':'#52778a'} stroke="#283133"/></>:<><rect x="-6" y="-4" width="12" height="9" rx="2" fill={active?'#e0c05e':'#d3ad45'} stroke={active?'#fff0a8':'#4f411b'}/><circle cx="-5" cy="6" r="2" fill="#242b2b"/><circle cx="5" cy="6" r="2" fill="#242b2b"/></>}
-            <title>{object.label}</title>
+          return <g key={object.id} onClick={()=>setSelectedId('mobile:'+object.id)} style={{cursor:'pointer'}}>
+            {person?<WalkableActor point={object.point} selected={active}/>:<WalkableObject point={object.point} selected={active}/>}<title>{object.label}</title>
           </g>
         })}
 
-        <g transform={'translate('+playerIso.x+' '+(playerIso.y-9)+')'}><ellipse cy="11" rx="8" ry="3.5" fill="#000" opacity=".3"/><circle cy="-4" r="4.5" fill="#e8c39e" stroke="#283133"/><path d="M-6 12 Q0 0 6 12 L5 20 L-5 20 Z" fill="#d4ad43" stroke="#4b3b17"/></g>
-      </svg>
+        <WalkablePlayer point={player}/>      </WalkableSurfaceSvg>
 
       <div className="hint"><b>WASD</b> bewegen · <b>Shift</b> schneller · Ziel anklicken · <b>F/Enter</b> interagieren</div>
       {hoveredBuildingId&&(()=>{const building=scene.buildings.find(item=>item.id===hoveredBuildingId);if(!building)return null;const entity=spatial?.entities?.find(item=>item.id===building.id);return <div className="building-hover"><small>GEBÄUDE</small><b>{building.label??building.entityId??'Gebäude'}</b><span>{entity?.owner_class==='STATE'?'Staatlich':entity?.owner_class==='CORPORATION'?'Corporation':entity?.profile_id?'Privat':'Neutral'} · {Math.round(Math.hypot(building.center.xM-player.xM,building.center.yM-player.yM))} m</span></div>})()}
