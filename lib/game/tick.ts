@@ -308,9 +308,9 @@ export async function runPopulationTick(
   return results
 }
 
-export async function runPriceTick(supabase: SB, tickNumber: number) {
+export async function runPriceTick(supabase: SB, tickNumber: number, locationSnapshot?: any[]) {
   const results: Record<string, unknown>[] = []
-  const { data: priceLocRows } = await supabase.from('locations').select('id, slug, population, population_max, is_supplied')
+  const priceLocRows = locationSnapshot ?? (await supabase.from('locations').select('id, slug, population, population_max, is_supplied')).data
   const priceLocMap = new Map<string, any>()
   for (const l of (priceLocRows ?? []) as any[]) priceLocMap.set(l.id, l)
   const { data: prices } = await supabase.from('market_prices').select('*')
@@ -351,10 +351,12 @@ export async function runPriceTick(supabase: SB, tickNumber: number) {
   return results
 }
 
-export async function runOrderTick(supabase: SB) {
+export async function runOrderTick(supabase: SB, locationSnapshot?: any[]) {
   const created: Record<string, unknown>[] = []
   await supabase.from('trade_orders').update({ status: 'expired' }).eq('status', 'open').lt('expires_at', new Date().toISOString())
-  const { data: locations } = await supabase.from('locations').select('id, slug, population, is_supplied').eq('simulate_tick', true)
+  const locations = locationSnapshot
+    ? locationSnapshot.filter((loc: any) => loc.simulate_tick === true)
+    : ((await supabase.from('locations').select('id, slug, population, is_supplied, simulate_tick').eq('simulate_tick', true)).data ?? [])
   for (const loc of locations ?? []) {
     const { data: resources } = await supabase.from('location_resources').select('resource, stock, consumption, production').eq('location_id', loc.id)
     for (const res of resources ?? []) {
@@ -379,10 +381,10 @@ export async function runOrderTick(supabase: SB) {
   return created
 }
 
-export async function runNpcTick(supabase: SB, tickNumber: number) {
+export async function runNpcTick(supabase: SB, tickNumber: number, locationSnapshot?: any[]) {
   const { data: actors } = await supabase.from('actors').select('id, decision_weights').eq('kind', 'npc_firm')
   if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
-  const { data: locRows } = await supabase.from('locations').select('id, slug')
+  const locRows = locationSnapshot ?? (await supabase.from('locations').select('id, slug')).data
   const locIdToSlug = new Map<string, string>()
   for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
   const { data: priceRows } = await supabase.from('market_prices').select('resource, buy_price, sell_price, location_id')
@@ -543,14 +545,21 @@ export async function runBankInterestTick(supabase: SB, tickNumber: number) {
 //   + Nähe zum Zentrum (Distanz 0 = +100, Distanz 10+ = 0)
 // Wird einmal pro Tick aufgerufen — nicht geschäftskritisch bei Fehler.
 
-export async function runLandValueTick(supabase: SB) {
-  // Alle besiedelten Kolonien mit Bevölkerung laden
-  const { data: locations, error: locErr } = await supabase
-    .from('locations')
-    .select('id, population, population_max')
-    .gt('population', 0)
+export async function runLandValueTick(supabase: SB, locationSnapshot?: any[]) {
+  // Reuse the post-population location snapshot when available.
+  let locations: any[] = []
+  if (locationSnapshot) {
+    locations = locationSnapshot.filter((loc: any) => Number(loc.population ?? 0) > 0)
+  } else {
+    const { data, error: locErr } = await supabase
+      .from('locations')
+      .select('id, population, population_max')
+      .gt('population', 0)
+    if (locErr) return { updated: 0 }
+    locations = data ?? []
+  }
 
-  if (locErr || !locations?.length) return { updated: 0 }
+  if (!locations.length) return { updated: 0 }
 
   let updated = 0
 
@@ -594,14 +603,21 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const namedPeople = await runPersonTick(supabase, tickNumber)
   const encounters = await persistPopulationEncounters(supabase, tickNumber)
   const socialLife = await runSocialLifeTick(supabase, tickNumber)
-  const npc = await runNpcTick(supabase, tickNumber)
+
+  // Aggregate population may update location population/capacity. Load one
+  // fresh post-population snapshot and share it across the remaining readers.
+  const { data: locationSnapshot } = await supabase
+    .from('locations')
+    .select('id, slug, population, population_max, is_supplied, simulate_tick')
+
+  const npc = await runNpcTick(supabase, tickNumber, locationSnapshot ?? [])
   const payroll = await runNpcPayrollTick(supabase, tickNumber)
   const consumption = await runNpcConsumptionTick(supabase, tickNumber)
   const propertyMarket = await runNpcPropertyMarketTick(supabase, tickNumber)
-  const prices = await runPriceTick(supabase, tickNumber)
-  const orders  = await runOrderTick(supabase)
+  const prices = await runPriceTick(supabase, tickNumber, locationSnapshot ?? [])
+  const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
-  const landValues = await runLandValueTick(supabase)
+  const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   return { tickNumber, population, livingPopulation, namedPeople, encounters, socialLife, prices, npc, payroll, consumption, propertyMarket, orders, bank, landValues }
 }
 
