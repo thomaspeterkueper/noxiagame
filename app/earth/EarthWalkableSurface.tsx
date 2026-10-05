@@ -13,6 +13,7 @@ import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worl
 import { constructionState } from '@/lib/game/constructionProgress'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
+import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePointsAttr as pointsAttr } from '@/app/components/WalkableSurfaceRenderer'
 
 type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
@@ -20,33 +21,16 @@ type Payload={ok:boolean;region?:{id?:string;name:string;origin:GeoPoint};queryC
 type SpatialEntity={id:string;entity_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;ownerLabel?:string;isOwn?:boolean;status?:string;latitude_deg?:number|null;longitude_deg?:number|null}
 type SpatialBuild={id:string;buildable_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;status?:string;created_at?:string|null;completes_at?:string|null}
 type Props={residents:ColonyResident[];onClose:()=>void}
-type IsoPoint={x:number;y:number}
 type ChatEntry={role:'user'|'assistant';content:string}
 type NpcWorldAction={type:'lead_walk';startedAt:number;durationSeconds:number;maxDistanceMeters:number;playerFollows:boolean}|{type:'visit_place';startedAt:number;durationSeconds:number;targetRef:string;targetName:string;targetX:number;targetY:number;startX:number;startY:number;playerFollows:boolean}
 
-const VIEW_W=1200
-const VIEW_H=760
+const VIEW_W=WALKABLE_VIEW.width
+const VIEW_H=WALKABLE_VIEW.height
 const SCENE_RADIUS_M=260
-const ISO_X=.92
-const ISO_Y=.46
 const HEIGHT_PX=12
 
 function role(resident:ColonyResident){return resident.assignments.find(item=>item.type==='work')?.roleCode??resident.activityState??'general'}
 function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
-function iso(point:ScenePoint):IsoPoint{return{x:VIEW_W/2+(point.xM-point.yM)*ISO_X,y:VIEW_H/2+(point.xM+point.yM)*ISO_Y}}
-function pathD(points:ScenePoint[]){return points.map((point,index)=>{const p=iso(point);return `${index?'L':'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`}).join(' ')}
-function polygonD(points:ScenePoint[]){return `${pathD(points)} Z`}
-function buildingPolygon(center:ScenePoint,widthM:number,depthM:number){
-  const corners=[
-    {xM:center.xM-widthM/2,yM:center.yM-depthM/2},
-    {xM:center.xM+widthM/2,yM:center.yM-depthM/2},
-    {xM:center.xM+widthM/2,yM:center.yM+depthM/2},
-    {xM:center.xM-widthM/2,yM:center.yM+depthM/2},
-  ]
-  return corners.map(iso)
-}
-function pointsAttr(points:IsoPoint[],dy=0){return points.map(point=>`${point.x},${point.y+dy}`).join(' ')}
-
 export default function EarthWalkableSurface({residents,onClose}:Props){
   const[data,setData]=useState<Payload|null>(null)
   const player=useEarthPlayerPositionStore(s=>s.position)
@@ -415,12 +399,10 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   if(!data)return <div className="earth-walkable-loading">Lokale Earth-Szene wird aufgebaut …</div>
   if(!data.ok||!scene)return <div className="earth-walkable-loading">Earth-Szene nicht verfügbar: {data.error??'keine Region'}</div>
 
-  const playerIso=iso(player)
-
   return <section className="earth-walkable" aria-label={`Begehbarer Ort ${data.region?.name??'Erde'}`}>
     <header><div><small>EARTH · LOCAL SCENE</small><b>{data.region?.name??'Aktueller Ort'}</b><span>{theme.label}</span></div><div className="meta"><span>{scene.buildings.length} Gebäude/Massen</span><span>{scene.roadGraph.length} Straßen</span><span>{scene.railGraph.length} Schienen</span></div><button onClick={onClose}>← Karte</button></header>
     <div className="earth-walkable-stage">
-      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid slice">
+      <WalkableSurfaceSvg>
         <defs>
           <linearGradient id="earth-scene-ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={theme.backgroundAlt}/><stop offset="100%" stopColor={theme.background}/></linearGradient>
         </defs>
@@ -487,29 +469,13 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           </g>
         })}
 
-        {navigationTarget&&navigationRoute&&(()=>{const to=iso({xM:navigationTarget.xM,yM:navigationTarget.yM});return <g pointerEvents="none"><path d={pathD(navigationRoute.points)} fill="none" stroke="#f1d57a" strokeWidth="1.8" strokeDasharray="7 5" opacity=".9"/><circle cx={to.x} cy={to.y} r="8" fill="none" stroke="#f1d57a" strokeWidth="2"/></g>})()}
+        {navigationTarget&&navigationRoute&&<WalkableRoute points={navigationRoute.points} target={{xM:navigationTarget.xM,yM:navigationTarget.yM}}/>}
 
-        {npcPositions.map(({resident,xM,yM})=>{const p=iso({xM,yM});const name=resident.displayName;const selectedNpc=selected?.id===resident.id;const labelWidth=Math.max(42,Math.min(112,name.length*6.1+14));return <g key={resident.id} transform={`translate(${p.x} ${p.y-8})`} onClick={()=>{setSelected(resident);setMessage('')}} style={{cursor:'pointer'}}>
-          <ellipse cy="10" rx="7" ry="3" fill="#000" opacity=".25"/>
-          <circle cy="-3" r="4" fill="#efc39d" stroke="#173845" strokeWidth="1"/>
-          <path d="M-5 11 Q0 1 5 11 L4 18 L-4 18 Z" fill={selectedNpc?'#e4bd4b':'#2e6274'} stroke="#173845" strokeWidth="1"/>
-          <g pointerEvents="none" transform="translate(0 -18)">
-            <rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill={selectedNpc?'#173845ee':'#071521d9'} stroke={selectedNpc?'#e4bd4b':'#57717d'} strokeWidth=".8"/>
-            <text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="#edf4f5">{name}</text>
-          </g>
-          <title>{resident.displayName} · {role(resident)}</title>
-        </g>})}
+        {npcPositions.map(({resident,xM,yM})=><WalkableActor key={resident.id} point={{xM,yM}} label={resident.displayName} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/>)}
 
-        <g transform={`translate(${playerIso.x} ${playerIso.y-9})`}>
-          <ellipse cy="11" rx="8" ry="3.5" fill="#000" opacity=".28"/>
-          <circle cy="-4" r="4.5" fill="#f0c49c" stroke="#493c18" strokeWidth="1.2"/>
-          <path d="M-6 12 Q0 0 6 12 L5 20 L-5 20 Z" fill="#d4ad43" stroke="#594717" strokeWidth="1.2"/>
-          <g pointerEvents="none" transform="translate(0 -20)">
-            <rect x={-Math.max(44,Math.min(118,playerName.length*6.1+16))/2} y="-12" width={Math.max(44,Math.min(118,playerName.length*6.1+16))} height="14" rx="4" fill="#173845ee" stroke="#e4bd4b" strokeWidth=".9"/>
-            <text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff7d8">{playerName}</text>
-          </g>
-        </g>
-      </svg>
+        <WalkablePlayer point={player} label={playerName}/>
+
+      </WalkableSurfaceSvg>
 
       <div className="earth-orientation">
         <div><small>DU BIST HIER</small><b>{data.region?.name??'Erde'}</b><span>{player.xM>=0?'+':''}{Math.round(player.xM)} m Ost · {player.yM>=0?'+':''}{Math.round(player.yM)} m Nord vom Szenenzentrum</span></div>
