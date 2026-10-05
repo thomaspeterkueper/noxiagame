@@ -21,6 +21,8 @@ export function surfacePathD(points:LocalSurfacePoint[]){
   }).join(' ')
 }
 
+export function surfacePolygonD(points:LocalSurfacePoint[]){return `${surfacePathD(points)} Z`}
+
 export function surfacePointsAttr(points:SurfaceScreenPoint[],dy=0){
   return points.map(point=>`${point.x},${point.y+dy}`).join(' ')
 }
