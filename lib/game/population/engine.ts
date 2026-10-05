@@ -113,9 +113,14 @@ async function updateNeedsForAction(
   }
 }
 
-async function decideBackgroundPerson(supabase: SupabaseLike, person: any, tick: number, needRows: any[]) {
-  const [{ data: assignmentRows }, { data: skillRows }, { data: relationRows }, { data: knowledgeRows }] = await Promise.all([
-    supabase.from('person_assignments').select('*').eq('person_id', person.id).eq('is_active', true),
+async function decideBackgroundPerson(
+  supabase: SupabaseLike,
+  person: any,
+  tick: number,
+  needRows: any[],
+  assignmentRows: any[],
+) {
+  const [{ data: skillRows }, { data: relationRows }, { data: knowledgeRows }] = await Promise.all([
     supabase.from('person_skills').select('*').eq('person_id', person.id),
     supabase.from('person_relationships').select('*').eq('person_id', person.id),
     supabase.from('person_knowledge').select('*').eq('person_id', person.id),
@@ -220,6 +225,12 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     assignmentRows = data ?? []
   }
   const assignments = assignmentRows.map(assignmentFromRow)
+  const assignmentRowsByPerson = new Map<string, any[]>()
+  for (const row of assignmentRows) {
+    const rows = assignmentRowsByPerson.get(row.person_id) ?? []
+    rows.push(row)
+    assignmentRowsByPerson.set(row.person_id, rows)
+  }
 
   let needRows: any[] = []
   if (personIds.length) {
@@ -251,7 +262,13 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       continue
     }
     const personNeeds = needsByPerson.get(person.id) ?? []
-    const { decision, context } = await decideBackgroundPerson(supabase, person, tick, personNeeds)
+    const { decision, context } = await decideBackgroundPerson(
+      supabase,
+      person,
+      tick,
+      personNeeds,
+      assignmentRowsByPerson.get(person.id) ?? [],
+    )
     const intent = actionIntentForDecision({
       personId: person.id,
       currentLocationId: person.current_location_id,
