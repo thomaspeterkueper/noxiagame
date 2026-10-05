@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import {
   beginLoadingTransportJob,
   createTransportJob,
@@ -30,11 +31,8 @@ type ObservationSnapshot = {
 }
 
 async function userFromRequest(req: NextRequest) {
-  const token = req.headers.get('authorization')?.split(' ')[1]
-  if (!token) return null
-  const supabase = createServiceClient()
-  const { data: { user } } = await supabase.auth.getUser(token)
-  return user ?? null
+  const id = await verifiedBearerUserId(req)
+  return id ? { id } : null
 }
 
 function finite(value: unknown, fallback: number) {

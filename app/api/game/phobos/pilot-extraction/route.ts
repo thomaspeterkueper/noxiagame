@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 
 const TARGET_MASS_KG = 50
 const ENERGY_COST = 22
@@ -20,7 +21,7 @@ const ROBOT_SPECS: RobotSpec[] = [
   { role: 'maintenance', canonicalPrefix: 'phobos-stickney-maintenance', frameId: 'PHOBOS-MAINT-MR1', label: 'Stickney Maintenance Robot 01', cargoCapacityT: 0.2, nominalWear: 2, modules: ['microgravity-anchor-spikes','tool-changer','inspection-camera','spares-rack','tether-reel','autonomy-pack'] },
 ]
 
-async function userFromRequest(req: NextRequest) { const token=req.headers.get('authorization')?.split(' ')[1]; if(!token)return null; const s=createServiceClient(); const {data:{user}}=await s.auth.getUser(token); return user??null }
+async function userFromRequest(req: NextRequest) { const id=await verifiedBearerUserId(req); return id?{id}:null }
 async function phobosLocation(s: ReturnType<typeof createServiceClient>){const {data,error}=await s.from('locations').select('id,slug').eq('slug','phobos').maybeSingle();if(error||!data)throw new Error(error?.message??'Phobos location missing');return data}
 async function requirePresence(s: ReturnType<typeof createServiceClient>, userId:string){const {data}=await s.from('profiles').select('current_location').eq('id',userId).maybeSingle();return data?.current_location==='phobos'}
 async function prospectById(s:ReturnType<typeof createServiceClient>,id:string){const {data,error}=await s.from('region_resources').select('id,resource_type,x_m,y_m,abundance,properties,discovered_at').eq('id',id).maybeSingle();if(error)throw new Error(error.message);if(!data||data.properties?.body!=='phobos'||data.properties?.surface_hub!=='stickney-alpha')return null;return data}

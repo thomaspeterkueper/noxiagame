@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
+import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import {
   LOGISTICS_RESOURCES,
   TRANSPORT_DOMAINS,
@@ -25,11 +25,8 @@ import {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 async function getUserFromRequest(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const supabase = createServiceClient()
-  const { data: { user } } = await supabase.auth.getUser(authHeader.slice('Bearer '.length))
-  return user
+  const id = await verifiedBearerUserId(req)
+  return id ? { id } : null
 }
 
 function uuid(value: unknown): string | null {

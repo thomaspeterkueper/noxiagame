@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
+import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 
 export async function GET(req: NextRequest) {
   const tileEntityId = req.nextUrl.searchParams.get('tileEntityId')
@@ -15,9 +16,6 @@ export async function GET(req: NextRequest) {
   const includeLifeState = req.nextUrl.searchParams.get('includeLifeState') === '1'
   const includeFamilyDemand = req.nextUrl.searchParams.get('includeFamilyDemand') === '1'
   const supabase = createServiceClient()
-  const authHeader = req.headers.get('authorization')
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-  const { data: { user } } = token ? await supabase.auth.getUser(token) : { data: { user: null } }
 
   if (personId) {
     const [{ data: needs }, { data: skills }, { data: events }] = await Promise.all([
@@ -48,44 +46,64 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  if (!locationId && locationSlug) {
-    const { data: location, error: locationError } = await supabase.from('locations').select('id, slug').eq('slug', locationSlug).maybeSingle()
-    if (locationError) return NextResponse.json({ residents: [], unavailable: true, diagnostic: diagnostic ? { stage: 'location', ok: false } : undefined })
-    locationId = location?.id ?? null
-    if (!locationId) return NextResponse.json({ residents: [], diagnostic: diagnostic ? { stage: 'location', ok: false, locationFound: false } : undefined })
+  if (!tileEntityId && !locationId && !locationSlug) {
+    return NextResponse.json({ error: 'tileEntityId, locationId oder locationSlug erforderlich.' }, { status: 400 })
   }
 
-  if (!tileEntityId && !locationId) return NextResponse.json({ error: 'tileEntityId, locationId oder locationSlug erforderlich.' }, { status: 400 })
+  let assignmentsQuery = supabase
+    .from('person_assignments')
+    .select(`
+      id, person_id, assignment_type, location_id, tile_entity_id, role_code, is_active,
+      locations!inner(slug),
+      people!inner(
+        id, person_key, display_name, observable_description, birth_year, bio_short,
+        public_role, traits, activity_state, last_action, last_decision_factors, last_tick,
+        person_appearance(
+          person_id, gender_presentation, body_frame, skin_tone_code, hair_style_code,
+          hair_color_code, facial_hair_code, visible_age_band, clothing_profile
+        )
+      )
+    `)
+    .eq('is_active', true)
 
-  let assignmentsQuery = supabase.from('person_assignments').select('id, person_id, assignment_type, location_id, tile_entity_id, role_code, is_active').eq('is_active', true)
   if (tileEntityId) assignmentsQuery = assignmentsQuery.eq('tile_entity_id', tileEntityId)
-  else assignmentsQuery = assignmentsQuery.eq('location_id', locationId)
+  else if (locationId) assignmentsQuery = assignmentsQuery.eq('location_id', locationId)
+  else if (locationSlug) assignmentsQuery = assignmentsQuery.eq('locations.slug', locationSlug)
 
   const { data: assignments, error } = await assignmentsQuery
-  if (error) return NextResponse.json({ residents: [], unavailable: true, diagnostic: diagnostic ? { stage: 'assignments', ok: false } : undefined })
+  if (error) {
+    return NextResponse.json({
+      residents: [],
+      unavailable: true,
+      diagnostic: diagnostic ? { stage: 'assignments', ok: false } : undefined,
+    })
+  }
 
-  const personIds = [...new Set((assignments ?? []).map(a => a.person_id))]
-  if (personIds.length === 0) return NextResponse.json({ residents: [], diagnostic: diagnostic ? { ok: true, locationFound: true, activeAssignments: 0, people: 0 } : undefined })
+  locationId = locationId ?? (assignments?.[0] as any)?.location_id ?? null
+  const personIds = [...new Set((assignments ?? []).map((a: any) => a.person_id))]
+  if (personIds.length === 0) {
+    return NextResponse.json({
+      residents: [],
+      diagnostic: diagnostic ? { ok: true, locationFound: true, activeAssignments: 0, people: 0 } : undefined,
+    })
+  }
 
-  const { data: people, error: peopleError } = await supabase
-    .from('people')
-    .select('id, person_key, display_name, observable_description, birth_year, bio_short, public_role, traits, activity_state, last_action, last_decision_factors, last_tick')
-    .in('id', personIds)
+  const peopleById = new Map<string, any>()
+  for (const assignment of assignments ?? []) {
+    const person = (assignment as any).people
+    if (person?.id && !peopleById.has(person.id)) peopleById.set(person.id, person)
+  }
+  const people = [...peopleById.values()]
 
-  if (peopleError) return NextResponse.json({ residents: [], unavailable: true, diagnostic: diagnostic ? { stage: 'people', ok: false, activeAssignments: personIds.length } : undefined })
-
-  const [identityResult, appearanceResult, lifeResult, familyDemandResult] = await Promise.all([
-    user
+  const profileId = await verifiedBearerUserId(req)
+  const [identityResult, lifeResult, familyDemandResult] = await Promise.all([
+    profileId
       ? supabase
         .from('player_person_identity_knowledge')
         .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind')
-        .eq('profile_id', user.id)
+        .eq('profile_id', profileId)
         .in('person_id', personIds)
       : Promise.resolve({ data: [] as any[] }),
-    supabase
-      .from('person_appearance')
-      .select('person_id, gender_presentation, body_frame, skin_tone_code, hair_style_code, hair_color_code, facial_hair_code, visible_age_band, clothing_profile')
-      .in('person_id', personIds),
     includeLifeState
       ? supabase
         .from('person_life_state')
@@ -102,14 +120,16 @@ export async function GET(req: NextRequest) {
   ])
 
   const identityByPerson = new Map((identityResult.data ?? []).map((row: any) => [row.person_id, row]))
-  const appearanceByPerson = new Map((appearanceResult.data ?? []).map((row: any) => [row.person_id, row]))
   const lifeByPerson = new Map((lifeResult.data ?? []).map((row: any) => [row.person_id, row]))
 
-  const residents = (people ?? []).map(person => {
+  const residents = people.map(person => {
     const personAssignments = (assignments ?? []).filter(a => a.person_id === person.id)
     const identity = identityByPerson.get(person.id) as any
     const identityState = perceivedIdentityState(identity)
-    const appearance = appearanceFromRow(appearanceByPerson.get(person.id))
+    const rawAppearance = Array.isArray(person.person_appearance)
+      ? person.person_appearance[0]
+      : person.person_appearance
+    const appearance = appearanceFromRow(rawAppearance)
     const observableDescription = person.observable_description?.trim() || observableDescriptionFromAppearance(appearance)
     const displayName = perceivedPersonLabel({
       state: identityState,
@@ -142,6 +162,11 @@ export async function GET(req: NextRequest) {
     ...(includeFamilyDemand ? { familyDemand: familyDemandResult.data ?? null } : {}),
     diagnostic: diagnostic ? { ok: true, locationFound: true, activeAssignments: (assignments ?? []).length, people: residents.length } : undefined,
   }, {
-    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
+    headers: {
+      'Cache-Control': profileId
+        ? 'private, max-age=30, stale-while-revalidate=120'
+        : 'public, s-maxage=120, stale-while-revalidate=600',
+      'Vary': 'Authorization',
+    },
   })
 }

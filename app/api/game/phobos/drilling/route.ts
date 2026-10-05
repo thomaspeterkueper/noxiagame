@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { localWorldToPlanetary } from '@/lib/game/spatial/planetary'
 import type { WorldFrame } from '@/lib/game/spatial/types'
 import { beginLoadingTransportJob, createTransportJob, startTransportJob } from '@/lib/game/core/logistics'
@@ -14,11 +15,8 @@ const CORE_COMPONENT_COST = 1
 const CORE_WEAR_COST = 8
 
 async function userFromRequest(req: NextRequest) {
-  const token = req.headers.get('authorization')?.split(' ')[1]
-  if (!token) return null
-  const supabase = createServiceClient()
-  const { data: { user } } = await supabase.auth.getUser(token)
-  return user ?? null
+  const id = await verifiedBearerUserId(req)
+  return id ? { id } : null
 }
 
 async function requirePhobosPresence(supabase: ReturnType<typeof createServiceClient>, userId: string) {
