@@ -9,6 +9,7 @@ import { WORKSHOP_STANDARD_INTERIOR } from './templates/workshopStandard'
 import { LOGISTICS_STANDARD_INTERIOR } from './templates/logisticsStandard'
 import { ACADEMY_STANDARD_INTERIOR } from './templates/academyStandard'
 import { UTILITY_STANDARD_INTERIOR } from './templates/utilityStandard'
+import { CIVIC_STANDARD_INTERIOR } from './templates/civicStandard'
 
 export interface InteriorTemplateRegistry {
   byId: Readonly<Record<InteriorTemplateId, InteriorTemplate>>
@@ -28,6 +29,7 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [LOGISTICS_STANDARD_INTERIOR.id]: LOGISTICS_STANDARD_INTERIOR,
     [ACADEMY_STANDARD_INTERIOR.id]: ACADEMY_STANDARD_INTERIOR,
     [UTILITY_STANDARD_INTERIOR.id]: UTILITY_STANDARD_INTERIOR,
+    [CIVIC_STANDARD_INTERIOR.id]: CIVIC_STANDARD_INTERIOR,
   },
   byBuildingTypeId: {
     laboratory: LABORATORY_STANDARD_INTERIOR.id,
@@ -58,6 +60,9 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     water_recycler: UTILITY_STANDARD_INTERIOR.id,
     water_isru: UTILITY_STANDARD_INTERIOR.id,
     radiator_field: UTILITY_STANDARD_INTERIOR.id,
+    admin: CIVIC_STANDARD_INTERIOR.id,
+    bank: CIVIC_STANDARD_INTERIOR.id,
+    command_node: CIVIC_STANDARD_INTERIOR.id,
   },
   byStationRole: {
     'habitat-transfer-station': ORBITAL_TRANSFER_STATION_INTERIOR.id,
