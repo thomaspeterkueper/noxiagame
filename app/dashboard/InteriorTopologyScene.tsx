@@ -3,14 +3,15 @@
 import { useEffect, useMemo } from 'react'
 import type { InteriorTemplate, RoomId } from '@/lib/game/buildings/interiors/types'
 
-type Props = { template: InteriorTemplate; roomId: RoomId; onRoomChange: (roomId: RoomId) => void }
+type Occupant = { id:string; name:string; roomId:string; activity?:string | null }
+type Props = { template: InteriorTemplate; roomId: RoomId; occupants?:Occupant[]; onRoomChange: (roomId: RoomId) => void }
 
 function roomGrid(index:number){
   const col=index%2, row=Math.floor(index/2)
   return {x:40+col*220,y:36+row*140,w:180,h:100}
 }
 
-export default function InteriorTopologyScene({template,roomId,onRoomChange}:Props){
+export default function InteriorTopologyScene({template,roomId,occupants=[],onRoomChange}:Props){
   const layout=useMemo(()=>new Map(template.rooms.map((room,index)=>[room.id,roomGrid(index)])),[template])
   const adjacent=useMemo(()=>{
     const out:string[]=[]
@@ -53,6 +54,12 @@ export default function InteriorTopologyScene({template,roomId,onRoomChange}:Pro
           <text x={box.x+12} y={box.y+24} fill={active?'#fff1b8':'#dbe6e4'} fontSize="13" fontWeight="700">{room.name}</text>
           <text x={box.x+12} y={box.y+42} fill="#8ea3aa" fontSize="9">{room.kind}</text>
           <text x={box.x+12} y={box.y+74} fill="#7fc0c7" fontSize="8">{(room.capabilities??[]).slice(0,3).join(' · ')}</text>
+          {occupants.filter(person=>person.roomId===room.id).slice(0,3).map((person,index)=><g key={person.id} transform={'translate('+(box.x+14+index*52)+' '+(box.y+88)+')'}>
+            <circle cx="5" cy="-5" r="4" fill="#e8c39e" stroke="#283133"/>
+            <path d="M0 5 Q5 -2 10 5 L9 12 L1 12 Z" fill="#d4ad43" stroke="#4b3b17"/>
+            <text x="13" y="5" fill="#eef4ee" fontSize="7">{person.name.length>10?person.name.slice(0,9)+'…':person.name}</text>
+          </g>)}
+          {occupants.filter(person=>person.roomId===room.id).length>3&&<text x={box.x+12} y={box.y+96} fill="#d6bf78" fontSize="7">+{occupants.filter(person=>person.roomId===room.id).length-3}</text>}
         </g>
       })}
       {(()=>{const box=layout.get(roomId);if(!box)return null;return <g transform={'translate('+(box.x+box.w/2)+' '+(box.y+box.h/2+18)+')'}><circle cy="-8" r="6" fill="#e8c39e" stroke="#283133"/><path d="M-8 13 Q0 -2 8 13 L7 22 L-7 22 Z" fill="#d4ad43" stroke="#4b3b17"/></g>})()}
