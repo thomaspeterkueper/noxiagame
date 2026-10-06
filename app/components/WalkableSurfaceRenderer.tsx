@@ -14,6 +14,28 @@ export function projectSurfacePoint(point:LocalSurfacePoint):SurfaceScreenPoint{
   }
 }
 
+export function surfaceCameraOffset(
+  focus:LocalSurfacePoint,
+  options?:{marginX?:number;marginY?:number},
+):SurfaceScreenPoint{
+  const point=projectSurfacePoint(focus)
+  const marginX=Math.max(80,Math.min(WALKABLE_VIEW.width/2-40,options?.marginX??260))
+  const marginY=Math.max(70,Math.min(WALKABLE_VIEW.height/2-40,options?.marginY??160))
+  const minX=marginX
+  const maxX=WALKABLE_VIEW.width-marginX
+  const minY=marginY
+  const maxY=WALKABLE_VIEW.height-marginY
+  return{
+    x:point.x<minX?minX-point.x:point.x>maxX?maxX-point.x:0,
+    y:point.y<minY?minY-point.y:point.y>maxY?maxY-point.y:0,
+  }
+}
+
+export function surfaceCameraTransform(focus:LocalSurfacePoint,options?:{marginX?:number;marginY?:number}){
+  const offset=surfaceCameraOffset(focus,options)
+  return `translate(${offset.x.toFixed(1)} ${offset.y.toFixed(1)})`
+}
+
 export function surfacePathD(points:LocalSurfacePoint[]){
   return points.map((point,index)=>{
     const p=projectSurfacePoint(point)
