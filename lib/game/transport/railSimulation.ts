@@ -127,3 +127,48 @@ export type RailEvent = {
 export function railEventKey(event: RailEvent) {
   return [event.runId, event.kind, event.stationId ?? '-', event.atMs].join(':')
 }
+
+
+/**
+ * Derives a point along an observed rail polyline. Useful for local rendering:
+ * the caller stores no intermediate positions and can choose any refresh rate.
+ */
+export function derivePointAlongRailPath(
+  points: LocalSurfacePoint[],
+  progress: number,
+): LocalSurfacePoint | null {
+  if (!points.length) return null
+  if (points.length === 1) return points[0]
+
+  const segments = points.slice(1).map((to, index) => {
+    const from = points[index]
+    return { from, to, lengthM: Math.hypot(to.xM - from.xM, to.yM - from.yM) }
+  }).filter(segment => segment.lengthM > 0)
+
+  const totalM = segments.reduce((sum, segment) => sum + segment.lengthM, 0)
+  if (totalM <= 0) return points[0]
+
+  const targetM = clamp01(progress) * totalM
+  let traversedM = 0
+  for (const segment of segments) {
+    if (targetM <= traversedM + segment.lengthM) {
+      const t = (targetM - traversedM) / segment.lengthM
+      return {
+        xM: segment.from.xM + (segment.to.xM - segment.from.xM) * t,
+        yM: segment.from.yM + (segment.to.yM - segment.from.yM) * t,
+      }
+    }
+    traversedM += segment.lengthM
+  }
+  return segments[segments.length - 1].to
+}
+
+/**
+ * Ping-pong progress keeps a local demonstration train on the observed segment
+ * without creating route endpoints or persistent simulation state.
+ */
+export function deriveLoopingRailProgress(nowMs: number, oneWayDurationMs = 45_000) {
+  const duration = Math.max(1, oneWayDurationMs)
+  const phase = ((nowMs % (duration * 2)) + duration * 2) % (duration * 2)
+  return phase <= duration ? phase / duration : 2 - phase / duration
+}

@@ -185,3 +185,17 @@ export function WalkableObject({point,selected=false}:{point:LocalSurfacePoint;s
     <circle cx="-5" cy="6" r="2" fill="#242b2b"/><circle cx="5" cy="6" r="2" fill="#242b2b"/>
   </g>
 }
+
+
+export function WalkableTrain({point,label}:{point:LocalSurfacePoint;label?:string}){
+  const p=projectSurfacePoint(point)
+  return <g transform={`translate(${p.x} ${p.y-5})`} pointerEvents="none">
+    <ellipse cy="9" rx="15" ry="4" fill="#000" opacity=".28"/>
+    <path d="M-15 3 L-11 -7 L10 -7 L15 3 L12 8 L-12 8 Z" fill="#aeb6b8" stroke="#263238" strokeWidth="1.3"/>
+    <rect x="-8" y="-5" width="6" height="4" rx="1" fill="#385664"/>
+    <rect x="1" y="-5" width="6" height="4" rx="1" fill="#385664"/>
+    <circle cx="-9" cy="8" r="2.3" fill="#202729"/>
+    <circle cx="9" cy="8" r="2.3" fill="#202729"/>
+    {label&&<text x="0" y="-11" textAnchor="middle" fontSize="7" fontWeight="700" fill="#f3f4f4">{label}</text>}
+  </g>
+}

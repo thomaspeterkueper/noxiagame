@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert'
-import { deriveTrainPoint, deriveTrainRunState, type RailNetwork, type RailService, type TrainRun } from './railSimulation'
+import { deriveLoopingRailProgress, derivePointAlongRailPath, deriveTrainPoint, deriveTrainRunState, type RailNetwork, type RailService, type TrainRun } from './railSimulation'
 
 const network: RailNetwork = {
   stations: [
@@ -32,3 +32,11 @@ assert.equal(deriveTrainRunState(service, run, 1_115_000).phase, 'dwelling')
 assert.equal(deriveTrainRunState(service, run, 1_121_000).phase, 'arrived')
 
 console.log('railSimulation tests passed')
+
+
+assert.deepEqual(derivePointAlongRailPath([{ xM: 0, yM: 0 }, { xM: 100, yM: 0 }], 0.25), { xM: 25, yM: 0 })
+assert.deepEqual(derivePointAlongRailPath([{ xM: 0, yM: 0 }, { xM: 100, yM: 0 }, { xM: 100, yM: 100 }], 0.75), { xM: 100, yM: 50 })
+assert.equal(deriveLoopingRailProgress(0, 1000), 0)
+assert.equal(deriveLoopingRailProgress(500, 1000), 0.5)
+assert.equal(deriveLoopingRailProgress(1000, 1000), 1)
+assert.equal(deriveLoopingRailProgress(1500, 1000), 0.5)
