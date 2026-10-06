@@ -155,3 +155,20 @@ export async function runNpcPropertyMarketTick(supabase: any, tick: number) {
   }
   return data ?? { ok: true, due: true, bought: 0, no_offer: 0, no_money: 0, total_credits: 0 }
 }
+
+
+export async function runNpcSelfBuildTick(supabase: any, tick: number) {
+  const completion = await supabase.rpc('complete_due_npc_builds', { p_tick: tick })
+  if (completion.error) console.error('completeDueNpcBuilds failed', { tick, code: completion.error.code })
+
+  if (tick % 72 !== 0) {
+    return { ok: !completion.error, due: false, completed: completion.data?.completed ?? 0, started: 0, no_money: 0, no_site: 0 }
+  }
+
+  const { data, error } = await supabase.rpc('run_npc_self_build', { p_tick: tick })
+  if (error) {
+    console.error('runNpcSelfBuildTick failed', { tick, code: error.code })
+    return { ok: false, due: true, completed: completion.data?.completed ?? 0, started: 0, no_money: 0, no_site: 0 }
+  }
+  return { ...(data ?? { ok: true, due: true, started: 0, no_money: 0, no_site: 0 }), completed: completion.data?.completed ?? 0 }
+}
