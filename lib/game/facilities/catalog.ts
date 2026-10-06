@@ -241,7 +241,6 @@ const ALIASES: Record<string, string> = {
   logistics_hub: 'warehouse',
   reserve_depot: 'warehouse',
   admin: 'administration',
-  bank: 'administration',
   command_node: 'administration',
   archive_library: 'library',
   scanner: 'laboratory',
