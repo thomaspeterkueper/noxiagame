@@ -10,6 +10,8 @@ import { LOGISTICS_STANDARD_INTERIOR } from './templates/logisticsStandard'
 import { ACADEMY_STANDARD_INTERIOR } from './templates/academyStandard'
 import { UTILITY_STANDARD_INTERIOR } from './templates/utilityStandard'
 import { CIVIC_STANDARD_INTERIOR } from './templates/civicStandard'
+import { LIBRARY_STANDARD_INTERIOR } from './templates/libraryStandard'
+import { SPACEPORT_STANDARD_INTERIOR } from './templates/spaceportStandard'
 
 export interface InteriorTemplateRegistry {
   byId: Readonly<Record<InteriorTemplateId, InteriorTemplate>>
@@ -30,6 +32,8 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [ACADEMY_STANDARD_INTERIOR.id]: ACADEMY_STANDARD_INTERIOR,
     [UTILITY_STANDARD_INTERIOR.id]: UTILITY_STANDARD_INTERIOR,
     [CIVIC_STANDARD_INTERIOR.id]: CIVIC_STANDARD_INTERIOR,
+    [LIBRARY_STANDARD_INTERIOR.id]: LIBRARY_STANDARD_INTERIOR,
+    [SPACEPORT_STANDARD_INTERIOR.id]: SPACEPORT_STANDARD_INTERIOR,
   },
   byBuildingTypeId: {
     laboratory: LABORATORY_STANDARD_INTERIOR.id,
@@ -63,6 +67,13 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     admin: CIVIC_STANDARD_INTERIOR.id,
     bank: CIVIC_STANDARD_INTERIOR.id,
     command_node: CIVIC_STANDARD_INTERIOR.id,
+    archive_library: LIBRARY_STANDARD_INTERIOR.id,
+    landing_pad: SPACEPORT_STANDARD_INTERIOR.id,
+    spaceport_core: SPACEPORT_STANDARD_INTERIOR.id,
+    spaceport_pad_standard: SPACEPORT_STANDARD_INTERIOR.id,
+    spaceport_pad_mini: SPACEPORT_STANDARD_INTERIOR.id,
+    scanner: LABORATORY_STANDARD_INTERIOR.id,
+    shipyard: WORKSHOP_STANDARD_INTERIOR.id,
   },
   byStationRole: {
     'habitat-transfer-station': ORBITAL_TRANSFER_STATION_INTERIOR.id,
