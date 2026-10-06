@@ -11,9 +11,10 @@ import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConvers
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
 import { constructionState } from '@/lib/game/constructionProgress'
+import { deriveLoopingRailProgress, derivePointAlongRailPath } from '@/lib/game/transport/railSimulation'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
-import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
+import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, WalkableTrain, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
 
 type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
@@ -140,6 +141,11 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     },Date.now())
     return[{id:`pending:${build.id}`,name:String(build.name??build.buildable_id),xM,yM,kind:'Baustelle',build,state}]
   }),[spatialBuilds,motionTime])
+  const localTrainPoint=useMemo(()=>{
+    const track=scene?.railGraph.find(path=>path.points.length>=2)
+    if(!track)return null
+    return derivePointAlongRailPath(track.points,deriveLoopingRailProgress(motionTime*1000))
+  },[scene,motionTime])
   const navigationTargets=useMemo(()=>[...buildingTargets,...pendingTargets,...namedPoiTargets].sort((a,b)=>a.name.localeCompare(b.name,'de')),[buildingTargets,pendingTargets,namedPoiTargets])
   const navigationTarget=navigationTargets.find(target=>target.id===navigationTargetId)??null
   const navigationRoute=useMemo(()=>scene&&navigationTarget?routeAcrossLocalScene(scene,player,{xM:navigationTarget.xM,yM:navigationTarget.yM}):null,[scene,navigationTarget,player])
@@ -499,6 +505,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
         {npcPositions.map(({resident,xM,yM})=><WalkableActor key={resident.id} point={{xM,yM}} label={resident.displayName} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/>)}
 
+        {localTrainPoint&&<WalkableTrain point={localTrainPoint} label="Regional"/>}
         <WalkablePlayer point={player} label={playerName}/>
         </g>
 
