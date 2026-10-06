@@ -50,6 +50,13 @@ export type ColonyResident = {
     visibleAgeBand: 'child' | 'teen' | 'young_adult' | 'adult' | 'older'
     clothingProfile?: Record<string, unknown>
   }
+  interiorPresence?: {
+    roomId: string
+    targetRoomId: string | null
+    templateId: string
+    sourceKind: 'assignment' | 'visit' | 'activity'
+    updatedTick: number
+  } | null
   birthYear: number | null
   activityState: string
   lastAction: string | null
