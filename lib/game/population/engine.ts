@@ -10,6 +10,7 @@ import { projectEncounterRelationship } from './encounterProjection'
 import { resolvedPresenceCandidates } from './presence'
 import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
 import { persistObservableKnowledge } from './observableKnowledge'
+import { projectInteriorPresence } from './interiorPresence'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
 type SupabaseLike = any
@@ -319,10 +320,20 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     processed += 1
   }
 
+  const interiorPresence = await projectInteriorPresence(
+    supabase,
+    tick,
+    peopleRows.map((person:any)=>({
+      id:person.id,
+      activity_state:(currentPeople.get(person.id)?.activityState ?? person.activity_state) as PersonActivityState,
+    })),
+    assignmentRows,
+  )
+
   const currentCandidates = resolvedPresenceCandidates([...currentPeople.values()], assignments)
   const encounters = derivePopulationEncounters({ tick, candidates: currentCandidates, previousCandidates })
   let relationshipsProjected = 0
   for (const encounter of encounters) relationshipsProjected += await persistEncounter(supabase, encounter)
 
-  return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, skipped: false }
+  return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, interiorPresence, skipped: false }
 }
