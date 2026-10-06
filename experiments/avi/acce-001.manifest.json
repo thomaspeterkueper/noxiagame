@@ -1,0 +1,46 @@
+{
+  "id": "ACCE-001",
+  "title": "AVI Core Closure Experiment 001 — hidden-state recovery",
+  "version": "0.1.0",
+  "modelClass": "BASELINE",
+  "status": "reference-test",
+  "purpose": "Verify that an apparent history effect disappears when a causally sufficient standard hidden state is restored; do not infer new AVI ontology.",
+  "cases": [
+    "NULL",
+    "REDUCED_HIDDEN_STATE",
+    "FULL_STATE_RECOVERY"
+  ],
+  "state": {
+    "observed": [
+      "x"
+    ],
+    "hidden": [
+      "h"
+    ],
+    "observable": "q = x + h"
+  },
+  "histories": {
+    "A": {
+      "x": 10,
+      "h": -2
+    },
+    "B": {
+      "x": 10,
+      "h": 2
+    }
+  },
+  "tests": {
+    "NULL": "Identical complete state predicts identical q.",
+    "REDUCED_HIDDEN_STATE": "If h is omitted, equal observed x can coexist with different q and produces an apparent closure defect.",
+    "FULL_STATE_RECOVERY": "Adding h to Omega_std exactly restores closure; no Z extension is admissible."
+  },
+  "expected": {
+    "qA": 8,
+    "qB": 12,
+    "reducedClosureDefect": 4,
+    "fullClosureDefect": 0,
+    "extensionAdmissible": false
+  },
+  "evidenceLabel": "SIMULATION_EVIDENCE",
+  "scientificGuardrail": "This experiment validates the AVI discovery procedure against a known hidden standard state. It is not empirical evidence for AVI."
+}
