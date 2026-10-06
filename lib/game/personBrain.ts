@@ -146,8 +146,10 @@ export async function runPersonTick(supabase: any, tick: number, pressuresByLoca
       for (const n of needsRows) (needs as any)[n.need_code] = Number(n.satisfaction)
       const skills: PersonSkillState = {}
       for (const s of skillsRows) skills[s.skill_code] = Number(s.level)
-      const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick, cognitive: { sleeping: person.last_action === 'sleep_and_consolidate' && Number(needs.rest ?? 1) < 0.85 } })
+      const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick, cognitive: { sleeping: person.activity_state === 'resting' && Number(needs.rest ?? 1) < 0.85 } })
       await supabase.from('people').update({ activity_state: decision.activity, last_action: decision.actionCode, last_decision_factors: decision.factors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
+      const runtimeState = decision.cognitiveState ?? selectCognitiveState({ sleeping: false, creativity: creativityFromTraits(person.traits ?? {}), stimulus: {} })
+      await supabase.from('person_cognitive_state').upsert({ person_id: person.id, mode: runtimeState.mode, compute_tier: runtimeState.computeTier, trigger_score: runtimeState.triggerScore, updated_tick: tick, updated_at: new Date().toISOString() }, { onConflict: 'person_id' })
       result.decisions++
       const meaningful = person.last_action !== decision.actionCode || Boolean(decision.subjectRef)
       if (meaningful) {
