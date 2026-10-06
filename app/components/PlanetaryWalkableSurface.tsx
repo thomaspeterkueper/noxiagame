@@ -13,7 +13,7 @@ import {
   routeAcrossLocalScene,
 } from '@/lib/game/spatial/localSceneRuntime'
 import type { PreparedCorridor, PlanetarySurfaceEntity, MobileSurfaceObject } from '@/app/components/PlanetarySurfaceMap'
-import { WALKABLE_VIEW, WalkableActor, WalkableObject, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingTop, surfacePathD as pathD, surfacePointsAttr as attrs } from '@/app/components/WalkableSurfaceRenderer'
+import { WALKABLE_VIEW, WalkableActor, WalkableObject, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingTop, surfacePathD as pathD, surfacePointsAttr as attrs, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
 
 type SpatialPayload={
   frame?:{body?:string;origin_status?:string|null;terrain_dataset_id?:string|null}|null
@@ -185,6 +185,7 @@ export default function PlanetaryWalkableSurface({
       <WalkableSurfaceSvg>
         <defs><radialGradient id={'ground-'+body} cx="45%" cy="38%"><stop offset="0%" stopColor={isMoon?'#777872':'#795b50'}/><stop offset="100%" stopColor={isMoon?'#343735':'#3e2f2b'}/></radialGradient></defs>
         <rect width={VIEW_W} height={VIEW_H} fill={'url(#ground-'+body+')'}/>
+        <g transform={cameraTransform(player)}>
         {scene.paths.map(path=><g key={path.id}><path d={pathD(path.points)} fill="none" stroke="#20231f" strokeWidth="13" strokeLinecap="round" opacity=".45"/><path d={pathD(path.points)} fill="none" stroke={path.kind==='road'?'#aaa28f':'#8d887a'} strokeWidth={path.kind==='road'?8:5} strokeLinecap="round"/></g>)}
 
         {route&&selected&&<WalkableRoute points={route.points} target={selected.point}/>}
@@ -219,7 +220,9 @@ export default function PlanetaryWalkableSurface({
           </g>
         })}
 
-        <WalkablePlayer point={player}/>      </WalkableSurfaceSvg>
+        <WalkablePlayer point={player}/>
+        </g>
+      </WalkableSurfaceSvg>
 
       <div className="hint"><b>WASD</b> bewegen · <b>Shift</b> schneller · Ziel anklicken · <b>F/Enter</b> interagieren</div>
       {hoveredBuildingId&&(()=>{const building=scene.buildings.find(item=>item.id===hoveredBuildingId);if(!building)return null;const entity=spatial?.entities?.find(item=>item.id===building.id);return <div className="building-hover"><small>GEBÄUDE</small><b>{building.label??building.entityId??'Gebäude'}</b><span>{entity?.owner_class==='STATE'?'Staatlich':entity?.owner_class==='CORPORATION'?'Corporation':entity?.profile_id?'Privat':'Neutral'} · {Math.round(Math.hypot(building.center.xM-player.xM,building.center.yM-player.yM))} m</span></div>})()}
