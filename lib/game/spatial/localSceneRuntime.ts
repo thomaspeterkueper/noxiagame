@@ -294,6 +294,38 @@ export function resolveLocalSceneStep(
   return current
 }
 
+export function advanceAlongLocalSceneRoute(
+  scene: LocalSurfaceScene,
+  current: LocalSurfacePoint,
+  route: LocalSceneRoute,
+  stepM = 2,
+) {
+  let cursor = current
+  let remaining = Math.max(0.1, stepM)
+
+  for (const waypoint of route.points) {
+    const segmentDistance = distance(cursor, waypoint)
+    if (segmentDistance < 0.05) continue
+
+    if (segmentDistance <= remaining) {
+      const next = resolveLocalSceneStep(scene, cursor, waypoint)
+      if (distance(next, cursor) < 0.01) return cursor
+      cursor = next
+      remaining -= segmentDistance
+      if (remaining <= 0.05) return cursor
+      continue
+    }
+
+    const ratio = remaining / segmentDistance
+    return resolveLocalSceneStep(scene, cursor, {
+      xM: cursor.xM + (waypoint.xM - cursor.xM) * ratio,
+      yM: cursor.yM + (waypoint.yM - cursor.yM) * ratio,
+    })
+  }
+
+  return cursor
+}
+
 function mobileKind(object: LocalSurfaceMobileObject): LocalSceneInteractionKind {
   const role = String(object.role ?? '').toLowerCase()
   if (/person|npc|crew|resident|human/.test(role)) return 'person'
