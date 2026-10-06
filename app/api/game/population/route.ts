@@ -96,12 +96,19 @@ export async function GET(req: NextRequest) {
   const people = [...peopleById.values()]
 
   const profileId = await verifiedBearerUserId(req)
-  const [identityResult, lifeResult, familyDemandResult] = await Promise.all([
+  const [identityResult, interiorPresenceResult, lifeResult, familyDemandResult] = await Promise.all([
     profileId
       ? supabase
         .from('player_person_identity_knowledge')
         .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind')
         .eq('profile_id', profileId)
+        .in('person_id', personIds)
+      : Promise.resolve({ data: [] as any[] }),
+    tileEntityId
+      ? supabase
+        .from('person_interior_presence')
+        .select('person_id, tile_entity_id, template_id, room_id, target_room_id, source_kind, updated_tick')
+        .eq('tile_entity_id', tileEntityId)
         .in('person_id', personIds)
       : Promise.resolve({ data: [] as any[] }),
     includeLifeState
@@ -120,6 +127,7 @@ export async function GET(req: NextRequest) {
   ])
 
   const identityByPerson = new Map((identityResult.data ?? []).map((row: any) => [row.person_id, row]))
+  const interiorPresenceByPerson = new Map((interiorPresenceResult.data ?? []).map((row: any) => [row.person_id, row]))
   const lifeByPerson = new Map((lifeResult.data ?? []).map((row: any) => [row.person_id, row]))
 
   const residents = people.map(person => {
@@ -145,6 +153,13 @@ export async function GET(req: NextRequest) {
       identityState,
       observableDescription,
       appearance,
+      interiorPresence: interiorPresenceByPerson.get(person.id) ? {
+        roomId: (interiorPresenceByPerson.get(person.id) as any).room_id,
+        targetRoomId: (interiorPresenceByPerson.get(person.id) as any).target_room_id ?? null,
+        templateId: (interiorPresenceByPerson.get(person.id) as any).template_id,
+        sourceKind: (interiorPresenceByPerson.get(person.id) as any).source_kind,
+        updatedTick: (interiorPresenceByPerson.get(person.id) as any).updated_tick,
+      } : null,
       birthYear: person.birth_year,
       bioShort: identityState === 'known' ? person.bio_short : null,
       publicRole: identityState === 'known' ? person.public_role : null,
