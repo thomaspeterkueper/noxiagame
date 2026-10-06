@@ -6,6 +6,7 @@ import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStat
 import { buildPlanetaryLocalScene } from '@/lib/game/spatial/planetaryLocalScene'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import {
+  advanceAlongLocalSceneRoute,
   isLocalScenePointWalkable,
   localSceneInteractionDistance,
   localSceneInteractions,
@@ -51,6 +52,7 @@ export default function PlanetaryWalkableSurface({
   const[error,setError]=useState<string|null>(null)
   const[player,setPlayer]=useState<Point>({xM:0,yM:0})
   const[selectedId,setSelectedId]=useState('')
+  const[autoWalkId,setAutoWalkId]=useState('')
   const[hoveredBuildingId,setHoveredBuildingId]=useState<string|null>(null)
   const[motionTime,setMotionTime]=useState(0)
   const[personPanelOpen,setPersonPanelOpen]=useState(false)
@@ -113,6 +115,7 @@ export default function PlanetaryWalkableSurface({
     : null
   const hasAction=Boolean(selectedResident||(selectedEntity&&onOpenWorldObject)||selectedMobile)
   const canInteract=Boolean(selected&&selectedDistance!==null&&selectedDistance<=Math.max(8,selected.rangeM)&&hasAction)
+  const autoWalkStopDistance=selected?.building?Math.max(8,selected.rangeM):Math.max(3,selected?.rangeM??3)
 
   useEffect(()=>{
     if(!scene||isLocalScenePointWalkable(scene,player))return
@@ -157,6 +160,15 @@ export default function PlanetaryWalkableSurface({
   }
 
   useEffect(()=>{
+    if(!scene||!selected||autoWalkId!==selected.id||selectedDistance===null||!route)return
+    if(selectedDistance<=autoWalkStopDistance){
+      setAutoWalkId('')
+      return
+    }
+    setPlayer(current=>advanceAlongLocalSceneRoute(scene,current,route,2.4))
+  },[motionTime,scene,selected,selectedDistance,route,autoWalkId,autoWalkStopDistance])
+
+  useEffect(()=>{
     if(!scene)return
     const onKey=(event:KeyboardEvent)=>{
       const target=event.target as HTMLElement|null
@@ -165,6 +177,7 @@ export default function PlanetaryWalkableSurface({
       const key=event.key.toLowerCase()
       if(!['w','a','s','d'].includes(key))return
       event.preventDefault()
+      setAutoWalkId('')
       const step=event.shiftKey?8:4
       setPlayer(current=>resolveLocalSceneStep(scene,current,{
         xM:current.xM+(key==='d'?step:key==='a'?-step:0),
@@ -231,6 +244,7 @@ export default function PlanetaryWalkableSurface({
         <small>{selected.kind.toUpperCase()} · {route?.usesNetwork?'NETZROUTE':'DIREKTE ROUTE'}</small>
         <b>{selected.label}</b>
         <span>{Math.round(selectedDistance??0)} m entfernt · Weg {Math.round(route?.distanceM??0)} m</span>
+        {selectedDistance!==null&&selectedDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkId(selected.id)}>{autoWalkId===selected.id?'GEHE …':'GEHE DAHIN'}</button>}
         {hasAction
           ? <button disabled={!canInteract} onClick={interact}>{canInteract?(selectedResident?'SPRECHEN':'INTERAGIEREN'):'NÄHER HERANGEHEN'}</button>
           : <em>{selected.building&&!selectedEntity?'im Bau / noch nicht zugänglich':'keine lokale Aktion hinterlegt'}</em>}

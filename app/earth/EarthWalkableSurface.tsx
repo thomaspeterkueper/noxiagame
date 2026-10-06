@@ -5,7 +5,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import { buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
-import { resolveLocalSceneStep, routeAcrossLocalScene } from '@/lib/game/spatial/localSceneRuntime'
+import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, resolveLocalSceneStep, routeAcrossLocalScene } from '@/lib/game/spatial/localSceneRuntime'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
@@ -50,6 +50,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[spatialBuilds,setSpatialBuilds]=useState<SpatialBuild[]>([])
   const[hoveredBuilding,setHoveredBuilding]=useState<{x:number;y:number;name:string;detail:string;distanceM:number}|null>(null)
   const[navigationTargetId,setNavigationTargetId]=useState<string>('')
+  const[autoWalkTargetId,setAutoWalkTargetId]=useState<string>('')
   const[entryRequest,setEntryRequest]=useState<BuildingEntryRequest|null>(null)
   const localEnrichmentAttempted=useRef(new Set<string>())
 
@@ -145,7 +146,17 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const targetDistance=navigationTarget?Math.hypot(navigationTarget.xM-player.xM,navigationTarget.yM-player.yM):null
   const selectedBuildingTarget=buildingTargets.find(target=>target.id===navigationTargetId)??null
   const selectedBuildingEntry=selectedBuildingTarget?getBuildingEntryDefinition(selectedBuildingTarget.entity.entity_id):null
-  const canEnterSelectedBuilding=Boolean(selectedBuildingTarget&&selectedBuildingEntry&&targetDistance!==null&&targetDistance<=8)
+  const selectedBuildingDistance=selectedBuildingTarget?distanceToBuildingFootprint(player,{
+    id:selectedBuildingTarget.entity.id,
+    center:{xM:selectedBuildingTarget.xM,yM:selectedBuildingTarget.yM},
+    widthM:Math.max(8,Number(selectedBuildingTarget.entity.footprint_width_m??18)),
+    depthM:Math.max(8,Number(selectedBuildingTarget.entity.footprint_depth_m??14)),
+    rotationDeg:Number(selectedBuildingTarget.entity.rotation_deg??0),
+    provenance:'canonical',
+  }):null
+  const targetInteractionDistance=selectedBuildingDistance??targetDistance
+  const autoWalkStopDistance=selectedBuildingTarget?6:2
+  const canEnterSelectedBuilding=Boolean(selectedBuildingTarget&&selectedBuildingEntry&&selectedBuildingDistance!==null&&selectedBuildingDistance<=8)
 
   function enterSelectedBuilding(){
     if(!selectedBuildingTarget||!selectedBuildingEntry||!canEnterSelectedBuilding)return
@@ -301,7 +312,21 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }
   },[awarenessItems,npcPositions,player])
 
-  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key)||!scene)return;event.preventDefault();setNpcWorldActionById(current=>Object.fromEntries(Object.entries(current).map(([id,action])=>[id,{...action,playerFollows:false}])));(()=>{const next=resolveLocalSceneStep(scene,player,{xM:player.xM+(key==='d'?step:key==='a'?-step:0),yM:player.yM+(key==='s'?step:key==='w'?-step:0)});setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,scene,setSharedPlayerPosition])
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key)||!scene)return;event.preventDefault();setAutoWalkTargetId('');setNpcWorldActionById(current=>Object.fromEntries(Object.entries(current).map(([id,action])=>[id,{...action,playerFollows:false}])));(()=>{const next=resolveLocalSceneStep(scene,player,{xM:player.xM+(key==='d'?step:key==='a'?-step:0),yM:player.yM+(key==='s'?step:key==='w'?-step:0)});setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,scene,setSharedPlayerPosition])
+
+  useEffect(()=>{
+    if(!scene||!origin||!navigationTarget||!navigationRoute||autoWalkTargetId!==navigationTarget.id||targetInteractionDistance===null)return
+    if(targetInteractionDistance<=autoWalkStopDistance){
+      setAutoWalkTargetId('')
+      return
+    }
+    const next=advanceAlongLocalSceneRoute(scene,player,navigationRoute,2.2)
+    if(Math.hypot(next.xM-player.xM,next.yM-player.yM)<.01){
+      setAutoWalkTargetId('')
+      return
+    }
+    setSharedPlayerPosition((data?.region as any)?.id??null,next,localMetersToGeo({eastM:next.xM,northM:next.yM},origin))
+  },[motionTime,scene,origin,navigationTarget,navigationRoute,autoWalkTargetId,targetInteractionDistance,autoWalkStopDistance,player,data?.region,setSharedPlayerPosition])
 
   useEffect(()=>{
     const entry=Object.entries(npcWorldActionById).find(([,action])=>action.playerFollows&&motionTime-action.startedAt>=0&&motionTime-action.startedAt<action.durationSeconds)
@@ -481,11 +506,11 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
       <div className="earth-orientation">
         <div><small>DU BIST HIER</small><b>{data.region?.name??'Erde'}</b><span>{player.xM>=0?'+':''}{Math.round(player.xM)} m Ost · {player.yM>=0?'+':''}{Math.round(player.yM)} m Nord vom Szenenzentrum</span></div>
-        <label><span>Ziel</span><select value={navigationTargetId} onChange={event=>setNavigationTargetId(event.target.value)}>
+        <label><span>Ziel</span><select value={navigationTargetId} onChange={event=>{setAutoWalkTargetId('');setNavigationTargetId(event.target.value)}}>
           <option value="">— kein Ziel —</option>
           {navigationTargets.map(target=><option key={target.id} value={target.id}>{target.name}</option>)}
         </select></label>
-        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetDistance??0)} m entfernt · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</span>{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}</div>}
+        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}</div>}
       </div>
       {pendingTargets.length>0&&<div className="earth-construction-hint">Baustellen sind gelb gestrichelt markiert und zeigen Bauphase + Fortschritt.</div>}
       {hoveredBuilding&&<div className="earth-building-tooltip" style={{left:hoveredBuilding.x+12,top:hoveredBuilding.y+12}}>
