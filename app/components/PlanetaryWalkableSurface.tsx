@@ -229,7 +229,7 @@ export default function PlanetaryWalkableSurface({
           const active=selectedId==='mobile:'+object.id
           const person=interaction?.kind==='person'
           return <g key={object.id} onClick={()=>setSelectedId('mobile:'+object.id)} style={{cursor:'pointer'}}>
-            {person?<WalkableActor point={object.point} selected={active}/>:<WalkableObject point={object.point} selected={active}/>}<title>{object.label}</title>
+            {person?<WalkableActor point={object.point} selected={active} appearance={object.id.startsWith('resident:')?residents.find(resident=>resident.id===object.id.slice('resident:'.length))?.appearance:undefined} visualSeed={object.id}/>:<WalkableObject point={object.point} selected={active}/>}<title>{object.label}</title>
           </g>
         })}
 

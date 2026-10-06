@@ -497,7 +497,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
         {navigationTarget&&navigationRoute&&<WalkableRoute points={navigationRoute.points} target={{xM:navigationTarget.xM,yM:navigationTarget.yM}}/>}
 
-        {npcPositions.map(({resident,xM,yM})=><WalkableActor key={resident.id} point={{xM,yM}} label={resident.displayName} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/>)}
+        {npcPositions.map(({resident,xM,yM})=><WalkableActor key={resident.id} point={{xM,yM}} label={resident.displayName} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/>)}
 
         <WalkablePlayer point={player} label={playerName}/>
         </g>

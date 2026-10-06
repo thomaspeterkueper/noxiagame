@@ -81,13 +81,98 @@ export function WalkablePlayer({point,label}:{point:LocalSurfacePoint;label?:str
   </g>
 }
 
-export function WalkableActor({point,label,selected=false,onClick}:{point:LocalSurfacePoint;label?:string;selected?:boolean;onClick?:()=>void}){
+export type WalkableActorAppearance={
+  genderPresentation?:'feminine'|'masculine'|'androgynous'
+  bodyFrame?:'slender'|'average'|'broad'
+  skinToneCode?:string
+  hairStyleCode?:string
+  hairColorCode?:string
+  facialHairCode?:string
+  visibleAgeBand?:'child'|'teen'|'young_adult'|'adult'|'older'
+  clothingProfile?:Record<string,unknown>
+}
+
+const ACTOR_SKIN:Record<string,string>={
+  skin_1:'#f4d2bd',
+  skin_2:'#e8b995',
+  skin_3:'#cf9670',
+  skin_4:'#ac7251',
+  skin_5:'#815039',
+  skin_6:'#573526',
+}
+const ACTOR_HAIR:Record<string,string>={
+  dark:'#252321',
+  brown:'#67452f',
+  light:'#c7a76f',
+  red:'#944d32',
+  grey:'#96928c',
+}
+const ACTOR_CLOTHES=['#2e6274','#466a52','#6b586d','#725c3f','#4f6079','#58686c']
+
+function actorHash(value:string){
+  let h=2166136261
+  for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}
+  return h>>>0
+}
+
+function actorClothingColor(appearance:WalkableActorAppearance|undefined,visualSeed:string){
+  const profile=appearance?.clothingProfile
+  const requested=typeof profile?.primaryColor==='string'?profile.primaryColor:typeof profile?.color==='string'?profile.color:null
+  if(requested&&/^#[0-9a-f]{6}$/i.test(requested))return requested
+  return ACTOR_CLOTHES[actorHash(visualSeed)%ACTOR_CLOTHES.length]
+}
+
+function ActorHair({style,color}:{style:string;color:string}){
+  if(style==='shaved')return <path d="M-3.7 -5.2 Q0 -7.2 3.7 -5.2" fill="none" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+  if(style==='long')return <><path d="M-4 -5 Q-5 -1 -4 4 L-2.2 3 Q-3 -1 0 -6.4 Q3 -1 2.2 3 L4 4 Q5 -1 4 -5 Q0 -8 -4 -5Z" fill={color}/><path d="M-3.5 -5 Q0 -7.6 3.5 -5 L3 -2.8 Q0 -5 -3 -2.8Z" fill={color}/></>
+  if(style==='curly')return <g fill={color}><circle cx="-2.8" cy="-5.1" r="2"/><circle cx="0" cy="-6.1" r="2.2"/><circle cx="2.8" cy="-5.1" r="2"/><circle cx="-3.7" cy="-2.9" r="1.5"/><circle cx="3.7" cy="-2.9" r="1.5"/></g>
+  if(style==='braided')return <><path d="M-3.6 -5 Q0 -7.5 3.6 -5 L3 -2.7 Q0 -4.8 -3 -2.7Z" fill={color}/><path d="M3.1 -2.5 Q5 0 3.4 2 Q5 4 3.6 6" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>
+  return <path d="M-3.8 -5 Q0 -7.4 3.8 -5 L3.3 -2.7 Q0 -4.6 -3.3 -2.7Z" fill={color}/>
+}
+
+function ActorBody({appearance,clothingColor}:{appearance:WalkableActorAppearance|undefined;clothingColor:string}){
+  const frame=appearance?.bodyFrame??'average'
+  const presentation=appearance?.genderPresentation??'androgynous'
+  const shoulder=frame==='slender'?4.7:frame==='broad'?7:5.7
+  const hip=frame==='slender'?4.3:frame==='broad'?6.1:5
+  const waist=presentation==='feminine'?Math.max(3.5,shoulder-1.7):presentation==='masculine'?Math.max(4.3,shoulder-.6):(shoulder+hip)/2-.5
+  return <path
+    d={`M-${shoulder} 5 Q-${waist} 9 -${hip} 15 L-${Math.max(3.4,hip-.6)} 19 L${Math.max(3.4,hip-.6)} 19 L${hip} 15 Q${waist} 9 ${shoulder} 5 Q0 1 -${shoulder} 5Z`}
+    fill={clothingColor}
+    stroke="#173845"
+    strokeWidth="1"
+  />
+}
+
+export function WalkableActor({
+  point,label,selected=false,onClick,appearance,visualSeed='actor',
+}:{
+  point:LocalSurfacePoint
+  label?:string
+  selected?:boolean
+  onClick?:()=>void
+  appearance?:WalkableActorAppearance
+  visualSeed?:string
+}){
   const p=projectSurfacePoint(point)
   const labelWidth=label?Math.max(42,Math.min(112,label.length*6.1+14)):0
+  const age=appearance?.visibleAgeBand??'adult'
+  const scale=age==='child'?.72:age==='teen'?.86:age==='older'?.96:1
+  const skin=ACTOR_SKIN[appearance?.skinToneCode??'']??ACTOR_SKIN.skin_3
+  const hair=ACTOR_HAIR[appearance?.hairColorCode??'']??ACTOR_HAIR.dark
+  const clothing=actorClothingColor(appearance,visualSeed)
+  const headRadius=age==='child'?4.4:4
   return <g transform={`translate(${p.x} ${p.y-8})`} onClick={onClick} style={onClick?{cursor:'pointer'}:undefined}>
-    <ellipse cy="10" rx="7" ry="3" fill="#000" opacity=".25"/>
-    <circle cy="-3" r="4" fill="#efc39d" stroke="#173845" strokeWidth="1"/>
-    <path d="M-5 11 Q0 1 5 11 L4 18 L-4 18 Z" fill={selected?'#e4bd4b':'#2e6274'} stroke="#173845" strokeWidth="1"/>
+    <ellipse cy="10" rx={7*scale} ry={3*scale} fill="#000" opacity=".25"/>
+    <g transform={`scale(${scale}) translate(0 ${(1-scale)*6})`}>
+      {appearance?.hairStyleCode==='long'&&<ActorHair style="long" color={hair}/>}
+      <circle cy="-3" r={headRadius} fill={skin} stroke={selected?'#e4bd4b':'#173845'} strokeWidth={selected?1.5:1}/>
+      {appearance?.hairStyleCode!=='long'&&<ActorHair style={appearance?.hairStyleCode??'short'} color={hair}/>}
+      {appearance?.facialHairCode&&appearance.facialHairCode!=='none'&&<path d="M-2.8 -.8 Q0 2.2 2.8 -.8 Q2.2 3.3 0 3.6 Q-2.2 3.3 -2.8 -.8Z" fill={hair} opacity=".9"/>}
+      <ActorBody appearance={appearance} clothingColor={clothing}/>
+      {age==='older'&&<path d="M-2.4 -1.8 H-0.5 M.5 -1.8 H2.4 M-.5 -1.8 H.5" stroke="#40515a" strokeWidth=".65" opacity=".8"/>}
+      {selected&&<ellipse cy="10" rx="9" ry="12" fill="none" stroke="#e4bd4b" strokeWidth="1.2" strokeDasharray="2 2"/>}
+    </g>
     {label&&<g pointerEvents="none" transform="translate(0 -18)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill={selected?'#173845ee':'#071521d9'} stroke={selected?'#e4bd4b':'#57717d'} strokeWidth=".8"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="#edf4f5">{label}</text></g>}
   </g>
 }
