@@ -13,7 +13,7 @@ import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worl
 import { constructionState } from '@/lib/game/constructionProgress'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
-import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr } from '@/app/components/WalkableSurfaceRenderer'
+import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
 
 type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
@@ -407,6 +407,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           <linearGradient id="earth-scene-ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={theme.backgroundAlt}/><stop offset="100%" stopColor={theme.background}/></linearGradient>
         </defs>
         <rect width={VIEW_W} height={VIEW_H} fill="url(#earth-scene-ground)"/>
+        <g transform={cameraTransform(player)}>
 
         {scene.polygons.map(feature=>{
           const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?'#bda96c':'#a9aaa0'
@@ -474,6 +475,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         {npcPositions.map(({resident,xM,yM})=><WalkableActor key={resident.id} point={{xM,yM}} label={resident.displayName} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/>)}
 
         <WalkablePlayer point={player} label={playerName}/>
+        </g>
 
       </WalkableSurfaceSvg>
 
