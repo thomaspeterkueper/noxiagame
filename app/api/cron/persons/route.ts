@@ -8,6 +8,8 @@ import { loadColonyPressures } from '@/lib/game/colonyPressure'
 import { runPersonTick } from '@/lib/game/personBrain'
 import { projectInteriorPresence } from '@/lib/game/population/interiorPresence'
 import { persistInteriorPerception } from '@/lib/game/cognition/interiorPerception'
+import { projectSurfacePresence } from '@/lib/game/population/surfacePresence'
+import { persistSurfacePerception } from '@/lib/game/cognition/surfacePerception'
 
 export async function GET(req: NextRequest) {
   if (req.headers.get(CRON_SECRET_HEADER) !== process.env.CRON_SECRET) {
@@ -36,6 +38,7 @@ export async function GET(req: NextRequest) {
     : { data: [], error: null }
 
   let interior = { projected: 0, moved: 0, entered: 0, cleared: 0 }
+  let surface = { projected: 0, updated: 0, cleared: 0 }
   let epistemic = { written: 0, error: null as string | null }
   const projectionErrors: string[] = []
   if (peopleError) projectionErrors.push(`interior people load: ${peopleError.message ?? peopleError}`)
@@ -43,6 +46,7 @@ export async function GET(req: NextRequest) {
   if (!peopleError && !assignmentsError) {
     try {
       interior = await projectInteriorPresence(supabase, tick, activePeople ?? [], assignments ?? [])
+      surface = await projectSurfacePresence(supabase, tick, activePeople ?? [], assignments ?? [])
       const { data: presenceRows, error: presenceError } = personIds.length
         ? await supabase
             .from('person_interior_presence')
@@ -51,6 +55,21 @@ export async function GET(req: NextRequest) {
         : { data: [], error: null }
       if (presenceError) projectionErrors.push(`interior presence load: ${presenceError.message ?? presenceError}`)
       else epistemic = await persistInteriorPerception(supabase, tick, presenceRows ?? [])
+
+      const { data: surfaceRows, error: surfaceError } = personIds.length
+        ? await supabase
+            .from('person_surface_presence')
+            .select('person_id, location_id, x_m, y_m, spatial_region_id, source_ref, confidence, updated_tick')
+            .in('person_id', personIds)
+        : { data: [], error: null }
+      if (surfaceError) projectionErrors.push(`surface presence load: ${surfaceError.message ?? surfaceError}`)
+      else {
+        const surfaceEpistemic = await persistSurfacePerception(supabase, tick, surfaceRows ?? [])
+        epistemic = {
+          written: epistemic.written + surfaceEpistemic.written,
+          error: epistemic.error ?? surfaceEpistemic.error,
+        }
+      }
     } catch (error: any) {
       projectionErrors.push(`interior projection: ${error?.message ?? String(error)}`)
     }
@@ -62,6 +81,7 @@ export async function GET(req: NextRequest) {
     locationsWithPressure: pressures.size,
     ...result,
     interior,
+    surface,
     epistemic,
     errors: [...result.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
   })
