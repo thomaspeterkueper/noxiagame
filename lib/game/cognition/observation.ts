@@ -1,7 +1,7 @@
 // Shared epistemic observation contract for NOXIA.
 // Observations are evidence with provenance, not canonical world truth.
 
-export type ObservationModality = 'visual' | 'auditory' | 'reported' | 'map' | 'sensor' | 'system_record'
+export type ObservationModality = 'visual' | 'auditory' | 'tactile' | 'proprioceptive' | 'thermal' | 'olfactory' | 'gustatory' | 'reported' | 'map' | 'sensor' | 'system_record'
 
 export interface ObservationSource {
   id: string
