@@ -101,6 +101,23 @@ Affekt ist nie tragend. Fehlt die Tabelle oder schlägt ein Zugriff fehl, läuft
 
 Wiederholungen sind abgesichert: `person_affect.source_event_id` hält das zuletzt eingerechnete Ereignis fest, dasselbe Ereignis wird nicht zweimal gezählt.
 
+## Abgrenzung zum Körpermodell
+
+`cognition/personBody.ts` ist die Quelle des Schmerzsignals. Die Affektschicht macht daraus, was die Person empfindet.
+
+| Schicht | Zuständig für |
+|---|---|
+| Körper (`personBody.ts`) | Gewebeschaden, Entzündung, Heilung, Nozizeption, systemische Belastung, Reflex-Reiz |
+| Affekt (`personAffect.ts`) | Schmerztoleranz, emotionales Echo, Ortsaversion, gezeigter Schmerz, Wirkung auf Entscheidungen |
+
+- `syncBodyAffect` setzt den empfundenen Schmerz aus der Nozizeption, in beide Richtungen. Wie lange es wehtut, entscheidet die Heilung des Körpers, nicht die Halbwertszeit der Affektschicht.
+- Nur ein merklicher Anstieg des Schmerzes wird als neues emotionales Ereignis bewertet. Gleichbleibender oder abklingender Schmerz erzeugt keine frische Angst.
+- Systemische Belastung (Sauerstoffmangel, Hitze, Dehydrierung) ist kein Schmerz. Sie hebt die Angst auf einen Mindestwert, statt sie bei jedem Abgleich zu addieren.
+- `population/bodyHealthBridge.ts` übersetzt Gesundheitsereignisse in den Körper: Arbeitsunfall → mechanische Verletzung an einer aus der Ereignis-ID abgeleiteten Region, Erschöpfung → `fatigue`, Umwelteinwirkung → `coreTemperatureStress`.
+- `painFromHealthEvent`, das eigene Abklingen von `pain` und der Reflex-Reiz aus `painEffects` bleiben als Rückfall für Personen ohne gespeicherten Körper.
+
+Der Körper wird noch nicht persistiert. Bis dahin läuft in der Engine der Rückfall.
+
 ## Offene Schritte
 
 1. **Benannte Personen:** `personBrain.ts` entscheidet nach Rollenschwellen (NOXIA-LIVING-0005). Ihr Affekt wird bereits fortgeschrieben, wirkt aber noch nicht auf ihre Entscheidungen. Offen ist, ob sie in die Utility-Entscheidung wandern oder einen eigenen Affekt-Modifikator bekommen.
@@ -109,7 +126,8 @@ Wiederholungen sind abgesichert: `person_affect.source_event_id` hält das zulet
 4. **Wahrnehmung:** Den gezeigten Affekt über `npcPerceptionFilter` für andere Personen beobachtbar machen (Ansteckung, Fehleinschätzung).
 5. **Dialog:** `npc-conversation` erhält den gezeigten Affekt als Tonparameter.
 6. **Kognition:** `affectSalience` speist `emotionalSalience` im Personen-Tick.
-7. **Schmerzwirkung:** `painEffects` (Arbeitsleistung, Reflex-Reiz) an Arbeitsertrag und Reflex-Gate anbinden.
+7. **Körper-Persistenz:** `PersonBodyState` speichern, je Tick heilen lassen und `healthRuntime.ts` von `applyHealthEventAffect` auf `applyHealthEventToBody` + `syncBodyAffect` umstellen.
+8. **Schmerzwirkung:** `painEffects` (Arbeitsleistung, Reflex-Reiz) an Arbeitsertrag und Reflex-Gate anbinden.
 
 ## Verworfene Alternativen
 

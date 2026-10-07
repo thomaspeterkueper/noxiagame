@@ -242,7 +242,11 @@ const PAIN_FACTOR: Record<PainSource, number> = {
   exhaustion: 0.35,
 }
 
-/** Pain is a signal from an explicit health event; nothing hurts without a cause. */
+/**
+ * Fallback estimate for persons without a simulated body (cognition/personBody).
+ * Where a body exists it is the source of the pain signal: use `syncBodyAffect`
+ * with its interoception instead, so intensity and healing are not computed twice.
+ */
 export function painFromHealthEvent(
   event: { eventType: PainSource; severity: number },
   profile: AffectProfile,
@@ -261,12 +265,62 @@ export function applyPain(
   pain: number,
   tick: number,
   profile: AffectProfile,
-  cause: Pick<AppraisalInput, 'causedByOther' | 'intentional' | 'causerTrust' | 'causerAffinity'> = {},
+  cause: PainCause = {},
 ): AffectState {
   const intensity = clamp01(pain)
-  const echo = appraiseEvent({ goalImpact: -intensity, stakes: 0.8, threat: intensity * 0.6, ...cause }, profile)
-  const next = applyAffect(state, echo, tick, profile)
+  const next = applyAffect(state, painEcho(intensity, profile, cause), tick, profile)
   return { ...next, pain: round(Math.max(next.pain, intensity)) }
+}
+
+type PainCause = Pick<AppraisalInput, 'causedByOther' | 'intentional' | 'causerTrust' | 'causerAffinity'>
+
+function painEcho(intensity: number, profile: AffectProfile, cause: PainCause = {}): AffectDelta {
+  return appraiseEvent({ goalImpact: -intensity, stakes: 0.8, threat: intensity * 0.6, ...cause }, profile)
+}
+
+/** Signal → felt pain. The body reports nociception; tolerance decides how much of it is felt. */
+export function feltPain(nociception: number, profile: AffectProfile): number {
+  return round(clamp01(clamp01(nociception) * (1 - 0.4 * clamp01(profile.painTolerance, 0.5))))
+}
+
+/** Structural subset of personBody.InteroceptiveState, so affect does not depend on the body module. */
+export interface BodySignal {
+  nociception: number
+  systemicDistress: number
+}
+
+const PAIN_RISE_THRESHOLD = 0.1
+const SYSTEMIC_FEAR_GAIN = 0.8
+
+/**
+ * Body-owned pain. The body is authoritative for how much it hurts and for
+ * healing, so felt pain is *set* from the signal here, in both directions,
+ * instead of being aged by affect's own half-life.
+ *
+ * - Only a noticeable rise in pain is appraised as a new emotional event;
+ *   steady or fading pain adds no fresh fear or anger.
+ * - Systemic distress (hypoxia, heat, dehydration) is not pain. It raises fear
+ *   to a floor instead of adding to it, so repeated syncs do not accumulate.
+ */
+export function syncBodyAffect(
+  state: AffectState,
+  signal: BodySignal,
+  tick: number,
+  profile: AffectProfile,
+  cause: PainCause = {},
+): AffectState {
+  const base = decayAffect(state, tick, profile)
+  const felt = feltPain(signal.nociception, profile)
+  const rise = felt - state.pain
+  const afterEcho = rise >= PAIN_RISE_THRESHOLD ? applyAffect(base, painEcho(rise, profile, cause), tick, profile) : base
+  const gain = 0.6 + 0.8 * clamp01(profile.reactivity, 0.5)
+  const fearFloor = clamp01(clamp01(signal.systemicDistress) * SYSTEMIC_FEAR_GAIN * gain)
+  return {
+    ...afterEcho,
+    fear: round(Math.max(afterEcho.fear, fearFloor)),
+    pain: felt,
+    updatedTick: tick,
+  }
 }
 
 export interface PainEffects {
@@ -274,7 +328,10 @@ export interface PainEffects {
   workCapacity: number
   /** Added to rest pressure, 0..0.3. */
   restPressureBoost: number
-  /** Feed into cognition/personReflex.evaluateReflex while pain is acute. */
+  /**
+   * Feed into cognition/personReflex.evaluateReflex while pain is acute.
+   * Fallback only: with a simulated body, use personBody.projectBody().reflexStimulus.
+   */
   reflexStimulus: { kind: 'pain'; intensity: number; immediacy: number } | null
 }
 
