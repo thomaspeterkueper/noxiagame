@@ -14,10 +14,7 @@ import { consolidateSleepingEpistemicTraces } from '@/lib/game/cognition/personE
 
 export async function GET(req: NextRequest) {
   if (req.headers.get(CRON_SECRET_HEADER) !== process.env.CRON_SECRET) {
-    const consolidation = await consolidateSleepingEpistemicTraces(supabase, { sleepingPersonIds, tick })
-  if (consolidation.error) projectionErrors.push(`sleep consolidation: ${consolidation.error}`)
-
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const supabase = createServiceClient()
@@ -79,6 +76,9 @@ export async function GET(req: NextRequest) {
       projectionErrors.push(`interior projection: ${error?.message ?? String(error)}`)
     }
   }
+
+  const consolidation = await consolidateSleepingEpistemicTraces(supabase, { sleepingPersonIds, tick })
+  if (consolidation.error) projectionErrors.push(`sleep consolidation: ${consolidation.error}`)
 
   return NextResponse.json({
     ok: true,
