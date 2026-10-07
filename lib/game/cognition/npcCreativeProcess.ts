@@ -1,4 +1,6 @@
 import type { NpcMemory } from './npcRelationalMemory'
+import type { CreativityProfile } from '../personCognition'
+import type { RoutineStop } from '../npcDailyRoutine'
 
 export const CREATIVE_DOMAINS = [
   'music',
@@ -110,6 +112,44 @@ export function normalizeDisposition(input: Partial<CreativeDisposition>): Creat
     sensitivity: unit(input.sensitivity ?? 0.5),
     routineTolerance: unit(input.routineTolerance ?? 0.5),
   }
+}
+
+/**
+ * Adapter from the already authoritative person-cognition creativity profile.
+ * This avoids a second independent personality source for creative behaviour.
+ */
+export function dispositionFromCognition(
+  profile: CreativityProfile,
+  traits?: { persistence?: number; sensitivity?: number },
+): CreativeDisposition {
+  return normalizeDisposition({
+    creativity: profile.associativeRange * 0.45 + profile.cognitiveFlexibility * 0.35 + profile.noveltySeeking * 0.20,
+    openness: profile.noveltySeeking * 0.55 + profile.cognitiveFlexibility * 0.45,
+    persistence: traits?.persistence ?? 0.5,
+    sensitivity: traits?.sensitivity ?? 0.5,
+    routineTolerance: profile.routineStability,
+  })
+}
+
+/**
+ * Cheap routine integration. Creative work competes with the NPC's real day;
+ * work/commute/sleep never become free creative compute.
+ */
+export function creativeHoursFromRoutine(input: {
+  routine: RoutineStop
+  interest: CreativeInterest
+  cognition: CreativityProfile
+}): number {
+  const pull = unit(input.interest.voluntaryPull * 0.65 + input.interest.strength * 0.35)
+  if (input.routine.activity === 'sleep' || input.routine.activity === 'work' || input.routine.activity === 'commute') return 0
+  if (input.routine.activity === 'meal') return pull >= 0.78 ? 0.2 : 0
+  if (input.routine.activity === 'community') {
+    return pull >= 0.62 ? 0.35 * (0.7 + input.cognition.cognitiveFlexibility * 0.3) : 0
+  }
+
+  const routineResistance = unit(input.cognition.routineStability)
+  const base = input.routine.activity === 'home' ? 1.4 : 0.75
+  return pull < 0.28 ? 0 : base * pull * (1.15 - routineResistance * 0.35)
 }
 
 /**
