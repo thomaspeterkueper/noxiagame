@@ -73,3 +73,10 @@ Sources:
 ## Implementation direction
 
 Start with the data contract, not satellite simulation. Define Observation, Source, WorldStateClaim and EvidenceLink primitives; then use them first for real-place acquisition and NPC knowledge. Orbital constellations can later become another producer of the same Observation objects.
+
+
+## Implemented cognition bridge
+
+The first shared data contract now lives in `lib/game/cognition/observation.ts`. `npcObservationMemory.ts` projects a person's own observation into the existing relational memory runtime while preserving provenance. This deliberately does not persist every visual frame: the next integration boundary is a salience/change filter at the authoritative person runtime so only meaningful observations become memories.
+
+The client `localFacts`/nearby-place payload remains a dialogue grounding aid until that authoritative projection is wired. It must not be treated as durable NPC knowledge merely because it was included in an LLM prompt.
