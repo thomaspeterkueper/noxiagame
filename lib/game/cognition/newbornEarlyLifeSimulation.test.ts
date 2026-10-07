@@ -32,12 +32,14 @@ const visitorSpeech = end.patterns.find(pattern =>
 check((caregiverSpeech?.occurrences ?? 0) > (visitorSpeech?.occurrences ?? 0), 'caregiver voice becomes more recurrent than occasional visitor')
 check((caregiverSpeech?.familiarity ?? 0) > 0.5, 'caregiver speech becomes strongly familiar within repeated exposure')
 check((caregiverSong?.occurrences ?? 0) >= 50, 'twice-daily singing leaves a recurring pattern without requiring 50 episodic memories')
+check(end.dreamAssociations > 0, 'nightly sleep can produce noncanonical association candidates from lived material')
+check(end.dreamAssociations >= week.dreamAssociations, 'dream associations accumulate across the month without becoming memories')
 
 if (failures) throw new Error(String(failures) + ' newborn early-life simulation test(s) failed')
 console.log(JSON.stringify({
   day1: { receptions: day1.totalReceptions, episodes: day1.episodicObservations, memories: day1.memories },
   week1: { receptions: week.totalReceptions, episodes: week.episodicObservations, memories: week.memories },
-  month1: { receptions: end.totalReceptions, episodes: end.episodicObservations, memories: end.memories },
+  month1: { receptions: end.totalReceptions, episodes: end.episodicObservations, memories: end.memories, dreamAssociations: end.dreamAssociations },
   strongestPatterns: end.patterns.slice(0, 8).map(pattern => ({
     source: pattern.sourceRef,
     class: pattern.sourceClass,
