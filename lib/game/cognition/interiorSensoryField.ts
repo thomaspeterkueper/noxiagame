@@ -69,7 +69,7 @@ export function buildInteriorSensoryField(input: {
     stimuli.push({
       id: `${sourceRef}:pressure:${input.tick}`,
       sourceRef,
-      modality: 'proprioceptive',
+      modality: 'interoceptive',
       vector: {
         intensity: unit(Math.abs(state.pressureKPa - 101.3) / 60),
         novelty: unit(Math.abs(state.pressureKPa - 101.3) / 50),
@@ -113,7 +113,7 @@ export function buildInteriorSensoryField(input: {
       stimuli.push({
         id: `${sourceRef}:oxygen-body-cue:${input.tick}`,
         sourceRef: 'body-environment:' + input.instance.id + ':' + input.room.id,
-        modality: 'proprioceptive',
+        modality: 'interoceptive',
         vector: {
           intensity: unit(deviation / 0.12),
           novelty: unit(deviation / 0.08),
