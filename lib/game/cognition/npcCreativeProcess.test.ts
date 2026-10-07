@@ -2,7 +2,9 @@ import { createNpcMemory } from './npcRelationalMemory'
 import {
   advanceCreativeProject,
   createCreativeSeed,
+  creativeHoursFromRoutine,
   deriveCreativeIdentity,
+  dispositionFromCognition,
   normalizeDisposition,
   startCreativeProject,
   stimulusFromMemory,
@@ -115,3 +117,61 @@ check(identity.professional, 'profession can emerge from sustained practice and 
 
 if (failures) throw new Error(String(failures) + ' npc creative process test(s) failed')
 console.log('NPC creative process v0.1: tests passed; external_llm_calls=0; persistence_writes=0')
+
+
+const cognitiveDisposition = dispositionFromCognition({
+  noveltySeeking: 0.82,
+  associativeRange: 0.9,
+  routineStability: 0.32,
+  cognitiveFlexibility: 0.84,
+  ideaThreshold: 0.54,
+}, { persistence: 0.68, sensitivity: 0.8 })
+
+check(cognitiveDisposition.creativity > 0.8, 'creative process reuses the authoritative cognition profile')
+check(cognitiveDisposition.routineTolerance === 0.32, 'routine stability maps into creative routine tolerance')
+
+const creativeHours = creativeHoursFromRoutine({
+  routine: {
+    activity: 'home',
+    label: 'Private Freizeit',
+    from: 'home',
+    target: 'home',
+    moving: false,
+    progress: 0,
+    shift: 'day',
+    shiftLabel: 'Tagschicht',
+    socialGroup: 1,
+  },
+  interest: { ...musicInterest, strength: 0.86, voluntaryPull: 0.8 },
+  cognition: {
+    noveltySeeking: 0.82,
+    associativeRange: 0.9,
+    routineStability: 0.32,
+    cognitiveFlexibility: 0.84,
+    ideaThreshold: 0.54,
+  },
+})
+check(creativeHours > 0, 'private free time can become creative practice time')
+
+const workHours = creativeHoursFromRoutine({
+  routine: {
+    activity: 'work',
+    label: 'Tagschicht',
+    from: 'work',
+    target: 'work',
+    moving: false,
+    progress: 0,
+    shift: 'day',
+    shiftLabel: 'Tagschicht',
+    socialGroup: 1,
+  },
+  interest: { ...musicInterest, strength: 1, voluntaryPull: 1 },
+  cognition: {
+    noveltySeeking: 1,
+    associativeRange: 1,
+    routineStability: 0,
+    cognitiveFlexibility: 1,
+    ideaThreshold: 0.5,
+  },
+})
+check(workHours === 0, 'creative work does not steal free compute from scheduled work')
