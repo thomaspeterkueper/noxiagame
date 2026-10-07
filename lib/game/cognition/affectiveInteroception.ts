@@ -4,7 +4,7 @@
 
 import type { CognitiveStimulus } from '../personCognition'
 
-export type BodyRegion = 'head'|'torso'|'left_arm'|'right_arm'|'left_leg'|'right_leg'|'general'
+export type BodyRegion = 'head'|'torso'|'left_arm'|'right_arm'|'left_hand'|'right_hand'|'left_leg'|'right_leg'|'general'
 
 export interface InjurySignal {
   id: string
