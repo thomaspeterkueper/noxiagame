@@ -13,6 +13,7 @@ import {
   type PopulationAction,
   type PopulationDecision,
 } from './types'
+import { affectActionModifiers, type AffectState } from '../cognition/personAffect'
 
 export interface KnownLocalProblem {
   subjectType: string
@@ -35,6 +36,8 @@ export interface PopulationDecisionContext {
   /** Optionale deterministische Reisekosten 0..1 je Zieltyp. */
   travelCostHome?: number
   travelCostWork?: number
+  /** NOXIA-LIVING-0006. Bereits auf den aktuellen Tick abgeklungener Affektzustand. */
+  affect?: AffectState
 }
 
 interface ScoredAction {
@@ -214,7 +217,17 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
     },
   ]
 
-  return result.map((entry) => ({ ...entry, score: roundScore(entry.score) }))
+  // NOXIA-LIVING-0006: Affekt verschiebt verfügbare Handlungen, schaltet aber keine frei.
+  const modifiers = context.affect ? affectActionModifiers(context.affect) : null
+
+  return result.map((entry) => {
+    const affectModifier = modifiers && entry.score > -1 ? modifiers[entry.action] ?? 0 : 0
+    return {
+      ...entry,
+      score: roundScore(entry.score + affectModifier),
+      factors: modifiers ? { ...entry.factors, affectModifier } : entry.factors,
+    }
+  })
 }
 
 export function decidePopulationAction(context: PopulationDecisionContext): PopulationDecision {

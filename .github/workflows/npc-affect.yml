@@ -1,0 +1,31 @@
+name: NPC affect
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/cognition/personAffect.ts'
+      - 'lib/game/cognition/personAffect.test.ts'
+      - 'lib/game/population/decision.ts'
+      - 'lib/game/population/types.ts'
+      - '.github/workflows/npc-affect.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/cognition/personAffect.ts'
+      - 'lib/game/cognition/personAffect.test.ts'
+      - 'lib/game/population/decision.ts'
+      - 'lib/game/population/types.ts'
+
+jobs:
+  deterministic-affect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The test has no runtime dependencies, so it only needs the compiler.
+      - name: Compile affect test
+        run: npx --yes --package typescript@5 tsc lib/game/cognition/personAffect.ts lib/game/cognition/personAffect.test.ts lib/game/population/decision.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .npc-affect-test
+      - name: Run deterministic affect test
+        run: node .npc-affect-test/game/cognition/personAffect.test.js
