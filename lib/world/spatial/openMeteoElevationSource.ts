@@ -36,20 +36,7 @@ async function fetchElevationBatch(url: string) {
 export class OpenMeteoElevationSource implements EarthElevationSource {
   readonly id = 'open-meteo-copernicus-glo90'
 
-  async load(bounds: GeoBounds, targetResolutionM = 500): Promise<ElevationGrid> {
-    const midLat = (bounds.south + bounds.north) / 2
-    const metresPerLat = 111_320
-    const metresPerLon = Math.max(1, metresPerLat * Math.cos(midLat * Math.PI / 180))
-    const widthM = Math.max(1, (bounds.east - bounds.west) * metresPerLon)
-    const heightM = Math.max(1, (bounds.north - bounds.south) * metresPerLat)
-    const cols = Math.max(3, Math.min(18, Math.ceil(widthM / targetResolutionM) + 1))
-    const rows = Math.max(3, Math.min(18, Math.ceil(heightM / targetResolutionM) + 1))
-    const points: { lat: number; lon: number }[] = []
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) points.push({
-      lat: bounds.north - (r / (rows - 1)) * (bounds.north - bounds.south),
-      lon: bounds.west + (c / (cols - 1)) * (bounds.east - bounds.west),
-    })
-
+  async sample(points: Array<{ lat: number; lon: number }>): Promise<ElevationSample[]> {
     const samples: ElevationSample[] = []
     for (let start = 0; start < points.length; start += BATCH_SIZE) {
       const batch = points.slice(start, start + BATCH_SIZE)
@@ -64,9 +51,27 @@ export class OpenMeteoElevationSource implements EarthElevationSource {
       }
       batch.forEach((p, i) => samples.push({ ...p, elevationM: Number(json.elevation![i]) }))
 
-      // Be gentle with the public API when a grid spans multiple batches.
+      // Be gentle with the public API when a request spans multiple batches.
       if (start + BATCH_SIZE < points.length) await sleep(250)
     }
+    return samples
+  }
+
+  async load(bounds: GeoBounds, targetResolutionM = 500): Promise<ElevationGrid> {
+    const midLat = (bounds.south + bounds.north) / 2
+    const metresPerLat = 111_320
+    const metresPerLon = Math.max(1, metresPerLat * Math.cos(midLat * Math.PI / 180))
+    const widthM = Math.max(1, (bounds.east - bounds.west) * metresPerLon)
+    const heightM = Math.max(1, (bounds.north - bounds.south) * metresPerLat)
+    const cols = Math.max(3, Math.min(18, Math.ceil(widthM / targetResolutionM) + 1))
+    const rows = Math.max(3, Math.min(18, Math.ceil(heightM / targetResolutionM) + 1))
+    const points: { lat: number; lon: number }[] = []
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) points.push({
+      lat: bounds.north - (r / (rows - 1)) * (bounds.north - bounds.south),
+      lon: bounds.west + (c / (cols - 1)) * (bounds.east - bounds.west),
+    })
+
+    const samples = await this.sample(points)
 
     return {
       bounds,
