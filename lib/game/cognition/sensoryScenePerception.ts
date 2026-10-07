@@ -8,6 +8,7 @@ import {
   type SensoryReception,
 } from './sensoryLayer'
 import type { Observation } from './observation'
+import { socialStimuliForObserver, type PersonExpressiveState } from './personSensoryField'
 
 export interface SensoryScenePerceptionResult {
   receptions: SensoryReception[]
@@ -24,14 +25,22 @@ export function observeSensoryScene(input: {
   state: PerceptionFilterState
   environment?: Omit<SensoryEnvironmentState, 'tick'>
   profile?: Omit<SensoryObserverProfile, 'observerId' | 'position'>
+  people?: PersonExpressiveState[]
 }): SensoryScenePerceptionResult {
-  const stimuli = buildWorldSensoryField({
-    scene: input.scene,
-    environment: {
+  const stimuli = [
+    ...buildWorldSensoryField({
+      scene: input.scene,
+      environment: {
+        tick: input.atTick,
+        ...(input.environment ?? {}),
+      },
+    }),
+    ...socialStimuliForObserver({
+      people: input.people ?? [],
+      observerId: input.observerId,
       tick: input.atTick,
-      ...(input.environment ?? {}),
-    },
-  })
+    }),
+  ]
 
   // Prevent self-perception through world-source mobile objects. Proprioception,
   // when present, must be emitted explicitly by the body runtime instead.
