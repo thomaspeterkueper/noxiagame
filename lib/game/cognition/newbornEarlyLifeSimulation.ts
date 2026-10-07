@@ -6,6 +6,7 @@ import { rememberObservation } from './npcObservationMemory'
 import type { NpcMemoryState } from './npcRelationalMemory'
 import type { PersonExpressiveState } from './personSensoryField'
 import { learnSensoryPatterns, type SensoryPattern, type SensoryPatternState } from './sensoryPatternLearning'
+import { recombineDuringDream } from './dreamRecombination'
 
 export interface EarlyLifeSnapshot {
   day: number
@@ -13,6 +14,7 @@ export interface EarlyLifeSnapshot {
   episodicObservations: number
   memories: number
   patterns: SensoryPattern[]
+  dreamAssociations: number
 }
 
 export interface EarlyLifeResult {
@@ -89,6 +91,7 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
   let patternState: SensoryPatternState = { patterns: [] }
   let totalReceptions = 0
   let episodicObservations = 0
+  let dreamAssociations = 0
   const snapshots: EarlyLifeSnapshot[] = []
   const checkpoints = new Set([1, 7, 14, 30, boundedDays].filter(day => day <= boundedDays))
 
@@ -123,6 +126,25 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
         const remembered = rememberObservation(memoryState, observation)
         memoryState = remembered.state
       }
+
+      // One bounded dream recombination pass per night. It reorganizes lived
+      // material into ephemeral associations but cannot create facts or projects.
+      if (hour === 22 && memoryState.memories.length > 0) {
+        const dream = recombineDuringDream({
+          memoryState,
+          patterns: patternState.patterns,
+          creativity: {
+            noveltySeeking: 0.5,
+            associativeRange: 0.5,
+            routineStability: 0.5,
+            cognitiveFlexibility: 0.5,
+            ideaThreshold: 0.65,
+          },
+          atTick: tick,
+          maxCandidates: 3,
+        })
+        dreamAssociations += dream.candidates.length
+      }
     }
 
     const completedDay = day + 1
@@ -133,6 +155,7 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
         episodicObservations,
         memories: memoryState.memories.length,
         patterns: patternState.patterns.map(pattern => ({ ...pattern })),
+        dreamAssociations,
       })
     }
   }
