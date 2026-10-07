@@ -7,6 +7,7 @@ import type { NpcMemoryState } from './npcRelationalMemory'
 import type { PersonExpressiveState } from './personSensoryField'
 import { learnSensoryPatterns, type SensoryPattern, type SensoryPatternState } from './sensoryPatternLearning'
 import { recombineDuringDream } from './dreamRecombination'
+import { updateEarlySocialLearning, type EarlySocialLearningState, type SocialSourceAssociation } from './earlySocialLearning'
 
 export interface EarlyLifeSnapshot {
   day: number
@@ -15,6 +16,8 @@ export interface EarlyLifeSnapshot {
   memories: number
   patterns: SensoryPattern[]
   dreamAssociations: number
+  socialAssociations: SocialSourceAssociation[]
+  distress: number
 }
 
 export interface EarlyLifeResult {
@@ -22,6 +25,7 @@ export interface EarlyLifeResult {
   snapshots: EarlyLifeSnapshot[]
   memoryState: NpcMemoryState
   patternState: SensoryPatternState
+  socialState: EarlySocialLearningState
 }
 
 const childId = 'newborn:early-life'
@@ -92,6 +96,8 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
   let totalReceptions = 0
   let episodicObservations = 0
   let dreamAssociations = 0
+  let socialLearningState: EarlySocialLearningState = { sources: [] }
+  let distress = 0.28
   const snapshots: EarlyLifeSnapshot[] = []
   const checkpoints = new Set([1, 7, 14, 30, boundedDays].filter(day => day <= boundedDays))
 
@@ -119,6 +125,39 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
       totalReceptions += perceived.receptions.length
       episodicObservations += perceived.emitted.length
       patternState = learnSensoryPatterns(patternState, perceived.receptions)
+
+      // Regulation is modeled as a body-level state change. The learner only
+      // credits sources that were actually present while distress decreased.
+      const beforeRegulation = distress
+      distress = Math.max(0, Math.min(1, distress + (awake(hour) ? 0.075 : -0.045)))
+      const peopleNow = socialState(day, hour)
+      const caregiverNow = peopleNow.find(entry => entry.person.id === caregiver.id)
+      const caregiverRegulation =
+        (caregiverNow?.contactTargetIds?.includes(childId) ? 0.18 : 0)
+        + (caregiverNow?.vocalExpression === 'singing' ? 0.12 : 0)
+        + (caregiverNow?.vocalExpression === 'speech' ? 0.055 : 0)
+      if (caregiverRegulation > 0) distress = Math.max(0, distress - caregiverRegulation)
+
+      const regulationEpisodes = caregiverRegulation > 0
+        ? [{
+            tick,
+            sourceRef: 'person:' + caregiver.id,
+            distressBefore: beforeRegulation,
+            distressAfter: distress,
+            safetyBefore: Math.max(0, 1 - beforeRegulation),
+            safetyAfter: Math.max(0, 1 - distress),
+            needRelief: caregiverRegulation,
+          }]
+        : []
+
+      socialLearningState = updateEarlySocialLearning({
+        state: socialLearningState,
+        receptions: perceived.receptions,
+        patterns: patternState.patterns,
+        regulationEpisodes,
+        distressed: beforeRegulation >= 0.34,
+        atTick: tick,
+      })
 
       for (const observation of perceived.emitted) {
         const threshold = awake(hour) ? 0.34 : 0.62
@@ -156,9 +195,11 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
         memories: memoryState.memories.length,
         patterns: patternState.patterns.map(pattern => ({ ...pattern })),
         dreamAssociations,
+        socialAssociations: socialLearningState.sources.map(source => ({ ...source })),
+        distress,
       })
     }
   }
 
-  return { days: boundedDays, snapshots, memoryState, patternState }
+  return { days: boundedDays, snapshots, memoryState, patternState, socialState: socialLearningState }
 }
