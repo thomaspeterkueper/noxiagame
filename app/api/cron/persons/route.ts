@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
     .select('id, activity_state')
     .eq('simulation_tier', 'active')
   const personIds = (activePeople ?? []).map((person: any) => person.id)
-  const sleepingPersonIds = (activePeople ?? []).filter((person: any) => person.activity_state === 'resting').map((person: any) => person.id)
   const { data: assignments, error: assignmentsError } = personIds.length
     ? await supabase
         .from('person_assignments')
@@ -77,8 +76,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const consolidation = await consolidateSleepingEpistemicTraces(supabase, { sleepingPersonIds, tick })
-  if (consolidation.error) projectionErrors.push(`sleep consolidation: ${consolidation.error}`)
+  // Sleep is a cognitive state, not merely the broader resting activity.
+  // Consolidation is intentionally periodic to avoid rewriting the same derived
+  // projection on every heartbeat while a person remains asleep.
+  let consolidation = { considered: 0, written: 0, error: null as string | null }
+  if (personIds.length && tick % 60 === 0) {
+    const { data: cognitiveRows, error: cognitiveError } = await supabase
+      .from('person_cognitive_state')
+      .select('person_id, mode')
+      .in('person_id', personIds)
+      .eq('mode', 'sleep')
+    if (cognitiveError) projectionErrors.push(`sleep state load: ${cognitiveError.message ?? cognitiveError}`)
+    else {
+      const sleepingPersonIds = (cognitiveRows ?? []).map((row: any) => row.person_id)
+      consolidation = await consolidateSleepingEpistemicTraces(supabase, { sleepingPersonIds, tick })
+      if (consolidation.error) projectionErrors.push(`sleep consolidation: ${consolidation.error}`)
+    }
+  }
 
   return NextResponse.json({
     ok: true,
