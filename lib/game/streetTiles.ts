@@ -53,10 +53,12 @@ export function getStreetTiles(
   population: number,
   entities: any[],
   pending: any[],
-  userId: string,
+  userId?: string,
   cols: number = 32,
   rows: number = 24,
 ): StreetTile[] {
+  // Ownership changes presentation only; road topology is world state and must
+  // therefore be identical in browser and authoritative server runtime.
   const grid = generateGrid(locationSlug, population, entities, pending, userId, cols, rows)
   const raw: Array<{row:number;col:number;mask:number}> = []
   for (let r = 0; r < rows; r++) {
@@ -97,4 +99,10 @@ export function connectedStreetNeighbours(tile:StreetTile,streets:StreetTile[]):
     if(next.mask!==0 && (next.mask&inBit)===0) return []
     return [next]
   })
+}
+
+/** Server-safe canonical topology. Ownership is intentionally omitted because
+ * it cannot change whether a road cell exists or how it connects. */
+export function getCanonicalStreetTiles(locationSlug:string,population:number,entities:any[],pending:any[],cols=32,rows=24):StreetTile[]{
+  return getStreetTiles(locationSlug,population,entities,pending,undefined,cols,rows)
 }
