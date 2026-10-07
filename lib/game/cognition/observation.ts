@@ -5,7 +5,7 @@ export type ObservationModality = 'visual' | 'auditory' | 'reported' | 'map' | '
 
 export interface ObservationSource {
   id: string
-  type: 'person' | 'sensor' | 'map' | 'record' | 'network' | 'simulation'
+  type: 'person' | 'sensor' | 'map' | 'record' | 'system_record' | 'network' | 'simulation'
   provenanceRefs?: string[]
 }
 
