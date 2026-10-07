@@ -175,6 +175,16 @@ export async function projectInteriorPresence(
     }
 
     if(!sameHost)result.entered+=1
+    const presenceChanged =
+      !sameHost
+      || existing?.room_id !== roomId
+      || existing?.target_room_id !== target
+      || existing?.source_assignment_id !== assignment.id
+      || existing?.source_kind !== (assignment.assignment_type==='temporary'?'visit':'assignment')
+    if(!presenceChanged){
+      result.projected+=1
+      continue
+    }
     upserts.push({
       person_id:person.id,
       tile_entity_id:tile.id,
