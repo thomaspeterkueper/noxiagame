@@ -10,7 +10,7 @@ import { projectInteriorPresence } from '@/lib/game/population/interiorPresence'
 import { persistInteriorPerception } from '@/lib/game/cognition/interiorPerception'
 import { projectSurfacePresence } from '@/lib/game/population/surfacePresence'
 import { persistSurfacePerception } from '@/lib/game/cognition/surfacePerception'
-import { runTravelTick } from '@/lib/game/population/travelRuntime'
+import { consolidateSleepingEpistemicTraces } from '@/lib/game/cognition/personEpistemicPersistence'
 
 export async function GET(req: NextRequest) {
   if (req.headers.get(CRON_SECRET_HEADER) !== process.env.CRON_SECRET) {
@@ -22,7 +22,6 @@ export async function GET(req: NextRequest) {
   const tick = Number(tickRow?.tick_number ?? 0)
   const pressures = await loadColonyPressures(supabase)
   const result = await runPersonTick(supabase, tick, pressures)
-  const travel = await runTravelTick(supabase, tick)
 
   // Project room presence after decisions so cognition observes the resulting
   // authoritative activity state, never the client-side spatial projection.
@@ -31,6 +30,7 @@ export async function GET(req: NextRequest) {
     .select('id, activity_state')
     .eq('simulation_tier', 'active')
   const personIds = (activePeople ?? []).map((person: any) => person.id)
+  const sleepingPersonIds = (activePeople ?? []).filter((person: any) => person.activity_state === 'resting').map((person: any) => person.id)
   const { data: assignments, error: assignmentsError } = personIds.length
     ? await supabase
         .from('person_assignments')
@@ -77,15 +77,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const consolidation = await consolidateSleepingEpistemicTraces(supabase, { sleepingPersonIds, tick })
+  if (consolidation.error) projectionErrors.push(`sleep consolidation: ${consolidation.error}`)
+
   return NextResponse.json({
     ok: true,
     tick,
     locationsWithPressure: pressures.size,
     ...result,
-    travel,
     interior,
     surface,
     epistemic,
-    errors: [...result.errors, ...travel.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
+    consolidation,
+    errors: [...result.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
   })
 }
