@@ -1,0 +1,33 @@
+{
+  "id": "ACCE-002",
+  "title": "AVI Core Closure Experiment 002 — layered state diagnosis",
+  "version": "0.1.0",
+  "modelClass": "BASELINE",
+  "status": "diagnostic-reference-test",
+  "purpose": "Test whether the AVI-Core workflow can localize an omitted standard-state carrier class before any ontology extension is considered.",
+  "layers": [
+    "internal",
+    "environment",
+    "global",
+    "channel"
+  ],
+  "protocol": "For each case omit exactly one known standard-state layer, measure the resulting closure defect, then add candidate layers one at a time. The correct carrier must uniquely restore closure.",
+  "expected": {
+    "internal": {
+      "defect": 2
+    },
+    "environment": {
+      "defect": 3
+    },
+    "global": {
+      "defect": 5
+    },
+    "channel": {
+      "defect": 7
+    },
+    "allRecoveredClosureDefect": 0,
+    "extensionAdmissible": false
+  },
+  "evidenceLabel": "SIMULATION_EVIDENCE",
+  "scientificGuardrail": "Successful diagnosis validates the diagnostic workflow only. It is not evidence for an AVI-specific state or for new physics."
+}
