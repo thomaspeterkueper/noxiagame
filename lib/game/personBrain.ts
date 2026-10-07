@@ -103,6 +103,16 @@ export function decidePerson(context: PersonDecisionContext): PersonDecision {
   return { activity: 'working', actionCode: 'perform_assigned_work', priority: 0.30, factors: { roleCode: role || null, tick }, reason: 'No higher-priority pressure or need; continue assigned work' }
 }
 
+export interface MemoryAttentionSignal { salience:number; uncertainty:number; strongestTraceId?:string }
+export function memoryAttentionSignal(rows:{trace_id:string;retention:number;replay_priority:number}[]):MemoryAttentionSignal{
+  if(!rows.length)return {salience:0,uncertainty:0}
+  const ranked=rows.slice().sort((a,b)=>Number(b.replay_priority)-Number(a.replay_priority)||a.trace_id.localeCompare(b.trace_id))
+  const strongest=ranked[0]
+  const salience=clamp01(Number(strongest.replay_priority))
+  const uncertainty=clamp01(1-Number(strongest.retention))
+  return {salience,uncertainty,strongestTraceId:strongest.trace_id}
+}
+
 export interface PersonTickResult { processed: number; decisions: number; events: number; errors: string[] }
 export async function runPersonTick(supabase: any, tick: number, pressuresByLocation: Map<string, ColonyPressure[]> = new Map()): Promise<PersonTickResult> {
   const result: PersonTickResult = { processed: 0, decisions: 0, events: 0, errors: [] }
@@ -110,17 +120,19 @@ export async function runPersonTick(supabase: any, tick: number, pressuresByLoca
   if (error) return { ...result, errors: [`people load: ${error.message ?? error}`] }
 
   const personIds = (people ?? []).map((person: any) => person.id)
-  const [{ data: allNeeds, error: needsError }, { data: allSkills, error: skillsError }, { data: allWork, error: workError }] = personIds.length
+  const [{ data: allNeeds, error: needsError }, { data: allSkills, error: skillsError }, { data: allWork, error: workError }, { data: allConsolidated, error: consolidatedError }] = personIds.length
     ? await Promise.all([
         supabase.from('person_needs').select('person_id, need_code, satisfaction').in('person_id', personIds),
         supabase.from('person_skills').select('person_id, skill_code, level').in('person_id', personIds),
         supabase.from('person_assignments').select('person_id, role_code').in('person_id', personIds).eq('assignment_type', 'work').eq('is_active', true),
+        supabase.from('person_epistemic_consolidation').select('person_id, trace_id, retention, replay_priority').in('person_id', personIds).order('replay_priority', { ascending: false }).limit(512),
       ])
-    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }]
+    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }, { data: [], error: null }]
 
   if (needsError) result.errors.push(`needs load: ${needsError.message ?? needsError}`)
   if (skillsError) result.errors.push(`skills load: ${skillsError.message ?? skillsError}`)
   if (workError) result.errors.push(`work load: ${workError.message ?? workError}`)
+  if (consolidatedError) result.errors.push(`memory attention load: ${consolidatedError.message ?? consolidatedError}`)
 
   const needsByPerson = new Map<string, any[]>()
   for (const row of allNeeds ?? []) {
@@ -136,6 +148,11 @@ export async function runPersonTick(supabase: any, tick: number, pressuresByLoca
   }
   const workByPerson = new Map<string, any>()
   for (const row of allWork ?? []) workByPerson.set(row.person_id, row)
+  const consolidatedByPerson = new Map<string, any[]>()
+  for (const row of allConsolidated ?? []) {
+    const rows = consolidatedByPerson.get(row.person_id) ?? []
+    rows.push(row); consolidatedByPerson.set(row.person_id, rows)
+  }
 
   for (const person of people ?? []) {
     try {
@@ -146,7 +163,8 @@ export async function runPersonTick(supabase: any, tick: number, pressuresByLoca
       for (const n of needsRows) (needs as any)[n.need_code] = Number(n.satisfaction)
       const skills: PersonSkillState = {}
       for (const s of skillsRows) skills[s.skill_code] = Number(s.level)
-      const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick, cognitive: { sleeping: person.activity_state === 'resting' && Number(needs.rest ?? 1) < 0.85 } })
+      const memoryAttention = memoryAttentionSignal(consolidatedByPerson.get(person.id) ?? [])
+      const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick, cognitive: { sleeping: person.activity_state === 'resting' && Number(needs.rest ?? 1) < 0.85, stimulus: { emotionalSalience: memoryAttention.salience * 0.35, uncertainty: memoryAttention.uncertainty * 0.25 } } })
       await supabase.from('people').update({ activity_state: decision.activity, last_action: decision.actionCode, last_decision_factors: decision.factors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
       const runtimeState = decision.cognitiveState ?? selectCognitiveState({ sleeping: false, creativity: creativityFromTraits(person.traits ?? {}), stimulus: {} })
       await supabase.from('person_cognitive_state').upsert({ person_id: person.id, mode: runtimeState.mode, compute_tier: runtimeState.computeTier, trigger_score: runtimeState.triggerScore, updated_tick: tick, updated_at: new Date().toISOString() }, { onConflict: 'person_id' })
