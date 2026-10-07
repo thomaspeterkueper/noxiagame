@@ -5,6 +5,7 @@ export type SensoryModality =
   | 'auditory'
   | 'tactile'
   | 'proprioceptive'
+  | 'interoceptive'
   | 'thermal'
   | 'olfactory'
   | 'gustatory'
@@ -78,6 +79,12 @@ function attenuation(stimulus: SensoryStimulus, observer: SensoryObserverProfile
     return stimulus.sourceRef === observer.observerId || stimulus.sourceRef === 'body:' + observer.observerId ? 1 : 0
   }
 
+  if (stimulus.modality === 'interoceptive') {
+    // Interoceptive signals are already body-integrated cues produced by a body/
+    // physiology adapter. They are observer-local and do not attenuate spatially.
+    return 1
+  }
+
   const d = distance(stimulus.position, observer.position)
   if (d == null) return 1
   const range = Math.max(0.5, stimulus.rangeM ?? defaultRange(stimulus.modality))
@@ -107,6 +114,7 @@ function defaultRange(modality: SensoryModality): number {
     case 'tactile': return 0.5
     case 'gustatory': return 0.1
     case 'proprioceptive': return 0
+    case 'interoceptive': return 0
   }
 }
 
