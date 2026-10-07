@@ -1,3 +1,4 @@
+import { consolidateMemories } from '../personCognition'
 import { advanceClock, mergeClock, provenanceIndependent, reconstruct, type RelationalTrace, type VectorClock } from './relationalWorldRuntime'
 
 export interface NpcMemory<T = unknown> {
@@ -73,16 +74,17 @@ export function consolidateDuringSleep<T>(
   atTick: number,
 ): { memory: NpcMemory<T>; trace: RelationalTrace<T> } {
   if (memory.state === 'forgotten' || !trace.active) return { memory, trace }
-  const strength = unit(memory.salience * 0.6 + memory.subjectiveConfidence * 0.4)
+  const [ranked] = consolidateMemories([{
+    id: memory.id,
+    salience: memory.salience,
+    valence: 0,
+    tick: memory.lastTouchedTick,
+    summary: memory.subjectRef + '#' + memory.attribute,
+  }], atTick)
+  const strength = ranked?.retention ?? 0
   const durable = strength >= 0.45
   return {
-    memory: {
-      ...memory,
-      state: durable ? 'consolidated' : 'fading',
-      subjectiveConfidence: unit(memory.subjectiveConfidence + (durable ? 0.08 : -0.08)),
-      rehearsalCount: memory.rehearsalCount + 1,
-      lastTouchedTick: atTick,
-    },
+    memory: { ...memory, state: durable ? 'consolidated' : 'fading', subjectiveConfidence: unit(memory.subjectiveConfidence + (durable ? 0.08 : -0.08)), rehearsalCount: memory.rehearsalCount + 1, lastTouchedTick: atTick },
     trace: { ...trace, durability: durable ? 'persistent' : trace.durability },
   }
 }
