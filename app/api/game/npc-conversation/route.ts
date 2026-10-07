@@ -12,6 +12,23 @@ const CREDIT_ACTION_MARKER = '[[ACTION:ACCEPT_CREDITS]]'
 const VISIT_PLACE_ACTION_RE = /\[\[ACTION:VISIT_PLACE:(p\d{1,2})\]\]/g
 const MIN_PERSISTED_EXCHANGES = 6
 const MAX_PERSISTED_EXCHANGES = 18
+type PersistedExchange = {
+  player?: unknown
+  npc?: unknown
+  at?: unknown
+  location?: unknown
+}
+
+function conversationMemoryLines(exchanges: PersistedExchange[]) {
+  return exchanges.slice(-3).flatMap((exchange, index) => {
+    const previousPlayer = clean(exchange?.player, MAX_PLAYER_CHARS)
+    const previousNpc = clean(exchange?.npc, MAX_REPLY_CHARS)
+    const location = clean(exchange?.location, 100)
+    const prefix = `[eigene Gesprächserinnerung #${index + 1}${location ? ` · Ort: ${location}` : ''}]`
+    return [previousPlayer ? `${prefix} Der Spieler sagte: ${previousPlayer}` : '', previousNpc ? `${prefix} Du antwortetest: ${previousNpc}` : ''].filter(Boolean)
+  })
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const serviceClient = createClient(
@@ -137,14 +154,7 @@ export async function POST(request: NextRequest) {
   }
 
   const priorEncounterLines = history.length === 0 && Array.isArray(persistedMemory?.recent_exchanges)
-    ? persistedMemory.recent_exchanges.slice(-3).flatMap((exchange: any) => {
-        const previousPlayer = clean(exchange?.player, MAX_PLAYER_CHARS)
-        const previousNpc = clean(exchange?.npc, MAX_REPLY_CHARS)
-        return [
-          previousPlayer ? `Spieler sagte: ${previousPlayer}` : '',
-          previousNpc ? `Du antwortetest: ${previousNpc}` : '',
-        ].filter(Boolean)
-      })
+    ? conversationMemoryLines(persistedMemory.recent_exchanges as PersistedExchange[])
     : []
 
   const system = [
@@ -165,7 +175,7 @@ export async function POST(request: NextRequest) {
     source ? `Quelle der Meldung: ${source}` : '',
     locationName ? `Aktueller Ort: ${locationName}` : '',
     priorEncounterLines.length ? `Erinnerung an frühere Begegnungen mit genau diesem Spieler:\n- ${priorEncounterLines.join('\n- ')}` : '',
-    priorEncounterLines.length ? 'Nutze diese Erinnerungen nur, wenn sie natürlich zum aktuellen Gespräch passen. Behaupte keine Details, die dort nicht stehen.' : '',
+    priorEncounterLines.length ? 'Epistemische Regel für Gesprächserinnerungen: Diese Zeilen sind deine eigenen begrenzten kommunikativen Spuren, keine vollständige Weltwahrheit. Eine erinnerte Aussage des Spielers belegt zunächst nur, dass der Spieler sie gesagt hat. Formuliere ältere Details bei Bedarf als Erinnerung („ich meine“, „wenn ich mich richtig erinnere“). Widersprechen aktuelle verifizierte lokale Fakten einer Erinnerung, behandle die aktuellen Fakten als neue Beobachtung, korrigiere dich natürlich und erfinde keine Erklärung für den Widerspruch.' : '',
     localFacts.length ? `Verifizierte lokale Fakten:\n- ${localFacts.join('\n- ')}` : 'Es liegen keine verifizierten lokalen Infrastruktur-Fakten vor.',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
