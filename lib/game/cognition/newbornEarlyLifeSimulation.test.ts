@@ -35,11 +35,32 @@ check((caregiverSong?.occurrences ?? 0) >= 50, 'twice-daily singing leaves a rec
 check(end.dreamAssociations > 0, 'nightly sleep can produce noncanonical association candidates from lived material')
 check(end.dreamAssociations >= week.dreamAssociations, 'dream associations accumulate across the month without becoming memories')
 
+const caregiverSocial = end.socialAssociations.find(source => source.sourceRef === 'person:caregiver')
+const visitorSocial = end.socialAssociations.find(source => source.sourceRef === 'person:visitor')
+check((caregiverSocial?.familiarity ?? 0) > (visitorSocial?.familiarity ?? 0), 'caregiver becomes more familiar than visitor')
+check((caregiverSocial?.soothingExpectation ?? 0) > (visitorSocial?.soothingExpectation ?? 0), 'caregiver gains stronger learned soothing expectation')
+check((caregiverSocial?.safetyAssociation ?? 0) > (visitorSocial?.safetyAssociation ?? 0), 'caregiver becomes more strongly associated with safety')
+check((caregiverSocial?.approachPreference ?? 0) > (visitorSocial?.approachPreference ?? 0), 'social preference emerges from co-regulation history')
+
 if (failures) throw new Error(String(failures) + ' newborn early-life simulation test(s) failed')
 console.log(JSON.stringify({
   day1: { receptions: day1.totalReceptions, episodes: day1.episodicObservations, memories: day1.memories },
   week1: { receptions: week.totalReceptions, episodes: week.episodicObservations, memories: week.memories },
-  month1: { receptions: end.totalReceptions, episodes: end.episodicObservations, memories: end.memories, dreamAssociations: end.dreamAssociations },
+  month1: {
+    receptions: end.totalReceptions,
+    episodes: end.episodicObservations,
+    memories: end.memories,
+    dreamAssociations: end.dreamAssociations,
+    distress: Number(end.distress.toFixed(3)),
+  },
+  socialAssociations: end.socialAssociations.map(source => ({
+    source: source.sourceRef,
+    familiarity: Number(source.familiarity.toFixed(3)),
+    soothingExpectation: Number(source.soothingExpectation.toFixed(3)),
+    safetyAssociation: Number(source.safetyAssociation.toFixed(3)),
+    responseReliability: Number(source.responseReliability.toFixed(3)),
+    approachPreference: Number(source.approachPreference.toFixed(3)),
+  })),
   strongestPatterns: end.patterns.slice(0, 8).map(pattern => ({
     source: pattern.sourceRef,
     class: pattern.sourceClass,
