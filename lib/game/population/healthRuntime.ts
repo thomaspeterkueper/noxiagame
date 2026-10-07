@@ -1,5 +1,6 @@
 import { projectHealthEffect, type HealthAffectingEvent } from './healthEffects'
 import type { PersonHealthState } from './health'
+import { applyHealthEventAffect } from './affectRuntime'
 
 type SupabaseLike = any
 
@@ -57,6 +58,15 @@ export async function applyHealthAffectingEvent(
     updated_at: new Date().toISOString(),
   }, { onConflict: 'person_id' })
   if (upsertError) throw upsertError
+
+  // NOXIA-LIVING-0006: pain, its emotional echo and learned place aversion.
+  await applyHealthEventAffect(supabase, {
+    personId: input.personId,
+    locationId: input.locationId,
+    tick: input.tick,
+    event: input.event,
+    sourceEventId: sourceEvent.id,
+  })
 
   return next
 }

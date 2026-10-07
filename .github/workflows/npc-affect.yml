@@ -6,6 +6,8 @@ on:
       - 'lib/game/cognition/personAffect.ts'
       - 'lib/game/cognition/personAffect.test.ts'
       - 'lib/game/population/decision.ts'
+      - 'lib/game/population/affectRuntime.ts'
+      - 'lib/game/population/affectRuntime.test.ts'
       - 'lib/game/population/types.ts'
       - '.github/workflows/npc-affect.yml'
   push:
@@ -14,6 +16,8 @@ on:
       - 'lib/game/cognition/personAffect.ts'
       - 'lib/game/cognition/personAffect.test.ts'
       - 'lib/game/population/decision.ts'
+      - 'lib/game/population/affectRuntime.ts'
+      - 'lib/game/population/affectRuntime.test.ts'
       - 'lib/game/population/types.ts'
 
 jobs:
@@ -26,6 +30,6 @@ jobs:
           node-version: 22
       # The test has no runtime dependencies, so it only needs the compiler.
       - name: Compile affect test
-        run: npx --yes --package typescript@5 tsc lib/game/cognition/personAffect.ts lib/game/cognition/personAffect.test.ts lib/game/population/decision.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .npc-affect-test
+        run: npx --yes --package typescript@5 tsc lib/game/cognition/personAffect.ts lib/game/cognition/personAffect.test.ts lib/game/population/decision.ts lib/game/population/affectRuntime.ts lib/game/population/affectRuntime.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .npc-affect-test
       - name: Run deterministic affect test
-        run: node .npc-affect-test/game/cognition/personAffect.test.js
+        run: node .npc-affect-test/game/cognition/personAffect.test.js && node .npc-affect-test/game/population/affectRuntime.test.js

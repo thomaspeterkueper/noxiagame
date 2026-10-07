@@ -2,7 +2,7 @@
 
 Status: proposed
 Date: 2026-10-07
-Code: `lib/game/cognition/personAffect.ts`, `lib/game/population/decision.ts`
+Code: `lib/game/cognition/personAffect.ts`, `lib/game/population/affectRuntime.ts`, `lib/game/population/decision.ts`, `lib/game/population/engine.ts`
 Test: `npm run test:npc-affect`
 
 ## Kontext
@@ -86,19 +86,30 @@ Der Modifikator steht als `affectModifier` in den `factors` und damit im Decisio
 - Ein LLM darf den gezeigten Affekt als Tonparameter lesen, aber keinen Affekt setzen.
 - Affekt wird nur für `active` und `background` geführt. `aggregate` erhält höchstens einen Stimmungsmittelwert je Kohorte.
 
-## Umfang dieses Schritts
+## Umsetzungsstand
 
-Enthalten sind die reinen Funktionen, die Anbindung an `decision.ts` und die Tests. Am Laufzeitverhalten ändert sich nichts, solange kein `affect` übergeben wird.
+**Schritt 1 – reine Funktionen:** `personAffect.ts`, Anbindung an `decision.ts`, Tests.
+
+**Schritt 2 – Persistenz und Engine:**
+
+- Migration `20261007130000_person_affect.sql` mit `person_affect` (eine Zeile je Person) und `person_place_aversions`.
+- `population/affectRuntime.ts` als Persistenzadapter.
+- `population/engine.ts` lädt den Affekt je Tick gebündelt, übergibt ihn abgeklungen an die Entscheidung und senkt das Sicherheitsempfinden an Orten mit Aversion. Neu persistierte Begegnungen werden bewertet und fortgeschrieben.
+- `population/healthRuntime.ts` schreibt bei jedem Gesundheitsereignis Schmerz, emotionales Echo und Ortsaversion.
+
+Affekt ist nie tragend. Fehlt die Tabelle oder schlägt ein Zugriff fehl, läuft der Tick ohne Affekt weiter (`affectAvailable: false` im Tick-Ergebnis). Die Reihenfolge von Deployment und Migration ist deshalb unkritisch.
+
+Wiederholungen sind abgesichert: `person_affect.source_event_id` hält das zuletzt eingerechnete Ereignis fest, dasselbe Ereignis wird nicht zweimal gezählt.
 
 ## Offene Schritte
 
-1. **Persistenz:** Tabelle `person_affect` (eine Zeile je Person, Spalten wie `AffectState`) und `person_place_aversions`. Die Migration ist bewusst nicht Teil dieses Schritts.
-2. **Engine:** In `population/engine.ts` den Affekt beim Persistieren von `population_events` fortschreiben und in den Entscheidungskontext laden. `healthRuntime.ts` ruft `applyPain` auf.
-3. **Benannte Personen:** `personBrain.ts` entscheidet nach Rollenschwellen (NOXIA-LIVING-0005). Offen ist, ob benannte Personen in die Utility-Entscheidung wandern oder einen eigenen Affekt-Modifikator bekommen.
-4. **Erinnerung:** Die Valenz in `person_memories` aus der Bewertung ableiten statt aus den Standardwerten je Ereignistyp.
-5. **Wahrnehmung:** Den gezeigten Affekt über `npcPerceptionFilter` für andere Personen beobachtbar machen (Ansteckung, Fehleinschätzung).
-6. **Dialog:** `npc-conversation` erhält den gezeigten Affekt als Tonparameter.
-7. **Kognition:** `affectSalience` speist `emotionalSalience` im Personen-Tick.
+1. **Benannte Personen:** `personBrain.ts` entscheidet nach Rollenschwellen (NOXIA-LIVING-0005). Ihr Affekt wird bereits fortgeschrieben, wirkt aber noch nicht auf ihre Entscheidungen. Offen ist, ob sie in die Utility-Entscheidung wandern oder einen eigenen Affekt-Modifikator bekommen.
+2. **Weitere Ereignisse:** Bisher erzeugen nur Begegnungen und Gesundheitsereignisse Affekt. Konflikt, Hilfe, Krise und Verlust werden bewertet, sobald die Engine solche Ereignisse erzeugt.
+3. **Erinnerung:** Die Valenz in `person_memories` aus der Bewertung ableiten statt aus den Standardwerten je Ereignistyp.
+4. **Wahrnehmung:** Den gezeigten Affekt über `npcPerceptionFilter` für andere Personen beobachtbar machen (Ansteckung, Fehleinschätzung).
+5. **Dialog:** `npc-conversation` erhält den gezeigten Affekt als Tonparameter.
+6. **Kognition:** `affectSalience` speist `emotionalSalience` im Personen-Tick.
+7. **Schmerzwirkung:** `painEffects` (Arbeitsleistung, Reflex-Reiz) an Arbeitsertrag und Reflex-Gate anbinden.
 
 ## Verworfene Alternativen
 

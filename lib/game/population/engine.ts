@@ -11,6 +11,7 @@ import { resolvedPresenceCandidates } from './presence'
 import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
 import { persistObservableKnowledge } from './observableKnowledge'
 import { projectInteriorPresence } from './interiorPresence'
+import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
 type SupabaseLike = any
@@ -120,6 +121,7 @@ async function decideBackgroundPerson(
   tick: number,
   needRows: any[],
   assignmentRows: any[],
+  affectSnapshot: AffectSnapshot,
 ) {
   const [{ data: skillRows }, { data: relationRows }, { data: knowledgeRows }] = await Promise.all([
     supabase.from('person_skills').select('*').eq('person_id', person.id),
@@ -130,7 +132,13 @@ async function decideBackgroundPerson(
   const context: PopulationDecisionContext = {
     person: personFromRow(person),
     assignments: (assignmentRows ?? []).map(assignmentFromRow),
-    needs: (needRows ?? []).map((r: any) => ({ personId: person.id, needCode: r.need_code, satisfaction: Number(r.satisfaction), updatedTick: r.updated_tick ?? null })),
+    // NOXIA-LIVING-0006: a place that hurt before lowers perceived safety for this decision only.
+    needs: needsWithPlaceAversion(
+      (needRows ?? []).map((r: any) => ({ personId: person.id, needCode: r.need_code, satisfaction: Number(r.satisfaction), updatedTick: r.updated_tick ?? null })),
+      affectSnapshot.aversionsByPerson.get(person.id),
+      person.current_location_id,
+      tick,
+    ),
     skills: (skillRows ?? []).map((r: any) => ({ personId: person.id, skillCode: r.skill_code, level: Number(r.level), experience: Number(r.experience), updatedTick: r.updated_tick ?? null })),
     relationships: (relationRows ?? []).map(relationshipFromRow),
     knowledge,
@@ -138,12 +146,19 @@ async function decideBackgroundPerson(
     workObligation: (assignmentRows ?? []).some((r: any) => r.assignment_type === 'work') ? (Math.abs(tick) % 4 === 3 ? 0.35 : 0.85) : 0,
     travelCostHome: 0.1,
     travelCostWork: 0.1,
+    affect: affectForDecision(affectSnapshot, person.id, tick, person.traits ?? null),
   }
   return { decision: decideFromState(context), context }
 }
 
-async function persistEncounterDirection(supabase: SupabaseLike, event: PopulationEvent): Promise<boolean> {
+interface EncounterAffectContext {
+  needsByPerson: Map<string, any[]>
+  traitsByPerson: Map<string, Record<string, unknown> | null>
+}
+
+async function persistEncounterDirection(supabase: SupabaseLike, event: PopulationEvent, affectContext: EncounterAffectContext): Promise<boolean> {
   if (!event.actorPersonId || !event.relatedPersonId) return false
+  let persistedEvent: PopulationEvent | null = null
 
   const { data: existingEvents, error: eventLookupError } = await supabase
     .from('population_events')
@@ -169,7 +184,7 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     if (insertError) throw insertError
     // Memory is downstream of the authoritative persisted event. Use its DB UUID,
     // never the synthetic in-memory encounter id, as source_event_id.
-    const persistedEvent: PopulationEvent = { ...event, id: insertedEvent.id }
+    persistedEvent = { ...event, id: insertedEvent.id }
     const memoryResult = await persistPopulationEventMemory(supabase, persistedEvent, { projectRelationship: false })
     if (memoryResult.errors.length) throw new Error(memoryResult.errors.join('; '))
     await persistObservableKnowledge(supabase, persistedEvent)
@@ -184,6 +199,16 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
   if (relationshipError) throw relationshipError
 
   const current = relationshipRow ? relationshipFromRow(relationshipRow) : null
+
+  // NOXIA-LIVING-0006: appraise the newly persisted event against the relationship
+  // as it stood before this encounter. Affect failures never fail the tick.
+  if (persistedEvent) {
+    await applyEventAffect(supabase, persistedEvent, {
+      needs: (affectContext.needsByPerson.get(event.actorPersonId) ?? []).map((r: any) => ({ needCode: r.need_code, satisfaction: Number(r.satisfaction) })),
+      relationship: current,
+      traits: affectContext.traitsByPerson.get(event.actorPersonId) ?? null,
+    })
+  }
   if ((current?.lastInteractionTick ?? -1) >= event.tick) return false
 
   const projection = projectEncounterRelationship(event, current)
@@ -203,10 +228,10 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
   return true
 }
 
-async function persistEncounter(supabase: SupabaseLike, encounter: PopulationEncounter): Promise<number> {
+async function persistEncounter(supabase: SupabaseLike, encounter: PopulationEncounter, affectContext: EncounterAffectContext): Promise<number> {
   let projected = 0
-  if (await persistEncounterDirection(supabase, encounter.eventA)) projected += 1
-  if (await persistEncounterDirection(supabase, encounter.eventB)) projected += 1
+  if (await persistEncounterDirection(supabase, encounter.eventA, affectContext)) projected += 1
+  if (await persistEncounterDirection(supabase, encounter.eventB, affectContext)) projected += 1
   return projected
 }
 
@@ -249,6 +274,9 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     needsByPerson.set(row.person_id, rows)
   }
 
+  const affectSnapshot = await loadAffectSnapshot(supabase, personIds)
+  const traitsByPerson = new Map<string, Record<string, unknown> | null>(peopleRows.map((person: any) => [person.id, person.traits ?? null] as const))
+
   const previousPeople: Person[] = peopleRows.map(personFromRow)
   const currentPeople = new Map<string, Person>(previousPeople.map(person => [person.id, person] as const))
   const previousCandidates = resolvedPresenceCandidates(previousPeople, assignments)
@@ -269,6 +297,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       tick,
       personNeeds,
       assignmentRowsByPerson.get(person.id) ?? [],
+      affectSnapshot,
     )
     const intent = actionIntentForDecision({
       personId: person.id,
@@ -333,7 +362,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
   const currentCandidates = resolvedPresenceCandidates([...currentPeople.values()], assignments)
   const encounters = derivePopulationEncounters({ tick, candidates: currentCandidates, previousCandidates })
   let relationshipsProjected = 0
-  for (const encounter of encounters) relationshipsProjected += await persistEncounter(supabase, encounter)
+  for (const encounter of encounters) relationshipsProjected += await persistEncounter(supabase, encounter, { needsByPerson, traitsByPerson })
 
-  return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, interiorPresence, skipped: false }
+  return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, interiorPresence, affectAvailable: affectSnapshot.available, skipped: false }
 }
