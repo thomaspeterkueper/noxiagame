@@ -1,6 +1,7 @@
 import type { Observation } from './observation'
 import type { NpcMemoryState } from './npcRelationalMemory'
 import { rememberObservation } from './npcObservationMemory'
+import { consolidateMemories } from '../personCognition'
 
 export interface PersistedEpistemicTrace {
   id:string
@@ -64,4 +65,48 @@ export function reconstructMemoryStateFromEpistemicTraces(npcId:string,rows:Pers
     state=rememberObservation(state,epistemicTraceToObservation(row)).state
   }
   return state
+}
+
+export interface SleepConsolidationRow {
+  person_id:string
+  trace_id:string
+  retention:number
+  replay_priority:number
+  consolidated_tick:number
+}
+
+export function sleepConsolidationRows(input:{
+  sleepingPersonIds:string[]
+  traces:PersistedEpistemicTrace[]
+  tick:number
+}):SleepConsolidationRow[]{
+  const sleeping=new Set(input.sleepingPersonIds)
+  const byPerson=new Map<string,PersistedEpistemicTrace[]>()
+  for(const trace of input.traces){
+    if(!sleeping.has(trace.person_id))continue
+    const rows=byPerson.get(trace.person_id)??[]
+    rows.push(trace);byPerson.set(trace.person_id,rows)
+  }
+  const out:SleepConsolidationRow[]=[]
+  for(const [personId,traces] of byPerson){
+    const ranked=consolidateMemories(traces.map(trace=>({
+      id:trace.id,salience:trace.salience,valence:0,tick:trace.observed_tick,
+      summary:trace.subject_ref+'#'+trace.attribute,
+    })),input.tick)
+    for(const item of ranked)out.push({person_id:personId,trace_id:item.id,retention:item.retention,replay_priority:item.replayPriority,consolidated_tick:input.tick})
+  }
+  return out
+}
+
+export async function consolidateSleepingEpistemicTraces(supabase:any,input:{sleepingPersonIds:string[];tick:number;lookbackTicks?:number}){
+  if(!input.sleepingPersonIds.length)return {considered:0,written:0,error:null}
+  const since=Math.max(0,input.tick-Math.max(1,input.lookbackTicks??1440))
+  const {data,error}=await supabase.from('person_epistemic_traces')
+    .select('id,person_id,subject_ref,attribute,value,source_type,source_ref,modality,provenance_refs,confidence,salience,observed_tick,trace_kind')
+    .in('person_id',input.sleepingPersonIds).gte('observed_tick',since).order('observed_tick',{ascending:false}).limit(512)
+  if(error)return {considered:0,written:0,error:error.message??String(error)}
+  const rows=sleepConsolidationRows({sleepingPersonIds:input.sleepingPersonIds,traces:(data??[]) as PersistedEpistemicTrace[],tick:input.tick})
+  if(!rows.length)return {considered:0,written:0,error:null}
+  const {error:writeError}=await supabase.from('person_epistemic_consolidation').upsert(rows,{onConflict:'person_id,trace_id'})
+  return {considered:rows.length,written:writeError?0:rows.length,error:writeError?.message??null}
 }

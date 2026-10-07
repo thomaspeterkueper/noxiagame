@@ -10,7 +10,7 @@ import { projectInteriorPresence } from '@/lib/game/population/interiorPresence'
 import { persistInteriorPerception } from '@/lib/game/cognition/interiorPerception'
 import { projectSurfacePresence } from '@/lib/game/population/surfacePresence'
 import { persistSurfacePerception } from '@/lib/game/cognition/surfacePerception'
-import { runTravelTick } from '@/lib/game/population/travelRuntime'
+import { consolidateSleepingEpistemicTraces } from '@/lib/game/cognition/personEpistemicPersistence'
 
 export async function GET(req: NextRequest) {
   if (req.headers.get(CRON_SECRET_HEADER) !== process.env.CRON_SECRET) {
@@ -22,7 +22,6 @@ export async function GET(req: NextRequest) {
   const tick = Number(tickRow?.tick_number ?? 0)
   const pressures = await loadColonyPressures(supabase)
   const result = await runPersonTick(supabase, tick, pressures)
-  const travel = await runTravelTick(supabase, tick)
 
   // Project room presence after decisions so cognition observes the resulting
   // authoritative activity state, never the client-side spatial projection.
@@ -77,15 +76,33 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Sleep is a cognitive state, not merely the broader resting activity.
+  // Consolidation is intentionally periodic to avoid rewriting the same derived
+  // projection on every heartbeat while a person remains asleep.
+  let consolidation = { considered: 0, written: 0, error: null as string | null }
+  if (personIds.length && tick % 60 === 0) {
+    const { data: cognitiveRows, error: cognitiveError } = await supabase
+      .from('person_cognitive_state')
+      .select('person_id, mode')
+      .in('person_id', personIds)
+      .eq('mode', 'sleep')
+    if (cognitiveError) projectionErrors.push(`sleep state load: ${cognitiveError.message ?? cognitiveError}`)
+    else {
+      const sleepingPersonIds = (cognitiveRows ?? []).map((row: any) => row.person_id)
+      consolidation = await consolidateSleepingEpistemicTraces(supabase, { sleepingPersonIds, tick })
+      if (consolidation.error) projectionErrors.push(`sleep consolidation: ${consolidation.error}`)
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     tick,
     locationsWithPressure: pressures.size,
     ...result,
-    travel,
     interior,
     surface,
     epistemic,
-    errors: [...result.errors, ...travel.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
+    consolidation,
+    errors: [...result.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
   })
 }
