@@ -12,7 +12,7 @@ export function createTravelState(input:{personId:string;from:TravelAnchor;to:Tr
  if(route.length<2)return null
  return {personId:input.personId,locationId:input.from.locationId,fromTileEntityId:input.from.tileEntityId,toTileEntityId:input.to.tileEntityId,route,progress:0,status:'active',startedTick:input.tick,updatedTick:input.tick}
 }
-export function advanceTravel(state:PersonTravelState,tick:number,step=0.08){
+export function advanceTravel(state:PersonTravelState,tick:number,step=0.08):PersonTravelState{
  if(state.status!=='active')return state
  const progress=Math.min(1,state.progress+Math.max(0,step))
  return {...state,progress,status:progress>=1?'arrived':'active',updatedTick:tick}
