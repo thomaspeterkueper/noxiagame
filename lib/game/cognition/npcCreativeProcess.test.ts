@@ -115,10 +115,6 @@ const identity = deriveCreativeIdentity({
 check(identity.identityStrength > 0.65, 'creative identity emerges from practice, works, interest and skill')
 check(identity.professional, 'profession can emerge from sustained practice and recognized output')
 
-if (failures) throw new Error(String(failures) + ' npc creative process test(s) failed')
-console.log('NPC creative process v0.1: tests passed; external_llm_calls=0; persistence_writes=0')
-
-
 const cognitiveDisposition = dispositionFromCognition({
   noveltySeeking: 0.82,
   associativeRange: 0.9,
@@ -175,3 +171,6 @@ const workHours = creativeHoursFromRoutine({
   },
 })
 check(workHours === 0, 'creative work does not steal free compute from scheduled work')
+
+if (failures) throw new Error(String(failures) + ' npc creative process test(s) failed')
+console.log('NPC creative process v0.1: tests passed; external_llm_calls=0; persistence_writes=0')
