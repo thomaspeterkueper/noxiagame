@@ -10,6 +10,7 @@ import { projectInteriorPresence } from '@/lib/game/population/interiorPresence'
 import { persistInteriorPerception } from '@/lib/game/cognition/interiorPerception'
 import { projectSurfacePresence } from '@/lib/game/population/surfacePresence'
 import { persistSurfacePerception } from '@/lib/game/cognition/surfacePerception'
+import { runTravelTick } from '@/lib/game/population/travelRuntime'
 
 export async function GET(req: NextRequest) {
   if (req.headers.get(CRON_SECRET_HEADER) !== process.env.CRON_SECRET) {
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
   const tick = Number(tickRow?.tick_number ?? 0)
   const pressures = await loadColonyPressures(supabase)
   const result = await runPersonTick(supabase, tick, pressures)
+  const travel = await runTravelTick(supabase, tick)
 
   // Project room presence after decisions so cognition observes the resulting
   // authoritative activity state, never the client-side spatial projection.
@@ -80,9 +82,10 @@ export async function GET(req: NextRequest) {
     tick,
     locationsWithPressure: pressures.size,
     ...result,
+    travel,
     interior,
     surface,
     epistemic,
-    errors: [...result.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
+    errors: [...result.errors, ...travel.errors, ...projectionErrors, ...(epistemic.error ? [`epistemic: ${epistemic.error}`] : [])],
   })
 }
