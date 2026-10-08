@@ -139,3 +139,29 @@ Zusätzliche Ausgaben mit `--out`:
 - `.access.json` – jedes einzelne Zugangsprotokoll.
 
 Ohne `--market` bleibt der Lauf unverändert. Regeln und erster Befund: `docs/decisions/NOXIA-LIVING-0010-housing-and-job-market.md`.
+
+
+## Live-Bestand als Forschungsstart
+
+Der Live-Bestand kann **nur lesend** in dasselbe Format projiziert werden, das der Markt im Forschungslauf verwendet:
+
+```bash
+npm run export:colony-live -- --out experiments/colony/live
+npm run research:colony -- --years 3 \
+  --snapshot experiments/colony/live.snapshot.json \
+  --market experiments/colony/live.market.json
+```
+
+Der Export schreibt zusätzlich `live.diagnostics.json`. Er verändert die Live-Welt nicht.
+
+Wichtige Semantik:
+
+- Physische Wohn- und Arbeitsorte bleiben aus `person_assignments` erhalten.
+- Markt-Zuordnungen verwenden zusätzlich explizite `dwellingId` und `jobId`, damit mehrere Rollen am selben Gebäude nicht zusammenfallen.
+- Staatlicher Wohnraum ohne Mietpreis wird als bereitgestellte Unterkunft mit Preis 0 exportiert.
+- Private Wohngebäude ohne Marktbedingungen bleiben für bestehende Bewohner erhalten, gelten aber **nicht** als neues Angebot.
+- `transient_capacity` wird als staatliche Mindestunterkunft exportiert.
+- Für Stellen gibt es live noch keine Vakanzen-/Kapazitätsangabe. Deshalb exportiert der Adapter nur die aktuell belegten Stellen und **0 freie Stellen**; er erfindet keine Jobs.
+- Arbeitgeber-`dailyIncome` wird nur aus beobachteten wiederkehrenden `income`-Buchungen der letzten 30 Spieltage abgeleitet. Bootstrap-Endowments und Eigentümereinlagen zählen nicht als laufendes Einkommen. Solange keine Steuerbuchungen beobachtet wurden, ist die öffentliche laufende Finanzierung im Export daher 0.
+
+Damit kann der Forschungslauf den echten Ausgangszustand verwenden, ohne Datenlücken durch synthetische Annahmen zu verdecken.
