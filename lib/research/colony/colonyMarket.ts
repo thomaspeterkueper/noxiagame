@@ -91,6 +91,16 @@ export interface MarketResult {
   records: AccessRecord[]
   summary: AccessSummary
   power: GatekeeperPower[]
+  money: {
+    initial: number
+    final: number
+    employerIncomeEmission: number
+    livingCostSink: number
+    propertyBuybackEmission: number
+    expectedDelta: number
+    actualDelta: number
+    unexplainedDelta: number
+  }
   final: {
     wealth: Record<string, number>
     tenure: Record<string, Tenure>
@@ -149,6 +159,9 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
   const records: AccessRecord[] = []
   const days: MarketDayRow[] = []
   let evictions = 0, quits = 0, applications = 0, refusals = 0, declined = 0, housingMoves = 0, jobChanges = 0, unpaidToday = 0
+  let employerIncomeEmission = 0
+  let livingCostSink = 0
+  let propertyBuybackEmission = 0
 
   const tenureIn = (dwelling: Dwelling, personId: string): Tenure =>
     dwelling.kind === 'hotel' ? 'hotel'
@@ -177,6 +190,8 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
     }
   })
   const personById = new Map(persons.map((person) => [person.id, person]))
+  const initialMoney = persons.reduce((sum, person) => sum + person.wealth, 0)
+    + [...employers.values()].reduce((sum, employer) => sum + employer.balance, 0)
 
   const residents = (dwellingId: string): string[] => persons.filter((person) => person.dwellingId === dwellingId).map((person) => person.id)
   const staff = (jobId: string): number => persons.filter((person) => person.jobId === jobId).length
@@ -249,6 +264,9 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
       // The owner sells back at a loss; the house is on the market again.
       const price = Math.round((old.baseRent ?? 0) * 0.9)
       person.wealth += price
+      // Research-market simplification: the abstract market buys the house back.
+      // No payer account exists yet, so G1 classifies this explicitly as emission.
+      propertyBuybackEmission += price
       old.ownerId = 'market'; old.ownerKind = 'landlord'; old.askingPrice = old.baseRent
     }
     person.dwellingId = null; person.tenure = 'none'; person.arrears = 0
@@ -369,7 +387,10 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
     /** Once per game day: wages, living costs, hotel bills; every billing interval rent and rent changes. */
     daily(tick: number, day: number): void {
       unpaidToday = 0
-      for (const employer of employers.values()) employer.balance += employer.dailyIncome
+      for (const employer of employers.values()) {
+        employer.balance += employer.dailyIncome
+        employerIncomeEmission += employer.dailyIncome
+      }
       for (const person of persons) {
         const job = person.jobId ? jobById.get(person.jobId) : undefined
         if (job) {
@@ -384,8 +405,14 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
             if (person.unpaidDays >= UNPAID_QUIT_DAYS) { loseJob(person); quits += 1 }
           }
         }
-        if (person.wealth >= livingCost) person.wealth -= livingCost
-        else { person.wealth = 0; host.adjustNeed(person.id, 'sustenance', -0.15) }
+        if (person.wealth >= livingCost) {
+          person.wealth -= livingCost
+          livingCostSink += livingCost
+        } else {
+          livingCostSink += person.wealth
+          person.wealth = 0
+          host.adjustNeed(person.id, 'sustenance', -0.15)
+        }
         const dwelling = person.dwellingId ? dwellingById.get(person.dwellingId) : undefined
         if (dwelling && person.tenure === 'hotel') {
           const rate = dwelling.nightlyRate ?? 0
@@ -457,8 +484,23 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
     },
 
     result(): MarketResult {
+      const finalMoney = persons.reduce((sum, person) => sum + person.wealth, 0)
+        + [...employers.values()].reduce((sum, employer) => sum + employer.balance, 0)
+        + [...ownerIncome.values()].reduce((sum, amount) => sum + amount, 0)
+      const expectedDelta = employerIncomeEmission + propertyBuybackEmission - livingCostSink
+      const actualDelta = finalMoney - initialMoney
       return {
         days, records, summary: summarizeAccess(records), power: gatekeeperPower(records),
+        money: {
+          initial: round(initialMoney),
+          final: round(finalMoney),
+          employerIncomeEmission: round(employerIncomeEmission),
+          livingCostSink: round(livingCostSink),
+          propertyBuybackEmission: round(propertyBuybackEmission),
+          expectedDelta: round(expectedDelta),
+          actualDelta: round(actualDelta),
+          unexplainedDelta: round(actualDelta - expectedDelta),
+        },
         final: {
           wealth: Object.fromEntries(persons.map((person) => [person.id, round(person.wealth)])),
           tenure: Object.fromEntries(persons.map((person) => [person.id, person.tenure])),
