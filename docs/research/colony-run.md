@@ -32,6 +32,12 @@ Eine Liste von Eingriffen. `tick` zählt Spielstunden ab Beginn des Laufs.
 
 Möglich sind `person_conflict`, `person_assistance`, `shared_work`, `crisis_experience`, `loss_experience` sowie die Gesundheitsereignisse `workplace_accident`, `environmental_exposure` und `exhaustion`. Ein Ereignis mit `otherPersonId` wirkt auf beide Personen, mit `"mutual": false` nur auf die erste.
 
+Mit `reassign` wechselt eine Person Arbeits- oder Wohnort, etwa um Menschen zu trennen oder zusammenzubringen:
+
+```json
+{ "tick": 720, "type": "reassign", "personId": "A", "assignment": "work", "tileEntityId": "anderer-arbeitsplatz" }
+```
+
 Zwei Läufe mit und ohne Szenario sind bis zum ersten Eingriff identisch. Jede Abweichung danach ist Folge des Eingriffs.
 
 ## Was der Lauf abbildet
@@ -60,3 +66,16 @@ Nach gut zwei Monaten ändert sich nichts mehr. Die Gründe liegen im Modell:
 3. **Eingriffe waschen sich aus.** Ein Konflikt senkt das Vertrauen spürbar, aber die täglichen Begegnungen heben es binnen Wochen wieder auf den Höchstwert.
 
 Die Folge für das Spiel: Mehr Tempo allein zeigt nicht mehr Veränderung, sondern denselben Stillstand schneller. Die Simulation braucht Quellen von Veränderung: Verblassen von Beziehungen, abnehmender Ertrag wiederholter Begegnungen, Reibung im Alltag, Wechsel von Arbeit und Wohnung, Besuche.
+
+## Zweiter Befund nach NOXIA-LIVING-0008 (2026-10-08)
+
+Mit Sättigung, begrenzten engen Bindungen und Verblassen, 31 Personen in einer Siedlung, drei Spieljahre:
+
+| Größe | Verlauf |
+|---|---|
+| Vertrauen im Mittel | 0,62 statt 1,0 |
+| Enge Bindungen | genau 4 je Person, bei 14 bis 16 Bekannten |
+| Freude im Mittel | 0,54 am ersten Tag, 0,18 ab dem ersten Monat |
+| Gleichgewicht | weiterhin nach etwa zwei Monaten erreicht |
+
+Die Beziehungen sind jetzt unterschiedlich und begrenzt, und Trennung lässt sie verblassen. Von selbst entsteht im Alltag aber noch keine Veränderung. Offen bleiben Reibung im Alltag und Bewegung im Netz.

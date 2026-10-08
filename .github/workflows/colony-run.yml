@@ -9,6 +9,8 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/relationshipDynamics.ts'
+      - 'lib/game/population/relationshipDynamics.test.ts'
       - 'lib/game/personSocialMemory.ts'
       - 'lib/game/cognition/personAffect.ts'
       - '.github/workflows/colony-run.yml'
@@ -21,6 +23,8 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/relationshipDynamics.ts'
+      - 'lib/game/population/relationshipDynamics.test.ts'
       - 'lib/game/personSocialMemory.ts'
       - 'lib/game/cognition/personAffect.ts'
 
@@ -35,6 +39,10 @@ jobs:
       # The run has no runtime dependencies, so it only needs the compiler.
       - name: Compile
         run: npx --yes --package typescript@5 tsc lib/research/colony/colonyRun.ts lib/research/colony/colonyRun.test.ts lib/research/colony/cli.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .colony-run
+      - name: Relationship dynamics
+        run: |
+          npx --yes --package typescript@5 tsc lib/game/population/relationshipDynamics.ts lib/game/population/relationshipDynamics.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .relationship-dynamics-test
+          node .relationship-dynamics-test/game/population/relationshipDynamics.test.js
       - name: Test
         run: node .colony-run/research/colony/colonyRun.test.js
       - name: One simulated year

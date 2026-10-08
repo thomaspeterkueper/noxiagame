@@ -10,10 +10,11 @@ export interface EncounterRelationshipProjection {
 export function projectEncounterRelationship(
   event: PopulationEvent,
   current: PersonRelationship | null,
+  peers: readonly PersonRelationship[] = [],
 ): EncounterRelationshipProjection | null {
   const memory = memoryFromPopulationEvent(event)
   if (!memory) return null
-  const relationship = projectRelationship(current, memory)
+  const relationship = projectRelationship(current, memory, peers)
   if (!relationship) return null
   return { event, relationship }
 }

@@ -13,6 +13,7 @@ check(settled.every((day) => day.sleepHours > 7 && day.sleepHours <= 8), 'people
 check(settled.every((day) => day.workHours >= 8 && day.workHours <= 10), 'people work a shift a day, plus some of their free time')
 check(settled.every((day) => day.restAvg > 0.4 && day.sustenanceAvg > 0.3), 'needs stay in a liveable range over a month')
 check(month.days[29].relationships > 0 && month.days[29].familiarityAvg > month.days[0].familiarityAvg, 'acquaintance grows from encounters')
+check(month.days[29].trustAvg < 0.9 && month.days[29].closeTiesMaxPerPerson <= 4, 'relationships no longer all end at the maximum')
 check(month.days.every((day) => day.joyAvg >= 0 && day.joyAvg <= 1 && day.moodAvg <= 1), 'affect stays bounded')
 check(month.days.reduce((sum, day) => sum + day.encounters, 0) > 0, 'people meet')
 
@@ -34,6 +35,19 @@ const accident = runColony(colony, { ticks: 24 * 3, scenario: [{ tick: 30, type:
 check(accident.days[1].painAvg > 0 && accident.days[1].fearAvg > 0, 'an accident registers as pain and fear')
 const oneSided = shortly([{ ...conflict[0], mutual: false } as ScenarioEvent])
 check(trust(oneSided, a, b)! < trust(shortly([]), a, b)! && trust(oneSided, b, a) === trust(shortly([]), b, a), 'a one-sided event changes only the affected person')
+
+// Separation: someone moves to another workplace and home; old ties fade.
+const mover = pairSeed.personId, former = pairSeed.otherPersonId
+const apart: ScenarioEvent[] = [
+  { tick: 24 * 30, type: 'reassign', personId: mover, assignment: 'work', tileEntityId: 'elsewhere:work' },
+  { tick: 24 * 30, type: 'reassign', personId: mover, assignment: 'home', tileEntityId: 'elsewhere:home' },
+]
+const stayed = runColony(colony, { ticks: 24 * 150 })
+const moved = runColony(colony, { ticks: 24 * 150, scenario: apart })
+const tie = (run: typeof month, from: string, to: string) => run.final.relationships.find((r) => r.personId === from && r.otherPersonId === to)!
+check(tie(moved, mover, former).trust < tie(stayed, mover, former).trust && tie(moved, former, mover).affinity < tie(stayed, former, mover).affinity, 'without contact a relationship fades on both sides')
+check(tie(moved, mover, former).familiarity < tie(stayed, mover, former).familiarity && tie(moved, mover, former).familiarity > 0.4, 'people do not forget each other that fast')
+check(JSON.stringify(moved.days.slice(0, 30)) === JSON.stringify(stayed.days.slice(0, 30)), 'the run is identical until the move')
 
 // Snapshot input: unknown relationship partners are ignored, tick continues from the snapshot.
 const fromSnapshot = runColony({ ...colony, tick: 2103, relationships: [

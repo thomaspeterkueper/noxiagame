@@ -44,7 +44,7 @@ const last = result.days[result.days.length - 1]
 console.log(`Colony run: ${result.people} people, ${result.days.length} game days in ${seconds.toFixed(1)} s (source: ${options.snapshot ?? 'synthetic'}, scenario events: ${scenario.length})`)
 console.table([first, result.days[Math.floor(result.days.length / 2)], last].map((row) => ({
   day: row.day, sleepH: row.sleepHours, workH: row.workHours, rest: row.restAvg, encounters: row.encounters,
-  joy: row.joyAvg, mood: row.moodAvg, fear: row.fearAvg, anger: row.angerAvg, ties: row.relationships, close: row.closeTies, trust: row.trustAvg,
+  joy: row.joyAvg, mood: row.moodAvg, fear: row.fearAvg, anger: row.angerAvg, ties: row.relationships, close: row.closeTies, closeMax: row.closeTiesMaxPerPerson, trust: row.trustAvg, affinity: row.affinityAvg,
 })))
 
 if (options.out) {

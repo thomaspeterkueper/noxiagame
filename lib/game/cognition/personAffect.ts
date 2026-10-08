@@ -49,6 +49,7 @@ const EMOTION_HALF_LIFE_TICKS = 6
 const MOOD_HALF_LIFE_TICKS = 96
 const PAIN_HALF_LIFE_TICKS = 24
 const MOOD_COUPLING = 0.18
+const ROUTINE_ENCOUNTER_FLOOR = 0.15
 
 const clamp01 = (value: number | undefined, fallback = 0): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback
@@ -182,8 +183,14 @@ export function appraisalFromPopulationEvent(
   switch (event.eventType) {
     case 'npc_social_interaction':
     case 'social_interaction':
-    case 'npc_met_person':
-      return { goalImpact: 0.3, stakes: 0.3 + 0.7 * pressure(context.needs, 'social') }
+    case 'npc_met_person': {
+      // NOXIA-LIVING-0008: a new face or a close friend is a pleasure; the daily
+      // meeting with a well-known colleague is routine and brings little.
+      const novelty = 1 - clamp01(rel?.familiarity)
+      const closeness = clamp01((clamp01(rel?.affinity, 0.5) - 0.5) * 2)
+      const meaning = Math.max(ROUTINE_ENCOUNTER_FLOOR, novelty, closeness)
+      return { goalImpact: 0.3 * meaning, stakes: 0.3 + 0.7 * pressure(context.needs, 'social') }
+    }
     case 'person_assistance':
     case 'npc_assistance':
       // Help matters most to someone who needed it.

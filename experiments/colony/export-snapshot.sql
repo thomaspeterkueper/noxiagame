@@ -17,7 +17,8 @@ select json_build_object(
   'relationships', (
     select json_agg(json_build_object(
       'personId', r.person_id, 'otherPersonId', r.other_person_id, 'familiarity', r.familiarity,
-      'trust', r.trust, 'affinity', r.affinity, 'lastInteractionTick', r.last_interaction_tick))
+      'trust', r.trust, 'affinity', r.affinity, 'lastInteractionTick', r.last_interaction_tick,
+      'relationshipType', r.relationship_type))
     from public.person_relationships r
     join public.people p on p.id = r.person_id
     join public.people o on o.id = r.other_person_id

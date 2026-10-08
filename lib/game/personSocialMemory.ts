@@ -2,6 +2,7 @@
 // Extends the existing population relationship model; it does not replace it.
 
 import type { PersonRelationship, PopulationEvent } from './population/types'
+import { fadeRelationship, growRelationship, relationshipTier } from './population/relationshipDynamics'
 
 export type PersonMemoryKind = 'interaction' | 'assistance' | 'conflict' | 'shared_work' | 'crisis'
 export interface PersonMemory { id: string; personId: string; otherPersonId?: string | null; locationId?: string | null; kind: PersonMemoryKind; tick: number; salience: number; valence: number; trustDelta: number; summary: string; sourceEventId: string }
@@ -25,13 +26,19 @@ export function memoryFromPopulationEvent(event: PopulationEvent): PersonMemory 
   return { id: `memory:${event.id}:${event.actorPersonId}`, personId: event.actorPersonId, otherPersonId: event.relatedPersonId, locationId: event.locationId, kind, tick: event.tick, salience: clamp(numberPayload(p, 'salience', defaultSalience), 0, 1), valence: clamp(numberPayload(p, 'valence', defaultValence), -1, 1), trustDelta: clamp(numberPayload(p, 'trustDelta', defaultTrust), -1, 1), summary: typeof p.summary === 'string' && p.summary.trim() ? p.summary.trim() : `${kind}:${event.subjectRef ?? event.relatedPersonId ?? event.locationId ?? 'event'}`, sourceEventId: event.id }
 }
 
-/** Project one memory onto the already-existing PersonRelationship shape. */
-export function projectRelationship(current: PersonRelationship | null, memory: PersonMemory): PersonRelationship | null {
+/**
+ * Project one memory onto the already-existing PersonRelationship shape.
+ * NOXIA-LIVING-0008: the relationship first fades for the time without contact,
+ * then grows towards the ceiling of its tier. `peers` are the person's other
+ * relationships; they decide whether this one holds a close slot.
+ */
+export function projectRelationship(current: PersonRelationship | null, memory: PersonMemory, peers: readonly PersonRelationship[] = []): PersonRelationship | null {
   if (!memory.otherPersonId || memory.otherPersonId === memory.personId) return current
   const base: PersonRelationship = current ?? { id: `relationship:${memory.personId}:${memory.otherPersonId}`, personId: memory.personId, otherPersonId: memory.otherPersonId, relationshipType: 'acquaintance', familiarity: 0, trust: 0.5, affinity: 0.5, lastInteractionTick: null }
   if (base.personId !== memory.personId || base.otherPersonId !== memory.otherPersonId) throw new Error('relationship identity does not match memory')
   const weight = 0.15 + 0.85 * clamp(memory.salience, 0, 1)
-  return { ...base, familiarity: clamp(base.familiarity + 0.04 + memory.salience * 0.12, 0, 1), trust: clamp(base.trust + memory.trustDelta * weight, 0, 1), affinity: clamp(base.affinity + memory.valence * weight * 0.08, 0, 1), lastInteractionTick: Math.max(base.lastInteractionTick ?? 0, memory.tick) }
+  const tier = relationshipTier(base, peers)
+  return growRelationship(fadeRelationship(base, memory.tick, tier), { tick: memory.tick, salience: memory.salience, trustDelta: memory.trustDelta * weight, affinityDelta: memory.valence * weight * 0.08 }, tier)
 }
 
 export function relationshipDecisionFactors(relationships: PersonRelationship[], goals: PersonLongTermGoal[]): Record<string, unknown> {

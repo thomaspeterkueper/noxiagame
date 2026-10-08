@@ -49,6 +49,7 @@ next-env.d.ts
 /.npc-affect-test
 /.circadian-test
 /.colony-run
+/.relationship-dynamics-test
 /experiments/colony/out/
 
 .vercel

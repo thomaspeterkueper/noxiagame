@@ -13,6 +13,7 @@ import { persistObservableKnowledge } from './observableKnowledge'
 import { projectInteriorPresence } from './interiorPresence'
 import { circadianProfile, circadianState } from './circadian'
 import { activityForAction, needDelta } from './actionEffects'
+import { fadeRelationships } from './relationshipDynamics'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
@@ -122,7 +123,8 @@ async function decideBackgroundPerson(
       tick,
     ),
     skills: (skillRows ?? []).map((r: any) => ({ personId: person.id, skillCode: r.skill_code, level: Number(r.level), experience: Number(r.experience), updatedTick: r.updated_tick ?? null })),
-    relationships: (relationRows ?? []).map(relationshipFromRow),
+    // NOXIA-LIVING-0008: decisions see relationships as they stand now, faded since the last contact.
+    relationships: fadeRelationships((relationRows ?? []).map(relationshipFromRow), tick),
     knowledge,
     localProblems: knowledge.filter((k: any) => k.knowledgeType === 'observed_failure' || k.knowledgeType === 'known_problem').map((k: any) => ({ subjectType: k.subjectType, subjectRef: k.subjectRef, severity: Number(k.details?.severity ?? k.confidence), requiredSkill: k.details?.requiredSkill ?? null, reportable: k.details?.reportable !== false })),
     // NOXIA-LIVING-0007: work follows the person's day rhythm instead of a four-tick cycle.
@@ -146,14 +148,16 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
 
   // NOXIA-LIVING-0007: a reunion within the cooldown is not a new encounter.
   // Checked before anything is written, so it leaves no event, memory or affect.
-  const { data: recentRelationship, error: recentError } = await supabase
+  // All relationships of the actor: the one with this person for the cooldown,
+  // the others to decide whether it holds a close slot (NOXIA-LIVING-0008).
+  const { data: actorRelationshipRows, error: recentError } = await supabase
     .from('person_relationships')
-    .select('last_interaction_tick')
+    .select('*')
     .eq('person_id', event.actorPersonId)
-    .eq('other_person_id', event.relatedPersonId)
-    .maybeSingle()
   if (recentError) throw recentError
-  const lastInteractionTick = recentRelationship?.last_interaction_tick == null ? null : Number(recentRelationship.last_interaction_tick)
+  const actorRelationships: PersonRelationship[] = (actorRelationshipRows ?? []).map(relationshipFromRow)
+  const recentRelationship = actorRelationships.find((relation) => relation.otherPersonId === event.relatedPersonId)
+  const lastInteractionTick = recentRelationship?.lastInteractionTick ?? null
   // An interaction recorded for this very tick is a replay and falls through to the guards below.
   if (lastInteractionTick !== event.tick && !isFreshEncounter(lastInteractionTick, event.tick)) return false
 
@@ -208,7 +212,7 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
   }
   if ((current?.lastInteractionTick ?? -1) >= event.tick) return false
 
-  const projection = projectEncounterRelationship(event, current)
+  const projection = projectEncounterRelationship(event, current, actorRelationships)
   if (!projection) return false
   const relationship = projection.relationship
   const { error: upsertError } = await supabase.from('person_relationships').upsert({

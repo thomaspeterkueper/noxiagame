@@ -29,6 +29,7 @@ import { circadianProfile, circadianState, DAY_TICKS, type CircadianProfile } fr
 import { decidePopulationAction } from '../../game/population/decision'
 import { derivePopulationEncounters, isFreshEncounter } from '../../game/population/encounters'
 import { resolvedPresenceCandidates } from '../../game/population/presence'
+import { fadeRelationships } from '../../game/population/relationshipDynamics'
 import {
   NEED_CODES,
   type NeedCode,
@@ -55,6 +56,7 @@ export interface SnapshotRelationship {
   trust: number
   affinity: number
   lastInteractionTick: number | null
+  relationshipType?: string | null
 }
 
 /** Same shape as experiments/colony/export-snapshot.sql returns. */
@@ -76,11 +78,18 @@ export type ScenarioEvent =
       mutual?: boolean
       severity?: number
     }
+  /** Moves a person's home or workplace: the way to separate people or bring them together. */
+  | { tick: number; type: 'reassign'; personId: string; assignment: 'home' | 'work'; tileEntityId: string | null; locationId?: string }
 
 type HealthScenarioEvent = Extract<ScenarioEvent, { type: PainSource }>
 const HEALTH_TYPES: readonly string[] = ['workplace_accident', 'environmental_exposure', 'exhaustion']
 function isHealthEvent(event: ScenarioEvent): event is HealthScenarioEvent {
   return HEALTH_TYPES.includes(event.type)
+}
+
+type MoveScenarioEvent = Extract<ScenarioEvent, { type: 'reassign' }>
+function isMoveEvent(event: ScenarioEvent): event is MoveScenarioEvent {
+  return event.type === 'reassign'
 }
 
 export interface ColonyRunOptions {
@@ -111,6 +120,8 @@ export interface ColonyDayRow {
   affinityAvg: number
   /** Directed relationships above the friendship thresholds of population/socialLife. */
   closeTies: number
+  /** Largest number of close ties any single person holds. */
+  closeTiesMaxPerPerson: number
 }
 
 export interface ColonyRunResult {
@@ -129,6 +140,7 @@ const CLOSE_FAMILIARITY = 0.45
 const CLOSE_TRUST = 0.56
 const CLOSE_AFFINITY = 0.58
 
+const isClose = (relation: PersonRelationship): boolean => relation.familiarity >= CLOSE_FAMILIARITY && relation.trust >= CLOSE_TRUST && relation.affinity >= CLOSE_AFFINITY
 const round = (value: number): number => Math.round(value * 10_000) / 10_000
 const mean = (values: number[]): number => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0)
 
@@ -171,7 +183,7 @@ function initialPeople(snapshot: ColonySnapshot): SimPerson[] {
     if (!owner || !byId.has(relation.otherPersonId)) continue
     owner.relationships.set(relation.otherPersonId, {
       id: `relationship:${relation.personId}:${relation.otherPersonId}`, personId: relation.personId,
-      otherPersonId: relation.otherPersonId, relationshipType: 'acquaintance', familiarity: Number(relation.familiarity),
+      otherPersonId: relation.otherPersonId, relationshipType: relation.relationshipType ?? 'acquaintance', familiarity: Number(relation.familiarity),
       trust: Number(relation.trust), affinity: Number(relation.affinity),
       lastInteractionTick: relation.lastInteractionTick == null ? null : Number(relation.lastInteractionTick),
     })
@@ -182,7 +194,7 @@ function initialPeople(snapshot: ColonySnapshot): SimPerson[] {
 export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): ColonyRunResult {
   const people = initialPeople(snapshot)
   const byId = new Map(people.map((entry) => [entry.person.id, entry]))
-  const allAssignments = people.flatMap((entry) => entry.assignments)
+  let allAssignments = people.flatMap((entry) => entry.assignments)
   const startTick = options.startTick ?? (snapshot.tick != null ? Number(snapshot.tick) + 1 : 0)
   const scenario = new Map<number, ScenarioEvent[]>()
   for (const event of options.scenario ?? []) {
@@ -196,6 +208,8 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
   const relationshipsOf = (entry: SimPerson): PersonRelationship[] =>
     (entry.relationshipList ??= [...entry.relationships.values()])
 
+  const fadedAt = (entry: SimPerson, tick: number): PersonRelationship[] => fadeRelationships(relationshipsOf(entry), tick)
+
   /** One directed social event: memory → relationship → affect, as the engine does. */
   const applySocialEvent = (event: PopulationEvent): void => {
     const actor = event.actorPersonId ? byId.get(event.actorPersonId) : undefined
@@ -205,7 +219,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     const appraisal = appraisalFromPopulationEvent(event, { needs: needsOf(actor), relationship: current })
     if (appraisal) actor.affect = applyAffect(actor.affect, appraiseEvent(appraisal, profile), event.tick, profile)
     const memory = memoryFromPopulationEvent(event)
-    const next = memory ? projectRelationship(current, memory) : null
+    const next = memory ? projectRelationship(current, memory, relationshipsOf(actor)) : null
     if (next && event.relatedPersonId) {
       actor.relationships.set(event.relatedPersonId, next)
       actor.relationshipList = null
@@ -227,7 +241,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
         needs: needsOf(entry),
         assignments: entry.assignments,
         skills: [],
-        relationships: relationshipsOf(entry),
+        relationships: fadedAt(entry, tick),
         knowledge: [],
         workObligation: hasWork ? circadian.workObligation : 0,
         travelCostHome: 0.1,
@@ -268,6 +282,19 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     for (const event of scenario.get(step) ?? []) {
       const subject = byId.get(event.personId)
       if (!subject) continue
+      if (isMoveEvent(event)) {
+        const move = event
+        const index = subject.assignments.findIndex((assignment) => assignment.assignmentType === move.assignment)
+        const base = index >= 0 ? subject.assignments[index] : {
+          id: `${subject.person.id}:${move.assignment}:scenario`, personId: subject.person.id, assignmentType: move.assignment,
+          locationId: subject.person.currentLocationId, tileEntityId: null, employerActorId: null, roleCode: null, startsTick: null, endsTick: null, isActive: true,
+        }
+        const next = { ...base, locationId: move.locationId ?? base.locationId, tileEntityId: move.tileEntityId }
+        if (index >= 0) subject.assignments[index] = next
+        else subject.assignments.push(next)
+        allAssignments = people.flatMap((entry) => entry.assignments)
+        continue
+      }
       if (isHealthEvent(event)) {
         const profile = affectProfileFromTraits(subject.traits)
         subject.affect = applyPain(subject.affect, painFromHealthEvent({ eventType: event.type, severity: event.severity }, profile), tick, profile)
@@ -286,7 +313,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     if ((step + 1) % DAY_TICKS === 0 || step === options.ticks - 1) {
       const hours = ((step % DAY_TICKS) + 1)
       const affect = people.map((entry) => decayAffect(entry.affect, tick, affectProfileFromTraits(entry.traits)))
-      const relations = people.flatMap((entry) => [...entry.relationships.values()])
+      const relations = people.flatMap((entry) => fadedAt(entry, tick))
       days.push({
         day: days.length + 1,
         sleepHours: round((sleepTicks / people.length) * (DAY_TICKS / hours)),
@@ -304,7 +331,8 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
         familiarityAvg: round(mean(relations.map((relation) => relation.familiarity))),
         trustAvg: round(mean(relations.map((relation) => relation.trust))),
         affinityAvg: round(mean(relations.map((relation) => relation.affinity))),
-        closeTies: relations.filter((relation) => relation.familiarity >= CLOSE_FAMILIARITY && relation.trust >= CLOSE_TRUST && relation.affinity >= CLOSE_AFFINITY).length,
+        closeTies: relations.filter(isClose).length,
+        closeTiesMaxPerPerson: Math.max(0, ...people.map((entry) => fadedAt(entry, tick).filter(isClose).length)),
       })
       sleepTicks = 0; workTicks = 0; encounters = 0
     }
@@ -317,7 +345,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     days,
     final: {
       affect: people.map((entry) => decayAffect(entry.affect, lastTick, affectProfileFromTraits(entry.traits))),
-      relationships: people.flatMap((entry) => [...entry.relationships.values()]),
+      relationships: people.flatMap((entry) => fadedAt(entry, lastTick)),
       needs: Object.fromEntries(people.map((entry) => [entry.person.id, { ...entry.needs }])),
     },
   }

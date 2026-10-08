@@ -77,7 +77,15 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
     .maybeSingle()
   if (relationError) { result.errors.push(`relationship lookup: ${relationError.message ?? relationError}`); return result }
 
-  const projected = projectRelationship(relationshipFromRow(relationRow), memory)
+  // NOXIA-LIVING-0008: the person's other relationships decide the tier of this one.
+  const { data: peerRows, error: peerError } = await supabase
+    .from('person_relationships')
+    .select('id, person_id, other_person_id, relationship_type, familiarity, trust, affinity, last_interaction_tick')
+    .eq('person_id', memory.personId)
+  if (peerError) { result.errors.push(`relationship peers lookup: ${peerError.message ?? peerError}`); return result }
+  const peers = (peerRows ?? []).map(relationshipFromRow).filter((peer: PersonRelationship | null): peer is PersonRelationship => Boolean(peer))
+
+  const projected = projectRelationship(relationshipFromRow(relationRow), memory, peers)
   if (!projected) return result
   const previousInteractionTick = relationRow?.last_interaction_tick == null
     ? null
