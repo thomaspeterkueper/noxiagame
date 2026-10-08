@@ -86,3 +86,15 @@ Die geplante Steuer-Gegenbuchung ist damit nachgelagert: Sie muss als echter Fis
 Migration `20261008210000_public_funding_fiscal_transfer.sql`: `sync_employer_economy` bucht die Finanzierung öffentlicher Arbeitgeber als Fiskaltransfer. Jeder neuen Gutschrift im `npc_ledger` (Referenz `colony_ledger:<id>`) steht im selben Statement eine gleich hohe Belastung der Koloniekasse gegenüber (`entry_type = 'public_service_transfer'`). Eine Wiederholung bucht keine Seite erneut. Gegen G1 geprüft in `financeSemantics.test.ts`. Die Migration ist gegen keine Datenbank gelaufen.
 
 Offen: `lib/game/tick.ts` bucht `building_payout` als Belastung der Koloniekasse und schreibt den Betrag dem Spielerprofil gut. Diese Ausschüttung hat keine Einnahme als Gegenstück; die Koloniekasse wird dadurch negativ. Nach G1 ist das eine Emission, die als solche ausgewiesen oder aus echten Einnahmen gedeckt werden muss.
+
+## Gebäudeausschüttung abgeschaltet (2026-10-08)
+
+Entscheidung: Ausschüttungen müssen aus echten Erlösen gedeckt sein. Produktion erzeugt Güter, keine Credits.
+
+- `lib/game/tick.ts`: Die automatische Gutschrift (`building_payout`, samt `tax_payout` darauf) läuft nicht mehr. Rückfall nur über `NOXIA_LEGACY_BUILDING_PAYOUT=true`.
+- Folge für Spieler: Gebäude bringen bis zur Anbindung echter Einnahmen keine Credits mehr.
+- Folge für den Haushalt: `tax_payout` entfällt als Steuerquelle. Öffentliche Arbeitgeber erhalten erst wieder Einnahmen, wenn Steuern aus echten Transfers fließen (`tax_transaction`, `tax_landing`, `tax_property`, `tariff`).
+
+Reihenfolge danach: Miete (Mietzahler an Eigentümer), Warenverkauf (Käufer an Verkäufer), öffentliche Leistung (Budget an Betreiber); Steuer jeweils aus dem Transfer abgezweigt. Förderung nur als ausgewiesener Zuschuss aus einem finanzierten Haushalt.
+
+Noch nicht geprüft: Rückbau und Verkauf von Gebäuden (`app/api/game/build/route.ts`) schreiben Spielern ebenfalls Credits ohne Gegenkonto gut.
