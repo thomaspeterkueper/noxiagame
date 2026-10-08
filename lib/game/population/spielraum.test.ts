@@ -1,4 +1,4 @@
-import { actionSpielraum, combineSpielraum, gini, placeSpielraum, relationalSpielraum, spielraumRegeneration, viableOptions, type ScoredOption } from './spielraum'
+import { actionSpielraum, combineSpielraum, gini, materialAccess, placeSpielraum, relationalSpielraum, spielraumRegeneration, viableOptions, type ScoredOption } from './spielraum'
 import { decidePopulationAction, type PopulationDecisionContext } from './decision'
 
 let failures = 0
@@ -39,6 +39,11 @@ check(relationalSpielraum([tie(0.1, 0.1), tie(0.1, 0.1)]) === 0, 'room never goe
 // Places.
 check(placeSpielraum(0) === 0 && placeSpielraum(6) > placeSpielraum(2), 'more open places mean more room')
 check(placeSpielraum(6, 0.3) < placeSpielraum(6, 1) && placeSpielraum(6, 0) > 0, 'scarcity shrinks the room a settlement offers without removing it')
+check(materialAccess({ wealth: 0, dailyIncome: 0, essentialDailyCost: 25 }) === 0, 'no income and no reserve means no material room')
+check(materialAccess({ wealth: 0, dailyIncome: 25, essentialDailyCost: 25 }) === 1, 'income covering essentials keeps material access open')
+check(materialAccess({ wealth: 25 * 14, dailyIncome: 0, essentialDailyCost: 25 }) < 0.2, 'a two-week reserve is only a narrow bridge, not durable freedom')
+check(materialAccess({ wealth: 25 * 365, dailyIncome: 0, essentialDailyCost: 25 }) > 0.95, 'deep savings can preserve material access without a job')
+check(placeSpielraum(14, 1, materialAccess({ wealth: 0, dailyIncome: 0, essentialDailyCost: 25 })) < placeSpielraum(2, 1, 1), 'nominal openings do not make a penniless unemployed person freer than a solvent person with fewer options')
 
 // Combination and distribution.
 const full = combineSpielraum({ action: 1, relational: 1, place: 1 })
