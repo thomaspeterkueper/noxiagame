@@ -1,4 +1,5 @@
 import { daysToCsv, runColony, syntheticColony, type ScenarioEvent } from './colonyRun'
+import { syntheticMarket } from './colonyMarket'
 
 let failures = 0
 const check = (ok: boolean, label: string) => { if (!ok) { failures++; console.error('FAIL: ' + label) } }
@@ -85,6 +86,30 @@ check(alive.spielraumBySettlement['settlement-0'].length === alive.days.length, 
 
 check(daysToCsv(month.days).split('\n').length === 32 && daysToCsv(month.days).startsWith('day,sleepHours'), 'days export as csv')
 check(syntheticColony({ people: 9, settlements: 3 }).people.filter((p) => p.locationId === 'settlement-0').length === 3, 'synthetic people are spread over settlements')
+
+// Housing and job market (NOXIA-LIVING-0010, stage 2).
+const marketTowns = syntheticColony({ people: 24, settlements: 2 })
+const setup = syntheticMarket(marketTowns)
+const traded = runColony(marketTowns, { ticks: 24 * 540, market: setup })
+const tradedAgain = runColony(marketTowns, { ticks: 24 * 540, market: syntheticMarket(marketTowns) })
+const m = traded.market!
+check(JSON.stringify(traded) === JSON.stringify(tradedAgain), 'a run with a market is deterministic')
+check(m.days.length === traded.days.length, 'the market reports one row per day')
+check(m.days[0].homeless === 0 && m.days[0].unemployed === 0, 'everybody starts housed and employed')
+check(m.records.length > 0 && m.records.every((r) => r.origin === 'market'), 'every application is logged as a market decision')
+check(m.records.some((r) => r.outcome === 'refused') && m.records.some((r) => r.outcome === 'granted'), 'gatekeepers grant and refuse')
+check(m.summary.accessibleShare > 0 && m.summary.accessibleShare < 1, 'only part of what exists is really open')
+check(m.power.length > 1 && m.power[0].peopleAffected >= m.power[m.power.length - 1].peopleAffected, 'gatekeepers are ranked by the people they decided about')
+check(m.days[539].wealthGini > m.days[0].wealthGini, 'wealth grows apart over time')
+check(m.days.some((d) => d.owners > 0), 'some people buy a home of their own')
+check(m.days.some((d) => d.unpaid > 0), 'an employer that spends more than it earns stops paying')
+check(Object.values(m.final.ownerIncome).some((v) => v > 0), 'landlords earn rent')
+const dwellingCapacity = new Map(setup.dwellings.map((d) => [d.id, d.capacity]))
+const housed: Record<string, number> = {}
+for (const p of traded.final.homes) if (p) housed[p] = (housed[p] ?? 0) + 1
+check(Object.entries(housed).every(([id, n]) => n <= (dwellingCapacity.get(id) ?? 0)), 'no dwelling holds more people than it has places')
+check(traded.days.every((d) => d.spielraumPlaceAvg >= 0 && d.spielraumPlaceAvg <= 1), 'place room stays bounded when only open places count')
+check(!runColony(marketTowns, { ticks: 24 }).market, 'without a market the run is what it was')
 
 if (failures) throw new Error(String(failures) + ' colony run test(s) failed')
 console.log('Colony research run: tests passed; database_calls=0; external_llm_calls=0')

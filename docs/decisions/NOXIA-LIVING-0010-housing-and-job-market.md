@@ -64,7 +64,7 @@ Macht wird damit nicht eingebaut, sondern beobachtet: Sie zeigt sich als Asymmet
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Reine Regeln für Wohnen, Stellen und Zugangsprotokoll | fertig |
-| 2 | Forschungslauf: Markt mit Löhnen, Mieten, Eigentum, Hotels. Spielraum zählt nur zugängliche Plätze. Über Spieljahre beobachten | offen |
+| 2 | Forschungslauf: Markt mit Löhnen, Mieten, Eigentum, Hotels. Spielraum zählt nur zugängliche Plätze. Über Spieljahre beobachten | fertig (`lib/research/colony/colonyMarket.ts`) |
 | 3 | Live-Bestand bereinigen: Wohnungen für die sieben Leitungen, Gebäude für die zwölf ohne Gebäude, Verwaltung nicht als Wohnung. Kapazität je Wohngebäude, Hotel als Gebäudetyp, Konten und Lohn für Personen | entschieden, Migration geschrieben, noch nicht angewendet |
 | 4 | Schattenbetrieb live: Personen treffen echte Entscheidungen gegen den Live-Bestand, protokolliert werden Zusage, Ablehnung und Spielraum. Nichts wird ausgeführt | offen |
 | 5 | Atomarer Wohnungswechsel als Datenbankfunktion: Platz reservieren, alte Zuweisung beenden, neue anlegen, Mietverhältnis synchronisieren, bei Fehler alles zurück. Keine direkte Änderung von `current_location_id` | offen |
@@ -104,6 +104,46 @@ Migration `20261008150000_employer_funding.sql`.
 - **Spielerunternehmen und NPC-Firmen** erhalten keine laufende Finanzierung. Der Eigentümer kapitalisiert über `fund_player_corp`, oder das Unternehmen erwirtschaftet Einnahmen.
 - **Einmalige Übergangsreserve:** Jeder bestehende Arbeitgeber, dessen Konto keinen Tageslohn deckt, erhält 14 Tageslöhne als `endowment` mit Referenz `bootstrap:employer:<actor_id>`.
 - **Danach gilt:** Reicht das Arbeitgeberkonto nicht, wird kein Lohn gezahlt.
+
+## Stufe 2: Markt im Forschungslauf (2026-10-08)
+
+Code: `lib/research/colony/colonyMarket.ts`, Aufruf `npm run research:colony -- --market`. Test: `npm run test:colony-run`.
+
+Der Lauf führt die reinen Regeln aus Stufe 1 über Spieljahre:
+
+- **Täglich:** Lohn vom Arbeitgeberkonto, Lebenshaltung, Hotelrechnung. Kann der Arbeitgeber nicht zahlen, bleibt der Lohn aus. Ein zahlungsunfähiger Arbeitgeber bietet keine Stelle an.
+- **Alle 30 Tage:** Miete, Mietschulden, Räumung, Mietanpassung.
+- **Tägliche Prüfung je Person:** `decideRelocation` liefert nur den Wunsch. Danach wählt die Person (`chooseHousing`), der Vermieter oder Arbeitgeber entscheidet, erst dann wird gewechselt. Höchstens ein Wechsel pro Tag.
+- **Spielraum:** Als offener Platz zählt nur, was die Person bezahlen kann und was Vermieter oder Arbeitgeber ihr geben würden.
+- **Protokoll:** Jede Zusage und Ablehnung ist ein `AccessRecord` mit `origin: 'market'`.
+
+### Erster Befund
+
+Synthetische Kolonie, 36 Personen, 3 Siedlungen, 3 Spieljahre. Je Siedlung ein volles staatliches Habitat, private Mietwohnungen, ein Gästehaus, ein Hotel, zwei Kaufhäuser; ein Unternehmen, das mehr Lohn zahlt, als es einnimmt.
+
+| Größe | Wert |
+|---|---|
+| Vermögen, Gini | 0,12 am ersten Tag, 0,31 nach drei Jahren |
+| Vermögen nach drei Jahren | 0 bis 82.730, Median 42.070 |
+| Erster ausgefallener Lohn | Tag 98 |
+| Erste Räumung | Tag 331 |
+| Räumungen | 6 |
+| Ablehnungen wegen früherer Mietschulden | 546, verteilt auf 3 Personen |
+| Tage mit Wohnungslosen | 511 von 1.095 |
+| Anteil gewährter Anfragen | 41 % |
+
+Spielraum am letzten Tag nach Wohnform:
+
+| Wohnform | Personen | Ortsspielraum | Spielraum gesamt |
+|---|---|---|---|
+| staatlich | 9 | 0,71 | 0,67 |
+| gemietet | 18 | 0,69 | 0,66 |
+| Eigentum | 6 | 0,70 | 0,59 |
+| ohne Wohnung | 3 | 0,08 | 0,44 |
+
+Die Kette ist: Arbeitgeber wird zahlungsunfähig, Lohn fällt aus, Mietschulden, Räumung. Danach lehnen private Vermieter ein Jahr lang ab. Die drei Betroffenen pendeln zwischen Gästehaus und Straße (330 Hoteleinzüge) und kommen nicht zurück in eine Wohnung. Macht zeigt sich hier als Gedächtnis der Vermieter, nicht als Miethöhe: Die Mieten sind gesunken (407 auf 371).
+
+Einschränkungen: Die Zahlen hängen an den synthetischen Startwerten (Löhne, Mieten, Lebenshaltung 25 pro Tag). Vermögen wächst zu leicht, es gibt außer Miete und Hauskauf nichts, wofür Menschen Geld ausgeben. Ein Lauf mit dem Live-Bestand steht aus.
 
 ## Noch offen
 

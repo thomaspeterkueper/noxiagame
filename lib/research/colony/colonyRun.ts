@@ -46,6 +46,8 @@ import {
   type PopulationEvent,
 } from '../../game/population/types'
 
+import { createMarket, type MarketResult, type MarketSetup } from './colonyMarket'
+
 export interface SnapshotPerson {
   id: string
   named?: boolean
@@ -108,6 +110,11 @@ export interface ColonyRunOptions {
   /** Switch off single mechanisms to see what each one contributes. All default to true. */
   friction?: boolean
   relocation?: boolean
+  /**
+   * Housing and job market (NOXIA-LIVING-0010). With it, homes and jobs are scarce,
+   * cost money and are granted or refused; Spielraum counts only places really open.
+   */
+  market?: MarketSetup
 }
 
 export interface ColonyDayRow {
@@ -171,11 +178,15 @@ export interface ColonyRunResult {
   moves: ColonyMove[]
   /** Mean Spielraum of the residents of each settlement, one value per day (null while nobody lives there). */
   spielraumBySettlement: Record<string, (number | null)[]>
+  /** Present when the run had a market. */
+  market?: MarketResult
   final: {
     affect: AffectState[]
     relationships: PersonRelationship[]
     needs: Record<string, Record<NeedCode, number>>
     residents: Record<string, number>
+    /** Home place of each person, in the order of the sorted ids; null without a home. */
+    homes: (string | null)[]
     /** Spielraum of each person and the mean per settlement on the last day. */
     spielraum: Record<string, SpielraumComponents>
     spielraumBySettlement: Record<string, number>
@@ -430,14 +441,14 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     const jobLocations = new Set([...places.work.entries()].filter(([key, place]) => free('work', key, place)).map(([, place]) => place.locationId))
     return people.map((entry) => {
       const home = assignmentOf(entry, 'home'), work = assignmentOf(entry, 'work')
-      let open = 0
-      for (const [key, place] of places.home) {
+      let open = market ? market.openPlaces(entry.person.id, tick) : 0
+      for (const [key, place] of market ? [] : places.home) {
         if (!free('home', key, place) || (home && key === placeKey(home.locationId, home.tileEntityId))) continue
         // Another settlement is only an option if one could also work there.
         if (place.locationId !== entry.person.currentLocationId && work && !jobLocations.has(place.locationId)) continue
         open += 1
       }
-      for (const [key, place] of places.work) {
+      for (const [key, place] of market ? [] : places.work) {
         if (place.locationId !== entry.person.currentLocationId || !free('work', key, place)) continue
         if (work && key === placeKey(work.locationId, work.tileEntityId)) continue
         open += 1
@@ -452,6 +463,38 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
 
   const days: ColonyDayRow[] = []
   const moves: ColonyMove[] = []
+  const unassign = (entry: SimPerson, kind: RelocationKind): void => { entry.assignments = entry.assignments.filter((assignment) => assignment.assignmentType !== kind) }
+  const companyOf = (entry: SimPerson, others: string[], tick: number): { affinity: number; close: number } => {
+    const faded = fadedAt(entry, tick)
+    const affinityTo = new Map(faded.map((relation) => [relation.otherPersonId, relation.affinity]))
+    const tiers = relationshipTiers(faded)
+    const rest = others.filter((id) => id !== entry.person.id)
+    return {
+      affinity: rest.length ? mean(rest.map((id) => affinityTo.get(id) ?? 0.5)) : 0.5,
+      close: rest.filter((id) => tiers.get(id) === 'close' || tiers.get(id) === 'partner').length,
+    }
+  }
+  if (options.market) {
+    // Capacity comes from the market, not from who happens to live or work somewhere.
+    places.home.clear(); places.work.clear()
+    for (const dwelling of options.market.dwellings) places.home.set(placeKey(dwelling.locationId, dwelling.tileEntityId ?? dwelling.id), { locationId: dwelling.locationId, tileEntityId: dwelling.tileEntityId ?? dwelling.id, capacity: dwelling.capacity })
+    for (const job of options.market.jobs) places.work.set(placeKey(job.locationId, job.tileEntityId ?? job.id), { locationId: job.locationId, tileEntityId: job.tileEntityId ?? job.id, capacity: job.positions })
+  }
+  const market = options.market ? createMarket(options.market, {
+    personIds: people.map((entry) => entry.person.id),
+    location: (id) => byId.get(id)!.person.currentLocationId,
+    home: (id) => assignmentOf(byId.get(id)!, 'home')?.tileEntityId ?? null,
+    work: (id) => assignmentOf(byId.get(id)!, 'work')?.tileEntityId ?? null,
+    setHome: (id, place) => { const entry = byId.get(id)!; if (place) reassign(entry, 'home', place.locationId, place.tileEntityId); else unassign(entry, 'home') },
+    setWork: (id, place) => { const entry = byId.get(id)!; if (place) reassign(entry, 'work', place.locationId, place.tileEntityId); else unassign(entry, 'work') },
+    moveTo: (id, locationId) => { const entry = byId.get(id)!; entry.person = { ...entry.person, currentLocationId: locationId } },
+    needs: (id) => byId.get(id)!.needs,
+    adjustNeed: (id, code, delta) => adjustNeed(byId.get(id)!, code, delta),
+    company: (id, others, tick) => companyOf(byId.get(id)!, others, tick),
+    affinity: (fromId, toId, tick) => { const from = byId.get(fromId); return from ? fadedAt(from, tick).find((relation) => relation.otherPersonId === toId)?.affinity : undefined },
+    supply: supplyOf,
+    lastMove: (id) => { const entry = byId.get(id)!; const { home, work } = entry.lastMoveTick; return home == null ? work : work == null ? home : Math.max(home, work) },
+  }) : null
   let lastSpielraum: SpielraumComponents[] = []
   const settlementIds = [...new Set([...places.home.values(), ...places.work.values()].map((place) => place.locationId))].sort()
   const spielraumBySettlement: Record<string, (number | null)[]> = Object.fromEntries(settlementIds.map((id) => [id, []]))
@@ -464,7 +507,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
 
     for (const entry of people) {
       const circadian = circadianState(tick, entry.profile)
-      const environment = { supply: supplyOf(entry.person.currentLocationId), varietyFloor: entry.varietyFloor }
+      const environment = { supply: supplyOf(entry.person.currentLocationId), varietyFloor: entry.varietyFloor, shelter: market ? market.shelter(entry.person.id) : undefined }
       const faded = fadedAt(entry, tick)
       const decision = decidePopulationAction({
         person: entry.person,
@@ -568,8 +611,17 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
 
     if (withRelocation) {
       const hour = ((tick % DAY_TICKS) + DAY_TICKS) % DAY_TICKS
+      if (market && hour === 0 && step > 0) market.daily(tick, day - 1)
       for (const entry of people) {
-        if (entry.reviewHour === hour && reviewRelocation(entry, tick, day, moves)) movesToday += 1
+        if (entry.reviewHour !== hour) continue
+        if (!market) { if (reviewRelocation(entry, tick, day, moves)) movesToday += 1; continue }
+        const change = market.review(entry.person.id, tick, day)
+        if (!change) continue
+        entry.lastMoveTick[change.kind] = tick
+        adjustNeed(entry, 'variety', RELOCATION_VARIETY_GAIN)
+        if (spielraumBySettlement[change.toLocationId] === undefined) spielraumBySettlement[change.toLocationId] = days.map(() => null)
+        moves.push({ tick, day, personId: entry.person.id, kind: change.kind, reason: change.reason, fromLocationId: change.fromLocationId, toLocationId: change.toLocationId })
+        movesToday += 1
       }
     }
 
@@ -610,6 +662,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
         spielraumGini: gini(room.map((value) => value.total)),
       })
       lastSpielraum = room
+      market?.closeDay(days.length, tick)
       for (const locationId of Object.keys(spielraumBySettlement)) {
         const local = room.filter((_, index) => people[index].person.currentLocationId === locationId)
         spielraumBySettlement[locationId].push(local.length ? round(mean(local.map((value) => value.total))) : null)
@@ -628,11 +681,13 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     days,
     moves,
     spielraumBySettlement,
+    ...(market ? { market: market.result() } : {}),
     final: {
       affect: people.map((entry) => affectAt(entry, lastTick)),
       relationships: people.flatMap((entry) => fadedAt(entry, lastTick)),
       needs: Object.fromEntries(people.map((entry) => [entry.person.id, { ...entry.needs }])),
       residents,
+      homes: people.map((entry) => assignmentOf(entry, 'home')?.tileEntityId ?? null),
       spielraum: Object.fromEntries(people.map((entry, index) => [entry.person.id, lastSpielraum[index]])),
       spielraumBySettlement: Object.fromEntries(Object.keys(residents).sort().map((locationId) => [locationId, round(mean(people.map((entry, index) => ({ entry, room: lastSpielraum[index] })).filter((item) => item.entry.person.currentLocationId === locationId).map((item) => item.room.total)))])),
     },
