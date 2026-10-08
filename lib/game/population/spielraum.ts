@@ -33,6 +33,8 @@ export const VIABLE_MARGIN = 0.35
 const ACTION_SATURATION = 5
 const RELATIONAL_SATURATION = 6
 const PLACE_SATURATION = 12
+/** Savings horizon after which lack of current income hardly constrains movement. */
+export const MATERIAL_RUNWAY_DAYS = 90
 const WEIGHTS = { action: 0.4, relational: 0.35, place: 0.25 }
 
 const clamp01 = (value: number): number => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
@@ -71,9 +73,35 @@ export function relationalSpielraum(relationships: readonly Pick<PersonRelations
   return round(saturating(openness, RELATIONAL_SATURATION))
 }
 
-/** Other homes and workplaces with room, in a settlement that can sustain a life. */
-export function placeSpielraum(openPlaces: number, supply = 1): number {
-  return round(saturating(openPlaces, PLACE_SATURATION) * (0.3 + 0.7 * clamp01(supply)))
+export interface MaterialMeans {
+  /** Liquid credits currently available to the person. */
+  wealth: number
+  /** Income that is actually being paid now; 0 while unpaid or unemployed. */
+  dailyIncome: number
+  /** Essential daily expenditure. */
+  essentialDailyCost: number
+}
+
+/**
+ * Ability to carry a transition economically, 0..1.
+ *
+ * Current income that covers essentials keeps material access open. Without it,
+ * savings provide runway instead. The horizon is deliberately long (90 days):
+ * a short emergency reserve does not make every nominal offer a durable option.
+ * This is measurement only; it does not change market decisions.
+ */
+export function materialAccess(means: MaterialMeans): number {
+  const cost = Math.max(0, means.essentialDailyCost)
+  if (cost === 0) return 1
+  const incomeCoverage = clamp01(Math.max(0, means.dailyIncome) / cost)
+  const runwayDays = Math.max(0, means.wealth) / cost
+  const runway = 1 - Math.exp(-runwayDays / MATERIAL_RUNWAY_DAYS)
+  return round(Math.max(incomeCoverage, runway))
+}
+
+/** Other homes and workplaces that are both institutionally and materially reachable. */
+export function placeSpielraum(openPlaces: number, supply = 1, material = 1): number {
+  return round(saturating(openPlaces, PLACE_SATURATION) * (0.3 + 0.7 * clamp01(supply)) * clamp01(material))
 }
 
 export function combineSpielraum(parts: { action: number; relational: number; place: number }): SpielraumComponents {
