@@ -12,6 +12,7 @@ import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
 import { persistObservableKnowledge } from './observableKnowledge'
 import { projectInteriorPresence } from './interiorPresence'
 import { circadianProfile, circadianState } from './circadian'
+import { activityForAction, needDelta } from './actionEffects'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
@@ -29,27 +30,6 @@ export function decidePopulationAction(tick: number, hasWork: boolean): Populati
   if (phase === 0) return { action: 'travel_work', activityState: 'travelling', factors: { phase, hasWork: true, destination: 'work' } }
   if (phase === 1 || phase === 2) return { action: 'work', activityState: 'working', factors: { phase, hasWork: true, obligation: 1 } }
   return { action: 'travel_home', activityState: 'travelling', factors: { phase, hasWork: true, destination: 'home' } }
-}
-
-function activityForAction(action: PopulationAction): PersonActivityState {
-  if (action === 'work') return 'working'
-  if (action === 'rest') return 'resting'
-  if (action === 'travel_home' || action === 'travel_work') return 'travelling'
-  if (action === 'social_interaction') return 'socialising'
-  if (action === 'seek_medical_care') return 'travelling'
-  if (action === 'inspect_problem' || action === 'report_problem') return 'inspecting'
-  return 'idle'
-}
-
-function needDelta(action: PopulationAction, needCode: string) {
-  if (action === 'work') return needCode === 'rest' ? -0.05 : needCode === 'sustenance' ? -0.025 : needCode === 'purpose' ? 0.04 : needCode === 'social' ? 0.01 : 0
-  if (action === 'rest') return needCode === 'rest' ? 0.12 : needCode === 'sustenance' ? -0.015 : needCode === 'purpose' ? -0.01 : 0
-  if (action === 'satisfy_basic_need') return needCode === 'sustenance' ? 0.16 : needCode === 'safety' ? 0.05 : 0
-  if (action === 'social_interaction') return needCode === 'social' ? 0.12 : needCode === 'rest' || needCode === 'sustenance' ? -0.01 : 0
-  if (action === 'seek_medical_care') return needCode === 'rest' || needCode === 'sustenance' ? -0.01 : 0
-  if (action === 'inspect_problem' || action === 'report_problem') return needCode === 'rest' ? -0.03 : needCode === 'sustenance' ? -0.015 : needCode === 'purpose' ? 0.05 : 0
-  if (action === 'travel_home' || action === 'travel_work') return needCode === 'rest' ? -0.015 : needCode === 'sustenance' ? -0.01 : 0
-  return 0
 }
 
 function actionFromNamedActivity(activity: PersonActivityState): PopulationAction {

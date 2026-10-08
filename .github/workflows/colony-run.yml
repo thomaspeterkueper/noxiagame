@@ -1,0 +1,41 @@
+name: Colony research run
+
+on:
+  pull_request:
+    paths:
+      - 'lib/research/colony/**'
+      - 'lib/game/population/actionEffects.ts'
+      - 'lib/game/population/circadian.ts'
+      - 'lib/game/population/decision.ts'
+      - 'lib/game/population/encounters.ts'
+      - 'lib/game/population/presence.ts'
+      - 'lib/game/personSocialMemory.ts'
+      - 'lib/game/cognition/personAffect.ts'
+      - '.github/workflows/colony-run.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/research/colony/**'
+      - 'lib/game/population/actionEffects.ts'
+      - 'lib/game/population/circadian.ts'
+      - 'lib/game/population/decision.ts'
+      - 'lib/game/population/encounters.ts'
+      - 'lib/game/population/presence.ts'
+      - 'lib/game/personSocialMemory.ts'
+      - 'lib/game/cognition/personAffect.ts'
+
+jobs:
+  deterministic-colony-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The run has no runtime dependencies, so it only needs the compiler.
+      - name: Compile
+        run: npx --yes --package typescript@5 tsc lib/research/colony/colonyRun.ts lib/research/colony/colonyRun.test.ts lib/research/colony/cli.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .colony-run
+      - name: Test
+        run: node .colony-run/research/colony/colonyRun.test.js
+      - name: One simulated year
+        run: node .colony-run/research/colony/cli.js --years 1 --people 31 --settlements 5

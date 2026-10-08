@@ -48,5 +48,7 @@ next-env.d.ts
 /.ssf-test
 /.npc-affect-test
 /.circadian-test
+/.colony-run
+/experiments/colony/out/
 
 .vercel
