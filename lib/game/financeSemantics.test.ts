@@ -1,6 +1,7 @@
 import {
   liquidMoneyDelta,
   summarizeMoneyFlows,
+  taxedTransfer,
   transferTransaction,
   validateMoneyTransaction,
   type MoneyTransaction,
@@ -86,3 +87,17 @@ check(summary.unclassifiedCredit === 1, 'credit stays visibly unresolved at G1')
 
 if (failures) throw new Error(String(failures) + ' finance invariant test(s) failed')
 console.log('Finance semantics G1: tests passed; live mutations=0')
+
+
+const taxedRent = taxedTransfer({
+  id: 'rent:1',
+  payer: 'tenant',
+  recipient: 'landlord',
+  publicAccount: 'colony',
+  gross: 400,
+  taxRate: 0.1,
+  reference: 'tenancy:1',
+})
+check(taxedRent.gross === 400 && taxedRent.tax === 40 && taxedRent.net === 360, 'rent tax is carved out of the gross payment')
+check(validateMoneyTransaction(taxedRent.transaction).ok, 'taxed rent remains a zero-sum fiscal transfer')
+check(validateMoneyTransaction(taxedRent.transaction).postingSum === 0, 'tenant debit equals landlord net plus tax')
