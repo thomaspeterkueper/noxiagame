@@ -196,3 +196,18 @@ Korrektur:
 - Dies ändert **keine Entscheidung und kein Verhalten**. Es korrigiert ausschließlich die Auswertung.
 
 Damit kann Arbeitslosigkeit weiterhin neue theoretische Stellen sichtbar machen, aber sie erhöht den realen Ortsspielraum nicht automatisch. Vermögende Arbeitslose bleiben beweglicher als mittellose; die Größe ist damit nicht bloß eine Beschäftigten-/Arbeitslosenmarkierung.
+
+
+### Mietanschluss nach G1 (2026-10-08)
+
+Der Live-Bestand enthält vier Personen in einem spielereigenen Wohnblock auf der Erde. Diese Mietverhältnisse sind jedoch `origin='backfill'`, `status='provided'` und ohne Mietpreis. Sie werden **nicht rückwirkend** zu kostenpflichtigen Marktverträgen gemacht. Eine Datenbereinigung darf keine nachträgliche wirtschaftliche Zustimmung fingieren.
+
+Daraus folgt:
+
+- Private Wohngebäude erhalten künftig explizite Angebotsmieten.
+- Ein kostenpflichtiges Mietverhältnis entsteht erst bei `origin='market'` bzw. einem später ausdrücklich modellierten Vertragsübergang.
+- Bestehender Backfill bleibt bis dahin bereitgestellt und kostenfrei.
+- Der Miettransfer lautet: Mieter zahlt Bruttomiete; daraus gehen Nettomiete an den Vermieter und eine ggf. konfigurierte Mietsteuer an die Koloniekasse. Summe der drei Buchungen = 0.
+- Die heutige Zuordnung des Vermieters läuft über `profile_economic_actors`: Einnahmen landen zunächst beim wirtschaftlichen Akteur des Spielers, nicht direkt in `profiles.credits`. Eine spätere Ausschüttung an das Spielerprofil ist ein eigener, typisierter Transfer.
+
+Damit wird weder ein Mietvertrag erfunden noch der Übergang zwischen Spieler- und NPC-Kontenkreis erneut unsichtbar gemacht.
