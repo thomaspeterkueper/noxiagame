@@ -34,7 +34,7 @@ import { resolvedPresenceCandidates } from '../../game/population/presence'
 import { fadeRelationships, pairCompatibility, relationshipTiers } from '../../game/population/relationshipDynamics'
 import { decideRelocation, type RelocationKind, type RelocationOption } from '../../game/population/relocation'
 import { encounterEventType, encounterOutcome, type FrictionPerson } from '../../game/population/socialFriction'
-import { actionSpielraum, combineSpielraum, gini, placeSpielraum, relationalSpielraum, type SpielraumComponents } from '../../game/population/spielraum'
+import { actionSpielraum, combineSpielraum, gini, materialAccess, placeSpielraum, relationalSpielraum, type SpielraumComponents } from '../../game/population/spielraum'
 import { chooseVisitTarget } from '../../game/population/visitTarget'
 import {
   NEED_CODES,
@@ -456,7 +456,11 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
       return combineSpielraum({
         action: entry.actionRoomHours ? entry.actionRoomSum / entry.actionRoomHours : 0,
         relational: relationalSpielraum(fadedAt(entry, tick)),
-        place: placeSpielraum(open, supplyOf(entry.person.currentLocationId)),
+        place: placeSpielraum(
+          open,
+          supplyOf(entry.person.currentLocationId),
+          market ? materialAccess(market.materialMeans(entry.person.id)) : 1,
+        ),
       })
     })
   }
