@@ -33,7 +33,7 @@ export interface MarketSetup {
   dwellings: Dwelling[]
   /** Each job needs a unique tileEntityId; it is the workplace people are assigned to. */
   jobs: MarketJob[]
-  people?: Record<string, { wealth?: number; skills?: Record<string, number> }>
+  people?: Record<string, { wealth?: number; skills?: Record<string, number>; jobId?: string | null; dwellingId?: string | null }>
   /** Employers missing here can always pay (e.g. a funded public service). */
   employers?: Record<string, MarketEmployer>
   /** Credits a person spends per day on living. Default 25. */
@@ -157,8 +157,14 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
 
   const persons = host.personIds.map((id, index): MarketPerson => {
     const homeTile = host.home(id), workTile = host.work(id)
-    const dwelling = homeTile ? dwellingByTile.get(homeTile) : undefined
-    const job = workTile ? jobByTile.get(workTile) : undefined
+    const explicitDwellingId = setup.people?.[id]?.dwellingId
+    const explicitJobId = setup.people?.[id]?.jobId
+    const dwelling = explicitDwellingId !== undefined
+      ? (explicitDwellingId ? dwellingById.get(explicitDwellingId) : undefined)
+      : homeTile ? dwellingByTile.get(homeTile) : undefined
+    const job = explicitJobId !== undefined
+      ? (explicitJobId ? jobById.get(explicitJobId) : undefined)
+      : workTile ? jobByTile.get(workTile) : undefined
     return {
       id,
       wealth: setup.people?.[id]?.wealth ?? (job?.dailyWage ?? 0) * 14,
