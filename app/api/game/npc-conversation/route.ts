@@ -334,7 +334,7 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
         const tick = Number(knowledgeTick?.tick_number)
-        if (!tickError && knowledgeTick && Number.isSafeInteger(tick) && tick >= 0) {
+        if (!tickError && knowledgeTick?.tick_number != null && Number.isSafeInteger(tick) && tick >= 0) {
           const { error: testimonyError } = await serviceClient
             .from('person_epistemic_traces')
             .upsert({
