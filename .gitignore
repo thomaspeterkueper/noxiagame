@@ -49,6 +49,7 @@ next-env.d.ts
 /.npc-affect-test
 /.circadian-test
 /.colony-run
+/.housing-market-test
 /.spielraum-test
 /.social-dynamics-test
 /.relationship-dynamics-test

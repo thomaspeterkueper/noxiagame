@@ -20,6 +20,8 @@ export interface NeedEnvironment {
   supply?: number
   /** Level below which this person's need for variety does not sink by itself (see `varietyFloor`). */
   varietyFloor?: number
+  /** 0..1 quality of the person's shelter (housing.shelterQuality). 1 when unknown. */
+  shelter?: number
 }
 
 function hash(value: string): number {
@@ -52,6 +54,8 @@ const clampUnit = (value: number | undefined, fallback: number): number =>
  */
 export function needDelta(action: PopulationAction, needCode: string, environment: NeedEnvironment = {}): number {
   if (action === 'satisfy_basic_need' && needCode === 'sustenance') return 0.16 * clampUnit(environment.supply, 1)
+  // NOXIA-LIVING-0010: without a proper place to sleep, rest restores less.
+  if (action === 'rest' && needCode === 'rest') return 0.12 * (0.4 + 0.6 * clampUnit(environment.shelter, 1))
   return baseNeedDelta(action, needCode)
 }
 
@@ -68,7 +72,9 @@ export function passiveNeedDrift(needCode: string, environment: NeedEnvironment 
   }
   if (needCode === 'safety') {
     const supply = clampUnit(environment.supply, 1)
-    return supply < 0.5 ? -0.04 * (0.5 - supply) : 0
+    const shelter = clampUnit(environment.shelter, 1)
+    // A badly supplied settlement feels unsafe, and so does having nowhere to live.
+    return (supply < 0.5 ? -0.04 * (0.5 - supply) : 0) + (shelter < 0.5 ? -0.03 * (0.5 - shelter) : 0)
   }
   return 0
 }

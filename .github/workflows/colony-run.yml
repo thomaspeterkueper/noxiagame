@@ -9,6 +9,10 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/housing.ts'
+      - 'lib/game/population/employment.ts'
+      - 'lib/game/population/access.ts'
+      - 'lib/game/population/housingMarket.test.ts'
       - 'lib/game/population/spielraum.ts'
       - 'lib/game/population/spielraum.test.ts'
       - 'lib/game/population/socialFriction.ts'
@@ -29,6 +33,10 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/housing.ts'
+      - 'lib/game/population/employment.ts'
+      - 'lib/game/population/access.ts'
+      - 'lib/game/population/housingMarket.test.ts'
       - 'lib/game/population/spielraum.ts'
       - 'lib/game/population/spielraum.test.ts'
       - 'lib/game/population/socialFriction.ts'
@@ -63,6 +71,10 @@ jobs:
         run: |
           npx --yes --package typescript@5 tsc lib/game/population/spielraum.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .spielraum-test
           node .spielraum-test/game/population/spielraum.test.js
+      - name: Housing, employment and access
+        run: |
+          npx --yes --package typescript@5 tsc lib/game/population/housingMarket.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .housing-market-test
+          node .housing-market-test/game/population/housingMarket.test.js
       - name: Test
         run: node .colony-run/research/colony/colonyRun.test.js
       - name: One simulated year
