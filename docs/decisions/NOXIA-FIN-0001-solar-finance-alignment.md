@@ -80,3 +80,9 @@ Der Forschungslauf weist nun zusätzlich eine Geldmengenbilanz aus:
 Damit wird eine neue implizite Emission sichtbar: Der bisherige Forschungsmarkt zahlt beim Rückverkauf eines Hauses 90 % an die Person, ohne ein Gegenkonto zu belasten. Der Mechanismus bleibt vorerst unverändert, wird aber nicht mehr als neutraler Transfer missverstanden.
 
 Die geplante Steuer-Gegenbuchung ist damit nachgelagert: Sie muss als echter Fiskaltransfer `Koloniekasse -> öffentlicher Arbeitgeber` die Nullsummen-Invariante erfüllen und darf keine zusätzliche Geldmenge erzeugen.
+
+## Steuer-Gegenbuchung (2026-10-08)
+
+Migration `20261008210000_public_funding_fiscal_transfer.sql`: `sync_employer_economy` bucht die Finanzierung öffentlicher Arbeitgeber als Fiskaltransfer. Jeder neuen Gutschrift im `npc_ledger` (Referenz `colony_ledger:<id>`) steht im selben Statement eine gleich hohe Belastung der Koloniekasse gegenüber (`entry_type = 'public_service_transfer'`). Eine Wiederholung bucht keine Seite erneut. Gegen G1 geprüft in `financeSemantics.test.ts`. Die Migration ist gegen keine Datenbank gelaufen.
+
+Offen: `lib/game/tick.ts` bucht `building_payout` als Belastung der Koloniekasse und schreibt den Betrag dem Spielerprofil gut. Diese Ausschüttung hat keine Einnahme als Gegenstück; die Koloniekasse wird dadurch negativ. Nach G1 ist das eine Emission, die als solche ausgewiesen oder aus echten Einnahmen gedeckt werden muss.
