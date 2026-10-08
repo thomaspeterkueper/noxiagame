@@ -26,6 +26,9 @@ import { persistPopulationEncounters } from './population/encounterRuntime'
 import { runSocialLifeTick } from './population/socialLife'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick } from './npcEconomy'
 
+/** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
+const LEGACY_BUILDING_PAYOUT_ENABLED = process.env.NOXIA_LEGACY_BUILDING_PAYOUT === 'true'
+
 export const TICK_INTERVAL_SECONDS = 3600
 export const TICK_MAX_CATCHUP      = 48
 
@@ -229,7 +232,11 @@ export async function runPopulationTick(
       .update({ population: newPop, population_max: popMax, is_supplied: isSupplied })
       .eq('id', loc.id)
 
-    if ((buildings ?? []).length > 0) {
+    // NOXIA-FIN-0001: Die automatische Gebäudeausschüttung schrieb Spielern einen
+    // berechneten Betrag gut, den niemand bezahlt hat – eine versteckte Emission.
+    // Sie ist abgeschaltet. Erlöse entstehen nur noch aus echten Zahlungen (Miete,
+    // Verkauf, öffentliches Budget). Die Produktion der Gebäude bleibt unberührt.
+    if (LEGACY_BUILDING_PAYOUT_ENABLED && (buildings ?? []).length > 0) {
       const { data: settings } = await supabase
         .from('colony_settings')
         .select('tax_transaction')
