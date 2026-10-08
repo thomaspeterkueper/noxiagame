@@ -41,6 +41,9 @@ check((caregiverSocial?.familiarity ?? 0) > (visitorSocial?.familiarity ?? 0), '
 check((caregiverSocial?.soothingExpectation ?? 0) > (visitorSocial?.soothingExpectation ?? 0), 'caregiver gains stronger learned soothing expectation')
 check((caregiverSocial?.safetyAssociation ?? 0) > (visitorSocial?.safetyAssociation ?? 0), 'caregiver becomes more strongly associated with safety')
 check((caregiverSocial?.approachPreference ?? 0) > (visitorSocial?.approachPreference ?? 0), 'social preference emerges from co-regulation history')
+check(end.expectationProbe.events.some(event => event.kind === 'expected_source_absent' && event.sourceRef === 'person:caregiver'), 'missing caregiver during distress produces learned expectation violation')
+check(end.expectationProbe.activeSearch?.targetRef === 'person:caregiver', 'one-month-old actively orients toward missing preferred regulation source')
+check(end.expectationProbe.activeSearch?.mode === 'orient', 'one-month-old social search remains developmentally non-locomotor')
 
 if (failures) throw new Error(String(failures) + ' newborn early-life simulation test(s) failed')
 console.log(JSON.stringify({
@@ -52,6 +55,10 @@ console.log(JSON.stringify({
     memories: end.memories,
     dreamAssociations: end.dreamAssociations,
     distress: Number(end.distress.toFixed(3)),
+  },
+  expectationProbe: {
+    events: end.expectationProbe.events.map(event => ({ kind: event.kind, source: event.sourceRef, surprise: Number(event.surprise.toFixed(3)) })),
+    activeSearch: end.expectationProbe.activeSearch,
   },
   socialAssociations: end.socialAssociations.map(source => ({
     source: source.sourceRef,
