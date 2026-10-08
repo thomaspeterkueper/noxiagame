@@ -8,6 +8,7 @@ import type { PersonExpressiveState } from './personSensoryField'
 import { learnSensoryPatterns, type SensoryPattern, type SensoryPatternState } from './sensoryPatternLearning'
 import { recombineDuringDream } from './dreamRecombination'
 import { updateEarlySocialLearning, type EarlySocialLearningState, type SocialSourceAssociation } from './earlySocialLearning'
+import { activeSocialSearch, evaluateSocialExpectations, type ActiveSocialSearch, type SocialExpectationEvent } from './socialExpectation'
 
 export interface EarlyLifeSnapshot {
   day: number
@@ -18,6 +19,10 @@ export interface EarlyLifeSnapshot {
   dreamAssociations: number
   socialAssociations: SocialSourceAssociation[]
   distress: number
+  expectationProbe: {
+    events: SocialExpectationEvent[]
+    activeSearch: ActiveSocialSearch | null
+  }
 }
 
 export interface EarlyLifeResult {
@@ -188,6 +193,26 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
 
     const completedDay = day + 1
     if (checkpoints.has(completedDay)) {
+      const probeVisitorReception = {
+        stimulusId: 'probe:visitor:' + completedDay,
+        observerId: childId,
+        sourceRef: 'person:visitor',
+        modality: 'visual' as const,
+        receivedIntensity: 0.5,
+        clarity: 0.8,
+        novelty: 0.5,
+        features: { sourceClass: 'person_presence' },
+        atTick: completedDay * 24,
+        provenanceRefs: [],
+      }
+      const expectationEvents = evaluateSocialExpectations({
+        state: socialLearningState,
+        receptions: [probeVisitorReception],
+        distressed: true,
+        ageDays: completedDay,
+      })
+      const search = activeSocialSearch(expectationEvents, completedDay)
+
       snapshots.push({
         day: completedDay,
         totalReceptions,
@@ -197,6 +222,10 @@ export function simulateNewbornEarlyLife(days: number): EarlyLifeResult {
         dreamAssociations,
         socialAssociations: socialLearningState.sources.map(source => ({ ...source })),
         distress,
+        expectationProbe: {
+          events: expectationEvents,
+          activeSearch: search,
+        },
       })
     }
   }
