@@ -137,7 +137,7 @@ export async function exportLiveColonyMarket(supabase: SupabaseLike): Promise<Li
   const tileIds = occupancy.map((row) => row.tile_entity_id).filter(Boolean)
   let tileRows: any[] = []
   if (tileIds.length) {
-    const q = await supabase.from('tile_entities').select('id,actor_id,profile_id,asking_price').in('id', tileIds)
+    const q = await supabase.from('tile_entities').select('id,actor_id,profile_id,asking_price,lease_price').in('id', tileIds)
     tileRows = required<any[]>(q.data ?? [], q.error, 'tile_entities')
   }
   const tileById = new Map(tileRows.map((row) => [row.id, row]))
@@ -155,9 +155,15 @@ export async function exportLiveColonyMarket(supabase: SupabaseLike): Promise<Li
       ?? tile.actor_id
       ?? (tile.profile_id ? profileActor.get(tile.profile_id) : null)
       ?? (stateOwned ? `state:${row.location_id}` : `landlord:${row.tile_entity_id}`)
-    const explicitRent = tenantRows.map((entry) => entry.rent_per_billing).find((value) => value != null)
+    const marketRent = tenantRows
+      .filter((entry) => entry.origin === 'market' && entry.status === 'active')
+      .map((entry) => entry.rent_per_billing)
+      .find((value) => value != null)
     const askingPrice = tile.asking_price == null ? null : asNumber(tile.asking_price)
-    const rent = stateOwned ? 0 : explicitRent == null ? null : asNumber(explicitRent)
+    const leasePrice = tile.lease_price == null ? null : asNumber(tile.lease_price)
+    // Existing backfill rent terms never define a market offer. A live market
+    // tenancy may carry its agreed rent; otherwise lease_price is the offer.
+    const rent = stateOwned ? 0 : marketRent == null ? leasePrice : asNumber(marketRent)
     if (!stateOwned && rent != null) marketRentalsWithTerms += 1
     if (!stateOwned && rent == null && askingPrice == null) privateHousingWithoutTerms += 1
 
