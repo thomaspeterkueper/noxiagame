@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "updatedOn": "2026-10-08",
+  "policy": "docs/decisions/ADR-experimental-features-lifecycle.md",
+  "notes": "Inventory is a governance record, not a runtime switch. Unverified entries are not assertions about production status. No automatic activation.",
+  "features": [
+    {
+      "id": "mars-atmospheric-cloud-events",
+      "domain": "mars",
+      "title": "Mars atmospheric cloud event screening",
+      "stage": "implemented-inactive",
+      "verification": "repository-code-reviewed",
+      "runtimeState": "default-off-via-wrapper; deployment not independently audited",
+      "entrypoints": ["lib/game/mars/cloudEvents.ts", "lib/game/mars/cloudRuntime.ts"],
+      "tests": ["lib/game/mars/cloudEvents.test.ts", "lib/game/mars/cloudRuntime.test.ts"],
+      "testsExecuted": false,
+      "activation": "explicit flags.enabled === true; experimental homogeneous mechanism separately opt-in",
+      "dependencies": ["calibrated observations", "environment inputs", "terrain availability", "core tick integration review"],
+      "cost": "unmeasured; no recurring work scheduled by this module",
+      "nextGate": "run unit tests, calibrate thresholds, audit consumer calls, benchmark isolated scenarios",
+      "rollback": "keep runtime gate false; do not wire into tick or rendering",
+      "evidence": ["docs/research/mars-atmosphere-amec-event-model-2026-10-08.md"]
+    },
+    {
+      "id": "npc-cognition-advanced",
+      "domain": "population",
+      "title": "Advanced cognition and research",
+      "stage": "audit-required",
+      "verification": "source-modules-reviewed-only",
+      "runtimeState": "unknown; existing cognition may already be active",
+      "entrypoints": ["lib/game/personBrain.ts", "lib/game/cognition/runtime.ts"],
+      "testsExecuted": null,
+      "nextGate": "trace call sites and live behavior before classifying experimental extensions"
+    },
+    {
+      "id": "npc-sleep-and-dreams",
+      "domain": "population",
+      "title": "Sleep, dreams and offline cognition",
+      "stage": "audit-required",
+      "verification": "sleep logic confirmed; dream runtime not audited",
+      "runtimeState": "unknown; do not disable existing sleep",
+      "entrypoints": ["lib/game/personBrain.ts"],
+      "testsExecuted": null,
+      "nextGate": "separate current sleep behavior from prospective dream consolidation experiments"
+    },
+    {
+      "id": "npc-affect-senses-social",
+      "domain": "population",
+      "title": "Affect, sensory perception and social processes",
+      "stage": "audit-required",
+      "verification": "affect-related imports in population engine confirmed",
+      "runtimeState": "unknown; may be live",
+      "entrypoints": ["lib/game/population/engine.ts"],
+      "testsExecuted": null,
+      "nextGate": "audit live data flows, migrations and NPC impacts"
+    },
+    {
+      "id": "npc-economy-experiments",
+      "domain": "economy",
+      "title": "Additional NPC economic and market simulations",
+      "stage": "audit-required",
+      "verification": "existing production-linked economy routines confirmed in source",
+      "runtimeState": "potentially active; do not gate wholesale",
+      "entrypoints": ["lib/game/npcEconomy.ts"],
+      "testsExecuted": null,
+      "nextGate": "identify experimental extensions separately from live payroll, transfers and property logic"
+    },
+    {
+      "id": "npc-beliefs-culture",
+      "domain": "population",
+      "title": "Beliefs, religion and cultural transmission extensions",
+      "stage": "candidate-unverified",
+      "verification": "conceptual candidate, implementation not audited",
+      "runtimeState": "unknown",
+      "testsExecuted": null,
+      "nextGate": "locate implementation and split live behavior from future experimental components"
+    },
+    {
+      "id": "robotics-and-mini-nodes",
+      "domain": "technology",
+      "title": "Advanced robotics and MiniNodes",
+      "stage": "candidate-unverified",
+      "verification": "conceptual candidate, implementation not audited",
+      "runtimeState": "unknown",
+      "testsExecuted": null,
+      "nextGate": "inventory technology, vehicle, research and build dependencies"
+    },
+    {
+      "id": "x-technology",
+      "domain": "technology",
+      "title": "Experimental X-technology physics and travel",
+      "stage": "candidate-unverified",
+      "verification": "conceptual candidate, implementation not audited",
+      "runtimeState": "unknown",
+      "testsExecuted": null,
+      "nextGate": "separate narrative canon, research assumptions and simulation rules"
+    }
+  ]
+}
