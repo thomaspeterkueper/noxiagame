@@ -36,6 +36,8 @@ export interface PopulationDecisionContext {
   /** Optionale deterministische Reisekosten 0..1 je Zieltyp. */
   travelCostHome?: number
   travelCostWork?: number
+  /** NOXIA-LIVING-0007. 0..1 Schlafdruck aus dem Tagesrhythmus; 1 = im Schlaffenster. */
+  sleepDrive?: number
   /** NOXIA-LIVING-0006. Bereits auf den aktuellen Tick abgeklungener Affektzustand. */
   affect?: AffectState
 }
@@ -63,6 +65,21 @@ const NEED_WEIGHT: Record<string, number> = {
   safety: 1.35,
   social: 0.7,
   purpose: 0.6,
+}
+
+/** Bedürfnisdruck, ab dem eine schlafende Person aufwacht. */
+const WAKE_SUSTENANCE_PRESSURE = 0.75
+const WAKE_SAFETY_PRESSURE = 0.5
+
+const SLEEP_DRIVE_WEIGHT: Partial<Record<PopulationAction, number>> = {
+  rest: 0.9,
+  satisfy_basic_need: -0.9,
+  report_problem: -0.9,
+  travel_home: 0.5,
+  work: -0.9,
+  travel_work: -0.9,
+  inspect_problem: -0.9,
+  social_interaction: -0.9,
 }
 
 function roundScore(value: number): number {
@@ -219,13 +236,27 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
 
   // NOXIA-LIVING-0006: Affekt verschiebt verfügbare Handlungen, schaltet aber keine frei.
   const modifiers = context.affect ? affectActionModifiers(context.affect) : null
+  // NOXIA-LIVING-0007: Schlafdruck zieht zur Ruhe und weg von Aktivität.
+  // Nur ein Notfall weckt: starker Hunger oder Gefahr. Dann entfällt der Schlafbonus,
+  // und das Grundbedürfnis setzt sich mit seinem normalen Score durch.
+  const sleepDrive = clampUnit(context.sleepDrive ?? 0)
+  const wakeEmergency = sustenancePressure >= WAKE_SUSTENANCE_PRESSURE || safetyPressure >= WAKE_SAFETY_PRESSURE
 
   return result.map((entry) => {
-    const affectModifier = modifiers && entry.score > -1 ? modifiers[entry.action] ?? 0 : 0
+    const available = entry.score > -1
+    const affectModifier = modifiers && available ? modifiers[entry.action] ?? 0 : 0
+    const sleepWeight = wakeEmergency
+      ? (entry.action === 'rest' || entry.action === 'satisfy_basic_need' ? 0 : SLEEP_DRIVE_WEIGHT[entry.action] ?? 0)
+      : SLEEP_DRIVE_WEIGHT[entry.action] ?? 0
+    const sleepModifier = sleepDrive > 0 && available ? sleepDrive * sleepWeight : 0
     return {
       ...entry,
-      score: roundScore(entry.score + affectModifier),
-      factors: modifiers ? { ...entry.factors, affectModifier } : entry.factors,
+      score: roundScore(entry.score + affectModifier + sleepModifier),
+      factors: {
+        ...entry.factors,
+        ...(modifiers ? { affectModifier } : {}),
+        ...(sleepDrive > 0 ? { sleepDrive, wakeEmergency, asleep: entry.action === 'rest' && sleepDrive >= 1 && !wakeEmergency } : {}),
+      },
     }
   })
 }

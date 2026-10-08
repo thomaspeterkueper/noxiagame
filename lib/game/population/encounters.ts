@@ -19,6 +19,19 @@ export interface PopulationEncounter {
   eventB: PopulationEvent
 }
 
+/**
+ * NOXIA-LIVING-0007: meeting the same person again within this many ticks is a
+ * continuation, not a new encounter. Without it every meal or short rest broke
+ * co-location and produced a fresh memory with every colleague on return.
+ */
+export const ENCOUNTER_COOLDOWN_TICKS = 12
+
+/** `lastInteractionTick` is the directed relationship's last recorded encounter. */
+export function isFreshEncounter(lastInteractionTick: number | null | undefined, tick: number): boolean {
+  if (lastInteractionTick == null) return true
+  return tick - lastInteractionTick >= ENCOUNTER_COOLDOWN_TICKS
+}
+
 function pair(a: string, b: string): [string, string] {
   return a.localeCompare(b) <= 0 ? [a, b] : [b, a]
 }

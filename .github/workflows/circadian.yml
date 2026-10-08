@@ -1,0 +1,35 @@
+name: Circadian rhythm
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/circadian.ts'
+      - 'lib/game/population/circadian.test.ts'
+      - 'lib/game/population/decision.ts'
+      - 'lib/game/population/presence.ts'
+      - 'lib/game/population/encounters.ts'
+      - 'lib/game/personBrain.ts'
+      - '.github/workflows/circadian.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/population/circadian.ts'
+      - 'lib/game/population/circadian.test.ts'
+      - 'lib/game/population/decision.ts'
+      - 'lib/game/population/presence.ts'
+      - 'lib/game/population/encounters.ts'
+      - 'lib/game/personBrain.ts'
+
+jobs:
+  deterministic-day-rhythm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The test has no runtime dependencies, so it only needs the compiler.
+      - name: Compile circadian test
+        run: npx --yes --package typescript@5 tsc lib/game/population/circadian.ts lib/game/population/circadian.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .circadian-test
+      - name: Run circadian test
+        run: node .circadian-test/game/population/circadian.test.js

@@ -4,6 +4,17 @@
 // Simulation truth is deterministic and auditable. No random or LLM decisions.
 
 import { creativityFromTraits, selectCognitiveState, type CognitiveState } from './personCognition'
+import { circadianProfile, circadianState } from './population/circadian'
+
+/** A named lead stays up for a colony pressure at or above this severity. */
+const NIGHT_DUTY_PRESSURE = 0.7
+
+/** NOXIA-LIVING-0007: named persons sleep through their night unless the colony needs them. */
+export function namedPersonSleeps(input: { personId: string; traits?: Record<string, unknown> | null; tick: number; pressures: ColonyPressure[]; sustenance?: number }): boolean {
+  if (!circadianState(input.tick, circadianProfile(input.personId, input.traits)).inSleepWindow) return false
+  if (typeof input.sustenance === 'number' && input.sustenance < 0.25) return false
+  return !input.pressures.some((p) => Number(p.severity) >= NIGHT_DUTY_PRESSURE)
+}
 
 export type PersonActivity = 'idle' | 'travelling' | 'working' | 'resting' | 'socialising' | 'inspecting'
 export interface PersonNeedState { sustenance?: number; rest?: number; safety?: number; social?: number; purpose?: number }
@@ -164,7 +175,7 @@ export async function runPersonTick(supabase: any, tick: number, pressuresByLoca
       const skills: PersonSkillState = {}
       for (const s of skillsRows) skills[s.skill_code] = Number(s.level)
       const memoryAttention = memoryAttentionSignal(consolidatedByPerson.get(person.id) ?? [])
-      const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick, cognitive: { sleeping: person.activity_state === 'resting' && Number(needs.rest ?? 1) < 0.85, stimulus: { emotionalSalience: memoryAttention.salience * 0.35, uncertainty: memoryAttention.uncertainty * 0.25 } } })
+      const decision = decidePerson({ person: { id: person.id, personKey: person.person_key, publicRole: person.public_role, roleCode: work?.role_code ?? null, traits: person.traits ?? {}, currentActivity: person.activity_state as PersonActivity }, needs, skills, pressures: pressuresByLocation.get(person.current_location_id) ?? [], tick, cognitive: { sleeping: namedPersonSleeps({ personId: person.id, traits: person.traits ?? {}, tick, pressures: pressuresByLocation.get(person.current_location_id) ?? [], sustenance: needs.sustenance }) || (person.activity_state === 'resting' && Number(needs.rest ?? 1) < 0.85), stimulus: { emotionalSalience: memoryAttention.salience * 0.35, uncertainty: memoryAttention.uncertainty * 0.25 } } })
       await supabase.from('people').update({ activity_state: decision.activity, last_action: decision.actionCode, last_decision_factors: decision.factors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
       const runtimeState = decision.cognitiveState ?? selectCognitiveState({ sleeping: false, creativity: creativityFromTraits(person.traits ?? {}), stimulus: {} })
       await supabase.from('person_cognitive_state').upsert({ person_id: person.id, mode: runtimeState.mode, compute_tier: runtimeState.computeTier, trigger_score: runtimeState.triggerScore, updated_tick: tick, updated_at: new Date().toISOString() }, { onConflict: 'person_id' })

@@ -5,12 +5,13 @@
 import { decidePopulationAction as decideFromState, type PopulationDecisionContext } from './decision'
 import { actionIntentForDecision } from './actionIntent'
 import { executePopulationActionIntent } from './personActionExecutor'
-import { derivePopulationEncounters, type PopulationEncounter } from './encounters'
+import { derivePopulationEncounters, isFreshEncounter, type PopulationEncounter } from './encounters'
 import { projectEncounterRelationship } from './encounterProjection'
 import { resolvedPresenceCandidates } from './presence'
 import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
 import { persistObservableKnowledge } from './observableKnowledge'
 import { projectInteriorPresence } from './interiorPresence'
+import { circadianProfile, circadianState } from './circadian'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
@@ -128,6 +129,7 @@ async function decideBackgroundPerson(
     supabase.from('person_relationships').select('*').eq('person_id', person.id),
     supabase.from('person_knowledge').select('*').eq('person_id', person.id),
   ])
+  const circadian = circadianState(tick, circadianProfile(person.id, person.traits ?? null))
   const knowledge = (knowledgeRows ?? []).map((r: any) => ({ id: r.id, personId: person.id, subjectType: r.subject_type, subjectRef: r.subject_ref, knowledgeType: r.knowledge_type, confidence: Number(r.confidence), learnedTick: Number(r.learned_tick), sourceEventId: r.source_event_id ?? null, details: r.details ?? {} }))
   const context: PopulationDecisionContext = {
     person: personFromRow(person),
@@ -143,7 +145,9 @@ async function decideBackgroundPerson(
     relationships: (relationRows ?? []).map(relationshipFromRow),
     knowledge,
     localProblems: knowledge.filter((k: any) => k.knowledgeType === 'observed_failure' || k.knowledgeType === 'known_problem').map((k: any) => ({ subjectType: k.subjectType, subjectRef: k.subjectRef, severity: Number(k.details?.severity ?? k.confidence), requiredSkill: k.details?.requiredSkill ?? null, reportable: k.details?.reportable !== false })),
-    workObligation: (assignmentRows ?? []).some((r: any) => r.assignment_type === 'work') ? (Math.abs(tick) % 4 === 3 ? 0.35 : 0.85) : 0,
+    // NOXIA-LIVING-0007: work follows the person's day rhythm instead of a four-tick cycle.
+    workObligation: (assignmentRows ?? []).some((r: any) => r.assignment_type === 'work') ? circadian.workObligation : 0,
+    sleepDrive: circadian.sleepDrive,
     travelCostHome: 0.1,
     travelCostWork: 0.1,
     affect: affectForDecision(affectSnapshot, person.id, tick, person.traits ?? null),
@@ -159,6 +163,19 @@ interface EncounterAffectContext {
 async function persistEncounterDirection(supabase: SupabaseLike, event: PopulationEvent, affectContext: EncounterAffectContext): Promise<boolean> {
   if (!event.actorPersonId || !event.relatedPersonId) return false
   let persistedEvent: PopulationEvent | null = null
+
+  // NOXIA-LIVING-0007: a reunion within the cooldown is not a new encounter.
+  // Checked before anything is written, so it leaves no event, memory or affect.
+  const { data: recentRelationship, error: recentError } = await supabase
+    .from('person_relationships')
+    .select('last_interaction_tick')
+    .eq('person_id', event.actorPersonId)
+    .eq('other_person_id', event.relatedPersonId)
+    .maybeSingle()
+  if (recentError) throw recentError
+  const lastInteractionTick = recentRelationship?.last_interaction_tick == null ? null : Number(recentRelationship.last_interaction_tick)
+  // An interaction recorded for this very tick is a replay and falls through to the guards below.
+  if (lastInteractionTick !== event.tick && !isFreshEncounter(lastInteractionTick, event.tick)) return false
 
   const { data: existingEvents, error: eventLookupError } = await supabase
     .from('population_events')
@@ -313,7 +330,9 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
 
     const nextActivity = activityForAction(decision.action)
-    const lastAction = execution.executed && execution.kind === 'social_visit' ? 'visit:social' : decision.action
+    const lastAction = decision.factors.asleep === true
+      ? 'sleep'
+      : execution.executed && execution.kind === 'social_visit' ? 'visit:social' : decision.action
     const decisionFactors = {
       ...decision.factors,
       score: decision.score,

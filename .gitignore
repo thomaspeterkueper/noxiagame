@@ -47,5 +47,6 @@ next-env.d.ts
 # domain test compile output
 /.ssf-test
 /.npc-affect-test
+/.circadian-test
 
 .vercel

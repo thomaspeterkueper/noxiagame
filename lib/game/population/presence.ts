@@ -1,5 +1,6 @@
 import type { Person, PersonAssignment } from './types'
 import type { EncounterCandidate } from './encounters'
+import { isAsleepAction } from './circadian'
 
 function activeAtLocation(person: Person, assignment: PersonAssignment): boolean {
   return assignment.isActive && assignment.locationId === person.currentLocationId && Boolean(assignment.tileEntityId)
@@ -36,6 +37,8 @@ export function resolvedPresenceCandidate(
   assignments: readonly PersonAssignment[],
 ): EncounterCandidate | null {
   if (person.activityState === 'travelling') return null
+  // NOXIA-LIVING-0007: a sleeping person is present but does not meet anyone.
+  if (isAsleepAction(person.lastAction)) return null
 
   const resolved = assignments
     .filter(assignment => activeAtLocation(person, assignment))
