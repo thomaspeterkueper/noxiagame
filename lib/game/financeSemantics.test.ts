@@ -27,6 +27,18 @@ const mirroredTax: MoneyTransaction = {
 check(!validateMoneyTransaction(mirroredTax).ok, 'crediting tax twice without a debit violates the fiscal invariant')
 check(validateMoneyTransaction(mirroredTax).errors.includes('non_zero_sum_transfer'), 'double-counted tax is detected explicitly')
 
+// Migration 20261008210000: colony treasury debited, public employer credited, same reference.
+const publicFunding: MoneyTransaction = {
+  id: 'colony_ledger:42',
+  operation: 'fiscal',
+  reference: 'colony_ledger:42',
+  postings: [
+    { accountId: 'colony', amount: -10, accountClass: 'public' },
+    { accountId: 'public-employer', amount: 10, accountClass: 'public' },
+  ],
+}
+check(validateMoneyTransaction(publicFunding).ok && liquidMoneyDelta(publicFunding) === 0, 'public funding is a zero-sum fiscal transfer from the colony treasury')
+
 const bootstrap: MoneyTransaction = {
   id: 'bootstrap:person:p1',
   operation: 'emission',
