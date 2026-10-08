@@ -323,6 +323,41 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // A confirmed player utterance is testimony, not verified world knowledge.
+      // Only project it after the existing conversation memory successfully writes.
+      // No LLM call, no extra schema, no diffusion from mere co-location.
+      if (!memoryError && canonicalNpc?.id) {
+        const { data: knowledgeTick, error: tickError } = await serviceClient
+          .from('tick_log')
+          .select('tick_number')
+          .order('tick_number', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const tick = Number(knowledgeTick?.tick_number)
+        if (!tickError && knowledgeTick && Number.isSafeInteger(tick) && tick >= 0) {
+          const { error: testimonyError } = await serviceClient
+            .from('person_epistemic_traces')
+            .upsert({
+              id: 'npc-player-utterance:' + npcId + ':' + user.id + ':' + now.toISOString(),
+              person_id: npcId,
+              subject_ref: 'player:' + user.id,
+              attribute: 'said',
+              value: { text: player },
+              source_type: 'person',
+              source_ref: user.id,
+              modality: 'reported',
+              provenance_refs: ['npc_player_conversation_memory:' + npcId + ':' + user.id],
+              confidence: 1,
+              salience: 0.3,
+              observed_tick: tick,
+              trace_kind: 'hearsay',
+            }, { onConflict: 'id', ignoreDuplicates: true })
+          if (testimonyError) console.error('npc player testimony trace write failed', {
+            npcId, code: testimonyError.code,
+          })
+        }
+      }
+
       if (canonicalNpc?.display_name && identityState !== 'known') {
         const normalizedReply = reply.toLocaleLowerCase('de-DE')
         const normalizedName = String(canonicalNpc.display_name).toLocaleLowerCase('de-DE')
