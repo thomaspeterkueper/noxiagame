@@ -426,6 +426,14 @@ export function createMarket(setup: MarketSetup, host: MarketHost) {
 
     openPlaces,
 
+    materialMeans(personId: string): { wealth: number; dailyIncome: number; essentialDailyCost: number } {
+      const person = personById.get(personId)
+      if (!person) return { wealth: 0, dailyIncome: 0, essentialDailyCost: livingCost }
+      const job = person.jobId ? jobById.get(person.jobId) : undefined
+      const dailyIncome = job && person.unpaidDays === 0 ? job.dailyWage : 0
+      return { wealth: person.wealth, dailyIncome, essentialDailyCost: livingCost }
+    },
+
     closeDay(day: number, tick: number): void {
       const open = persons.map((person) => openPlaces(person.id, tick))
       const rented = persons.filter((person) => person.tenure === 'rented').map((person) => dwellingById.get(person.dwellingId!)?.rent ?? 0)
