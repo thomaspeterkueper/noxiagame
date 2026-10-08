@@ -40,3 +40,12 @@ Messgrößen: (a) Herkunftskette rekonstruierbar, (b) Wissen ohne tatsächlichen
 ## Produktpositionierung
 
 Der öffentlich sichtbare Produktname ist **noχ¹ᐃ**. Forschungsziel: eine persistente Gesellschaftssimulation, in der Ereignisse unabhängig von ihrem späteren historischen Bild stattfinden und NPCs Kultur, Glaube, Tradition und Wissen durch tatsächliche Erlebnisse und Weitergabe entwickeln. **Nicht als bereits vollständig implementierte Funktion behaupten.** Einzigartigkeit gegenüber anderen Spielen benötigt Vergleich und Benchmark; vorläufig als Differenzierungshypothese kommunizieren.
+
+
+## Betriebsentscheidung 2026-10-08 — sensibler Gesprächsinhalt
+
+Der Gesprächsendpunkt kann Aussagen des Spielers als epistemische Spuren projizieren. **Diese zusätzliche Erfassung ist standardmäßig deaktiviert** und verlangt sowohl die serverseitige Freigabe `NOXIA_TESTIMONY_CAPTURE_ENABLED=true` als auch das explizite Feld `allowTestimonyMemory: true` im jeweiligen Request. Das Feld ist bislang nicht als geprüfter, persistenter Nutzer-Einwilligungsdialog implementiert und ist **keine ausreichende Rechtsgrundlage** für Live-Erfassung. Daher Flag aus lassen, bis Opt-in-UI, nachweisbare Einwilligung, Widerruf, Löschung, Speicherlimit und Replay-Idempotenz eingebaut und geprüft sind.
+
+Die bestehende `npc_player_conversation_memory` speichert bereits Dialoge unabhängig von der neuen Funktion; diese Sicherheitsentscheidung gilt nur für die zusätzliche epistemische Projektion. Die volle Datenschutzbewertung muss beide Speicherpfade umfassen.
+
+Offene Risiken: zeitstempelbasierte Trace-IDs verhindern Duplikate bei Request-Retries nicht zuverlässig; das neue Trace-Schema erlaubt unbegrenztes Wachstum ohne Retention; die subjektive Erinnerung ist noch nicht in den NPC-zu-NPC-Dialogfluss integriert. Alle drei vor produktiver Aktivierung beheben.
