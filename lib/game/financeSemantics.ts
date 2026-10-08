@@ -159,3 +159,45 @@ export function transferTransaction(input: {
     ],
   }
 }
+
+
+export interface TaxedTransfer {
+  gross: number
+  tax: number
+  net: number
+  transaction: MoneyTransaction
+}
+
+/**
+ * One payer, one recipient, one public till. The tax is carved out of the
+ * gross payment; it is not added on top and therefore cannot create money.
+ */
+export function taxedTransfer(input: {
+  id: string
+  payer: string
+  recipient: string
+  publicAccount: string
+  gross: number
+  taxRate: number
+  reference?: string
+}): TaxedTransfer {
+  const gross = Math.max(0, Math.round(Number(input.gross || 0)))
+  const rate = Math.max(0, Math.min(1, Number(input.taxRate || 0)))
+  const tax = Math.min(gross, Math.round(gross * rate))
+  const net = gross - tax
+  return {
+    gross,
+    tax,
+    net,
+    transaction: {
+      id: input.id,
+      operation: 'fiscal',
+      reference: input.reference,
+      postings: [
+        { accountId: input.payer, amount: -gross },
+        { accountId: input.recipient, amount: net },
+        { accountId: input.publicAccount, amount: tax },
+      ],
+    },
+  }
+}
