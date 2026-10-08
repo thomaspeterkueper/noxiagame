@@ -1,0 +1,65 @@
+# NOXIA-FIN-0001 — Abgleich solarer Finanzkanon und lokale Simulation
+
+Status: Architekturabgleich / Konzept, NICHT für Live-Aktivierung
+Datum: 2026-10-08
+Quellen: OTA-FND-0008-2025-DE (Solares Finanzsystem), OTA-TEC-0023-2091-DE (Mars Credit), OTA-TEC-0024-2150-DE (relativistische Finanzmetriken).
+Code-Bestand: docs/core/RESOURCE_INVENTORY_ECONOMY_MAP.md, docs/decisions/NOXIA-LIVING-0010-housing-and-job-market.md, lib/game/npcEconomy.ts, supabase/migrations/20261008150000_employer_funding.sql.
+
+## Trennung der Ebenen
+
+1. Lokale Simulationscredits: operative Löhne, Mieten, Konsum, Steuern, Eigentümer-Einlagen; keine vorschnelle Benennung als MCR.
+2. Historisch/fiktionaler Mars Credit (MCR): eigenständiges Mars Financial Network, Einführung 2075/2082, Settlement zur Erde; zeitgebunden.
+3. Solar Clearing Unit (SCU-1): überplanetares Clearing, keine örtliche Alltagswährung.
+4. Entropy Credit / relativistische Metriken: spekulative spätere Stufe; keine Produktionsregel aus physikalischer Behauptung ableiten.
+
+Ein Simulation-Credit ist NICHT ohne explizite Epoch-/Standort-/Wechselkursentscheidung ein Mars Credit oder SCU-1. Der physikalische Entropie-Anker ist fiktionale/spekulative Designannahme, kein bewiesenes finanzphysikalisches Gesetz.
+
+## Stand am 08.10.2026 (Repository, nicht als Live-DB-Migrationsbestätigung)
+
+- `npc_ledger` dient für Einnahmen, Löhne und Einlagen; `runNpcPayrollTick` führt Synchronisation, Payroll und Mieten im 24-Tick-Raster aus. `runNpcConsumptionTick` läuft alle 6 Ticks.
+- `fund_player_corp` erlaubt Eigentümer-Einlagen; Einnahmen und Einlagen sind nicht identisch mit Umsätzen.
+- Migration `20261008150000_employer_funding.sql` korrigiert Ledger-Constraint für `building_payout`/`tax_payout`, überträgt bestimmte lokale Steuereinnahmen an öffentliche Arbeitgeber und gibt einmalig 14 Tageslöhne als `endowment` aus. Vorhandensein im Repository bestätigt NICHT Anwendung in der Datenbank.
+- Bei ungenügendem Arbeitgeberkonto entfällt Lohn. Eine Übergangsreserve verhindert keinen strukturellen Liquiditätsmangel.
+- Core-Vertrag erlaubt explizite monetäre Quellen/Senken (u.a. Loans), fordert aber atomare Transfers und idempotente Buchungen. Das ist keine Bestätigung, dass alle gewünschten Kreditprodukte implementiert sind.
+
+## Geldmengen- und Buchungssemantik
+
+Unterscheide verpflichtend:
+- TRANSFER: gleich hohe Soll-/Habenbuchung zwischen Akteuren; Geldmenge unverändert.
+- FISKALISCH: Steuer als Transfer Akteur -> öffentliche Kasse; Auszahlung als Transfer öffentliche Kasse -> Empfänger. Steuern dürfen nicht zugleich Einnahme des Staates und zusätzliche Geldschöpfung sein.
+- EMISSION/ENDOWMENT: explizite neue Simulationseinheiten mit Ursache, Emittent, Epoch-Kontext, Obergrenze und Audit-Referenz.
+- KREDITVERGABE: Forderung und Verbindlichkeit gleicher Höhe; falls Depositen neu geschaffen werden, Geldmengenänderung gesondert ausweisen. Rückzahlung reduziert Forderung/Verbindlichkeit und ggf. Einlagen; Zins ist Ertragstransfer, keine automatische reale Wertschöpfung.
+- VERNICHTUNG/SINK: expliziter, auditierbarer Abfluss aus dem Geldkreislauf.
+- VERRECHNUNG (SCU-1): Austausch/Netting getrennt von lokaler Emission.
+
+Nicht allein `SUM(credit_delta)` über unterschiedlich definierte Konten als globale Geldmenge interpretieren: Kontenabgrenzung, Transfers, Quellen und Schulden vorher typisieren.
+
+## Abgleich mit Arbeitgeberproblem
+
+1. Erst feststellen, ob Migration in Live-DB tatsächlich angewendet und `colony_ledger` wieder befüllt wird.
+2. `colony_ledger -> npc_ledger` auf exakte Referenzen, Idempotenz und **Doppelzählung** prüfen. Öffentliches Arbeitgeberbudget darf bei der Spiegelung nicht zusätzliches Geld aus dem Nichts schaffen, sofern ursprünglich ein Steuertransfer vorgesehen ist.
+3. Budgetidentität öffentlich: Anfangsbestand + echte Steuereingänge + explizite Zuschüsse - Löhne - Beschaffung - sonstige Ausgaben = Endbestand.
+4. Private Firmen benötigen Verkäufe/Aufträge/Einlagen oder später echten Kredit; eine pauschale tägliche Zuschreibung wäre nur für klar ausgewiesenen Förderbetrieb sinnvoll.
+5. Einmalige Bootstrap-Endowments getrennt von normaler Geldschöpfung und wirtschaftlicher Leistung statistisch führen.
+6. Danach Forschungsläufe mit unveränderten Ausgangsdaten und alternativen nachhaltigen Einnahmequellen vergleichen.
+
+## Kreditsystem — Entwurf, nicht aktiv
+
+Kreditvertrag benötigt mindestens `lender_actor_id`, `borrower_actor_id`, `principal`, `outstanding_principal`, `annual_rate`, `opened_tick`, `due_tick`, `currency_scope`, `status`, `default_state`, `purpose`, `reference`. Dazu unveränderliche Buchungshistorie, eindeutig referenzierte Auszahlung/Tilgung/Zins und getrennte Sicherheiten.
+
+Vor jeder Einführung festlegen, ob Banken Depositen erzeugen dürfen oder nur bestehende Mittel verleihen. Beide Regime in **getrennten Forschungsläufen** testen. Keines unbemerkt als kanonisch setzen.
+
+## Aktivierungsgates
+
+G0: Dokumentiert (dieses Dokument).
+G1: Buchungssemantik und Geldmengen-Invarianten als reine Regeln + Tests.
+G2: Deterministischer Forschungslauf inkl. Insolvenzen, Zins, Tilgung und Fiskaltransfer.
+G3: Lesender Audit auf tatsächlichem Live-Bestand; keine Mutationen.
+G4: Schattenbetrieb mit Auditlog und Feature-Flag standardmäßig AUS.
+G5: Erst nach expliziter Freigabe Migration/Produktionsaktivierung.
+
+Tests mindestens: Nullsummen-Transfer, steuerliche Doppelzählung, Kredit-Doppelvergabe bei Retry, Lohn ohne Deckung, Tilgung, Zins, Ausfall, Begrenzung pro Währungsraum, Konjunktions-/Settlement-Latenz im separaten späteren Modell.
+
+## Kein vorschneller Kanonwechsel
+
+Die OTA-Dokumente bleiben Weltkanon, die heute laufende Ökonomie bleibt lokale technische Implementation. Finanzierungsmechanismen sind Hypothesen, bis durch mehrjährige Experimente validiert. Komplexe interplanetare und relativistische Verträge bleiben vorbereitet, aber deaktiviert.
