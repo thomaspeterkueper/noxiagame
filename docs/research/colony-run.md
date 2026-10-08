@@ -123,3 +123,19 @@ Mangel (120 Tage Versorgung 0,3 in einer Siedlung):
 Die Stimmung sinkt über drei Jahre auch ohne Mangel leicht (auf 0,13). Mit Mangel liegt sie am Ende bei 0,10.
 
 Die Verteilung ist in allen Läufen fast gleich: Gini 0,02 bis 0,04, niemand unter 0,35.
+
+## Wohn- und Stellenmarkt
+
+```
+npm run research:colony -- --years 3 --people 36 --settlements 3 --market --out out/markt
+npm run research:colony -- --snapshot tharsis.snapshot.json --market mein-markt.json
+```
+
+`--market` ohne Datei erzeugt einen synthetischen Markt zur Kolonie (`syntheticMarket`). Mit Datei wird ein eigener Bestand geladen: `dwellings`, `jobs`, optional `people` (Vermögen, Fähigkeiten), `employers` (Kontostand, Tageseinnahme) und `livingCost`. Jede Wohnung und jede Stelle braucht eine eindeutige `tileEntityId`, die zu den Zuweisungen im Snapshot passt.
+
+Zusätzliche Ausgaben mit `--out`:
+
+- `.market.json` – Tageswerte (Vermögen, Gini, Arbeitslose, unbezahlte Löhne, Wohnungslose, Mieten, offene Plätze), Zusammenfassung, Rangliste der Entscheider, Endstand.
+- `.access.json` – jedes einzelne Zugangsprotokoll.
+
+Ohne `--market` bleibt der Lauf unverändert. Regeln und erster Befund: `docs/decisions/NOXIA-LIVING-0010-housing-and-job-market.md`.
