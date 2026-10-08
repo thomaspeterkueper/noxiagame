@@ -65,16 +65,38 @@ Macht wird damit nicht eingebaut, sondern beobachtet: Sie zeigt sich als Asymmet
 |---|---|---|
 | 1 | Reine Regeln für Wohnen, Stellen und Zugangsprotokoll | fertig |
 | 2 | Forschungslauf: Markt mit Löhnen, Mieten, Eigentum, Hotels. Spielraum zählt nur zugängliche Plätze. Über Spieljahre beobachten | offen |
-| 3 | Live-Bestand bereinigen: Wohnungen für die sieben Leitungen, Gebäude für die zwölf ohne Gebäude, Verwaltung nicht als Wohnung. Kapazität je Wohngebäude, Hotel als Gebäudetyp, Konten und Lohn für Personen | offen, braucht Entscheidungen |
+| 3 | Live-Bestand bereinigen: Wohnungen für die sieben Leitungen, Gebäude für die zwölf ohne Gebäude, Verwaltung nicht als Wohnung. Kapazität je Wohngebäude, Hotel als Gebäudetyp, Konten und Lohn für Personen | entschieden, Migration geschrieben, noch nicht angewendet |
 | 4 | Schattenbetrieb live: Personen treffen echte Entscheidungen gegen den Live-Bestand, protokolliert werden Zusage, Ablehnung und Spielraum. Nichts wird ausgeführt | offen |
 | 5 | Atomarer Wohnungswechsel als Datenbankfunktion: Platz reservieren, alte Zuweisung beenden, neue anlegen, Mietverhältnis synchronisieren, bei Fehler alles zurück. Keine direkte Änderung von `current_location_id` | offen |
 | 6 | Stellenwechsel entsprechend | offen |
 
 Über Spieljahre lässt sich nur im Forschungslauf beobachten. Der Live-Schattenbetrieb läuft in Echtzeit und zeigt, ob die Entscheidungen auf dem echten Bestand plausibel sind.
 
-## Offene Entscheidungen für Stufe 3
+## Entscheidungen für Stufe 3 (2026-10-08)
 
-1. Wo wohnen die sieben benannten Leitungen: im vorhandenen Wohnblock eines Spielers in Tharsis, oder in einem neuen staatlichen Habitat?
-2. Bekommt Prometheus ein Habitat, oder ziehen die vier dort Arbeitenden in eine andere Siedlung?
-3. Wie viele Plätze hat ein Habitat, wie viele ein Wohnblock?
-4. Wer betreibt Hotels: der Staat, Unternehmen, Spieler?
+Leitlinie: Der Staat garantiert Existenzfähigkeit, aber nicht Gleichwertigkeit. Reihenfolge: staatliche Habitate als historische Grundversorgung, echte Kapazitäten, ökonomische Identität aller Personen, Mindestunterkunft – danach erst Markt und Macht.
+
+1. **Die sieben Tharsis-Leitungen wohnen in einem neuen staatlichen Habitat**, nicht im Wohnblock eines Spielers. Eine Datenlücke soll keinem Spieler Vermietermacht verschaffen, die nicht aus dem Spiel entstanden ist.
+2. **Prometheus bekommt ein staatliches Habitat.** Die vier dort Arbeitenden bleiben.
+3. **Kapazität ist ein eigener Wert:** `tile_entities.residential_capacity`, Habitat 8, Wohnblock 12. Sie wird nicht aus `population_bonus` abgeleitet. Die Belegung ergibt sich aus aktiven `home`-Zuweisungen (Sicht `residential_occupancy`).
+4. **Hotels dürfen Staat, Unternehmen und Spieler betreiben.** Jeder relevante Ort hat zusätzlich eine staatlich garantierte Mindestunterkunft, damit kein einzelner Eigentümer den Zugang zu einer Siedlung sperren kann.
+5. **Alle 32 Personen erhalten einen `person_economic_actor`.** Der Startbestand stammt aus der Lohnhistorie. Wo es keine gibt, wird ein ausdrücklich gekennzeichneter Bootstrap-Betrag gebucht (Ledger-Typ `endowment`, Referenz `bootstrap:person:<id>`).
+
+### Backfill ist keine Marktentscheidung
+
+Zuweisungen aus der Datenbereinigung dürfen in der Spielraum- und Machtanalyse nicht als freiwillige Entscheidungen zählen. Sonst würde die Bereinigung später als gesellschaftliches Verhalten gemessen.
+
+- `person_tenancies.origin` unterscheidet `backfill`, `provided` und `market`. Alle bestehenden Mietverhältnisse sind `backfill`.
+- `AccessRecord.origin` trägt dieselbe Herkunft. `gatekeeperPower` und `summarizeAccess` werten nur `market` aus (`marketRecords`).
+
+### Umsetzung
+
+Migration `20261008120000_housing_capacity_and_backfill.sql`.
+
+Abweichung von der Vorlage: Die Mindestunterkunft ist vorerst kein eigener Gebäudetyp, sondern `transient_capacity` – zwei Gästeplätze in einem staatlichen Habitat je Ort. Die Oberfläche kennt bisher nur `habitat`. Kommerzielle Hotels kommen als eigener Gebäudetyp mit Stufe 5.
+
+## Noch offen
+
+1. **Acht unbenannte Personen in Tharsis** sind im Verwaltungsgebäude gemeldet. Das neue Habitat ist mit den sieben Leitungen fast voll. Vorschlag, nicht entschieden: ein zweites staatliches Habitat (`20261008121000_tharsis_second_state_habitat_proposal.sql`).
+2. **Arbeitgeber ohne Geld:** Außer HeliosCorp haben alle Arbeitgeber einen Kontostand von 0. Die Lohnzahlung scheitert deshalb, es wurde noch nie Lohn gezahlt. Ohne Finanzierung öffentlicher Einrichtungen gibt es kein Einkommen und damit keinen Mietmarkt.
+3. `residential_block` fehlt in `building_definitions`.

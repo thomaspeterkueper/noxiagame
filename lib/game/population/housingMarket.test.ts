@@ -95,6 +95,8 @@ check(power.find((entry) => entry.gatekeeperId === 'L2')?.declined === 1 && powe
 const summary = summarizeAccess(log)
 check(summary.requests === 6 && summary.accessibleShare === 0.5 && summary.shutOut === 1 && summary.topGatekeeperShare === round4(4 / 6), 'the summary shows how much is really open and who is shut out')
 check(summary.declinedShare === 0.25, 'and how often people themselves said no')
+const withCleanup = [...log, { ...record('x', 'state', 'granted'), origin: 'backfill' as const }, { ...record('y', 'state', 'granted'), origin: 'provided' as const }]
+check(JSON.stringify(summarizeAccess(withCleanup)) === JSON.stringify(summary) && JSON.stringify(gatekeeperPower(withCleanup)) === JSON.stringify(power), 'backfill and plain assignment do not count as market behaviour')
 check(summarizeAccess([]).accessibleShare === 1 && gatekeeperPower([]).length === 0, 'no decisions, no power')
 function round4(value: number): number { return Math.round(value * 10_000) / 10_000 }
 

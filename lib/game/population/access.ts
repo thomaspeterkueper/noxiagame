@@ -21,6 +21,16 @@ export interface AccessRecord {
   gatekeeperId: string
   outcome: AccessOutcome
   reason: string
+  /**
+   * How the decision came about. Only 'market' is behaviour; 'backfill' is data
+   * cleanup and 'provided' an assignment nobody decided on. Defaults to 'market'.
+   */
+  origin?: 'market' | 'provided' | 'backfill'
+}
+
+/** Records that are behaviour: neither data cleanup nor plain assignment. */
+export function marketRecords(records: readonly AccessRecord[]): AccessRecord[] {
+  return records.filter((record) => (record.origin ?? 'market') === 'market')
 }
 
 export interface GatekeeperPower {
@@ -40,7 +50,8 @@ export interface GatekeeperPower {
 const round = (value: number): number => Math.round(value * 10_000) / 10_000
 
 /** Who decided how often about whom, strongest gatekeeper first. */
-export function gatekeeperPower(records: readonly AccessRecord[]): GatekeeperPower[] {
+export function gatekeeperPower(allRecords: readonly AccessRecord[]): GatekeeperPower[] {
+  const records = marketRecords(allRecords)
   const byGatekeeper = new Map<string, { granted: number; refused: number; declined: number; people: Set<string> }>()
   for (const record of records) {
     const entry = byGatekeeper.get(record.gatekeeperId) ?? { granted: 0, refused: 0, declined: 0, people: new Set<string>() }
@@ -74,7 +85,8 @@ export interface AccessSummary {
   shutOut: number
 }
 
-export function summarizeAccess(records: readonly AccessRecord[]): AccessSummary {
+export function summarizeAccess(allRecords: readonly AccessRecord[]): AccessSummary {
+  const records = marketRecords(allRecords)
   const decided = records.filter((record) => record.outcome !== 'declined')
   const granted = decided.filter((record) => record.outcome === 'granted')
   const grantedPeople = new Set(granted.map((record) => record.personId))
