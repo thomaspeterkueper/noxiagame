@@ -180,3 +180,19 @@ Schwäche des Maßes: Wer seine Stelle verliert, gilt als ungebunden und bekommt
 1. Ob die Steuereinnahmen die öffentlichen Löhne tragen, ist ungeprüft. Es gab bisher keine einzige Buchung.
 2. `residential_block` fehlt in `building_definitions`.
 3. Kommerzielle Hotels als eigener Gebäudetyp.
+
+
+### Korrektur des Ortsspielraums nach Live-Vergleich (2026-10-08)
+
+Der erste Live-basierte A/B/C-Lauf zeigte einen Messfehler: Nach Verlust einer Stelle stieg der gezählte Ortsspielraum, weil mehr Stellen formal als offen galten. Arbeitslosigkeit durfte dadurch den gemessenen Möglichkeitsraum erhöhen.
+
+Korrektur:
+
+- Der Markt liefert zusätzlich die materiellen Mittel einer Person: liquides Vermögen, tatsächlich gezahltes Tageseinkommen und tägliche Grundkosten.
+- `materialAccess` bildet daraus eine reine Messgröße 0..1.
+- Laufendes Einkommen, das die Grundkosten deckt, hält den materiellen Zugang offen.
+- Ohne laufendes Einkommen zählt die finanzielle Reichweite. Eine kurze Reserve ist nur eine Übergangsbrücke; erst eine lange Reichweite bewahrt annähernd denselben materiellen Spielraum.
+- `placeSpielraum` multipliziert institutionell offene Orte deshalb mit dieser materiellen Zugänglichkeit.
+- Dies ändert **keine Entscheidung und kein Verhalten**. Es korrigiert ausschließlich die Auswertung.
+
+Damit kann Arbeitslosigkeit weiterhin neue theoretische Stellen sichtbar machen, aber sie erhöht den realen Ortsspielraum nicht automatisch. Vermögende Arbeitslose bleiben beweglicher als mittellose; die Größe ist damit nicht bloß eine Beschäftigten-/Arbeitslosenmarkierung.
