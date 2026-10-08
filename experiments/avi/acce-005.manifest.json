@@ -1,0 +1,30 @@
+{
+  "id": "ACCE-005",
+  "title": "AVI Core Closure Experiment 005 — uncertainty-aware reconstruction gate",
+  "version": "0.1.0",
+  "modelClass": "BASELINE",
+  "status": "diagnostic-reference-test",
+  "purpose": "Test posterior-predictive closure under state-reconstruction uncertainty.",
+  "preregistration": {
+    "seed": 20261008,
+    "testStatistic": "absolute posterior-predictive z-score",
+    "threshold": 2,
+    "statePosterior": {
+      "mean": 10,
+      "variance": 4
+    },
+    "measurementVariance": 1
+  },
+  "cases": {
+    "FALSE_POINT_ALARM": {
+      "observation": 13,
+      "expected": "point z=3; marginalized z≈1.342; STANDARD_CLOSURE"
+    },
+    "ROBUST_UNRESOLVED_DEFECT": {
+      "observation": 16,
+      "expected": "marginalized z≈2.683; UNRESOLVED_CLOSURE_DEFECT; E1/E2 audit only"
+    }
+  },
+  "evidenceLabel": "SIMULATION_EVIDENCE",
+  "scientificGuardrail": "Surviving marginalization does not confirm AVI or admit Z."
+}
