@@ -72,6 +72,7 @@ if (result.market) {
   console.log(`Access: ${JSON.stringify(result.market.summary)}`)
   console.table(result.market.power.slice(0, 6))
   console.log(`Owner income: ${JSON.stringify(result.market.final.ownerIncome)}. Employer balances: ${JSON.stringify(result.market.final.employerBalance)}`)
+  console.log(`Money: ${JSON.stringify(result.market.money)}`)
 }
 
 if (options.out) {
