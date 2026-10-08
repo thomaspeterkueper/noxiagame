@@ -145,6 +145,36 @@ Die Kette ist: Arbeitgeber wird zahlungsunfähig, Lohn fällt aus, Mietschulden,
 
 Einschränkungen: Die Zahlen hängen an den synthetischen Startwerten (Löhne, Mieten, Lebenshaltung 25 pro Tag). Vermögen wächst zu leicht, es gibt außer Miete und Hauskauf nichts, wofür Menschen Geld ausgeben. Ein Lauf mit dem Live-Bestand steht aus.
 
+## Erster Lauf auf dem Live-Bestand (2026-10-08, Tick 2113)
+
+Grundlage: der Live-Bestand, lesend per SQL abgefragt und von Hand ins Marktformat gebracht, weil der Export ohne Service-Schlüssel nicht lief. Näherungen: Beziehungen als Gruppenmittel, Vermögen als 14 Tageslöhne, Bedürfnisse als typische Werte. Die Eingabedateien liegen nicht im Repository. Drei Varianten über je drei Spieljahre, 32 Personen:
+
+- **A – wie live:** keine freien Stellen, private Wohnungen ohne Miete nicht im Angebot, Arbeitgeber ohne Einnahmen.
+- **B – mit angenommenen Marktdaten:** private Miete 400, je Stelle zwei freie Plätze. Arbeitgeber weiter ohne Einnahmen.
+- **C – wie B, öffentliche Arbeitgeber finanziert** in Höhe ihrer heutigen Lohnsumme.
+
+| Größe | A | B | C |
+|---|---|---|---|
+| Erster ausgefallener Lohn | Tag 15 | Tag 12 | Tag 15 |
+| Unbezahlte am Tag 30 | 31 | 29 | 4 |
+| Arbeitslose nach einem Jahr | 31 | 32 | 10 |
+| Kündigungen wegen ausbleibendem Lohn | 32 | 32 | 21 |
+| Anfragen an Vermieter und Arbeitgeber | 0 | 20 | 58 |
+| Ablehnungen | 0 | 0 | 0 |
+| Räumungen | 0 | 2 | 0 |
+| Wohnungslose | 0 | 0 | 0 |
+| Offene Plätze je Person, Tag 1 | 1,5 | 26,8 | 26,8 |
+| Ortsspielraum, Tag 1 | 0,12 | 0,88 | 0,88 |
+
+Befund:
+
+1. **Der Engpass ist die Arbeitgeberfinanzierung.** In jeder Variante endet die Lohnzahlung mit der 14-Tage-Reserve. Ohne laufende Einnahmen ist nach fünf Wochen fast niemand mehr beschäftigt.
+2. **Fehlende Marktdaten machen den Ortsspielraum eng:** 0,12 statt 0,88 am ersten Tag. Das ist eine Datenlücke, kein Verhalten.
+3. **Wohnzugang ist kein Engpass.** Freie staatliche Plätze fangen alle auf, niemand wird wohnungslos, niemand wird abgelehnt. Macht ist im Protokoll nicht sichtbar.
+4. **Finanzierung in Höhe der heutigen Lohnsumme reicht nicht (C):** Beschäftigte der zahlungsunfähigen Unternehmen wechseln auf freie öffentliche Stellen, die Lohnsumme wächst über die Einnahmen. Öffentliche Finanzierung muss an besetzten Stellen hängen, oder die Stellenzahl muss begrenzt sein.
+
+Schwäche des Maßes: Wer seine Stelle verliert, gilt als ungebunden und bekommt mehr „offene Plätze" (A: 1,5 auf 14). Der Ortsspielraum steigt also durch Arbeitslosigkeit. Mittellosigkeit muss in das Maß eingehen, bevor es live etwas steuert.
+
 ## Noch offen
 
 1. Ob die Steuereinnahmen die öffentlichen Löhne tragen, ist ungeprüft. Es gab bisher keine einzige Buchung.
