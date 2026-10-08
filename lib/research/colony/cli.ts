@@ -51,13 +51,18 @@ console.table(pick.map((row) => ({
   day: row.day, encounters: row.encounters, conflicts: row.conflicts, assists: row.assists, visits: row.visits, moves: row.moves,
   ties: row.relationships, close: row.closeTies, strained: row.strainedTies, trust: row.trustAvg, affinity: row.affinityAvg,
 })))
+console.table(pick.map((row) => ({
+  day: row.day, spielraum: row.spielraumAvg, action: row.spielraumActionAvg, relational: row.spielraumRelationalAvg, place: row.spielraumPlaceAvg,
+  min: row.spielraumMin, narrowShare: row.spielraumNarrowShare, gini: row.spielraumGini,
+})))
 const total = (key: 'encounters' | 'conflicts' | 'assists' | 'visits' | 'moves') => result.days.reduce((sum, row) => sum + row[key], 0)
-console.log(`Totals: ${total('encounters')} encounters, ${total('conflicts')} conflicts, ${total('assists')} acts of help, ${total('visits')} visits, ${total('moves')} moves. Residents: ${JSON.stringify(result.final.residents)}`)
+console.log(`Totals: ${total('encounters')} encounters, ${total('conflicts')} conflicts, ${total('assists')} acts of help, ${total('visits')} visits, ${total('moves')} moves. Residents: ${JSON.stringify(result.final.residents)}. Spielraum by settlement: ${JSON.stringify(result.final.spielraumBySettlement)}`)
 
 if (options.out) {
   fs.mkdirSync(path.dirname(options.out), { recursive: true })
   fs.writeFileSync(`${options.out}.days.csv`, daysToCsv(result.days))
   fs.writeFileSync(`${options.out}.final.json`, JSON.stringify(result.final, null, 2))
   fs.writeFileSync(`${options.out}.moves.json`, JSON.stringify(result.moves, null, 2))
-  console.log(`Wrote ${options.out}.days.csv, .final.json and .moves.json`)
+  fs.writeFileSync(`${options.out}.spielraum.json`, JSON.stringify(result.spielraumBySettlement))
+  console.log(`Wrote ${options.out}.days.csv, .final.json, .moves.json and .spielraum.json`)
 }

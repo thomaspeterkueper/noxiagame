@@ -146,6 +146,8 @@ export interface PopulationDecision {
   action: PopulationAction
   score: number
   factors: Record<string, number | string | boolean>
+  /** All considered actions with their scores, best first. For evaluation (Spielraum), not for persistence. */
+  options?: { action: PopulationAction; score: number }[]
 }
 
 export function clampUnit(value: number): number {

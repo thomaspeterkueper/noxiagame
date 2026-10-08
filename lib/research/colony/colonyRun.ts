@@ -34,6 +34,7 @@ import { resolvedPresenceCandidates } from '../../game/population/presence'
 import { fadeRelationships, pairCompatibility, relationshipTiers } from '../../game/population/relationshipDynamics'
 import { decideRelocation, type RelocationKind, type RelocationOption } from '../../game/population/relocation'
 import { encounterEventType, encounterOutcome, type FrictionPerson } from '../../game/population/socialFriction'
+import { actionSpielraum, combineSpielraum, gini, placeSpielraum, relationalSpielraum, type SpielraumComponents } from '../../game/population/spielraum'
 import { chooseVisitTarget } from '../../game/population/visitTarget'
 import {
   NEED_CODES,
@@ -140,6 +141,17 @@ export interface ColonyDayRow {
   closeTiesMaxPerPerson: number
   /** Directed relationships with trust or affinity clearly below neutral. */
   strainedTies: number
+  /** Spielraum (NOXIA-OMNI-0001): mean over all people, 0..1, and its three components. */
+  spielraumAvg: number
+  spielraumActionAvg: number
+  spielraumRelationalAvg: number
+  spielraumPlaceAvg: number
+  /** The person with the least room on this day. */
+  spielraumMin: number
+  /** Share of people whose room is narrow (below 0.35). */
+  spielraumNarrowShare: number
+  /** How unequally room is distributed: 0 = equal. */
+  spielraumGini: number
 }
 
 export interface ColonyMove {
@@ -157,11 +169,16 @@ export interface ColonyRunResult {
   ticks: number
   days: ColonyDayRow[]
   moves: ColonyMove[]
+  /** Mean Spielraum of the residents of each settlement, one value per day (null while nobody lives there). */
+  spielraumBySettlement: Record<string, (number | null)[]>
   final: {
     affect: AffectState[]
     relationships: PersonRelationship[]
     needs: Record<string, Record<NeedCode, number>>
     residents: Record<string, number>
+    /** Spielraum of each person and the mean per settlement on the last day. */
+    spielraum: Record<string, SpielraumComponents>
+    spielraumBySettlement: Record<string, number>
   }
 }
 
@@ -172,6 +189,7 @@ const CLOSE_AFFINITY = 0.58
 
 const isClose = (relation: PersonRelationship): boolean => relation.familiarity >= CLOSE_FAMILIARITY && relation.trust >= CLOSE_TRUST && relation.affinity >= CLOSE_AFFINITY
 const isStrained = (relation: PersonRelationship): boolean => relation.trust < 0.4 || relation.affinity < 0.4
+const NARROW_SPIELRAUM = 0.35
 const round = (value: number): number => Math.round(value * 10_000) / 10_000
 const mean = (values: number[]): number => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0)
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value))
@@ -199,6 +217,9 @@ interface SimPerson {
   lastMoveTick: Record<RelocationKind, number | null>
   reviewHour: number
   varietyFloor: number
+  /** Action room summed over the waking hours of the current day. */
+  actionRoomSum: number
+  actionRoomHours: number
 }
 
 interface Place {
@@ -231,6 +252,8 @@ function initialPeople(snapshot: ColonySnapshot): SimPerson[] {
       lastMoveTick: { home: null, work: null },
       reviewHour: hash(`review:${entry.id}`) % DAY_TICKS,
       varietyFloor: varietyFloor(entry.id, entry.traits ?? null),
+      actionRoomSum: 0,
+      actionRoomHours: 0,
     }
   })
   const byId = new Map(people.map((entry) => [entry.person.id, entry]))
@@ -318,6 +341,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     else entry.assignments.push(next)
     const key = placeKey(locationId, tileEntityId)
     if (!places[kind].has(key)) places[kind].set(key, { locationId, tileEntityId, capacity: 2 })
+    if (spielraumBySettlement[locationId] === undefined) spielraumBySettlement[locationId] = days.map(() => null)
   }
 
   const occupants = (kind: RelocationKind): Map<string, SimPerson[]> => {
@@ -399,8 +423,38 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     return false
   }
 
+  /** Spielraum of every person at `tick`, from the day's waking hours, their ties and the places open to them. */
+  const measureSpielraum = (tick: number): SpielraumComponents[] => {
+    const homes = occupants('home'), jobs = occupants('work')
+    const free = (kind: RelocationKind, key: string, place: Place): boolean => ((kind === 'home' ? homes : jobs).get(key)?.length ?? 0) < place.capacity
+    const jobLocations = new Set([...places.work.entries()].filter(([key, place]) => free('work', key, place)).map(([, place]) => place.locationId))
+    return people.map((entry) => {
+      const home = assignmentOf(entry, 'home'), work = assignmentOf(entry, 'work')
+      let open = 0
+      for (const [key, place] of places.home) {
+        if (!free('home', key, place) || (home && key === placeKey(home.locationId, home.tileEntityId))) continue
+        // Another settlement is only an option if one could also work there.
+        if (place.locationId !== entry.person.currentLocationId && work && !jobLocations.has(place.locationId)) continue
+        open += 1
+      }
+      for (const [key, place] of places.work) {
+        if (place.locationId !== entry.person.currentLocationId || !free('work', key, place)) continue
+        if (work && key === placeKey(work.locationId, work.tileEntityId)) continue
+        open += 1
+      }
+      return combineSpielraum({
+        action: entry.actionRoomHours ? entry.actionRoomSum / entry.actionRoomHours : 0,
+        relational: relationalSpielraum(fadedAt(entry, tick)),
+        place: placeSpielraum(open, supplyOf(entry.person.currentLocationId)),
+      })
+    })
+  }
+
   const days: ColonyDayRow[] = []
   const moves: ColonyMove[] = []
+  let lastSpielraum: SpielraumComponents[] = []
+  const settlementIds = [...new Set([...places.home.values(), ...places.work.values()].map((place) => place.locationId))].sort()
+  const spielraumBySettlement: Record<string, (number | null)[]> = Object.fromEntries(settlementIds.map((id) => [id, []]))
   let sleepTicks = 0, workTicks = 0, encounters = 0, conflicts = 0, assists = 0, visits = 0, movesToday = 0
 
   for (let step = 0; step < options.ticks; step += 1) {
@@ -428,6 +482,11 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
       for (const code of NEED_CODES) adjustNeed(entry, code, needDelta(decision.action, code, environment) + passiveNeedDrift(code, environment, entry.needs[code]))
       const asleep = decision.factors.asleep === true
       if (asleep) sleepTicks += 1
+      // Room to act is measured while awake; nobody chooses in their sleep.
+      if (circadian.sleepDrive === 0 && decision.options) {
+        entry.actionRoomSum += actionSpielraum(decision.options)
+        entry.actionRoomHours += 1
+      }
       if (decision.action === 'work') workTicks += 1
 
       // A visit: one hour at the home of the chosen person, inside the settlement.
@@ -519,6 +578,7 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
       const affect = people.map((entry) => affectAt(entry, tick))
       const perPerson = people.map((entry) => fadedAt(entry, tick))
       const relations = perPerson.flat()
+      const room = measureSpielraum(tick)
       days.push({
         day: days.length + 1,
         sleepHours: round((sleepTicks / people.length) * (DAY_TICKS / hours)),
@@ -541,7 +601,20 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
         closeTies: relations.filter(isClose).length,
         closeTiesMaxPerPerson: Math.max(0, ...perPerson.map((list) => list.filter(isClose).length)),
         strainedTies: relations.filter(isStrained).length,
+        spielraumAvg: round(mean(room.map((value) => value.total))),
+        spielraumActionAvg: round(mean(room.map((value) => value.action))),
+        spielraumRelationalAvg: round(mean(room.map((value) => value.relational))),
+        spielraumPlaceAvg: round(mean(room.map((value) => value.place))),
+        spielraumMin: round(Math.min(...room.map((value) => value.total))),
+        spielraumNarrowShare: round(room.filter((value) => value.total < NARROW_SPIELRAUM).length / room.length),
+        spielraumGini: gini(room.map((value) => value.total)),
       })
+      lastSpielraum = room
+      for (const locationId of Object.keys(spielraumBySettlement)) {
+        const local = room.filter((_, index) => people[index].person.currentLocationId === locationId)
+        spielraumBySettlement[locationId].push(local.length ? round(mean(local.map((value) => value.total))) : null)
+      }
+      for (const entry of people) { entry.actionRoomSum = 0; entry.actionRoomHours = 0 }
       sleepTicks = 0; workTicks = 0; encounters = 0; conflicts = 0; assists = 0; visits = 0; movesToday = 0
     }
   }
@@ -554,11 +627,14 @@ export function runColony(snapshot: ColonySnapshot, options: ColonyRunOptions): 
     ticks: options.ticks,
     days,
     moves,
+    spielraumBySettlement,
     final: {
       affect: people.map((entry) => affectAt(entry, lastTick)),
       relationships: people.flatMap((entry) => fadedAt(entry, lastTick)),
       needs: Object.fromEntries(people.map((entry) => [entry.person.id, { ...entry.needs }])),
       residents,
+      spielraum: Object.fromEntries(people.map((entry, index) => [entry.person.id, lastSpielraum[index]])),
+      spielraumBySettlement: Object.fromEntries(Object.keys(residents).sort().map((locationId) => [locationId, round(mean(people.map((entry, index) => ({ entry, room: lastSpielraum[index] })).filter((item) => item.entry.person.currentLocationId === locationId).map((item) => item.room.total)))])),
     },
   }
 }

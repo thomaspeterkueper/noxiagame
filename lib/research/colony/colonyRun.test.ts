@@ -75,6 +75,14 @@ check(sum(starved, 'conflicts', 200, 300) > sum(fed, 'conflicts', 200, 300), 'a 
 check(starved.moves.some((move) => move.reason === 'scarcity' && move.fromLocationId === 'settlement-0' && move.toLocationId !== 'settlement-0'), 'and drives people out of the affected settlement')
 check(JSON.stringify(starved.days.slice(0, 200)) === JSON.stringify(fed.days.slice(0, 200)), 'until the shortage both runs are identical')
 
+// Spielraum is measured, never acted on (NOXIA-OMNI-0001).
+check(alive.days.every((day) => day.spielraumAvg >= 0 && day.spielraumAvg <= 1 && day.spielraumMin <= day.spielraumAvg), 'Spielraum stays between none and full')
+check(alive.days[400].spielraumRelationalAvg > alive.days[0].spielraumRelationalAvg, 'relational room grows as people get to know each other')
+const s0 = (run: typeof alive, from: number, to: number) => { const v = run.spielraumBySettlement['settlement-0'].slice(from, to).filter((x): x is number => x !== null); return v.reduce((a, b) => a + b, 0) / v.length }
+check(s0(starved, 200, 300) < s0(fed, 200, 300), 'a shortage narrows the Spielraum of the affected settlement')
+check(Object.keys(alive.final.spielraum).length === alive.people && Object.keys(alive.spielraumBySettlement).length === 3, 'Spielraum is reported per person and per settlement')
+check(alive.spielraumBySettlement['settlement-0'].length === alive.days.length, 'the settlement series has one value per day')
+
 check(daysToCsv(month.days).split('\n').length === 32 && daysToCsv(month.days).startsWith('day,sleepHours'), 'days export as csv')
 check(syntheticColony({ people: 9, settlements: 3 }).people.filter((p) => p.locationId === 'settlement-0').length === 3, 'synthetic people are spread over settlements')
 

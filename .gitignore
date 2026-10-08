@@ -49,6 +49,7 @@ next-env.d.ts
 /.npc-affect-test
 /.circadian-test
 /.colony-run
+/.spielraum-test
 /.social-dynamics-test
 /.relationship-dynamics-test
 /experiments/colony/out/

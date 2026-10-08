@@ -9,6 +9,8 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/spielraum.ts'
+      - 'lib/game/population/spielraum.test.ts'
       - 'lib/game/population/socialFriction.ts'
       - 'lib/game/population/relocation.ts'
       - 'lib/game/population/visitTarget.ts'
@@ -27,6 +29,8 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/spielraum.ts'
+      - 'lib/game/population/spielraum.test.ts'
       - 'lib/game/population/socialFriction.ts'
       - 'lib/game/population/relocation.ts'
       - 'lib/game/population/visitTarget.ts'
@@ -55,6 +59,10 @@ jobs:
         run: |
           npx --yes --package typescript@5 tsc lib/game/population/socialDynamics.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .social-dynamics-test
           node .social-dynamics-test/game/population/socialDynamics.test.js
+      - name: Spielraum measure
+        run: |
+          npx --yes --package typescript@5 tsc lib/game/population/spielraum.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .spielraum-test
+          node .spielraum-test/game/population/spielraum.test.js
       - name: Test
         run: node .colony-run/research/colony/colonyRun.test.js
       - name: One simulated year

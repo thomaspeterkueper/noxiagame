@@ -289,5 +289,6 @@ export function decidePopulationAction(context: PopulationDecisionContext): Popu
       ...winner.factors,
       deterministicTieBreak: ACTION_TIE_BREAK.indexOf(winner.action),
     },
+    options: scores.map((entry) => ({ action: entry.action, score: entry.score })),
   }
 }

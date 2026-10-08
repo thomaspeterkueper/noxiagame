@@ -16,7 +16,7 @@ npm run research:colony -- --years 1 --scenario experiments/colony/konflikt.scen
 | `--people`, `--settlements` | Größe einer künstlichen Kolonie, wenn kein Abbild angegeben ist |
 | `--snapshot` | Abbild der echten Kolonie, erzeugt mit `experiments/colony/export-snapshot.sql` |
 | `--scenario` | Eingriffe als JSON-Liste, siehe unten |
-| `--out` | Pfad-Präfix für `.days.csv` (eine Zeile je Spieltag), `.final.json` (Endzustand) und `.moves.json` (Umzüge) |
+| `--out` | Pfad-Präfix für `.days.csv` (eine Zeile je Spieltag), `.final.json` (Endzustand), `.moves.json` (Umzüge) und `.spielraum.json` (Spielraum je Siedlung und Tag) |
 | `--no-friction`, `--no-relocation` | einen Mechanismus abschalten, um seinen Beitrag zu sehen |
 
 ## Szenario: die Frage „was wäre, wenn"
@@ -101,3 +101,25 @@ Mit Reibung, Abwechslung und Umzügen, 31 Personen in fünf Siedlungen, zehn Spi
 Die Kolonie pendelt sich nicht mehr ein. Das Netz wächst über die ganze Zeit, enge Bindungen lösen sich nach Umzügen und bilden sich neu, die Siedlungen werden ungleich groß.
 
 In einer einzelnen dichten Siedlung bleibt es dagegen ruhig: Jeder kennt jeden, es gibt nichts Neues und kaum einen Ort, an den man ziehen könnte.
+
+## Vierter Befund: Spielraum als Messgröße (2026-10-08)
+
+Entscheidung und Definition: `docs/decisions/NOXIA-OMNI-0001-spielraum-as-measure.md`. 31 Personen, drei Spieljahre, Mittel des dritten Jahres:
+
+| Lauf | Spielraum | Handeln | Beziehung | Ort | Stimmung |
+|---|---|---|---|---|---|
+| fünf Siedlungen | 0,64 | 0,56 | 0,74 | 0,62 | 0,13 |
+| ohne Reibung | 0,62 | 0,56 | 0,70 | 0,59 | 0,14 |
+| ohne Umzüge | 0,67 | 0,47 | 0,78 | 0,83 | 0,12 |
+| eine dichte Siedlung | 0,59 | 0,46 | 1,00 | 0,25 | 0,41 |
+
+Mangel (120 Tage Versorgung 0,3 in einer Siedlung):
+
+| Größe | vorher | tiefster Wert | Verlust | Tage bis zur Regeneration |
+|---|---|---|---|---|
+| Spielraum der betroffenen Siedlung | 0,65 | 0,54 | 18 % | 0 |
+| Stimmung der Kolonie | 0,16 | 0,05 | 67 % | im Lauf nicht erreicht |
+
+Die Stimmung sinkt über drei Jahre auch ohne Mangel leicht (auf 0,13). Mit Mangel liegt sie am Ende bei 0,10.
+
+Die Verteilung ist in allen Läufen fast gleich: Gini 0,02 bis 0,04, niemand unter 0,35.
