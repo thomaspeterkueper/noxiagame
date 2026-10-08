@@ -95,8 +95,18 @@ Migration `20261008120000_housing_capacity_and_backfill.sql`.
 
 Abweichung von der Vorlage: Die Mindestunterkunft ist vorerst kein eigener Gebäudetyp, sondern `transient_capacity` – zwei Gästeplätze in einem staatlichen Habitat je Ort. Die Oberfläche kennt bisher nur `habitat`. Kommerzielle Hotels kommen als eigener Gebäudetyp mit Stufe 5.
 
+### Arbeitgeberfinanzierung (2026-10-08)
+
+Migration `20261008150000_employer_funding.sql`.
+
+- **Öffentliche Arbeitgeber** werden aus den Steuereinnahmen ihres Ortes finanziert. Jede Einnahme im `colony_ledger` erscheint beim öffentlichen Akteur als `income` mit Referenz `colony_ledger:<id>`.
+- **Ursache der leeren Kassen:** `tick.ts` bucht `tax_payout` und `building_payout`, beide Typen fehlten im Check-Constraint von `colony_ledger`. Die Buchung schlug still fehl. Die Migration ergänzt die Typen.
+- **Spielerunternehmen und NPC-Firmen** erhalten keine laufende Finanzierung. Der Eigentümer kapitalisiert über `fund_player_corp`, oder das Unternehmen erwirtschaftet Einnahmen.
+- **Einmalige Übergangsreserve:** Jeder bestehende Arbeitgeber, dessen Konto keinen Tageslohn deckt, erhält 14 Tageslöhne als `endowment` mit Referenz `bootstrap:employer:<actor_id>`.
+- **Danach gilt:** Reicht das Arbeitgeberkonto nicht, wird kein Lohn gezahlt.
+
 ## Noch offen
 
-1. **Acht unbenannte Personen in Tharsis** sind im Verwaltungsgebäude gemeldet. Das neue Habitat ist mit den sieben Leitungen fast voll. Vorschlag, nicht entschieden: ein zweites staatliches Habitat (`20261008121000_tharsis_second_state_habitat_proposal.sql`).
-2. **Arbeitgeber ohne Geld:** Außer HeliosCorp haben alle Arbeitgeber einen Kontostand von 0. Die Lohnzahlung scheitert deshalb, es wurde noch nie Lohn gezahlt. Ohne Finanzierung öffentlicher Einrichtungen gibt es kein Einkommen und damit keinen Mietmarkt.
-3. `residential_block` fehlt in `building_definitions`.
+1. Ob die Steuereinnahmen die öffentlichen Löhne tragen, ist ungeprüft. Es gab bisher keine einzige Buchung.
+2. `residential_block` fehlt in `building_definitions`.
+3. Kommerzielle Hotels als eigener Gebäudetyp.
