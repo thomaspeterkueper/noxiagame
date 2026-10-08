@@ -52,7 +52,7 @@ Vor jeder Einführung festlegen, ob Banken Depositen erzeugen dürfen oder nur b
 ## Aktivierungsgates
 
 G0: Dokumentiert (dieses Dokument).
-G1: Buchungssemantik und Geldmengen-Invarianten als reine Regeln + Tests.
+G1: Buchungssemantik und Geldmengen-Invarianten als reine Regeln + Tests. **Umgesetzt am 08.10.2026** in `lib/game/financeSemantics.ts` und `financeSemantics.test.ts`; der Forschungslauf weist zusätzlich Anfangs-/Endgeldmenge, explizite Emissionen, Senken und unerklärte Differenzen aus.
 G2: Deterministischer Forschungslauf inkl. Insolvenzen, Zins, Tilgung und Fiskaltransfer.
 G3: Lesender Audit auf tatsächlichem Live-Bestand; keine Mutationen.
 G4: Schattenbetrieb mit Auditlog und Feature-Flag standardmäßig AUS.
@@ -63,3 +63,20 @@ Tests mindestens: Nullsummen-Transfer, steuerliche Doppelzählung, Kredit-Doppel
 ## Kein vorschneller Kanonwechsel
 
 Die OTA-Dokumente bleiben Weltkanon, die heute laufende Ökonomie bleibt lokale technische Implementation. Finanzierungsmechanismen sind Hypothesen, bis durch mehrjährige Experimente validiert. Komplexe interplanetare und relativistische Verträge bleiben vorbereitet, aber deaktiviert.
+
+
+## G1-Implementierungsbefund (2026-10-08)
+
+Die reine Finanzsemantik klassifiziert Transaktionen als Transfer, Fiskaltransfer, Emission, Senke, Clearing oder Kreditvorgang. Transfer/Fiskal/Clearing müssen Nullsummenbuchungen sein; Emissionen und Senken brauchen eine Audit-Referenz und müssen die Geldmenge in der erwarteten Richtung ändern. Kreditvorgänge werden bewusst noch nicht als normale Geldbewegung akzeptiert, sondern verlangen später eine eigene Forderungs-/Verbindlichkeitsinvariante.
+
+Der Forschungslauf weist nun zusätzlich eine Geldmengenbilanz aus:
+
+- `initial` / `final`: erfasste liquide Bestände von Personen, Arbeitgebern und externen Eigentümerkonten,
+- `employerIncomeEmission`: bisherige vereinfachte tägliche Arbeitgeber-Einnahmen ohne modelliertes Gegenkonto,
+- `livingCostSink`: Lebenshaltung, solange kein Empfängerkonto modelliert ist,
+- `propertyBuybackEmission`: explizit ausgewiesene Vereinfachung beim Rückverkauf von Eigentum an den abstrakten Markt,
+- `unexplainedDelta`: Differenz zwischen erwarteter und tatsächlicher Geldmengenänderung.
+
+Damit wird eine neue implizite Emission sichtbar: Der bisherige Forschungsmarkt zahlt beim Rückverkauf eines Hauses 90 % an die Person, ohne ein Gegenkonto zu belasten. Der Mechanismus bleibt vorerst unverändert, wird aber nicht mehr als neutraler Transfer missverstanden.
+
+Die geplante Steuer-Gegenbuchung ist damit nachgelagert: Sie muss als echter Fiskaltransfer `Koloniekasse -> öffentlicher Arbeitgeber` die Nullsummen-Invariante erfüllen und darf keine zusätzliche Geldmenge erzeugen.
