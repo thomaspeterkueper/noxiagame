@@ -5,6 +5,7 @@
 
 import { evaluatePersonActionAffordance, type PersonActionAffordanceBlocker, type PersonActionAffordanceRequest } from './actionAffordance'
 import type { PersonAssignment, PersonKnowledge, PersonRelationship, PopulationDecision, SimulationTier } from './types'
+import { chooseVisitTarget } from './visitTarget'
 
 export type PopulationActionIntent =
   | {
@@ -60,10 +61,11 @@ function affordanceRequestForDecision(
     return { action: decision.action }
   }
   if (decision.action === 'social_interaction') {
-    const target = relationships
-      .slice()
-      .sort((a, b) => (b.familiarity + b.trust + b.affinity) - (a.familiarity + a.trust + a.affinity)
-        || a.otherPersonId.localeCompare(b.otherPersonId))[0]?.otherPersonId ?? null
+    // NOXIA-LIVING-0009: the lonely seek their strongest bond, the bored someone they have not seen for long.
+    const target = chooseVisitTarget(relationships, {
+      socialPressure: typeof decision.factors.socialPressure === 'number' ? decision.factors.socialPressure : 0,
+      varietyPressure: typeof decision.factors.varietyPressure === 'number' ? decision.factors.varietyPressure : 0,
+    })
     return { action: 'social_interaction', otherPersonId: target }
   }
   if (decision.action === 'inspect_problem' || decision.action === 'report_problem') {

@@ -16,7 +16,8 @@ npm run research:colony -- --years 1 --scenario experiments/colony/konflikt.scen
 | `--people`, `--settlements` | Größe einer künstlichen Kolonie, wenn kein Abbild angegeben ist |
 | `--snapshot` | Abbild der echten Kolonie, erzeugt mit `experiments/colony/export-snapshot.sql` |
 | `--scenario` | Eingriffe als JSON-Liste, siehe unten |
-| `--out` | Pfad-Präfix für `.days.csv` (eine Zeile je Spieltag) und `.final.json` (Endzustand) |
+| `--out` | Pfad-Präfix für `.days.csv` (eine Zeile je Spieltag), `.final.json` (Endzustand) und `.moves.json` (Umzüge) |
+| `--no-friction`, `--no-relocation` | einen Mechanismus abschalten, um seinen Beitrag zu sehen |
 
 ## Szenario: die Frage „was wäre, wenn"
 
@@ -32,6 +33,12 @@ Eine Liste von Eingriffen. `tick` zählt Spielstunden ab Beginn des Laufs.
 
 Möglich sind `person_conflict`, `person_assistance`, `shared_work`, `crisis_experience`, `loss_experience` sowie die Gesundheitsereignisse `workplace_accident`, `environmental_exposure` und `exhaustion`. Ein Ereignis mit `otherPersonId` wirkt auf beide Personen, mit `"mutual": false` nur auf die erste.
 
+Mit `supply` ändert sich die Versorgung einer Siedlung, etwa für einen Mangel und sein Ende:
+
+```json
+{ "tick": 8760, "type": "supply", "locationId": "settlement-0", "level": 0.3 }
+```
+
 Mit `reassign` wechselt eine Person Arbeits- oder Wohnort, etwa um Menschen zu trennen oder zusammenzubringen:
 
 ```json
@@ -42,9 +49,9 @@ Zwei Läufe mit und ohne Szenario sind bis zum ersten Eingriff identisch. Jede A
 
 ## Was der Lauf abbildet
 
-Tagesrhythmus und Schlaf, Arbeit und Bedürfnisse, Begegnungen mit Abklingzeit, Erinnerung und Beziehung, Affekt und Schmerz.
+Tagesrhythmus und Schlaf, Arbeit und Bedürfnisse, Begegnungen mit Ausgang (neutral, Konflikt, Hilfe), Besuche, Umzug und Arbeitswechsel, Versorgung, Erinnerung und Beziehung, Affekt und Schmerz.
 
-Nicht abgebildet, weil im Live-Tick noch an die Datenbank gebunden: Wirtschaft, Bau, Familien und Geburten, Reisen zwischen Siedlungen, Wissen und Kolonie-Druck. Benannte Personen entscheiden hier wie alle anderen und nicht nach ihrer Rollenlogik.
+Nicht abgebildet, weil im Live-Tick noch an die Datenbank gebunden: Wirtschaft, Bau, Familien und Geburten, Wissen und Kolonie-Druck. Ein Besuch dauert eine Stunde und bleibt in der Siedlung, ein Umzug geschieht sofort. Benannte Personen entscheiden hier wie alle anderen und nicht nach ihrer Rollenlogik.
 
 ## Erster Befund (2026-10-08)
 
@@ -79,3 +86,18 @@ Mit Sättigung, begrenzten engen Bindungen und Verblassen, 31 Personen in einer 
 | Gleichgewicht | weiterhin nach etwa zwei Monaten erreicht |
 
 Die Beziehungen sind jetzt unterschiedlich und begrenzt, und Trennung lässt sie verblassen. Von selbst entsteht im Alltag aber noch keine Veränderung. Offen bleiben Reibung im Alltag und Bewegung im Netz.
+
+## Dritter Befund nach NOXIA-LIVING-0009 (2026-10-08)
+
+Mit Reibung, Abwechslung und Umzügen, 31 Personen in fünf Siedlungen, zehn Spieljahre:
+
+| Größe | Jahr 1 | Jahr 5 | Jahr 10 |
+|---|---|---|---|
+| Beziehungen | 170 | 334 | 430 |
+| Enge Bindungen | 110 | 52 | 45 |
+| Konflikte pro Tag | 0,7 | 1,1 | 1,0 |
+| Umzüge pro Jahr | 22 | 18 | 15 |
+
+Die Kolonie pendelt sich nicht mehr ein. Das Netz wächst über die ganze Zeit, enge Bindungen lösen sich nach Umzügen und bilden sich neu, die Siedlungen werden ungleich groß.
+
+In einer einzelnen dichten Siedlung bleibt es dagegen ruhig: Jeder kennt jeden, es gibt nichts Neues und kaum einen Ort, an den man ziehen könnte.

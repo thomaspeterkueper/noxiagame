@@ -56,6 +56,25 @@ const fromSnapshot = runColony({ ...colony, tick: 2103, relationships: [
 ] }, { ticks: 24 })
 check(fromSnapshot.final.relationships.some((r) => r.personId === a && r.otherPersonId === b) && !fromSnapshot.final.relationships.some((r) => r.otherPersonId === 'gone'), 'snapshot relationships are carried over, dangling ones dropped')
 
+// Friction, variety and movement keep the colony changing (NOXIA-LIVING-0009).
+const towns = syntheticColony({ people: 18, settlements: 3 })
+const alive = runColony(towns, { ticks: 24 * 365 * 2 })
+const sum = (run: typeof alive, key: 'conflicts' | 'assists' | 'visits' | 'moves' | 'encounters', from = 0, to = run.days.length) => run.days.slice(from, to).reduce((total, day) => total + day[key], 0)
+check(sum(alive, 'conflicts') > 0 && sum(alive, 'assists') > 0, 'everyday life produces conflicts and help')
+check(sum(alive, 'conflicts') < sum(alive, 'encounters') * 0.1, 'but conflict stays the exception')
+check(alive.moves.length > 0 && alive.moves.every((move) => move.reason !== 'none'), 'some people move, each for a reason')
+check(alive.days[729].relationships > alive.days[60].relationships, 'the network keeps growing after the first weeks')
+check(JSON.stringify(alive.days.slice(-30)) !== JSON.stringify(alive.days.slice(-60, -30)), 'the colony does not settle into a fixed state')
+const frozen = runColony(towns, { ticks: 24 * 365, friction: false, relocation: false })
+check(sum(frozen, 'conflicts') === 0 && frozen.moves.length === 0, 'both mechanisms can be switched off for comparison')
+check(JSON.stringify(runColony(towns, { ticks: 24 * 120 })) === JSON.stringify(runColony(towns, { ticks: 24 * 120 })), 'runs with friction and movement are still deterministic')
+const shortage: ScenarioEvent[] = [{ tick: 24 * 200, type: 'supply', locationId: 'settlement-0', level: 0.3 }, { tick: 24 * 300, type: 'supply', locationId: 'settlement-0', level: 1 }]
+const starved = runColony(towns, { ticks: 24 * 365, scenario: shortage })
+const fed = runColony(towns, { ticks: 24 * 365 })
+check(sum(starved, 'conflicts', 200, 300) > sum(fed, 'conflicts', 200, 300), 'a shortage raises conflict while it lasts')
+check(starved.moves.some((move) => move.reason === 'scarcity' && move.fromLocationId === 'settlement-0' && move.toLocationId !== 'settlement-0'), 'and drives people out of the affected settlement')
+check(JSON.stringify(starved.days.slice(0, 200)) === JSON.stringify(fed.days.slice(0, 200)), 'until the shortage both runs are identical')
+
 check(daysToCsv(month.days).split('\n').length === 32 && daysToCsv(month.days).startsWith('day,sleepHours'), 'days export as csv')
 check(syntheticColony({ people: 9, settlements: 3 }).people.filter((p) => p.locationId === 'settlement-0').length === 3, 'synthetic people are spread over settlements')
 

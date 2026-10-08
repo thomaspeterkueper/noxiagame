@@ -162,6 +162,23 @@ export interface EventAppraisalContext {
   relationship?: Pick<PersonRelationship, 'familiarity' | 'trust' | 'affinity'> | null
 }
 
+/**
+ * 0..1: how much a meeting means. A new face or a close friend means a lot,
+ * the daily meeting with a well-known colleague is routine.
+ */
+export function encounterMeaning(relationship: Pick<PersonRelationship, 'familiarity' | 'affinity'> | null | undefined): number {
+  const { novelty, closeness } = encounterQualities(relationship)
+  return Math.max(ROUTINE_ENCOUNTER_FLOOR, novelty, closeness)
+}
+
+/** The two things a meeting can give: something new, or someone close. Both 0..1. */
+export function encounterQualities(relationship: Pick<PersonRelationship, 'familiarity' | 'affinity'> | null | undefined): { novelty: number; closeness: number } {
+  return {
+    novelty: 1 - clamp01(relationship?.familiarity),
+    closeness: clamp01((clamp01(relationship?.affinity, 0.5) - 0.5) * 2),
+  }
+}
+
 function pressure(needs: EventAppraisalContext['needs'], code: NeedCode): number {
   return 1 - clamp01(needs.find((need) => need.needCode === code)?.satisfaction, 1)
 }
@@ -186,10 +203,7 @@ export function appraisalFromPopulationEvent(
     case 'npc_met_person': {
       // NOXIA-LIVING-0008: a new face or a close friend is a pleasure; the daily
       // meeting with a well-known colleague is routine and brings little.
-      const novelty = 1 - clamp01(rel?.familiarity)
-      const closeness = clamp01((clamp01(rel?.affinity, 0.5) - 0.5) * 2)
-      const meaning = Math.max(ROUTINE_ENCOUNTER_FLOOR, novelty, closeness)
-      return { goalImpact: 0.3 * meaning, stakes: 0.3 + 0.7 * pressure(context.needs, 'social') }
+      return { goalImpact: 0.3 * encounterMeaning(rel), stakes: 0.3 + 0.7 * pressure(context.needs, 'social') }
     }
     case 'person_assistance':
     case 'npc_assistance':

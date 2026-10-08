@@ -136,6 +136,12 @@ function socialOpportunity(context: PopulationDecisionContext): number {
   }, 0)
 }
 
+/** 0..1: is there anyone among the known people who would be a change to see? */
+function noveltyOpportunity(context: PopulationDecisionContext): number {
+  return context.relationships.reduce((best, relation) =>
+    Math.max(best, relation.affinity >= 0.5 ? Math.max(0, (1 - clampUnit(relation.familiarity)) - 0.2) / 0.8 : 0), 0)
+}
+
 function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
   const home = activeAssignment(context.assignments, 'home')
   const work = activeAssignment(context.assignments, 'work')
@@ -147,11 +153,15 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
   const safetyPressure = needPressure(context.needs, 'safety')
   const socialPressure = needPressure(context.needs, 'social')
   const purposePressure = needPressure(context.needs, 'purpose')
+  // NOXIA-LIVING-0009: boredom pulls towards other people and slightly away from routine work.
+  const varietyPressure = needPressure(context.needs, 'variety')
   const workObligation = clampUnit(context.workObligation ?? 0.5)
   const problem = bestKnownProblem(context)
   const problemSeverity = problem ? clampUnit(problem.severity) : 0
   const problemSkill = problem ? bestSkillLevel(context.skills, problem.requiredSkill) : 0
   const relationshipOpportunity = socialOpportunity(context)
+  // Going out only answers boredom if there is someone to see who is not routine.
+  const novelty = noveltyOpportunity(context)
 
   const basicNeedPressure = Math.max(
     sustenancePressure * NEED_WEIGHT.sustenance,
@@ -172,7 +182,7 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
     {
       action: 'work',
       score: work
-        ? 0.1 + workObligation * 0.72 + purposePressure * 0.28 + (atWork ? 0.15 : -0.18)
+        ? 0.1 + workObligation * 0.72 + purposePressure * 0.28 + (atWork ? 0.15 : -0.18) - varietyPressure * 0.1
         : -1,
       factors: { hasWork: Boolean(work), workObligation, purposePressure, atWork },
     },
@@ -205,9 +215,9 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
     {
       action: 'social_interaction',
       score: context.relationships.length > 0
-        ? 0.05 + socialPressure * 0.7 + relationshipOpportunity * 0.24
+        ? 0.05 + socialPressure * 0.7 + varietyPressure * 0.35 * novelty + relationshipOpportunity * 0.24
         : -1,
-      factors: { socialPressure, relationshipOpportunity, hasRelationship: context.relationships.length > 0 },
+      factors: { socialPressure, varietyPressure, noveltyOpportunity: novelty, relationshipOpportunity, hasRelationship: context.relationships.length > 0 },
     },
     {
       action: 'inspect_problem',

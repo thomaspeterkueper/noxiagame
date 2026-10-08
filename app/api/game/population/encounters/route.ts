@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { ENCOUNTER_EVENT_TYPES } from '@/lib/game/population/socialFriction'
 
 interface EncounterPersonResponse {
   id: string
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     .from('population_events')
     .select('id, tick, actor_person_id, related_person_id, location_id, payload, occurred_at')
     .eq('location_id', locationId)
-    .eq('event_type', 'social_interaction')
+    .in('event_type', ENCOUNTER_EVENT_TYPES as string[])
     .order('tick', { ascending: false })
     .limit(20)
 

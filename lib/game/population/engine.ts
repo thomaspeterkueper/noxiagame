@@ -12,8 +12,10 @@ import { persistPopulationEventMemory } from '../personSocialMemoryPersistence'
 import { persistObservableKnowledge } from './observableKnowledge'
 import { projectInteriorPresence } from './interiorPresence'
 import { circadianProfile, circadianState } from './circadian'
-import { activityForAction, needDelta } from './actionEffects'
-import { fadeRelationships } from './relationshipDynamics'
+import { activityForAction, encounterNeedDelta, needDelta, passiveNeedDrift, varietyFloor, type NeedEnvironment } from './actionEffects'
+import { encounterEventType, encounterOutcome, ENCOUNTER_EVENT_TYPES, type EncounterOutcome } from './socialFriction'
+import { encounterQualities, decayAffect, affectProfileFromTraits } from '../cognition/personAffect'
+import { fadeRelationships, pairCompatibility } from './relationshipDynamics'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
@@ -90,11 +92,23 @@ async function updateNeedsForAction(
   needs: any[],
   action: PopulationAction,
   tick: number,
+  environment: NeedEnvironment = {},
 ) {
   for (const need of needs) {
-    const next = Math.max(0, Math.min(1, Number(need.satisfaction ?? 1) + needDelta(action, need.need_code)))
+    const current = Number(need.satisfaction ?? 1)
+    // NOXIA-LIVING-0009: the action's effect under local supply, plus what wears off every hour.
+    const next = Math.max(0, Math.min(1, current + needDelta(action, need.need_code, environment) + passiveNeedDrift(need.need_code, environment, current)))
     await supabase.from('person_needs').update({ satisfaction: next, updated_tick: tick, updated_at: new Date().toISOString() }).eq('person_id', personId).eq('need_code', need.need_code)
+    // Keep the in-memory row current: later steps of this tick read it.
+    need.satisfaction = next
+    need.updated_tick = tick
   }
+}
+
+/** Supply of a settlement as far as the world state knows it: supplied or not. */
+const UNSUPPLIED_LEVEL = 0.4
+function supplyFromLocationRow(row: any): number {
+  return row && row.is_supplied === false ? UNSUPPLIED_LEVEL : 1
 }
 
 async function decideBackgroundPerson(
@@ -140,6 +154,8 @@ async function decideBackgroundPerson(
 interface EncounterAffectContext {
   needsByPerson: Map<string, any[]>
   traitsByPerson: Map<string, Record<string, unknown> | null>
+  affectSnapshot: AffectSnapshot
+  supplyByLocation: Map<string, number>
 }
 
 async function persistEncounterDirection(supabase: SupabaseLike, event: PopulationEvent, affectContext: EncounterAffectContext): Promise<boolean> {
@@ -165,7 +181,8 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     .from('population_events')
     .select('id')
     .eq('tick', event.tick)
-    .eq('event_type', event.eventType)
+    // Any encounter type counts: on a replay the outcome must not be stored a second time under another type.
+    .in('event_type', ENCOUNTER_EVENT_TYPES as string[])
     .eq('actor_person_id', event.actorPersonId)
     .eq('related_person_id', event.relatedPersonId)
     .limit(1)
@@ -209,6 +226,15 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
       relationship: current,
       traits: affectContext.traitsByPerson.get(event.actorPersonId) ?? null,
     })
+    // NOXIA-LIVING-0009: someone close answers the need for contact, someone new the need for variety.
+    const qualities = event.eventType === 'person_conflict' ? { novelty: 0, closeness: 0 } : encounterQualities(current ? fadeRelationships([current], event.tick)[0] : null)
+    for (const need of affectContext.needsByPerson.get(event.actorPersonId) ?? []) {
+      const gain = encounterNeedDelta(need.need_code, qualities)
+      if (gain === 0) continue
+      const next = Math.max(0, Math.min(1, Number(need.satisfaction ?? 1) + gain))
+      await supabase.from('person_needs').update({ satisfaction: next, updated_tick: event.tick, updated_at: new Date().toISOString() }).eq('person_id', event.actorPersonId).eq('need_code', need.need_code)
+      need.satisfaction = next
+    }
   }
   if ((current?.lastInteractionTick ?? -1) >= event.tick) return false
 
@@ -229,10 +255,43 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
   return true
 }
 
+/** NOXIA-LIVING-0009: how this meeting goes, from the state of both people and the settlement. */
+async function decideEncounterOutcome(supabase: SupabaseLike, encounter: PopulationEncounter, context: EncounterAffectContext): Promise<EncounterOutcome> {
+  const { data: rows, error } = await supabase
+    .from('person_relationships')
+    .select('*')
+    .in('person_id', [encounter.personAId, encounter.personBId])
+    .in('other_person_id', [encounter.personAId, encounter.personBId])
+  if (error) throw error
+  const faded = fadeRelationships((rows ?? []).map(relationshipFromRow), encounter.tick)
+  const affinity = (from: string, to: string) => faded.find((relation) => relation.personId === from && relation.otherPersonId === to)?.affinity
+  const person = (id: string) => {
+    const needs: Record<string, number> = {}
+    for (const row of context.needsByPerson.get(id) ?? []) needs[row.need_code] = Number(row.satisfaction)
+    const stored = context.affectSnapshot.affectByPerson.get(id)
+    return { id, needs, affect: stored ? decayAffect(stored, encounter.tick, affectProfileFromTraits(context.traitsByPerson.get(id) ?? null)) : null }
+  }
+  return encounterOutcome({
+    tick: encounter.tick,
+    a: person(encounter.personAId),
+    b: person(encounter.personBId),
+    compatibility: pairCompatibility(encounter.personAId, encounter.personBId),
+    affinityAB: affinity(encounter.personAId, encounter.personBId),
+    affinityBA: affinity(encounter.personBId, encounter.personAId),
+    supply: context.supplyByLocation.get(encounter.locationId) ?? 1,
+  })
+}
+
 async function persistEncounter(supabase: SupabaseLike, encounter: PopulationEncounter, affectContext: EncounterAffectContext): Promise<number> {
+  const outcome = await decideEncounterOutcome(supabase, encounter, affectContext)
+  const typed = (event: PopulationEvent): PopulationEvent => ({
+    ...event,
+    eventType: encounterEventType(outcome, event.actorPersonId ?? ''),
+    payload: { ...event.payload, outcome: outcome.kind },
+  })
   let projected = 0
-  if (await persistEncounterDirection(supabase, encounter.eventA, affectContext)) projected += 1
-  if (await persistEncounterDirection(supabase, encounter.eventB, affectContext)) projected += 1
+  if (await persistEncounterDirection(supabase, typed(encounter.eventA), affectContext)) projected += 1
+  if (await persistEncounterDirection(supabase, typed(encounter.eventB), affectContext)) projected += 1
   return projected
 }
 
@@ -278,6 +337,18 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
   const affectSnapshot = await loadAffectSnapshot(supabase, personIds)
   const traitsByPerson = new Map<string, Record<string, unknown> | null>(peopleRows.map((person: any) => [person.id, person.traits ?? null] as const))
 
+  // NOXIA-LIVING-0009: local supply changes what a meal restores and how tense people are.
+  const supplyByLocation = new Map<string, number>()
+  const locationIds = [...new Set(peopleRows.map((person: any) => person.current_location_id).filter(Boolean))]
+  if (locationIds.length) {
+    const { data: locationRows } = await supabase.from('locations').select('id, is_supplied').in('id', locationIds)
+    for (const row of locationRows ?? []) supplyByLocation.set(row.id, supplyFromLocationRow(row))
+  }
+  const environmentOf = (person: any): NeedEnvironment => ({
+    supply: supplyByLocation.get(person.current_location_id) ?? 1,
+    varietyFloor: varietyFloor(person.id, person.traits ?? null),
+  })
+
   const previousPeople: Person[] = peopleRows.map(personFromRow)
   const currentPeople = new Map<string, Person>(previousPeople.map(person => [person.id, person] as const))
   const previousCandidates = resolvedPresenceCandidates(previousPeople, assignments)
@@ -287,7 +358,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
   for (const person of peopleRows) {
     if (Number(person.last_tick ?? -1) >= tick) continue
     if (person.person_key) {
-      await updateNeedsForAction(supabase, person.id, needsByPerson.get(person.id) ?? [], actionFromNamedActivity(person.activity_state), tick)
+      await updateNeedsForAction(supabase, person.id, needsByPerson.get(person.id) ?? [], actionFromNamedActivity(person.activity_state), tick, environmentOf(person))
       namedNeedsAdvanced += 1
       continue
     }
@@ -325,7 +396,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       execution: execution.executed ? execution.kind : null,
     }
     await supabase.from('people').update({ activity_state: nextActivity, last_action: lastAction, last_decision_factors: decisionFactors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
-    await updateNeedsForAction(supabase, person.id, personNeeds, decision.action, tick)
+    await updateNeedsForAction(supabase, person.id, personNeeds, decision.action, tick, environmentOf(person))
     await supabase.from('population_events').insert({
       tick,
       event_type: intent.ok ? `npc_${decision.action}` : 'npc_action_blocked',
@@ -365,7 +436,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
   const currentCandidates = resolvedPresenceCandidates([...currentPeople.values()], assignments)
   const encounters = derivePopulationEncounters({ tick, candidates: currentCandidates, previousCandidates })
   let relationshipsProjected = 0
-  for (const encounter of encounters) relationshipsProjected += await persistEncounter(supabase, encounter, { needsByPerson, traitsByPerson })
+  for (const encounter of encounters) relationshipsProjected += await persistEncounter(supabase, encounter, { needsByPerson, traitsByPerson, affectSnapshot, supplyByLocation })
 
   return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, interiorPresence, affectAvailable: affectSnapshot.available, skipped: false }
 }

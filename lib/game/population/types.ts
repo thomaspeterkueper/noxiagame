@@ -23,7 +23,8 @@ export type PersonActivityState = (typeof PERSON_ACTIVITY_STATES)[number]
 export const ASSIGNMENT_TYPES = ['home', 'work', 'temporary'] as const
 export type AssignmentType = (typeof ASSIGNMENT_TYPES)[number]
 
-export const NEED_CODES = ['sustenance', 'rest', 'safety', 'social', 'purpose'] as const
+// 'variety' (NOXIA-LIVING-0009): need for change and new impressions. A person without a stored row counts as satisfied.
+export const NEED_CODES = ['sustenance', 'rest', 'safety', 'social', 'purpose', 'variety'] as const
 export type NeedCode = (typeof NEED_CODES)[number]
 
 export const BASE_ROLE_CODES = [

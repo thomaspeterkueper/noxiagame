@@ -9,6 +9,10 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/socialFriction.ts'
+      - 'lib/game/population/relocation.ts'
+      - 'lib/game/population/visitTarget.ts'
+      - 'lib/game/population/socialDynamics.test.ts'
       - 'lib/game/population/relationshipDynamics.ts'
       - 'lib/game/population/relationshipDynamics.test.ts'
       - 'lib/game/personSocialMemory.ts'
@@ -23,6 +27,10 @@ on:
       - 'lib/game/population/decision.ts'
       - 'lib/game/population/encounters.ts'
       - 'lib/game/population/presence.ts'
+      - 'lib/game/population/socialFriction.ts'
+      - 'lib/game/population/relocation.ts'
+      - 'lib/game/population/visitTarget.ts'
+      - 'lib/game/population/socialDynamics.test.ts'
       - 'lib/game/population/relationshipDynamics.ts'
       - 'lib/game/population/relationshipDynamics.test.ts'
       - 'lib/game/personSocialMemory.ts'
@@ -43,6 +51,10 @@ jobs:
         run: |
           npx --yes --package typescript@5 tsc lib/game/population/relationshipDynamics.ts lib/game/population/relationshipDynamics.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .relationship-dynamics-test
           node .relationship-dynamics-test/game/population/relationshipDynamics.test.js
+      - name: Friction, variety and relocation
+        run: |
+          npx --yes --package typescript@5 tsc lib/game/population/socialDynamics.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .social-dynamics-test
+          node .social-dynamics-test/game/population/socialDynamics.test.js
       - name: Test
         run: node .colony-run/research/colony/colonyRun.test.js
       - name: One simulated year
