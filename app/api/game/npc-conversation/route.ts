@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
       // A confirmed player utterance is testimony, not verified world knowledge.
       // Only project it after the existing conversation memory successfully writes.
       // No LLM call, no extra schema, no diffusion from mere co-location.
-      if (!memoryError && canonicalNpc?.id) {
+      if (process.env.NOXIA_TESTIMONY_CAPTURE_ENABLED === 'true' && body.allowTestimonyMemory === true && !memoryError && canonicalNpc?.id) {
         const { data: knowledgeTick, error: tickError } = await serviceClient
           .from('tick_log')
           .select('tick_number')
