@@ -98,3 +98,14 @@ Entscheidung: Ausschüttungen müssen aus echten Erlösen gedeckt sein. Produkti
 Reihenfolge danach: Miete (Mietzahler an Eigentümer), Warenverkauf (Käufer an Verkäufer), öffentliche Leistung (Budget an Betreiber); Steuer jeweils aus dem Transfer abgezweigt. Förderung nur als ausgewiesener Zuschuss aus einem finanzierten Haushalt.
 
 Noch nicht geprüft: Rückbau und Verkauf von Gebäuden (`app/api/game/build/route.ts`) schreiben Spielern ebenfalls Credits ohne Gegenkonto gut.
+
+
+## Miettransfer als erster echter Einnahmepfad
+
+Die G1-Regel für besteuerte Mietzahlungen ist jetzt als reine Funktion `taxedTransfer` modelliert: Bruttomiete wird beim Mieter abgebucht, Nettomiete beim Vermieter gutgeschrieben und die Steuer an die öffentliche Kasse geleitet. Die Buchung bleibt nullsummig.
+
+Wichtig für den Live-Bestand: Bestehende private Wohnzuweisungen sind historische `backfill`-Zuweisungen ohne vereinbarte Miete. Sie werden nicht rückwirkend belastet. Echte Mieterlöse entstehen daher erst bei neuen Marktverträgen oder einem später expliziten Vertragsübergang.
+
+Die Einnahme eines spielereigenen Mietobjekts landet zunächst beim zugeordneten `player_corp`-Akteur. Eine Übertragung auf `profiles.credits` wäre ein separater Eigentümer-/Dividenden-Transfer und darf nicht stillschweigend erfolgen.
+
+Aktuell sind alle konfigurierten lokalen Steuersätze 0. Ein künftiger Mietsteuersatz muss daher ausdrücklich beschlossen werden; er wird nicht aus `tax_property` oder `tax_transaction` erraten.
