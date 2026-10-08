@@ -211,3 +211,16 @@ Daraus folgt:
 - Die heutige Zuordnung des Vermieters läuft über `profile_economic_actors`: Einnahmen landen zunächst beim wirtschaftlichen Akteur des Spielers, nicht direkt in `profiles.credits`. Eine spätere Ausschüttung an das Spielerprofil ist ein eigener, typisierter Transfer.
 
 Damit wird weder ein Mietvertrag erfunden noch der Übergang zwischen Spieler- und NPC-Kontenkreis erneut unsichtbar gemacht.
+
+
+### Dormanter Live-Mietpfad (2026-10-08)
+
+Der technische Pfad für echte private Mietverhältnisse ist vorhanden, aber noch nicht an den Tick gekoppelt:
+
+- `POST /api/game/housing/lease` erlaubt einem authentifizierten Eigentümer, für ein eigenes aktives Wohnobjekt `lease_price` zu setzen oder das Angebot durch `NULL` zurückzunehmen.
+- `move_person_to_market_rental(person,tile,tick)` ist eine service-role-only Datenbankfunktion. Sie sperrt das Zielobjekt, prüft private Eigentümerschaft, Wohnkapazität, Angebot und Vermieterkonto, beendet die bisherige Wohnzuweisung und erzeugt atomar eine neue aktive `origin='market'`, `tenure='rented'` tenancy mit dem zum Einzugszeitpunkt gültigen `lease_price`.
+- Der erste Miettermin liegt 720 Ticks nach Einzug. Spätere Änderungen am Angebotsmietpreis verändern den bereits geschlossenen Vertrag nicht automatisch.
+- Kein Tick und kein NPC-Verhalten ruft die Move-Funktion derzeit auf. Damit ist Stufe 4 weiterhin nicht aktiviert.
+- Backfill/provided bleibt unverändert.
+
+Vor einer automatischen Nutzung muss der aufrufende Marktpfad weiterhin die bereits vorhandenen reinen Regeln für Leistbarkeit, Vermieterentscheidung und freiwillige Annahme anwenden. Die DB-Funktion ist der atomare Executor, nicht der Entscheider.
