@@ -44,6 +44,9 @@ check((caregiverSocial?.approachPreference ?? 0) > (visitorSocial?.approachPrefe
 check(end.expectationProbe.events.some(event => event.kind === 'expected_source_absent' && event.sourceRef === 'person:caregiver'), 'missing caregiver during distress produces learned expectation violation')
 check(end.expectationProbe.activeSearch?.targetRef === 'person:caregiver', 'one-month-old actively orients toward missing preferred regulation source')
 check(end.expectationProbe.activeSearch?.mode === 'orient', 'one-month-old social search remains developmentally non-locomotor')
+check(end.expectationProbe.events.some(event => event.kind === 'expected_source_absent' && event.sourceRef === 'person:caregiver'), 'missing caregiver during distress produces learned expectation violation')
+check(end.expectationProbe.activeSearch?.targetRef === 'person:caregiver', 'one-month-old actively orients toward missing preferred regulation source')
+check(end.expectationProbe.activeSearch?.mode === 'orient', 'one-month-old social search remains developmentally non-locomotor')
 
 if (failures) throw new Error(String(failures) + ' newborn early-life simulation test(s) failed')
 console.log(JSON.stringify({
