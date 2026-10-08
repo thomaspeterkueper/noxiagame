@@ -13,7 +13,8 @@ import {
   type PopulationAction,
   type PopulationDecision,
 } from './types'
-import { affectActionModifiers, type AffectState } from '../cognition/personAffect'
+import { affectActionModifiers, type AffectState } from '../cognition/personAffect' 
+import { habitActionModifier, type HabitState } from '../cognition/personHabit'
 
 export interface KnownLocalProblem {
   subjectType: string
