@@ -48,5 +48,5 @@ check(admitted.accessibleShare === 1 && admitted.shutOut === 0, 'granted request
 check(summarizeAccess([log('refused', 'backfill')]).requests === 0, 'backfill does not count as exercise of power')
 check(summarizeAccess([log('refused', 'provided')]).requests === 0, 'provided assignment does not count as exercise of power')
 check(summarizeAccess([log('declined')]).requests === 0, 'applicant decline not attributed to gatekeeper decision')
-console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 15, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, scope: 'pure rule contrast; no live effects' }))
-if (failures) process.exitCode = 1
+console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 16, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, scope: 'pure rule contrast; no live effects' }))
+if (failures) throw new Error(`OMNI-O5-ACCESS-001: ${failures} checks failed`)
