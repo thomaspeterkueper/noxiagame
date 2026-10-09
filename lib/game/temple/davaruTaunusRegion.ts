@@ -5,6 +5,9 @@ export const DAVARU_TAUNUS_HOME_REGION = {
   locality: 'Schmitten im Taunus',
   broaderArea: 'Großer Feldberg / Hochtaunus',
   narrativePrecision: 'approximate',
+  // Observed Schmitten settlement centre, not the temple plot (Wikidata Q622207).
+  placeCenter: { lat: 50.26972, lon: 8.44431 },
+  placeRadiusKm: 2.2,
   templeLocationStatus: 'unplaced',
   canonicalCharacterKeys: ['daniel-van-runen-davaru', 'aristeas-lux'],
   geography: {
