@@ -394,7 +394,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       ? await executePopulationActionIntent(supabase, intent.intent, tick)
       : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
 
-    const habitExecutionEvidence = classifyHabitExecution(decision.action, execution)
+    const habitExecutionEvidence = intent.ok ? classifyHabitExecution(decision.action, execution as Awaited<ReturnType<typeof executePopulationActionIntent>>) : { status: 'unverified' as const, reason: 'intent_blocked' }
     const nextActivity = activityForAction(decision.action)
     const lastAction = decision.factors.asleep === true
       ? 'sleep'
