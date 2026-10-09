@@ -44,7 +44,7 @@ export async function projectSurfacePresence(supabase:SupabaseLike,tick:number,p
     ? await supabase.from('person_travel_state').select('person_id').in('person_id',ids).eq('status','active')
     : {data:[],error:null}
   if(travelError)throw travelError
-  const travelling=new Set((activeTravel??[]).map((row:any)=>row.person_id))
+  const travelling=new Set<string>((activeTravel??[]).map((row:any):string=>String(row.person_id)))
   const keep=new Set<string>(travelling)
   const upserts:any[]=[]
   for(const candidate of candidates){
