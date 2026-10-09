@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: Compile intent contracts
         run: npx tsc lib/game/population/actionIntent.test.ts lib/game/population/tickIntent.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .population-intent-test
       - name: Run intent contracts
