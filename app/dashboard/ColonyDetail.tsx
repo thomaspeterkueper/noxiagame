@@ -2,9 +2,9 @@
 
 // app/dashboard/ColonyDetail.tsx
 // Kolonie-Detailansicht mit Versorgung, Ressourcen, Reisen und sichtbaren Personen.
-// Aktualisiert: 09.10.2026 — Bugfix: Flugkosten und Reichweite über transferQuote wie der Server;
-//               Linienflug-Preis für Spieler ohne eigenes Schiff
-// Version:      1.0.1
+// Aktualisiert: 09.10.2026 — Lagerbestand mit Kapazität; Hinweis, wenn die Produktion wegen vollen Lagers ruht
+// Vorher:       09.10.2026 — Flugkosten und Reichweite über transferQuote wie der Server
+// Version:      1.1.0
 
 import React from 'react'
 
@@ -25,6 +25,7 @@ interface Colony {
   population_max: number
   is_supplied: boolean
   location_resources?: ResRow[]
+  storage_capacity?: Record<string, number>
 }
 
 function ticksLeft(r: ResRow): number | null {
@@ -100,12 +101,15 @@ export default function ColonyDetail({
           {(colony.location_resources ?? []).map((r) => {
             const bal = r.production - r.consumption
             const left = ticksLeft(r)
+            const cap = colony.storage_capacity?.[r.resource]
+            const full = cap != null && r.stock >= cap
             return (
               <div key={r.resource} style={{ background: '#0a1420', border: '0.5px solid #1f3650', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', color: '#cfe0f5' }}>{RESOURCE_ICON[r.resource]} {RESOURCE_LABEL[r.resource]}</span>
                   <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', color: '#cfe0f5' }}>
-                    {r.stock}t
+                    {r.stock.toLocaleString('de')}{cap != null ? ` / ${cap.toLocaleString('de')}` : ''} t
+                    {full && <span style={{ color: '#e0b060', marginLeft: '6px', fontSize: '0.72rem' }}>Lager voll · Produktion ruht</span>}
                     <span style={{ color: bal >= 0 ? '#5dcaa5' : '#e0846a', marginLeft: '6px', fontSize: '0.72rem' }}>
                       ({bal >= 0 ? '+' : ''}{bal}/Tick)
                     </span>

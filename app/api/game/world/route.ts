@@ -1,9 +1,10 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Kolonie-Chronik: NPC-Ereignisse (Begegnungen, Konflikte, Firmenverkäufe,
+// Aktualisiert: 09.10.2026 — Lagerkapazität je Ort (storage_capacity) für die Anzeige
+// Vorher:       09.10.2026 — Kolonie-Chronik: NPC-Ereignisse (Begegnungen, Konflikte, Firmenverkäufe,
 //               Produktion) aus population_events und npc_ledger im Feed; erfundener Fülltext entfernt
 // Vorher:       28.08.2026 — Referenzorte (z. B. Erde) aus Live-Koloniestatistik entfernt
-// Version:      0.12.0
+// Version:      0.13.0
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -16,6 +17,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { BUILDINGS } from '@/lib/game/buildings/index'
 import { economyChronicle, personChronicle, type ChronicleItem } from '@/lib/game/chronicle'
+import { capacityFor, loadStorageCapacities, type StorageCapacity } from '@/lib/game/storageCapacity'
 
 const CHRONICLE_PERSON_WINDOW_TICKS = 24
 const CHRONICLE_ECONOMY_WINDOW_TICKS = 6
@@ -183,13 +185,19 @@ export async function GET() {
     news.push({ type: 'success', icon: '🟢', text: 'Alle Kolonien stabil versorgt' })
   }
 
+  // Lagerkapazität nur für simulierte Orte; schlägt die Abfrage fehl, fehlt die Angabe einfach.
+  let capacities: Map<string, StorageCapacity> | undefined
+  try { capacities = await loadStorageCapacities(supabase) } catch (err) { console.error('world: storage capacity failed:', err) }
+  const locationsWithStorage = (locations ?? []).map((loc: any) =>
+    capacities && loc.simulate_tick !== false ? { ...loc, storage_capacity: capacityFor(capacities, loc.id) } : loc)
+
   const totalPop = liveLocations.reduce((s: number, l: any) => s + Number(l.population ?? 0), 0)
   const suppliedCount = liveLocations.filter((l: any) => l.is_supplied).length
 
   return NextResponse.json({
     news:         news.slice(0, 8),
     chronicle,
-    locations:    locations ?? [],
+    locations:    locationsWithStorage,
     transactions: transactions.slice(0, 1),
     stats: {
       totalPopulation:  totalPop,

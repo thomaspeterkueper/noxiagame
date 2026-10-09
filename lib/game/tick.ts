@@ -1,9 +1,9 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 09.10.2026 — Preise folgen der Lagerreichweite (lib/game/priceModel.ts) statt festen
-//               Tonnen-Schwellen; Orte ohne Simulation behalten ihre gesetzten Preise
-// Vorher:       09.10.2026 — Bevölkerungsänderung über steppedDelta statt Math.round
-// Version:      3.5.0
+// Aktualisiert: 09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts): Produktion von Ort und
+//               NPC-Firmen ruht bei vollem Lager; Bestände über der Kapazität bleiben liegen
+// Vorher:       09.10.2026 — Preise folgen der Lagerreichweite (lib/game/priceModel.ts)
+// Version:      3.6.0
 
 import {
   CONSUMPTION_PER_100,
@@ -18,6 +18,7 @@ import {
 import { BUILDING_SALE } from './buildingSale'
 import { nextPopulation } from './populationGrowth'
 import { nextMarketPrice } from './priceModel'
+import { acceptedInflow, capacityFor, loadStorageCapacities, type StorageCapacity, type StorageResource } from './storageCapacity'
 import { entscheideNpc } from './npcBrain'
 import { runPopulationTick as runPersonPopulationTick } from './population/engine'
 import { runPersonTick } from './personBrain'
@@ -44,6 +45,7 @@ type SB = any
 
 interface DBBuildingDef {
   key:              string
+  tier:             number
   cost_credits:     number
   population_bonus: number
   production:       { resource: string; amount: number }[]
@@ -53,7 +55,7 @@ interface DBBuildingDef {
 async function loadBuildingDefs(supabase: SB): Promise<Map<string, DBBuildingDef>> {
   const { data, error } = await supabase
     .from('building_definitions')
-    .select('key, cost_credits, population_bonus, production, consumption')
+    .select('key, tier, cost_credits, population_bonus, production, consumption')
     .eq('is_active', true)
 
   if (error) {
@@ -65,6 +67,7 @@ async function loadBuildingDefs(supabase: SB): Promise<Map<string, DBBuildingDef
   for (const row of data ?? []) {
     map.set(row.key, {
       key:              row.key,
+      tier:             row.tier ?? 1,
       cost_credits:     row.cost_credits ?? 0,
       population_bonus: row.population_bonus ?? 0,
       production:       Array.isArray(row.production) ? row.production : [],
@@ -78,6 +81,7 @@ export async function runPopulationTick(
   supabase: SB,
   tickNumber: number,
   defs: Map<string, DBBuildingDef>,
+  storageCapacities?: Map<string, StorageCapacity>,
 ) {
   const results: Record<string, unknown>[] = []
 
@@ -207,9 +211,15 @@ export async function runPopulationTick(
       }
 
       const baseProduction = Number(r.base_production ?? 0)
-      const totalProd = baseProduction + legacyBuildingProduction + nativeBuildingProduction
-      const aggregateInflow = baseProduction + legacyBuildingProduction
+      const possibleInflow = baseProduction + legacyBuildingProduction
       const totalCons = (consumed[res] ?? 0) + totalBuildingConsumption
+      // Lagergrenze: produziert wird nur, was ins Lager passt. Ohne geladene
+      // Kapazitäten (Lookup fehlgeschlagen) gilt das bisherige Verhalten.
+      const aggregateInflow = storageCapacities
+        ? acceptedInflow({ stock: r.stock, inflow: possibleInflow, consumption: totalCons, capacity: capacityFor(storageCapacities, loc.id)[res as StorageResource] })
+        : possibleInflow
+      // production zeigt, was tatsächlich erzeugt wurde – bei vollem Lager also weniger.
+      const totalProd = aggregateInflow + nativeBuildingProduction
       const newStock  = Math.max(0, r.stock + aggregateInflow - totalCons)
 
       await supabase.from('location_resources')
@@ -381,7 +391,7 @@ export async function runOrderTick(supabase: SB, locationSnapshot?: any[]) {
   return created
 }
 
-export async function runNpcTick(supabase: SB, tickNumber: number, locationSnapshot?: any[]) {
+export async function runNpcTick(supabase: SB, tickNumber: number, locationSnapshot?: any[], storageCapacities?: Map<string, StorageCapacity>) {
   const { data: actors } = await supabase.from('actors').select('id, decision_weights').eq('kind', 'npc_firm')
   if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
   const locRows = locationSnapshot ?? (await supabase.from('locations').select('id, slug')).data
@@ -415,6 +425,14 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
       if (a.typ === 'produce') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
+        // Lagergrenze: Eine Firma produziert nur, was das Lager des Orts noch aufnimmt.
+        // Bei vollem Lager ruht die Anlage – keine Ware, kein Erlös.
+        const key0 = `${locId}|${a.resource}`
+        const menge = storageCapacities
+          ? acceptedInflow({ stock: stockMap.get(key0) ?? 0, inflow: a.menge, consumption: 0, capacity: capacityFor(storageCapacities, locId)[a.resource as StorageResource] ?? 0 })
+          : a.menge
+        if (menge <= 0) continue
+        a.menge = menge
         const erloes = a.menge * (sellPriceMap.get(`${locId}|${a.resource}`) ?? 0)
         const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'produce', resource: a.resource, goods_delta: a.menge, credit_delta: erloes, location_id: locId, ref: a.ref }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
         if (!ins?.length) continue
@@ -558,7 +576,15 @@ export async function runLandValueTick(supabase: SB, _locationSnapshot?: any[]) 
 
 export async function runTick(supabase: SB, tickNumber: number) {
   const defs = await loadBuildingDefs(supabase)
-  const population = await runPopulationTick(supabase, tickNumber, defs)
+  // Eine Abfrage für alle Orte; geteilt von Orts- und Firmenproduktion. Schlägt
+  // sie fehl, läuft der Tick ohne Lagergrenze weiter statt gar nicht.
+  let storageCapacities: Map<string, StorageCapacity> | undefined
+  try {
+    storageCapacities = await loadStorageCapacities(supabase, (entityId) => defs.get(entityId)?.tier ?? 1)
+  } catch (err) {
+    console.error('runTick: storage capacities unavailable, tick runs uncapped:', err)
+  }
+  const population = await runPopulationTick(supabase, tickNumber, defs, storageCapacities)
   // Living Population runs after aggregate colony state so decisions observe the
   // current tick. Unnamed people use the population engine; named actors use personBrain.
   const livingPopulation = await runPersonPopulationTick(supabase, tickNumber)
@@ -572,7 +598,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
     .from('locations')
     .select('id, slug, population, population_max, is_supplied, simulate_tick')
 
-  const npc = await runNpcTick(supabase, tickNumber, locationSnapshot ?? [])
+  const npc = await runNpcTick(supabase, tickNumber, locationSnapshot ?? [], storageCapacities)
   const payroll = await runNpcPayrollTick(supabase, tickNumber)
   const consumption = await runNpcConsumptionTick(supabase, tickNumber)
   const propertyMarket = await runNpcPropertyMarketTick(supabase, tickNumber)

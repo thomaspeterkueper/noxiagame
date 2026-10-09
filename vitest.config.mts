@@ -21,6 +21,7 @@ export default defineConfig({
       'lib/game/pilotQualification.test.ts',
       'lib/game/populationGrowth.test.ts',
       'lib/game/priceModel.test.ts',
+      'lib/game/storageCapacity.test.ts',
       'lib/game/core/facilityIncidents.test.ts',
       'lib/game/core/facilityMaintenance.test.ts',
       'lib/game/core/facilityProductionWear.test.ts',
