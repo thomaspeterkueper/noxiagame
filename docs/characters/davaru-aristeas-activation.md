@@ -26,3 +26,12 @@ Stand 2026-10-09: Figurenkonzepte, kanonische Rollen und Tempel-Adapter existier
 6. Später Tempelgebäude/Grundstück und rechtmäßige Zuweisungen im Core einrichten; Fernbesuche bleiben separate Sitzungen.
 
 Keine automatische Erstellung über GET-Endpunkte, kein Zugriff auf andere Spielerprofile, keine religiöse Autoritätsgewichtung.
+
+## Nachtrag 2026-10-09: Live-Anlage bestätigt
+
+Die beiden separaten `people`-Zeilen wurden in der NOXIA-Supabase-Datenbank angelegt und per SELECT samt `person_canonical_characters`-Zuordnung verifiziert:
+
+- DaVaRu: `person_key=literary:daniel-van-runen-davaru`, `character_key=daniel-van-runen-davaru`, `simulation_tier=background`, Standort `earth`.
+- Aristeas Lux: `person_key=literary:aristeas-lux`, `character_key=aristeas-lux`, `simulation_tier=background`, Standort `earth`.
+
+Beide sind unterschiedliche echte Personen-IDs. Es wurden keine Häuser, Tempelpräsenz, Geburtsjahre oder erfundenen Beziehungen zugewiesen. Der physische Tempel und seine tatsächliche Anwesenheitslogik bleiben offen.
