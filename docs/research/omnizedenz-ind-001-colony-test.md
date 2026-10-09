@@ -46,3 +46,17 @@ Aktueller Code: `lib/game/population/access.ts` (`NOXIA-OMNI-0002`), `housing.ts
 **Durchführungsgate:** Zuerst reinen, deterministischen Kontrasttest mit vorhandenen Funktionen schreiben und ausführen; erst nach separater Prüfung die Regeln in die isolierte Kolonie-Runtime einbinden. Keine Änderung von Live-Markt, Steuern oder NPC-Vermögen im Zuge dieser Forschung.
 
 **Status:** Design ergänzt, kein neuer Kontrastlauf ausgeführt. H1/H2 von IND-001 bleiben offen.
+
+## O5 — Erkenntnisregister nach deterministischen Zugangs-Kontrasten (2026-10-09)
+
+**Evidenzstatus:** Die isolierten Regeltests auf PR #468 (Branch `research/omni-o5-access-contrast-20261009`) sind im dedizierten GitHub-Actions-Workflow erfolgreich gelaufen, einschließlich Alternativen und Eigentumskonzentration. Die PR ist zum Zeitpunkt der Erfassung nicht in `main` integriert. Keine Langzeitkoloniesimulation und kein Realweltbeleg.
+
+- **O5-E1 — Vier Stufen:** Ressourcenexistenz, individuelle Eignung/Finanzierbarkeit, fremd- bzw. institutionell bewilligter Zugang und tatsächliche Realisierung getrennt messen. Eine bewilligte Option ist noch keine ausgeführte Handlung.
+- **O5-E2 — Kontrafaktische Machtwirkung:** Bei konstanten Personen/Ressourcen die Entscheidung oder Kontrollstruktur eines Akteurs variieren und die Veränderung zugänglicher Alternativen bestimmen. `M(A→B;C) = Δ|P_B(C)|` ist nur eine kontextgebundene *Kardinalitätsheuristik*, kein universeller Machtbegriff: Möglichkeiten sind nicht gleichwertig, können voneinander abhängen und verschiedene Zeitwirkungen besitzen.
+- **O5-E3 — Konzentration vs. Wirkung:** `topGatekeeperShare` zählt Entscheidungen; kausale Ausschlusswirkung erfordert zusätzlich den Vergleich der tatsächlich erreichbaren Alternativen. Viele Entscheidungen allein belegen keinen starken Eingriff.
+- **O5-E4 — Substituierbarkeit als Moderator:** Unter gleichen Beständen und Antragstellereigenschaften kann die Verteilung der Kontrolle auf unabhängige Gatekeeper eine verweigerte Option durch andere Optionen kompensierbar machen. Im Modell sind zwei getrennte Eigentümer mit einer Bewilligung nicht gleich einem Eigentümer, der beide Wohnungen verweigert.
+- **O5-H1 — Langzeitabhängigkeit (offen):** Wiederholter, nicht substituierbarer Zugangsentzug könnte Einkommen, Ortswechsel, Beziehungen und künftigen Spielraum kumulativ beeinflussen. Noch nicht getestet; Gegenhypothesen: Anpassung, öffentliche Versorgung, neue Angebote, Mobilität und Exit.
+
+**Methodische Sicherungen:** Zähler nur über wohldefinierte, für dieselbe Person relevante Optionen; keine bloße Addition ungleichwertiger Chancen. Zugangsablehnung, Nicht-Eignung, Kapazitätsmangel, eigener Verzicht und technische Nicht-Ausführung auseinanderhalten. Gleichbleibende Seeds, Personen, Ressourcen und Nachfrage; Änderung nur der zu prüfenden Kontrollvariable. Keine Ableitung starker ontologischer Irreduzibilität aus simulierten Regelwirkungen.
+
+**Nächste Prüfung:** zeitlicher Verlauf mit Ersatzoptionen und Exit-Möglichkeiten, individuelle Verteilungsmetriken statt nur Aggregatmittelwerten; anschließend isolierte Kolonieintegration. Forschungsbranch erst nach Review und CI-Gesamtzustand integrieren.
