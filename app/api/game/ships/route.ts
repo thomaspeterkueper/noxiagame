@@ -2,7 +2,7 @@
 // Aktualisiert: 09.10.2026 — erstes eigenes Schiff setzt kaufmännische Qualifikation voraus
 //               (Handelserfahrung oder Grundausbildung, s. lib/game/merchantQualification.ts)
 // Vorher:       10.09.2026 — atomarer Schiffstyp-Kauf/-Wechsel
-// Version:      0.5.0
+// Version:      0.5.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -37,7 +37,8 @@ function shipPurchaseError(error: unknown) {
   if (message.includes('NOXIA_SHIP_TYPE_WRONG_LOCATION')) {
     const match = message.match(/NOXIA_SHIP_TYPE_WRONG_LOCATION:([^ ·]+)/)
     const availableAt = match?.[1] ?? 'diesem Standort'
-    return NextResponse.json({ error: `Dieses Schiff ist nur auf ${availableAt.toUpperCase()} erhältlich.` }, { status: 400 })
+    const place: Record<string, string> = { moon: 'dem Mond', mars: 'dem Mars', earth: 'der Erde', phobos: 'Phobos' }
+    return NextResponse.json({ error: `Dieses Schiff gibt es nur in der Werft auf ${place[availableAt] ?? availableAt}.` }, { status: 400 })
   }
   console.error('ship purchase command failed:', message)
   return NextResponse.json({ error: 'Schiffskauf fehlgeschlagen' }, { status: 500 })
