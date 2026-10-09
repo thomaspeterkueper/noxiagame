@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { LOC_ICON, LOC_NAME } from './ui'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
+import { pilotFee } from '@/lib/game/pilotQualification'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
 import { getToken } from '@/lib/supabase/auth'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -43,6 +44,7 @@ export default function LandingOverlay({
   const hasShip = useGameStore(state => Boolean(state.shipId))
   const speedMult = useGameStore(state => state.speedMult)
   const credits = useGameStore(state => state.credits)
+  const pilotRequired = useGameStore(state => state.pilotRequired)
   const [navigationProficiency, setNavigationProficiency] = useState(0)
 
   // Navigationswissen senkt Energie und Dauer; der Server rechnet damit, also
@@ -155,6 +157,7 @@ export default function LandingOverlay({
                         {hasShip ? `⚡ ${Number.isFinite(energyCost) ? energyCost : '–'}t` : `🎫 Linienflug ${Number.isFinite(ticketPrice) ? ticketPrice.toLocaleString('de') : '–'} Cr`}
                         {!hasEnergy && hasShip && Number.isFinite(energyCost) && ` (fehlt ${energyCost - energyOnBoard}t)`}
                         {!hasEnergy && !hasShip && ' (zu wenig Guthaben)'}
+                        {hasShip && pilotRequired && quote && ` · 🧑‍✈️ Pilot ${pilotFee(quote, false).toLocaleString('de')} Cr`}
                       </span>
                       {!reachable && travelSecs != null && (
                         <span style={{ color: '#e74c3c' }}>außer Reichweite</span>

@@ -28,9 +28,9 @@ function shipPurchaseError(error: unknown) {
     return NextResponse.json({ error: 'Schiff kann während eines laufenden Transits nicht gewechselt werden.', code: 'SHIP_IN_TRANSIT' }, { status: 409 })
   }
   if (message.includes('NOXIA_SHIP_TYPE_NOT_FOUND')) return NextResponse.json({ error: 'Schiffstyp nicht gefunden' }, { status: 404 })
-  // Der atomare Kauf-Befehl tauscht bisher nur den Typ eines vorhandenen Schiffs.
-  // Den Erstkauf ohne Schiff kann er noch nicht anlegen (eigene Migration nötig).
+  // Nur noch möglich, solange Migration 20261009140000 (Erstkauf) nicht eingespielt ist.
   if (message.includes('NOXIA_SHIP_NOT_FOUND')) return NextResponse.json({ error: 'Der Erstkauf eines Schiffs ist noch nicht freigeschaltet.', code: 'FIRST_SHIP_PURCHASE_PENDING' }, { status: 409 })
+  if (message.includes('NOXIA_SHIP_TYPE_NOT_FOR_SALE')) return NextResponse.json({ error: 'Dieses Schiff steht nicht zum Verkauf.' }, { status: 400 })
   if (message.includes('NOXIA_PROFILE_NOT_FOUND')) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
   if (message.includes('NOXIA_SHIP_TYPE_ALREADY_OWNED')) return NextResponse.json({ error: 'Du hast dieses Schiff bereits.' }, { status: 400 })
   if (message.includes('NOXIA_SHIP_PURCHASE_CREDITS_INSUFFICIENT')) return NextResponse.json({ error: 'Unzureichende Credits.' }, { status: 400 })

@@ -57,6 +57,8 @@ interface GameState {
   shipId:     string | null
   shipTypeId: string
   speedMult:  number
+  /** Eigenes Schiff ohne Flugausbildung: je Flug fällt ein Pilotenhonorar an. */
+  pilotRequired: boolean
   shipRange:  number
   loaded:     boolean
 
@@ -129,6 +131,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   shipId:     null,
   shipTypeId: 'freighter_mk1',
   speedMult:  1.0,
+  pilotRequired: false,
   shipRange:  28,
   loaded:     false,
 
@@ -174,6 +177,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         shipId:       data.shipId,
         shipTypeId:   data.shipTypeId ?? 'freighter_mk1',
         speedMult:    data.speedMult ?? 1.0,
+        pilotRequired: Boolean(data.pilotRequired),
         shipRange:    data.rangeDistance ?? 28,
         loaded:       true,
         inTransit,

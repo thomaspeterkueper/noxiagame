@@ -118,6 +118,8 @@ export type AtomicTransitStartResult = {
   energy_used: number
   energy_left: number
   landing_fee: number
+  /** Honorar des angeheuerten Piloten (0 mit eigener Flugausbildung oder im Linienflug). */
+  pilot_fee?: number
   credits?: number
   docking_managed: boolean
   docking_pad_entity_id: string | null
@@ -272,17 +274,20 @@ export async function startTransitCommand(input: {
   durationSeconds: number
   energyNeeded: number
   dockingIdleHours?: number
+  /** Honorar eines angeheuerten Piloten; wird atomar mit dem Start gebucht (Migration 20261009140000). */
+  pilotFee?: number
 }): Promise<AtomicTransitStartResult> {
   const supabase = createServiceClient()
-  const { data, error } = await supabase.rpc('noxia_start_transit', {
+  const { data, error } = await supabase.rpc('noxia_start_transit_with_pilot', {
     p_profile_id: input.profileId,
     p_destination_slug: input.destination,
     p_duration_seconds: input.durationSeconds,
     p_energy_needed: input.energyNeeded,
     p_docking_idle_hours: input.dockingIdleHours ?? 24,
+    p_pilot_fee: Math.max(0, Math.round(input.pilotFee ?? 0)),
   })
 
-  if (error) throw commandError('noxia_start_transit', error)
+  if (error) throw commandError('noxia_start_transit_with_pilot', error)
   return data as AtomicTransitStartResult
 }
 
