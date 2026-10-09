@@ -262,12 +262,16 @@ function scoreActions(context: PopulationDecisionContext): ScoredAction[] {
       ? (entry.action === 'rest' || entry.action === 'satisfy_basic_need' ? 0 : SLEEP_DRIVE_WEIGHT[entry.action] ?? 0)
       : SLEEP_DRIVE_WEIGHT[entry.action] ?? 0
     const sleepModifier = sleepDrive > 0 && available ? sleepDrive * sleepWeight : 0
+    const habitModifier = available && context.habitContextKey && !wakeEmergency && sleepDrive < 0.8
+      ? Math.max(0, ...(context.habits ?? []).map(h => habitActionModifier(h, entry.action, context.habitContextKey!)))
+      : 0
     return {
       ...entry,
-      score: roundScore(entry.score + affectModifier + sleepModifier),
+      score: roundScore(entry.score + affectModifier + sleepModifier + habitModifier),
       factors: {
         ...entry.factors,
         ...(modifiers ? { affectModifier } : {}),
+        ...(habitModifier ? { habitModifier } : {}),
         ...(sleepDrive > 0 ? { sleepDrive, wakeEmergency, asleep: entry.action === 'rest' && sleepDrive >= 1 && !wakeEmergency } : {}),
       },
     }
