@@ -85,5 +85,29 @@ const concentratedLog: AccessRecord[] = [
 check(summarizeAccess(distributedLog).topGatekeeperShare === 0.5, 'distributed decisions have half-share concentration')
 check(summarizeAccess(concentratedLog).topGatekeeperShare === 1, 'single owner decides all applications')
 check(summarizeAccess(distributedLog).shutOut === 0 && summarizeAccess(concentratedLog).shutOut === 1, 'ownership concentration changes complete exclusion')
-console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 25, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, concentration: { distributedAccess, concentratedAccess }, scope: 'pure rule contrast; no live effects' }))
+
+// Temporal counterfactual: same starting resources and deterministic rules.
+// A missed job causes foregone wages, which can outlast the gate reopening.
+// This is a deliberately minimal model, not the colony tick economy.
+type TemporalState = { wealth: number; working: boolean; missedWages: number }
+const simulatePeriods = (blockedFirstPeriod: boolean, alternativeJob: boolean): TemporalState => {
+  const state: TemporalState = { wealth: 0, working: false, missedWages: 0 }
+  for (let period = 0; period < 4; period++) {
+    const primaryOpen = period > 0 || !blockedFirstPeriod
+    const accessible = primaryOpen || alternativeJob
+    if (accessible) state.working = true
+    if (state.working) state.wealth += 100
+    else state.missedWages += 100
+  }
+  return state
+}
+const uninterrupted = simulatePeriods(false, false)
+const temporaryBlock = simulatePeriods(true, false)
+const temporaryBlockWithExit = simulatePeriods(true, true)
+check(uninterrupted.wealth === 400, 'uninterrupted employment yields four wage periods')
+check(temporaryBlock.wealth === 300 && temporaryBlock.working, 'one-period refusal creates persistent wealth gap after reopening')
+check(temporaryBlock.missedWages === 100, 'foregone wages are explicitly recorded')
+check(temporaryBlockWithExit.wealth === uninterrupted.wealth, 'independent substitute prevents wage gap')
+check(simulatePeriods(true, false).wealth === temporaryBlock.wealth, 'temporal contrast is deterministic')
+console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 30, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, concentration: { distributedAccess, concentratedAccess }, temporal: { uninterrupted, temporaryBlock, temporaryBlockWithExit }, scope: 'pure rule contrast; no live effects' }))
 if (failures) throw new Error(`OMNI-O5-ACCESS-001: ${failures} checks failed`)
