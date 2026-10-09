@@ -48,5 +48,21 @@ check(admitted.accessibleShare === 1 && admitted.shutOut === 0, 'granted request
 check(summarizeAccess([log('refused', 'backfill')]).requests === 0, 'backfill does not count as exercise of power')
 check(summarizeAccess([log('refused', 'provided')]).requests === 0, 'provided assignment does not count as exercise of power')
 check(summarizeAccess([log('declined')]).requests === 0, 'applicant decline not attributed to gatekeeper decision')
-console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 16, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, scope: 'pure rule contrast; no live effects' }))
+// Multiple independent alternatives: a refusal only closes the possibility space
+// if no other accessible, affordable offer remains.
+const alternative: Dwelling = { ...dwelling, id: 'flat-2', ownerId: 'owner-b' }
+const alternatives = [dwelling, alternative]
+const possibleHomes = (affinities: Record<string, number>): string[] =>
+  alternatives.filter((home) =>
+    housingOffer(home, applicant, 1) !== null &&
+    landlordDecision({ dwelling: home, freePlaces: 1, applicant, ownerAffinity: affinities[home.ownerId] }).granted
+  ).map((home) => home.id)
+const openBoth = possibleHomes({ 'owner-a': 0.6, 'owner-b': 0.6 })
+const deniedOne = possibleHomes({ 'owner-a': 0.2, 'owner-b': 0.6 })
+const deniedBoth = possibleHomes({ 'owner-a': 0.2, 'owner-b': 0.2 })
+check(openBoth.length === 2, 'two independent owners provide two accessible alternatives')
+check(deniedOne.length === 1 && deniedOne[0] === 'flat-2', 'one refusal reduces but does not eliminate alternatives')
+check(deniedBoth.length === 0, 'combined refusal closes all alternatives')
+check(possibleHomes({ 'owner-a': 0.2, 'owner-b': 0.6 }).length === deniedOne.length, 'deterministic replay of the same conditions')
+console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 20, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, scope: 'pure rule contrast; no live effects' }))
 if (failures) throw new Error(`OMNI-O5-ACCESS-001: ${failures} checks failed`)
