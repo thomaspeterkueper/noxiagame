@@ -6,6 +6,7 @@
 // Vorher: 10.09.2026 — atomarer Spot-Handel; Transit aus Trade herausgelöst
 // Version:      1.0.2
 
+import { hasPilotTraining } from '@/lib/game/pilotQualification'
 import { NextRequest, NextResponse } from 'next/server'
 import { publishTransaction } from '@/lib/ably/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -107,6 +108,11 @@ async function executeSpotTrade(userId: string, action: SpotTradeAction, resourc
   }
 }
 
+async function playerHasPilotTraining(userId: string) {
+  const { data } = await serviceClient.from('player_learning_progress').select('module_id').eq('profile_id', userId).eq('completed', true)
+  return hasPilotTraining((data ?? []).map((m: any) => String(m.module_id)))
+}
+
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -171,6 +177,8 @@ export async function GET(req: NextRequest) {
       cargoMax: ship?.cargo_max ?? 40,
       cargo,
       hasShip: Boolean(ship),
+      // Eigenes Schiff ohne Flugausbildung: ein angeheuerter Pilot fliegt (Honorar je Flug).
+      pilotRequired: Boolean(ship) && !(await playerHasPilotTraining(user.id)),
       shipId: ship?.id ?? null,
       shipTypeId: ship?.ship_type_id ?? null,
       speedMult: Number((shipType as any)?.speed_mult ?? 1.0),

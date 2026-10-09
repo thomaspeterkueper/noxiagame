@@ -10,6 +10,7 @@ import React from 'react'
 
 import { ResourceType, LocationSlug, useGameStore } from '@/lib/store/gameStore'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
+import { pilotFee } from '@/lib/game/pilotQualification'
 import BuildingResidentsCard from './BuildingResidentsCard'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
@@ -47,7 +48,7 @@ export default function ColonyDetail({
   onTravel: (dest: LocationSlug) => void
   currentTick?: number
 }) {
-  const { location, shipRange, shipId, speedMult, credits } = useGameStore()
+  const { location, shipRange, shipId, speedMult, credits, pilotRequired } = useGameStore()
   if (!colony) return null
 
   // Dieselbe Rechnung wie der Server (lib/game/core/transit.ts). Navigations-
@@ -143,7 +144,7 @@ export default function ColonyDetail({
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginTop: '6px', padding: '0 4px' }}>
               {hasShip ? <>
-                <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>⚡ Treibstoff: {energyCost}t</span>
+                <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>⚡ Treibstoff: {energyCost}t{pilotRequired && quote && pilotFee(quote, false, currentTick) > 0 ? ` · Pilot ${pilotFee(quote, false, currentTick).toLocaleString('de')} Cr` : ''}</span>
                 <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>
                   An Bord: {energyOnBoard}t{!hasEnergy && ` · fehlt ${energyCost - energyOnBoard}t`}
                 </span>

@@ -47,6 +47,13 @@ function transitError(error: unknown) {
       landingFee: match ? Number(match[1]) : undefined,
     }, { status: 400 })
   }
+  if (message.includes('NOXIA_TRANSIT_PILOT_FEE_INSUFFICIENT')) {
+    const match = message.match(/NOXIA_TRANSIT_PILOT_FEE_INSUFFICIENT:(\d+):(\d+)/)
+    return NextResponse.json({
+      error: match ? `Der Pilot verlangt ${match[1]} Cr Honorar — nicht genug Credits (${match[2]} Cr nach Landegebühr)` : 'Nicht genug Credits für das Pilotenhonorar.',
+      pilotFee: match ? Number(match[1]) : undefined,
+    }, { status: 400 })
+  }
   if (message.includes('NOXIA_TRANSIT_NO_LANDING_CAPACITY')) return NextResponse.json({ error: 'Kein freier Landeplatz am Ziel verfügbar.', code: 'NO_LANDING_CAPACITY' }, { status: 409 })
   if (message.includes('NOXIA_TRANSIT_ALREADY_ACTIVE')) return NextResponse.json({ error: 'Das Schiff befindet sich bereits im Transit.', code: 'TRANSIT_ALREADY_ACTIVE' }, { status: 409 })
   if (message.includes('NOXIA_TRANSIT_SAME_LOCATION')) return NextResponse.json({ error: 'Das Schiff befindet sich bereits am Ziel.' }, { status: 400 })
@@ -105,6 +112,7 @@ export async function POST(req: NextRequest) {
         energyUsed: result.energy_used,
         energyLeft: result.energy_left,
         landingFee: result.landing_fee,
+        pilotFee: result.pilot_fee ?? 0,
         credits: result.credits,
         docking: {
           managed: result.docking_managed,

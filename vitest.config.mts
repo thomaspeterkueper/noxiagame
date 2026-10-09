@@ -18,6 +18,7 @@ export default defineConfig({
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/chronicle.test.ts',
       'lib/game/merchantQualification.test.ts',
+      'lib/game/pilotQualification.test.ts',
       'lib/game/populationGrowth.test.ts',
       'lib/game/priceModel.test.ts',
       'lib/game/core/facilityIncidents.test.ts',

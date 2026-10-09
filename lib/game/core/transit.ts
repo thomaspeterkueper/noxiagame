@@ -6,6 +6,7 @@ import { ORBITS } from '@/lib/game/orbits'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
+import { hasPilotTraining, pilotFee } from '@/lib/game/pilotQualification'
 import {
   completePassengerTransitCommand,
   completeTransitCommand,
@@ -199,12 +200,22 @@ export async function startPlayerTransit(profileId: string, destination: string)
     throw new Error(`NOXIA_TRANSIT_OUT_OF_RANGE:${quote.distance}:${rangeDistance}`)
   }
 
+  // Ohne eigene Flugausbildung fliegt ein angeheuerter Pilot. Abgeleitet aus
+  // dem Lernjournal; schlägt die Abfrage fehl, gilt der Spieler als ungeschult.
+  const { data: completedModules } = await supabase
+    .from('player_learning_progress')
+    .select('module_id')
+    .eq('profile_id', profileId)
+    .eq('completed', true)
+  const trained = hasPilotTraining((completedModules ?? []).map((m: any) => String(m.module_id)))
+
   return startTransitCommand({
     profileId,
     destination,
     durationSeconds: quote.durationSeconds,
     energyNeeded: quote.energy,
     dockingIdleHours: DOCKING_IDLE_EXPIRE_HOURS,
+    pilotFee: pilotFee(quote, trained, tick),
   })
 }
 
