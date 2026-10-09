@@ -201,3 +201,56 @@ export function taxedTransfer(input: {
     },
   }
 }
+
+
+export interface FiscalCoverageInput {
+  publicPayroll: number
+  taxableBases: {
+    transactionGross?: number
+    rentGross?: number
+    propertyGross?: number
+    landingGross?: number
+    tariffGross?: number
+  }
+  rates: {
+    transaction?: number
+    rent?: number
+    property?: number
+    landing?: number
+    tariff?: number
+  }
+}
+
+export interface FiscalCoverageResult {
+  publicPayroll: number
+  projectedRevenue: number
+  coverageRatio: number
+  fundingGap: number
+  bySource: Record<'transaction'|'rent'|'property'|'landing'|'tariff', number>
+}
+
+/**
+ * Read-only fiscal sustainability measure.
+ *
+ * It does not choose rates and does not alter gameplay. It only asks whether
+ * observed taxable flows, at explicitly supplied rates, could finance the
+ * public payroll without emission.
+ */
+export function fiscalCoverage(input: FiscalCoverageInput): FiscalCoverageResult {
+  const payroll = Math.max(0, Number(input.publicPayroll || 0))
+  const clampRate = (value: number | undefined) => Math.max(0, Math.min(1, Number(value || 0)))
+  const base = (value: number | undefined) => Math.max(0, Number(value || 0))
+
+  const bySource = {
+    transaction: round(base(input.taxableBases.transactionGross) * clampRate(input.rates.transaction)),
+    rent: round(base(input.taxableBases.rentGross) * clampRate(input.rates.rent)),
+    property: round(base(input.taxableBases.propertyGross) * clampRate(input.rates.property)),
+    landing: round(base(input.taxableBases.landingGross) * clampRate(input.rates.landing)),
+    tariff: round(base(input.taxableBases.tariffGross) * clampRate(input.rates.tariff)),
+  }
+  const projectedRevenue = round(Object.values(bySource).reduce((total, value) => total + value, 0))
+  const fundingGap = round(Math.max(0, payroll - projectedRevenue))
+  const coverageRatio = payroll > 0 ? round(projectedRevenue / payroll) : 1
+
+  return { publicPayroll: payroll, projectedRevenue, coverageRatio, fundingGap, bySource }
+}
