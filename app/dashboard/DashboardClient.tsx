@@ -2,7 +2,11 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 16.09.2026 — Onboarding-Check (profile.onboarded) entfernt;
+// Aktualisiert: 09.10.2026 — Einstieg: Guide-Buttons öffnen echte Ziele statt
+//               window.scrollTo (im fixen Viewport wirkungslos); Guide öffnet
+//               sich nach Ankunft am Journey-Ziel; Werft/Header ohne
+//               Schein-Frachter für schifflose Spieler.
+// Vorher:       16.09.2026 — Onboarding-Check (profile.onboarded) entfernt;
 //               DashboardGate.tsx prüft das jetzt exklusiv VOR dem Mounten
 //               dieser Komponente (s. Commit d9d5def), diese Stelle wurde
 //               dadurch wirkungslos und ist jetzt bereinigt.
@@ -14,7 +18,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.22.0-debug
+// Version:      2.22.1-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -64,7 +68,7 @@ function KompetenzBar({ icon, wert, max, farbe }: { icon: string; wert: number; 
 }
 
 function DashboardClientInner({ locations: initialLocations, prices, orders: initialOrders, autoOpenJourney }: { locations: any[]; prices: any[]; orders: any[]; autoOpenJourney?: boolean }) {
-  const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loadFromServer, inTransit, shipTypeId, invalidate, invalidations, shipRange } = useGameStore()
+  const { credits, cargo, cargoMax, location, buy, sell, travel, cargoUsed, loadFromServer, inTransit, shipId, shipTypeId, invalidate, invalidations, shipRange } = useGameStore()
 
   const handleInteriorAction = (kind: 'market'|'shipyard'|'navigation'|'ship'|'parts'|null) => {
     if (kind === 'market')     setAuctionOpen(true)
@@ -104,6 +108,10 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   const [cockpitOpen, setCockpitOpen]           = useState(false)
   const [solarSystemOpen, setSolarSystemOpen]   = useState(false)
   const [journeyDest,  setJourneyDest]          = useState<string | undefined>(undefined)
+  // Ziel des aktiven Journey-Schritts; nach Ankunft dort öffnet sich der Guide
+  // wieder, damit der erledigte Schritt und der nächste sichtbar werden.
+  const journeyDestRef = React.useRef<string | undefined>(undefined)
+  useEffect(() => { journeyDestRef.current = journeyDest }, [journeyDest])
   const GRID_TILE_SIZE = 64
   const [shipyardOpen, setShipyardOpen] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
@@ -115,7 +123,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
 
   useEffect(() => { loadFromServer() }, [])
   const prevLocationRef = React.useRef(location)
-  useEffect(() => { if (prevLocationRef.current !== location) { prevLocationRef.current = location; loadFromServer() } }, [location])
+  useEffect(() => { if (prevLocationRef.current !== location) { prevLocationRef.current = location; loadFromServer(); if (journeyDestRef.current && journeyDestRef.current === location) setJourneyOpen(true) } }, [location])
   useEffect(() => {
     async function fetchWorld() {
       if (document.visibilityState !== 'visible') return
@@ -268,10 +276,9 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
 
   // Journey-Hint-Mapper: welche entity_ids je Schritt hervorheben?
   const JOURNEY_STEP_HINTS: Record<string, string[]> = {
-    'moon-1':   ['shipyard'],
     'moon-2':   [],
-    'moon-3':   ['solar', 'ice_drill'],
-    'moon-4':   ['habitat'],
+    'moon-3':   ['solar'],
+    'moon-4':   ['ice_drill'],
     'merchant-1': ['shipyard'],
     'merchant-2': ['warehouse'],
     'research-1': ['school'],
@@ -304,9 +311,10 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   const journeyActions = {
     onOpenShipyard: () => { setJourneyOpen(false); setShipyardOpen(true) },
     onOpenWarehouse: () => { setJourneyOpen(false); setWarehouseOpen(true) },
-    onOpenTravel: () => { setJourneyOpen(false); window.scrollTo({ top: 70, behavior: 'smooth' }) },
-    onFocusGrid: () => { setJourneyOpen(false); window.scrollTo({ top: 120, behavior: 'smooth' }) },
-    onOpenAcademyHint: () => { setJourneyOpen(false); showToast('Klicke auf die Akademie im Grid, um Wissen zu sammeln.', true) },
+    onOpenTravel: () => { setJourneyOpen(false); setSolarSystemOpen(true) },
+    onTransitStarted: () => { setJourneyOpen(false) },
+    onFocusGrid: () => { setJourneyOpen(false); showToast('Wählen Sie eine freie Stelle auf der Karte und dann „Bauen".', true) },
+    onOpenAcademyHint: () => { setJourneyOpen(false); showToast('Wählen Sie die Akademie auf der Karte, um Wissen zu sammeln.', true) },
     onActiveStepChange: handleActiveStepChange,
     onStepCompleted: (title: string) => showToast(`✓ Geschafft: ${title}`, true),
     onJourneyCompleted: handleJourneyCompleted,
@@ -393,7 +401,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
           </div>
         </div>
       )}
-      <ShipyardOverlay open={shipyardOpen} onClose={() => setShipyardOpen(false)} currentShipTypeId={shipTypeId ?? 'freighter_mk1'} credits={credits} onBuyShip={async (type) => { const token = await getToken(); const data = await (await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`${type} gekauft!`, true); await loadFromServer(); setShipyardOpen(false) } else showToast(data.error ?? 'Kauf fehlgeschlagen', false) }} />
+      <ShipyardOverlay open={shipyardOpen} onClose={() => setShipyardOpen(false)} currentShipTypeId={shipId ? (shipTypeId ?? 'freighter_mk1') : null} credits={credits} onBuyShip={async (type) => { const token = await getToken(); const data = await (await fetch(`/api/game/ships?action=buy&shipTypeId=${type}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`${SHIP_LABEL[type] ?? 'Schiff'} gekauft!`, true); await loadFromServer(); setShipyardOpen(false) } else showToast(data.error ?? 'Kauf fehlgeschlagen', false) }} />
       <OrderNegotiation order={negotiateOrder ? { ...negotiateOrder, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === negotiateOrder.resource)?.stock } : null} onClose={() => setNegotiateOrder(null)} canFulfill={negotiateOrder?.locations?.slug === location && (cargo[negotiateOrder?.resource as ResourceType] ?? 0) >= negotiateOrder?.amount} fulfillHint={negotiateOrder?.locations?.slug !== location ? 'Falscher Standort.' : 'Nicht genug Ladung.'} onAccept={async (id, bonus) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${id}&agreedReward=${Math.round(bonus)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} />
 
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 1200, flexShrink: 0, boxShadow: '0 1px 8px rgba(27,39,51,0.04)' }}>
@@ -402,7 +410,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
           <button onClick={() => setJourneyOpen(true)} style={{ background: 'transparent', color: T.blueDeep, border: `1px solid ${T.line}`, borderRadius: T.radius, padding: '0.45rem 0.8rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.02em' }}>☰ Einweisung</button>
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          {([['Credits', `${credits.toLocaleString('de')} Cr`], ['Frachter', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
+          {([['Credits', `${credits.toLocaleString('de')} Cr`], [shipId ? 'Frachter' : 'Fracht (Spediteur)', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
           <button onClick={() => setFoundingOpen(true)} style={{ background: 'none', border: `1px solid ${T.line}`, borderRadius: 8, padding: '0.3rem 0.75rem', cursor: 'pointer', color: T.inkSoft, fontSize: '0.78rem' }}>
             🚀 Gründen
           </button>

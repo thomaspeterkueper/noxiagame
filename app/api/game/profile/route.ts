@@ -1,6 +1,6 @@
 // route.ts
-// Aktualisiert: 23.06.2026 — flight_count im Profil ausgeben
-// Version:      0.3.0
+// Aktualisiert: 09.10.2026 — Start-Journey: Titel und Schrittzahl an den Katalog angeglichen
+// Version:      0.3.1
 // app/api/game/profile/route.ts
 // Erstellt:     07.06.2026
 // Aktualisiert: 23.06.2026 17:05 — flight_count im Profil ausgeben
@@ -205,11 +205,11 @@ export async function GET(req: NextRequest) {
       await serviceClient.from('player_journeys').insert({
         profile_id:  user.id,
         journey_key: 'moon_colony',
-        title:       'Mondbasis gründen',
+        title:       'Von der Erde nach Shackleton',
         status:      'active',
         selected:    true,
         progress:    0,
-        progress_max: 4,
+        progress_max: 3,
         started_at:  new Date().toISOString(),
       })
     }

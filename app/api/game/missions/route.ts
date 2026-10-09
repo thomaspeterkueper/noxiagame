@@ -1,5 +1,8 @@
 // app/api/game/missions/route.ts
 // Start missions backed by real game state.
+// Aktualisiert: 09.10.2026 — „Eigenes Schiff" ist kein Pflicht-Einstieg mehr (schiffloser Start),
+//               Mission ans Ende der Grundmissionen verschoben; Texte ohne „Kachel"
+// Version:      1.0.1
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -8,12 +11,12 @@ type Step = { id:string; title:string; description:string; action:'shipyard'|'wa
 type Mission = { id:string; title:string; theme:string; summary:string; reward:string; steps:Step[] }
 
 const MISSIONS: Mission[] = [
-  { id:'m_start_ship',title:'Startklar',theme:'Raumfahrt',summary:'Besorgen Sie sich ein einsatzfähiges Schiff. Ohne Schiff bleiben Handel, Expansion und Mondprogramm Theorie.',reward:'+ Orientierung',steps:[{id:'ship_owned',title:'Ein Schiff besitzen',description:'Öffnen Sie die Werft und kaufen oder aktivieren Sie ein geeignetes Schiff.',action:'shipyard'}]},
   { id:'m_first_trade',title:'Der erste Handel',theme:'Handel',summary:'Kaufen Sie Ware an einem Standort und verkaufen oder liefern Sie sie an anderer Stelle.',reward:'+ Handelsverständnis',steps:[{id:'cargo_ready',title:'Laderaum nutzen',description:'Öffnen Sie das Warenhaus und kaufen Sie Wasser, Energie oder Metall.',action:'warehouse'},{id:'trade_done',title:'Ersten Handel abschließen',description:'Verkaufen Sie Ware oder erfüllen Sie einen Auftrag.',action:'warehouse'}]},
   { id:'m_first_flight',title:'Der erste Flug',theme:'Navigation',summary:'Reisen Sie zu einem anderen Standort. Dadurch wird klar, dass Noxia nicht an einem Ort stattfindet.',reward:'+ Raumgefühl',steps:[{id:'flight_done',title:'Standort wechseln',description:'Öffnen Sie die Standort-/Reiseansicht und fliegen Sie zu einem erreichbaren Ziel.',action:'travel'}]},
-  { id:'m_first_industry',title:'Erste Produktion',theme:'Industrie',summary:'Errichten Sie ein Produktionsgebäude. Energie, Wasser und Metall sind die Grundlage späterer Kolonien.',reward:'+ Produktionsverständnis',steps:[{id:'production_built',title:'Produktionsgebäude bauen',description:'Klicken Sie auf eine freie Kachel und bauen Sie z. B. Solarfeld, Mine oder Eisbohrer.',action:'grid'}]},
+  { id:'m_first_industry',title:'Erste Produktion',theme:'Industrie',summary:'Errichten Sie ein Produktionsgebäude. Energie, Wasser und Metall sind die Grundlage späterer Kolonien.',reward:'+ Produktionsverständnis',steps:[{id:'production_built',title:'Produktionsgebäude bauen',description:'Wählen Sie eine freie Stelle auf der Karte und bauen Sie z. B. Solarfeld, Mine oder Eisbohrer.',action:'grid'}]},
   { id:'m_first_knowledge',title:'Wissen freischalten',theme:'Forschung',summary:'Wissenschaft ist ein Kernmotor von Noxia. Sammeln Sie erste Wissenspunkte.',reward:'+ Forschungsverständnis',steps:[{id:'knowledge_gained',title:'Erste Wissenspunkte sammeln',description:'Suchen Sie eine Akademie und nutzen Sie Aufgaben oder Handbuch.',action:'academy'}]},
   { id:'m_moon_basis',title:'Die erste Mondbasis',theme:'Kolonisation',summary:'Verbinden Sie Raumfahrt, Versorgung und Bau zu einer dauerhaften Präsenz auf dem Mond.',reward:'+ Mondprogramm',steps:[{id:'moon_reached',title:'Mond erreichen',description:'Fliegen Sie zum Mond oder besitzen Sie dort ein erstes Gebäude.',action:'travel'},{id:'moon_power',title:'Energie auf dem Mond sichern',description:'Bauen Sie ein Solarfeld oder eine andere Energiequelle auf dem Mond.',action:'grid'},{id:'moon_water',title:'Wasser oder Eis sichern',description:'Bauen Sie einen Eisbohrer oder Wasserextraktor auf dem Mond.',action:'grid'}]},
+  { id:'m_start_ship',title:'Eigenes Schiff',theme:'Raumfahrt',summary:'Linienflüge und Spediteure genügen für den Anfang. Ein eigenes Schiff bringt mehr Laderaum und Tempo.',reward:'+ Unabhängigkeit',steps:[{id:'ship_owned',title:'Ein Schiff besitzen',description:'Öffnen Sie die Werft und kaufen Sie ein Schiff, sobald Ihr Guthaben reicht.',action:'shipyard'}]},
   {
     id:'m_phobos_stickney',title:'Stickney-Einsatz',theme:'Phobos · Mikrogravitation',
     summary:'Nehmen Sie Base Alpha wissenschaftlich und technisch in Betrieb: Versorgung, Prospektion, direkte Bohrkern-Evidenz und robotischer Pilotabbau.',

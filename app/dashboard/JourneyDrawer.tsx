@@ -2,8 +2,9 @@
 
 // app/dashboard/JourneyDrawer.tsx
 // Erstellt:     01.07.2026
-// Aktualisiert: 09.07.2026 — Commit E: Callbacks durchleiten, Offen-Welt-Hinweis
-// Version:      0.2.0
+// Aktualisiert: 09.10.2026 — onTransitStarted durchleiten (Guide schließt nach Flugstart)
+// Vorher:       09.07.2026 — Commit E: Callbacks durchleiten, Offen-Welt-Hinweis
+// Version:      0.2.1
 import React from 'react'
 import JourneyGuideCard from './JourneyGuideCard'
 import StarterMissionsCard from './StarterMissionsCard'
@@ -16,6 +17,7 @@ type Props = {
   onOpenShipyard: () => void
   onOpenWarehouse: () => void
   onOpenTravel: () => void
+  onTransitStarted?: () => void
   onFocusGrid: () => void
   onOpenAcademyHint: () => void
   onActiveStepChange?: (stepId: string | null) => void
@@ -52,6 +54,7 @@ export default function JourneyDrawer({ open, currentLocation, onClose, ...actio
             onOpenShipyard={actions.onOpenShipyard}
             onOpenWarehouse={actions.onOpenWarehouse}
             onOpenTravel={actions.onOpenTravel}
+            onTransitStarted={actions.onTransitStarted}
             onFocusGrid={actions.onFocusGrid}
             onOpenAcademyHint={actions.onOpenAcademyHint}
             onActiveStepChange={actions.onActiveStepChange}

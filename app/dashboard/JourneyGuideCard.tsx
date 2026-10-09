@@ -2,8 +2,10 @@
 
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 18.09.2026 — Mondweg startet kanonischen Transit nach Shackleton
-// Version:      0.6.0
+// Aktualisiert: 09.10.2026 — Mondweg ohne Schiffspflicht: Aktionen an Schritt-ID statt Reihenfolge,
+//               Linienflug-Beschriftung für schifflose Spieler
+// Vorher:       18.09.2026 — Mondweg startet kanonischen Transit nach Shackleton
+// Version:      0.6.1
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
@@ -36,6 +38,7 @@ type JourneyGuideCardProps = {
   onOpenShipyard?: () => void
   onOpenWarehouse?: () => void
   onOpenTravel?: () => void
+  onTransitStarted?: () => void
   onFocusGrid?: () => void
   onOpenAcademyHint?: () => void
   onActiveStepChange?: (stepId: string | null) => void
@@ -48,14 +51,13 @@ function pct(j: PlayerJourney) {
   return Math.max(0, Math.min(100, Math.round((j.progress / Math.max(1, j.progress_max)) * 100)))
 }
 
-function actionForStep(journeyKey: JourneyKey, step: JourneyStep | undefined, actions: JourneyGuideCardProps) {
+function actionForStep(journeyKey: JourneyKey, step: JourneyStep | undefined, actions: JourneyGuideCardProps, hasShip = true) {
   if (!step) return null
   const base = { fontSize: '0.61rem', fontWeight: 800, borderRadius: 5, padding: '0.35rem 0.55rem', cursor: 'pointer' as const }
 
   if (journeyKey === 'moon_colony') {
-    if (step.step_order === 1) return { label: 'Werft öffnen', onClick: actions.onOpenShipyard, style: base }
-    if (step.step_order === 2) return { label: 'Mondflug starten', onClick: actions.onOpenTravel, style: base }
-    if (step.step_order === 3 || step.step_order === 4) return { label: 'Shackleton-Oberfläche öffnen', onClick: actions.onFocusGrid, style: base }
+    if (step.id === 'moon-2') return { label: hasShip ? 'Mondflug starten' : 'Linienflug nach Shackleton buchen', onClick: actions.onOpenTravel, style: base }
+    if (step.id === 'moon-3' || step.id === 'moon-4') return { label: 'Bauplatz auf dem Mond wählen', onClick: actions.onFocusGrid, style: base }
   }
 
   if (journeyKey === 'merchant') {
@@ -86,6 +88,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   const travel = useGameStore(state => state.travel)
   const inTransit = useGameStore(state => state.inTransit)
   const gameLocation = useGameStore(state => state.location)
+  const hasShip = useGameStore(state => Boolean(state.shipId))
 
   async function loadJourneys() {
     try {
@@ -169,7 +172,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
       await travel('moon')
       // Der bestehende Dashboard-Callback schließt die Einweisung. Der
       // TransitPanel übernimmt danach die Darstellung des serverseitigen Flugs.
-      props.onOpenTravel?.()
+      props.onTransitStarted?.()
     } finally {
       setBusy(null)
     }
@@ -222,8 +225,8 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
               const completed = new Set(j?.completed_step_ids ?? [])
               const ownSteps = steps.filter(s => s.journey_key === def.key).sort((a, b) => a.step_order - b.step_order)
               const firstOpen = ownSteps.find(s => !completed.has(s.id))
-              const moonTransfer = def.key === 'moon_colony' && firstOpen?.step_order === 2
-              const action = actionForStep(def.key, firstOpen, moonTransfer ? { ...props, onOpenTravel: startMoonTransfer } : props)
+              const moonTransfer = def.key === 'moon_colony' && firstOpen?.id === 'moon-2'
+              const action = actionForStep(def.key, firstOpen, moonTransfer ? { ...props, onOpenTravel: startMoonTransfer } : props, hasShip)
               const progressMax = j?.progress_max ?? (ownSteps.length || 1)
               return (
                 <div key={def.key} style={{ background: '#fbfaf7', border: `1px solid ${T.lineSoft}`, borderRadius: T.radius, padding: '0.75rem' }}>

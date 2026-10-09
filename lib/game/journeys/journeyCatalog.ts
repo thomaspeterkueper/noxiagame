@@ -1,3 +1,8 @@
+// lib/game/journeys/journeyCatalog.ts
+// Aktualisiert: 09.10.2026 — Mondweg ohne Schiffspflicht: Schritt „Schiff bereitmachen" entfernt
+//               (neue Profile starten seit 03.10.2026 schifflos; Linienflug genügt), Texte in Spielsprache
+// Version:      1.1.0
+
 export type JourneyKey = 'moon_colony' | 'merchant' | 'research' | 'industry'
 
 export type JourneyGuideDef = {
@@ -33,9 +38,9 @@ export const JOURNEY_DEFS: JourneyGuideDef[] = [
     key: 'moon_colony',
     icon: '🚀',
     title: 'Von der Erde nach Shackleton',
-    subtitle: 'Schiff vorbereiten, Mondtransfer fliegen und eine Basis aufbauen',
+    subtitle: 'Zum Mond fliegen und die erste Versorgung aufbauen',
     goal: 'Fliegen Sie von der Erde zum Shackleton-Gebiet und errichten Sie dort die ersten dauerhaft nutzbaren Versorgungsstrukturen.',
-    firstStep: 'Prüfen Sie Ihr Schiff. Danach führt der Weg über den Mondtransfer direkt nach Shackleton.',
+    firstStep: 'Fliegen Sie nach Shackleton – per Linienflug oder mit dem eigenen Schiff.',
   },
   {
     key: 'merchant',
@@ -71,38 +76,29 @@ export const JOURNEY_TITLES: Record<JourneyKey, string> = JOURNEY_DEFS.reduce(
 export const DEFAULT_JOURNEY_STEPS: Record<JourneyKey, JourneyCatalogStep[]> = {
   moon_colony: [
     {
-      id: 'moon-1',
-      journey_key: 'moon_colony',
-      step_order: 1,
-      title: 'Schiff für den Mondtransfer bereitmachen',
-      description: 'Prüfen Sie Ihr aktives Schiff in der Werft. Ein vorhandenes geeignetes Schiff erfüllt diesen Schritt automatisch; Reichweite und Energie werden beim Start serverseitig geprüft.',
-      optional: false,
-      trigger: { type: 'ship_count', min: 1 },
-    },
-    {
       id: 'moon-2',
       journey_key: 'moon_colony',
-      step_order: 2,
+      step_order: 1,
       title: 'Von der Erde nach Shackleton fliegen',
-      description: 'Starten Sie den Mondtransfer. NOXIA führt den Flug als echten serverseitigen Transit: Abflug, Transfer, Brems- und Landephase. Erst nach der bestätigten Ankunft wechselt Ihr Standort auf den Mond.',
+      description: 'Buchen Sie einen Linienflug zum Mond oder fliegen Sie mit dem eigenen Schiff. Der Flug dauert nur wenige Sekunden; nach der Landung sind Sie in Shackleton.',
       optional: false,
       trigger: { type: 'current_location', value: 'moon' },
     },
     {
       id: 'moon-3',
       journey_key: 'moon_colony',
-      step_order: 3,
+      step_order: 2,
       title: 'Energieversorgung in Shackleton sichern',
-      description: 'Öffnen Sie die Shackleton-Oberfläche, wählen Sie im metrischen ENU-Gelände einen freien Bauplatz und errichten Sie ein Solarfeld oder eine andere geeignete Energieanlage.',
+      description: 'Wählen Sie auf der Mondkarte einen freien Bauplatz und errichten Sie ein Solarfeld oder eine andere Energieanlage.',
       optional: false,
       trigger: { type: 'entity_at_location', location: 'moon', entityIds: ['solar', 'solar_field', 'power_plant'] },
     },
     {
       id: 'moon-4',
       journey_key: 'moon_colony',
-      step_order: 4,
+      step_order: 3,
       title: 'Wasser oder Eis erschließen',
-      description: 'Erschließen Sie anschließend Wasser beziehungsweise polares Eis. Platzierung, Kollisionen, Credits und Bauzeit laufen über denselben persistenten Spatial-Build-Pfad wie die übrige Welt.',
+      description: 'Bauen Sie anschließend einen Eisbohrer oder Wasserextraktor. Mit Energie und Wasser steht Ihre erste Versorgung.',
       optional: false,
       trigger: { type: 'entity_at_location', location: 'moon', entityIds: ['ice_drill', 'water_extractor'] },
     },
