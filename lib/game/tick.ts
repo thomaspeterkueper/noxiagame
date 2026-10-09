@@ -1,7 +1,9 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 11.09.2026 — Facility-Produktion in adressierbare Logistics-Inventare
-// Version:      3.4.0
+// Aktualisiert: 09.10.2026 — Bugfix: Bevölkerungsänderung über steppedDelta statt Math.round
+//               (kleine Kolonien konnten nie wachsen, sehr kleine nie schrumpfen)
+// Vorher:       11.09.2026 — Facility-Produktion in adressierbare Logistics-Inventare
+// Version:      3.4.1
 
 import {
   CONSUMPTION_PER_100,
@@ -19,6 +21,7 @@ import {
   ORDER_COVERAGE_TICKS,
 } from './config'
 import { BUILDING_SALE } from './buildingSale'
+import { nextPopulation } from './populationGrowth'
 import { entscheideNpc } from './npcBrain'
 import { runPopulationTick as runPersonPopulationTick } from './population/engine'
 import { runPersonTick } from './personBrain'
@@ -225,8 +228,10 @@ export async function runPopulationTick(
       overcrowded = true
       newPop = Math.max(popMax, pop - Math.ceil(pop * DECLINE_RATE))
     } else {
-      const rate = isSupplied ? GROWTH_RATE : -DECLINE_RATE
-      newPop = Math.round(Math.max(0, Math.min(popMax, pop * (1 + rate))))
+      newPop = nextPopulation({
+        population: pop, populationMax: popMax, supplied: isSupplied,
+        growthRate: GROWTH_RATE, declineRate: DECLINE_RATE, tickNumber,
+      })
     }
 
     await supabase.from('locations')

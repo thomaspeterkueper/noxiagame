@@ -2,8 +2,9 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 05.09.2026 — Scanner-Fokus gehört dem Grid statt Dashboard-DOM-Bridges
-// Version:      5.25.0
+// Aktualisiert: 09.10.2026 — Bauzeit in Echtzeit statt „Tick(s)" (Grid-Pfad: 1 Tick = 24 h)
+// Vorher:       05.09.2026 — Scanner-Fokus gehört dem Grid statt Dashboard-DOM-Bridges
+// Version:      5.25.1
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -296,7 +297,7 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
                 }}>
                   <div style={{ fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
                   <div style={{ fontSize: '0.65rem', color: canBuildNow ? '#5a5248' : '#9e9485' }}>
-                    {shownCost.toLocaleString('de')} Cr · {item.buildTimeTicks} Tick(s)
+                    {shownCost.toLocaleString('de')} Cr · Bauzeit ca. {item.buildTimeTicks} {item.buildTimeTicks === 1 ? 'Tag' : 'Tage'}
                     {prodText && ` · ${prodText}`}
                     {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
                   </div>

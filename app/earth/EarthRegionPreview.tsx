@@ -1,5 +1,9 @@
 'use client'
 
+// app/earth/EarthRegionPreview.tsx
+// Aktualisiert: 09.10.2026 — Bauzeit in Stunden statt „Tick(s)", Fertigstellungszeit nach dem Bauauftrag
+// Version:      1.0.1
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
@@ -24,6 +28,18 @@ type Candidate = GeoPoint & { elevationM:number; slopePercent:number; reliefM:nu
 type ShortlistCandidate = Candidate & { shortlistRank:1|2|3; shortlistLabel:'A'|'B'|'C'; shortlistReason:string }
 type CandidatePayload = { ok:boolean; candidates?:Candidate[]; shortlist?:ShortlistCandidate[]; attribution?:string; error?:string }
 type BuildRequirements = { knowledgeOk:boolean; creditsOk:boolean; canBuild:boolean; requiredUnlock:string|null; requiredLabel:string|null }
+// Fertig wird ein Bau beim ersten stündlichen Lauf nach completes_at, daher
+// auf die nächste volle Stunde aufrunden.
+function readyLabel(iso?:string|null){
+  if(!iso)return ''
+  const t=new Date(iso).getTime()
+  if(!Number.isFinite(t))return ''
+  const ready=new Date(Math.ceil(t/3600000)*3600000)
+  const sameDay=ready.toDateString()===new Date().toDateString()
+  const time=ready.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})
+  return ` – fertig gegen ${sameDay?'':ready.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+', '}${time} Uhr`
+}
+
 type BuildingDef = { id:string; name:string; cost:number; buildTimeTicks:number; footprint:{widthM:number;depthM:number;clearanceM:number}; requirements?:BuildRequirements }
 type SpatialEntity = { id:string; entity_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string; ownerLabel?:string; isOwn?:boolean }
 type PendingBuild = { id:string; buildable_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string; created_at?:string|null; completes_at?:string|null; buildTimeTicks?:number|null }
@@ -375,7 +391,7 @@ export default function EarthRegionPreview(){
       const response=await fetch('/api/game/build/spatial',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({buildableId:building.id,location:'earth',xM:target.xM,yM:target.yM,rotationDeg:normalized})})
       const json=await response.json()
       if(!response.ok)throw new Error(json.error??'Bauauftrag fehlgeschlagen')
-      setBuildMessage(`${building.name}: Bauauftrag bei ${normalized}° angelegt`)
+      setBuildMessage(`${building.name}: Bauauftrag angelegt${readyLabel(json.completesAt)}`)
       setSelectedSpot(null);setSelectedPendingBuildId(json.buildId);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setLayers(v=>({...v,noxia:true}))
       await loadSpatial()
     }catch(error){setBuildMessage(error instanceof Error?error.message:String(error))}
@@ -492,7 +508,7 @@ export default function EarthRegionPreview(){
           <div className="earth-rotation-fine"><button onClick={()=>setRotationDeg(v=>normalizeRotation(v-15))}>−15°</button><input aria-label="Gebäuderotation" type="range" min="0" max="359" step="1" value={rotationDeg} onChange={e=>setRotationDeg(normalizeRotation(Number(e.currentTarget.value)))}/><button onClick={()=>setRotationDeg(v=>normalizeRotation(v+15))}>+15°</button></div>
           <small className="earth-preview-note">Gelb: metrischer Footprint · gestrichelt: lokaler Freiraum. Die gespeicherte Rotation wird vom Weltobjekt übernommen.</small>
           <div className="earth-placement-actions"><button onClick={()=>{setSelectedBuild(null);setRotationDeg(0)}}>Zurück</button><button className="primary" disabled={placing} onClick={()=>void placeBuilding(selectedBuild,selectedSpot,rotationDeg)}>{placing?'Prüfe …':'Jetzt bauen'}</button></div>
-        </div>:<div className="earth-build-picker"><div className="earth-build-picker-head"><b>Gebäude wählen</b><button onClick={()=>setBuildMenuOpen(false)}>zurück</button></div><div className="earth-build-options">{(spatial?.available??[]).map(building=>{const req=building.requirements,creditsOk=req?.creditsOk??((spatial?.profile?.credits??0)>=building.cost),knowledgeOk=req?.knowledgeOk??true,canBuild=req?.canBuild??(creditsOk&&knowledgeOk);return <button key={building.id} className={`earth-build-option ${canBuild?'':'locked'}`} disabled={!canBuild||placing} onClick={()=>{setSelectedBuild(building);setRotationDeg(0);setBuildMessage(null)}}><span className="build-name"><strong>{building.name}</strong><em>{building.cost.toLocaleString('de-DE')} Cr</em></span><span className="build-meta">{building.footprint.widthM}×{building.footprint.depthM} m · {building.buildTimeTicks} Tick{building.buildTimeTicks===1?'':'s'}</span><span className={creditsOk?'req-ok':'req-no'}>{creditsOk?'✓':'×'} Credits</span><span className={knowledgeOk?'req-ok':'req-no'}>{knowledgeOk?'✓':'×'} {req?.requiredLabel?`Wissen: ${req.requiredLabel}`:'keine zusätzliche Wissensvoraussetzung'}</span></button>})}</div></div>}
+        </div>:<div className="earth-build-picker"><div className="earth-build-picker-head"><b>Gebäude wählen</b><button onClick={()=>setBuildMenuOpen(false)}>zurück</button></div><div className="earth-build-options">{(spatial?.available??[]).map(building=>{const req=building.requirements,creditsOk=req?.creditsOk??((spatial?.profile?.credits??0)>=building.cost),knowledgeOk=req?.knowledgeOk??true,canBuild=req?.canBuild??(creditsOk&&knowledgeOk);return <button key={building.id} className={`earth-build-option ${canBuild?'':'locked'}`} disabled={!canBuild||placing} onClick={()=>{setSelectedBuild(building);setRotationDeg(0);setBuildMessage(null)}}><span className="build-name"><strong>{building.name}</strong><em>{building.cost.toLocaleString('de-DE')} Cr</em></span><span className="build-meta">{building.footprint.widthM}×{building.footprint.depthM} m · Bauzeit ca. {building.buildTimeTicks} Std.</span><span className={creditsOk?'req-ok':'req-no'}>{creditsOk?'✓':'×'} Credits</span><span className={knowledgeOk?'req-ok':'req-no'}>{knowledgeOk?'✓':'×'} {req?.requiredLabel?`Wissen: ${req.requiredLabel}`:'keine zusätzliche Wissensvoraussetzung'}</span></button>})}</div></div>}
         <small className="earth-terrain-note">Geländedaten sind derzeit eine Standortanalyse. Harte Baugrenzen werden erst mit dem validierten Terrain-Sampler serverseitig verbindlich.</small>
       </div>}
 

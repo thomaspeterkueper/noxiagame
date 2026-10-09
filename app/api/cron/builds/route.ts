@@ -1,7 +1,9 @@
 // app/api/cron/builds/route.ts
 // Erstellt: 31.05.2026
-// Aktualisiert: 10.09.2026 — atomarer Build-Abschluss über NOXIA Game Core
-// Version:      1.2.0
+// Aktualisiert: 09.10.2026 — Bugfix: Bau-Abschluss wird dem Spieler gemeldet (publishBuildCompleted
+//               wurde nie aufgerufen, der Toast „Bau abgeschlossen!" konnte nie erscheinen)
+// Vorher:       10.09.2026 — atomarer Build-Abschluss über NOXIA Game Core
+// Version:      1.2.1
 //
 // Cron-Job: Prüft fällige Bauaufträge. Die eigentliche Zustandsänderung liegt
 // ausschließlich im transaktionalen Core-Command noxia_complete_build().
@@ -11,6 +13,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { completeBuildCommand } from '@/lib/game/core/commands'
 import { CRON_SECRET_HEADER } from '@/lib/game/config'
 import { BUILDINGS } from '@/lib/game/buildings/index'
+import { publishBuildCompleted } from '@/lib/ably/server'
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get(CRON_SECRET_HEADER)
@@ -40,6 +43,20 @@ export async function GET(req: NextRequest) {
         }
 
         const result = await completeBuildCommand(build.id, !buildable.planned)
+
+        // Nur melden, wenn dieser Lauf den Bau wirklich abgeschlossen hat. Die
+        // Meldung ist reine Anzeige: schlägt sie fehl, bleibt der Bau gültig.
+        if (!result.idempotent && build.profile_id) {
+          try {
+            await publishBuildCompleted(build.profile_id, {
+              entityId: String(result.entity_id ?? build.buildable_id),
+              entityName: buildable.name,
+              locationSlug: build.locations?.slug ?? '',
+            })
+          } catch (notifyErr) {
+            console.error(`Build ${build.id}: Abschlussmeldung fehlgeschlagen:`, notifyErr)
+          }
+        }
 
         completed.push({
           buildId: build.id,

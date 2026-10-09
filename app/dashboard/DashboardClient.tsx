@@ -2,7 +2,8 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Einstieg: Guide-Buttons öffnen echte Ziele statt
+// Aktualisiert: 09.10.2026 — Bau-Abschluss-Toast nennt Gebäude und Ort.
+// Vorher:       09.10.2026 — Einstieg: Guide-Buttons öffnen echte Ziele statt
 //               window.scrollTo (im fixen Viewport wirkungslos); Guide öffnet
 //               sich nach Ankunft am Journey-Ziel; Werft/Header ohne
 //               Schein-Frachter für schifflose Spieler.
@@ -18,7 +19,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.22.1-debug
+// Version:      2.22.2-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -202,7 +203,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   useAblyChannel(
     userId ? ABLY_CHANNELS.builds(userId) : '',
     ABLY_EVENTS.build.completed,
-    () => { invalidate('builds'); showToast('🏗️ Bau abgeschlossen!', true) }
+    (msg: any) => { invalidate('builds'); const d = msg?.data ?? msg ?? {}; showToast(d.entityName ? `🏗️ ${d.entityName} fertiggestellt${d.locationSlug ? ` · ${LOC_NAME[d.locationSlug] ?? d.locationSlug}` : ''}` : '🏗️ Bau abgeschlossen!', true) }
   )
   useAblyChannel(
     userId ? ABLY_CHANNELS.builds(userId) : '',
