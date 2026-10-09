@@ -66,7 +66,7 @@ Macht wird damit nicht eingebaut, sondern beobachtet: Sie zeigt sich als Asymmet
 | 1 | Reine Regeln für Wohnen, Stellen und Zugangsprotokoll | fertig |
 | 2 | Forschungslauf: Markt mit Löhnen, Mieten, Eigentum, Hotels. Spielraum zählt nur zugängliche Plätze. Über Spieljahre beobachten | fertig (`lib/research/colony/colonyMarket.ts`) |
 | 3 | Live-Bestand bereinigen: Wohnungen für die sieben Leitungen, Gebäude für die zwölf ohne Gebäude, Verwaltung nicht als Wohnung. Kapazität je Wohngebäude, Hotel als Gebäudetyp, Konten und Lohn für Personen | entschieden, Migration geschrieben, noch nicht angewendet |
-| 4 | Schattenbetrieb live: Personen treffen echte Entscheidungen gegen den Live-Bestand, protokolliert werden Zusage, Ablehnung und Spielraum. Nichts wird ausgeführt | offen |
+| 4 | Schattenbetrieb live: Personen treffen echte Entscheidungen gegen den Live-Bestand, protokolliert werden Zusage, Ablehnung und offene Plätze. Nichts wird ausgeführt | Wohnen gebaut, standardmäßig aus; Stellen offen |
 | 5 | Atomarer Wohnungswechsel als Datenbankfunktion: Platz reservieren, alte Zuweisung beenden, neue anlegen, Mietverhältnis synchronisieren, bei Fehler alles zurück. Keine direkte Änderung von `current_location_id` | offen |
 | 6 | Stellenwechsel entsprechend | offen |
 
@@ -174,6 +174,16 @@ Befund:
 4. **Finanzierung in Höhe der heutigen Lohnsumme reicht nicht (C):** Beschäftigte der zahlungsunfähigen Unternehmen wechseln auf freie öffentliche Stellen, die Lohnsumme wächst über die Einnahmen. Öffentliche Finanzierung muss an besetzten Stellen hängen, oder die Stellenzahl muss begrenzt sein.
 
 Schwäche des Maßes: Wer seine Stelle verliert, gilt als ungebunden und bekommt mehr „offene Plätze" (A: 1,5 auf 14). Der Ortsspielraum steigt also durch Arbeitslosigkeit. Mittellosigkeit muss in das Maß eingehen, bevor es live etwas steuert.
+
+## Stufe 4: Schattenbetrieb Wohnen (2026-10-09)
+
+Code: `lib/game/population/housingShadow.ts` (reine Entscheidung), `housingShadowRuntime.ts` (Live-Bestand lesen, Protokoll schreiben). Test: `npm run test:housing-shadow`. Migration: `20261009030000_housing_shadow_decisions.sql`.
+
+- Einmal je Spieltag wird für jede Person berechnet, was sie täte: bleiben, kein Angebot, Zusage oder Ablehnung. Dazu, wie viele Plätze sie bezahlen könnte und wie viele ihr auch gegeben würden.
+- Geschrieben wird ausschließlich `housing_shadow_decisions`. Keine Zuweisung, kein Mietverhältnis, kein Ledger. `move_person_to_market_rental` wird nicht aufgerufen.
+- `executable` markiert die Fälle, die der atomare Einzug später ausführen könnte: Zusage für eine private Wohnung mit Mietpreis.
+- Standard: aus. Einschalten über `NOXIA_HOUSING_SHADOW=true`. Jeder Fehler lässt den Tick unberührt.
+- Vereinfachungen: Arbeit gilt nur am eigenen Ort als erreichbar, frühere Räumungen sind live noch nicht erfasst, Vermieter haben keine persönliche Abneigung.
 
 ## Noch offen
 

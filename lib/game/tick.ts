@@ -24,6 +24,7 @@ import { runPopulationTick as runPersonPopulationTick } from './population/engin
 import { runPersonTick } from './personBrain'
 import { persistPopulationEncounters } from './population/encounterRuntime'
 import { runSocialLifeTick } from './population/socialLife'
+import { runHousingShadowTick } from './population/housingShadowRuntime'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick } from './npcEconomy'
 
 /** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
@@ -621,12 +622,14 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const payroll = await runNpcPayrollTick(supabase, tickNumber)
   const consumption = await runNpcConsumptionTick(supabase, tickNumber)
   const propertyMarket = await runNpcPropertyMarketTick(supabase, tickNumber)
+  // Shadow mode only: logs what people would decide, executes nothing. Off by default.
+  const housingShadow = await runHousingShadowTick(supabase, tickNumber)
   const npcBuilding = await runNpcSelfBuildTick(supabase, tickNumber)
   const prices = await runPriceTick(supabase, tickNumber, locationSnapshot ?? [])
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
-  return { tickNumber, population, livingPopulation, namedPeople, encounters, socialLife, prices, npc, payroll, consumption, propertyMarket, npcBuilding, orders, bank, landValues }
+  return { tickNumber, population, livingPopulation, namedPeople, encounters, socialLife, prices, npc, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
