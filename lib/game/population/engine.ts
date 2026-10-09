@@ -393,9 +393,10 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       relationships: context.relationships,
       knowledge: context.knowledge,
     })
+    const intentBlocker = 'reason' in intent ? intent.reason : null
     const execution = intent.ok
       ? await executePopulationActionIntent(supabase, intent.intent, tick)
-      : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
+      : { executed: false as const, kind: 'blocked' as const, reason: intentBlocker }
 
     const nextActivity = activityForAction(decision.action)
     const lastAction = decision.factors.asleep === true
@@ -405,7 +406,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       ...decision.factors,
       score: decision.score,
       intent: intent.ok ? intent.intent.kind : null,
-      intentBlocker: intent.ok ? null : intent.reason,
+      intentBlocker: intentBlocker,
       execution: execution.executed ? execution.kind : null,
     }
     await supabase.from('people').update({ activity_state: nextActivity, last_action: lastAction, last_decision_factors: decisionFactors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
@@ -422,7 +423,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
         score: decision.score,
         factors: decision.factors,
         intent: intent.ok ? intent.intent : null,
-        blocker: intent.ok ? null : intent.reason,
+        blocker: intentBlocker,
         execution,
       },
     })
