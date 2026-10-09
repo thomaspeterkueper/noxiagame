@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
+import { HERCEG_NOVI_EARTH_PLACE } from '@/lib/world/spatial/hercegNoviPlace'
 import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 
@@ -88,6 +89,7 @@ export default function EarthRegionSwitcherOverlay(){
     <div style={{display:'flex',gap:4,alignItems:'center',padding:3,border:'1px solid rgba(104,131,138,.72)',borderRadius:9,background:'rgba(7,17,27,.92)',boxShadow:'0 8px 24px rgba(0,0,0,.22)',backdropFilter:'blur(12px)'}}>
       <button type="button" title="Aktuellen Ort neu zentrieren" style={{...navButton,background:'rgba(31,79,95,.72)',cursor:'default'}} onClick={()=>window.location.reload()}>Aktuell · {viewLabel?.split(',')[0]??'Erde'}</button>
       <button type="button" title="Zum Home-Ort zurückkehren" style={{...navButton,color:'#e6d29a',borderColor:'rgba(168,137,61,.55)'}} onClick={()=>selectPoint(SELMECKE.lat,SELMECKE.lon,SELMECKE.label,SAUERLAND_REGION)}>⌂ Home</button>
+      <button type="button" title="Herceg Novi, Montenegro – möglicher Romanschauplatz" style={navButton} onClick={()=>selectPoint(HERCEG_NOVI_EARTH_PLACE.center.lat,HERCEG_NOVI_EARTH_PLACE.center.lon,'Herceg Novi, Montenegro')}>Herceg Novi</button>
       <form onSubmit={runSearch} style={{display:'flex',gap:4,flex:'1 1 320px',minWidth:0}}>
         <input value={query} onChange={event=>setQuery(event.currentTarget.value)} placeholder="Ort oder 51.33745, 7.97975" aria-label="Ort oder Koordinate auf der Erde suchen" autoComplete="off" style={{minWidth:0,flex:1,border:'1px solid rgba(112,143,151,.72)',borderRadius:6,padding:'7px 9px',background:'rgba(240,246,244,.96)',color:'#17313c',font:'700 10px system-ui,sans-serif',outline:'none'}}/>
         <button type="submit" disabled={searchDisabled} style={{border:'1px solid #9c7b2b',borderRadius:6,padding:'7px 10px',background:'#b88b27',color:'#fffdf2',font:'900 9px system-ui,sans-serif',cursor:searching?'wait':'pointer',opacity:searchDisabled ? .55 : 1,whiteSpace:'nowrap'}}>{searching?'Suche …':'Springen'}</button>
