@@ -1,7 +1,9 @@
 // lib/store/gameStore.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 10.09.2026 — server-autoritiver, reload-fester Transit
-// Version:      0.5.0
+// Aktualisiert: 09.10.2026 — Bugfix: Handelsmeldung nennt den tatsächlich gebuchten Betrag
+//               (Guthaben-Differenz inkl. Abgaben) statt Preis × Menge
+// Vorher:       10.09.2026 — server-autoritiver, reload-fester Transit
+// Version:      0.5.1
 //
 // v0.5.0: Transit wird vom Server gestartet/abgeschlossen und beim Reload aus
 // ships.status + Zeitstempeln rekonstruiert. Der Browser zählt nur für die UI.
@@ -230,7 +232,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       })
       const msg = booked < amount
         ? `${booked} von ${amount}t gekauft (mehr war nicht möglich).`
-        : `${booked}t gekauft für ${price * booked} Cr.`
+        : `${booked}t gekauft für ${Math.abs(credits - Number(data.credits)).toLocaleString('de')} Cr inkl. Abgaben.`
       return { ok: true, msg, booked }
     } catch {
       set(s => ({
@@ -242,7 +244,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   sell: async (resource, price, amount = 1) => {
-    const { cargo, location, inTransit } = get()
+    const { cargo, location, inTransit, credits } = get()
     if (inTransit)             return { ok: false, msg: 'Im Transit – warte auf Landung.', booked: 0 }
     if (cargo[resource] < 1)   return { ok: false, msg: 'Keine Ware an Bord.', booked: 0 }
 
@@ -268,7 +270,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const booked = data.bookedAmount ?? optimistic
       const msg = booked < amount
         ? `${booked} von ${amount}t verkauft (mehr war nicht an Bord).`
-        : `${booked}t verkauft für ${price * booked} Cr.`
+        : `${booked}t verkauft für ${Math.abs(Number(data.credits) - credits).toLocaleString('de')} Cr nach Abgaben.`
       return { ok: true, msg, booked }
     } catch {
       set(s => ({

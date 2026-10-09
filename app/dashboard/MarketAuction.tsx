@@ -5,6 +5,11 @@
 // Aktualisiert: 24.08.2026
 // Version:      0.4.2
 //
+// STILLGELEGT seit 09.10.2026: nicht mehr eingebunden. Der Handel läuft als
+// Direkthandel zum Marktpreis (WarehouseOverlay/BuyRow), weil der Server die
+// hier gezeigten Gebote nie abrechnete. Die Datei bleibt als Ausgangspunkt
+// für eine spätere M.U.L.E.-/Börsenstruktur mit echten Geboten erhalten.
+//
 // v0.4.2: Doppelte Abfrage entfernt. WarehouseOverlay/BuyRow fragen Menge und
 // Preislimit bereits VOR dem Öffnen der Auktion ab (eigenes Prep-Panel) —
 // der in v0.4.0 eingeführte Konfigurationsschritt fragte dieselben zwei
