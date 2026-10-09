@@ -1,33 +1,61 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getToken } from '@/lib/supabase/auth'
 import InteriorTopologyScene from '@/app/dashboard/InteriorTopologyScene'
 import { DAVARU_TEMPLE_INTERIOR } from '@/lib/game/buildings/interiors/templates/davaruTemple'
-import { createInteriorInstance } from '@/lib/game/buildings/interiors/instances'
-import { findInteriorRoute } from '@/lib/game/buildings/interiors/navigation'
+type Session = { destinationKey: string; channel: string; roomId: string; expiresAt: string }
 
-// Standalone architectural preview: no auth grant, avatar session, or Core occupancy.
-// Do not confuse this local room selection with entering the authoritative world.
-const previewInstance = createInteriorInstance(DAVARU_TEMPLE_INTERIOR, {
-  id: 'preview:davaru-temple', buildingInstanceId: 'preview-only-not-a-core-building',
-})
-export default function TemplePreviewPage() {
-  const [roomId, setRoomId] = useState('entrance')
-  const room = DAVARU_TEMPLE_INTERIOR.rooms.find(item => item.id === roomId)
+export default function TemplePage() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [ready, setReady] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  async function request(method: 'GET' | 'POST', body?: object) {
+    const token = await getToken()
+    if (!token) throw new Error('Bitte zuerst in NOXIA anmelden.')
+    const response = await fetch('/api/game/temple', {
+      method, headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(response.status === 401 ? 'Bitte zuerst anmelden.' : String(data.error ?? 'Tempelzugang derzeit nicht verfügbar'))
+    setSession(data.session ?? null)
+  }
+  useEffect(() => {
+    let active = true
+    getToken().then(token => {
+      if (!token) throw new Error('Bitte zuerst in NOXIA anmelden.')
+      return fetch('/api/game/temple', {headers:{Authorization:'Bearer '+token}})
+    }).then(async response => {
+      const data = await response.json()
+      if (!response.ok) throw new Error(String(data.error ?? 'Tempelzugang derzeit nicht verfügbar'))
+      if (active) setSession(data.session ?? null)
+    }).catch(error => { if (active) setMessage(error.message) })
+      .finally(() => { if (active) setReady(true) })
+    return () => { active = false }
+  }, [])
+  async function act(body: object) {
+    if (busy) return
+    setBusy(true); setMessage('')
+    try { await request('POST', body) }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Anfrage fehlgeschlagen') }
+    finally { setBusy(false) }
+  }
   return <main style={{maxWidth:900,margin:'24px auto',padding:20}}>
     <h1>Tempel des DaVaRu</h1>
-    <p>Interaktive Innenraumvorschau · Keine Live-Instanz · Kein ENDIA-Login oder physischer Ortswechsel</p>
-    <InteriorTopologyScene
-      template={DAVARU_TEMPLE_INTERIOR}
-      roomId={roomId}
-      occupants={[]}
-      onRoomChange={next => {
-        if (findInteriorRoute(DAVARU_TEMPLE_INTERIOR, previewInstance, roomId, next)?.steps.length === 1) setRoomId(next)
-      }}
-    />
-    <section aria-live="polite" style={{marginTop:16,padding:16,border:'1px solid #b9c7c7',borderRadius:8}}>
-      <h2>{room?.name ?? 'Unbekannter Raum'}</h2>
-      <p>{roomId==='entrance'?'Hier beginnt der Besuch.':roomId==='conversation'?'Ein Raum für freiwillige philosophische Gespräche.':roomId==='library'?'Eine künftige Sammlung von Texten und Überlieferungen.':'Ein stiller Garten am Bach.'}</p>
-    </section>
+    <p>ENDIA-Fernzugang · Ein gemeinsames Ziel · Keine physische Reise</p>
+    {!ready ? <p>Sitzung wird geprüft …</p> : session ? <>
+      <p>Virtuelle Sitzung aktiv bis {new Date(session.expiresAt).toLocaleTimeString('de-DE')} · Raum: {DAVARU_TEMPLE_INTERIOR.rooms.find(room=>room.id===session.roomId)?.name}</p>
+      <InteriorTopologyScene template={DAVARU_TEMPLE_INTERIOR} roomId={session.roomId}
+        occupants={[]} onRoomChange={roomId=>void act({action:'move',roomId})}/>
+      <p>Du bewegst einen virtuellen Besucher. Dein tatsächlicher Standort bleibt unverändert.</p>
+      <button type="button" disabled={busy} onClick={()=>void act({action:'leave'})}>Tempel verlassen</button>
+    </> : <>
+      <p>Der Tempel kann über ENDIA aus dem gesamten Universum besucht werden. Diese erste Version ermöglicht die Navigation zwischen seinen Räumen. Gemeinsame NPC-Begegnungen folgen später.</p>
+      <button type="button" disabled={busy} onClick={()=>void act({action:'enter'})}>Über ENDIA eintreten</button>
+      <p><a href="/auth/login">Anmelden</a></p>
+    </>}
+    {message && <p role="status">{message}</p>}
   </main>
 }
