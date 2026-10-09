@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
+import { languagePromptConstraint, type LanguageProfile } from '@/lib/game/cognition/languageSystem'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY_MESSAGES = 10
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
 
   let persistedMemory: any = null
   let canonicalNpc: any = null
+  let npcLanguageProfile: LanguageProfile | null = null
   if (npcId) {
     const [{ data: memoryData }, { data: personData }, { data: identityData }] = await Promise.all([
       serviceClient
@@ -132,7 +134,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       serviceClient
         .from('people')
-        .select('id, display_name, public_role')
+        .select('id, display_name, public_role, traits')
         .eq('id', npcId)
         .maybeSingle(),
       serviceClient
@@ -146,6 +148,35 @@ export async function POST(request: NextRequest) {
     canonicalNpc = personData ?? null
     if (canonicalNpc?.display_name) npcName = clean(canonicalNpc.display_name, 48)
     if (canonicalNpc?.public_role) npcRole = clean(canonicalNpc.public_role, 48)
+    if (canonicalNpc) {
+      const languageTraits = canonicalNpc.traits?.language_profile
+      const declaredLanguages = Array.isArray(languageTraits?.languages)
+        ? languageTraits.languages
+            .map((entry:any)=>({
+              languageCode: clean(entry?.languageCode ?? entry?.language_code, 16),
+              phonemeDiscrimination: Math.max(0, Math.min(1, Number(entry?.phonemeDiscrimination ?? entry?.phoneme_discrimination ?? 0.7))),
+              comprehension: Math.max(0, Math.min(1, Number(entry?.comprehension ?? 0.75))),
+              production: Math.max(0, Math.min(1, Number(entry?.production ?? 0.7))),
+              grammar: Math.max(0, Math.min(1, Number(entry?.grammar ?? 0.68))),
+              vocabulary: Math.max(0, Math.min(1, Number(entry?.vocabulary ?? 0.72))),
+              pragmaticSkill: Math.max(0, Math.min(1, Number(entry?.pragmaticSkill ?? entry?.pragmatic_skill ?? 0.7))),
+            }))
+            .filter((entry:any)=>entry.languageCode)
+        : []
+      npcLanguageProfile = {
+        personId: String(canonicalNpc.id),
+        primaryLanguageCode: clean(languageTraits?.primaryLanguageCode ?? languageTraits?.primary_language_code, 16) || 'de',
+        languages: declaredLanguages.length ? declaredLanguages : [{
+          languageCode: 'de',
+          phonemeDiscrimination: 0.82,
+          comprehension: 0.78,
+          production: 0.72,
+          grammar: 0.7,
+          vocabulary: 0.74,
+          pragmaticSkill: 0.72,
+        }],
+      }
+    }
     identityState = identityData?.identity_state === 'known'
       ? 'known'
       : identityData?.identity_state === 'inferred'
@@ -162,7 +193,10 @@ export async function POST(request: NextRequest) {
     identityState === 'known'
       ? `Der Spieler kennt deinen Namen bereits als ${npcName}.`
       : `Der Spieler kennt deinen Namen noch nicht sicher. Verwende deinen echten Namen nicht beiläufig als bereits bekannt. Wenn du dich natürlich vorstellst oder nach deinem Namen gefragt wirst, sage klar „Ich bin ${npcName}“ oder „Mein Name ist ${npcName}“.`,
-    'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-2 kurze Sätze.',
+    npcLanguageProfile
+      ? languagePromptConstraint({ profile: npcLanguageProfile, preferredLanguageCode: npcLanguageProfile.primaryLanguageCode ?? 'de' })
+      : 'Sprachregel: Antworte auf Deutsch, knapp und dialogisch. Es liegt noch kein explizites Sprachprofil vor; unterstelle keine außergewöhnliche Sprachkompetenz.',
+    'Formuliere normalerweise 1-2 kurze Sätze und überschreite die im Sprachprofil beschriebene Kompetenz nicht.',
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
