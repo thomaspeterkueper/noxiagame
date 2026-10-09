@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DAVARU_TEMPLE_DESTINATION, resolveSharedTempleEntrance } from '@/lib/game/temple/sharedTempleAccess'
+import { TEMPLE_CANONICAL_ROLES, resolveTempleCanonicalPeople } from '@/lib/game/temple/canonicalTemplePeople'
 import { DAVARU_TEMPLE_INTERIOR } from '@/lib/game/buildings/interiors/templates/davaruTemple'
 import { createInteriorInstance } from '@/lib/game/buildings/interiors/instances'
 import { findInteriorRoute } from '@/lib/game/buildings/interiors/navigation'
@@ -34,7 +35,17 @@ export async function GET(request: NextRequest) {
   const activeVisitors = Object.fromEntries(template.rooms.map(room => [
     room.id, (visitors ?? []).filter(visitor => visitor.room_id === room.id).length,
   ]))
-  return NextResponse.json({ session: data ? safeRow(data) : null, activeVisitors })
+  const [{ data: links, error: linksError }, { data: tickRow, error: tickError }] = await Promise.all([
+    db.from('person_canonical_characters')
+      .select('person_id,character_key,universe_key,integration_mode,valid_from_tick,valid_until_tick')
+      .eq('universe_key', 'noxia')
+      .in('character_key', TEMPLE_CANONICAL_ROLES.map(role => role.characterKey)),
+    db.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
+  ])
+  const tickValue = Number(tickRow?.tick_number)
+  const currentTick = !tickError && tickRow?.tick_number != null && Number.isSafeInteger(tickValue) ? tickValue : null
+  const registeredCharacters = linksError || currentTick === null ? [] : resolveTempleCanonicalPeople(links ?? [], currentTick)
+  return NextResponse.json({ session: data ? safeRow(data) : null, activeVisitors, registeredCharacters })
 }
 export async function POST(request: NextRequest) {
   const user = await actor(request)
