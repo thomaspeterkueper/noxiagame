@@ -27,7 +27,14 @@ export async function GET(request: NextRequest) {
   const { data, error } = await db.from('davaru_temple_remote_sessions')
     .select('channel, room_id, expires_at').eq('profile_id', user.id).gt('expires_at', new Date().toISOString()).maybeSingle()
   if (error) return NextResponse.json({ error: 'session_unavailable' }, { status: 503 })
-  return NextResponse.json({ session: data ? safeRow(data) : null })
+  // Aggregate only; never expose other visitors' account identities or locations.
+  const { data: visitors, error: visitorsError } = await db.from('davaru_temple_remote_sessions')
+    .select('room_id').gt('expires_at', new Date().toISOString()).limit(1000)
+  if (visitorsError) return NextResponse.json({ error: 'visitor_presence_unavailable' }, { status: 503 })
+  const activeVisitors = Object.fromEntries(template.rooms.map(room => [
+    room.id, (visitors ?? []).filter(visitor => visitor.room_id === room.id).length,
+  ]))
+  return NextResponse.json({ session: data ? safeRow(data) : null, activeVisitors })
 }
 export async function POST(request: NextRequest) {
   const user = await actor(request)
