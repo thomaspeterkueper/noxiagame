@@ -49,7 +49,8 @@
     "test:acce-003": "tsc lib/game/cognition/personReflex.ts lib/research/avi/acce003.ts lib/research/avi/acce003.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .acce-003-test && node .acce-003-test/research/avi/acce003.test.js",
     "test:acce-004": "tsc lib/game/cognition/personAffect.ts lib/game/cognition/personReflex.ts lib/research/avi/acce004.ts lib/research/avi/acce004.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .acce-004-test && node .acce-004-test/research/avi/acce004.test.js",
     "export:colony-live": "tsc lib/research/colony/liveExport.ts lib/research/colony/liveExportCli.ts lib/supabase/service.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .colony-live-export && node .colony-live-export/research/colony/liveExportCli.js",
-    "test:finance-invariants": "tsc lib/game/financeSemantics.ts lib/game/financeSemantics.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .finance-invariants-test && node .finance-invariants-test/game/financeSemantics.test.js"
+    "test:finance-invariants": "tsc lib/game/financeSemantics.ts lib/game/financeSemantics.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .finance-invariants-test && node .finance-invariants-test/game/financeSemantics.test.js",
+    "test:omni-o5-access": "tsc lib/game/population/accessContrast.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .omni-o5-test && node .omni-o5-test/game/population/accessContrast.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
