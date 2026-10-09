@@ -64,5 +64,26 @@ check(openBoth.length === 2, 'two independent owners provide two accessible alte
 check(deniedOne.length === 1 && deniedOne[0] === 'flat-2', 'one refusal reduces but does not eliminate alternatives')
 check(deniedBoth.length === 0, 'combined refusal closes all alternatives')
 check(possibleHomes({ 'owner-a': 0.2, 'owner-b': 0.6 }).length === deniedOne.length, 'deterministic replay of the same conditions')
-console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 20, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, scope: 'pure rule contrast; no live effects' }))
+// Concentration counterfactual: identical homes, means and capacities;
+// only the ownership graph and one owner's decision policy differ.
+const jointlyOwned: Dwelling[] = [dwelling, { ...alternative, ownerId: 'owner-a' }]
+const accessibleUnder = (homes: Dwelling[], affinities: Record<string, number>) =>
+  homes.filter((home) => housingOffer(home, applicant, 1) !== null &&
+    landlordDecision({ dwelling: home, freePlaces: 1, applicant, ownerAffinity: affinities[home.ownerId] }).granted).length
+const distributedAccess = accessibleUnder(alternatives, { 'owner-a': 0.2, 'owner-b': 0.6 })
+const concentratedAccess = accessibleUnder(jointlyOwned, { 'owner-a': 0.2 })
+check(distributedAccess === 1 && concentratedAccess === 0, 'same refusal by owner A closes all options only under concentrated ownership')
+check(accessibleUnder(jointlyOwned, { 'owner-a': 0.6 }) === 2, 'concentrated owner can also open both options')
+const distributedLog: AccessRecord[] = [
+  { ...log('refused'), targetId: 'flat-1', gatekeeperId: 'owner-a' },
+  { ...log('granted'), targetId: 'flat-2', gatekeeperId: 'owner-b' },
+]
+const concentratedLog: AccessRecord[] = [
+  { ...log('refused'), targetId: 'flat-1', gatekeeperId: 'owner-a' },
+  { ...log('refused'), targetId: 'flat-2', gatekeeperId: 'owner-a' },
+]
+check(summarizeAccess(distributedLog).topGatekeeperShare === 0.5, 'distributed decisions have half-share concentration')
+check(summarizeAccess(concentratedLog).topGatekeeperShare === 1, 'single owner decides all applications')
+check(summarizeAccess(distributedLog).shutOut === 0 && summarizeAccess(concentratedLog).shutOut === 1, 'ownership concentration changes complete exclusion')
+console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 25, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, concentration: { distributedAccess, concentratedAccess }, scope: 'pure rule contrast; no live effects' }))
 if (failures) throw new Error(`OMNI-O5-ACCESS-001: ${failures} checks failed`)
