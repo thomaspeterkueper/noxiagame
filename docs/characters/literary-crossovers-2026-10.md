@@ -1,4 +1,4 @@
-# Literarische Figuren: Aristeas Lux, Xerxes, Mr. Marx — Intake 2026-10-09
+# Literarische Figuren: Aristeas Lux, Daniel van Runen (DaVaRu), Xerxes, Mr. Marx — Intake 2026-10-09
 
 Status: **Quellengebundene Kandidatenregistrierung, nicht live gespawnt.**
 
@@ -6,6 +6,9 @@ Die Einbindung verwendet die bestehende `CanonicalCharacterRef`-Brücke (siehe `
 
 ## Aristeas Lux
 Beleg: Drive-Dokument `Charakter Aristeas Lux.docx`. Geistiger Abenteurer, Erzähler und Rätseldeuter; versucht philosophische, symbolische und hermeneutische Deutungen. Gewünschte Rolle: Vertreter des DaVaRu. Frühere Entwurfsfassung überbetonte Klang/Frequenz; dies ist ausdrücklich keine feste Fähigkeit oder bevorzugte Ontologie. Interpretation und überprüfte Erkenntnis im Spiel stets trennen.
+
+## Daniel van Runen (DaVaRu)
+Beleg: `Wie der Weg des Davaru nach Endia kam.docx`. Eine von Aristeas Lux / Peter Masterson **getrennte**, für die Spielwelt geschaffene Figur, deren Texte zu selbständigem Denken und Handeln anregen. Der Weg des DaVaRu betont innere Stärke, Selbsterkenntnis, Offenheit für Wissen und Verbundenheit mit Menschen, Tieren, Pflanzen und der Welt. Sein Wohnort auf einem Hügel am Gebirgsbach mit Wasserfall in Sichtweite, nahe einer kleinen Stadt, ist zunächst ein Setting des Buchs und darf nicht ohne Prüfung als bestehender NOXIA-Ort gelten. Keine Bekehrungsautomatik oder Autoritätsbonus.
 
 ## Xerxes
 Beleg: Drive `OTA-LIT-0004-2026.docx` zum Zyklus `Das Gefälle`, Buch 1 `XERXES` (68–72 V.Ä.). Xerxes versteht Mishkenaz, spricht es nicht vollständig; Vârun-Gemeinschaft und Velun sind Teil des Quellenkontexts. Wünsche: als tatsächliche Buchfigur in NOXIA leben lassen, allerdings keine willkürliche Zeitsynchronisation. Vor Spawn kanonische Datierung, Alter und Ort überprüfen. Bücherkanon bleibt unberührt von emergenter Simulation.
