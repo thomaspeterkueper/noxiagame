@@ -36,7 +36,7 @@ function competenceAtAge(ageDays: number): LanguageProfile {
       languageCode: 'de',
       phonemeDiscrimination: Math.min(1, 0.45 + ramp(0, 1.2) * 0.5),
       comprehension: Math.min(1, ramp(0.45, 5) * 0.82),
-      production: Math.min(1, ramp(0.75, 6) * 0.82),
+      production: Math.min(1, ramp(0.75, 4) * 0.82),
       grammar: Math.min(1, ramp(1.2, 9) * 0.86),
       vocabulary: Math.min(1, ramp(0.7, 7) * 0.9),
       pragmaticSkill: Math.min(1, ramp(1.2, 10) * 0.85),
