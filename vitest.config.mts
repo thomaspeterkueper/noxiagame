@@ -19,6 +19,7 @@ export default defineConfig({
       'lib/game/chronicle.test.ts',
       'lib/game/merchantQualification.test.ts',
       'lib/game/populationGrowth.test.ts',
+      'lib/game/priceModel.test.ts',
       'lib/game/core/facilityIncidents.test.ts',
       'lib/game/core/facilityMaintenance.test.ts',
       'lib/game/core/facilityProductionWear.test.ts',

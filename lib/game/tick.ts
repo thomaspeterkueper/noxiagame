@@ -1,20 +1,15 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 09.10.2026 — Bugfix: Bevölkerungsänderung über steppedDelta statt Math.round
-//               (kleine Kolonien konnten nie wachsen, sehr kleine nie schrumpfen)
-// Vorher:       11.09.2026 — Facility-Produktion in adressierbare Logistics-Inventare
-// Version:      3.4.1
+// Aktualisiert: 09.10.2026 — Preise folgen der Lagerreichweite (lib/game/priceModel.ts) statt festen
+//               Tonnen-Schwellen; Orte ohne Simulation behalten ihre gesetzten Preise
+// Vorher:       09.10.2026 — Bevölkerungsänderung über steppedDelta statt Math.round
+// Version:      3.5.0
 
 import {
   CONSUMPTION_PER_100,
   GROWTH_RATE,
   DECLINE_RATE,
-  PRICE_PRESSURE_HIGH,
-  PRICE_PRESSURE_LOW,
   STOCK_LOW_THRESHOLD,
-  STOCK_HIGH_THRESHOLD,
-  PRICE_MIN,
-  PRICE_MAX,
   ORDER_MIN_AMOUNT,
   ORDER_REWARD_MULT,
   ORDER_EXPIRE_HOURS,
@@ -22,6 +17,7 @@ import {
 } from './config'
 import { BUILDING_SALE } from './buildingSale'
 import { nextPopulation } from './populationGrowth'
+import { nextMarketPrice } from './priceModel'
 import { entscheideNpc } from './npcBrain'
 import { runPopulationTick as runPersonPopulationTick } from './population/engine'
 import { runPersonTick } from './personBrain'
@@ -323,7 +319,7 @@ export async function runPopulationTick(
 
 export async function runPriceTick(supabase: SB, tickNumber: number, locationSnapshot?: any[]) {
   const results: Record<string, unknown>[] = []
-  const priceLocRows = locationSnapshot ?? (await supabase.from('locations').select('id, slug, population, population_max, is_supplied')).data
+  const priceLocRows = locationSnapshot ?? (await supabase.from('locations').select('id, slug, population, population_max, is_supplied, simulate_tick')).data
   const priceLocMap = new Map<string, any>()
   for (const l of (priceLocRows ?? []) as any[]) priceLocMap.set(l.id, l)
   const { data: prices } = await supabase.from('market_prices').select('*')
@@ -333,23 +329,14 @@ export async function runPriceTick(supabase: SB, tickNumber: number, locationSna
     if (!loc) continue
     const { data: res } = await supabase.from('location_resources').select('stock, consumption, production').eq('location_id', loc.id).eq('resource', price.resource).single()
     if (!res) continue
-    const stock = res.stock ?? 0
-    const balance = (res.production ?? 0) - (res.consumption ?? 0)
-    let multiplier = 1.0
-    if (stock < STOCK_LOW_THRESHOLD) multiplier = PRICE_PRESSURE_HIGH
-    else if (stock > STOCK_HIGH_THRESHOLD) multiplier = PRICE_PRESSURE_LOW
-    if (balance < -5 && stock < 200) multiplier = Math.max(multiplier, 1.03)
-    else if (balance > 5 && stock > 300) multiplier = Math.min(multiplier, 0.98)
-    if (!loc.is_supplied && price.resource === 'water') multiplier = Math.max(multiplier, 1.08)
-    const popPct = loc.population / loc.population_max
-    if (popPct > 0.7 && price.resource === 'water') multiplier = Math.max(multiplier, 1.02)
-    if (multiplier === 1.0) {
-      if (price.buy_price > 200) multiplier = 0.99
-      else if (price.buy_price < 30) multiplier = 1.01
-    }
-    const newBuy = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX, price.buy_price * multiplier)))
-    const newSell = Math.round(Math.max(PRICE_MIN, Math.min(PRICE_MAX - 1, price.sell_price * multiplier)))
-    const safeSell = Math.min(newSell, newBuy - 5)
+    // Nur simulierte Orte haben einen echten Verbrauch. Referenzorte (Erde,
+    // Stationen ohne Tick) behalten ihre gesetzten Preise; die Historie läuft
+    // trotzdem weiter, damit Kursverläufe lückenlos bleiben.
+    const next = loc.simulate_tick === false
+      ? { buy: price.buy_price, sell: price.sell_price }
+      : nextMarketPrice({ resource: price.resource, buyPrice: price.buy_price, sellPrice: price.sell_price, stock: res.stock ?? 0, consumption: res.consumption ?? 0 })
+    const newBuy = next.buy
+    const safeSell = next.sell
     if (!(newBuy === price.buy_price && safeSell === price.sell_price)) await supabase.from('market_prices').update({ buy_price: newBuy, sell_price: safeSell }).eq('id', price.id)
     await supabase.from('price_history').insert({ location_id: loc.id, resource: price.resource, tick_number: tickNumber, buy_price: newBuy, sell_price: safeSell })
     const { data: recent } = await supabase.from('price_history').select('sell_price').eq('location_id', loc.id).eq('resource', price.resource).order('tick_number', { ascending: false }).limit(AVG_WINDOW_TICKS)
