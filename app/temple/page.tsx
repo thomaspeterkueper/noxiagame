@@ -8,6 +8,7 @@ type Session = { destinationKey: string; channel: string; roomId: string; expire
 
 export default function TemplePage() {
   const [session, setSession] = useState<Session | null>(null)
+  const [activeVisitors, setActiveVisitors] = useState<Record<string, number>>({})
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -21,6 +22,7 @@ export default function TemplePage() {
     const data = await response.json()
     if (!response.ok) throw new Error(response.status === 401 ? 'Bitte zuerst anmelden.' : String(data.error ?? 'Tempelzugang derzeit nicht verfügbar'))
     setSession(data.session ?? null)
+    if (data.activeVisitors) setActiveVisitors(data.activeVisitors)
   }
   useEffect(() => {
     let active = true
@@ -30,7 +32,10 @@ export default function TemplePage() {
     }).then(async response => {
       const data = await response.json()
       if (!response.ok) throw new Error(String(data.error ?? 'Tempelzugang derzeit nicht verfügbar'))
-      if (active) setSession(data.session ?? null)
+      if (active) {
+        setSession(data.session ?? null)
+        setActiveVisitors(data.activeVisitors ?? {})
+      }
     }).catch(error => { if (active) setMessage(error.message) })
       .finally(() => { if (active) setReady(true) })
     return () => { active = false }
@@ -38,7 +43,7 @@ export default function TemplePage() {
   async function act(body: object) {
     if (busy) return
     setBusy(true); setMessage('')
-    try { await request('POST', body) }
+    try { await request('POST', body); await request('GET') }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Anfrage fehlgeschlagen') }
     finally { setBusy(false) }
   }
@@ -50,6 +55,8 @@ export default function TemplePage() {
       <InteriorTopologyScene template={DAVARU_TEMPLE_INTERIOR} roomId={session.roomId}
         occupants={[]} onRoomChange={roomId=>void act({action:'move',roomId})}/>
       <p>Du bewegst einen virtuellen Besucher. Dein tatsächlicher Standort bleibt unverändert.</p>
+      <p>Angemeldete Remote-Besucher in diesem Raum: {activeVisitors[session.roomId] ?? 0} (Momentaufnahme, keine Namen).</p>
+      <button type="button" disabled={busy} onClick={()=>void request('GET').catch(error=>setMessage(error instanceof Error?error.message:'Aktualisierung fehlgeschlagen'))}>Besucherzahl aktualisieren</button>
       <button type="button" disabled={busy} onClick={()=>void act({action:'leave'})}>Tempel verlassen</button>
     </> : <>
       <p>Der Tempel kann über ENDIA aus dem gesamten Universum besucht werden. Diese erste Version ermöglicht die Navigation zwischen seinen Räumen. Gemeinsame NPC-Begegnungen folgen später.</p>
