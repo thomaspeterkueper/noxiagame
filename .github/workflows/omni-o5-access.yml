@@ -1,0 +1,31 @@
+name: OMNI O5 access contrast
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/accessContrast.test.ts'
+      - 'lib/game/population/access.ts'
+      - 'lib/game/population/housing.ts'
+      - 'lib/game/population/employment.ts'
+      - '.github/workflows/omni-o5-access.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/population/accessContrast.test.ts'
+      - 'lib/game/population/access.ts'
+      - 'lib/game/population/housing.ts'
+      - 'lib/game/population/employment.ts'
+      - '.github/workflows/omni-o5-access.yml'
+
+jobs:
+  isolated-access-contrast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compile without project dependency install
+        run: npx --yes --package typescript@5 tsc lib/game/population/accessContrast.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .omni-o5-test
+      - name: Run deterministic O5 contrast
+        run: node .omni-o5-test/game/population/accessContrast.test.js
