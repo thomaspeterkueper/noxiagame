@@ -2,7 +2,8 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Bau-Abschluss-Toast nennt Gebäude und Ort.
+// Aktualisiert: 09.10.2026 — Feed zeigt bis zu sechs Meldungen (Kolonie-Chronik).
+// Vorher:       09.10.2026 — Bau-Abschluss-Toast nennt Gebäude und Ort.
 // Vorher:       09.10.2026 — Einstieg: Guide-Buttons öffnen echte Ziele statt
 //               window.scrollTo (im fixen Viewport wirkungslos); Guide öffnet
 //               sich nach Ankunft am Journey-Ziel; Werft/Header ohne
@@ -19,7 +20,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.22.2-debug
+// Version:      2.23.0-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -261,7 +262,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   const feed = React.useMemo((): FeedItem[] => [
     ...attention.map(a => ({ type: a.level === 'critical' ? 'critical' as const : 'warning' as const, icon: a.level === 'critical' ? '🔴' : '🟡', text: a.text })),
     ...(best ? [{ type: 'route' as const, icon: '⚡', text: `Beste Route: ${LOC_NAME[best.from]} → ${LOC_NAME[best.to]} · ${RESOURCE_LABEL[best.resource]} +${best.profit} Cr/t` }] : []),
-    ...news.slice(0, 3).map((n: any) => ({ type: 'news' as const, icon: n.icon ?? '📰', text: n.text })),
+    ...news.slice(0, 6).map((n: any) => ({ type: 'news' as const, icon: n.icon ?? '📰', text: n.text })),
   ], [attention, best, news])
 
   function showToast(msg: string, ok: boolean) { setToast({ msg, ok }); setTimeout(() => setToast(null), 2500) }
