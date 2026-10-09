@@ -75,6 +75,9 @@ begin
   exception when others then r := r || jsonb_build_object('T2_already_owned', sqlerrm); end;
 
   -- T3: Typwechsel  -> erwartet first_ship false, weiterhin genau 1 Schiff, dasselbe Schiff
+  -- Eigene Finanzierung des Typwechsels: 15.000 Cr, nach Erstkauf nur 12.000 Cr uebrig.
+  -- Testguthaben innerhalb dieses atomaren, am Ende zurueckgerollten Blocks auffuellen.
+  update public.profiles set credits=200000 where id=p;
   v := public.noxia_buy_ship_type(p, 'heavy_hauler');
   r := r || jsonb_build_object('T3_type_change', jsonb_build_object('first_ship', v->'first_ship', 'new_credits', v->'new_credits', 'ship_count', (select count(*) from public.ships where profile_id=p), 'same_ship', (v->>'ship_id')::uuid = v_ship));
 
