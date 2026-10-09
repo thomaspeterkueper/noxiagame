@@ -5,6 +5,7 @@
 import { decidePopulationAction as decideFromState, type PopulationDecisionContext } from './decision'
 import { actionIntentForDecision } from './actionIntent'
 import { executePopulationActionIntent } from './personActionExecutor'
+import { classifyHabitExecution } from './habitExecutionEvidence'
 import { derivePopulationEncounters, isFreshEncounter, type PopulationEncounter } from './encounters'
 import { projectEncounterRelationship } from './encounterProjection'
 import { resolvedPresenceCandidates } from './presence'
@@ -393,6 +394,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       ? await executePopulationActionIntent(supabase, intent.intent, tick)
       : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
 
+    const habitExecutionEvidence = intent.ok ? classifyHabitExecution(decision.action, execution as Awaited<ReturnType<typeof executePopulationActionIntent>>) : { status: 'unverified' as const, reason: 'intent_blocked' }
     const nextActivity = activityForAction(decision.action)
     const lastAction = decision.factors.asleep === true
       ? 'sleep'
@@ -403,6 +405,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       intent: intent.ok ? intent.intent.kind : null,
       intentBlocker: intent.ok ? null : intent.reason,
       execution: execution.executed ? execution.kind : null,
+      habitEvidenceStatus: habitExecutionEvidence.status,
     }
     await supabase.from('people').update({ activity_state: nextActivity, last_action: lastAction, last_decision_factors: decisionFactors, last_tick: tick, updated_at: new Date().toISOString() }).eq('id', person.id)
     await updateNeedsForAction(supabase, person.id, personNeeds, decision.action, tick, environmentOf(person))
@@ -420,6 +423,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
         intent: intent.ok ? intent.intent : null,
         blocker: intent.ok ? null : intent.reason,
         execution,
+        habitEvidence: habitExecutionEvidence,
       },
     })
     currentPeople.set(person.id, {
