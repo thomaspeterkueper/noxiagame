@@ -96,14 +96,16 @@ async function updateNeedsForAction(
 ) {
   if (!needs.length) return
   const updatedAt = new Date().toISOString()
-  const updates = needs.map(need => {
+  const updates = needs.flatMap(need => {
     const current = Number(need.satisfaction ?? 1)
-    // NOXIA-LIVING-0009: same action + passive drift, persisted in one request per person.
+    // Include passive drift, but do not persist values unchanged after clamping.
     const next = Math.max(0, Math.min(1, current + needDelta(action, need.need_code, environment) + passiveNeedDrift(need.need_code, environment, current)))
+    if (next === current) return []
     need.satisfaction = next
     need.updated_tick = tick
-    return { person_id: personId, need_code: need.need_code, satisfaction: next, updated_tick: tick, updated_at: updatedAt }
+    return [{ person_id: personId, need_code: need.need_code, satisfaction: next, updated_tick: tick, updated_at: updatedAt }]
   })
+  if (!updates.length) return
   const { error } = await supabase.from('person_needs').upsert(updates, { onConflict: 'person_id,need_code' })
   if (error) console.error('updateNeedsForAction failed', { personId, tick, code: error.code })
 }
@@ -236,7 +238,9 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     for (const need of affectContext.needsByPerson.get(event.actorPersonId) ?? []) {
       const gain = encounterNeedDelta(need.need_code, qualities)
       if (gain === 0) continue
-      const next = Math.max(0, Math.min(1, Number(need.satisfaction ?? 1) + gain))
+      const current = Number(need.satisfaction ?? 1)
+      const next = Math.max(0, Math.min(1, current + gain))
+      if (next === current) continue
       encounterUpdates.push({ person_id: event.actorPersonId, need_code: need.need_code, satisfaction: next, updated_tick: event.tick, updated_at: updatedAt })
       need.satisfaction = next
     }
