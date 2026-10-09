@@ -26,3 +26,10 @@ DaVaRu vermittelt den Weg, ohne Besucher zu bekehren. Aristeas Lux kann dort als
 
 ## Kosten/Sicherheit
 Eventgetriebene Besucherpräsenz, keine Neuanlage je Eintritt, keine per-Tick-LLM-Gespräche, idempotente Session-IDs, begrenzte Archivspeicherung, Schutz privater weltanschaulicher Inhalte. Authentifizierung am Eingang tatsächlich serverseitig prüfen; Eingabefelder wie `authenticated` sind im reinen Domänenvertrag nur bereits autorisierte Fakten und dürfen nicht direkt vom Browser vertraut werden.
+
+## Standortentscheidung 2026-10-09: Schmitten / Großer Feldberg, Taunus
+DaVaRus literarisch-persönlicher Landschaftsbezug wird in NOXIA als Taunus/Schmitten festgelegt, weil Daniel in der Umgebung des Großen Feldbergs leidenschaftlich Rennrad fuhr, oft mit möglichst vielen Höhenmetern und unterschiedlich langen Touren. Der narrative Anker steht in `lib/game/temple/davaruTaunusRegion.ts`.
+
+**Nicht als erledigt darstellen:** Für Schmitten/Feldberg wurde im Live-`celestial_regions`-Katalog noch keine materialisierte Region gefunden. Weder ein geeigneter Hang noch Gewässerlage, Schutzstatus, WGS84-Bauplatz oder ein physisches Tempelgebäude sind damit bestätigt. Keine Änderung an bestehenden Erd-Geometrien und keine erfundene Fluss-/Weggeometrie.
+
+Nächste Etappe: reale Schmitten-Region über die vorhandene Earth-Place-Materialisierung aufbauen; Gewässer, Relief und Wege aus Quellen prüfen; danach erst ein persistentes Gebäude in einer tatsächlich verfügbaren Kachel und passende Personenzuweisungen einrichten. Daniels Rennradvorliebe bleibt bis zu einem echten Bewegungs-/Routensystem Charakterprofil, kein erfundener täglicher Weg.
