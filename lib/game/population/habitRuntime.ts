@@ -18,3 +18,9 @@ export async function recordVerifiedHabitOutcome(db:Db,personId:string,prior:Hab
  const {error}=await db.from('person_habits').upsert({person_id:personId,context_key:h.contextKey,action:h.action,repetitions:h.repetitions,successes:h.successes,strength:h.strength,success_expectation:h.successExpectation,last_tick:h.lastTick,updated_at:new Date().toISOString()},{onConflict:'person_id,context_key,action'});
  return !error;
 }
+
+/** Atomic event-linked intake. Never infer success from decision or need drift. */
+export async function recordAuthoritativeHabitEvent(db:Db,args:{eventId:string;personId:string;contextKey:string;action:PopulationAction;successful:boolean;tick:number}):Promise<boolean>{
+ const {data,error}=await db.rpc('record_person_habit_outcome',{p_event_id:args.eventId,p_person_id:args.personId,p_context_key:args.contextKey,p_action:args.action,p_successful:args.successful,p_tick:args.tick});
+ return !error&&data===true;
+}
