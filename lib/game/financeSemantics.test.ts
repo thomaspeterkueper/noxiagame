@@ -101,3 +101,40 @@ const taxedRent = taxedTransfer({
 check(taxedRent.gross === 400 && taxedRent.tax === 40 && taxedRent.net === 360, 'rent tax is carved out of the gross payment')
 check(validateMoneyTransaction(taxedRent.transaction).ok, 'taxed rent remains a zero-sum fiscal transfer')
 check(validateMoneyTransaction(taxedRent.transaction).postingSum === 0, 'tenant debit equals landlord net plus tax')
+
+
+describe('fiscalCoverage', () => {
+  it('shows that a tax cannot finance more than its observed base', async () => {
+    const { fiscalCoverage } = await import('./financeSemantics')
+    const result = fiscalCoverage({
+      publicPayroll: 1880,
+      taxableBases: { transactionGross: 40 },
+      rates: { transaction: 1 },
+    })
+    expect(result.projectedRevenue).toBe(40)
+    expect(result.coverageRatio).toBeCloseTo(40 / 1880, 4)
+    expect(result.fundingGap).toBe(1840)
+  })
+
+  it('combines independent real revenue bases without creating credits', async () => {
+    const { fiscalCoverage } = await import('./financeSemantics')
+    const result = fiscalCoverage({
+      publicPayroll: 1000,
+      taxableBases: {
+        transactionGross: 2000,
+        rentGross: 500,
+        landingGross: 300,
+      },
+      rates: {
+        transaction: 0.1,
+        rent: 0.2,
+        landing: 0.5,
+      },
+    })
+    expect(result.bySource.transaction).toBe(200)
+    expect(result.bySource.rent).toBe(100)
+    expect(result.bySource.landing).toBe(150)
+    expect(result.projectedRevenue).toBe(450)
+    expect(result.fundingGap).toBe(550)
+  })
+})
