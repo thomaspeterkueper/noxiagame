@@ -3,7 +3,7 @@ import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DOCKING_IDLE_EXPIRE_HOURS } from '@/lib/game/config'
 import { ORBITS } from '@/lib/game/orbits'
-import { transferQuote } from '@/lib/game/transfer'
+import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
 import {
@@ -105,11 +105,8 @@ async function arrivalStateForShip(shipId: string): Promise<StationArrivalState 
   return data as StationArrivalState
 }
 
-// Linienflug-Fahrpreis ohne eigenes Schiff: dieselbe Energie-Abstraktion wie
-// beim Schiffstransit (quote.energy, s. lib/game/transfer.ts), umgerechnet
-// in Credits statt in Treibstoff -- der Spediteur verlangt eine Pauschale,
-// kein eigener Energievorrat wird verbraucht.
-const PASSENGER_TICKET_CR_PER_ENERGY = 25
+// Linienflug-Fahrpreis ohne eigenes Schiff: passengerTicketPrice() in
+// lib/game/transfer.ts (gemeinsam mit der Anzeige im Client).
 
 async function startPlayerPassengerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
   const supabase = createServiceClient()
@@ -140,7 +137,7 @@ async function startPlayerPassengerTransit(profileId: string, destination: strin
     throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${profile.current_location}:${destination}`)
   }
 
-  const ticketPrice = Math.round(quote.energy * PASSENGER_TICKET_CR_PER_ENERGY)
+  const ticketPrice = passengerTicketPrice(quote)
 
   return startPassengerTransitCommand({
     profileId,

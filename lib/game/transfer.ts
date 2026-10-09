@@ -1,5 +1,8 @@
 // transfer.ts
-// Version 0.1.0 — geometry-driven interplanetary transfer model
+// Aktualisiert: 09.10.2026 — Linienflug-Fahrpreis (PASSENGER_TICKET_CR_PER_ENERGY, passengerTicketPrice)
+//               hierher verlegt, damit Server und Anzeige dieselbe Rechnung benutzen
+// Version:      0.2.0
+// Vorher:       Version 0.1.0 — geometry-driven interplanetary transfer model
 //
 // Pure, deterministic model. No DB access and no Date.now().
 // The departure tick snapshots orbital geometry. Navigation proficiency only
@@ -103,4 +106,13 @@ export function transferQuote(
     timeEfficiency,
     energyEfficiency,
   }
+}
+
+// Linienflug-Fahrpreis ohne eigenes Schiff: dieselbe Energie-Abstraktion wie
+// beim Schiffstransit, umgerechnet in Credits statt in Treibstoff -- der
+// Spediteur verlangt eine Pauschale, kein eigener Energievorrat wird verbraucht.
+export const PASSENGER_TICKET_CR_PER_ENERGY = 25
+
+export function passengerTicketPrice(quote: Pick<TransferQuote, 'energy'>): number {
+  return Math.round(quote.energy * PASSENGER_TICKET_CR_PER_ENERGY)
 }

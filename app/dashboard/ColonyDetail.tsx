@@ -2,11 +2,14 @@
 
 // app/dashboard/ColonyDetail.tsx
 // Kolonie-Detailansicht mit Versorgung, Ressourcen, Reisen und sichtbaren Personen.
+// Aktualisiert: 09.10.2026 — Bugfix: Flugkosten und Reichweite über transferQuote wie der Server;
+//               Linienflug-Preis für Spieler ohne eigenes Schiff
+// Version:      1.0.1
 
 import React from 'react'
 
-import { ResourceType, LocationSlug, useGameStore, effectiveRange } from '@/lib/store/gameStore'
-import { baseTravelSeconds, flightEnergyCost } from '@/lib/game/ships'
+import { ResourceType, LocationSlug, useGameStore } from '@/lib/store/gameStore'
+import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import BuildingResidentsCard from './BuildingResidentsCard'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
@@ -35,23 +38,29 @@ export default function ColonyDetail({
   cargo,
   onClose,
   onTravel,
+  currentTick = 0,
 }: {
   colony: Colony | null
   isHere: boolean
   cargo: Record<ResourceType, number>
   onClose: () => void
   onTravel: (dest: LocationSlug) => void
+  currentTick?: number
 }) {
-  const { location, shipRange } = useGameStore()
+  const { location, shipRange, shipId, speedMult, credits } = useGameStore()
   if (!colony) return null
 
-  const used       = Object.values(cargo).reduce((a, b) => a + b, 0)
-  const reach      = effectiveRange(shipRange, used)
-  const travelSec  = baseTravelSeconds(location, colony.slug as LocationSlug)
-  const reachable  = travelSec != null && travelSec <= reach
-  const energyCost = flightEnergyCost(location, colony.slug)
+  // Dieselbe Rechnung wie der Server (lib/game/core/transit.ts). Navigations-
+  // wissen ist hier nicht bekannt; die Vorschau zeigt daher die Grundwerte,
+  // der tatsächliche Flug kann etwas günstiger sein, nie teurer.
+  const hasShip    = Boolean(shipId)
+  const quote      = transferQuote(location, colony.slug, currentTick, { speedMult: hasShip ? speedMult : 1 })
+  const travelSec  = quote?.durationSeconds ?? null
+  const reachable  = !!quote && (!hasShip || quote.distance <= shipRange)
+  const energyCost = quote?.energy ?? 0
+  const ticketPrice = quote ? passengerTicketPrice(quote) : 0
   const energyOnBoard = cargo['energy'] ?? 0
-  const hasEnergy  = energyOnBoard >= energyCost
+  const hasEnergy  = hasShip ? energyOnBoard >= energyCost : credits >= ticketPrice
   const popPct = Math.round((colony.population / colony.population_max) * 100)
 
   const overlay: React.CSSProperties = {
@@ -133,10 +142,12 @@ export default function ColonyDetail({
               {LOC_ICON[colony.slug]} Nach {colony.name} fliegen{travelSec != null ? ` · ${travelSec}s` : ''}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginTop: '6px', padding: '0 4px' }}>
-              <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>⚡ Treibstoff: {energyCost}t</span>
-              <span style={{ color: energyOnBoard >= energyCost ? '#5dcaa5' : '#e0846a' }}>
-                An Bord: {energyOnBoard}t{!hasEnergy && ` · fehlt ${energyCost - energyOnBoard}t`}
-              </span>
+              {hasShip ? <>
+                <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>⚡ Treibstoff: {energyCost}t</span>
+                <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>
+                  An Bord: {energyOnBoard}t{!hasEnergy && ` · fehlt ${energyCost - energyOnBoard}t`}
+                </span>
+              </> : <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>🎫 Linienflug: {ticketPrice.toLocaleString('de')} Cr{!hasEnergy && ' · zu wenig Guthaben'}</span>}
             </div>
           </div>
         ) : (

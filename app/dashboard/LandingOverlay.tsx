@@ -2,17 +2,22 @@
 
 // app/dashboard/LandingOverlay.tsx
 // Erstellt:     21.06.2026
-// Aktualisiert: 25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
-// Version:      1.1.0
+// Aktualisiert: 09.10.2026 — Bugfix: Energie, Dauer und Reichweite über transferQuote wie der Server
+//               (vorher alte FLIGHT_ENERGY-Tabelle und Sekunden-gegen-Distanz-Vergleich: Button aktiv,
+//               Server lehnte ab); Linienflug-Preis für Spieler ohne eigenes Schiff
+// Vorher:       25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
+// Version:      1.1.1
 //
 // Landeplatz-Overlay — öffnet sich beim Klick auf landing_pad im Grid.
 // Zeigt Sonnensystem-Karte + Reiseziele mit Energiekosten + Flug-Button.
 // Ersetzt die Fliegen-Buttons im Dashboard-Kolonien-Tab.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LOC_ICON, LOC_NAME } from './ui'
-import { flightEnergyCost } from '@/lib/game/ships'
-import { orbitalBaseSeconds } from '@/lib/game/orbits'
+import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
+import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
+import { getToken } from '@/lib/supabase/auth'
+import { useGameStore } from '@/lib/store/gameStore'
 import SolarSystem from './SolarSystem'
 
 interface LandingOverlayProps {
@@ -35,6 +40,26 @@ export default function LandingOverlay({
   const [showMap, setShowMap] = useState(false)
 
   const energyOnBoard = cargo['energy'] ?? 0
+  const hasShip = useGameStore(state => Boolean(state.shipId))
+  const speedMult = useGameStore(state => state.speedMult)
+  const credits = useGameStore(state => state.credits)
+  const [navigationProficiency, setNavigationProficiency] = useState(0)
+
+  // Navigationswissen senkt Energie und Dauer; der Server rechnet damit, also
+  // muss die Vorschau es auch tun. Ohne Antwort gelten die Grundwerte.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch('/api/game/unlocks', { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) return
+        const data = await res.json() as { unlocks?: string[] }
+        if (!cancelled) setNavigationProficiency(navigationProficiencyFromUnlocks(data.unlocks ?? []))
+      } catch { /* Grundwerte */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Reiseziele = alle Stationen außer aktueller
   const destinations = locations.filter(l => l.slug !== currentLocation)
@@ -100,10 +125,14 @@ export default function LandingOverlay({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {destinations.map(loc => {
-              const energyCost   = flightEnergyCost(currentLocation, loc.slug)
-              const travelSecs   = orbitalBaseSeconds(currentLocation, loc.slug, currentTick)
-              const reachable    = travelSecs != null && travelSecs <= shipRange
-              const hasEnergy    = energyOnBoard >= energyCost
+              // Mit Schiff: Energie und Reichweite des Schiffs. Ohne Schiff:
+              // Linienflug im Standardtempo gegen Ticketpreis, keine Reichweitengrenze.
+              const quote        = transferQuote(currentLocation, loc.slug, currentTick, { navigationProficiency, speedMult: hasShip ? speedMult : 1 })
+              const travelSecs   = quote?.durationSeconds ?? null
+              const energyCost   = quote?.energy ?? Number.POSITIVE_INFINITY
+              const ticketPrice  = quote ? passengerTicketPrice(quote) : Number.POSITIVE_INFINITY
+              const reachable    = !!quote && (!hasShip || quote.distance <= shipRange)
+              const hasEnergy    = hasShip ? energyOnBoard >= energyCost : credits >= ticketPrice
               const canFly       = reachable && hasEnergy && !inTransit
 
               return (
@@ -123,8 +152,9 @@ export default function LandingOverlay({
                         <span>⏱ {travelSecs}s</span>
                       )}
                       <span style={{ color: hasEnergy ? '#5dcaa5' : '#e74c3c' }}>
-                        ⚡ {energyCost}t
-                        {!hasEnergy && ` (fehlt ${energyCost - energyOnBoard}t)`}
+                        {hasShip ? `⚡ ${Number.isFinite(energyCost) ? energyCost : '–'}t` : `🎫 Linienflug ${Number.isFinite(ticketPrice) ? ticketPrice.toLocaleString('de') : '–'} Cr`}
+                        {!hasEnergy && hasShip && Number.isFinite(energyCost) && ` (fehlt ${energyCost - energyOnBoard}t)`}
+                        {!hasEnergy && !hasShip && ' (zu wenig Guthaben)'}
                       </span>
                       {!reachable && travelSecs != null && (
                         <span style={{ color: '#e74c3c' }}>außer Reichweite</span>
@@ -144,7 +174,7 @@ export default function LandingOverlay({
                       whiteSpace: 'nowrap' as const,
                     }}
                   >
-                    {inTransit ? 'Im Flug …' : 'Fliegen →'}
+                    {inTransit ? 'Im Flug …' : hasShip ? 'Fliegen →' : 'Buchen →'}
                   </button>
                 </div>
               )

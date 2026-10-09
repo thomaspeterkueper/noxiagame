@@ -2,7 +2,8 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Feed zeigt bis zu sechs Meldungen (Kolonie-Chronik).
+// Aktualisiert: 09.10.2026 — ColonyDetail erhält den aktuellen Tick für die Flugkosten.
+// Vorher:       09.10.2026 — Feed zeigt bis zu sechs Meldungen (Kolonie-Chronik).
 // Vorher:       09.10.2026 — Bau-Abschluss-Toast nennt Gebäude und Ort.
 // Vorher:       09.10.2026 — Einstieg: Guide-Buttons öffnen echte Ziele statt
 //               window.scrollTo (im fixen Viewport wirkungslos); Guide öffnet
@@ -20,7 +21,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.23.0-debug
+// Version:      2.23.1-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -390,7 +391,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
       {auctionOpen && <MarketAuction open={auctionOpen} onClose={() => setAuctionOpen(false)} location={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} rows={currentPrices.map((p: any) => ({ resource: p.resource, buy_price: p.buy_price, sell_price: p.sell_price, stock: currentLocationData?.location_resources?.find((r: any) => r.resource === p.resource)?.stock ?? 100 }))} credits={credits} cargo={cargo} cargoMax={cargoMax} initialResource={auctionConfig.resource} initialMode={auctionConfig.mode} initialQty={auctionConfig.qty} playerLimit={auctionConfig.limit} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} />}
       {warehouseOpen && <WarehouseOverlay locationSlug={location as LocationSlug} locationName={currentLocationData?.name ?? LOC_NAME[location]} prices={prices} resources={currentLocationData?.location_resources ?? []} orders={initialOrders.filter((o: any) => o.locations?.slug === location)} cargo={cargo} cargoMax={cargoMax} credits={credits} onTrade={async (resource, mode, amount, price) => { const result = mode === 'buy' ? await buy(resource, price, amount) : await sell(resource, price, amount); showToast(result.msg, result.ok); return result.ok }} onFulfillOrder={async (orderId, agreedReward) => { const token = await getToken(); const data = await (await fetch(`/api/game/orders?action=fulfill&orderId=${orderId}&agreedReward=${Math.round(agreedReward)}`, { headers: { Authorization: `Bearer ${token}` } })).json(); if (data.ok) { showToast(`Auftrag erfüllt! +${data.reward?.toLocaleString('de')} Cr`, true); await loadFromServer() } else showToast(data.error, false); return data.ok }} onClose={() => setWarehouseOpen(false)} />}
       {profileOpen && profile && <ProfileOverlay username={profile.username ?? '?'} avatar={profile.avatar ?? 'pilot_01'} credits={credits} onClose={() => setProfileOpen(false)} />}
-      <ColonyDetail colony={detailColony} isHere={detailColony?.slug === location} cargo={cargo} onClose={() => setDetailColony(null)} onTravel={handleTravel} />
+      <ColonyDetail colony={detailColony} isHere={detailColony?.slug === location} cargo={cargo} onClose={() => setDetailColony(null)} onTravel={handleTravel} currentTick={stats?.tickNumber ?? 0} />
       {solarSystemOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={e => e.target === e.currentTarget && setSolarSystemOpen(false)}>
