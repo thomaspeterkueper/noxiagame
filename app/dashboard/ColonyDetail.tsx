@@ -144,7 +144,7 @@ export default function ColonyDetail({
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginTop: '6px', padding: '0 4px' }}>
               {hasShip ? <>
-                <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>⚡ Treibstoff: {energyCost}t{pilotRequired && quote ? ` · Pilot ${pilotFee(quote, false).toLocaleString('de')} Cr` : ''}</span>
+                <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>⚡ Treibstoff: {energyCost}t{pilotRequired && quote && pilotFee(quote, false, currentTick) > 0 ? ` · Pilot ${pilotFee(quote, false, currentTick).toLocaleString('de')} Cr` : ''}</span>
                 <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>
                   An Bord: {energyOnBoard}t{!hasEnergy && ` · fehlt ${energyCost - energyOnBoard}t`}
                 </span>

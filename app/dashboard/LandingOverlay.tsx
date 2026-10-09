@@ -157,7 +157,7 @@ export default function LandingOverlay({
                         {hasShip ? `⚡ ${Number.isFinite(energyCost) ? energyCost : '–'}t` : `🎫 Linienflug ${Number.isFinite(ticketPrice) ? ticketPrice.toLocaleString('de') : '–'} Cr`}
                         {!hasEnergy && hasShip && Number.isFinite(energyCost) && ` (fehlt ${energyCost - energyOnBoard}t)`}
                         {!hasEnergy && !hasShip && ' (zu wenig Guthaben)'}
-                        {hasShip && pilotRequired && quote && ` · 🧑‍✈️ Pilot ${pilotFee(quote, false).toLocaleString('de')} Cr`}
+                        {hasShip && pilotRequired && quote && pilotFee(quote, false, currentTick) > 0 && ` · 🧑‍✈️ Pilot ${pilotFee(quote, false, currentTick).toLocaleString('de')} Cr`}
                       </span>
                       {!reachable && travelSecs != null && (
                         <span style={{ color: '#e74c3c' }}>außer Reichweite</span>

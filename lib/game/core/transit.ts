@@ -215,7 +215,7 @@ export async function startPlayerTransit(profileId: string, destination: string)
     durationSeconds: quote.durationSeconds,
     energyNeeded: quote.energy,
     dockingIdleHours: DOCKING_IDLE_EXPIRE_HOURS,
-    pilotFee: pilotFee(quote, trained),
+    pilotFee: pilotFee(quote, trained, tick),
   })
 }
 
