@@ -2,7 +2,8 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Direkthandel: Stationsmarkt öffnet das Warenhaus, Auktion entfernt.
+// Aktualisiert: 09.10.2026 — Hinweise des neuen Händlerwegs (Spediteur → Qualifikation → Schiff).
+// Vorher:       09.10.2026 — Direkthandel: Stationsmarkt öffnet das Warenhaus, Auktion entfernt.
 // Vorher:       09.10.2026 — ColonyDetail erhält den aktuellen Tick für die Flugkosten.
 // Vorher:       09.10.2026 — Feed zeigt bis zu sechs Meldungen (Kolonie-Chronik).
 // Vorher:       09.10.2026 — Bau-Abschluss-Toast nennt Gebäude und Ort.
@@ -22,7 +23,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.24.0-debug
+// Version:      2.24.1-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -272,7 +273,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   // Journey-Destination-Mapper: welches Reiseziel je Schritt hervorheben?
   const JOURNEY_STEP_DESTINATIONS: Record<string, string> = {
     'moon-2': 'moon',
-    'merchant-3': 'mars',
+    'merchant-2': 'moon',
   }
 
   // Journey-Hint-Mapper: welche entity_ids je Schritt hervorheben?
@@ -280,8 +281,9 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
     'moon-2':   [],
     'moon-3':   ['solar'],
     'moon-4':   ['ice_drill'],
-    'merchant-1': ['shipyard'],
-    'merchant-2': ['warehouse'],
+    'merchant-1': ['warehouse'],
+    'merchant-3': ['warehouse'],
+    'merchant-4': ['shipyard'],
     'research-1': ['school'],
     'research-2': ['school'],
     'industry-1': ['mine', 'solar'],

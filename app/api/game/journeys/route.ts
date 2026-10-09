@@ -1,12 +1,14 @@
 // app/api/game/journeys/route.ts
 // Erstellt: 01.07.2026
-// Aktualisiert: 09.07.2026 — Commit E: status=completed wenn alle Steps done, andere Journeys freischalten
-// Version:      0.6.0
+// Aktualisiert: 09.10.2026 — Handelsstand (Einkäufe, Fernverkäufe, Qualifikation) für den Händlerweg
+// Vorher:       09.07.2026 — Commit E: status=completed wenn alle Steps done, andere Journeys freischalten
+// Version:      0.7.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DEFAULT_JOURNEY_STEPS, getJourneyTitle, isJourneyKey, progressFromTriggers } from '@/lib/game/journeys'
 import type { JourneyCatalogStep } from '@/lib/game/journeys'
+import { merchantStanding } from '@/lib/game/merchantQualification'
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -53,12 +55,13 @@ export async function GET(req: NextRequest) {
     ? await serviceClient.from('journey_steps').select('*').in('journey_key', keys).order('step_order', { ascending: true })
     : { data: [] }
 
-  const [shipsR, entitiesR, tradesR, profileR, knowledgeR] = await Promise.all([
+  const [shipsR, entitiesR, tradesR, profileR, knowledgeR, modulesR] = await Promise.all([
     serviceClient.from('ships').select('*').eq('profile_id', user.id),
     serviceClient.from('tile_entities').select('*, locations(slug)').eq('profile_id', user.id),
-    serviceClient.from('trade_transactions').select('id').eq('profile_id', user.id).limit(20),
+    serviceClient.from('trade_transactions').select('id, resource, from_location, profit, traded_at').eq('profile_id', user.id).order('traded_at', { ascending: true }).limit(500),
     serviceClient.from('profiles').select('current_location').eq('id', user.id).single(),
     serviceClient.from('player_knowledge').select('knowledge_points').eq('profile_id', user.id).single(),
+    serviceClient.from('player_learning_progress').select('module_id').eq('profile_id', user.id).eq('completed', true),
   ])
 
   const steps = fallbackStepsFor(keys, dbSteps ?? [])
@@ -68,6 +71,7 @@ export async function GET(req: NextRequest) {
     trades: tradesR.data ?? [],
     knowledge: knowledgeR.data?.knowledge_points ?? 0,
     currentLocation: profileR.data?.current_location,
+    merchant: merchantStanding((tradesR.data ?? []) as any, (modulesR.data ?? []).map((m: any) => String(m.module_id))),
   }
 
   const enrichedJourneys = (journeys ?? []).map(j => {
@@ -107,7 +111,7 @@ export async function GET(req: NextRequest) {
     void toUnlock // acknowledged, intentional
   }
 
-  return NextResponse.json({ journeys: enrichedJourneys, steps, moonCompleted: moonDone })
+  return NextResponse.json({ journeys: enrichedJourneys, steps, moonCompleted: moonDone, merchant: ctx.merchant })
 }
 
 export async function POST(req: NextRequest) {

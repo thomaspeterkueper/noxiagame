@@ -1,10 +1,13 @@
 // app/api/game/ships/route.ts
-// Aktualisiert: 10.09.2026 — atomarer Schiffstyp-Kauf/-Wechsel
-// Version:      0.4.1
+// Aktualisiert: 09.10.2026 — erstes eigenes Schiff setzt kaufmännische Qualifikation voraus
+//               (Handelserfahrung oder Grundausbildung, s. lib/game/merchantQualification.ts)
+// Vorher:       10.09.2026 — atomarer Schiffstyp-Kauf/-Wechsel
+// Version:      0.5.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { buyShipTypeCommand } from '@/lib/game/core/commands'
+import { COMMERCIAL_BASICS_MODULES, MERCHANT_EXPERIENCE_SALES, merchantStanding } from '@/lib/game/merchantQualification'
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,7 +28,9 @@ function shipPurchaseError(error: unknown) {
     return NextResponse.json({ error: 'Schiff kann während eines laufenden Transits nicht gewechselt werden.', code: 'SHIP_IN_TRANSIT' }, { status: 409 })
   }
   if (message.includes('NOXIA_SHIP_TYPE_NOT_FOUND')) return NextResponse.json({ error: 'Schiffstyp nicht gefunden' }, { status: 404 })
-  if (message.includes('NOXIA_SHIP_NOT_FOUND')) return NextResponse.json({ error: 'Schiff nicht gefunden' }, { status: 404 })
+  // Der atomare Kauf-Befehl tauscht bisher nur den Typ eines vorhandenen Schiffs.
+  // Den Erstkauf ohne Schiff kann er noch nicht anlegen (eigene Migration nötig).
+  if (message.includes('NOXIA_SHIP_NOT_FOUND')) return NextResponse.json({ error: 'Der Erstkauf eines Schiffs ist noch nicht freigeschaltet.', code: 'FIRST_SHIP_PURCHASE_PENDING' }, { status: 409 })
   if (message.includes('NOXIA_PROFILE_NOT_FOUND')) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
   if (message.includes('NOXIA_SHIP_TYPE_ALREADY_OWNED')) return NextResponse.json({ error: 'Du hast dieses Schiff bereits.' }, { status: 400 })
   if (message.includes('NOXIA_SHIP_PURCHASE_CREDITS_INSUFFICIENT')) return NextResponse.json({ error: 'Unzureichende Credits.' }, { status: 400 })
@@ -40,6 +45,23 @@ function shipPurchaseError(error: unknown) {
 
 async function buyShip(userId: string, shipTypeId: string | null) {
   if (!shipTypeId) return NextResponse.json({ error: 'Fehlende Ship Type ID' }, { status: 400 })
+
+  // Wer noch kein Schiff besitzt, handelt über Spediteure. Das erste eigene
+  // Schiff setzt Handelserfahrung oder die kaufmännische Grundausbildung voraus.
+  const { count: shipCount } = await serviceClient.from('ships').select('id', { count: 'exact', head: true }).eq('profile_id', userId)
+  if ((shipCount ?? 0) === 0) {
+    const [tradesR, modulesR] = await Promise.all([
+      serviceClient.from('trade_transactions').select('resource, from_location, profit, traded_at').eq('profile_id', userId).order('traded_at', { ascending: true }).limit(500),
+      serviceClient.from('player_learning_progress').select('module_id').eq('profile_id', userId).eq('completed', true),
+    ])
+    const standing = merchantStanding((tradesR.data ?? []) as any, (modulesR.data ?? []).map((m: any) => String(m.module_id)))
+    if (!standing.qualified) {
+      return NextResponse.json({
+        error: `Für das erste eigene Schiff fehlt die kaufmännische Qualifikation: ${standing.salesElsewhere} von ${MERCHANT_EXPERIENCE_SALES} Fernverkäufen oder ${standing.commercialBasicsCompleted} von ${COMMERCIAL_BASICS_MODULES} Grundmodulen.`,
+        code: 'MERCHANT_QUALIFICATION_REQUIRED',
+      }, { status: 403 })
+    }
+  }
 
   try {
     const result = await buyShipTypeCommand(userId, shipTypeId)

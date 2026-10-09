@@ -1,5 +1,10 @@
+// lib/game/journeys/journeyEngine.ts
+// Aktualisiert: 09.10.2026 — Auslöser für den Händlerweg (Einkäufe, Fernverkäufe, Qualifikation)
+// Version:      1.1.0
+
 import type { Journey, JourneyStepStatus } from './types'
 import type { JourneyCatalogStep, JourneyStepTrigger } from './journeyCatalog'
+import type { MerchantStanding } from '../merchantQualification'
 
 export type JourneyProgress = Record<string, boolean>
 
@@ -15,6 +20,8 @@ export type JourneyEvaluationContext = {
   trades: any[]
   knowledge: number
   currentLocation?: string
+  /** Abgeleiteter Handelsstand; fehlt er, gelten die Händler-Auslöser als nicht erfüllt. */
+  merchant?: MerchantStanding
 }
 
 export function getStepStatus(
@@ -101,6 +108,18 @@ export function evaluateJourneyTrigger(
 
   if (trigger.type === 'trade_count') {
     return (ctx.trades?.length ?? 0) >= trigger.min
+  }
+
+  if (trigger.type === 'purchase_count') {
+    return (ctx.merchant?.purchases ?? 0) >= trigger.min
+  }
+
+  if (trigger.type === 'sales_elsewhere') {
+    return (ctx.merchant?.salesElsewhere ?? 0) >= trigger.min
+  }
+
+  if (trigger.type === 'merchant_qualified') {
+    return ctx.merchant?.qualified === true
   }
 
   if (trigger.type === 'knowledge_points') {

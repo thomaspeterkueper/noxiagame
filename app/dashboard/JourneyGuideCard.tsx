@@ -2,15 +2,16 @@
 
 // app/dashboard/JourneyGuideCard.tsx
 // Erstellt: 01.07.2026
-// Aktualisiert: 09.10.2026 — Mondweg ohne Schiffspflicht: Aktionen an Schritt-ID statt Reihenfolge,
-//               Linienflug-Beschriftung für schifflose Spieler
-// Vorher:       18.09.2026 — Mondweg startet kanonischen Transit nach Shackleton
-// Version:      0.6.1
+// Aktualisiert: 09.10.2026 — Händlerweg neu (Spediteur → Qualifikation → eigenes Schiff):
+//               Aktionen je Schritt, Fortschritt der Handelserfahrung sichtbar
+// Vorher:       09.10.2026 — Mondweg ohne Schiffspflicht, Aktionen an Schritt-ID
+// Version:      0.7.0
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { JOURNEY_DEFS, JourneyKey } from '@/lib/game/journeys'
 import { useGameStore } from '@/lib/store/gameStore'
+import { COMMERCIAL_BASICS_MODULES, MERCHANT_EXPERIENCE_SALES } from '@/lib/game/merchantQualification'
 import { T } from './ui'
 
 type PlayerJourney = {
@@ -61,9 +62,10 @@ function actionForStep(journeyKey: JourneyKey, step: JourneyStep | undefined, ac
   }
 
   if (journeyKey === 'merchant') {
-    if (step.step_order === 1) return { label: 'Schiffe ansehen', onClick: actions.onOpenShipyard, style: base }
-    if (step.step_order === 2 || step.step_order === 4) return { label: 'Warenhaus öffnen', onClick: actions.onOpenWarehouse, style: base }
-    if (step.step_order === 3) return { label: 'Reise / Standort öffnen', onClick: actions.onOpenTravel, style: base }
+    if (step.id === 'merchant-1') return { label: 'Warenhaus öffnen', onClick: actions.onOpenWarehouse, style: base }
+    if (step.id === 'merchant-2') return { label: 'Reiseziele ansehen', onClick: actions.onOpenTravel, style: base }
+    if (step.id === 'merchant-3') return { label: 'Warenhaus öffnen', onClick: actions.onOpenWarehouse, style: base }
+    if (step.id === 'merchant-4') return { label: 'Werft ansehen', onClick: actions.onOpenShipyard, style: base }
   }
 
   if (journeyKey === 'research') {
@@ -81,6 +83,7 @@ function actionForStep(journeyKey: JourneyKey, step: JourneyStep | undefined, ac
 export default function JourneyGuideCard(props: JourneyGuideCardProps) {
   const [journeys, setJourneys] = useState<PlayerJourney[]>([])
   const [steps, setSteps] = useState<JourneyStep[]>([])
+  const [merchant, setMerchant] = useState<{ salesElsewhere: number; commercialBasicsCompleted: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -104,6 +107,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
       const newSteps = Array.isArray(data.steps) ? data.steps : []
       setJourneys(newJourneys)
       setSteps(newSteps)
+      setMerchant(data.merchant ?? null)
 
       if (props.onStepCompleted) {
         for (const j of newJourneys) {
@@ -268,6 +272,7 @@ export default function JourneyGuideCard(props: JourneyGuideCardProps) {
                               {step.title}{step.optional && <span style={{ color: T.inkFaint, fontWeight: 500 }}> · optional</span>}
                             </div>
                             {current && step.description && <div style={{ fontSize: '0.6rem', color: T.inkSoft, lineHeight: 1.35, marginTop: '0.12rem' }}>{step.description}</div>}
+                            {current && step.id === 'merchant-3' && merchant && <div style={{ fontSize: '0.6rem', color: T.blueDeep, fontWeight: 700, marginTop: '0.2rem' }}>Handelserfahrung: {Math.min(merchant.salesElsewhere, MERCHANT_EXPERIENCE_SALES)} von {MERCHANT_EXPERIENCE_SALES} Verkäufen · Grundausbildung: {Math.min(merchant.commercialBasicsCompleted, COMMERCIAL_BASICS_MODULES)} von {COMMERCIAL_BASICS_MODULES} Modulen</div>}
                           </div>
                         </div>
                       )

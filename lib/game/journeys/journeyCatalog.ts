@@ -1,7 +1,8 @@
 // lib/game/journeys/journeyCatalog.ts
-// Aktualisiert: 09.10.2026 — Mondweg ohne Schiffspflicht: Schritt „Schiff bereitmachen" entfernt
-//               (neue Profile starten seit 03.10.2026 schifflos; Linienflug genügt), Texte in Spielsprache
-// Version:      1.1.0
+// Aktualisiert: 09.10.2026 — Händlerweg neu: erst Handel über fremde Schiffe (Spediteur),
+//               dann Erfahrung oder kaufmännische Grundausbildung, zuletzt das eigene Schiff
+// Vorher:       09.10.2026 — Mondweg ohne Schiffspflicht (neue Profile starten schifflos)
+// Version:      1.2.0
 
 export type JourneyKey = 'moon_colony' | 'merchant' | 'research' | 'industry'
 
@@ -21,6 +22,9 @@ export type JourneyStepTrigger =
   | { type: 'entity_owned_any'; entityIds: string[] }
   | { type: 'entity_owned_count'; entityIds: string[]; min: number }
   | { type: 'trade_count'; min: number }
+  | { type: 'purchase_count'; min: number }
+  | { type: 'sales_elsewhere'; min: number }
+  | { type: 'merchant_qualified' }
   | { type: 'knowledge_points'; min: number }
 
 export type JourneyCatalogStep = {
@@ -46,9 +50,9 @@ export const JOURNEY_DEFS: JourneyGuideDef[] = [
     key: 'merchant',
     icon: '📦',
     title: 'Handel & Logistik',
-    subtitle: 'Waren bewegen, Märkte nutzen, Aufträge erfüllen',
-    goal: 'Bauen Sie ein Handelsnetz zwischen den Welten auf.',
-    firstStep: 'Kaufen Sie Ware am aktuellen Standort und suchen Sie einen besseren Verkaufspreis.',
+    subtitle: 'Erst mit dem Spediteur handeln, später mit eigenem Schiff',
+    goal: 'Verdienen Sie am Preisunterschied zwischen den Welten – zunächst über fremde Schiffe, dann mit dem eigenen.',
+    firstStep: 'Kaufen Sie Ware am aktuellen Standort und verkaufen Sie sie dort, wo sie mehr wert ist.',
   },
   {
     key: 'research',
@@ -108,37 +112,37 @@ export const DEFAULT_JOURNEY_STEPS: Record<JourneyKey, JourneyCatalogStep[]> = {
       id: 'merchant-1',
       journey_key: 'merchant',
       step_order: 1,
-      title: 'Laderaum prüfen',
-      description: 'Prüfen Sie Ihr aktives Schiff und den freien Laderaum.',
+      title: 'Ware einkaufen',
+      description: 'Kaufen Sie im Warenhaus Ware, die hier günstig ist. Ohne eigenes Schiff reist sie mit dem Spediteur: bis zu 40 t Fracht.',
       optional: false,
-      trigger: { type: 'ship_count', min: 1 },
+      trigger: { type: 'purchase_count', min: 1 },
     },
     {
       id: 'merchant-2',
       journey_key: 'merchant',
       step_order: 2,
-      title: 'Ware kaufen',
-      description: 'Kaufen Sie Wasser, Energie oder Metall an einem Standort mit gutem Preis.',
+      title: 'An einem anderen Standort verkaufen',
+      description: 'Nehmen Sie den Linienflug zu einem Markt mit höherem Preis und verkaufen Sie dort. Der Spediteur behält 12 % des Erlöses.',
       optional: false,
-      trigger: { type: 'ship_count', min: 1 },
+      trigger: { type: 'sales_elsewhere', min: 1 },
     },
     {
       id: 'merchant-3',
       journey_key: 'merchant',
       step_order: 3,
-      title: 'Zu einem anderen Markt reisen',
-      description: 'Transportieren Sie die Ware zu einem Standort mit besserem Verkaufspreis.',
+      title: 'Kaufmännisch qualifizieren',
+      description: 'Sammeln Sie Handelserfahrung mit fünf Verkäufen an einem anderen Standort als dem Einkaufsort – oder schließen Sie in der Akademie die kaufmännische Grundausbildung ab (drei Wirtschafts-Grundmodule).',
       optional: false,
-      trigger: { type: 'trade_count', min: 1 },
+      trigger: { type: 'merchant_qualified' },
     },
     {
       id: 'merchant-4',
       journey_key: 'merchant',
       step_order: 4,
-      title: 'Ware verkaufen oder Auftrag erfüllen',
-      description: 'Verkaufen Sie profitabel oder erfüllen Sie einen offenen Auftrag.',
+      title: 'Eigenes Handelsschiff führen',
+      description: 'Mit Qualifikation und genug Guthaben können Sie in der Werft auf dem Mond ein eigenes Schiff erwerben: mehr Laderaum, keine Spediteurgebühr.',
       optional: false,
-      trigger: { type: 'trade_count', min: 1 },
+      trigger: { type: 'ship_count', min: 1 },
     },
   ],
   research: [
