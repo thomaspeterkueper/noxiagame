@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import { DAVARU_TAUNUS_HOME_REGION } from '@/lib/game/temple/davaruTaunusRegion'
+import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import InteriorTopologyScene from '@/app/dashboard/InteriorTopologyScene'
 import { DAVARU_TEMPLE_INTERIOR } from '@/lib/game/buildings/interiors/templates/davaruTemple'
 type Session = { destinationKey: string; channel: string; roomId: string; expiresAt: string }
@@ -12,6 +14,8 @@ export default function TemplePage() {
   const [registeredCharacters, setRegisteredCharacters] = useState<Array<{personId:string;displayName:string;role:string}>>([])
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [importingPlace, setImportingPlace] = useState(false)
+  const [importReport, setImportReport] = useState('')
   const [message, setMessage] = useState('')
   async function request(method: 'GET' | 'POST', body?: object) {
     const token = await getToken()
@@ -50,6 +54,26 @@ export default function TemplePage() {
     catch (error) { setMessage(error instanceof Error ? error.message : 'Anfrage fehlgeschlagen') }
     finally { setBusy(false) }
   }
+  async function importSchmitten() {
+    if (importingPlace) return
+    setImportingPlace(true); setImportReport('')
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Bitte zuerst anmelden.')
+      const point = DAVARU_TAUNUS_HOME_REGION.placeCenter
+      const response = await fetch('/api/earth/materialize', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: point.lat, lon: point.lon, label: 'Schmitten im Taunus',
+          slug: earthPlaceSlug(point), radiusKm: DAVARU_TAUNUS_HOME_REGION.placeRadiusKm }),
+      })
+      const result = await response.json()
+      if (!result.ok) throw new Error(String(result.error ?? 'Geografieimport noch nicht bereit'))
+      setImportReport('Schmitten ist materialisiert: ' + Number(result.total ?? 0) + ' gespeicherte geografische Merkmale.')
+    } catch (error) {
+      setImportReport(error instanceof Error ? error.message : 'Geografieimport fehlgeschlagen')
+    } finally { setImportingPlace(false) }
+  }
   return <main style={{maxWidth:900,margin:'24px auto',padding:20}}>
     <h1>Tempel des DaVaRu</h1>
     <p>ENDIA-Fernzugang · Ein gemeinsames Ziel · Keine physische Reise</p>
@@ -72,6 +96,14 @@ export default function TemplePage() {
         {person.displayName} · {person.role==='host'?'Gastgeber':'Gesprächsgast'} · kanonisch registriert
       </li>)}</ul> : <p>DaVaRu und Aristeas Lux sind noch nicht als kanonische Personen mit diesem Ort verbunden.</p>}
       <small>Die Registrierung bedeutet nicht, dass die Person aktuell im Tempel anwesend ist.</small>
+    </section>
+    <section style={{marginTop:18,padding:12,border:'1px solid #b9c7c7',borderRadius:8}}>
+      <h2>Heimatregion: Schmitten im Taunus</h2>
+      <p>Realer Ortsanker am Großen Feldberg. Dieser Punkt ist kein Tempelbauplatz.</p>
+      <button type="button" disabled={importingPlace} onClick={()=>void importSchmitten()}>
+        {importingPlace ? 'Geografiedaten werden eingelesen …' : 'Schmitten-Geografie einmalig einlesen'}
+      </button>
+      {importReport && <p role="status">{importReport}</p>}
     </section>
     {message && <p role="status">{message}</p>}
   </main>
