@@ -11,6 +11,7 @@ import { ACADEMY_STANDARD_INTERIOR } from './templates/academyStandard'
 import { UTILITY_STANDARD_INTERIOR } from './templates/utilityStandard'
 import { CIVIC_STANDARD_INTERIOR } from './templates/civicStandard'
 import { LIBRARY_STANDARD_INTERIOR } from './templates/libraryStandard'
+import { DAVARU_TEMPLE_INTERIOR } from './templates/davaruTemple'
 import { SPACEPORT_STANDARD_INTERIOR } from './templates/spaceportStandard'
 
 export interface InteriorTemplateRegistry {
@@ -33,6 +34,7 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [UTILITY_STANDARD_INTERIOR.id]: UTILITY_STANDARD_INTERIOR,
     [CIVIC_STANDARD_INTERIOR.id]: CIVIC_STANDARD_INTERIOR,
     [LIBRARY_STANDARD_INTERIOR.id]: LIBRARY_STANDARD_INTERIOR,
+    [DAVARU_TEMPLE_INTERIOR.id]: DAVARU_TEMPLE_INTERIOR,
     [SPACEPORT_STANDARD_INTERIOR.id]: SPACEPORT_STANDARD_INTERIOR,
   },
   byBuildingTypeId: {
@@ -68,6 +70,7 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     bank: CIVIC_STANDARD_INTERIOR.id,
     command_node: CIVIC_STANDARD_INTERIOR.id,
     archive_library: LIBRARY_STANDARD_INTERIOR.id,
+    davaru_temple: DAVARU_TEMPLE_INTERIOR.id,
     landing_pad: SPACEPORT_STANDARD_INTERIOR.id,
     spaceport_core: SPACEPORT_STANDARD_INTERIOR.id,
     spaceport_pad_standard: SPACEPORT_STANDARD_INTERIOR.id,
