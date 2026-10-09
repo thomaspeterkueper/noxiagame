@@ -9,6 +9,7 @@ type Session = { destinationKey: string; channel: string; roomId: string; expire
 export default function TemplePage() {
   const [session, setSession] = useState<Session | null>(null)
   const [activeVisitors, setActiveVisitors] = useState<Record<string, number>>({})
+  const [registeredCharacters, setRegisteredCharacters] = useState<Array<{personId:string;displayName:string;role:string}>>([])
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -23,6 +24,7 @@ export default function TemplePage() {
     if (!response.ok) throw new Error(response.status === 401 ? 'Bitte zuerst anmelden.' : String(data.error ?? 'Tempelzugang derzeit nicht verfügbar'))
     setSession(data.session ?? null)
     if (data.activeVisitors) setActiveVisitors(data.activeVisitors)
+    if (Array.isArray(data.registeredCharacters)) setRegisteredCharacters(data.registeredCharacters)
   }
   useEffect(() => {
     let active = true
@@ -35,6 +37,7 @@ export default function TemplePage() {
       if (active) {
         setSession(data.session ?? null)
         setActiveVisitors(data.activeVisitors ?? {})
+        setRegisteredCharacters(Array.isArray(data.registeredCharacters) ? data.registeredCharacters : [])
       }
     }).catch(error => { if (active) setMessage(error.message) })
       .finally(() => { if (active) setReady(true) })
@@ -63,6 +66,13 @@ export default function TemplePage() {
       <button type="button" disabled={busy} onClick={()=>void act({action:'enter'})}>Über ENDIA eintreten</button>
       <p><a href="/auth/login">Anmelden</a></p>
     </>}
+    <section style={{marginTop:18,padding:12,border:'1px solid #b9c7c7',borderRadius:8}}>
+      <h2>Literarische Figuren</h2>
+      {registeredCharacters.length ? <ul>{registeredCharacters.map(person=><li key={person.personId}>
+        {person.displayName} · {person.role==='host'?'Gastgeber':'Gesprächsgast'} · kanonisch registriert
+      </li>)}</ul> : <p>DaVaRu und Aristeas Lux sind noch nicht als kanonische Personen mit diesem Ort verbunden.</p>}
+      <small>Die Registrierung bedeutet nicht, dass die Person aktuell im Tempel anwesend ist.</small>
+    </section>
     {message && <p role="status">{message}</p>}
   </main>
 }
