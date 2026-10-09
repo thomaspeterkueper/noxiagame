@@ -185,6 +185,15 @@ Code: `lib/game/population/housingShadow.ts` (reine Entscheidung), `housingShado
 - Standard: aus. Einschalten über `NOXIA_HOUSING_SHADOW=true`. Jeder Fehler lässt den Tick unberührt.
 - Vereinfachungen: Arbeit gilt nur am eigenen Ort als erreichbar, frühere Räumungen sind live noch nicht erfasst, Vermieter haben keine persönliche Abneigung.
 
+## Erster ausgeführter Schritt: Einzug in staatlichen Wohnraum (2026-10-09)
+
+Migration `20261009210000_public_housing_placement.sql`, Funktion `move_person_to_public_housing(person, tile, tick)`.
+
+- Nur für Personen ohne Wohnung, nur am eigenen Ort, nur in ein staatliches Wohngebäude mit freiem Platz.
+- Eine Transaktion: Gebäude sperren, Kapazität prüfen, `home`-Zuweisung und Mietverhältnis anlegen. Keine Miete, keine Buchung. `current_location_id` wird nicht verändert.
+- Das Mietverhältnis trägt `origin = 'provided'`: eine Zuteilung, keine Marktentscheidung.
+- Der Schattenlauf ruft die Funktion nur mit `NOXIA_HOUSING_PUBLIC_PLACEMENT=true` auf, und nur für Entscheidungen „ohne Wohnung, Zusage, staatliches Ziel". Standard: aus.
+
 ## Noch offen
 
 1. Ob die Steuereinnahmen die öffentlichen Löhne tragen, ist ungeprüft. Es gab bisher keine einzige Buchung.

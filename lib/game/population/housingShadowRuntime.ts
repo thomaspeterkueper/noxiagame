@@ -2,9 +2,12 @@
 // NOXIA-LIVING-0010, stage 4: shadow mode against the live inventory.
 //
 // Once per game day every person's housing decision is computed and written to
-// housing_shadow_decisions. Nothing else is touched: no assignment, no tenancy,
-// no ledger, and move_person_to_market_rental is never called from here.
-// Off unless NOXIA_HOUSING_SHADOW=true. Any failure leaves the tick untouched.
+// housing_shadow_decisions. No ledger is touched and move_person_to_market_rental
+// is never called from here. Off unless NOXIA_HOUSING_SHADOW=true.
+//
+// One exception, behind its own switch NOXIA_HOUSING_PUBLIC_PLACEMENT=true: a
+// person without a home is placed in free public housing at their own location
+// (move_person_to_public_housing). Any failure leaves the tick untouched.
 
 import type { Dwelling, Tenure } from './housing'
 import { shadowHousingDecision, type ShadowDwelling, type ShadowPerson } from './housingShadow'
@@ -18,7 +21,12 @@ export function housingShadowEnabled(): boolean {
   return process.env.NOXIA_HOUSING_SHADOW === 'true'
 }
 
-export async function runHousingShadowTick(supabase: any, tick: number): Promise<{ ok: boolean; skipped?: string; decisions?: number; error?: string }> {
+/** Carries out exactly one kind of decision: a person without a home moving into free public housing. */
+export function publicPlacementEnabled(): boolean {
+  return process.env.NOXIA_HOUSING_PUBLIC_PLACEMENT === 'true'
+}
+
+export async function runHousingShadowTick(supabase: any, tick: number): Promise<{ ok: boolean; skipped?: string; decisions?: number; placed?: number; placementErrors?: string[]; error?: string }> {
   if (!housingShadowEnabled()) return { ok: true, skipped: 'disabled' }
   if (tick % DAY_TICKS !== 0) return { ok: true, skipped: 'not_due' }
   try {
@@ -109,7 +117,21 @@ export async function runHousingShadowTick(supabase: any, tick: number): Promise
     if (!rows.length) return { ok: true, decisions: 0 }
     const { error } = await supabase.from('housing_shadow_decisions').upsert(rows, { onConflict: 'person_id,tick', ignoreDuplicates: true })
     if (error) return { ok: false, error: error.message ?? String(error) }
-    return { ok: true, decisions: rows.length }
+    if (!publicPlacementEnabled()) return { ok: true, decisions: rows.length }
+    // Sorted so that two people competing for the last place are resolved the same way every time.
+    const stateTiles = new Set(inventory.filter((entry) => entry.dwelling.ownerKind === 'state').map((entry) => entry.dwelling.id))
+    const due = rows
+      .filter((row: any) => row.outcome === 'granted' && row.must_move && row.tenure === 'none' && row.target_tile_entity_id && stateTiles.has(row.target_tile_entity_id))
+      .sort((a: any, b: any) => String(a.person_id).localeCompare(String(b.person_id)))
+    let placed = 0
+    const placementErrors: string[] = []
+    for (const row of due) {
+      // The database function checks capacity, location and "no home yet" again, atomically.
+      const result = await supabase.rpc('move_person_to_public_housing', { p_person_id: row.person_id, p_tile_entity_id: row.target_tile_entity_id, p_tick: tick })
+      if (result.error) placementErrors.push(`${row.person_id}: ${result.error.message ?? String(result.error)}`)
+      else placed += 1
+    }
+    return { ok: true, decisions: rows.length, placed, placementErrors }
   } catch (error: any) {
     return { ok: false, error: error?.message ?? String(error) }
   }
