@@ -14,6 +14,7 @@ import {
   type PopulationDecision,
 } from './types'
 import { affectActionModifiers, type AffectState } from '../cognition/personAffect'
+import { habitActionModifier, type HabitState } from '../cognition/personHabit'
 
 export interface KnownLocalProblem {
   subjectType: string
@@ -40,6 +41,8 @@ export interface PopulationDecisionContext {
   sleepDrive?: number
   /** NOXIA-LIVING-0006. Bereits auf den aktuellen Tick abgeklungener Affektzustand. */
   affect?: AffectState
+  habits?: HabitState[]
+  habitContextKey?: string
 }
 
 interface ScoredAction {
