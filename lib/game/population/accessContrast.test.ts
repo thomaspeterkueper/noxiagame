@@ -109,5 +109,36 @@ check(temporaryBlock.wealth === 300 && temporaryBlock.working, 'one-period refus
 check(temporaryBlock.missedWages === 100, 'foregone wages are explicitly recorded')
 check(temporaryBlockWithExit.wealth === uninterrupted.wealth, 'independent substitute prevents wage gap')
 check(simulatePeriods(true, false).wealth === temporaryBlock.wealth, 'temporal contrast is deterministic')
-console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 30, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, concentration: { distributedAccess, concentratedAccess }, temporal: { uninterrupted, temporaryBlock, temporaryBlockWithExit }, scope: 'pure rule contrast; no live effects' }))
+
+// Minimal feedback loop, explicitly separate from live tick rules:
+// housing determines whether a job is reachable; work generates means for housing.
+// A one-period access shock can lock the system into a low-access state.
+// Public temporary housing is a modeled intervention, not an existing live policy.
+type LoopState = { wealth: number; housed: boolean; employed: boolean; income: number }
+const feedbackRun = (initialHousingRefusal: boolean, bridgeHousing: boolean): LoopState[] => {
+  const state: LoopState = { wealth: 0, housed: false, employed: false, income: 0 }
+  const history: LoopState[] = []
+  for (let period = 0; period < 4; period++) {
+    const privateAccess = period > 0 || !initialHousingRefusal
+    // Rent is affordable from wages, but admission requires either an active job
+    // or a temporary bridge; this models a circular entry requirement.
+    const canEnterHousing = privateAccess && (state.employed || period === 0)
+    if (!state.housed && (canEnterHousing || (bridgeHousing && period === 0))) state.housed = true
+    // Commuting to this workplace requires residence in the settlement.
+    if (state.housed) state.employed = true
+    state.income = state.employed ? 100 : 0
+    state.wealth += state.income
+    history.push({ ...state })
+  }
+  return history
+}
+const feedbackBaseline = feedbackRun(false, false)
+const feedbackExcluded = feedbackRun(true, false)
+const feedbackBridged = feedbackRun(true, true)
+check(feedbackBaseline[3].wealth === 400 && feedbackBaseline[3].housed, 'unblocked entrant gains housing and four wages')
+check(feedbackExcluded[3].wealth === 0 && !feedbackExcluded[3].housed, 'initial denial plus entry requirements traps entrant')
+check(feedbackBridged[3].wealth === 400 && feedbackBridged[3].housed, 'temporary substitute breaks entry loop')
+check(feedbackExcluded[1].wealth === 0, 'reopened private access alone does not undo circular exclusion')
+check(feedbackRun(true, true)[3].wealth === feedbackBridged[3].wealth, 'feedback experiment replay is deterministic')
+console.log(JSON.stringify({ experiment: 'OMNI-O5-ACCESS-001', checks: 35, failures, housing: { affordable: Boolean(offered), denied: refused.reason, admitted: granted.reason }, employment: { denied: jobRefused.reason, admitted: jobGranted.reason }, measurement: { denied, admitted }, alternatives: { openBoth, deniedOne, deniedBoth }, concentration: { distributedAccess, concentratedAccess }, temporal: { uninterrupted, temporaryBlock, temporaryBlockWithExit }, feedback: { baseline: feedbackBaseline, excluded: feedbackExcluded, bridged: feedbackBridged }, scope: 'pure rule contrast; no live effects' }))
 if (failures) throw new Error(`OMNI-O5-ACCESS-001: ${failures} checks failed`)
