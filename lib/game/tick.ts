@@ -553,53 +553,15 @@ export async function runBankInterestTick(supabase: SB, tickNumber: number) {
 //   + Nähe zum Zentrum (Distanz 0 = +100, Distanz 10+ = 0)
 // Wird einmal pro Tick aufgerufen — nicht geschäftskritisch bei Fehler.
 
-export async function runLandValueTick(supabase: SB, locationSnapshot?: any[]) {
-  // Reuse the post-population location snapshot when available.
-  let locations: any[] = []
-  if (locationSnapshot) {
-    locations = locationSnapshot.filter((loc: any) => Number(loc.population ?? 0) > 0)
-  } else {
-    const { data, error: locErr } = await supabase
-      .from('locations')
-      .select('id, population, population_max')
-      .gt('population', 0)
-    if (locErr) return { updated: 0 }
-    locations = data ?? []
+export async function runLandValueTick(supabase: SB, _locationSnapshot?: any[]) {
+  // The database computes the same population + center-distance formula for all
+  // buildings in one statement and writes only rows whose value changed.
+  const { data, error } = await supabase.rpc('refresh_changed_land_values')
+  if (error) {
+    console.error('refresh_changed_land_values failed', { code: error.code, message: error.message })
+    return { updated: 0, error: error.code ?? 'land_value_refresh_failed' }
   }
-
-  if (!locations.length) return { updated: 0 }
-
-  let updated = 0
-
-  for (const loc of locations) {
-    const popFactor = Math.min(200, Math.round((loc.population ?? 0) * 0.02))
-
-    // Alle Kacheln dieser Kolonie
-    const { data: tiles } = await supabase
-      .from('tile_entities')
-      .select('id, tile_row, tile_col, entity_type')
-      .eq('location_id', loc.id)
-      .eq('entity_type', 'building')
-
-    for (const tile of tiles ?? []) {
-      // Nähe zum Zentrum (Grid 10×10, Mitte bei 5,5)
-      const dr = Math.abs((tile.tile_row ?? 5) - 5)
-      const dc = Math.abs((tile.tile_col ?? 5) - 5)
-      const dist = Math.sqrt(dr * dr + dc * dc)
-      const proximityBonus = Math.max(0, Math.round(100 - dist * 10))
-
-      const landValue = 10 + popFactor + 50 + proximityBonus
-
-      await supabase
-        .from('tile_entities')
-        .update({ land_value: landValue, land_value_updated_at: new Date().toISOString() })
-        .eq('id', tile.id)
-
-      updated++
-    }
-  }
-
-  return { updated }
+  return { updated: Number(data ?? 0) }
 }
 
 export async function runTick(supabase: SB, tickNumber: number) {
