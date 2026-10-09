@@ -1,4 +1,5 @@
 import type { EarthRegionAnchor } from './earthSpatial'
+import { HERCEG_NOVI_EARTH_PLACE } from './hercegNoviPlace'
 import { EARTH_CELL_SIZE_M, EARTH_CHUNK_SIZE_M } from './earthSpatial'
 
 /**
@@ -39,9 +40,18 @@ export const EARTH_NAMIBIA_ERONGO_REGION: EarthRegionAnchor = {
   cellSizeM: EARTH_CELL_SIZE_M,
 }
 
+export const EARTH_MONTENEGRO_HERCEG_NOVI_REGION: EarthRegionAnchor = {
+  id: HERCEG_NOVI_EARTH_PLACE.id,
+  name: 'Earth · Montenegro · Herceg Novi',
+  origin: HERCEG_NOVI_EARTH_PLACE.center,
+  chunkSizeM: EARTH_CHUNK_SIZE_M,
+  cellSizeM: EARTH_CELL_SIZE_M,
+}
+
 export const EARTH_REGIONS: Record<string, EarthRegionAnchor> = {
   [EARTH_SAUERLAND_REGION.id]: EARTH_SAUERLAND_REGION,
   [EARTH_NAMIBIA_ERONGO_REGION.id]: EARTH_NAMIBIA_ERONGO_REGION,
+  [EARTH_MONTENEGRO_HERCEG_NOVI_REGION.id]: EARTH_MONTENEGRO_HERCEG_NOVI_REGION,
 }
 
 export function getEarthRegion(id: string): EarthRegionAnchor | null {
