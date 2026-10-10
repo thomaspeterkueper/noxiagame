@@ -482,7 +482,20 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           const facade=[top[1],top[2],side[2],side[1]]
           const front=[top[2],top[3],side[3],side[2]]
           const distanceM=Math.hypot(target.xM-player.xM,target.yM-player.yM)
-          return <g key={target.id} style={{cursor:'pointer'}} onClick={()=>setNavigationTargetId(target.id)}
+          return <g key={target.id} style={{cursor:'pointer'}} onClick={()=>{
+              setNavigationTargetId(target.id)
+              const entry=getBuildingEntryDefinition(entity.entity_id)
+              const footprintDistance=distanceToBuildingFootprint(player,{
+                id:entity.id,center:{xM:target.xM,yM:target.yM},widthM:width,depthM:depth,
+                rotationDeg:Number(entity.rotation_deg??0),provenance:'canonical',
+              })
+              if(entry&&footprintDistance<=8){
+                setAutoWalkTargetId('')
+                setEntryRequest({entityId:entity.id,buildingTypeId:entity.entity_id,buildingName:target.name,kind:entry.kind})
+              }else if(entry){
+                setAutoWalkTargetId(target.id)
+              }
+            }}
             onMouseMove={event=>setHoveredBuilding({x:event.clientX,y:event.clientY,name:target.name,detail:`${entity.ownerLabel??'NOXIA'} · ${entity.status??'aktiv'}`,distanceM})}
             onMouseLeave={()=>setHoveredBuilding(null)}>
             <polygon points={pointsAttr(facade)} fill="#496778" stroke="#183643" strokeWidth="1.1"/>
