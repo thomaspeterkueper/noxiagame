@@ -52,6 +52,9 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[hoveredBuilding,setHoveredBuilding]=useState<{x:number;y:number;name:string;detail:string;distanceM:number}|null>(null)
   const[navigationTargetId,setNavigationTargetId]=useState<string>('')
   const[autoWalkTargetId,setAutoWalkTargetId]=useState<string>('')
+  // Prevent a position update from immediately triggering another auto-walk step
+  // before the next animation frame. React state changes recalculate the route.
+  const lastAutoWalkMotionTime=useRef<number|null>(null)
   const[entryRequest,setEntryRequest]=useState<BuildingEntryRequest|null>(null)
   const localEnrichmentAttempted=useRef(new Set<string>())
 
@@ -322,6 +325,10 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
   useEffect(()=>{
     if(!scene||!origin||!navigationTarget||!navigationRoute||autoWalkTargetId!==navigationTarget.id||targetInteractionDistance===null)return
+    // A changed player position recomputes navigationRoute and reruns this effect.
+    // Only advance once per motion clock tick to avoid React update-depth loops.
+    if(lastAutoWalkMotionTime.current===motionTime)return
+    lastAutoWalkMotionTime.current=motionTime
     if(targetInteractionDistance<=autoWalkStopDistance){
       setAutoWalkTargetId('')
       return
