@@ -50,6 +50,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
   const [cardIdx, setCardIdx] = useState(0)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
+  const [starterCafeId, setStarterCafeId] = useState<string | null>(null)
 
   // ── Onboarding-Kalibrierungsquiz ──────────────────────────────────────────
   // Rein diagnostisch (siehe app/api/game/onboarding-quiz/route.ts) — kalibriert
@@ -76,6 +77,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
     const data = await res.json()
     setSaving(false)
     if (data.error) { setError(data.error); return }
+    setStarterCafeId(data?.starter?.kind === 'cafe' && data?.starter?.entityId ? String(data.starter.entityId) : null)
     setStep('quiz')
     loadQuiz()
   }
@@ -302,7 +304,14 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
             </div>
 
             <button
-              onClick={() => cardIdx < CARDS.length - 1 ? setCardIdx(cardIdx + 1) : onDone({ openJourney: true })}
+              onClick={() => {
+                if (cardIdx < CARDS.length - 1) { setCardIdx(cardIdx + 1); return }
+                if (starterCafeId) {
+                  window.location.assign('/earth?starterCafe=' + encodeURIComponent(starterCafeId))
+                  return
+                }
+                onDone({ openJourney: true })
+              }}
               style={{
                 ...mono, padding: '0.75rem 2.5rem',
                 background: 'transparent', border: `1px solid ${C.gold}`, color: C.gold,
