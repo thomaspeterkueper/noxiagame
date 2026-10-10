@@ -1,6 +1,16 @@
 # Ortsstufen und Standardausstattung (Entwurf)
 
-Status: Entwurf – Schwellenwerte sind Platzhalter, bitte vor dem Bau bestätigen.
+Status: Entwurf – Entscheidungen vom 10.10.2026 eingearbeitet.
+
+Entschieden:
+- Schwellen 20 / 100 / 500 sind Startwerte und Tuningparameter, keine Balancewerte (`lib/game/settlements/tiers.ts`).
+- Verwaltung: auf der Erde staatlich, nicht regulär baubar, automatisch ab Stufe 0. Bestehende Gebäude bleiben unberührt. Auf anderen Planeten/Stationen kann sie später auch einem Unternehmen gehören (historisch war auch auf der Erde nicht alles staatlich, z. B. kirchliche Verwaltung).
+- Bar-MVP: NPC-Wirt, bestehende Gesprächspipeline, Startpunkt neuer Spieler. Keine Bar-spezifische Affect-Logik; erst die Affect-Schnittstelle prüfen, dann ein allgemeiner Mechanismus für soziale Orte.
+- Architekturregel: Café/Bar ist der erste Typ „soziale Infrastruktur" (`SOCIAL_INFRASTRUCTURE`). Markt, Park, Freibad, religiöse Orte nutzen dieselbe Struktur.
+
+Fund beim Bau: Ein Café existiert bereits (aktive `building_definitions`-Zeile `cafe`, begehbares Interieur `CafeWalkableInterior`, NPC-Gespräche über `npc-conversation`, Gebäude-Eintritt). Die „Bar" ist daher kein neues Gebäude, sondern eine Variante/Alias des Cafés; `bar` bleibt vorerst `planned`.
+
+Stand im Code: Das Stufenmodell ist rein beschreibend. Die Stufe wird noch nirgends ausgelöst, Standardgebäude werden nicht automatisch gebaut.
 
 ## 1. Leitgedanke
 

@@ -1,4 +1,7 @@
 import {
+  SOCIAL_HOSPITALITY_EQUIVALENTS,
+  arrivalPoints,
+  isSocialInfrastructure,
   SETTLEMENT_TIER_DOWNGRADE_FACTOR,
   SETTLEMENT_TIER_THRESHOLDS,
   missingSettlementCapabilities,
@@ -22,6 +25,10 @@ check(missingSettlementCapabilities({population:20,buildingIds:['landing_pad','a
 check(missingSettlementCapabilities({population:20,buildingIds:['landing_pad','admin','bar']}).missing.length===0,'bar is same first social capability')
 check(missingSettlementCapabilities({population:20,buildingIds:['landing_pad','admin','q1_everyday_life']}).missing.length===0,'Q1 everyday module satisfies social tier')
 check(missingSettlementCapabilities({population:100,buildingIds:['landing_pad','admin','cafe']}).missing.join(',')==='market,academy,clinic','tier 2 lists missing standard capabilities')
+
+check(isSocialInfrastructure('cafe')&&isSocialInfrastructure('bar')&&!isSocialInfrastructure('warehouse'),'cafe and bar are social infrastructure')
+check(SOCIAL_HOSPITALITY_EQUIVALENTS.every(isSocialInfrastructure),'every hospitality equivalent is registered as social infrastructure')
+check(arrivalPoints(['admin','q1_everyday_life','cafe']).join(',')==='cafe','new players arrive in a cafe or bar, not in the Q1 module')
 
 if(failures) throw new Error(String(failures)+' settlement tier test(s) failed')
 console.log('Settlement tiers: tests passed; mutations=0')
