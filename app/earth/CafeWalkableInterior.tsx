@@ -26,9 +26,10 @@ const HOST_PREFIX='host:'
 // (keine Gesprächsspeicherung); sobald echte Bewohner mit Arbeitsplatz hier
 // existieren, ersetzen sie diesen Fallback.
 const HOST_GREETING='Willkommen! Neu hier? Setz dich, ich erkläre dir gern, wie du ins Geschäft kommst – Handel, Reisen, Wissen. Was hast du vor?'
-type PlayerBrief={credits?:number;knowledge_level?:number;home_location?:string;current_location?:string}
-function hostFacts(brief:PlayerBrief|null):string[]{
-  const facts=[
+// Der Wirt weiß nur, was ein Wirt wissen kann: nichts über Kontostand oder
+// Wissensstufe des Gastes. Das erfährt er höchstens, wenn der Gast es erzählt.
+function hostFacts():string[]{
+  return [
     'Du bist der Wirt dieses Cafés und kennst die Gegend; du hilfst neuen Gästen beim Einstieg',
     'In der Akademie kann man Wissen sammeln und Prüfungen ablegen; mehr Wissen öffnet mehr Möglichkeiten',
     'Handeln ist auch ohne eigenes Schiff möglich: Ein Spediteur übernimmt den Transport und behält dafür einen Anteil vom Gewinn',
@@ -37,9 +38,6 @@ function hostFacts(brief:PlayerBrief|null):string[]{
     'Wer ein Ziel hat (z. B. kosmischer Händler), beginnt klein: Waren günstig kaufen, am Zielort teurer verkaufen',
     'Den Heimatort kann man bei der Verwaltung des Ortes ändern, an dem man sich registrieren will',
   ]
-  if(brief?.credits!==undefined)facts.push('Der Gast hat etwa '+Math.round(brief.credits)+' Credits')
-  if(brief?.knowledge_level!==undefined)facts.push('Wissensstufe des Gastes: '+brief.knowledge_level+' von 6')
-  return facts
 }
 
 const furniture:Furniture[]=[
@@ -71,7 +69,6 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
   const[history,setHistory]=useState<Array<{role:'user'|'assistant';content:string}>>([])
   const[sending,setSending]=useState(false)
   const[status,setStatus]=useState('')
-  const[brief,setBrief]=useState<PlayerBrief|null>(null)
 
   useEffect(()=>{
     let live=true
@@ -88,19 +85,6 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
     })()
     return()=>{live=false}
   },[entityId,companion?.id])
-
-  useEffect(()=>{
-    let live=true
-    ;(async()=>{
-      try{
-        const{token}=await getSessionInfo()
-        const response=await fetch('/api/game/profile',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
-        const data=await response.json()
-        if(live&&response.ok)setBrief(data?.profile??data)
-      }catch{}
-    })()
-    return()=>{live=false}
-  },[])
 
   const hostResident=useMemo<ColonyResident|null>(()=>{
     const hasWorker=residents.some(r=>r.assignments.some(a=>a.type==='work'&&a.tileEntityId===entityId))
@@ -160,7 +144,7 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
             'Ihr befindet euch im Café '+buildingName,
             'Im Innenraum gibt es einen Gastraum, mehrere Tische und einen Tresen',
             'Der Ausgang liegt beim Eingang des Cafés',
-            ...(isHost(selected)?hostFacts(brief):[]),
+            ...(isHost(selected)?hostFacts():[]),
           ],
           history,
         }),
