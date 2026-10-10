@@ -71,11 +71,12 @@ function activityForAction(action: PopulationAction, intent: PopulationIntentRes
 function updateNeeds(needs: PersonNeed[], action: PopulationAction, tick: number, intent: PopulationIntentResult): PersonNeed[] {
   if (!intent.ok || intent.intent.kind === 'travel' || intent.intent.kind === 'work') return needs
   const deltas = NEED_DELTAS[action] ?? {}
-  return needs.map((need) => ({
-    ...need,
-    satisfaction: clampUnit(need.satisfaction + (deltas[need.needCode] ?? 0)),
-    updatedTick: tick,
-  }))
+  return needs.map((need) => {
+    const satisfaction = clampUnit(need.satisfaction + (deltas[need.needCode] ?? 0))
+    // Preserve unchanged need rows and timestamps; downstream persistence can skip them.
+    if (satisfaction === need.satisfaction) return need
+    return { ...need, satisfaction, updatedTick: tick }
+  })
 }
 
 function relatedPersonForAction(input: PopulationTickInput, action: PopulationAction): string | null {

@@ -97,14 +97,16 @@ async function updateNeedsForAction(
 ) {
   if (!needs.length) return
   const updatedAt = new Date().toISOString()
-  const updates = needs.map(need => {
+  const updates = needs.flatMap(need => {
     const current = Number(need.satisfaction ?? 1)
-    // NOXIA-LIVING-0009: same action + passive drift, persisted in one request per person.
+    // Include passive drift, but do not persist values unchanged after clamping.
     const next = Math.max(0, Math.min(1, current + needDelta(action, need.need_code, environment) + passiveNeedDrift(need.need_code, environment, current)))
+    if (next === current) return []
     need.satisfaction = next
     need.updated_tick = tick
-    return { person_id: personId, need_code: need.need_code, satisfaction: next, updated_tick: tick, updated_at: updatedAt }
+    return [{ person_id: personId, need_code: need.need_code, satisfaction: next, updated_tick: tick, updated_at: updatedAt }]
   })
+  if (!updates.length) return
   const { error } = await supabase.from('person_needs').upsert(updates, { onConflict: 'person_id,need_code' })
   if (error) console.error('updateNeedsForAction failed', { personId, tick, code: error.code })
 }
@@ -237,7 +239,9 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     for (const need of affectContext.needsByPerson.get(event.actorPersonId) ?? []) {
       const gain = encounterNeedDelta(need.need_code, qualities)
       if (gain === 0) continue
-      const next = Math.max(0, Math.min(1, Number(need.satisfaction ?? 1) + gain))
+      const current = Number(need.satisfaction ?? 1)
+      const next = Math.max(0, Math.min(1, current + gain))
+      if (next === current) continue
       encounterUpdates.push({ person_id: event.actorPersonId, need_code: need.need_code, satisfaction: next, updated_tick: event.tick, updated_at: updatedAt })
       need.satisfaction = next
     }
@@ -390,9 +394,10 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       relationships: context.relationships,
       knowledge: context.knowledge,
     })
+    const intentBlocker = 'reason' in intent ? intent.reason : null
     const execution = intent.ok
       ? await executePopulationActionIntent(supabase, intent.intent, tick)
-      : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
+      : { executed: false as const, kind: 'blocked' as const, reason: intentBlocker }
 
     const habitExecutionEvidence = intent.ok ? classifyHabitExecution(decision.action, execution as Awaited<ReturnType<typeof executePopulationActionIntent>>) : { status: 'unverified' as const, reason: 'intent_blocked' }
     const nextActivity = activityForAction(decision.action)
@@ -403,7 +408,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       ...decision.factors,
       score: decision.score,
       intent: intent.ok ? intent.intent.kind : null,
-      intentBlocker: intent.ok ? null : intent.reason,
+      intentBlocker: intentBlocker,
       execution: execution.executed ? execution.kind : null,
       habitEvidenceStatus: habitExecutionEvidence.status,
     }
@@ -421,7 +426,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
         score: decision.score,
         factors: decision.factors,
         intent: intent.ok ? intent.intent : null,
-        blocker: intent.ok ? null : intent.reason,
+        blocker: intentBlocker,
         execution,
         habitEvidence: habitExecutionEvidence,
       },

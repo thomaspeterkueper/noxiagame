@@ -26,5 +26,40 @@ check(result.events[0]?.eventType === 'npc_started_travel', 'event records trave
 check(result.events[0]?.locationId === 'home', 'travel-start event remains at origin')
 check(result.needs.every((need, index) => need.satisfaction === needs[index]?.satisfaction), 'travel costs wait for authoritative execution/completion')
 
+
+// Change-only needs: a successful report increases purpose, but must not
+// refresh unrelated need timestamps or replace their object identities.
+const reportResult = runPopulationTick({
+  tick: 11,
+  person: { ...person, currentLocationId: 'home' },
+  assignments: [],
+  needs: [
+    { personId: 'p1', needCode: 'purpose', satisfaction: 0.1, updatedTick: 0 },
+    { personId: 'p1', needCode: 'safety', satisfaction: 1, updatedTick: 0 },
+  ],
+  skills: [],
+  relationships: [],
+  knowledge: [],
+  localProblems: [],
+})
+check(reportResult.needs.length === 2, 'need array remains complete even when values do not change')
+check(reportResult.needs.every(need => need.updatedTick === 0 || need.updatedTick === 11), 'need timestamps remain valid')
+
+// Pure change-only semantics are also exercised through a saturated need:
+// no action should manufacture a new timestamp when a clamped value is unchanged.
+const saturatedNeeds: PersonNeed[] = [{ personId: 'p1', needCode: 'safety', satisfaction: 1, updatedTick: 3 }]
+const saturatedResult = runPopulationTick({
+  tick: 12,
+  person,
+  assignments,
+  needs: saturatedNeeds,
+  skills: [],
+  relationships: [],
+  knowledge: [],
+  localProblems: [],
+})
+check(saturatedResult.needs[0] === saturatedNeeds[0], 'unchanged safety need retains identity')
+check(saturatedResult.needs[0]?.updatedTick === 3, 'unchanged safety need retains last change tick')
+
 if (failures) throw new Error(`${failures} population tick intent test(s) failed`)
 console.log('Population tick intent boundary: tests passed')
