@@ -11,9 +11,10 @@
 // Wissensstufe oder Vorhaben des Gegenübers kennt sie nicht. Was hinter einer
 // geschlossenen Personaltür liegt, weiß nur, wer dort arbeitet.
 //
-// Bestellung, Bezahlung, Stimmungswirkung und der Wirt als Bewohner mit
-// Arbeitsvertrag sind hier bewusst nicht gebaut. Anschlussstellen:
-// docs/gameplay/hospitality-venues.md.
+// Die Buchung einer Bestellung liegt im Teilprojekt Bevölkerung und Ökonomie
+// (/api/game/hospitality/order). Hier steht nur, wer im Raum was darüber weiß.
+// Stimmungswirkung und der Wirt als Bewohner mit Arbeitsvertrag sind nicht
+// gebaut. Anschlussstellen: docs/gameplay/hospitality-venues.md.
 
 import type { InteriorTemplate } from '../buildings/interiors/types'
 import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeStandard'
@@ -398,6 +399,27 @@ export function placeVenueFigures(layout: VenueLayout, residents: readonly Venue
   return figures
 }
 
+// ── Betrieb ─────────────────────────────────────────────────────────────────
+/**
+ * Entscheidung (Thomas, 10.10.2026): Ein Lokal ohne Personal ist geschlossen –
+ * oder ein Automatencafé. Es gibt keinen Platzhalter-Wirt mehr.
+ *
+ * - `staffed`: Mindestens eine Person arbeitet hier.
+ * - `self-service`: Café ohne Personal. Der Automat am Tresen verkauft, niemand berät.
+ * - `closed`: Bar oder Restaurant ohne Personal. Kein Ausschank, keine Gäste.
+ */
+export type VenueService = 'staffed' | 'self-service' | 'closed'
+
+export function venueService(layout: VenueLayout, figures: readonly VenueFigure[]): VenueService {
+  if (figures.some(figure => figure.roomRole === 'staff')) return 'staffed'
+  return layout.kind === 'cafe' ? 'self-service' : 'closed'
+}
+
+export interface VenueMenuItem {
+  label: string
+  priceCredits: number
+}
+
 // ── Wo steht der Spieler? ───────────────────────────────────────────────────
 /** Ortsangabe für den Spieler, wie sie jemand im Raum beschreiben würde. */
 export function describePlayerPosition(layout: VenueLayout, pos: VenuePoint): string {
@@ -462,6 +484,27 @@ export interface ConversationFactsInput {
   playerPos: VenuePoint
   /** Kommen in diesem Lokal neue Spieler an? Dann kennt das Personal den Einstieg. */
   arrivalPoint: boolean
+  /** Die Karte des Lokals. Leer oder weggelassen: hier wird nichts verkauft. */
+  menu?: readonly VenueMenuItem[]
+  /** Was der Spieler bei diesem Besuch bestellt hat – jeder im Raum hat es gesehen. */
+  playerOrders?: readonly string[]
+}
+
+function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
+  const tail = ` Credits; bestellt und bezahlt wird ${layout.servicePoint.locative}, nicht im Gespräch`
+  let list = ''
+  for (const item of menu) {
+    const next = (list ? list + ', ' : '') + `${item.label} ${item.priceCredits}`
+    if (('Karte: ' + next + tail).length > MAX_CONVERSATION_FACT_CHARS) break
+    list = next
+  }
+  return 'Karte: ' + list + tail
+}
+
+function ordersFact(orders: readonly string[]): string {
+  const counts = new Map<string, number>()
+  for (const label of orders) counts.set(label, (counts.get(label) ?? 0) + 1)
+  return 'Dein Gegenüber hat hier eben bestellt: ' + [...counts].map(([label, count]) => (count > 1 ? `${count}× ${label}` : label)).join(', ')
 }
 
 /**
@@ -491,11 +534,22 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   }
   facts.push(staff ? layout.staffBackFact : layout.guestBackFact)
 
-  // Bestellung und Bezahlung sind noch nicht angebunden. Bis dahin darf
-  // niemand im Gespräch so tun, als würde ausgeschenkt oder kassiert.
-  facts.push(staff
-    ? 'Heute wird noch nichts ausgeschenkt oder kassiert; nimm keine Bestellungen an und nenne keine Preise'
-    : 'Heute wird hier noch nichts ausgeschenkt; du hast nichts bestellt und kennst keine Preise')
+  // Das Personal kennt die Karte. Ein Gast weiß nur, wo bestellt wird. Preise
+  // nennt niemand aus dem Kopf, der sie nicht kennt, und niemand kassiert im
+  // Gespräch: gebucht wird ausschließlich am Tresen, Empfang oder Automaten.
+  const menu = input.menu ?? []
+  if (menu.length === 0) {
+    facts.push(staff
+      ? 'Heute wird noch nichts ausgeschenkt oder kassiert; nimm keine Bestellungen an und nenne keine Preise'
+      : 'Heute wird hier noch nichts ausgeschenkt; du hast nichts bestellt und kennst keine Preise')
+  } else if (staff) {
+    facts.push(menuFact(layout, menu))
+  } else if (venueService(layout, input.figures) === 'self-service') {
+    facts.push(`Hier bedient kein Personal; bestellt und bezahlt wird am Automaten ${layout.servicePoint.locative}`)
+  } else {
+    facts.push(`Bestellt und bezahlt wird ${layout.servicePoint.locative} beim Personal; die Preise hast du nicht im Kopf`)
+  }
+  if (seesGuestRoom && input.playerOrders?.length) facts.push(ordersFact(input.playerOrders))
 
   facts.push('Über Kontostand, Wissen, Beruf oder Vorhaben deines Gegenübers weißt du nur, was es dir selbst erzählt')
 

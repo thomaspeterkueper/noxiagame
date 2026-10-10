@@ -1,6 +1,6 @@
 # Café, Bar und Restaurant – Innenaufbau, Figuren, Gespräche
 
-Status: gebaut (Innenaufbau, Platzierung, Gesprächswissen). Wirt als Bewohner, Bestellung/Bezahlung und Stimmungswirkung sind **nicht** gebaut – nur die Anschlussstellen sind unten beschrieben.
+Status: gebaut (Innenaufbau, Platzierung, Gesprächswissen, Bestellen am Tresen). Die Buchung selbst gehört zum Teilprojekt Bevölkerung und Ökonomie. Wirt als Bewohner und Stimmungswirkung sind **nicht** gebaut – nur die Anschlussstellen sind unten beschrieben.
 
 Bezug: `docs/gameplay/settlement-tiers.md` (Rolle des Cafés), `NOXIA-LIVING-0010` (Stellen), `NOXIA-FIN-0001` (Buchungssemantik), `NOXIA-LIVING-0006` (Affekt).
 
@@ -40,7 +40,19 @@ Die Prüfungen stellen sicher: Möbel überlappen nicht, jeder Sitzplatz liegt a
 - Liegt ein Eintrag in `person_interior_presence` vor, gilt dessen Raum. Ist er vom Gastraum aus nicht einsehbar, wird die Figur nicht gezeigt.
 - Ist der Raum voll, werden weitere Personen nicht dargestellt.
 
-Ohne Personal bleibt der bisherige Platzhalter: ein Wirt ohne Personendatensatz und ohne Gesprächsspeicher, damit niemand in einen leeren Raum kommt.
+### Lokal ohne Personal
+
+Entscheidung (Thomas, 10.10.2026): Ein Lokal ohne Personal ist geschlossen – oder ein Automatencafé. Den Platzhalter-Wirt gibt es nicht mehr. `venueService` leitet daraus ab:
+
+| Betrieb | Wann | Folge |
+|---|---|---|
+| `staffed` | mindestens eine Person arbeitet hier | Personal steht am Platz, kennt die Karte |
+| `self-service` | Café ohne Personal | Automat am Tresen verkauft, niemand berät; Gäste können da sein |
+| `closed` | Bar oder Restaurant ohne Personal | kein Ausschank, keine Figuren; der Spieler kann nur wieder gehen |
+
+Dass gerade das Café zum Automatencafé wird und Bar und Restaurant schließen, ist eine Lesart dieser Entscheidung, keine eigene Datenspalte. Soll ein Gebäude das selbst festlegen können, braucht es ein Merkmal am Gebäude.
+
+„Personal“ heißt hier: Arbeitszuweisung zu diesem Gebäude. Ob die Person gerade Schicht hat, weiß der Raum nicht (siehe 6.1).
 
 ## 4. Gespräche
 
@@ -54,42 +66,60 @@ Regel: **Eine Figur weiß nur, was sie im Raum wissen kann.** `venueConversation
 | Wo der Spieler gerade steht | ja, wenn einsehbar | ja, wenn einsehbar |
 | Andere Personen in Sichtweite – Anzahl und Platz, **keine Namen** | ja | ja |
 | Personalbereich | nur, dass es ihn gibt | was dort liegt |
+| Karte und Preise | nein – nur, wo bestellt wird | ja |
+| Was der Spieler bei diesem Besuch bestellt hat | ja, wenn einsehbar | ja, wenn einsehbar |
 | Weg in die Welt (Akademie, Handel, Linienflug, Verwaltung) | nein | nur in Ankunftslokalen (Café, Bar) |
 
 Nie enthalten: Kontostand, Wissensstufe, Beruf oder Vorhaben des Spielers. Das steht als ausdrücklicher Fakt dabei – die Figur erfährt es nur, wenn der Spieler es erzählt. Der Koch im Restaurant bekommt weder Raumaufbau noch Gäste, weil er sie nicht sieht.
 
 Die Liste bleibt innerhalb der Grenzen der Gesprächsroute (höchstens 16 Fakten mit je 140 Zeichen). Das ist geprüft, weil die Route sonst still abschneidet.
 
-Änderung gegenüber vorher: Der Weg in die Welt hing am Platzhalter-Wirt. Seit der Migration `20261010090000_earth_cafe_host.sql` steht im Startcafé eine echte Person mit Arbeitszuweisung – sie ersetzte den Platzhalter und hatte dieses Wissen nicht mehr. Jetzt hängt es an der Rolle im Raum (Personal eines Ankunftslokals), nicht am Platzhalter.
+Der Weg in die Welt hängt an der Rolle im Raum (Personal eines Ankunftslokals). In einem Automatencafé erklärt ihn niemand. Das Startcafé braucht deshalb Personal – die Migration `20261010090000_earth_cafe_host.sql` legt dafür eine Person mit Arbeitszuweisung an.
 
-## 5. Anschlussstellen – nicht gebaut
+Niemand kassiert im Gespräch. Das Personal kennt die Karte und sagt, wo bestellt wird; gebucht wird nur über den Knopf am Tresen, Empfang oder Automaten. Gibt es für ein Lokal keine Karte, sagen die Fakten ausdrücklich, dass nichts ausgeschenkt wird.
 
-### 5.1 Wirt als echter Bewohner (`NOXIA-LIVING-0010`)
+## 5. Bestellen
+
+Am `servicePoint` (vor Tresen, Empfang oder Automat) öffnet ein Knopf die Karte in der Seitenleiste.
+
+- Karte und Kontostand kommen von `GET /api/game/hospitality/order`. Was nicht bezahlbar ist, steht auf der Karte, ist aber gesperrt.
+- Bestellen geht nur, solange der Spieler am `servicePoint` steht.
+- Jeder Bestellversuch trägt eine eigene `requestId`. Bricht die Verbindung ab, behält der nächste Klick auf denselben Posten die Kennung – es wird nicht doppelt gebucht.
+- Nach der Buchung zeigt die Karte den neuen Kontostand und sperrt, was nun zu teuer ist.
+- In einem geschlossenen Lokal gibt es keinen Knopf.
+
+Karten gibt es bisher nur für `cafe`. Vorschlag für die fehlenden Zeilen in `hospitality_menu` (anzulegen im Teilprojekt Bevölkerung und Ökonomie; Preise an Getränk 3 / Kuchen 5 / Mahlzeit 8 ausgerichtet):
+
+| `entity_id` | `item_code` | `label` | Credits |
+|---|---|---|---|
+| `bar` | `drink` | Getränk | 3 |
+| `bar` | `snack` | Snack | 4 |
+| `bar` | `longdrink` | Longdrink | 6 |
+| `restaurant` | `drink` | Getränk | 3 |
+| `restaurant` | `dessert` | Nachtisch | 5 |
+| `restaurant` | `starter` | Vorspeise | 6 |
+| `restaurant` | `main` | Hauptgericht | 12 |
+
+## 6. Anschlussstellen – nicht gebaut
+
+### 6.1 Wirt als echter Bewohner (`NOXIA-LIVING-0010`)
 
 - **Eingang ins Raummodell:** `VenueResidentInput.worksHere`. Der Wert kommt aus `person_assignments` (`assignment_type = 'work'`, `tile_entity_id` = dieses Gebäude). Mehr braucht das Raummodell nicht.
 - **Stellenzahl:** Die Personalplätze je Lokal (1 / 2 / 3) sind die natürliche Zahl offener Stellen. `Vacancy` in `lib/game/population/employment.ts` kann sie aus `VENUE_LAYOUTS[kind].spots` mit `kind === 'staff'` ableiten statt eine zweite Zahl zu führen.
 - **Anwesenheit:** `/api/game/population?tileEntityId=…` liefert alle Personen mit Zuweisung zum Gebäude, unabhängig davon, ob sie gerade da sind. Der Raum zeigt deshalb auch Personal, das laut Tagesrhythmus schläft. Abhilfe ist `person_interior_presence`: Das Raummodell wertet `presenceRoomId` bereits aus. Offen ist, dass die Schicht diesen Eintrag verlässlich schreibt.
-- **Platzhalter:** Er verschwindet, sobald mindestens eine Person hier arbeitet (`hostResident` im Bauteil). Ist die einzige Kraft nicht anwesend, wäre der Raum leer – diese Entscheidung (Platzhalter zurück oder Lokal geschlossen) gehört in den anderen Strang.
+- **Betrieb:** `venueService` schaut nur auf die Arbeitszuweisung. Sobald Anwesenheit verlässlich ist, sollte „geschlossen“ an anwesendem Personal hängen, nicht an der Stelle.
 - **Rollenname:** Die Gesprächsroute nimmt `people.public_role`, sobald die Person bekannt ist. Das Raummodell vergibt keine Berufsbezeichnung.
 
-### 5.2 Bestellung und Bezahlung (`NOXIA-FIN-0001`)
-
-- **Ort im Raum:** `VenueLayout.servicePoint` (vor Tresen bzw. Empfang). Dort erscheint heute ein Knopf, der nur meldet, dass Bestellen noch nicht möglich ist.
-- **Fähigkeiten:** Die Vorlagen tragen `order`, `serve`, `pay` am Tresen bzw. im Speiseraum. Diese Kennungen stehen noch nicht in `INTERIOR_CAPABILITY_REGISTRY`; `validateInteriorTemplate` meldet sie deshalb als unbekannt – beim Café schon vor dieser Arbeit. Wer Bestellung baut, trägt sie dort ein.
-- **Angebot und Preis:** `npc_service_catalog` kennt bereits `cafe` / `cafe_meal` (8 Credits, Bedürfnis `sustenance`). Für `bar` und `restaurant` fehlen Zeilen.
-- **Buchung:** Spieler → Betreiber als besteuerter Transfer nach `taxedTransfer` (`lib/game/financeSemantics.ts`), so wie `run_npc_consumption` es für Bewohner tut. Keine Geldschöpfung, Steuer aus dem Bruttopreis.
-- **Nicht dafür verwenden:** den Marker `[[ACTION:ACCEPT_CREDITS]]` der Gesprächsroute. Er ist ein Geschenk an eine Person, kein Kauf beim Betrieb.
-- **Gespräch:** Zwei Fakten sagen heute ausdrücklich, dass nichts ausgeschenkt oder kassiert wird (`venueConversationFacts`, Kommentar an der Stelle). Mit der Bestellung werden sie durch Angebot und Preise ersetzt – für das Personal vollständig, für Gäste nur das, was sie selbst bestellt haben.
-
-### 5.3 Wirkung auf Stimmung (`NOXIA-LIVING-0006`)
+### 6.2 Wirkung auf Stimmung (`NOXIA-LIVING-0006`)
 
 - **Entscheidung steht:** keine Bar-eigene Affektlogik, sondern ein allgemeiner Mechanismus für soziale Orte (`settlement-tiers.md`). Der Anker dafür ist `SOCIAL_INFRASTRUCTURE` in `lib/game/settlements/tiers.ts`; `restaurant` ist dort jetzt eingetragen (Begegnungsort, kein Ankunftspunkt, keine Erfüllung der Standardausstattung).
 - **Auslöser:** ein Besuchsereignis der Bevölkerung, das `applyEventAffect` (`lib/game/population/affectRuntime.ts`) bewertet. Das Raummodell erzeugt keine Ereignisse.
 - **Wer wen wahrnimmt:** `interiorPresenceObservations` wertet Personen im selben Raum als gemeinsam anwesend. Das Raummodell rechnet großzügiger mit Sichtbereichen (Gastraum und Tresen gehören zusammen). Bevor Begegnungen im Lokal auf Stimmung wirken, sollte eine der beiden Regeln gelten – `sightAreas` ist dafür als reine Funktion verfügbar.
 - **Gespräch:** Stimmung fließt heute nicht in die lokalen Fakten ein. Wenn sie es soll, dann nur die eigene der Figur und was sie an anderen sehen kann (gezeigte, nicht empfundene Stimmung – Abschnitt 5 von LIVING-0006).
 
-## 6. Offen
+## 7. Offen
 
 1. Café und Bar teilen sich noch die Frage aus `settlement-tiers.md`: eine Gebäudedefinition mit zwei Namen oder zwei Definitionen. Das Raummodell trägt beides.
-2. Die Begrüßung des Platzhalter-Wirts ist für alle drei Lokale gleich.
+2. `order`, `serve`, `pay`, `sit`, `consume` stehen jetzt im Fähigkeitsregister. Die allgemeinen Kennungen `arrival`, `exit`, `conversation`, `storage`, `staff` nutzen auch andere Vorlagen (Akademie, Verwaltung); sie sind weiter nicht registriert und gehören zum gemeinsamen Innenraumsystem.
 3. Der Raum zeigt Personen ohne Bewegung; Wege zwischen Plätzen gibt es nicht.
+4. Die Bestelloberfläche ist gegen nachgestellte Antworten geprüft, nicht gegen die echte Datenbankfunktion.

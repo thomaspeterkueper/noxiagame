@@ -8,6 +8,7 @@ export type InteriorCapabilityDomain =
   | 'utilities'
   | 'administration'
   | 'logistics'
+  | 'hospitality'
 
 export interface InteriorCapabilityDefinition {
   id: string
@@ -125,6 +126,40 @@ export const INTERIOR_CAPABILITY_REGISTRY = {
     domain: 'administration',
     label: 'Administration',
     description: 'Provide administrative workspace and related management functions.',
+  },
+  // Gastronomie (Café, Bar, Restaurant). Kurze Kennungen, wie sie die
+  // Vorlagen seit dem ersten Café tragen. Allgemeine Kennungen, die auch
+  // andere Vorlagen nutzen (arrival, exit, conversation, storage, staff),
+  // gehören nicht hierher und sind weiterhin nicht registriert.
+  sit: {
+    id: 'sit',
+    domain: 'hospitality',
+    label: 'Sitzen',
+    description: 'Seats and standing places for guests.',
+  },
+  consume: {
+    id: 'consume',
+    domain: 'hospitality',
+    label: 'Verzehr',
+    description: 'Guests eat and drink here.',
+  },
+  order: {
+    id: 'order',
+    domain: 'hospitality',
+    label: 'Bestellen',
+    description: 'Guests place orders here.',
+  },
+  serve: {
+    id: 'serve',
+    domain: 'hospitality',
+    label: 'Bedienen',
+    description: 'Staff hand out what was ordered.',
+  },
+  pay: {
+    id: 'pay',
+    domain: 'hospitality',
+    label: 'Bezahlen',
+    description: 'Orders are paid here; booking follows NOXIA-FIN-0001.',
   },
 } as const satisfies Record<string, InteriorCapabilityDefinition>
 

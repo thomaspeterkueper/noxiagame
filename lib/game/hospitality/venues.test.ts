@@ -15,6 +15,7 @@ import {
   placeVenueFigures,
   venueConversationFacts,
   venueKindForBuildingType,
+  venueService,
   type VenueKind,
   type VenueLayout,
   type VenuePoint,
@@ -183,6 +184,29 @@ const g1 = pair.find(f => f.id === 'g1')!
 const g1Facts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true })
 check(g1Facts.some(f => f.startsWith('Außer euch siehst du im Raum: eine Person hinter dem Tresen') && f.endsWith('ihre Namen kennst du nicht')), 'a guest sees the person behind the counter, without a name')
 check(!g1Facts.some(f => /zwei Personen|Nebenraum/.test(f)), 'a guest does not count the person in the back room')
+
+// ── Betrieb und Karte ───────────────────────────────────────────────────────
+check(venueService(cafe, lonely) === 'staffed', 'a venue with a worker is staffed')
+check(venueService(cafe, placeVenueFigures(cafe, guests(3))) === 'self-service', 'a cafe without staff is a self-service cafe')
+check(venueService(VENUE_LAYOUTS.bar, placeVenueFigures(VENUE_LAYOUTS.bar, guests(3))) === 'closed' && venueService(restaurant, []) === 'closed', 'bar and restaurant without staff are closed')
+check(venueService(restaurant, [brigade[2]]) === 'staffed', 'a cook alone still keeps the restaurant open')
+
+const cafeMenu = [{ label: 'Getränk', priceCredits: 3 }, { label: 'Kuchen', priceCredits: 5 }, { label: 'Mahlzeit', priceCredits: 8 }]
+const staffMenuFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: pair[0].roomRole === 'staff' ? pair[0] : pair.find(f => f.roomRole === 'staff')!, figures: pair, playerPos: cafe.servicePoint, arrivalPoint: true, menu: cafeMenu, playerOrders: ['Kuchen', 'Kuchen', 'Getränk'] })
+check(staffMenuFacts.includes('Karte: Getränk 3, Kuchen 5, Mahlzeit 8 Credits; bestellt und bezahlt wird am Tresen, nicht im Gespräch'), 'staff knows the menu and where it is paid')
+check(staffMenuFacts.includes('Dein Gegenüber hat hier eben bestellt: 2× Kuchen, Getränk'), 'staff saw what the player ordered')
+check(!staffMenuFacts.some(f => /ausgeschenkt/.test(f)), 'with a menu nobody claims the venue does not serve')
+check(staffMenuFacts.length === MAX_CONVERSATION_FACTS && staffMenuFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'staff facts with menu and orders use the full budget, not more')
+check(staffMenuFacts[staffMenuFacts.length - 1] === ARRIVAL_ORIENTATION_FACTS[ARRIVAL_ORIENTATION_FACTS.length - 1], 'no orientation fact is cut off')
+const guestMenuFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu })
+check(guestMenuFacts.includes('Bestellt und bezahlt wird am Tresen beim Personal; die Preise hast du nicht im Kopf') && !guestMenuFacts.some(f => /Karte:|\d Credits/.test(f)), 'a guest knows where to order but not the prices')
+const automat = placeVenueFigures(cafe, guests(2))
+const automatFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: automat[0], figures: automat, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu })
+check(automatFacts.includes('Hier bedient kein Personal; bestellt und bezahlt wird am Automaten am Tresen'), 'in a self-service cafe guests point to the machine')
+check(!automatFacts.some(f => f === ARRIVAL_ORIENTATION_FACTS[1]), 'nobody in a self-service cafe explains the way in')
+const longMenu = Array.from({ length: 30 }, (_, i) => ({ label: 'Tagesgericht Nummer ' + i, priceCredits: 10 + i }))
+const longFacts = venueConversationFacts({ layout: restaurant, buildingName: 'Sol', self: brigade[0], figures: brigade, playerPos: restaurant.start, arrivalPoint: false, menu: longMenu })
+check(longFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS) && longFacts.some(f => f.startsWith('Karte: Tagesgericht Nummer 0 10') && f.endsWith('nicht im Gespräch')), 'a long menu is shortened without losing where to pay')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
