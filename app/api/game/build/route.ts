@@ -225,6 +225,9 @@ export async function GET(req: NextRequest) {
     const tileLevel = parseInt(searchParams.get('tileLevel') ?? '0')
 
     if (!buildableId || !locationSlug) return NextResponse.json({ error: 'Fehlende Parameter' }, { status: 400 })
+    if (BUILDINGS[buildableId]?.stateOnlyLocations?.some((slug) => slug === locationSlug)) {
+      return NextResponse.json({ error: 'Dieses Gebäude ist staatliche Grundinfrastruktur und nicht regulär baubar.', code: 'STATE_ONLY' }, { status: 403 })
+    }
     if (buildableId === 'admin') {
       return NextResponse.json({ error: 'Verwaltung wird als staatliche Grundinfrastruktur bereitgestellt und ist nicht regulär baubar.' }, { status: 403 })
     }

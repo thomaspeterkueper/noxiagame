@@ -20,6 +20,33 @@ export const SETTLEMENT_TIER_DOWNGRADE_FACTOR = 0.8
 
 export const SOCIAL_HOSPITALITY_EQUIVALENTS = ['cafe', 'bar', 'q1_everyday_life'] as const
 
+/**
+ * Soziale Infrastruktur: Gebäude, die Begegnung ermöglichen. Café und Bar sind
+ * die ersten Vertreter; Markt, Park, Freibad oder religiöse Orte nutzen später
+ * dieselbe Struktur statt eines Sonderwegs.
+ */
+export interface SocialInfrastructureKind {
+  /** Neue Spieler können hier ankommen (Startpunkt). */
+  arrivalPoint: boolean
+  /** Der Ort führt NPC-Gespräche über die npc-conversation-Pipeline. */
+  hostsConversation: boolean
+}
+
+export const SOCIAL_INFRASTRUCTURE: Record<string, SocialInfrastructureKind> = {
+  cafe: { arrivalPoint: true, hostsConversation: true },
+  bar: { arrivalPoint: true, hostsConversation: true },
+  // Das handgebaute Q1-Modul erfüllt die Stufe, ist aber kein Startpunkt.
+  q1_everyday_life: { arrivalPoint: false, hostsConversation: false },
+}
+
+export function isSocialInfrastructure(buildingId: string): boolean {
+  return buildingId in SOCIAL_INFRASTRUCTURE
+}
+
+export function arrivalPoints(buildingIds: Iterable<string>): string[] {
+  return [...buildingIds].filter((id) => SOCIAL_INFRASTRUCTURE[id]?.arrivalPoint === true)
+}
+
 export const SETTLEMENT_TIERS: readonly SettlementTierDefinition[] = [
   { id: 0, name: 'outpost', enterPopulation: 0, requiredCapabilities: ['landing_or_docking', 'administration'] },
   { id: 1, name: 'settlement', enterPopulation: SETTLEMENT_TIER_THRESHOLDS.settlement, requiredCapabilities: ['social_hospitality'] },

@@ -127,10 +127,14 @@ export const BUILDINGS: Record<string, BuildingDef> = {
 
   admin: {
     id: 'admin', name: 'Verwaltung', category: 'service',
-    description: 'Kolonieverwaltung, Steuersätze, Statistiken · Earth-Testgebäude',
+    description: 'Kolonieverwaltung, Steuersätze, Statistiken · auf der Erde staatlich',
     cost: 4000, buildTimeTicks: 3,
     overlay: 'AdminOverlay',
     allowedLocations: ['earth'],
+    // Staatliche Grundinfrastruktur: auf der Erde ist nur der Neubau gesperrt,
+    // bestehende Verwaltungsgebäude bleiben unberührt. Außerhalb der Erde kann
+    // die Verwaltung später auch einem Unternehmen gehören.
+    stateOnlyLocations: ['earth'],
   },
 
   smelter: {

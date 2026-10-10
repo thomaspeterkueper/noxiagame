@@ -30,6 +30,8 @@ export interface BuildingDef {
   populationBonus?: number
   allowedLocations?: LocationSlug[]
   blockedLocations?: LocationSlug[]
+  /** An diesen Orten nicht regulär kaufbar oder baubar (staatliche Grundinfrastruktur). */
+  stateOnlyLocations?: LocationSlug[]
   overlay?: OverlayId
   planned?: boolean
   planHint?: string
