@@ -244,9 +244,8 @@ export async function POST(req: NextRequest) {
     .eq('id', user.id)
 
   // ── Mindest-Infrastruktur anlegen (Landing Pad + Verwaltung) ──────────────
-  // Wird bei nächstem Grid-Load automatisch angezeigt. Landing Pad bleibt
-  // staatlich (Grundversorgung), die Verwaltung gehört dem Gründer — ohne
-  // Verwaltung funktioniert eine Kolonie nicht (Steuern, Grundfunktionen).
+  // Stufe 0 ist staatliche Grundinfrastruktur. Gründer/Gouverneur bleibt eine
+  // Rolle am Ort, aber besitzt die Verwaltung nicht als privates Gebäude.
   await supabase.from('tile_entities').insert({
     profile_id:   null,
     actor_id:     null,
@@ -262,10 +261,10 @@ export async function POST(req: NextRequest) {
 
   if (locationType === 'colony' || locationType === 'outpost') {
     await supabase.from('tile_entities').insert({
-      profile_id:      user.id,
+      profile_id:      null,
       actor_id:        null,
-      owner_class:     'PLAYER',
-      is_state_owned:  false,
+      owner_class:     'STATE',
+      is_state_owned:  true,
       entity_type:     'building',
       entity_id:       'admin',
       location_id:     location.id,
