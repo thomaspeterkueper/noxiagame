@@ -322,6 +322,24 @@ export default function EarthRegionPreview(){
   const selectedPendingBuild=useMemo(()=>selectedPendingBuildId?placed.find(b=>b.id===selectedPendingBuildId&&b.pending)??null:null,[placed,selectedPendingBuildId])
   const selectedConstruction=selectedPendingBuild?constructionState({buildable_id:selectedPendingBuild.typeId,tile_row:0,tile_col:0,status:selectedPendingBuild.status,created_at:selectedPendingBuild.created_at,completes_at:selectedPendingBuild.completes_at},now):null
   const selectedEntry=selectedWorldObject?getBuildingEntryDefinition(selectedWorldObject.typeId):null
+
+  // Onboarding may hand over a concrete starter café. Opening the existing
+  // hospitality interior is a presentation action only; the player's durable
+  // location remains profiles.current_location='earth'.
+  useEffect(()=>{
+    if(typeof window==='undefined'||entryRequest)return
+    const params=new URLSearchParams(window.location.search)
+    const starterCafeId=params.get('starterCafe')
+    if(!starterCafeId)return
+    const cafe=(spatial?.entities??[]).find(entity=>entity.id===starterCafeId&&entity.entity_id==='cafe'&&entity.status==='active')
+    if(!cafe)return
+    const entry=getBuildingEntryDefinition('cafe')
+    if(!entry)return
+    setEntryRequest({entityId:cafe.id,buildingTypeId:'cafe',buildingName:cafe.name??'Café',kind:entry.kind})
+    params.delete('starterCafe')
+    const query=params.toString()
+    window.history.replaceState(null,'',window.location.pathname+(query?'?'+query:'')+window.location.hash)
+  },[spatial,entryRequest])
   const placementPreview=useMemo(()=>{
     if(!selectedSpot||!selectedBuild||!mapMetrics)return null
     const widthSvg=selectedBuild.footprint.widthM/mapMetrics.widthM*1000
