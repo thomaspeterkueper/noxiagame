@@ -96,7 +96,7 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
         const{token}=await getSessionInfo()
         const response=await fetch('/api/game/profile',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
         const data=await response.json()
-        if(live&&response.ok)setBrief(data)
+        if(live&&response.ok)setBrief(data?.profile??data)
       }catch{}
     })()
     return()=>{live=false}
