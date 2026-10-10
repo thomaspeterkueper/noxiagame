@@ -19,6 +19,26 @@ const W=760,H=470
 const START={x:90,y:390}
 const SPEED=12
 const PLAYER_R=10
+const HOST_POS={x:580,y:158}
+const HOST_PREFIX='host:'
+// Gastgeber-Fallback: jedes Café hat einen Wirt am Tresen, damit neue Spieler
+// nie in einen leeren Raum kommen. Wirt ist eine Rolle, keine Simulationsperson
+// (keine Gesprächsspeicherung); sobald echte Bewohner mit Arbeitsplatz hier
+// existieren, ersetzen sie diesen Fallback.
+const HOST_GREETING='Willkommen! Neu hier? Setz dich, ich erkläre dir gern, wie du ins Geschäft kommst – Handel, Reisen, Wissen. Was hast du vor?'
+// Der Wirt weiß nur, was ein Wirt wissen kann: nichts über Kontostand oder
+// Wissensstufe des Gastes. Das erfährt er höchstens, wenn der Gast es erzählt.
+function hostFacts():string[]{
+  return [
+    'Du bist der Wirt dieses Cafés und kennst die Gegend; du hilfst neuen Gästen beim Einstieg',
+    'In der Akademie kann man Wissen sammeln und Prüfungen ablegen; mehr Wissen öffnet mehr Möglichkeiten',
+    'Handeln ist auch ohne eigenes Schiff möglich: Ein Spediteur übernimmt den Transport und behält dafür einen Anteil vom Gewinn',
+    'Ohne eigenes Schiff kann man per Linienflug zu anderen Orten reisen; das Ticket kostet Credits',
+    'Ein eigenes Schiff ist kein Muss, sondern ein möglicher späterer Schritt, wenn man genug Credits hat',
+    'Wer ein Ziel hat (z. B. kosmischer Händler), beginnt klein: Waren günstig kaufen, am Zielort teurer verkaufen',
+    'Den Heimatort kann man bei der Verwaltung des Ortes ändern, an dem man sich registrieren will',
+  ]
+}
 
 const furniture:Furniture[]=[
   {id:'counter',kind:'counter',x:525,y:70,w:175,h:58},
@@ -66,6 +86,13 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
     return()=>{live=false}
   },[entityId,companion?.id])
 
+  const hostResident=useMemo<ColonyResident|null>(()=>{
+    const hasWorker=residents.some(r=>r.assignments.some(a=>a.type==='work'&&a.tileEntityId===entityId))
+    if(hasWorker)return null
+    return{id:HOST_PREFIX+entityId,displayName:'Wirt',identityState:'known',birthYear:null,activityState:'working',lastAction:null,assignments:[{type:'work',roleCode:'Wirt',tileEntityId:entityId}],needs:[],skills:[]}
+  },[residents,entityId])
+  const isHost=(r:ColonyResident|null)=>Boolean(r&&r.id.startsWith(HOST_PREFIX))
+
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
       const target=event.target as HTMLElement|null
@@ -109,7 +136,7 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
           player:text,
           npcId:selected.id,
           npcName:selected.displayName,
-          npcRole:selected.assignments.find(a=>a.type==='work')?.roleCode??selected.activityState,
+          npcRole:isHost(selected)?'Wirt':(selected.assignments.find(a=>a.type==='work')?.roleCode??selected.activityState),
           headline:'Gespräch im '+buildingName,
           source:'NOXIA café interior',
           locationName:buildingName,
@@ -117,6 +144,7 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
             'Ihr befindet euch im Café '+buildingName,
             'Im Innenraum gibt es einen Gastraum, mehrere Tische und einen Tresen',
             'Der Ausgang liegt beim Eingang des Cafés',
+            ...(isHost(selected)?hostFacts():[]),
           ],
           history,
         }),
@@ -140,6 +168,9 @@ export default function CafeWalkableInterior({entityId,buildingName,companion=nu
         {npcPositions.map(item=><div key={item.resident.id} className="npc" style={{left:item.x-12,top:item.y-34}}>
           <NpcFigure id={item.resident.id} name={item.resident.displayName} role={item.resident.activityState} appearance={item.resident.appearance} showLabel={selected?.id===item.resident.id||Math.hypot(item.x-pos.x,item.y-pos.y)<70} showRoleLabel={item.resident.identityState==='known'} selected={selected?.id===item.resident.id} onClick={()=>{setSelected(item.resident);setHistory([])}}/>
         </div>)}
+        {hostResident&&<div className="npc" style={{left:HOST_POS.x-12,top:HOST_POS.y-34}}>
+          <NpcFigure id={hostResident.id} name={hostResident.displayName} role="Wirt" showLabel showRoleLabel selected={selected?.id===hostResident.id} onClick={()=>{setSelected(hostResident);setHistory([{role:'assistant',content:HOST_GREETING}])}}/>
+        </div>}
         <div className="player" style={{left:pos.x-10,top:pos.y-24}}><i/><span>Du</span></div>
         {nearCounter&&<button className="context" style={{left:535,top:142}} onClick={()=>setStatus('Du wartest am Tresen. Bestellungen werden als nächster Hospitality-Schritt an die Ökonomie angebunden.')}>AM TRESEN</button>}
         {nearExit&&<button className="context exit" style={{left:42,top:420}} onClick={onClose}>CAFÉ VERLASSEN</button>}
