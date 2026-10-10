@@ -60,6 +60,7 @@ export default function EarthRegionSwitcherOverlay(){
   const[results,setResults]=useState<SearchResult[]>([])
   const[searching,setSearching]=useState(false)
   const[error,setError]=useState<string|null>(null)
+  const[placesOpen,setPlacesOpen]=useState(false)
 
   useEffect(()=>{
     setViewLabel(readCookie(EARTH_VIEW_LABEL_COOKIE))
@@ -90,13 +91,22 @@ export default function EarthRegionSwitcherOverlay(){
     <div style={{display:'flex',gap:4,alignItems:'center',padding:3,border:'1px solid rgba(104,131,138,.72)',borderRadius:9,background:'rgba(7,17,27,.92)',boxShadow:'0 8px 24px rgba(0,0,0,.22)',backdropFilter:'blur(12px)'}}>
       <button type="button" title="Aktuellen Ort neu zentrieren" style={{...navButton,background:'rgba(31,79,95,.72)',cursor:'default'}} onClick={()=>window.location.reload()}>Aktuell · {viewLabel?.split(',')[0]??'Erde'}</button>
       <button type="button" title="Zum Home-Ort zurückkehren" style={{...navButton,color:'#e6d29a',borderColor:'rgba(168,137,61,.55)'}} onClick={()=>selectPoint(SELMECKE.lat,SELMECKE.lon,SELMECKE.label,SAUERLAND_REGION)}>⌂ Home</button>
-      <button type="button" title="Schmitten im Taunus – DaVaRus Heimatregion am Großen Feldberg" style={navButton} onClick={()=>selectPoint(DAVARU_TAUNUS_HOME_REGION.placeCenter.lat,DAVARU_TAUNUS_HOME_REGION.placeCenter.lon,'Schmitten im Taunus')}>Schmitten</button>
-      <button type="button" title="Herceg Novi, Montenegro – möglicher Romanschauplatz" style={navButton} onClick={()=>selectPoint(HERCEG_NOVI_EARTH_PLACE.center.lat,HERCEG_NOVI_EARTH_PLACE.center.lon,'Herceg Novi, Montenegro')}>Herceg Novi</button>
+      <button type="button" aria-expanded={placesOpen} aria-controls="noxia-earth-place-menu" title="Vorgemerkte Orte öffnen" style={navButton} onClick={()=>setPlacesOpen(open=>!open)}>Orte ▾</button>
       <form onSubmit={runSearch} style={{display:'flex',gap:4,flex:'1 1 320px',minWidth:0}}>
         <input value={query} onChange={event=>setQuery(event.currentTarget.value)} placeholder="Ort oder 51.33745, 7.97975" aria-label="Ort oder Koordinate auf der Erde suchen" autoComplete="off" style={{minWidth:0,flex:1,border:'1px solid rgba(112,143,151,.72)',borderRadius:6,padding:'7px 9px',background:'rgba(240,246,244,.96)',color:'#17313c',font:'700 10px system-ui,sans-serif',outline:'none'}}/>
         <button type="submit" disabled={searchDisabled} style={{border:'1px solid #9c7b2b',borderRadius:6,padding:'7px 10px',background:'#b88b27',color:'#fffdf2',font:'900 9px system-ui,sans-serif',cursor:searching?'wait':'pointer',opacity:searchDisabled ? .55 : 1,whiteSpace:'nowrap'}}>{searching?'Suche …':'Springen'}</button>
       </form>
     </div>
+    {placesOpen&&<div id="noxia-earth-place-menu" aria-label="Vorgemerkte Erdorte" style={{justifySelf:'end',width:'min(520px,100%)',border:'1px solid rgba(91,118,126,.82)',borderRadius:9,background:'rgba(8,21,31,.97)',boxShadow:'0 14px 34px rgba(0,0,0,.34)',padding:7,display:'grid',gap:5}}>
+      <div style={{font:'800 10px system-ui,sans-serif',color:'#b8ccd0',padding:'4px 6px'}}>Orte · Vorgemerkte Ziele</div>
+      {[
+        {id:'schmitten',label:'Schmitten im Taunus',detail:'DaVaRus Heimatregion · Großer Feldberg',point:DAVARU_TAUNUS_HOME_REGION.placeCenter},
+        {id:'herceg-novi',label:'Herceg Novi, Montenegro',detail:'Möglicher Romanschauplatz · Bucht von Kotor',point:HERCEG_NOVI_EARTH_PLACE.center},
+      ].map(place=><button key={place.id} type="button" onClick={()=>selectPoint(place.point.lat,place.point.lon,place.label)} style={{border:'1px solid rgba(104,131,138,.35)',borderRadius:6,background:'rgba(26,55,68,.75)',color:'#e8efed',padding:'9px',textAlign:'left',cursor:'pointer',display:'grid',gap:3}}>
+        <strong style={{fontSize:11}}>{place.label}</strong><span style={{fontSize:9,color:'#97adb2'}}>{place.detail}</span>
+      </button>)}
+      <small style={{padding:5,color:'#97adb2'}}>Weitere Orte über die Suche finden. Dieser Katalog verleiht weder Eigentum noch Reiserechte.</small>
+    </div>}
     {(results.length>0||error)&&<div style={{justifySelf:'end',width:'min(520px,100%)',maxHeight:'42vh',overflow:'auto',border:'1px solid rgba(91,118,126,.82)',borderRadius:9,background:'rgba(8,21,31,.97)',boxShadow:'0 14px 34px rgba(0,0,0,.34)',padding:6}}>
       {error&&<div style={{padding:'8px 9px',color:'#efc8bd',font:'800 10px system-ui,sans-serif'}}>{error}</div>}
       {results.map(result=><button key={result.id} type="button" onClick={()=>selectTarget(result)} style={{width:'100%',display:'grid',gap:2,border:0,borderRadius:6,padding:'8px 9px',background:'transparent',color:'#e8efed',textAlign:'left',cursor:'pointer'}}><strong style={{font:'800 10px system-ui,sans-serif'}}>{result.label}</strong><span style={{font:'700 8px system-ui,sans-serif',color:'#8eaaaf'}}>{result.kind} · {result.lat.toFixed(5)}, {result.lon.toFixed(5)}</span></button>)}
