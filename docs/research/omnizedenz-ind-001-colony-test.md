@@ -60,3 +60,19 @@ Aktueller Code: `lib/game/population/access.ts` (`NOXIA-OMNI-0002`), `housing.ts
 **Methodische Sicherungen:** Zähler nur über wohldefinierte, für dieselbe Person relevante Optionen; keine bloße Addition ungleichwertiger Chancen. Zugangsablehnung, Nicht-Eignung, Kapazitätsmangel, eigener Verzicht und technische Nicht-Ausführung auseinanderhalten. Gleichbleibende Seeds, Personen, Ressourcen und Nachfrage; Änderung nur der zu prüfenden Kontrollvariable. Keine Ableitung starker ontologischer Irreduzibilität aus simulierten Regelwirkungen.
 
 **Nächste Prüfung:** zeitlicher Verlauf mit Ersatzoptionen und Exit-Möglichkeiten, individuelle Verteilungsmetriken statt nur Aggregatmittelwerten; anschließend isolierte Kolonieintegration. Forschungsbranch erst nach Review und CI-Gesamtzustand integrieren.
+
+## O5 — Pfadabhängigkeit und strukturelle Verfestigung (2026-10-10)
+
+**Technischer Status:** Der isolierte O5-Workflow für Commit `6bc600613e81365e6981257237e482774c8d0086` (PR #468) ist erfolgreich abgeschlossen. Die Testimplementierung befindet sich im Forschungsbranch, nicht notwendigerweise auf `main`. Es handelt sich um deterministische kontrafaktische Regeltests, **nicht** um empirische Beobachtungen in der laufenden NOXIA-Welt oder um einen Langzeit-Kolonielauf.
+
+**O5-E5 — Persistierende Spur / Pfadabhängigkeit:** Ein einmaliger verwehrter Jobzugang verursacht im Vierperioden-Minimalmodell einen entgangenen Lohn von 100 Credits, der bei späterer Wiederöffnung des Zugangs ohne Ausgleich bestehen bleibt (400 gegenüber 300 Credits). Die Differenz ist eine historische Spur; sie beweist noch keine selbsterhaltende Sperre.
+
+**O5-E6 — Gegenwärtig selbsterhaltende Sperre / strukturelle Verfestigung:** Im separaten, ausdrücklich konstruierten Wohnungs-Arbeits-Modell erfordert Beschäftigung lokalen Wohnraum, während spätere Wohnungsaufnahme bereits Beschäftigung voraussetzt. Ein anfänglicher verweigerter Zugang führt unter diesen Regeln auch nach Wiederöffnung der ursprünglichen Option zu null Einkommen und fehlender Wohnung (gegenüber 400 Credits im ungestörten Verlauf). Hier reproduziert die **aktuelle** Zugangsstruktur den Ausschluss; die bloße Vergangenheit ist nicht mehr die einzige Erklärung.
+
+**O5-E7 — Brücke als Gegenfaktum:** Ein temporäres Ersatzangebot (Übergangswohnung) durchbricht in diesem Modell den Zirkel und ermöglicht 400 Credits Einkommen. Daraus folgt keine allgemeine Aussage über die Wirksamkeit realer Interventionen; der Befund ist abhängig von explizit gesetzten Zugangs- und Lohnregeln.
+
+**Begriffliche Prüffrage:** Ein Zustand ist nicht allein deshalb „strukturell verfestigt“, weil eine Differenz über die Zeit bestehen bleibt. Zu prüfen ist, ob nach Wegfall des Auslösers ein gegenwärtiger Mechanismus die Benachteiligung aktiv reproduziert. Gegenproben: unabhängige Arbeitsmöglichkeiten, Ortsmobilität, öffentliches Wohnen, Sparvermögen, Kredit, spätere Nachqualifizierung, alternative Eigentümer und geänderte Eintrittsregeln.
+
+**Ontologische Grenze:** Die Tests zeigen regelbasierte, kontextabhängige Wirkungen verschachtelter Zugangsbedingungen. Sie belegen weder eine allgemeine soziale Gesetzmäßigkeit noch die ontologische Irreduzibilität von Organisation oder Individuum.
+
+**Nächster Schritt:** Mechanismen in einem isolierten Kolonielauf mit realen NOXIA-Entscheidungsregeln, Ressourcenknappheit und Verteilungsmetriken prüfen; keine Live-Aktivierung ohne getrennte Freigabe.
