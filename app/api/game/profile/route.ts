@@ -214,7 +214,28 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ ok: true, username, avatar })
+    // Diegetischer Startpunkt: bevorzugt ein konkret verortetes Earth-Café.
+    // Fehlt eines, bleibt der normale Ortsstart auf earth bestehen.
+    const { data: starterCafe } = await serviceClient
+      .from('tile_entities')
+      .select('id, entity_id, location_id, spatial_region_id, created_at')
+      .eq('entity_type', 'building')
+      .eq('entity_id', 'cafe')
+      .eq('status', 'active')
+      .eq('location_id', (await serviceClient.from('locations').select('id').eq('slug', 'earth').single()).data?.id ?? '')
+      .order('created_at', { ascending: true })
+
+    const cafeRows = starterCafe ?? []
+    const preferredCafe = cafeRows.find((row: any) => String(row.spatial_region_id ?? '').startsWith('earth-place-'))
+      ?? cafeRows[0]
+      ?? null
+
+    return NextResponse.json({
+      ok: true,
+      username,
+      avatar,
+      starter: preferredCafe ? { kind: 'cafe', entityId: preferredCafe.id, location: 'earth' } : { kind: 'location', location: 'earth' },
+    })
   }
 
   return NextResponse.json({ error: 'Ungültige Aktion' }, { status: 400 })
