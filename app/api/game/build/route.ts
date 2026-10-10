@@ -225,6 +225,9 @@ export async function GET(req: NextRequest) {
     const tileLevel = parseInt(searchParams.get('tileLevel') ?? '0')
 
     if (!buildableId || !locationSlug) return NextResponse.json({ error: 'Fehlende Parameter' }, { status: 400 })
+    if (buildableId === 'admin') {
+      return NextResponse.json({ error: 'Verwaltung wird als staatliche Grundinfrastruktur bereitgestellt und ist nicht regulär baubar.' }, { status: 403 })
+    }
     if (tileLevel < -3 || tileLevel > 0) return NextResponse.json({ error: 'Ungültige Ebene' }, { status: 400 })
     if (tileRow < 0 || tileRow >= WORLD_ROWS || tileCol < 0 || tileCol >= WORLD_COLS || Number.isNaN(tileRow) || Number.isNaN(tileCol)) {
       return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
