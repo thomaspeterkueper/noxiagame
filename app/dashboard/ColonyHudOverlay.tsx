@@ -1,10 +1,11 @@
 'use client'
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 import type { ColonySimulationResult } from '@/lib/game/colonySimulation'
 
-const ICON: Record<string,string> = { water:'💧', energy:'⚡', metal:'⬡', oxygen:'O₂', food:'◉', knowledge:'◈' }
-const LABEL: Record<string,string> = { water:'Wasser', energy:'Energie', metal:'Metall', oxygen:'Sauerstoff', food:'Nahrung', knowledge:'Wissen' }
+const ICON: Record<string,string> = { water:'💧', energy:ENERGY_GOOD_ICON, metal:'⬡', oxygen:'O₂', food:'◉', knowledge:'◈' }
+const LABEL: Record<string,string> = { water:'Wasser', energy:ENERGY_GOOD_LABEL, metal:'Metall', oxygen:'Sauerstoff', food:'Nahrung', knowledge:'Wissen' }
 
 export default function ColonyHudOverlay({ builds, simulation }:{ builds:any[]; simulation:ColonySimulationResult }){
   const visible = simulation.resources.filter(resource=>['water','energy','metal','oxygen','food'].includes(resource.resource)).slice(0,5)

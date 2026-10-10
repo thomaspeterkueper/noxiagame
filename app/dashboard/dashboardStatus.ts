@@ -1,6 +1,7 @@
 // dashboardStatus.ts
-// Aktualisiert: 04.07.2026 — Header ergänzt; Dashboard-Statushilfen
-// Version:      0.1.0
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       04.07.2026 — Header ergänzt; Dashboard-Statushilfen
+// Version:      0.1.1
 // app/dashboard/dashboardStatus.ts
 // Reine Ableitungen für das Übersichts-Layout.
 // Nur aus resource / stock / production / consumption — keine anderen Felder.
@@ -16,6 +17,7 @@
 // „reicht noch ~N Ticks" ist die einzige tick-abhängige Größe — ehrlich
 // als ~ beschriftet, bis Lazy Ticks (0.1.5) die Tickdauer auf Stunden bringt.
 
+import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 export type ResourceState = 'critical' | 'low' | 'stable' | 'surplus'
 
 export interface ResourceStatus {
@@ -80,7 +82,7 @@ export function stateColor(state: ResourceState, T: Record<string, string>): str
   }
 }
 
-const RES_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
+const RES_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
 
 export function stateLabel(s: ResourceStatus): string {
   const name = RES_LABEL[s.resource] ?? s.resource

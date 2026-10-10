@@ -1,21 +1,23 @@
 'use client'
 
 // app/dashboard/WarehouseOverlay.tsx
-// Aktualisiert: 09.10.2026 — Direkthandel zum Marktpreis für alle Güter. Die Auktion
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       09.10.2026 — Direkthandel zum Marktpreis für alle Güter. Die Auktion
 //               zeigte Gebote, die der Server nie abrechnete; jetzt steht nach jedem Handel,
 //               was tatsächlich gebucht wurde (Menge und Betrag inkl. Abgaben).
 // Vorher:       28.09.2026 — Energie ist Versorgungsware und wird direkt
 //               zum lokalen Spotpreis gebunkert.
-// Version:      2.0.0
+// Version:      2.0.1
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import { useState } from 'react'
 import BuyRow from './BuyRow'
 import OrderNegotiation from './OrderNegotiation'
 import BuildingOverlayShell from './BuildingOverlayShell'
 import { useGameStore, type ResourceType, type LocationSlug } from '@/lib/store/gameStore'
 
-const RES_ICON:Record<string,string>={water:'💧',energy:'⚡',metal:'⛏️'}
-const RES_LABEL:Record<string,string>={water:'Wasser',energy:'Energie',metal:'Metall'}
+const RES_ICON:Record<string,string>={water:'💧',energy:ENERGY_GOOD_ICON,metal:'⛏️'}
+const RES_LABEL:Record<string,string>={water:'Wasser',energy:ENERGY_GOOD_LABEL,metal:'Metall'}
 interface MarketRow{id:string;resource:ResourceType;buy_price:number;sell_price:number;stock:number}
 interface OrderData{id:string;resource:string;amount:number;reward:number;expires_at?:string;locations?:{slug?:string;name?:string};stock?:number}
 interface Props{locationSlug:LocationSlug;locationName:string;prices:any[];resources:{resource:string;stock:number;consumption:number}[];orders:OrderData[];cargo:Record<ResourceType,number>;cargoMax:number;credits:number;onTrade:(resource:ResourceType,mode:'buy'|'sell',amount:number,price:number)=>Promise<boolean>;onFulfillOrder:(orderId:string,agreedReward:number)=>Promise<boolean>;onClose:()=>void}

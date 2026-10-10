@@ -1,11 +1,13 @@
 'use client'
 
 // StationOverlay.tsx
-// Aktualisiert: 15.09.2026 — physisches Cargo-Terminal / Phobos-Markt integriert
-// Version:      1.0.0
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       15.09.2026 — physisches Cargo-Terminal / Phobos-Markt integriert
+// Version:      1.0.1
 //
 // Raumstations-Ansicht für L4/L5-Stationen und Orbit-Stationen.
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import { useState, useEffect, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { STATION_MODULE_DEFS as MODULE_DEFS, BUILDABLE_STATION_MODULES as BUILDABLE_MODULES } from '@/lib/game/stationModules'
@@ -19,7 +21,7 @@ import StationCargoTerminal from './StationCargoTerminal'
 
 interface StationModule { id:string;entity_id:string;condition:number;status:string;profile_id:string|null;owner_class?:string }
 interface StationOverlayProps { slug:string;name:string;population:number;populationMax:number;userId:string;locationId:string;locationResources:{resource:string;stock:number;consumption:number}[];credits:number;entities:StationModule[];onChanged:()=>void;onOpenWarehouse?:()=>void;onOpenMarket?:()=>void }
-const DARK='#07111b',MONO='monospace',RES_ICON:Record<string,string>={water:'💧',energy:'⚡',metal:'⛏️',components:'⚙️'},RES_LABEL:Record<string,string>={water:'Wasser',energy:'Energie',metal:'Metall',components:'Bauteile'}
+const DARK='#07111b',MONO='monospace',RES_ICON:Record<string,string>={water:'💧',energy:ENERGY_GOOD_ICON,metal:'⛏️',components:'⚙️'},RES_LABEL:Record<string,string>={water:'Wasser',energy:ENERGY_GOOD_LABEL,metal:'Metall',components:'Bauteile'}
 function stockColor(stock:number,consumption:number){return stock<=Math.max(10,consumption*2)?'#e87070':stock<=Math.max(30,consumption*5)?'#e0b060':'#83c99a'}
 function ModuleRing({modules,selected,onSelect,userId,onOpenWarehouse}:{modules:StationModule[];selected:string|null;onSelect:(id:string)=>void;userId:string;onOpenWarehouse?:()=>void}){return <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8,marginBottom:16}}>{modules.map(m=>{const d=MODULE_DEFS[m.entity_id],own=m.profile_id===userId,state=m.owner_class==='STATE';return <button key={m.id} onClick={()=>m.entity_id==='warehouse'&&onOpenWarehouse?onOpenWarehouse():onSelect(m.id)} style={{padding:12,textAlign:'left',background:selected===m.id?'#173047':'#0a1824',border:`1px solid ${own?'#c9a961':state?'#5aaeff':'#294052'}`,color:'#d6e2ec',borderRadius:8,cursor:'pointer'}}><div>{d?.icon??'◆'} <b>{d?.label??m.entity_id}</b></div><small style={{color:'#7e94a7'}}>{m.condition}% · {m.status}</small></button>})}</div>}
 function ModuleDetail({module,userId,onClose,onSell}:{module:StationModule;userId:string;onClose:()=>void;credits:number;onSell:(id:string)=>void}){const def=MODULE_DEFS[module.entity_id],isOwn=module.profile_id===userId,isState=module.owner_class==='STATE',condColor=module.condition<40?'#e87070':module.condition<70?'#e0b060':'#83c99a';return <div style={{background:'#0a1520',border:'1px solid #1e3a52',borderRadius:8,padding:16}}><div style={{display:'flex',justifyContent:'space-between'}}><strong style={{color:'#c9a961'}}>{def?.icon} {def?.label??module.entity_id}</strong><button onClick={onClose}>×</button></div><p style={{color:'#8aa0b5',fontSize:12}}>{def?.description}</p><div style={{color:condColor,fontFamily:MONO,fontSize:12}}>Zustand: {module.condition}% · {module.status}</div><div style={{color:'#64788a',fontSize:11,marginTop:8}}>{isState?'Staatseigentum':isOwn?'Dein Modul':'Fremdeigentum'}</div>{isOwn&&!isState&&<button onClick={()=>onSell(module.id)} style={{marginTop:12}}>Verkaufen</button>}</div>}

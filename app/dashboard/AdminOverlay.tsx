@@ -2,9 +2,10 @@
 
 // app/dashboard/AdminOverlay.tsx
 // Erstellt: 20.06.2026
-// Aktualisiert: 25.08.2026 — Steuersätze bearbeitbar + Kasse-Abheben für den
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       25.08.2026 — Steuersätze bearbeitbar + Kasse-Abheben für den
 //               Gouverneur (NOXIA-ECON-0002), Verkaufen-Button ergänzt
-// Version:  1.2.0
+// Version:  1.2.1
 //
 // Verwaltungs-Overlay — öffnet sich beim Klick auf das Admin-Gebäude.
 // Zeigt: Aufträge, Stationsguthaben, Einnahmen, Ausgaben, Lagerbestand,
@@ -15,16 +16,17 @@
 //   Gold  (#c9a961) = eigenes Gebäude
 //   Rot   (#c94040) = fremder Spieler
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 
 import { useState, useEffect } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 
 const RES_DE: Record<string, string> = {
-  water: 'Wasser', energy: 'Energie', metal: 'Metall',
+  water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall',
 }
 const RES_ICON: Record<string, string> = {
-  water: '💧', energy: '⚡', metal: '⛏️',
+  water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️',
 }
 const ENTRY_LABEL: Record<string, string> = {
   tax_property:    'Grundsteuer',

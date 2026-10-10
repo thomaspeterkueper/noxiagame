@@ -1,5 +1,6 @@
 'use client'
 
+import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 
@@ -71,7 +72,7 @@ type StorageAccount = {
 
 const LABEL: Record<Resource, string> = {
   water: 'Wasser',
-  energy: 'Energie',
+  energy: ENERGY_GOOD_LABEL,
   metal: 'Metall',
   components: 'Bauteile',
 }

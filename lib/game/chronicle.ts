@@ -1,11 +1,13 @@
 // lib/game/chronicle.ts
 // Erstellt:     09.10.2026 — Kolonie-Chronik: macht bereits simulierte NPC-Ereignisse im Feed sichtbar
-// Version:      1.0.0
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Version:      1.0.1
 //
 // Reine Projektion: liest vorhandene Zeilen aus population_events und
 // npc_ledger und formuliert sie als Feed-Zeilen. Kein eigener Zustand, keine
 // erfundenen Ereignisse – gibt es nichts zu berichten, bleibt die Chronik leer.
 
+import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 export type ChronicleItem = { type: 'info' | 'success' | 'warning'; icon: string; text: string }
 
 export type ChroniclePersonEvent = {
@@ -35,7 +37,7 @@ export type ChronicleLookups = {
   buildingName: (tileEntityId: string | undefined) => string | undefined
 }
 
-const RESOURCE_DE: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall', components: 'Komponenten' }
+const RESOURCE_DE: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall', components: 'Komponenten' }
 
 function ago(currentTick: number, tick: number): string {
   const hours = Math.max(0, currentTick - tick)

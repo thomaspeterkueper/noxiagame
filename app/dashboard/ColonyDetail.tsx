@@ -2,10 +2,12 @@
 
 // app/dashboard/ColonyDetail.tsx
 // Kolonie-Detailansicht mit Versorgung, Ressourcen, Reisen und sichtbaren Personen.
-// Aktualisiert: 09.10.2026 — Lagerbestand mit Kapazität; Hinweis, wenn die Produktion wegen vollen Lagers ruht
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       09.10.2026 — Lagerbestand mit Kapazität; Hinweis, wenn die Produktion wegen vollen Lagers ruht
 // Vorher:       09.10.2026 — Flugkosten und Reichweite über transferQuote wie der Server
-// Version:      1.1.0
+// Version:      1.1.1
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 
 import { ResourceType, LocationSlug, useGameStore } from '@/lib/store/gameStore'
@@ -13,8 +15,8 @@ import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { pilotFee } from '@/lib/game/pilotQualification'
 import BuildingResidentsCard from './BuildingResidentsCard'
 
-const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
-const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
+const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
+const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️' }
 const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨' }
 
 interface ResRow { resource: string; stock: number; production: number; consumption: number }

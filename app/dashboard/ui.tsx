@@ -1,12 +1,14 @@
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 // ui.tsx
-// Aktualisiert: 10.09.2026 — Prometheus-Anzeigename durch Kepler Station ersetzt
-// Version:      0.2.1
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       10.09.2026 — Prometheus-Anzeigename durch Kepler Station ersetzt
+// Version:      0.2.2
 // app/dashboard/ui.tsx
 // Erstellt:     15.06.2026
 
-export const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall', components: 'Bauteile' }
-export const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️', components: '🧱' }
+export const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall', components: 'Bauteile' }
+export const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️', components: '🧱' }
 // `prometheus` bleibt vorerst als Legacy-Slug erhalten, bis DB- und Reise-Referenzen atomar migriert sind.
 export const LOC_ICON:       Record<string, string> = { earth: '🌍', moon: '🌙', mars: '🔴', phobos: '🪨', deimos: '🛰️', prometheus: '🛸', kepler: '🛸' }
 export const LOC_NAME:       Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', deimos: 'Deimos', prometheus: 'Kepler Station', kepler: 'Kepler Station' }

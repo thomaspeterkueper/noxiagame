@@ -1,10 +1,11 @@
 // app/api/game/world/route.ts
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Lagerkapazität je Ort (storage_capacity) für die Anzeige
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       09.10.2026 — Lagerkapazität je Ort (storage_capacity) für die Anzeige
 // Vorher:       09.10.2026 — Kolonie-Chronik: NPC-Ereignisse (Begegnungen, Konflikte, Firmenverkäufe,
 //               Produktion) aus population_events und npc_ledger im Feed; erfundener Fülltext entfernt
 // Vorher:       28.08.2026 — Referenzorte (z. B. Erde) aus Live-Koloniestatistik entfernt
-// Version:      0.13.0
+// Version:      0.13.1
 //
 // v0.3.0: HERZSCHLAG der Lazy-Tick-Engine. Vor dem Laden der Weltdaten
 // werden fällige Ticks via runDueTicks() nachgerechnet (claim_due_ticks
@@ -13,6 +14,7 @@
 // simulation_ticks-Tabelle.
 // v0.2.0: 1t-Transaktionen werden zusammengefasst (groupTransactions).
 
+import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { BUILDINGS } from '@/lib/game/buildings/index'
@@ -166,7 +168,7 @@ export async function GET() {
 
   if (transactions.length > 0) {
     const lastTrade = transactions[0]
-    const RESOURCE_LABELS: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
+    const RESOURCE_LABELS: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
     const resource = RESOURCE_LABELS[String(lastTrade.resource)] ?? String(lastTrade.resource)
     news.push({
       type: 'info', icon: '📦',

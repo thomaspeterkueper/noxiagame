@@ -2,10 +2,12 @@
 
 // app/dashboard/ColonyGrid.tsx
 // Erstellt:     31.05.2026
-// Aktualisiert: 09.10.2026 — Bauzeit in Echtzeit statt „Tick(s)" (Grid-Pfad: 1 Tick = 24 h)
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       09.10.2026 — Bauzeit in Echtzeit statt „Tick(s)" (Grid-Pfad: 1 Tick = 24 h)
 // Vorher:       05.09.2026 — Scanner-Fokus gehört dem Grid statt Dashboard-DOM-Bridges
-// Version:      5.25.1
+// Version:      5.25.2
 
+import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { BUILDINGS } from '@/lib/game/buildings/index'
@@ -42,7 +44,7 @@ const WORLD_ROWS = 24
 const COLS = WORLD_COLS
 const ROWS = WORLD_ROWS
 const TILE_SIZE = 64
-const RES_DE: Record<string, string> = { metal: 'Metall', energy: 'Energie', water: 'Wasser' }
+const RES_DE: Record<string, string> = { metal: 'Metall', energy: ENERGY_GOOD_LABEL, water: 'Wasser' }
 
 export interface TileEntity {
   id: string; profile_id: string | null; is_state_owned?: boolean

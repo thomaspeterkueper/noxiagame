@@ -2,8 +2,9 @@
 
 // app/dashboard/OrderNegotiation.tsx
 // Erstellt:     01.06.2026
-// Aktualisiert: 01.06.2026
-// Version:      0.1.0
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       01.06.2026
+// Version:      0.1.1
 //
 // Auftrags-Verhandlung als Overlay. Öffnet sich per Klick auf einen Auftrag
 // im Übersicht-Tab ("Verhandeln" statt sofortigem "Erfüllen").
@@ -22,13 +23,14 @@
 // WICHTIG: Loop client-seitig, useEffect mit clearInterval. Kein Server-State.
 // Voraussetzung Cargo/Standort wird wie bisher serverseitig in fulfill geprüft.
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { orderMaxReward } from '@/lib/game/config'
 
-const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
-const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
+const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
+const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️' }
 const LOC_ICON:       Record<string, string> = { moon: '🌙', mars: '🔴', phobos: '🪨' }
 
 const TICK_MS = 140

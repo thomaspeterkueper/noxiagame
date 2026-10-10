@@ -2,8 +2,9 @@
 
 // app/dashboard/MarketAuction.tsx
 // Erstellt:     01.06.2026
-// Aktualisiert: 24.08.2026
-// Version:      0.4.2
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       24.08.2026
+// Version:      0.4.3
 //
 // STILLGELEGT seit 09.10.2026: nicht mehr eingebunden. Der Handel läuft als
 // Direkthandel zum Marktpreis (WarehouseOverlay/BuyRow), weil der Server die
@@ -50,14 +51,15 @@
 //
 // v0.2.0: Horizontales Mehrbalken-Layout (Käufer vs. gemeinsamer Verkäufer).
 
+import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import { PRICE_MIN, PRICE_MAX, STOCK_LOW_THRESHOLD } from '@/lib/game/config'
 
-const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: 'Energie', metal: 'Metall' }
-const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: '⚡', metal: '⛏️' }
+const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
+const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️' }
 
 const TICK_MS = 120
 const STEP_BASE = 1.2

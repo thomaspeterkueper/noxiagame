@@ -1,7 +1,8 @@
 // lib/game/buildings/overlays/index.ts
 // Erstellt:     24.06.2026
-// Aktualisiert: 26.06.2026 — ice_drill, water_recycler, scanner eingetragen
-// Version:      1.2.0
+// Aktualisiert: 10.10.2026 — Name und Symbol des Guts `energy` aus lib/constants (NOXIA-ENERGY-0001)
+// Vorher:       26.06.2026 — ice_drill, water_recycler, scanner eingetragen
+// Version:      1.2.1
 //
 // Zentrale Funktion für das Overlay-System.
 // Aufruf: buildOverlayForBuilding(entityId, context)
@@ -9,6 +10,7 @@
 // Neue Gebäude: eigene Datei in overlays/ anlegen, hier eintragen.
 // Fallback: generischer Overlay für alle unbekannten Gebäude.
 
+import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 import type { OverlayDef, BuildingContext, OverlayMetric, OverlayAlert } from '../types'
 import { buildMineOverlay, MINE_OVERLAY_STATIC } from './mine'
 import { buildSolarOverlay } from './solar'
@@ -77,7 +79,7 @@ function buildGenericOverlay(entityId: string, ctx: BuildingContext): OverlayDef
 
 function resLabel(res: string): string {
   const map: Record<string, string> = {
-    metal: 'Metall', energy: 'Energie', water: 'Wasser',
+    metal: 'Metall', energy: ENERGY_GOOD_LABEL, water: 'Wasser',
   }
   return map[res] ?? res
 }
