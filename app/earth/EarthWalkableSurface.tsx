@@ -126,14 +126,23 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     if(Math.abs(metric.eastM)>SCENE_RADIUS_M||Math.abs(metric.northM)>SCENE_RADIUS_M)return[]
     return[{id:`poi:${feature.id}`,name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType)}]
   }).slice(0,30):[],[origin,features])
+  // Spatial building coordinates use the canonical Earth region origin (the same
+  // frame used by EarthRegionPreview), which may differ from a local query center.
+  const toSceneCoordinates=(x:number|null|undefined,y:number|null|undefined)=>{
+    if(x==null||y==null||!Number.isFinite(Number(x))||!Number.isFinite(Number(y))||!origin||!data?.region?.origin)return null
+    const geo=localMetersToGeo({eastM:Number(x),northM:Number(y)},data.region.origin)
+    const local=geoToLocalMeters(geo,origin)
+    return {xM:local.eastM,yM:local.northM}
+  }
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
-    const xM=Number(entity.x_m),yM=Number(entity.y_m)
-    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
-    return[{id:`building:${entity.id}`,name:String(entity.name??entity.entity_id),xM,yM,kind:'NOXIA-Gebäude',entity}]
-  }),[spatialEntities])
+    const point=toSceneCoordinates(entity.x_m,entity.y_m)
+    if(!point||Math.abs(point.xM)>SCENE_RADIUS_M||Math.abs(point.yM)>SCENE_RADIUS_M)return[]
+    return[{id:`building:${entity.id}`,name:String(entity.name??entity.entity_id),...point,kind:'NOXIA-Gebäude',entity}]
+  }),[spatialEntities,origin,data?.region?.origin])
   const pendingTargets=useMemo(()=>spatialBuilds.flatMap(build=>{
-    const xM=Number(build.x_m),yM=Number(build.y_m)
-    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
+    const point=toSceneCoordinates(build.x_m,build.y_m)
+    if(!point||Math.abs(point.xM)>SCENE_RADIUS_M||Math.abs(point.yM)>SCENE_RADIUS_M)return[]
+    const {xM,yM}=point
     const state=constructionState({
       buildable_id:build.buildable_id,
       tile_row:0,
@@ -143,7 +152,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       completes_at:build.completes_at,
     },Date.now())
     return[{id:`pending:${build.id}`,name:String(build.name??build.buildable_id),xM,yM,kind:'Baustelle',build,state}]
-  }),[spatialBuilds,motionTime])
+  }),[spatialBuilds,motionTime,origin,data?.region?.origin])
   const localTrainPoint=useMemo(()=>{
     const track=scene?.railGraph.find(path=>path.points.length>=2)
     if(!track)return null
