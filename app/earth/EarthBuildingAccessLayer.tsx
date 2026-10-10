@@ -272,6 +272,7 @@ export default function EarthBuildingAccessLayer({
     return (
       <CafeWalkableInterior
         entityId={request.entityId}
+        buildingTypeId={request.buildingTypeId}
         buildingName={request.buildingName}
         companion={companion}
         onClose={onClose}

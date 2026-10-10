@@ -18,3 +18,5 @@ export * from './templates/orbitalTransferStation'
 export * from './templates/pressurizedHabitatCluster'
 
 export * from './templates/cafeStandard'
+export * from './templates/barStandard'
+export * from './templates/restaurantStandard'

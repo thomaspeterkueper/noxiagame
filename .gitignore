@@ -56,3 +56,5 @@ next-env.d.ts
 /experiments/colony/out/
 
 .vercel
+/.hospitality-test
+/.interior-test

@@ -10,6 +10,8 @@ Entschieden:
 
 Fund beim Bau: Ein Café existiert bereits (aktive `building_definitions`-Zeile `cafe`, begehbares Interieur `CafeWalkableInterior`, NPC-Gespräche über `npc-conversation`, Gebäude-Eintritt). Die „Bar" ist daher kein neues Gebäude, sondern eine Variante/Alias des Cafés; `bar` bleibt vorerst `planned`.
 
+Innenaufbau, Figuren und Gesprächswissen für Café, Bar und Restaurant: `docs/gameplay/hospitality-venues.md`. Dort stehen auch die Anschlussstellen für Wirt als Bewohner, Bestellung/Bezahlung und Stimmung.
+
 Stand im Code: Das Stufenmodell ist rein beschreibend. Die Stufe wird noch nirgends ausgelöst, Standardgebäude werden nicht automatisch gebaut.
 
 ## 1. Leitgedanke

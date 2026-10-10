@@ -3,6 +3,8 @@ import { LABORATORY_STANDARD_INTERIOR } from './templates/laboratoryStandard'
 import { ORBITAL_TRANSFER_STATION_INTERIOR } from './templates/orbitalTransferStation'
 import { PRESSURIZED_HABITAT_CLUSTER_INTERIOR } from './templates/pressurizedHabitatCluster'
 import { CAFE_STANDARD_INTERIOR } from './templates/cafeStandard'
+import { BAR_STANDARD_INTERIOR } from './templates/barStandard'
+import { RESTAURANT_STANDARD_INTERIOR } from './templates/restaurantStandard'
 import { HABITAT_STANDARD_INTERIOR } from './templates/habitatStandard'
 import { MEDICAL_STANDARD_INTERIOR } from './templates/medicalStandard'
 import { WORKSHOP_STANDARD_INTERIOR } from './templates/workshopStandard'
@@ -26,6 +28,8 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [ORBITAL_TRANSFER_STATION_INTERIOR.id]: ORBITAL_TRANSFER_STATION_INTERIOR,
     [PRESSURIZED_HABITAT_CLUSTER_INTERIOR.id]: PRESSURIZED_HABITAT_CLUSTER_INTERIOR,
     [CAFE_STANDARD_INTERIOR.id]: CAFE_STANDARD_INTERIOR,
+    [BAR_STANDARD_INTERIOR.id]: BAR_STANDARD_INTERIOR,
+    [RESTAURANT_STANDARD_INTERIOR.id]: RESTAURANT_STANDARD_INTERIOR,
     [HABITAT_STANDARD_INTERIOR.id]: HABITAT_STANDARD_INTERIOR,
     [MEDICAL_STANDARD_INTERIOR.id]: MEDICAL_STANDARD_INTERIOR,
     [WORKSHOP_STANDARD_INTERIOR.id]: WORKSHOP_STANDARD_INTERIOR,
@@ -42,6 +46,8 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     habitat_cluster: PRESSURIZED_HABITAT_CLUSTER_INTERIOR.id,
     cafe: CAFE_STANDARD_INTERIOR.id,
     'café': CAFE_STANDARD_INTERIOR.id,
+    bar: BAR_STANDARD_INTERIOR.id,
+    restaurant: RESTAURANT_STANDARD_INTERIOR.id,
     habitat: HABITAT_STANDARD_INTERIOR.id,
     residential_block: HABITAT_STANDARD_INTERIOR.id,
     medical_core: MEDICAL_STANDARD_INTERIOR.id,
