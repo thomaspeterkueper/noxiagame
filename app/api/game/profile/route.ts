@@ -226,7 +226,7 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: true })
 
     const cafeRows = starterCafe ?? []
-    const preferredCafe = cafeRows.find((row: any) => String(row.spatial_region_id ?? '').startsWith('earth-place-'))
+    const preferredCafe = cafeRows.find((row: any) => String(row.spatial_region_id ?? '') === 'earth-sauerland')
       ?? cafeRows[0]
       ?? null
 
