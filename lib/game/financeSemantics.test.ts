@@ -41,6 +41,10 @@ const publicFunding: MoneyTransaction = {
 }
 check(validateMoneyTransaction(publicFunding).ok && liquidMoneyDelta(publicFunding) === 0, 'public funding is a zero-sum fiscal transfer from the colony treasury')
 
+// Migration 20261010110000: a guest pays 8 for a meal, 1 of it is tax.
+const order = taxedTransfer({ id: 'hospitality_order:1', payer: 'guest', recipient: 'cafe-operator', publicAccount: 'colony', gross: 8, taxRate: 0.125, reference: 'hospitality_order:1' })
+check(order.tax === 1 && order.net === 7 && validateMoneyTransaction(order.transaction).ok && liquidMoneyDelta(order.transaction) === 0, 'a cafe order is a zero-sum taxed transfer: tax comes out of the price')
+
 const bootstrap: MoneyTransaction = {
   id: 'bootstrap:person:p1',
   operation: 'emission',
