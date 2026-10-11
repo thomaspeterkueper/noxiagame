@@ -1,0 +1,39 @@
+name: NOXIA core causality guard
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/**'
+      - 'lib/world/**'
+      - 'scripts/check-core-*.mjs'
+      - 'docs/decisions/NOXIA-PHYSICS-0001-kausalitaet-und-effizienz.md'
+      - '.github/workflows/noxia-core-causality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/**'
+      - 'lib/world/**'
+      - 'scripts/check-core-*.mjs'
+      - '.github/workflows/noxia-core-causality.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run existing core invariants
+        run: npm run test:core-invariants
