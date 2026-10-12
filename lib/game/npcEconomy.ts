@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/service'
+import { createServiceClient } from '../supabase/service'
 
 const MAX_GIFT_CREDITS = 1000
 
