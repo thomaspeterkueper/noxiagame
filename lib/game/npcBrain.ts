@@ -1,7 +1,10 @@
 // lib/game/npcBrain.ts
 // Erstellt:     14.06.2026
-// Aktualisiert: 20.07.2026 — Phase C: runNpcTick (Persistenz-Schicht)
-// Version:      2.0.0
+// Aktualisiert: 12.10.2026 — Bugfix Firmenbuchungen: Verkauf nur dort, wo die Ware liegt (kein
+//               Verkauf ohne Transport); Ausbau nur, wenn Absatz möglich ist (Lager nicht voll,
+//               Preis nicht unter dem Mindestpreis)
+// Vorher:       20.07.2026 — Phase C: runNpcTick (Persistenz-Schicht)
+// Version:      2.1.0
 //
 // Deterministischer NPC-Brain (Phase A → C).
 //
@@ -59,7 +62,12 @@ export interface NpcGebaeude {
 
 export interface NpcKontext {
   actor:    { id: string; decision_weights: NpcDecisionWeights | null }
-  bestand:  Record<string, number>  // Netto-Lagerstand (Käufe + Produktion − Verkäufe)
+  // Eigener Warenbestand: Käufe − Verkäufe. Produktion zählt NICHT dazu – sie wird
+  // im selben Tick an den Markt des Standorts geliefert und dort bezahlt.
+  bestand:  Record<string, number>
+  // Derselbe Bestand je Standort (Slug → Gut → t). Ist er gesetzt, wird nur dort
+  // verkauft, wo die Ware tatsächlich liegt. Fehlt er, gilt das alte Verhalten.
+  lager?:   Record<string, Record<string, number>>
   treasury: number                  // Σ credit_delta aus npc_ledger
   gebaeude: NpcGebaeude[]           // eigene tile_entities
 }
@@ -70,6 +78,7 @@ export interface MarktPreis {
   buy_price:  number
   sell_price: number
   stock?:     number
+  capacity?:  number   // Lagerkapazität des Orts für dieses Gut (t), falls bekannt
 }
 
 export interface NpcWelt {
@@ -119,6 +128,18 @@ function cmp(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0
 }
 
+/** Findet die geplante Anlage am Ausbauort Absatz? Ohne Marktdaten: ja (altes Verhalten). */
+export function ausbauLohnt(w: NpcDecisionWeights, welt: NpcWelt): boolean {
+  if (!w.expand) return false
+  const gut = BUILDINGS[w.expand.building]?.produces?.resource
+  if (!gut) return true
+  const markt = welt.preise.find(p => p.location === w.expand!.location && p.resource === gut)
+  if (!markt) return true
+  if (typeof markt.capacity === 'number' && typeof markt.stock === 'number' && markt.stock >= markt.capacity) return false
+  if (typeof w.sell_floor === 'number' && markt.sell_price < w.sell_floor) return false
+  return true
+}
+
 // ── Der Brain ─────────────────────────────────────────────────────────────────
 export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
   const w = kontext.actor.decision_weights ?? {}
@@ -154,19 +175,28 @@ export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
 
     for (const gut of w.sells) {
       if (!MARKT_GUETER.has(gut)) continue
-      const bestand = kontext.bestand[gut] ?? 0
-      const ueberschuss = bestand - reserve
-      if (ueberschuss <= 0) continue
+      // Ware kann nur dort verkauft werden, wo sie liegt: ohne Transport kein
+      // Verkauf an einem anderen Ort. Mit `lager` wird je Standort entschieden.
+      const orte = kontext.lager
+        ? Object.keys(kontext.lager).filter(ort => (kontext.lager![ort][gut] ?? 0) - reserve > 0)
+        : null
+      const bestand = orte
+        ? orte.reduce((s, ort) => s + (kontext.lager![ort][gut] ?? 0), 0)
+        : (kontext.bestand[gut] ?? 0)
+      const ueberschussGesamt = orte
+        ? orte.reduce((s, ort) => s + (kontext.lager![ort][gut] ?? 0) - reserve, 0)
+        : bestand - reserve
+      if (ueberschussGesamt <= 0) continue
 
-      // Besten Markt finden: sell_price ≥ sell_floor, höchster Preis zuerst.
-      // Nur Orte, wo der NPC ein passendes Gebäude hat, ODER alle Orte wenn
-      // kein Gebäude-Constraint gesetzt (flexibler Händler).
+      // Besten Markt finden: sell_price ≥ sell_floor, höchster Preis zuerst –
+      // unter den Orten, an denen Ware liegt.
       const markt = welt.preise
-        .filter(p => p.resource === gut && p.sell_price >= sellFloor)
+        .filter(p => p.resource === gut && p.sell_price >= sellFloor && (!orte || orte.includes(p.location)))
         .sort((a, b) => (b.sell_price - a.sell_price) || cmp(a.location, b.location))[0]
 
       if (!markt) continue  // kein Markt über dem Boden → warten
 
+      const ueberschuss = orte ? (kontext.lager![markt.location][gut] ?? 0) - reserve : ueberschussGesamt
       const menge = Math.floor(Math.min(ueberschuss, sellPerTick))
       if (menge <= 0) continue
 
@@ -186,7 +216,10 @@ export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
   // (keine Bauzeit-Ticks), Kosten werden aus der Treasury gebucht. Die Idempotenz
   // hängt am uniq_npc_ledger_event-Index in der DB (kind='build', ref=location).
   // Genau eine build-Aktion pro Tick (nicht mehrere Gebäude auf einmal).
-  if (w.expand && kontext.treasury >= w.expand.treasury_min) {
+  // Ausgebaut wird nur, wenn die zusätzliche Produktion auch Absatz findet: Das
+  // Lager des Orts ist nicht voll, und der Preis liegt nicht unter dem
+  // Mindestpreis der Firma. Sonst würde sie in eine ruhende Anlage investieren.
+  if (w.expand && kontext.treasury >= w.expand.treasury_min && ausbauLohnt(w, welt)) {
     aktionen.push({
       typ:      'build',
       building: w.expand.building,

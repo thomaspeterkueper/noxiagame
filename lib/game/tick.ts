@@ -1,9 +1,11 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts): Produktion von Ort und
-//               NPC-Firmen ruht bei vollem Lager; Bestände über der Kapazität bleiben liegen
-// Vorher:       09.10.2026 — Preise folgen der Lagerreichweite (lib/game/priceModel.ts)
-// Version:      3.6.0
+// Aktualisiert: 12.10.2026 — Bugfix Firmenbuchungen: Ware von Firmenanlagen entsteht nur noch im
+//               Firmen-Tick (vorher zusätzlich im Kolonie-Tick und im Anlagenlager); produzierte Ware
+//               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
+//               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
+// Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
+// Version:      3.6.1
 
 import {
   CONSUMPTION_PER_100,
@@ -146,6 +148,10 @@ export async function runPopulationTick(
     if (!facilityInventoryError) {
       for (const b of buildings ?? []) {
         if (!nativeFacilityIds.has(b.id)) continue
+        // Anlagen von NPC-Firmen liefern ausschließlich im Firmen-Tick (runNpcTick):
+        // dort wird die Ware an den Markt geliefert, bezahlt und an der Lagergrenze
+        // gekappt. Eine zweite Gutschrift ins Anlagenlager wäre dieselbe Ware doppelt.
+        if (b.actor_id) continue
         const def = defs.get(b.entity_id)
         if (!def) continue
 
@@ -202,6 +208,9 @@ export async function runPopulationTick(
 
         for (const prod of def.production) {
           if (prod.resource !== res) continue
+          // Firmenanlagen (actor_id) zählen hier nicht: ihre Ware kommt über den
+          // Firmen-Tick in den Bestand. Vorher lief sie auf beiden Wegen ein.
+          if (b.actor_id) continue
           if (!facilityInventoryError && nativeFacilityIds.has(b.id)) nativeBuildingProduction += prod.amount
           else legacyBuildingProduction += prod.amount
         }
@@ -391,6 +400,20 @@ export async function runOrderTick(supabase: SB, locationSnapshot?: any[]) {
   return created
 }
 
+const NPC_BAU_ZEILEN = [7, 6, 5] as const
+const NPC_BAU_SPALTEN = 12
+
+/** Erste freie Kachel für ein NPC-Gebäude: Zeile 7, dann 6, dann 5 – jeweils von Spalte 11 abwärts. */
+export function naechsteFreieKachel(belegt: { tile_row: number | null; tile_col: number | null }[]): { row: number; col: number } | null {
+  const besetzt = new Set(belegt.map(b => `${b.tile_row}|${b.tile_col}`))
+  for (const row of NPC_BAU_ZEILEN) {
+    for (let col = NPC_BAU_SPALTEN - 1; col >= 0; col--) {
+      if (!besetzt.has(`${row}|${col}`)) return { row, col }
+    }
+  }
+  return null
+}
+
 export async function runNpcTick(supabase: SB, tickNumber: number, locationSnapshot?: any[], storageCapacities?: Map<string, StorageCapacity>) {
   const { data: actors } = await supabase.from('actors').select('id, decision_weights').eq('kind', 'npc_firm')
   if (!actors?.length) return { actors: 0, trades: 0, produces: 0, sells: 0, builds: 0 }
@@ -398,29 +421,50 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
   const locIdToSlug = new Map<string, string>()
   for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
   const { data: priceRows } = await supabase.from('market_prices').select('resource, buy_price, sell_price, location_id')
-  const { data: stockRows } = await supabase.from('location_resources').select('location_id, resource, stock')
+  const { data: stockRows } = await supabase.from('location_resources').select('location_id, resource, stock, production')
   const stockMap = new Map<string, number>()
-  for (const s of (stockRows ?? []) as any[]) stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
+  const productionMap = new Map<string, number>()
+  for (const s of (stockRows ?? []) as any[]) {
+    stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
+    productionMap.set(`${s.location_id}|${s.resource}`, Number(s.production ?? 0))
+  }
   const sellPriceMap = new Map<string, number>()
   const slugToId = new Map<string, string>()
   const preise = ((priceRows ?? []) as any[]).map((p) => {
     const slug = locIdToSlug.get(p.location_id) ?? ''
     if (slug) { slugToId.set(slug, p.location_id); sellPriceMap.set(`${p.location_id}|${p.resource}`, Number(p.sell_price ?? 0)) }
-    return { resource: p.resource, location: slug, buy_price: p.buy_price, sell_price: p.sell_price, stock: stockMap.get(`${p.location_id}|${p.resource}`) }
+    return {
+      resource: p.resource, location: slug, buy_price: p.buy_price, sell_price: p.sell_price,
+      stock: stockMap.get(`${p.location_id}|${p.resource}`),
+      capacity: storageCapacities ? capacityFor(storageCapacities, p.location_id)[p.resource as StorageResource] : undefined,
+    }
   }).filter((p) => p.location)
   let trades = 0, produces = 0, sells = 0, builds = 0
   for (const actor of actors as any[]) {
-    const { data: buyLed } = await supabase.from('npc_trades').select('resource, amount').eq('actor_id', actor.id)
+    // Eigener Warenbestand der Firma = Käufe − Verkäufe, je Standort. Produzierte
+    // Ware zählt nicht dazu: sie wird im selben Tick an den Markt des Standorts
+    // geliefert und bezahlt. Vorher zählte sie zusätzlich als Bestand und wurde
+    // ein zweites Mal verkauft – an einem anderen Ort, ohne Transport.
+    const { data: buyLed } = await supabase.from('npc_trades').select('resource, amount, location_id').eq('actor_id', actor.id)
+    const { data: sellLed } = await supabase.from('npc_ledger').select('resource, goods_delta, location_id').eq('actor_id', actor.id).eq('kind', 'sell')
     const bestand: Record<string, number> = {}
-    for (const r of (buyLed ?? []) as any[]) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.amount)
-    const { data: prodLed } = await supabase.from('npc_ledger').select('resource, goods_delta').eq('actor_id', actor.id).not('resource', 'is', null)
-    for (const r of (prodLed ?? []) as any[]) if (r.resource) bestand[r.resource] = (bestand[r.resource] ?? 0) + Number(r.goods_delta ?? 0)
+    const lager: Record<string, Record<string, number>> = {}
+    const buche = (locationId: string | null, resource: string | null, menge: number) => {
+      if (!resource) return
+      bestand[resource] = (bestand[resource] ?? 0) + menge
+      const slug = locationId ? locIdToSlug.get(locationId) : undefined
+      if (!slug) return
+      lager[slug] = lager[slug] ?? {}
+      lager[slug][resource] = (lager[slug][resource] ?? 0) + menge
+    }
+    for (const r of (buyLed ?? []) as any[]) buche(r.location_id, r.resource, Number(r.amount ?? 0))
+    for (const r of (sellLed ?? []) as any[]) buche(r.location_id, r.resource, Number(r.goods_delta ?? 0))
     const { data: ledSum } = await supabase.from('npc_ledger').select('credit_delta').eq('actor_id', actor.id)
     const treasury = (ledSum ?? []).reduce((s: number, r: any) => s + Number(r.credit_delta ?? 0), 0)
     const { data: gebRows } = await supabase.from('tile_entities').select('entity_id, location_id, tile_col').eq('actor_id', actor.id).eq('entity_type', 'building')
     const gebaeude = ((gebRows ?? []) as any[]).map(g => ({ entity_id: g.entity_id, location_id: g.location_id, location: locIdToSlug.get(g.location_id) ?? '', tile_col: Number(g.tile_col ?? 0) })).filter(g => g.location)
     for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
-    const aktionen = entscheideNpc({ actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, treasury, gebaeude }, { tick: tickNumber, preise })
+    const aktionen = entscheideNpc({ actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, lager, treasury, gebaeude }, { tick: tickNumber, preise })
     for (const a of aktionen) {
       if (a.typ === 'produce') {
         const locId = slugToId.get(a.location)
@@ -438,8 +482,12 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
         if (!ins?.length) continue
         const key = `${locId}|${a.resource}`
         const neuerStock = (stockMap.get(key) ?? 0) + a.menge
-        await supabase.from('location_resources').update({ stock: neuerStock }).eq('location_id', locId).eq('resource', a.resource)
+        // production zeigt die tatsächliche Erzeugung am Ort; der Kolonie-Tick hat
+        // den Wert in diesem Tick ohne Firmenanlagen gesetzt, hier kommen sie dazu.
+        const neueProduktion = (productionMap.get(key) ?? 0) + a.menge
+        await supabase.from('location_resources').update({ stock: neuerStock, production: neueProduktion }).eq('location_id', locId).eq('resource', a.resource)
         stockMap.set(key, neuerStock)
+        productionMap.set(key, neueProduktion)
         produces++
       } else if (a.typ === 'sell') {
         const locId = slugToId.get(a.location)
@@ -457,11 +505,22 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
       } else if (a.typ === 'build') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
-        const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'build', resource: null, goods_delta: 0, credit_delta: -a.cost, location_id: locId, ref: a.location }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
+        // Erst eine freie Kachel suchen, dann buchen, dann bauen. Vorher wurde die
+        // Spalte nur aus den eigenen Gebäuden abgeleitet; stand dort ein fremdes
+        // Gebäude, scheiterte das Anlegen stillschweigend – das Geld war trotzdem weg.
+        const { data: belegt } = await supabase.from('tile_entities').select('tile_row, tile_col').eq('location_id', locId).eq('tile_level', 0).eq('entity_type', 'building').not('tile_row', 'is', null)
+        const frei = naechsteFreieKachel((belegt ?? []) as { tile_row: number | null; tile_col: number | null }[])
+        if (!frei) continue
+        const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'build', resource: null, goods_delta: 0, credit_delta: -a.cost, location_id: locId, ref: a.location, note: `${a.building} @ ${a.location} [${frei.row}/${frei.col}]` }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
         if (!ins?.length) continue
-        const { data: vorhandene } = await supabase.from('tile_entities').select('tile_col').eq('actor_id', actor.id).eq('location_id', locId).eq('entity_id', a.building).order('tile_col', { ascending: false })
-        const naechsteCol = vorhandene?.length ? Math.max(0, (vorhandene[0].tile_col ?? 11) - 1) : 11
-        await supabase.from('tile_entities').insert({ actor_id: actor.id, location_id: locId, tile_level: 0, tile_row: 7, tile_col: naechsteCol, entity_type: 'building', entity_id: a.building })
+        const { error: bauFehler } = await supabase.from('tile_entities').insert({ actor_id: actor.id, location_id: locId, tile_level: 0, tile_row: frei.row, tile_col: frei.col, entity_type: 'building', entity_id: a.building })
+        if (bauFehler) {
+          // Kein Gebäude, keine Zahlung. Das Journal bleibt anfügend: die Buchung wird
+          // nicht gelöscht, sondern durch eine Stornobuchung im selben Tick ausgeglichen.
+          console.error(`runNpcTick: build ${a.building} @ ${a.location} failed, booking reversed:`, bauFehler)
+          await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'build', resource: null, goods_delta: 0, credit_delta: a.cost, location_id: locId, ref: `${a.location}:storno`, note: `Storno: ${a.building} @ ${a.location} konnte nicht errichtet werden` }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true })
+          continue
+        }
         builds++
       } else if (a.typ === 'buy') {
         const locId = slugToId.get(a.location)
