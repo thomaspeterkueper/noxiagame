@@ -1,6 +1,6 @@
 // lib/game/spatial/buildingMassing.ts
-// Aktualisiert: 12.10.2026 — Höhe, Dachform und Farbgebung realer Gebäude für die 2,5D-Darstellung
-// Version:      1.0.0
+// Aktualisiert: 12.10.2026 — Walmdach für rechteckige Grundrisse und Fensterreihen; Höhe, Dachform und Farbgebung realer Gebäude für die 2,5D-Darstellung
+// Version:      1.1.0
 
 export type BuildingRoofForm = 'pitched' | 'flat'
 export type BuildingMassingStyle = {
@@ -92,4 +92,63 @@ export function extrudeFootprint(base: ScreenPoint[], heightPx: number) {
     { x: cx + ridgeDir.x * half, y: cy + ridgeDir.y * half },
   ]
   return { walls, roof, ridge }
+}
+
+export type GroundPoint = { xM: number; yM: number }
+
+/**
+ * Hipped roof for a four-cornered footprint (ground metres): the ridge runs
+ * along the long axis and is pulled in by half the short side at both ends.
+ * Returns the two ridge ends and, per footprint edge, which ridge ends its
+ * roof face touches. Other footprints get no hip roof (null).
+ */
+export function hipRoof(footprint: GroundPoint[]) {
+  if (footprint.length !== 4) return null
+  const side = (i: number) => Math.hypot(footprint[(i + 1) % 4].xM - footprint[i].xM, footprint[(i + 1) % 4].yM - footprint[i].yM)
+  const a = (side(0) + side(2)) / 2, b = (side(1) + side(3)) / 2
+  const shortM = Math.min(a, b), longM = Math.max(a, b)
+  if (shortM < 2.5 || longM / shortM > 6) return null
+  // Short edges are 1 and 3 when edge 0 is long, otherwise 0 and 2.
+  const firstShort = a >= b ? 1 : 0
+  const mid = (i: number) => ({ xM: (footprint[i].xM + footprint[(i + 1) % 4].xM) / 2, yM: (footprint[i].yM + footprint[(i + 1) % 4].yM) / 2 })
+  const m1 = mid(firstShort), m2 = mid(firstShort + 2)
+  const inset = Math.min(.5, (shortM / 2) / (longM || 1))
+  const ridgeA = { xM: m1.xM + (m2.xM - m1.xM) * inset, yM: m1.yM + (m2.yM - m1.yM) * inset }
+  const ridgeB = { xM: m2.xM + (m1.xM - m2.xM) * inset, yM: m2.yM + (m1.yM - m2.yM) * inset }
+  // Face per edge i: short edge → triangle to its ridge end, long edge → trapezoid to both.
+  const faces = [0, 1, 2, 3].map(i => {
+    if (i === firstShort) return { edge: i, ridge: ['a'] as Array<'a' | 'b'> }
+    if (i === firstShort + 2) return { edge: i, ridge: ['b'] as Array<'a' | 'b'> }
+    // The long edge following the first short edge runs from the A side to the B side.
+    return { edge: i, ridge: (i === (firstShort + 1) % 4 ? ['b', 'a'] : ['a', 'b']) as Array<'a' | 'b'> }
+  })
+  return { ridgeA, ridgeB, faces, riseM: Math.min(4.5, shortM * .32) }
+}
+
+/**
+ * Window rows on the viewer-facing walls as one SVG path. Each wall is the quad
+ * [base p, base q, lifted q, lifted p]; windows are spaced along the edge.
+ */
+export function windowPath(walls: Array<{ points: ScreenPoint[] }>, heightM: number, heightPx: number, spacingPx = 3.4) {
+  const floors = Math.max(1, Math.min(8, Math.round((heightM - .5) / 3)))
+  const floorPx = heightPx / floors
+  if (floorPx < 1.6) return ''
+  let d = ''
+  for (const wall of walls) {
+    const [p, q] = wall.points
+    const length = Math.hypot(q.x - p.x, q.y - p.y)
+    const count = Math.floor((length - 1.2) / spacingPx)
+    if (count < 1) continue
+    const margin = (length - count * spacingPx) / 2
+    for (let floor = 0; floor < floors; floor++) {
+      const bottom = floor * floorPx + floorPx * .28, top = floor * floorPx + floorPx * .78
+      for (let i = 0; i < count; i++) {
+        const t0 = (margin + i * spacingPx + spacingPx * .22) / length, t1 = (margin + i * spacingPx + spacingPx * .78) / length
+        const x0 = p.x + (q.x - p.x) * t0, y0 = p.y + (q.y - p.y) * t0
+        const x1 = p.x + (q.x - p.x) * t1, y1 = p.y + (q.y - p.y) * t1
+        d += `M${x0.toFixed(1)} ${(y0 - bottom).toFixed(1)}L${x1.toFixed(1)} ${(y1 - bottom).toFixed(1)}L${x1.toFixed(1)} ${(y1 - top).toFixed(1)}L${x0.toFixed(1)} ${(y0 - top).toFixed(1)}Z`
+      }
+    }
+  }
+  return d
 }

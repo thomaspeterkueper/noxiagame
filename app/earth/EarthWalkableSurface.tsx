@@ -1,10 +1,10 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — 2,5D-Gebäude: reale Häuser mit Höhe, belichteten Wänden, Dachform und Schatten; NOXIA-Gebäude mit ihrem Gebäudebild; Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.8.0
+// Aktualisiert: 12.10.2026 — reale Gebäude als eigene, einmal je Szene aufgebaute Ebene mit Walmdächern und Fensterreihen; 2,5D-Gebäude: reale Häuser mit Höhe, belichteten Wänden, Dachform und Schatten; NOXIA-Gebäude mit ihrem Gebäudebild; Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.9.0
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
@@ -20,7 +20,9 @@ import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/gam
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from './LandmarkWalkableInterior'
 import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
-import { buildingMassingStyle, extrudeFootprint } from '@/lib/game/spatial/buildingMassing'
+import { extrudeFootprint } from '@/lib/game/spatial/buildingMassing'
+import EarthBuildingMassingLayer, { HEIGHT_PX_PER_M } from './EarthBuildingMassingLayer'
+import type { LocalSurfaceBuilding } from '@/lib/game/spatial/localSurfaceScene'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, WalkableTrain, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
 
@@ -41,8 +43,6 @@ const HEIGHT_PX=12
 // far too small for a town where a house is 10 m wide and a figure 30 px tall.
 // Earth scenes zoom the ground in; figures and labels keep their screen size.
 const SCENE_ZOOM=2.4
-// Screen pixels (before zoom) per metre of building height.
-const HEIGHT_PX_PER_M=.8
 const LANDMARK_LABEL:Record<string,string>={library:'Bibliothek',place_of_worship:'Gotteshaus',museum:'Museum',gallery:'Galerie',attraction:'Sehenswürdigkeit',viewpoint:'Aussichtspunkt',castle:'Burg / Schloss',fort:'Festung',city_gate:'Stadttor',ruins:'Ruine',archaeological_site:'Ausgrabungsstätte',monument:'Denkmal',memorial:'Gedenkstätte',university:'Universität',townhall:'Rathaus',theatre:'Theater',arts_centre:'Kulturzentrum',hospital:'Krankenhaus',station:'Bahnhof',tower:'Turm',lighthouse:'Leuchtturm',observatory:'Sternwarte'}
 function landmarkLabel(kind:string,tags?:Record<string,any>){if(kind==='place_of_worship'){const religion=String(tags?.religion??'');return religion==='christian'?'Kirche':religion==='muslim'?'Moschee':religion==='jewish'?'Synagoge':religion==='buddhist'||religion==='hindu'?'Tempel':'Gotteshaus'}return LANDMARK_LABEL[kind]??'Landmark'}
 // One plain glyph per landmark class, drawn inside a 20 px badge.
@@ -118,6 +118,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const lastAutoWalkMotionTime=useRef<number|null>(null)
   const[entryRequest,setEntryRequest]=useState<BuildingEntryRequest|null>(null)
   const localEnrichmentAttempted=useRef(new Set<string>())
+  // Stable callback for the memoised building layer; the player position is
+  // read at hover time instead of making the layer depend on every step.
+  const playerRef=useRef(player)
+  playerRef.current=player
+  const hoverRealBuilding=useCallback((building:LocalSurfaceBuilding|null,event?:MouseEvent)=>{
+    if(!building||!event){setHoveredBuilding(null);return}
+    setHoveredBuilding({x:event.clientX,y:event.clientY,name:building.label??'Gebäude',detail:building.provenance==='observed'?'reale Geometrie':'abgeleitete Bebauungsmasse',distanceM:Math.hypot(building.center.xM-playerRef.current.xM,building.center.yM-playerRef.current.yM)})
+  },[])
   const[detailStatus,setDetailStatus]=useState<'idle'|'loading'|'failed'>('idle')
   const[detailRetry,setDetailRetry]=useState(0)
   const[sceneCenter,setSceneCenter]=useState<GeoPoint|null>(null)
@@ -614,21 +622,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           </g>
         })}
 
-        {[...scene.buildings].sort((a,b)=>(a.center.xM+a.center.yM)-(b.center.xM+b.center.yM)).map(building=>{
-          const base=building.footprint&&building.footprint.length>=3?building.footprint.map(iso):buildingPolygon(building.center,building.widthM,building.depthM)
-          const style=buildingMassingStyle(building.id,building.tags)
-          const massing=extrudeFootprint(base,style.heightM*HEIGHT_PX_PER_M)
-          const distanceM=Math.hypot(building.center.xM-player.xM,building.center.yM-player.yM)
-          return <g key={building.id} opacity={building.provenance==='observed'?1:.78} style={{cursor:'help'}}
-            onMouseMove={event=>setHoveredBuilding({x:event.clientX,y:event.clientY,name:building.label??'Gebäude',detail:building.provenance==='observed'?'reale Geometrie':'abgeleitete Bebauungsmasse',distanceM})}
-            onMouseLeave={()=>setHoveredBuilding(null)}>
-            <polygon points={pointsAttr(base.map(point=>({x:point.x+style.heightM*.35,y:point.y+style.heightM*.12})))} fill="#1c2a1c" opacity=".2"/>
-            {massing.walls.map((wall,index)=><polygon key={index} points={pointsAttr(wall.points)} fill={wall.lit?style.wallLight:style.wallDark} stroke="#6d6557" strokeWidth=".3"/>)}
-            <polygon points={pointsAttr(massing.roof)} fill={style.roof} stroke={style.roofEdge} strokeWidth=".5" strokeLinejoin="round"/>
-            {style.roofForm==='pitched'&&<line x1={massing.ridge[0].x} y1={massing.ridge[0].y} x2={massing.ridge[1].x} y2={massing.ridge[1].y} stroke="#ffffff" strokeOpacity=".38" strokeWidth=".9" strokeLinecap="round"/>}
-            <title>{building.label??'Gebäude'} · {building.provenance==='observed'?'reale Geometrie':'abgeleitete Bebauungsmasse'}</title>
-          </g>
-        })}
+        <EarthBuildingMassingLayer buildings={scene.buildings} onHover={hoverRealBuilding}/>
 
         {navigationTarget&&navigationRoute&&<WalkableRoute points={navigationRoute.points} target={{xM:navigationTarget.xM,yM:navigationTarget.yM}}/>}
 
