@@ -18,6 +18,7 @@ export default defineConfig({
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',
+      'lib/game/landmarks/interiors.test.ts',
       'lib/game/chronicle.test.ts',
       'lib/game/merchantQualification.test.ts',
       'lib/game/npcBuildTile.test.ts',

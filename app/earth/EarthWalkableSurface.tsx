@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.6.0
+// Aktualisiert: 12.10.2026 — Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.7.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -18,6 +18,8 @@ import { constructionState } from '@/lib/game/constructionProgress'
 import { deriveLoopingRailProgress, derivePointAlongRailPath } from '@/lib/game/transport/railSimulation'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
+import LandmarkWalkableInterior from './LandmarkWalkableInterior'
+import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, WalkableTrain, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
 
 type GeoPoint={lat:number;lon:number}
@@ -281,11 +283,27 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     return facts
   },[data?.region?.name,scene])
 
-  const npcPositions=useMemo(()=>scene?residents.slice(0,18).map((resident,index)=>{
+  const npcPositions=useMemo(()=>scene?residents.slice(0,18).flatMap((resident,index)=>{
     const h=hash(resident.id)
+    // A person with a workplace or home is where the simulation says: at work
+    // while working, otherwise at home – also when that building lies outside
+    // this scene, in which case the person is simply not here.
+    if(!npcWorldActionById[resident.id]){
+      const activity=resident.activityState.toLowerCase()
+      const atWork=/work|produc|serv|operat/.test(activity)
+      const wanted=[atWork?'work':'home',atWork?'home':'work']
+      const anchor=wanted.map(type=>resident.assignments.find(item=>item.type===type&&item.tileEntityId)).map(item=>item?buildingTargets.find(target=>target.entity.id===item.tileEntityId):undefined).find(Boolean)
+      if(anchor){
+        if(Math.abs(anchor.xM)>SCENE_RADIUS_M||Math.abs(anchor.yM)>SCENE_RADIUS_M)return[]
+        const depth=Math.max(8,Number(anchor.entity.footprint_depth_m??14))
+        const width=Math.max(8,Number(anchor.entity.footprint_width_m??18))
+        const sway=selected?.id===resident.id?0:Math.sin(motionTime*.35+(h%628)/100)*1.2
+        return[{resident,xM:anchor.xM+(((h%7)-3)/3)*(width/2-1)+sway,yM:anchor.yM+depth/2+2.5+((h>>>5)%3)*1.6}]
+      }
+    }
     const road=scene.roadGraph.length?scene.roadGraph[h%scene.roadGraph.length]:null
     const fallback={xM:-90+(h%180),yM:-70+((h>>>9)%140)}
-    if(!road||road.points.length<2)return{resident,...fallback}
+    if(!road||road.points.length<2)return[{resident,...fallback}]
 
     const segments=road.points.slice(1).map((point,i)=>{
       const from=road.points[i]
@@ -293,7 +311,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       return{from,to:point,length}
     }).filter(segment=>segment.length>.01)
     const total=segments.reduce((sum,segment)=>sum+segment.length,0)
-    if(total<=0)return{resident,...fallback}
+    if(total<=0)return[{resident,...fallback}]
 
     const state=resident.activityState.toLowerCase()
     const baseSpeed=/work|travel|move|commut|deliver|patrol/.test(state)?1.45:/idle|rest|sleep/.test(state)?.32:.8
@@ -332,12 +350,12 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         walked+=segment.length
       }
     }
-    return{
+    return[{
       resident,
       xM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,position.xM+((index%3)-1)*2.5)),
       yM:Math.max(-SCENE_RADIUS_M,Math.min(SCENE_RADIUS_M,position.yM+((index%2)?2:-2))),
-    }
-  }):[],[scene,residents,motionTime,selected?.id,npcWorldActionById])
+    }]
+  }):[],[scene,residents,motionTime,selected?.id,npcWorldActionById,buildingTargets])
 
   function perceivedLocalFactsForNpc(npcId:string){
     const npc=npcPositions.find(item=>item.resident.id===npcId)
@@ -630,7 +648,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         </select></label>
         {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
       </div>
-      {openLandmark&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
+      {openLandmark&&landmarkRoomKind(openLandmark.kind)&&<LandmarkWalkableInterior kind={landmarkRoomKind(openLandmark.kind)!} name={openLandmark.name} typeLabel={landmarkLabel(openLandmark.kind,openLandmark.tags)} onClose={()=>setOpenLandmarkId('')} facts={[
+        ['Adresse',[openLandmark.tags['addr:street'],openLandmark.tags['addr:housenumber']].filter(Boolean).join(' ')],
+        ['Geöffnet',openLandmark.tags.opening_hours],
+        ['Konfession',openLandmark.tags.denomination],
+        ['Erbaut',openLandmark.tags.start_date],
+        ['Träger',openLandmark.tags.operator],
+      ].flatMap(([label,value])=>value?[{label:String(label),value:String(value)}]:[])}/>}
+      {openLandmark&&!landmarkRoomKind(openLandmark.kind)&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
         <div className="head"><div><small>REALER ORT · {landmarkLabel(openLandmark.kind,openLandmark.tags).toUpperCase()}</small><b>{openLandmark.name}</b></div><button onClick={()=>setOpenLandmarkId('')}>×</button></div>
         <svg viewBox="-14 -14 28 28" width="54" height="54" aria-hidden="true"><circle r="12" fill="#f4ecd2" stroke="#17313c" strokeWidth="1.2"/>{landmarkGlyph(openLandmark.kind,openLandmark.tags)}</svg>
         {openLandmark.tags.description&&<p>{String(openLandmark.tags.description)}</p>}
