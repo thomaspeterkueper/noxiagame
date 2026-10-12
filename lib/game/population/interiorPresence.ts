@@ -1,6 +1,6 @@
-import { getInteriorTemplateForBuildingType } from '@/lib/game/buildings/interiors/registry'
-import { findInteriorRoute } from '@/lib/game/buildings/interiors/navigation'
-import type { InteriorInstance, InteriorTemplate, RoomId } from '@/lib/game/buildings/interiors/types'
+import { getInteriorTemplateForBuildingType } from '../buildings/interiors/registry'
+import { findInteriorRoute } from '../buildings/interiors/navigation'
+import type { InteriorInstance, InteriorTemplate, RoomId } from '../buildings/interiors/types'
 import type { PersonActivityState } from './types'
 
 type SupabaseLike = any
