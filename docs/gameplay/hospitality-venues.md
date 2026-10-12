@@ -98,7 +98,11 @@ Am `servicePoint` (vor Tresen, Empfang oder Automat) öffnet ein Knopf die Karte
 - Bestellen geht nur, solange der Spieler am `servicePoint` steht.
 - Jeder Bestellversuch trägt eine eigene `requestId`. Bricht die Verbindung ab, behält der nächste Klick auf denselben Posten die Kennung – es wird nicht doppelt gebucht.
 - Nach der Buchung zeigt die Karte den neuen Kontostand und sperrt, was nun zu teuer ist.
-- In einem geschlossenen Lokal gibt es keinen Knopf.
+- In einem geschlossenen Lokal gibt es keine Karte.
+- Die Karte erscheint von selbst, sobald der Spieler an der Kante von Tresen oder Empfang steht.
+- **Sichtbar:** Was bestellt wurde, steht für den Rest des Besuchs im Raum – vor dem Spieler oder vor der Person, der es gilt.
+- **Ausgeben:** Ist eine Person angesprochen, lässt sich „Für mich“ oder „Für <Person>“ wählen. Die Bestellung trägt dann `recipientPersonId`. Die beschenkte Figur weiß im Gespräch, dass ihr ausgegeben wurde; alle anderen haben nur eine Bestellung gesehen.
+- **Noch ohne Wirkung auf die Person:** Die Buchung wertet `recipientPersonId` bisher nicht aus. Dass die Versorgung der beschenkten Person steigt und die Beziehung sich ändert, gehört zum Teilprojekt Bevölkerung und Ökonomie (dort als Aufgabe eingetragen). Ein eigenes Bedürfnis „Durst“ gibt es nicht; Essen und Trinken laufen beide über `sustenance`.
 
 Karten gibt es bisher nur für `cafe`. Vorschlag für die fehlenden Zeilen in `hospitality_menu` (anzulegen im Teilprojekt Bevölkerung und Ökonomie; Preise an Getränk 3 / Kuchen 5 / Mahlzeit 8 ausgerichtet):
 

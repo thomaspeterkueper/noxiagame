@@ -206,6 +206,15 @@ check(staffMenuFacts.includes('Dein Gegenüber hat hier eben bestellt: 2× Kuche
 check(!staffMenuFacts.some(f => /ausgeschenkt/.test(f)), 'with a menu nobody claims the venue does not serve')
 check(staffMenuFacts.length === MAX_CONVERSATION_FACTS && staffMenuFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'staff facts with menu and orders use the full budget, not more')
 check(staffMenuFacts[staffMenuFacts.length - 1] === ARRIVAL_ORIENTATION_FACTS[ARRIVAL_ORIENTATION_FACTS.length - 1], 'no orientation fact is cut off')
+const mikaSelf = pair.find(f => f.roomRole === 'staff')!
+const treatFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: mikaSelf, figures: pair, playerPos: cafe.servicePoint, arrivalPoint: true, menu: cafeMenu, playerOrders: ['Kuchen'], giftsToSelf: ['Getränk'] })
+check(treatFacts.includes('Dein Gegenüber hat dir eben ausgegeben: Getränk; es steht vor dir. Für sich selbst bestellt: Kuchen'), 'the treated figure knows it was treated and what the player ordered')
+check(treatFacts.length === MAX_CONVERSATION_FACTS && treatFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'a treat does not push staff facts over the limit')
+const onlyTreat = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu, giftsToSelf: ['Getränk', 'Getränk'] })
+check(onlyTreat.includes('Dein Gegenüber hat dir eben ausgegeben: 2× Getränk; es steht vor dir'), 'a treated guest knows it too')
+const bystander = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu, playerOrders: ['Getränk'] })
+check(bystander.includes('Dein Gegenüber hat hier eben bestellt: Getränk') && !bystander.some(f => /ausgegeben/.test(f)), 'a bystander only saw an order')
+
 const guestMenuFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu })
 check(guestMenuFacts.includes('Bestellt und bezahlt wird am Tresen beim Personal; die Preise hast du nicht im Kopf') && !guestMenuFacts.some(f => /Karte:|\d Credits/.test(f)), 'a guest knows where to order but not the prices')
 const automat = placeVenueFigures(cafe, guests(2))
