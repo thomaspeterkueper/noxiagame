@@ -2,6 +2,11 @@ name: Repair pnpm lockfile (manual, isolated)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/ci-node-types-peer-resolution-20261009
+    paths:
+      - .github/workflows/repair-pnpm-lockfile.yml
 
 permissions:
   contents: read
