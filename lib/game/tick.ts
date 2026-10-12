@@ -1,11 +1,13 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 12.10.2026 — Bugfix Firmenbuchungen: Ware von Firmenanlagen entsteht nur noch im
+// Aktualisiert: 12.10.2026 — Handelsfirma (lib/game/npcTrade.ts, Tabelle npc_shipments): kaufen,
+//               verschiffen, verkaufen; Firmenkäufe werden bezahlt
+// Zuvor am selben Tag: Bugfix Firmenbuchungen: Ware von Firmenanlagen entsteht nur noch im
 //               Firmen-Tick (vorher zusätzlich im Kolonie-Tick und im Anlagenlager); produzierte Ware
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.6.1
+// Version:      3.7.0
 
 import {
   CONSUMPTION_PER_100,
@@ -22,6 +24,8 @@ import { nextPopulation } from './populationGrowth'
 import { nextMarketPrice } from './priceModel'
 import { acceptedInflow, capacityFor, loadStorageCapacities, type StorageCapacity, type StorageResource } from './storageCapacity'
 import { entscheideNpc } from './npcBrain'
+import { handelsStand, planeLieferung, planeVerkaeufe, type SendungZeile } from './npcTrade'
+import { transferQuote } from './transfer'
 import { runPopulationTick as runPersonPopulationTick } from './population/engine'
 import { runPersonTick } from './personBrain'
 import { persistPopulationEncounters } from './population/encounterRuntime'
@@ -421,10 +425,12 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
   const locIdToSlug = new Map<string, string>()
   for (const l of (locRows ?? []) as any[]) locIdToSlug.set(l.id, l.slug)
   const { data: priceRows } = await supabase.from('market_prices').select('resource, buy_price, sell_price, location_id')
-  const { data: stockRows } = await supabase.from('location_resources').select('location_id, resource, stock, production')
+  const { data: stockRows } = await supabase.from('location_resources').select('location_id, resource, stock, production, consumption')
   const stockMap = new Map<string, number>()
   const productionMap = new Map<string, number>()
+  const consumptionMap = new Map<string, number>()
   for (const s of (stockRows ?? []) as any[]) {
+    consumptionMap.set(`${s.location_id}|${s.resource}`, Number(s.consumption ?? 0))
     stockMap.set(`${s.location_id}|${s.resource}`, Number(s.stock ?? 0))
     productionMap.set(`${s.location_id}|${s.resource}`, Number(s.production ?? 0))
   }
@@ -439,7 +445,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
       capacity: storageCapacities ? capacityFor(storageCapacities, p.location_id)[p.resource as StorageResource] : undefined,
     }
   }).filter((p) => p.location)
-  let trades = 0, produces = 0, sells = 0, builds = 0
+  let trades = 0, produces = 0, sells = 0, builds = 0, shipments = 0
   for (const actor of actors as any[]) {
     // Eigener Warenbestand der Firma = Käufe − Verkäufe, je Standort. Produzierte
     // Ware zählt nicht dazu: sie wird im selben Tick an den Markt des Standorts
@@ -465,6 +471,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
     const gebaeude = ((gebRows ?? []) as any[]).map(g => ({ entity_id: g.entity_id, location_id: g.location_id, location: locIdToSlug.get(g.location_id) ?? '', tile_col: Number(g.tile_col ?? 0) })).filter(g => g.location)
     for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
     const aktionen = entscheideNpc({ actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, lager, treasury, gebaeude }, { tick: tickNumber, preise })
+    let kasse = treasury
     for (const a of aktionen) {
       if (a.typ === 'produce') {
         const locId = slugToId.get(a.location)
@@ -525,8 +532,13 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
       } else if (a.typ === 'buy') {
         const locId = slugToId.get(a.location)
         if (!locId) continue
+        // Ein Kauf wird bezahlt. Vorher wurde nur die Ware gebucht, die Kasse blieb unberührt.
+        const kosten = a.menge * a.maxPreis
+        if (kasse < kosten) continue
         const { data: eingefuegt } = await supabase.from('npc_trades').upsert({ actor_id: actor.id, tick: tickNumber, resource: a.resource, amount: a.menge, unit_price: a.maxPreis, location_id: locId }, { onConflict: 'actor_id,tick,resource', ignoreDuplicates: true }).select('id')
         if (!eingefuegt?.length) continue
+        await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'buy', resource: a.resource, goods_delta: a.menge, credit_delta: -kosten, location_id: locId, ref: a.location }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true })
+        kasse -= kosten
         const key = `${locId}|${a.resource}`
         const neuerStock = Math.max(0, (stockMap.get(key) ?? 0) - a.menge
         )
@@ -535,8 +547,73 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
         trades++
       }
     }
+    if (actor.decision_weights?.role === 'trader') {
+      shipments += await runHandel(supabase, actor.id, tickNumber, kasse, { preise, stockMap, consumptionMap, sellPriceMap, slugToId, locIdToSlug })
+    }
   }
-  return { actors: actors.length, trades, produces, sells, builds }
+  return { actors: actors.length, trades, produces, sells, builds, shipments }
+}
+
+// ── Handelsfirma ──────────────────────────────────────────────────────────────
+// Kauft, wo es billig ist, verschifft und verkauft, wo es teuer ist. Der Stand
+// wird aus den Sendungen und der Zeit abgeleitet: Eine Sendung ist angekommen,
+// sobald ihr Ankunfts-Tick erreicht ist – dafür wird nichts geschrieben.
+// Je Firma und Tick höchstens eine neue Sendung.
+async function runHandel(supabase: SB, actorId: string, tick: number, kasse: number, w: {
+  preise: any[]; stockMap: Map<string, number>; consumptionMap: Map<string, number>; sellPriceMap: Map<string, number>
+  slugToId: Map<string, string>; locIdToSlug: Map<string, string>
+}): Promise<number> {
+  const { data: sendRows, error } = await supabase.from('npc_shipments').select('resource, amount, from_location_id, to_location_id, arrive_tick, unit_cost').eq('actor_id', actorId)
+  if (error) { console.error('runHandel: npc_shipments not readable', error); return 0 }
+  const sendungen: SendungZeile[] = ((sendRows ?? []) as any[]).map(r => ({
+    resource: r.resource, amount: Number(r.amount), from: w.locIdToSlug.get(r.from_location_id) ?? '', to: w.locIdToSlug.get(r.to_location_id) ?? '',
+    arrive_tick: Number(r.arrive_tick), unit_cost: Number(r.unit_cost),
+  }))
+  const { data: vk } = await supabase.from('npc_ledger').select('resource, goods_delta, location_id').eq('actor_id', actorId).eq('kind', 'sell').like('ref', 'handel:%')
+  const verkauft: Record<string, number> = {}
+  for (const r of (vk ?? []) as any[]) {
+    const k = `${w.locIdToSlug.get(r.location_id)}|${r.resource}`
+    verkauft[k] = (verkauft[k] ?? 0) - Number(r.goods_delta ?? 0)
+  }
+  const maerkte = w.preise.map(p => {
+    const id = w.slugToId.get(p.location)
+    return { ...p, buy_price: Number(p.buy_price), sell_price: Number(p.sell_price), stock: w.stockMap.get(`${id}|${p.resource}`), consumption: w.consumptionMap.get(`${id}|${p.resource}`) ?? 0 }
+  })
+  const { posten, offen } = handelsStand(sendungen, verkauft, tick)
+
+  for (const v of planeVerkaeufe(posten, maerkte)) {
+    const locId = w.slugToId.get(v.location)
+    if (!locId) continue
+    const key = `${locId}|${v.resource}`
+    const erloes = v.menge * (w.sellPriceMap.get(key) ?? 0)
+    const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actorId, tick, kind: 'sell', resource: v.resource, goods_delta: -v.menge, credit_delta: erloes, location_id: locId, ref: `handel:${v.location}`, note: v.grund }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
+    if (!ins?.length) continue
+    const neu = (w.stockMap.get(key) ?? 0) + v.menge
+    await supabase.from('location_resources').update({ stock: neu }).eq('location_id', locId).eq('resource', v.resource)
+    w.stockMap.set(key, neu)
+    kasse += erloes
+  }
+
+  const l = planeLieferung({ treasury: kasse, tick, offen }, maerkte, (from, to) => {
+    const q = transferQuote(from, to, tick)
+    return q ? { energy: q.energy, ticks: q.durationSeconds / TICK_INTERVAL_SECONDS } : null
+  })
+  if (!l) return 0
+  const fromId = w.slugToId.get(l.from), toId = w.slugToId.get(l.to)
+  if (!fromId || !toId) return 0
+  // Die Sendung ist der Beleg: erst sie, dann Zahlung und Lagerabgang. Die
+  // Eindeutigkeit (Firma, Tick, Gut) verhindert doppelte Ausführung.
+  const { data: ins } = await supabase.from('npc_shipments').upsert({ actor_id: actorId, resource: l.resource, amount: l.menge, from_location_id: fromId, to_location_id: toId, depart_tick: tick, arrive_tick: l.ankunftTick, unit_cost: l.stueckkosten, freight_cost: l.fracht }, { onConflict: 'actor_id,depart_tick,resource', ignoreDuplicates: true }).select('id')
+  if (!ins?.length) return 0
+  await supabase.from('npc_ledger').upsert([
+    { actor_id: actorId, tick, kind: 'buy', resource: l.resource, goods_delta: l.menge, credit_delta: -l.menge * l.kaufpreis, location_id: fromId, ref: `handel:${l.from}`, note: l.grund },
+    { actor_id: actorId, tick, kind: 'expense', resource: l.resource, goods_delta: 0, credit_delta: -l.fracht, location_id: fromId, ref: `fracht:${l.from}>${l.to}`, note: `Fracht ${l.menge} t ${l.resource} ${l.from}→${l.to}` },
+  ], { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true })
+  const key = `${fromId}|${l.resource}`
+  const neu = Math.max(0, (w.stockMap.get(key) ?? 0) - l.menge)
+  await supabase.from('location_resources').update({ stock: neu }).eq('location_id', fromId).eq('resource', l.resource)
+  w.stockMap.set(key, neu)
+  return 1
 }
 
 // ── Bank-Zinsen ───────────────────────────────────────────────────────────────

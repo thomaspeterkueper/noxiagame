@@ -22,6 +22,7 @@ export default defineConfig({
       'lib/game/merchantQualification.test.ts',
       'lib/game/npcBuildTile.test.ts',
       'lib/game/npcFirmRules.test.ts',
+      'lib/game/npcTrade.test.ts',
       'lib/game/pilotQualification.test.ts',
       'lib/game/populationGrowth.test.ts',
       'lib/game/priceModel.test.ts',

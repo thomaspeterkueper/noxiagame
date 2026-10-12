@@ -1,11 +1,11 @@
 // lib/game/npcBrain.ts
 // Erstellt:     14.06.2026
-// Aktualisiert: 12.10.2026 — Alte Persistenz-Schicht runNpcTick entfernt (ungenutzt, fehlerhaft);
+// Aktualisiert: 12.10.2026 — Handelsfirmen (role 'trader') horten nicht mehr; alte Persistenz-Schicht runNpcTick entfernt (ungenutzt, fehlerhaft);
 //               Persistenz liegt allein in lib/game/tick.ts
 // Vorher:       12.10.2026 — Bugfix Firmenbuchungen: Verkauf nur dort, wo die Ware liegt (kein
 //               Verkauf ohne Transport); Ausbau nur, wenn Absatz möglich ist (Lager nicht voll,
 //               Preis nicht unter dem Mindestpreis)
-// Version:      3.0.0
+// Version:      3.1.0
 //
 // Deterministischer NPC-Brain (Phase A → C).
 //
@@ -232,7 +232,8 @@ export function entscheideNpc(kontext: NpcKontext, welt: NpcWelt): NpcAktion[] {
 
   // ── 4) BUY (Akkumulator, Phase A-Logik unverändert) ─────────────────────────
   const preferred = (w.preferred_goods ?? []).filter(g => MARKT_GUETER.has(g))
-  if (preferred.length > 0) {
+  // Handelsfirmen horten nicht: ihr Einkauf läuft über lib/game/npcTrade.ts.
+  if (preferred.length > 0 && w.role !== 'trader') {
     const stockpileFactor = typeof w.stockpile_factor === 'number' ? w.stockpile_factor : 1
     const threshold       = clamp01(typeof w.buy_threshold === 'number' ? w.buy_threshold : 0)
     const preisDeckel     = threshold * PRICE_MAX
