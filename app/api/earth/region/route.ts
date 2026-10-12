@@ -1,6 +1,6 @@
 // app/api/earth/region/route.ts
-// Aktualisiert: 12.10.2026 — Lokaldetail folgt einem ausdrücklich angefragten Szenenmittelpunkt (mitwandernde begehbare Szene), Detailzeilen werden dedupliziert
-// Version:      1.3.0
+// Aktualisiert: 12.10.2026 — Feste Regionen mit älterem Importprofil melden ebenfalls 'outdated' (Landmarks, Flüsse, Meer für das Sauerland); Lokaldetail folgt einem ausdrücklich angefragten Szenenmittelpunkt (mitwandernde begehbare Szene), Detailzeilen werden dedupliziert
+// Version:      1.4.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
@@ -256,7 +256,18 @@ export async function GET(req: NextRequest) {
           status: materializationStatus,
           source: effectiveSource,
           inheritedFrom,
-        } : null,
+        } : (getEarthRegion(storedRegion.slug) && Number.isFinite(Number(storedRegion.center_lat)) && Number.isFinite(Number(storedRegion.center_lon)) ? {
+          // A fixed region is always usable; it only reports whether its
+          // snapshot predates the current import profile.
+          slug: storedRegion.slug,
+          label: storedRegion.label ?? viewRegion.name,
+          lat: Number(storedRegion.center_lat),
+          lon: Number(storedRegion.center_lon),
+          radiusKm: Number(storedRegion.radius_km ?? 3),
+          status: ownGeography && Number(storedRegion.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION ? 'outdated' : 'ready',
+          source: storedRegion.source,
+          inheritedFrom: null,
+        } : null),
         narrativeLandmarks: narrativeLandmarksFor(storedBounds),
         attribution: inheritedFrom
           ? `© OpenStreetMap contributors · ODbL · NOXIA inherited geography (${inheritedFrom})`

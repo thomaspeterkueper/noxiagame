@@ -1,6 +1,6 @@
 // lib/world/spatial/earthPlaceMaterializer.server.ts
 // Aktualisiert: 12.10.2026 — Importprofil v2: Meer aus Küstenlinien, Strand und Fels; ältere Ortsimporte werden beim nächsten Aufruf einmalig erneuert
-// Version:      1.1.0
+// Version:      1.1.1
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { seaPolygonsFromCoastlines } from './earthCoastline'
@@ -324,14 +324,15 @@ export async function materializeEarthPlace(input: {
   if (existing) {
     const { data: featureRows, error: featureError } = await supabase
       .from('region_features')
-      .select('id, enrichment:properties->>noxia_enrichment')
+      .select('id, feature_type, enrichment:properties->>noxia_enrichment')
       .eq('region_id', existing.id)
     if (featureError) throw featureError
     // Only regional geography counts as the persisted snapshot. Local detail
     // rows (footprints, paths) belong to the walkable scene and neither prove
     // that the place was materialized nor get replaced by a geography import.
-    existingFeatureIds = ((featureRows ?? []) as Array<{ id: string; enrichment: string | null }>)
-      .filter(row => !row.enrichment)
+    // Resolved arrival nodes are world state of their own and survive a refresh.
+    existingFeatureIds = ((featureRows ?? []) as Array<{ id: string; feature_type: string; enrichment: string | null }>)
+      .filter(row => !row.enrichment && row.feature_type !== 'arrival_node')
       .map(row => String(row.id))
 
     // Create once, persist, enrich incrementally. Existing geography is

@@ -1,6 +1,11 @@
+// app/api/earth/materialize/route.ts
+// Aktualisiert: 12.10.2026 — Feste Erdregionen (z. B. Sauerland) lassen sich über denselben Import erneuern wie gesuchte Orte
+// Version:      1.1.0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
+import { getEarthRegion } from '@/lib/world/spatial/regions'
 import { materializeEarthPlace } from '@/lib/world/spatial/earthPlaceMaterializer.server'
 
 export const maxDuration = 120
@@ -33,8 +38,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ort, Breite und Länge sind erforderlich' }, { status: 400 })
   }
 
-  const canonicalSlug = earthPlaceSlug({ lat, lon })
-  if (body.slug && body.slug !== canonicalSlug) {
+  // A configured region keeps its own identity and anchor; only searched
+  // places are identified by their coordinates.
+  const configured = body.slug ? getEarthRegion(body.slug) : null
+  const canonicalSlug = configured ? configured.id : earthPlaceSlug({ lat, lon })
+  if (!configured && body.slug && body.slug !== canonicalSlug) {
     return NextResponse.json({ error: 'Ortsidentität stimmt nicht mit den Koordinaten überein' }, { status: 400 })
   }
 
