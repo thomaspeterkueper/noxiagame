@@ -1,12 +1,12 @@
 'use client'
 
 // app/earth/EarthBuildingMassingLayer.tsx
-// Aktualisiert: 12.10.2026 — 2,5D-Ebene der realen Gebäude: Walmdächer, Fensterreihen, einmal je Szene aufgebaut
-// Version:      1.0.0
+// Aktualisiert: 12.10.2026 — Kirchen mit Turm, Spitzhelm und hohen Fenstern; 2,5D-Ebene der realen Gebäude: Walmdächer, Fensterreihen, einmal je Szene aufgebaut
+// Version:      1.1.0
 
-import { memo, type MouseEvent } from 'react'
+import { memo, type MouseEvent, type ReactNode } from 'react'
 import type { LocalSurfaceBuilding } from '@/lib/game/spatial/localSurfaceScene'
-import { buildingMassingStyle, extrudeFootprint, hipRoof, windowPath, type ScreenPoint } from '@/lib/game/spatial/buildingMassing'
+import { bellTowerFootprint, buildingMassingStyle, extrudeFootprint, hasBellTower, hipRoof, windowPath, type ScreenPoint } from '@/lib/game/spatial/buildingMassing'
 import { projectSurfacePoint as iso, surfaceBuildingTop, surfacePointsAttr as pointsAttr } from '@/app/components/WalkableSurfaceRenderer'
 
 // Screen pixels (before the scene zoom) per metre of building height.
@@ -30,9 +30,33 @@ function Building({ building, onHover }: { building: LocalSurfaceBuilding; onHov
   const heightPx = style.heightM * HEIGHT_PX_PER_M
   const massing = extrudeFootprint(base, heightPx)
   const cls = String(building.tags?.building ?? 'yes')
-  const windows = style.heightM >= 4.5 && !/^(barn|farm_auxiliary|stable|cowshed|sty|hangar|parking|church|cathedral|chapel)$/.test(cls)
-    ? windowPath(massing.walls, style.heightM, heightPx, style.roofForm === 'flat' && style.heightM <= 9 ? 5.2 : 3.4)
-    : ''
+  const sacred = /^(church|cathedral|chapel|mosque|synagogue|temple|shrine|monastery)$/.test(cls)
+  const windows = sacred
+    ? windowPath(massing.walls, style.heightM, heightPx, 4.6, true)
+    : style.heightM >= 4.5 && !/^(barn|farm_auxiliary|stable|cowshed|sty|hangar|parking)$/.test(cls)
+      ? windowPath(massing.walls, style.heightM, heightPx, style.roofForm === 'flat' && style.heightM <= 9 ? 5.2 : 3.4)
+      : ''
+  // Bell tower: a slim square shaft at one short end with a pointed spire.
+  const towerPlan = hasBellTower(cls) && footprint ? bellTowerFootprint(footprint) : null
+  let tower: ReactNode = null
+  let towerBehind = false
+  if (towerPlan) {
+    const shaftPx = heightPx * 1.75
+    const shaft = extrudeFootprint(towerPlan.corners.map(iso), shaftPx)
+    const centre = iso(towerPlan.centre)
+    const apex = { x: centre.x, y: centre.y - shaftPx - towerPlan.sideM * 1.5 * HEIGHT_PX_PER_M }
+    const spire = shaft.roof.map((point, index) => {
+      const next = shaft.roof[(index + 1) % shaft.roof.length]
+      const mx = (point.x + next.x) / 2, my = (point.y + next.y) / 2
+      return { key: index, depth: my, points: [point, next, apex], fill: shade(style.roof, (mx - centre.x < 0 ? 1.14 : .82) * (my - (centre.y - shaftPx) < 0 ? .9 : 1)) }
+    }).sort((a, b) => a.depth - b.depth)
+    towerBehind = towerPlan.centre.xM + towerPlan.centre.yM < building.center.xM + building.center.yM
+    tower = <>
+      {shaft.walls.map((wall, index) => <polygon key={index} points={pointsAttr(wall.points)} fill={wall.lit ? style.wallLight : style.wallDark} stroke="#6d6557" strokeWidth=".3"/>)}
+      <path d={windowPath(shaft.walls.map(wall => ({ points: wall.points.map(point => ({ x: point.x, y: point.y - shaftPx * .72 })) })), 4, shaftPx * .2, 2.6, true)} fill="#3d4f5c" fillOpacity=".85"/>
+      {spire.map(face => <polygon key={face.key} points={pointsAttr(face.points)} fill={face.fill} stroke={style.roofEdge} strokeWidth=".35" strokeLinejoin="round"/>)}
+    </>
+  }
   const hip = style.roofForm === 'pitched' && footprint ? hipRoof(footprint) : null
   let roof = <polygon points={pointsAttr(massing.roof)} fill={style.roof} stroke={style.roofEdge} strokeWidth=".5" strokeLinejoin="round"/>
   if (hip) {
@@ -54,10 +78,12 @@ function Building({ building, onHover }: { building: LocalSurfaceBuilding; onHov
   return <g opacity={building.provenance === 'observed' ? 1 : .78} style={{ cursor: 'help' }}
     onMouseMove={event => onHover(building, event)} onMouseLeave={() => onHover(null)}>
     <polygon points={pointsAttr(base.map(point => ({ x: point.x + style.heightM * .35, y: point.y + style.heightM * .12 })))} fill="#1c2a1c" opacity=".2"/>
+    {towerBehind && tower}
     {massing.walls.map((wall, index) => <polygon key={index} points={pointsAttr(wall.points)} fill={wall.lit ? style.wallLight : style.wallDark} stroke="#6d6557" strokeWidth=".3"/>)}
     {windows && <path d={windows} fill="#4f6577" fillOpacity=".82"/>}
     {roof}
     {!hip && style.roofForm === 'pitched' && <line x1={massing.ridge[0].x} y1={massing.ridge[0].y} x2={massing.ridge[1].x} y2={massing.ridge[1].y} stroke="#ffffff" strokeOpacity=".38" strokeWidth=".9" strokeLinecap="round"/>}
+    {!towerBehind && tower}
     <title>{building.label ?? 'Gebäude'} · {building.provenance === 'observed' ? 'reale Geometrie' : 'abgeleitete Bebauungsmasse'}</title>
   </g>
 }

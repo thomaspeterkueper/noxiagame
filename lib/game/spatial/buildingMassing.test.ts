@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingHeightM, buildingMassingStyle, extrudeFootprint, hipRoof, windowPath } from './buildingMassing'
+import { buildingHeightM, buildingMassingStyle, bellTowerFootprint, extrudeFootprint, hasBellTower, hipRoof, windowPath } from './buildingMassing'
 
 describe('building massing', () => {
   it('prefers mapped height, then levels, then the class default', () => {
@@ -54,5 +54,26 @@ describe('building massing', () => {
     expect(windowPath([wall], 9, 8).split('M').length - 1).toBe(15)
     expect(windowPath([{ points: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: -8 }, { x: 0, y: -8 }] }], 9, 8)).toBe('')
     expect(windowPath([wall], 30, 4)).toBe('')
+  })
+
+  it('places a bell tower inside one short end of the nave', () => {
+    const nave = [{ xM: 0, yM: 0 }, { xM: 30, yM: 0 }, { xM: 30, yM: 12 }, { xM: 0, yM: 12 }]
+    const tower = bellTowerFootprint(nave)!
+    expect(tower.sideM).toBeCloseTo(6.6, 5)
+    for (const corner of tower.corners) {
+      // Which short end carries the tower follows the footprint's edge order.
+      expect(corner.xM).toBeGreaterThanOrEqual(23.4 - 1e-9)
+      expect(corner.xM).toBeLessThanOrEqual(30 + 1e-9)
+      expect(corner.yM).toBeGreaterThan(2)
+      expect(corner.yM).toBeLessThan(10)
+    }
+    expect(bellTowerFootprint([{ xM: 0, yM: 0 }, { xM: 6, yM: 0 }, { xM: 6, yM: 4 }, { xM: 0, yM: 4 }])).toBeNull()
+    expect(hasBellTower('church')).toBe(true)
+    expect(hasBellTower('mosque')).toBe(false)
+  })
+
+  it('draws one row of high windows when asked for tall windows', () => {
+    const wall = { points: [{ x: 0, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 0 }, { x: 0, y: 0 }] }
+    expect(windowPath([wall], 14, 10, 4.6, true).split('M').length - 1).toBe(4)
   })
 })

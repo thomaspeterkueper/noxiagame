@@ -1,6 +1,6 @@
 // lib/game/spatial/buildingMassing.ts
-// Aktualisiert: 12.10.2026 — Walmdach für rechteckige Grundrisse und Fensterreihen; Höhe, Dachform und Farbgebung realer Gebäude für die 2,5D-Darstellung
-// Version:      1.1.0
+// Aktualisiert: 12.10.2026 — Kirchturm-Grundriss und hohe Fenster; Walmdach für rechteckige Grundrisse und Fensterreihen; Höhe, Dachform und Farbgebung realer Gebäude für die 2,5D-Darstellung
+// Version:      1.2.0
 
 export type BuildingRoofForm = 'pitched' | 'flat'
 export type BuildingMassingStyle = {
@@ -122,15 +122,16 @@ export function hipRoof(footprint: GroundPoint[]) {
     // The long edge following the first short edge runs from the A side to the B side.
     return { edge: i, ridge: (i === (firstShort + 1) % 4 ? ['b', 'a'] : ['a', 'b']) as Array<'a' | 'b'> }
   })
-  return { ridgeA, ridgeB, faces, riseM: Math.min(4.5, shortM * .32) }
+  return { ridgeA, ridgeB, faces, riseM: Math.min(4.5, shortM * .32), shortMidA: m1, shortMidB: m2, shortM, longM }
 }
 
 /**
  * Window rows on the viewer-facing walls as one SVG path. Each wall is the quad
  * [base p, base q, lifted q, lifted p]; windows are spaced along the edge.
  */
-export function windowPath(walls: Array<{ points: ScreenPoint[] }>, heightM: number, heightPx: number, spacingPx = 3.4) {
-  const floors = Math.max(1, Math.min(8, Math.round((heightM - .5) / 3)))
+export function windowPath(walls: Array<{ points: ScreenPoint[] }>, heightM: number, heightPx: number, spacingPx = 3.4, tall = false) {
+  // Tall: one row of high windows over the whole wall, as in a nave.
+  const floors = tall ? 1 : Math.max(1, Math.min(8, Math.round((heightM - .5) / 3)))
   const floorPx = heightPx / floors
   if (floorPx < 1.6) return ''
   let d = ''
@@ -143,7 +144,7 @@ export function windowPath(walls: Array<{ points: ScreenPoint[] }>, heightM: num
     for (let floor = 0; floor < floors; floor++) {
       const bottom = floor * floorPx + floorPx * .28, top = floor * floorPx + floorPx * .78
       for (let i = 0; i < count; i++) {
-        const t0 = (margin + i * spacingPx + spacingPx * .22) / length, t1 = (margin + i * spacingPx + spacingPx * .78) / length
+        const t0 = (margin + i * spacingPx + spacingPx * (tall ? .32 : .22)) / length, t1 = (margin + i * spacingPx + spacingPx * (tall ? .68 : .78)) / length
         const x0 = p.x + (q.x - p.x) * t0, y0 = p.y + (q.y - p.y) * t0
         const x1 = p.x + (q.x - p.x) * t1, y1 = p.y + (q.y - p.y) * t1
         d += `M${x0.toFixed(1)} ${(y0 - bottom).toFixed(1)}L${x1.toFixed(1)} ${(y1 - bottom).toFixed(1)}L${x1.toFixed(1)} ${(y1 - top).toFixed(1)}L${x0.toFixed(1)} ${(y0 - top).toFixed(1)}Z`
@@ -151,4 +152,26 @@ export function windowPath(walls: Array<{ points: ScreenPoint[] }>, heightM: num
     }
   }
   return d
+}
+
+/** Classes that carry a bell tower in the 2.5D view. */
+export function hasBellTower(buildingClass: string) {
+  return /^(church|cathedral|chapel)$/.test(buildingClass)
+}
+
+/**
+ * Square tower footprint (ground metres) standing inside one short end of a
+ * four-cornered nave, aligned with its axes. Null when the nave is too small.
+ */
+export function bellTowerFootprint(footprint: GroundPoint[]) {
+  const roof = hipRoof(footprint)
+  if (!roof || roof.shortM < 5) return null
+  const side = Math.max(3, Math.min(8, roof.shortM * .55))
+  const ax = roof.shortMidB.xM - roof.shortMidA.xM, ay = roof.shortMidB.yM - roof.shortMidA.yM
+  const length = Math.hypot(ax, ay) || 1
+  const u = { x: ax / length, y: ay / length }, v = { x: -u.y, y: u.x }
+  const centre = { xM: roof.shortMidA.xM + u.x * side / 2, yM: roof.shortMidA.yM + u.y * side / 2 }
+  const h = side / 2
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => ({ xM: centre.xM + u.x * h * a + v.x * h * b, yM: centre.yM + u.y * h * a + v.y * h * b }))
+  return { centre, corners, sideM: side }
 }
