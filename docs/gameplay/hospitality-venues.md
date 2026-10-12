@@ -78,6 +78,18 @@ Der Weg in die Welt hängt an der Rolle im Raum (Personal eines Ankunftslokals).
 
 Niemand kassiert im Gespräch. Das Personal kennt die Karte und sagt, wo bestellt wird; gebucht wird nur über den Knopf am Tresen, Empfang oder Automaten. Gibt es für ein Lokal keine Karte, sagen die Fakten ausdrücklich, dass nichts ausgeschenkt wird.
 
+### Ortswissen
+
+Was eine Figur sieht, steht in den lokalen Fakten. Was sie über ihre Gegend **weiß**, ohne es zu sehen, ist Ortswissen – eine eigene Liste (`placeKnowledge`, höchstens 10 Sätze) neben den lokalen Fakten.
+
+- **Quelle real:** die importierten Kartendaten (`region_features`) im Umkreis von 6 km – Ort und Einordnung, Nachbarorte, Gewässer, Wald, benannte Plätze und Betriebe, Straßen. Immer das Nächste zuerst.
+- **Quelle NOXIA:** Gebäude am Ort im Umkreis von 4 km (je Art das nächste, mit grober Entfernung und Himmelsrichtung), kanonische Landmarken (`earthLandmarks.ts`) und der Referenzstandort Selmecke.
+- **Nichts Erfundenes:** Liegen für einen Ort keine Kartendaten vor, ist die Liste leer. Die Gesprächsroute erlaubt zusätzlich allgemein Bekanntes zur realen Gegend, aber keine weiteren Einrichtungen, Öffnungszeiten oder Wege.
+- **Wer es weiß:** alle Figuren im Lokal – sie sind Bewohner des Ortes.
+- **Kein Wissen über Personen:** Wer wo wohnt oder was jemand besitzt, steht nicht darin.
+
+Regeln: `lib/game/hospitality/placeKnowledge.ts`, Laden: `placeKnowledge.server.ts`, Abruf: `GET /api/game/hospitality/place?tileEntityId=…`. Ein Lokal ohne Erdposition (Station) hat noch kein Ortswissen.
+
 ## 5. Bestellen
 
 Am `servicePoint` (vor Tresen, Empfang oder Automat) öffnet ein Knopf die Karte in der Seitenleiste.
@@ -123,3 +135,5 @@ Karten gibt es bisher nur für `cafe`. Vorschlag für die fehlenden Zeilen in `h
 2. `order`, `serve`, `pay`, `sit`, `consume` stehen jetzt im Fähigkeitsregister. Die allgemeinen Kennungen `arrival`, `exit`, `conversation`, `storage`, `staff` nutzen auch andere Vorlagen (Akademie, Verwaltung); sie sind weiter nicht registriert und gehören zum gemeinsamen Innenraumsystem.
 3. Der Raum zeigt Personen ohne Bewegung; Wege zwischen Plätzen gibt es nicht.
 4. Die Bestelloberfläche ist gegen nachgestellte Antworten geprüft, nicht gegen die echte Datenbankfunktion.
+5. Ortswissen gibt es nur im Lokal. Die Personen draußen auf der Erdoberfläche (`EarthWalkableSurface`) wissen weiterhin nur, was sie im Umkreis von 45 m sehen; `placeKnowledge` der Gesprächsroute steht ihnen offen.
+6. Ortswissen ist für alle Figuren gleich. Dass Zugezogene weniger wissen als Alteingesessene, ist nicht abgebildet.

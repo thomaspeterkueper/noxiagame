@@ -48,6 +48,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[loaded,setLoaded]=useState(false)
   const[menu,setMenu]=useState<Menu|null>(null)
   const[menuOpen,setMenuOpen]=useState(false)
+  const[placeKnowledge,setPlaceKnowledge]=useState<string[]>([])
   const[ordering,setOrdering]=useState<string|null>(null)
   const[orders,setOrders]=useState<string[]>([])
   // Eine Kennung je Bestellversuch. Bleibt bei einem Netzfehler stehen, damit
@@ -70,6 +71,21 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     })()
     return()=>{live=false}
   },[entityId,companion?.id])
+
+  // Ortswissen laden: was Ansässige über die Gegend wissen (reale Geographie
+  // und NOXIA-Einrichtungen am Ort). Ohne Antwort wissen sie eben nichts.
+  useEffect(()=>{
+    let live=true
+    ;(async()=>{
+      try{
+        const{token}=await getSessionInfo()
+        const response=await fetch('/api/game/hospitality/place?tileEntityId='+encodeURIComponent(entityId),{headers:{Authorization:'Bearer '+token},cache:'no-store'})
+        const data=await response.json()
+        if(live&&response.ok&&Array.isArray(data.facts))setPlaceKnowledge(data.facts.map(String))
+      }catch{/* kein Ortswissen */}
+    })()
+    return()=>{live=false}
+  },[entityId])
 
   // Karte laden. Sie sagt je Posten, ob der Gast ihn bezahlen kann.
   useEffect(()=>{
@@ -185,6 +201,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           source:'NOXIA '+layout.kind+' interior',
           locationName:buildingName,
           localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders}),
+          placeKnowledge,
           history,
         }),
       })

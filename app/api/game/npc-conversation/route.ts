@@ -95,6 +95,11 @@ export async function POST(request: NextRequest) {
   const localFacts = Array.isArray(body.localFacts)
     ? body.localFacts.slice(0, 16).map((value: unknown) => clean(value, 140)).filter(Boolean)
     : []
+  // Ortswissen: was die Person über ihre Gegend weiß, ohne es gerade zu sehen.
+  // Eigene Liste, damit es die verifizierten lokalen Fakten nicht verdrängt.
+  const placeKnowledge = Array.isArray(body.placeKnowledge)
+    ? body.placeKnowledge.slice(0, 10).map((value: unknown) => clean(value, 140)).filter(Boolean)
+    : []
   const nearbyPlaces = Array.isArray(body.nearbyPlaces)
     ? body.nearbyPlaces.slice(0, 10).map((value: any, index: number) => ({
         key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
@@ -177,6 +182,8 @@ export async function POST(request: NextRequest) {
     priorEncounterLines.length ? `Erinnerung an frühere Begegnungen mit genau diesem Spieler:\n- ${priorEncounterLines.join('\n- ')}` : '',
     priorEncounterLines.length ? 'Epistemische Regel für Gesprächserinnerungen: Diese Zeilen sind deine eigenen begrenzten kommunikativen Spuren, keine vollständige Weltwahrheit. Eine erinnerte Aussage des Spielers belegt zunächst nur, dass der Spieler sie gesagt hat. Formuliere ältere Details bei Bedarf als Erinnerung („ich meine“, „wenn ich mich richtig erinnere“). Widersprechen aktuelle verifizierte lokale Fakten einer Erinnerung, behandle die aktuellen Fakten als neue Beobachtung, korrigiere dich natürlich und erfinde keine Erklärung für den Widerspruch.' : '',
     localFacts.length ? `Verifizierte lokale Fakten:\n- ${localFacts.join('\n- ')}` : 'Es liegen keine verifizierten lokalen Infrastruktur-Fakten vor.',
+    placeKnowledge.length ? `Ortswissen – was du als Ansässige(r) über die Gegend weißt, auch ohne es gerade zu sehen:\n- ${placeKnowledge.join('\n- ')}` : '',
+    placeKnowledge.length ? 'Nutze das Ortswissen, wenn nach der Gegend, nach Sehenswertem, nach Einrichtungen oder nach dem Weg gefragt wird: Nenne dann zwei, drei passende Dinge daraus, statt zu passen. Was im Ortswissen steht, gilt als belegt. Zur realen Gegend darfst du außerdem allgemein Bekanntes sagen (Landschaft, Region, größere Nachbarorte), aber erfinde keine weiteren Einrichtungen, Öffnungszeiten oder Wegbeschreibungen.' : '',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',
