@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.5.0
+// Aktualisiert: 12.10.2026 — NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.6.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -64,6 +64,10 @@ function unzoomedAt(point:ScenePoint){const p=iso(point);return `translate(${p.x
 // player, snapped to a fixed grid so the same ground always maps to the same
 // stored detail rows instead of a new set for every few metres walked.
 const RECENTER_AT_M=190
+// Own and state buildings stay selectable as a destination well beyond the
+// visible scene; walking there crosses several scene frames.
+const TARGET_RANGE_M=6000
+const ROUTE_STAGE_M=235
 const SCENE_GRID_M=300
 function sceneGridNode(point:GeoPoint):GeoPoint{
   const latStep=SCENE_GRID_M/110540
@@ -201,12 +205,12 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   }).slice(0,30):[],[origin,features])
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
     const{xM,yM}=scenePosition(entity,origin)
-    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
+    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>TARGET_RANGE_M||Math.abs(yM)>TARGET_RANGE_M)return[]
     return[{id:`building:${entity.id}`,name:String(entity.name??entity.entity_id),xM,yM,kind:'NOXIA-Gebäude',entity}]
   }),[spatialEntities,origin])
   const pendingTargets=useMemo(()=>spatialBuilds.flatMap(build=>{
     const{xM,yM}=scenePosition(build,origin)
-    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
+    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>TARGET_RANGE_M||Math.abs(yM)>TARGET_RANGE_M)return[]
     const state=constructionState({
       buildable_id:build.buildable_id,
       tile_row:0,
@@ -224,7 +228,20 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   },[scene,motionTime])
   const navigationTargets=useMemo(()=>[...buildingTargets,...pendingTargets,...namedPoiTargets].sort((a,b)=>a.name.localeCompare(b.name,'de')),[buildingTargets,pendingTargets,namedPoiTargets])
   const navigationTarget=navigationTargets.find(target=>target.id===navigationTargetId)??null
-  const navigationRoute=useMemo(()=>scene&&navigationTarget?routeAcrossLocalScene(scene,player,{xM:navigationTarget.xM,yM:navigationTarget.yM}):null,[scene,navigationTarget,player])
+  const navigationRoute=useMemo(()=>{
+    if(!scene||!navigationTarget)return null
+    const goal={xM:navigationTarget.xM,yM:navigationTarget.yM}
+    const reach=Math.max(Math.abs(goal.xM),Math.abs(goal.yM))
+    if(reach<=ROUTE_STAGE_M)return routeAcrossLocalScene(scene,player,goal)
+    // The destination lies beyond this scene frame: head for the point where
+    // the direct line leaves it, preferring the road network on the way.
+    const dx=goal.xM-player.xM,dy=goal.yM-player.yM
+    let t=1
+    if(dx>0)t=Math.min(t,(ROUTE_STAGE_M-player.xM)/dx);else if(dx<0)t=Math.min(t,(-ROUTE_STAGE_M-player.xM)/dx)
+    if(dy>0)t=Math.min(t,(ROUTE_STAGE_M-player.yM)/dy);else if(dy<0)t=Math.min(t,(-ROUTE_STAGE_M-player.yM)/dy)
+    t=Math.max(0,t)
+    return routeAcrossLocalScene(scene,player,{xM:player.xM+dx*t,yM:player.yM+dy*t},{maxConnectorM:140})
+  },[scene,navigationTarget,player])
   const targetDistance=navigationTarget?Math.hypot(navigationTarget.xM-player.xM,navigationTarget.yM-player.yM):null
   const selectedLandmark=namedPoiTargets.find(target=>target.id===navigationTargetId&&target.isLandmark)??null
   const openLandmark=namedPoiTargets.find(target=>target.id===openLandmarkId)??null
@@ -410,7 +427,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }
     const next=advanceAlongLocalSceneRoute(scene,player,navigationRoute,2.2)
     if(Math.hypot(next.xM-player.xM,next.yM-player.yM)<.01){
-      setAutoWalkTargetId('')
+      // At the frame edge the next scene is still loading – wait, don't give up.
+      if(Math.max(Math.abs(player.xM),Math.abs(player.yM))<RECENTER_AT_M)setAutoWalkTargetId('')
       return
     }
     setSharedPlayerPosition((data?.region as any)?.id??null,next,localMetersToGeo({eastM:next.xM,northM:next.yM},origin))
@@ -608,9 +626,9 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <div><small>DU BIST HIER</small><b>{data.region?.name??'Erde'}</b><span>{player.xM>=0?'+':''}{Math.round(player.xM)} m Ost · {player.yM>=0?'+':''}{Math.round(player.yM)} m Nord vom Szenenzentrum</span></div>
         <label><span>Ziel</span><select value={navigationTargetId} onChange={event=>{setAutoWalkTargetId('');setNavigationTargetId(event.target.value)}}>
           <option value="">— kein Ziel —</option>
-          {navigationTargets.map(target=><option key={target.id} value={target.id}>{target.name}</option>)}
+          {navigationTargets.map(target=>{const away=Math.hypot(target.xM-player.xM,target.yM-player.yM);return <option key={target.id} value={target.id}>{target.name}{away>SCENE_RADIUS_M?` · ${(away/1000).toFixed(1).replace('.',',')} km`:''}</option>})}
         </select></label>
-        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
+        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
       </div>
       {openLandmark&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
         <div className="head"><div><small>REALER ORT · {landmarkLabel(openLandmark.kind,openLandmark.tags).toUpperCase()}</small><b>{openLandmark.name}</b></div><button onClick={()=>setOpenLandmarkId('')}>×</button></div>
