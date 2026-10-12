@@ -1,0 +1,42 @@
+name: Repair pnpm lockfile (manual, isolated)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-lockfile:
+    if: github.ref == 'refs/heads/fix/ci-node-types-peer-resolution-20261009'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+          run_install: false
+      - name: Regenerate lockfile in runner only
+        run: pnpm install --lockfile-only --ignore-scripts
+      - name: Verify frozen install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Upload proposed lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: proposed-pnpm-lockfile
+          path: pnpm-lock.yaml
+          retention-days: 3
+      - name: Core invariants
+        run: pnpm run test:core-invariants
+      - name: Population tests
+        run: pnpm run test:population-seed
+      - name: Transport tests
+        run: pnpm run test:transport
+      - name: Spatial tests
+        run: pnpm run test:spatial
