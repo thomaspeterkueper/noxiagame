@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="roof" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f1e6cf"/><stop offset="1" stop-color="#c7ad86"/></linearGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fcf5e6"/><stop offset="1" stop-color="#e2d0ae"/></linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe2a0"/><stop offset="1" stop-color="#eeb154"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#shadow)" transform="translate(48 92)">
+    <path d="M52 470 330 612 668 440 369 300Z" fill="#7d7460" opacity=".26"/>
+    <!-- Terrasse vor der Fensterfront -->
+    <path d="M360 527 624 403 668 427 404 551Z" fill="#cfae7c" stroke="#6b5241" stroke-width="4"/>
+    <path d="M404 551 668 427 668 437 404 561Z" fill="#a98858"/>
+    <!-- Baukörper: eingeschossig -->
+    <path d="M96 309 380 176 624 307 340 440Z" fill="url(#roof)" stroke="#6b5241" stroke-width="5"/>
+    <path d="M96 309 340 440 340 536 96 405Z" fill="url(#wall)" stroke="#6b5241" stroke-width="5"/>
+    <path d="M340 440 624 307 624 403 340 536Z" fill="#ead9ba" stroke="#6b5241" stroke-width="5"/>
+    <!-- Sockel -->
+    <path d="M96 391 340 522 340 536 96 405Z" fill="#b99c74"/><path d="M340 522 624 389 624 403 340 536Z" fill="#a98f68"/>
+    <!-- Dach: Gründach, Oberlicht, Solarband, Abzug -->
+    <path d="M150 300 300 230 372 266 222 337Z" fill="#8aa56a" stroke="#5f7a48" stroke-width="3"/>
+    <path d="M384 262 470 222 520 247 434 288Z" fill="#9fd0df" stroke="#6b5241" stroke-width="3"/><path d="M427 242 477 267" stroke="#6b5241" stroke-width="2"/>
+    <path d="M330 368 470 302 506 320 366 386Z" fill="#35546b" stroke="#22394b" stroke-width="3"/><path d="M377 346 413 364M424 324 460 342" stroke="#6f93ad" stroke-width="2"/>
+    <path d="M548 262 566 254 566 292 548 300Z" fill="#8d7a66"/><path d="M566 254 580 261 580 299 566 292Z" fill="#74624f"/><path d="M548 262 562 255 580 261 566 268Z" fill="#a3907b"/>
+    <!-- Eingangsseite: großes Fenster, Tür -->
+    <path d="M120 344 244 410 244 458 120 392Z" fill="url(#glow)" stroke="#6b5241" stroke-width="3"/>
+    <path d="M161 366 161 414M203 388 203 436" stroke="#6b5241" stroke-width="3"/>
+    <path d="M268 423 316 449 316 523 268 497Z" fill="#7a4a33" stroke="#4f2f20" stroke-width="3"/>
+    <path d="M277 436 307 452 307 486 277 470Z" fill="url(#glow)"/><circle cx="302" cy="496" r="3" fill="#f0d9a0"/>
+    <!-- Markise -->
+    <path d="M110.0 328.5 137.0 343.0 106.0 371.0 79.0 356.5Z" fill="#c4573a"/><path d="M137.0 343.0 164.0 357.5 133.0 385.5 106.0 371.0Z" fill="#f6ead2"/><path d="M164.0 357.5 191.0 372.0 160.0 400.0 133.0 385.5Z" fill="#c4573a"/><path d="M191.0 372.0 218.0 386.5 187.0 414.5 160.0 400.0Z" fill="#f6ead2"/><path d="M218.0 386.5 245.0 401.0 214.0 429.0 187.0 414.5Z" fill="#c4573a"/><path d="M245.0 401.0 272.0 415.5 241.0 443.5 214.0 429.0Z" fill="#f6ead2"/><path d="M272.0 415.5 299.0 430.0 268.0 458.0 241.0 443.5Z" fill="#c4573a"/><path d="M299.0 430.0 326.0 444.5 295.0 472.5 268.0 458.0Z" fill="#f6ead2"/>
+    <path d="M110 328.5 326 444.5 295 472.5 79 356.5Z" fill="none" stroke="#6b5241" stroke-width="3"/>
+    <path d="M79 356.5 295 472.5 295 484.5 79 368.5Z" fill="#a8452c"/>
+    <!-- Fensterfront zur Terrasse -->
+    <g fill="url(#glow)" stroke="#6b5241" stroke-width="3">
+      <path d="M368 449 448 411.5 448 463.5 368 501Z"/><path d="M464 404 544 366.5 544 418.5 464 456Z"/>
+    </g>
+    <path d="M408 430 408 482M504 385 504 437" stroke="#6b5241" stroke-width="3"/>
+    <path d="M358 442 556 349 556 357 358 450Z" fill="#c4573a"/>
+    <!-- Hängeschild mit Tasse -->
+    <path d="M590 322 590 344" stroke="#4f2f20" stroke-width="3"/><circle cx="590" cy="362" r="19" fill="#c4573a" stroke="#4f2f20" stroke-width="3"/>
+    <path d="M580 356h17v8a8 8 0 0 1-8 8h-1a8 8 0 0 1-8-8z" fill="#fcf5e6"/><path d="M597 358h3a4 4 0 0 1 0 8h-3" fill="none" stroke="#fcf5e6" stroke-width="2.5"/>
+    <!-- Terrasse: Tische, Stühle, Schirm, Pflanzkübel -->
+    <g>
+      <ellipse cx="452" cy="512" rx="19" ry="9" fill="#7a5236" stroke="#4f2f20" stroke-width="2.5"/><path d="M452 516v12" stroke="#4f2f20" stroke-width="3"/>
+      <ellipse cx="423" cy="524" rx="8" ry="4.5" fill="#5c4230"/><ellipse cx="482" cy="500" rx="8" ry="4.5" fill="#5c4230"/>
+      <ellipse cx="560" cy="462" rx="19" ry="9" fill="#7a5236" stroke="#4f2f20" stroke-width="2.5"/><path d="M560 466v12" stroke="#4f2f20" stroke-width="3"/>
+      <ellipse cx="531" cy="474" rx="8" ry="4.5" fill="#5c4230"/><ellipse cx="590" cy="450" rx="8" ry="4.5" fill="#5c4230"/>
+      <path d="M560 462V398" stroke="#4f2f20" stroke-width="3"/>
+      <path d="M514 414Q560 368 606 414Q560 430 514 414Z" fill="#f6ead2" stroke="#6b5241" stroke-width="3"/>
+      <path d="M537 398Q548 380 560 386L560 424Q546 423 537 398Z" fill="#c4573a"/><path d="M583 398Q572 380 560 386L560 424Q574 423 583 398Z" fill="#c4573a" opacity=".55"/>
+    </g>
+    <path d="M374 536 396 526 396 544 374 554Z" fill="#8d6e4d"/><ellipse cx="385" cy="524" rx="15" ry="11" fill="#6f9455"/>
+    <path d="M636 424 654 416 654 432 636 440Z" fill="#8d6e4d"/><ellipse cx="645" cy="414" rx="13" ry="10" fill="#6f9455"/>
+    <path d="M104 420 130 434 130 450 104 436Z" fill="#8d6e4d"/><ellipse cx="117" cy="420" rx="15" ry="11" fill="#6f9455"/>
+  </g>
+</svg>

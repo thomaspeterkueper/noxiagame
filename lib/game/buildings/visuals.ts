@@ -27,6 +27,9 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
     phobos: profile('habitat/phobos/style-anchor.svg', 'phobos', 1.22, 'Phobos-Habitat: Kartenabbildung nahe an der realen Grundflaeche; dunkles Regolith und sichtbare Ankerseile bleiben erhalten.'),
     deimos: profile('habitat/deimos/style-anchor.svg', 'deimos', 1.45, 'Sehr funktionales Mini-Habitat: schlichter Modulkoerper, Luke statt Fenster, exponierte Leitungen, keine Zierelemente.'),
   },
+  cafe: {
+    earth: profile('cafe/earth/style-anchor.svg', 'earth', 1.6, 'Eingeschossiges Café: Markise über dem Eingang, erleuchtete Fensterfront, Terrasse mit Schirm, Hängeschild mit Tasse, Gründach.'),
+  },
   residential_block: {
     mars: profile('residential_block/mars/style-anchor.svg', 'mars', 1.55, 'Mars-Wohnblock als druckbeaufschlagter Langbau.'),
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.85, 'Earth residential block currently reuses the habitat visual language until its own anchor exists.'),
