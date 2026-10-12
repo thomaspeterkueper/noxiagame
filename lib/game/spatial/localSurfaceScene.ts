@@ -47,6 +47,8 @@ export type LocalSurfaceBuilding = {
   label?:string
   /** Real outline in scene metres, when known. Width/depth remain its extent. */
   footprint?:LocalSurfacePoint[]
+  /** Source tags that drive height and roof (building, building:levels, height, roof:shape). */
+  tags?:Record<string,unknown>
   entityId?:string|null
 }
 
