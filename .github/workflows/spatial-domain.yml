@@ -31,5 +31,16 @@ jobs:
         with:
           node-version: 22
       - run: corepack enable && corepack prepare pnpm@10.28.0 --activate
+      # Temporary repair artifact for PR #463; never changes the repository.
+      - name: Generate proposed lockfile on repair branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/ci-node-types-peer-resolution-20261009'
+        run: pnpm install --lockfile-only --ignore-scripts
+      - name: Upload proposed lockfile
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/ci-node-types-peer-resolution-20261009'
+        uses: actions/upload-artifact@v4
+        with:
+          name: proposed-pnpm-lockfile
+          path: pnpm-lock.yaml
+          retention-days: 3
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:spatial
