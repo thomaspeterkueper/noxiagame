@@ -1,8 +1,9 @@
 // lib/game/npcTrade.ts
 // Erstellt:     12.10.2026
-// Aktualisiert: 12.10.2026 — Handelsfirma: Lieferung planen (kaufen, wo es billig ist; verschiffen;
+// Aktualisiert: 12.10.2026 — Erde als Quelle zugelassen; Frachtdauer aus der Entfernung (frachtTicks)
+// Vorher:       12.10.2026 — Handelsfirma: Lieferung planen (kaufen, wo es billig ist; verschiffen;
 //               verkaufen, wo es teuer ist) und Verkauf angekommener Ware
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // REINE FUNKTIONEN: kein DB-Zugriff, kein Zufall, keine Uhr.
 //
@@ -32,9 +33,9 @@ export const HANDEL_STANDARD: HandelsParameter = {
   frachtCrProEnergie: 25,
   deckungTicks: 48,
   verkaufProTick: 20,
-  // Die Erde ist nicht simuliert: unbegrenzter Bestand, Preise reagieren nicht.
-  // Solange das so ist, wäre sie eine unerschöpfliche Quelle.
-  gesperrteQuellen: ['earth'],
+  // Die Erde ist als Quelle zugelassen (Entscheidung 12.10.2026). Begrenzt wird der
+  // Zustrom durch Fracht, Lagergrenzen am Ziel und die dortige Preisreaktion.
+  gesperrteQuellen: [],
   gueter: ['water', 'energy', 'metal'],
 }
 
@@ -46,6 +47,16 @@ export interface HandelsMarkt {
   stock?:       number
   capacity?:    number
   consumption?: number
+}
+
+// Frachtdauer. Zeitfaktor 60: ein Tick (1 h Echtzeit) sind 60 h Spielzeit = 2,5 Tage.
+// Erde–Mond (3 Einheiten) dauert rund 3 Tage, also gut einen Tick → 0,4 Ticks je Einheit.
+// Erde–Mars (rund 125–170 Einheiten) ergibt damit 50–68 Ticks, also 125–170 Spieltage.
+// Gilt nur für Fracht; die Flugdauer der Spielerschiffe bleibt unberührt.
+export const FRACHT_TICKS_JE_EINHEIT = 0.4
+
+export function frachtTicks(distanz: number): number {
+  return Math.max(1, Math.ceil(distanz * FRACHT_TICKS_JE_EINHEIT))
 }
 
 export interface Route { energy: number; ticks: number }

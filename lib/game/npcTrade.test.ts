@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { handelsStand, planeLieferung, planeVerkaeufe, HANDEL_STANDARD, type HandelsMarkt } from './npcTrade'
+import { frachtTicks, handelsStand, planeLieferung, planeVerkaeufe, HANDEL_STANDARD, type HandelsMarkt } from './npcTrade'
 
 const markt = (location: string, buy: number, sell: number, stock: number, capacity = 1000, consumption = 0): HandelsMarkt =>
   ({ resource: 'water', location, buy_price: buy, sell_price: sell, stock, capacity, consumption })
@@ -25,7 +25,8 @@ describe('planeLieferung', () => {
     expect(planeLieferung(lage, [markt('phobos', 59, 44, 200, 1000, 5), markt('prometheus', 130, 100, 0)], route)).toBeNull()
   })
   it('kauft nicht an gesperrten Quellen und nicht über die Kasse hinaus', () => {
-    expect(planeLieferung(lage, [markt('earth', 22, 12, 999999), markt('prometheus', 130, 100, 0)], route)).toBeNull()
+    expect(planeLieferung(lage, [markt('earth', 22, 12, 999999), markt('prometheus', 130, 100, 0)], route, { ...HANDEL_STANDARD, gesperrteQuellen: ['earth'] })).toBeNull()
+    expect(planeLieferung(lage, [markt('earth', 22, 12, 999999), markt('prometheus', 130, 100, 0)], route)!.from).toBe('earth')
     expect(planeLieferung({ ...lage, treasury: 740 }, [markt('phobos', 59, 44, 200), markt('prometheus', 130, 100, 0)], route)!.menge).toBe(10)
   })
   it('hält je Zielort und Gut nur eine offene Position', () => {
@@ -53,5 +54,13 @@ describe('handelsStand und planeVerkaeufe', () => {
     const posten = [{ location: 'prometheus', resource: 'water', menge: 30, stueckkosten: 62 }]
     expect(planeVerkaeufe(posten, [markt('prometheus', 80, 60, 100)])).toEqual([])
     expect(planeVerkaeufe(posten, [markt('prometheus', 130, 100, 295, 300)])[0].menge).toBe(5)
+  })
+})
+
+describe('frachtTicks', () => {
+  it('Erde–Mond gut ein Tick, Erde–Mars viele Ticks, nie unter einem', () => {
+    expect(frachtTicks(3)).toBe(2)
+    expect(frachtTicks(150)).toBe(60)
+    expect(frachtTicks(0.1)).toBe(1)
   })
 })

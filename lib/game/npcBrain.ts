@@ -5,7 +5,7 @@
 // Vorher:       12.10.2026 — Bugfix Firmenbuchungen: Verkauf nur dort, wo die Ware liegt (kein
 //               Verkauf ohne Transport); Ausbau nur, wenn Absatz möglich ist (Lager nicht voll,
 //               Preis nicht unter dem Mindestpreis)
-// Version:      3.1.0
+// Version:      3.1.1
 //
 // Deterministischer NPC-Brain (Phase A → C).
 //
@@ -41,7 +41,7 @@ export interface NpcDecisionWeights {
   stockpile_factor?: number    // Zielbestand = NPC_BASIS_LAGER × stockpile_factor
 
   // Phase C (Produzent-Modus: Goibniu / Belenus / Boann)
-  role?:           'producer' | 'trader'
+  role?:           'producer' | 'trader' | 'carrier'   // carrier = Spedition, empfängt Fracht
   sells?:          string[]     // Güter die dieser NPC aktiv verkauft
   sell_floor?:     number       // Mindestpreis (absolute Credits) unter dem nicht verkauft wird
   reserve?:        number       // t — Pflichtreserve, nicht verkaufen

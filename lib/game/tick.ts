@@ -1,13 +1,14 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 12.10.2026 — Handelsfirma (lib/game/npcTrade.ts, Tabelle npc_shipments): kaufen,
+// Aktualisiert: 12.10.2026 — Fracht geht an die Spedition (role 'carrier'); Frachtdauer aus der
+//               Entfernung; davor am selben Tag: Handelsfirma (lib/game/npcTrade.ts, Tabelle npc_shipments): kaufen,
 //               verschiffen, verkaufen; Firmenkäufe werden bezahlt
 // Zuvor am selben Tag: Bugfix Firmenbuchungen: Ware von Firmenanlagen entsteht nur noch im
 //               Firmen-Tick (vorher zusätzlich im Kolonie-Tick und im Anlagenlager); produzierte Ware
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.7.0
+// Version:      3.8.0
 
 import {
   CONSUMPTION_PER_100,
@@ -24,8 +25,9 @@ import { nextPopulation } from './populationGrowth'
 import { nextMarketPrice } from './priceModel'
 import { acceptedInflow, capacityFor, loadStorageCapacities, type StorageCapacity, type StorageResource } from './storageCapacity'
 import { entscheideNpc } from './npcBrain'
-import { handelsStand, planeLieferung, planeVerkaeufe, type SendungZeile } from './npcTrade'
+import { frachtTicks, handelsStand, planeLieferung, planeVerkaeufe, type SendungZeile } from './npcTrade'
 import { transferQuote } from './transfer'
+import { distance } from './orbits'
 import { runPopulationTick as runPersonPopulationTick } from './population/engine'
 import { runPersonTick } from './personBrain'
 import { persistPopulationEncounters } from './population/encounterRuntime'
@@ -548,7 +550,8 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
       }
     }
     if (actor.decision_weights?.role === 'trader') {
-      shipments += await runHandel(supabase, actor.id, tickNumber, kasse, { preise, stockMap, consumptionMap, sellPriceMap, slugToId, locIdToSlug })
+      const spediteur = (actors as any[]).find(x => x.decision_weights?.role === 'carrier')?.id ?? null
+      shipments += await runHandel(supabase, actor.id, tickNumber, kasse, spediteur, { preise, stockMap, consumptionMap, sellPriceMap, slugToId, locIdToSlug })
     }
   }
   return { actors: actors.length, trades, produces, sells, builds, shipments }
@@ -559,7 +562,7 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
 // wird aus den Sendungen und der Zeit abgeleitet: Eine Sendung ist angekommen,
 // sobald ihr Ankunfts-Tick erreicht ist – dafür wird nichts geschrieben.
 // Je Firma und Tick höchstens eine neue Sendung.
-async function runHandel(supabase: SB, actorId: string, tick: number, kasse: number, w: {
+async function runHandel(supabase: SB, actorId: string, tick: number, kasse: number, spediteurId: string | null, w: {
   preise: any[]; stockMap: Map<string, number>; consumptionMap: Map<string, number>; sellPriceMap: Map<string, number>
   slugToId: Map<string, string>; locIdToSlug: Map<string, string>
 }): Promise<number> {
@@ -596,7 +599,7 @@ async function runHandel(supabase: SB, actorId: string, tick: number, kasse: num
 
   const l = planeLieferung({ treasury: kasse, tick, offen }, maerkte, (from, to) => {
     const q = transferQuote(from, to, tick)
-    return q ? { energy: q.energy, ticks: q.durationSeconds / TICK_INTERVAL_SECONDS } : null
+    return q ? { energy: q.energy, ticks: frachtTicks(distance(from, to, tick)) } : null
   })
   if (!l) return 0
   const fromId = w.slugToId.get(l.from), toId = w.slugToId.get(l.to)
@@ -609,6 +612,13 @@ async function runHandel(supabase: SB, actorId: string, tick: number, kasse: num
     { actor_id: actorId, tick, kind: 'buy', resource: l.resource, goods_delta: l.menge, credit_delta: -l.menge * l.kaufpreis, location_id: fromId, ref: `handel:${l.from}`, note: l.grund },
     { actor_id: actorId, tick, kind: 'expense', resource: l.resource, goods_delta: 0, credit_delta: -l.fracht, location_id: fromId, ref: `fracht:${l.from}>${l.to}`, note: `Fracht ${l.menge} t ${l.resource} ${l.from}→${l.to}` },
   ], { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true })
+  // Die Fracht hat einen Empfänger: die Spedition (Firma mit role 'carrier').
+  // Gibt es keine, bleibt die Fracht eine Ausgabe ohne Gegenbuchung – das wird gemeldet.
+  if (spediteurId) {
+    await supabase.from('npc_ledger').upsert({ actor_id: spediteurId, tick, kind: 'income', resource: l.resource, goods_delta: 0, credit_delta: l.fracht, location_id: fromId, ref: `fracht:${actorId}:${l.from}>${l.to}`, note: `Frachterlös ${l.menge} t ${l.resource} ${l.from}→${l.to}` }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true })
+  } else {
+    console.warn(`runHandel: no carrier firm, freight ${l.fracht} Cr has no recipient`)
+  }
   const key = `${fromId}|${l.resource}`
   const neu = Math.max(0, (w.stockMap.get(key) ?? 0) - l.menge)
   await supabase.from('location_resources').update({ stock: neu }).eq('location_id', fromId).eq('resource', l.resource)
