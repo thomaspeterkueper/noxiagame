@@ -1,3 +1,7 @@
+// lib/world/spatial/earthPlaceMaterializer.server.ts
+// Aktualisiert: 12.10.2026 — Lokaldetail-Zeilen gelten nicht als vorhandene Geographie (fehlgeschlagene Orte wurden sonst nie erneut importiert) und werden beim Geographie-Import nicht gelöscht
+// Version:      1.0.1
+
 import { createServiceClient } from '@/lib/supabase/service'
 
 type GeoPoint = { lat: number; lon: number }
@@ -261,10 +265,15 @@ export async function materializeEarthPlace(input: {
   if (existing) {
     const { data: featureRows, error: featureError } = await supabase
       .from('region_features')
-      .select('id')
+      .select('id, enrichment:properties->>noxia_enrichment')
       .eq('region_id', existing.id)
     if (featureError) throw featureError
-    existingFeatureIds = (featureRows ?? []).map(row => String(row.id))
+    // Only regional geography counts as the persisted snapshot. Local detail
+    // rows (footprints, paths) belong to the walkable scene and neither prove
+    // that the place was materialized nor get replaced by a geography import.
+    existingFeatureIds = ((featureRows ?? []) as Array<{ id: string; enrichment: string | null }>)
+      .filter(row => !row.enrichment)
+      .map(row => String(row.id))
 
     // Create once, persist, enrich incrementally. Existing geography is
     // authoritative until an explicit geography refresh succeeds.

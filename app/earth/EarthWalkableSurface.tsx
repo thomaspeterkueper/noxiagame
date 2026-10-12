@@ -1,10 +1,14 @@
 'use client'
 
+// app/earth/EarthWalkableSurface.tsx
+// Aktualisiert: 12.10.2026 — Lokaldetail (Gebäude, Wege, Bäche/Flüsse) auch am Home-Ort laden, Profil local-scene-v2, Wiesen grün statt ackerfarben, Flüsse breiter als Bäche
+// Version:      1.1.0
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
-import { buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
+import { EARTH_LOCAL_ENRICHMENT_PROFILE, buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
 import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, resolveLocalSceneStep, routeAcrossLocalScene } from '@/lib/game/spatial/localSceneRuntime'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
@@ -18,7 +22,7 @@ import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSu
 
 type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
-type Payload={ok:boolean;region?:{id?:string;name:string;origin:GeoPoint};queryCenter?:GeoPoint;bounds?:{south:number;west:number;north:number;east:number};features?:Feature[];error?:string}
+type Payload={ok:boolean;region?:{id?:string;name:string;origin:GeoPoint};queryCenter?:GeoPoint;localDetail?:{slug:string;lat:number;lon:number};bounds?:{south:number;west:number;north:number;east:number};features?:Feature[];error?:string}
 type SpatialEntity={id:string;entity_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;ownerLabel?:string;isOwn?:boolean;status?:string;latitude_deg?:number|null;longitude_deg?:number|null}
 type SpatialBuild={id:string;buildable_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;status?:string;created_at?:string|null;completes_at?:string|null}
 type Props={residents:ColonyResident[];onClose:()=>void}
@@ -60,24 +64,23 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
   useEffect(()=>{let live=true;fetch('/api/earth/region?v=walkable-v2',{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live)setData(json)}).catch(()=>{if(live)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[])
   useEffect(()=>{
-    const regionId=String((data?.region as any)?.id??'')
-    const originPoint=data?.queryCenter??data?.region?.origin
-    if(!data?.ok||!regionId.startsWith('earth-place-')||!originPoint)return
-    const alreadyEnriched=(data.features??[]).some(feature=>feature.properties?.noxia_enrichment==='local-scene-v1')
-    if(alreadyEnriched||localEnrichmentAttempted.current.has(regionId))return
-    localEnrichmentAttempted.current.add(regionId)
+    const detail=data?.localDetail
+    if(!data?.ok||!detail?.slug)return
+    const alreadyEnriched=(data.features??[]).some(feature=>feature.properties?.noxia_enrichment===EARTH_LOCAL_ENRICHMENT_PROFILE)
+    if(alreadyEnriched||localEnrichmentAttempted.current.has(detail.slug))return
+    localEnrichmentAttempted.current.add(detail.slug)
     let live=true
     ;(async()=>{
       try{
         const {token}=await getSessionInfo()
-        const response=await fetch('/api/earth/local-enrich',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({slug:regionId,lat:originPoint.lat,lon:originPoint.lon,radiusKm:.34})})
+        const response=await fetch('/api/earth/local-enrich',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({slug:detail.slug,lat:detail.lat,lon:detail.lon,radiusKm:.34})})
         if(!response.ok)return
         const refreshed=await fetch('/api/earth/region?v=walkable-v3',{cache:'no-store'}).then(result=>result.json())
         if(live&&refreshed?.ok)setData(refreshed)
       }catch{}
     })()
     return()=>{live=false}
-  },[data?.ok,data?.region,data?.queryCenter,data?.features])
+  },[data?.ok,data?.localDetail,data?.features])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{if(!live)return;setSpatialEntities(Array.isArray(json?.entities)?json.entities:[]);setSpatialBuilds(Array.isArray(json?.builds)?json.builds:[])}).catch(()=>{if(live){setSpatialEntities([]);setSpatialBuilds([])}});return()=>{live=false}},[])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=80){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
@@ -448,11 +451,11 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <g transform={cameraTransform(player)}>
 
         {scene.polygons.map(feature=>{
-          const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?'#bda96c':'#a9aaa0'
+          const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?(/^(meadow|grass|orchard)$/.test(feature.className??'')?'#a9c178':'#bda96c'):'#a9aaa0'
           return <path key={feature.id} d={polygonD(feature.points)} fill={fill} stroke={feature.kind==='water'?'#4d8eae':'rgba(54,71,57,.5)'} strokeWidth="1" opacity={feature.kind==='urban' ? .72 : .88}/>
         })}
 
-        {scene.paths.filter(path=>path.kind==='waterway').map(path=><path key={path.id} d={pathD(path.points)} fill="none" stroke="#5ca6c8" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>)}
+        {scene.paths.filter(path=>path.kind==='waterway').map(path=><path key={path.id} d={pathD(path.points)} fill="none" stroke="#5ca6c8" strokeWidth={/^(river|canal)$/.test(path.className??'')?14:7} strokeLinecap="round" strokeLinejoin="round"/>)}
         {scene.paths.filter(path=>path.kind==='rail').map(path=><g key={path.id}><path d={pathD(path.points)} fill="none" stroke="#444b4c" strokeWidth="5" strokeLinecap="round"/><path d={pathD(path.points)} fill="none" stroke="#a9acaa" strokeWidth="1.3" strokeDasharray="5 4"/></g>)}
         {scene.paths.filter(path=>path.kind==='road').map(path=>{const major=/motorway|trunk|primary|secondary/.test(path.className??'');return <g key={path.id}><path d={pathD(path.points)} fill="none" stroke={major?'#d4c3a0':'#ddd8ca'} strokeWidth={major?12:8} strokeLinecap="round" strokeLinejoin="round"/><path d={pathD(path.points)} fill="none" stroke={major?'#b4975d':'#b6b0a4'} strokeWidth="1.1" strokeDasharray={major?'8 8':'3 7'}/></g>})}
 

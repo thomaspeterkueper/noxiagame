@@ -32,6 +32,7 @@ export type LocalSurfacePolygon = {
   kind:LocalSurfacePolygonKind
   points:LocalSurfacePoint[]
   provenance?:'observed'|'derived'|'synthetic'
+  className?:string
 }
 
 export type LocalSurfaceBuilding = {

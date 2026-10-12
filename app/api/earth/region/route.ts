@@ -1,9 +1,14 @@
+// app/api/earth/region/route.ts
+// Aktualisiert: 12.10.2026 — Geerbte Regionsgeographie per Bounding-Box (große Wälder/Wiesen fielen heraus), nur Regionen mit importierter Geographie als Erbquelle, Lokaldetail-Layer auch für Regionsansichten (Home)
+// Version:      1.1.0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
 import { OverpassEarthFeatureSource } from '@/lib/world/spatial/overpassEarthFeatureSource'
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { earthLandmarksInBounds } from '@/lib/world/spatial/earthLandmarkPresentation'
+import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
@@ -51,7 +56,22 @@ function featureIntersectsBounds(feature: any, bounds: { south:number; west:numb
   if (!geometry) return false
   if (geometry.kind === 'point') return pointInBounds(geometry.coordinates, bounds)
   const points = Array.isArray(geometry.coordinates) ? geometry.coordinates : []
-  return points.some((point: any) => pointInBounds(point, bounds))
+  // Compare extents, not vertices: a forest or meadow enclosing the view and a
+  // road segment crossing it have no vertex inside the view at all.
+  let south = Infinity, north = -Infinity, west = Infinity, east = -Infinity
+  for (const point of points) {
+    const lat = Number(point?.lat), lon = Number(point?.lon)
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    if (lat < south) south = lat
+    if (lat > north) north = lat
+    if (lon < west) west = lon
+    if (lon > east) east = lon
+  }
+  return south <= bounds.north && north >= bounds.south && west <= bounds.east && east >= bounds.west
+}
+
+function isLocalDetailRow(row: { properties?: unknown }) {
+  return Boolean((row.properties as Record<string, unknown> | null)?.noxia_enrichment)
 }
 
 function narrativeLandmarksFor(bounds: { south:number; west:number; north:number; east:number }) {
@@ -102,6 +122,10 @@ export async function GET(req: NextRequest) {
     : null
   const placeLabel = (p.get('label') ?? req.cookies.get(EARTH_VIEW_LABEL_COOKIE)?.value ?? viewRegion.name).slice(0, 240)
   const storedSlug = placeSlug ?? requestedRegionId
+  // Footprints, paths and watercourses of the walkable scene are stored per
+  // view centre. A searched place keeps them in its own row; a regional view
+  // (e.g. Home) keeps them in a detail-only row with the coordinate slug.
+  const localDetail = { slug: placeSlug ?? earthPlaceSlug(center), lat: center.lat, lon: center.lon }
 
   // Runtime rendering never depends on a live Overpass request for arbitrary
   // searched places. Once selected, a place is identified persistently and
@@ -134,6 +158,8 @@ export async function GET(req: NextRequest) {
           .select('id, slug, bounds, source')
           .eq('body', 'earth')
           .neq('slug', storedRegion.slug)
+          // Failed or detail-only rows carry no regional geography to inherit.
+          .gte('geography_import_version', 1)
 
         const covering = (regionalCandidates ?? []).find(candidate => {
           const candidateBounds = candidate.bounds as typeof bounds | null
@@ -157,6 +183,19 @@ export async function GET(req: NextRequest) {
             : storedRegion.source
           inheritedFrom = covering.slug
         }
+      } else if (localDetail.slug !== storedRegion.slug) {
+        const { data: detailRegion } = await supabase
+          .from('celestial_regions')
+          .select('id')
+          .eq('slug', localDetail.slug)
+          .maybeSingle()
+        if (detailRegion) {
+          const { data: detailRows } = await supabase
+            .from('region_features')
+            .select('id, feature_type, geometry, properties')
+            .eq('region_id', detailRegion.id)
+          effectiveRows = [...effectiveRows, ...(detailRows ?? []).filter(isLocalDetailRow)]
+        }
       }
 
       const storedBounds = (storedRegion.bounds as typeof bounds) ?? bounds
@@ -169,8 +208,11 @@ export async function GET(req: NextRequest) {
         ...effectiveRows.map(r => ({ id: r.id, featureType: r.feature_type, properties: r.properties, geometry: r.geometry })),
         ...(containsSelmecke ? [SELMECKE_REFERENCE_FEATURE] : []),
       ]
+      // Local detail rows alone are not a materialized place: without own or
+      // inherited geography the place still has to be imported.
+      const hasGeography = Boolean(inheritedFrom) || (rows ?? []).some(row => !isLocalDetailRow(row))
       const materializationStatus = placeSlug
-        ? (features.length > 0
+        ? (hasGeography
             ? 'ready'
             : String(storedRegion.source ?? '').includes('failed') ? 'failed' : 'pending')
         : null
@@ -190,6 +232,7 @@ export async function GET(req: NextRequest) {
         viewRegion: runtimeRegion,
         queryCenter: center,
         detail: hasLocalCenter,
+        localDetail,
         bounds: storedBounds,
         featureCount: features.length,
         features,
@@ -226,6 +269,7 @@ export async function GET(req: NextRequest) {
       viewRegion: viewRegion,
       queryCenter: center,
       detail: true,
+      localDetail,
       bounds,
       featureCount: 0,
       features: [],
@@ -265,6 +309,7 @@ export async function GET(req: NextRequest) {
       viewRegion,
       queryCenter: center,
       detail: hasLocalCenter,
+      localDetail,
       bounds,
       featureCount: features.length,
       features,

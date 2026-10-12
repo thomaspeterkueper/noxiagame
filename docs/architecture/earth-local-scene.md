@@ -36,6 +36,21 @@ Derived scene primitives include:
 - NPC spawn / activity positions;
 - later: vehicle routes, transit stops and interaction nodes.
 
+## Local detail layer (2026-10-12)
+
+Building footprints, minor roads, tracks, paths and watercourses (river, canal,
+stream, ditch) come from the local detail layer, profile `local-scene-v2`. It is
+stored per view centre:
+
+- a searched place keeps the rows in its own `celestial_regions` row;
+- a regional view such as Home keeps them in a detail-only row
+  (`source = noxia:local-detail`) identified by the coordinate slug.
+
+Detail rows are never regional geography: they do not mark a place as
+materialized, are not inherited by other places and survive a geography import.
+Regional land cover is selected by extent, not by vertices, so a forest or
+meadow that encloses the scene is part of it.
+
 ## Buildings and provenance
 
 Observed building footprints may become canonical local-scene buildings.
