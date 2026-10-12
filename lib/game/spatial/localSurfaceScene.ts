@@ -45,6 +45,8 @@ export type LocalSurfaceBuilding = {
   rotationDeg:number
   provenance:'observed'|'derived'|'synthetic'|'canonical'
   label?:string
+  /** Real outline in scene metres, when known. Width/depth remain its extent. */
+  footprint?:LocalSurfacePoint[]
   entityId?:string|null
 }
 

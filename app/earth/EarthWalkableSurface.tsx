@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.3.0
+// Aktualisiert: 12.10.2026 — Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.4.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -33,6 +33,12 @@ const VIEW_W=WALKABLE_VIEW.width
 const VIEW_H=WALKABLE_VIEW.height
 const SCENE_RADIUS_M=260
 const HEIGHT_PX=12
+// The shared projection draws about 1.3 px per metre – right for open terrain,
+// far too small for a town where a house is 10 m wide and a figure 30 px tall.
+// Earth scenes zoom the ground in; figures and labels keep their screen size.
+const SCENE_ZOOM=2.4
+function zoomedCamera(focus:ScenePoint){const p=iso(focus);return `translate(${VIEW_W/2} ${VIEW_H/2}) scale(${SCENE_ZOOM}) translate(${(-p.x).toFixed(1)} ${(-p.y).toFixed(1)})`}
+function unzoomedAt(point:ScenePoint){const p=iso(point);return `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${1/SCENE_ZOOM}) translate(${(-p.x).toFixed(1)} ${(-p.y).toFixed(1)})`}
 // The scene covers ±260 m. Well before that edge it is rebuilt around the
 // player, snapped to a fixed grid so the same ground always maps to the same
 // stored detail rows instead of a new set for every few metres walked.
@@ -490,16 +496,16 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           <linearGradient id="earth-scene-ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={theme.backgroundAlt}/><stop offset="100%" stopColor={theme.background}/></linearGradient>
         </defs>
         <rect width={VIEW_W} height={VIEW_H} fill="url(#earth-scene-ground)"/>
-        <g transform={cameraTransform(player)}>
+        <g transform={zoomedCamera(player)}>
 
         {scene.polygons.map(feature=>{
           const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='beach'?'#e2d5a3':feature.kind==='rock'?'#aea89d':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?(/^(meadow|grass|orchard)$/.test(feature.className??'')?'#a9c178':'#bda96c'):'#a9aaa0'
           return <path key={feature.id} d={polygonD(feature.points)} fill={fill} stroke={feature.kind==='water'?'#4d8eae':'rgba(54,71,57,.5)'} strokeWidth="1" opacity={feature.kind==='urban' ? .72 : .88}/>
         })}
 
-        {scene.paths.filter(path=>path.kind==='waterway').map(path=><path key={path.id} d={pathD(path.points)} fill="none" stroke="#5ca6c8" strokeWidth={/^(river|canal)$/.test(path.className??'')?14:7} strokeLinecap="round" strokeLinejoin="round"/>)}
+        {scene.paths.filter(path=>path.kind==='waterway').map(path=><path key={path.id} d={pathD(path.points)} fill="none" stroke="#5ca6c8" strokeWidth={/^(river|canal)$/.test(path.className??'')?14:3.5} strokeLinecap="round" strokeLinejoin="round"/>)}
         {scene.paths.filter(path=>path.kind==='rail').map(path=><g key={path.id}><path d={pathD(path.points)} fill="none" stroke="#444b4c" strokeWidth="5" strokeLinecap="round"/><path d={pathD(path.points)} fill="none" stroke="#a9acaa" strokeWidth="1.3" strokeDasharray="5 4"/></g>)}
-        {scene.paths.filter(path=>path.kind==='road').map(path=>{const major=/motorway|trunk|primary|secondary/.test(path.className??'');return <g key={path.id}><path d={pathD(path.points)} fill="none" stroke={major?'#d4c3a0':'#ddd8ca'} strokeWidth={major?12:8} strokeLinecap="round" strokeLinejoin="round"/><path d={pathD(path.points)} fill="none" stroke={major?'#b4975d':'#b6b0a4'} strokeWidth="1.1" strokeDasharray={major?'8 8':'3 7'}/></g>})}
+        {scene.paths.filter(path=>path.kind==='road').map(path=>{const major=/motorway|trunk|primary|secondary/.test(path.className??'');return <g key={path.id}><path d={pathD(path.points)} fill="none" stroke={major?'#d4c3a0':'#ddd8ca'} strokeWidth={major?11:/^(footway|path|steps|cycleway|pedestrian|track)$/.test(path.className??'')?3.2:7} strokeLinecap="round" strokeLinejoin="round"/><path d={pathD(path.points)} fill="none" stroke={major?'#b4975d':'#b6b0a4'} strokeWidth=".5" strokeDasharray={major?'8 8':'3 7'}/></g>})}
 
         {pendingTargets.map(target=>{
           const build=target.build
@@ -537,28 +543,25 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           </g>
         })}
 
-        {scene.buildings.map(building=>{
-          const top=buildingPolygon(building.center,building.widthM,building.depthM)
-          const side=top.map(point=>({x:point.x,y:point.y+HEIGHT_PX}))
-          const facade=[top[1],top[2],side[2],side[1]]
-          const front=[top[2],top[3],side[3],side[2]]
+        {[...scene.buildings].sort((a,b)=>(a.center.xM+a.center.yM)-(b.center.xM+b.center.yM)).map(building=>{
+          const top=building.footprint&&building.footprint.length>=3?building.footprint.map(iso):buildingPolygon(building.center,building.widthM,building.depthM)
+          const walls=top.map((point,index)=>{const next=top[(index+1)%top.length];return[point,next,{x:next.x,y:next.y+HEIGHT_PX},{x:point.x,y:point.y+HEIGHT_PX}]})
           const distanceM=Math.hypot(building.center.xM-player.xM,building.center.yM-player.yM)
           return <g key={building.id} opacity={building.provenance==='observed'?1:.78} style={{cursor:'help'}}
             onMouseMove={event=>setHoveredBuilding({x:event.clientX,y:event.clientY,name:building.label??'Gebäude',detail:building.provenance==='observed'?'reale Geometrie':'abgeleitete Bebauungsmasse',distanceM})}
             onMouseLeave={()=>setHoveredBuilding(null)}>
-            <polygon points={pointsAttr(facade)} fill="#6f7776" stroke="#39464b" strokeWidth="1"/>
-            <polygon points={pointsAttr(front)} fill="#596466" stroke="#39464b" strokeWidth="1"/>
-            <polygon points={pointsAttr(top)} fill={building.provenance==='observed'?'#d7d2c5':'#c8c3b8'} stroke="#4b5759" strokeWidth="1.2"/>
+            {walls.map((wall,index)=><polygon key={index} points={pointsAttr(wall)} fill="#646e6f" stroke="#39464b" strokeWidth=".4"/>)}
+            <polygon points={pointsAttr(top)} fill={building.provenance==='observed'?'#d7d2c5':'#c8c3b8'} stroke="#4b5759" strokeWidth=".6"/>
             <title>{building.label??'Gebäude'} · {building.provenance==='observed'?'reale Geometrie':'abgeleitete Bebauungsmasse'}</title>
           </g>
         })}
 
         {navigationTarget&&navigationRoute&&<WalkableRoute points={navigationRoute.points} target={{xM:navigationTarget.xM,yM:navigationTarget.yM}}/>}
 
-        {npcPositions.map(({resident,xM,yM})=><WalkableActor key={resident.id} point={{xM,yM}} label={resident.displayName} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/>)}
+        {npcPositions.map(({resident,xM,yM})=><g key={resident.id} transform={unzoomedAt({xM,yM})}><WalkableActor point={{xM,yM}} label={resident.displayName} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/></g>)}
 
         {localTrainPoint&&<WalkableTrain point={localTrainPoint} label="Regional"/>}
-        <WalkablePlayer point={player} label={playerName}/>
+        <g transform={unzoomedAt(player)}><WalkablePlayer point={player} label={playerName}/></g>
         </g>
 
       </WalkableSurfaceSvg>

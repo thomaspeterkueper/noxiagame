@@ -1,6 +1,6 @@
 // lib/world/spatial/earthLocalScene.ts
-// Aktualisiert: 12.10.2026 — Strand- und Felsflächen in die Szene übernehmen; Flächen/Linien per Bounding-Box statt Eckpunkt-Test (große Wälder/Wiesen fielen heraus), abgeleitete Bebauung nur ohne reale Footprints, Landnutzungsklasse an Flächen
-// Version:      1.2.0
+// Aktualisiert: 12.10.2026 — reale Gebäudeumrisse an die Szene weitergeben; Strand- und Felsflächen in die Szene übernehmen; Flächen/Linien per Bounding-Box statt Eckpunkt-Test (große Wälder/Wiesen fielen heraus), abgeleitete Bebauung nur ohne reale Footprints, Landnutzungsklasse an Flächen
+// Version:      1.3.0
 
 import { geoToLocalMeters, type GeoPoint } from './earthSpatial'
 import { buildLocalSurfaceScene, type LocalSurfaceBuilding, type LocalSurfacePath, type LocalSurfacePoint, type LocalSurfacePolygon, type LocalSurfaceScene } from '@/lib/game/spatial/localSurfaceScene'
@@ -117,6 +117,7 @@ export function buildEarthLocalScene(input:{
         rotationDeg:0,
         provenance:'observed',
         label:String(feature.properties?.name??'Gebäude'),
+        footprint:points.length>3&&points[0].xM===points[points.length-1].xM&&points[0].yM===points[points.length-1].yM?points.slice(0,-1):points,
       })
     }
   }
