@@ -15,7 +15,7 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
 2. Stellenkapazität: offene Stellen eines Lokals aus dessen Personalplätzen ableiten (`VENUE_LAYOUTS`, siehe `hospitality-venues.md` 6.1).
 3. Ortsspielraum: Mittellosigkeit einrechnen (Arbeitslosigkeit erhöht ihn derzeit).
 4. Wahrnehmung im Lokal: „selber Sichtbereich" statt „selber Raum", bevor Begegnungen dort auf Stimmung wirken.
-5. Hunger und Durst von Spielern: Entwurf, noch keine Entscheidung.
+5. Hunger und Durst etablieren – **entschieden (Thomas, 12.10.2026): ja, auch für Spieler.** Durst und Hunger werden eigene Bedürfnisse, für Bewohner und für Spieler. Bisher gibt es für Bewohner nur `sustenance` (Essen und Trinken zusammen) und für Spieler gar keine Bedürfnisse. Vor der Live-Wirkung zu entwerfen: Trennung von `sustenance` in Hunger und Durst samt Übergang der Bestandswerte; wie schnell beides sinkt; was bei Mangel passiert; was mit einem Spieler geschieht, der eine Woche nicht online ist; welcher Posten der Karte was stillt (Getränk → Durst, Kuchen/Mahlzeit → Hunger). Hängt mit Aufgabe 9 zusammen.
 6. Rückbau und Verkauf von Gebäuden schreiben Credits ohne Gegenkonto gut (`app/api/game/build/route.ts`).
 7. Karten für `bar` und `restaurant` in `hospitality_menu` anlegen – Vorschlag in `docs/gameplay/hospitality-venues.md` Abschnitt 5 (aus Teilprojekt Gastronomie).
 8. Startcafé braucht Personal: Der Platzhalter-Wirt ist entfernt, ein Café ohne Personal ist ein Automatencafé ohne Einstiegsgespräch. Prüfen, ob `20261010090000_earth_cafe_host.sql` live angewendet ist (aus Teilprojekt Gastronomie).

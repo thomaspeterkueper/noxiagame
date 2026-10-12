@@ -22,5 +22,5 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 ## Nicht in diesem Teilprojekt
 
 - Wirt als Bewohner mit Stelle und Lohn, Stellenzahl aus den Personalplätzen.
-- Hunger und Durst von Spielern.
+- Hunger und Durst als Bedürfnisse, auch für Spieler (entschieden am 12.10.2026, liegt bei Bevölkerung und Ökonomie). Sobald es sie gibt: im Lokal anzeigen, was ein Posten stillt.
 - Wirkung des Lokals auf Stimmung.
