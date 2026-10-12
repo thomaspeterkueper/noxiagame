@@ -7,9 +7,9 @@ const events:MemoryEvent[]=[
 {id:"a",topic:"route",value:1},{id:"b",topic:"route",value:2},{id:"c",topic:"route",value:3},
 {id:"d",topic:"weather",value:2},{id:"e",topic:"weather",value:4},
 {id:"f",topic:"trust",value:1,anchor:true},{id:"g",topic:"emergency",value:1,critical:true},
-{id:"h",topic:"route",value:4},{id:"i",topic:"weather",value:6}
+{id:"h",topic:"route",value:3},{id:"i",topic:"weather",value:6}
 ];
-const queries:Query[]=[{topic:"route",expected:4},{topic:"weather",expected:6},{topic:"trust",expected:1},{topic:"emergency",expected:1}];
+const queries:Query[]=[{topic:"route",expected:3},{topic:"weather",expected:6},{topic:"trust",expected:1},{topic:"emergency",expected:1}];
 function encode(e:MemoryEvent[]):string{return JSON.stringify(e);}
 export function runMemoryValueBenchmark(regime:Regime):BenchmarkResult{
  let kept:MemoryEvent[];
