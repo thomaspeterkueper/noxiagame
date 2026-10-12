@@ -420,11 +420,28 @@ export interface VenueMenuItem {
   priceCredits: number
 }
 
+// ── Bestellplatz ────────────────────────────────────────────────────────────
+const SERVICE_REACH = 44
+
+/**
+ * Steht jemand am Tresen, Empfang oder Automaten? Gemeint ist die ganze Kante
+ * des Möbels, nicht nur seine Mitte – wer am Ende des Tresens steht, steht am Tresen.
+ */
+export function isAtServicePoint(layout: VenueLayout, pos: VenuePoint): boolean {
+  if (Math.hypot(pos.x - layout.servicePoint.x, pos.y - layout.servicePoint.y) < 60) return true
+  return layout.furniture.some(item => {
+    if (item.kind !== 'counter' && item.kind !== 'desk') return false
+    const dx = Math.max(item.x - pos.x, 0, pos.x - (item.x + item.w))
+    const dy = Math.max(item.y - pos.y, 0, pos.y - (item.y + item.h))
+    return Math.hypot(dx, dy) <= SERVICE_REACH
+  })
+}
+
 // ── Wo steht der Spieler? ───────────────────────────────────────────────────
 /** Ortsangabe für den Spieler, wie sie jemand im Raum beschreiben würde. */
 export function describePlayerPosition(layout: VenueLayout, pos: VenuePoint): string {
   const distance = (p: VenuePoint) => Math.hypot(p.x - pos.x, p.y - pos.y)
-  if (distance(layout.servicePoint) < 60) return layout.servicePoint.locative
+  if (isAtServicePoint(layout, pos)) return layout.servicePoint.locative
   if (distance(layout.exit) < 60) return 'beim Eingang'
   const near = layout.spots
     .filter(spot => spot.kind !== 'staff' && !spot.id.startsWith('entry-'))
