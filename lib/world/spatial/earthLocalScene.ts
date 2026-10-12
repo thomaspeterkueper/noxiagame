@@ -1,6 +1,6 @@
 // lib/world/spatial/earthLocalScene.ts
-// Aktualisiert: 12.10.2026 — Flächen/Linien per Bounding-Box statt Eckpunkt-Test (große Wälder/Wiesen fielen heraus), abgeleitete Bebauung nur ohne reale Footprints, Landnutzungsklasse an Flächen
-// Version:      1.1.0
+// Aktualisiert: 12.10.2026 — Strand- und Felsflächen in die Szene übernehmen; Flächen/Linien per Bounding-Box statt Eckpunkt-Test (große Wälder/Wiesen fielen heraus), abgeleitete Bebauung nur ohne reale Footprints, Landnutzungsklasse an Flächen
+// Version:      1.2.0
 
 import { geoToLocalMeters, type GeoPoint } from './earthSpatial'
 import { buildLocalSurfaceScene, type LocalSurfaceBuilding, type LocalSurfacePath, type LocalSurfacePoint, type LocalSurfacePolygon, type LocalSurfaceScene } from '@/lib/game/spatial/localSurfaceScene'
@@ -77,7 +77,7 @@ export function buildEarthLocalScene(input:{
       continue
     }
 
-    if(['water','forest','vegetation','farmland','urban'].includes(feature.featureType)&&feature.geometry.kind==='polygon'&&points.length>=3){
+    if(['water','forest','vegetation','farmland','urban','beach','rock'].includes(feature.featureType)&&feature.geometry.kind==='polygon'&&points.length>=3){
       polygons.push({id:feature.id,kind:feature.featureType as LocalSurfacePolygon['kind'],points,provenance:'observed',className:String(feature.properties?.landuse??feature.properties?.natural??feature.properties?.landcover??feature.properties?.leisure??feature.featureType)})
       if(feature.featureType==='urban'){
         // Until real building footprints are available, derive sparse visual

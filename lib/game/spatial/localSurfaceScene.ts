@@ -25,6 +25,8 @@ export type LocalSurfacePolygonKind =
   | 'vegetation'
   | 'farmland'
   | 'urban'
+  | 'beach'
+  | 'rock'
   | 'terrain-zone'
 
 export type LocalSurfacePolygon = {

@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthRegionPreview.tsx
-// Aktualisiert: 09.10.2026 — Bauzeit in Stunden statt „Tick(s)", Fertigstellungszeit nach dem Bauauftrag
-// Version:      1.0.1
+// Aktualisiert: 12.10.2026 — Meer, Inseln, Strand und Fels zeichnen; veraltete Ortsimporte einmal pro Sitzung im Hintergrund erneuern
+// Version:      1.1.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
@@ -20,7 +20,7 @@ import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStor
 
 type GeoPoint = { lat:number; lon:number }
 type Feature = { id:string; featureType:string; properties:Record<string,string>; geometry:{kind:'point';coordinates:GeoPoint}|{kind:'line'|'polygon';coordinates:GeoPoint[]} }
-type Materialization = { slug:string; label:string; lat:number; lon:number; radiusKm:number; status:'missing'|'pending'|'failed'|'ready'; source?:string|null }
+type Materialization = { slug:string; label:string; lat:number; lon:number; radiusKm:number; status:'missing'|'pending'|'failed'|'outdated'|'ready'; source?:string|null }
 type NarrativeProject = { project:string; relation:'setting'|'reference'|'research-anchor'|'worldbuilding-anchor'; note?:string; references?:Array<{kind:'work'|'chapter'|'scene';label:string;sourcePath?:string}> }
 type NarrativeLandmark = { id:string; name:string; locality:string; countryCode:string; tags:string[]; presentDayRole:string; noxiaRole:string; sourceProjects:NarrativeProject[]; locator:{kind:'address';value:string}; point:GeoPoint&{precision:'real_location'|'approximate'|'fictionalized'} }
 type Payload = { ok:boolean; region?:{id?:string;name:string;origin:GeoPoint}; queryCenter?:GeoPoint; detail?:boolean; bounds?:{south:number;west:number;north:number;east:number}; featureCount?:number; features?:Feature[]; materialization?:Materialization|null; narrativeLandmarks?:NarrativeLandmark[]; attribution?:string; error?:string }
@@ -49,20 +49,24 @@ type TerrainCell = { row:number;col:number;xM:number;yM:number;elevationM:number
 type TerrainPayload = { ok:boolean; sourceResolutionM?:number; sampledRows?:number; sampledCols?:number; cells?:TerrainCell[]; error?:string }
 type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slope'|'noxia'|'landmarks'|'sites'|'corridor'
 
-const layerOrder=['farmland','vegetation','forest','urban','water','industrial','public','building','waterway','rail','road','settlement']
+const layerOrder=['island','farmland','vegetation','forest','rock','beach','urban','water','industrial','public','building','waterway','rail','road','settlement']
 const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,landmarks:true,sites:true,corridor:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=SURFACE_LOCAL_CAMERA.visibleWidthM
 const LOCAL_DETAIL_RADIUS_KM=1.35
 const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
 const EARTH_DATA_VERSION='20260906-local-detail-1'
 
+// The sea lies below every land feature; lakes and ponds stay above land use.
+function drawRank(feature:{featureType:string;properties?:Record<string,string>}){return feature.featureType==='water'&&feature.properties?.visual_class==='sea'?-2:layerOrder.indexOf(feature.featureType)}
 function styleFor(type:string,tags:Record<string,string>){
   switch(type){
     case'forest':return{fill:'#6f875d',stroke:'#5f754f',width:.45}
     case'vegetation':return{fill:'#88a36c',stroke:'#6f8958',width:.35}
     case'farmland':return{fill:'#c4b879',stroke:'#b1a46b',width:.35}
     case'urban':return{fill:'#aaa9a3',stroke:'#85847f',width:.45}
-    case'water':return{fill:'#82b8d4',stroke:'#5b9cbe',width:.6}
+    case'water':return tags.visual_class==='sea'?{fill:'#6fa9c9',stroke:'#4f8fb2',width:.8}:{fill:'#82b8d4',stroke:'#5b9cbe',width:.6}
+    case'beach':return{fill:'#e6d9a8',stroke:'#cdbd86',width:.35}
+    case'rock':return{fill:'#b3ada2',stroke:'#928b80',width:.35}
     case'waterway':return{fill:'none',stroke:'#5b9cbe',width:1.4}
     case'industrial':return{fill:'#b8b5ad',stroke:'#8b8880',width:.4}
     case'public':return{fill:'#d9d2b8',stroke:'#b4aa88',width:.4}
@@ -142,8 +146,12 @@ export default function EarthRegionPreview(){
 
   const materializePlace=async(spec:Materialization)=>{
     if(spec.status==='ready'||materializingPlaces.current.has(spec.slug))return
+    // A usable but outdated snapshot is renewed quietly, once per session.
+    const background=spec.status==='outdated'
+    const refreshKey=`noxia-earth-geo-refresh:${spec.slug}`
+    if(background){try{if(sessionStorage.getItem(refreshKey))return;sessionStorage.setItem(refreshKey,'1')}catch{return}}
     materializingPlaces.current.add(spec.slug)
-    setMaterializationBusy(true);setMaterializationError(null)
+    if(!background){setMaterializationBusy(true);setMaterializationError(null)}
     try{
       const token=await getToken()
       if(!token)throw new Error('Nicht angemeldet')
@@ -160,16 +168,17 @@ export default function EarthRegionPreview(){
           throw new Error(`Ortsanreicherung lieferte keine gültige JSON-Antwort (HTTP ${response.status}).`)
         }
       }
-      if(response.ok&&result?.ok){window.location.reload();return}
+      if(response.ok&&result?.ok){if(!result.refreshFailed)window.location.reload();return}
+      if(background)return
       const serverError=result?.error
         ??(raw.trim()?raw.slice(0,220):null)
         ??`Ortsanreicherung ohne Antwort beendet (HTTP ${response.status}).`
       throw new Error(serverError)
     }catch(error){
-      setMaterializationError(error instanceof Error?error.message:String(error))
+      if(!background)setMaterializationError(error instanceof Error?error.message:String(error))
     }finally{
       materializingPlaces.current.delete(spec.slug)
-      setMaterializationBusy(false)
+      if(!background)setMaterializationBusy(false)
     }
   }
 
@@ -179,7 +188,7 @@ export default function EarthRegionPreview(){
         const response=await fetch(`/api/earth/region?radiusKm=3&v=${EARTH_DATA_VERSION}`,{cache:'no-store'})
         const json=await response.json() as Payload
         setData(json)
-        if(json.ok&&json.materialization&&(json.materialization.status==='missing'||json.materialization.status==='pending'))void materializePlace(json.materialization)
+        if(json.ok&&json.materialization&&(json.materialization.status==='missing'||json.materialization.status==='pending'||json.materialization.status==='outdated'))void materializePlace(json.materialization)
         if(json.ok){
           setOverviewData(json)
           const isSauerland=json.region?.id==='earth-sauerland'
@@ -268,7 +277,7 @@ export default function EarthRegionPreview(){
 
   useEffect(()=>{if(!data?.bounds||!data.region?.origin)return;const origin=data.region.origin,b=data.bounds,nw=geoToLocalMeters({lat:b.north,lon:b.west},origin),se=geoToLocalMeters({lat:b.south,lon:b.east},origin);const q=new URLSearchParams({minXM:String(Math.min(nw.eastM,se.eastM)),minYM:String(Math.min(nw.northM,se.northM)),maxXM:String(Math.max(nw.eastM,se.eastM)),maxYM:String(Math.max(nw.northM,se.northM)),maxBuildableSlopeDeg:'5',maxRestrictedSlopeDeg:'12',resolutionM:data.detail?'30':'120'});fetch(`/api/earth/buildability?${q}`).then(r=>r.json()).then(setTerrain).catch(e=>setTerrain({ok:false,error:String(e)}))},[data])
 
-  const projected=useMemo(()=>{if(!projection||!data?.features)return[];return[...data.features].sort((a,b)=>layerOrder.indexOf(a.featureType)-layerOrder.indexOf(b.featureType)).map(f=>f.geometry.kind==='point'?{...f,p:[projection.x(f.geometry.coordinates.lon),projection.y(f.geometry.coordinates.lat)]as[number,number]}:{...f,d:f.geometry.coordinates.map((p,i)=>`${i?'L':'M'}${projection.x(p.lon).toFixed(2)} ${projection.y(p.lat).toFixed(2)}`).join(' ')+(f.geometry.kind==='polygon'?' Z':'')})},[data,projection])
+  const projected=useMemo(()=>{if(!projection||!data?.features)return[];return[...data.features].sort((a,b)=>drawRank(a)-drawRank(b)).map(f=>f.geometry.kind==='point'?{...f,p:[projection.x(f.geometry.coordinates.lon),projection.y(f.geometry.coordinates.lat)]as[number,number]}:{...f,d:f.geometry.coordinates.map((p,i)=>`${i?'L':'M'}${projection.x(p.lon).toFixed(2)} ${projection.y(p.lat).toFixed(2)}`).join(' ')+(f.geometry.kind==='polygon'?' Z':'')})},[data,projection])
   const candidates=useMemo(()=>projection?(candidateData?.candidates??[]).map((c,i)=>({...c,index:i,x:projection.x(c.lon),y:projection.y(c.lat)})):[],[candidateData,projection])
   const shortlist=useMemo(()=>projection?(candidateData?.shortlist??[]).map(c=>({...c,x:projection.x(c.lon),y:projection.y(c.lat)})):[],[candidateData,projection])
   const corridorOverlay=useMemo(()=>{
@@ -349,7 +358,7 @@ export default function EarthRegionPreview(){
     return{widthSvg,depthSvg,clearanceWidthSvg,clearanceDepthSvg}
   },[selectedSpot,selectedBuild,mapMetrics])
 
-  function featureVisible(type:string){if(type==='water'||type==='waterway')return layers.water;if(type==='forest'||type==='vegetation'||type==='farmland'||type==='urban')return layers.landuse;if(type==='landmark')return layers.landmarks;if(type==='road'||type==='rail'||type==='industrial'||type==='public'||type==='building')return layers.infrastructure;return true}
+  function featureVisible(type:string){if(type==='water'||type==='waterway')return layers.water;if(type==='forest'||type==='vegetation'||type==='farmland'||type==='urban'||type==='beach'||type==='rock')return layers.landuse;if(type==='landmark')return layers.landmarks;if(type==='road'||type==='rail'||type==='industrial'||type==='public'||type==='building')return layers.infrastructure;return true}
   function toggleLayer(key:LayerKey){setLayers(v=>({...v,[key]:!v[key]}))}
   function setCamera(nextZoom:number,centerX:number,centerY:number){setZoom(nextZoom);setOffset({x:500-centerX*nextZoom,y:500-centerY*nextZoom})}
   function clearPlacement(){setSelectedSpot(null);setBuildMenuOpen(false);setSelectedBuild(null);setRotationDeg(0);setBuildMessage(null)}
@@ -506,7 +515,7 @@ export default function EarthRegionPreview(){
       {layers.corridor&&corridorOverlay&&<div className="earth-corridor-status"><b>Korridor B</b><span>Vorprüfung · nicht kanonisch</span></div>}
       {focusLoading&&<div className="earth-detail-status">Kartendetails werden geladen …</div>}
       {focusError&&<div className="earth-detail-status error">{focusError}</div>}
-      {data.materialization&&data.materialization.status!=='ready'&&<div className={`earth-materialization ${data.materialization.status==='failed'||materializationError?'error':''}`} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}><div><b>{materializationBusy?'Realweltdaten werden normalisiert …':data.materialization.status==='failed'||materializationError?'Realweltdaten noch nicht vollständig':'Ort wird aus realen Geodaten aufgebaut'}</b><span>{materializationError??'Die Karte bleibt benutzbar; Details werden persistent ergänzt.'}</span></div>{!materializationBusy&&(data.materialization.status==='failed'||materializationError)&&<button onClick={()=>void materializePlace(data.materialization!)}>Erneut versuchen</button>}</div>}
+      {data.materialization&&data.materialization.status!=='ready'&&data.materialization.status!=='outdated'&&<div className={`earth-materialization ${data.materialization.status==='failed'||materializationError?'error':''}`} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}><div><b>{materializationBusy?'Realweltdaten werden normalisiert …':data.materialization.status==='failed'||materializationError?'Realweltdaten noch nicht vollständig':'Ort wird aus realen Geodaten aufgebaut'}</b><span>{materializationError??'Die Karte bleibt benutzbar; Details werden persistent ergänzt.'}</span></div>{!materializationBusy&&(data.materialization.status==='failed'||materializationError)&&<button onClick={()=>void materializePlace(data.materialization!)}>Erneut versuchen</button>}</div>}
 
       {selectedSpot&&<div className="earth-site-panel" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
         <div className="earth-site-head"><div><small>AUSGEWÄHLTE STELLE</small><strong>{selectedTerrain?terrainLabel(selectedTerrain.state):'Geländedaten werden gesucht'}</strong></div><button onClick={clearPlacement}>×</button></div>
