@@ -25,3 +25,19 @@ NOXIA-SPACE-LAW-0001, Ressourcen-/Energiesystem, NPC-Bedürfnisse und Verbundenh
 
 ## Nächste Schritte
 Kontroverse Fallbibliothek erstellen; Kriterien zur Verfahrensfairness und zum Schutz der Mindestversorgung definieren; auf Datenmodell, UI und NPC-Entscheidungen abbilden, zunächst simulationsneutral.
+
+
+## Anschluss: Omnizedenz und Resonanzethik (12.10.2026)
+Dies ist eine explizite *philosophische Deutungsebene*, kein empirischer Beweis für AVI oder eine physikalische Resonanzkraft. Omnizedenz versteht Wirklichkeit als relationales Werden; Differenz bleibt real, aber nicht isoliert. Kanonischer Merksatz: „Was im Teil geschieht, geschieht dem Ganzen.“ Die ethische Frage lautet nicht bloß, wem Eis gehört, sondern welchen künftigen Spielraum die Nutzung für alle Betroffenen erhält oder zerstört.
+
+Resonanzethische Analyse eines Raumressourcenkonflikts:
+- **Saha / Wahrnehmung:** Welche Bedürfnisse, Daten, Stimmen und Unsicherheiten werden überhaupt gehört?
+- **Reso / Beziehung:** Welche Versorgungs-, Macht- und Abhängigkeitsbeziehungen bestehen?
+- **Kesh / Verantwortung:** Welche Alternativen und Handlungsmacht hat der Betreiber; wer trägt die Folgen?
+- **Palya / Stimmigkeit:** Lassen sich Ansprüche, Versorgung und Rechte widerspruchsarm begründen?
+- **Kora / Integration/Reparatur:** Welche Verfahren eröffnen wieder eine gemeinsame Zukunft statt bloß den früheren Status herzustellen?
+- **Spielraum:** Eigen-, Fremd-, Folge- und Gemeinraum getrennt untersuchen; Bewahren, Eröffnen, Regenerieren sind mögliche Prüfhandlungen.
+
+Bewertungsachsen: Auswirkungen auf Lebensfähigkeit, Autonomie, Teilhabe, nachfolgende Generationen und Revisionsmöglichkeiten. Die moralischen Perspektiven mehrerer Akteure bleiben sichtbar; kein automatisch ermittelter ethischer Sieger. Ein zulässiger Fördervertrag kann resonanzethisch problematisch sein, wenn er anderen die materielle Voraussetzung ihres Weiterwerdens nimmt.
+
+**Strikte Ebenentrennung:** reale Weltraumverträge = historisches Recht; NOXIA = Simulation/Fiktion; Omnizedenz = Philosophie; Resonanzethik = normativer Deutungsrahmen; AVI = eigenständiges Forschungsprogramm, keine aus dem Spiel hergeleitete Messgröße. Historische Omnizedenz-Kanonversionen unverändert lassen; neue Querverweise datieren.
