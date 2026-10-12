@@ -48,32 +48,42 @@ Drei Schritte, jeder einzeln deploybar, wie bei `variety` (NOXIA-LIVING-0009):
 
 Prüfsatz für B: Ein Lauf über die Forschungskolonie (`colonyRun`) mit gleichem Seed liefert über 60 Tage dieselbe Zahl an Mangelereignissen ±10 % wie vorher.
 
-### 3. Spielerbedürfnisse: abgeleitet, nicht getickt
+### 3. Spielerbedürfnisse: abgeleitet, nach Spielzeit
 
-Neue Tabelle `player_needs(profile_id, need_code, satisfaction, updated_tick)`, `need_code in ('hunger','thirst')`, RLS nur Service Role.
+**Entschieden (Thomas, 12.10.2026): Ist der Spieler nicht da, ändert sich sein Zustand nicht.** Spielerbedürfnisse laufen deshalb nicht nach Weltzeit (Ticks), sondern nach aktiver Spielzeit. Bewohner leben weiter nach Weltzeit. Das sind bewusst zwei Uhren.
 
-Der Wert wird **nicht** vom Cron heruntergezählt. Gespeichert wird nur der Stand nach dem letzten Essen oder Trinken. Der aktuelle Wert wird beim Lesen berechnet:
+**Aktive Spielzeit messen**
+
+- `profiles.active_minutes` (Zähler) und `profiles.last_active_minute` (letzte gezählte Minute, z. B. Unix-Minuten).
+- Der Client sendet höchstens einmal pro Minute ein Lebenszeichen (`POST /api/game/player/presence`) – nur wenn der Tab sichtbar ist (`document.visibilityState === 'visible'`) und es in den letzten 5 Minuten eine Eingabe gab. Ein vergessener offener Tab zählt nicht als Spielzeit.
+- Der Server zählt atomar und höchstens einmal je Minute:
+  `update profiles set active_minutes = active_minutes + 1, last_active_minute = :jetzt where id = :spieler and coalesce(last_active_minute, 0) < :jetzt`
+  Doppelte oder vorgezogene Lebenszeichen bewirken nichts. Die Minute bestimmt der Server, nicht der Client.
+
+**Bedürfniswert ableiten**
+
+Neue Tabelle `player_needs(profile_id, need_code, satisfaction, active_minutes_at, updated_tick)`, `need_code in ('hunger','thirst')`, RLS nur Service Role. Gespeichert wird nur der Stand nach dem letzten Essen oder Trinken, samt Zählerstand der Spielzeit zu diesem Moment. Der aktuelle Wert wird beim Lesen berechnet:
 
 ```
-aktuell = max(UNTERGRENZE, gespeichert − Rate × (jetziger Tick − updated_tick))
+aktuell = max(UNTERGRENZE, gespeichert − Rate × (active_minutes jetzt − active_minutes_at))
 ```
 
-Das folgt dem Grundsatz „Zustand = Basiswert + Ereignisse + verstrichene Zeit" und erzeugt für inaktive Spieler keine Schreibvorgänge. Erste Zeile beim ersten Lesen: 1,0 (neuer Spieler ist versorgt).
+Kein Cron, keine Schreibvorgänge für Abwesende, und es stimmt auch über mehrere Sitzungen mit Pausen dazwischen. Erste Zeile beim ersten Lesen: 1,0 (neuer Spieler ist versorgt). `updated_tick` bleibt nur als Historie.
 
-Vorgeschlagene Raten für Spieler (Tick = Stunde):
+Vorgeschlagene Raten (je Minute aktiver Spielzeit):
 
-| Bedürfnis | Rate je Tick | von voll bis „hungrig/durstig" (0,4) |
-|---|---|---|
-| thirst | 0,03 | 20 Stunden |
-| hunger | 0,02 | 30 Stunden |
+| Bedürfnis | Rate je Minute | bis „durstig/hungrig" (0,4) | bis Untergrenze (0,25) |
+|---|---|---|---|
+| thirst | 0,005 | 2 Stunden Spielzeit | 2,5 Stunden |
+| hunger | 0,0033 | 3 Stunden Spielzeit | 3,75 Stunden |
 
-Wer einmal am Tag spielt, kommt also durstig, aber nicht am Ende wieder. Das ist der gewünschte Anlass, ins Lokal zu gehen.
+In einer normalen Sitzung kommt so einmal der Anlass, ins Lokal zu gehen – spürbar, aber nicht ständig. Wer eine Woche nicht spielt, kommt genau so zurück, wie er gegangen ist.
 
 ### 4. Was bei Mangel passiert
 
 **Bewohner:** wie bisher bei `sustenance` – Druck in der Entscheidung, Aufwachen bei kritischem Wert, `restore_sustenance`. Durst bekommt ein höheres Gewicht als Hunger (Vorschlag 1,4 gegenüber 1,1; bisher `sustenance` 1,25).
 
-**Spieler (Alpha):** Untergrenze **0,25**. Ein Spieler verhungert und verdurstet nicht und verliert nichts, auch nicht nach einer Woche Abwesenheit. Er kommt hungrig und durstig zurück, mit Wert 0,25. Mangel ist sichtbar (Abschnitt 6) und wirkt zunächst nur auf Begegnungen: Personen nehmen einen erschöpften Spieler wahr, was sie im Gespräch zeigen dürfen. Spürbare Nachteile (z. B. Abzug in Verhandlungen) sind bewusst offen, siehe „Offene Fragen" – die 15-Minuten-Regel gilt: neue Härte nur, wenn sie eine Entscheidung erzeugt.
+**Spieler – entschieden (Thomas, 12.10.2026): Mangel ist vorerst nur sichtbar.** Er kostet nichts: keine Abzüge in Handel, Verhandlung, Reise oder Bau. Untergrenze 0,25 – ein Spieler verhungert und verdurstet nicht. Mangel zeigt sich in der Topbar (Abschnitt 6) und darf in Gesprächen auftauchen: Personen nehmen einen erschöpften Spieler wahr und dürfen das ansprechen, ohne dass es Werte ändert. Mechanische Folgen erst, wenn sie eine echte Entscheidung erzeugen (15-Minuten-Regel), und nur mit eigener Entscheidung.
 
 ### 5. Welcher Posten was stillt – eine Quelle für Spieler und Bewohner
 
@@ -91,8 +101,8 @@ Bar und Restaurant folgen mit Aufgabe 7 nach demselben Muster.
 
 ### 6. Sichtbarkeit für den Spieler
 
-- **Topbar** (`DashboardTopbarManager`): zwei kleine Anzeigen neben den Credits, Hunger und Durst als Balken. Wörter statt Zahlen im Tooltip: „satt / hungrig / sehr hungrig", „versorgt / durstig / sehr durstig" (Grenzen 0,6 und 0,4). Der Wert wird beim Laden mitgeliefert und im Client bis zum nächsten Abruf mit derselben Formel weitergerechnet – keine Abfrage im Sekundentakt.
-- **API:** `GET /api/game/player/needs` liefert `{ hunger, thirst, tick }` (bereits abgeleitet). Die Bestellantwort liefert die neuen Werte mit, damit die Anzeige nach dem Bestellen sofort springt.
+- **Topbar** (`DashboardTopbarManager`): zwei kleine Anzeigen neben den Credits, Hunger und Durst als Balken. Wörter statt Zahlen im Tooltip: „satt / hungrig / sehr hungrig", „versorgt / durstig / sehr durstig" (Grenzen 0,6 und 0,4). Der Wert wird beim Laden mitgeliefert und im Client mit derselben Formel weitergerechnet, aber nur für Minuten, die als aktiv zählen (dieselbe Bedingung wie beim Lebenszeichen). Ist der Tab im Hintergrund, steht die Anzeige still. Keine Abfrage im Sekundentakt.
+- **API:** `GET /api/game/player/needs` liefert `{ hunger, thirst, activeMinutes, ratePerMinute }` (bereits abgeleitet). Die Antwort auf das Lebenszeichen liefert dieselben Felder. Die Bestellantwort liefert die neuen Werte mit, damit die Anzeige nach dem Bestellen sofort springt.
 - **Im Lokal:** Die Karte zeigt je Posten, was er stillt (Symbol Tropfen/Teller), nicht die Zahl.
 - Später, nicht Teil dieses Schritts: Spieler sehen bei Personen nur Wahrnehmbares („wirkt durstig") ab einer Grenze – passend zur wahrnehmungsbasierten Identität (`player_person_identity_knowledge`).
 
@@ -117,7 +127,7 @@ Prüfungen in derselben Transaktion, vor der Abbuchung:
 
 1. Migration A (hunger/thirst für Bewohner, Werte aus `sustenance`) + `hospitality_item_effects` + `player_needs`.
 2. Code B (Engine, abgeleitetes `sustenance`) – Prüfsatz colonyRun.
-3. Spielerbestellung wirkt auf `player_needs` + Topbar-Anzeige + `GET /api/game/player/needs`.
+3. Spielzeit-Zähler (`profiles.active_minutes`, Lebenszeichen) + Spielerbestellung wirkt auf `player_needs` + Topbar-Anzeige + `GET /api/game/player/needs`.
 4. Ausgeben im Lokal (Empfänger, Anwesenheit, Beziehungstabelle, Stimmungsereignis).
 5. Migration C (`sustenance` entfernen).
 
@@ -125,7 +135,8 @@ Jeder Schritt ist ein eigener Deploy.
 
 ## Offene Fragen für Thomas
 
-1. Untergrenze 0,25 für Spieler – oder sollen Spieler auch auf 0 fallen können, mit Folgen?
-2. Soll Mangel beim Spieler mechanisch etwas kosten (z. B. schlechtere Verhandlung), oder vorerst nur sichtbar sein und in Gesprächen auftauchen?
-3. Sinken Spielerwerte während langer Abwesenheit weiter bis zur Untergrenze (Vorschlag), oder friert der Wert nach z. B. 12 Ticks ohne Aktivität ein?
-4. Durst an den Wasserbestand der Kolonie koppeln – jetzt mitplanen oder als eigener Schritt nach 5?
+Entschieden am 12.10.2026: Mangel beim Spieler vorerst nur sichtbar (Abschnitt 4); Zustand ändert sich nicht, solange der Spieler nicht da ist (Abschnitt 3).
+
+1. Untergrenze 0,25 beibehalten – oder darf der Wert auf 0 fallen, da Mangel ohnehin nichts kostet?
+2. Durst an den Wasserbestand der Kolonie koppeln (nur Bewohner) – jetzt mitplanen oder als eigener Schritt nach 5?
+3. Raten nach Spielzeit (2 bzw. 3 Stunden bis „durstig/hungrig") – nach den ersten Testsitzungen nachjustieren?
