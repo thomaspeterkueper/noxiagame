@@ -126,14 +126,23 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     if(Math.abs(metric.eastM)>SCENE_RADIUS_M||Math.abs(metric.northM)>SCENE_RADIUS_M)return[]
     return[{id:`poi:${feature.id}`,name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType)}]
   }).slice(0,30):[],[origin,features])
+  // Spatial building coordinates use the canonical Earth region origin (the same
+  // frame used by EarthRegionPreview), which may differ from a local query center.
+  const toSceneCoordinates=(x:number|null|undefined,y:number|null|undefined)=>{
+    if(x==null||y==null||!Number.isFinite(Number(x))||!Number.isFinite(Number(y))||!origin||!data?.region?.origin)return null
+    const geo=localMetersToGeo({eastM:Number(x),northM:Number(y)},data.region.origin)
+    const local=geoToLocalMeters(geo,origin)
+    return {xM:local.eastM,yM:local.northM}
+  }
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
-    const xM=Number(entity.x_m),yM=Number(entity.y_m)
-    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
-    return[{id:`building:${entity.id}`,name:String(entity.name??entity.entity_id),xM,yM,kind:'NOXIA-Gebäude',entity}]
-  }),[spatialEntities])
+    const point=toSceneCoordinates(entity.x_m,entity.y_m)
+    if(!point||Math.abs(point.xM)>SCENE_RADIUS_M||Math.abs(point.yM)>SCENE_RADIUS_M)return[]
+    return[{id:`building:${entity.id}`,name:String(entity.name??entity.entity_id),...point,kind:'NOXIA-Gebäude',entity}]
+  }),[spatialEntities,origin,data?.region?.origin])
   const pendingTargets=useMemo(()=>spatialBuilds.flatMap(build=>{
-    const xM=Number(build.x_m),yM=Number(build.y_m)
-    if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
+    const point=toSceneCoordinates(build.x_m,build.y_m)
+    if(!point||Math.abs(point.xM)>SCENE_RADIUS_M||Math.abs(point.yM)>SCENE_RADIUS_M)return[]
+    const {xM,yM}=point
     const state=constructionState({
       buildable_id:build.buildable_id,
       tile_row:0,
@@ -143,7 +152,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       completes_at:build.completes_at,
     },Date.now())
     return[{id:`pending:${build.id}`,name:String(build.name??build.buildable_id),xM,yM,kind:'Baustelle',build,state}]
-  }),[spatialBuilds,motionTime])
+  }),[spatialBuilds,motionTime,origin,data?.region?.origin])
   const localTrainPoint=useMemo(()=>{
     const track=scene?.railGraph.find(path=>path.points.length>=2)
     if(!track)return null
@@ -482,7 +491,20 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           const facade=[top[1],top[2],side[2],side[1]]
           const front=[top[2],top[3],side[3],side[2]]
           const distanceM=Math.hypot(target.xM-player.xM,target.yM-player.yM)
-          return <g key={target.id} style={{cursor:'pointer'}} onClick={()=>setNavigationTargetId(target.id)}
+          return <g key={target.id} style={{cursor:'pointer'}} onClick={()=>{
+              setNavigationTargetId(target.id)
+              const entry=getBuildingEntryDefinition(entity.entity_id)
+              const footprintDistance=distanceToBuildingFootprint(player,{
+                id:entity.id,center:{xM:target.xM,yM:target.yM},widthM:width,depthM:depth,
+                rotationDeg:Number(entity.rotation_deg??0),provenance:'canonical',
+              })
+              if(entry&&footprintDistance<=8){
+                setAutoWalkTargetId('')
+                setEntryRequest({entityId:entity.id,buildingTypeId:entity.entity_id,buildingName:target.name,kind:entry.kind})
+              }else if(entry){
+                setAutoWalkTargetId(target.id)
+              }
+            }}
             onMouseMove={event=>setHoveredBuilding({x:event.clientX,y:event.clientY,name:target.name,detail:`${entity.ownerLabel??'NOXIA'} · ${entity.status??'aktiv'}`,distanceM})}
             onMouseLeave={()=>setHoveredBuilding(null)}>
             <polygon points={pointsAttr(facade)} fill="#496778" stroke="#183643" strokeWidth="1.1"/>
