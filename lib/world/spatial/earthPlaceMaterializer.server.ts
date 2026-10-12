@@ -1,8 +1,9 @@
 // lib/world/spatial/earthPlaceMaterializer.server.ts
-// Aktualisiert: 12.10.2026 — Lokaldetail-Zeilen gelten nicht als vorhandene Geographie (fehlgeschlagene Orte wurden sonst nie erneut importiert) und werden beim Geographie-Import nicht gelöscht
-// Version:      1.0.1
+// Aktualisiert: 12.10.2026 — Importprofil v2: Meer aus Küstenlinien, Strand und Fels; ältere Ortsimporte werden beim nächsten Aufruf einmalig erneuert
+// Version:      1.1.0
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { seaPolygonsFromCoastlines } from './earthCoastline'
 
 type GeoPoint = { lat: number; lon: number }
 type Bounds = { south: number; west: number; north: number; east: number }
@@ -29,10 +30,11 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
 ]
 const MAX_POINTS_PER_FEATURE = 36
-export const EARTH_GEOGRAPHY_IMPORT_VERSION = 1
+export const EARTH_GEOGRAPHY_IMPORT_VERSION = 2
 export const EARTH_NORMALIZATION_VERSION = 1
 export const EARTH_ENRICHMENT_VERSION = 1
-const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v1'
+const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v2'
+const OVERPASS_TIMEOUT_MS = 25_000
 
 export function earthPlaceBounds(lat: number, lon: number, radiusKm: number): Bounds {
   const latDelta = radiusKm / 111.32
@@ -89,6 +91,8 @@ function classify(tags: Tags, isNode = false) {
   if (tags.railway && /^(rail|light_rail|tram)$/.test(tags.railway)) return 'rail'
   if (tags.waterway && /^(river|canal)$/.test(tags.waterway)) return 'waterway'
   if (tags.natural === 'water' || tags.water) return 'water'
+  if (/^(beach|sand|shoal)$/.test(tags.natural ?? '')) return 'beach'
+  if (/^(bare_rock|scree|shingle|rock)$/.test(tags.natural ?? '')) return 'rock'
   if (tags.landuse === 'forest' || tags.natural === 'wood' || tags.landcover === 'trees') return 'forest'
   if (/^(scrub|grassland|heath|wetland)$/.test(tags.natural ?? '') || tags.landcover === 'grass' || /^(park|nature_reserve)$/.test(tags.leisure ?? '')) return 'vegetation'
   if (/^(farmland|farmyard|meadow|orchard|grass)$/.test(tags.landuse ?? '')) return 'farmland'
@@ -102,6 +106,7 @@ function visualClass(featureType: string, tags: Tags) {
   if (featureType === 'farmland') return tags.landuse ?? 'farmland'
   if (featureType === 'vegetation') return tags.natural ?? tags.landcover ?? tags.leisure ?? 'vegetation'
   if (featureType === 'urban') return tags.landuse ?? 'urban'
+  if (featureType === 'beach' || featureType === 'rock') return tags.natural ?? featureType
   if (featureType === 'landmark') return tags.tourism ?? tags.historic ?? tags.amenity ?? tags.railway ?? tags.man_made ?? 'landmark'
   return featureType
 }
@@ -128,10 +133,44 @@ function geometryFeature(featureType: string, raw: GeoPoint[], tags: Tags, sourc
   }
 }
 
-function toFeatures(elements: OverpassElement[]) {
+function pointInRing(point: GeoPoint, ring: GeoPoint[]) {
+  let hit = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j]
+    if ((a.lat > point.lat) !== (b.lat > point.lat) && point.lon < (b.lon - a.lon) * (point.lat - a.lat) / (b.lat - a.lat) + a.lon) hit = !hit
+  }
+  return hit
+}
+
+function derivedCoastFeature(featureType: string, ring: GeoPoint[], sourceId: string, visual: string): PreparedFeature | null {
+  // No point cap here: the shoreline is the most visible edge of a coastal map.
+  const simplified = simplify(ring.slice(0, -1), .00004)
+  if (simplified.length < 3) return null
+  return {
+    feature_type: featureType,
+    geometry: { kind: 'polygon', coordinates: [...simplified, simplified[0]] },
+    properties: {
+      ...(featureType === 'water' ? { natural: 'water', water: 'sea' } : { place: 'island' }),
+      noxia_source: 'OpenStreetMap',
+      noxia_source_id: sourceId,
+      noxia_provenance: 'derived',
+      noxia_derivation: 'natural=coastline',
+      visual_seed: sourceId,
+      visual_class: visual,
+    },
+  }
+}
+
+function toFeatures(elements: OverpassElement[], bounds: Bounds) {
   const output: PreparedFeature[] = []
+  const coastlines: GeoPoint[][] = []
   for (const element of elements) {
     const tags = element.tags ?? {}
+    if (element.type === 'way' && tags.natural === 'coastline') {
+      const points = (element.geometry ?? []).filter(point => Number.isFinite(point?.lat) && Number.isFinite(point?.lon))
+      if (points.length >= 2) coastlines.push(points)
+      continue
+    }
     const featureType = classify(tags, element.type === 'node')
     if (!featureType || element.id == null) continue
     const sourceId = `osm:${element.type}:${element.id}`
@@ -182,6 +221,24 @@ function toFeatures(elements: OverpassElement[]) {
     const feature = geometryFeature(featureType, element.geometry ?? [], tags, sourceId)
     if (feature) output.push(feature)
   }
+  // OSM has no sea polygon; the sea is whatever lies on the water side of the
+  // coastline. Derive it once at import so every view shows the same shore.
+  if (coastlines.length) {
+    const { sea, islands } = seaPolygonsFromCoastlines(coastlines, bounds)
+    // Plausibility: a settlement can never lie in the sea. If one does, the
+    // coastline data was incomplete for this view – show no sea rather than
+    // flooding the land.
+    const settlements = output.flatMap(feature => feature.feature_type === 'settlement' && feature.geometry.kind === 'point' ? [feature.geometry.coordinates as GeoPoint] : [])
+    const plausibleSea = sea.filter(ring => !settlements.some(point => pointInRing(point, ring)))
+    plausibleSea.forEach((ring, index) => {
+      const feature = derivedCoastFeature('water', ring, `noxia:sea:${index}`, 'sea')
+      if (feature) output.push(feature)
+    })
+    islands.forEach((ring, index) => {
+      const feature = derivedCoastFeature('island', ring, `noxia:island:${index}`, 'island')
+      if (feature) output.push(feature)
+    })
+  }
   return output
 }
 
@@ -189,7 +246,9 @@ function queryFor(bounds: Bounds) {
   const box = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   // Deliberately no blanket [building] query. A materialized NOXIA city keeps
   // the real morphology while avoiding tens of thousands of irrelevant houses.
-  return `[out:json][timeout:12];(
+  return `[out:json][timeout:25];(
+way[natural=coastline](${box});
+way[natural~"beach|sand|shoal|bare_rock|scree|shingle|rock"](${box});relation[natural~"beach|sand|shoal|bare_rock|scree|shingle|rock"](${box});
 way[natural=water](${box});way[water](${box});relation[natural=water](${box});
 way[waterway~"river|canal"](${box});
 way[landuse=forest](${box});way[natural=wood](${box});relation[landuse=forest](${box});relation[natural=wood](${box});
@@ -216,7 +275,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
   const query = queryFor(bounds)
   for (const endpoint of OVERPASS_ENDPOINTS) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 10_000)
+    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -233,7 +292,7 @@ async function loadNormalizedFeatures(bounds: Bounds) {
         continue
       }
       const payload = await response.json() as { elements?: OverpassElement[] }
-      return { features: toFeatures(payload.elements ?? []), source: `overpass:${new URL(endpoint).host}:${EARTH_IMPORT_PROFILE}` }
+      return { features: toFeatures(payload.elements ?? [], bounds), source: `overpass:${new URL(endpoint).host}:${EARTH_IMPORT_PROFILE}` }
     } catch (error) {
       failures.push(`${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
@@ -276,7 +335,11 @@ export async function materializeEarthPlace(input: {
       .map(row => String(row.id))
 
     // Create once, persist, enrich incrementally. Existing geography is
-    // authoritative until an explicit geography refresh succeeds.
+    // authoritative until a geography refresh succeeds. A snapshot written by
+    // an older import profile is refreshed; if that fails it simply stays.
+    if (existingFeatureIds.length > 0 && Number(existing.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION) {
+      input = { ...input, refreshGeography: true }
+    }
     if (existingFeatureIds.length > 0 && !input.refreshGeography) {
       const versionPatch: Record<string, unknown> = {}
       if (Number(existing.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION) {

@@ -464,7 +464,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <g transform={cameraTransform(player)}>
 
         {scene.polygons.map(feature=>{
-          const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?(/^(meadow|grass|orchard)$/.test(feature.className??'')?'#a9c178':'#bda96c'):'#a9aaa0'
+          const fill=feature.kind==='water'?'#6aa9c6':feature.kind==='beach'?'#e2d5a3':feature.kind==='rock'?'#aea89d':feature.kind==='forest'?theme.vegetation:feature.kind==='vegetation'?theme.backgroundAlt:feature.kind==='farmland'?(/^(meadow|grass|orchard)$/.test(feature.className??'')?'#a9c178':'#bda96c'):'#a9aaa0'
           return <path key={feature.id} d={polygonD(feature.points)} fill={fill} stroke={feature.kind==='water'?'#4d8eae':'rgba(54,71,57,.5)'} strokeWidth="1" opacity={feature.kind==='urban' ? .72 : .88}/>
         })}
 

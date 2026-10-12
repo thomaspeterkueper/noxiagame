@@ -1,6 +1,6 @@
 // app/api/earth/region/route.ts
-// Aktualisiert: 12.10.2026 — Geerbte Regionsgeographie per Bounding-Box (große Wälder/Wiesen fielen heraus), nur Regionen mit importierter Geographie als Erbquelle, Lokaldetail-Layer auch für Regionsansichten (Home)
-// Version:      1.1.0
+// Aktualisiert: 12.10.2026 — Orte mit älterem Importprofil melden den Status 'outdated', damit Meer, Strand und Fels nachgeladen werden
+// Version:      1.2.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
@@ -9,6 +9,7 @@ import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regi
 import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites'
 import { earthLandmarksInBounds } from '@/lib/world/spatial/earthLandmarkPresentation'
 import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
+import { EARTH_GEOGRAPHY_IMPORT_VERSION } from '@/lib/world/spatial/earthPlaceMaterializer.server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const source = new OverpassEarthFeatureSource()
@@ -134,7 +135,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const { data: storedRegion } = await supabase
     .from('celestial_regions')
-    .select('id, slug, label, center_lat, center_lon, radius_km, bounds, source, imported_at')
+    .select('id, slug, label, center_lat, center_lon, radius_km, bounds, source, imported_at, geography_import_version')
     .eq('slug', storedSlug)
     .maybeSingle()
 
@@ -210,10 +211,12 @@ export async function GET(req: NextRequest) {
       ]
       // Local detail rows alone are not a materialized place: without own or
       // inherited geography the place still has to be imported.
-      const hasGeography = Boolean(inheritedFrom) || (rows ?? []).some(row => !isLocalDetailRow(row))
+      const ownGeography = (rows ?? []).some(row => !isLocalDetailRow(row))
+      const hasGeography = Boolean(inheritedFrom) || ownGeography
       const materializationStatus = placeSlug
         ? (hasGeography
-            ? 'ready'
+            // Usable, but imported before sea/beach/rock were part of the profile.
+            ? (ownGeography && Number(storedRegion.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION ? 'outdated' : 'ready')
             : String(storedRegion.source ?? '').includes('failed') ? 'failed' : 'pending')
         : null
       const runtimeRegion = placeSlug
