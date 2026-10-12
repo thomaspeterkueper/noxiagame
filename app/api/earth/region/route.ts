@@ -1,6 +1,6 @@
 // app/api/earth/region/route.ts
-// Aktualisiert: 12.10.2026 — Orte mit älterem Importprofil melden den Status 'outdated', damit Meer, Strand und Fels nachgeladen werden
-// Version:      1.2.0
+// Aktualisiert: 12.10.2026 — Lokaldetail folgt einem ausdrücklich angefragten Szenenmittelpunkt (mitwandernde begehbare Szene), Detailzeilen werden dedupliziert
+// Version:      1.3.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { CURRENT_EARTH_BOOTSTRAP_CLASSES, type ImportedEarthFeature } from '@/lib/world/spatial/earthFeatureSource'
@@ -126,7 +126,10 @@ export async function GET(req: NextRequest) {
   // Footprints, paths and watercourses of the walkable scene are stored per
   // view centre. A searched place keeps them in its own row; a regional view
   // (e.g. Home) keeps them in a detail-only row with the coordinate slug.
-  const localDetail = { slug: placeSlug ?? earthPlaceSlug(center), lat: center.lat, lon: center.lon }
+  // When the walkable scene follows the player it asks for an explicit centre;
+  // that centre then owns its detail row regardless of the selected place.
+  const explicitCenter = queryLat != null && queryLon != null
+  const localDetail = { slug: placeSlug && !explicitCenter ? placeSlug : earthPlaceSlug(center), lat: center.lat, lon: center.lon }
 
   // Runtime rendering never depends on a live Overpass request for arbitrary
   // searched places. Once selected, a place is identified persistently and
@@ -184,7 +187,8 @@ export async function GET(req: NextRequest) {
             : storedRegion.source
           inheritedFrom = covering.slug
         }
-      } else if (localDetail.slug !== storedRegion.slug) {
+      }
+      if (localDetail.slug !== storedRegion.slug) {
         const { data: detailRegion } = await supabase
           .from('celestial_regions')
           .select('id')
@@ -195,7 +199,11 @@ export async function GET(req: NextRequest) {
             .from('region_features')
             .select('id, feature_type, geometry, properties')
             .eq('region_id', detailRegion.id)
-          effectiveRows = [...effectiveRows, ...(detailRows ?? []).filter(isLocalDetailRow)]
+          const seen = new Set(effectiveRows.map(row => String((row.properties as any)?.noxia_source_id ?? row.id)))
+          effectiveRows = [
+            ...effectiveRows,
+            ...(detailRows ?? []).filter(row => isLocalDetailRow(row) && !seen.has(String((row.properties as any)?.noxia_source_id ?? row.id))),
+          ]
         }
       }
 

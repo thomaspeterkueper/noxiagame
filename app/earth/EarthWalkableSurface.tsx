@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — NOXIA-Gebäude und Baustellen über ihre WGS84-Position in die Szene projizieren (standen am Home-Ort im falschen Bezugsrahmen), sichtbarer Ladestatus des Lokaldetails mit erneutem Versuch
-// Version:      1.2.0
+// Aktualisiert: 12.10.2026 — Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.3.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -33,6 +33,18 @@ const VIEW_W=WALKABLE_VIEW.width
 const VIEW_H=WALKABLE_VIEW.height
 const SCENE_RADIUS_M=260
 const HEIGHT_PX=12
+// The scene covers ±260 m. Well before that edge it is rebuilt around the
+// player, snapped to a fixed grid so the same ground always maps to the same
+// stored detail rows instead of a new set for every few metres walked.
+const RECENTER_AT_M=190
+const SCENE_GRID_M=300
+function sceneGridNode(point:GeoPoint):GeoPoint{
+  const latStep=SCENE_GRID_M/110540
+  const lat=Math.round(point.lat/latStep)*latStep
+  const lonStep=SCENE_GRID_M/(111320*Math.max(.05,Math.cos(lat*Math.PI/180)))
+  return{lat:Number(lat.toFixed(6)),lon:Number((Math.round(point.lon/lonStep)*lonStep).toFixed(6))}
+}
+function regionUrl(tag:string,center:GeoPoint|null){return `/api/earth/region?v=${tag}`+(center?`&lat=${center.lat}&lon=${center.lon}`:'')}
 
 function role(resident:ColonyResident){return resident.assignments.find(item=>item.type==='work')?.roleCode??resident.activityState??'general'}
 // x_m/y_m of an entity are relative to the region anchor of the API response,
@@ -71,8 +83,10 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const localEnrichmentAttempted=useRef(new Set<string>())
   const[detailStatus,setDetailStatus]=useState<'idle'|'loading'|'failed'>('idle')
   const[detailRetry,setDetailRetry]=useState(0)
+  const[sceneCenter,setSceneCenter]=useState<GeoPoint|null>(null)
+  const recenterRequested=useRef('')
 
-  useEffect(()=>{let live=true;fetch('/api/earth/region?v=walkable-v2',{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live)setData(json)}).catch(()=>{if(live)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[])
+  useEffect(()=>{let live=true;fetch(regionUrl('walkable-v2',sceneCenter),{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live&&(json?.ok||!sceneCenter))setData(json)}).catch(()=>{if(live&&!sceneCenter)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[sceneCenter])
   useEffect(()=>{
     const detail=data?.localDetail
     if(!data?.ok||!detail?.slug)return
@@ -86,14 +100,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         const {token}=await getSessionInfo()
         const response=await fetch('/api/earth/local-enrich',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({slug:detail.slug,lat:detail.lat,lon:detail.lon,radiusKm:.34})})
         if(!response.ok){if(live)setDetailStatus('failed');return}
-        const refreshed=await fetch('/api/earth/region?v=walkable-v3',{cache:'no-store'}).then(result=>result.json())
+        const refreshed=await fetch(regionUrl('walkable-v3',sceneCenter),{cache:'no-store'}).then(result=>result.json())
         if(!live)return
         if(refreshed?.ok)setData(refreshed)
         setDetailStatus('idle')
       }catch{if(live)setDetailStatus('failed')}
     })()
     return()=>{live=false}
-  },[data?.ok,data?.localDetail,data?.features,detailRetry])
+  },[data?.ok,data?.localDetail,data?.features,detailRetry,sceneCenter])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{if(!live)return;setSpatialEntities(Array.isArray(json?.entities)?json.entities:[]);setSpatialBuilds(Array.isArray(json?.builds)?json.builds:[])}).catch(()=>{if(live){setSpatialEntities([]);setSpatialBuilds([])}});return()=>{live=false}},[])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=80){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
@@ -133,6 +147,21 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       setSharedPlayerPosition(regionId,player,localMetersToGeo({eastM:player.xM,northM:player.yM},origin))
     }
   },[data?.region,origin,playerRegionId,player,playerGeo,resetSharedPlayerPosition,setSharedPlayerPosition])
+  // WGS84 is the player's canonical position; the local metres only describe
+  // it inside the current scene frame. Keep both in step and move the frame
+  // before the player reaches its edge.
+  useEffect(()=>{
+    const regionId=(data?.region as any)?.id??null
+    if(!origin||!playerGeo||!playerRegionId||(regionId&&playerRegionId!==regionId))return
+    const metric=geoToLocalMeters(playerGeo,origin)
+    if(Math.max(Math.abs(metric.eastM),Math.abs(metric.northM))>RECENTER_AT_M){
+      const node=sceneGridNode(playerGeo)
+      const key=`${node.lat},${node.lon}`
+      if(recenterRequested.current!==key){recenterRequested.current=key;setSceneCenter(node)}
+      return
+    }
+    if(Math.hypot(metric.eastM-player.xM,metric.northM-player.yM)>.5)setSharedPlayerPosition(regionId,{xM:metric.eastM,yM:metric.northM},playerGeo)
+  },[data?.region,origin,playerGeo,playerRegionId,player,setSharedPlayerPosition])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
   const namedPoiTargets=useMemo(()=>origin?features.flatMap(feature=>{
