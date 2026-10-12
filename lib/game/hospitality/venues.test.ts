@@ -11,6 +11,7 @@ import {
   VENUE_PLAYER_RADIUS,
   canSeeRoom,
   describePlayerPosition,
+  isAtServicePoint,
   isVenueBlocked,
   placeVenueFigures,
   venueConversationFacts,
@@ -145,6 +146,13 @@ check(describePlayerPosition(cafe, cafe.servicePoint) === 'am Tresen', 'player a
 check(describePlayerPosition(restaurant, restaurant.servicePoint) === 'am Empfang', 'restaurant service point is the desk')
 check(describePlayerPosition(cafe, { x: 300, y: 175 }) === 'an Tisch 1' || describePlayerPosition(cafe, { x: 300, y: 175 }) === 'an Tisch 2', 'player between tables is at a table')
 check(describePlayerPosition(cafe, { x: 480, y: 400 }) === 'mitten im Raum', 'player away from everything is in the room')
+
+// Am Tresen steht, wer irgendwo an seiner Kante steht – nicht nur in der Mitte.
+check(isAtServicePoint(cafe, { x: 548, y: 172 }) && isAtServicePoint(cafe, { x: 690, y: 172 }), 'both ends of the cafe counter count as at the counter')
+check(isAtServicePoint(cafe, { x: 500, y: 126 }), 'standing at the short side of the counter counts')
+check(!isAtServicePoint(cafe, cafe.start) && !isAtServicePoint(cafe, { x: 440, y: 230 }), 'entrance and tables are not the counter')
+check(isAtServicePoint(VENUE_LAYOUTS.bar, { x: 520, y: 100 }) && isAtServicePoint(VENUE_LAYOUTS.bar, { x: 520, y: 330 }), 'the whole length of the bar counts')
+check(isAtServicePoint(restaurant, restaurant.servicePoint) && !isAtServicePoint(restaurant, { x: 400, y: 200 }), 'restaurant: desk yes, dining room no')
 
 // ── Gesprächswissen ─────────────────────────────────────────────────────────
 const FORBIDDEN = /kontostand von|wissensstufe \d|heimatort ist|guest-\d|worker-|friend/i
