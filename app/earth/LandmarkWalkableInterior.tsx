@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 12.10.2026 — Begehbarer Innenraum für reale Landmarks (Bibliothek, Gotteshaus)
-// Version:      1.0.0
+// Aktualisiert: 12.10.2026 — Bibliotheksregale zeigen den Bücherbestand (Autor, Titel, Genre, Teaser); Begehbarer Innenraum für reale Landmarks (Bibliothek, Gotteshaus)
+// Version:      1.1.0
 
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -14,6 +14,7 @@ import {
   type LandmarkRoomKind,
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
+import { LIBRARY_BOOKS, LIBRARY_SHELVES } from '@/lib/game/landmarks/libraryCatalogue'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet nur. Der Raum ist ein typischer Grundriss für die Ortsart,
@@ -34,6 +35,8 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
   const [active, setActive] = useState<LandmarkSpot | null>(null)
   const [candles, setCandles] = useState(3)
   const [seated, setSeated] = useState(false)
+  const [bookId, setBookId] = useState('')
+  const book = LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -80,6 +83,17 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
         <h3>{shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>
         {!shown && <p>Du kannst dich frei im Raum bewegen. Tritt an einen Bereich heran, um ihn näher anzusehen.</p>}
         {shown && <p>{shown.text}</p>}
+        {shown?.action === 'books' && !book && <div className="books">{LIBRARY_SHELVES.map(shelf => <section key={shelf.id}>
+          <h4>{shelf.label}</h4>
+          {LIBRARY_BOOKS.filter(entry => entry.shelf === shelf.id).map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
+        </section>)}</div>}
+        {shown?.action === 'books' && book && <div className="book">
+          <span>{book.author}</span>
+          <b>{book.title}</b>
+          <i>{book.genre}</i>
+          <p>{book.teaser}</p>
+          <button className="act" onClick={() => setBookId('')}>← Zurück ins Regal</button>
+        </div>}
         {shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
         {shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
         {shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
@@ -123,6 +137,18 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       aside h3{margin:0;font-size:15px}
       aside p{margin:0;color:#d5e0dd}
       .act{border:1px solid #6e7d55;border-radius:5px;background:#273d24;color:#edf3dd;padding:7px 9px;font:800 9px monospace;cursor:pointer}
+      .books{display:grid;gap:10px;max-height:300px;overflow:auto;padding-right:4px}
+      .books section{display:grid;gap:3px}
+      .books h4{margin:0 0 2px;font:800 8px monospace;letter-spacing:.1em;color:#d7b96e}
+      .books button{display:grid;gap:1px;text-align:left;border:0;border-left:3px solid #8a5a3a;border-radius:2px;background:#16302f;color:#eef2ed;padding:5px 8px;cursor:pointer}
+      .books button:hover{background:#1d3d3c}
+      .books button b{font-size:11px}
+      .books button span{font-size:9px;color:#8ea4a6}
+      .book{display:grid;gap:5px;padding:10px;border:1px solid #5d4428;border-radius:6px;background:#efe6d2;color:#2b2118}
+      .book span{font:800 8px monospace;letter-spacing:.1em;color:#7a5a36}
+      .book b{font-size:14px;line-height:1.2}
+      .book i{font-size:10px;color:#6b5a48}
+      .book p{margin:2px 0 4px;color:#2b2118;line-height:1.5}
       aside dl{margin:0;display:grid;gap:4px}
       aside dl div{display:grid;grid-template-columns:86px 1fr;gap:6px}
       aside dt{color:#7e9896}

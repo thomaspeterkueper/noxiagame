@@ -1,12 +1,12 @@
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 12.10.2026 — Begehbare Innenräume für reale Landmarks: Bibliothek und Gotteshaus
-// Version:      1.0.0
+// Aktualisiert: 12.10.2026 — Regale führen zum Bücherbestand, die Ausleihe zu den Lernmodulen; Begehbare Innenräume für reale Landmarks: Bibliothek und Gotteshaus
+// Version:      1.1.0
 
 export type LandmarkRoomKind = 'library' | 'worship'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
-export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'learn' | 'candle' | 'sit' }
+export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' }
 export type LandmarkRoomLayout = {
   kind: LandmarkRoomKind
   noun: string
@@ -34,9 +34,9 @@ function libraryLayout(): LandmarkRoomLayout {
     exit: { x: 380, y: 452 },
     furniture,
     spots: [
-      { id: 'shelves', label: 'REGALE', x: 195, y: 108, action: 'learn', text: 'Sachbücher, nach Fachgebieten geordnet. Was hier steht, findest du in NOXIA als Lernmodule der Solar Science Foundation.' },
+      { id: 'shelves', label: 'REGALE', x: 195, y: 108, action: 'books', text: 'Romane, Erzählungen und Sachbücher. Zieh einen Band heraus, um Titel und Klappentext zu lesen.' },
       { id: 'reading', label: 'LESETISCH', x: 478, y: 200, action: 'sit', text: 'Ein ruhiger Platz mit Leselampe. Niemand drängt dich weiter.' },
-      { id: 'desk', label: 'AUSLEIHE', x: 495, y: 420, text: 'Die Ausleihe ist unbesetzt. Ein Schild verweist auf die Öffnungszeiten.' },
+      { id: 'desk', label: 'AUSLEIHE', x: 495, y: 420, action: 'learn', text: 'Die Ausleihe ist unbesetzt. Ein Aushang verweist auf die Lernmodule der Solar Science Foundation.' },
     ],
   }
 }
