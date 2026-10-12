@@ -32,3 +32,19 @@ Prinzip aus PCGH-Artikel (2026): https://www.pcgameshardware.de/Gears-of-War-E-D
 
 ## Grenzen
 Automatische CI-Tests prüfen nur explizit formulierte Invarianten. Sie können weder vollständige physikalische Richtigkeit noch alle emergenten Spielfolgen beweisen. Ein ständig rechnender Hintergrund-Simulator ist ausdrücklich nicht vorgesehen.
+
+## Technologie-Plausibilitätsprüfung (Erweiterung 12.10.2026)
+**Vor** Implementierung, Balancing oder Aufnahme in den technischen Kanon ist jeder neue physikalische Mechanismus zu klassifizieren:
+
+1. **Physikalische Zulässigkeit:** Welche Erhaltungsgrößen, Teilchenstatistik, Symmetrien, Grenzfälle und No-Go-Sätze gelten? Voraussetzungen und Geltungsbereich der Aussage dokumentieren. Ein *spezifisch* widerlegter Mechanismus bedeutet nicht, dass eine ganze Technologieklasse unmöglich ist.
+2. **Evidenzstatus:** A = reproduziertes Experiment; B = experimenteller Einzelbefund; C = theoretisch konsistentes Modell; D = plausible Extrapolation; E = ausdrücklich fiktionale Annahme; X = im angegebenen Modell widerlegter Mechanismus. Evidenzstatus enthält keine automatische Aussage über wirtschaftliche Reife.
+3. **Technische Machbarkeit:** Wirkungsgrade, Stoff- und Energiebilanzen, Komponenten, Skalierung, Stabilität, Betrieb und realistische Entwicklungszeit separat prüfen.
+4. **Kanon und Simulation:** Epoche, Infrastruktur, Materialströme und Auswirkungen auf die Ökonomie abgleichen. Modelle mit Status X für die konkreten widerlegten Voraussetzungen nicht als reale Technologie übernehmen; SF-Abweichungen sichtbar als fiktionale Prämissen markieren.
+5. **Automatisierung:** Ein PR-Check kann Dokumentationspflichten und definierte Invarianten kontrollieren, jedoch keine physikalische Möglichkeit allgemeingültig beweisen. Bei neuen Technologieklassen fachliche Review-Freigabe verlangen; keine permanente rechenintensive Simulation starten.
+
+### Beispiel: Neutrino-Laser (2026)
+Die spezifische superradiante Verstärkung von Neutrinoemission aus radioaktiven Bose-Einstein-Kondensaten ist laut zwei theoretischen Arbeiten durch Rückstoß/Kohärenzverlust und Fermionenstatistik ausgeschlossen bzw. nicht erreichbar. Das ist **kein universeller Ausschluss** aller denkbaren Neutrinoquellen oder Neutrino-Kommunikation. Für NOXIA: Status X für genau diesen Mechanismus, andere Neutrinotechnologien getrennt bewerten.
+Quellen: https://doi.org/10.1103/8x7k-rwx2 und https://doi.org/10.1103/rnx6-wqpf ; Einordnung https://www.scinexx.de/news/physik/quantengesetze-verhindern-den-geplanten-neutrino-laser/
+
+### Review-Auslöser
+Neue Primärstudien, widersprechende Experimente, neue Forschungsmechaniken oder bedeutende Änderungen am Kanon. Spätestens Oktober 2027 erneut prüfen.
