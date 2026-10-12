@@ -1,6 +1,6 @@
 // lib/world/spatial/earthLocalEnrichment.server.ts
-// Aktualisiert: 12.10.2026 — Profil local-scene-v2: Flüsse/Kanäle und Feld-/Waldwege, Detail-Layer auch für Regionsansichten (Home), ältere Profilzeilen werden nach erfolgreichem Import ersetzt
-// Version:      1.1.0
+// Aktualisiert: 12.10.2026 — Overpass-Spiegel parallel statt nacheinander abfragen (erste gültige Antwort gewinnt), zusätzlicher Spiegel
+// Version:      1.2.0
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { earthPlaceSlug } from './earthPlaceIdentity'
@@ -13,7 +13,8 @@ type PreparedFeature={feature_type:string;geometry:{kind:'line'|'polygon';coordi
 const PROFILE=EARTH_LOCAL_ENRICHMENT_PROFILE
 /** Marks a region row that only carries the local detail layer, no regional geography. */
 export const EARTH_LOCAL_DETAIL_SOURCE='noxia:local-detail'
-const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass-api.de/api/interpreter']
+const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass-api.de/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter']
+const ENDPOINT_TIMEOUT_MS=20000
 const LOCAL_HIGHWAYS='footway|path|pedestrian|steps|cycleway|service|residential|living_street|unclassified|track'
 const LOCAL_WATERWAYS='river|canal|stream|ditch|drain'
 const HIGHWAY_PATTERN=new RegExp('^('+LOCAL_HIGHWAYS+')$')
@@ -84,21 +85,33 @@ export async function enrichEarthLocalScene(input:{slug:string;lat:number;lon:nu
   if(existingError)throw existingError
   if((existing??[]).length>0)return{ok:true,status:'ready' as const,total:existing!.length,cached:true}
 
+  // The public Overpass mirrors are frequently overloaded. Ask all of them at
+  // once and keep the first valid answer instead of waiting out each timeout.
   const failures:string[]=[]
   let prepared:PreparedFeature[]|null=null
   let source=''
   const overpassQuery=query(input.lat,input.lon,radiusKm)
-  for(const endpoint of ENDPOINTS){
-    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000)
-    try{
-      const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','user-agent':'NOXIA/0.1 earth-local-enrichment'},body:new URLSearchParams({data:overpassQuery}),signal:controller.signal,cache:'no-store'})
-      if(!response.ok){failures.push(new URL(endpoint).host+': HTTP '+response.status);continue}
-      const payload=await response.json() as {elements?:OverpassElement[]}
-      prepared=toFeatures(payload.elements??[])
-      source='overpass:'+new URL(endpoint).host+':'+PROFILE
-      break
-    }catch(error){failures.push(new URL(endpoint).host+': '+(error instanceof Error?error.message:String(error)))}finally{clearTimeout(timer)}
-  }
+  const controllers=ENDPOINTS.map(()=>new AbortController())
+  try{
+    const winner=await Promise.any(ENDPOINTS.map(async(endpoint,index)=>{
+      const host=new URL(endpoint).host
+      const timer=setTimeout(()=>controllers[index].abort(),ENDPOINT_TIMEOUT_MS)
+      try{
+        const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','user-agent':'NOXIA/0.1 earth-local-enrichment'},body:new URLSearchParams({data:overpassQuery}),signal:controllers[index].signal,cache:'no-store'})
+        if(!response.ok)throw new Error('HTTP '+response.status)
+        const payload=await response.json() as {elements?:OverpassElement[];remark?:string}
+        // A timed-out query still answers 200 with a remark and no data.
+        if(!Array.isArray(payload.elements)||(payload.elements.length===0&&payload.remark))throw new Error(payload.remark??'keine Daten')
+        return{host,elements:payload.elements}
+      }catch(error){
+        failures.push(host+': '+(error instanceof Error?error.message:String(error)))
+        throw error
+      }finally{clearTimeout(timer)}
+    }))
+    prepared=toFeatures(winner.elements)
+    source='overpass:'+winner.host+':'+PROFILE
+  }catch{}
+  finally{for(const controller of controllers)controller.abort()}
   if(!prepared)throw new Error('Local enrichment failed: '+failures.join('; '))
 
   // Rows of an older enrichment profile stay visible until the new snapshot is

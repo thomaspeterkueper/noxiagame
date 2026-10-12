@@ -16,6 +16,7 @@ export async function POST(req:NextRequest){
     const result=await enrichEarthLocalScene({slug,lat,lon,radiusKm:body.radiusKm})
     return NextResponse.json(result,{headers:{'Cache-Control':'private, no-store, max-age=0'}})
   }catch(error){
+    console.error('earth local enrichment failed',error)
     return NextResponse.json({ok:false,error:error instanceof Error?error.message:String(error)},{status:500,headers:{'Cache-Control':'private, no-store, max-age=0'}})
   }
 }

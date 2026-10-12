@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — Lokaldetail (Gebäude, Wege, Bäche/Flüsse) auch am Home-Ort laden, Profil local-scene-v2, Wiesen grün statt ackerfarben, Flüsse breiter als Bäche
-// Version:      1.1.0
+// Aktualisiert: 12.10.2026 — NOXIA-Gebäude und Baustellen über ihre WGS84-Position in die Szene projizieren (standen am Home-Ort im falschen Bezugsrahmen), sichtbarer Ladestatus des Lokaldetails mit erneutem Versuch
+// Version:      1.2.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -24,7 +24,7 @@ type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
 type Payload={ok:boolean;region?:{id?:string;name:string;origin:GeoPoint};queryCenter?:GeoPoint;localDetail?:{slug:string;lat:number;lon:number};bounds?:{south:number;west:number;north:number;east:number};features?:Feature[];error?:string}
 type SpatialEntity={id:string;entity_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;ownerLabel?:string;isOwn?:boolean;status?:string;latitude_deg?:number|null;longitude_deg?:number|null}
-type SpatialBuild={id:string;buildable_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;status?:string;created_at?:string|null;completes_at?:string|null}
+type SpatialBuild={id:string;buildable_id:string;name?:string;latitude_deg?:number|null;longitude_deg?:number|null;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;status?:string;created_at?:string|null;completes_at?:string|null}
 type Props={residents:ColonyResident[];onClose:()=>void}
 type ChatEntry={role:'user'|'assistant';content:string}
 type NpcWorldAction={type:'lead_walk';startedAt:number;durationSeconds:number;maxDistanceMeters:number;playerFollows:boolean}|{type:'visit_place';startedAt:number;durationSeconds:number;targetRef:string;targetName:string;targetX:number;targetY:number;startX:number;startY:number;playerFollows:boolean}
@@ -35,6 +35,14 @@ const SCENE_RADIUS_M=260
 const HEIGHT_PX=12
 
 function role(resident:ColonyResident){return resident.assignments.find(item=>item.type==='work')?.roleCode??resident.activityState??'general'}
+// x_m/y_m of an entity are relative to the region anchor of the API response,
+// the scene is centred on the current view centre. WGS84 is the canonical
+// position, so project it into the scene frame instead of mixing both frames.
+function scenePosition(item:{latitude_deg?:number|null;longitude_deg?:number|null;x_m?:number|null;y_m?:number|null},origin:GeoPoint|undefined){
+  const lat=item.latitude_deg==null?NaN:Number(item.latitude_deg),lon=item.longitude_deg==null?NaN:Number(item.longitude_deg)
+  if(origin&&Number.isFinite(lat)&&Number.isFinite(lon)){const metric=geoToLocalMeters({lat,lon},origin);return{xM:metric.eastM,yM:metric.northM}}
+  return{xM:item.x_m==null?NaN:Number(item.x_m),yM:item.y_m==null?NaN:Number(item.y_m)}
+}
 function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 export default function EarthWalkableSurface({residents,onClose}:Props){
   const[data,setData]=useState<Payload|null>(null)
@@ -61,6 +69,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const lastAutoWalkMotionTime=useRef<number|null>(null)
   const[entryRequest,setEntryRequest]=useState<BuildingEntryRequest|null>(null)
   const localEnrichmentAttempted=useRef(new Set<string>())
+  const[detailStatus,setDetailStatus]=useState<'idle'|'loading'|'failed'>('idle')
+  const[detailRetry,setDetailRetry]=useState(0)
 
   useEffect(()=>{let live=true;fetch('/api/earth/region?v=walkable-v2',{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live)setData(json)}).catch(()=>{if(live)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[])
   useEffect(()=>{
@@ -70,17 +80,20 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     if(alreadyEnriched||localEnrichmentAttempted.current.has(detail.slug))return
     localEnrichmentAttempted.current.add(detail.slug)
     let live=true
+    setDetailStatus('loading')
     ;(async()=>{
       try{
         const {token}=await getSessionInfo()
         const response=await fetch('/api/earth/local-enrich',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({slug:detail.slug,lat:detail.lat,lon:detail.lon,radiusKm:.34})})
-        if(!response.ok)return
+        if(!response.ok){if(live)setDetailStatus('failed');return}
         const refreshed=await fetch('/api/earth/region?v=walkable-v3',{cache:'no-store'}).then(result=>result.json())
-        if(live&&refreshed?.ok)setData(refreshed)
-      }catch{}
+        if(!live)return
+        if(refreshed?.ok)setData(refreshed)
+        setDetailStatus('idle')
+      }catch{if(live)setDetailStatus('failed')}
     })()
     return()=>{live=false}
-  },[data?.ok,data?.localDetail,data?.features])
+  },[data?.ok,data?.localDetail,data?.features,detailRetry])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{if(!live)return;setSpatialEntities(Array.isArray(json?.entities)?json.entities:[]);setSpatialBuilds(Array.isArray(json?.builds)?json.builds:[])}).catch(()=>{if(live){setSpatialEntities([]);setSpatialBuilds([])}});return()=>{live=false}},[])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=80){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
@@ -130,12 +143,12 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     return[{id:`poi:${feature.id}`,name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType)}]
   }).slice(0,30):[],[origin,features])
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
-    const xM=Number(entity.x_m),yM=Number(entity.y_m)
+    const{xM,yM}=scenePosition(entity,origin)
     if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
     return[{id:`building:${entity.id}`,name:String(entity.name??entity.entity_id),xM,yM,kind:'NOXIA-Gebäude',entity}]
-  }),[spatialEntities])
+  }),[spatialEntities,origin])
   const pendingTargets=useMemo(()=>spatialBuilds.flatMap(build=>{
-    const xM=Number(build.x_m),yM=Number(build.y_m)
+    const{xM,yM}=scenePosition(build,origin)
     if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>SCENE_RADIUS_M||Math.abs(yM)>SCENE_RADIUS_M)return[]
     const state=constructionState({
       buildable_id:build.buildable_id,
@@ -146,7 +159,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       completes_at:build.completes_at,
     },Date.now())
     return[{id:`pending:${build.id}`,name:String(build.name??build.buildable_id),xM,yM,kind:'Baustelle',build,state}]
-  }),[spatialBuilds,motionTime])
+  }),[spatialBuilds,motionTime,origin])
   const localTrainPoint=useMemo(()=>{
     const track=scene?.railGraph.find(path=>path.points.length>=2)
     if(!track)return null
@@ -537,6 +550,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       <div className="earth-walkable-help"><b>WASD</b> bewegen · <b>Shift</b> schneller · NPC anklicken · lokale 2.5D-Szene aus realer Geographie</div>
       <div className="earth-walkable-provenance">Gebäude ohne reale Footprints werden vorläufig als <b>abgeleitete Bebauungsmasse</b> dargestellt. Straßen, Wasser, Landnutzung und Routen stammen aus dem persistierten Orts-Snapshot.</div>
 
+      {detailStatus!=='idle'&&<div className="earth-walkable-detail">{detailStatus==='loading'?'Gebäude, Wege und Gewässer dieses Ortes werden geladen …':<>Kartendienst nicht erreichbar – Gebäude, Wege und Gewässer fehlen noch. <button onClick={()=>{if(data?.localDetail)localEnrichmentAttempted.current.delete(data.localDetail.slug);setDetailRetry(count=>count+1)}}>Erneut versuchen</button></>}</div>}
+
       {ambientConversation&&!selected&&<div className="earth-overheard">
         <small>GESPRÄCH IN HÖRWEITE · {ambientConversation.conversation.item.kind==='colony'?'NOXIA':'HEUTE'}</small>
         <b>{ambientConversation.first.displayName} + {ambientConversation.second.displayName}</b>
@@ -550,7 +565,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     <EarthBuildingAccessLayer request={entryRequest} companion={interiorCompanion} onClose={()=>setEntryRequest(null)}/>
     <style jsx>{`
       .earth-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;background:#0b1115;color:#e7eef0;font-family:system-ui;overflow:hidden}.earth-walkable header{height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;background:#081723ef;border-bottom:1px solid #38546b;position:relative;z-index:3}.earth-walkable header>div:first-child{display:flex;align-items:baseline;gap:10px;min-width:0}.earth-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.earth-walkable header b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.earth-walkable header span{font-size:9px;color:#8ea4af}.earth-walkable header .meta{display:flex;gap:10px;margin-left:auto}.earth-walkable header button,.earth-walkable aside button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.earth-walkable-stage{position:absolute;inset:46px 0 0;overflow:hidden}.earth-walkable-stage svg{width:100%;height:100%;display:block}.earth-orientation{position:absolute;right:16px;top:16px;z-index:4;display:flex;gap:10px;align-items:center;padding:9px 11px;border:1px solid #536f7d;border-radius:8px;background:#071521df;backdrop-filter:blur(7px);font-size:9px}.earth-orientation>div:first-child{display:grid;gap:1px}.earth-orientation small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.earth-orientation b{font-size:11px}.earth-orientation span{color:#89a1ac}.earth-orientation label{display:grid;gap:2px;min-width:180px}.earth-orientation select{max-width:220px;border:1px solid #476476;border-radius:5px;background:#06111a;color:#e7eff2;padding:5px 7px;font-size:9px}.earth-target{display:grid;gap:3px;padding-left:9px;border-left:1px solid #425b67}.earth-target button{margin-top:3px;border:1px solid #6e7d55;border-radius:4px;background:#273d24;color:#edf3dd;padding:4px 6px;font:800 8px monospace;cursor:pointer}.earth-target button:disabled{opacity:.45;cursor:not-allowed}.earth-construction-hint{position:absolute;left:12px;top:76px;padding:5px 7px;border:1px solid #8a6a20;border-radius:5px;background:#2a220ed9;color:#ead59a;font:8px monospace}.earth-building-tooltip{position:fixed;z-index:5000;pointer-events:none;display:grid;gap:2px;min-width:150px;max-width:240px;padding:7px 9px;border:1px solid #6b8793;border-radius:6px;background:#06131df2;color:#ecf3f5;box-shadow:0 8px 24px #0007;font-size:9px}.earth-building-tooltip b{font-size:10px}.earth-building-tooltip span,.earth-building-tooltip small{color:#90a6af}
-      .earth-walkable-help,.earth-walkable-provenance{position:absolute;left:12px;padding:6px 8px;border:1px solid #4b6877;border-radius:6px;background:#071521d9;font:9px monospace;color:#b7c8cf}.earth-walkable-help{top:12px}.earth-walkable-provenance{top:44px;max-width:520px;color:#92a9b2}.earth-overheard{position:absolute;left:16px;bottom:84px;width:360px;max-width:calc(100vw - 32px);padding:10px 12px;border:1px solid #567487;border-radius:9px;background:#071521e8;box-shadow:0 12px 28px #0007;color:#dce8ed;backdrop-filter:blur(7px)}.earth-overheard small{display:block;color:#7fb1c9;font:800 8px monospace;letter-spacing:.1em}.earth-overheard>b{display:block;margin-top:3px;font-size:11px}.earth-overheard p{margin:6px 0 0;font-size:10px;line-height:1.4}.earth-overheard>span{display:block;margin-top:7px;color:#879ca7;font-size:8px}.earth-walkable aside{position:absolute;right:16px;top:16px;width:390px;max-height:calc(100% - 32px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.earth-walkable .head{display:flex;justify-content:space-between;gap:12px}.earth-walkable .head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.earth-walkable .head b{display:block;margin-top:3px}.earth-walkable .head span{display:block;margin-top:2px;color:#8ba3ad;font-size:9px}.earth-walkable .facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.earth-walkable .facts span{color:#7e98a3}.earth-walkable .chat{display:flex;gap:6px;margin-top:10px}.earth-walkable .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.earth-walkable aside p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.earth-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;display:grid;place-items:center;background:#07111b;color:#bcd2dc;font-family:monospace}
+      .earth-walkable-help,.earth-walkable-provenance{position:absolute;left:12px;padding:6px 8px;border:1px solid #4b6877;border-radius:6px;background:#071521d9;font:9px monospace;color:#b7c8cf}.earth-walkable-help{top:12px}.earth-walkable-detail{position:absolute;left:12px;top:92px;max-width:520px;padding:6px 8px;border:1px solid #8a6a20;border-radius:6px;background:#2a220ee6;color:#ead59a;font:9px monospace}.earth-walkable-detail button{margin-left:6px;border:1px solid #8a6a20;border-radius:4px;background:#4a3a14;color:#f3e2ad;padding:2px 6px;font:800 8px monospace;cursor:pointer}.earth-walkable-provenance{top:44px;max-width:520px;color:#92a9b2}.earth-overheard{position:absolute;left:16px;bottom:84px;width:360px;max-width:calc(100vw - 32px);padding:10px 12px;border:1px solid #567487;border-radius:9px;background:#071521e8;box-shadow:0 12px 28px #0007;color:#dce8ed;backdrop-filter:blur(7px)}.earth-overheard small{display:block;color:#7fb1c9;font:800 8px monospace;letter-spacing:.1em}.earth-overheard>b{display:block;margin-top:3px;font-size:11px}.earth-overheard p{margin:6px 0 0;font-size:10px;line-height:1.4}.earth-overheard>span{display:block;margin-top:7px;color:#879ca7;font-size:8px}.earth-walkable aside{position:absolute;right:16px;top:16px;width:390px;max-height:calc(100% - 32px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.earth-walkable .head{display:flex;justify-content:space-between;gap:12px}.earth-walkable .head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.earth-walkable .head b{display:block;margin-top:3px}.earth-walkable .head span{display:block;margin-top:2px;color:#8ba3ad;font-size:9px}.earth-walkable .facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.earth-walkable .facts span{color:#7e98a3}.earth-walkable .chat{display:flex;gap:6px;margin-top:10px}.earth-walkable .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.earth-walkable aside p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.earth-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;display:grid;place-items:center;background:#07111b;color:#bcd2dc;font-family:monospace}
       @media(max-width:760px){.earth-walkable header .meta{display:none}.earth-orientation{left:12px;right:12px;top:12px;flex-wrap:wrap}.earth-orientation label{min-width:140px;flex:1}.earth-walkable-provenance{max-width:calc(100% - 24px)}.earth-overheard{left:12px;right:12px;bottom:92px;width:auto}.earth-walkable aside{left:12px;right:12px;top:auto;bottom:92px;width:auto;max-height:42vh}}
     `}</style>
   </section>

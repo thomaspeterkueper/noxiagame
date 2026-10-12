@@ -1,3 +1,7 @@
+// lib/world/spatial/earthLandmarkPresentation.ts
+// Aktualisiert: 12.10.2026 — SSF-Hauptsitz-Marker auf den realen Standort Bogenstraße 15 gelegt (deckungsgleich mit dem platzierten Foundation House)
+// Version:      1.0.1
+
 import { EARTH_LANDMARKS, type EarthLandmark } from './earthLandmarks'
 
 export type EarthLandmarkMappingPrecision = 'real_location' | 'approximate' | 'fictionalized'
@@ -18,7 +22,8 @@ export type EarthLandmarkMapPoint = {
 export const EARTH_LANDMARK_MAP_POINTS: Readonly<Record<string, EarthLandmarkMapPoint>> = {
   'earth-de-menden-hexenteich': { lat: 51.4372958, lon: 7.8219999, precision: 'real_location' },
   'earth-de-menden-gesamtschule': { lat: 51.42996, lon: 7.79372, precision: 'real_location' },
-  'earth-de-sundern-ssf-hq': { lat: 51.328, lon: 8.004, precision: 'real_location' },
+  // Bogenstraße 15: identical to the placed Foundation House (world_unique_objects).
+  'earth-de-sundern-ssf-hq': { lat: 51.3407577, lon: 8.001473, precision: 'real_location' },
   'earth-de-darmstadt-esoc': { lat: 49.8728, lon: 8.6227, precision: 'real_location' },
   'earth-de-darmstadt-eumetsat': { lat: 49.8627, lon: 8.6276, precision: 'real_location' },
   'earth-de-cologne-eac': { lat: 50.852, lon: 7.126, precision: 'real_location' },
