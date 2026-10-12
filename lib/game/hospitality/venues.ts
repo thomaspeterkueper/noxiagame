@@ -505,6 +505,8 @@ export interface ConversationFactsInput {
   menu?: readonly VenueMenuItem[]
   /** Was der Spieler bei diesem Besuch bestellt hat – jeder im Raum hat es gesehen. */
   playerOrders?: readonly string[]
+  /** Was der Spieler bei diesem Besuch genau dieser Figur ausgegeben hat. */
+  giftsToSelf?: readonly string[]
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -518,10 +520,17 @@ function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
   return 'Karte: ' + list + tail
 }
 
-function ordersFact(orders: readonly string[]): string {
+function countedList(labels: readonly string[]): string {
   const counts = new Map<string, number>()
-  for (const label of orders) counts.set(label, (counts.get(label) ?? 0) + 1)
-  return 'Dein Gegenüber hat hier eben bestellt: ' + [...counts].map(([label, count]) => (count > 1 ? `${count}× ${label}` : label)).join(', ')
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1)
+  return [...counts].map(([label, count]) => (count > 1 ? `${count}× ${label}` : label)).join(', ')
+}
+
+/** Ein Satz für beides, damit die Faktenliste des Personals in der Grenze bleibt. */
+function ordersFact(orders: readonly string[], gifts: readonly string[]): string {
+  if (gifts.length === 0) return 'Dein Gegenüber hat hier eben bestellt: ' + countedList(orders)
+  const treat = `Dein Gegenüber hat dir eben ausgegeben: ${countedList(gifts)}; es steht vor dir`
+  return orders.length ? `${treat}. Für sich selbst bestellt: ${countedList(orders)}` : treat
 }
 
 /**
@@ -566,7 +575,8 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   } else {
     facts.push(`Bestellt und bezahlt wird ${layout.servicePoint.locative} beim Personal; die Preise hast du nicht im Kopf`)
   }
-  if (seesGuestRoom && input.playerOrders?.length) facts.push(ordersFact(input.playerOrders))
+  const gifts = input.giftsToSelf ?? []
+  if (gifts.length || (seesGuestRoom && input.playerOrders?.length)) facts.push(ordersFact(seesGuestRoom ? input.playerOrders ?? [] : [], gifts))
 
   facts.push('Über Kontostand, Wissen, Beruf oder Vorhaben deines Gegenübers weißt du nur, was es dir selbst erzählt')
 
