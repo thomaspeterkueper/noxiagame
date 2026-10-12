@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthRegionPreview.tsx
-// Aktualisiert: 12.10.2026 — Meer, Inseln, Strand und Fels zeichnen; veraltete Ortsimporte einmal pro Sitzung im Hintergrund erneuern
-// Version:      1.1.0
+// Aktualisiert: 12.10.2026 — Landmarks und Ortspunkte liegen über allen Flächen und Linien (waren teils verdeckt); Meer, Inseln, Strand und Fels zeichnen; veraltete Ortsimporte einmal pro Sitzung im Hintergrund erneuern
+// Version:      1.1.1
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
@@ -57,7 +57,7 @@ const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
 const EARTH_DATA_VERSION='20260906-local-detail-1'
 
 // The sea lies below every land feature; lakes and ponds stay above land use.
-function drawRank(feature:{featureType:string;properties?:Record<string,string>}){return feature.featureType==='water'&&feature.properties?.visual_class==='sea'?-2:layerOrder.indexOf(feature.featureType)}
+function drawRank(feature:{featureType:string;properties?:Record<string,string>}){if(feature.featureType==='landmark')return 1000;if(feature.featureType==='settlement')return 999;return feature.featureType==='water'&&feature.properties?.visual_class==='sea'?-2:layerOrder.indexOf(feature.featureType)}
 function styleFor(type:string,tags:Record<string,string>){
   switch(type){
     case'forest':return{fill:'#6f875d',stroke:'#5f754f',width:.45}

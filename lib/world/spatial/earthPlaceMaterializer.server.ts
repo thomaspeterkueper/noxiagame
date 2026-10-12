@@ -1,6 +1,6 @@
 // lib/world/spatial/earthPlaceMaterializer.server.ts
-// Aktualisiert: 12.10.2026 — Importprofil v2: Meer aus Küstenlinien, Strand und Fels; ältere Ortsimporte werden beim nächsten Aufruf einmalig erneuert
-// Version:      1.1.1
+// Aktualisiert: 12.10.2026 — Importprofil v3: Kirchen und andere Gotteshäuser als Landmarks; Importprofil v2: Meer aus Küstenlinien, Strand und Fels; ältere Ortsimporte werden beim nächsten Aufruf einmalig erneuert
+// Version:      1.2.0
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { seaPolygonsFromCoastlines } from './earthCoastline'
@@ -30,10 +30,10 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
 ]
 const MAX_POINTS_PER_FEATURE = 36
-export const EARTH_GEOGRAPHY_IMPORT_VERSION = 2
+export const EARTH_GEOGRAPHY_IMPORT_VERSION = 3
 export const EARTH_NORMALIZATION_VERSION = 1
 export const EARTH_ENRICHMENT_VERSION = 1
-const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v2'
+const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v3'
 const OVERPASS_TIMEOUT_MS = 25_000
 
 export function earthPlaceBounds(lat: number, lon: number, radiusKm: number): Bounds {
@@ -83,7 +83,7 @@ function classify(tags: Tags, isNode = false) {
   if (tags.name && (
     /^(museum|attraction|viewpoint|gallery)$/.test(tags.tourism ?? '')
     || /^(castle|monument|memorial|archaeological_site|ruins|fort|city_gate)$/.test(tags.historic ?? '')
-    || /^(university|townhall|theatre|arts_centre|library|hospital)$/.test(tags.amenity ?? '')
+    || /^(university|townhall|theatre|arts_centre|library|hospital|place_of_worship)$/.test(tags.amenity ?? '')
     || /^(station)$/.test(tags.railway ?? '')
     || /^(tower|lighthouse|observatory)$/.test(tags.man_made ?? '')
   )) return 'landmark'
@@ -264,7 +264,7 @@ way[railway~"rail|light_rail|tram"](${box});
 node[place~"city|town|village|hamlet|suburb"](${box});
 nwr[name][tourism~"museum|attraction|viewpoint|gallery"](${box});
 nwr[name][historic~"castle|monument|memorial|archaeological_site|ruins|fort|city_gate"](${box});
-nwr[name][amenity~"university|townhall|theatre|arts_centre|library|hospital"](${box});
+nwr[name][amenity~"university|townhall|theatre|arts_centre|library|hospital|place_of_worship"](${box});
 nwr[name][railway=station](${box});
 nwr[name][man_made~"tower|lighthouse|observatory"](${box});
 );out center geom;`

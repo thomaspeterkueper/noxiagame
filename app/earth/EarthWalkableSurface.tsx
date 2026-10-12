@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.4.0
+// Aktualisiert: 12.10.2026 — Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.5.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -37,6 +37,27 @@ const HEIGHT_PX=12
 // far too small for a town where a house is 10 m wide and a figure 30 px tall.
 // Earth scenes zoom the ground in; figures and labels keep their screen size.
 const SCENE_ZOOM=2.4
+const LANDMARK_LABEL:Record<string,string>={library:'Bibliothek',place_of_worship:'Gotteshaus',museum:'Museum',gallery:'Galerie',attraction:'Sehenswürdigkeit',viewpoint:'Aussichtspunkt',castle:'Burg / Schloss',fort:'Festung',city_gate:'Stadttor',ruins:'Ruine',archaeological_site:'Ausgrabungsstätte',monument:'Denkmal',memorial:'Gedenkstätte',university:'Universität',townhall:'Rathaus',theatre:'Theater',arts_centre:'Kulturzentrum',hospital:'Krankenhaus',station:'Bahnhof',tower:'Turm',lighthouse:'Leuchtturm',observatory:'Sternwarte'}
+function landmarkLabel(kind:string,tags?:Record<string,any>){if(kind==='place_of_worship'){const religion=String(tags?.religion??'');return religion==='christian'?'Kirche':religion==='muslim'?'Moschee':religion==='jewish'?'Synagoge':religion==='buddhist'||religion==='hindu'?'Tempel':'Gotteshaus'}return LANDMARK_LABEL[kind]??'Landmark'}
+// One plain glyph per landmark class, drawn inside a 20 px badge.
+function landmarkGlyph(kind:string,tags?:Record<string,any>){
+  const ink={fill:'none',stroke:'#17313c',strokeWidth:1.5,strokeLinecap:'round' as const,strokeLinejoin:'round' as const}
+  switch(kind){
+    case'library':return <path {...ink} d="M-6 -4 Q-3 -6 0 -4 Q3 -6 6 -4 V5 Q3 3 0 5 Q-3 3 -6 5 Z M0 -4 V5"/>
+    case'place_of_worship':return String(tags?.religion??'')==='christian'
+      ?<path {...ink} d="M0 -7 V-2 M-2 -5 H2 M-5 6 V0 L0 -3 L5 0 V6 Z M-1.5 6 V3 H1.5 V6"/>
+      :<path {...ink} d="M-5 6 V0 Q0 -8 5 0 V6 Z M-1.5 6 V3 H1.5 V6"/>
+    case'museum':case'gallery':case'townhall':case'university':case'theatre':case'arts_centre':return <path {...ink} d="M-6 -2 L0 -6 L6 -2 Z M-4 -2 V4 M0 -2 V4 M4 -2 V4 M-6 5 H6"/>
+    case'castle':case'fort':case'city_gate':return <path {...ink} d="M-6 6 V-5 H-3.5 V-3 H-1.2 V-5 H1.2 V-3 H3.5 V-5 H6 V6 Z M-1.5 6 V2 Q0 0 1.5 2 V6"/>
+    case'ruins':case'archaeological_site':return <path {...ink} d="M-6 6 V-1 L-4 -3 V6 M-1 6 V-5 H1 V6 M4 6 V1 L6 -1 V6 M-7 6 H7"/>
+    case'monument':case'memorial':return <path {...ink} d="M0 -7 L2 -4 L1.2 4 H-1.2 L-2 -4 Z M-4 6 H4 M-3 4 H3"/>
+    case'tower':case'lighthouse':case'observatory':return <path {...ink} d="M-2 6 L-1.2 -3 H1.2 L2 6 Z M-2.5 -3 H2.5 M0 -3 V-7 M-5 -6 L-2.5 -5 M5 -6 L2.5 -5"/>
+    case'viewpoint':case'attraction':return <path {...ink} d="M-7 5 L-2 -3 L1 1 L3 -1 L7 5 Z M3 -5 A1.4 1.4 0 1 0 3.01 -5"/>
+    case'hospital':return <path {...ink} d="M-5 -5 H5 V5 H-5 Z M0 -3 V3 M-3 0 H3"/>
+    case'station':return <path {...ink} d="M-4 -5 H4 Q5 -5 5 -4 V2 Q5 3 4 3 H-4 Q-5 3 -5 2 V-4 Q-5 -5 -4 -5 Z M-5 -1 H5 M-3 6 L-2 3 M3 6 L2 3"/>
+    default:return <path {...ink} d="M0 -6 L1.8 -1.8 L6 -1.8 L2.6 1 L4 5.5 L0 2.8 L-4 5.5 L-2.6 1 L-6 -1.8 L-1.8 -1.8 Z"/>
+  }
+}
 function zoomedCamera(focus:ScenePoint){const p=iso(focus);return `translate(${VIEW_W/2} ${VIEW_H/2}) scale(${SCENE_ZOOM}) translate(${(-p.x).toFixed(1)} ${(-p.y).toFixed(1)})`}
 function unzoomedAt(point:ScenePoint){const p=iso(point);return `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${1/SCENE_ZOOM}) translate(${(-p.x).toFixed(1)} ${(-p.y).toFixed(1)})`}
 // The scene covers ±260 m. Well before that edge it is rebuilt around the
@@ -90,6 +111,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[detailStatus,setDetailStatus]=useState<'idle'|'loading'|'failed'>('idle')
   const[detailRetry,setDetailRetry]=useState(0)
   const[sceneCenter,setSceneCenter]=useState<GeoPoint|null>(null)
+  const[openLandmarkId,setOpenLandmarkId]=useState('')
   const recenterRequested=useRef('')
 
   useEffect(()=>{let live=true;fetch(regionUrl('walkable-v2',sceneCenter),{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live&&(json?.ok||!sceneCenter))setData(json)}).catch(()=>{if(live&&!sceneCenter)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[sceneCenter])
@@ -175,7 +197,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     const point=feature.geometry.coordinates as GeoPoint
     const metric=geoToLocalMeters(point,origin)
     if(Math.abs(metric.eastM)>SCENE_RADIUS_M||Math.abs(metric.northM)>SCENE_RADIUS_M)return[]
-    return[{id:`poi:${feature.id}`,name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType)}]
+    return[{id:`poi:${feature.id}`,name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType),isLandmark:feature.featureType==='landmark',tags:(feature.properties??{}) as Record<string,any>}]
   }).slice(0,30):[],[origin,features])
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
     const{xM,yM}=scenePosition(entity,origin)
@@ -204,6 +226,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const navigationTarget=navigationTargets.find(target=>target.id===navigationTargetId)??null
   const navigationRoute=useMemo(()=>scene&&navigationTarget?routeAcrossLocalScene(scene,player,{xM:navigationTarget.xM,yM:navigationTarget.yM}):null,[scene,navigationTarget,player])
   const targetDistance=navigationTarget?Math.hypot(navigationTarget.xM-player.xM,navigationTarget.yM-player.yM):null
+  const selectedLandmark=namedPoiTargets.find(target=>target.id===navigationTargetId&&target.isLandmark)??null
+  const openLandmark=namedPoiTargets.find(target=>target.id===openLandmarkId)??null
   const selectedBuildingTarget=buildingTargets.find(target=>target.id===navigationTargetId)??null
   const selectedBuildingEntry=selectedBuildingTarget?getBuildingEntryDefinition(selectedBuildingTarget.entity.entity_id):null
   const selectedBuildingDistance=selectedBuildingTarget?distanceToBuildingFootprint(player,{
@@ -561,6 +585,20 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         {npcPositions.map(({resident,xM,yM})=><g key={resident.id} transform={unzoomedAt({xM,yM})}><WalkableActor point={{xM,yM}} label={resident.displayName} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('')}}/></g>)}
 
         {localTrainPoint&&<WalkableTrain point={localTrainPoint} label="Regional"/>}
+        {namedPoiTargets.filter(target=>target.isLandmark).map(target=>{
+          const p=iso({xM:target.xM,yM:target.yM})
+          const active=navigationTargetId===target.id
+          const width=Math.max(48,Math.min(150,target.name.length*5.4+14))
+          return <g key={target.id} transform={unzoomedAt({xM:target.xM,yM:target.yM})} style={{cursor:'pointer'}} onClick={()=>{setAutoWalkTargetId('');setNavigationTargetId(target.id)}}>
+            <g transform={`translate(${p.x.toFixed(1)} ${(p.y-16).toFixed(1)})`}>
+              <path d="M0 16 L-5 8 H5 Z" fill={active?'#e0c05e':'#f4ecd2'} stroke="#17313c" strokeWidth="1"/>
+              <circle r="11" fill={active?'#e0c05e':'#f4ecd2'} stroke="#17313c" strokeWidth="1.4"/>
+              {landmarkGlyph(target.kind,target.tags)}
+              <g pointerEvents="none" transform="translate(0 -15)"><rect x={-width/2} y="-11" width={width} height="13" rx="4" fill="#173845ee" stroke="#8fa7b0" strokeWidth=".8"/><text y="-2" textAnchor="middle" fontSize="7.5" fontWeight="800" fill="#f3f7f8">{target.name.length>26?target.name.slice(0,25)+'…':target.name}</text></g>
+              <title>{target.name} · {landmarkLabel(target.kind,target.tags)}</title>
+            </g>
+          </g>
+        })}
         <g transform={unzoomedAt(player)}><WalkablePlayer point={player} label={playerName}/></g>
         </g>
 
@@ -572,8 +610,21 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           <option value="">— kein Ziel —</option>
           {navigationTargets.map(target=><option key={target.id} value={target.id}>{target.name}</option>)}
         </select></label>
-        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}</div>}
+        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
       </div>
+      {openLandmark&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
+        <div className="head"><div><small>REALER ORT · {landmarkLabel(openLandmark.kind,openLandmark.tags).toUpperCase()}</small><b>{openLandmark.name}</b></div><button onClick={()=>setOpenLandmarkId('')}>×</button></div>
+        <svg viewBox="-14 -14 28 28" width="54" height="54" aria-hidden="true"><circle r="12" fill="#f4ecd2" stroke="#17313c" strokeWidth="1.2"/>{landmarkGlyph(openLandmark.kind,openLandmark.tags)}</svg>
+        {openLandmark.tags.description&&<p>{String(openLandmark.tags.description)}</p>}
+        <dl>
+          {openLandmark.tags['addr:street']&&<><dt>Adresse</dt><dd>{String(openLandmark.tags['addr:street'])} {String(openLandmark.tags['addr:housenumber']??'')}</dd></>}
+          {openLandmark.tags.opening_hours&&<><dt>Geöffnet</dt><dd>{String(openLandmark.tags.opening_hours)}</dd></>}
+          {openLandmark.tags.denomination&&<><dt>Konfession</dt><dd>{String(openLandmark.tags.denomination)}</dd></>}
+          {openLandmark.tags.start_date&&<><dt>Erbaut</dt><dd>{String(openLandmark.tags.start_date)}</dd></>}
+          {openLandmark.tags.operator&&<><dt>Träger</dt><dd>{String(openLandmark.tags.operator)}</dd></>}
+        </dl>
+        <span>Du stehst im Eingangsbereich. Ein eigener Innenraum für diesen Ortstyp ist noch nicht gebaut. Quelle: OpenStreetMap.</span>
+      </div>}
       {pendingTargets.length>0&&<div className="earth-construction-hint">Baustellen sind gelb gestrichelt markiert und zeigen Bauphase + Fortschritt.</div>}
       {hoveredBuilding&&<div className="earth-building-tooltip" style={{left:hoveredBuilding.x+12,top:hoveredBuilding.y+12}}>
         <b>{hoveredBuilding.name}</b><span>{hoveredBuilding.detail}</span><small>{Math.round(hoveredBuilding.distanceM)} m von dir</small>
@@ -597,7 +648,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     <EarthBuildingAccessLayer request={entryRequest} companion={interiorCompanion} onClose={()=>setEntryRequest(null)}/>
     <style jsx>{`
       .earth-walkable{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;background:#0b1115;color:#e7eef0;font-family:system-ui;overflow:hidden}.earth-walkable header{height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;background:#081723ef;border-bottom:1px solid #38546b;position:relative;z-index:3}.earth-walkable header>div:first-child{display:flex;align-items:baseline;gap:10px;min-width:0}.earth-walkable header small{font:800 8px monospace;letter-spacing:.14em;color:#d7b96e}.earth-walkable header b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.earth-walkable header span{font-size:9px;color:#8ea4af}.earth-walkable header .meta{display:flex;gap:10px;margin-left:auto}.earth-walkable header button,.earth-walkable aside button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}.earth-walkable-stage{position:absolute;inset:46px 0 0;overflow:hidden}.earth-walkable-stage svg{width:100%;height:100%;display:block}.earth-orientation{position:absolute;right:16px;top:16px;z-index:4;display:flex;gap:10px;align-items:center;padding:9px 11px;border:1px solid #536f7d;border-radius:8px;background:#071521df;backdrop-filter:blur(7px);font-size:9px}.earth-orientation>div:first-child{display:grid;gap:1px}.earth-orientation small{color:#d7b96e;font:800 8px monospace;letter-spacing:.1em}.earth-orientation b{font-size:11px}.earth-orientation span{color:#89a1ac}.earth-orientation label{display:grid;gap:2px;min-width:180px}.earth-orientation select{max-width:220px;border:1px solid #476476;border-radius:5px;background:#06111a;color:#e7eff2;padding:5px 7px;font-size:9px}.earth-target{display:grid;gap:3px;padding-left:9px;border-left:1px solid #425b67}.earth-target button{margin-top:3px;border:1px solid #6e7d55;border-radius:4px;background:#273d24;color:#edf3dd;padding:4px 6px;font:800 8px monospace;cursor:pointer}.earth-target button:disabled{opacity:.45;cursor:not-allowed}.earth-construction-hint{position:absolute;left:12px;top:76px;padding:5px 7px;border:1px solid #8a6a20;border-radius:5px;background:#2a220ed9;color:#ead59a;font:8px monospace}.earth-building-tooltip{position:fixed;z-index:5000;pointer-events:none;display:grid;gap:2px;min-width:150px;max-width:240px;padding:7px 9px;border:1px solid #6b8793;border-radius:6px;background:#06131df2;color:#ecf3f5;box-shadow:0 8px 24px #0007;font-size:9px}.earth-building-tooltip b{font-size:10px}.earth-building-tooltip span,.earth-building-tooltip small{color:#90a6af}
-      .earth-walkable-help,.earth-walkable-provenance{position:absolute;left:12px;padding:6px 8px;border:1px solid #4b6877;border-radius:6px;background:#071521d9;font:9px monospace;color:#b7c8cf}.earth-walkable-help{top:12px}.earth-walkable-detail{position:absolute;left:12px;top:92px;max-width:520px;padding:6px 8px;border:1px solid #8a6a20;border-radius:6px;background:#2a220ee6;color:#ead59a;font:9px monospace}.earth-walkable-detail button{margin-left:6px;border:1px solid #8a6a20;border-radius:4px;background:#4a3a14;color:#f3e2ad;padding:2px 6px;font:800 8px monospace;cursor:pointer}.earth-walkable-provenance{top:44px;max-width:520px;color:#92a9b2}.earth-overheard{position:absolute;left:16px;bottom:84px;width:360px;max-width:calc(100vw - 32px);padding:10px 12px;border:1px solid #567487;border-radius:9px;background:#071521e8;box-shadow:0 12px 28px #0007;color:#dce8ed;backdrop-filter:blur(7px)}.earth-overheard small{display:block;color:#7fb1c9;font:800 8px monospace;letter-spacing:.1em}.earth-overheard>b{display:block;margin-top:3px;font-size:11px}.earth-overheard p{margin:6px 0 0;font-size:10px;line-height:1.4}.earth-overheard>span{display:block;margin-top:7px;color:#879ca7;font-size:8px}.earth-walkable aside{position:absolute;right:16px;top:16px;width:390px;max-height:calc(100% - 32px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.earth-walkable .head{display:flex;justify-content:space-between;gap:12px}.earth-walkable .head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.earth-walkable .head b{display:block;margin-top:3px}.earth-walkable .head span{display:block;margin-top:2px;color:#8ba3ad;font-size:9px}.earth-walkable .facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.earth-walkable .facts span{color:#7e98a3}.earth-walkable .chat{display:flex;gap:6px;margin-top:10px}.earth-walkable .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.earth-walkable aside p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.earth-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;display:grid;place-items:center;background:#07111b;color:#bcd2dc;font-family:monospace}
+      .earth-walkable-help,.earth-walkable-provenance{position:absolute;left:12px;padding:6px 8px;border:1px solid #4b6877;border-radius:6px;background:#071521d9;font:9px monospace;color:#b7c8cf}.earth-walkable-help{top:12px}.earth-landmark-room{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;width:min(420px,calc(100vw - 32px));display:grid;gap:8px;padding:14px;border:1px solid #617b85;border-radius:10px;background:#071521f5;box-shadow:0 18px 44px #000a;font-size:11px;color:#dce8ed}.earth-landmark-room .head{display:flex;justify-content:space-between;gap:12px}.earth-landmark-room small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.earth-landmark-room b{display:block;margin-top:3px;font-size:14px}.earth-landmark-room button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:4px 9px;cursor:pointer;height:fit-content}.earth-landmark-room p{margin:0;line-height:1.45}.earth-landmark-room dl{display:grid;grid-template-columns:90px 1fr;gap:4px;margin:0}.earth-landmark-room dt{color:#7e98a3}.earth-landmark-room dd{margin:0}.earth-landmark-room>span{color:#879ca7;font-size:9px}.earth-walkable-detail{position:absolute;left:12px;top:92px;max-width:520px;padding:6px 8px;border:1px solid #8a6a20;border-radius:6px;background:#2a220ee6;color:#ead59a;font:9px monospace}.earth-walkable-detail button{margin-left:6px;border:1px solid #8a6a20;border-radius:4px;background:#4a3a14;color:#f3e2ad;padding:2px 6px;font:800 8px monospace;cursor:pointer}.earth-walkable-provenance{top:44px;max-width:520px;color:#92a9b2}.earth-overheard{position:absolute;left:16px;bottom:84px;width:360px;max-width:calc(100vw - 32px);padding:10px 12px;border:1px solid #567487;border-radius:9px;background:#071521e8;box-shadow:0 12px 28px #0007;color:#dce8ed;backdrop-filter:blur(7px)}.earth-overheard small{display:block;color:#7fb1c9;font:800 8px monospace;letter-spacing:.1em}.earth-overheard>b{display:block;margin-top:3px;font-size:11px}.earth-overheard p{margin:6px 0 0;font-size:10px;line-height:1.4}.earth-overheard>span{display:block;margin-top:7px;color:#879ca7;font-size:8px}.earth-walkable aside{position:absolute;right:16px;top:16px;width:390px;max-height:calc(100% - 32px);overflow:auto;padding:10px;border:1px solid #617b85;border-radius:9px;background:#071521f2;box-shadow:0 16px 38px #0008;backdrop-filter:blur(8px)}.earth-walkable .head{display:flex;justify-content:space-between;gap:12px}.earth-walkable .head small{display:block;color:#d7b96e;font:800 8px monospace;letter-spacing:.12em}.earth-walkable .head b{display:block;margin-top:3px}.earth-walkable .head span{display:block;margin-top:2px;color:#8ba3ad;font-size:9px}.earth-walkable .facts{display:grid;grid-template-columns:90px 1fr;gap:5px;margin-top:10px;font-size:10px}.earth-walkable .facts span{color:#7e98a3}.earth-walkable .chat{display:flex;gap:6px;margin-top:10px}.earth-walkable .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}.earth-walkable aside p{margin:9px 0 0;padding-top:8px;border-top:1px solid #314753;color:#d7e4e8;font-size:11px;line-height:1.45}.earth-walkable-loading{position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120;display:grid;place-items:center;background:#07111b;color:#bcd2dc;font-family:monospace}
       @media(max-width:760px){.earth-walkable header .meta{display:none}.earth-orientation{left:12px;right:12px;top:12px;flex-wrap:wrap}.earth-orientation label{min-width:140px;flex:1}.earth-walkable-provenance{max-width:calc(100% - 24px)}.earth-overheard{left:12px;right:12px;bottom:92px;width:auto}.earth-walkable aside{left:12px;right:12px;top:auto;bottom:92px;width:auto;max-height:42vh}}
     `}</style>
   </section>
