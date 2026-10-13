@@ -437,6 +437,102 @@ export function isAtServicePoint(layout: VenueLayout, pos: VenuePoint): boolean 
   })
 }
 
+// ── Besuch eines Gastes ─────────────────────────────────────────────────────
+// Ein Besuch beginnt mit einem echten Kauf (person_consumption_events). Was
+// danach im Raum zu sehen ist, folgt allein aus der seither vergangenen Zeit:
+// am Tresen bestellen, zum Platz gehen, sitzen, gehen. Nichts davon wird
+// gespeichert, und niemand erscheint ohne Kauf.
+export const VISIT_TIMES = { orderS: 90, walkS: 18, stayS: 35 * 60, leaveS: 22 } as const
+export type VisitPhase = 'ordering' | 'to-seat' | 'seated' | 'leaving' | 'gone'
+
+export function visitPhase(ageSeconds: number): { phase: VisitPhase; progress: number } {
+  const t = Math.max(0, ageSeconds)
+  const { orderS, walkS, stayS, leaveS } = VISIT_TIMES
+  if (t < orderS) return { phase: 'ordering', progress: t / orderS }
+  if (t < orderS + walkS) return { phase: 'to-seat', progress: (t - orderS) / walkS }
+  if (t < orderS + walkS + stayS) return { phase: 'seated', progress: (t - orderS - walkS) / stayS }
+  if (t < orderS + walkS + stayS + leaveS) return { phase: 'leaving', progress: (t - orderS - walkS - stayS) / leaveS }
+  return { phase: 'gone', progress: 1 }
+}
+
+const PATH_STEP = 8
+const PATH_RADIUS = 7
+
+/**
+ * Weg durch den Raum um die Möbel herum. Start und Ziel dürfen auf einem
+ * Stuhl oder direkt am Tresen liegen; gesucht wird ab der nächsten freien Stelle.
+ */
+export function venuePath(layout: VenueLayout, from: VenuePoint, to: VenuePoint): VenuePoint[] {
+  const free = (p: VenuePoint) => !isVenueBlocked(layout, p, PATH_RADIUS)
+  const snap = (p: VenuePoint): VenuePoint | null => {
+    const base = { x: Math.round(p.x / PATH_STEP) * PATH_STEP, y: Math.round(p.y / PATH_STEP) * PATH_STEP }
+    let best: VenuePoint | null = null, bestD = Infinity
+    for (let dx = -6; dx <= 6; dx++) for (let dy = -6; dy <= 6; dy++) {
+      const c = { x: base.x + dx * PATH_STEP, y: base.y + dy * PATH_STEP }
+      const d = Math.hypot(c.x - p.x, c.y - p.y)
+      if (d < bestD && free(c)) { best = c; bestD = d }
+    }
+    return best
+  }
+  const start = snap(from), goal = snap(to)
+  if (!start || !goal) return [from, to]
+  const key = (p: VenuePoint) => p.x + ':' + p.y
+  const previous = new Map<string, VenuePoint | null>([[key(start), null]])
+  const queue: VenuePoint[] = [start]
+  while (queue.length) {
+    const p = queue.shift() as VenuePoint
+    if (p.x === goal.x && p.y === goal.y) break
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const next = { x: p.x + dx * PATH_STEP, y: p.y + dy * PATH_STEP }
+      if (previous.has(key(next)) || !free(next)) continue
+      // schräg nur, wenn beide Nachbarn frei sind – sonst schneidet der Weg eine Ecke
+      if (dx && dy && (!free({ x: p.x + dx * PATH_STEP, y: p.y }) || !free({ x: p.x, y: p.y + dy * PATH_STEP }))) continue
+      previous.set(key(next), p)
+      queue.push(next)
+    }
+  }
+  if (!previous.has(key(goal))) return [from, to]
+  const cells: VenuePoint[] = []
+  for (let p: VenuePoint | null = goal; p; p = previous.get(key(p)) ?? null) cells.unshift(p)
+  return [from, ...cells, to]
+}
+
+/** Punkt nach dem Anteil `t` (0…1) der Weglänge. */
+export function pointAlongPath(path: readonly VenuePoint[], t: number): VenuePoint {
+  if (path.length === 0) return { x: 0, y: 0 }
+  const lengths = path.slice(1).map((p, i) => Math.hypot(p.x - path[i].x, p.y - path[i].y))
+  const total = lengths.reduce((sum, l) => sum + l, 0)
+  let remaining = Math.max(0, Math.min(1, t)) * total
+  for (let i = 0; i < lengths.length; i++) {
+    if (remaining <= lengths[i]) {
+      const f = lengths[i] > 0 ? remaining / lengths[i] : 0
+      return { x: path[i].x + (path[i + 1].x - path[i].x) * f, y: path[i].y + (path[i + 1].y - path[i].y) * f }
+    }
+    remaining -= lengths[i]
+  }
+  return path[path.length - 1]
+}
+
+export interface GuestMoment {
+  phase: VisitPhase
+  point: VenuePoint
+  /** Der Platz, den die Figur gerade einnimmt – für das, was sie über sich weiß. */
+  spot: VenueSpot
+  /** Steht das Bestellte schon vor ihr? */
+  served: boolean
+}
+
+/** Wo ein Gast `ageSeconds` nach seinem Kauf ist. `seat` ist sein zugewiesener Platz. */
+export function guestMoment(layout: VenueLayout, seat: VenueSpot, ageSeconds: number): GuestMoment {
+  const { phase, progress } = visitPhase(ageSeconds)
+  const counter: VenueSpot = { id: 'at-service', kind: 'standing', x: layout.servicePoint.x, y: layout.servicePoint.y, roomId: layout.playerRoomId, label: layout.servicePoint.locative, posture: 'standing' }
+  if (phase === 'ordering') return { phase, point: layout.servicePoint, spot: counter, served: false }
+  if (phase === 'to-seat') return { phase, point: pointAlongPath(venuePath(layout, layout.servicePoint, seat), progress), spot: { ...seat, posture: 'standing' }, served: false }
+  if (phase === 'seated') return { phase, point: seat, spot: seat, served: true }
+  const exitSpot: VenueSpot = { id: 'leaving', kind: 'standing', x: layout.exit.x, y: layout.exit.y, roomId: layout.playerRoomId, label: 'auf dem Weg zum Ausgang', posture: 'standing' }
+  return { phase, point: phase === 'leaving' ? pointAlongPath(venuePath(layout, seat, layout.exit), progress) : layout.exit, spot: exitSpot, served: false }
+}
+
 // ── Wo steht der Spieler? ───────────────────────────────────────────────────
 /** Ortsangabe für den Spieler, wie sie jemand im Raum beschreiben würde. */
 export function describePlayerPosition(layout: VenueLayout, pos: VenuePoint): string {
@@ -507,6 +603,8 @@ export interface ConversationFactsInput {
   playerOrders?: readonly string[]
   /** Was der Spieler bei diesem Besuch genau dieser Figur ausgegeben hat. */
   giftsToSelf?: readonly string[]
+  /** Was die Figur bei diesem Besuch selbst gekauft hat. */
+  ownOrder?: string | null
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -564,7 +662,10 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   // nennt niemand aus dem Kopf, der sie nicht kennt, und niemand kassiert im
   // Gespräch: gebucht wird ausschließlich am Tresen, Empfang oder Automaten.
   const menu = input.menu ?? []
-  if (menu.length === 0) {
+  if (input.ownOrder) facts.push(`Du hast hier vor kurzem selbst bestellt und bezahlt: ${input.ownOrder}`)
+  if (input.ownOrder && menu.length === 0) {
+    // Wer selbst gekauft hat, weiß, dass hier verkauft wird.
+  } else if (menu.length === 0) {
     facts.push(staff
       ? 'Heute wird noch nichts ausgeschenkt oder kassiert; nimm keine Bestellungen an und nenne keine Preise'
       : 'Heute wird hier noch nichts ausgeschenkt; du hast nichts bestellt und kennst keine Preise')

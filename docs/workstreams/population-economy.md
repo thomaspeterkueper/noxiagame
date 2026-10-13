@@ -17,6 +17,40 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
 4. Wahrnehmung im Lokal: „selber Sichtbereich" statt „selber Raum", bevor Begegnungen dort auf Stimmung wirken.
 5. Hunger und Durst etablieren – **entschieden (Thomas, 12.10.2026): ja, auch für Spieler.** Entwurf: `docs/decisions/NOXIA-LIVING-0012-hunger-and-thirst.md` (Status: proposed). Kurz: `hunger` und `thirst` ersetzen `sustenance` in drei Schritten (Bestandswerte übernehmen, `sustenance` als `min(hunger, thirst)` ableiten, dann entfernen); Spielerwerte in `player_needs`, beim Lesen aus letztem Essen/Trinken und **aktiver Spielzeit** berechnet – **entschieden (12.10.2026): offline ändert sich nichts, Mangel ist vorerst nur sichtbar**, Untergrenze 0,25; eine Wirkungstabelle `hospitality_item_effects` für Spieler und Bewohner (Getränk → Durst, Kuchen → Hunger, Mahlzeit → beides). **Der Status ist für den Spieler sichtbar:** Hunger und Durst als Anzeige in der Topbar, Wirkung je Posten auf der Karte. Offene Fragen in NOXIA-LIVING-0012 am Ende. Voraussetzung für Aufgabe 9.
 6. Rückbau und Verkauf von Gebäuden schreiben Credits ohne Gegenkonto gut (`app/api/game/build/route.ts`).
-7. Karten für `bar` und `restaurant` in `hospitality_menu` anlegen – Vorschlag in `docs/gameplay/hospitality-venues.md` Abschnitt 5 (aus Teilprojekt Gastronomie).
+7. Siehe Request R-2.
 8. Startcafé braucht Personal: Der Platzhalter-Wirt ist entfernt, ein Café ohne Personal ist ein Automatencafé ohne Einstiegsgespräch. Prüfen, ob `20261010090000_earth_cafe_host.sql` live angewendet ist (aus Teilprojekt Gastronomie).
 9. Ausgeben im Lokal: Die Oberfläche sendet bei `POST /api/game/hospitality/order` jetzt `recipientPersonId`, wenn der Spieler für eine Person im Raum bestellt. Route und `order_hospitality_item` werten das Feld noch nicht aus. Gewünscht (Thomas, 12.10.2026): Die Eigenschaften der Person ändern sich – ihr Hunger bzw. Durst wird gestillt (nach Aufgabe 5, `hospitality_item_effects`), dazu Wirkung auf Beziehung und Stimmung. Entwurf: NOXIA-LIVING-0012 Abschnitt 7. Zu bauen: Prüfung, dass die Person in diesem Gebäude ist (`person_interior_presence`); Wiederholung per `requestId` wirkt nur einmal (Geld, Bedürfnis, Beziehung, Stimmung in einer Transaktion); Beziehungseffekt skaliert mit dem Bedarf der Person; neue Tabelle `person_player_relationships` nach den Regeln aus NOXIA-LIVING-0008 – eine Beziehung Person ↔ Spieler gibt es bisher nicht; Stimmung über ein `population_events`-Ereignis, nicht direkt in `person_affect`. Erst nach Aufgabe 5 Schritte 1–3 (aus Teilprojekt Gastronomie).
+
+## Requests aus anderen Teilprojekten
+
+Ein Request ist eine Bitte eines anderen Teilprojekts an dieses. Erledigtes hier abhaken und im anfragenden Teilprojekt vermerken.
+
+### R-1 (Gastronomie, 13.10.2026): Bar und Restaurant baubar machen
+
+Innenraum, Figuren, Gesprächswissen, Eintritt und Gebäudeansicht sind fertig (`docs/gameplay/hospitality-venues.md`). Es gibt aber kein einziges solches Gebäude, weil beide Arten nicht gebaut werden können.
+
+- `building_definitions`: je eine aktive Zeile für `bar` und `restaurant`. Zum Vergleich das Café: Kategorie `life`, Stufe 1, 900 Credits, 1 Tick Bauzeit, überall erlaubt. Vorschlag: Bar 1 800 Credits (so steht es schon im lokalen Katalog), Restaurant 2 400 Credits, beide 2 Ticks.
+- `lib/game/buildings/index.ts`: `bar` steht dort auf `planned: true`; `restaurant` fehlt.
+- Zu entscheiden: ab welcher Ortsstufe (siehe `docs/gameplay/settlement-tiers.md` – Café ab Siedlung, Bar ab Ort?) und ob Spieler sie als zusätzliche Einrichtung bauen dürfen.
+- Stellen: Bar 2, Restaurant 3 Personalplätze (Aufgabe 2). Ohne Personal sind beide geschlossen.
+
+### R-2 (Gastronomie, 13.10.2026): Karten für Bar und Restaurant anlegen
+
+Ersetzt Aufgabe 7. Zeilen in `hospitality_menu`; Vorschlag, an Getränk 3 / Kuchen 5 / Mahlzeit 8 des Cafés ausgerichtet:
+
+| `entity_id` | `item_code` | `label` | Credits |
+|---|---|---|---|
+| `bar` | `drink` | Getränk | 3 |
+| `bar` | `snack` | Snack | 4 |
+| `bar` | `longdrink` | Longdrink | 6 |
+| `restaurant` | `drink` | Getränk | 3 |
+| `restaurant` | `dessert` | Nachtisch | 5 |
+| `restaurant` | `starter` | Vorspeise | 6 |
+| `restaurant` | `main` | Hauptgericht | 12 |
+
+Die Oberfläche zeigt eine neue Karte ohne weitere Änderung. Für Bewohner fehlt dazu der Eintrag in `npc_service_catalog` (heute nur `cafe` / `cafe_meal`), sonst kaufen sie in Bar und Restaurant nichts.
+
+### R-3 (Gastronomie, 13.10.2026): Käufe der Bewohner sind selten
+
+Im Lokal erscheinen jetzt die Bewohner als Gäste, die dort wirklich gekauft haben (`person_consumption_events`, letzte Stunde). Bisher gibt es 19 Käufe insgesamt, etwa einen alle paar Stunden – das Café ist deshalb meist leer bis auf das Personal. Kein Fehler der Anzeige; ob häufiger gegessen und getrunken wird, hängt an Bedarf, Geld und `min_interval_ticks`, also an den Aufgaben 5 und 9.
+

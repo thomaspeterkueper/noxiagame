@@ -9,11 +9,13 @@ import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
 import {
   VENUE_PLAYER_RADIUS,
   isVenueBlocked,
+  guestMoment,
   isAtServicePoint,
   placeVenueFigures,
   venueConversationFacts,
   venueLayoutForBuildingType,
   venueService,
+  type GuestMoment,
   type VenueFigure,
 } from '@/lib/game/hospitality/venues'
 
@@ -30,7 +32,9 @@ type Props = {
 }
 
 type Point = { x:number; y:number }
-type ShownFigure = { figure:VenueFigure; resident:ColonyResident }
+type ShownFigure = { figure:VenueFigure; resident:ColonyResident; moment:GuestMoment|null }
+// Ein echter Kauf eines Bewohners in diesem Lokal; alter Stand zum Zeitpunkt des Abrufs.
+type Visit = { resident:ColonyResident; ageSeconds:number; fetchedAt:number; label:string }
 
 const SPEED=12
 
@@ -55,6 +59,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[menuOpen,setMenuOpen]=useState(false)
   const[menuState,setMenuState]=useState<'loading'|'ready'|'failed'>('loading')
   const[placeKnowledge,setPlaceKnowledge]=useState<string[]>([])
+  const[visits,setVisits]=useState<Visit[]>([])
+  const[nowMs,setNowMs]=useState(()=>Date.now())
   const[ordering,setOrdering]=useState<string|null>(null)
   const[orders,setOrders]=useState<PlacedOrder[]>([])
   // Für wen bestellt wird: für sich selbst oder für die angesprochene Person.
@@ -95,6 +101,27 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     return()=>{live=false}
   },[entityId])
 
+  // Gäste: Bewohner, die hier in der letzten Stunde wirklich gekauft haben.
+  // Jede Minute neu abgefragt; dazwischen läuft nur die Uhr weiter.
+  useEffect(()=>{
+    let live=true
+    const load=async()=>{
+      try{
+        const{token}=await getSessionInfo()
+        const response=await fetch('/api/game/hospitality/guests?tileEntityId='+encodeURIComponent(entityId),{headers:{Authorization:'Bearer '+token},cache:'no-store'})
+        const data=await response.json()
+        if(live&&response.ok&&Array.isArray(data.guests)){
+          const fetchedAt=Date.now()
+          setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
+        }
+      }catch{/* ohne Antwort bleibt der Raum, wie er ist */}
+    }
+    void load()
+    const refresh=setInterval(()=>void load(),60_000)
+    const clock=setInterval(()=>setNowMs(Date.now()),400)
+    return()=>{live=false;clearInterval(refresh);clearInterval(clock)}
+  },[entityId])
+
   // Karte laden. Sie sagt je Posten, ob der Gast ihn bezahlen kann.
   useEffect(()=>{
     let live=true
@@ -133,26 +160,50 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 
   // Wer wo steht: Personal an Tresen/Empfang, Begleitung beim Eingang, Gäste
   // an freien Plätzen. Wer in einem nicht einsehbaren Raum ist, wird nicht gezeigt.
-  const figures=useMemo(()=>{
-    return placeVenueFigures(layout,residents.map(r=>({
+  // Alle Personen im Raum: wer hierher gehört, plus wer gerade als Gast da ist.
+  const worksHere=(r:ColonyResident)=>r.assignments.some(a=>a.type==='work'&&a.tileEntityId===entityId)
+  const everyone=useMemo(()=>{
+    const known=new Set(residents.map(r=>r.id))
+    return[...residents,...visits.filter(visit=>!known.has(visit.resident.id)).map(visit=>visit.resident)]
+  },[residents,visits])
+  const{figures,moments}=useMemo(()=>{
+    const ageOf=new Map(visits.map(visit=>[visit.resident.id,visit.ageSeconds+(nowMs-visit.fetchedAt)/1000]))
+    const placed=placeVenueFigures(layout,everyone.map(r=>({
       id:r.id,
-      worksHere:r.assignments.some(a=>a.type==='work'&&a.tileEntityId===entityId),
+      worksHere:worksHere(r),
       isCompanion:Boolean(companion&&r.id===companion.id),
       presenceRoomId:r.interiorPresence?.roomId??null,
     })))
-  },[layout,residents,entityId,companion?.id])
+    const moments=new Map<string,GuestMoment>()
+    const figures:VenueFigure[]=[]
+    let queue=1
+    for(const figure of placed){
+      const age=ageOf.get(figure.id)
+      // Personal bleibt Personal, auch wenn es selbst etwas gekauft hat.
+      if(age===undefined||figure.roomRole==='staff'||!figure.visibleToPlayer){figures.push(figure);continue}
+      const moment=guestMoment(layout,figure.spot,age)
+      // Wer gegangen ist, ist nicht mehr im Raum – außer er gehört ohnehin hierher.
+      if(moment.phase==='gone'){if(residents.some(r=>r.id===figure.id))figures.push(figure);continue}
+      // Wer gleichzeitig bestellt, steht hintereinander an.
+      const point=moment.phase==='ordering'?{x:moment.point.x-queue++*16,y:moment.point.y+4}:moment.point
+      moments.set(figure.id,moment)
+      figures.push({...figure,spot:{...moment.spot,x:point.x,y:point.y}})
+    }
+    return{figures,moments}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[layout,everyone,visits,nowMs,entityId,companion?.id,residents])
   // Ohne Personal: Café läuft als Automatencafé, Bar und Restaurant sind zu.
   const service=venueService(layout,figures)
   const closed=loaded&&service==='closed'
   const hasMenu=Boolean(menu?.items.length)&&service!=='closed'
   const shown=useMemo<ShownFigure[]>(()=>{
-    const byId=new Map(residents.map(r=>[r.id,r]))
+    const byId=new Map(everyone.map(r=>[r.id,r]))
     if(service==='closed')return[]
     return figures.filter(f=>f.visibleToPlayer).flatMap(figure=>{
       const resident=byId.get(figure.id)
-      return resident?[{figure,resident}]:[]
+      return resident?[{figure,resident,moment:moments.get(figure.id)??null}]:[]
     })
-  },[figures,residents,service])
+  },[figures,moments,everyone,service])
 
   const nearestNpc=useMemo(()=>shown.map(item=>({...item,d:Math.hypot(item.figure.spot.x-pos.x,item.figure.spot.y-pos.y)})).sort((a,b)=>a.d-b.d)[0]??null,[shown,pos])
   const nearService=isAtServicePoint(layout,pos)
@@ -214,7 +265,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           headline:'Gespräch '+layout.locative+' '+buildingName,
           source:'NOXIA '+layout.kind+' interior',
           locationName:buildingName,
-          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label)}),
+          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null}),
           placeKnowledge,
           history,
         }),
@@ -237,12 +288,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         {counter&&<div className="label" style={{left:counter.x+counter.w/2,top:counter.y+counter.h/2}}>{loaded&&service==='self-service'?'AUTOMAT':'TRESEN'}</div>}
         {kitchen&&<div className="label" style={{left:kitchen.x+kitchen.w/2,top:kitchen.y+kitchen.h/2}}>KÜCHE</div>}
         {desk&&<div className="label" style={{left:desk.x+desk.w/2,top:desk.y+desk.h/2}}>EMPFANG</div>}
-        {shown.map(({figure,resident})=>{
+        {shown.map(({figure,resident,moment})=>{
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className="npc" style={{left:figure.spot.x-12,top:figure.spot.y-34}}>
-            <NpcFigure id={resident.id} name={resident.displayName} role={resident.activityState} appearance={resident.appearance} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setHistory([]);setTreat(false)}}/>
+            <NpcFigure id={resident.id} name={resident.displayName} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setHistory([]);setTreat(false)}}/>
           </div>
         })}
+        {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
         {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>Hier arbeitet gerade niemand.</span></div>}
         {orders.map((entry,index)=>{
           // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt, sonst vor dem Spieler am Tresen.
