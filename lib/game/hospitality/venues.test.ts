@@ -22,6 +22,8 @@ import {
   upperFloorFact,
   venueClosedReason,
   venueOpenAt,
+  venueHoursFor,
+  clockLabel,
   withUpperFloor,
   guestMoment,
   pointAlongPath,
@@ -332,6 +334,13 @@ for (const kind of kinds) {
 }
 const seatFact = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: false, playerSeat: { ...g1.spot, id: 'x' }, joinedPlayer: true })
 check(seatFact.some(f => f.startsWith('Dein Gegenüber sitzt ') && f.includes('du hast dich eben dazugesetzt')) && !seatFact.some(f => f.includes('steht gerade')) && seatFact.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'a guest who joined knows that both sit together')
+
+// ── Startcafé nach Ortszeit des Spielers ────────────────────────────────────
+const arrival = venueHoursFor('cafe', true), plain = venueHoursFor('cafe')
+check(arrival.clock === 'player' && arrival.open === 6 && arrival.close === 23 && plain.clock === 'colony' && plain.open === 6 && plain.close === 20, 'the arrival café keeps 6–23 by the player clock, other cafés colony hours')
+check(venueOpenAt('cafe', 22, arrival) && !venueOpenAt('cafe', 22) && !venueOpenAt('cafe', 23.5, arrival) && venueOpenAt('cafe', 6, arrival), 'at 22 the arrival café is open while a normal café is closed; 23–6 it is closed')
+check(venueService(cafe, pair, 23, arrival) === 'closed' && venueService(cafe, pair, 23) === 'closed' && venueService(cafe, pair, 22, arrival) === 'staffed', 'the service follows the hours handed in')
+check(clockLabel(arrival) === 'deiner Ortszeit' && clockLabel(plain) === 'Koloniezeit', 'the player is told which clock applies')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
