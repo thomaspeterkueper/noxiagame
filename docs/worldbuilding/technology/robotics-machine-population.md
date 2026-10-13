@@ -77,3 +77,17 @@ Research basis:
 OTA research/robotics/robotics-diffusion-unstructured-work-environments-2026.md
 KG entities/concepts/robotics-diffusion-machine-population.md
 SSF learning/robotics/from-industrial-robot-to-machine-population.md
+
+
+## 2026 food-service reference
+
+A concrete contemporary reference for the "food service" stage now exists in
+`docs/research/NOXIA-ROBOTICS-0002-automated-food-service.md`.
+
+The important modeling lesson is that food-service robotics first appears as a
+specialized process cell rather than as a general humanoid cook. Prepared ingredients,
+controlled workspaces, compact manipulators, refrigeration, software orchestration and
+human refill/maintenance reduce environment entropy enough to make useful autonomy
+commercially viable. Later NOXIA systems may automate more of the surrounding logistics,
+cleaning and maintenance chain, but those capabilities must be modeled explicitly rather
+than assumed.
