@@ -61,7 +61,7 @@ describe('world lab: simplification', () => {
   const built = buildTile(features, tile, TILE_Z)
 
   it('keeps each building once, in the tile its centre lies in, and skips tiny ones', () => {
-    expect(built.blocks.map(block => block.k).sort()).toEqual(['church', 'hall', 'house'])
+    expect(built.blocks.map(block => block.k).sort()).toEqual(['church', 'factory', 'house'])
     const house = built.blocks.find(block => block.k === 'house')!
     expect([house.x, house.y, house.w, house.d]).toEqual([46, 44, 12, 8])
     expect(built.blocks.find(block => block.k === 'church')!.l).toBe(5)
@@ -117,6 +117,22 @@ describe('world lab: simplification', () => {
     expect(kinds('industrial', { visual_class: 'industrial' })).toEqual(['built'])
     expect(kinds('vegetation', { visual_class: 'park' })).toEqual(['garden'])
     expect(kinds('vegetation', { visual_class: 'scrub' })).toEqual(['forest'])
+  })
+
+  it('marks a football pitch once, in the tile of its centre', () => {
+    const pitch: SourceFeature = { id: 'p', featureType: 'sport', geometry: polygon([[40, 40], [145, 40], [145, 108], [40, 108], [40, 40]]), properties: { visual_class: 'pitch', sport: 'soccer' } }
+    const marked = buildTile([pitch], tile, TILE_Z)
+    expect(marked.marks).toHaveLength(6)   // Mittellinie, Kreis, je zwei Räume an beiden Enden
+    expect(buildTile([pitch], { x: tile.x + 1, y: tile.y }, TILE_Z).marks).toBeUndefined()
+    const tennis = { ...pitch, properties: { visual_class: 'pitch', sport: 'tennis' } }
+    expect(buildTile([tennis], tile, TILE_Z).marks).toBeUndefined()
+  })
+
+  it('keeps the real footprint of an L-shaped factory', () => {
+    const lShape = polygon([[20, 20], [120, 20], [120, 50], [60, 50], [60, 110], [20, 110], [20, 20]])
+    const built2 = buildTile([{ id: 'f', featureType: 'building', geometry: lShape, properties: { building: 'industrial' } }], tile, TILE_Z)
+    expect(built2.blocks[0].k).toBe('factory')
+    expect(built2.blocks[0].f!.length).toBeGreaterThanOrEqual(12)
   })
 
   it('stays small', () => {

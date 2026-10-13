@@ -26,7 +26,8 @@ Maße (Breite × Höhe in Pixeln):
 |---|---|---|---|---|
 | `house` | Wohnhaus | 3 m | 48 × 48 | 64 × 64 |
 | `row` | Zeile, Mehrfamilienhaus, Schule | 3 m | 48 × 48 | 64 × 64 |
-| `hall` | Halle, Gewerbe, Werk | 4 m | 96 × 64 | 64 × 64 |
+| `hall` | Halle, Lager, Gewerbe, Handel | 4 m | 96 × 64 | 64 × 64 |
+| `factory` | Fabrik, Industriebau (nur Weltkarte) | 5 m | 96 × 80 | 64 × 64 |
 | `church` | Kirche, Kapelle | 3,5 m | 64 × 56 | 64 × 64 |
 | `shed` | Schuppen, Garage | 2,5 m | 48 × 40 | 64 × 64 |
 
@@ -53,13 +54,14 @@ Die Breite eines Wandabschnitts ist frei wählbar, solange sie ein Vielfaches vo
 
 ## Stand der Zeichnungen
 
-Seit 13.10.2026 sind alle fünf Blockarten gezeichnet (je Erdgeschoss, Obergeschoss, Dach) und in `DRAWN` eingetragen. Die Bilder sind errechnet: `python3 scripts/worldlab-blocks.py` erzeugt sie neu nach `public/worldlab/blocks/`. Wer ein Stück von Hand nachzeichnet, übermalt die Datei – ein erneuter Lauf des Skripts überschreibt sie.
+Seit 13.10.2026 sind alle Blockarten gezeichnet (die Fabrik seit dem Abend) (je Erdgeschoss, Obergeschoss, Dach) und in `DRAWN` eingetragen. Die Bilder sind errechnet: `python3 scripts/worldlab-blocks.py` erzeugt sie neu nach `public/worldlab/blocks/`. Wer ein Stück von Hand nachzeichnet, übermalt die Datei – ein erneuter Lauf des Skripts überschreibt sie.
 
 | Blockart | Wand | Dach |
 |---|---|---|
 | `house` | Putz, Sprossenfenster mit grünen Läden, Sockel | rote Tonziegel |
 | `row` | Putz, hohe Fenster mit Fasche, Sockel | dunklere Tonziegel |
 | `hall` | Trapezblech, unten Sektionaltor, oben Lichtband | Trapezblech |
+| `factory` | Wellblech, unten Rolltor mit Anfahrschutz, oben durchgehendes Fensterband | Sheddach von oben: Oberlichter alle 4 m, Flachdach |
 | `church` | Quadermauerwerk, Spitzbogenfenster | Schiefer |
 | `shed` | senkrechte Bretter, kleines Fenster | Dachpappe in Bahnen |
 
@@ -81,3 +83,9 @@ Einzelbilder sind noch nicht eingebaut; sie stehen als offene Aufgabe in `world-
 - Ansicht und Abbildung der Bilder auf Wände und Dächer: `lib/worldlab/facade.ts` (mit Tests)
 - Geschosshöhen, Abschnittsbreiten, Liste der fertigen Zeichnungen: `lib/worldlab/blocks.ts`
 - Zeichnen: `drawBlock` in `app/world-lab/worldEngine.ts`
+
+## Fabriken und große Hallen
+
+- Industriebauten (`building=industrial|factory|manufacture`) sind in der Weltkarte eine eigene Blockart `factory`; die begehbare Erdszene zeigt sie weiter als `hall` (`blockKind` unverändert, die Weltkarte nutzt `worldBlockKind`).
+- Fabriken haben ein Flachdach; das Dachbild zeigt das Sheddach von oben, oben im Bild liegt die Oberlicht-Reihe, es wiederholt sich quer zur Längsachse.
+- Hallen und Fabriken mit verwinkeltem Grundriss (Fläche unter 90 % ihres Rechtecks) werden mit ihrem echten Grundriss gezeichnet, nicht als Rechteck – z. B. das Metallwerk Sundern.

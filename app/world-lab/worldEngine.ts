@@ -221,6 +221,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         g.poly(quad(0, eave)).fill(lit ? style.wallLight : style.wallDark).stroke(outline)
       }
     }
+    // Flachdach (Fabrik): eine Fläche, Dachbild entlang der langen Achse.
+    if (roofM <= 0.01) {
+      drawFlatRoof(g, kind, c, eave, { x: -sin, y: cos }, roofColor)
+      return c
+    }
     // Dach: Walmdach über der langen Achse; bei flachen Bauten fast eben.
     const ridgeHalf = Math.max(0, hw - hd)
     const r = [corner(-ridgeHalf, 0), corner(ridgeHalf, 0)]
@@ -249,6 +254,60 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return c
   }
 
+  /** Ebenes Dach auf Höhe `eave`; `inward` zeigt quer zur Längsachse (Richtung der Dachbild-Reihen). */
+  function drawFlatRoof(g: PixiGraphics, kind: BlockKind, ring: Array<{ x: number; y: number }>, eave: number, inward: { x: number; y: number }, roofColor?: number) {
+    const style = BLOCK_STYLES[kind]
+    const pts = ring.flatMap(p => { const s = iso(p.x, p.y, eave); return [s.x, s.y] })
+    const roofTexture = art.get(kind)?.roof
+    const along = { x: inward.y, y: -inward.x }
+    if (roofColor === undefined && roofTexture) {
+      const m = roofMatrix(ring[0], { x: ring[0].x + along.x, y: ring[0].y + along.y }, eave, inward, 0)
+      g.poly(pts).fill({ texture: roofTexture, matrix: matrix(m), color: 0xf2f2f2, textureSpace: 'global' })
+    } else {
+      g.poly(pts).fill(shade(roofColor ?? style.roof, 0.95))
+    }
+    g.poly(pts).stroke({ width: 0.5, color: OUTLINE, alpha: 0.6 })
+  }
+
+  /**
+   * Bau mit echtem Grundriss (Hallen, Fabriken): senkrechte Wände entlang jeder
+   * Kante, die zur Kamera zeigt, von hinten nach vorn gezeichnet, darüber ein
+   * Flachdach. Gibt den Grundriss in Weltmetern zurück.
+   */
+  function drawPrism(g: PixiGraphics, kind: BlockKind, ring: Array<{ x: number; y: number }>, eave: number, inward: { x: number; y: number }, roofColor?: number) {
+    const style = BLOCK_STYLES[kind]
+    const textures = art.get(kind)
+    let signed = 0
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) signed += (ring[j].x * ring[i].y - ring[i].x * ring[j].y)
+    const outward = signed > 0 ? 1 : -1   // y zeigt nach Süden: Umlaufsinn entscheidet, wo außen ist
+    const walls: Array<{ a: { x: number; y: number }; b: { x: number; y: number }; depth: number; lit: boolean }> = []
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length]
+      if (a.x === b.x && a.y === b.y) continue
+      const nx = (b.y - a.y) * outward, ny = -(b.x - a.x) * outward
+      if (nx + ny <= 0) continue
+      walls.push({ a, b, depth: (a.x + b.x + a.y + b.y) / 2, lit: nx - ny > 0 })
+    }
+    walls.sort((p, q) => p.depth - q.depth)
+    const outline = { width: 0.35, color: OUTLINE, alpha: 0.7 }
+    for (const { a, b, lit } of walls) {
+      const quad = (h0: number, h1: number) => { const a0 = iso(a.x, a.y, h0), b0 = iso(b.x, b.y, h0), a1 = iso(a.x, a.y, h1), b1 = iso(b.x, b.y, h1); return [a0.x, a0.y, b0.x, b0.y, b1.x, b1.y, a1.x, a1.y] }
+      const ground = textures?.wallGround, upper = textures?.wallUpper ?? textures?.wallGround
+      if (ground && upper) {
+        const [left, right] = leftToRight(a, b)
+        const tint = lit ? 0xffffff : 0xd2d2d2
+        const groundTop = Math.min(eave, style.storeyM)
+        g.poly(quad(0, groundTop)).fill({ texture: ground, matrix: matrix(wallMatrix(left, right, groundTop)), color: tint, textureSpace: 'global' })
+        if (eave > groundTop + 0.01) g.poly(quad(groundTop, eave)).fill({ texture: upper, matrix: matrix(wallMatrix(left, right, eave)), color: tint, textureSpace: 'global' })
+        g.poly(quad(0, eave)).stroke(outline)
+      } else {
+        g.poly(quad(0, eave)).fill(lit ? style.wallLight : style.wallDark).stroke(outline)
+      }
+    }
+    drawFlatRoof(g, kind, ring, eave, inward, roofColor)
+    return ring
+  }
+
   function drawBlock(block: TileBlock, ox: number, oy: number) {
     const style = BLOCK_STYLES[block.k]
     const g = new PIXI.Graphics()
@@ -260,7 +319,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const owner = noxiaOn(cx, cy, hw, hd, cos, sin)
     const look = owner ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] } : null
     const eave = (look?.levels ?? block.l) * style.storeyM
-    const c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM, look?.roof)
+    let c: Array<{ x: number; y: number }>
+    if (block.f && block.f.length >= 8) {
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i < block.f.length; i += 2) ring.push({ x: ox + block.f[i], y: oy + block.f[i + 1] })
+      if (ring.length > 3 && ring[0].x === ring[ring.length - 1].x && ring[0].y === ring[ring.length - 1].y) ring.pop()
+      c = drawPrism(g, block.k, ring, eave, { x: -sin, y: cos }, look?.roof)
+    } else {
+      c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM, look?.roof)
+    }
     if (owner) claim(owner)
     if (block.k === 'church' && block.w >= 12) {
       // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
@@ -280,10 +347,20 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const { data, ox, oy } = entry
     const g = new PIXI.Graphics()
     const path = (flat: number[]) => { const out: number[] = []; for (let i = 0; i < flat.length; i += 2) { const s = iso(ox + flat[i], oy + flat[i + 1]); out.push(s.x, s.y) } return out }
+    // Kanten, die nur durch das Zuschneiden auf die Kachel entstanden (auf dem
+    // Kachelrand), bekommen keine Randlinie.
+    const onBorder = (v: number) => Math.abs(v + 0.2) < 0.06 || Math.abs(v - data.size - 0.2) < 0.06
     for (const area of data.areas) {
-      g.poly(path(area.p)).fill(AREA_COLORS[area.k])
+      const p = path(area.p)
+      g.poly(p).fill(AREA_COLORS[area.k])
       const outline = AREA_OUTLINES[area.k]
-      if (outline) g.stroke({ width: outline.widthM * 0.75, color: outline.color, join: 'miter' })
+      if (!outline) continue
+      for (let i = 0; i + 3 < area.p.length; i += 2) {
+        const x0 = area.p[i], y0 = area.p[i + 1], x1 = area.p[i + 2], y1 = area.p[i + 3]
+        if ((onBorder(x0) && onBorder(x1) && Math.abs(x0 - x1) < 0.06) || (onBorder(y0) && onBorder(y1) && Math.abs(y0 - y1) < 0.06)) continue
+        g.moveTo(p[i], p[i + 1]).lineTo(p[i + 2], p[i + 3])
+      }
+      g.stroke({ width: outline.widthM * 0.75, color: outline.color, cap: 'square' })
     }
     const l = new PIXI.Graphics()
     for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
@@ -291,6 +368,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const style = ROAD_STYLES[road.c], p = path(road.p)
       l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
       l.stroke({ width: style.widthM * 0.75, color: style.color, cap: 'round', join: 'round' })
+    }
+    for (const mark of data.marks ?? []) {
+      const p = path(mark)
+      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
+      l.stroke({ width: 0.12 * 0.75 * 4, color: 0xf2f5ec, cap: 'butt', join: 'miter' })
     }
     ground.addChild(g)
     lines.addChild(l)
