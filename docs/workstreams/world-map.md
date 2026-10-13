@@ -19,6 +19,9 @@ Seite: `/world-lab` (nur angemeldet erreichbar, nicht aus dem Spiel verlinkt).
 | Zeichenmaschine ohne React (Kacheln, Tiefe, Kamera, Messung) | `app/world-lab/worldEngine.ts` |
 | Welche Kacheln der Bildschirm braucht, kleinster Zoom | `lib/worldlab/viewTiles.ts`, Tests daneben |
 | Messung je Bild (Bildabstand, Logik, Zeichnen) | `lib/worldlab/frameStats.ts`, Tests daneben |
+| Ansicht (2:1, Höhe √1,5) und Abbildung gezeichneter Bilder auf Wände und Dächer | `lib/worldlab/facade.ts`, Tests daneben |
+| Zeichenvorlage (Maße, Regeln, Einbau) | `docs/workstreams/world-map-zeichenvorlage.md` |
+| Vorlagen zum Übermalen | `public/worldlab/vorlagen/`, erzeugt von `scripts/worldlab-templates.py` |
 
 Wie es arbeitet:
 
@@ -54,13 +57,15 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 ## Offene Aufgaben
 
 1. ~~Messen, wo die Zeit bleibt; Zeichenleistung umbauen; Ladebereich an den Zoom koppeln.~~ Erledigt (siehe „Leistung“). Offen: Thomas misst in `/world-lab` beim Laufen durch Sundern (Bildrate, langsamstes Bild, Ruckler; bei Bedarf mit `?aa=0` und `?res=1`) und prüft dabei, ob Straßen und Blöcke an der richtigen Stelle stehen. Reicht es nicht für stabile 60, zeigt die Anzeige, ob Prozessor oder Grafikkarte die Grenze ist.
-2. Zeichenvorlage für den Baukasten: Blickwinkel (heute 2:1), Fußpunkt, Pixel je Meter und Geschosshöhe festlegen, bevor Blöcke gezeichnet werden. Dann `blocks.ts` von gezeichneten Quadern auf Bilder umstellen.
+2. ~~Zeichenvorlage festlegen, Blöcke auf Bilder umstellen.~~ Erledigt: Fassaden von vorn, 2:1 geometrisch richtig, 16 px je Meter (siehe `world-map-zeichenvorlage.md`). Wände und Dächer nehmen gezeichnete Bilder an; prüfen mit `/world-lab?art=vorlage`. Offen: Thomas zeichnet die ersten Bilder.
 3. Kacheln vorab erzeugen und als Dateien ablegen statt bei jedem ersten Abruf aus der Datenbank zu rechnen.
 4. Kollision und Wegenetz (im Prototyp läuft die Figur durch alles hindurch).
 5. Personen, Ansprechen, „Gehe hin“, Betreten von Gebäuden – erst wenn die Darstellung trägt.
 6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
 7. Datenlücke: Echte Gebäudeumrisse gibt es bisher nur an einzelnen Stellen (Sundern Mitte und drei kleine Ausschnitte). Außerhalb zeigt die Karte Straßen und Flächen, aber keine Blöcke.
 8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Offen: Sundern neu importieren – siehe `internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`.
+9. Einzelbilder für besondere Gebäude (Kirche, Bahnhof, Café, NOXIA-Gebäude): ganzes Bild in derselben Ansicht mit Fußpunkt, statt aus Wandstücken zusammengesetzt. Maße stehen in der Zeichenvorlage.
+10. Häuser vor der Figur durchscheinend machen, damit sie in engen Gassen sichtbar bleibt (die richtige Höhe verdeckt mehr Straße).
 
 ## Nicht in diesem Teilprojekt
 

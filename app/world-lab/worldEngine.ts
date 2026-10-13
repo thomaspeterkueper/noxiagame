@@ -5,11 +5,12 @@
 // kommen über die Optionen herein. So lässt sich dieselbe Maschine auch ohne
 // Anmeldung und Datenbank mit Testkacheln messen.
 
-import type { Application, Container, Graphics as PixiGraphics } from 'pixi.js'
+import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { AREA_COLORS, AREA_OUTLINES, BLOCK_STYLES, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { AREA_COLORS, AREA_OUTLINES, BLOCK_STYLES, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
-import type { SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
+import type { BlockKind, SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
 
 type Pixi = typeof import('pixi.js')
@@ -28,6 +29,8 @@ export interface WorldEngineOptions {
   host: HTMLElement
   start: GeoPoint
   settings: WorldSettings
+  /** Gezeichnete Bilder je Blockart (lib/worldlab/blocks.ts → blockArt). Fehlt eins, bleibt die Fläche einfarbig. */
+  art?: Partial<Record<BlockKind, BlockArt>>
   loadTile: (tile: TileId) => Promise<SimplifiedTile>
   loadNoxia?: () => Promise<NoxiaBuilding[]>
   noxiaVisual?: (typeId: string) => { mapAsset?: string; mapScale?: number } | null | undefined
@@ -40,16 +43,14 @@ export interface WorldEngine {
   destroy: () => void
 }
 
-// Schrägansicht 2:1 – ein Meter nach Osten geht nach rechts unten, ein Meter nach Süden nach links unten.
-const ISO_Y = 0.5
-const HEIGHT = 0.82
-const iso = (x: number, y: number, h = 0) => ({ x: x - y, y: (x + y) * ISO_Y - h * HEIGHT })
+// Schrägansicht 2:1, geometrisch richtig (lib/worldlab/facade.ts): ein Meter nach
+// Osten geht nach rechts unten, nach Süden nach links unten, nach oben um √1,5.
 
 // Geladen wird, was der Bildschirm zeigt – beim Herauszoomen mehr Kacheln.
 // Damit das begrenzt bleibt, endet das Herauszoomen bei rund 60 Kacheln Bodenfläche.
 const MAX_VIEW_TILES = 60
 const PRELOAD_MARGIN = 40         // Bildeinheiten: knapp außerhalb schon laden
-const HEIGHT_MARGIN = 40          // Bildeinheiten: hohe Gebäude, deren Fuß unter dem Bildrand steht
+const HEIGHT_MARGIN = 50          // Bildeinheiten: hohe Gebäude, deren Fuß unter dem Bildrand steht
 const KEEP_MARGIN_TILES = 0.6     // erst so weit außerhalb fällt eine Kachel weg
 const MAX_ZOOM = 7
 const FETCHED_CACHE = 600         // so viele Kacheldaten bleiben im Speicher
@@ -78,6 +79,21 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const app: Application = new PIXI.Application()
   await app.init({ resizeTo: host, background: GROUND_COLOR, antialias: settings.antialias, autoDensity: true, resolution: Math.min(settings.maxResolution, window.devicePixelRatio || 1) })
   host.appendChild(app.canvas)
+
+  // ── Gezeichnete Bilder ──────────────────────────────────────────────
+  // Vor der ersten Kachel geladen, damit kein Block erst einfarbig erscheint.
+  type ArtTextures = { wallGround?: Texture; wallUpper?: Texture; roof?: Texture }
+  const art = new Map<BlockKind, ArtTextures>()
+  await Promise.all(Object.entries(options.art ?? {}).flatMap(([kind, paths]) =>
+    (Object.entries(paths ?? {}) as Array<[keyof BlockArt, string]>).map(async ([part, src]) => {
+      try {
+        const texture: Texture = await PIXI.Assets.load({ src, data: { autoGenerateMipmaps: true } })
+        const entry = art.get(kind as BlockKind) ?? {}
+        entry[part] = texture
+        art.set(kind as BlockKind, entry)
+      } catch { options.onError('Bild ' + src + ' fehlt oder ist kaputt – die Fläche bleibt einfarbig.') }
+    })))
+  const matrix = (m: Affine) => new PIXI.Matrix(m.a, m.b, m.c, m.d, m.tx, m.ty)
 
   // ── Messung ─────────────────────────────────────────────────────────
   const stats = new FrameStats(120)
@@ -158,34 +174,56 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
 
   function drawBlock(block: TileBlock, ox: number, oy: number) {
     const style = BLOCK_STYLES[block.k]
+    const textures = art.get(block.k)
     const g = new PIXI.Graphics()
     const cos = Math.cos(block.a), sin = Math.sin(block.a)
     const corner = (lx: number, ly: number) => ({ x: ox + block.x + lx * cos - ly * sin, y: oy + block.y + lx * sin + ly * cos })
     const hw = block.w / 2, hd = block.d / 2
     const c = [corner(-hw, -hd), corner(hw, -hd), corner(hw, hd), corner(-hw, hd)]
     const eave = block.l * style.storeyM
+    const outline = { width: 0.35, color: OUTLINE, alpha: 0.7 }
     // Wände: nur die beiden, die zur Kamera zeigen.
     for (let i = 0; i < 4; i++) {
       const a = c[i], b = c[(i + 1) % 4]
       const nx = b.y - a.y, ny = -(b.x - a.x)
       if (nx + ny <= 0) continue
-      const a0 = iso(a.x, a.y), b0 = iso(b.x, b.y), a1 = iso(a.x, a.y, eave), b1 = iso(b.x, b.y, eave)
-      g.poly([a0.x, a0.y, b0.x, b0.y, b1.x, b1.y, a1.x, a1.y]).fill(nx - ny > 0 ? style.wallLight : style.wallDark).stroke({ width: 0.35, color: OUTLINE, alpha: 0.7 })
+      const lit = nx - ny > 0
+      const quad = (h0: number, h1: number) => { const a0 = iso(a.x, a.y, h0), b0 = iso(b.x, b.y, h0), a1 = iso(a.x, a.y, h1), b1 = iso(b.x, b.y, h1); return [a0.x, a0.y, b0.x, b0.y, b1.x, b1.y, a1.x, a1.y] }
+      const ground = textures?.wallGround, upper = textures?.wallUpper ?? textures?.wallGround
+      if (ground && upper) {
+        // Bild links oben an der im Bild linken Ecke; Erdgeschoss und darüber getrennt,
+        // damit das Erdgeschossbild (Tür, Sockel) nur unten erscheint.
+        const [left, right] = leftToRight(a, b)
+        const tint = lit ? 0xffffff : 0xd2d2d2
+        g.poly(quad(0, style.storeyM)).fill({ texture: ground, matrix: matrix(wallMatrix(left, right, style.storeyM)), color: tint, textureSpace: 'global' })
+        if (block.l > 1) g.poly(quad(style.storeyM, eave)).fill({ texture: upper, matrix: matrix(wallMatrix(left, right, eave)), color: tint, textureSpace: 'global' })
+        g.poly(quad(0, eave)).stroke(outline)
+      } else {
+        g.poly(quad(0, eave)).fill(lit ? style.wallLight : style.wallDark).stroke(outline)
+      }
     }
     // Dach: Walmdach über der langen Achse; bei flachen Bauten fast eben.
     const ridgeHalf = Math.max(0, hw - hd)
     const r = [corner(-ridgeHalf, 0), corner(ridgeHalf, 0)]
     const top = eave + style.roofM
-    const faces: Array<{ pts: Array<{ x: number; y: number; h: number }>; n: { x: number; y: number } }> = [
-      { pts: [{ ...c[0], h: eave }, { ...c[1], h: eave }, { ...r[1], h: top }, { ...r[0], h: top }], n: { x: sin, y: -cos } },
-      { pts: [{ ...c[2], h: eave }, { ...c[3], h: eave }, { ...r[0], h: top }, { ...r[1], h: top }], n: { x: -sin, y: cos } },
-      { pts: [{ ...c[1], h: eave }, { ...c[2], h: eave }, { ...r[1], h: top }], n: { x: cos, y: sin } },
-      { pts: [{ ...c[3], h: eave }, { ...c[0], h: eave }, { ...r[0], h: top }], n: { x: -cos, y: -sin } },
+    const pitch = style.roofM / Math.max(0.5, Math.min(hw, hd))
+    type Face = { pts: Array<{ x: number; y: number; h: number }>; n: { x: number; y: number }; eave: [{ x: number; y: number }, { x: number; y: number }] }
+    const faces: Face[] = [
+      { pts: [{ ...c[0], h: eave }, { ...c[1], h: eave }, { ...r[1], h: top }, { ...r[0], h: top }], n: { x: sin, y: -cos }, eave: [c[0], c[1]] },
+      { pts: [{ ...c[2], h: eave }, { ...c[3], h: eave }, { ...r[0], h: top }, { ...r[1], h: top }], n: { x: -sin, y: cos }, eave: [c[2], c[3]] },
+      { pts: [{ ...c[1], h: eave }, { ...c[2], h: eave }, { ...r[1], h: top }], n: { x: cos, y: sin }, eave: [c[1], c[2]] },
+      { pts: [{ ...c[3], h: eave }, { ...c[0], h: eave }, { ...r[0], h: top }], n: { x: -cos, y: -sin }, eave: [c[3], c[0]] },
     ]
     faces.sort((a, b) => (a.n.x + a.n.y) - (b.n.x + b.n.y))
     for (const face of faces) {
       const pts = face.pts.flatMap(p => { const s = iso(p.x, p.y, p.h); return [s.x, s.y] })
-      g.poly(pts).fill(shade(style.roof, 0.86 + 0.14 * Math.max(-1, Math.min(1, face.n.x - face.n.y)))).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
+      const light = 0.86 + 0.14 * Math.max(-1, Math.min(1, face.n.x - face.n.y))
+      if (textures?.roof) {
+        const roof = roofMatrix(face.eave[0], face.eave[1], eave, { x: -face.n.x, y: -face.n.y }, pitch)
+        g.poly(pts).fill({ texture: textures.roof, matrix: matrix(roof), color: shade(0xffffff, light), textureSpace: 'global' }).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
+      } else {
+        g.poly(pts).fill(shade(style.roof, light)).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
+      }
     }
     // Tiefe: der vorderste Fußpunkt entscheidet, was vor wem steht.
     g.zIndex = Math.max(...c.map(p => p.x + p.y))
