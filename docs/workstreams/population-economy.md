@@ -117,3 +117,14 @@ Quelle: Spielbeschreibung unter https://gamesoffame.wordpress.com/sundog/ (von T
 - **Alkohol hat einen Preis:** In SunDog kann Bier zur Ohnmacht führen, und man wird ausgeraubt. Zu entscheiden, ob Getränke der Bar eine Nebenwirkung haben (z. B. Wirkung auf Leistung im nächsten Tick). Kein Raub ohne ein Sicherheitsmodell.
 - **Ware beim Wirt:** In SunDog bekommt man in der Bar über „Info“ auch Gegenstände, legale und illegale; der Handel findet in einer Nische mit einer Person aus der Bar statt. Ergänzt R-8: Ob das Lokal Ort für Geschäfte zwischen Personen und Spieler wird, und ob es verbotene Ware gibt. Die Sitznischen der Bar sind im Innenraum vorhanden.
 - **Bilder als gemeinsamer Bestand:** Die Posten der Karte haben jetzt gezeichnete Bilder (`app/earth/HospitalityItemIcon.tsx`, Schlüssel ist `item_code`). Wenn Waren, Inventar und Markt ebenfalls Bilder bekommen (SunDog: Gegenstände per Ziehen und Ablegen), sollte es ein gemeinsamer Bestand mit einer Regel für Größe und Stil werden. Neue Zeilen in `hospitality_menu` (R-2) bitte mit den dort genannten Codes, sonst erscheint das Ersatzbild.
+
+### R-10 (Gastronomie, 13.10.2026): Echte Angebote für den Einstieg, Einführung in jedem Gebäude
+
+Entscheidung (Thomas, 13.10.2026): Jedes Gebäude kann Neue in die Welt von NOXIA einführen, jedes auf seine Art; die Hinweise kommen von den Leuten, die dort arbeiten. Ziel ist, dass der Spieler ins Herumkommen gerät – etwa durch eine Stelle auf einem Handelsraumschiff „oder andere spannende Sachen“.
+
+In Café, Bar und Restaurant ist die Haltung gebaut (`lib/game/hospitality/introductions.ts`, Feld `introduction` der Gesprächsroute). Das Personal darf aber kein Angebot erfinden. Es fehlt:
+
+- **Angebote als Daten:** offene Stellen, die ein Spieler annehmen kann (Mitflug oder Arbeit auf einem Handelsschiff, Aushilfe in einem Betrieb), und Aufträge (Lieferung, Botengang) – mit Anbieter, Ort, Lohn und Annahme über den Server. Heute gibt es Stellen nur für Bewohner.
+- **Zuordnung zum Haus:** welche Art Angebot wo zu hören ist – Bar eher das Riskante und Einträgliche, Café das Solide, Hotel Reisen und Ausflüge. Das Lokal liest dann die Angebote seines Ortes und gibt sie dem Personal als Fakten mit; der Knopf zum Annehmen gehört an den Tresen, nicht ins Gespräch.
+- **Andere Gebäude:** Verwaltung, Akademie, Markt, Raumhafen brauchen dieselbe Einführung mit eigener Haltung. Das Muster (Haltung plus Hinweise, nur fürs Personal) lässt sich übernehmen; welches Teilprojekt die Innenräume dieser Gebäude führt, ist zu klären.
+- Hängt mit R-8 (Auskunft gegen Geld) und R-9 (Ware beim Wirt) zusammen: Ein Angebot kann auch eine Auskunft sein, die etwas kostet.

@@ -122,6 +122,22 @@ Was eine Figur sieht, steht in den lokalen Fakten. Was sie über ihre Gegend **w
 
 Regeln: `lib/game/hospitality/placeKnowledge.ts`, Laden: `placeKnowledge.server.ts`, Abruf: `GET /api/game/hospitality/place?tileEntityId=…`. Ein Lokal ohne Erdposition (Station) hat noch kein Ortswissen.
 
+### Einführung je Haus
+
+Entscheidung (Thomas, 13.10.2026): Jedes Gebäude kann einen Einstieg in die Welt geben, und jedes auf seine Art – die Hinweise werden den Leuten in den Mund gelegt, die dort arbeiten. Für die Lokale ist das gebaut (`lib/game/hospitality/introductions.ts`):
+
+| Haus | Haltung des Personals | worauf es Neue stößt |
+|---|---|---|
+| Café | seriös, verlässlich, rät zum soliden Weg | Akademie, Verwaltung, klein anfangen |
+| Bar | halblaut, sieht überall eine Gelegenheit, nennt das Risiko | Preisunterschiede, Spediteur, herumkommen |
+| Restaurant | gesellig, empfiehlt | selbst bauen, Betriebe und Personal, Handel |
+| Haus mit Gästezimmern | zuvorkommend wie am Empfang | Sehenswertes aus dem Ortswissen, Linienflug |
+
+- Die Gesprächsroute bekommt dafür das Feld `introduction` (Haltung und höchstens fünf Hinweise). Nur das Personal erhält es.
+- **Der Ton färbt, die Tatsachen bleiben.** Alle Hinweise nennen Wege, die es im Spiel gibt. Die Bar klingt zwielichtig, bietet aber nichts Verbotenes an – das gibt es im Spiel nicht.
+- **Kein erfundenes Angebot.** Eine bestimmte Stelle auf einem Handelsschiff, ein Auftrag oder ein Preis kommt erst über echte Daten ins Gespräch (Request R-10). Bis dahin macht das Personal Lust und zeigt die Richtung.
+- Die Orientierungsfakten des Ankunftscafés (`ARRIVAL_ORIENTATION_FACTS`) bleiben daneben bestehen.
+
 ### Mitbekommenes
 
 Wer hinter dem Tresen steht, bekommt mit, was am Ort geschieht. Das ist eine dritte Liste (`hearsay`, höchstens 6 Sätze) neben lokalen Fakten und Ortswissen, und nur das Personal erhält sie.
