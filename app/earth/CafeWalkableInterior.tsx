@@ -1,6 +1,7 @@
 'use client'
 
 import HospitalityItemIcon from './HospitalityItemIcon'
+import { venueIntroduction } from '@/lib/game/hospitality/introductions'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { NpcFigure, NpcVisualStyles } from '@/lib/grid/NpcVisual'
@@ -283,6 +284,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           placeKnowledge,
           // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
           hearsay:self.roomRole==='staff'?heard:[],
+          // Jedes Haus führt Neue auf seine Art ein – nur wer hier arbeitet.
+          introduction:self.roomRole==='staff'?venueIntroduction(layout.kind,upper?.guestRooms??0):undefined,
           history,
         }),
       })

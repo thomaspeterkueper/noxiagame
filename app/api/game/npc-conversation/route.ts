@@ -105,6 +105,11 @@ export async function POST(request: NextRequest) {
   const hearsay = Array.isArray(body.hearsay)
     ? body.hearsay.slice(0, 6).map((value: unknown) => clean(value, 140)).filter(Boolean)
     : []
+  // Einführung: wie dieses Haus Neue in die Welt führt – Haltung und Hinweise.
+  const introStance = clean(body.introduction?.stance, 320)
+  const introLeads = Array.isArray(body.introduction?.leads)
+    ? body.introduction.leads.slice(0, 5).map((value: unknown) => clean(value, 180)).filter(Boolean)
+    : []
   const nearbyPlaces = Array.isArray(body.nearbyPlaces)
     ? body.nearbyPlaces.slice(0, 10).map((value: any, index: number) => ({
         key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
@@ -191,6 +196,9 @@ export async function POST(request: NextRequest) {
     placeKnowledge.length ? 'Nutze das Ortswissen, wenn nach der Gegend, nach Sehenswertem, nach Einrichtungen oder nach dem Weg gefragt wird: Nenne dann zwei, drei passende Dinge daraus, statt zu passen. Was im Ortswissen steht, gilt als belegt. Zur realen Gegend darfst du außerdem allgemein Bekanntes sagen (Landschaft, Region, größere Nachbarorte), aber erfinde keine weiteren Einrichtungen, Öffnungszeiten oder Wegbeschreibungen.' : '',
     hearsay.length ? `Was du in letzter Zeit mitbekommen hast:\n- ${hearsay.join('\n- ')}` : '',
     hearsay.length ? 'Erzähle davon, wenn nach Neuigkeiten, Gerüchten, Arbeit oder dem Geschehen am Ort gefragt wird – nicht von dir aus alles auf einmal. Was mit „Gehört“ beginnt, gibst du als Gehörtes weiter („man erzählt sich“, „ich habe gehört“), nicht als Tatsache. Schmücke nichts aus und nenne keine Namen, die dort nicht stehen.' : '',
+    introStance ? `Wie du Neue in die Welt einführst: ${introStance}` : '',
+    introLeads.length ? `Wege in die Welt, die du kennst und auf deine Art weitergibst:\n- ${introLeads.join('\n- ')}` : '',
+    introStance || introLeads.length ? 'Wenn jemand neu wirkt, nach Arbeit, Geld, Zielen oder dem Anfang fragt, gib einen oder zwei dieser Hinweise in deinem Ton – nicht alle auf einmal, und frag nach, was die Person reizt. Dein Ton färbt nur die Art; die Tatsachen bleiben dieselben. Erfinde kein konkretes Angebot: keine bestimmte Stelle, kein bestimmtes Schiff, keinen Auftrag, keinen Preis und keine Person, die etwas anbietet, wenn es nicht in deinen Fakten oder im Mitbekommenen steht.' : '',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',

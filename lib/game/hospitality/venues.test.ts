@@ -3,6 +3,7 @@ import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeSta
 import { getInteriorTemplateForBuildingType } from '../buildings/interiors/registry'
 import { getBuildingEntryDefinition } from '../buildings/entry'
 import { isSocialInfrastructure, arrivalPoints, SOCIAL_HOSPITALITY_EQUIVALENTS } from '../settlements/tiers'
+import { venueIntroduction, MAX_INTRO_LEADS, MAX_INTRO_LEAD_CHARS, MAX_INTRO_STANCE_CHARS } from './introductions'
 import { venueHearsay, MAX_HEARSAY, MAX_HEARSAY_CHARS } from './hearsay'
 import {
   ARRIVAL_ORIENTATION_FACTS,
@@ -302,6 +303,12 @@ check(heard.every(line => /^(Selbst gesehen|Gehört): /.test(line) && line.lengt
 const quiet = venueHearsay({ guestsToday: 0, hoursSinceLastGuest: null, builds: [], conflicts: 0, assistances: 0, jobSeekers: 0 })
 check(quiet.length === 1 && quiet[0].includes('niemand etwas bestellt'), 'a quiet day yields one honest line and no invented rumours')
 check(venueHearsay({ guestsToday: 1, hoursSinceLastGuest: 0.2, builds: [], conflicts: 1, assistances: 0, jobSeekers: 1 }).join('|') === 'Selbst gesehen: Seit gestern war ein Gast hier; der letzte Gast war eben erst da|Gehört: Eine Person am Ort sucht Arbeit|Gehört: Seit gestern gab es am Ort einen Streit; wer beteiligt war, weißt du nicht', 'singular forms')
+
+// ── Einführung je Haus ──────────────────────────────────────────────────────
+const intros = ([['cafe', 0], ['bar', 0], ['restaurant', 0], ['cafe', 6]] as const).map(([kind, rooms]) => venueIntroduction(kind, rooms))
+check(new Set(intros.map(entry => entry.stance)).size === 4 && intros[3].style === 'hotel', 'every house introduces newcomers in its own way; guest rooms make it a hotel')
+check(intros.every(entry => entry.stance.length <= MAX_INTRO_STANCE_CHARS && entry.leads.length >= 3 && entry.leads.length <= MAX_INTRO_LEADS && entry.leads.every(lead => lead.length <= MAX_INTRO_LEAD_CHARS)), 'stance and leads fit the limits of the conversation route')
+check(intros.every(entry => !/\d|Stelle frei|sucht (einen|eine)|Kapitän|heißt/.test(entry.leads.join(' '))), 'no lead names a concrete offer, price or person')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
