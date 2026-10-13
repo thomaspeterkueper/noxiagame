@@ -1,0 +1,10 @@
+import { evaluateHabitGate, habitActionModifier, updateHabit } from "./personHabit";
+let h=null;
+for(let tick=1;tick<=8;tick++)h=updateHabit(h,{action:'work',contextKey:'workplace:shift',successful:true,tick});
+if(!evaluateHabitGate(h!,'workplace:shift').triggered)throw new Error('repeated successful action should compile into a habit');
+if(evaluateHabitGate(h!,'home:night').triggered)throw new Error('habit must remain context bound');
+if(!(habitActionModifier(h!,'work','workplace:shift')>0))throw new Error('matching habit should bias matching action');
+if(habitActionModifier(h!,'rest','workplace:shift')!==0)throw new Error('habit must not bias a different action');
+let bad=null; for(let tick=1;tick<=8;tick++)bad=updateHabit(bad,{action:'inspect_problem',contextKey:'hazard:x',successful:false,tick});
+if(evaluateHabitGate(bad!,'hazard:x').triggered)throw new Error('repetition alone must not certify a harmful/failed habit');
+console.log('NPC habit PASS',{habit:h,failed:bad,external_llm_calls:0,world_truth_writes:0});
