@@ -4,20 +4,18 @@ import React from 'react'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const preset = searchParams.get('email')?.trim().toLowerCase()
+    const preset = new URLSearchParams(window.location.search).get('email')?.trim().toLowerCase()
     if (preset) setEmail(preset)
-  }, [searchParams])
+  }, [])
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
