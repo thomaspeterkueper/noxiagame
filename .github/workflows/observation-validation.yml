@@ -1,0 +1,20 @@
+name: Observation validation contract
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/observationValidation.ts'
+      - 'lib/game/population/prototypeExperiment.ts'
+      - 'lib/game/population/prototypeResidual.ts'
+      - 'lib/game/population/observationValidation.test.ts'
+      - 'docs/core/OBSERVATION_VALIDATION_CONTRACT.md'
+      - '.github/workflows/observation-validation.yml'
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc lib/game/population/observationValidation.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .observation-validation-test
+      - run: node .observation-validation-test/game/population/observationValidation.test.js
