@@ -22,6 +22,8 @@ export const BLOCK_STYLES: Record<BlockKind, BlockStyle> = {
   house:  { wallLight: 0xf4ead6, wallDark: 0xd9c9a8, roof: 0xb8553a, storeyM: 3, roofM: 2.4, bayM: 3 },
   row:    { wallLight: 0xefe6d8, wallDark: 0xcfc2ad, roof: 0x9c4a36, storeyM: 3, roofM: 2, bayM: 3 },
   hall:   { wallLight: 0xd9dee0, wallDark: 0xb4bcc0, roof: 0x8d979c, storeyM: 4, roofM: 0.8, bayM: 6 },
+  // Fabrik: Wellblech, Fensterband, Tore; flaches Sheddach (Sägezahn-Oberlichter) als Dachbild.
+  factory: { wallLight: 0xc9d0d4, wallDark: 0xa3abb0, roof: 0x7a8288, storeyM: 5, roofM: 0, bayM: 6 },
   church: { wallLight: 0xe9e2d2, wallDark: 0xc6bca6, roof: 0x5f6e7a, storeyM: 3.5, roofM: 5, bayM: 4 },
   shed:   { wallLight: 0xcdbfa6, wallDark: 0xa99a80, roof: 0x7d6a55, storeyM: 2.5, roofM: 0.6, bayM: 3 },
 }
@@ -69,6 +71,7 @@ export const DRAWN: Partial<Record<BlockKind, Partial<Record<keyof BlockArt, tru
   house: { wallGround: true, wallUpper: true, roof: true },
   row: { wallGround: true, wallUpper: true, roof: true },
   hall: { wallGround: true, wallUpper: true, roof: true },
+  factory: { wallGround: true, wallUpper: true, roof: true },
   church: { wallGround: true, wallUpper: true, roof: true },
   shed: { wallGround: true, wallUpper: true, roof: true },
 }

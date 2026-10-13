@@ -20,6 +20,7 @@ KINDS = {
     'house':  (3.0, 3, 0xf4ead6, 0xb8553a),
     'row':    (3.0, 3, 0xefe6d8, 0x9c4a36),
     'hall':   (4.0, 6, 0xd9dee0, 0x8d979c),
+    'factory': (5.0, 6, 0xc9d0d4, 0x7a8288),
     'church': (3.5, 4, 0xe9e2d2, 0x5f6e7a),
     'shed':   (2.5, 3, 0xcdbfa6, 0x7d6a55),
 }
@@ -67,6 +68,53 @@ def wall(kind, storey_m, bay_m, wall_color, ground):
     return img
 
 
+def factory_wall(storey_m, bay_m, wall_color, ground):
+    """Wellblech mit senkrechten Sicken, Fensterband oben, im Erdgeschoss ein Rolltor."""
+    w, h = round(bay_m * PX), round(storey_m * PX)
+    img = Image.new('RGB', (w, h), rgb(wall_color))
+    d = ImageDraw.Draw(img)
+    for x in range(0, w, 4):  # Sicken alle 25 cm
+        d.line([(x, 0), (x, h - 1)], fill=rgb(wall_color, 0.88))
+        d.line([(x + 1, 0), (x + 1, h - 1)], fill=rgb(wall_color, 1.06))
+    # Fensterband: 1,25 m hoch, 0,5 m unter der Oberkante, durchgehend (nahtlos)
+    top = PX // 2
+    d.rectangle([0, top, w - 1, top + round(1.25 * PX)], fill=(118, 146, 164))
+    for x in range(0, w, PX):
+        d.line([(x, top), (x, top + round(1.25 * PX))], fill=(70, 80, 90))
+    d.line([(0, top), (w - 1, top)], fill=(70, 80, 90))
+    d.line([(0, top + round(1.25 * PX)), (w - 1, top + round(1.25 * PX))], fill=(70, 80, 90))
+    if ground:
+        # Rolltor 4 m breit, 3 m hoch, mit Lamellen; Sockel 0,5 m
+        cx = w // 2
+        d.rectangle([0, h - PX // 2, w - 1, h - 1], fill=rgb(wall_color, 0.72))
+        gx0, gx1, gy0 = cx - 2 * PX, cx + 2 * PX - 1, h - 3 * PX
+        d.rectangle([gx0, gy0, gx1, h - 1], fill=(148, 154, 158), outline=(70, 80, 90))
+        for y in range(gy0 + 3, h - 1, 3):
+            d.line([(gx0 + 1, y), (gx1 - 1, y)], fill=(122, 128, 132))
+    return img
+
+
+def factory_roof(roof_color):
+    """Sheddach von oben: alle 4 m eine Reihe Oberlichter, dazwischen die geneigte Dachfläche."""
+    size = 4 * PX
+    img = Image.new('RGB', (size, size), rgb(roof_color))
+    d = ImageDraw.Draw(img)
+    glass = round(0.9 * PX)
+    for y in range(size):
+        if y < glass:
+            # Oberlicht (Glas, zum First hin heller)
+            d.line([(0, y), (size - 1, y)], fill=(150 + y, 176 + y, 190 + y // 2))
+        else:
+            # Dachfläche: vom First (hell) zur Kehle (dunkel)
+            t = (y - glass) / (size - glass)
+            d.line([(0, y), (size - 1, y)], fill=rgb(roof_color, 1.12 - 0.32 * t))
+    d.line([(0, glass), (size - 1, glass)], fill=rgb(roof_color, 0.6))
+    d.line([(0, size - 1), (size - 1, size - 1)], fill=rgb(roof_color, 0.55))
+    for x in range(0, size, PX // 2):  # Sprossen der Oberlichter
+        d.line([(x, 0), (x, glass - 1)], fill=(90, 104, 114))
+    return img
+
+
 def roof(roof_color):
     size = 4 * PX
     img = Image.new('RGB', (size, size), rgb(roof_color))
@@ -84,9 +132,14 @@ def main():
     for kind, (storey_m, bay_m, wall_color, roof_color) in KINDS.items():
         out = ROOT / kind
         out.mkdir(parents=True, exist_ok=True)
-        wall(kind, storey_m, bay_m, wall_color, True).save(out / 'wand-erdgeschoss.png')
-        wall(kind, storey_m, bay_m, wall_color, False).save(out / 'wand-obergeschoss.png')
-        roof(roof_color).save(out / 'dach.png')
+        if kind == 'factory':
+            factory_wall(storey_m, bay_m, wall_color, True).save(out / 'wand-erdgeschoss.png')
+            factory_wall(storey_m, bay_m, wall_color, False).save(out / 'wand-obergeschoss.png')
+            factory_roof(roof_color).save(out / 'dach.png')
+        else:
+            wall(kind, storey_m, bay_m, wall_color, True).save(out / 'wand-erdgeschoss.png')
+            wall(kind, storey_m, bay_m, wall_color, False).save(out / 'wand-obergeschoss.png')
+            roof(roof_color).save(out / 'dach.png')
         print(kind, f'{round(bay_m * PX)} × {round(storey_m * PX)} px Wand, 64 × 64 px Dach')
 
 

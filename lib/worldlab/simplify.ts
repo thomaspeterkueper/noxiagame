@@ -17,11 +17,15 @@ export interface SourceFeature {
 
 export type RoadClass = 'main' | 'street' | 'path'
 export type AreaKind = 'water' | 'forest' | 'field' | 'built' | 'garden' | 'grounds' | 'track' | 'pitch'
-export type BlockKind = 'house' | 'row' | 'hall' | 'church' | 'shed'
+export type BlockKind = 'house' | 'row' | 'hall' | 'factory' | 'church' | 'shed'
 
 export interface TileRoad { c: RoadClass; p: number[] }
 export interface TileArea { k: AreaKind; p: number[] }
-export interface TileBlock { x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number }
+export interface TileBlock {
+  x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
+  /** Echter Grundriss (Meter in der Kachel, x/y abwechselnd) – nur bei Hallen und Fabriken, deren Form kein Rechteck ist. */
+  f?: number[]
+}
 export interface SimplifiedTile {
   z: number
   x: number
@@ -30,6 +34,8 @@ export interface SimplifiedTile {
   size: number
   roads: TileRoad[]
   rivers: number[][]
+  /** Platzmarkierungen (weiße Linien, x/y abwechselnd) – nur in der Kachel, in der die Platzmitte liegt. */
+  marks?: number[][]
   areas: TileArea[]
   blocks: TileBlock[]
 }
@@ -156,17 +162,57 @@ export function blockKind(properties: Record<string, unknown>, w: number, d: num
   return 'house'
 }
 
+/**
+ * Blockart in der Weltkarte: wie `blockKind`, aber Industriebauten werden zur
+ * Fabrik (Sheddach, Wellblech). `blockKind` selbst bleibt unverändert, weil die
+ * begehbare Erdszene es ebenfalls nutzt.
+ */
+export function worldBlockKind(properties: Record<string, unknown>, w: number, d: number): BlockKind {
+  const kind = blockKind(properties, w, d)
+  const tag = String(properties.visual_class ?? properties.building ?? '').toLowerCase()
+  return kind === 'hall' && /industrial|factory|manufacture|works/.test(tag) ? 'factory' : kind
+}
+
+/**
+ * Markierungen eines Fußballplatzes: Mittellinie, Anstoßkreis, Straf- und
+ * Torräume an beiden Enden. Maße nach Regelwerk, bei kleinen Plätzen
+ * verhältnisgleich verkleinert. Rückgabe in denselben Koordinaten wie `box`.
+ */
+export function pitchMarkings(box: { x: number; y: number; w: number; d: number; a: number }): P[][] {
+  const cos = Math.cos(box.a), sin = Math.sin(box.a)
+  const at = (lx: number, ly: number): P => ({ x: box.x + lx * cos - ly * sin, y: box.y + lx * sin + ly * cos })
+  const hw = box.w / 2, hd = box.d / 2
+  const scale = Math.min(1, box.d / 68)               // Regelbreite 68 m
+  const lines: P[][] = [[at(0, -hd), at(0, hd)]]       // Mittellinie quer zur Längsachse
+  const r = 9.15 * scale
+  lines.push(Array.from({ length: 25 }, (_, i) => { const t = i / 24 * Math.PI * 2; return at(Math.cos(t) * r, Math.sin(t) * r) }))
+  for (const end of [-1, 1]) {
+    for (const [depth, width] of [[16.5, 40.3], [5.5, 18.3]]) {
+      const dx = Math.min(depth * scale, hw * 0.4), hy = Math.min(width * scale, box.d * 0.9) / 2
+      lines.push([at(end * hw, -hy), at(end * (hw - dx), -hy), at(end * (hw - dx), hy), at(end * hw, hy)])
+    }
+  }
+  return lines
+}
+
+/** Fläche eines Vielecks (Shoelace, Betrag). */
+function polygonArea(points: readonly P[]): number {
+  let sum = 0
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) sum += (points[j].x + points[i].x) * (points[j].y - points[i].y)
+  return Math.abs(sum) / 2
+}
+
 function levels(properties: Record<string, unknown>, kind: BlockKind): number {
   const tagged = Number(properties['building:levels'])
   if (Number.isFinite(tagged) && tagged >= 1) return Math.min(8, Math.round(tagged))
   // Gesamthöhe in Metern (OSM height), abzüglich Dach, durch Geschosshöhe – grob wie blocks.ts.
   const height = Number.parseFloat(String(properties.height ?? ''))
   if (Number.isFinite(height) && height > 2) {
-    const storey = kind === 'hall' ? 4 : kind === 'church' ? 3.5 : kind === 'shed' ? 2.5 : 3
-    const roof = kind === 'church' ? 5 : kind === 'house' ? 2.4 : kind === 'row' ? 2 : 0.7
+    const storey = kind === 'factory' ? 5 : kind === 'hall' ? 4 : kind === 'church' ? 3.5 : kind === 'shed' ? 2.5 : 3
+    const roof = kind === 'church' ? 5 : kind === 'house' ? 2.4 : kind === 'row' ? 2 : kind === 'factory' ? 1.2 : 0.7
     return Math.max(1, Math.min(8, Math.round((height - roof) / storey)))
   }
-  return kind === 'shed' ? 1 : kind === 'hall' ? 2 : kind === 'row' ? 3 : kind === 'church' ? 4 : 2
+  return kind === 'shed' ? 1 : kind === 'hall' || kind === 'factory' ? 2 : kind === 'row' ? 3 : kind === 'church' ? 4 : 2
 }
 
 /**
@@ -205,8 +251,15 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       if (!box || box.x < 0 || box.x >= size || box.y < 0 || box.y >= size) continue
       seen.add(key)
       if (box.w * box.d < 18) continue
-      const kind = blockKind(properties, box.w, box.d)
-      out.blocks.push({ x: round1(box.x), y: round1(box.y), w: round1(box.w), d: round1(box.d), a: Math.round(box.a * 1000) / 1000, k: kind, l: levels(properties, kind) })
+      const kind = worldBlockKind(properties, box.w, box.d)
+      const block: TileBlock = { x: round1(box.x), y: round1(box.y), w: round1(box.w), d: round1(box.d), a: Math.round(box.a * 1000) / 1000, k: kind, l: levels(properties, kind) }
+      // Große Bauten mit verwinkeltem Grundriss nicht zum Rechteck aufblähen:
+      // Das Rechteck um ein L-förmiges Werk deckt sonst Nachbarflächen zu.
+      if ((kind === 'hall' || kind === 'factory') && points.length > 5) {
+        const ring = simplifyLine(points, 1)
+        if (ring.length >= 4 && polygonArea(ring) < 0.9 * box.w * box.d) block.f = flat(ring)
+      }
+      out.blocks.push(block)
       continue
     }
     if (!touches(points, 12)) continue
@@ -223,6 +276,13 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       const simplified = simplifyLine(points, feature.featureType === 'sport' ? 1 : 4)
       // Ein Hauch Überlappung (0,2 m), damit an der Kachelgrenze keine Haarfuge bleibt.
       const clipped = simplified.length >= 3 ? clipToSquare(simplified, -0.2, size + 0.2) : []
+      // Fußballplatz (oder Platz ohne Sportart): Markierungen, gezeichnet von der Kachel mit der Platzmitte.
+      if (feature.featureType === 'sport' && areaKind(feature.featureType, properties) === 'pitch' && (properties.sport === undefined || properties.sport === 'soccer')) {
+        const box = orientedBox(points)
+        if (box && box.x >= 0 && box.x < size && box.y >= 0 && box.y < size && box.w >= 30 && box.d >= 20 && polygonArea(points) > 0.85 * box.w * box.d) {
+          out.marks = [...(out.marks ?? []), ...pitchMarkings(box).map(flat)]
+        }
+      }
       if (clipped.length >= 4) out.areas.push({ k: areaKind(feature.featureType, properties) as AreaKind, p: flat(clipped) })
     }
   }

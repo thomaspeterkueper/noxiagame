@@ -191,6 +191,65 @@ def sheet_roof(base=0x8d979c, w=64, h=64):
     return grain(img, .02, 41)
 
 
+# ── Fabrik ─────────────────────────────────────────────────────────────────
+def factory(ground):
+    """Wellblech (Sicken alle 25 cm), Geschoss 5 m. Unten Rolltor 4 m, oben durchgehendes Fensterband."""
+    w, h = 96, 80
+    base = 0xc9d0d4
+    img = Image.new('RGB', (w, h), rgb(base))
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            rib = x % 4
+            px[x, y] = rgb(base, 1.07 if rib == 1 else .86 if rib == 3 else 1.0)
+    grain(img, .015, 61)
+    d = ImageDraw.Draw(img)
+    if ground:
+        d.rectangle([0, h - 8, w - 1, h - 1], fill=(150, 152, 150))
+        d.line([(0, h - 8), (w - 1, h - 8)], fill=(116, 120, 120))
+        # Rolltor 4 m breit, 3,5 m hoch, mittig; Lamellen alle 0,25 m
+        gx0, gy0, gx1, gy1 = 16, h - 8 - 56, 79, h - 9
+        d.rectangle([gx0 - 2, gy0 - 3, gx1 + 2, gy1], fill=(82, 90, 96))
+        for y in range(gy0, gy1 + 1):
+            c = (132, 140, 146) if (y - gy0) % 4 else (104, 112, 118)
+            d.line([(gx0, y), (gx1, y)], fill=c)
+        # Gelb-schwarze Anfahrschutz-Pfosten neben dem Tor
+        for x0 in (gx0 - 6, gx1 + 3):
+            for y in range(h - 8 - 16, h - 8):
+                d.line([(x0, y), (x0 + 2, y)], fill=(222, 178, 40) if (y // 3) % 2 else (40, 40, 40))
+    else:
+        # Fensterband 1,25 m hoch, 0,5 m unter der Oberkante, durchgehend; Pfosten jeden Meter
+        y0, y1 = 8, 28
+        d.rectangle([0, y0, w - 1, y1], fill=(80, 92, 100))
+        for y in range(y0 + 2, y1 - 1):
+            t = (y - y0) / (y1 - y0)
+            d.line([(0, y), (w - 1, y)], fill=mix((172, 196, 210), (108, 140, 162), t))
+        for x in range(0, w, 16):
+            d.line([(x, y0), (x, y1)], fill=(80, 92, 100))
+    return img
+
+
+def shed_roof(base=0x7a8288, w=64, h=64):
+    """Sheddach von oben: alle 4 m eine Reihe Oberlichter (oben im Bild = zum First), dazwischen geneigtes Blech."""
+    img = Image.new('RGB', (w, h), rgb(base))
+    px = img.load()
+    glass = 14
+    for y in range(h):
+        for x in range(w):
+            if y < glass:
+                g = mix((178, 204, 218), (120, 152, 172), y / glass)
+                px[x, y] = g if x % 8 else (84, 98, 108)
+            else:
+                t = (y - glass) / (h - glass)
+                rib = x % 8
+                f = (1.14 - .34 * t) * (1.05 if rib in (2, 3) else .9 if rib == 0 else 1.0)
+                px[x, y] = rgb(base, f)
+    d = ImageDraw.Draw(img)
+    d.line([(0, glass), (w - 1, glass)], fill=rgb(base, .55))
+    d.line([(0, h - 1), (w - 1, h - 1)], fill=rgb(base, .5))
+    return grain(img, .02, 71)
+
+
 # ── Kirche ─────────────────────────────────────────────────────────────────
 def church(ground):
     w, h = 64, 56
@@ -306,6 +365,7 @@ IMAGES = {
     'house': (house(True), house(False), tile_roof(0xb8553a, seed=3)),
     'row': (row(True), row(False), tile_roof(0x9c4a36, seed=5)),
     'hall': (hall(True), hall(False), sheet_roof()),
+    'factory': (factory(True), factory(False), shed_roof()),
     'church': (church(True), church(False), slate_roof()),
     'shed': (shed(True), shed(False), felt_roof()),
 }
