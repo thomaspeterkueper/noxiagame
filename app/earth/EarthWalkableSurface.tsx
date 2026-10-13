@@ -69,6 +69,8 @@ function unzoomedAt(point:ScenePoint){const p=iso(point);return `translate(${p.x
 // The scene covers ±260 m. Well before that edge it is rebuilt around the
 // player, snapped to a fixed grid so the same ground always maps to the same
 // stored detail rows instead of a new set for every few metres walked.
+// Ansprechen kann man nur, wen man erreicht hat.
+const TALK_RANGE_M=8
 const RECENTER_AT_M=190
 // Own and state buildings stay selectable as a destination well beyond the
 // visible scene; walking there crosses several scene frames.
@@ -113,6 +115,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[hoveredBuilding,setHoveredBuilding]=useState<{x:number;y:number;name:string;detail:string;distanceM:number}|null>(null)
   const[navigationTargetId,setNavigationTargetId]=useState<string>('')
   const[autoWalkTargetId,setAutoWalkTargetId]=useState<string>('')
+  // Person, auf die die Spielfigur gerade zugeht.
+  const[approachNpcId,setApproachNpcId]=useState<string>('')
   // Prevent a position update from immediately triggering another auto-walk step
   // before the next animation frame. React state changes recalculate the route.
   const lastAutoWalkMotionTime=useRef<number|null>(null)
@@ -132,28 +136,35 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[openLandmarkId,setOpenLandmarkId]=useState('')
   const recenterRequested=useRef('')
 
-  useEffect(()=>{let live=true;fetch(regionUrl('walkable-v2',sceneCenter),{cache:'no-store'}).then(r=>r.json()).then(json=>{if(live&&(json?.ok||!sceneCenter))setData(json)}).catch(()=>{if(live&&!sceneCenter)setData({ok:false,error:'Earth-Region nicht erreichbar'})});return()=>{live=false}},[sceneCenter])
+  // Eine Szene wird erst gezeigt, wenn ihre Ortsdetails da sind. Sonst baut sich
+  // der Ort zweimal auf: zuerst mit abgeleiteten Baumassen, dann mit den echten
+  // Gebäuden. Beim Weiterlaufen bleibt die bisherige Szene stehen, bis die neue fertig ist.
   useEffect(()=>{
-    const detail=data?.localDetail
-    if(!data?.ok||!detail?.slug)return
-    const alreadyEnriched=(data.features??[]).some(feature=>feature.properties?.noxia_enrichment===EARTH_LOCAL_ENRICHMENT_PROFILE)
-    if(alreadyEnriched||localEnrichmentAttempted.current.has(detail.slug))return
-    localEnrichmentAttempted.current.add(detail.slug)
     let live=true
-    setDetailStatus('loading')
     ;(async()=>{
+      let base:Payload|null=null
+      try{base=await fetch(regionUrl('walkable-v2',sceneCenter),{cache:'no-store'}).then(r=>r.json())}catch{base=null}
+      if(!live)return
+      if(!base){if(!sceneCenter)setData({ok:false,error:'Earth-Region nicht erreichbar'});return}
+      if(!base.ok){if(!sceneCenter)setData(base);return}
+      const detail=base.localDetail
+      const enriched=(base.features??[]).some(feature=>feature.properties?.noxia_enrichment===EARTH_LOCAL_ENRICHMENT_PROFILE)
+      if(!detail?.slug||enriched||localEnrichmentAttempted.current.has(detail.slug)){setData(base);setDetailStatus('idle');return}
+      localEnrichmentAttempted.current.add(detail.slug)
+      setDetailStatus('loading')
       try{
         const {token}=await getSessionInfo()
         const response=await fetch('/api/earth/local-enrich',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({slug:detail.slug,lat:detail.lat,lon:detail.lon,radiusKm:.34})})
-        if(!response.ok){if(live)setDetailStatus('failed');return}
+        if(!live)return
+        if(!response.ok){setData(base);setDetailStatus('failed');return}
         const refreshed=await fetch(regionUrl('walkable-v3',sceneCenter),{cache:'no-store'}).then(result=>result.json())
         if(!live)return
-        if(refreshed?.ok)setData(refreshed)
+        setData(refreshed?.ok?refreshed:base)
         setDetailStatus('idle')
-      }catch{if(live)setDetailStatus('failed')}
+      }catch{if(live){setData(base);setDetailStatus('failed')}}
     })()
     return()=>{live=false}
-  },[data?.ok,data?.localDetail,data?.features,detailRetry,sceneCenter])
+  },[sceneCenter,detailRetry])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
   // Gebäude am Ort. Ohne sie gibt es keine Ziele und niemand steht an seinem
   // Arbeitsplatz – deshalb wird ein fehlgeschlagener Abruf wiederholt und gemeldet.
@@ -399,6 +410,25 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }]
   }):[],[scene,residents,motionTime,selected?.id,npcWorldActionById,buildingTargets])
 
+  const selectedNpcPoint=selected?npcPositions.find(item=>item.resident.id===selected.id)??null:null
+  const selectedNpcDistance=selectedNpcPoint?Math.hypot(selectedNpcPoint.xM-player.xM,selectedNpcPoint.yM-player.yM):null
+  const canTalkToSelected=selectedNpcDistance!==null&&selectedNpcDistance<=TALK_RANGE_M
+  // „Gehe hin“: Schritt für Schritt auf die gewählte Person zu, bis man sie ansprechen kann.
+  const lastApproachMotionTime=useRef<number|null>(null)
+  useEffect(()=>{
+    if(!approachNpcId||!scene||!origin)return
+    const npc=npcPositions.find(item=>item.resident.id===approachNpcId)
+    if(!npc||selected?.id!==approachNpcId){setApproachNpcId('');return}
+    if(lastApproachMotionTime.current===motionTime)return
+    lastApproachMotionTime.current=motionTime
+    const away=Math.hypot(npc.xM-player.xM,npc.yM-player.yM)
+    if(away<=TALK_RANGE_M-2){setApproachNpcId('');return}
+    const route=routeAcrossLocalScene(scene,player,{xM:npc.xM,yM:npc.yM})
+    const next=route?advanceAlongLocalSceneRoute(scene,player,route,2.2):player
+    if(Math.hypot(next.xM-player.xM,next.yM-player.yM)<.01){setApproachNpcId('');return}
+    setSharedPlayerPosition((data?.region as any)?.id??null,next,localMetersToGeo({eastM:next.xM,northM:next.yM},origin))
+  },[motionTime,approachNpcId,npcPositions,selected?.id,scene,origin,player,data?.region,setSharedPlayerPosition])
+
   function perceivedLocalFactsForNpc(npcId:string){
     const npc=npcPositions.find(item=>item.resident.id===npcId)
     if(!npc)return baseLocalFacts
@@ -473,7 +503,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }
   },[awarenessItems,npcPositions,player])
 
-  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key)||!scene)return;event.preventDefault();setAutoWalkTargetId('');setNpcWorldActionById(current=>Object.fromEntries(Object.entries(current).map(([id,action])=>[id,{...action,playerFollows:false}])));(()=>{const next=resolveLocalSceneStep(scene,player,{xM:player.xM+(key==='d'?step:key==='a'?-step:0),yM:player.yM+(key==='s'?step:key==='w'?-step:0)});setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,scene,setSharedPlayerPosition])
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(target?.closest('input,textarea'))return;const step=event.shiftKey?8:4;const key=event.key.toLowerCase();if(!['w','a','s','d'].includes(key)||!scene)return;event.preventDefault();setAutoWalkTargetId('');setApproachNpcId('');setNpcWorldActionById(current=>Object.fromEntries(Object.entries(current).map(([id,action])=>[id,{...action,playerFollows:false}])));(()=>{const next=resolveLocalSceneStep(scene,player,{xM:player.xM+(key==='d'?step:key==='a'?-step:0),yM:player.yM+(key==='s'?step:key==='w'?-step:0)});setSharedPlayerPosition((data?.region as any)?.id??null,next,origin?localMetersToGeo({eastM:next.xM,northM:next.yM},origin):playerGeo)})()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[data?.region,origin,player,playerGeo,scene,setSharedPlayerPosition])
 
   useEffect(()=>{
     if(!scene||!origin||!navigationTarget||!navigationRoute||autoWalkTargetId!==navigationTarget.id||targetInteractionDistance===null)return
@@ -528,7 +558,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const selectedActionActive=Boolean(activeActionForSelected&&motionTime-activeActionForSelected.startedAt>=0&&motionTime-activeActionForSelected.startedAt<activeActionForSelected.durationSeconds)
 
   async function talk(){
-    if(!selected||!message.trim()||sending)return
+    if(!selected||!message.trim()||sending||!canTalkToSelected)return
     const playerMessage=message.trim().slice(0,80)
     if(!playerMessage)return
     const history=conversationByNpc[selected.id]??[]
@@ -587,8 +617,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }finally{setSending(false)}
   }
 
-  if(!data)return <div className="earth-walkable-loading">Lokale Earth-Szene wird aufgebaut …</div>
+  if(!data)return <div className="earth-walkable-loading">{detailStatus==='loading'?'Gebäude, Wege und Gewässer dieses Ortes werden geladen …':'Lokale Earth-Szene wird aufgebaut …'}</div>
   if(!data.ok||!scene)return <div className="earth-walkable-loading">Earth-Szene nicht verfügbar: {data.error??'keine Region'}</div>
+  // Steht die Spielfigur vom letzten Besuch weit vom Mittelpunkt dieser ersten
+  // Szene entfernt, wird gleich um sie herum neu geladen – die erste Szene nicht zeigen.
+  if(!sceneCenter&&origin&&playerGeo&&playerRegionId&&playerRegionId===((data.region as any)?.id??null)){
+    const away=geoToLocalMeters(playerGeo,origin)
+    if(Math.max(Math.abs(away.eastM),Math.abs(away.northM))>RECENTER_AT_M)return <div className="earth-walkable-loading">Lokale Earth-Szene wird aufgebaut …</div>
+  }
 
   return <section className="earth-walkable" aria-label={`Begehbarer Ort ${data.region?.name??'Erde'}`}>
     <header><div><small>EARTH · LOCAL SCENE</small><b>{data.region?.name??'Aktueller Ort'}</b><span>{theme.label}</span></div><div className="meta"><span>{scene.buildings.length} Gebäude/Massen</span><span>{scene.roadGraph.length} Straßen</span><span>{scene.railGraph.length} Schienen</span></div><button onClick={onClose}>← Karte</button></header>
@@ -724,7 +760,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <span>{ambientConversation.conversation.item.kind==='colony'?'NOXIA-Weltgeschehen':`Reale Meldung · ${ambientConversation.source?.name??ambientConversation.conversation.item.sourceId}`} · ca. {Math.round(ambientConversation.playerDistance)} m entfernt</span>
       </div>}
 
-      {selected&&<aside><div className="head"><div><small>NPC · LOKAL</small><b>{selected.displayName}</b><span>{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selectedActionActive?'geht voraus':selected.activityState}</b><span>Letzte Aktion</span><b>{selectedActionActive?(activeActionForSelected?.type==='visit_place'?`geht zu ${activeActionForSelected.targetName}`:(activeActionForSelected?.playerFollows?'führt dich den Weg entlang':'geht den Weg entlang')):selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}<div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></aside>}
+      {selected&&<aside><div className="head"><div><small>NPC · LOKAL</small><b>{selected.displayName}</b><span>{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selectedActionActive?'geht voraus':selected.activityState}</b><span>Letzte Aktion</span><b>{selectedActionActive?(activeActionForSelected?.type==='visit_place'?`geht zu ${activeActionForSelected.targetName}`:(activeActionForSelected?.playerFollows?'führt dich den Weg entlang':'geht den Weg entlang')):selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}{canTalkToSelected?<><div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></>:<div className="chat"><span style={{flex:1,alignSelf:'center',fontSize:11,color:'#9fb0bb'}}>{selectedNpcDistance===null?'Nicht mehr in Sichtweite.':`Zu weit weg zum Ansprechen – ${Math.round(selectedNpcDistance)} m.`}</span>{selectedNpcDistance!==null&&<button onClick={()=>{setAutoWalkTargetId('');setApproachNpcId(selected.id)}}>{approachNpcId===selected.id?'GEHE …':'GEHE HIN'}</button>}</div>}</aside>}
     </div>
     <EarthBuildingAccessLayer request={entryRequest} companion={interiorCompanion} onClose={()=>setEntryRequest(null)}/>
     <style jsx>{`
