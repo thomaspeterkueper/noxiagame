@@ -98,7 +98,7 @@ Der Innenraum zeigt eine Treppe „PRIVAT ↑“, sobald ein Gastronomiegebäude
 - Der Wirt wohnt bevorzugt über seinem Lokal; sonst Vermietung mit Miete an den Eigentümer.
 - Zu entscheiden: eigene Gebäudeart „Wohn- und Geschäftshaus“ oder Ausbau eines bestehenden Lokals.
 
-**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** Vorschlag: keine eigene Gebäudeart, sondern Ausbau eines bestehenden Lokals (`residential_capacity` 1–2 am Gebäude). Der Wohnungsmarkt (NOXIA-LIVING-0010) kann solche Plätze bereits vergeben; neu wäre nur die Vorliebe des Wirts für die Wohnung über seinem Lokal und die Miete an den Eigentümer. **Zu entscheiden (Thomas):** Ausbau oder eigene Gebäudeart.
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026) – entschieden (Thomas, 13.10.2026):** Wohnen über dem Lokal ist ein **Gebäude-Ausbau**; bei manchen Lokalen und auch Geschäften ist es schon standardmäßig vorhanden. Umsetzung: `residential_capacity` am Gebäude – als Standardwert je Gebäudeart (Gebäude mit Wohnung oben von Anfang an) oder durch einen Ausbau (Kosten, Bauzeit) nachträglich. Der Wohnungsmarkt (NOXIA-LIVING-0010) vergibt die Plätze bereits; neu sind die Vorliebe des Wirts für die Wohnung über seinem Lokal und die Miete an den Eigentümer. Offen: welche Gebäudearten die Wohnung standardmäßig haben (Vorschlag: Café und Bar in Orten auf der Erde ja, Restaurant nein; Läden später) und was der Ausbau kostet.
 
 ### R-7 (Gastronomie, 13.10.2026): Hotel und Gästezimmer
 

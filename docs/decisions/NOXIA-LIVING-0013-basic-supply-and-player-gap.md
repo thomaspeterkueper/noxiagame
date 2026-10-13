@@ -75,12 +75,26 @@ In einer zurückgerollten Transaktion gegen die Live-Daten: 6 Kantinen in den Ha
 
 Entschieden am 13.10.2026: Kantine überall, auch neben Lokalen; sie bleibt bestehen.
 
-Entschieden am 13.10.2026 (Thomas): Die Kantine hat kein menschliches Personal. Sie wird von einem **Automaten oder einem humanoiden Roboter** bedient – einem Roboter, wie er in etwa 50 Jahren gebaut wird, nicht einem Androiden aus der Science-Fiction. Siehe Abschnitt „Bedienung“.
+Entschieden am 13.10.2026 (Thomas): Die Kantine hat kein menschliches Personal. Kleine Kantinen haben nur einen Automaten; größere werden von einem oder mehreren humanoiden Robotern bedient – Robotern, wie sie in etwa 50 Jahren gebaut werden. Diese sind vernetzt, erinnern sich und haben ein Schwarmbewusstsein. Siehe Abschnitt „Bedienung“.
+
+1. Reichweite des Schwarms: ein Schwarm je Kolonie bzw. Station, oder ein gemeinsamer Schwarm über alle Häfen, der über Funk mit Lichtlaufzeit abgleicht (Erde–Mars je nach Stellung etwa 3 bis 22 Minuten)? Vorschlag: ein Netz über alle Häfen, Abgleich mit Verzögerung – dann weiß der Schwarm auf dem Mars erst nach Minuten, was auf der Erde geschah, und Spieler können das merken.
+2. Was weiß der Schwarm? Vorschlag unten: nur, was die Roboter selbst wahrgenommen haben.
 
 ## Bedienung: Automat oder Roboter
 
-- **Kein Bewohner, keine Stelle, kein Lohn.** Der Roboter ist Ausstattung der Kantine, keine Person in `people`. Er hat kein Gedächtnis für Gäste, keine Stimmung, keine Beziehungen und erzählt keine Gerüchte.
-- **Plausible Technik:** erkennbar Maschine – Gelenke, Sensorkopf, abwischbare Schalen, vielleicht Abnutzung; greift, reicht aus, spricht knapp mit synthetischer Stimme. Keine täuschend menschliche Haut, kein Mienenspiel, keine Gefühle. Sinngemäß das, was man aus heutiger Robotik in einem halben Jahrhundert erwarten kann.
-- **Gesprächsumfang:** nur, was ein Ausgaberoboter weiß – Karte, Preise, rund um die Uhr geöffnet, Notration für Mittellose, Weg zum Hafen. Kein freies Gespräch über die Gesprächs-KI. Fragt man mehr, verweist er auf die Verwaltung oder ein Lokal am Ort. Das passt zur Lücke für Spieler: Die Kantine versorgt, aber niemand erzählt dort etwas.
-- **Automat oder Roboter je Ort:** Vorschlag – kleine Häfen (Landeplatz auf Mond, Phobos) ein Automat; größere Häfen und Stationen (Andockmodul, Raumhafen, Q1) ein Roboter. Gastronomie entscheidet beim Innenraum.
-- Später möglich: Wartung des Roboters als Kostenposten der Koloniekasse; ein Ausfall („Automat außer Betrieb“) als Ereignis.
+### Automat (kleine Kantinen)
+
+- Wirklich nur ein Automat: Auswahl, Bezahlung, Ausgabe. Keine Stimme, kein Gespräch, kein Gedächtnis. Anzeige von Karte, Preisen und Notration.
+- Vorschlag: an kleinen Landeplätzen (Mond / Shackleton, Phobos, später neue Außenposten).
+
+### Humanoide Roboter (größere Kantinen)
+
+- **Keine Bewohner, keine Stelle, kein Lohn.** Die Roboter sind Ausstattung der Kantine, keine Personen in `people`; sie haben keine Stimmung, keine Bedürfnisse und keine Beziehungen im Sinne von NOXIA-LIVING-0008.
+- **Plausible Technik:** erkennbar Maschine – Gelenke, Sensorkopf, abwischbare Schalen, Gebrauchsspuren; greifen, reichen aus, sprechen knapp mit synthetischer Stimme. Keine täuschend menschliche Haut, kein Mienenspiel, keine Gefühle.
+- **Vernetzt mit Schwarmbewusstsein:** Alle Kantinenroboter teilen ein Gedächtnis. Was einer gesehen hat, wissen alle im Netz; ein Gast, den ein Roboter auf Phobos bedient hat, wird vom Roboter in Prometheus wiedererkannt. Der Schwarm spricht von sich gern im Plural („Wir haben Sie zuletzt auf Phobos gesehen.“). Mehrere Roboter in einer Kantine sind Körper desselben Schwarms, nicht verschiedene Figuren.
+- **Gedächtnis:** Der Schwarm erinnert sich an Gäste (wer, wann, wo, was bestellt, ob Notration), an Ankünfte und Abflüge, die man vom Hafen aus sieht, und an das, was in seiner Hörweite in der Kantine gesagt wurde. Grundsatz bleibt: Er weiß nur, was er wahrnehmen konnte – kein Zugriff auf Datenbanken der Verwaltung, keine Gedanken von Personen, nichts aus Lokalen, in denen kein Roboter steht.
+- **Gesprächsumfang:** mehr als ein Automat – Karte, Preise, Notration, Weg zum Hafen, dazu was der Schwarm erlebt hat: wer zuletzt angekommen ist, wie viele Notrationen ausgegeben werden, welcher Gast wiederkommt. Sachlich und ohne Klatsch-Ton; Deutungen und Gerüchte bleiben Sache der Menschen im Lokal. So bleibt die Lücke für Spieler: Der Schwarm weiß Tatsachen, das Lokal erzählt Geschichten.
+- **Anschluss an R-8 (Wissen der Personen):** Der Schwarm ist ein eigener Wissensträger im selben Modell wie die Wissensspuren der Bewohner (Quelle, Alter, Verlässlichkeit), mit Quelle „Kantinenschwarm“. Ob er Auskunft gegen Geld gibt oder Wissen an Bewohner weitergibt, wird dort entschieden.
+- **Technisch:** ein Akteur „Kantinenschwarm“ (kein Bewohner), ein gemeinsames Gedächtnis als Ereignisliste (wer, wo, wann, was), abgeleitet aus vorhandenen Ereignissen wie `person_consumption_events`, Bestellungen und Ankünften – nichts wird doppelt gespeichert.
+- Vorschlag: Roboter an größeren Häfen und Stationen (Mars / Tharsis Hub, Prometheus Station, Q1, Tharsis Hub Sauerland). Gastronomie entscheidet beim Innenraum.
+- Später möglich: Wartung als Kostenposten der Koloniekasse; Ausfall eines Automaten oder Netzausfall des Schwarms als Ereignis – dann erinnert sich die betroffene Kantine vorübergehend an nichts Neues.
