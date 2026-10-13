@@ -108,3 +108,12 @@ Das Personal erzählt jetzt, was am Ort geschehen ist (`lib/game/hospitality/hea
 - Wissensspuren je Person: wer was gesehen oder von wem gehört hat, mit Alter und Verlässlichkeit; Weitergabe bei Begegnungen, im Lokal besonders. Der Innenraum liest dann das Wissen der anwesenden Person statt `venueState`.
 - Auskunft als Ware nach SunDog (in der Bar kauft und verkauft man „Info“ beim Wirt): Preis, was eine Auskunft enthält (Preise anderer Orte, Stellen, Aufträge), und was der Spieler selbst verkaufen kann. Buchung über den Server, nicht im Gespräch.
 - Gastronomie baut danach den Posten „Auskunft“ am Tresen.
+
+### R-9 (Gastronomie, 13.10.2026): Lehren aus SunDog für Bedürfnisse und Waren
+
+Quelle: Spielbeschreibung unter https://gamesoffame.wordpress.com/sundog/ (von Thomas genannt). Was davon nicht im Lokal liegt:
+
+- **Sichtbare Balken:** SunDog zeigt vier Balken – Ernährung, Ruhe, Kraft, Gesundheit. Für Aufgabe 5 heißt das: Hunger und Durst (und Erholung, R-7) des Spielers stehen dauerhaft sichtbar in der Kopfzeile, nicht nur als Zahl im Profil. Essen kauft man im Lokal; wer lange unterwegs ist, ohne zu essen, bekommt Folgen. Das Lokal zeigt dann je Posten, was er stillt.
+- **Alkohol hat einen Preis:** In SunDog kann Bier zur Ohnmacht führen, und man wird ausgeraubt. Zu entscheiden, ob Getränke der Bar eine Nebenwirkung haben (z. B. Wirkung auf Leistung im nächsten Tick). Kein Raub ohne ein Sicherheitsmodell.
+- **Ware beim Wirt:** In SunDog bekommt man in der Bar über „Info“ auch Gegenstände, legale und illegale; der Handel findet in einer Nische mit einer Person aus der Bar statt. Ergänzt R-8: Ob das Lokal Ort für Geschäfte zwischen Personen und Spieler wird, und ob es verbotene Ware gibt. Die Sitznischen der Bar sind im Innenraum vorhanden.
+- **Bilder als gemeinsamer Bestand:** Die Posten der Karte haben jetzt gezeichnete Bilder (`app/earth/HospitalityItemIcon.tsx`, Schlüssel ist `item_code`). Wenn Waren, Inventar und Markt ebenfalls Bilder bekommen (SunDog: Gegenstände per Ziehen und Ablegen), sollte es ein gemeinsamer Bestand mit einer Regel für Größe und Stil werden. Neue Zeilen in `hospitality_menu` (R-2) bitte mit den dort genannten Codes, sonst erscheint das Ersatzbild.

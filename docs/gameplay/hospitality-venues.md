@@ -159,6 +159,10 @@ Karten gibt es bisher nur für `cafe`. Vorschlag für die fehlenden Zeilen in `h
 | `restaurant` | `starter` | Vorspeise | 6 |
 | `restaurant` | `main` | Hauptgericht | 12 |
 
+### Bilder statt nur Text
+
+Jeder Posten der Karte hat ein gezeichnetes Bild (`app/earth/HospitalityItemIcon.tsx`): Die Karte ist ein Raster aus Kacheln mit Bild, Name und Preis, und was bestellt wurde, steht mit demselben Bild im Raum. Das Bild hängt am `item_code` (`drink`, `cake`, `meal`, `snack`, `longdrink`, `starter`, `main`, `dessert`); ein unbekannter Posten bekommt den Teller unter der Haube. Vorbild ist SunDog, wo Waren und Speisen als Bilder gekauft und bewegt werden. Ein neuer Posten in `hospitality_menu` braucht also auch ein Bild hier.
+
 ## 6. Anschlussstellen – nicht gebaut
 
 ### 6.1 Wirt als echter Bewohner (`NOXIA-LIVING-0010`)
