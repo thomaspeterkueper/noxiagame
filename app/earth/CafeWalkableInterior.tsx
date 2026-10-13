@@ -14,7 +14,13 @@ import {
   placeVenueFigures,
   venueConversationFacts,
   venueLayoutForBuildingType,
+  hasUpperFloor,
+  venueClosedReason,
+  venueHoursText,
   venueService,
+  withUpperFloor,
+  VENUE_HOURS,
+  type VenueUpperFloor,
   type GuestMoment,
   type VenueFigure,
 } from '@/lib/game/hospitality/venues'
@@ -45,7 +51,11 @@ type PlacedOrder = { key:string; itemCode:string; label:string; forId:string|nul
 const ITEM_GLYPH:Record<string,string>={drink:'🥤',cake:'🍰',meal:'🍽️',snack:'🥨',longdrink:'🍹',starter:'🥗',main:'🍽️',dessert:'🍮'}
 
 export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose}:Props){
-  const layout=useMemo(()=>venueLayoutForBuildingType(buildingTypeId),[buildingTypeId])
+  // Zustand des Lokals: Koloniestunde, Obergeschoss, was das Personal mitbekommen hat.
+  const[hour,setHour]=useState<number|null>(null)
+  const[upper,setUpper]=useState<VenueUpperFloor|null>(null)
+  const[heard,setHeard]=useState<string[]>([])
+  const layout=useMemo(()=>{const base=venueLayoutForBuildingType(buildingTypeId);return hasUpperFloor(upper)?withUpperFloor(base):base},[buildingTypeId,upper])
   const arrivalPoint=SOCIAL_INFRASTRUCTURE[layout.kind]?.arrivalPoint===true
   const[pos,setPos]=useState<Point>(layout.start)
   const[residents,setResidents]=useState<ColonyResident[]>([])
@@ -112,6 +122,9 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         const data=await response.json()
         if(live&&response.ok&&Array.isArray(data.guests)){
           const fetchedAt=Date.now()
+          setHour(typeof data.hour==='number'?data.hour:null)
+          setUpper(data.upper&&typeof data.upper==='object'?{homes:Number(data.upper.homes??0),guestRooms:Number(data.upper.guestRooms??0)}:null)
+          setHeard(Array.isArray(data.heard)?data.heard.map(String):[])
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
         }
       }catch{/* ohne Antwort bleibt der Raum, wie er ist */}
@@ -193,7 +206,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[layout,everyone,visits,nowMs,entityId,companion?.id,residents])
   // Ohne Personal: Café läuft als Automatencafé, Bar und Restaurant sind zu.
-  const service=venueService(layout,figures)
+  const service=venueService(layout,figures,hour)
+  const closedReason=venueClosedReason(layout,figures,hour)
   const closed=loaded&&service==='closed'
   const hasMenu=Boolean(menu?.items.length)&&service!=='closed'
   const shown=useMemo<ShownFigure[]>(()=>{
@@ -265,8 +279,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           headline:'Gespräch '+layout.locative+' '+buildingName,
           source:'NOXIA '+layout.kind+' interior',
           locationName:buildingName,
-          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null}),
+          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour,upper}),
           placeKnowledge,
+          // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
+          hearsay:self.roomRole==='staff'?heard:[],
           history,
         }),
       })
@@ -279,7 +295,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 
   return <div className="cafe-interior">
     <NpcVisualStyles/>
-    <header><div><small>INNENRAUM · {layout.noun.toUpperCase()}</small><b>{buildingName}</b><span>WASD bewegen · NPC anklicken · ESC verlassen</span></div><button onClick={onClose}>← Verlassen</button></header>
+    <header><div><small>INNENRAUM · {layout.noun.toUpperCase()}</small><b>{buildingName}</b><span>WASD bewegen · NPC anklicken · ESC verlassen{hour!==null?' · Koloniezeit '+hour+' Uhr · geöffnet '+venueHoursText(layout.kind):''}</span></div><button onClick={onClose}>← Verlassen</button></header>
     <main>
       <div className={'room '+layout.kind}>
         {layout.windows.map((win,index)=><div key={index} className="window" style={{left:win.x,width:win.w}}/>)}
@@ -295,7 +311,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           </div>
         })}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
-        {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>Hier arbeitet gerade niemand.</span></div>}
+        {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>{closedReason==='hours'?'Öffnet um '+VENUE_HOURS[layout.kind].open+' Uhr Koloniezeit.':'Hier arbeitet gerade niemand.'}</span></div>}
+        {hasUpperFloor(upper)&&<div className="label" style={{left:67,top:66}}>{upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'}</div>}
         {orders.map((entry,index)=>{
           // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt, sonst vor dem Spieler am Tresen.
           const target=entry.forId?shown.find(item=>item.resident.id===entry.forId)?.figure.spot:null
@@ -310,7 +327,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       <aside>
         <small>{layout.noun.toUpperCase()} · LOKAL</small>
         <h3>{selected?.displayName??'Gastraum'}</h3>
-        {!selected&&closed&&<p>Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.</p>}
+        {!selected&&closed&&<p>{closedReason==='hours'?'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(layout.kind)+' Koloniezeit; jetzt ist es '+hour+' Uhr.':'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}</p>}
         {!selected&&!closed&&!showMenu&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{loaded&&service==='self-service'?' Hier bedient kein Personal – bestellt wird am Automaten.':''}</p>}
         {selected&&<>
           <div className="history">{history.map((entry,index)=><p key={index}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}</div>
@@ -339,7 +356,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       </aside>
     </main>
     <style jsx>{`
-      .cafe-interior{position:fixed;inset:44px 0 0;z-index:2600;background:#0d1718;color:#eef2ed;font-family:system-ui}.cafe-interior header{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#10272a;border-bottom:1px solid #476263}.cafe-interior header small,.cafe-interior header b,.cafe-interior header span{display:block}.cafe-interior header small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}.cafe-interior header b{margin-top:2px}.cafe-interior header span{font-size:9px;color:#91a7a7}.cafe-interior header button{border:1px solid #5a7472;background:#17383a;color:#eef2ed;border-radius:6px;padding:7px 10px;cursor:pointer}.cafe-interior main{display:grid;grid-template-columns:minmax(0,1fr) 320px;height:calc(100% - 54px)}.room{position:relative;width:min(100%,760px);height:470px;margin:28px auto;background:linear-gradient(var(--wall) 0 18%,var(--rail) 18% 20%,var(--floor) 20% 100%);border:12px solid #5c4431;box-shadow:0 18px 50px #0008;overflow:hidden}.room.cafe{--wall:#d4c59f;--rail:#b88d5f;--floor:#d9c9a7}.room.bar{--wall:#4a3a44;--rail:#2e222b;--floor:#6b5560}.room.restaurant{--wall:#c9b8a8;--rail:#8a5a48;--floor:#e2d6c6}.room:after{content:'';position:absolute;inset:20% 0 0;background-image:linear-gradient(#8f775f22 1px,transparent 1px),linear-gradient(90deg,#8f775f22 1px,transparent 1px);background-size:32px 32px;pointer-events:none}.window{position:absolute;top:24px;height:44px;background:#87b8c8;border:8px solid #684c35}.room.bar .window{background:#3b5870}.door{position:absolute;left:45px;bottom:0;width:86px;height:55px;background:#3d2e25;border:5px solid #6a4d37;color:#e4d4aa;font:700 8px monospace;display:grid;place-items:center}.f{position:absolute;z-index:2}.table{background:#704c30;border:4px solid #4e3525;border-radius:50%}.high-table{background:#3a2a22;border:4px solid #c9a35a;border-radius:50%}.chair{background:#5c4230;border:2px solid #412e22;border-radius:4px}.stool{background:#8a3b34;border:2px solid #3d1b18;border-radius:50%}.counter{background:#67432b;border:5px solid #40291e;border-radius:5px}.shelf{background:#3f2a1e;border:2px solid #c9a35a55;border-radius:2px}.desk{background:#67432b;border:4px solid #40291e;border-radius:4px}.wall{background:#5c4431}.pass{background:#d8c9a8;border:3px solid #40291e;z-index:3}.kitchen{background:repeating-linear-gradient(45deg,#9aa3a3 0 8px,#8b9494 8px 16px);z-index:1}.closed{position:absolute;inset:0;z-index:15;background:#0b1214cc;display:grid;place-content:center;justify-items:center;gap:6px;color:#ead3a4}.closed b{font:800 20px monospace;letter-spacing:.2em}.closed span{font-size:11px;color:#b9cbc6}.menu button{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;margin-top:6px;padding:8px 10px;text-align:left;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;cursor:pointer;font-size:12px}.menu button b{color:#f1d57a}.menu button small{grid-column:1/-1;color:#d9a48a;font-size:10px}.menu button:disabled{cursor:not-allowed;background:#102526;border-color:#2d4445;color:#7f9591}.menu button:disabled b{color:#7f9591}.label{position:absolute;z-index:3;transform:translate(-50%,-50%);color:#ead3a4;font:800 8px monospace;letter-spacing:.08em;pointer-events:none;text-shadow:0 1px 2px #000a}.npc{position:absolute;z-index:8}.player{position:absolute;z-index:10;width:20px;height:28px}.player i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}.player span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}.context{position:absolute;z-index:20;border:1px solid #d0b66a;background:#153438;color:#f4e8c4;border-radius:5px;padding:5px 7px;font:800 8px monospace;cursor:pointer}.item{position:absolute;z-index:9;font-size:13px;line-height:14px;pointer-events:auto;filter:drop-shadow(0 1px 1px #0006)}.for{display:flex;gap:6px;margin-top:6px}.menu .for button{display:block;width:auto;flex:1;margin:0;padding:5px 8px;font-size:11px;text-align:center;background:#102526;border-color:#2d4445;color:#9fb5b0}.menu .for button.on{background:#17383a;border-color:#d0b66a;color:#f4e8c4}.context.hint{cursor:default;white-space:nowrap}.menu{margin-top:12px;padding-top:10px;border-top:1px solid #2d4445}.context.exit{background:#3a2b24}.cafe-interior aside{padding:16px;background:#091719;border-left:1px solid #40595a;overflow:auto}.cafe-interior aside small{color:#d9bb6a;font:800 8px monospace;letter-spacing:.12em}.cafe-interior aside h3{margin:4px 0 10px}.cafe-interior aside p{font-size:11px;line-height:1.45;color:#cbd6d2}.history p{border-top:1px solid #2d4445;padding-top:7px}.chat{display:flex;gap:6px;margin-top:10px}.chat input{flex:1;min-width:0;background:#061012;color:#eef;border:1px solid #40595a;border-radius:5px;padding:7px}.chat button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:0 9px}.status,.near{margin-top:10px;padding:8px;border:1px solid #485f5d;border-radius:6px;background:#102526;font-size:10px;color:#b9cbc6}.near{color:#92aaa5}@media(max-width:900px){.cafe-interior main{grid-template-columns:1fr}.cafe-interior aside{position:absolute;right:10px;bottom:10px;width:min(320px,80vw);max-height:40vh;border:1px solid #40595a;border-radius:8px}}
+      .cafe-interior{position:fixed;inset:44px 0 0;z-index:2600;background:#0d1718;color:#eef2ed;font-family:system-ui}.cafe-interior header{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#10272a;border-bottom:1px solid #476263}.cafe-interior header small,.cafe-interior header b,.cafe-interior header span{display:block}.cafe-interior header small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}.cafe-interior header b{margin-top:2px}.cafe-interior header span{font-size:9px;color:#91a7a7}.cafe-interior header button{border:1px solid #5a7472;background:#17383a;color:#eef2ed;border-radius:6px;padding:7px 10px;cursor:pointer}.cafe-interior main{display:grid;grid-template-columns:minmax(0,1fr) 320px;height:calc(100% - 54px)}.room{position:relative;width:min(100%,760px);height:470px;margin:28px auto;background:linear-gradient(var(--wall) 0 18%,var(--rail) 18% 20%,var(--floor) 20% 100%);border:12px solid #5c4431;box-shadow:0 18px 50px #0008;overflow:hidden}.room.cafe{--wall:#d4c59f;--rail:#b88d5f;--floor:#d9c9a7}.room.bar{--wall:#4a3a44;--rail:#2e222b;--floor:#6b5560}.room.restaurant{--wall:#c9b8a8;--rail:#8a5a48;--floor:#e2d6c6}.room:after{content:'';position:absolute;inset:20% 0 0;background-image:linear-gradient(#8f775f22 1px,transparent 1px),linear-gradient(90deg,#8f775f22 1px,transparent 1px);background-size:32px 32px;pointer-events:none}.window{position:absolute;top:24px;height:44px;background:#87b8c8;border:8px solid #684c35}.room.bar .window{background:#3b5870}.door{position:absolute;left:45px;bottom:0;width:86px;height:55px;background:#3d2e25;border:5px solid #6a4d37;color:#e4d4aa;font:700 8px monospace;display:grid;place-items:center}.f{position:absolute;z-index:2}.table{background:#704c30;border:4px solid #4e3525;border-radius:50%}.high-table{background:#3a2a22;border:4px solid #c9a35a;border-radius:50%}.chair{background:#5c4230;border:2px solid #412e22;border-radius:4px}.stool{background:#8a3b34;border:2px solid #3d1b18;border-radius:50%}.counter{background:#67432b;border:5px solid #40291e;border-radius:5px}.shelf{background:#3f2a1e;border:2px solid #c9a35a55;border-radius:2px}.desk{background:#67432b;border:4px solid #40291e;border-radius:4px}.wall{background:#5c4431}.pass{background:#d8c9a8;border:3px solid #40291e;z-index:3}.stairs{background:repeating-linear-gradient(90deg,#8a6a4c 0 8px,#6f5238 8px 10px);border:3px solid #40291e;border-radius:3px}.kitchen{background:repeating-linear-gradient(45deg,#9aa3a3 0 8px,#8b9494 8px 16px);z-index:1}.closed{position:absolute;inset:0;z-index:15;background:#0b1214cc;display:grid;place-content:center;justify-items:center;gap:6px;color:#ead3a4}.closed b{font:800 20px monospace;letter-spacing:.2em}.closed span{font-size:11px;color:#b9cbc6}.menu button{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;margin-top:6px;padding:8px 10px;text-align:left;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;cursor:pointer;font-size:12px}.menu button b{color:#f1d57a}.menu button small{grid-column:1/-1;color:#d9a48a;font-size:10px}.menu button:disabled{cursor:not-allowed;background:#102526;border-color:#2d4445;color:#7f9591}.menu button:disabled b{color:#7f9591}.label{position:absolute;z-index:3;transform:translate(-50%,-50%);color:#ead3a4;font:800 8px monospace;letter-spacing:.08em;pointer-events:none;text-shadow:0 1px 2px #000a}.npc{position:absolute;z-index:8}.player{position:absolute;z-index:10;width:20px;height:28px}.player i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}.player span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}.context{position:absolute;z-index:20;border:1px solid #d0b66a;background:#153438;color:#f4e8c4;border-radius:5px;padding:5px 7px;font:800 8px monospace;cursor:pointer}.item{position:absolute;z-index:9;font-size:13px;line-height:14px;pointer-events:auto;filter:drop-shadow(0 1px 1px #0006)}.for{display:flex;gap:6px;margin-top:6px}.menu .for button{display:block;width:auto;flex:1;margin:0;padding:5px 8px;font-size:11px;text-align:center;background:#102526;border-color:#2d4445;color:#9fb5b0}.menu .for button.on{background:#17383a;border-color:#d0b66a;color:#f4e8c4}.context.hint{cursor:default;white-space:nowrap}.menu{margin-top:12px;padding-top:10px;border-top:1px solid #2d4445}.context.exit{background:#3a2b24}.cafe-interior aside{padding:16px;background:#091719;border-left:1px solid #40595a;overflow:auto}.cafe-interior aside small{color:#d9bb6a;font:800 8px monospace;letter-spacing:.12em}.cafe-interior aside h3{margin:4px 0 10px}.cafe-interior aside p{font-size:11px;line-height:1.45;color:#cbd6d2}.history p{border-top:1px solid #2d4445;padding-top:7px}.chat{display:flex;gap:6px;margin-top:10px}.chat input{flex:1;min-width:0;background:#061012;color:#eef;border:1px solid #40595a;border-radius:5px;padding:7px}.chat button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:0 9px}.status,.near{margin-top:10px;padding:8px;border:1px solid #485f5d;border-radius:6px;background:#102526;font-size:10px;color:#b9cbc6}.near{color:#92aaa5}@media(max-width:900px){.cafe-interior main{grid-template-columns:1fr}.cafe-interior aside{position:absolute;right:10px;bottom:10px;width:min(320px,80vw);max-height:40vh;border:1px solid #40595a;border-radius:8px}}
     `}</style>
   </div>
 }

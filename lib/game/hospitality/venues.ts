@@ -26,7 +26,7 @@ export type VenueKind = 'cafe' | 'bar' | 'restaurant'
 export interface VenuePoint { x: number; y: number }
 
 export type VenueFurnitureKind =
-  | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen'
+  | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs'
 
 export interface VenueFurniture {
   id: string
@@ -266,6 +266,68 @@ export function venueLayoutForBuildingType(buildingTypeId: string | null | undef
   return VENUE_LAYOUTS[venueKindForBuildingType(buildingTypeId)]
 }
 
+// ── Obergeschoss ────────────────────────────────────────────────────────────
+// Ein Lokal kann unten Lokal und oben etwas anderes sein: Wohnungen (der Wirt
+// wohnt über seinem Café) oder Gästezimmer (dann ist es ein Hotel mit Lokal).
+// Ob es das Obergeschoss gibt, sagen die Gebäudedaten – nicht der Lokaltyp.
+export interface VenueUpperFloor {
+  /** Wohnplätze über dem Lokal (tile_entities.residential_capacity). */
+  homes: number
+  /** Gästezimmer über dem Lokal (tile_entities.transient_capacity). */
+  guestRooms: number
+}
+
+export function hasUpperFloor(upper: VenueUpperFloor | null | undefined): upper is VenueUpperFloor {
+  return Boolean(upper && (upper.homes > 0 || upper.guestRooms > 0))
+}
+
+const STAIRS: VenueFurniture = { id: 'stairs', kind: 'stairs', x: 38, y: 46, w: 58, h: 40 }
+const UPPER_LAYOUTS = new Map<VenueKind, VenueLayout>()
+
+/** Derselbe Raum mit einer Treppe nach oben in der hinteren linken Ecke. */
+export function withUpperFloor(layout: VenueLayout): VenueLayout {
+  const cached = UPPER_LAYOUTS.get(layout.kind)
+  if (cached) return cached
+  const upper = { ...layout, furniture: [...layout.furniture, STAIRS] }
+  UPPER_LAYOUTS.set(layout.kind, upper)
+  return upper
+}
+
+/** Was jemand über das Obergeschoss weiß. Gäste sehen nur die Treppe. */
+export function upperFloorFact(upper: VenueUpperFloor, staff: boolean): string {
+  if (upper.guestRooms > 0) {
+    return staff
+      ? `Im Obergeschoss liegen ${upper.guestRooms} Gästezimmer; Zimmer vergibst du noch nicht, das Haus nimmt bisher keine Übernachtungsgäste auf`
+      : 'Eine Treppe führt zu Gästezimmern im Obergeschoss; ob man dort schon übernachten kann, weißt du nicht'
+  }
+  return staff
+    ? 'Über dem Lokal liegt eine Wohnung; die Treppe in der Ecke ist privat'
+    : 'In der Ecke führt eine Treppe nach oben; sie ist privat, was oben ist, weißt du nicht'
+}
+
+// ── Öffnungszeiten ──────────────────────────────────────────────────────────
+// Stunden in Koloniezeit (ein Tick ist eine Stunde, siehe circadian.ts).
+// Das Café ist der Ort des Tages, die Bar der Ort der Nacht. Ein Automatencafé
+// hat kein Personal und deshalb auch keine Schließzeit.
+export const VENUE_HOURS: Readonly<Record<VenueKind, { open: number; close: number }>> = {
+  cafe: { open: 6, close: 20 },
+  restaurant: { open: 11, close: 23 },
+  bar: { open: 17, close: 2 },
+}
+
+const hourOfDay = (hour: number) => ((Math.trunc(hour) % 24) + 24) % 24
+
+export function venueOpenAt(kind: VenueKind, hour: number): boolean {
+  const { open, close } = VENUE_HOURS[kind]
+  const h = hourOfDay(hour)
+  return open < close ? h >= open && h < close : h >= open || h < close
+}
+
+export function venueHoursText(kind: VenueKind): string {
+  const { open, close } = VENUE_HOURS[kind]
+  return `von ${open} bis ${close} Uhr`
+}
+
 // ── Begehbare Fläche ────────────────────────────────────────────────────────
 export function isVenueBlocked(layout: VenueLayout, p: VenuePoint, radius = VENUE_PLAYER_RADIUS): boolean {
   if (p.x < WALL.left || p.x > WALL.right || p.y < WALL.top || p.y > WALL.bottom) return true
@@ -410,9 +472,18 @@ export function placeVenueFigures(layout: VenueLayout, residents: readonly Venue
  */
 export type VenueService = 'staffed' | 'self-service' | 'closed'
 
-export function venueService(layout: VenueLayout, figures: readonly VenueFigure[]): VenueService {
-  if (figures.some(figure => figure.roomRole === 'staff')) return 'staffed'
+/** `hour` ist die Koloniestunde; ohne Angabe gelten keine Öffnungszeiten. */
+export function venueService(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null): VenueService {
+  if (figures.some(figure => figure.roomRole === 'staff')) {
+    return hour == null || venueOpenAt(layout.kind, hour) ? 'staffed' : 'closed'
+  }
   return layout.kind === 'cafe' ? 'self-service' : 'closed'
+}
+
+/** Warum ein Lokal zu ist: außerhalb der Öffnungszeit oder weil niemand dort arbeitet. */
+export function venueClosedReason(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null): 'hours' | 'no-staff' | null {
+  if (venueService(layout, figures, hour) !== 'closed') return null
+  return figures.some(figure => figure.roomRole === 'staff') ? 'hours' : 'no-staff'
 }
 
 export interface VenueMenuItem {
@@ -605,6 +676,10 @@ export interface ConversationFactsInput {
   giftsToSelf?: readonly string[]
   /** Was die Figur bei diesem Besuch selbst gekauft hat. */
   ownOrder?: string | null
+  /** Koloniestunde – eine Uhr hängt in jedem Lokal. */
+  hour?: number | null
+  /** Obergeschoss, falls das Gebäude eines hat. */
+  upper?: VenueUpperFloor | null
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -639,12 +714,13 @@ function ordersFact(orders: readonly string[], gifts: readonly string[]): string
 export function venueConversationFacts(input: ConversationFactsInput): string[] {
   const { layout, self } = input
   const staff = self.roomRole === 'staff'
-  const name = String(input.buildingName ?? '').replace(/\s+/g, ' ').trim().slice(0, 60)
+  const name = String(input.buildingName ?? '').replace(/\s+/g, ' ').trim().slice(0, input.hour == null ? 60 : 44)
+  const clock = input.hour == null ? '' : `; es ist etwa ${hourOfDay(input.hour)} Uhr, geöffnet ist ${venueHoursText(layout.kind)}`
   const seesGuestRoom = canSeeRoom(layout, self.spot.roomId, layout.playerRoomId)
   const posture = self.spot.posture === 'sitting' ? 'sitzt' : 'stehst'
 
   const facts: string[] = [
-    name ? `Ihr befindet euch ${layout.locative} ${name}` : `Ihr befindet euch ${layout.locative}`,
+    (name ? `Ihr befindet euch ${layout.locative} ${name}` : `Ihr befindet euch ${layout.locative}`) + clock,
   ]
   if (seesGuestRoom) facts.push(layout.roomFact)
 
@@ -656,7 +732,9 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
     facts.push(othersFact(layout, self, input.figures))
   }
-  facts.push(staff ? layout.staffBackFact : layout.guestBackFact)
+  // Mit Obergeschoss tritt die Treppe an die Stelle des Personalbereichs – die
+  // Liste bleibt gleich lang und damit in der Grenze der Gesprächsroute.
+  facts.push(hasUpperFloor(input.upper) && seesGuestRoom ? upperFloorFact(input.upper, staff) : staff ? layout.staffBackFact : layout.guestBackFact)
 
   // Das Personal kennt die Karte. Ein Gast weiß nur, wo bestellt wird. Preise
   // nennt niemand aus dem Kopf, der sie nicht kennt, und niemand kassiert im
