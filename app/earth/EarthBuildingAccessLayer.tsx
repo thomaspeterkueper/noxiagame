@@ -397,6 +397,7 @@ export default function EarthBuildingAccessLayer({
     <SpaceportOverlay
       buildingTypeId={request.buildingTypeId}
       buildingName={request.buildingName}
+      entityId={request.entityId}
       onClose={onClose}
       onOpenNavigation={() => setSpaceportMode('navigation')}
       onOpenMaintenance={() => setSpaceportMode('maintenance')}

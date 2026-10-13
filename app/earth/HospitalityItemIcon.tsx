@@ -61,6 +61,20 @@ const ICONS: Record<string, ReactNode> = {
     <circle cx="16" cy="9.5" r="1.8" fill="#d7dcdc" {...s} />
     <path d="M3 22h26v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#f4ead6" {...s} />
   </>,
+  // Wasserflasche – Grundversorgung der Hafenkantine
+  water: <>
+    <path d="M13 4h6v3h-6z" fill="#8fb7c9" {...s} />
+    <path d="M12 7h8l2 5v13a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V12z" fill="#dff1f7" {...s} />
+    <path d="M11 16h10v9a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1z" fill="#8fc5e0" />
+    <path d="M14 13h4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+  </>,
+  // Ration – verpackter Riegel
+  ration: <>
+    <path d="M5 11h22v12H5z" fill="#b9a46b" {...s} />
+    <path d="M5 11l-2-3M27 11l2-3M5 23l-2 3M27 23l2 3" fill="none" {...s} />
+    <path d="M9 14h14v6H9z" fill="#6f5a2b" />
+    <path d="M12 16h8M12 18h8" stroke="#d9c58c" strokeWidth="1" />
+  </>,
   // Dessertglas
   dessert: <>
     <path d="M8 12h16a8 8 0 0 1-16 0z" fill="#dff1ee" {...s} />

@@ -16,6 +16,16 @@ Bezug: `docs/gameplay/settlement-tiers.md` (Rolle des Cafés), `NOXIA-LIVING-001
 
 Im Spiel erreichbar ist heute nur das Café. `bar` steht im Gebäudekatalog weiter auf `planned`, `restaurant` hat dort noch keinen Eintrag. Beides bleibt so, bis die Lokale eine echte Funktion haben (Regel „keine leeren Hüllen“). Sobald ein Gebäude mit `entity_id` `bar` oder `restaurant` existiert, öffnet es ohne weitere Arbeit den passenden Raum.
 
+## 1a. Hafenkantine
+
+Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Für Spieler ist sie jetzt betretbar (Request G-1):
+
+- **Zugang:** vom Hafengebäude aus – „Kantine betreten“ im Raumhafen-Overlay (Erde, Mond, Phobos, Deimos) und als Raum „Hafenkantine“ im Kolonie-Innenraum von Landeplatz und Andockmodul (Mars, Prometheus). Ob eine Kantine im Hafen steht, sagt `GET /api/game/hospitality/canteen?parentEntityId=…`; ohne Kantine gibt es keinen Eintritt.
+- **Innenraum** (`app/dashboard/PortCanteenInterior.tsx`): Ausgabe, kein Sitzplatz, rund um die Uhr. Bedient von einem **Automaten** (kleine Landeplätze) oder einem **Ausgaberoboter** (Raumhafen, Andockmodul, Hafenviertel) – erkennbar Maschine, Entscheidung Thomas 13.10.2026.
+- **Kein Gespräch:** Das Gerät ist keine Person und läuft nicht über die Gesprächs-KI. Es beantwortet sechs feste Fragen (`lib/game/hospitality/canteen.ts`): Karte, Öffnungszeit, kein Geld, wo bin ich, Arbeit, wer bist du – knapp und synthetisch; nach Arbeit verweist es an die Verwaltung.
+- **Karte:** Wasser 2 Cr, Ration 6 Cr aus `hospitality_menu`, mit eigenen Bildern; Bestellung über `POST /api/game/hospitality/order` wie im Lokal.
+- **Notration** für Spieler ohne Geld ist noch nicht freigeschaltet (LIVING-0012 Schritt 3); das Gerät sagt das so.
+
 ## 2. Innenaufbau
 
 Alle drei Räume sind 760 × 470 groß, der Eingang liegt unten links.
