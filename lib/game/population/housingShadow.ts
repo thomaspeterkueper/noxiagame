@@ -6,7 +6,7 @@
 // landlordDecision) and says what would happen. Nothing is carried out here.
 
 import {
-  chooseHousing, housingOffer, landlordDecision, rentBurden,
+  chooseHousing, housingOffer, housingValue, landlordDecision, rentBurden, tenureSecurity,
   type Dwelling, type HousingCandidate, type Tenure,
 } from './housing'
 import { decideRelocation } from './relocation'
@@ -33,6 +33,8 @@ export interface ShadowPerson {
   closeTies: string[]
   lastMoveTick: number | null
   ticksSinceEviction: number | null
+  /** Actual current tenancy rent; may differ from the building's current asking rent. */
+  currentRent?: number | null
 }
 
 export type ShadowOutcome = 'stay' | 'no_offer' | 'granted' | 'refused'
@@ -52,6 +54,17 @@ export interface ShadowDecision {
   accessiblePlaces: number
   /** Only a granted move into a private rental could be handed to move_person_to_market_rental. */
   executable: boolean
+  discontent: number
+  monotony: number
+  badCompany: number
+  scarcity: number
+  rentStrain: number
+  crowding: number
+  insecurity: number
+  commuteBurden: number
+  cooldownBlocked: boolean
+  currentHousingValue: number
+  bestCandidateValue: number | null
 }
 
 const mean = (values: number[]): number => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0.5)
@@ -83,9 +96,26 @@ export function shadowHousingDecision(person: ShadowPerson, inventory: readonly 
     return { offer, supply: entry.supply, affinityToResidents: there.affinity, closeTies: there.close, workReachable: entry.dwelling.locationId === person.locationId }
   })
   const mustMove = person.tenure === 'none' || person.tenure === 'hotel'
+  const currentRent = person.currentRent ?? (current?.dwelling.kind === 'rental' ? current.dwelling.rent ?? 0 : 0)
+  const currentBurden = Math.min(1, rentBurden(currentRent ?? 0, person.dailyWage))
+  const currentOccupancy = current?.dwelling.capacity
+    ? Math.min(1, (current.residents.length || 0) / Math.max(1, current.dwelling.capacity))
+    : 0
+  // Commute remains neutral until a grounded route from home to work exists.
+  const commuteBurden = 0
   const wish = decideRelocation({
     personId: person.id, tick, kind: 'home', needs: person.needs,
-    current: { locationId: person.locationId, tileEntityId: current?.dwelling.tileEntityId ?? '', supply: hereSupply, affinityToResidents: here.affinity, closeTies: here.close },
+    current: {
+      locationId: person.locationId,
+      tileEntityId: current?.dwelling.tileEntityId ?? '',
+      supply: hereSupply,
+      affinityToResidents: here.affinity,
+      closeTies: here.close,
+      rentBurden: currentBurden,
+      occupancyRatio: currentOccupancy,
+      tenureSecurity: tenureSecurity(person.tenure),
+      commuteBurden,
+    },
     lastMoveTick: person.lastMoveTick,
     options: candidates.filter((candidate) => candidate.workReachable && candidate.offer.tenure !== 'hotel').map((candidate) => {
       const entry = inventory.find((item) => item.dwelling.id === candidate.offer.dwelling.id)!
@@ -96,13 +126,41 @@ export function shadowHousingDecision(person: ShadowPerson, inventory: readonly 
       }
     }),
   })
+  const currentHousingValue = housingValue({
+    supply: hereSupply,
+    affinity: here.affinity,
+    closeTies: here.close,
+    burden: currentBurden,
+    tenure: person.tenure,
+  })
+  const candidateValues = candidates
+    .filter((candidate) => candidate.workReachable && candidate.offer.dwelling.id !== person.dwellingId)
+    .filter((candidate) => mustMove || candidate.offer.tenure !== 'hotel')
+    .map((candidate) => housingValue({
+      supply: candidate.supply,
+      affinity: candidate.affinityToResidents,
+      closeTies: candidate.closeTies,
+      burden: candidate.offer.burden,
+      tenure: candidate.offer.tenure,
+    }))
+  const bestCandidateValue = candidateValues.length ? Math.max(...candidateValues) : null
   const base = {
     personId: person.id, tick, mustMove, wantsToMove: wish.move,
     affordablePlaces: offered.length, accessiblePlaces: accessible.length,
+    discontent: wish.discontent,
+    monotony: wish.components.monotony,
+    badCompany: wish.components.badCompany,
+    scarcity: wish.components.scarcity,
+    rentStrain: wish.components.rentStrain,
+    crowding: wish.components.crowding,
+    insecurity: wish.components.insecurity,
+    commuteBurden: wish.components.commute,
+    cooldownBlocked: wish.cooldownBlocked,
+    currentHousingValue,
+    bestCandidateValue,
   }
-  const rent = current?.dwelling.kind === 'rental' ? current.dwelling.rent ?? 0 : 0
   const pick = chooseHousing({
-    current: { tenure: person.tenure, dwellingId: person.dwellingId, locationId: person.locationId, burden: Math.min(1, rentBurden(rent, person.dailyWage)), supply: hereSupply, affinityToResidents: here.affinity, closeTies: here.close },
+    current: { tenure: person.tenure, dwellingId: person.dwellingId, locationId: person.locationId, burden: currentBurden, supply: hereSupply, affinityToResidents: here.affinity, closeTies: here.close },
     mustMove, wantsToMove: wish.move, candidates,
   })
   if (!pick) {
