@@ -1,6 +1,6 @@
 # Bereinigung 13.10.2026 – Altlasten der Erdkarte
 
-**Status:** Straßenstücke zum Löschen vorgesehen, SQL in `internal-tasks/open/REQ-NOXIA-20261013-world-map-cleanup.md` (Löschbefehle kamen aus der Claude-Umgebung nicht durch). Die leeren Ortszeilen bleiben auf Thomas' Wunsch stehen: Sie zeigen, welche Orte noch in die Karte gehören.
+**Status: erledigt 13.10.2026** (Thomas, SQL aus `internal-tasks/done/REQ-NOXIA-20261013-world-map-cleanup.md`). Geprüft: 0 Straßenstücke, 0 Straßen-Bauaufträge, 0 koordinatenlose Wohnblöcke; die vier Bewohner wohnen im Wohnblock `5662262e-…` in Sundern (4 neue Mietverhältnisse „provided“, die alten als „ended“ erhalten). Die leeren Ortszeilen bleiben auf Thomas' Wunsch stehen: Sie zeigen, welche Orte noch in die Karte gehören.
 
 Auf Thomas' Wunsch („die alten Straßen und andere jetzt sinnlose Artefakte von früher löschen"). Vorher geprüft: kein Fremdschlüssel und keine Spielzeile verweist darauf. Alle Straßenstücke gehören Thomas' Konten (Aristeas, McKnight).
 
@@ -33,6 +33,6 @@ Reste gescheiterter Abrufe. Thomas (13.10.2026): Hinweise, dass diese Orte in di
 ## Bewusst stehen gelassen
 
 - Alle übrigen NOXIA-Gebäude auf der Erde (Raumhafen Selmecke, Café, Bauten in Peru, Namibia, Tunesien usw.) – Spielstand, keine Altlast.
-- Zwei `residential_block` ohne Koordinaten (Thomas, McKnight) – werden gelöscht, nachdem die vier Bewohner in McKnights Wohnblock in Sundern umgezogen sind (SQL im Request).
+- Zwei `residential_block` ohne Koordinaten (Thomas, McKnight) – werden gelöscht, nachdem die vier Bewohner in McKnights Wohnblock in Sundern umgezogen sind (erledigt).
 - Ältere Ortsdetail-Zeilen mit 340 m Radius – die begehbare Erdszene nutzt sie; doppelte Objekte zählt die Karte nur einmal.
 - Die Region `earth-place-51p32983-8p00726` (Quelle „materialization-failed", aber mit 643 Objekten) – enthält brauchbare Daten.
