@@ -16,6 +16,7 @@ import { CIVIC_STANDARD_INTERIOR } from './templates/civicStandard'
 import { LIBRARY_STANDARD_INTERIOR } from './templates/libraryStandard'
 import { DAVARU_TEMPLE_INTERIOR } from './templates/davaruTemple'
 import { SPACEPORT_STANDARD_INTERIOR } from './templates/spaceportStandard'
+import { ROBOTIC_KITCHEN_STANDARD_INTERIOR } from './templates/roboticKitchenStandard'
 
 export interface InteriorTemplateRegistry {
   byId: Readonly<Record<InteriorTemplateId, InteriorTemplate>>
@@ -42,6 +43,7 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [LIBRARY_STANDARD_INTERIOR.id]: LIBRARY_STANDARD_INTERIOR,
     [DAVARU_TEMPLE_INTERIOR.id]: DAVARU_TEMPLE_INTERIOR,
     [SPACEPORT_STANDARD_INTERIOR.id]: SPACEPORT_STANDARD_INTERIOR,
+    [ROBOTIC_KITCHEN_STANDARD_INTERIOR.id]: ROBOTIC_KITCHEN_STANDARD_INTERIOR,
   },
   byBuildingTypeId: {
     laboratory: LABORATORY_STANDARD_INTERIOR.id,
@@ -86,6 +88,9 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     spaceport_pad_mini: SPACEPORT_STANDARD_INTERIOR.id,
     scanner: LABORATORY_STANDARD_INTERIOR.id,
     shipyard: WORKSHOP_STANDARD_INTERIOR.id,
+    robotic_kitchen: ROBOTIC_KITCHEN_STANDARD_INTERIOR.id,
+    automated_food_service: ROBOTIC_KITCHEN_STANDARD_INTERIOR.id,
+    habitat_food_cell: ROBOTIC_KITCHEN_STANDARD_INTERIOR.id,
   },
   byStationRole: {
     'habitat-transfer-station': ORBITAL_TRANSFER_STATION_INTERIOR.id,
