@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
   if (!earth) return NextResponse.json({ buildings: [] })
   const [{ data: rows }, { data: definitions }] = await Promise.all([
     supabase.from('tile_entities').select('id,entity_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg')
-      .eq('location_id', earth.id).eq('entity_type', 'building').eq('status', 'active').not('latitude_deg', 'is', null).limit(1000),
+      // Straßenstücke aus dem alten Bausystem gehören nicht in die Karte – Straßen kommen aus OpenStreetMap.
+      .eq('location_id', earth.id).eq('entity_type', 'building').eq('status', 'active').neq('entity_id', 'road').not('latitude_deg', 'is', null).limit(1000),
     supabase.from('building_definitions').select('key,name'),
   ])
   const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), String(row.name)]))

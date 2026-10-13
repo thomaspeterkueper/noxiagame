@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileOrigin, TILE_SIZE_MERC, TILE_Z } from './mercator'
-import { buildTile, orientedBox, simplifyLine, type SourceFeature } from './simplify'
+import { buildTile, clipToSquare, orientedBox, simplifyLine, type SourceFeature } from './simplify'
 
 const SUNDERN = { lat: 51.3262, lon: 8.0 }
 const tile = tileAt(geoToMerc(SUNDERN))
@@ -93,6 +93,20 @@ describe('world lab: simplification', () => {
     expect(tileWithSport.areas.map(area => area.k)).toEqual(['forest', 'grounds', 'track', 'pitch'])
     // das Spielfeld bleibt ein Rechteck
     expect(tileWithSport.areas[3].p).toHaveLength(10) // vier Ecken und der Schlusspunkt
+  })
+
+  it('cuts areas to the tile so neighbours never overlap', () => {
+    const meadow = built.areas.find(area => area.k === 'field')!
+    const xs = meadow.p.filter((_, i) => i % 2 === 0), ys = meadow.p.filter((_, i) => i % 2 === 1)
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(-0.2)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(built.size + 0.25)
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(-0.2)
+    expect(Math.max(...ys)).toBeLessThanOrEqual(built.size + 0.25)
+  })
+
+  it('clips a square half inside to the inside half', () => {
+    const cut = clipToSquare([{ x: -10, y: 10 }, { x: 10, y: 10 }, { x: 10, y: 30 }, { x: -10, y: 30 }, { x: -10, y: 10 }], 0, 100)
+    expect(cut.map(p => p.x).sort((a, b) => a - b)).toEqual([0, 0, 0, 10, 10])
   })
 
   it('stays small', () => {

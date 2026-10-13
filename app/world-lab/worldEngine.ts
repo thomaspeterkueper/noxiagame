@@ -7,7 +7,7 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { AREA_COLORS, AREA_OUTLINES, BLOCK_STYLES, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { AREA_COLORS, AREA_OUTLINES, BLOCK_STYLES, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
@@ -15,7 +15,7 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 
 type Pixi = typeof import('pixi.js')
 
-export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number }
+export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number }
 export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number }
 
 export interface WorldSettings {
@@ -129,9 +129,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Reihenfolge in einem Streifen, bleibt alles andere unberührt.
   const world = new PIXI.Container({ isRenderGroup: true })
   const ground = new PIXI.Container({ isRenderGroup: true })
+  // Straßen und Gewässer über allen Flächen: Eine später geladene Kachel darf
+  // die Straßen ihrer Nachbarn nicht zudecken.
+  const lines = new PIXI.Container({ isRenderGroup: true })
   const objects = new PIXI.Container({ isRenderGroup: true })
   objects.sortableChildren = true
-  world.addChild(ground, objects)
+  world.addChild(ground, lines, objects)
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -166,10 +169,20 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   playerSprite.zIndex = player.x + player.y
   addObject(playerSprite)
 
+  // NOXIA-Gebäude zuerst holen, damit jede Kachel beim Aufbau weiß, welches
+  // echte Gebäude einem Spieler gehört.
+  type NoxiaPlaced = NoxiaBuilding & { rotation: number; x: number; y: number; claimed: boolean; stand: Container | null }
+  const noxia: NoxiaPlaced[] = []
+  try {
+    for (const building of options.loadNoxia ? await options.loadNoxia() : []) {
+      noxia.push({ ...building, rotation: Number(building.rotation ?? 0) || 0, ...toWorld({ lat: building.lat, lon: building.lon }), claimed: false, stand: null })
+    }
+  } catch { /* ohne Anmeldung keine NOXIA-Gebäude */ }
+
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; blocks: Container[]; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -181,7 +194,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
    * Ein Baukörper: Quader mit Walmdach (bei quadratischem Grundriss eine Pyramide).
    * Mitte (cx, cy) und Achsen in Bodenmetern; `eave` Traufhöhe, `roofM` Dachaufbau.
    */
-  function drawMass(g: PixiGraphics, kind: BlockKind, cx: number, cy: number, hw: number, hd: number, cos: number, sin: number, eave: number, roofM: number) {
+  function drawMass(g: PixiGraphics, kind: BlockKind, cx: number, cy: number, hw: number, hd: number, cos: number, sin: number, eave: number, roofM: number, roofColor?: number) {
     const style = BLOCK_STYLES[kind]
     const textures = art.get(kind)
     const corner = (lx: number, ly: number) => ({ x: cx + lx * cos - ly * sin, y: cy + lx * sin + ly * cos })
@@ -224,7 +237,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     for (const face of faces) {
       const pts = face.pts.flatMap(p => { const s = iso(p.x, p.y, p.h); return [s.x, s.y] })
       const light = 0.86 + 0.14 * Math.max(-1, Math.min(1, face.n.x - face.n.y))
-      if (textures?.roof) {
+      if (roofColor !== undefined) {
+        g.poly(pts).fill(shade(roofColor, light)).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
+      } else if (textures?.roof) {
         const roof = roofMatrix(face.eave[0], face.eave[1], eave, { x: -face.n.x, y: -face.n.y }, pitch)
         g.poly(pts).fill({ texture: textures.roof, matrix: matrix(roof), color: shade(0xffffff, light), textureSpace: 'global' }).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
       } else {
@@ -240,8 +255,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     let cos = Math.cos(block.a), sin = Math.sin(block.a)
     const hw = block.w / 2, hd = block.d / 2
     const cx = ox + block.x, cy = oy + block.y
-    const eave = block.l * style.storeyM
-    const c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM)
+    // Steht hier ein NOXIA-Gebäude, übernimmt es den echten Grundriss: gleiche
+    // Lage, Größe und Drehung wie die Nachbarn, aber sein eigenes Dach.
+    const owner = noxiaOn(cx, cy, hw, hd, cos, sin)
+    const look = owner ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] } : null
+    const eave = (look?.levels ?? block.l) * style.storeyM
+    const c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM, look?.roof)
+    if (owner) claim(owner)
     if (block.k === 'church' && block.w >= 12) {
       // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
       // spitzem Pyramidendach – macht eine Kirche von Weitem erkennbar.
@@ -265,21 +285,24 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const outline = AREA_OUTLINES[area.k]
       if (outline) g.stroke({ width: outline.widthM * 0.75, color: outline.color, join: 'miter' })
     }
-    for (const river of data.rivers) { const p = path(river); g.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]); g.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
+    const l = new PIXI.Graphics()
+    for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
     for (const road of data.roads) {
       const style = ROAD_STYLES[road.c], p = path(road.p)
-      g.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1])
-      g.stroke({ width: style.widthM * 0.75, color: style.color, cap: 'round', join: 'round' })
+      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
+      l.stroke({ width: style.widthM * 0.75, color: style.color, cap: 'round', join: 'round' })
     }
     ground.addChild(g)
+    lines.addChild(l)
     entry.ground = g
+    entry.lines = l
   }
 
   function showTile(tile: TileId, data: SimplifiedTile) {
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, blocks: [], done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], done: false })
     building.push(key)
   }
 
@@ -309,6 +332,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
 
   function dropTile(key: string, entry: Loaded) {
     entry.ground?.destroy()
+    entry.lines?.destroy()
     for (const block of entry.blocks) block.destroy()
     loaded.delete(key)
     pruneBands()
@@ -377,35 +401,51 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
 
   // ── NOXIA-Gebäude ───────────────────────────────────────────────────
-  const noxia: Array<NoxiaBuilding & { x: number; y: number }> = []
+  // Ein NOXIA-Gebäude, das auf einem echten Gebäude steht, wird mit dessen
+  // Grundriss gezeichnet (siehe drawBlock); das eigene Bild oder der Ersatzblock
+  // tritt dann zurück. Gebäude ohne echtes Gegenstück behalten Bild oder Block.
+  function noxiaOn(cx: number, cy: number, hw: number, hd: number, cos: number, sin: number) {
+    for (const building of noxia) {
+      const dx = building.x - cx, dy = building.y - cy
+      const lx = dx * cos + dy * sin, ly = -dx * sin + dy * cos
+      if (Math.abs(lx) <= hw + 2 && Math.abs(ly) <= hd + 2) return building
+    }
+    return null
+  }
+  function claim(building: NoxiaPlaced) {
+    building.claimed = true
+    if (building.stand) building.stand.visible = false
+  }
   void (async () => {
-    try {
-      const buildings = options.loadNoxia ? await options.loadNoxia() : []
-      for (const building of buildings) {
-        if (disposed) return
-        const at = toWorld({ lat: building.lat, lon: building.lon })
-        noxia.push({ ...building, ...at })
-        const visual = options.noxiaVisual?.(building.typeId)
-        const foot = iso(at.x, at.y)
-        if (visual?.mapAsset) {
-          try {
-            const texture = await PIXI.Assets.load({ src: visual.mapAsset, data: { resolution: 2 } })
-            if (disposed) return
-            const sprite = new PIXI.Sprite(texture)
-            const side = (building.w + building.d) * 1.18 * ((visual.mapScale ?? 1.7) / 1.7)
-            sprite.anchor.set(0.5, 0.86)
-            sprite.width = side; sprite.height = side
-            sprite.position.set(foot.x, foot.y + (building.w + building.d) / 2 * ISO_Y)
-            sprite.zIndex = at.x + at.y + (building.w + building.d) / 2
-            addObject(sprite)
-            continue
-          } catch { /* ohne Bild: Block */ }
-        }
-        const block = drawBlock({ x: at.x, y: at.y, w: building.w, d: building.d, a: 0, k: 'hall', l: 2 }, 0, 0)
-        block.tint = 0x9fc4e8
-        addObject(block)
+    for (const building of noxia) {
+      if (disposed) return
+      const visual = options.noxiaVisual?.(building.typeId)
+      const foot = iso(building.x, building.y)
+      let stand: Container | null = null
+      if (visual?.mapAsset) {
+        try {
+          const texture = await PIXI.Assets.load({ src: visual.mapAsset, data: { resolution: 2 } })
+          if (disposed) return
+          const sprite = new PIXI.Sprite(texture)
+          const side = (building.w + building.d) * 1.18 * ((visual.mapScale ?? 1.7) / 1.7)
+          sprite.anchor.set(0.5, 0.86)
+          sprite.width = side; sprite.height = side
+          sprite.position.set(foot.x, foot.y + (building.w + building.d) / 2 * ISO_Y)
+          sprite.zIndex = building.x + building.y + (building.w + building.d) / 2
+          stand = sprite
+        } catch { /* ohne Bild: Block */ }
       }
-    } catch { /* ohne Anmeldung keine NOXIA-Gebäude */ }
+      if (!stand) {
+        const a = building.rotation * Math.PI / 180
+        const g = new PIXI.Graphics()
+        const c = drawMass(g, 'hall', building.x, building.y, building.w / 2, building.d / 2, Math.cos(a), Math.sin(a), 2 * BLOCK_STYLES.hall.storeyM, BLOCK_STYLES.hall.roofM, NOXIA_DEFAULT_LOOK.roof)
+        g.zIndex = Math.max(...c.map(p => p.x + p.y))
+        stand = g
+      }
+      building.stand = stand
+      stand.visible = !building.claimed
+      addObject(stand)
+    }
   })()
 
   // ── Eingabe ─────────────────────────────────────────────────────────

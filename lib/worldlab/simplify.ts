@@ -53,6 +53,36 @@ function areaKind(featureType: string, properties: Record<string, unknown>): Are
 type P = { x: number; y: number }
 const round1 = (value: number) => Math.round(value * 10) / 10
 
+/**
+ * Schneidet ein Vieleck auf das Quadrat [lo, hi]² zu (Sutherland–Hodgman).
+ * Jede Kachel zeichnet so nur ihren eigenen Teil einer Fläche: Nachbarkacheln
+ * überdecken sich nicht, und eine später geladene Kachel kann die Straßen der
+ * früheren nicht mehr zudecken.
+ */
+export function clipToSquare(points: readonly P[], lo: number, hi: number): P[] {
+  let ring = [...points]
+  if (ring.length > 1 && ring[0].x === ring[ring.length - 1].x && ring[0].y === ring[ring.length - 1].y) ring.pop()
+  const edges: Array<{ inside: (p: P) => boolean; cut: (a: P, b: P) => P }> = [
+    { inside: p => p.x >= lo, cut: (a, b) => ({ x: lo, y: a.y + (b.y - a.y) * (lo - a.x) / (b.x - a.x) }) },
+    { inside: p => p.x <= hi, cut: (a, b) => ({ x: hi, y: a.y + (b.y - a.y) * (hi - a.x) / (b.x - a.x) }) },
+    { inside: p => p.y >= lo, cut: (a, b) => ({ x: a.x + (b.x - a.x) * (lo - a.y) / (b.y - a.y), y: lo }) },
+    { inside: p => p.y <= hi, cut: (a, b) => ({ x: a.x + (b.x - a.x) * (hi - a.y) / (b.y - a.y), y: hi }) },
+  ]
+  for (const edge of edges) {
+    if (!ring.length) break
+    const out: P[] = []
+    for (let i = 0; i < ring.length; i++) {
+      const current = ring[i], previous = ring[(i + ring.length - 1) % ring.length]
+      const inNow = edge.inside(current), inBefore = edge.inside(previous)
+      if (inNow) { if (!inBefore) out.push(edge.cut(previous, current)); out.push(current) }
+      else if (inBefore) out.push(edge.cut(previous, current))
+    }
+    ring = out
+  }
+  if (ring.length < 3) return []
+  return [...ring, ring[0]]
+}
+
 /** Douglas–Peucker: lässt Punkte weg, die weniger als `tolerance` Meter ausmachen. */
 export function simplifyLine(points: readonly P[], tolerance: number): P[] {
   if (points.length <= 2) return [...points]
@@ -184,7 +214,9 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     } else if (areaKind(feature.featureType, properties) && feature.geometry.kind === 'polygon' && points.length >= 3) {
       // Sportflächen sind klein und rechteckig – feiner vereinfachen, damit das Feld eckig bleibt.
       const simplified = simplifyLine(points, feature.featureType === 'sport' ? 1 : 4)
-      if (simplified.length >= 3) out.areas.push({ k: areaKind(feature.featureType, properties) as AreaKind, p: flat(simplified) })
+      // Ein Hauch Überlappung (0,2 m), damit an der Kachelgrenze keine Haarfuge bleibt.
+      const clipped = simplified.length >= 3 ? clipToSquare(simplified, -0.2, size + 0.2) : []
+      if (clipped.length >= 4) out.areas.push({ k: areaKind(feature.featureType, properties) as AreaKind, p: flat(clipped) })
     }
   }
   // Feste Reihenfolge: Felder unten, dann bebaute Fläche, Wald, Sportanlage,

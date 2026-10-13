@@ -55,6 +55,12 @@ Gemessen im Prüfaufbau (Chromium ohne Grafikkarte, künstliche Kacheln in Sunde
 
 Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder je Sekunde, für Thomas ausreichend. Lage geprüft: Das Metallwerk Sundern (MESU) steht an der richtigen Stelle, das Röhrtalstadion davor ebenfalls – es fehlt aber als Fläche (siehe Aufgabe 8).
 
+## Rückmeldung an der Bogenstraße (Thomas, 13.10.2026 abends)
+
+- Wohnstraßen erschienen beim Laden kurz und verschwanden dann: Jede Kachel zeichnete große Flächen (Wohngebiet, Wald) ungeschnitten und deckte damit die Straßen früher geladener Nachbarn zu. Behoben – Flächen werden auf ihre Kachel zugeschnitten, Straßen und Gewässer liegen in einer eigenen Ebene darüber. Nebenbei zeichnet die Grafikkarte weniger übereinander.
+- Die blauen Blöcke waren Straßenstücke aus dem alten Bausystem (`tile_entities` mit `entity_id = 'road'`). `/world-lab` zeigt sie nicht mehr.
+- Ein NOXIA-Gebäude, das auf einem echten Gebäude steht, übernimmt dessen Grundriss und Drehung und bekommt sein eigenes Dach (`NOXIA_LOOKS` in `lib/worldlab/blocks.ts`). Bogenstraße 15 (`ssf_headquarters_sundern`): eingeschossig, dunkelblaues Walmdach. Ohne echtes Gegenstück bleibt das bisherige Bild, ein Ersatzblock folgt jetzt `rotation_deg`.
+
 ## Offene Aufgaben
 
 1. ~~Messen, wo die Zeit bleibt; Zeichenleistung umbauen; Ladebereich an den Zoom koppeln.~~ Erledigt (siehe „Leistung“). Offen: Thomas misst in `/world-lab` beim Laufen durch Sundern (Bildrate, langsamstes Bild, Ruckler; bei Bedarf mit `?aa=0` und `?res=1`) und prüft dabei, ob Straßen und Blöcke an der richtigen Stelle stehen. Reicht es nicht für stabile 60, zeigt die Anzeige, ob Prozessor oder Grafikkarte die Grenze ist.
