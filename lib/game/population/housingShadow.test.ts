@@ -39,7 +39,19 @@ const elsewhere = entry(dwelling('far', { locationId: 'moon' }))
 check(shadowHousingDecision(person({ dwellingId: null, tenure: 'none' }), [full, elsewhere], 100).outcome === 'no_offer', 'another settlement is no option without work there')
 
 const bored = shadowHousingDecision(person({ needs: { variety: 0.05 } }), [habitat, block], 100)
-check(bored.wantsToMove && bored.outcome === 'no_offer' && bored.reason === 'monotony', 'a bored person wants to move but does not trade free housing for a paid one')
+check(!bored.wantsToMove && bored.outcome === 'stay' && bored.reason === 'monotony', 'monotony alone no longer forces a housing move')
+check(bored.monotony > 0.9 && bored.rentStrain === 0 && bored.crowding === 0, 'shadow diagnostics expose the grounded pressure components')
+
+const expensiveHome = entry(dwelling('expensive-home', { ownerKind: 'landlord', ownerId: 'corp', rent: 900, baseRent: 900 }), ['p1'])
+const cheaperHome = entry(dwelling('cheaper-home', { ownerKind: 'landlord', ownerId: 'corp2', rent: 400, baseRent: 400 }))
+const rentStrained = shadowHousingDecision(person({ dwellingId: 'expensive-home', tenure: 'rented', currentRent: 900 }), [expensiveHome, cheaperHome], 100)
+check(rentStrained.wantsToMove && rentStrained.reason === 'rent_strain', 'high real rent burden can create a voluntary move wish')
+check(rentStrained.rentStrain > 0.6 && rentStrained.bestCandidateValue !== null, 'rent pressure and best candidate value are observable')
+
+const crowdedHome = entry(dwelling('crowded-home', { capacity: 4 }), ['p1', 'p2', 'p3', 'p4'])
+const roomyHome = entry(dwelling('roomy-home'), [])
+const crowded = shadowHousingDecision(person({ dwellingId: 'crowded-home', tenure: 'provided' }), [crowdedHome, roomyHome], 100)
+check(crowded.wantsToMove && crowded.reason === 'crowding', 'full occupancy can create a housing move wish without inventing bad relationships')
 check(JSON.stringify(shadowHousingDecision(person(), [habitat, block], 100)) === JSON.stringify(shadowHousingDecision(person(), [habitat, block], 100)), 'the decision is deterministic')
 
 if (failures) throw new Error(String(failures) + ' housing shadow test(s) failed')
