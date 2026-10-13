@@ -13,6 +13,9 @@ describe('shared building interior registry',()=>{
     ['cafe','cafe-standard-v1'],
     ['bar','bar-standard-v1'],
     ['restaurant','restaurant-standard-v1'],
+    ['robotic_kitchen','robotic-kitchen-standard-v1'],
+    ['automated_food_service','robotic-kitchen-standard-v1'],
+    ['habitat_food_cell','robotic-kitchen-standard-v1'],
   ])('maps %s to %s',(buildingId,templateId)=>{
     expect(getInteriorTemplateForBuildingType(buildingId)?.id).toBe(templateId)
   })
