@@ -33,6 +33,6 @@ Reste gescheiterter Abrufe. Thomas (13.10.2026): Hinweise, dass diese Orte in di
 ## Bewusst stehen gelassen
 
 - Alle übrigen NOXIA-Gebäude auf der Erde (Raumhafen Selmecke, Café, Bauten in Peru, Namibia, Tunesien usw.) – Spielstand, keine Altlast.
-- Zwei `residential_block` ohne Koordinaten (Thomas, McKnight) – Thomas will sie weg; im Block auf Konto Thomas wohnen aber vier Figuren. Offen, siehe Request.
+- Zwei `residential_block` ohne Koordinaten (Thomas, McKnight) – werden gelöscht, nachdem die vier Bewohner in McKnights Wohnblock in Sundern umgezogen sind (SQL im Request).
 - Ältere Ortsdetail-Zeilen mit 340 m Radius – die begehbare Erdszene nutzt sie; doppelte Objekte zählt die Karte nur einmal.
 - Die Region `earth-place-51p32983-8p00726` (Quelle „materialization-failed", aber mit 643 Objekten) – enthält brauchbare Daten.
