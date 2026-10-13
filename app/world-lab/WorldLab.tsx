@@ -43,8 +43,9 @@ export default function WorldLab() {
         start,
         // Messschalter: ?aa=0 schaltet die Kantenglättung ab, ?res=1 begrenzt die Pixeldichte.
         settings: { antialias: params.get('aa') !== '0', maxResolution: Number(params.get('res')) || 2 },
-        // ?art=vorlage legt die Zeichenvorlagen auf die Blöcke – zum Prüfen von Maßstab und Ausrichtung.
-        art: blockArt(params.get('art') === 'vorlage' ? 'template' : 'drawn'),
+        // Standard: eigene Zeichnungen, wo vorhanden, sonst die Vorlagen.
+        // ?art=vorlage zeigt nur Vorlagen, ?art=farbe einfarbige Quader (zum Vergleichen der Bildrate).
+        art: blockArt(params.get('art') === 'vorlage' ? 'template' : params.get('art') === 'farbe' ? 'none' : 'drawn'),
         loadTile: async tile => {
           const response = await fetch(`/api/world-lab/tile?x=${tile.x}&y=${tile.y}`)
           if (!response.ok) throw new Error(String(response.status))
@@ -77,7 +78,7 @@ export default function WorldLab() {
     <div className="panel">
       <small>PROTOTYP · EINE WELT</small>
       <b>Kacheln statt Szenen</b>
-      <span>WASD laufen · Shift schneller · Mausrad zoomt · ?art=vorlage zeigt die Zeichenvorlagen</span>
+      <span>WASD laufen · Shift schneller · Mausrad zoomt</span>
       <div className="places">{PLACES.map(place => <button key={place.label} onClick={() => engine.current?.jump(place.at)}>{place.label}</button>)}</div>
       {hud && <dl>
         <dt>Bilder je Sekunde</dt><dd>{Math.round(hud.frame.fps)}</dd>

@@ -57,7 +57,7 @@ export const ART_FILES = { wallGround: 'wand-erdgeschoss.png', wallUpper: 'wand-
 
 /** Ordner für fertige Zeichnungen: public/worldlab/blocks/<art>/<datei>. */
 export const ART_DIR = '/worldlab/blocks'
-/** Ordner mit den Vorlagen zum Übermalen; in der Karte zu sehen mit /world-lab?art=vorlage. */
+/** Ordner mit den Vorlagen zum Übermalen; stehen auf der Karte, solange keine eigene Zeichnung eingetragen ist. */
 export const TEMPLATE_DIR = '/worldlab/vorlagen'
 
 /**
@@ -73,15 +73,22 @@ export const DRAWN: Partial<Record<BlockKind, Partial<Record<keyof BlockArt, tru
   shed: { wallGround: true, wallUpper: true, roof: true },
 }
 
-/** Pfade der Bilder für alle Blockarten – aus DRAWN oder, zum Prüfen, die Vorlagen. */
-export function blockArt(source: 'drawn' | 'template'): Partial<Record<BlockKind, BlockArt>> {
+/**
+ * Pfade der Bilder für alle Blockarten.
+ * - 'drawn': fertige Zeichnung aus DRAWN, wo es eine gibt, sonst die Vorlage (Standard)
+ * - 'template': nur Vorlagen
+ * - 'none': keine Bilder, einfarbige Quader
+ */
+export function blockArt(source: 'drawn' | 'template' | 'none'): Partial<Record<BlockKind, BlockArt>> {
   const out: Partial<Record<BlockKind, BlockArt>> = {}
+  if (source === 'none') return out
   for (const kind of Object.keys(BLOCK_STYLES) as BlockKind[]) {
     const art: BlockArt = {}
     for (const part of Object.keys(ART_FILES) as Array<keyof BlockArt>) {
-      if (source === 'template' || DRAWN[kind]?.[part]) art[part] = `${source === 'template' ? TEMPLATE_DIR : ART_DIR}/${kind}/${ART_FILES[part]}`
+      const drawn = source === 'drawn' && DRAWN[kind]?.[part]
+      art[part] = `${drawn ? ART_DIR : TEMPLATE_DIR}/${kind}/${ART_FILES[part]}`
     }
-    if (Object.keys(art).length) out[kind] = art
+    out[kind] = art
   }
   return out
 }

@@ -43,13 +43,13 @@ Die Breite eines Wandabschnitts ist frei wählbar, solange sie ein Vielfaches vo
 ## Vorlagen und Prüfen
 
 - Die Vorlagen liegen in `public/worldlab/vorlagen/<art>/` – mit Meterraster, Sockel, Platzhaltern für Fenster und Tür. Erzeugt von `scripts/worldlab-templates.py`.
-- `/world-lab?art=vorlage` legt die Vorlagen auf die Karte. So lässt sich vor dem Zeichnen prüfen, ob Maßstab und Ausrichtung stimmen.
+- Solange für ein Bild keine eigene Zeichnung eingetragen ist, legt `/world-lab` die Vorlage auf die Blöcke. `?art=vorlage` zeigt nur Vorlagen, `?art=farbe` einfarbige Quader (zum Vergleichen der Bildrate).
 
 ## Eine Zeichnung einbauen
 
 1. Vorlage kopieren, übermalen, unter `public/worldlab/blocks/<art>/<datei>` ablegen (gleicher Dateiname, gleiche Maße).
 2. In `lib/worldlab/blocks.ts` bei `DRAWN` eintragen, z. B. `house: { wallGround: true, wallUpper: true, roof: true }`.
-3. Fehlt ein Bild, bleibt die Fläche einfarbig wie bisher. Nicht alles muss auf einmal gezeichnet werden.
+3. Was nicht eingetragen ist, zeigt weiter die Vorlage. Nicht alles muss auf einmal gezeichnet werden.
 
 ## Stand der Zeichnungen
 
