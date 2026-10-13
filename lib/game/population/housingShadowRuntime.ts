@@ -38,7 +38,7 @@ export async function runHousingShadowTick(supabase: any, tick: number): Promise
       supabase.from('locations').select('id,is_supplied'),
       supabase.from('residential_occupancy').select('tile_entity_id,location_id,owner_class,residential_capacity'),
       supabase.from('tile_entities').select('id,profile_id,lease_price').gt('residential_capacity', 0),
-      supabase.from('person_tenancies').select('person_id,tile_entity_id,tenure,status'),
+      supabase.from('person_tenancies').select('person_id,tile_entity_id,tenure,status,rent_per_billing').in('status', ['active','provided']),
       supabase.from('role_wage_rates').select('role_code,daily_credits'),
       supabase.from('person_economic_actors').select('person_id,actor_id'),
       supabase.from('profile_economic_actors').select('profile_id,actor_id'),
@@ -89,7 +89,11 @@ export async function runHousingShadowTick(supabase: any, tick: number): Promise
       }])
     }
     const tenure = new Map<string, Tenure>()
-    for (const row of tenanciesQ.data ?? []) if (row.tenure) tenure.set(row.person_id, row.tenure as Tenure)
+    const currentRent = new Map<string, number | null>()
+    for (const row of tenanciesQ.data ?? []) {
+      if (row.tenure) tenure.set(row.person_id, row.tenure as Tenure)
+      currentRent.set(row.person_id, row.rent_per_billing == null ? null : Number(row.rent_per_billing))
+    }
 
     const rows = (peopleQ.data ?? []).map((row: any) => {
       const faded = fadeRelationships(relations.get(row.id) ?? [], tick)
@@ -104,6 +108,7 @@ export async function runHousingShadowTick(supabase: any, tick: number): Promise
         affinity: Object.fromEntries(faded.map((relation) => [relation.otherPersonId, relation.affinity])),
         closeTies: faded.filter((relation) => { const tier = tiers.get(relation.otherPersonId); return tier === 'close' || tier === 'partner' }).map((relation) => relation.otherPersonId),
         lastMoveTick: place?.since ?? null, ticksSinceEviction: null,
+        currentRent: currentRent.get(row.id) ?? null,
       }
       const decision = shadowHousingDecision(person, inventory, tick)
       return {
@@ -112,6 +117,17 @@ export async function runHousingShadowTick(supabase: any, tick: number): Promise
         tenure: person.tenure, must_move: decision.mustMove, wants_to_move: decision.wantsToMove,
         affordable_places: decision.affordablePlaces, accessible_places: decision.accessiblePlaces,
         executable: decision.executable, daily_wage: person.dailyWage, wealth: person.wealth,
+        discontent: decision.discontent,
+        monotony: decision.monotony,
+        bad_company: decision.badCompany,
+        scarcity: decision.scarcity,
+        rent_strain: decision.rentStrain,
+        crowding: decision.crowding,
+        insecurity: decision.insecurity,
+        commute_burden: decision.commuteBurden,
+        cooldown_blocked: decision.cooldownBlocked,
+        current_housing_value: decision.currentHousingValue,
+        best_candidate_value: decision.bestCandidateValue,
       }
     })
     if (!rows.length) return { ok: true, decisions: 0 }
