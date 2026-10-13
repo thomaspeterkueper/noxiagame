@@ -28,3 +28,6 @@ alter table cognitive_research_group_grants enable row level security;
 
 comment on table cognitive_research_group_grants is
   'Institutional evidence access grants. A grant controls discoverability, never ground-truth access or canon authority.';
+
+-- Nachtrag 13.10.2026 (beim Einspielen ergänzt): Der Server braucht Rechte auf die neuen Tabellen.
+grant select, insert, update on cognitive_research_groups, cognitive_research_group_grants to service_role;
