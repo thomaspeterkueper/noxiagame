@@ -8,6 +8,7 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
 - Arbeitgeber leben von einer 14-Tage-Reserve (erster Lohnlauf Tick 2136). Laufende Einnahmen fehlen.
 - Automatische Gebäudeausschüttung ist aus. Erlöse nur aus echten Zahlungen.
 - Bestellung im Lokal: `order_hospitality_item` und `/api/game/hospitality/order` (Migration `20261010110000`).
+- Hafenkantine live an allen sechs Orten mit Hafen (NOXIA-LIVING-0013, Migration `20261013100000`): Bewohner kaufen zuerst im Lokal, sonst in der Kantine; wer nichts zahlen kann, bekommt eine Notration ohne Geldfluss.
 
 ## Offene Aufgaben
 
@@ -20,8 +21,9 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
 7. Siehe Request R-2.
 8. Startcafé braucht Personal: Der Platzhalter-Wirt ist entfernt, ein Café ohne Personal ist ein Automatencafé ohne Einstiegsgespräch. Prüfen, ob `20261010090000_earth_cafe_host.sql` live angewendet ist (aus Teilprojekt Gastronomie).
 9. Ausgeben im Lokal: Die Oberfläche sendet bei `POST /api/game/hospitality/order` jetzt `recipientPersonId`, wenn der Spieler für eine Person im Raum bestellt. Route und `order_hospitality_item` werten das Feld noch nicht aus. Gewünscht (Thomas, 12.10.2026): Die Eigenschaften der Person ändern sich – ihr Hunger bzw. Durst wird gestillt (nach Aufgabe 5, `hospitality_item_effects`), dazu Wirkung auf Beziehung und Stimmung. Entwurf: NOXIA-LIVING-0012 Abschnitt 7. Zu bauen: Prüfung, dass die Person in diesem Gebäude ist (`person_interior_presence`); Wiederholung per `requestId` wirkt nur einmal (Geld, Bedürfnis, Beziehung, Stimmung in einer Transaktion); Beziehungseffekt skaliert mit dem Bedarf der Person; neue Tabelle `person_player_relationships` nach den Regeln aus NOXIA-LIVING-0008 – eine Beziehung Person ↔ Spieler gibt es bisher nicht; Stimmung über ein `population_events`-Ereignis, nicht direkt in `person_affect`. Erst nach Aufgabe 5 Schritte 1–3 (aus Teilprojekt Gastronomie).
-10. Essensangebot an bewohnten Orten (aus R-3) – **entschieden (Thomas, 13.10.2026):** Wo es nichts gibt, steht eine schlichte Grundversorgung am Hafen (Stationskantine, wie am Bahnhof oder Flughafen); das eigentliche Lokal bleibt eine Gelegenheit für Spieler. Entwurf: `docs/decisions/NOXIA-LIVING-0013-basic-supply-and-player-gap.md` – staatliche `port_canteen` an Landeplatz/Andockmodul, rund um die Uhr, nur Wasser und Ration, nicht billiger als ein Café, keine Wirkung auf Stimmung. Zuerst an Mars / Tharsis Hub, Phobos, Prometheus Station und Mond / Shackleton.
-11. Wahl unter mehreren Lokalen am Ort nach Reiz statt nur nach Preis (aus R-1): `run_npc_consumption` nimmt heute immer das billigste, bei Gleichstand dasselbe Gebäude. Neu: Preis, Wirkung auf das drängende Bedürfnis, Geselligkeit/`variety` und Öffnungszeit (R-4); die Hafenkantine ist nur Rückfallebene (NOXIA-LIVING-0013). Zusammen mit R-5. Voraussetzung, damit Spielerlokale Nachfrage gewinnen.
+10. ~~Essensangebot an bewohnten Orten (aus R-3).~~ Erledigt 13.10.2026: Hafenkantine überall, dauerhaft, mit Notration (NOXIA-LIVING-0013). Rest: Spieler können sie noch nicht betreten (Request an Gastronomie).
+11. Wahl unter mehreren Lokalen am Ort nach Reiz statt nur nach Preis (aus R-1). **Erster Schritt live (13.10.2026):** Lokale vor der Kantine, erstes bezahlbares Angebot, Gleichstand gestreut je Person und Tick. Offen: Reiz aus Preis, Wirkung auf das drängende Bedürfnis, Geselligkeit/`variety` und Öffnungszeit (R-4), Tageszeit (R-5).
+12. Angebote für Spieler als Daten (aus R-10): Stellen und Aufträge, die ein Spieler annehmen kann – Anbieter, Ort, Lohn, Annahme über den Server. Heute gibt es Stellen nur für Bewohner (LIVING-0010). Zuständigkeit für Fracht- und Schiffsstellen mit dem Handel abstimmen.
 
 ## Requests aus anderen Teilprojekten
 
@@ -80,9 +82,13 @@ Der Innenraum kennt jetzt Öffnungszeiten nach Koloniezeit (`VENUE_HOURS` in `li
 - Personal arbeitet in Schichten, die zur Öffnungszeit passen (hängt an Aufgabe 2 und `person_interior_presence`).
 - Zu entscheiden: Das Startcafé neuer Spieler ist nachts geschlossen. Entweder öffnet es durchgehend, oder der Einstieg bekommt einen anderen Ort.
 
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** übernommen. Vorschlag: Öffnungszeiten je Gebäudeart als Standard (Tabelle `venue_hours`), überschreibbar je Gebäude durch den Betreiber; `order_hospitality_item` und `run_npc_consumption` prüfen serverseitig. Die Hafenkantine ist rund um die Uhr offen und fängt die Nacht auf. **Zu entscheiden (Thomas):** Startcafé nachts – geschlossen lassen und neue Spieler nachts an die Kantine verweisen, oder durchgehend öffnen? Vorschlag: geschlossen lassen; das Einstiegsgespräch gibt es dann am Morgen.
+
 ### R-5 (Gastronomie, 13.10.2026): Ausgehen nach Tageszeit
 
 Damit sich die drei Lokale unterscheiden: Bewohner gehen morgens ins Café, mittags und abends ins Restaurant, abends in die Bar. Gewichtung der Käufe nach Stunde (`circadian.ts`) und nach Bedürfnis (Aufgabe 5); Freizeit und Geselligkeit als Anlass, nicht nur Hunger. Folgt auf R-2 und R-3.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** übernommen als Teil von Aufgabe 11 (Reiz eines Angebots). Tageszeit wird ein Gewicht im Reiz, nicht eine feste Regel. Geselligkeit als Anlass braucht einen zweiten Kaufauslöser neben dem Essen (`social` oder `variety` niedrig) – folgt nach Hunger und Durst (Aufgabe 5).
 
 ### R-6 (Gastronomie, 13.10.2026): Wohnen über dem Lokal
 
@@ -91,6 +97,8 @@ Der Innenraum zeigt eine Treppe „PRIVAT ↑“, sobald ein Gastronomiegebäude
 - Wohnplätze für Café, Bar und Restaurant (als Variante oder Ausbau), Vorschlag: 1–2.
 - Der Wirt wohnt bevorzugt über seinem Lokal; sonst Vermietung mit Miete an den Eigentümer.
 - Zu entscheiden: eigene Gebäudeart „Wohn- und Geschäftshaus“ oder Ausbau eines bestehenden Lokals.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** Vorschlag: keine eigene Gebäudeart, sondern Ausbau eines bestehenden Lokals (`residential_capacity` 1–2 am Gebäude). Der Wohnungsmarkt (NOXIA-LIVING-0010) kann solche Plätze bereits vergeben; neu wäre nur die Vorliebe des Wirts für die Wohnung über seinem Lokal und die Miete an den Eigentümer. **Zu entscheiden (Thomas):** Ausbau oder eigene Gebäudeart.
 
 ### R-7 (Gastronomie, 13.10.2026): Hotel und Gästezimmer
 
@@ -101,6 +109,8 @@ Vorbild SunDog: Im Hotel mietet man am Empfang ein Zimmer und ruht sich aus. Der
 - Wirkung der Übernachtung: Erholung für Spieler und Reisende (zusammen mit Hunger und Durst, Aufgabe 5); Reisende als Personen, die nur vorübergehend am Ort sind.
 - Gastronomie baut danach Lobby und Empfang als Innenraum und den Knopf „Zimmer nehmen“.
 
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** grundsätzlich übernommen, nach LIVING-0012. Hängt an zwei Entscheidungen: **(Thomas)** Gibt es Erholung als drittes Spielerbedürfnis (dann nach denselben Regeln wie Hunger und Durst: nur sichtbar, offline eingefroren)? Und Reisende als vorübergehende Personen – ein eigenes Modell, das es noch nicht gibt. Buchung eines Zimmers kann `order_hospitality_item` als Vorlage nehmen.
+
 ### R-8 (Gastronomie, 13.10.2026): Gerüchte als Wissen der Personen, Auskunft gegen Geld
 
 Das Personal erzählt jetzt, was am Ort geschehen ist (`lib/game/hospitality/hearsay.ts`, aus Käufen, Baustellen und `population_events`). Das ist aber ein Blick des Lokals auf die Daten: Niemand hat es wirklich erfahren, niemand erinnert sich, und es wandert nicht weiter.
@@ -108,6 +118,8 @@ Das Personal erzählt jetzt, was am Ort geschehen ist (`lib/game/hospitality/hea
 - Wissensspuren je Person: wer was gesehen oder von wem gehört hat, mit Alter und Verlässlichkeit; Weitergabe bei Begegnungen, im Lokal besonders. Der Innenraum liest dann das Wissen der anwesenden Person statt `venueState`.
 - Auskunft als Ware nach SunDog (in der Bar kauft und verkauft man „Info“ beim Wirt): Preis, was eine Auskunft enthält (Preise anderer Orte, Stellen, Aufträge), und was der Spieler selbst verkaufen kann. Buchung über den Server, nicht im Gespräch.
 - Gastronomie baut danach den Posten „Auskunft“ am Tresen.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** übernommen als eigener Baustein (eigene Entscheidung, nach LIVING-0012). Anschluss an das bestehende soziale Gedächtnis (`lib/game/personSocialMemory.ts`): Wissensspuren mit Quelle, Alter und Verlässlichkeit, Weitergabe bei Begegnungen. Auskunft gegen Geld als besteuerter Transfer wie eine Bestellung. Gerüchte über die Hafenkantine („auf Phobos gibt es nur Ration“) sind ein erster Anwendungsfall (LIVING-0013).
 
 ### R-9 (Gastronomie, 13.10.2026): Lehren aus SunDog für Bedürfnisse und Waren
 
@@ -117,6 +129,8 @@ Quelle: Spielbeschreibung unter https://gamesoffame.wordpress.com/sundog/ (von T
 - **Alkohol hat einen Preis:** In SunDog kann Bier zur Ohnmacht führen, und man wird ausgeraubt. Zu entscheiden, ob Getränke der Bar eine Nebenwirkung haben (z. B. Wirkung auf Leistung im nächsten Tick). Kein Raub ohne ein Sicherheitsmodell.
 - **Ware beim Wirt:** In SunDog bekommt man in der Bar über „Info“ auch Gegenstände, legale und illegale; der Handel findet in einer Nische mit einer Person aus der Bar statt. Ergänzt R-8: Ob das Lokal Ort für Geschäfte zwischen Personen und Spieler wird, und ob es verbotene Ware gibt. Die Sitznischen der Bar sind im Innenraum vorhanden.
 - **Bilder als gemeinsamer Bestand:** Die Posten der Karte haben jetzt gezeichnete Bilder (`app/earth/HospitalityItemIcon.tsx`, Schlüssel ist `item_code`). Wenn Waren, Inventar und Markt ebenfalls Bilder bekommen (SunDog: Gegenstände per Ziehen und Ablegen), sollte es ein gemeinsamer Bestand mit einer Regel für Größe und Stil werden. Neue Zeilen in `hospitality_menu` (R-2) bitte mit den dort genannten Codes, sonst erscheint das Ersatzbild.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** Sichtbare Balken sind in LIVING-0012 Abschnitt 6 vorgesehen (Hunger, Durst; Erholung offen, siehe R-7). „Wer lange unterwegs ist, bekommt Folgen“ ist vorerst nicht so: Mangel beim Spieler ist nur sichtbar (Entscheidung 12.10.2026). **Zu entscheiden (Thomas):** Nebenwirkung von Alkohol – vorerst keine, solange Mangel nichts kostet? Kartencodes: R-2 wie vorgeschlagen; neu sind `water` und `ration` der Hafenkantine.
 
 ### R-10 (Gastronomie, 13.10.2026): Echte Angebote für den Einstieg, Einführung in jedem Gebäude
 
@@ -128,3 +142,5 @@ In Café, Bar und Restaurant ist die Haltung gebaut (`lib/game/hospitality/intro
 - **Zuordnung zum Haus:** welche Art Angebot wo zu hören ist – Bar eher das Riskante und Einträgliche, Café das Solide, Hotel Reisen und Ausflüge. Das Lokal liest dann die Angebote seines Ortes und gibt sie dem Personal als Fakten mit; der Knopf zum Annehmen gehört an den Tresen, nicht ins Gespräch.
 - **Andere Gebäude:** Verwaltung, Akademie, Markt, Raumhafen brauchen dieselbe Einführung mit eigener Haltung. Das Muster (Haltung plus Hinweise, nur fürs Personal) lässt sich übernehmen; welches Teilprojekt die Innenräume dieser Gebäude führt, ist zu klären.
 - Hängt mit R-8 (Auskunft gegen Geld) und R-9 (Ware beim Wirt) zusammen: Ein Angebot kann auch eine Auskunft sein, die etwas kostet.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** Angebote als Daten übernommen als Aufgabe 12. Stellen für Spieler gehören zum Arbeitsmarkt hier; Mitflug und Arbeit auf Handelsschiffen berühren Handel und Schiffe und werden dort abgestimmt.

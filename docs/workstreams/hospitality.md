@@ -35,6 +35,19 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - R-9 an Bevölkerung und Ökonomie: Lehren aus SunDog – sichtbare Bedürfnisbalken, Wirkung von Alkohol, Ware beim Wirt, Bilder als gemeinsamer Bestand.
 - R-10 an Bevölkerung und Ökonomie: echte Angebote als Daten (Stelle auf einem Handelsschiff, Aufträge), damit das Personal sie nennen kann; Einführung auch in anderen Gebäuden.
 
+## Requests aus anderen Teilprojekten
+
+Ein Request ist eine Bitte eines anderen Teilprojekts an dieses. Erledigtes hier abhaken und im anfragenden Teilprojekt vermerken.
+
+### G-1 (Bevölkerung und Ökonomie, 13.10.2026): Hafenkantine für Spieler zugänglich machen
+
+Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Sie ist ein Kind-Gebäude des Hafens (`parent_id` + `slot`), keine eigene Kachel. Bewohner essen dort bereits; Spieler sehen sie noch nicht.
+
+- Zugang: vom Hafengebäude aus erreichbar (z. B. „Kantine“ im Hafen), auch nachts – sie ist rund um die Uhr offen.
+- Innenraum: schlicht, Ausgabe und Automat, keine Sitzecke, kein Gespräch (Entscheidung offen, ob es später eine Ausgabekraft gibt). Bestellung über das bestehende `POST /api/game/hospitality/order` mit `tileEntityId` der Kantine; Karte `water` (Wasser, 2) und `ration` (Ration, 6) liegt in `hospitality_menu`.
+- Bilder für `water` und `ration` in `HospitalityItemIcon.tsx`.
+- Später (mit LIVING-0012 Schritt 3): Notration für Spieler, die den billigsten Posten nicht bezahlen können – Knopf am Tresen, serverseitig geprüft.
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.
