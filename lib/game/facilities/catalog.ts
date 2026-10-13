@@ -218,6 +218,22 @@ const FACILITIES: Record<string, FacilityDefinition> = {
       planned('research-library', 'Archiv recherchieren', 'research', 'Bestände und Quellen für Forschung erschließen.'),
     ],
   },
+  robotic_kitchen: {
+    id: 'robotic_kitchen',
+    label: 'Automatisierte Küche',
+    description: 'Robotisierte Speisenzubereitung mit Zutatenlager, Ausgabe sowie Hygiene- und Wartungspfad.',
+    zones: [
+      { id: 'entry', label: 'Bestellung', kind: 'access', description: 'Bestellung, Zahlung und Zugang zur Ausgabe.', interactionIds: [] },
+      { id: 'pickup', label: 'Ausgabe', kind: 'social', description: 'Abholung fertiger Mahlzeiten und kurze Aufenthalte.', interactionIds: [] },
+      { id: 'kitchen-cell', label: 'Küchenzelle', kind: 'technical', description: 'Automatisiertes Kochen, Portionieren und Zusammenstellen.', interactionIds: [] },
+      { id: 'cold-store', label: 'Kühl- & Zutatenlager', kind: 'logistics', description: 'Vorbereitete Zutaten, Kühlung und Nachfüllung.', interactionIds: ['robotic-kitchen-logistics'] },
+      { id: 'hygiene-service', label: 'Hygiene & Wartung', kind: 'technical', description: 'Reinigung, Abfall, Wasser und technische Wartung.', interactionIds: ['robotic-kitchen-service'] },
+    ],
+    interactions: [
+      planned('robotic-kitchen-logistics', 'Zutatenversorgung prüfen', 'logistics', 'Künftige Bestands-, Kühl- und Nachfülllogik der automatisierten Küche.'),
+      planned('robotic-kitchen-service', 'Küche warten', 'conversation', 'Künftige Wartungs-, Hygiene- und Störungsinteraktion.'),
+    ],
+  },
   solar: {
     id: 'solar',
     label: 'Energieanlage',
@@ -260,6 +276,8 @@ const ALIASES: Record<string, string> = {
   life_support_hub: 'habitat',
   battery_storage: 'solar',
   school: 'academy',
+  automated_food_service: 'robotic_kitchen',
+  habitat_food_cell: 'robotic_kitchen',
 }
 
 const FALLBACK: FacilityDefinition = {
