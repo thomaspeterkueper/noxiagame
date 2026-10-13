@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from 'react'
 import SolarSystem from './SolarSystem'
 import BuildingResidentsCard from './BuildingResidentsCard'
+import PortCanteenInterior from './PortCanteenInterior'
 
 interface TileEntity {
   id:          string
@@ -53,7 +54,7 @@ interface RoomDef {
   label:    string
   icon:     string
   wallHue:  number
-  detail:   'console' | 'crates' | 'beds' | 'shelves' | 'reactor' | 'terminal' | 'desk' | 'bar' | 'stars' | 'dock' | 'live_map' | 'plain'
+  detail:   'console' | 'crates' | 'beds' | 'shelves' | 'reactor' | 'terminal' | 'desk' | 'bar' | 'stars' | 'dock' | 'live_map' | 'plain' | 'canteen'
   action?:  ActionKind
   actionLabel?: string
   visible?: (ctx: RoomCtx) => boolean
@@ -85,9 +86,13 @@ const DOCKING_BAY_ROOMS: RoomDef[] = [
   { id: 'dock', label: 'Andockbucht', icon: '🛸', wallHue: 220, detail: 'dock', action: 'ship', actionLabel: '🛸 Zum Schiff', items: () => ['Magnetkupplungen aktiv'] },
 ]
 
+// Hafenkantine (NOXIA-LIVING-0013): Kind-Gebäude des Hafens, von hier aus betretbar.
+const CANTEEN_ROOM: RoomDef =
+  { id: 'canteen', label: 'Hafenkantine', icon: '🥫', wallHue: 185, detail: 'canteen', items: () => ['Wasser und Ration, rund um die Uhr', 'Ausgabe durch Automat oder Roboter'] }
+
 const BUILDING_ROOMS: Record<string, RoomDef[]> = {
-  landing_pad: LANDING_PAD_ROOMS,
-  docking_bay: DOCKING_BAY_ROOMS,
+  landing_pad: [...LANDING_PAD_ROOMS, CANTEEN_ROOM],
+  docking_bay: [...DOCKING_BAY_ROOMS, CANTEEN_ROOM],
   habitat: [
     { id: 'entry', label: 'Eingangsschleuse', icon: '🚪', wallHue: 200, detail: 'plain', items: () => ['Druckluftschleuse', 'Stiefelablage'] },
     { id: 'common', label: 'Gemeinschaftsraum', icon: '🛋', wallHue: 40, detail: 'desk', items: ({ population }) => [`${Math.min(20, Math.ceil(population/50))} Bewohner anwesend`, 'Gemeinschaftstisch'] },
@@ -249,6 +254,10 @@ export default function BuildingInterior({
       {room.detail === 'live_map' ? (
         <div style={{ background: '#05070c', padding: '0.4rem' }}>
           <SolarSystem currentTick={currentTick ?? 0} shipRange={shipRange ?? 250} currentLocation={currentLocationSlug ?? entity.entity_id} />
+        </div>
+      ) : room.detail === 'canteen' ? (
+        <div style={{ background: '#0b1113', padding: '0.5rem' }}>
+          <PortCanteenInterior parentEntityId={entity.id} portTypeId={entity.entity_id} />
         </div>
       ) : <RoomScene room={room} />}
 

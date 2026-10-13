@@ -244,7 +244,7 @@ export default function DashboardDeimosSurface({ locations }: Props) {
 
     {notice && <div className="deimos-notice">{notice}</div>}
 
-    {dockEntity && <SpaceportOverlay
+    {dockEntity && <SpaceportOverlay entityId={dockEntity.id}
       buildingTypeId="shuttle_dock_deimos"
       buildingName={dockName}
       onClose={() => setDockEntity(null)}

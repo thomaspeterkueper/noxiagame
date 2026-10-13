@@ -21,6 +21,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Karte mit gezeichneten Bildern je Posten statt nur Text, dieselben Bilder im Raum (Branch `feat/hospitality-item-icons`).
 - Einführung je Haus: Das Personal führt Neue in eigenem Ton in die Welt ein – Café seriös, Bar zwielichtig, Restaurant gesellig, Haus mit Gästezimmern auf Sehenswertes aus (Branch `feat/hospitality-introductions`).
 - Hinsetzen per Klick, „Zum Tresen gehen“, Personal begrüßt am Tresen von sich aus, Gäste setzen sich zum sitzenden Spieler (Branch `feat/hospitality-sit-and-greet`).
+- Hafenkantine betretbar (Request G-1): Zugang vom Hafen, Innenraum mit Automat oder Roboter, feste Antworten, Wasser und Ration mit Bildern (Branch `feat/port-canteen-interior`). Beschreibung: `hospitality-venues.md` Abschnitt 1a.
 
 ## Gestellte Requests
 
@@ -39,7 +40,9 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 
 Ein Request ist eine Bitte eines anderen Teilprojekts an dieses. Erledigtes hier abhaken und im anfragenden Teilprojekt vermerken.
 
-### G-1 (Bevölkerung und Ökonomie, 13.10.2026): Hafenkantine für Spieler zugänglich machen
+### G-1 (Bevölkerung und Ökonomie, 13.10.2026): Hafenkantine für Spieler zugänglich machen – erledigt 13.10.2026
+
+Gebaut: Zugang, Innenraum, Automat/Roboter, Bilder. Offen: Notration-Knopf (wartet auf LIVING-0012 Schritt 3), Zugang in Q1 (Hafenviertel hat noch keinen Weg in die Kantine).
 
 Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Sie ist ein Kind-Gebäude des Hafens (`parent_id` + `slot`), keine eigene Kachel. Bewohner essen dort bereits; Spieler sehen sie noch nicht.
 
@@ -63,6 +66,8 @@ Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port
 7. „Auskunft“ als Posten am Tresen (SunDog: Info kaufen und verkaufen), sobald R-8 entschieden ist.
 
 8. Bedienung am Tisch: Personal kommt zum sitzenden Spieler und nimmt die Bestellung auf.
+
+9. Hafenkantine in Q1: Das Hafenviertel hat noch keinen Weg hinein. Dazu Notration-Knopf, sobald der Server sie für Spieler ausgibt.
 
 ## Nicht in diesem Teilprojekt
 
