@@ -73,6 +73,7 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Die veraltete Region Sauerland erneuert `/world-lab` beim Start selbst. Offen: prüfen, ob das Röhrtalstadion erscheint (`internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`).
 9. Kirchen haben jetzt einen Turm an der Stirnseite (geschätzt, OSM sagt nicht, wo er steht), Höhen aus OSM `height` werden genutzt. Einzelbilder für besondere Gebäude (Kirche, Bahnhof, Café, NOXIA-Gebäude): ganzes Bild in derselben Ansicht mit Fußpunkt, statt aus Wandstücken zusammengesetzt. Maße stehen in der Zeichenvorlage.
 10. Häuser vor der Figur durchscheinend machen, damit sie in engen Gassen sichtbar bleibt (die richtige Höhe verdeckt mehr Straße).
+11. Gescheiterte Kartenabrufe nachholen (Thomas, 13.10.2026: Hinweise, welche Orte in die Karte gehören): Ortssuchen Frankfurt (50,1106 / 8,6821), Darmstadt (49,9915 / 8,6667), Datong (40,0923 / 113,2953) und leere Ortsdetail-Zellen in Sundern (u. a. Innenstadt 51,327 / 8,0032). Die leeren Zeilen in `celestial_regions` bleiben als Merkposten stehen; nachholen über `/api/world-lab/refresh` bzw. die Ortssuche, sobald Overpass antwortet.
 
 ## Nicht in diesem Teilprojekt
 

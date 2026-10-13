@@ -1,6 +1,6 @@
 # Bereinigung 13.10.2026 – Altlasten der Erdkarte
 
-**Status: vorgesehen, noch nicht gelöscht.** Die Löschanfrage an die Datenbank wurde am 13.10.2026 vor dem Ausführen abgebrochen; es wartet auf Thomas' Bestätigung. Diese Datei hält fest, was gelöscht werden soll, damit es danach nachvollziehbar bleibt.
+**Status:** Straßenstücke zum Löschen vorgesehen, SQL in `internal-tasks/open/REQ-NOXIA-20261013-world-map-cleanup.md` (Löschbefehle kamen aus der Claude-Umgebung nicht durch). Die leeren Ortszeilen bleiben auf Thomas' Wunsch stehen: Sie zeigen, welche Orte noch in die Karte gehören.
 
 Auf Thomas' Wunsch („die alten Straßen und andere jetzt sinnlose Artefakte von früher löschen"). Vorher geprüft: kein Fremdschlüssel und keine Spielzeile verweist darauf. Alle Straßenstücke gehören Thomas' Konten (Aristeas, McKnight).
 
@@ -15,9 +15,9 @@ Ersetzt durch die echten Straßen aus OpenStreetMap. Je 8 × 24 m, Zustand 100, 
 | ce2f34d6-2680-487d-89c9-6bf33348f5b5 | McKnight | 51.330428683679 | 8.00737324037499 | 0 | f96295b5-bfb7-4674-8cac-18807e560052 |
 | 23b880f2-b003-4f63-9705-94e81559775e | McKnight | 51.3306472108119 | 8.00737566899599 | 0 | 5a7a8238-01df-4edd-8389-86b09e2b5807 |
 
-## Leere Ortszeilen (`celestial_regions` ohne ein einziges Kartenobjekt)
+## Leere Ortszeilen (`celestial_regions` ohne ein einziges Kartenobjekt) – bleiben stehen
 
-Reste gescheiterter Abrufe. Sie werden beim nächsten Besuch des Ortes neu angelegt und neu gefüllt.
+Reste gescheiterter Abrufe. Thomas (13.10.2026): Hinweise, dass diese Orte in die Karte gehören – nicht löschen, sondern nachholen.
 
 | slug | Art | Mitte |
 |---|---|---|
@@ -33,6 +33,6 @@ Reste gescheiterter Abrufe. Sie werden beim nächsten Besuch des Ortes neu angel
 ## Bewusst stehen gelassen
 
 - Alle übrigen NOXIA-Gebäude auf der Erde (Raumhafen Selmecke, Café, Bauten in Peru, Namibia, Tunesien usw.) – Spielstand, keine Altlast.
-- Zwei `residential_block` ohne Koordinaten (Thomas, McKnight) – nicht auf der Karte, aber möglicherweise für Wohnen gezählt; Entscheidung bei Thomas.
+- Zwei `residential_block` ohne Koordinaten (Thomas, McKnight) – Thomas will sie weg; im Block auf Konto Thomas wohnen aber vier Figuren. Offen, siehe Request.
 - Ältere Ortsdetail-Zeilen mit 340 m Radius – die begehbare Erdszene nutzt sie; doppelte Objekte zählt die Karte nur einmal.
 - Die Region `earth-place-51p32983-8p00726` (Quelle „materialization-failed", aber mit 643 Objekten) – enthält brauchbare Daten.
