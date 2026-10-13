@@ -100,6 +100,11 @@ export async function POST(request: NextRequest) {
   const placeKnowledge = Array.isArray(body.placeKnowledge)
     ? body.placeKnowledge.slice(0, 10).map((value: unknown) => clean(value, 140)).filter(Boolean)
     : []
+  // Mitbekommenes: eigene Beobachtung oder Gehörtes der letzten Zeit. Jede
+  // Zeile sagt selbst, was von beidem sie ist.
+  const hearsay = Array.isArray(body.hearsay)
+    ? body.hearsay.slice(0, 6).map((value: unknown) => clean(value, 140)).filter(Boolean)
+    : []
   const nearbyPlaces = Array.isArray(body.nearbyPlaces)
     ? body.nearbyPlaces.slice(0, 10).map((value: any, index: number) => ({
         key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
@@ -184,6 +189,8 @@ export async function POST(request: NextRequest) {
     localFacts.length ? `Verifizierte lokale Fakten:\n- ${localFacts.join('\n- ')}` : 'Es liegen keine verifizierten lokalen Infrastruktur-Fakten vor.',
     placeKnowledge.length ? `Ortswissen – was du als Ansässige(r) über die Gegend weißt, auch ohne es gerade zu sehen:\n- ${placeKnowledge.join('\n- ')}` : '',
     placeKnowledge.length ? 'Nutze das Ortswissen, wenn nach der Gegend, nach Sehenswertem, nach Einrichtungen oder nach dem Weg gefragt wird: Nenne dann zwei, drei passende Dinge daraus, statt zu passen. Was im Ortswissen steht, gilt als belegt. Zur realen Gegend darfst du außerdem allgemein Bekanntes sagen (Landschaft, Region, größere Nachbarorte), aber erfinde keine weiteren Einrichtungen, Öffnungszeiten oder Wegbeschreibungen.' : '',
+    hearsay.length ? `Was du in letzter Zeit mitbekommen hast:\n- ${hearsay.join('\n- ')}` : '',
+    hearsay.length ? 'Erzähle davon, wenn nach Neuigkeiten, Gerüchten, Arbeit oder dem Geschehen am Ort gefragt wird – nicht von dir aus alles auf einmal. Was mit „Gehört“ beginnt, gibst du als Gehörtes weiter („man erzählt sich“, „ich habe gehört“), nicht als Tatsache. Schmücke nichts aus und nenne keine Namen, die dort nicht stehen.' : '',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',

@@ -68,6 +68,24 @@ Dass gerade das Café zum Automatencafé wird und Bar und Restaurant schließen,
 
 „Personal“ heißt hier: Arbeitszuweisung zu diesem Gebäude. Ob die Person gerade Schicht hat, weiß der Raum nicht (siehe 6.1).
 
+### Öffnungszeiten
+
+Die Kolonie hat eine Uhr: ein Tick ist eine Stunde, die Stunde ist `Tick % 24`. Das ist Koloniezeit, nicht die Uhrzeit des Spielers.
+
+| Lokal | geöffnet |
+|---|---|
+| Café | 6–20 Uhr |
+| Restaurant | 11–23 Uhr |
+| Bar | 17–2 Uhr |
+
+Die Zeiten stehen als feste Werte in `VENUE_HOURS` (`venues.ts`) – ein Startwert, keine Gebäudeeigenschaft (Request R-4). Außerhalb der Zeit ist ein Lokal mit Personal geschlossen; die Tafel nennt die nächste Öffnung. Ein Automatencafé schließt nie. `venueClosedReason` unterscheidet „außerhalb der Zeit“ und „kein Personal“. Uhrzeit und Öffnungszeit stehen im ersten Gesprächsfakt, das Personal kann also sagen, wann geöffnet ist.
+
+Bewohner und Personal richten sich noch nicht nach diesen Zeiten – Käufe und Arbeit laufen in der Simulation rund um die Uhr (Requests R-4, R-5).
+
+### Obergeschoss: Wohnung oder Gästezimmer
+
+Hat das Gebäude Wohnplätze (`residential_capacity`) oder Gästeplätze (`transient_capacity`), bekommt der Raum eine Treppe (`withUpperFloor`): „PRIVAT ↑“ für eine Wohnung, „ZIMMER ↑“ für Gästezimmer. Das Personal weiß davon (`upperFloorFact`), Gäste sehen nur die Treppe. Die Treppe ist nicht begehbar, oben gibt es noch keinen Raum. Heute hat kein Gastronomiegebäude solche Plätze; wer oben wohnt und wie man ein Zimmer mietet, liegt bei Bevölkerung und Ökonomie (Requests R-6, R-7).
+
 ## 4. Gespräche
 
 Regel: **Eine Figur weiß nur, was sie im Raum wissen kann.** `venueConversationFacts` baut die lokalen Fakten für `/api/game/npc-conversation` aus Sicht der Figur:
@@ -103,6 +121,17 @@ Was eine Figur sieht, steht in den lokalen Fakten. Was sie über ihre Gegend **w
 - **Kein Wissen über Personen:** Wer wo wohnt oder was jemand besitzt, steht nicht darin.
 
 Regeln: `lib/game/hospitality/placeKnowledge.ts`, Laden: `placeKnowledge.server.ts`, Abruf: `GET /api/game/hospitality/place?tileEntityId=…`. Ein Lokal ohne Erdposition (Station) hat noch kein Ortswissen.
+
+### Mitbekommenes
+
+Wer hinter dem Tresen steht, bekommt mit, was am Ort geschieht. Das ist eine dritte Liste (`hearsay`, höchstens 6 Sätze) neben lokalen Fakten und Ortswissen, und nur das Personal erhält sie.
+
+- **„Selbst gesehen:“** – wie viele Gäste heute da waren, wie lange der letzte her ist (aus `person_consumption_events`).
+- **„Gehört:“** – am Ort wird gebaut (`player_builds`), es gab Streit oder jemand hat geholfen (`population_events`, letzte 24 Stunden), Leute suchen Arbeit.
+- **Keine Namen, keine Zahlen über Geld.** Die Gesprächsroute verlangt, Gehörtes als Hörensagen weiterzugeben.
+- **Alles aus echten Daten.** Ist nichts geschehen, ist die Liste leer.
+
+Regeln: `lib/game/hospitality/hearsay.ts`; geliefert von `GET /api/game/hospitality/guests` (`heard`, dazu `hour` und `upper`). Das ist ein Blick des Lokals auf den Ort, kein Wissen einzelner Personen: Zwei Wirte am selben Ort haben dasselbe gehört, und niemand erinnert sich später daran. Echte Gerüchte, die von Person zu Person wandern, und Auskunft gegen Geld wie in SunDog: Request R-8.
 
 ## 5. Bestellen
 

@@ -17,12 +17,18 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 
 - Gebäudeansichten für Bar und Restaurant (Erde), eingetragen in `visuals.ts`.
 - Leben im Lokal: Bewohner, die dort in der letzten Stunde wirklich gekauft haben, stehen am Tresen an, gehen um die Möbel herum zu ihrem Platz, sitzen mit ihrer Bestellung und gehen wieder (`guestMoment`, `venuePath`, `GET /api/game/hospitality/guests`). Nichts wird erfunden oder gespeichert.
+- Öffnungszeiten nach Koloniezeit (Café 6–20, Restaurant 11–23, Bar 17–2), Mitbekommenes fürs Personal aus echten Ereignissen am Ort, Treppe ins Obergeschoss, sobald das Gebäude Wohn- oder Gästeplätze hat (Branch `feat/hospitality-hours-hearsay-upper`). Beschreibung: `hospitality-venues.md` Abschnitte 3 und 4.
 
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
 - R-2 an Bevölkerung und Ökonomie: Karten für Bar und Restaurant.
 - R-3 an Bevölkerung und Ökonomie: Käufe der Bewohner sind selten, das Lokal meist leer.
+- R-4 an Bevölkerung und Ökonomie: Öffnungszeiten als Gebäudedaten; Bewohner kaufen und Personal arbeitet nur in dieser Zeit.
+- R-5 an Bevölkerung und Ökonomie: Ausgehen nach Tageszeit.
+- R-6 an Bevölkerung und Ökonomie: Wohnen über dem Lokal.
+- R-7 an Bevölkerung und Ökonomie: Hotel und Gästezimmer.
+- R-8 an Bevölkerung und Ökonomie: Gerüchte als Wissen der Personen, Auskunft kaufen und verkaufen.
 
 ## Offene Aufgaben
 
@@ -31,6 +37,12 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 3. Ortswissen-Abruf einmal live prüfen (`/api/game/hospitality/place`); die Regeln sind mit echten Daten aus Sundern getestet, der Abruf selbst lief noch nicht.
 
 4. Gäste-Abruf einmal live prüfen (`/api/game/hospitality/guests`): Erscheint nach einem echten Kauf eines Bewohners eine Person am Tresen?
+
+5. Öffnungszeiten, Treppe und Mitbekommenes einmal live prüfen; bisher nur Regeltests.
+
+6. Empfang und Lobby fürs Hotel als eigener Innenraum, sobald R-7 entschieden ist.
+
+7. „Auskunft“ als Posten am Tresen (SunDog: Info kaufen und verkaufen), sobald R-8 entschieden ist.
 
 ## Nicht in diesem Teilprojekt
 

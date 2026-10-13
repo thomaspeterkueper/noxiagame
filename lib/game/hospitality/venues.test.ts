@@ -3,6 +3,7 @@ import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeSta
 import { getInteriorTemplateForBuildingType } from '../buildings/interiors/registry'
 import { getBuildingEntryDefinition } from '../buildings/entry'
 import { isSocialInfrastructure, arrivalPoints, SOCIAL_HOSPITALITY_EQUIVALENTS } from '../settlements/tiers'
+import { venueHearsay, MAX_HEARSAY, MAX_HEARSAY_CHARS } from './hearsay'
 import {
   ARRIVAL_ORIENTATION_FACTS,
   MAX_CONVERSATION_FACTS,
@@ -11,6 +12,11 @@ import {
   VENUE_PLAYER_RADIUS,
   canSeeRoom,
   describePlayerPosition,
+  hasUpperFloor,
+  upperFloorFact,
+  venueClosedReason,
+  venueOpenAt,
+  withUpperFloor,
   guestMoment,
   pointAlongPath,
   venuePath,
@@ -256,6 +262,46 @@ check(guestMoment(cafe, seat, visitEnd + 5).spot.label === 'auf dem Weg zum Ausg
 const buyer = { ...g1, spot: sitting.spot }
 const buyerFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: buyer, figures: pair, playerPos: cafe.start, arrivalPoint: true, ownOrder: 'Mahlzeit' })
 check(buyerFacts.includes('Du hast hier vor kurzem selbst bestellt und bezahlt: Mahlzeit') && !buyerFacts.some(f => /nichts bestellt|nichts ausgeschenkt/.test(f)), 'a guest who bought knows it and does not claim nothing is served')
+
+// ── Öffnungszeiten ──────────────────────────────────────────────────────────
+check(venueOpenAt('cafe', 6) && venueOpenAt('cafe', 19) && !venueOpenAt('cafe', 20) && !venueOpenAt('cafe', 5), 'cafe: open through the day')
+check(venueOpenAt('bar', 17) && venueOpenAt('bar', 23) && venueOpenAt('bar', 1) && !venueOpenAt('bar', 2) && !venueOpenAt('bar', 12), 'bar: open through the night, across midnight')
+check(venueOpenAt('restaurant', 11) && !venueOpenAt('restaurant', 23) && venueOpenAt('cafe', 30), 'hours repeat every day')
+check(venueService(cafe, lonely, 12) === 'staffed' && venueService(cafe, lonely, 3) === 'closed' && venueClosedReason(cafe, lonely, 3) === 'hours', 'a staffed cafe is closed at night – because of the hour')
+check(venueService(cafe, [], 3) === 'self-service', 'a self-service cafe has no closing time')
+check(venueClosedReason(VENUE_LAYOUTS.bar, [], 20) === 'no-staff' && venueClosedReason(cafe, lonely, 12) === null, 'a bar without staff is closed for lack of staff, even in the evening')
+check(venueService(cafe, lonely) === 'staffed' && venueService(cafe, lonely, null) === 'staffed', 'without a clock no hours apply')
+const noonFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: lonely[0], figures: lonely, playerPos: cafe.start, arrivalPoint: true, hour: 12 })
+check(noonFacts[0] === 'Ihr befindet euch im Café Sol; es ist etwa 12 Uhr, geöffnet ist von 6 bis 20 Uhr', 'everyone in the room knows the time and the opening hours')
+check(venueConversationFacts({ layout: restaurant, buildingName: 'x'.repeat(90), self: brigade[0], figures: brigade, playerPos: restaurant.start, arrivalPoint: false, hour: 22 })[0].length <= MAX_CONVERSATION_FACT_CHARS, 'the clock never pushes the first fact over the limit')
+
+// ── Obergeschoss ────────────────────────────────────────────────────────────
+check(!hasUpperFloor(null) && !hasUpperFloor({ homes: 0, guestRooms: 0 }) && hasUpperFloor({ homes: 2, guestRooms: 0 }), 'an upper floor exists only if the building data say so')
+for (const kind of kinds) {
+  const upper = withUpperFloor(VENUE_LAYOUTS[kind])
+  const stairs = upper.furniture.find(item => item.kind === 'stairs')!
+  check(Boolean(stairs) && !VENUE_LAYOUTS[kind].furniture.some(item => item.kind === 'stairs'), kind + ': stairs appear only in the variant with an upper floor')
+  check(upper.furniture.filter(item => item !== stairs && item.kind !== 'pass').every(item => !overlaps(item, stairs)), kind + ': the stairs stand clear of the furniture')
+  check(reachable(upper, upper.servicePoint, 12) && upper.spots.filter(spot => spot.kind === 'seat').every(spot => reachable(upper, spot, VENUE_PLAYER_RADIUS + 26)), kind + ': with stairs every seat and the counter stay reachable')
+  check(withUpperFloor(VENUE_LAYOUTS[kind]) === upper, kind + ': the variant is built once')
+}
+const flat = { homes: 2, guestRooms: 0 }, hotel = { homes: 0, guestRooms: 8 }
+const staffFlat = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: lonely[0], figures: lonely, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu, playerOrders: ['Kuchen'], upper: flat, hour: 12 })
+check(staffFlat.includes(upperFloorFact(flat, true)) && !staffFlat.includes(cafe.staffBackFact), 'staff knows about the flat above')
+check(staffFlat.length === MAX_CONVERSATION_FACTS && staffFlat.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'upper floor and clock keep the staff facts within the limit')
+const guestFlat = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true, upper: flat })
+check(guestFlat.includes('In der Ecke führt eine Treppe nach oben; sie ist privat, was oben ist, weißt du nicht'), 'a guest sees the stairs and nothing more')
+check(upperFloorFact(hotel, true).includes('8 Gästezimmer') && upperFloorFact(hotel, true).includes('keine Übernachtungsgäste') && upperFloorFact(hotel, true).length <= MAX_CONVERSATION_FACT_CHARS, 'hotel staff knows the rooms and does not pretend to let them yet')
+
+// ── Mitbekommenes ───────────────────────────────────────────────────────────
+const heard = venueHearsay({ guestsToday: 3, hoursSinceLastGuest: 2.2, builds: [{ name: 'Fabrik', distanceM: 820, bearingDeg: 90 }], conflicts: 2, assistances: 1, jobSeekers: 4 })
+check(heard[0] === 'Selbst gesehen: Seit gestern waren drei Gäste hier; der letzte vor etwa zwei Stunden', 'own observation: guests of the day')
+check(heard.includes('Gehört: Am Ort wird gebaut – Fabrik, ca. 800 m östlich') && heard.includes('Gehört: Vier Leute am Ort suchen Arbeit'), 'hearsay: building site and job seekers')
+check(heard.includes('Gehört: Seit gestern gab es am Ort zweimal Streit; wer beteiligt war, weißt du nicht'), 'hearsay about a conflict names nobody')
+check(heard.every(line => /^(Selbst gesehen|Gehört): /.test(line) && line.length <= MAX_HEARSAY_CHARS) && heard.length <= MAX_HEARSAY, 'every line says whether it was seen or heard and fits the limit')
+const quiet = venueHearsay({ guestsToday: 0, hoursSinceLastGuest: null, builds: [], conflicts: 0, assistances: 0, jobSeekers: 0 })
+check(quiet.length === 1 && quiet[0].includes('niemand etwas bestellt'), 'a quiet day yields one honest line and no invented rumours')
+check(venueHearsay({ guestsToday: 1, hoursSinceLastGuest: 0.2, builds: [], conflicts: 1, assistances: 0, jobSeekers: 1 }).join('|') === 'Selbst gesehen: Seit gestern war ein Gast hier; der letzte Gast war eben erst da|Gehört: Eine Person am Ort sucht Arbeit|Gehört: Seit gestern gab es am Ort einen Streit; wer beteiligt war, weißt du nicht', 'singular forms')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
