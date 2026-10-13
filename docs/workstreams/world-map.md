@@ -33,12 +33,12 @@ Wie es arbeitet:
 ## Erster Lauf mit echten Daten (Thomas, 13.10.2026)
 
 - Der Kachel-Abruf gegen die Datenbank funktioniert: Sundern erscheint mit Straßen, Flächen, Gewässern und 451 Gebäudeblöcken in 36 Kacheln; die NOXIA-Gebäude (Landeplätze, Solarfelder) stehen an ihrem Ort.
-- Bildrate: 30 Bilder je Sekunde, weit herausgezoomt. Ob das eine Grenze des Bildschirms oder der Zeichenleistung ist, ist offen – als Erstes klären (herangezoomt messen, Bildwiederholrate des Bildschirms prüfen).
+- Bildrate: schwankt zwischen etwa 22 und 60 Bildern je Sekunde, im Mittel um 30. Der Bildschirm begrenzt also nicht – die Zeichenleistung reicht nicht durchgehend. Verdächtig im Prototyp: Jeder Gebäudeblock ist ein eigenes Zeichenobjekt (hier 451), die Reihenfolge aller Objekte wird in jedem Bild neu sortiert, und beim Nachladen wird eine ganze Kachel in einem Bild aufgebaut (Einbrüche beim Laufen). Erst messen, dann ändern.
 - Sichtbar wurde: Weit herausgezoomt reicht der geladene Bereich von 5 × 5 Kacheln nicht bis zum Bildrand. Der Ladebereich muss sich nach dem Zoom richten, oder der Zoom wird begrenzt.
 
 ## Offene Aufgaben
 
-1. Bildrate klären (siehe erster Lauf) und den Ladebereich an den Zoom koppeln. Danach beim Laufen durch Sundern prüfen, ob Straßen und Blöcke an der richtigen Stelle stehen.
+1. Bildrate auf stabile 60 bringen (siehe erster Lauf: messen, wo die Zeit bleibt) und den Ladebereich an den Zoom koppeln. Danach beim Laufen durch Sundern prüfen, ob Straßen und Blöcke an der richtigen Stelle stehen.
 2. Zeichenvorlage für den Baukasten: Blickwinkel (heute 2:1), Fußpunkt, Pixel je Meter und Geschosshöhe festlegen, bevor Blöcke gezeichnet werden. Dann `blocks.ts` von gezeichneten Quadern auf Bilder umstellen.
 3. Kacheln vorab erzeugen und als Dateien ablegen statt bei jedem ersten Abruf aus der Datenbank zu rechnen.
 4. Kollision und Wegenetz (im Prototyp läuft die Figur durch alles hindurch).
