@@ -78,4 +78,40 @@ describe('shared local scene runtime', () => {
     expect(route.distanceM).toBe(5)
     expect(route.points).toHaveLength(2)
   })
+
+  // A real outline: a hall running diagonally across the scene. Its bounding
+  // box is a 60 m square, the hall itself only a 10 m wide strip.
+  const diagonal = buildLocalSurfaceScene({
+    body: 'earth',
+    frameId: 'diagonal',
+    radiusM: 100,
+    paths: [],
+    buildings: [{
+      id: 'hall',
+      center: { xM: 0, yM: 0 },
+      widthM: 60,
+      depthM: 60,
+      rotationDeg: 0,
+      provenance: 'observed',
+      footprint: [{ xM: -30, yM: -23 }, { xM: -23, yM: -30 }, { xM: 30, yM: 23 }, { xM: 23, yM: 30 }],
+    }],
+  })
+
+  it('blocks a building by its outline, not by its bounding box', () => {
+    expect(isLocalScenePointWalkable(diagonal, { xM: 0, yM: 0 })).toBe(false)
+    expect(isLocalScenePointWalkable(diagonal, { xM: 20, yM: -20 })).toBe(true)
+    expect(isLocalScenePointWalkable(diagonal, { xM: -20, yM: 20 })).toBe(true)
+    // close to the wall counts as blocked, a step further does not
+    expect(isLocalScenePointWalkable(diagonal, { xM: 3.9, yM: -3.9 })).toBe(false)
+    expect(isLocalScenePointWalkable(diagonal, { xM: 7, yM: -7 })).toBe(true)
+  })
+
+  it('lets someone who stands inside a building walk out again', () => {
+    const inside = { xM: 0, yM: 0 }
+    const out = resolveLocalSceneStep(diagonal, inside, { xM: 4, yM: -4 })
+    expect(out).toEqual({ xM: 4, yM: -4 })
+    // from walkable ground the wall still stops the step
+    const outside = { xM: 10, yM: -10 }
+    expect(resolveLocalSceneStep(diagonal, outside, { xM: 2, yM: -2 })).not.toEqual({ xM: 2, yM: -2 })
+  })
 })

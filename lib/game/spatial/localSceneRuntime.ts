@@ -259,8 +259,37 @@ export function pointBlockedByBuilding(
   clearanceM = 0.8,
 ) {
   const local = rotateIntoBuilding(point, building)
-  return Math.abs(local.xM) < building.widthM / 2 + clearanceM
+  const inBox = Math.abs(local.xM) < building.widthM / 2 + clearanceM
     && Math.abs(local.yM) < building.depthM / 2 + clearanceM
+  if (!inBox) return false
+  // A real outline blocks only where the building actually stands. Its bounding
+  // box alone would also block the yard of an L-shaped hall and the road beside
+  // a building that runs diagonally across the scene.
+  const outline = building.footprint
+  if (!outline || outline.length < 3) return true
+  return pointInPolygon(point, outline) || distanceToPolygonEdge(point, outline) < clearanceM
+}
+
+function pointInPolygon(point: LocalSurfacePoint, polygon: readonly LocalSurfacePoint[]) {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i], b = polygon[j]
+    if ((a.yM > point.yM) !== (b.yM > point.yM)
+      && point.xM < (b.xM - a.xM) * (point.yM - a.yM) / (b.yM - a.yM) + a.xM) inside = !inside
+  }
+  return inside
+}
+
+function distanceToPolygonEdge(point: LocalSurfacePoint, polygon: readonly LocalSurfacePoint[]) {
+  let best = Infinity
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[j], b = polygon[i]
+    const dx = b.xM - a.xM, dy = b.yM - a.yM
+    const lengthSq = dx * dx + dy * dy
+    const t = lengthSq > 0 ? Math.max(0, Math.min(1, ((point.xM - a.xM) * dx + (point.yM - a.yM) * dy) / lengthSq)) : 0
+    best = Math.min(best, Math.hypot(point.xM - (a.xM + dx * t), point.yM - (a.yM + dy * t)))
+  }
+  return best
 }
 
 export function isLocalScenePointWalkable(scene: LocalSurfaceScene, point: LocalSurfacePoint, clearanceM = 0.8) {
@@ -284,6 +313,11 @@ export function resolveLocalSceneStep(
     yM: Math.max(-scene.radiusM, Math.min(scene.radiusM, desired.yM)),
   }
   if (isLocalScenePointWalkable(scene, clamped, clearanceM)) return clamped
+
+  // Whoever already stands inside a blocked area – after a scene change, a
+  // reload or new building data – must be able to walk out again. Blocking
+  // only applies when entering from walkable ground.
+  if (!isLocalScenePointWalkable(scene, current, clearanceM)) return clamped
 
   const xOnly = { xM: clamped.xM, yM: current.yM }
   if (isLocalScenePointWalkable(scene, xOnly, clearanceM)) return xOnly

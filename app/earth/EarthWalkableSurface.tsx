@@ -155,7 +155,29 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     return()=>{live=false}
   },[data?.ok,data?.localDetail,data?.features,detailRetry,sceneCenter])
   useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/profile',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{const username=String(json?.profile?.username??'').trim();if(live&&username)setPlayerName(username)}).catch(()=>{});return()=>{live=false}},[])
-  useEffect(()=>{let live=true;getSessionInfo().then(({token})=>fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'})).then(response=>response.ok?response.json():null).then(json=>{if(!live)return;setSpatialEntities(Array.isArray(json?.entities)?json.entities:[]);setSpatialBuilds(Array.isArray(json?.builds)?json.builds:[])}).catch(()=>{if(live){setSpatialEntities([]);setSpatialBuilds([])}});return()=>{live=false}},[])
+  // Gebäude am Ort. Ohne sie gibt es keine Ziele und niemand steht an seinem
+  // Arbeitsplatz – deshalb wird ein fehlgeschlagener Abruf wiederholt und gemeldet.
+  const[spatialStatus,setSpatialStatus]=useState<'loading'|'ready'|'failed'>('loading')
+  useEffect(()=>{
+    let live=true,timer:ReturnType<typeof setTimeout>|null=null
+    const load=async(attempt:number)=>{
+      try{
+        const{token}=await getSessionInfo()
+        const response=token?await fetch('/api/game/build/spatial?location=earth',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'}):null
+        const json=response?.ok?await response.json():null
+        if(!live)return
+        if(json&&Array.isArray(json.entities)){
+          setSpatialEntities(json.entities);setSpatialBuilds(Array.isArray(json.builds)?json.builds:[]);setSpatialStatus('ready')
+          return
+        }
+      }catch{/* erneut versuchen */}
+      if(!live)return
+      if(attempt<4)timer=setTimeout(()=>void load(attempt+1),1500*(attempt+1))
+      else setSpatialStatus('failed')
+    }
+    void load(0)
+    return()=>{live=false;if(timer)clearTimeout(timer)}
+  },[])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=80){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
   useEffect(()=>{let live=true;Promise.all([
     fetch('/api/game/world-awareness',{cache:'no-store'}).then(r=>r.ok?r.json():{items:[]}).catch(()=>({items:[]})),
@@ -305,8 +327,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       const atWork=/work|produc|serv|operat/.test(activity)
       const wanted=[atWork?'work':'home',atWork?'home':'work']
       const anchor=wanted.map(type=>resident.assignments.find(item=>item.type===type&&item.tileEntityId)).map(item=>item?buildingTargets.find(target=>target.entity.id===item.tileEntityId):undefined).find(Boolean)
+      // Wer einem Gebäude zugewiesen ist, läuft nicht ersatzweise auf irgendeiner
+      // Straße herum, nur weil das Gebäude hier nicht (oder noch nicht) bekannt ist.
+      if(!anchor&&resident.assignments.some(item=>(item.type==='work'||item.type==='home')&&item.tileEntityId))return[]
       if(anchor){
         if(Math.abs(anchor.xM)>SCENE_RADIUS_M||Math.abs(anchor.yM)>SCENE_RADIUS_M)return[]
+        // Wer arbeitet und dessen Arbeitsplatz betretbar ist, ist drinnen – nicht davor.
+        const worksHere=atWork&&resident.assignments.some(item=>item.type==='work'&&item.tileEntityId===anchor.entity.id)
+        if(worksHere&&getBuildingEntryDefinition(anchor.entity.entity_id))return[]
         const depth=Math.max(8,Number(anchor.entity.footprint_depth_m??14))
         const width=Math.max(8,Number(anchor.entity.footprint_width_m??18))
         const sway=selected?.id===resident.id?0:Math.sin(motionTime*.35+(h%628)/100)*1.2
@@ -346,7 +374,9 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       const travelDistance=action?.type==='lead_walk'
         ? actionElapsed*actionSpeed
         : selectedNpc?0:motionTime*speed
-      const distance=((phase*total)+travelDistance)%total
+      // Hin und zurück statt Sprung an den Anfang: am Ende des Weges kehrt die Person um.
+      const lap=((phase*total)+travelDistance)%(2*total)
+      const distance=lap<=total?lap:2*total-lap
 
       let walked=0
       position=road.points[0]
@@ -651,7 +681,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       <div className="earth-orientation">
         <div><small>DU BIST HIER</small><b>{data.region?.name??'Erde'}</b><span>{player.xM>=0?'+':''}{Math.round(player.xM)} m Ost · {player.yM>=0?'+':''}{Math.round(player.yM)} m Nord vom Szenenzentrum</span></div>
         <label><span>Ziel</span><select value={navigationTargetId} onChange={event=>{setAutoWalkTargetId('');setNavigationTargetId(event.target.value)}}>
-          <option value="">— kein Ziel —</option>
+          <option value="">{spatialStatus==='loading'?'— Ziele werden geladen —':spatialStatus==='failed'?'— Gebäude nicht geladen —':'— kein Ziel —'}</option>
           {navigationTargets.map(target=>{const away=Math.hypot(target.xM-player.xM,target.yM-player.yM);return <option key={target.id} value={target.id}>{target.name}{away>SCENE_RADIUS_M?` · ${(away/1000).toFixed(1).replace('.',',')} km`:''}</option>})}
         </select></label>
         {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
