@@ -51,6 +51,20 @@ Die Breite eines Wandabschnitts ist frei wählbar, solange sie ein Vielfaches vo
 2. In `lib/worldlab/blocks.ts` bei `DRAWN` eintragen, z. B. `house: { wallGround: true, wallUpper: true, roof: true }`.
 3. Fehlt ein Bild, bleibt die Fläche einfarbig wie bisher. Nicht alles muss auf einmal gezeichnet werden.
 
+## Stand der Zeichnungen
+
+Seit 13.10.2026 sind alle fünf Blockarten gezeichnet (je Erdgeschoss, Obergeschoss, Dach) und in `DRAWN` eingetragen. Die Bilder sind errechnet: `python3 scripts/worldlab-blocks.py` erzeugt sie neu nach `public/worldlab/blocks/`. Wer ein Stück von Hand nachzeichnet, übermalt die Datei – ein erneuter Lauf des Skripts überschreibt sie.
+
+| Blockart | Wand | Dach |
+|---|---|---|
+| `house` | Putz, Sprossenfenster mit grünen Läden, Sockel | rote Tonziegel |
+| `row` | Putz, hohe Fenster mit Fasche, Sockel | dunklere Tonziegel |
+| `hall` | Trapezblech, unten Sektionaltor, oben Lichtband | Trapezblech |
+| `church` | Quadermauerwerk, Spitzbogenfenster | Schiefer |
+| `shed` | senkrechte Bretter, kleines Fenster | Dachpappe in Bahnen |
+
+Im Erdgeschoss von `house`, `row`, `church` und `shed` sitzt ein Fenster, keine Tür – Türen kommen als eigenes Stück. Die Halle hat in jedem Abschnitt (6 m) ein Tor.
+
 ## Einzelbilder für besondere Gebäude (später)
 
 Kirche, Bahnhof, das Café oder NOXIA-Gebäude können als ganzes Bild gezeichnet werden, schon schräg. Dafür gilt dieselbe Ansicht bei 16 px je Meter:

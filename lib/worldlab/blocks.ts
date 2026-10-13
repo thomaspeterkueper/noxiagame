@@ -64,7 +64,14 @@ export const TEMPLATE_DIR = '/worldlab/vorlagen'
  * Welche Zeichnungen es gibt. Eine neue Zeichnung: Datei nach ART_DIR legen und
  * hier eintragen, z. B. house: { wallGround: true, roof: true }.
  */
-export const DRAWN: Partial<Record<BlockKind, Partial<Record<keyof BlockArt, true>>>> = {}
+export const DRAWN: Partial<Record<BlockKind, Partial<Record<keyof BlockArt, true>>>> = {
+  // Erzeugt von scripts/worldlab-blocks.py (13.10.2026).
+  house: { wallGround: true, wallUpper: true, roof: true },
+  row: { wallGround: true, wallUpper: true, roof: true },
+  hall: { wallGround: true, wallUpper: true, roof: true },
+  church: { wallGround: true, wallUpper: true, roof: true },
+  shed: { wallGround: true, wallUpper: true, roof: true },
+}
 
 /** Pfade der Bilder für alle Blockarten – aus DRAWN oder, zum Prüfen, die Vorlagen. */
 export function blockArt(source: 'drawn' | 'template'): Partial<Record<BlockKind, BlockArt>> {
