@@ -82,7 +82,14 @@ Der Innenraum kennt jetzt Öffnungszeiten nach Koloniezeit (`VENUE_HOURS` in `li
 - Personal arbeitet in Schichten, die zur Öffnungszeit passen (hängt an Aufgabe 2 und `person_interior_presence`).
 - Zu entscheiden: Das Startcafé neuer Spieler ist nachts geschlossen. Entweder öffnet es durchgehend, oder der Einstieg bekommt einen anderen Ort.
 
-**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** übernommen. Vorschlag: Öffnungszeiten je Gebäudeart als Standard (Tabelle `venue_hours`), überschreibbar je Gebäude durch den Betreiber; `order_hospitality_item` und `run_npc_consumption` prüfen serverseitig. Die Hafenkantine ist rund um die Uhr offen und fängt die Nacht auf. **Zu entscheiden (Thomas):** Startcafé nachts – geschlossen lassen und neue Spieler nachts an die Kantine verweisen, oder durchgehend öffnen? Vorschlag: geschlossen lassen; das Einstiegsgespräch gibt es dann am Morgen.
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** übernommen. Vorschlag: Öffnungszeiten je Gebäudeart als Standard (Tabelle `venue_hours`), überschreibbar je Gebäude durch den Betreiber; `order_hospitality_item` und `run_npc_consumption` prüfen serverseitig. Die Hafenkantine ist rund um die Uhr offen und fängt die Nacht auf.
+
+**Entschieden (Thomas, 13.10.2026): Das Startcafé ist von 23:00 bis 6:00 Uhr geschlossen – nach der echten Ortszeit des Spielers, nicht nach Koloniezeit.** Folgen:
+
+- Für den Spieler gilt seine Uhr: Wer abends um 23:30 Uhr spielt, findet das Startcafé geschlossen und wird zur Hafenkantine verwiesen; ab 6:00 Uhr gibt es das Einstiegsgespräch.
+- Bewohner leben weiter nach Koloniezeit (ein Tick ist eine Stunde). Ihre Käufe im Startcafé richten sich nach den Öffnungszeiten in Koloniezeit. Ein und dasselbe Café kann also für einen Spieler zu und für Bewohner offen sein – wie bei den Bedürfnissen gibt es bewusst zwei Uhren.
+- Die Zeitzone des Spielers fehlt bisher. Vorschlag: `profiles.time_zone` (IANA-Name, z. B. `Europe/Berlin`), beim Anmelden aus dem Browser übernommen und gespeichert; der Server prüft damit in `order_hospitality_item`. Ohne gespeicherte Zone gilt UTC.
+- Gilt vorerst nur für das Startcafé. Ob andere Lokale für Spieler ebenfalls nach Ortszeit öffnen, ist offen.
 
 ### R-5 (Gastronomie, 13.10.2026): Ausgehen nach Tageszeit
 

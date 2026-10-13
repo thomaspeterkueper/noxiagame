@@ -51,6 +51,14 @@ Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port
 - Bilder für `water` und `ration` in `HospitalityItemIcon.tsx`.
 - Später (mit LIVING-0012 Schritt 3): Notration für Spieler, die den billigsten Posten nicht bezahlen können – Knopf am Tresen, serverseitig geprüft.
 
+### G-2 (Bevölkerung und Ökonomie, 13.10.2026): Startcafé nach Ortszeit des Spielers
+
+Entscheidung Thomas, 13.10.2026: Das Startcafé ist von 23:00 bis 6:00 Uhr geschlossen – nach der **echten Ortszeit des Spielers**, nicht nach Koloniezeit (`VENUE_HOURS` in `lib/game/hospitality/venues.ts` rechnet heute in Koloniezeit).
+
+- Innenraum: Für das Startcafé die Uhr des Spielers verwenden (Browser-Zeitzone bzw. künftig `profiles.time_zone`). Geschlossen heißt: kein Personal am Tresen, kein Einstiegsgespräch, Hinweis auf die Hafenkantine, die rund um die Uhr offen ist.
+- Bewohner im Raum folgen weiter der Koloniezeit; das Café kann für Bewohner offen sein, während es für den Spieler zu ist. Darstellung dann: Tür zu, kein Einlass.
+- Serverseitige Prüfung der Bestellung übernimmt Bevölkerung und Ökonomie (Antwort auf R-4).
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.
