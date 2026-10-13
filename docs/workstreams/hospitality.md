@@ -23,6 +23,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Hinsetzen per Klick, „Zum Tresen gehen“, Personal begrüßt am Tresen von sich aus, Gäste setzen sich zum sitzenden Spieler (Branch `feat/hospitality-sit-and-greet`).
 - Hafenkantine betretbar (Request G-1): Zugang vom Hafen, Innenraum mit Automat oder Roboter, feste Antworten, Wasser und Ration mit Bildern (Branch `feat/port-canteen-interior`). Beschreibung: `hospitality-venues.md` Abschnitt 1a.
 - Kantinenschwarm mit Gedächtnis aus echten Bestellungen, stummer Automat; Startcafé 23–6 Uhr nach Ortszeit des Spielers geschlossen (Branch `feat/canteen-swarm-and-local-hours`).
+- Hotel: Lobby mit Empfang, Zimmer buchen als Posten `room_night` über die Bestellroute, Belegung aus echten Buchungen, Gebäudeansicht (Branch `feat/hotel-rooms`). Beschreibung: `hospitality-venues.md` Abschnitt 1b.
 
 ## Gestellte Requests
 
@@ -32,7 +33,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - R-4 an Bevölkerung und Ökonomie: Öffnungszeiten als Gebäudedaten; Bewohner kaufen und Personal arbeitet nur in dieser Zeit.
 - R-5 an Bevölkerung und Ökonomie: Ausgehen nach Tageszeit.
 - R-6 an Bevölkerung und Ökonomie: Wohnen über dem Lokal.
-- R-7 an Bevölkerung und Ökonomie: Hotel und Gästezimmer.
+- R-7 an Bevölkerung und Ökonomie: Hotel und Gästezimmer – Nachtrag 13.10.2026: Gebäudeart `hotel`, Kartenzeile `room_night`, Belegungsprüfung im Server.
 - R-8 an Bevölkerung und Ökonomie: Gerüchte als Wissen der Personen, Auskunft kaufen und verkaufen.
 - R-9 an Bevölkerung und Ökonomie: Lehren aus SunDog – sichtbare Bedürfnisbalken, Wirkung von Alkohol, Ware beim Wirt, Bilder als gemeinsamer Bestand.
 - R-10 an Bevölkerung und Ökonomie: echte Angebote als Daten (Stelle auf einem Handelsschiff, Aufträge), damit das Personal sie nennen kann; Einführung auch in anderen Gebäuden.

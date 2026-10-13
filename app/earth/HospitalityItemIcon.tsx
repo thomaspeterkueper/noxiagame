@@ -75,6 +75,13 @@ const ICONS: Record<string, ReactNode> = {
     <path d="M9 14h14v6H9z" fill="#6f5a2b" />
     <path d="M12 16h8M12 18h8" stroke="#d9c58c" strokeWidth="1" />
   </>,
+  // Zimmerschlüssel – ein Zimmer für eine Nacht
+  room_night: <>
+    <circle cx="11" cy="11" r="7" fill="#e8c35a" {...s} />
+    <circle cx="11" cy="11" r="2.5" fill="#6b5a2b" />
+    <path d="M16 16l11 11M23 23l3-3M20 20l3-3" fill="none" stroke={LINE} strokeWidth="3" strokeLinecap="round" />
+    <path d="M16 16l11 11M23 23l3-3M20 20l3-3" fill="none" stroke="#e8c35a" strokeWidth="1.5" strokeLinecap="round" />
+  </>,
   // Dessertglas
   dessert: <>
     <path d="M8 12h16a8 8 0 0 1-16 0z" fill="#dff1ee" {...s} />

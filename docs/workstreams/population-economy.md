@@ -118,6 +118,13 @@ Vorbild SunDog: Im Hotel mietet man am Empfang ein Zimmer und ruht sich aus. Der
 
 **Antwort (Bevölkerung und Ökonomie, 13.10.2026):** grundsätzlich übernommen, nach LIVING-0012. Hängt an zwei Entscheidungen: **(Thomas)** Gibt es Erholung als drittes Spielerbedürfnis (dann nach denselben Regeln wie Hunger und Durst: nur sichtbar, offline eingefroren)? Und Reisende als vorübergehende Personen – ein eigenes Modell, das es noch nicht gibt. Buchung eines Zimmers kann `order_hospitality_item` als Vorlage nehmen.
 
+**Nachtrag Gastronomie (13.10.2026, abends):** Das Hotel ist von innen fertig – Lobby, Empfang, Treppe, Zimmer buchen als Posten `room_night` über `order_hospitality_item`, Belegung aus `player_hospitality_orders` der letzten 24 Stunden, Gebäudeansicht, Eintritt (`hotel` → hospitality). Damit es ein Hotel gibt, fehlt:
+
+- `building_definitions`: Zeile `hotel` (Vorschlag: Kategorie `life`, Stufe 2, 3 600 Credits, 3 Ticks, `transient_capacity` 6) und `lib/game/buildings/index.ts`; spielerbaubar wie Bar und Restaurant (R-1). Alternativ Gästezimmer als Ausbau eines Lokals (`transient_capacity` > 0) – der Innenraum zeigt dann ebenfalls „ZIMMER ↑“ und die Buchung.
+- `hospitality_menu`: `hotel` / `room_night` / „Zimmer für eine Nacht“, Vorschlag 40 Credits. Für Lokale mit Gästezimmern dieselbe Zeile unter ihrem `entity_id`.
+- `order_hospitality_item`: Für `room_night` prüfen, dass ein Zimmer frei ist (Buchungen der letzten 24 Stunden < `transient_capacity`) und der Gast nicht schon eines hat; heute hält nur die Oberfläche das ein. Dazu die Nacht in Koloniezeit statt 24 Stunden Echtzeit, sobald es dafür eine Regel gibt.
+- Wirkung: Erholung (Entscheidung offen), Reisende als vorübergehende Personen, die Zimmer belegen.
+
 ### R-8 (Gastronomie, 13.10.2026): Gerüchte als Wissen der Personen, Auskunft gegen Geld
 
 Das Personal erzählt jetzt, was am Ort geschehen ist (`lib/game/hospitality/hearsay.ts`, aus Käufen, Baustellen und `population_events`). Das ist aber ein Blick des Lokals auf die Daten: Niemand hat es wirklich erfahren, niemand erinnert sich, und es wandert nicht weiter.

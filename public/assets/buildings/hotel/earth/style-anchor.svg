@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <defs>
+    <linearGradient id="roof" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d8d3c4"/><stop offset="1" stop-color="#9f9a8a"/></linearGradient>
+    <linearGradient id="wallL" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f3e9d6"/><stop offset="1" stop-color="#d7c9ae"/></linearGradient>
+    <linearGradient id="wallR" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e4d8c2"/><stop offset="1" stop-color="#c5b597"/></linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff2c6"/><stop offset="1" stop-color="#f0c063"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity=".26"/></filter>
+  </defs>
+  <g filter="url(#shadow)" transform="translate(48 40)">
+<path d="M96.0 587.0 340.0 858.0 668.0 585.0 380.0 454.0Z" fill="#7d7460" opacity=".22"/>
+<path d="M96.0 297.0 380.0 164.0 624.0 295.0 340.0 428.0Z" fill="url(#roof)" stroke="#3f4a42" stroke-width="5"/>
+<path d="M96.0 297.0 340.0 428.0 340.0 678.0 96.0 547.0Z" fill="url(#wallL)" stroke="#3f4a42" stroke-width="5"/>
+<path d="M340.0 428.0 624.0 295.0 624.0 545.0 340.0 678.0Z" fill="url(#wallR)" stroke="#3f4a42" stroke-width="5"/>
+<path d="M340.0 204.0 410.0 170.0 480.0 206.0 410.0 240.0Z" fill="#8f8a7a" stroke="#3f4a42" stroke-width="4"/>
+<path d="M96.0 380.3 340.0 511.3 340.0 517.3 96.0 386.3Z" fill="#b8a98c" opacity=".7"/>
+<path d="M340.0 511.3 624.0 378.3 624.0 384.3 340.0 517.3Z" fill="#a59577" opacity=".7"/>
+<path d="M96.0 463.7 340.0 594.7 340.0 600.7 96.0 469.7Z" fill="#b8a98c" opacity=".7"/>
+<path d="M340.0 594.7 624.0 461.7 624.0 467.7 340.0 600.7Z" fill="#a59577" opacity=".7"/>
+<path d="M120.4 332.1 154.6 350.4 154.6 396.4 120.4 378.1Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M174.1 360.9 208.2 379.3 208.2 425.3 174.1 406.9Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M227.8 389.7 261.9 408.1 261.9 454.1 227.8 435.7Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M281.4 418.6 315.6 436.9 315.6 482.9 281.4 464.6Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M368.4 436.7 408.2 418.1 408.2 464.1 368.4 482.7Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M430.9 407.4 470.6 388.8 470.6 434.8 430.9 453.4Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M493.4 378.2 533.1 359.6 533.1 405.6 493.4 424.2Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M555.8 348.9 595.6 330.3 595.6 376.3 555.8 394.9Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M120.4 415.4 154.6 433.8 154.6 479.8 120.4 461.4Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M174.1 444.3 208.2 462.6 208.2 508.6 174.1 490.3Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M227.8 473.1 261.9 491.4 261.9 537.4 227.8 519.1Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M281.4 501.9 315.6 520.2 315.6 566.2 281.4 547.9Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M368.4 520.0 408.2 501.4 408.2 547.4 368.4 566.0Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M430.9 490.8 470.6 472.2 470.6 518.2 430.9 536.8Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M493.4 461.5 533.1 442.9 533.1 488.9 493.4 507.5Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M555.8 432.3 595.6 413.6 595.6 459.6 555.8 478.3Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M120.4 498.8 154.6 517.1 154.6 563.1 120.4 544.8Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M281.4 585.2 315.6 603.6 315.6 649.6 281.4 631.2Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M368.4 603.4 408.2 584.7 408.2 630.7 368.4 649.4Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M430.9 574.1 470.6 555.5 470.6 601.5 430.9 620.1Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M493.4 544.8 533.1 526.2 533.1 572.2 493.4 590.8Z" fill="url(#glow)" stroke="#3f4a42" stroke-width="3"/>
+<path d="M555.8 515.6 595.6 497.0 595.6 543.0 555.8 561.6Z" fill="#8fb0bd" stroke="#3f4a42" stroke-width="3"/>
+<path d="M169.2 516.3 247.3 558.2 247.3 628.2 169.2 586.3Z" fill="#3b4a52" stroke="#3f4a42" stroke-width="4"/>
+<path d="M169.2 534.3 247.3 576.2 247.3 624.2 169.2 582.3Z" fill="url(#glow)" opacity=".85"/>
+<path d="M143.2 498.3 273.3 540.2 247.3 558.2 169.2 516.3Z" fill="#8c2f2a" stroke="#3f4a42" stroke-width="4"/>
+<path d="M159.4 341.1 276.6 403.9 276.6 363.9 159.4 301.1Z" fill="#1f2a2e" stroke="#3f4a42" stroke-width="4"/>
+<text x="218.0" y="358.5" transform="rotate(28.2 218.0 358.5)" text-anchor="middle" font-family="monospace" font-weight="700" font-size="30" fill="#f3d37a" letter-spacing="6">HOTEL</text>
+  </g>
+</svg>

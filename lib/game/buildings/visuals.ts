@@ -36,6 +36,9 @@ export const BUILDING_VISUALS: Record<string, Record<string, BuildingVisualProfi
   restaurant: {
     earth: profile('restaurant/earth/style-anchor.svg', 'earth', 1.7, 'Restaurant: helle Fassade, große Fenster, grün-weiße Markise, Terrasse mit drei Tischen, Kräuterdach, Hängeschild mit Teller.'),
   },
+  hotel: {
+    earth: profile('hotel/earth/style-anchor.svg', 'earth', 1.9, 'Dreigeschossiges Hotel: sandfarbene Fassade, drei Fensterreihen, rotes Vordach über dem Eingang, dunkles Schild „HOTEL“ mit gelben Lettern.'),
+  },
   residential_block: {
     mars: profile('residential_block/mars/style-anchor.svg', 'mars', 1.55, 'Mars-Wohnblock als druckbeaufschlagter Langbau.'),
     earth: profile('habitat/earth/style-anchor.svg', 'earth', 1.85, 'Earth residential block currently reuses the habitat visual language until its own anchor exists.'),

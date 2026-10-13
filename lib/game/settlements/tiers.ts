@@ -38,6 +38,8 @@ export const SOCIAL_INFRASTRUCTURE: Record<string, SocialInfrastructureKind> = {
   // Restaurants sind zusätzliche Einrichtungen: Begegnungsort, aber weder
   // Startpunkt noch Erfüllung der Standardausstattung.
   restaurant: { arrivalPoint: false, hostsConversation: true },
+  // Hotel: Zimmer am Empfang, Lobby als Treffpunkt für Reisende.
+  hotel: { arrivalPoint: false, hostsConversation: true },
   // Das handgebaute Q1-Modul erfüllt die Stufe, ist aber kein Startpunkt.
   q1_everyday_life: { arrivalPoint: false, hostsConversation: false },
 }

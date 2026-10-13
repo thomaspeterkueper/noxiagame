@@ -22,6 +22,11 @@ import {
   upperFloorFact,
   venueClosedReason,
   venueOpenAt,
+  venueHoursText,
+  roomsFact,
+  roomsFree,
+  canBookRoom,
+  ROOM_ITEM_CODE,
   venueHoursFor,
   clockLabel,
   withUpperFloor,
@@ -45,7 +50,7 @@ import {
 let failures = 0
 const check = (ok: boolean, label: string) => { if (!ok) { failures++; console.error('FAIL: ' + label) } }
 
-const kinds: VenueKind[] = ['cafe', 'bar', 'restaurant']
+const kinds: VenueKind[] = ['cafe', 'bar', 'restaurant', 'hotel']
 
 // ── Zuordnung ───────────────────────────────────────────────────────────────
 check(venueKindForBuildingType('cafe') === 'cafe' && venueKindForBuildingType('café') === 'cafe', 'cafe ids map to cafe')
@@ -286,6 +291,7 @@ check(venueConversationFacts({ layout: restaurant, buildingName: 'x'.repeat(90),
 // ── Obergeschoss ────────────────────────────────────────────────────────────
 check(!hasUpperFloor(null) && !hasUpperFloor({ homes: 0, guestRooms: 0 }) && hasUpperFloor({ homes: 2, guestRooms: 0 }), 'an upper floor exists only if the building data say so')
 for (const kind of kinds) {
+  if (kind === 'hotel') continue // das Hotel hat seine Treppe von Anfang an
   const upper = withUpperFloor(VENUE_LAYOUTS[kind])
   const stairs = upper.furniture.find(item => item.kind === 'stairs')!
   check(Boolean(stairs) && !VENUE_LAYOUTS[kind].furniture.some(item => item.kind === 'stairs'), kind + ': stairs appear only in the variant with an upper floor')
@@ -341,6 +347,19 @@ check(arrival.clock === 'player' && arrival.open === 6 && arrival.close === 23 &
 check(venueOpenAt('cafe', 22, arrival) && !venueOpenAt('cafe', 22) && !venueOpenAt('cafe', 23.5, arrival) && venueOpenAt('cafe', 6, arrival), 'at 22 the arrival café is open while a normal café is closed; 23–6 it is closed')
 check(venueService(cafe, pair, 23, arrival) === 'closed' && venueService(cafe, pair, 23) === 'closed' && venueService(cafe, pair, 22, arrival) === 'staffed', 'the service follows the hours handed in')
 check(clockLabel(arrival) === 'deiner Ortszeit' && clockLabel(plain) === 'Koloniezeit', 'the player is told which clock applies')
+
+// ── Hotel und Zimmer ────────────────────────────────────────────────────────
+const hotelLayout = VENUE_LAYOUTS.hotel
+check(venueKindForBuildingType('hotel') === 'hotel' && hotelLayout.furniture.some(item => item.kind === 'stairs') && withUpperFloor(hotelLayout) === hotelLayout, 'the hotel has its stairs from the start and gets no second one')
+check(venueOpenAt('hotel', 3) && venueOpenAt('hotel', 23.9) && venueHoursText('hotel') === 'rund um die Uhr', 'the reception never closes')
+const free = { capacity: 4, occupied: 1, mineForS: null }, full = { capacity: 4, occupied: 4, mineForS: null }, mine = { capacity: 4, occupied: 2, mineForS: 5 * 3600 }
+check(roomsFree(free) === 3 && canBookRoom(free) && !canBookRoom(full) && !canBookRoom(mine) && !canBookRoom(null), 'booking needs a free room and no room of one\'s own')
+check(roomsFact(free, true) === 'Oben gibt es 4 Gästezimmer, davon 3 frei; gebucht wird am Empfang' && roomsFact(full, true).includes('keins frei'), 'staff knows the rooms')
+check(roomsFact(mine, false) === 'Oben gibt es Gästezimmer; wie viele frei sind, weißt du nicht; dein Gegenüber hat hier ein Zimmer, noch etwa 5 Stunden', 'a guest sees the stairs and the player\'s key, not the books')
+const hotelStaff = placeVenueFigures(hotelLayout, [{ id: 'r', worksHere: true }])
+const hotelFacts = venueConversationFacts({ layout: hotelLayout, buildingName: 'Hotel Sol', self: hotelStaff[0], figures: hotelStaff, playerPos: hotelLayout.servicePoint, arrivalPoint: false, menu: [{ label: 'Zimmer für eine Nacht', priceCredits: 40 }], rooms: free, upper: { homes: 0, guestRooms: 4 } })
+check(hotelFacts.includes(roomsFact(free, true)) && !hotelFacts.includes(upperFloorFact({ homes: 0, guestRooms: 4 }, true)) && hotelFacts.length <= MAX_CONVERSATION_FACTS, 'with room data the rooms fact replaces the upper-floor fact')
+check(ROOM_ITEM_CODE === 'room_night', 'the room is a menu item')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
