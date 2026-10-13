@@ -16,7 +16,7 @@ export interface SourceFeature {
 }
 
 export type RoadClass = 'main' | 'street' | 'path'
-export type AreaKind = 'water' | 'forest' | 'field' | 'built' | 'grounds' | 'track' | 'pitch'
+export type AreaKind = 'water' | 'forest' | 'field' | 'built' | 'garden' | 'grounds' | 'track' | 'pitch'
 export type BlockKind = 'house' | 'row' | 'hall' | 'church' | 'shed'
 
 export interface TileRoad { c: RoadClass; p: number[] }
@@ -45,6 +45,12 @@ const AREA_KIND: Record<string, AreaKind> = {
 
 /** Sportflächen: Anlage (Stadion, Sportzentrum), Laufbahn, Spielfeld. */
 function areaKind(featureType: string, properties: Record<string, unknown>): AreaKind | undefined {
+  const tag = String(properties.visual_class ?? properties.landuse ?? properties.leisure ?? properties.natural ?? '')
+  // Gärten: Wohngebiete bestehen in Wirklichkeit großteils aus Gärten, OSM trägt
+  // sie aber nicht einzeln ein. Gewerbe, Handel und Industrie bleiben „bebaut“.
+  if (featureType === 'urban') return tag === 'commercial' || tag === 'retail' ? 'built' : 'garden'
+  // Parks und Rasen sind Gärten, kein Wald; Gebüsch, Heide, Feuchtgebiet bleiben dunkel.
+  if (featureType === 'vegetation' && /^(park|grass|grassland|village_green|recreation_ground)$/.test(tag)) return 'garden'
   if (featureType !== 'sport') return AREA_KIND[featureType]
   const leisure = String(properties.visual_class ?? properties.leisure ?? '')
   return leisure === 'track' ? 'track' : leisure === 'stadium' || leisure === 'sports_centre' ? 'grounds' : 'pitch'
@@ -219,9 +225,9 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       if (clipped.length >= 4) out.areas.push({ k: areaKind(feature.featureType, properties) as AreaKind, p: flat(clipped) })
     }
   }
-  // Feste Reihenfolge: Felder unten, dann bebaute Fläche, Wald, Sportanlage,
+  // Feste Reihenfolge: Felder unten, dann Gärten und bebaute Fläche, Wald, Sportanlage,
   // Laufbahn, Spielfeld, Wasser zuoberst.
-  const order: Record<AreaKind, number> = { field: 0, built: 1, forest: 2, grounds: 3, track: 4, pitch: 5, water: 6 }
+  const order: Record<AreaKind, number> = { field: 0, garden: 1, built: 1, forest: 2, grounds: 3, track: 4, pitch: 5, water: 6 }
   out.areas.sort((a, b) => order[a.k] - order[b.k])
   const roadOrder: Record<RoadClass, number> = { path: 0, street: 1, main: 2 }
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])

@@ -109,6 +109,16 @@ describe('world lab: simplification', () => {
     expect(cut.map(p => p.x).sort((a, b) => a - b)).toEqual([0, 0, 0, 10, 10])
   })
 
+  it('draws residential areas and parks as gardens, commerce and industry as built', () => {
+    const square = polygon([[10, 10], [60, 10], [60, 60], [10, 60], [10, 10]])
+    const kinds = (type: string, props: Record<string, unknown>) => buildTile([{ id: 'a', featureType: type, geometry: square, properties: props }], tile, TILE_Z).areas.map(area => area.k)
+    expect(kinds('urban', { visual_class: 'residential' })).toEqual(['garden'])
+    expect(kinds('urban', { visual_class: 'retail' })).toEqual(['built'])
+    expect(kinds('industrial', { visual_class: 'industrial' })).toEqual(['built'])
+    expect(kinds('vegetation', { visual_class: 'park' })).toEqual(['garden'])
+    expect(kinds('vegetation', { visual_class: 'scrub' })).toEqual(['forest'])
+  })
+
   it('stays small', () => {
     expect(JSON.stringify(built).length).toBeLessThan(900)
   })

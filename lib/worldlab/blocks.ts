@@ -28,7 +28,7 @@ export const BLOCK_STYLES: Record<BlockKind, BlockStyle> = {
 
 export const GROUND_COLOR = 0xa9bd8c
 export const AREA_COLORS: Record<AreaKind, number> = {
-  field: 0xbfcf93, built: 0xcfc9b4, forest: 0x6f9a62, water: 0x6fb1d6,
+  field: 0xbfcf93, built: 0xcfc9b4, garden: 0x9fc283, forest: 0x6f9a62, water: 0x6fb1d6,
   grounds: 0xb9c6a0, track: 0xb5654a, pitch: 0x5f9e4c,
 }
 /** Randlinie für Flächen, die eine haben (Spielfeld: helle Markierung). */
