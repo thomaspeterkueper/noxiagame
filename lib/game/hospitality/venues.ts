@@ -604,6 +604,49 @@ export function guestMoment(layout: VenueLayout, seat: VenueSpot, ageSeconds: nu
   return { phase, point: phase === 'leaving' ? pointAlongPath(venuePath(layout, seat, layout.exit), progress) : layout.exit, spot: exitSpot, served: false }
 }
 
+// ── Hinsetzen und Dazusetzen ────────────────────────────────────────────────
+/** Freie Sitzplätze im Gastraum: niemand sitzt dort oder ist dorthin unterwegs. */
+export function freeSeats(layout: VenueLayout, figures: readonly VenueFigure[], taken: readonly string[] = []): VenueSpot[] {
+  const used = new Set([...figures.map(figure => figure.spot.id), ...taken])
+  return layout.spots.filter(spot => spot.kind === 'seat' && spot.roomId === layout.playerRoomId && !used.has(spot.id))
+}
+
+/** Der nächste freie Platz von einer Stelle aus. */
+export function nearestFreeSeat(layout: VenueLayout, figures: readonly VenueFigure[], from: VenuePoint): VenueSpot | null {
+  return freeSeats(layout, figures).map(spot => ({ spot, d: Math.hypot(spot.x - from.x, spot.y - from.y) })).sort((a, b) => a.d - b.d)[0]?.spot ?? null
+}
+
+/** Ein freier Platz am selben Tisch (gleiche Ortsangabe) – der nächste zuerst. */
+export function seatBeside(layout: VenueLayout, seat: VenueSpot, figures: readonly VenueFigure[]): VenueSpot | null {
+  return freeSeats(layout, figures, [seat.id]).filter(spot => spot.label === seat.label)
+    .map(spot => ({ spot, d: Math.hypot(spot.x - seat.x, spot.y - seat.y) })).sort((a, b) => a.d - b.d)[0]?.spot ?? null
+}
+
+/**
+ * Setzt sich dieser Gast zu jemandem an den Tisch? Nicht jeder tut es – etwa
+ * jeder zweite, fest je Person, damit es beim Neuladen nicht umspringt.
+ */
+export function likesCompany(personId: string): boolean {
+  let sum = 0
+  for (const char of personId) sum = (sum * 31 + char.charCodeAt(0)) >>> 0
+  return sum % 2 === 0
+}
+
+/**
+ * Kommt ein Gast an den Tisch des Spielers? Nur wer erst nach dem Hinsetzen
+ * des Spielers vom Tresen losgeht, wer Gesellschaft mag und wenn dort frei ist.
+ */
+export function seatForGuest(layout: VenueLayout, own: VenueSpot, guestId: string, ageSeconds: number, player: { seat: VenueSpot; seatedForS: number } | null, figures: readonly VenueFigure[]): { seat: VenueSpot; joined: boolean } {
+  if (!player) return { seat: own, joined: false }
+  const leftCounterAgoS = ageSeconds - VISIT_TIMES.orderS
+  const cameAfter = leftCounterAgoS < player.seatedForS
+  const beside = seatBeside(layout, player.seat, figures.filter(figure => figure.id !== guestId))
+  if (cameAfter && beside && (likesCompany(guestId) || own.id === player.seat.id)) return { seat: beside, joined: true }
+  // Sitzt der Spieler auf dem Platz, der diesem Gast zugedacht war, weicht der Gast aus.
+  if (own.id === player.seat.id) return { seat: freeSeats(layout, figures.filter(figure => figure.id !== guestId), [own.id])[0] ?? own, joined: false }
+  return { seat: own, joined: false }
+}
+
 // ── Wo steht der Spieler? ───────────────────────────────────────────────────
 /** Ortsangabe für den Spieler, wie sie jemand im Raum beschreiben würde. */
 export function describePlayerPosition(layout: VenueLayout, pos: VenuePoint): string {
@@ -666,6 +709,10 @@ export interface ConversationFactsInput {
   /** Alle platzierten Figuren, auch die für den Spieler unsichtbaren. */
   figures: readonly VenueFigure[]
   playerPos: VenuePoint
+  /** Sitzt der Spieler? Dann sein Platz. */
+  playerSeat?: VenueSpot | null
+  /** Hat sich diese Figur eben zum Spieler gesetzt? */
+  joinedPlayer?: boolean
   /** Kommen in diesem Lokal neue Spieler an? Dann kennt das Personal den Einstieg. */
   arrivalPoint: boolean
   /** Die Karte des Lokals. Leer oder weggelassen: hier wird nichts verkauft. */
@@ -729,7 +776,11 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   else facts.push(`Du bist als Gast hier und ${posture} ${self.spot.label}`)
 
   if (seesGuestRoom) {
-    facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
+    const seat = input.playerSeat
+    if (seat) {
+      const together = self.spot.label === seat.label && self.spot.posture === 'sitting'
+      facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
+    } else facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
     facts.push(othersFact(layout, self, input.figures))
   }
   // Mit Obergeschoss tritt die Treppe an die Stelle des Personalbereichs – die
