@@ -20,6 +20,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Öffnungszeiten nach Koloniezeit (Café 6–20, Restaurant 11–23, Bar 17–2), Mitbekommenes fürs Personal aus echten Ereignissen am Ort, Treppe ins Obergeschoss, sobald das Gebäude Wohn- oder Gästeplätze hat (Branch `feat/hospitality-hours-hearsay-upper`). Beschreibung: `hospitality-venues.md` Abschnitte 3 und 4.
 - Karte mit gezeichneten Bildern je Posten statt nur Text, dieselben Bilder im Raum (Branch `feat/hospitality-item-icons`).
 - Einführung je Haus: Das Personal führt Neue in eigenem Ton in die Welt ein – Café seriös, Bar zwielichtig, Restaurant gesellig, Haus mit Gästezimmern auf Sehenswertes aus (Branch `feat/hospitality-introductions`).
+- Hinsetzen per Klick, „Zum Tresen gehen“, Personal begrüßt am Tresen von sich aus, Gäste setzen sich zum sitzenden Spieler (Branch `feat/hospitality-sit-and-greet`).
 
 ## Gestellte Requests
 
@@ -47,6 +48,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 6. Empfang und Lobby fürs Hotel als eigener Innenraum, sobald R-7 entschieden ist.
 
 7. „Auskunft“ als Posten am Tresen (SunDog: Info kaufen und verkaufen), sobald R-8 entschieden ist.
+
+8. Bedienung am Tisch: Personal kommt zum sitzenden Spieler und nimmt die Bestellung auf.
 
 ## Nicht in diesem Teilprojekt
 

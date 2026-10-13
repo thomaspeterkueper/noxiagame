@@ -6,6 +6,11 @@ import { isSocialInfrastructure, arrivalPoints, SOCIAL_HOSPITALITY_EQUIVALENTS }
 import { venueIntroduction, MAX_INTRO_LEADS, MAX_INTRO_LEAD_CHARS, MAX_INTRO_STANCE_CHARS } from './introductions'
 import { venueHearsay, MAX_HEARSAY, MAX_HEARSAY_CHARS } from './hearsay'
 import {
+  freeSeats,
+  nearestFreeSeat,
+  seatBeside,
+  seatForGuest,
+  likesCompany,
   ARRIVAL_ORIENTATION_FACTS,
   MAX_CONVERSATION_FACTS,
   MAX_CONVERSATION_FACT_CHARS,
@@ -309,6 +314,24 @@ const intros = ([['cafe', 0], ['bar', 0], ['restaurant', 0], ['cafe', 6]] as con
 check(new Set(intros.map(entry => entry.stance)).size === 4 && intros[3].style === 'hotel', 'every house introduces newcomers in its own way; guest rooms make it a hotel')
 check(intros.every(entry => entry.stance.length <= MAX_INTRO_STANCE_CHARS && entry.leads.length >= 3 && entry.leads.length <= MAX_INTRO_LEADS && entry.leads.every(lead => lead.length <= MAX_INTRO_LEAD_CHARS)), 'stance and leads fit the limits of the conversation route')
 check(intros.every(entry => !/\d|Stelle frei|sucht (einen|eine)|Kapitän|heißt/.test(entry.leads.join(' '))), 'no lead names a concrete offer, price or person')
+
+// ── Hinsetzen und Dazusetzen ────────────────────────────────────────────────
+for (const kind of kinds) {
+  const room = VENUE_LAYOUTS[kind]
+  const seats = freeSeats(room, [])
+  check(seats.length >= 4 && seats.every(spot => venuePath(room, room.start, spot).length >= 2 && venuePath(room, spot, room.servicePoint).length >= 2), kind + ': the player can walk to every seat and from there to the counter')
+  const mine = nearestFreeSeat(room, [], room.start)!
+  const beside = seatBeside(room, mine, [])
+  check(Boolean(beside) && beside!.id !== mine.id && beside!.label === mine.label, kind + ': there is a second seat at the same table')
+  const liker = ['a', 'b', 'c', 'd', 'e', 'f'].find(likesCompany)!, loner = ['a', 'b', 'c', 'd', 'e', 'f'].find(id => !likesCompany(id))!
+  const far = seats.find(spot => spot.label !== mine.label)!
+  check(seatForGuest(room, far, liker, 100, { seat: mine, seatedForS: 60 }, []).joined && seatForGuest(room, far, liker, 100, { seat: mine, seatedForS: 60 }, []).seat.id === beside!.id, kind + ': a sociable guest who leaves the counter after the player sat down joins the table')
+  check(!seatForGuest(room, far, liker, 400, { seat: mine, seatedForS: 60 }, []).joined, kind + ': a guest already on the way keeps the seat')
+  check(!seatForGuest(room, far, loner, 100, { seat: mine, seatedForS: 60 }, []).joined && !seatForGuest(room, far, liker, 100, null, []).joined, kind + ': nobody joins a standing player, and not everybody joins')
+  check(seatForGuest(room, mine, loner, 400, { seat: mine, seatedForS: 60 }, []).seat.id !== mine.id, kind + ': nobody sits down on the player')
+}
+const seatFact = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: false, playerSeat: { ...g1.spot, id: 'x' }, joinedPlayer: true })
+check(seatFact.some(f => f.startsWith('Dein Gegenüber sitzt ') && f.includes('du hast dich eben dazugesetzt')) && !seatFact.some(f => f.includes('steht gerade')) && seatFact.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'a guest who joined knows that both sit together')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')

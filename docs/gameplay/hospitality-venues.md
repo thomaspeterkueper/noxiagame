@@ -54,6 +54,14 @@ Ein Bewohner, der im Lokal wirklich gekauft hat (`person_consumption_events`), i
 
 Der Gast weiß im Gespräch, was er selbst bestellt hat; andere sehen ihn dort, wo er gerade ist. Nichts davon wird gespeichert – der Raum zeigt nur, was aus echten Käufen folgt. Ohne Kauf erscheint niemand.
 
+### Hinsetzen, zum Tresen gehen, Gesellschaft
+
+- **Laufen per Klick:** „Zum Tresen gehen“ und „An einen Tisch setzen“ führen die Spielfigur um die Möbel herum (`venuePath`); ein Klick auf einen freien Platz setzt sie genau dorthin. WASD bricht den Weg ab und lässt sie aufstehen.
+- **Am Tresen spricht das Personal zuerst:** Tritt der Spieler an den Tresen, begrüßt ihn die nächste Person vom Personal von sich aus – einmal je Besuch (Feld `opening` der Gesprächsroute, höchstens zwei Sätze, im Ton des Hauses). Am Automaten begrüßt niemand.
+- **Jemand setzt sich dazu:** Sitzt der Spieler, kommt ein Gast an seinen Tisch, wenn er erst danach vom Tresen losgeht, dort ein Platz frei ist und er Gesellschaft mag (`seatForGuest`, `likesCompany` – etwa jeder zweite, fest je Person). Der Gast weiß im Gespräch, dass er sich dazugesetzt hat. Das Gespräch beginnt der Spieler.
+- **Nur echte Gäste.** Dazusetzen kann sich nur, wer wirklich gekauft hat. Solange Bewohner selten kaufen (Request R-3), geschieht das selten.
+- Sitzen hat noch keine Wirkung auf den Spieler (Erholung: Requests R-7, R-9), und bestellt wird weiter am Tresen, nicht am Tisch.
+
 ### Lokal ohne Personal
 
 Entscheidung (Thomas, 10.10.2026): Ein Lokal ohne Personal ist geschlossen – oder ein Automatencafé. Den Platzhalter-Wirt gibt es nicht mehr. `venueService` leitet daraus ab:

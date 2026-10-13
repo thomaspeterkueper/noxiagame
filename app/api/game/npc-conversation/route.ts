@@ -81,7 +81,9 @@ export async function POST(request: NextRequest) {
   if (!key) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
 
   const body = await request.json().catch(() => ({}))
-  const player = clean(body.player)
+  // Eröffnung: Die Figur spricht den Spieler von sich aus an (z. B. der Wirt am Tresen).
+  const opening = body.opening === true
+  const player = opening ? '(tritt heran und hat noch nichts gesagt)' : clean(body.player)
   const npcIdRaw = clean(body.npcId, 64)
   const npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
   const perceivedNpcName = clean(body.npcName, 48) || 'Bewohner'
@@ -200,6 +202,7 @@ export async function POST(request: NextRequest) {
     introLeads.length ? `Wege in die Welt, die du kennst und auf deine Art weitergibst:\n- ${introLeads.join('\n- ')}` : '',
     introStance || introLeads.length ? 'Wenn jemand neu wirkt, nach Arbeit, Geld, Zielen oder dem Anfang fragt, gib einen oder zwei dieser Hinweise in deinem Ton – nicht alle auf einmal, und frag nach, was die Person reizt. Dein Ton färbt nur die Art; die Tatsachen bleiben dieselben. Erfinde kein konkretes Angebot: keine bestimmte Stelle, kein bestimmtes Schiff, keinen Auftrag, keinen Preis und keine Person, die etwas anbietet, wenn es nicht in deinen Fakten oder im Mitbekommenen steht.' : '',
     'Über Speisen und Getränke weißt du nur, was in den Fakten steht: Name und Preis. Erfinde keine Eigenschaften dazu – nicht warm oder kalt, frisch, hausgemacht, Sorte, Zutaten oder Zubereitung. Kuchen und Snacks sind nie warm und werden nicht „kalt“. Dränge nicht zur Eile beim Essen.',
+    opening ? 'Dein Gegenüber ist gerade zu dir getreten und hat noch nichts gesagt. Sprich es von dir aus an: eine kurze Begrüßung in deinem Ton und eine offene Frage oder ein Angebot, das zu deinem Platz passt – höchstens zwei Sätze. Tu nicht so, als hätte es schon etwas gesagt oder bestellt.' : '',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',
