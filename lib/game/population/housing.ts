@@ -107,7 +107,7 @@ export interface HousingChoiceInput {
 const TENURE_SECURITY: Record<Tenure, number> = { owned: 1, provided: 0.8, rented: 0.7, hotel: 0.25, none: 0 }
 
 /** How good a housing situation is: the place, the company, what it costs and how secure it is. */
-function housingValue(parts: { supply: number; affinity: number; closeTies: number; burden: number; tenure: Tenure }): number {
+export function housingValue(parts: { supply: number; affinity: number; closeTies: number; burden: number; tenure: Tenure }): number {
   return 0.3 * clamp01(parts.supply) + 0.2 * clamp01(parts.affinity) + 0.1 * Math.min(1, parts.closeTies / 2)
     + 0.25 * TENURE_SECURITY[parts.tenure] - 0.3 * clamp01(parts.burden)
 }
