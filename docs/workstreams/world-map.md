@@ -49,7 +49,7 @@ Gemessen im Prüfaufbau (Chromium ohne Grafikkarte, künstliche Kacheln in Sunde
 - Vorher: Beim Laufen wurden in **jedem Bild alle Ecken** aller Kacheln und Blöcke neu verpackt und hochgeladen (Kamera bewegt die ganze Welt auf dem Prozessor; die Tiefe der Figur ändert sich und erzwingt eine neue Sortierung und einen Neuaufbau aller Objekte). Im Profil: rund 6 ms je Bild allein dafür. Dazu ein Einbruch von über 100 ms, wenn Kacheln in einem Bild aufgebaut werden.
 - Nachher: Kamerabewegung kostet auf dem Prozessor fast nichts; ein Neuaufbau betrifft nur noch den Tiefenstreifen der Figur (wenige Dutzend Blöcke). Im Profil beim Laufen gut 20 ms Rechenzeit in 6 Sekunden statt rund 180 ms. Der Kachelaufbau ist auf mehrere Bilder verteilt.
 
-Noch nicht gemessen: dasselbe auf Thomas' Rechner mit echter Grafikkarte und echten Daten.
+Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder je Sekunde, für Thomas ausreichend. Lage geprüft: Das Metallwerk Sundern (MESU) steht an der richtigen Stelle, das Röhrtalstadion davor ebenfalls – es fehlt aber als Fläche (siehe Aufgabe 8).
 
 ## Offene Aufgaben
 
@@ -60,6 +60,7 @@ Noch nicht gemessen: dasselbe auf Thomas' Rechner mit echter Grafikkarte und ech
 5. Personen, Ansprechen, „Gehe hin“, Betreten von Gebäuden – erst wenn die Darstellung trägt.
 6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
 7. Datenlücke: Echte Gebäudeumrisse gibt es bisher nur an einzelnen Stellen (Sundern Mitte und drei kleine Ausschnitte). Außerhalb zeigt die Karte Straßen und Flächen, aber keine Blöcke.
+8. Sportplätze fehlen: Der Import (`scripts/import-earth-region.mjs`) übernimmt keine Sportflächen (`leisure=pitch|stadium|track|sports_centre`). Das Röhrtalstadion erscheint deshalb als beige Wohnfläche. Vorschlag: fünfte Flächenart „Sportplatz“ (Rasen mit hellen Linien, Laufbahn rotbraun) in `simplify.ts` und `blocks.ts`, danach Sundern neu importieren. Der Import braucht Zugang zu Overpass und läuft deshalb nicht aus der Claude-Umgebung.
 
 ## Nicht in diesem Teilprojekt
 
