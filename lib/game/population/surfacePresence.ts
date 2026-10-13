@@ -39,9 +39,16 @@ export async function projectSurfacePresence(supabase:SupabaseLike,tick:number,p
   if(existingError)throw existingError
   const existingByPerson=new Map((existing??[]).map((row:any)=>[row.person_id,row]))
 
-  const keep=new Set<string>()
+  // Active travel owns its route position; building assignments must not override it.
+  const {data:activeTravel,error:travelError}=ids.length
+    ? await supabase.from('person_travel_state').select('person_id').in('person_id',ids).eq('status','active')
+    : {data:[],error:null}
+  if(travelError)throw travelError
+  const travelling=new Set<string>((activeTravel??[]).map((row:any):string=>String(row.person_id)))
+  const keep=new Set<string>(travelling)
   const upserts:any[]=[]
   for(const candidate of candidates){
+    if(travelling.has(candidate.person.id))continue
     const tile:any=tileById.get(candidate.tileEntityId)
     if(!tile)continue
     // A building anchor is coarse but authoritative enough for local discovery.
