@@ -28,11 +28,17 @@ Wie es arbeitet:
 ## Geprüft und nicht geprüft
 
 - Geprüft: Kachelmathematik und Vereinfachung mit Tests; die Ansicht im Browser mit einer künstlichen Stadt (Laden, Laufen über Kachelgrenzen, Zoomen, keine Fehler).
-- **Nicht geprüft:** der Kachel-Abruf gegen die echte Datenbank und die Bildrate auf einer echten Grafikkarte. Der Testbrowser rechnet ohne Grafikkarte und kam nur auf wenige Bilder je Sekunde – das sagt nichts über einen normalen Rechner, belegt aber auch keine 60.
+- Seit dem ersten Lauf belegt: der Kachel-Abruf gegen die echte Datenbank. Noch offen: ob 60 Bilder je Sekunde erreichbar sind.
+
+## Erster Lauf mit echten Daten (Thomas, 13.10.2026)
+
+- Der Kachel-Abruf gegen die Datenbank funktioniert: Sundern erscheint mit Straßen, Flächen, Gewässern und 451 Gebäudeblöcken in 36 Kacheln; die NOXIA-Gebäude (Landeplätze, Solarfelder) stehen an ihrem Ort.
+- Bildrate: 30 Bilder je Sekunde, weit herausgezoomt. Ob das eine Grenze des Bildschirms oder der Zeichenleistung ist, ist offen – als Erstes klären (herangezoomt messen, Bildwiederholrate des Bildschirms prüfen).
+- Sichtbar wurde: Weit herausgezoomt reicht der geladene Bereich von 5 × 5 Kacheln nicht bis zum Bildrand. Der Ladebereich muss sich nach dem Zoom richten, oder der Zoom wird begrenzt.
 
 ## Offene Aufgaben
 
-1. Im Browser prüfen: `/world-lab` öffnen, durch Sundern laufen. Stimmt die Bildrate, laden die Kacheln, stehen Straßen und Blöcke an der richtigen Stelle?
+1. Bildrate klären (siehe erster Lauf) und den Ladebereich an den Zoom koppeln. Danach beim Laufen durch Sundern prüfen, ob Straßen und Blöcke an der richtigen Stelle stehen.
 2. Zeichenvorlage für den Baukasten: Blickwinkel (heute 2:1), Fußpunkt, Pixel je Meter und Geschosshöhe festlegen, bevor Blöcke gezeichnet werden. Dann `blocks.ts` von gezeichneten Quadern auf Bilder umstellen.
 3. Kacheln vorab erzeugen und als Dateien ablegen statt bei jedem ersten Abruf aus der Datenbank zu rechnen.
 4. Kollision und Wegenetz (im Prototyp läuft die Figur durch alles hindurch).
