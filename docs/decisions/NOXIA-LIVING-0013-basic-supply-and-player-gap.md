@@ -77,8 +77,10 @@ Entschieden am 13.10.2026: Kantine überall, auch neben Lokalen; sie bleibt best
 
 Entschieden am 13.10.2026 (Thomas): Die Kantine hat kein menschliches Personal. Kleine Kantinen haben nur einen Automaten; größere werden von einem oder mehreren humanoiden Robotern bedient – Robotern, wie sie in etwa 50 Jahren gebaut werden. Diese sind vernetzt, erinnern sich und haben ein Schwarmbewusstsein. Siehe Abschnitt „Bedienung“.
 
-1. Reichweite des Schwarms: ein Schwarm je Kolonie bzw. Station, oder ein gemeinsamer Schwarm über alle Häfen, der über Funk mit Lichtlaufzeit abgleicht (Erde–Mars je nach Stellung etwa 3 bis 22 Minuten)? Vorschlag: ein Netz über alle Häfen, Abgleich mit Verzögerung – dann weiß der Schwarm auf dem Mars erst nach Minuten, was auf der Erde geschah, und Spieler können das merken.
-2. Was weiß der Schwarm? Vorschlag unten: nur, was die Roboter selbst wahrgenommen haben.
+Entschieden am 13.10.2026 (Thomas): **mehrere Schwärme**, nicht ein gemeinsames Netz über alle Häfen.
+
+1. Grenze eines Schwarms: Vorschlag – ein Schwarm je Kolonie bzw. Station. Zwei Kantinen am selben Ort teilen ihn; Phobos und Mars haben verschiedene.
+2. Austausch zwischen Schwärmen: Vorschlag – keiner von selbst. Was ein Schwarm vom anderen weiß, kommt über Reisende, Fracht und Nachrichten mit Laufzeit (Anschluss an R-8), nicht über eine Leitung.
 
 ## Bedienung: Automat oder Roboter
 
@@ -91,10 +93,10 @@ Entschieden am 13.10.2026 (Thomas): Die Kantine hat kein menschliches Personal. 
 
 - **Keine Bewohner, keine Stelle, kein Lohn.** Die Roboter sind Ausstattung der Kantine, keine Personen in `people`; sie haben keine Stimmung, keine Bedürfnisse und keine Beziehungen im Sinne von NOXIA-LIVING-0008.
 - **Plausible Technik:** erkennbar Maschine – Gelenke, Sensorkopf, abwischbare Schalen, Gebrauchsspuren; greifen, reichen aus, sprechen knapp mit synthetischer Stimme. Keine täuschend menschliche Haut, kein Mienenspiel, keine Gefühle.
-- **Vernetzt mit Schwarmbewusstsein:** Alle Kantinenroboter teilen ein Gedächtnis. Was einer gesehen hat, wissen alle im Netz; ein Gast, den ein Roboter auf Phobos bedient hat, wird vom Roboter in Prometheus wiedererkannt. Der Schwarm spricht von sich gern im Plural („Wir haben Sie zuletzt auf Phobos gesehen.“). Mehrere Roboter in einer Kantine sind Körper desselben Schwarms, nicht verschiedene Figuren.
+- **Vernetzt mit Schwarmbewusstsein:** Die Roboter eines Schwarms teilen ein Gedächtnis. Was einer gesehen hat, wissen alle Roboter dieses Schwarms. Es gibt **mehrere Schwärme** (Vorschlag: einer je Kolonie bzw. Station); sie teilen ihr Gedächtnis nicht. Wer auf Phobos bedient wurde, ist für den Schwarm in Prometheus ein Fremder. Der Schwarm spricht von sich gern im Plural („Wir haben Sie hier schon gesehen.“). Mehrere Roboter in einer Kantine sind Körper desselben Schwarms, nicht verschiedene Figuren. Schwärme können sich in Ton und Gewohnheiten unterscheiden – je Ort ein eigener Charakter.
 - **Gedächtnis:** Der Schwarm erinnert sich an Gäste (wer, wann, wo, was bestellt, ob Notration), an Ankünfte und Abflüge, die man vom Hafen aus sieht, und an das, was in seiner Hörweite in der Kantine gesagt wurde. Grundsatz bleibt: Er weiß nur, was er wahrnehmen konnte – kein Zugriff auf Datenbanken der Verwaltung, keine Gedanken von Personen, nichts aus Lokalen, in denen kein Roboter steht.
 - **Gesprächsumfang:** mehr als ein Automat – Karte, Preise, Notration, Weg zum Hafen, dazu was der Schwarm erlebt hat: wer zuletzt angekommen ist, wie viele Notrationen ausgegeben werden, welcher Gast wiederkommt. Sachlich und ohne Klatsch-Ton; Deutungen und Gerüchte bleiben Sache der Menschen im Lokal. So bleibt die Lücke für Spieler: Der Schwarm weiß Tatsachen, das Lokal erzählt Geschichten.
 - **Anschluss an R-8 (Wissen der Personen):** Der Schwarm ist ein eigener Wissensträger im selben Modell wie die Wissensspuren der Bewohner (Quelle, Alter, Verlässlichkeit), mit Quelle „Kantinenschwarm“. Ob er Auskunft gegen Geld gibt oder Wissen an Bewohner weitergibt, wird dort entschieden.
-- **Technisch:** ein Akteur „Kantinenschwarm“ (kein Bewohner), ein gemeinsames Gedächtnis als Ereignisliste (wer, wo, wann, was), abgeleitet aus vorhandenen Ereignissen wie `person_consumption_events`, Bestellungen und Ankünften – nichts wird doppelt gespeichert.
+- **Technisch:** je Schwarm ein Akteur „Kantinenschwarm <Ort>“ (kein Bewohner), ein gemeinsames Gedächtnis als Ereignisliste (wer, wo, wann, was), abgeleitet aus vorhandenen Ereignissen wie `person_consumption_events`, Bestellungen und Ankünften – nichts wird doppelt gespeichert.
 - Vorschlag: Roboter an größeren Häfen und Stationen (Mars / Tharsis Hub, Prometheus Station, Q1, Tharsis Hub Sauerland). Gastronomie entscheidet beim Innenraum.
 - Später möglich: Wartung als Kostenposten der Koloniekasse; Ausfall eines Automaten oder Netzausfall des Schwarms als Ereignis – dann erinnert sich die betroffene Kantine vorübergehend an nichts Neues.
