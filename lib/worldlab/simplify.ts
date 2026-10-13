@@ -145,7 +145,8 @@ export function orientedBox(points: readonly P[]): { x: number; y: number; w: nu
   return { x: best.x, y: best.y, w, d, a }
 }
 
-function blockKind(properties: Record<string, unknown>, w: number, d: number): BlockKind {
+/** Blockart eines Gebäudes aus seinen Kartentags und Grundmaßen (Meter). */
+export function blockKind(properties: Record<string, unknown>, w: number, d: number): BlockKind {
   const tag = String(properties.visual_class ?? properties.building ?? '').toLowerCase()
   const area = w * d
   if (/church|chapel|cathedral|mosque|synagogue|temple/.test(tag) || properties.amenity === 'place_of_worship') return 'church'
