@@ -75,4 +75,12 @@ In einer zurückgerollten Transaktion gegen die Live-Daten: 6 Kantinen in den Ha
 
 Entschieden am 13.10.2026: Kantine überall, auch neben Lokalen; sie bleibt bestehen.
 
-1. Soll die Kantine ein Gesicht bekommen (eine Ausgabekraft als Bewohner mit Stelle), oder bleibt sie Automat und Ausgabe ohne Gespräch?
+Entschieden am 13.10.2026 (Thomas): Die Kantine hat kein menschliches Personal. Sie wird von einem **Automaten oder einem humanoiden Roboter** bedient – einem Roboter, wie er in etwa 50 Jahren gebaut wird, nicht einem Androiden aus der Science-Fiction. Siehe Abschnitt „Bedienung“.
+
+## Bedienung: Automat oder Roboter
+
+- **Kein Bewohner, keine Stelle, kein Lohn.** Der Roboter ist Ausstattung der Kantine, keine Person in `people`. Er hat kein Gedächtnis für Gäste, keine Stimmung, keine Beziehungen und erzählt keine Gerüchte.
+- **Plausible Technik:** erkennbar Maschine – Gelenke, Sensorkopf, abwischbare Schalen, vielleicht Abnutzung; greift, reicht aus, spricht knapp mit synthetischer Stimme. Keine täuschend menschliche Haut, kein Mienenspiel, keine Gefühle. Sinngemäß das, was man aus heutiger Robotik in einem halben Jahrhundert erwarten kann.
+- **Gesprächsumfang:** nur, was ein Ausgaberoboter weiß – Karte, Preise, rund um die Uhr geöffnet, Notration für Mittellose, Weg zum Hafen. Kein freies Gespräch über die Gesprächs-KI. Fragt man mehr, verweist er auf die Verwaltung oder ein Lokal am Ort. Das passt zur Lücke für Spieler: Die Kantine versorgt, aber niemand erzählt dort etwas.
+- **Automat oder Roboter je Ort:** Vorschlag – kleine Häfen (Landeplatz auf Mond, Phobos) ein Automat; größere Häfen und Stationen (Andockmodul, Raumhafen, Q1) ein Roboter. Gastronomie entscheidet beim Innenraum.
+- Später möglich: Wartung des Roboters als Kostenposten der Koloniekasse; ein Ausfall („Automat außer Betrieb“) als Ereignis.

@@ -44,7 +44,7 @@ Ein Request ist eine Bitte eines anderen Teilprojekts an dieses. Erledigtes hier
 Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Sie ist ein Kind-Gebäude des Hafens (`parent_id` + `slot`), keine eigene Kachel. Bewohner essen dort bereits; Spieler sehen sie noch nicht.
 
 - Zugang: vom Hafengebäude aus erreichbar (z. B. „Kantine“ im Hafen), auch nachts – sie ist rund um die Uhr offen.
-- Innenraum: schlicht, Ausgabe und Automat, keine Sitzecke, kein Gespräch (Entscheidung offen, ob es später eine Ausgabekraft gibt). Bestellung über das bestehende `POST /api/game/hospitality/order` mit `tileEntityId` der Kantine; Karte `water` (Wasser, 2) und `ration` (Ration, 6) liegt in `hospitality_menu`.
+- Innenraum: schlicht, Ausgabe, keine Sitzecke. **Bedienung (Entscheidung Thomas, 13.10.2026): ein Automat oder ein humanoider Roboter, wie er in etwa 50 Jahren gebaut wird** – erkennbar Maschine, keine menschliche Haut, kein Mienenspiel, knappe synthetische Stimme. Kein Bewohner, kein Gedächtnis, keine Gerüchte; er weiß nur Karte, Preise, Öffnungszeit und Notration und verweist sonst an Verwaltung oder Lokal. Vorschlag: Automat an kleinen Landeplätzen, Roboter an größeren Häfen und Stationen. Einzelheiten: NOXIA-LIVING-0013 Abschnitt „Bedienung“. Bestellung über das bestehende `POST /api/game/hospitality/order` mit `tileEntityId` der Kantine; Karte `water` (Wasser, 2) und `ration` (Ration, 6) liegt in `hospitality_menu`.
 - Bilder für `water` und `ration` in `HospitalityItemIcon.tsx`.
 - Später (mit LIVING-0012 Schritt 3): Notration für Spieler, die den billigsten Posten nicht bezahlen können – Knopf am Tresen, serverseitig geprüft.
 
