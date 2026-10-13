@@ -40,6 +40,20 @@ Die Prüfungen stellen sicher: Möbel überlappen nicht, jeder Sitzplatz liegt a
 - Liegt ein Eintrag in `person_interior_presence` vor, gilt dessen Raum. Ist er vom Gastraum aus nicht einsehbar, wird die Figur nicht gezeigt.
 - Ist der Raum voll, werden weitere Personen nicht dargestellt.
 
+### Gäste, die kommen und gehen
+
+Ein Bewohner, der im Lokal wirklich gekauft hat (`person_consumption_events`), ist für eine gute halbe Stunde Gast. Was man sieht, folgt allein aus der Zeit seit dem Kauf:
+
+| Zeit seit dem Kauf | Im Raum |
+|---|---|
+| bis 1,5 Minuten | steht am Tresen (mehrere stehen hintereinander an) |
+| danach 18 Sekunden | geht um die Möbel herum zu seinem Platz |
+| danach 35 Minuten | sitzt, die Bestellung steht vor ihm |
+| danach 22 Sekunden | geht zum Ausgang |
+| später | nicht mehr da |
+
+Der Gast weiß im Gespräch, was er selbst bestellt hat; andere sehen ihn dort, wo er gerade ist. Nichts davon wird gespeichert – der Raum zeigt nur, was aus echten Käufen folgt. Ohne Kauf erscheint niemand.
+
 ### Lokal ohne Personal
 
 Entscheidung (Thomas, 10.10.2026): Ein Lokal ohne Personal ist geschlossen – oder ein Automatencafé. Den Platzhalter-Wirt gibt es nicht mehr. `venueService` leitet daraus ab:

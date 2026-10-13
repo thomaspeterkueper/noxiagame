@@ -11,6 +11,11 @@ import {
   VENUE_PLAYER_RADIUS,
   canSeeRoom,
   describePlayerPosition,
+  guestMoment,
+  pointAlongPath,
+  venuePath,
+  visitPhase,
+  VISIT_TIMES,
   isAtServicePoint,
   isVenueBlocked,
   placeVenueFigures,
@@ -224,6 +229,33 @@ check(!automatFacts.some(f => f === ARRIVAL_ORIENTATION_FACTS[1]), 'nobody in a 
 const longMenu = Array.from({ length: 30 }, (_, i) => ({ label: 'Tagesgericht Nummer ' + i, priceCredits: 10 + i }))
 const longFacts = venueConversationFacts({ layout: restaurant, buildingName: 'Sol', self: brigade[0], figures: brigade, playerPos: restaurant.start, arrivalPoint: false, menu: longMenu })
 check(longFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS) && longFacts.some(f => f.startsWith('Karte: Tagesgericht Nummer 0 10') && f.endsWith('nicht im Gespräch')), 'a long menu is shortened without losing where to pay')
+
+// ── Besuch eines Gastes ─────────────────────────────────────────────────────
+check(visitPhase(0).phase === 'ordering' && visitPhase(VISIT_TIMES.orderS - 1).phase === 'ordering', 'a visit starts at the counter')
+check(visitPhase(VISIT_TIMES.orderS + 1).phase === 'to-seat' && visitPhase(600).phase === 'seated', 'then the guest walks to the seat and sits')
+const visitEnd = VISIT_TIMES.orderS + VISIT_TIMES.walkS + VISIT_TIMES.stayS
+check(visitPhase(visitEnd + 1).phase === 'leaving' && visitPhase(visitEnd + VISIT_TIMES.leaveS + 1).phase === 'gone' && visitPhase(99999).phase === 'gone', 'after the stay the guest leaves and is gone')
+check(visitPhase(-5).phase === 'ordering', 'a clock running slightly ahead does not break the visit')
+for (const kind of kinds) {
+  const layout = VENUE_LAYOUTS[kind]
+  for (const seat of layout.spots.filter(spot => spot.kind !== 'staff')) {
+    for (const [from, to, what] of [[layout.servicePoint, seat, 'to'], [seat, layout.exit, 'from']] as const) {
+      const path = venuePath(layout, from, to)
+      check(path.length > 2, kind + ': a way ' + what + ' ' + seat.id + ' exists')
+      check(path.slice(1, -1).every(p => !isVenueBlocked(layout, p, 7)), kind + ': the way ' + what + ' ' + seat.id + ' goes around the furniture')
+      check(path.slice(1).every((p, i) => Math.hypot(p.x - path[i].x, p.y - path[i].y) < 60), kind + ': the way ' + what + ' ' + seat.id + ' has no jumps')
+    }
+  }
+}
+check(JSON.stringify(pointAlongPath([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], 0.75)) === JSON.stringify({ x: 10, y: 5 }), 'position along a path follows its length')
+const seat = cafe.spots.find(spot => spot.id === 'table-3-l')!
+check(guestMoment(cafe, seat, 10).spot.label === 'am Tresen' && !guestMoment(cafe, seat, 10).served, 'a guest who just bought stands at the counter, not yet served')
+const sitting = guestMoment(cafe, seat, 900)
+check(sitting.phase === 'seated' && sitting.point.x === seat.x && sitting.served, 'later the guest sits at the seat with the order')
+check(guestMoment(cafe, seat, visitEnd + 5).spot.label === 'auf dem Weg zum Ausgang', 'at the end the guest is on the way out')
+const buyer = { ...g1, spot: sitting.spot }
+const buyerFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: buyer, figures: pair, playerPos: cafe.start, arrivalPoint: true, ownOrder: 'Mahlzeit' })
+check(buyerFacts.includes('Du hast hier vor kurzem selbst bestellt und bezahlt: Mahlzeit') && !buyerFacts.some(f => /nichts bestellt|nichts ausgeschenkt/.test(f)), 'a guest who bought knows it and does not claim nothing is served')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
