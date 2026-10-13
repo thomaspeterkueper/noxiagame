@@ -1,0 +1,65 @@
+import type { InteriorTemplate } from '../types'
+
+export const ROBOTIC_KITCHEN_STANDARD_INTERIOR: InteriorTemplate = {
+  id: 'robotic-kitchen-standard-v1',
+  buildingTypeId: 'robotic_kitchen',
+  hostKinds: ['building'],
+  name: 'Automatisierte Küche Standard',
+  version: 1,
+  levels: [
+    { id: 'ground', name: 'Betriebsebene', order: 0, elevationM: 0 },
+  ],
+  rooms: [
+    {
+      id: 'entry',
+      levelId: 'ground',
+      name: 'Bestellung & Eingang',
+      kind: 'entrance',
+      capacity: 8,
+      capabilities: ['arrival', 'order', 'pay'],
+      tags: ['public'],
+    },
+    {
+      id: 'pickup',
+      levelId: 'ground',
+      name: 'Ausgabe',
+      kind: 'service',
+      capacity: 10,
+      capabilities: ['pickup', 'consume', 'service'],
+      tags: ['public', 'food-service'],
+    },
+    {
+      id: 'kitchen-cell',
+      levelId: 'ground',
+      name: 'Robotische Küchenzelle',
+      kind: 'technical',
+      capacity: 4,
+      capabilities: ['cook', 'assemble', 'portion', 'process-food'],
+      tags: ['staff-only', 'robotics', 'food-service'],
+    },
+    {
+      id: 'cold-store',
+      levelId: 'ground',
+      name: 'Kühl- & Zutatenlager',
+      kind: 'storage',
+      capacity: 4,
+      capabilities: ['food-storage', 'chilled-storage', 'refill'],
+      tags: ['staff-only', 'logistics'],
+    },
+    {
+      id: 'hygiene-service',
+      levelId: 'ground',
+      name: 'Hygiene & Wartung',
+      kind: 'utility',
+      capacity: 4,
+      capabilities: ['clean', 'waste', 'maintenance', 'water-service'],
+      tags: ['staff-only', 'technical'],
+    },
+  ],
+  portals: [
+    { id: 'entry-pickup', kind: 'passage', fromRoomId: 'entry', toRoomId: 'pickup', normallyOpen: true },
+    { id: 'pickup-kitchen', kind: 'door', fromRoomId: 'pickup', toRoomId: 'kitchen-cell', normallyOpen: false, accessTags: ['staff'] },
+    { id: 'kitchen-store', kind: 'door', fromRoomId: 'kitchen-cell', toRoomId: 'cold-store', normallyOpen: false, accessTags: ['staff'] },
+    { id: 'kitchen-service', kind: 'door', fromRoomId: 'kitchen-cell', toRoomId: 'hygiene-service', normallyOpen: false, accessTags: ['staff'] },
+  ],
+}
