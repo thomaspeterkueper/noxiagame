@@ -19,6 +19,8 @@ import {
   hasUpperFloor,
   venueClosedReason,
   venueHoursText,
+  venueHoursFor,
+  clockLabel,
   venueService,
   venuePath,
   freeSeats,
@@ -26,7 +28,6 @@ import {
   seatForGuest,
   type VenueSpot,
   withUpperFloor,
-  VENUE_HOURS,
   type VenueUpperFloor,
   type GuestMoment,
   type VenueFigure,
@@ -242,8 +243,11 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[layout,everyone,visits,nowMs,entityId,companion?.id,residents,seat,satAt])
   // Ohne Personal: Café läuft als Automatencafé, Bar und Restaurant sind zu.
-  const service=venueService(layout,figures,hour)
-  const closedReason=venueClosedReason(layout,figures,hour)
+  // Das Startcafé geht nach der Uhr des Spielers (23–6 Uhr zu), alle anderen Lokale nach Koloniezeit.
+  const hours=venueHoursFor(layout.kind,arrivalPoint)
+  const playerHour=hours.clock==='player'?new Date(nowMs).getHours():hour
+  const service=venueService(layout,figures,playerHour,hours)
+  const closedReason=venueClosedReason(layout,figures,playerHour,hours)
   const closed=loaded&&service==='closed'
   const hasMenu=Boolean(menu?.items.length)&&service!=='closed'
   const shown=useMemo<ShownFigure[]>(()=>{
@@ -319,7 +323,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           headline:'Gespräch '+layout.locative+' '+buildingName,
           source:'NOXIA '+layout.kind+' interior',
           locationName:buildingName,
-          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,playerSeat:seat,joinedPlayer:joined===self.id,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour,upper}),
+          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,playerSeat:seat,joinedPlayer:joined===self.id,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour:playerHour,hours,upper}),
           placeKnowledge,
           // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
           hearsay:self.roomRole==='staff'?heard:[],
@@ -366,7 +370,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 
   return <div className="cafe-interior">
     <NpcVisualStyles/>
-    <header><div><small>INNENRAUM · {layout.noun.toUpperCase()}</small><b>{buildingName}</b><span>WASD bewegen · Platz anklicken zum Hinsetzen · NPC anklicken · ESC verlassen{hour!==null?' · Koloniezeit '+hour+' Uhr · geöffnet '+venueHoursText(layout.kind):''}</span></div><button onClick={onClose}>← Verlassen</button></header>
+    <header><div><small>INNENRAUM · {layout.noun.toUpperCase()}</small><b>{buildingName}</b><span>WASD bewegen · Platz anklicken zum Hinsetzen · NPC anklicken · ESC verlassen{playerHour!==null?' · '+(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(layout.kind,hours):''}</span></div><button onClick={onClose}>← Verlassen</button></header>
     <main>
       <div className={'room '+layout.kind}>
         {layout.windows.map((win,index)=><div key={index} className="window" style={{left:win.x,width:win.w}}/>)}
@@ -382,7 +386,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           </div>
         })}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
-        {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>{closedReason==='hours'?'Öffnet um '+VENUE_HOURS[layout.kind].open+' Uhr Koloniezeit.':'Hier arbeitet gerade niemand.'}</span></div>}
+        {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>{closedReason==='hours'?'Öffnet um '+hours.open+' Uhr '+clockLabel(hours)+'.'+(arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''):'Hier arbeitet gerade niemand.'}</span></div>}
         {hasUpperFloor(upper)&&<div className="label" style={{left:67,top:66}}>{upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'}</div>}
         {orders.map((entry,index)=>{
           // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt, sonst vor dem Spieler am Tresen.
@@ -399,7 +403,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       <aside>
         <small>{layout.noun.toUpperCase()} · LOKAL</small>
         <h3>{selected?.displayName??'Gastraum'}</h3>
-        {!selected&&closed&&<p>{closedReason==='hours'?'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(layout.kind)+' Koloniezeit; jetzt ist es '+hour+' Uhr.':'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}</p>}
+        {!selected&&closed&&<p>{closedReason==='hours'?'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(layout.kind,hours)+' '+clockLabel(hours)+'; jetzt ist es '+playerHour+' Uhr.'+(arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''):'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}</p>}
         {!selected&&!closed&&!showMenu&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{loaded&&service==='self-service'?' Hier bedient kein Personal – bestellt wird am Automaten.':''}</p>}
         {selected&&<>
           <div className="history">{historyState.map((entry,index)=><p key={index}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}</div>

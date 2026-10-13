@@ -21,8 +21,9 @@ Im Spiel erreichbar ist heute nur das Café. `bar` steht im Gebäudekatalog weit
 Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Für Spieler ist sie jetzt betretbar (Request G-1):
 
 - **Zugang:** vom Hafengebäude aus – „Kantine betreten“ im Raumhafen-Overlay (Erde, Mond, Phobos, Deimos) und als Raum „Hafenkantine“ im Kolonie-Innenraum von Landeplatz und Andockmodul (Mars, Prometheus). Ob eine Kantine im Hafen steht, sagt `GET /api/game/hospitality/canteen?parentEntityId=…`; ohne Kantine gibt es keinen Eintritt.
-- **Innenraum** (`app/dashboard/PortCanteenInterior.tsx`): Ausgabe, kein Sitzplatz, rund um die Uhr. Bedient von einem **Automaten** (kleine Landeplätze) oder einem **Ausgaberoboter** (Raumhafen, Andockmodul, Hafenviertel) – erkennbar Maschine, Entscheidung Thomas 13.10.2026.
-- **Kein Gespräch:** Das Gerät ist keine Person und läuft nicht über die Gesprächs-KI. Es beantwortet sechs feste Fragen (`lib/game/hospitality/canteen.ts`): Karte, Öffnungszeit, kein Geld, wo bin ich, Arbeit, wer bist du – knapp und synthetisch; nach Arbeit verweist es an die Verwaltung.
+- **Innenraum** (`app/dashboard/PortCanteenInterior.tsx`): Ausgabe, kein Sitzplatz, rund um die Uhr.
+- **Automat** (kleine Landeplätze: Mond, Phobos): stumm. Eine Anzeige mit Karte, Preisen und Notration, sonst nichts.
+- **Kantinenschwarm** (Raumhafen, Andockmodul, Hafenviertel): zwei Roboterkörper eines Schwarms, erkennbar Maschine. Sie sprechen im Plural und beantworten acht feste Fragen (`lib/game/hospitality/canteen.ts`) – keine Gesprächs-KI. Ihr Gedächtnis ist je Ort und besteht nur aus dem, was sie selbst gesehen haben: Bestellungen dieses Spielers in Kantinen des Ortes (`player_hospitality_orders`), Gäste und Notrationen der letzten 24 Stunden (`person_consumption_events`). „Kennt ihr mich?“ – „Wir haben Sie hier schon zweimal bedient, zuletzt vor einer Stunde: Ration.“ Nach Arbeit verweisen sie an die Verwaltung; keine Deutungen, kein Klatsch.
 - **Karte:** Wasser 2 Cr, Ration 6 Cr aus `hospitality_menu`, mit eigenen Bildern; Bestellung über `POST /api/game/hospitality/order` wie im Lokal.
 - **Notration** für Spieler ohne Geld ist noch nicht freigeschaltet (LIVING-0012 Schritt 3); das Gerät sagt das so.
 
@@ -96,7 +97,9 @@ Die Kolonie hat eine Uhr: ein Tick ist eine Stunde, die Stunde ist `Tick % 24`. 
 | Restaurant | 11–23 Uhr |
 | Bar | 17–2 Uhr |
 
-Die Zeiten stehen als feste Werte in `VENUE_HOURS` (`venues.ts`) – ein Startwert, keine Gebäudeeigenschaft (Request R-4). Außerhalb der Zeit ist ein Lokal mit Personal geschlossen; die Tafel nennt die nächste Öffnung. Ein Automatencafé schließt nie. `venueClosedReason` unterscheidet „außerhalb der Zeit“ und „kein Personal“. Uhrzeit und Öffnungszeit stehen im ersten Gesprächsfakt, das Personal kann also sagen, wann geöffnet ist.
+Die Zeiten stehen als feste Werte in `VENUE_HOURS` (`venues.ts`) – ein Startwert, keine Gebäudeeigenschaft (Request R-4).
+
+**Startcafé:** Der Ankunftsort neuer Spieler geht nach der echten Ortszeit des Spielers (Entscheidung Thomas, 13.10.2026): geschlossen von 23 bis 6 Uhr, Browseruhr, `ARRIVAL_PLAYER_HOURS`. Die Tafel verweist nachts auf die Hafenkantine. Bewohner leben weiter nach Koloniezeit – dasselbe Café kann für den Spieler zu und für sie offen sein. Nur die Oberfläche prüft das; serverseitig (`profiles.time_zone`, `order_hospitality_item`) liegt es bei R-4. Außerhalb der Zeit ist ein Lokal mit Personal geschlossen; die Tafel nennt die nächste Öffnung. Ein Automatencafé schließt nie. `venueClosedReason` unterscheidet „außerhalb der Zeit“ und „kein Personal“. Uhrzeit und Öffnungszeit stehen im ersten Gesprächsfakt, das Personal kann also sagen, wann geöffnet ist.
 
 Bewohner und Personal richten sich noch nicht nach diesen Zeiten – Käufe und Arbeit laufen in der Simulation rund um die Uhr (Requests R-4, R-5).
 

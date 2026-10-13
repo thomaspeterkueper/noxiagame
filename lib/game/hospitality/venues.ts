@@ -315,17 +315,36 @@ export const VENUE_HOURS: Readonly<Record<VenueKind, { open: number; close: numb
   bar: { open: 17, close: 2 },
 }
 
+export type VenueHours = { open: number; close: number; clock: 'colony' | 'player' }
+
+/**
+ * Das Startcafé (Ankunftsort neuer Spieler) richtet sich nach der echten
+ * Ortszeit des Spielers, nicht nach Koloniezeit – Entscheidung Thomas,
+ * 13.10.2026: geschlossen von 23 bis 6 Uhr. Bewohner leben weiter nach
+ * Koloniezeit; dasselbe Café kann für den Spieler zu und für sie offen sein.
+ */
+export const ARRIVAL_PLAYER_HOURS: VenueHours = { open: 6, close: 23, clock: 'player' }
+
+/** Welche Uhr und welche Zeiten für den Spieler in diesem Lokal gelten. */
+export function venueHoursFor(kind: VenueKind, arrivalPoint = false): VenueHours {
+  return arrivalPoint ? ARRIVAL_PLAYER_HOURS : { ...VENUE_HOURS[kind], clock: 'colony' }
+}
+
 const hourOfDay = (hour: number) => ((Math.trunc(hour) % 24) + 24) % 24
 
-export function venueOpenAt(kind: VenueKind, hour: number): boolean {
-  const { open, close } = VENUE_HOURS[kind]
+export function venueOpenAt(kind: VenueKind, hour: number, hours: VenueHours = venueHoursFor(kind)): boolean {
+  const { open, close } = hours
   const h = hourOfDay(hour)
   return open < close ? h >= open && h < close : h >= open || h < close
 }
 
-export function venueHoursText(kind: VenueKind): string {
-  const { open, close } = VENUE_HOURS[kind]
-  return `von ${open} bis ${close} Uhr`
+export function venueHoursText(kind: VenueKind, hours: VenueHours = venueHoursFor(kind)): string {
+  return `von ${hours.open} bis ${hours.close} Uhr`
+}
+
+/** „Koloniezeit“ oder „deiner Ortszeit“ – damit der Spieler weiß, welche Uhr gilt. */
+export function clockLabel(hours: VenueHours): string {
+  return hours.clock === 'player' ? 'deiner Ortszeit' : 'Koloniezeit'
 }
 
 // ── Begehbare Fläche ────────────────────────────────────────────────────────
@@ -473,16 +492,16 @@ export function placeVenueFigures(layout: VenueLayout, residents: readonly Venue
 export type VenueService = 'staffed' | 'self-service' | 'closed'
 
 /** `hour` ist die Koloniestunde; ohne Angabe gelten keine Öffnungszeiten. */
-export function venueService(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null): VenueService {
+export function venueService(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null, hours: VenueHours = venueHoursFor(layout.kind)): VenueService {
   if (figures.some(figure => figure.roomRole === 'staff')) {
-    return hour == null || venueOpenAt(layout.kind, hour) ? 'staffed' : 'closed'
+    return hour == null || venueOpenAt(layout.kind, hour, hours) ? 'staffed' : 'closed'
   }
   return layout.kind === 'cafe' ? 'self-service' : 'closed'
 }
 
 /** Warum ein Lokal zu ist: außerhalb der Öffnungszeit oder weil niemand dort arbeitet. */
-export function venueClosedReason(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null): 'hours' | 'no-staff' | null {
-  if (venueService(layout, figures, hour) !== 'closed') return null
+export function venueClosedReason(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null, hours: VenueHours = venueHoursFor(layout.kind)): 'hours' | 'no-staff' | null {
+  if (venueService(layout, figures, hour, hours) !== 'closed') return null
   return figures.some(figure => figure.roomRole === 'staff') ? 'hours' : 'no-staff'
 }
 
@@ -709,6 +728,8 @@ export interface ConversationFactsInput {
   /** Alle platzierten Figuren, auch die für den Spieler unsichtbaren. */
   figures: readonly VenueFigure[]
   playerPos: VenuePoint
+  /** Welche Öffnungszeit für den Spieler gilt (Startcafé: seine Ortszeit). */
+  hours?: VenueHours
   /** Sitzt der Spieler? Dann sein Platz. */
   playerSeat?: VenueSpot | null
   /** Hat sich diese Figur eben zum Spieler gesetzt? */
@@ -762,7 +783,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   const { layout, self } = input
   const staff = self.roomRole === 'staff'
   const name = String(input.buildingName ?? '').replace(/\s+/g, ' ').trim().slice(0, input.hour == null ? 60 : 44)
-  const clock = input.hour == null ? '' : `; es ist etwa ${hourOfDay(input.hour)} Uhr, geöffnet ist ${venueHoursText(layout.kind)}`
+  const clock = input.hour == null ? '' : `; es ist etwa ${hourOfDay(input.hour)} Uhr, geöffnet ist ${venueHoursText(layout.kind, input.hours ?? venueHoursFor(layout.kind))}`
   const seesGuestRoom = canSeeRoom(layout, self.spot.roomId, layout.playerRoomId)
   const posture = self.spot.posture === 'sitting' ? 'sitzt' : 'stehst'
 
