@@ -70,6 +70,7 @@ function unzoomedAt(point:ScenePoint){const p=iso(point);return `translate(${p.x
 // player, snapped to a fixed grid so the same ground always maps to the same
 // stored detail rows instead of a new set for every few metres walked.
 // Ansprechen kann man nur, wen man erreicht hat.
+const WALK_VIEW_KEY='noxia-earth-walk-view-v1'
 const TALK_RANGE_M=8
 const RECENTER_AT_M=190
 // Own and state buildings stay selectable as a destination well beyond the
@@ -83,6 +84,7 @@ function sceneGridNode(point:GeoPoint):GeoPoint{
   const lonStep=SCENE_GRID_M/(111320*Math.max(.05,Math.cos(lat*Math.PI/180)))
   return{lat:Number(lat.toFixed(6)),lon:Number((Math.round(point.lon/lonStep)*lonStep).toFixed(6))}
 }
+function rememberedViewMatches(origin:GeoPoint){try{return window.localStorage.getItem(WALK_VIEW_KEY)===`${origin.lat.toFixed(4)},${origin.lon.toFixed(4)}`}catch{return false}}
 function regionUrl(tag:string,center:GeoPoint|null){return `/api/earth/region?v=${tag}`+(center?`&lat=${center.lat}&lon=${center.lon}`:'')}
 
 function role(resident:ColonyResident){return resident.assignments.find(item=>item.type==='work')?.roleCode??resident.activityState??'general'}
@@ -135,6 +137,9 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[sceneCenter,setSceneCenter]=useState<GeoPoint|null>(null)
   const[openLandmarkId,setOpenLandmarkId]=useState('')
   const recenterRequested=useRef('')
+  const openedViewChecked=useRef(false)
+  // Erst wenn entschieden ist, wo die Spielfigur beim Öffnen steht, darf die Szene ihr nachrücken.
+  const[viewDecided,setViewDecided]=useState(false)
 
   // Eine Szene wird erst gezeigt, wenn ihre Ortsdetails da sind. Sonst baut sich
   // der Ort zweimal auf: zuerst mit abgeleiteten Baumassen, dann mit den echten
@@ -214,6 +219,18 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   useEffect(()=>{
     const regionId=(data?.region as any)?.id??null
     if(!origin)return
+    // Beim Öffnen gilt der gewählte Ort. Die gemerkte Position der Spielfigur
+    // zählt nur, wenn sie zu genau diesem Ort gehört – sonst stünde man nach
+    // „Springen“ oder „Home“ erst hier und würde gleich darauf kilometerweit
+    // an die alte Stelle zurückversetzt.
+    if(!sceneCenter&&!openedViewChecked.current){
+      openedViewChecked.current=true
+      const viewKey=`${origin.lat.toFixed(4)},${origin.lon.toFixed(4)}`
+      let remembered:string|null=null
+      try{remembered=window.localStorage.getItem(WALK_VIEW_KEY);window.localStorage.setItem(WALK_VIEW_KEY,viewKey)}catch{/* ohne Speicher gilt der gewählte Ort */}
+      setViewDecided(true)
+      if(remembered!==viewKey){resetSharedPlayerPosition(regionId,origin);return}
+    }
     if(regionId&&playerRegionId&&playerRegionId!==regionId){
       resetSharedPlayerPosition(regionId,origin)
       return
@@ -231,7 +248,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   // before the player reaches its edge.
   useEffect(()=>{
     const regionId=(data?.region as any)?.id??null
-    if(!origin||!playerGeo||!playerRegionId||(regionId&&playerRegionId!==regionId))return
+    if(!viewDecided||!origin||!playerGeo||!playerRegionId||(regionId&&playerRegionId!==regionId))return
     const metric=geoToLocalMeters(playerGeo,origin)
     if(Math.max(Math.abs(metric.eastM),Math.abs(metric.northM))>RECENTER_AT_M){
       const node=sceneGridNode(playerGeo)
@@ -240,7 +257,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       return
     }
     if(Math.hypot(metric.eastM-player.xM,metric.northM-player.yM)>.5)setSharedPlayerPosition(regionId,{xM:metric.eastM,yM:metric.northM},playerGeo)
-  },[data?.region,origin,playerGeo,playerRegionId,player,setSharedPlayerPosition])
+  },[data?.region,origin,playerGeo,playerRegionId,player,setSharedPlayerPosition,viewDecided])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
   const namedPoiTargets=useMemo(()=>origin?features.flatMap(feature=>{
@@ -621,7 +638,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   if(!data.ok||!scene)return <div className="earth-walkable-loading">Earth-Szene nicht verfügbar: {data.error??'keine Region'}</div>
   // Steht die Spielfigur vom letzten Besuch weit vom Mittelpunkt dieser ersten
   // Szene entfernt, wird gleich um sie herum neu geladen – die erste Szene nicht zeigen.
-  if(!sceneCenter&&origin&&playerGeo&&playerRegionId&&playerRegionId===((data.region as any)?.id??null)){
+  if(!sceneCenter&&origin&&playerGeo&&playerRegionId&&playerRegionId===((data.region as any)?.id??null)&&rememberedViewMatches(origin)){
     const away=geoToLocalMeters(playerGeo,origin)
     if(Math.max(Math.abs(away.eastM),Math.abs(away.northM))>RECENTER_AT_M)return <div className="earth-walkable-loading">Lokale Earth-Szene wird aufgebaut …</div>
   }
