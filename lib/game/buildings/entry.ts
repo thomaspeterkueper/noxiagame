@@ -55,6 +55,11 @@ const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
     label: 'Restaurant betreten',
     hint: 'Innenraum, Begegnungen und Aufenthalt öffnen',
   },
+  hotel: {
+    kind: 'hospitality',
+    label: 'Hotel betreten',
+    hint: 'Lobby, Empfang und Zimmer öffnen',
+  },
   warehouse_storage: {
     kind: 'warehouse',
     label: 'Lager betreten',

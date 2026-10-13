@@ -27,6 +27,16 @@ Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port
 - **Karte:** Wasser 2 Cr, Ration 6 Cr aus `hospitality_menu`, mit eigenen Bildern; Bestellung über `POST /api/game/hospitality/order` wie im Lokal.
 - **Notration** für Spieler ohne Geld ist noch nicht freigeschaltet (LIVING-0012 Schritt 3); das Gerät sagt das so.
 
+## 1b. Hotel
+
+Nach dem Vorbild SunDog: Am Empfang mietet man ein Zimmer. Gebaut (Entscheidung Thomas, 13.10.2026: „im Hotel sollte man ein Zimmer buchen können“):
+
+- **Innenraum** `hotel`: Lobby mit Empfang (Bestellplatz), zwei Tische, Treppe „ZIMMER ↑“, Büro hinter dem Empfang; Vorlage `hotelStandard.ts`, Layout in `venues.ts`. Der Empfang ist rund um die Uhr besetzt, ohne Personal ist das Hotel geschlossen. Gebäudeansicht `public/assets/buildings/hotel/earth/style-anchor.svg`.
+- **Zimmer buchen:** Ein Zimmer ist ein Posten der Karte (`item_code` `room_night`, „Zimmer für eine Nacht“) und wird am Empfang wie eine Bestellung gebucht – versteuerte Überweisung über `order_hospitality_item`, Kennung je Versuch. Die Karte zeigt ihn getrennt von Speisen, mit Schlüssel als Bild.
+- **Belegung:** Zimmerzahl ist `transient_capacity` des Gebäudes; belegt sind die Buchungen der letzten 24 Stunden (`player_hospitality_orders`, eine Nacht = 24 Stunden Echtzeit – ein Platzhalter, bis Koloniezeit und Spielzeit verknüpft sind). `GET /api/game/hospitality/guests` liefert `rooms {capacity, occupied, mineForS}`. Wer schon ein Zimmer hat oder wenn keins frei ist, kann nicht buchen – das prüft nur die Oberfläche (Request R-7: serverseitig).
+- **Wissen:** Das Personal kennt Zimmerzahl und freie Zimmer und weiß, ob der Gast eines hat; ein Gast sieht nur die Treppe und den Schlüssel des Gegenübers. Zimmer über einem Café oder Restaurant funktionieren genauso, sobald das Gebäude Gästeplätze hat.
+- **Noch nichts bewirkt** das Zimmer: Erholung als Bedürfnis gibt es nicht (R-7), und es gibt kein Hotelgebäude – `hotel` fehlt in `building_definitions`, die Karte hat keine Zeile `room_night`. Beides liegt bei Bevölkerung und Ökonomie.
+
 ## 2. Innenaufbau
 
 Alle drei Räume sind 760 × 470 groß, der Eingang liegt unten links.
@@ -96,6 +106,7 @@ Die Kolonie hat eine Uhr: ein Tick ist eine Stunde, die Stunde ist `Tick % 24`. 
 | Café | 6–20 Uhr |
 | Restaurant | 11–23 Uhr |
 | Bar | 17–2 Uhr |
+| Hotel | rund um die Uhr |
 
 Die Zeiten stehen als feste Werte in `VENUE_HOURS` (`venues.ts`) – ein Startwert, keine Gebäudeeigenschaft (Request R-4).
 

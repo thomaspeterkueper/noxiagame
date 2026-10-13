@@ -19,9 +19,10 @@
 import type { InteriorTemplate } from '../buildings/interiors/types'
 import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeStandard'
 import { BAR_STANDARD_INTERIOR } from '../buildings/interiors/templates/barStandard'
+import { HOTEL_STANDARD_INTERIOR } from '../buildings/interiors/templates/hotelStandard'
 import { RESTAURANT_STANDARD_INTERIOR } from '../buildings/interiors/templates/restaurantStandard'
 
-export type VenueKind = 'cafe' | 'bar' | 'restaurant'
+export type VenueKind = 'cafe' | 'bar' | 'restaurant' | 'hotel'
 
 export interface VenuePoint { x: number; y: number }
 
@@ -244,10 +245,43 @@ const RESTAURANT_LAYOUT: VenueLayout = {
   staffBackFact: 'Hinter der Durchreiche liegt die Küche, dahinter ein Vorratsraum; Gäste haben dort keinen Zutritt',
 }
 
+// ── Hotel ───────────────────────────────────────────────────────────────────
+// Lobby mit Empfang; die Zimmer liegen oben, die Treppe gehört zum Haus.
+const hotelLounge = tables([[190, 300], [330, 300]])
+const HOTEL_STAIRS: VenueFurniture = { id: 'stairs', kind: 'stairs', x: 640, y: 330, w: 58, h: 40 }
+const HOTEL_LAYOUT: VenueLayout = {
+  kind: 'hotel',
+  template: HOTEL_STANDARD_INTERIOR,
+  noun: 'Hotel',
+  locative: 'im Hotel',
+  width: VENUE_WIDTH,
+  height: VENUE_HEIGHT,
+  start: START,
+  exit: EXIT,
+  playerRoomId: 'guest-room',
+  servicePoint: { x: 430, y: 160, label: 'AM EMPFANG', locative: 'am Empfang' },
+  windows: [{ x: 120, w: 100 }, { x: 260, w: 100 }],
+  furniture: [
+    { id: 'desk', kind: 'desk', x: 380, y: 90, w: 180, h: 40 },
+    { id: 'shelf', kind: 'shelf', x: 380, y: 60, w: 180, h: 12 },
+    ...hotelLounge.furniture,
+    HOTEL_STAIRS,
+  ],
+  spots: [
+    staffSpot('staff-desk', 470, 76, 'counter', 'hinter dem Empfang'),
+    standingSpot('entry-1', 150, 395, 'beim Eingang'),
+    ...hotelLounge.spots.map(spot => ({ ...spot, label: spot.label.replace('an Tisch', 'in der Lobby an Tisch') })),
+  ],
+  roomFact: 'Die Lobby hat einen Empfang, zwei Tische mit je zwei Stühlen und eine Treppe zu den Zimmern; der Ausgang liegt beim Eingang',
+  guestBackFact: 'Hinter dem Empfang ist eine Tür zum Büro; was dahinter liegt, weißt du nicht',
+  staffBackFact: 'Hinter dem Empfang liegt das Büro mit den Zimmerschlüsseln; Gäste haben dort keinen Zutritt',
+}
+
 export const VENUE_LAYOUTS: Readonly<Record<VenueKind, VenueLayout>> = {
   cafe: CAFE_LAYOUT,
   bar: BAR_LAYOUT,
   restaurant: RESTAURANT_LAYOUT,
+  hotel: HOTEL_LAYOUT,
 }
 
 const KIND_BY_BUILDING: Readonly<Record<string, VenueKind>> = {
@@ -255,6 +289,7 @@ const KIND_BY_BUILDING: Readonly<Record<string, VenueKind>> = {
   'café': 'cafe',
   bar: 'bar',
   restaurant: 'restaurant',
+  hotel: 'hotel',
 }
 
 /** Unbekannte Gebäudetypen fallen auf das Café zurück – der bisherige Stand. */
@@ -286,6 +321,8 @@ const UPPER_LAYOUTS = new Map<VenueKind, VenueLayout>()
 
 /** Derselbe Raum mit einer Treppe nach oben in der hinteren linken Ecke. */
 export function withUpperFloor(layout: VenueLayout): VenueLayout {
+  // Ein Haus, das die Treppe schon hat (Hotel), bekommt keine zweite.
+  if (layout.furniture.some(item => item.kind === 'stairs')) return layout
   const cached = UPPER_LAYOUTS.get(layout.kind)
   if (cached) return cached
   const upper = { ...layout, furniture: [...layout.furniture, STAIRS] }
@@ -313,6 +350,8 @@ export const VENUE_HOURS: Readonly<Record<VenueKind, { open: number; close: numb
   cafe: { open: 6, close: 20 },
   restaurant: { open: 11, close: 23 },
   bar: { open: 17, close: 2 },
+  // Der Empfang ist immer besetzt – Reisende kommen zu jeder Stunde.
+  hotel: { open: 0, close: 24 },
 }
 
 export type VenueHours = { open: number; close: number; clock: 'colony' | 'player' }
@@ -339,6 +378,7 @@ export function venueOpenAt(kind: VenueKind, hour: number, hours: VenueHours = v
 }
 
 export function venueHoursText(kind: VenueKind, hours: VenueHours = venueHoursFor(kind)): string {
+  if (hours.open === 0 && hours.close === 24) return 'rund um die Uhr'
   return `von ${hours.open} bis ${hours.close} Uhr`
 }
 
@@ -666,6 +706,44 @@ export function seatForGuest(layout: VenueLayout, own: VenueSpot, guestId: strin
   return { seat: own, joined: false }
 }
 
+// ── Zimmer ──────────────────────────────────────────────────────────────────
+// Ein Zimmer ist ein Posten der Karte (`room_night`), gebucht am Empfang wie
+// eine Bestellung. Wie viele Zimmer es gibt, sagen die Gebäudedaten
+// (transient_capacity); belegt ist, was in den letzten 24 Stunden gebucht wurde.
+export const ROOM_ITEM_CODE = 'room_night'
+export const ROOM_NIGHT_S = 24 * 60 * 60
+
+export interface VenueRooms {
+  capacity: number
+  /** Belegte Zimmer, die Buchung des Spielers eingeschlossen. */
+  occupied: number
+  /** Hat der Spieler hier gerade ein Zimmer? Dann bis wann (Sekunden). */
+  mineForS: number | null
+}
+
+export function roomsFree(rooms: VenueRooms): number {
+  return Math.max(0, rooms.capacity - rooms.occupied)
+}
+
+/** Darf der Spieler jetzt buchen? Nicht ohne Zimmer, nicht doppelt. */
+export function canBookRoom(rooms: VenueRooms | null | undefined): boolean {
+  return Boolean(rooms) && rooms!.mineForS == null && roomsFree(rooms!) > 0
+}
+
+function hoursLeft(seconds: number): string {
+  const h = Math.max(1, Math.round(seconds / 3600))
+  return h === 1 ? 'noch etwa eine Stunde' : `noch etwa ${h} Stunden`
+}
+
+/** Was das Personal bzw. ein Gast über die Zimmer weiß. */
+export function roomsFact(rooms: VenueRooms, staff: boolean): string {
+  if (rooms.capacity === 0) return staff ? 'Dieses Haus hat keine Gästezimmer' : 'Ob es hier Zimmer gibt, weißt du nicht'
+  const mine = rooms.mineForS != null ? `; dein Gegenüber hat hier ein Zimmer, ${hoursLeft(rooms.mineForS)}` : ''
+  if (!staff) return fit(`Oben gibt es Gästezimmer; wie viele frei sind, weißt du nicht${mine}`)
+  const free = roomsFree(rooms)
+  return fit(`Oben gibt es ${rooms.capacity} Gästezimmer, davon ${free === 0 ? 'keins' : free === rooms.capacity ? 'alle' : String(free)} frei; gebucht wird am Empfang${mine}`)
+}
+
 // ── Wo steht der Spieler? ───────────────────────────────────────────────────
 /** Ortsangabe für den Spieler, wie sie jemand im Raum beschreiben würde. */
 export function describePlayerPosition(layout: VenueLayout, pos: VenuePoint): string {
@@ -728,6 +806,8 @@ export interface ConversationFactsInput {
   /** Alle platzierten Figuren, auch die für den Spieler unsichtbaren. */
   figures: readonly VenueFigure[]
   playerPos: VenuePoint
+  /** Zimmer des Hauses, falls es welche gibt. */
+  rooms?: VenueRooms | null
   /** Welche Öffnungszeit für den Spieler gilt (Startcafé: seine Ortszeit). */
   hours?: VenueHours
   /** Sitzt der Spieler? Dann sein Platz. */
@@ -806,7 +886,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   }
   // Mit Obergeschoss tritt die Treppe an die Stelle des Personalbereichs – die
   // Liste bleibt gleich lang und damit in der Grenze der Gesprächsroute.
-  facts.push(hasUpperFloor(input.upper) && seesGuestRoom ? upperFloorFact(input.upper, staff) : staff ? layout.staffBackFact : layout.guestBackFact)
+  facts.push(input.rooms && input.rooms.capacity > 0 && seesGuestRoom ? roomsFact(input.rooms, staff) : hasUpperFloor(input.upper) && seesGuestRoom ? upperFloorFact(input.upper, staff) : staff ? layout.staffBackFact : layout.guestBackFact)
 
   // Das Personal kennt die Karte. Ein Gast weiß nur, wo bestellt wird. Preise
   // nennt niemand aus dem Kopf, der sie nicht kennt, und niemand kassiert im

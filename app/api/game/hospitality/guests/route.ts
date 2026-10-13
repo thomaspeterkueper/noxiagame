@@ -12,6 +12,7 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { venueHearsay } from '@/lib/game/hospitality/hearsay'
+import { ROOM_ITEM_CODE, ROOM_NIGHT_S, type VenueRooms } from '@/lib/game/hospitality/venues'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab0-9a-f]{12}$/i
 const WINDOW_S = 60 * 60
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
   const latest = new Map<string, { serviceCode: string; at: string }>()
   for (const event of events ?? []) if (!latest.has(event.person_id)) latest.set(event.person_id, { serviceCode: String(event.service_code), at: String(event.created_at) })
   const personIds = [...latest.keys()]
-  const venue = await venueState(supabase, tileEntityId)
+  const venue = await venueState(supabase, tileEntityId, profileId)
   if (personIds.length === 0) return NextResponse.json({ ok: true, guests: [], ...venue }, { headers: { 'Cache-Control': 'private, no-store' } })
 
   const [{ data: people }, { data: identities }] = await Promise.all([
@@ -75,7 +76,7 @@ function metres(from: { lat: number; lon: number }, to: { lat: number; lon: numb
 }
 
 /** Uhrzeit, Obergeschoss und was das Personal mitbekommen hat. Fehlt etwas, bleibt es weg. */
-async function venueState(supabase: any, tileEntityId: string) {
+async function venueState(supabase: any, tileEntityId: string, profileId: string) {
   const [{ data: tile }, { data: tickRow }] = await Promise.all([
     supabase.from('tile_entities').select('id,location_id,latitude_deg,longitude_deg,residential_capacity,transient_capacity').eq('id', tileEntityId).maybeSingle(),
     supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
@@ -83,7 +84,7 @@ async function venueState(supabase: any, tileEntityId: string) {
   const tick = Number(tickRow?.tick_number)
   const hour = Number.isFinite(tick) ? ((Math.trunc(tick) % 24) + 24) % 24 : null
   const upper = { homes: Math.max(0, Number(tile?.residential_capacity ?? 0)), guestRooms: Math.max(0, Number(tile?.transient_capacity ?? 0)) }
-  if (!tile) return { hour, upper, heard: [] as string[] }
+  if (!tile) return { hour, upper, heard: [] as string[], rooms: null }
 
   const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString()
   const [{ data: sales }, { data: builds }, { data: events }, { data: adults }, { data: working }, { data: definitions }] = await Promise.all([
@@ -110,5 +111,15 @@ async function venueState(supabase: any, tileEntityId: string) {
     assistances: (events ?? []).filter((row: any) => row.event_type === 'person_assistance').length,
     jobSeekers: (adults ?? []).filter((row: any) => !employed.has(row.id)).length,
   })
-  return { hour, upper, heard }
+  // Zimmer: Buchungen der letzten 24 Stunden (eine Nacht) gegen die Gästeplätze.
+  let rooms: VenueRooms | null = null
+  if (upper.guestRooms > 0) {
+    const nightAgo = new Date(Date.now() - ROOM_NIGHT_S * 1000).toISOString()
+    const { data: bookings } = await supabase.from('player_hospitality_orders').select('profile_id,created_at').eq('tile_entity_id', tileEntityId).eq('item_code', ROOM_ITEM_CODE).gte('created_at', nightAgo).limit(500)
+    const byGuest = new Map<string, number>()
+    for (const row of bookings ?? []) byGuest.set(String(row.profile_id), Math.max(byGuest.get(String(row.profile_id)) ?? 0, Date.parse(row.created_at)))
+    const mineAt = byGuest.get(profileId)
+    rooms = { capacity: upper.guestRooms, occupied: Math.min(upper.guestRooms, byGuest.size), mineForS: mineAt ? Math.max(0, Math.round((mineAt + ROOM_NIGHT_S * 1000 - Date.now()) / 1000)) : null }
+  }
+  return { hour, upper, heard, rooms }
 }

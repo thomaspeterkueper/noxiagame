@@ -27,6 +27,10 @@ import {
   nearestFreeSeat,
   seatForGuest,
   type VenueSpot,
+  type VenueRooms,
+  ROOM_ITEM_CODE,
+  canBookRoom,
+  roomsFree,
   withUpperFloor,
   type VenueUpperFloor,
   type GuestMoment,
@@ -62,6 +66,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[hour,setHour]=useState<number|null>(null)
   const[upper,setUpper]=useState<VenueUpperFloor|null>(null)
   const[heard,setHeard]=useState<string[]>([])
+  const[rooms,setRooms]=useState<VenueRooms|null>(null)
   const layout=useMemo(()=>{const base=venueLayoutForBuildingType(buildingTypeId);return hasUpperFloor(upper)?withUpperFloor(base):base},[buildingTypeId,upper])
   const arrivalPoint=SOCIAL_INFRASTRUCTURE[layout.kind]?.arrivalPoint===true
   const[pos,setPos]=useState<Point>(layout.start)
@@ -139,6 +144,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setHour(typeof data.hour==='number'?data.hour:null)
           setUpper(data.upper&&typeof data.upper==='object'?{homes:Number(data.upper.homes??0),guestRooms:Number(data.upper.guestRooms??0)}:null)
           setHeard(Array.isArray(data.heard)?data.heard.map(String):[])
+          setRooms(data.rooms&&typeof data.rooms==='object'?{capacity:Number(data.rooms.capacity??0),occupied:Number(data.rooms.occupied??0),mineForS:data.rooms.mineForS==null?null:Number(data.rooms.mineForS)}:null)
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
         }
       }catch{/* ohne Antwort bleibt der Raum, wie er ist */}
@@ -286,10 +292,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       if(response.ok&&data.ok){
         const credits=Number(data.credits??0)
         setMenu(current=>current?{credits,items:current.items.map(entry=>({...entry,affordable:credits>=entry.priceCredits}))}:current)
-        if(!data.duplicate)setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null}].slice(-8))
+        if(item.itemCode===ROOM_ITEM_CODE){
+          // Ein Zimmer steht nicht auf dem Tresen: Es ist ab jetzt deins, eine Nacht lang.
+          if(!data.duplicate)setRooms(current=>current?{...current,occupied:current.occupied+1,mineForS:24*3600}:current)
+        }else if(!data.duplicate)setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null}].slice(-8))
         // Die Kopfzeile des Spiels zeigt denselben Kontostand.
         useGameStore.setState({credits})
-        setStatus((recipient?item.label+' für '+recipient.displayName+' bestellt':item.label+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
+        setStatus((item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?item.label+' für '+recipient.displayName+' bestellt':item.label+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
       }else{
         setStatus(String(data.error??'Die Bestellung konnte nicht gebucht werden. Es wurde nichts abgebucht.'))
         if(data.code==='NOXIA_CREDITS_INSUFFICIENT')setMenu(current=>current?{...current,items:current.items.map(entry=>entry.itemCode===item.itemCode?{...entry,affordable:false}:entry)}:current)
@@ -323,7 +332,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           headline:'Gespräch '+layout.locative+' '+buildingName,
           source:'NOXIA '+layout.kind+' interior',
           locationName:buildingName,
-          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,playerSeat:seat,joinedPlayer:joined===self.id,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour:playerHour,hours,upper}),
+          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,playerSeat:seat,joinedPlayer:joined===self.id,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour:playerHour,hours,upper,rooms}),
           placeKnowledge,
           // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
           hearsay:self.roomRole==='staff'?heard:[],
@@ -387,7 +396,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         })}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
         {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>{closedReason==='hours'?'Öffnet um '+hours.open+' Uhr '+clockLabel(hours)+'.'+(arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''):'Hier arbeitet gerade niemand.'}</span></div>}
-        {hasUpperFloor(upper)&&<div className="label" style={{left:67,top:66}}>{upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'}</div>}
+        {(()=>{const stairs=layout.furniture.find(item=>item.kind==='stairs');if(!stairs)return null;const label=hasUpperFloor(upper)?(upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'):layout.kind==='hotel'?'ZIMMER ↑':null;return label?<div className="label" style={{left:stairs.x+stairs.w/2,top:stairs.y+stairs.h/2}}>{label}</div>:null})()}
         {orders.map((entry,index)=>{
           // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt, sonst vor dem Spieler am Tresen.
           const target=entry.forId?shown.find(item=>item.resident.id===entry.forId)?.figure.spot:null
@@ -424,11 +433,20 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
             <button className={treat?'':'on'} onClick={()=>setTreat(false)}>Für mich</button>
             <button className={treat?'on':''} onClick={()=>setTreat(true)}>Für {selected.displayName.length>22?'diese Person':selected.displayName}</button>
           </div>}
-          <div className="tiles">{menu.items.map(item=><button key={item.itemCode} className="tile" disabled={!item.affordable||!nearService||ordering!==null} onClick={()=>void order(item)} title={item.affordable?item.label:'Dafür reichen deine Credits nicht.'}>
+          <div className="tiles">{menu.items.filter(item=>item.itemCode!==ROOM_ITEM_CODE).map(item=><button key={item.itemCode} className="tile" disabled={!item.affordable||!nearService||ordering!==null} onClick={()=>void order(item)} title={item.affordable?item.label:'Dafür reichen deine Credits nicht.'}>
             <HospitalityItemIcon code={item.itemCode} size={44} title={item.label}/>
             <span>{item.label}</span><b>{item.priceCredits} Cr</b>
             {!item.affordable&&<small>zu teuer</small>}
           </button>)}</div>
+          {(()=>{const room=menu.items.find(item=>item.itemCode===ROOM_ITEM_CODE);if(!room)return null;const free=rooms?roomsFree(rooms):0;return <div className="rooms">
+            <small>ZIMMER</small>
+            {rooms?.mineForS!=null?<p>Du hast hier ein Zimmer, noch etwa {Math.max(1,Math.round(rooms.mineForS/3600))} Stunden.</p>:<p>{rooms?rooms.capacity+' Zimmer, '+free+' frei.':'Ob ein Zimmer frei ist, weiß gerade niemand.'}</p>}
+            <button className="tile" disabled={!room.affordable||!nearService||ordering!==null||!canBookRoom(rooms)} onClick={()=>{setTreat(false);void order(room)}} title={room.affordable?'Zimmer für eine Nacht':'Dafür reichen deine Credits nicht.'}>
+              <HospitalityItemIcon code={ROOM_ITEM_CODE} size={40} title="Zimmer"/>
+              <span>Zimmer für eine Nacht</span><b>{room.priceCredits} Cr</b>
+              {!room.affordable&&<small>zu teuer</small>}
+            </button>
+          </div>})()}
           {!nearService&&<p>Zum Bestellen musst du {service==='self-service'?'am Automaten':layout.servicePoint.locative} stehen.</p>}
           </>}
         </div>}
@@ -442,7 +460,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 .player.sitting i{height:16px;margin-top:6px}
 .moves{display:flex;gap:6px;margin-top:10px}
 .moves button{flex:1;padding:6px 8px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;cursor:pointer;font-size:11px}
-.player{position:absolute;z-index:10;width:20px;height:28px}.player i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}.player span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}.context{position:absolute;z-index:20;border:1px solid #d0b66a;background:#153438;color:#f4e8c4;border-radius:5px;padding:5px 7px;font:800 8px monospace;cursor:pointer}.item{position:absolute;z-index:9;pointer-events:auto;filter:drop-shadow(0 1px 1px #0006)}.for{display:flex;gap:6px;margin-top:6px}.menu .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:6px}
+.player{position:absolute;z-index:10;width:20px;height:28px}.player i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}.player span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}.context{position:absolute;z-index:20;border:1px solid #d0b66a;background:#153438;color:#f4e8c4;border-radius:5px;padding:5px 7px;font:800 8px monospace;cursor:pointer}.item{position:absolute;z-index:9;pointer-events:auto;filter:drop-shadow(0 1px 1px #0006)}.for{display:flex;gap:6px;margin-top:6px}.menu .rooms{margin-top:8px;display:grid;gap:4px}.menu .rooms p{margin:0;font-size:11px;color:#9fb5b0}
+.menu .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:6px}
 .menu button.tile{display:flex;flex-direction:column;align-items:center;gap:3px;margin:0;padding:8px 4px 7px;text-align:center}
 .menu button.tile:disabled :global(svg){opacity:.35;filter:grayscale(1)}
 .menu .for button{display:block;width:auto;flex:1;margin:0;padding:5px 8px;font-size:11px;text-align:center;background:#102526;border-color:#2d4445;color:#9fb5b0}.menu .for button.on{background:#17383a;border-color:#d0b66a;color:#f4e8c4}.context.hint{cursor:default;white-space:nowrap}.menu{margin-top:12px;padding-top:10px;border-top:1px solid #2d4445}.context.exit{background:#3a2b24}.cafe-interior aside{padding:16px;background:#091719;border-left:1px solid #40595a;overflow:auto}.cafe-interior aside small{color:#d9bb6a;font:800 8px monospace;letter-spacing:.12em}.cafe-interior aside h3{margin:4px 0 10px}.cafe-interior aside p{font-size:11px;line-height:1.45;color:#cbd6d2}.history p{border-top:1px solid #2d4445;padding-top:7px}.chat{display:flex;gap:6px;margin-top:10px}.chat input{flex:1;min-width:0;background:#061012;color:#eef;border:1px solid #40595a;border-radius:5px;padding:7px}.chat button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:0 9px}.status,.near{margin-top:10px;padding:8px;border:1px solid #485f5d;border-radius:6px;background:#102526;font-size:10px;color:#b9cbc6}.near{color:#92aaa5}@media(max-width:900px){.cafe-interior main{grid-template-columns:1fr}.cafe-interior aside{position:absolute;right:10px;bottom:10px;width:min(320px,80vw);max-height:40vh;border:1px solid #40595a;border-radius:8px}}
