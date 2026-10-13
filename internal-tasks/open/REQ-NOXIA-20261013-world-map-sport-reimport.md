@@ -18,7 +18,7 @@ Die bestehende begehbare Erdszene und die Regionsvorschau zeichnen `sport` nicht
 
 ## Was zu tun ist
 
-1. Nach dem Deployment im Spiel die Erdkarte auf Sundern öffnen. Weil das Importprofil jetzt 4 ist, meldet die Region „veraltet“ und wird im Hintergrund neu aus OpenStreetMap aufgebaut (`/api/earth/materialize`). Schlägt das fehl, bleiben die alten Daten stehen.
+1. Nach dem Deployment `/world-lab` öffnen. Die Seite ruft beim Start `/api/world-lab/refresh` auf; das erneuert die Region Sauerland (Importprofil 4) und holt Ortsdetail um die Figur. Unten im Feld steht, was geklappt hat. Alternativ an der gewünschten Stelle „Kartendaten hier nachladen“ drücken. Der Neuaufbau einer Region kann bis zu zwei Minuten dauern.
 2. Prüfen, ob es geklappt hat – zum Beispiel im Supabase-SQL-Editor:
    ```sql
    select r.slug, f.properties->>'visual_class' as art, count(*)
@@ -26,7 +26,7 @@ Die bestehende begehbare Erdszene und die Regionsvorschau zeichnen `sport` nicht
    where f.feature_type = 'sport' group by 1, 2;
    ```
    Für Sundern sollte mindestens ein `pitch` (Röhrtalstadion) erscheinen.
-3. `/world-lab` an der Halle des Metallwerks öffnen. Achtung: Die Kacheln dürfen am Vercel-Rand bis zu einem Tag zwischengespeichert werden. Zeigt die Karte das Stadion noch nicht, ein erneutes Deployment auslösen (leert den Zwischenspeicher) oder bis morgen warten.
+3. Zum Stadion laufen (vor dem Metallwerk). Nach dem Nachladen holt die Seite die Kacheln ohne Zwischenspeicher neu.
 
 ## Erledigt, wenn
 

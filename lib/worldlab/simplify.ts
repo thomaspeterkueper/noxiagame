@@ -122,6 +122,13 @@ function blockKind(properties: Record<string, unknown>, w: number, d: number): B
 function levels(properties: Record<string, unknown>, kind: BlockKind): number {
   const tagged = Number(properties['building:levels'])
   if (Number.isFinite(tagged) && tagged >= 1) return Math.min(8, Math.round(tagged))
+  // Gesamthöhe in Metern (OSM height), abzüglich Dach, durch Geschosshöhe – grob wie blocks.ts.
+  const height = Number.parseFloat(String(properties.height ?? ''))
+  if (Number.isFinite(height) && height > 2) {
+    const storey = kind === 'hall' ? 4 : kind === 'church' ? 3.5 : kind === 'shed' ? 2.5 : 3
+    const roof = kind === 'church' ? 5 : kind === 'house' ? 2.4 : kind === 'row' ? 2 : 0.7
+    return Math.max(1, Math.min(8, Math.round((height - roof) / storey)))
+  }
   return kind === 'shed' ? 1 : kind === 'hall' ? 2 : kind === 'row' ? 3 : kind === 'church' ? 4 : 2
 }
 

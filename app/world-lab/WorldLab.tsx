@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { blockArt } from '@/lib/worldlab/blocks'
+import { detailCell } from '@/lib/worldlab/detailCells'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
 import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine } from './worldEngine'
@@ -28,6 +29,51 @@ export default function WorldLab() {
   const engine = useRef<WorldEngine | null>(null)
   const [hud, setHud] = useState<Hud | null>(null)
   const [error, setError] = useState('')
+  const [refresh, setRefresh] = useState<{ busy: boolean; text: string }>({ busy: false, text: '' })
+  const busy = useRef(false)
+  const tried = useRef(new Set<string>())
+  const fresh = useRef('')
+
+  /**
+   * Holt für die Gegend um die Figur fehlende Kartendaten aus OpenStreetMap
+   * (veraltete Regionen neu, Ortsdetail für die Zelle) und lädt die Kacheln neu.
+   */
+  async function refreshHere(reason: string) {
+    const engine_ = engine.current
+    if (!engine_ || busy.current) return
+    const at = engine_.position()
+    const cell = detailCell(at)
+    tried.current.add(cell.lat + '/' + cell.lon)
+    busy.current = true
+    setRefresh({ busy: true, text: reason + ' – Kartendaten werden geholt …' })
+    try {
+      const { token } = await getSessionInfo()
+      if (!token) throw new Error('nicht angemeldet')
+      const response = await fetch('/api/world-lab/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(at) })
+      const json = await response.json()
+      if (!response.ok) throw new Error(json?.error ?? String(response.status))
+      const parts: string[] = []
+      for (const region of json.regions ?? []) parts.push(region.ok ? 'Region erneuert' : 'Region nicht erneuert (' + (region.error ?? 'Fehler') + ')')
+      if (json.detail?.ok) parts.push(json.detail.cached ? 'Ortsdetail war schon da' : json.detail.total + ' Objekte Ortsdetail geholt')
+      else parts.push('Ortsdetail nicht geholt (' + (json.detail?.error ?? 'Fehler') + ')')
+      fresh.current = String(Date.now())
+      engine.current?.reloadTiles()
+      setRefresh({ busy: false, text: parts.join(' · ') })
+    } catch (reason) {
+      setRefresh({ busy: false, text: 'Nachladen fehlgeschlagen: ' + String((reason as Error)?.message ?? reason) })
+    } finally { busy.current = false }
+  }
+
+  // Selbsttätig: einmal beim Start (veraltete Regionen), danach in bebauten
+  // Kacheln ohne Gebäude – je Zelle höchstens einmal je Besuch der Seite.
+  const started = useRef(false)
+  useEffect(() => {
+    if (!hud || !engine.current) return
+    if (!started.current) { started.current = true; void refreshHere('Start'); return }
+    if (!hud.here.loaded || hud.here.blocks > 0 || !hud.here.built) return
+    const cell = detailCell(engine.current.position())
+    if (!tried.current.has(cell.lat + '/' + cell.lon)) void refreshHere('Hier fehlen Gebäude')
+  }, [hud])
 
   useEffect(() => {
     let disposed = false
@@ -47,7 +93,7 @@ export default function WorldLab() {
         // ?art=vorlage zeigt nur Vorlagen, ?art=farbe einfarbige Quader (zum Vergleichen der Bildrate).
         art: blockArt(params.get('art') === 'vorlage' ? 'template' : params.get('art') === 'farbe' ? 'none' : 'drawn'),
         loadTile: async tile => {
-          const response = await fetch(`/api/world-lab/tile?x=${tile.x}&y=${tile.y}`)
+          const response = await fetch(`/api/world-lab/tile?x=${tile.x}&y=${tile.y}` + (fresh.current ? '&fresh=' + fresh.current : ''))
           if (!response.ok) throw new Error(String(response.status))
           return await response.json() as SimplifiedTile
         },
@@ -92,6 +138,8 @@ export default function WorldLab() {
         <dt>Position</dt><dd>{hud.lat.toFixed(5)}, {hud.lon.toFixed(5)}</dd>
         {hud.near && <><dt>In der Nähe</dt><dd>{hud.near}</dd></>}
       </dl>}
+      <button className="refresh" disabled={refresh.busy} onClick={() => void refreshHere('Von Hand')}>{refresh.busy ? 'Lädt …' : 'Kartendaten hier nachladen'}</button>
+      {refresh.text && <p className="note">{refresh.text}</p>}
       {error && <p className="error">{error}</p>}
       <a href="/dashboard">← zurück ins Spiel</a>
     </div>
@@ -107,6 +155,9 @@ export default function WorldLab() {
       dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:4px 0;font-size:11px}
       dt{color:#9fb5b0}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
       .error{margin:4px 0;font-size:11px;color:#f0b9a0}
+      .refresh{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;margin-top:4px}
+      .refresh:disabled{opacity:.6;cursor:default}
+      .note{margin:2px 0;font-size:10px;color:#9fb5b0}
       .panel a{font-size:11px;color:#d9bb6a;text-decoration:none;margin-top:4px}
     `}</style>
   </div>

@@ -22,6 +22,7 @@ export default defineConfig({
       'lib/worldlab/viewTiles.test.ts',
       'lib/worldlab/frameStats.test.ts',
       'lib/worldlab/facade.test.ts',
+      'lib/worldlab/detailCells.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',
       'lib/game/landmarks/interiors.test.ts',
       'lib/game/spatial/buildingMassing.test.ts',

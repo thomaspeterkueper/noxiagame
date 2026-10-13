@@ -16,7 +16,7 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 type Pixi = typeof import('pixi.js')
 
 export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number }
-export type Hud = { frame: FrameSummary; rebuildsPerS: number; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number }
+export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number }
 
 export interface WorldSettings {
   /** Kantenglättung (MSAA). Messschalter: ?aa=0 */
@@ -40,6 +40,10 @@ export interface WorldEngineOptions {
 
 export interface WorldEngine {
   jump: (at: GeoPoint) => void
+  /** Wo die Spielfigur steht. */
+  position: () => GeoPoint
+  /** Alle Kacheln verwerfen und neu holen (nach einem Nachladen von Kartendaten). */
+  reloadTiles: () => void
   destroy: () => void
 }
 
@@ -170,17 +174,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
   let building: string[] = []
+  let generation = 0          // steigt bei reloadTiles; ältere Antworten werden verworfen
   let keepKeys = new Set<string>()
 
-  function drawBlock(block: TileBlock, ox: number, oy: number) {
-    const style = BLOCK_STYLES[block.k]
-    const textures = art.get(block.k)
-    const g = new PIXI.Graphics()
-    const cos = Math.cos(block.a), sin = Math.sin(block.a)
-    const corner = (lx: number, ly: number) => ({ x: ox + block.x + lx * cos - ly * sin, y: oy + block.y + lx * sin + ly * cos })
-    const hw = block.w / 2, hd = block.d / 2
+  /**
+   * Ein Baukörper: Quader mit Walmdach (bei quadratischem Grundriss eine Pyramide).
+   * Mitte (cx, cy) und Achsen in Bodenmetern; `eave` Traufhöhe, `roofM` Dachaufbau.
+   */
+  function drawMass(g: PixiGraphics, kind: BlockKind, cx: number, cy: number, hw: number, hd: number, cos: number, sin: number, eave: number, roofM: number) {
+    const style = BLOCK_STYLES[kind]
+    const textures = art.get(kind)
+    const corner = (lx: number, ly: number) => ({ x: cx + lx * cos - ly * sin, y: cy + lx * sin + ly * cos })
     const c = [corner(-hw, -hd), corner(hw, -hd), corner(hw, hd), corner(-hw, hd)]
-    const eave = block.l * style.storeyM
     const outline = { width: 0.35, color: OUTLINE, alpha: 0.7 }
     // Wände: nur die beiden, die zur Kamera zeigen.
     for (let i = 0; i < 4; i++) {
@@ -195,8 +200,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         // damit das Erdgeschossbild (Tür, Sockel) nur unten erscheint.
         const [left, right] = leftToRight(a, b)
         const tint = lit ? 0xffffff : 0xd2d2d2
-        g.poly(quad(0, style.storeyM)).fill({ texture: ground, matrix: matrix(wallMatrix(left, right, style.storeyM)), color: tint, textureSpace: 'global' })
-        if (block.l > 1) g.poly(quad(style.storeyM, eave)).fill({ texture: upper, matrix: matrix(wallMatrix(left, right, eave)), color: tint, textureSpace: 'global' })
+        const groundTop = Math.min(eave, style.storeyM)
+        g.poly(quad(0, groundTop)).fill({ texture: ground, matrix: matrix(wallMatrix(left, right, groundTop)), color: tint, textureSpace: 'global' })
+        if (eave > groundTop + 0.01) g.poly(quad(groundTop, eave)).fill({ texture: upper, matrix: matrix(wallMatrix(left, right, eave)), color: tint, textureSpace: 'global' })
         g.poly(quad(0, eave)).stroke(outline)
       } else {
         g.poly(quad(0, eave)).fill(lit ? style.wallLight : style.wallDark).stroke(outline)
@@ -205,8 +211,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Dach: Walmdach über der langen Achse; bei flachen Bauten fast eben.
     const ridgeHalf = Math.max(0, hw - hd)
     const r = [corner(-ridgeHalf, 0), corner(ridgeHalf, 0)]
-    const top = eave + style.roofM
-    const pitch = style.roofM / Math.max(0.5, Math.min(hw, hd))
+    const top = eave + roofM
+    const pitch = roofM / Math.max(0.5, Math.min(hw, hd))
     type Face = { pts: Array<{ x: number; y: number; h: number }>; n: { x: number; y: number }; eave: [{ x: number; y: number }, { x: number; y: number }] }
     const faces: Face[] = [
       { pts: [{ ...c[0], h: eave }, { ...c[1], h: eave }, { ...r[1], h: top }, { ...r[0], h: top }], n: { x: sin, y: -cos }, eave: [c[0], c[1]] },
@@ -224,6 +230,26 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       } else {
         g.poly(pts).fill(shade(style.roof, light)).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
       }
+    }
+    return c
+  }
+
+  function drawBlock(block: TileBlock, ox: number, oy: number) {
+    const style = BLOCK_STYLES[block.k]
+    const g = new PIXI.Graphics()
+    let cos = Math.cos(block.a), sin = Math.sin(block.a)
+    const hw = block.w / 2, hd = block.d / 2
+    const cx = ox + block.x, cy = oy + block.y
+    const eave = block.l * style.storeyM
+    const c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM)
+    if (block.k === 'church' && block.w >= 12) {
+      // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
+      // spitzem Pyramidendach – macht eine Kirche von Weitem erkennbar.
+      if (cos + sin < 0) { cos = -cos; sin = -sin }
+      const side = Math.min(8, Math.max(4, block.d * 0.5))
+      const tx = cx + (hw - side / 2) * cos, ty = cy + (hw - side / 2) * sin
+      const towerEave = eave + style.roofM + Math.max(8, side * 1.6)
+      drawMass(g, block.k, tx, ty, side / 2 + 0.3, side / 2 + 0.3, cos, sin, towerEave, side * 1.8)
     }
     // Tiefe: der vorderste Fußpunkt entscheidet, was vor wem steht.
     g.zIndex = Math.max(...c.map(p => p.x + p.y))
@@ -294,8 +320,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const known = fetched.get(key)
     if (known) { showTile(tile, known); return }
     inFlight.add(key)
+    const asked = generation
     try {
       const data = await options.loadTile(tile)
+      if (asked !== generation) return
       fetched.set(key, data)
       if (fetched.size > FETCHED_CACHE) fetched.delete(fetched.keys().next().value as string)
       // Nur zeigen, wenn die Kachel noch gebraucht wird.
@@ -441,7 +469,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       for (const entry of loaded.values()) blocks += entry.blocks.length
       const rebuildsPerS = (rebuilds - hudRebuilds) / seconds
       hudRebuilds = rebuilds
-      options.onHud({ frame: stats.summary(), rebuildsPerS, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom })
+      const hereTile = loaded.get(tileKey(tileAt(geoToMerc(geo))))
+      const here = { loaded: Boolean(hereTile?.done), blocks: hereTile?.data.blocks.length ?? 0, built: Boolean(hereTile?.data.areas.some(area => area.k === 'built')) }
+      options.onHud({ frame: stats.summary(), rebuildsPerS, here, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom })
     }
     logicMs = performance.now() - logicStart
   })
@@ -450,6 +480,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     jump(at) {
       const p = toWorld(at)
       player.x = p.x; player.y = p.y; camera.x = p.x; camera.y = p.y
+      lastViewKey = ''
+    },
+    position: () => toGeo(player),
+    reloadTiles() {
+      for (const [key, entry] of loaded) dropTile(key, entry)
+      fetched.clear()
+      inFlight.clear()
+      generation++
+      building = []
       lastViewKey = ''
     },
     destroy() {

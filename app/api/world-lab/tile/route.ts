@@ -17,6 +17,9 @@ type Region = { id: string; lat: number; lon: number; radiusKm: number }
 const REGION_TTL_MS = 10 * 60_000
 let regionCache: { at: number; regions: Region[] } | null = null
 const featureCache = new Map<string, { at: number; features: SourceFeature[] }>()
+// Nach einem Nachladen (/api/world-lab/refresh) schickt die Ansicht einen neuen
+// Stempel mit; dann werden Regionen und Objekte einmal neu gelesen.
+let freshStamp = ''
 
 async function earthRegions(supabase: any): Promise<Region[]> {
   if (regionCache && Date.now() - regionCache.at < REGION_TTL_MS) return regionCache.regions
@@ -49,6 +52,8 @@ export async function GET(req: NextRequest) {
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= max || y >= max) {
     return NextResponse.json({ error: 'x und y müssen ganze Kachelnummern sein.' }, { status: 400 })
   }
+  const fresh = params.get('fresh') ?? ''
+  if (fresh && fresh !== freshStamp) { freshStamp = fresh; regionCache = null; featureCache.clear() }
   const origin = tileOrigin({ x, y })
   const centre = mercToGeo({ x: origin.x + TILE_SIZE_MERC / 2, y: origin.y - TILE_SIZE_MERC / 2 })
 
@@ -60,6 +65,7 @@ export async function GET(req: NextRequest) {
   })
   const features = (await Promise.all(regions.map(region => regionFeatures(supabase, region.id)))).flat()
   return NextResponse.json(buildTile(features, { x, y }, TILE_Z), {
-    headers: { 'Cache-Control': 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800' },
+    // Nachgeladene Kacheln nicht am Rand zwischenspeichern; sonst eine Stunde lang.
+    headers: { 'Cache-Control': fresh ? 'private, no-store, max-age=0' : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' },
   })
 }

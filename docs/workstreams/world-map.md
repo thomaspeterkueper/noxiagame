@@ -15,6 +15,7 @@ Seite: `/world-lab` (nur angemeldet erreichbar, nicht aus dem Spiel verlinkt).
 | Baukasten: Aussehen je Blockart, Farben für Flächen und Straßen | `lib/worldlab/blocks.ts` |
 | Kachel-Abruf | `GET /api/world-lab/tile?x=…&y=…` |
 | NOXIA-Gebäude auf der Erde | `GET /api/world-lab/buildings` |
+| Kartendaten für einen Ort nachladen (veraltete Regionen, Ortsdetail je Zelle von ≈ 667 m) | `POST /api/world-lab/refresh`, Raster in `lib/worldlab/detailCells.ts` |
 | Ansicht (Bühne und Anzeige) | `app/world-lab/WorldLab.tsx` |
 | Zeichenmaschine ohne React (Kacheln, Tiefe, Kamera, Messung) | `app/world-lab/worldEngine.ts` |
 | Welche Kacheln der Bildschirm braucht, kleinster Zoom | `lib/worldlab/viewTiles.ts`, Tests daneben |
@@ -62,9 +63,9 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 4. Kollision und Wegenetz (im Prototyp läuft die Figur durch alles hindurch).
 5. Personen, Ansprechen, „Gehe hin“, Betreten von Gebäuden – erst wenn die Darstellung trägt.
 6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
-7. Datenlücke: Echte Gebäudeumrisse gibt es bisher nur an einzelnen Stellen (Sundern Mitte und drei kleine Ausschnitte). Außerhalb zeigt die Karte Straßen und Flächen, aber keine Blöcke.
-8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Offen: Sundern neu importieren – siehe `internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`.
-9. Einzelbilder für besondere Gebäude (Kirche, Bahnhof, Café, NOXIA-Gebäude): ganzes Bild in derselben Ansicht mit Fußpunkt, statt aus Wandstücken zusammengesetzt. Maße stehen in der Zeichenvorlage.
+7. ~~Datenlücke~~ Teilweise erledigt: `/world-lab` holt Ortsdetail (Gebäude, Wohnstraßen, Wege) selbst nach – beim Start für die Zelle um die Figur, in bebauten Kacheln ohne Gebäude selbsttätig, sonst mit „Kartendaten hier nachladen“. Offen: prüfen, ob Overpass zuverlässig antwortet; Zellen ohne Bebauung werden nicht geholt.
+8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Die veraltete Region Sauerland erneuert `/world-lab` beim Start selbst. Offen: prüfen, ob das Röhrtalstadion erscheint (`internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`).
+9. Kirchen haben jetzt einen Turm an der Stirnseite (geschätzt, OSM sagt nicht, wo er steht), Höhen aus OSM `height` werden genutzt. Einzelbilder für besondere Gebäude (Kirche, Bahnhof, Café, NOXIA-Gebäude): ganzes Bild in derselben Ansicht mit Fußpunkt, statt aus Wandstücken zusammengesetzt. Maße stehen in der Zeichenvorlage.
 10. Häuser vor der Figur durchscheinend machen, damit sie in engen Gassen sichtbar bleibt (die richtige Höhe verdeckt mehr Straße).
 
 ## Nicht in diesem Teilprojekt
