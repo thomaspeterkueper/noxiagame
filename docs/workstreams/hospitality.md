@@ -60,6 +60,14 @@ Entscheidung Thomas, 13.10.2026: Das Startcafé ist von 23:00 bis 6:00 Uhr gesch
 - Bewohner im Raum folgen weiter der Koloniezeit; das Café kann für Bewohner offen sein, während es für den Spieler zu ist. Darstellung dann: Tür zu, kein Einlass.
 - Serverseitige Prüfung der Bestellung übernimmt Bevölkerung und Ökonomie (Antwort auf R-4).
 
+### G-3 (Bevölkerung und Ökonomie, 13.10.2026): Sprache der Figuren im Gespräch
+
+Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in China spricht man häufiger Mandarin als Deutsch. Entwurf: NOXIA-LIVING-0014. Sobald `person_languages` existiert:
+
+- Die Gesprächsroute gibt der Figur ihre Sprachen und Kenntnisse als Fakten mit; die Figur spricht in ihrer Sprache bzw. der besten gemeinsamen.
+- Oberfläche: Rede in der Sprache der Figur oder übersetzt mit Kennzeichnung – Vorschlag bitte von hier.
+- Karten im Lokal mehrsprachig bzw. in der Ortssprache; Küche je Ort (später).
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.
