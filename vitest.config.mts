@@ -18,6 +18,7 @@ export default defineConfig({
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/game/spatial/localSceneRuntime.test.ts',
+      'lib/worldlab/simplify.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',
       'lib/game/landmarks/interiors.test.ts',
       'lib/game/spatial/buildingMassing.test.ts',
