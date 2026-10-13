@@ -20,6 +20,8 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
 7. Siehe Request R-2.
 8. Startcafé braucht Personal: Der Platzhalter-Wirt ist entfernt, ein Café ohne Personal ist ein Automatencafé ohne Einstiegsgespräch. Prüfen, ob `20261010090000_earth_cafe_host.sql` live angewendet ist (aus Teilprojekt Gastronomie).
 9. Ausgeben im Lokal: Die Oberfläche sendet bei `POST /api/game/hospitality/order` jetzt `recipientPersonId`, wenn der Spieler für eine Person im Raum bestellt. Route und `order_hospitality_item` werten das Feld noch nicht aus. Gewünscht (Thomas, 12.10.2026): Die Eigenschaften der Person ändern sich – ihr Hunger bzw. Durst wird gestillt (nach Aufgabe 5, `hospitality_item_effects`), dazu Wirkung auf Beziehung und Stimmung. Entwurf: NOXIA-LIVING-0012 Abschnitt 7. Zu bauen: Prüfung, dass die Person in diesem Gebäude ist (`person_interior_presence`); Wiederholung per `requestId` wirkt nur einmal (Geld, Bedürfnis, Beziehung, Stimmung in einer Transaktion); Beziehungseffekt skaliert mit dem Bedarf der Person; neue Tabelle `person_player_relationships` nach den Regeln aus NOXIA-LIVING-0008 – eine Beziehung Person ↔ Spieler gibt es bisher nicht; Stimmung über ein `population_events`-Ereignis, nicht direkt in `person_affect`. Erst nach Aufgabe 5 Schritte 1–3 (aus Teilprojekt Gastronomie).
+10. Essensangebot an bewohnten Orten (aus R-3): Mars / Tharsis Hub, Phobos, Prometheus Station und Mond / Shackleton haben Bewohner, aber kein Café und keine Speisehalle. Zu entscheiden: Standardausstattung nach Ortsstufe jetzt auslösen (`settlement-tiers.md`: Café ab Stufe 1, staatlich) oder vorerst je Ort ein staatliches Café per Migration setzen.
+11. Wahl unter mehreren Lokalen am Ort streuen (aus R-1): `run_npc_consumption` nimmt immer das billigste, bei Gleichstand dasselbe Gebäude. Zusammen mit R-5 (Ausgehen nach Tageszeit) und R-4 (Öffnungszeiten auch in der Kaufauswahl prüfen).
 
 ## Requests aus anderen Teilprojekten
 
@@ -33,6 +35,10 @@ Innenraum, Figuren, Gesprächswissen, Eintritt und Gebäudeansicht sind fertig (
 - `lib/game/buildings/index.ts`: `bar` steht dort auf `planned: true`; `restaurant` fehlt.
 - Zu entscheiden: ab welcher Ortsstufe (siehe `docs/gameplay/settlement-tiers.md` – Café ab Siedlung, Bar ab Ort?) und ob Spieler sie als zusätzliche Einrichtung bauen dürfen.
 - Stellen: Bar 2, Restaurant 3 Personalplätze (Aufgabe 2). Ohne Personal sind beide geschlossen.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** übernommen, noch nicht gebaut. Bereits geklärt durch `settlement-tiers.md` Abschnitt 5: Spieler dürfen Bar und Restaurant als zusätzliche Einrichtung bauen und daraus Einnahmen beziehen. Offen und von Thomas zu entscheiden: Ortsstufe (Vorschlag: Bar und Restaurant ab Stufe 2 Ort; das Café bleibt die Standardausstattung ab Stufe 1) und die Preise (Vorschlag aus dem Request übernommen: Bar 1 800, Restaurant 2 400, je 2 Ticks). Weil die Stufe noch nirgends ausgelöst wird (`settlement-tiers.md`), wäre die Stufengrenze vorerst nur eine dokumentierte Regel, keine Sperre.
+
+Fund dazu, gilt für alle Lokale: Bewohner wählen in `run_npc_consumption` immer das billigste Angebot am Ort, bei Gleichstand nach `tile_entities.id`. In Tharsis Hub Sauerland stehen zwei Cafés; eines hat alle 19 Verkäufe, das andere keinen. Mit Bar und Restaurant würde jedes weitere Lokal am Ort dauerhaft leer bleiben. Vor R-1 live: Wahl unter gleichwertigen Angeboten streuen (deterministisch nach Person und Tick) oder nach Gewohnheit (`person_habits`) – Aufgabe 11, zusammen mit R-5.
 
 ### R-2 (Gastronomie, 13.10.2026): Karten für Bar und Restaurant anlegen
 
@@ -50,9 +56,20 @@ Ersetzt Aufgabe 7. Zeilen in `hospitality_menu`; Vorschlag, an Getränk 3 / Kuch
 
 Die Oberfläche zeigt eine neue Karte ohne weitere Änderung. Für Bewohner fehlt dazu der Eintrag in `npc_service_catalog` (heute nur `cafe` / `cafe_meal`), sonst kaufen sie in Bar und Restaurant nichts.
 
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026):** Karte wie vorgeschlagen übernommen. Die Wirkung der Posten auf Hunger und Durst ist in `NOXIA-LIVING-0012` Abschnitt 5 ergänzt (`hospitality_item_effects`), sodass dieselbe Tabelle Spieler und Bewohner bedient. Die Zeilen in `hospitality_menu` kommen mit R-1 in dieselbe Migration – ohne baubares Gebäude ist eine Karte wirkungslos. Für Bewohner wird `npc_service_catalog` nicht um weitere `sustenance`-Dienste erweitert, sondern zieht mit LIVING-0012 Schritt 3 auf die Kartenposten um.
+
 ### R-3 (Gastronomie, 13.10.2026): Käufe der Bewohner sind selten
 
 Im Lokal erscheinen jetzt die Bewohner als Gäste, die dort wirklich gekauft haben (`person_consumption_events`, letzte Stunde). Bisher gibt es 19 Käufe insgesamt, etwa einen alle paar Stunden – das Café ist deshalb meist leer bis auf das Personal. Kein Fehler der Anzeige; ob häufiger gegessen und getrunken wird, hängt an Bedarf, Geld und `min_interval_ticks`, also an den Aufgaben 5 und 9.
+
+**Antwort (Bevölkerung und Ökonomie, 13.10.2026), Befund aus den Live-Daten:**
+
+- 17 von 32 Bewohnern liegen unter der Kaufschwelle (`sustenance` < 0,65), Mittelwert aller 0,61. Geld ist genug da (Guthaben im Schnitt 700–1 700 Credits).
+- 15 dieser 17 leben an Orten **ohne jedes Essensangebot**: Mars / Tharsis Hub (10, im Schnitt 0,40), Phobos (2), Prometheus Station (2), Mond / Shackleton (1). Sie können gar nicht kaufen.
+- Essensangebote gibt es nur in Tharsis Hub Sauerland (zwei Cafés, 7 Bewohner) und Q1 (Café und Speisehalle, 1 Bewohner). Alle 19 Käufe fanden im selben Café in Sauerland statt.
+- Gekauft wird nur in jedem sechsten Tick und nur unter 0,65.
+
+Das leere Lokal liegt also vor allem am Angebot, nicht an Bedarf oder Geld. Hunger und Durst (LIVING-0012) erhöhen die Häufigkeit – Durst sinkt schneller –, lösen das aber nicht allein. Nötig sind Essensangebote an den bewohnten Orten. Nach `settlement-tiers.md` wäre das die Standardausstattung ab Stufe 1 (Café, automatisch, staatlich), die noch nicht ausgelöst wird. Neue Aufgabe 10.
 
 ### R-4 (Gastronomie, 13.10.2026): Öffnungszeiten als Daten
 

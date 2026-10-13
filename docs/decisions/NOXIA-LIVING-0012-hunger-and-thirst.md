@@ -97,7 +97,19 @@ Startwerte Café:
 | cake (Kuchen) | +0,15 | – | 5 |
 | meal (Mahlzeit) | +0,30 | +0,10 | 8 |
 
-Bar und Restaurant folgen mit Aufgabe 7 nach demselben Muster.
+Bar und Restaurant (Karte aus Request R-2 der Gastronomie, 13.10.2026):
+
+| Lokal | Posten | hunger | thirst | Preis |
+|---|---|---|---|---|
+| bar | drink (Getränk) | – | +0,35 | 3 |
+| bar | snack (Snack) | +0,10 | – | 4 |
+| bar | longdrink (Longdrink) | – | +0,30 | 6 |
+| restaurant | drink (Getränk) | – | +0,35 | 3 |
+| restaurant | dessert (Nachtisch) | +0,15 | – | 5 |
+| restaurant | starter (Vorspeise) | +0,15 | +0,05 | 6 |
+| restaurant | main (Hauptgericht) | +0,40 | +0,10 | 12 |
+
+Der Longdrink stillt etwas weniger Durst als ein Getränk und kostet mehr: In der Bar zahlt man für den Ort und die Gesellschaft, nicht für die Versorgung. Diese Wirkung (Stimmung, `variety`) gehört zur offenen Aufgabe „Wirkung des Lokals auf Stimmung", nicht in diese Tabelle.
 
 ### 6. Sichtbarkeit für den Spieler
 
