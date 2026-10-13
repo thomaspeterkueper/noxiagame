@@ -1,6 +1,6 @@
 // lib/game/spatial/buildingMassing.ts
 // Aktualisiert: 12.10.2026 — Kirchturm-Grundriss und hohe Fenster; Walmdach für rechteckige Grundrisse und Fensterreihen; Höhe, Dachform und Farbgebung realer Gebäude für die 2,5D-Darstellung
-// Version:      1.2.0
+// Version:      1.2.1
 
 export type BuildingRoofForm = 'pitched' | 'flat'
 export type BuildingMassingStyle = {
@@ -72,7 +72,7 @@ export function extrudeFootprint(base: ScreenPoint[], heightPx: number) {
   for (let i = 0; i < base.length; i++) { const p = base[i], q = base[(i + 1) % base.length]; area += p.x * q.y - q.x * p.y }
   const sign = area >= 0 ? 1 : -1
   const lift = (point: ScreenPoint) => ({ x: point.x, y: point.y - heightPx })
-  const walls: Array<{ points: ScreenPoint[]; lit: boolean }> = []
+  const walls: Array<{ points: ScreenPoint[]; lit: boolean; edge: number }> = []
   let longest = 0, ridgeDir = { x: 1, y: 0 }
   for (let i = 0; i < base.length; i++) {
     const p = base[i], q = base[(i + 1) % base.length]
@@ -81,7 +81,7 @@ export function extrudeFootprint(base: ScreenPoint[], heightPx: number) {
     if (length > longest) { longest = length; ridgeDir = { x: dx / (length || 1), y: dy / (length || 1) } }
     const outward = { x: dy * sign, y: -dx * sign }
     if (outward.y <= 0) continue
-    walls.push({ points: [p, q, lift(q), lift(p)], lit: outward.x < 0 })
+    walls.push({ points: [p, q, lift(q), lift(p)], lit: outward.x < 0, edge: i })
   }
   const roof = base.map(lift)
   const cx = roof.reduce((sum, point) => sum + point.x, 0) / roof.length
