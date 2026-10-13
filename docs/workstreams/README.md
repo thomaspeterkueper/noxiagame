@@ -13,3 +13,4 @@ Regeln:
 |---|---|---|
 | Bevölkerung und Ökonomie | `population-economy.md` | Bedürfnisse, Affekt, Beziehungen, Wohnen, Stellen, Geldkreislauf, Forschungslauf |
 | Gastronomie | `hospitality.md` | Café, Bar, Restaurant: Innenaufbau, Figuren, Gespräche, Bedienoberfläche |
+| Erdkarte – eine Welt | `world-map.md` | Kartendarstellung der Erde als durchgehende Welt (Prototyp mit PixiJS), Baukasten für Gebäudeblöcke |
