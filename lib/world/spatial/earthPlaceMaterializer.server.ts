@@ -30,7 +30,8 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
 ]
 const MAX_POINTS_PER_FEATURE = 36
-export const EARTH_GEOGRAPHY_IMPORT_VERSION = 3
+// 4: Sportflächen (leisure=pitch|stadium|track|sports_centre, ohne Golf) als 'sport'
+export const EARTH_GEOGRAPHY_IMPORT_VERSION = 4
 export const EARTH_NORMALIZATION_VERSION = 1
 export const EARTH_ENRICHMENT_VERSION = 1
 const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v3'
@@ -93,6 +94,7 @@ function classify(tags: Tags, isNode = false) {
   if (tags.natural === 'water' || tags.water) return 'water'
   if (/^(beach|sand|shoal)$/.test(tags.natural ?? '')) return 'beach'
   if (/^(bare_rock|scree|shingle|rock)$/.test(tags.natural ?? '')) return 'rock'
+  if (/^(pitch|stadium|track|sports_centre)$/.test(tags.leisure ?? '') && tags.sport !== 'golf') return 'sport'
   if (tags.landuse === 'forest' || tags.natural === 'wood' || tags.landcover === 'trees') return 'forest'
   if (/^(scrub|grassland|heath|wetland)$/.test(tags.natural ?? '') || tags.landcover === 'grass' || /^(park|nature_reserve)$/.test(tags.leisure ?? '')) return 'vegetation'
   if (/^(farmland|farmyard|meadow|orchard|grass)$/.test(tags.landuse ?? '')) return 'farmland'
@@ -106,6 +108,7 @@ function visualClass(featureType: string, tags: Tags) {
   if (featureType === 'farmland') return tags.landuse ?? 'farmland'
   if (featureType === 'vegetation') return tags.natural ?? tags.landcover ?? tags.leisure ?? 'vegetation'
   if (featureType === 'urban') return tags.landuse ?? 'urban'
+  if (featureType === 'sport') return tags.leisure ?? 'pitch'
   if (featureType === 'beach' || featureType === 'rock') return tags.natural ?? featureType
   if (featureType === 'landmark') return tags.tourism ?? tags.historic ?? tags.amenity ?? tags.railway ?? tags.man_made ?? 'landmark'
   return featureType
@@ -256,6 +259,7 @@ way[landcover=trees](${box});relation[landcover=trees](${box});
 way[natural~"scrub|grassland|heath|wetland"](${box});relation[natural~"scrub|grassland|heath|wetland"](${box});
 way[landcover=grass](${box});relation[landcover=grass](${box});
 way[leisure~"park|nature_reserve"](${box});relation[leisure~"park|nature_reserve"](${box});
+way[leisure~"pitch|stadium|track|sports_centre"](${box});relation[leisure~"pitch|stadium|track|sports_centre"](${box});
 way[landuse~"farmland|farmyard|meadow|orchard|grass"](${box});
 way[landuse~"residential|commercial|retail"](${box});relation[landuse~"residential|commercial|retail"](${box});
 way[landuse=industrial](${box});relation[landuse=industrial](${box});

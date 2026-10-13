@@ -82,6 +82,19 @@ describe('world lab: simplification', () => {
     expect(built.areas.map(area => area.k)).toEqual(['field', 'forest', 'water'])
   })
 
+  it('keeps sports grounds: grounds below track below pitch, golf stays vegetation', () => {
+    const sport: SourceFeature[] = [
+      { id: 'pitch', featureType: 'sport', geometry: polygon([[60, 60], [120, 60], [120, 100], [60, 100], [60, 60]]), properties: { visual_class: 'pitch' } },
+      { id: 'track', featureType: 'sport', geometry: polygon([[50, 50], [130, 50], [130, 110], [50, 110], [50, 50]]), properties: { visual_class: 'track' } },
+      { id: 'stadium', featureType: 'sport', geometry: polygon([[40, 40], [140, 40], [140, 120], [40, 120], [40, 40]]), properties: { visual_class: 'stadium' } },
+      { id: 'green', featureType: 'vegetation', geometry: polygon([[0, 150], [20, 150], [20, 170], [0, 170], [0, 150]]), properties: { leisure: 'pitch', sport: 'golf' } },
+    ]
+    const tileWithSport = buildTile(sport, tile, TILE_Z)
+    expect(tileWithSport.areas.map(area => area.k)).toEqual(['forest', 'grounds', 'track', 'pitch'])
+    // das Spielfeld bleibt ein Rechteck
+    expect(tileWithSport.areas[3].p).toHaveLength(10) // vier Ecken und der Schlusspunkt
+  })
+
   it('stays small', () => {
     expect(JSON.stringify(built).length).toBeLessThan(900)
   })

@@ -25,7 +25,7 @@ Wie es arbeitet:
 - **Kacheln statt Szenen.** Geladen ist, was der Bildschirm zeigt, plus ein schmaler Rand (und nach unten etwas mehr für hohe Gebäude). Beim Herauszoomen kommen Kacheln dazu; das Herauszoomen endet bei rund 60 Kacheln Bodenfläche (bei 1280 × 800 etwa Zoom 0,68). Neue Kacheln werden über mehrere Bilder verteilt aufgebaut, erst der Boden, dann die Blöcke in Portionen. Es wird nie die ganze Ansicht ersetzt.
 - **Zeichengruppen.** Welt, Boden und jeder Tiefenstreifen der Objekte (32 m) sind eigene PixiJS-Zeichengruppen. Die Kamerabewegung rechnet die Grafikkarte; geht die Figur an einem Block vorbei, wird nur ihr Streifen neu sortiert.
 - **Ein Koordinatensystem.** Die Position ist Web-Mercator; jede Kachel passt lückenlos an ihre Nachbarn. Es gibt keine Regionsanker und keine gemerkte Position je Szene.
-- **Stark vereinfacht.** Straßen in drei Klassen (Hauptstraße, Straße, Weg), Flächen in vier Arten (Feld, bebaut, Wald, Wasser), Gewässerlinien, Gebäude als Blöcke: Lage, Größe, Drehung, Art (Haus, Zeile, Halle, Kirche, Schuppen), Geschosse. Eine Kachel ist rund 1 kB groß.
+- **Stark vereinfacht.** Straßen in drei Klassen (Hauptstraße, Straße, Weg), Flächen in sieben Arten (Feld, bebaut, Wald, Wasser, Sportanlage, Laufbahn, Spielfeld), Gewässerlinien, Gebäude als Blöcke: Lage, Größe, Drehung, Art (Haus, Zeile, Halle, Kirche, Schuppen), Geschosse. Eine Kachel ist rund 1 kB groß.
 - **Jedes Gebäude einmal.** Es gehört zu der Kachel, in der seine Mitte liegt; doppelt importierte Objekte werden nur einmal gezählt.
 - **NOXIA-Gebäude** stehen mit ihren bestehenden Bildern an ihrer echten Position.
 
@@ -60,7 +60,7 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 5. Personen, Ansprechen, „Gehe hin“, Betreten von Gebäuden – erst wenn die Darstellung trägt.
 6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
 7. Datenlücke: Echte Gebäudeumrisse gibt es bisher nur an einzelnen Stellen (Sundern Mitte und drei kleine Ausschnitte). Außerhalb zeigt die Karte Straßen und Flächen, aber keine Blöcke.
-8. Sportplätze fehlen: Der Import (`scripts/import-earth-region.mjs`) übernimmt keine Sportflächen (`leisure=pitch|stadium|track|sports_centre`). Das Röhrtalstadion erscheint deshalb als beige Wohnfläche. Vorschlag: fünfte Flächenart „Sportplatz“ (Rasen mit hellen Linien, Laufbahn rotbraun) in `simplify.ts` und `blocks.ts`, danach Sundern neu importieren. Der Import braucht Zugang zu Overpass und läuft deshalb nicht aus der Claude-Umgebung.
+8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Offen: Sundern neu importieren – siehe `internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`.
 
 ## Nicht in diesem Teilprojekt
 

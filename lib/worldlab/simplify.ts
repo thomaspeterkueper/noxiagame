@@ -16,7 +16,7 @@ export interface SourceFeature {
 }
 
 export type RoadClass = 'main' | 'street' | 'path'
-export type AreaKind = 'water' | 'forest' | 'field' | 'built'
+export type AreaKind = 'water' | 'forest' | 'field' | 'built' | 'grounds' | 'track' | 'pitch'
 export type BlockKind = 'house' | 'row' | 'hall' | 'church' | 'shed'
 
 export interface TileRoad { c: RoadClass; p: number[] }
@@ -40,7 +40,14 @@ const ROAD_CLASS: Record<string, RoadClass> = {
   footway: 'path', path: 'path', track: 'path', cycleway: 'path',
 }
 const AREA_KIND: Record<string, AreaKind> = {
-  water: 'water', forest: 'forest', vegetation: 'forest', farmland: 'field', urban: 'built', industrial: 'built',
+  water: 'water', forest: 'forest', vegetation: 'forest', farmland: 'field', urban: 'built', industrial: 'built', sport: 'pitch',
+}
+
+/** Sportflächen: Anlage (Stadion, Sportzentrum), Laufbahn, Spielfeld. */
+function areaKind(featureType: string, properties: Record<string, unknown>): AreaKind | undefined {
+  if (featureType !== 'sport') return AREA_KIND[featureType]
+  const leisure = String(properties.visual_class ?? properties.leisure ?? '')
+  return leisure === 'track' ? 'track' : leisure === 'stadium' || leisure === 'sports_centre' ? 'grounds' : 'pitch'
 }
 
 type P = { x: number; y: number }
@@ -167,13 +174,15 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       out.roads.push({ c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : 1.5)) })
     } else if (feature.featureType === 'waterway' && feature.geometry.kind === 'line') {
       out.rivers.push(flat(simplifyLine(points, 2)))
-    } else if (AREA_KIND[feature.featureType] && feature.geometry.kind === 'polygon' && points.length >= 3) {
-      const simplified = simplifyLine(points, 4)
-      if (simplified.length >= 3) out.areas.push({ k: AREA_KIND[feature.featureType], p: flat(simplified) })
+    } else if (areaKind(feature.featureType, properties) && feature.geometry.kind === 'polygon' && points.length >= 3) {
+      // Sportflächen sind klein und rechteckig – feiner vereinfachen, damit das Feld eckig bleibt.
+      const simplified = simplifyLine(points, feature.featureType === 'sport' ? 1 : 4)
+      if (simplified.length >= 3) out.areas.push({ k: areaKind(feature.featureType, properties) as AreaKind, p: flat(simplified) })
     }
   }
-  // Feste Reihenfolge: Felder unten, dann bebaute Fläche, Wald, Wasser zuoberst.
-  const order: Record<AreaKind, number> = { field: 0, built: 1, forest: 2, water: 3 }
+  // Feste Reihenfolge: Felder unten, dann bebaute Fläche, Wald, Sportanlage,
+  // Laufbahn, Spielfeld, Wasser zuoberst.
+  const order: Record<AreaKind, number> = { field: 0, built: 1, forest: 2, grounds: 3, track: 4, pitch: 5, water: 6 }
   out.areas.sort((a, b) => order[a.k] - order[b.k])
   const roadOrder: Record<RoadClass, number> = { path: 0, street: 1, main: 2 }
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])

@@ -24,7 +24,14 @@ export const BLOCK_STYLES: Record<BlockKind, BlockStyle> = {
 }
 
 export const GROUND_COLOR = 0xa9bd8c
-export const AREA_COLORS: Record<AreaKind, number> = { field: 0xbfcf93, built: 0xcfc9b4, forest: 0x6f9a62, water: 0x6fb1d6 }
+export const AREA_COLORS: Record<AreaKind, number> = {
+  field: 0xbfcf93, built: 0xcfc9b4, forest: 0x6f9a62, water: 0x6fb1d6,
+  grounds: 0xb9c6a0, track: 0xb5654a, pitch: 0x5f9e4c,
+}
+/** Randlinie für Flächen, die eine haben (Spielfeld: helle Markierung). */
+export const AREA_OUTLINES: Partial<Record<AreaKind, { widthM: number; color: number }>> = {
+  pitch: { widthM: 0.8, color: 0xf2f5ec },
+}
 export const ROAD_STYLES: Record<RoadClass, { widthM: number; color: number }> = {
   main: { widthM: 9, color: 0xf2ead8 },
   street: { widthM: 6, color: 0xe9e2d0 },

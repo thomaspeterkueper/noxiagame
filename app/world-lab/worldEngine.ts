@@ -7,7 +7,7 @@
 
 import type { Application, Container, Graphics as PixiGraphics } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { AREA_COLORS, BLOCK_STYLES, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { AREA_COLORS, AREA_OUTLINES, BLOCK_STYLES, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
@@ -196,7 +196,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const { data, ox, oy } = entry
     const g = new PIXI.Graphics()
     const path = (flat: number[]) => { const out: number[] = []; for (let i = 0; i < flat.length; i += 2) { const s = iso(ox + flat[i], oy + flat[i + 1]); out.push(s.x, s.y) } return out }
-    for (const area of data.areas) g.poly(path(area.p)).fill(AREA_COLORS[area.k])
+    for (const area of data.areas) {
+      g.poly(path(area.p)).fill(AREA_COLORS[area.k])
+      const outline = AREA_OUTLINES[area.k]
+      if (outline) g.stroke({ width: outline.widthM * 0.75, color: outline.color, join: 'miter' })
+    }
     for (const river of data.rivers) { const p = path(river); g.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]); g.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
     for (const road of data.roads) {
       const style = ROAD_STYLES[road.c], p = path(road.p)
