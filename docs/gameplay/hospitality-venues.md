@@ -35,7 +35,8 @@ Nach dem Vorbild SunDog: Am Empfang mietet man ein Zimmer. Gebaut (Entscheidung 
 - **Zimmer buchen:** Ein Zimmer ist ein Posten der Karte (`item_code` `room_night`, „Zimmer für eine Nacht“) und wird am Empfang wie eine Bestellung gebucht – versteuerte Überweisung über `order_hospitality_item`, Kennung je Versuch. Die Karte zeigt ihn getrennt von Speisen, mit Schlüssel als Bild.
 - **Belegung:** Zimmerzahl ist `transient_capacity` des Gebäudes; belegt sind die Buchungen der letzten 24 Stunden (`player_hospitality_orders`, eine Nacht = 24 Stunden Echtzeit – ein Platzhalter, bis Koloniezeit und Spielzeit verknüpft sind). `GET /api/game/hospitality/guests` liefert `rooms {capacity, occupied, mineForS}`. Wer schon ein Zimmer hat oder wenn keins frei ist, kann nicht buchen – das prüft nur die Oberfläche (Request R-7: serverseitig).
 - **Wissen:** Das Personal kennt Zimmerzahl und freie Zimmer und weiß, ob der Gast eines hat; ein Gast sieht nur die Treppe und den Schlüssel des Gegenübers. Zimmer über einem Café oder Restaurant funktionieren genauso, sobald das Gebäude Gästeplätze hat.
-- **Noch nichts bewirkt** das Zimmer: Erholung als Bedürfnis gibt es nicht (R-7), und es gibt kein Hotelgebäude – `hotel` fehlt in `building_definitions`, die Karte hat keine Zeile `room_night`. Beides liegt bei Bevölkerung und Ökonomie.
+- **Baubar** (Entscheidung Thomas, 14.10.2026: einbauen): Migration `20261014090000_hotel_rooms.sql` – Gebäudeart `hotel` (Stufe 2, 3 600 Credits, 3 Ticks), neue Hotels bekommen 6 Gästeplätze, Kartenzeile `room_night` 40 Credits, und ein Trigger auf `player_hospitality_orders` weist Buchungen ab, wenn kein Zimmer frei ist oder der Gast schon eines hat (`NOXIA_ROOM_NONE_FREE`, `NOXIA_ROOM_ALREADY_BOOKED`, `NOXIA_ROOM_NONE_HERE`). Geprüft in einer zurückgerollten Transaktion gegen die Live-Daten.
+- **Noch nichts bewirkt** das Zimmer: Erholung als Bedürfnis gibt es nicht (R-7).
 
 ## 2. Innenaufbau
 

@@ -24,6 +24,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Hafenkantine betretbar (Request G-1): Zugang vom Hafen, Innenraum mit Automat oder Roboter, feste Antworten, Wasser und Ration mit Bildern (Branch `feat/port-canteen-interior`). Beschreibung: `hospitality-venues.md` Abschnitt 1a.
 - Kantinenschwarm mit Gedächtnis aus echten Bestellungen, stummer Automat; Startcafé 23–6 Uhr nach Ortszeit des Spielers geschlossen (Branch `feat/canteen-swarm-and-local-hours`).
 - Hotel: Lobby mit Empfang, Zimmer buchen als Posten `room_night` über die Bestellroute, Belegung aus echten Buchungen, Gebäudeansicht (Branch `feat/hotel-rooms`). Beschreibung: `hospitality-venues.md` Abschnitt 1b.
+- Hotel baubar: Migration `20261014090000_hotel_rooms.sql` (Gebäudeart, 6 Zimmer, Kartenzeile, Belegungsprüfung im Server) – entschieden von Thomas am 14.10.2026, von Gastronomie selbst gebaut (Branch `feat/hotel-buildable`). Einspielen live: siehe Aufgabe 10.
 
 ## Gestellte Requests
 
@@ -86,6 +87,8 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 8. Bedienung am Tisch: Personal kommt zum sitzenden Spieler und nimmt die Bestellung auf.
 
 9. Hafenkantine in Q1: Das Hafenviertel hat noch keinen Weg hinein. Dazu Notration-Knopf, sobald der Server sie für Spieler ausgibt.
+
+10. Migration `20261014090000_hotel_rooms.sql` live einspielen – `apply_migration` und `execute_sql` kamen beide mit „cancelled“ zurück; Inhalt in einer zurückgerollten Probe geprüft. Danach ein Hotel bauen und einmal ein Zimmer buchen.
 
 ## Nicht in diesem Teilprojekt
 
