@@ -35,3 +35,28 @@ An observation carries observer identity, tick/time, subject identity, observati
 ## Non-human actors
 
 The same cycle should later support rovers, mines, power plants and habitat controllers. Their sensors and actuators differ; the epistemic boundary and authoritative action contract do not.
+
+
+## Resolution boundary
+
+Observation depth and simulation depth are independent.
+
+The engine may resolve a subsystem more deeply for causal, failure, interaction or
+research reasons without granting that detail to any actor. An observer may only receive
+detail that is reachable through its instruments, knowledge and observation path.
+
+The shared deterministic contract lives in:
+`lib/game/simulation/resolution.ts`.
+
+Rule:
+
+`observer-visible depth <= epistemic capability`
+
+even when
+
+`simulated depth > epistemic capability`.
+
+This prevents internal engine detail from becoming accidental NPC omniscience.
+
+See also:
+`docs/architecture/NOXIA-PHIL-0001-causal-sufficiency-and-simulation-epistemology.md`.
