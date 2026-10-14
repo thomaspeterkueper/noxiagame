@@ -72,6 +72,28 @@ Weil Kolonien dadurch lebendig wirken. Der Spieler baut nicht die gesamte Stadt 
 
 ---
 
+
+## 3a. Simulationsauflösung: nur so tief wie nötig
+
+NOXIA simuliert Stadt und Zivilisation nicht überall mit derselben Detailtiefe.
+
+Ein System bleibt auf einer groben, konsistenten Ebene, solange seine internen Details
+keine beobachtbare, kausale oder entscheidungsrelevante Wirkung haben. Erst wenn ein
+Engpass, Ausfall, Konflikt, eine Interaktion oder eine Messung davon abhängt, wird die
+betroffene Stelle feiner aufgelöst.
+
+Beispiele:
+- normale Gebäudereinigung bleibt Wartungs-/Instandhaltungskosten;
+- erst ein relevanter technischer Ausfall zerlegt eine Anlage bis auf betroffene Komponenten;
+- Bevölkerung kann makroskopisch betrachtet werden, einzelne Personen werden dort explizit,
+  wo Biografie, Beziehung, Bewegung, Eigentum oder Entscheidung relevant wird;
+- Weltgeographie wird lokal bis zu Straßen, Gebäuden und Innenräumen verfeinert, nicht global.
+
+Leitprinzip: **Detailtiefe dort, wo sie gebraucht wird; Konsistenz überall.**
+
+Kanonische Querschnittsregel:
+`docs/cross-cutting/integrity-timescale-engineering.md` — Adaptive Detail Resolution.
+
 ## 4. Was begrenzt Wachstum?
 
 Wachstum ist nie eindimensional. Es gibt sechs Engpassebenen, die gleichzeitig wirken:
