@@ -7,7 +7,7 @@ import {
   type CanonicalLogisticsNodeId,
 } from './logisticsNodes'
 
-const expectedIds: CanonicalLogisticsNodeId[] = ['earth', 'moon', 'mars', 'phobos', 'prometheus']
+const expectedIds: CanonicalLogisticsNodeId[] = ['earth', 'moon', 'mars', 'phobos', 'deimos', 'prometheus']
 assert.deepEqual(Object.keys(LOGISTICS_NODES).sort(), [...expectedIds].sort())
 
 for (const id of expectedIds) {
@@ -24,6 +24,7 @@ assert.deepEqual(
     moon: 'moon',
     mars: 'mars',
     phobos: 'phobos',
+    deimos: 'deimos',
     prometheus: 'earth',
   },
   'canonical logistics nodes must retain their current world-model anchors',
@@ -45,7 +46,7 @@ for (const id of ['moon', 'mars'] as const) {
   assert.equal(LOGISTICS_NODES[id].domainMeaning, 'surface-domain')
 }
 
-for (const id of ['phobos', 'prometheus'] as const) {
+for (const id of ['phobos', 'deimos', 'prometheus'] as const) {
   assert.equal(LOGISTICS_NODES[id].domainMeaning, 'orbital-station')
   assert.equal(LOGISTICS_NODES[id].transferEndpoint, 'node-itself')
   assert.equal(LOGISTICS_NODES[id].surfaceLegSeparate, false)

@@ -390,9 +390,11 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       relationships: context.relationships,
       knowledge: context.knowledge,
     })
+    // Typsicher für die Einzeldatei-Prüfung in CI: `reason` gibt es nur im Fehlerzweig.
+    const intentBlocker = 'reason' in intent ? intent.reason : null
     const execution = intent.ok
       ? await executePopulationActionIntent(supabase, intent.intent, tick)
-      : { executed: false as const, kind: 'blocked' as const, reason: intent.reason }
+      : { executed: false as const, kind: 'blocked' as const, reason: intentBlocker }
 
     const habitExecutionEvidence = intent.ok ? classifyHabitExecution(decision.action, execution as Awaited<ReturnType<typeof executePopulationActionIntent>>) : { status: 'unverified' as const, reason: 'intent_blocked' }
     const nextActivity = activityForAction(decision.action)
@@ -403,7 +405,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
       ...decision.factors,
       score: decision.score,
       intent: intent.ok ? intent.intent.kind : null,
-      intentBlocker: intent.ok ? null : intent.reason,
+      intentBlocker,
       execution: execution.executed ? execution.kind : null,
       habitEvidenceStatus: habitExecutionEvidence.status,
     }
@@ -421,7 +423,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
         score: decision.score,
         factors: decision.factors,
         intent: intent.ok ? intent.intent : null,
-        blocker: intent.ok ? null : intent.reason,
+        blocker: intentBlocker,
         execution,
         habitEvidence: habitExecutionEvidence,
       },
