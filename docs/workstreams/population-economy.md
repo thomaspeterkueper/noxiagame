@@ -119,6 +119,8 @@ Vorbild SunDog: Im Hotel mietet man am Empfang ein Zimmer und ruht sich aus. Der
 
 **Antwort (Bevölkerung und Ökonomie, 13.10.2026):** grundsätzlich übernommen, nach LIVING-0012. Hängt an zwei Entscheidungen: **(Thomas)** Gibt es Erholung als drittes Spielerbedürfnis (dann nach denselben Regeln wie Hunger und Durst: nur sichtbar, offline eingefroren)? Und Reisende als vorübergehende Personen – ein eigenes Modell, das es noch nicht gibt. Buchung eines Zimmers kann `order_hospitality_item` als Vorlage nehmen.
 
+**Nachtrag Gastronomie (14.10.2026):** Thomas hat entschieden, das Hotel einzubauen; Gastronomie hat die drei Datenpunkte unten selbst gebaut (`20261014090000_hotel_rooms.sql`: Gebäudeart `hotel`, 6 Zimmer je neuem Hotel, `room_night` 40 Credits, Belegungsprüfung als Trigger auf `player_hospitality_orders`, Nacht = 24 Stunden Echtzeit). Bleibt bei euch: Nacht in Koloniezeit, Erholung, Reisende, und ob Bar/Restaurant Gästezimmer per Ausbau bekommen (R-6-Muster).
+
 **Nachtrag Gastronomie (13.10.2026, abends):** Das Hotel ist von innen fertig – Lobby, Empfang, Treppe, Zimmer buchen als Posten `room_night` über `order_hospitality_item`, Belegung aus `player_hospitality_orders` der letzten 24 Stunden, Gebäudeansicht, Eintritt (`hotel` → hospitality). Damit es ein Hotel gibt, fehlt:
 
 - `building_definitions`: Zeile `hotel` (Vorschlag: Kategorie `life`, Stufe 2, 3 600 Credits, 3 Ticks, `transient_capacity` 6) und `lib/game/buildings/index.ts`; spielerbaubar wie Bar und Restaurant (R-1). Alternativ Gästezimmer als Ausbau eines Lokals (`transient_capacity` > 0) – der Innenraum zeigt dann ebenfalls „ZIMMER ↑“ und die Buchung.

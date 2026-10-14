@@ -16,6 +16,9 @@ const ERRORS: Record<string, { status: number; error: string }> = {
   NOXIA_ORDER_VENUE_NOT_FOUND: { status: 404, error: 'Lokal nicht gefunden.' },
   NOXIA_ORDER_SELLER_ACCOUNT_MISSING: { status: 409, error: 'Dieses Lokal kann gerade nicht kassieren.' },
   NOXIA_ORDER_REQUEST_CONFLICT: { status: 409, error: 'Diese Bestellung gehört zu einem anderen Konto.' },
+  NOXIA_ROOM_NONE_HERE: { status: 404, error: 'Dieses Haus hat keine Gästezimmer.' },
+  NOXIA_ROOM_NONE_FREE: { status: 409, error: 'Kein Zimmer frei.' },
+  NOXIA_ROOM_ALREADY_BOOKED: { status: 409, error: 'Du hast hier schon ein Zimmer.' },
 }
 
 async function menuFor(supabase: any, tileEntityId: string) {
