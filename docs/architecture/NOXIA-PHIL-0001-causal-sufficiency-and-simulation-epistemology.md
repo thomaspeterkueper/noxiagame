@@ -173,3 +173,17 @@ Zusammen:
 - Causal Sufficiency: Wann ist eine gröbere Ebene für die Weltwirkung bereits ausreichend?
 - Progressive Resolution Cost: Warum wird tiefere Erkenntnis zunehmend aufwendig?
 
+
+
+## Minimal implementation contract
+
+The first code-level expression is intentionally small:
+`lib/game/simulation/resolution.ts`.
+
+It only compares ontological, simulated, requested and epistemic depth. It does not
+materialize atoms, components or other fine state; it does not add persistence; and it
+does not define a universal cost formula. Domain systems remain responsible for deciding
+what a refinement actually means and what evidence/resources it requires.
+
+This preserves Adaptive Detail Resolution as a constraint instead of turning it into a
+second simulation engine.
