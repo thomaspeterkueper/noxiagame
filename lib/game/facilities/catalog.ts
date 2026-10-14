@@ -218,6 +218,34 @@ const FACILITIES: Record<string, FacilityDefinition> = {
       planned('research-library', 'Archiv recherchieren', 'research', 'Bestände und Quellen für Forschung erschließen.'),
     ],
   },
+  sacred_place: {
+    id: 'sacred_place',
+    label: 'Religiöser Versammlungsort',
+    description: 'Ort für Gottesdienst, Gebet, Lehre, Gespräch und Gemeinschaft.',
+    zones: [
+      { id: 'entry', label: 'Eingang', kind: 'access', description: 'Öffentlicher Zugang und Orientierung.', interactionIds: [] },
+      { id: 'assembly', label: 'Versammlungsraum', kind: 'social', description: 'Gemeinsame Gottesdienste, Gebete, Rituale und Zusammenkünfte.', interactionIds: ['talk-spiritual'] },
+      { id: 'conversation', label: 'Gespräch', kind: 'social', description: 'Seelsorge, Lehre und persönliche Gespräche.', interactionIds: ['talk-spiritual'] },
+      { id: 'quiet', label: 'Rückzug', kind: 'social', description: 'Stiller Bereich für Gebet, Reflexion oder Ruhe.', interactionIds: [] },
+    ],
+    interactions: [
+      planned('talk-spiritual', 'Mit Menschen sprechen', 'conversation', 'Mit Geistlichen, Mitarbeitenden oder Besuchern sprechen.'),
+    ],
+  },
+  resonance_place: {
+    id: 'resonance_place',
+    label: 'Resonanzplatz',
+    description: 'Offener Omnizedenz-Ort für Begegnung, Reflexion, Gespräch und gemeinsames Verweilen.',
+    zones: [
+      { id: 'threshold', label: 'Übergang', kind: 'access', description: 'Öffentlicher Zugang und Orientierung.', interactionIds: [] },
+      { id: 'forum', label: 'Resonanzraum', kind: 'social', description: 'Begegnung, Gespräch und gemeinsames Wahrnehmen.', interactionIds: ['talk-resonance'] },
+      { id: 'quiet-edge', label: 'Stiller Rand', kind: 'social', description: 'Rückzug, Beobachtung und Reflexion.', interactionIds: [] },
+      { id: 'study', label: 'Lesen & Denken', kind: 'research', description: 'Texte lesen, nachdenken und diskutieren.', interactionIds: ['talk-resonance'] },
+    ],
+    interactions: [
+      planned('talk-resonance', 'Gespräch suchen', 'conversation', 'Mit Anwesenden sprechen; der Ort selbst gewährt kein privilegiertes Wissen.'),
+    ],
+  },
   robotic_kitchen: {
     id: 'robotic_kitchen',
     label: 'Automatisierte Küche',
@@ -278,6 +306,12 @@ const ALIASES: Record<string, string> = {
   school: 'academy',
   automated_food_service: 'robotic_kitchen',
   habitat_food_cell: 'robotic_kitchen',
+  church: 'sacred_place',
+  mosque: 'sacred_place',
+  synagogue: 'sacred_place',
+  temple: 'sacred_place',
+  shrine: 'sacred_place',
+  omnizedenz_resonance_place: 'resonance_place',
 }
 
 const FALLBACK: FacilityDefinition = {
