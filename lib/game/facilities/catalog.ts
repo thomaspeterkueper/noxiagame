@@ -227,11 +227,11 @@ const FACILITIES: Record<string, FacilityDefinition> = {
       { id: 'pickup', label: 'Ausgabe', kind: 'social', description: 'Abholung fertiger Mahlzeiten und kurze Aufenthalte.', interactionIds: [] },
       { id: 'kitchen-cell', label: 'Küchenzelle', kind: 'technical', description: 'Automatisiertes Kochen, Portionieren und Zusammenstellen.', interactionIds: [] },
       { id: 'cold-store', label: 'Kühl- & Zutatenlager', kind: 'logistics', description: 'Vorbereitete Zutaten, Kühlung und Nachfüllung.', interactionIds: ['robotic-kitchen-logistics'] },
-      { id: 'hygiene-service', label: 'Hygiene & Wartung', kind: 'technical', description: 'Reinigung, Abfall, Wasser und technische Wartung.', interactionIds: ['robotic-kitchen-service'] },
+      { id: 'service-bay', label: 'Service & Wartung', kind: 'technical', description: 'Technische Wartung, Nachfüllung und Facility-Inventar einschließlich Reinigungsrobotik.', interactionIds: ['robotic-kitchen-service'] },
     ],
     interactions: [
       planned('robotic-kitchen-logistics', 'Zutatenversorgung prüfen', 'logistics', 'Künftige Bestands-, Kühl- und Nachfülllogik der automatisierten Küche.'),
-      planned('robotic-kitchen-service', 'Küche warten', 'conversation', 'Künftige Wartungs-, Hygiene- und Störungsinteraktion.'),
+      planned('robotic-kitchen-service', 'Küche warten', 'conversation', 'Künftige Wartungs- und Störungsinteraktion; Reinigung und Müll bleiben Teil der normalen Facility-Unterhaltung.'),
     ],
   },
   solar: {
