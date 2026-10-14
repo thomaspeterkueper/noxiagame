@@ -33,6 +33,7 @@ import { runPersonTick } from './personBrain'
 import { persistPopulationEncounters } from './population/encounterRuntime'
 import { runSocialLifeTick } from './population/socialLife'
 import { runHousingShadowTick } from './population/housingShadowRuntime'
+import { projectSurfacePresence } from './population/surfacePresence'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick } from './npcEconomy'
 
 /** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
@@ -720,6 +721,40 @@ export async function runLandValueTick(supabase: SB, _locationSnapshot?: any[]) 
   return { updated: Number(data ?? 0) }
 }
 
+
+async function runSurfacePresenceProjection(supabase: SB, tickNumber: number) {
+  const { data: people, error: peopleError } = await supabase
+    .from('people')
+    .select('id, display_name, birth_year, current_location_id, simulation_tier, activity_state, last_action, last_decision_factors, last_tick')
+    .eq('simulation_tier', 'active')
+
+  if (peopleError) {
+    console.error('runSurfacePresenceProjection: people load failed', peopleError)
+    return { projected: 0, updated: 0, cleared: 0, error: peopleError.code ?? 'people_load_failed' }
+  }
+
+  const personIds = (people ?? []).map((person: any) => person.id)
+  const { data: assignments, error: assignmentsError } = personIds.length
+    ? await supabase
+        .from('person_assignments')
+        .select('id, person_id, assignment_type, location_id, tile_entity_id, region_feature_id, employer_actor_id, role_code, starts_tick, ends_tick, is_active')
+        .in('person_id', personIds)
+        .eq('is_active', true)
+    : { data: [], error: null }
+
+  if (assignmentsError) {
+    console.error('runSurfacePresenceProjection: assignments load failed', assignmentsError)
+    return { projected: 0, updated: 0, cleared: 0, error: assignmentsError.code ?? 'assignments_load_failed' }
+  }
+
+  try {
+    return { ...(await projectSurfacePresence(supabase, tickNumber, people ?? [], assignments ?? [])), error: null }
+  } catch (error: any) {
+    console.error('runSurfacePresenceProjection failed', { tick: tickNumber, message: error?.message ?? String(error) })
+    return { projected: 0, updated: 0, cleared: 0, error: error?.message ?? 'surface_presence_failed' }
+  }
+}
+
 export async function runTick(supabase: SB, tickNumber: number) {
   const defs = await loadBuildingDefs(supabase)
   // Eine Abfrage für alle Orte; geteilt von Orts- und Firmenproduktion. Schlägt
@@ -735,6 +770,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   // current tick. Unnamed people use the population engine; named actors use personBrain.
   const livingPopulation = await runPersonPopulationTick(supabase, tickNumber)
   const namedPeople = await runPersonTick(supabase, tickNumber)
+  const surfacePresence = await runSurfacePresenceProjection(supabase, tickNumber)
   const encounters = await persistPopulationEncounters(supabase, tickNumber)
   const socialLife = await runSocialLifeTick(supabase, tickNumber)
 
@@ -755,7 +791,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
-  return { tickNumber, population, livingPopulation, namedPeople, encounters, socialLife, prices, npc, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, population, livingPopulation, namedPeople, surfacePresence, encounters, socialLife, prices, npc, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
