@@ -16,7 +16,12 @@ export interface SourceFeature {
 }
 
 export type RoadClass = 'main' | 'street' | 'path'
-export type AreaKind = 'water' | 'forest' | 'field' | 'built' | 'garden' | 'grounds' | 'track' | 'pitch'
+export type AreaKind =
+  | 'water' | 'forest' | 'field' | 'built' | 'garden'
+  // Orte des Alltags
+  | 'park' | 'playground' | 'cemetery' | 'allotments' | 'parking' | 'pool'
+  // Sport: Anlage, Laufbahn, Rasenplatz, Sand (Reiten, Beach), Hartplatz (Skaten, Basketball), Asche (Tennis)
+  | 'grounds' | 'track' | 'pitch' | 'sand' | 'hardcourt' | 'clay'
 export type BlockKind = 'house' | 'row' | 'hall' | 'factory' | 'church' | 'shed'
 
 export interface TileRoad { c: RoadClass; p: number[] }
@@ -50,16 +55,37 @@ const AREA_KIND: Record<string, AreaKind> = {
 }
 
 /** Sportflächen: Anlage (Stadion, Sportzentrum), Laufbahn, Spielfeld. */
+const PLACE_AREA: Record<string, AreaKind> = {
+  playground: 'playground', garden: 'park', dog_park: 'park', grass: 'park', recreation_ground: 'park', village_green: 'park',
+  swimming_pool: 'pool', cemetery: 'cemetery', allotments: 'allotments', parking: 'parking',
+}
+
+/** Fläche eines Sportplatzes nach Sportart. */
+function sportKind(properties: Record<string, unknown>): AreaKind {
+  const leisure = String(properties.visual_class ?? properties.leisure ?? '')
+  const sport = String(properties.sport ?? '').split(';')[0]
+  if (leisure === 'track') return 'track'
+  if (leisure === 'stadium' || leisure === 'sports_centre') return 'grounds'
+  if (/^(equestrian|beachvolleyball|horse_racing)$/.test(sport)) return 'sand'
+  if (/^(skateboard|basketball|roller_skating|multi|handball|volleyball)$/.test(sport)) return 'hardcourt'
+  if (sport === 'tennis') return 'clay'
+  if (sport === 'shooting') return 'grounds'
+  return 'pitch'
+}
+
 function areaKind(featureType: string, properties: Record<string, unknown>): AreaKind | undefined {
   const tag = String(properties.visual_class ?? properties.landuse ?? properties.leisure ?? properties.natural ?? '')
+  if (featureType === 'place_area') return PLACE_AREA[tag]
+  // Naturschutzgebiete sind Gebietsgrenzen über allem anderen, keine sichtbare Fläche.
+  if (featureType === 'vegetation' && tag === 'nature_reserve') return undefined
   // Gärten: Wohngebiete bestehen in Wirklichkeit großteils aus Gärten, OSM trägt
   // sie aber nicht einzeln ein. Gewerbe, Handel und Industrie bleiben „bebaut“.
   if (featureType === 'urban') return tag === 'commercial' || tag === 'retail' ? 'built' : 'garden'
   // Parks und Rasen sind Gärten, kein Wald; Gebüsch, Heide, Feuchtgebiet bleiben dunkel.
-  if (featureType === 'vegetation' && /^(park|grass|grassland|village_green|recreation_ground)$/.test(tag)) return 'garden'
+  if (featureType === 'vegetation' && /^(park|village_green|recreation_ground)$/.test(tag)) return 'park'
+  if (featureType === 'vegetation' && /^(grass|grassland|meadow)$/.test(tag)) return 'field'
   if (featureType !== 'sport') return AREA_KIND[featureType]
-  const leisure = String(properties.visual_class ?? properties.leisure ?? '')
-  return leisure === 'track' ? 'track' : leisure === 'stadium' || leisure === 'sports_centre' ? 'grounds' : 'pitch'
+  return sportKind(properties)
 }
 
 type P = { x: number; y: number }
@@ -195,6 +221,32 @@ export function pitchMarkings(box: { x: number; y: number; w: number; d: number;
   return lines
 }
 
+/**
+ * Markierungen eines Tennisplatzes (Doppelfeld 23,77 × 10,97 m mittig im
+ * Platz): Außenlinien, Einzel-Seitenlinien, Aufschlaglinien, Mittellinie, Netz.
+ * Größere Flächen mit mehreren Plätzen bekommen einen Platz je 36 × 18 m.
+ */
+export function tennisMarkings(box: { x: number; y: number; w: number; d: number; a: number }): P[][] {
+  const cos = Math.cos(box.a), sin = Math.sin(box.a)
+  const lines: P[][] = []
+  const courts = Math.max(1, Math.min(6, Math.round(box.d / 18)))
+  const along = Math.max(1, Math.min(3, Math.round(box.w / 36)))
+  const cw = Math.min(23.77, box.w / along * 0.72), cd = Math.min(10.97, box.d / courts * 0.68)
+  const scale = cw / 23.77
+  for (let i = 0; i < along; i++) {
+    for (let j = 0; j < courts; j++) {
+      const ox = -box.w / 2 + (i + 0.5) * box.w / along, oy = -box.d / 2 + (j + 0.5) * box.d / courts
+      const at = (lx: number, ly: number): P => ({ x: box.x + (ox + lx) * cos - (oy + ly) * sin, y: box.y + (ox + lx) * sin + (oy + ly) * cos })
+      const hw = cw / 2, hd = cd / 2, single = hd * 8.23 / 10.97, service = 6.4 * scale
+      lines.push([at(-hw, -hd), at(hw, -hd), at(hw, hd), at(-hw, hd), at(-hw, -hd)])
+      lines.push([at(-hw, -single), at(hw, -single)], [at(-hw, single), at(hw, single)])
+      lines.push([at(-service, -single), at(-service, single)], [at(service, -single), at(service, single)])
+      lines.push([at(-service, 0), at(service, 0)], [at(0, -hd - 0.5), at(0, hd + 0.5)])
+    }
+  }
+  return lines
+}
+
 /** Fläche eines Vielecks (Shoelace, Betrag). */
 function polygonArea(points: readonly P[]): number {
   let sum = 0
@@ -273,22 +325,31 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       out.rivers.push(flat(simplifyLine(points, 2)))
     } else if (areaKind(feature.featureType, properties) && feature.geometry.kind === 'polygon' && points.length >= 3) {
       // Sportflächen sind klein und rechteckig – feiner vereinfachen, damit das Feld eckig bleibt.
-      const simplified = simplifyLine(points, feature.featureType === 'sport' ? 1 : 4)
+      const simplified = simplifyLine(points, feature.featureType === 'sport' || feature.featureType === 'place_area' ? 1 : 4)
       // Ein Hauch Überlappung (0,2 m), damit an der Kachelgrenze keine Haarfuge bleibt.
       const clipped = simplified.length >= 3 ? clipToSquare(simplified, -0.2, size + 0.2) : []
       // Fußballplatz (oder Platz ohne Sportart): Markierungen, gezeichnet von der Kachel mit der Platzmitte.
-      if (feature.featureType === 'sport' && areaKind(feature.featureType, properties) === 'pitch' && (properties.sport === undefined || properties.sport === 'soccer')) {
+      const kindHere = areaKind(feature.featureType, properties)
+      if (feature.featureType === 'sport' && (kindHere === 'pitch' || kindHere === 'clay')) {
         const box = orientedBox(points)
-        if (box && box.x >= 0 && box.x < size && box.y >= 0 && box.y < size && box.w >= 30 && box.d >= 20 && polygonArea(points) > 0.85 * box.w * box.d) {
-          out.marks = [...(out.marks ?? []), ...pitchMarkings(box).map(flat)]
+        const rectangular = box && polygonArea(points) > 0.85 * box.w * box.d
+        if (box && rectangular && box.x >= 0 && box.x < size && box.y >= 0 && box.y < size) {
+          if (kindHere === 'pitch' && (properties.sport === undefined || properties.sport === 'soccer') && box.w >= 30 && box.d >= 20) {
+            out.marks = [...(out.marks ?? []), ...pitchMarkings(box).map(flat)]
+          } else if (kindHere === 'clay' && box.w >= 18 && box.d >= 9) {
+            out.marks = [...(out.marks ?? []), ...tennisMarkings(box).map(flat)]
+          }
         }
       }
-      if (clipped.length >= 4) out.areas.push({ k: areaKind(feature.featureType, properties) as AreaKind, p: flat(clipped) })
+      if (clipped.length >= 4) out.areas.push({ k: kindHere as AreaKind, p: flat(clipped) })
     }
   }
   // Feste Reihenfolge: Felder unten, dann Gärten und bebaute Fläche, Wald, Sportanlage,
   // Laufbahn, Spielfeld, Wasser zuoberst.
-  const order: Record<AreaKind, number> = { field: 0, garden: 1, built: 1, forest: 2, grounds: 3, track: 4, pitch: 5, water: 6 }
+  const order: Record<AreaKind, number> = {
+    field: 0, garden: 1, built: 1, park: 2, cemetery: 2, allotments: 2, parking: 2, forest: 3,
+    grounds: 4, playground: 5, track: 5, sand: 6, hardcourt: 6, clay: 6, pitch: 6, pool: 7, water: 8,
+  }
   out.areas.sort((a, b) => order[a.k] - order[b.k])
   const roadOrder: Record<RoadClass, number> = { path: 0, street: 1, main: 2 }
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])

@@ -109,13 +109,13 @@ describe('world lab: simplification', () => {
     expect(cut.map(p => p.x).sort((a, b) => a - b)).toEqual([0, 0, 0, 10, 10])
   })
 
-  it('draws residential areas and parks as gardens, commerce and industry as built', () => {
+  it('draws residential areas as gardens, parks as parks, commerce and industry as built', () => {
     const square = polygon([[10, 10], [60, 10], [60, 60], [10, 60], [10, 10]])
     const kinds = (type: string, props: Record<string, unknown>) => buildTile([{ id: 'a', featureType: type, geometry: square, properties: props }], tile, TILE_Z).areas.map(area => area.k)
     expect(kinds('urban', { visual_class: 'residential' })).toEqual(['garden'])
     expect(kinds('urban', { visual_class: 'retail' })).toEqual(['built'])
     expect(kinds('industrial', { visual_class: 'industrial' })).toEqual(['built'])
-    expect(kinds('vegetation', { visual_class: 'park' })).toEqual(['garden'])
+    expect(kinds('vegetation', { visual_class: 'park' })).toEqual(['park'])
     expect(kinds('vegetation', { visual_class: 'scrub' })).toEqual(['forest'])
   })
 
@@ -124,8 +124,8 @@ describe('world lab: simplification', () => {
     const marked = buildTile([pitch], tile, TILE_Z)
     expect(marked.marks).toHaveLength(6)   // Mittellinie, Kreis, je zwei Räume an beiden Enden
     expect(buildTile([pitch], { x: tile.x + 1, y: tile.y }, TILE_Z).marks).toBeUndefined()
-    const tennis = { ...pitch, properties: { visual_class: 'pitch', sport: 'tennis' } }
-    expect(buildTile([tennis], tile, TILE_Z).marks).toBeUndefined()
+    const skate = { ...pitch, properties: { visual_class: 'pitch', sport: 'skateboard' } }
+    expect(buildTile([skate], tile, TILE_Z).marks).toBeUndefined()
   })
 
   it('keeps the real footprint of an L-shaped factory', () => {
@@ -133,6 +133,29 @@ describe('world lab: simplification', () => {
     const built2 = buildTile([{ id: 'f', featureType: 'building', geometry: lShape, properties: { building: 'industrial' } }], tile, TILE_Z)
     expect(built2.blocks[0].k).toBe('factory')
     expect(built2.blocks[0].f!.length).toBeGreaterThanOrEqual(12)
+  })
+
+  it('maps everyday places and sports to their own areas', () => {
+    const square = polygon([[10, 10], [60, 10], [60, 40], [10, 40], [10, 10]])
+    const kind = (type: string, props: Record<string, unknown>) => buildTile([{ id: 'a', featureType: type, geometry: square, properties: props }], tile, TILE_Z).areas.map(area => area.k)
+    expect(kind('place_area', { visual_class: 'playground' })).toEqual(['playground'])
+    expect(kind('place_area', { visual_class: 'cemetery' })).toEqual(['cemetery'])
+    expect(kind('place_area', { visual_class: 'allotments' })).toEqual(['allotments'])
+    expect(kind('place_area', { visual_class: 'parking' })).toEqual(['parking'])
+    expect(kind('place_area', { visual_class: 'swimming_pool' })).toEqual(['pool'])
+    expect(kind('place_area', { visual_class: 'garden' })).toEqual(['park'])
+    expect(kind('sport', { visual_class: 'pitch', sport: 'equestrian' })).toEqual(['sand'])
+    expect(kind('sport', { visual_class: 'pitch', sport: 'skateboard' })).toEqual(['hardcourt'])
+    expect(kind('sport', { visual_class: 'pitch', sport: 'tennis' })).toEqual(['clay'])
+    expect(kind('vegetation', { visual_class: 'nature_reserve' })).toEqual([])
+    expect(kind('vegetation', { visual_class: 'grassland' })).toEqual(['field'])
+  })
+
+  it('marks tennis courts', () => {
+    const court = polygon([[40, 40], [76, 40], [76, 58], [40, 58], [40, 40]])
+    const marked = buildTile([{ id: 't', featureType: 'sport', geometry: court, properties: { visual_class: 'pitch', sport: 'tennis' } }], tile, TILE_Z)
+    expect(marked.areas.map(area => area.k)).toEqual(['clay'])
+    expect(marked.marks?.length).toBe(7)
   })
 
   it('stays small', () => {

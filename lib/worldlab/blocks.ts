@@ -31,11 +31,36 @@ export const BLOCK_STYLES: Record<BlockKind, BlockStyle> = {
 export const GROUND_COLOR = 0xa9bd8c
 export const AREA_COLORS: Record<AreaKind, number> = {
   field: 0xbfcf93, built: 0xcfc9b4, garden: 0x9fc283, forest: 0x6f9a62, water: 0x6fb1d6,
-  grounds: 0xb9c6a0, track: 0xb5654a, pitch: 0x5f9e4c,
+  park: 0x8fbd72, playground: 0xdcc898, cemetery: 0x8eae78, allotments: 0xa3c27c, parking: 0xb4b3ae, pool: 0x74c4e6,
+  grounds: 0xb9c6a0, track: 0xb5654a, pitch: 0x5f9e4c, sand: 0xd9c49a, hardcourt: 0xa8a49d, clay: 0xc06e4a,
 }
-/** Randlinie für Flächen, die eine haben (Spielfeld: helle Markierung). */
+/** Randlinie für Flächen, die eine haben (Spielfeld: helle Markierung, Becken: heller Rand). */
 export const AREA_OUTLINES: Partial<Record<AreaKind, { widthM: number; color: number }>> = {
   pitch: { widthM: 0.8, color: 0xf2f5ec },
+  clay: { widthM: 0.6, color: 0xf2f5ec },
+  pool: { widthM: 1.2, color: 0xeef3f4 },
+  playground: { widthM: 0.5, color: 0x9a7f52 },
+  parking: { widthM: 0.4, color: 0x8e8d88 },
+}
+
+/**
+ * Muster auf Flächen, damit man sie auf einen Blick erkennt. Die Ansicht
+ * erzeugt die Muster selbst (keine Bilddateien); `sizeM` ist die Kantenlänge
+ * einer Musterkachel am Boden.
+ *   trees   – Baumkronen (Wald dicht, Park locker, Friedhof vereinzelt)
+ *   graves  – Grabreihen
+ *   plots   – Parzellen mit Beeten und Laube
+ *   stalls  – Stellplatz-Markierung
+ *   rows    – Ackerfurchen
+ */
+export type AreaPattern = { kind: 'trees' | 'graves' | 'plots' | 'stalls' | 'rows'; sizeM: number; density?: number }
+export const AREA_PATTERNS: Partial<Record<AreaKind, AreaPattern>> = {
+  forest: { kind: 'trees', sizeM: 24, density: 1 },
+  park: { kind: 'trees', sizeM: 32, density: 0.18 },
+  cemetery: { kind: 'graves', sizeM: 16 },
+  allotments: { kind: 'plots', sizeM: 30 },
+  parking: { kind: 'stalls', sizeM: 15 },
+  field: { kind: 'rows', sizeM: 12 },
 }
 export const ROAD_STYLES: Record<RoadClass, { widthM: number; color: number }> = {
   main: { widthM: 9, color: 0xf2ead8 },

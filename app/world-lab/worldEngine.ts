@@ -7,8 +7,9 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { AREA_COLORS, AREA_OUTLINES, BLOCK_STYLES, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
+import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
@@ -98,6 +99,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       } catch { options.onError('Bild ' + src + ' fehlt oder ist kaputt – die Fläche bleibt einfarbig.') }
     })))
   const matrix = (m: Affine) => new PIXI.Matrix(m.a, m.b, m.c, m.d, m.tx, m.ty)
+
+  // Flächenmuster einmal je Art erzeugen (Leinwand im Browser, keine Dateien).
+  const patterns = new Map<string, { texture: Texture; matrix: InstanceType<typeof PIXI.Matrix> }>()
+  for (const [kind, spec] of Object.entries(AREA_PATTERNS)) {
+    if (!spec) continue
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = PATTERN_PX
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    paintPattern(ctx, spec, AREA_COLORS[kind as keyof typeof AREA_COLORS])
+    patterns.set(kind, { texture: PIXI.Texture.from(canvas), matrix: matrix(patternMatrix(spec.sizeM, ISO_Y)) })
+  }
 
   // ── Messung ─────────────────────────────────────────────────────────
   const stats = new FrameStats(120)
@@ -352,7 +365,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const onBorder = (v: number) => Math.abs(v + 0.2) < 0.06 || Math.abs(v - data.size - 0.2) < 0.06
     for (const area of data.areas) {
       const p = path(area.p)
-      g.poly(p).fill(AREA_COLORS[area.k])
+      const pattern = patterns.get(area.k)
+      if (pattern) g.poly(p).fill({ texture: pattern.texture, matrix: pattern.matrix, textureSpace: 'global' })
+      else g.poly(p).fill(AREA_COLORS[area.k])
       const outline = AREA_OUTLINES[area.k]
       if (!outline) continue
       for (let i = 0; i + 3 < area.p.length; i += 2) {

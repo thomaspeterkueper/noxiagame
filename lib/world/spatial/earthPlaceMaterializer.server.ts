@@ -31,7 +31,9 @@ const OVERPASS_ENDPOINTS = [
 ]
 const MAX_POINTS_PER_FEATURE = 36
 // 4: Sportflächen (leisure=pitch|stadium|track|sports_centre, ohne Golf) als 'sport'
-export const EARTH_GEOGRAPHY_IMPORT_VERSION = 4
+// 5: Orte des Alltags als 'place_area' (Spielplatz, Garten, Freibad, Friedhof,
+//    Kleingärten, Rasen, Festplatz, Parkplatz); visual_class nennt die Art
+export const EARTH_GEOGRAPHY_IMPORT_VERSION = 5
 export const EARTH_NORMALIZATION_VERSION = 1
 export const EARTH_ENRICHMENT_VERSION = 1
 const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v3'
@@ -95,11 +97,21 @@ function classify(tags: Tags, isNode = false) {
   if (/^(beach|sand|shoal)$/.test(tags.natural ?? '')) return 'beach'
   if (/^(bare_rock|scree|shingle|rock)$/.test(tags.natural ?? '')) return 'rock'
   if (/^(pitch|stadium|track|sports_centre)$/.test(tags.leisure ?? '') && tags.sport !== 'golf') return 'sport'
+  if (placeAreaClass(tags)) return 'place_area'
   if (tags.landuse === 'forest' || tags.natural === 'wood' || tags.landcover === 'trees') return 'forest'
   if (/^(scrub|grassland|heath|wetland)$/.test(tags.natural ?? '') || tags.landcover === 'grass' || /^(park|nature_reserve)$/.test(tags.leisure ?? '')) return 'vegetation'
   if (/^(farmland|farmyard|meadow|orchard|grass)$/.test(tags.landuse ?? '')) return 'farmland'
   if (/^(residential|commercial|retail)$/.test(tags.landuse ?? '')) return 'urban'
   if (tags.landuse === 'industrial') return 'industrial'
+  return null
+}
+
+/** Orte des Alltags, die man auf der Karte wiedererkennt. */
+function placeAreaClass(tags: Tags): string | null {
+  if (/^(playground|garden|swimming_pool|water_park|dog_park)$/.test(tags.leisure ?? '')) return tags.leisure === 'water_park' ? 'swimming_pool' : tags.leisure!
+  if (/^(cemetery|allotments|grass|recreation_ground|village_green)$/.test(tags.landuse ?? '')) return tags.landuse!
+  if (tags.amenity === 'grave_yard') return 'cemetery'
+  if (tags.amenity === 'parking' && tags.parking !== 'underground' && tags.parking !== 'multi-storey') return 'parking'
   return null
 }
 
@@ -109,6 +121,7 @@ function visualClass(featureType: string, tags: Tags) {
   if (featureType === 'vegetation') return tags.natural ?? tags.landcover ?? tags.leisure ?? 'vegetation'
   if (featureType === 'urban') return tags.landuse ?? 'urban'
   if (featureType === 'sport') return tags.leisure ?? 'pitch'
+  if (featureType === 'place_area') return placeAreaClass(tags) ?? 'place_area'
   if (featureType === 'beach' || featureType === 'rock') return tags.natural ?? featureType
   if (featureType === 'landmark') return tags.tourism ?? tags.historic ?? tags.amenity ?? tags.railway ?? tags.man_made ?? 'landmark'
   return featureType
@@ -260,6 +273,9 @@ way[natural~"scrub|grassland|heath|wetland"](${box});relation[natural~"scrub|gra
 way[landcover=grass](${box});relation[landcover=grass](${box});
 way[leisure~"park|nature_reserve"](${box});relation[leisure~"park|nature_reserve"](${box});
 way[leisure~"pitch|stadium|track|sports_centre"](${box});relation[leisure~"pitch|stadium|track|sports_centre"](${box});
+way[leisure~"playground|garden|swimming_pool|water_park|dog_park"](${box});
+way[landuse~"cemetery|allotments|grass|recreation_ground|village_green"](${box});relation[landuse~"cemetery|allotments|recreation_ground"](${box});
+way[amenity~"grave_yard|parking"](${box});
 way[landuse~"farmland|farmyard|meadow|orchard|grass"](${box});
 way[landuse~"residential|commercial|retail"](${box});relation[landuse~"residential|commercial|retail"](${box});
 way[landuse=industrial](${box});relation[landuse=industrial](${box});
