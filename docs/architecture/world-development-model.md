@@ -259,6 +259,20 @@ A future Earth scenario may expose trajectories, but the runtime effect should r
 
 The same global trajectory can therefore produce different local outcomes.
 
+
+## Adaptive detail rule
+
+World Development is deliberately a coarse projection. It must not force every contributing
+domain to persist or simulate the same level of detail.
+
+Follow `docs/cross-cutting/integrity-timescale-engineering.md`:
+refine a domain only when a causal outcome, observation, decision, bottleneck or command
+requires finer state. A macro pressure may therefore trigger inspection of a specific grid,
+route, household, facility or supply chain without converting the whole world to that resolution.
+
+The projection may summarize fine state, but it must never erase authoritative consequences
+that the owning domain still needs.
+
 ## Persistence rule
 
 Do **not** create a `world_development_state` table merely because the projection exists.
