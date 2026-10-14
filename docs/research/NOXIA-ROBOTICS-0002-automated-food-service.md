@@ -74,7 +74,6 @@ food inventory
   -> payment
   -> meal output
   -> consumption
-  -> waste / cleaning
   -> maintenance / refill
 
 Jeder Schritt soll später auf reale Systemzustände zurückgeführt werden können.
@@ -129,10 +128,7 @@ Vorgesehener Building/Fa­cility-Identifier:
 
 - ingredient_stock
 - chilled_stock
-- clean_state
 - energy_available
-- water_available
-- waste_capacity
 - maintenance_debt
 - throughput_limit
 - active_orders
@@ -142,8 +138,6 @@ Vorgesehener Building/Fa­cility-Identifier:
 
 - food ingredients
 - electricity
-- water
-- cleaning consumables
 - replacement parts
 - staff/robot maintenance time
 
@@ -152,8 +146,6 @@ Vorgesehener Building/Fa­cility-Identifier:
 - prepared meals
 - NPC sustenance satisfaction
 - service revenue
-- waste
-- heat
 - maintenance demand
 
 ## Verbindung zum bestehenden NPC-Konsum
@@ -167,7 +159,7 @@ ist bereits der passende ökonomische Anschluss.
 Für eine robotic_kitchen darf später ein Serviceangebot aber nur dann aktiv sein, wenn:
 1. Zutatenbestand vorhanden ist,
 2. Facility operational ist,
-3. Energie/Wasser verfügbar sind,
+3. erforderliche Energie verfügbar ist,
 4. Kapazität nicht überschritten ist.
 
 Damit entsteht kein Essen aus dem Nichts und kein Umsatz ohne physische Leistung.
@@ -176,16 +168,13 @@ Damit entsteht kein Essen aus dem Nichts und kein Umsatz ohne physische Leistung
 
 Realer Stand 2026 rechtfertigt **keine Null-Personal-Annahme**.
 
-Auch bei hoher Kochautomatisierung bleiben mindestens folgende Aufgaben relevant:
-- Zutatenlogistik und Nachfüllung,
-- Reinigung/Hygiene,
-- Fehlerbehandlung,
-- Wartung,
-- Qualitätskontrolle,
-- Lieferkettenorganisation.
+Auch bei hoher Kochautomatisierung bleiben insbesondere Zutatenlogistik/Nachfüllung,
+Fehlerbehandlung, Wartung, Qualitätskontrolle und Lieferkettenorganisation relevant.
 
-Später kann NOXIA einen Teil davon an weitere Maschinenpopulationen übergeben. Dann verschiebt sich Arbeit von
-direkter Speisenzubereitung zu Logistik, Technik, Hygiene und Flotten-/Facility-Betrieb.
+**Modellierungsgrenze NOXIA:** Reinigung und Abfallentsorgung werden nicht als eigene
+Simulationsschleifen geführt. Reinigungsroboter gehören zum Facility-Inventar; Reinigung,
+Verbrauchsmittel und Müll laufen zusammen mit normalen Wartungs- und Instandhaltungskosten.
+Erst wenn eine spätere Mechanik dafür einen echten spielerischen Engpass erzeugt, wird tiefer modelliert.
 
 ## Robotik-Einordnung
 
@@ -215,8 +204,6 @@ Versorgungsmöglichkeit sein. Manuelle oder alternative Notversorgung bleibt ein
 Vor Gameplay-Aktivierung offen:
 - Baukosten,
 - Energie pro Mahlzeit,
-- Wasserverbrauch,
-- Reinigungszyklus,
 - Lebensmittelverlust,
 - Personalstunden,
 - Wartungsintervalle,
