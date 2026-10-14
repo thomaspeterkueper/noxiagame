@@ -33,7 +33,8 @@ const MAX_POINTS_PER_FEATURE = 36
 // 4: Sportflächen (leisure=pitch|stadium|track|sports_centre, ohne Golf) als 'sport'
 // 5: Orte des Alltags als 'place_area' (Spielplatz, Garten, Freibad, Friedhof,
 //    Kleingärten, Rasen, Festplatz, Parkplatz); visual_class nennt die Art
-export const EARTH_GEOGRAPHY_IMPORT_VERSION = 5
+// 6: Einzelbäume (natural=tree, Punkt) und Alleen (natural=tree_row, Linie)
+export const EARTH_GEOGRAPHY_IMPORT_VERSION = 6
 export const EARTH_NORMALIZATION_VERSION = 1
 export const EARTH_ENRICHMENT_VERSION = 1
 const EARTH_IMPORT_PROFILE = 'earth-osm-generalized-v3'
@@ -83,6 +84,8 @@ function capPoints(points: GeoPoint[], polygon: boolean) {
 
 function classify(tags: Tags, isNode = false) {
   if (isNode && /^(city|town|village|hamlet|suburb)$/.test(tags.place ?? '')) return 'settlement'
+  if (isNode && tags.natural === 'tree') return 'tree'
+  if (tags.natural === 'tree_row') return 'tree_row'
   if (tags.name && (
     /^(museum|attraction|viewpoint|gallery)$/.test(tags.tourism ?? '')
     || /^(castle|monument|memorial|archaeological_site|ruins|fort|city_gate)$/.test(tags.historic ?? '')
@@ -276,6 +279,7 @@ way[leisure~"pitch|stadium|track|sports_centre"](${box});relation[leisure~"pitch
 way[leisure~"playground|garden|swimming_pool|water_park|dog_park"](${box});
 way[landuse~"cemetery|allotments|grass|recreation_ground|village_green"](${box});relation[landuse~"cemetery|allotments|recreation_ground"](${box});
 way[amenity~"grave_yard|parking"](${box});
+node[natural=tree](${box});way[natural=tree_row](${box});
 way[landuse~"farmland|farmyard|meadow|orchard|grass"](${box});
 way[landuse~"residential|commercial|retail"](${box});relation[landuse~"residential|commercial|retail"](${box});
 way[landuse=industrial](${box});relation[landuse=industrial](${box});

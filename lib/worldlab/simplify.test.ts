@@ -158,6 +158,21 @@ describe('world lab: simplification', () => {
     expect(marked.marks?.length).toBe(7)
   })
 
+  it('plants single trees and avenues in the tile they stand in', () => {
+    const tree: SourceFeature = { id: 't', featureType: 'tree', geometry: { kind: 'point', coordinates: at(50, 50) }, properties: {} }
+    const avenue: SourceFeature = { id: 'r', featureType: 'tree_row', geometry: { kind: 'line', coordinates: [at(10, 100), at(90, 100)] }, properties: {} }
+    const planted = buildTile([tree, avenue], tile, TILE_Z)
+    // ein Baum und eine Allee von rund 80 m mit 8 m Abstand (10 oder 11 Bäume, je nach Rundung am Ende)
+    expect(planted.trees!.length / 2).toBeGreaterThanOrEqual(11)
+    expect(planted.trees!.length / 2).toBeLessThanOrEqual(12)
+    expect(buildTile([tree], { x: tile.x + 1, y: tile.y }, TILE_Z).trees).toBeUndefined()
+  })
+
+  it('keeps a running track mapped as a line', () => {
+    const ring: SourceFeature = { id: 'k', featureType: 'sport', geometry: { kind: 'line', coordinates: [at(30, 30), at(130, 30), at(130, 90), at(30, 90)] }, properties: { visual_class: 'track' } }
+    expect(buildTile([ring], tile, TILE_Z).tracks).toHaveLength(1)
+  })
+
   it('stays small', () => {
     expect(JSON.stringify(built).length).toBeLessThan(900)
   })

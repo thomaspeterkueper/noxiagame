@@ -7,9 +7,10 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
+import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
@@ -111,6 +112,16 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     paintPattern(ctx, spec, AREA_COLORS[kind as keyof typeof AREA_COLORS])
     patterns.set(kind, { texture: PIXI.Texture.from(canvas), matrix: matrix(patternMatrix(spec.sizeM, ISO_Y)) })
   }
+  // Baumbilder (Laubbäume, Fichte).
+  const treeTextures: Texture[] = []
+  for (let variant = 0; variant < TREE_VARIANTS; variant++) {
+    const canvas = document.createElement('canvas')
+    canvas.width = TREE_PX.w; canvas.height = TREE_PX.h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) break
+    paintTree(ctx, variant)
+    treeTextures.push(PIXI.Texture.from(canvas))
+  }
 
   // ── Messung ─────────────────────────────────────────────────────────
   const stats = new FrameStats(120)
@@ -195,7 +206,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -384,6 +395,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
       l.stroke({ width: style.widthM * 0.75, color: style.color, cap: 'round', join: 'round' })
     }
+    for (const track of data.tracks ?? []) {
+      const p = path(track)
+      const lane = (width: number, color: number) => { l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: width * 0.75, color, cap: 'round', join: 'round' }) }
+      lane(TRACK_STYLE.widthM + 0.6, TRACK_STYLE.laneColor)
+      lane(TRACK_STYLE.widthM, TRACK_STYLE.color)
+      lane(0.25, TRACK_STYLE.laneColor)
+    }
     for (const mark of data.marks ?? []) {
       const p = path(mark)
       l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
@@ -393,13 +411,26 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     lines.addChild(l)
     entry.ground = g
     entry.lines = l
+    // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
+    const trees = data.trees ?? []
+    if (treeTextures.length) for (let i = 0; i + 1 < trees.length; i += 2) {
+      const x = ox + trees[i], y = oy + trees[i + 1]
+      const sprite = new PIXI.Sprite(treeTextures[treeVariant(x, y) % treeTextures.length])
+      sprite.anchor.set(0.5, (TREE_PX.h - 4) / TREE_PX.h)
+      sprite.width = TREE_WORLD.w; sprite.height = TREE_WORLD.h
+      const foot = iso(x, y)
+      sprite.position.set(foot.x, foot.y)
+      sprite.zIndex = x + y
+      addObject(sprite)
+      entry.trees.push(sprite)
+    }
   }
 
   function showTile(tile: TileId, data: SimplifiedTile) {
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], done: false })
     building.push(key)
   }
 
@@ -411,7 +442,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (!entry) { building.shift(); continue }
       if (!entry.ground) {
         drawGround(entry)
-        budget -= 20 + (entry.data.roads.length + entry.data.rivers.length + entry.data.areas.length) / 2
+        budget -= 20 + (entry.data.roads.length + entry.data.rivers.length + entry.data.areas.length) / 2 + (entry.data.trees?.length ?? 0) / 8
         continue
       }
       const from = entry.blocks.length
@@ -430,6 +461,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   function dropTile(key: string, entry: Loaded) {
     entry.ground?.destroy()
     entry.lines?.destroy()
+    for (const tree of entry.trees) tree.destroy()
     for (const block of entry.blocks) block.destroy()
     loaded.delete(key)
     pruneBands()

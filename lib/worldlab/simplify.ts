@@ -43,6 +43,10 @@ export interface SimplifiedTile {
   marks?: number[][]
   areas: TileArea[]
   blocks: TileBlock[]
+  /** Laufbahnen, die OSM als Linie führt (x/y abwechselnd). */
+  tracks?: number[][]
+  /** Einzelbäume und Bäume aus Alleen: Standorte x/y abwechselnd, nur die in dieser Kachel. */
+  trees?: number[]
 }
 
 const ROAD_CLASS: Record<string, RoadClass> = {
@@ -247,6 +251,20 @@ export function tennisMarkings(box: { x: number; y: number; w: number; d: number
   return lines
 }
 
+/** Punkte im Abstand `step` Meter entlang einer Linie (Anfang eingeschlossen). */
+export function samplesAlong(points: readonly P[], step: number): P[] {
+  const out: P[] = []
+  let carry = 0
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i]
+    const length = Math.hypot(b.x - a.x, b.y - a.y)
+    let t = carry
+    while (t <= length + 1e-6) { out.push({ x: a.x + (b.x - a.x) * t / length, y: a.y + (b.y - a.y) * t / length }); t += step }
+    carry = t - length
+  }
+  return out
+}
+
 /** Fläche eines Vielecks (Shoelace, Betrag). */
 function polygonArea(points: readonly P[]): number {
   let sum = 0
@@ -294,6 +312,14 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     const key = String(properties.noxia_source_id ?? feature.id)
     if (seen.has(key)) continue
     const coordinates = feature.geometry?.coordinates
+    // Einzelbaum: gehört der Kachel, in der er steht.
+    if (feature.featureType === 'tree' && feature.geometry.kind === 'point') {
+      const at = local(feature.geometry.coordinates as GeoPoint)
+      if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
+      seen.add(key)
+      ;(out.trees ??= []).push(round1(at.x), round1(at.y))
+      continue
+    }
     if (!Array.isArray(coordinates) || coordinates.length < 2) continue
     const points = coordinates.map(local)
 
@@ -317,6 +343,19 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     if (!touches(points, 12)) continue
     seen.add(key)
 
+    // Allee: alle 8 m ein Baum entlang der Linie, jeder in der Kachel, in der er steht.
+    if (feature.featureType === 'tree_row' && feature.geometry.kind === 'line') {
+      for (const at of samplesAlong(points, 8)) {
+        if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
+        ;(out.trees ??= []).push(round1(at.x), round1(at.y))
+      }
+      continue
+    }
+    // Laufbahn als Linie (offener oder als Mittellinie geführter Ring).
+    if (feature.featureType === 'sport' && feature.geometry.kind === 'line' && String(properties.visual_class ?? properties.leisure) === 'track') {
+      ;(out.tracks ??= []).push(flat(simplifyLine(points, 0.5)))
+      continue
+    }
     if (feature.featureType === 'road' && feature.geometry.kind === 'line') {
       const roadClass = ROAD_CLASS[String(properties.highway ?? '')]
       if (!roadClass || properties.tunnel === 'yes') continue

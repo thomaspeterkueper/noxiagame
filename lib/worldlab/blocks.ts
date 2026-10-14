@@ -39,6 +39,7 @@ export const AREA_OUTLINES: Partial<Record<AreaKind, { widthM: number; color: nu
   pitch: { widthM: 0.8, color: 0xf2f5ec },
   clay: { widthM: 0.6, color: 0xf2f5ec },
   pool: { widthM: 1.2, color: 0xeef3f4 },
+  track: { widthM: 0.5, color: 0xf2f5ec },
   playground: { widthM: 0.5, color: 0x9a7f52 },
   parking: { widthM: 0.4, color: 0x8e8d88 },
 }
@@ -67,6 +68,8 @@ export const ROAD_STYLES: Record<RoadClass, { widthM: number; color: number }> =
   street: { widthM: 6, color: 0xe9e2d0 },
   path: { widthM: 2.2, color: 0xd8cfb8 },
 }
+/** Laufbahn als Linie: rotes Band mit sechs Bahnen (7,3 m). */
+export const TRACK_STYLE = { widthM: 7.3, color: 0xb5654a, laneColor: 0xf2f5ec }
 export const RIVER_STYLE = { widthM: 5, color: 0x6fb1d6 }
 export const OUTLINE = 0x5b4a3c
 
