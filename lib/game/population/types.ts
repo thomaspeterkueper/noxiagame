@@ -73,7 +73,7 @@ export interface PersonAssignment {
   assignmentType: AssignmentType
   locationId: LocationId
   tileEntityId: TileEntityId | null
-  regionFeatureId: RegionFeatureId | null
+  regionFeatureId?: RegionFeatureId | null
   employerActorId: ActorId | null
   roleCode: string | null
   startsTick: number | null
