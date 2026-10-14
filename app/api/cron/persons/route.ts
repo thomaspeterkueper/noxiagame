@@ -29,13 +29,13 @@ export async function GET(req: NextRequest) {
   // authoritative activity state, never the client-side spatial projection.
   const { data: activePeople, error: peopleError } = await supabase
     .from('people')
-    .select('id, activity_state')
+    .select('id, display_name, birth_year, current_location_id, simulation_tier, activity_state, last_action, last_decision_factors, last_tick')
     .eq('simulation_tier', 'active')
   const personIds = (activePeople ?? []).map((person: any) => person.id)
   const { data: assignments, error: assignmentsError } = personIds.length
     ? await supabase
         .from('person_assignments')
-        .select('id, person_id, assignment_type, tile_entity_id, role_code, is_active')
+        .select('id, person_id, assignment_type, location_id, tile_entity_id, region_feature_id, employer_actor_id, role_code, starts_tick, ends_tick, is_active')
         .in('person_id', personIds)
         .eq('is_active', true)
     : { data: [], error: null }
