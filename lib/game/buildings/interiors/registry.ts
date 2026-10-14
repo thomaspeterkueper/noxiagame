@@ -17,6 +17,8 @@ import { LIBRARY_STANDARD_INTERIOR } from './templates/libraryStandard'
 import { DAVARU_TEMPLE_INTERIOR } from './templates/davaruTemple'
 import { SPACEPORT_STANDARD_INTERIOR } from './templates/spaceportStandard'
 import { ROBOTIC_KITCHEN_STANDARD_INTERIOR } from './templates/roboticKitchenStandard'
+import { SACRED_PLACE_STANDARD_INTERIOR } from './templates/sacredPlaceStandard'
+import { RESONANCE_PLACE_STANDARD_INTERIOR } from './templates/resonancePlaceStandard'
 
 export interface InteriorTemplateRegistry {
   byId: Readonly<Record<InteriorTemplateId, InteriorTemplate>>
@@ -44,6 +46,8 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     [DAVARU_TEMPLE_INTERIOR.id]: DAVARU_TEMPLE_INTERIOR,
     [SPACEPORT_STANDARD_INTERIOR.id]: SPACEPORT_STANDARD_INTERIOR,
     [ROBOTIC_KITCHEN_STANDARD_INTERIOR.id]: ROBOTIC_KITCHEN_STANDARD_INTERIOR,
+    [SACRED_PLACE_STANDARD_INTERIOR.id]: SACRED_PLACE_STANDARD_INTERIOR,
+    [RESONANCE_PLACE_STANDARD_INTERIOR.id]: RESONANCE_PLACE_STANDARD_INTERIOR,
   },
   byBuildingTypeId: {
     laboratory: LABORATORY_STANDARD_INTERIOR.id,
@@ -91,6 +95,14 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     robotic_kitchen: ROBOTIC_KITCHEN_STANDARD_INTERIOR.id,
     automated_food_service: ROBOTIC_KITCHEN_STANDARD_INTERIOR.id,
     habitat_food_cell: ROBOTIC_KITCHEN_STANDARD_INTERIOR.id,
+    church: SACRED_PLACE_STANDARD_INTERIOR.id,
+    mosque: SACRED_PLACE_STANDARD_INTERIOR.id,
+    synagogue: SACRED_PLACE_STANDARD_INTERIOR.id,
+    temple: SACRED_PLACE_STANDARD_INTERIOR.id,
+    shrine: SACRED_PLACE_STANDARD_INTERIOR.id,
+    sacred_place: SACRED_PLACE_STANDARD_INTERIOR.id,
+    resonance_place: RESONANCE_PLACE_STANDARD_INTERIOR.id,
+    omnizedenz_resonance_place: RESONANCE_PLACE_STANDARD_INTERIOR.id,
   },
   byStationRole: {
     'habitat-transfer-station': ORBITAL_TRANSFER_STATION_INTERIOR.id,
