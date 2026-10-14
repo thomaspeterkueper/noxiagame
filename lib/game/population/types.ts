@@ -52,6 +52,7 @@ export type BaseSkillCode = (typeof BASE_SKILL_CODES)[number]
 export type PersonId = string
 export type LocationId = string
 export type TileEntityId = string
+export type RegionFeatureId = string
 export type ActorId = string
 
 export interface Person {
@@ -72,6 +73,7 @@ export interface PersonAssignment {
   assignmentType: AssignmentType
   locationId: LocationId
   tileEntityId: TileEntityId | null
+  regionFeatureId: RegionFeatureId | null
   employerActorId: ActorId | null
   roleCode: string | null
   startsTick: number | null
