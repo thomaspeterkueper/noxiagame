@@ -47,12 +47,12 @@ export const ROBOTIC_KITCHEN_STANDARD_INTERIOR: InteriorTemplate = {
       tags: ['staff-only', 'logistics'],
     },
     {
-      id: 'hygiene-service',
+      id: 'service-bay',
       levelId: 'ground',
-      name: 'Hygiene & Wartung',
+      name: 'Service & Wartung',
       kind: 'utility',
       capacity: 4,
-      capabilities: ['clean', 'waste', 'maintenance', 'water-service'],
+      capabilities: ['maintenance', 'robot-service', 'refill'],
       tags: ['staff-only', 'technical'],
     },
   ],
@@ -60,6 +60,6 @@ export const ROBOTIC_KITCHEN_STANDARD_INTERIOR: InteriorTemplate = {
     { id: 'entry-pickup', kind: 'passage', fromRoomId: 'entry', toRoomId: 'pickup', normallyOpen: true },
     { id: 'pickup-kitchen', kind: 'door', fromRoomId: 'pickup', toRoomId: 'kitchen-cell', normallyOpen: false, accessTags: ['staff'] },
     { id: 'kitchen-store', kind: 'door', fromRoomId: 'kitchen-cell', toRoomId: 'cold-store', normallyOpen: false, accessTags: ['staff'] },
-    { id: 'kitchen-service', kind: 'door', fromRoomId: 'kitchen-cell', toRoomId: 'hygiene-service', normallyOpen: false, accessTags: ['staff'] },
+    { id: 'kitchen-service', kind: 'door', fromRoomId: 'kitchen-cell', toRoomId: 'service-bay', normallyOpen: false, accessTags: ['staff'] },
   ],
 }
