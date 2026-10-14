@@ -16,6 +16,11 @@ describe('shared building interior registry',()=>{
     ['robotic_kitchen','robotic-kitchen-standard-v1'],
     ['automated_food_service','robotic-kitchen-standard-v1'],
     ['habitat_food_cell','robotic-kitchen-standard-v1'],
+    ['church','sacred-place-standard-v1'],
+    ['mosque','sacred-place-standard-v1'],
+    ['temple','sacred-place-standard-v1'],
+    ['resonance_place','resonance-place-standard-v1'],
+    ['omnizedenz_resonance_place','resonance-place-standard-v1'],
   ])('maps %s to %s',(buildingId,templateId)=>{
     expect(getInteriorTemplateForBuildingType(buildingId)?.id).toBe(templateId)
   })
