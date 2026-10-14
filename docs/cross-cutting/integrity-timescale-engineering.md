@@ -82,6 +82,18 @@ Adaptive detail is therefore a resolution strategy, not data deletion.
 
 Together they control **trust, time and granularity**.
 
+## Causal Sufficiency
+
+Adaptive Detail Resolution is constrained by **causal sufficiency**: a coarse representation
+is acceptable only while it can reproduce all causally relevant consequences required at that
+level. Deeper state is resolved when observation, interaction, failure or research makes it
+necessary, and the refined state must remain compatible with the already established history.
+
+This creates three distinct notions of depth: ontological, simulated and epistemic. They must
+never be conflated.
+
+See `docs/architecture/NOXIA-PHIL-0001-causal-sufficiency-and-simulation-epistemology.md`.
+
 ## Robustness rule
 
 Disturbances are part of the model. Prefer architectures that represent, characterize, authenticate, suppress or route around disturbances rather than assuming ideal inputs.
