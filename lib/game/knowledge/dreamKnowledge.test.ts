@@ -18,3 +18,16 @@ assert.equal(synthesizeNpcDream({ ...input, sleeping: false }), null)
 assert.equal(synthesizeNpcDream({ ...input, memories: [], sources: [] }), null)
 assert.throws(() => synthesizeNpcDream({ ...input, tick: -1 }))
 console.log('dreamKnowledge offline tests passed')
+
+const nightmare = synthesizeNpcDream({
+  ...input,
+  sources: [{ ...input.sources[0], emotionalIntensity: 1 }],
+  emotionalSensitivity: 1,
+})
+assert.equal(nightmare?.emotionalTone, 'nightmare')
+assert.equal(nightmare?.epistemicStatus, 'subjective-dream')
+assert.equal(synthesizeNpcDream({
+  ...input, sources: [{ ...input.sources[0], emotionalIntensity: 0 }],
+  memories: [], emotionalSensitivity: 0,
+})?.emotionalTone, 'neutral')
+assert.throws(() => synthesizeNpcDream({ ...input, emotionalSensitivity: 2 }), /sensitivity/)
