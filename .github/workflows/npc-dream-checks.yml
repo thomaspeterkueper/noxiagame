@@ -1,0 +1,31 @@
+name: NPC dream prototype checks
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/knowledge/dreamKnowledge*'
+      - 'lib/game/cognition/npcDreamPreview*'
+      - '.github/workflows/npc-dream-checks.yml'
+  workflow_dispatch:
+
+jobs:
+  dream-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck and compile focused tests
+        run: |
+          npx tsc lib/game/knowledge/dreamKnowledge.test.ts lib/game/cognition/npcDreamPreview.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .dream-test
+      - name: Run focused dream tests
+        run: |
+          node .dream-test/game/knowledge/dreamKnowledge.test.js
+          node .dream-test/game/cognition/npcDreamPreview.test.js
+      - name: Existing knowledge transmission regression
+        run: npm run test:knowledge-transmission
