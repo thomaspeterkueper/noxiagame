@@ -46,4 +46,4 @@ assert.equal(synthesizeNpcDream({ ...input, sources: [{ ...input.sources[0], wor
 const sourceText = 'Bridge repair contains a very long passage that should never be repeated in the dream motif list'
 const protectedDream = synthesizeNpcDream({ ...input, sources: [{ ...input.sources[0], text: sourceText }] })
 assert.equal(protectedDream?.motifs.some(m => m.includes('Bridge repair contains a very long passage')), false)
-assert.equal(protectedDream?.motifs.every(m => m.split(/\\s+/).length < 8), true)
+assert.equal(protectedDream?.motifs.every(m => m.split(/\s+/).length < 8), true)
