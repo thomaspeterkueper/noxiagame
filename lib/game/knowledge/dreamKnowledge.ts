@@ -96,6 +96,7 @@ export function synthesizeNpcDream(input: {
     motifs,
     strength: memoryIntensity,
     novelty: sources.length ? 0.5 : 0,
+    maxMotifs: 24,
   })
   return Object.freeze({
     ...association,
