@@ -1,0 +1,30 @@
+name: Verify sensory population integration 483
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-sensory-population-483.yml'
+      - 'lib/game/npcEconomy.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-sensory-population:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - name: Population tests
+        run: npm run test:population
+      - name: Population persistence compilation
+        run: npx tsc lib/game/population/engine.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+      - name: Tick orchestration compilation
+        run: npx tsc lib/game/tick.ts lib/game/personBrain.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+      - name: Core invariants
+        run: npm run test:core-invariants
