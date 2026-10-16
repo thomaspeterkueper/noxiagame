@@ -73,6 +73,36 @@ export function selectDreamSourceIds(input: {
     .map(item => item.id)
 }
 
+/** Optional, at most one explicitly marked unrelated impulse from already-approved sources. */
+export function selectDreamSourceMotifs(input: {
+  npcId: string
+  atTick: number
+  motifKeys: readonly string[]
+  sources: readonly { id: string; motifs: readonly string[] }[]
+  limit: number
+  allowForeignImpulse?: boolean
+}): readonly { id: string; kind: 'related' | 'foreign-impulse' }[] {
+  const limit = Math.max(0, Math.min(12, input.limit))
+  if (!limit) return []
+  const keys = new Set(input.motifKeys.flatMap(abstractMotifKeys))
+  const ranked = input.sources.map(source => ({
+    id: source.id,
+    score: source.motifs.flatMap(abstractMotifKeys).filter(key => keys.has(key)).length,
+  })).sort((a, b) => b.score - a.score ||
+    stableHash01(input.npcId + ':' + input.atTick + ':' + a.id) -
+    stableHash01(input.npcId + ':' + input.atTick + ':' + b.id) || a.id.localeCompare(b.id))
+  const selected = ranked.filter(s => s.score > 0).slice(0, limit)
+    .map(s => ({ id: s.id, kind: 'related' as const }))
+  if (input.allowForeignImpulse && selected.length < limit) {
+    const unrelated = ranked.find(s => s.score === 0 && !selected.some(item => item.id === s.id))
+    if (unrelated) selected.push({ id: unrelated.id, kind: 'foreign-impulse' as const })
+  }
+  if (!selected.length) {
+    return ranked.slice(0, limit).map(s => ({ id: s.id, kind: 'related' as const }))
+  }
+  return selected
+}
+
 export interface DreamRecombinationResult {
   candidates: DreamAssociation[]
   consideredMemoryIds: string[]
