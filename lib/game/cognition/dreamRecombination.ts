@@ -7,6 +7,7 @@ export interface DreamAssociation {
   id: string
   npcId: string
   sourceMemoryIds: string[]
+  sourceIds?: readonly string[]
   sourceTraceIds: string[]
   sourcePatternKeys: string[]
   motifs: readonly string[]
@@ -15,6 +16,36 @@ export interface DreamAssociation {
   createdAtTick: number
   provenance: 'dream_recombination'
   canonical: false
+}
+
+/** Common provenance-preserving association constructor for internal and cached-source dreams. */
+export function createDreamAssociation(input: {
+  npcId: string
+  atTick: number
+  memoryIds: readonly string[]
+  traceIds?: readonly string[]
+  patternKeys?: readonly string[]
+  sourceIds?: readonly string[]
+  motifs: readonly string[]
+  strength: number
+  novelty: number
+}): DreamAssociation {
+  const sourceIds = input.sourceIds ?? []
+  const key = [...input.memoryIds, ...input.traceIds ?? [], ...input.patternKeys ?? [], ...sourceIds].join('|')
+  return {
+    id: 'dream-association:' + input.npcId + ':' + input.atTick + ':' + stableHash01(key).toFixed(5),
+    npcId: input.npcId,
+    createdAtTick: input.atTick,
+    sourceMemoryIds: [...input.memoryIds],
+    sourceTraceIds: [...input.traceIds ?? []],
+    sourcePatternKeys: [...input.patternKeys ?? []],
+    sourceIds: [...sourceIds],
+    motifs: [...new Set(input.motifs)].slice(0, 24),
+    associationStrength: unit(input.strength),
+    novelty: unit(input.novelty),
+    provenance: 'dream_recombination',
+    canonical: false,
+  }
 }
 
 export interface DreamRecombinationResult {
