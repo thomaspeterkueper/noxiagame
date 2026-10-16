@@ -88,6 +88,8 @@ check(result.candidates.some(candidate => candidate.sourcePatternKeys.includes(p
 check(!result.candidates.some(candidate =>
   candidate.sourceMemoryIds.includes(first.memory.id) && candidate.sourceMemoryIds.includes(copied.memory.id),
 ), 'derived copy is not treated as independent novelty')
+check(result.candidates.every(candidate => candidate.motifs.every(motif => motif.split(/\\s+/).length < 8)), 'dream motifs never contain eight-word prose spans')
+check(result.candidates.every(candidate => candidate.motifs.every(motif => motif.length <= 48)), 'dream motif keys stay bounded')
 check(state.memories.length === 3, 'dream recombination does not create new memories')
 check(state.traces.length === 3, 'dream recombination does not mutate provenance graph')
 
