@@ -7,7 +7,7 @@ export interface DreamAssociation {
   id: string
   npcId: string
   sourceMemoryIds: string[]
-  sourceIds?: readonly string[]
+  sourceIds: readonly string[]
   sourceTraceIds: string[]
   sourcePatternKeys: string[]
   motifs: readonly string[]
@@ -29,6 +29,7 @@ export function createDreamAssociation(input: {
   motifs: readonly string[]
   strength: number
   novelty: number
+  maxMotifs?: number
 }): DreamAssociation {
   const sourceIds = input.sourceIds ?? []
   const key = [...input.memoryIds, ...(input.traceIds ?? []), ...(input.patternKeys ?? []), ...sourceIds].join('|')
@@ -40,7 +41,7 @@ export function createDreamAssociation(input: {
     sourceTraceIds: [...input.traceIds ?? []],
     sourcePatternKeys: [...input.patternKeys ?? []],
     sourceIds: [...sourceIds],
-    motifs: [...new Set(input.motifs)].slice(0, 24),
+    motifs: [...new Set(input.motifs)].slice(0, Math.max(0, Math.min(24, input.maxMotifs ?? 12))),
     associationStrength: unit(input.strength),
     novelty: unit(input.novelty),
     provenance: 'dream_recombination',
@@ -192,6 +193,7 @@ export function recombineDuringDream(input: {
         motifs,
         strength: source.rawScore,
         novelty,
+        maxMotifs: 12,
       })
     })
 
