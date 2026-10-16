@@ -97,9 +97,6 @@ export function selectDreamSourceMotifs(input: {
     const unrelated = ranked.find(s => s.score === 0 && !selected.some(item => item.id === s.id))
     if (unrelated) selected.push({ id: unrelated.id, kind: 'foreign-impulse' as const })
   }
-  if (!selected.length) {
-    return ranked.slice(0, limit).map(s => ({ id: s.id, kind: 'related' as const }))
-  }
   return selected
 }
 
