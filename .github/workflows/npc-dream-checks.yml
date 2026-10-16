@@ -19,14 +19,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Typecheck and compile focused tests
         run: |
-          npx tsc lib/game/knowledge/dreamKnowledge.test.ts lib/game/knowledge/dreamInquiry.test.ts lib/game/knowledge/dreamInquiryDecision.test.ts lib/game/knowledge/dreamActionIntent.test.ts lib/game/knowledge/dreamActionAdmission.test.ts lib/game/knowledge/dreamCyclePreview.test.ts lib/game/cognition/npcDreamPreview.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .dream-test
+          pnpm exec tsc lib/game/knowledge/dreamKnowledge.test.ts lib/game/knowledge/dreamInquiry.test.ts lib/game/knowledge/dreamInquiryDecision.test.ts lib/game/knowledge/dreamActionIntent.test.ts lib/game/knowledge/dreamActionAdmission.test.ts lib/game/knowledge/dreamCyclePreview.test.ts lib/game/cognition/npcDreamPreview.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .dream-test
       - name: Run focused dream tests
         run: |
           node .dream-test/game/knowledge/dreamKnowledge.test.js
@@ -37,4 +40,4 @@ jobs:
           node .dream-test/game/knowledge/dreamCyclePreview.test.js
           node .dream-test/game/cognition/npcDreamPreview.test.js
       - name: Existing knowledge transmission regression
-        run: npm run test:knowledge-transmission
+        run: pnpm run test:knowledge-transmission
