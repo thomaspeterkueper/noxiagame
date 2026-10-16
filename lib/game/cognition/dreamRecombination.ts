@@ -49,6 +49,30 @@ export function createDreamAssociation(input: {
   }
 }
 
+/** Shared deterministic input selection for cached external dream impulses.
+ * Callers must filter provenance, licensing and in-world access first.
+ */
+export function selectDreamSourceIds(input: {
+  npcId: string
+  atTick: number
+  motifKeys: readonly string[]
+  sources: readonly { id: string; motifs: readonly string[] }[]
+  limit: number
+}): string[] {
+  const keys = new Set(input.motifKeys.flatMap(abstractMotifKeys))
+  return input.sources
+    .map(source => ({
+      id: source.id,
+      score: source.motifs.flatMap(abstractMotifKeys).filter(key => keys.has(key)).length,
+    }))
+    .sort((a, b) => b.score - a.score ||
+      stableHash01(input.npcId + ':' + input.atTick + ':' + a.id) -
+      stableHash01(input.npcId + ':' + input.atTick + ':' + b.id) ||
+      a.id.localeCompare(b.id))
+    .slice(0, Math.max(0, Math.min(12, input.limit)))
+    .map(item => item.id)
+}
+
 export interface DreamRecombinationResult {
   candidates: DreamAssociation[]
   consideredMemoryIds: string[]
