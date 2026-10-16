@@ -1,4 +1,4 @@
-import { createDreamAssociation, type DreamAssociation } from '../cognition/dreamRecombination'
+import { createDreamAssociation, selectDreamSourceIds, type DreamAssociation } from '../cognition/dreamRecombination'
 
 /**
  * Experimental offline NPC dream synthesis. No network, persistence or canonical knowledge writes.
@@ -34,15 +34,6 @@ function motifKeys(value: string): string[] {
   return [...new Set((value.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []).slice(0, 32))]
     .filter(key => !['about', 'there', 'their', 'would', 'could', 'from', 'with', 'have', 'that', 'this'].includes(key))
 }
-function overlap(a: readonly string[], b: readonly string[]): number {
-  const keys = new Set(a)
-  return b.filter(key => keys.has(key)).length
-}
-function hash(value: string): number {
-  let h = 2166136261
-  for (let i = 0; i < value.length; i++) h = Math.imul(h ^ value.charCodeAt(i), 16777619)
-  return h >>> 0
-}
 /** Explicit opt-in caller, e.g. sleep event; deterministic and side-effect free. */
 export function synthesizeNpcDream(input: {
   npcId: string
@@ -69,14 +60,18 @@ export function synthesizeNpcDream(input: {
     .sort((a, b) => b.emotionalWeight - a.emotionalWeight || a.id.localeCompare(b.id))
     .slice(0, budget.maxMemories)
   const memoryKeys = [...new Set(memories.flatMap(m => motifKeys(m.summary)))]
-  const sources = [...input.sources]
+  const eligibleSources = [...input.sources]
     .filter(s => s.id.trim() && s.sourceUri.trim() && s.license.trim() &&
       s.availableFromYear <= worldYear && s.observedAtTick <= tick && s.text.trim() &&
       s.worldProjection?.accessible === true && s.worldProjection.availableFromYear <= worldYear &&
       (s.emotionalIntensity === undefined || (Number.isFinite(s.emotionalIntensity) && s.emotionalIntensity >= 0 && s.emotionalIntensity <= 1)))
-    .sort((a, b) => overlap(memoryKeys, motifKeys(b.text)) - overlap(memoryKeys, motifKeys(a.text)) ||
-      hash(npcId + ':' + tick + ':' + a.id) - hash(npcId + ':' + tick + ':' + b.id) || a.id.localeCompare(b.id))
-    .slice(0, budget.maxSources)
+  const chosenIds = selectDreamSourceIds({
+    npcId, atTick: tick, motifKeys: memoryKeys,
+    sources: eligibleSources.map(s => ({ id: s.id, motifs: motifKeys(s.text) })),
+    limit: budget.maxSources,
+  })
+  const byId = new Map(eligibleSources.map(s => [s.id, s]))
+  const sources = chosenIds.map(id => byId.get(id)!).filter(Boolean)
   if (!memories.length && !sources.length) return null
   // Keep abstract motif keys only; never replicate source or memory prose into a dream.
   const motifs = [...new Set([...memories.flatMap(m => motifKeys(m.summary)),
