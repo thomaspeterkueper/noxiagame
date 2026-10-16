@@ -1,3 +1,5 @@
+import type { DreamAssociation } from '../cognition/dreamRecombination'
+
 /**
  * Experimental offline NPC dream synthesis. No network, persistence or canonical knowledge writes.
  * A dream is a subjective association, never a verified claim.
@@ -13,11 +15,9 @@ export type DreamSource = Readonly<{
   worldProjection?: Readonly<{ availableFromYear: number; accessible: boolean; location?: string }> // approved in-world availability
 }>
 export type DreamMemory = Readonly<{ id: string; summary: string; emotionalWeight: number }>
-export type DreamEpisode = Readonly<{
-  id: string
-  npcId: string
+/** Compatibility view: one authoritative dream identity and provenance model. */
+export type DreamEpisode = Readonly<DreamAssociation & {
   atTick: number
-  motifs: readonly string[]
   sourceIds: readonly string[]
   memoryIds: readonly string[]
   interpretation: string
@@ -89,8 +89,16 @@ export function synthesizeNpcDream(input: {
   const emotionalTone = distressScore >= 0.75 ? 'nightmare' as const :
     distressScore >= 0.4 ? 'uneasy' as const : 'neutral' as const
   return Object.freeze({
-    id: 'dream:' + npcId + ':' + tick,
+    id: 'dream-association:' + npcId + ':' + tick,
     npcId, atTick: tick,
+    createdAtTick: tick,
+    sourceMemoryIds: Object.freeze(memories.map(m => m.id)),
+    sourceTraceIds: Object.freeze([] as string[]),
+    sourcePatternKeys: Object.freeze([] as string[]),
+    associationStrength: memoryIntensity,
+    novelty: sources.length ? 0.5 : 0,
+    provenance: 'dream_recombination' as const,
+    canonical: false as const,
     motifs: Object.freeze(motifs),
     sourceIds: Object.freeze(sources.map(s => s.id)),
     memoryIds: Object.freeze(memories.map(m => m.id)),
