@@ -81,6 +81,8 @@ const result = recombineDuringDream({
   maxCandidates: 6,
 })
 
+check(result.candidates.every(candidate => candidate.motifs.length <= 12), 'memory recombination keeps its original twelve-motif cap')
+check(result.candidates.every(candidate => Array.isArray(candidate.sourceIds)), 'sourceIds always present')
 check(result.candidates.length > 0, 'dream can generate bounded association candidates')
 check(result.candidates.every(candidate => candidate.canonical === false), 'dream associations are never canonical truth')
 check(result.candidates.every(candidate => candidate.provenance === 'dream_recombination'), 'dream provenance is explicit')
