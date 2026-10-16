@@ -9,7 +9,7 @@ export interface DreamAssociation {
   sourceMemoryIds: string[]
   sourceTraceIds: string[]
   sourcePatternKeys: string[]
-  motifs: string[]
+  motifs: readonly string[]
   associationStrength: number
   novelty: number
   createdAtTick: number
