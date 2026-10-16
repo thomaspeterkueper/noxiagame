@@ -1,0 +1,30 @@
+name: Verify population import fix 486
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-population-import-486.yml'
+      - 'lib/game/npcEconomy.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-population:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - name: Population domain tests
+        run: npm run test:population
+      - name: Compile population persistence
+        run: npx tsc lib/game/population/engine.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+      - name: Compile authoritative tick orchestration
+        run: npx tsc lib/game/tick.ts lib/game/personBrain.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+      - name: Check core invariants
+        run: npm run test:core-invariants
