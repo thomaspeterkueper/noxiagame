@@ -31,7 +31,7 @@ export function createDreamAssociation(input: {
   novelty: number
 }): DreamAssociation {
   const sourceIds = input.sourceIds ?? []
-  const key = [...input.memoryIds, ...input.traceIds ?? [], ...input.patternKeys ?? [], ...sourceIds].join('|')
+  const key = [...input.memoryIds, ...(input.traceIds ?? []), ...(input.patternKeys ?? []), ...sourceIds].join('|')
   return {
     id: 'dream-association:' + input.npcId + ':' + input.atTick + ':' + stableHash01(key).toFixed(5),
     npcId: input.npcId,
@@ -183,19 +183,16 @@ export function recombineDuringDream(input: {
           + input.creativity.noveltySeeking * 0.20,
       )
 
-      return {
-        id: 'dream-association:' + input.memoryState.npcId + ':' + input.atTick + ':' + stableHash01(source.key).toFixed(5),
+      return createDreamAssociation({
         npcId: input.memoryState.npcId,
-        sourceMemoryIds,
-        sourceTraceIds,
-        sourcePatternKeys,
-        motifs: [...new Set(motifs)].slice(0, 12),
-        associationStrength: source.rawScore,
+        atTick: input.atTick,
+        memoryIds: sourceMemoryIds,
+        traceIds: sourceTraceIds,
+        patternKeys: sourcePatternKeys,
+        motifs,
+        strength: source.rawScore,
         novelty,
-        createdAtTick: input.atTick,
-        provenance: 'dream_recombination' as const,
-        canonical: false as const,
-      }
+      })
     })
 
   return {
