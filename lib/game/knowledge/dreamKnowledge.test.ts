@@ -47,6 +47,15 @@ const related = synthesizeNpcDream({
   ],
 })
 assert.deepEqual(related?.sourceIds, ['related'])
+assert.deepEqual(related, synthesizeNpcDream({
+  ...input,
+  budget: { maxSources: 1, maxMemories: 1, maxTextLength: 180 },
+  sources: [
+    { ...input.sources[0], id: 'related', text: 'Bridge repair and construction', worldProjection: { availableFromYear: 2100, accessible: true } },
+    { ...input.sources[0], id: 'unrelated', text: 'Stars galaxies nebulas', worldProjection: { availableFromYear: 2100, accessible: true } },
+  ],
+}), 'source ordering must not change deterministic output')
+
 assert.equal(synthesizeNpcDream({ ...input, sources: [{ ...input.sources[0], worldProjection: undefined }] })?.sourceIds.length, 0)
 assert.equal(synthesizeNpcDream({ ...input, sources: [{ ...input.sources[0], worldProjection: { availableFromYear: 2200, accessible: true } }] })?.sourceIds.length, 0)
 const sourceText = 'Bridge repair contains a very long passage that should never be repeated in the dream motif list'
