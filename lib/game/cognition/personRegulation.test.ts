@@ -1,0 +1,13 @@
+import {neutralRegulation,advanceRegulation,regulationEffects} from './personRegulation'
+const initial=neutralRegulation(0)
+const isolated=advanceRegulation(initial,1,{isolation:1,rejection:.7})
+if(!(isolated.values.loneliness>initial.values.loneliness))throw Error('isolation should increase loneliness')
+if(!(isolated.values.belonging<initial.values.belonging))throw Error('rejection should reduce belonging')
+const connected=advanceRegulation(isolated,2,{meaningfulContact:1,support:1})
+if(!(connected.values.loneliness<isolated.values.loneliness))throw Error('contact should reduce loneliness')
+if(!(connected.values.belonging>isolated.values.belonging))throw Error('contact should improve belonging')
+const hurt=advanceRegulation(initial,1,{injury:1,threat:1})
+if(!(hurt.values.stress>initial.values.stress))throw Error('injury should increase stress')
+if(!(regulationEffects(hurt).healingMultiplier<regulationEffects(initial).healingMultiplier))throw Error('stress should impair healing')
+if(JSON.stringify(advanceRegulation(initial,1,{injury:1}))!==JSON.stringify(advanceRegulation(initial,1,{injury:1})))throw Error('not deterministic')
+console.log('PASS: regulation, belonging, loneliness, injury, deterministic')
