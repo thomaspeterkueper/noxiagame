@@ -36,7 +36,7 @@ function stableHash01(value: string) {
 
 // Emit bounded semantic keys, never remembered sentences or observation prose.
 function abstractMotifKeys(value: string): string[] {
-  return [...new Set(value.toLowerCase().match(/[\\p{L}\\p{N}_:-]{4,}/gu) ?? [])]
+  return [...new Set(value.toLowerCase().match(/[\p{L}\p{N}_:-]{4,}/gu) ?? [])]
     .filter(key => key.length <= 48)
     .slice(0, 8)
 }
