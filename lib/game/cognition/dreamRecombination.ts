@@ -34,26 +34,31 @@ function stableHash01(value: string) {
   return ((h >>> 0) % 100000) / 100000
 }
 
+// Emit bounded semantic keys, never remembered sentences or observation prose.
+function abstractMotifKeys(value: string): string[] {
+  return [...new Set(value.toLowerCase().match(/[\\p{L}\\p{N}_:-]{4,}/gu) ?? [])]
+    .filter(key => key.length <= 48)
+    .slice(0, 8)
+}
+
 function memoryMotifs(memory: NpcMemory): string[] {
+  const keys = [memory.attribute, memory.subjectRef]
   const value = memory.rememberedValue
-  const motifs = [memory.attribute, memory.subjectRef]
-  if (typeof value === 'string' && value.trim()) motifs.push(value.trim())
+  if (typeof value === 'string') keys.push(...abstractMotifKeys(value))
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const object = value as Record<string, unknown>
-    const features = object.features
+    const features = (value as Record<string, unknown>).features
     if (features && typeof features === 'object' && !Array.isArray(features)) {
       for (const [key, feature] of Object.entries(features as Record<string, unknown>)) {
-        if (typeof feature === 'string' || typeof feature === 'number' || typeof feature === 'boolean') {
-          motifs.push(key + ':' + String(feature))
-        }
+        keys.push(key)
+        if (typeof feature === 'string') keys.push(...abstractMotifKeys(feature))
       }
     }
   }
-  return [...new Set(motifs)].slice(0, 8)
+  return [...new Set(keys.flatMap(abstractMotifKeys))].slice(0, 8)
 }
 
 function patternMotifs(pattern: SensoryPattern): string[] {
-  return [pattern.modality, pattern.sourceClass, pattern.sourceRef]
+  return [...new Set([pattern.modality, pattern.sourceClass, pattern.sourceRef].flatMap(abstractMotifKeys))]
 }
 
 function memoryScore(memory: NpcMemory) {
