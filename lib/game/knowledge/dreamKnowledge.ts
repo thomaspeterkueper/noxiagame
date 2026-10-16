@@ -10,6 +10,7 @@ export type DreamSource = Readonly<{
   availableFromYear: number
   license: string
   emotionalIntensity?: number // optional cached source classification, 0..1
+  worldProjection?: Readonly<{ availableFromYear: number; accessible: boolean; location?: string }> // approved in-world availability
 }>
 export type DreamMemory = Readonly<{ id: string; summary: string; emotionalWeight: number }>
 export type DreamEpisode = Readonly<{
@@ -28,6 +29,14 @@ export type DreamBudget = Readonly<{ maxSources: number; maxMemories: number; ma
 
 function positiveInt(n: number, label: string): void {
   if (!Number.isSafeInteger(n) || n < 0) throw new Error('Invalid ' + label)
+}
+function motifKeys(value: string): string[] {
+  return [...new Set((value.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []).slice(0, 32))]
+    .filter(key => !['about', 'there', 'their', 'would', 'could', 'from', 'with', 'have', 'that', 'this'].includes(key))
+}
+function overlap(a: readonly string[], b: readonly string[]): number {
+  const keys = new Set(a)
+  return b.filter(key => keys.has(key)).length
 }
 function hash(value: string): number {
   let h = 2166136261
@@ -59,16 +68,19 @@ export function synthesizeNpcDream(input: {
     .filter(m => m.id.trim() && m.summary.trim() && Number.isFinite(m.emotionalWeight))
     .sort((a, b) => b.emotionalWeight - a.emotionalWeight || a.id.localeCompare(b.id))
     .slice(0, budget.maxMemories)
+  const memoryKeys = [...new Set(memories.flatMap(m => motifKeys(m.summary)))]
   const sources = [...input.sources]
     .filter(s => s.id.trim() && s.sourceUri.trim() && s.license.trim() &&
       s.availableFromYear <= worldYear && s.observedAtTick <= tick && s.text.trim() &&
+      s.worldProjection?.accessible === true && s.worldProjection.availableFromYear <= worldYear &&
       (s.emotionalIntensity === undefined || (Number.isFinite(s.emotionalIntensity) && s.emotionalIntensity >= 0 && s.emotionalIntensity <= 1)))
-    .sort((a, b) => hash(npcId + ':' + tick + ':' + a.id) - hash(npcId + ':' + tick + ':' + b.id) || a.id.localeCompare(b.id))
+    .sort((a, b) => overlap(memoryKeys, motifKeys(b.text)) - overlap(memoryKeys, motifKeys(a.text)) ||
+      hash(npcId + ':' + tick + ':' + a.id) - hash(npcId + ':' + tick + ':' + b.id) || a.id.localeCompare(b.id))
     .slice(0, budget.maxSources)
   if (!memories.length && !sources.length) return null
-  // External text is inspiration only: truncate and never mark as factual knowledge.
-  const motifs = [...memories.map(m => m.summary), ...sources.map(s => s.text)]
-    .map(s => s.slice(0, budget.maxTextLength))
+  // Keep abstract motif keys only; never replicate source or memory prose into a dream.
+  const motifs = [...new Set([...memories.flatMap(m => motifKeys(m.summary)),
+    ...sources.flatMap(s => motifKeys(s.text))])].slice(0, 24)
   const sourceIntensity = sources.length ? Math.max(...sources.map(s => s.emotionalIntensity ?? 0)) : 0
   const memoryIntensity = memories.length ? Math.max(...memories.map(m => Math.max(0, Math.min(1, Math.abs(m.emotionalWeight))))) : 0
   // Heuristic only; do not infer psychiatric diagnoses or make claims about human nightmares.
