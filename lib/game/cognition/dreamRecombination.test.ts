@@ -1,5 +1,5 @@
 import { createNpcMemory, type NpcMemoryState } from './npcRelationalMemory'
-import { recombineDuringDream } from './dreamRecombination'
+import { recombineDuringDream, selectDreamSourceMotifs } from './dreamRecombination'
 import type { SensoryPattern } from './sensoryPatternLearning'
 
 let failures = 0
@@ -94,6 +94,24 @@ check(result.candidates.every(candidate => candidate.motifs.every(motif => motif
 check(result.candidates.every(candidate => candidate.motifs.every(motif => motif.length <= 48)), 'dream motif keys stay bounded')
 check(state.memories.length === 3, 'dream recombination does not create new memories')
 check(state.traces.length === 3, 'dream recombination does not mutate provenance graph')
+
+const impulseInput = {
+  npcId: 'child', atTick: 100, motifKeys: ['bridge'],
+  sources: [
+    { id: 'related', motifs: ['bridge'] },
+    { id: 'unexpected', motifs: ['ocean'] },
+  ],
+  limit: 2,
+}
+check(JSON.stringify(selectDreamSourceMotifs(impulseInput)) ===
+  JSON.stringify([{ id: 'related', kind: 'related' }]), 'unrelated impulse is excluded by default')
+check(JSON.stringify(selectDreamSourceMotifs({ ...impulseInput, allowForeignImpulse: true })) ===
+  JSON.stringify([{ id: 'related', kind: 'related' }, { id: 'unexpected', kind: 'foreign-impulse' }]),
+  'optional foreign impulse is explicitly marked')
+check(selectDreamSourceMotifs({ ...impulseInput, limit: 1, allowForeignImpulse: true }).length === 1,
+  'foreign impulse never exceeds the source budget')
+check(selectDreamSourceMotifs({ ...impulseInput, motifKeys: ['unmatched'] }).length === 0,
+  'unrelated sources never enter unmarked')
 
 if (failures) throw new Error(String(failures) + ' dream recombination test(s) failed')
 console.log('Dream recombination v0.1: tests passed; canonical_outputs=0; memory_writes=0; external_llm_calls=0')
