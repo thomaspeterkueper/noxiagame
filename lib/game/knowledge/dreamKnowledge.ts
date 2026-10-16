@@ -1,4 +1,4 @@
-import type { DreamAssociation } from '../cognition/dreamRecombination'
+import { createDreamAssociation, type DreamAssociation } from '../cognition/dreamRecombination'
 
 /**
  * Experimental offline NPC dream synthesis. No network, persistence or canonical knowledge writes.
@@ -88,18 +88,19 @@ export function synthesizeNpcDream(input: {
     (input.emotionalSensitivity ?? 0) * 0.15)
   const emotionalTone = distressScore >= 0.75 ? 'nightmare' as const :
     distressScore >= 0.4 ? 'uneasy' as const : 'neutral' as const
-  return Object.freeze({
-    id: 'dream-association:' + npcId + ':' + tick,
-    npcId, atTick: tick,
-    createdAtTick: tick,
-    sourceMemoryIds: memories.map(m => m.id),
-    sourceTraceIds: [] as string[],
-    sourcePatternKeys: [] as string[],
-    associationStrength: memoryIntensity,
+  const association = createDreamAssociation({
+    npcId,
+    atTick: tick,
+    memoryIds: memories.map(m => m.id),
+    sourceIds: sources.map(s => s.id),
+    motifs,
+    strength: memoryIntensity,
     novelty: sources.length ? 0.5 : 0,
-    provenance: 'dream_recombination' as const,
-    canonical: false as const,
-    motifs: Object.freeze(motifs),
+  })
+  return Object.freeze({
+    ...association,
+    atTick: tick,
+    motifs: Object.freeze([...association.motifs]),
     sourceIds: Object.freeze(sources.map(s => s.id)),
     memoryIds: Object.freeze(memories.map(m => m.id)),
     interpretation: 'Subjective associations; requires independent verification.',
