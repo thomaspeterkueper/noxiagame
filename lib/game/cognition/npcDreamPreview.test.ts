@@ -13,7 +13,8 @@ const state: NpcMemoryState = {
 }
 const sources = [
   { id: 'history', text: 'Historic bridge joinery', sourceUri: 'https://example.org/bridge',
-    observedAtTick: 5, availableFromYear: 2020, license: 'CC-BY' },
+    observedAtTick: 5, availableFromYear: 2020, license: 'CC-BY',
+    worldProjection: { availableFromYear: 2100, accessible: true } },
 ]
 const before = JSON.stringify(state)
 const result = previewRelationalNpcDream({
