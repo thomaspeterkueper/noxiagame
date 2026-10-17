@@ -24,11 +24,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install --no-audit --no-fund
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Validate shared interiors
-        run: npm run test:interiors
+        run: pnpm run test:interiors
       - name: Validate Core invariants
-        run: npm run test:core-invariants
+        run: pnpm run test:core-invariants

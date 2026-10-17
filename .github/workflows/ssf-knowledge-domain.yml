@@ -31,14 +31,18 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: build-only-service-role-key
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
+          cache: pnpm
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
       - name: Compile ssf knowledge domain test
-        run: npx tsc lib/ssfKnowledge.ts lib/ssfKnowledge.test.ts lib/knowledge/unlockRegistry.ts lib/knowledge/types.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .ssf-test
+        run: pnpm exec tsc lib/ssfKnowledge.ts lib/ssfKnowledge.test.ts lib/knowledge/unlockRegistry.ts lib/knowledge/types.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .ssf-test
       - name: Run ssf knowledge domain test
         run: node .ssf-test/ssfKnowledge.test.js
       - name: Verify application build
-        run: npm run build
+        run: pnpm run build

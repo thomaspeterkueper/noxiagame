@@ -30,13 +30,13 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Compile and run launch-system contract tests
         run: |
           rm -rf .launch-system-test
-          npx tsc \
+          pnpm exec tsc \
             lib/game/launchSystems.test.ts \
             lib/game/engineeringLaunchAuthorities.test.ts \
             --target ES2022 --module commonjs --moduleResolution node \

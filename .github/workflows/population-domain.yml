@@ -28,18 +28,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install --no-audit --no-fund
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Validate population contracts
-        run: npm run test:population
+        run: pnpm run test:population
       - name: Compile population persistence engine
-        run: npx tsc lib/game/population/engine.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+        run: pnpm exec tsc lib/game/population/engine.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
       - name: Compile authoritative tick orchestration
-        run: npx tsc lib/game/tick.ts lib/game/personBrain.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+        run: pnpm exec tsc lib/game/tick.ts lib/game/personBrain.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
       - name: Validate Core invariants
-        run: npm run test:core-invariants
+        run: pnpm run test:core-invariants
       - name: Reproduce production Next build
         env:
           # CI-only placeholders: page-data collection requires Supabase configuration even
@@ -47,4 +51,4 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
-        run: npm run build
+        run: pnpm run build

@@ -13,8 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm install --no-audit --no-fund
-      - run: npx tsc lib/game/cognition/researchSupabaseStore.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .cognitive-supabase-test
+        with: { node-version: '24' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc lib/game/cognition/researchSupabaseStore.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .cognitive-supabase-test
       - run: node .cognitive-supabase-test/game/cognition/researchSupabaseStore.test.js

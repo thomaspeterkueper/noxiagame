@@ -25,12 +25,12 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Verify shared surface logistics node contract
         run: >-
-          npx tsc lib/game/vehicles/surfaceLogisticsNodes.test.ts
+          pnpm exec tsc lib/game/vehicles/surfaceLogisticsNodes.test.ts
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .surface-node-test
           && node .surface-node-test/game/vehicles/surfaceLogisticsNodes.test.js

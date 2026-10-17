@@ -21,12 +21,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
+          cache: pnpm
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
       - name: Compile social-memory test
-        run: npx tsc lib/game/personSocialMemory.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --allowImportingTsExtensions false --outDir .social-memory-test
+        run: pnpm exec tsc lib/game/personSocialMemory.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --allowImportingTsExtensions false --outDir .social-memory-test
       - name: Run deterministic projection test
         run: node .social-memory-test/personSocialMemory.test.js
