@@ -22,12 +22,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install --no-audit --no-fund
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Compile intent contracts
-        run: npx tsc lib/game/population/actionIntent.test.ts lib/game/population/tickIntent.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .population-intent-test
+        run: pnpm exec tsc lib/game/population/actionIntent.test.ts lib/game/population/tickIntent.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .population-intent-test
       - name: Run intent contracts
         run: |
           node .population-intent-test/game/population/actionIntent.test.js

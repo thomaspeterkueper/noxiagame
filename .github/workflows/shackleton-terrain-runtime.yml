@@ -24,19 +24,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm install
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Verify persisted terrain manifest contract
         run: >-
-          npx tsc lib/game/spatial/terrainTilePersistence.test.ts
+          pnpm exec tsc lib/game/spatial/terrainTilePersistence.test.ts
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .terrain-runtime-test
           && node .terrain-runtime-test/game/spatial/terrainTilePersistence.test.js
       - name: Type-check Shackleton runtime sources
         run: >-
-          npx tsc
+          pnpm exec tsc
           lib/game/spatial/terrainTilePersistence.ts
           lib/game/spatial/supabaseTerrainObjectStore.ts
           lib/game/spatial/shackletonTerrainRuntime.ts

@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
       # The test has no runtime dependencies, so it only needs the compiler.
       - name: Compile affect test
         run: npx --yes --package typescript@5 tsc lib/game/cognition/personAffect.ts lib/game/cognition/personAffect.test.ts lib/game/population/decision.ts lib/game/population/affectRuntime.ts lib/game/population/affectRuntime.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .npc-affect-test

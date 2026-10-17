@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
       # The run has no runtime dependencies, so it only needs the compiler.
       - name: Compile
         run: npx --yes --package typescript@5 tsc lib/research/colony/colonyRun.ts lib/research/colony/colonyRun.test.ts lib/research/colony/cli.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .colony-run

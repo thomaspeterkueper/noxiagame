@@ -47,22 +47,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
+          cache: pnpm
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
       - name: Run Core invariants
-        run: npm run test:core-invariants
+        run: pnpm run test:core-invariants
       - name: Validate Tharsis energy reconciliation
         run: node scripts/check-tharsis-energy-reconciliation.mjs
       - name: Validate Tharsis E1 power-grid migration
         run: node scripts/check-tharsis-power-grid-e1.mjs
       - name: Run Tharsis E1 topology observation tests
         run: >-
-          npx tsc lib/game/energyGridObservation.test.ts
+          pnpm exec tsc lib/game/energyGridObservation.test.ts
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .energy-grid-test
           && node .energy-grid-test/game/energyGridObservation.test.js
       - name: Run world-development projection contract
-        run: npm run test:world-development
+        run: pnpm run test:world-development

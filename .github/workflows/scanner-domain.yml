@@ -37,18 +37,22 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: build-only-service-role-key
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
+          cache: pnpm
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
       - name: Compile scanner domain test
-        run: npx tsc lib/game/scanning.ts lib/game/scanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .scanner-test
+        run: pnpm exec tsc lib/game/scanning.ts lib/game/scanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .scanner-test
       - name: Run scanner domain test
         run: node .scanner-test/scanning.test.js
       - name: Compile resource prospecting test
-        run: npx tsc lib/game/resourceScanning.ts lib/game/resourceScanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .resource-scanning-test
+        run: pnpm exec tsc lib/game/resourceScanning.ts lib/game/resourceScanning.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir .resource-scanning-test
       - name: Run resource prospecting test
         run: node .resource-scanning-test/resourceScanning.test.js
       - name: Verify application build
-        run: npm run build
+        run: pnpm run build

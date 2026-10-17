@@ -72,13 +72,13 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Compile and run ascent-control contract tests
         run: |
           rm -rf .ascent-control-test
-          npx tsc \
+          pnpm exec tsc \
             lib/game/ascentControl.test.ts \
             lib/game/ascentPersistence.contract.test.ts \
             lib/game/ascentReadiness.contract.test.ts \
