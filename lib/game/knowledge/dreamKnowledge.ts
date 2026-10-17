@@ -24,6 +24,7 @@ export type DreamEpisode = Readonly<DreamAssociation & {
   emotionalTone: 'neutral' | 'uneasy' | 'nightmare'
   distressScore: number
   epistemicStatus: 'subjective-dream'
+  sourceImpulseKinds: readonly Readonly<{ id: string; kind: 'related' | 'foreign-impulse' }>[]
 }>
 export type DreamBudget = Readonly<{ maxSources: number; maxMemories: number; maxTextLength: number }>
 
