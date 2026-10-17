@@ -56,3 +56,20 @@ PRs mit Migrationen (#375, #316) dürfen nur als eigener Auftrag mit `risk_class
 ## Beobachtung
 
 Bei #481 und #482 wurden die Vorgänger (#459, #361) korrekt geschlossen. Bei #494, #495 und #358 blieben die Vorgänger (#484, #485, #333) dagegen offen, bis diese Sichtung sie schloss. Künftig gehört zum Nachfolger-PR immer das Schließen des Vorgängers mit Verweis.
+
+## Entscheidung zu den veralteten PRs (2026-10-17, 14:20)
+
+Vom Inhaber freigegeben: Empfehlung umsetzen. Keiner der elf PRs ist inhaltlich auf `main`. Alle elf wurden geschlossen; wo der Inhalt weiter gebraucht wird, steht er als Auftrag nach neuem Vertrag in `coordination/open/`. Die Branches bleiben als Ausgangspunkt erhalten.
+
+| PR | Neuer Auftrag |
+|---|---|
+| #471 | `20261017-1415-core-to-core-population-need-timestamps.md` |
+| #316 | `20261017-1416-core-to-core-living-long-term-goals.md` (Migration) |
+| #375 | `20261017-1417-core-to-core-q1-care-networks.md` (Migration) |
+| #322 | `20261017-1418-core-to-interiors-cultural-places.md` – ohne zweiten Resonanzort, der ist als `resonancePlaceStandard` auf `main` |
+| #314, #281 | `20261017-1419-core-to-earth-selmecke-start-and-spaceport.md` |
+| #455 | `20261017-1420-core-to-core-body-interoception.md` – zusammen mit #481, der offen bleibt |
+| #468 | `20261017-1421-core-to-core-omni-o5-access-contrasts.md` |
+| #334 | `20261017-1422-core-to-core-physical-observation-refraction.md` |
+| #215 | `20261017-1423-core-to-core-autonomous-actor-loop.md` |
+| #231 | kein neuer Auftrag – der zugrunde liegende Request `external-tasks/open/EXT-NOXIA-EARTH-20260911-surface-logistics.md` ist weiterhin offen und bleibt die Quelle |
