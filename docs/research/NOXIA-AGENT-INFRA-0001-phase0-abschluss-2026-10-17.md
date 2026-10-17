@@ -151,8 +151,8 @@ In zwei Requests vom 16./17.10. stand, `docs/agent-infra-0001` habe keine gemein
 | M3 | umgesetzt | `import-shackleton-terrain`, `sync-active-moon-terrain`, `validate-active-moon-terrain` nur noch `workflow_dispatch` (`6905fc25`); der Merge-Commit hat 0 Workflow-Runs ausgelöst |
 | M4 | umgesetzt | `vercel.json`: `feat/*`, `test/*`, `research/*` ohne automatische Deployments (`6905fc25`); Produktions-Deployment `dpl_2UJqBvrwauQ7PdaMbjBM2URUgaYh` mit der neuen Konfiguration `READY` |
 | M5 | **offen – manuell** | Anlegen eines Rulesets per API ist aus der Agenten-Session nicht erlaubt (HTTP 403). Schritte siehe unten. |
-| M6 | offen | eigener Auftrag, schrittweise je Workflow-Gruppe |
-| M7 | umgesetzt | #484, #485, #487, #488, #490, #491, #492, #493 mit Begründung geschlossen; Branches erhalten |
+| M6 | umgesetzt | PR #499, Squash `46b339ab`: 46 Workflows auf Node 24, davon alle mit Abhängigkeiten auf `pnpm install --frozen-lockfile`; 50 von 54 Checks grün, die 3 Fehlschläge bestanden schon vorher auf `main` (Auftrag `coordination/open/20261017-0830-qa-to-core-preexisting-test-failures.md`). Unverändert: die drei manuellen Gelände-Workflows |
+| M7 | umgesetzt | #484, #485, #487, #488, #490, #491, #492, #493, später #460 und #333 mit Begründung geschlossen; Branches erhalten. Sichtung aller übrigen PRs: `NOXIA-AGENT-INFRA-0001-pr-sichtung-2026-10-17.md` |
 
 Previews für Agenten-Branches lassen sich bei Bedarf weiterhin manuell im Vercel-Dashboard oder per `vercel deploy` erzeugen.
 
@@ -164,4 +164,4 @@ GitHub → Repository `noxiagame` → Settings → Rules → Rulesets → New br
 - Keine Pflicht für Pull Requests oder Status-Checks – der bisherige Weg (eigener Branch, dann Fast-Forward auf `main`) bleibt möglich.
 
 ### Weiterer Rückstand
-Nach M7 sind noch 21 PRs offen, teils seit September (z. B. #231, #281, #314, #316, #322). Sie wurden nicht pauschal geschlossen, weil ihr Inhalt nicht nachweislich anderweitig auf `main` ist. Empfehlung: einmalige Sichtung als eigener Auftrag.
+Erledigt durch die Sichtung vom 2026-10-17 (`NOXIA-AGENT-INFRA-0001-pr-sichtung-2026-10-17.md`): 1 PR mergebereit, 5 zum Rebase, 11 veraltete mit Entscheidungsbedarf.
