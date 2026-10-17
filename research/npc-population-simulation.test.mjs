@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {runPopulation} from './npc-population-simulation.mjs';
+const a=runPopulation({seed:10,npcsPerGroup:8,ticks:20});
+assert.deepEqual(a,runPopulation({seed:10,npcsPerGroup:8,ticks:20}),'replay');
+assert.equal(a.timeline.length,20);
+assert.equal(a.final.control.dreams,0);
+assert.ok(a.final.recombination.dreams>0);
+assert.ok(a.final.social.memories> a.final.control.memories);
+assert.equal(a.final.signal.targetExposure,1);
+for(const group of ['control','recombination','social','placebo']) assert.equal(a.final[group].targetExposure,0);
+assert.equal(a.final.signal.knowledge,a.final.placebo.knowledge,'balanced hint volume');
+assert.throws(()=>runPopulation({ticks:0}));
+console.log('PASS: longitudinal synthetic population');
