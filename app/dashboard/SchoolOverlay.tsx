@@ -12,6 +12,7 @@
 // Version:      1.5.0
 
 import React, { useEffect, useRef, useState } from 'react'
+import { UI_LAYER } from '@/lib/ui/layers'
 import KursRenderer from './KursRenderer'
 import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
 import { unlockLabel, type SsfUnlock } from '@/lib/ssfKnowledge'
@@ -627,7 +628,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2300, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: UI_LAYER.interior, display: 'flex', flexDirection: 'column' }}>
       {bg && <img src={bg.src} alt={bg.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,18,28,0.52)' }} />
       {canSell && onSellClick && (
