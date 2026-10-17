@@ -136,7 +136,7 @@ export function abstractMotifKeys(value: string): string[] {
   const stop = new Set(['about', 'there', 'their', 'would', 'could', 'from', 'with', 'have', 'that', 'this',
     'eine', 'einer', 'eines', 'einem', 'einen', 'auch', 'aber', 'oder', 'nicht', 'dass',
     'sind', 'wird', 'werden', 'und', 'der', 'die', 'das', 'dem', 'den', 'des', 'für', 'mit', 'von'])
-  return [...new Set((value.toLowerCase().match(/[\\p{L}\\p{N}_:-]{4,}/gu) ?? [])
+  return [...new Set((value.toLowerCase().match(/[\p{L}\p{N}_:-]{4,}/gu) ?? [])
     .filter(word => word.length <= 48 && !stop.has(word))
     .map(word => {
       if (/^reparat(?:ur|uren)$|^reparier(?:en|t|te|ten)$/.test(word)) return 'repar'
