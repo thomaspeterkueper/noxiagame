@@ -5,7 +5,7 @@ const input = {
   npcId: 'artisan-1', tick: 100, worldYear: 2150, sleeping: true,
   memories: [{ id: 'm1', summary: 'I repaired a bridge', emotionalWeight: 0.8 }],
   sources: [
-    { id: 's1', text: 'Ancient joinery technique', sourceUri: 'https://example.org/1', observedAtTick: 99, availableFromYear: 2020, license: 'CC-BY', worldProjection: { availableFromYear: 2100, accessible: true } },
+    { id: 's1', text: 'Ancient bridge joinery technique', sourceUri: 'https://example.org/1', observedAtTick: 99, availableFromYear: 2020, license: 'CC-BY', worldProjection: { availableFromYear: 2100, accessible: true } },
     { id: 'future', text: 'Unpublished future invention', sourceUri: 'https://example.org/2', observedAtTick: 99, availableFromYear: 2200, license: 'CC-BY' },
     { id: 'unlicensed', text: 'Restricted text', sourceUri: 'https://example.org/3', observedAtTick: 99, availableFromYear: 2020, license: '' },
   ]
@@ -13,6 +13,20 @@ const input = {
 const first = synthesizeNpcDream(input)
 assert.deepEqual(first, synthesizeNpcDream(input))
 assert.deepEqual(first?.sourceIds, ['s1'])
+assert.deepEqual(first?.sourceImpulseKinds, [{ id: 's1', kind: 'related' }])
+const unrelatedOnly = { ...input, sources: [
+  { ...input.sources[0], id: 'unrelated-only', text: 'Galaxies and distant nebulae' },
+] }
+assert.deepEqual(synthesizeNpcDream(unrelatedOnly)?.sourceIds, [], 'unrelated source is excluded by default')
+const permittedImpulse = synthesizeNpcDream({ ...unrelatedOnly, allowForeignImpulse: true })
+assert.deepEqual(permittedImpulse?.sourceIds, ['unrelated-only'])
+assert.deepEqual(permittedImpulse?.sourceImpulseKinds,
+  [{ id: 'unrelated-only', kind: 'foreign-impulse' }])
+assert.deepEqual(synthesizeNpcDream({
+  ...unrelatedOnly, allowForeignImpulse: true,
+  sources: [{ ...unrelatedOnly.sources[0], worldProjection: undefined }],
+})?.sourceIds, [], 'foreign impulse never bypasses lore gate')
+
 assert.equal(first?.epistemicStatus, 'subjective-dream')
 assert.equal(first?.provenance, 'dream_recombination')
 assert.equal(first?.canonical, false)
@@ -34,7 +48,7 @@ assert.equal(nightmare?.emotionalTone, 'nightmare')
 assert.equal(nightmare?.epistemicStatus, 'subjective-dream')
 assert.equal(synthesizeNpcDream({
   ...input, sources: [{ ...input.sources[0], emotionalIntensity: 0 }],
-  memories: [], emotionalSensitivity: 0,
+  memories: [], emotionalSensitivity: 0, allowForeignImpulse: true,
 })?.emotionalTone, 'neutral')
 assert.throws(() => synthesizeNpcDream({ ...input, emotionalSensitivity: 2 }), /sensitivity/)
 
