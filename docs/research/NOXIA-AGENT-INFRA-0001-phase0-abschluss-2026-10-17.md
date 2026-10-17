@@ -141,3 +141,27 @@ Ein Phase-1-Auftrag gilt als bestanden, wenn:
 ## Korrektur früherer Aussagen
 
 In zwei Requests vom 16./17.10. stand, `docs/agent-infra-0001` habe keine gemeinsame Basis mit `main` und #490 würde über 4.000 Zeilen löschen. Beides beruhte auf Vergleichen in einer flachen Kopie ohne Merge-Base. Richtig ist: Die Merge-Base ist `583f76f2`; #487 fügt nur Dateien hinzu (+413/−0), #490 ändert 2 Dateien (+10/−22). Die Requests wurden entsprechend korrigiert. #490 ist trotzdem überholt, weil sein Inhalt (Node 24, `test:dreams`) in #496 aufgegangen ist.
+
+## Umsetzungsstand der Maßnahmen (2026-10-17, 07:45 MESZ)
+
+| # | Stand | Nachweis |
+|---|---|---|
+| M1 | umgesetzt | `coordination/TASK-TEMPLATE.md` erweitert, erster Vertrag `coordination/open/20261017-0500-core-to-core-dream-persistence-pilot.md` (`b805f7e2`) |
+| M2 | als Regel im Aufgabenvertrag | Repository-Einstellung unverändert (alle Merge-Arten erlaubt) |
+| M3 | umgesetzt | `import-shackleton-terrain`, `sync-active-moon-terrain`, `validate-active-moon-terrain` nur noch `workflow_dispatch` (`6905fc25`); der Merge-Commit hat 0 Workflow-Runs ausgelöst |
+| M4 | umgesetzt | `vercel.json`: `feat/*`, `test/*`, `research/*` ohne automatische Deployments (`6905fc25`); Produktions-Deployment `dpl_2UJqBvrwauQ7PdaMbjBM2URUgaYh` mit der neuen Konfiguration `READY` |
+| M5 | **offen – manuell** | Anlegen eines Rulesets per API ist aus der Agenten-Session nicht erlaubt (HTTP 403). Schritte siehe unten. |
+| M6 | offen | eigener Auftrag, schrittweise je Workflow-Gruppe |
+| M7 | umgesetzt | #484, #485, #487, #488, #490, #491, #492, #493 mit Begründung geschlossen; Branches erhalten |
+
+Previews für Agenten-Branches lassen sich bei Bedarf weiterhin manuell im Vercel-Dashboard oder per `vercel deploy` erzeugen.
+
+### M5 manuell einrichten
+GitHub → Repository `noxiagame` → Settings → Rules → Rulesets → New branch ruleset:
+- Name: „main – kein Force-Push, kein Löschen", Enforcement: Active
+- Target branches: Include default branch
+- Rules: nur „Restrict deletions" und „Block force pushes" aktivieren
+- Keine Pflicht für Pull Requests oder Status-Checks – der bisherige Weg (eigener Branch, dann Fast-Forward auf `main`) bleibt möglich.
+
+### Weiterer Rückstand
+Nach M7 sind noch 21 PRs offen, teils seit September (z. B. #231, #281, #314, #316, #322). Sie wurden nicht pauschal geschlossen, weil ihr Inhalt nicht nachweislich anderweitig auf `main` ist. Empfehlung: einmalige Sichtung als eigener Auftrag.
