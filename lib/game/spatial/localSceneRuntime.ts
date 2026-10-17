@@ -195,10 +195,11 @@ export function routeAcrossLocalScene(
   const segments = walkableSegments(scene).filter(segment => traversableSegment(scene, segment.a, segment.b))
   if (!segments.length) return { points: [start, end], distanceM: directDistance, usesNetwork: false }
 
-  const startProjection = nearestProjection(start, segments)
-  const endProjection = nearestProjection(end, segments)
+  const safeSegments = segments.filter(segment => traversableSegment(scene, start, projectToSegment(start, segment).point) || traversableSegment(scene, end, projectToSegment(end, segment).point))
+  const startProjection = nearestProjection(start, safeSegments.filter(segment => traversableSegment(scene, start, projectToSegment(start, segment).point)))
+  const endProjection = nearestProjection(end, safeSegments.filter(segment => traversableSegment(scene, end, projectToSegment(end, segment).point)))
   if (!startProjection || !endProjection || startProjection.offDistance > maxConnectorM || endProjection.offDistance > maxConnectorM) {
-    return { points: [start, end], distanceM: directDistance, usesNetwork: false }
+    return { points: traversableSegment(scene, start, end) ? [start, end] : [start], distanceM: traversableSegment(scene, start, end) ? directDistance : 0, usesNetwork: false }
   }
 
   const graph = new Map<string, Edge[]>()
