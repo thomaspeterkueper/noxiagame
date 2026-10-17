@@ -1,5 +1,5 @@
 import { createNpcMemory, type NpcMemoryState } from './npcRelationalMemory'
-import { recombineDuringDream, selectDreamSourceMotifs } from './dreamRecombination'
+import { abstractMotifKeys, recombineDuringDream, selectDreamSourceMotifs } from './dreamRecombination'
 import type { SensoryPattern } from './sensoryPatternLearning'
 
 let failures = 0
@@ -113,5 +113,12 @@ check(selectDreamSourceMotifs({ ...impulseInput, limit: 1, allowForeignImpulse: 
 check(selectDreamSourceMotifs({ ...impulseInput, motifKeys: ['unmatched'] }).length === 0,
   'unrelated sources never enter unmarked')
 
+check(abstractMotifKeys('I repaired a bridge').filter(key =>
+  abstractMotifKeys('bridge repair').includes(key)).length >= 2,
+  'English repair inflections match')
+check(abstractMotifKeys('Reparatur reparieren').filter(key => key === 'repar').length === 1,
+  'German repair variants share one key')
+check(!abstractMotifKeys('Die Brücke und der Fluss').includes('und'),
+  'German stopwords are excluded')
 if (failures) throw new Error(String(failures) + ' dream recombination test(s) failed')
 console.log('Dream recombination v0.1: tests passed; canonical_outputs=0; memory_writes=0; external_llm_calls=0')
