@@ -91,7 +91,7 @@ export function selectDreamSourceMotifs(input: {
   })).sort((a, b) => b.score - a.score ||
     stableHash01(input.npcId + ':' + input.atTick + ':' + a.id) -
     stableHash01(input.npcId + ':' + input.atTick + ':' + b.id) || a.id.localeCompare(b.id))
-  const selected = ranked.filter(s => s.score > 0).slice(0, limit)
+  const selected: { id: string; kind: 'related' | 'foreign-impulse' }[] = ranked.filter(s => s.score > 0).slice(0, limit)
     .map(s => ({ id: s.id, kind: 'related' as const }))
   if (input.allowForeignImpulse && selected.length < limit) {
     const unrelated = ranked.find(s => s.score === 0 && !selected.some(item => item.id === s.id))
