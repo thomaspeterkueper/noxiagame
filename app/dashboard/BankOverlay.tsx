@@ -8,6 +8,7 @@
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
 import React, { useState, useEffect } from 'react'
+import { UI_LAYER } from '@/lib/ui/layers'
 
 interface BankOverlayProps {
   locationSlug:     string
@@ -198,7 +199,7 @@ export default function BankOverlay({
   const amtValid = Number.isFinite(amt) && amt > 0
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: UI_LAYER.interior, display: 'flex', flexDirection: 'column' }}>
 
       {bg && (
         <img src={bg.src} alt={bg.label}
