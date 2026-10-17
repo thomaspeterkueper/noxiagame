@@ -209,6 +209,113 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
       { project: 'NOXIA', relation: 'research-anchor', note: 'Zeitmessung, biologische Rhythmen und Standardisierung.' },
     ],
   },
+  // Mittelmeer-Stationen der historischen Reise (aus #324 übernommen, 14.10.2026)
+  {
+    id: 'earth-mt-hal-saflieni',
+    name: 'Ħal Saflieni Hypogeum',
+    countryCode: 'MT',
+    locality: 'Paola, Malta',
+    locator: { kind: 'address', value: 'Ħal Saflieni Hypogeum, Paola, Malta' },
+    tags: ['archaeology', 'cross-universe'],
+    presentDayRole: 'Prähistorischer unterirdischer Kult- und Bestattungsort auf Malta; als reale archäologische Stätte getrennt von fiktionalen Deutungen geführt.',
+    noxiaRole: 'Malta-Anker für unterirdische Räume, Archäoakustik, Materialgedächtnis und langfristige Konservierung.',
+    sourceProjects: [
+      { project: 'KUEPER-Resonanzwelt', relation: 'setting', note: 'Malta-Schauplatz und Resonanz-/Archäoakustik-Anker.' },
+      { project: 'NOXIA', relation: 'research-anchor', note: 'Archäologie, Akustik und Konservierung.' },
+    ],
+    externalUrl: 'https://heritagemalta.mt/explore/hal-saflieni-hypogeum/',
+    externalLinkLabel: 'Heritage Malta außerhalb von NOXIA öffnen',
+  },
+
+  {
+    id: 'earth-it-palermo',
+    name: 'Palermo / Sizilien',
+    countryCode: 'IT',
+    locality: 'Palermo, Sicily',
+    locator: { kind: 'address', value: 'Palermo, Sicily, Italy' },
+    tags: ['history-of-science', 'cross-universe'],
+    presentDayRole: 'Historische Mittelmeermetropole auf Sizilien mit arabischen, byzantinischen, normannischen und späteren kulturellen Schichten.',
+    noxiaRole: 'Cross-Universe-Anker für Mehrsprachigkeit, Vermessung, kulturelle Überschichtung und maritime Navigation.',
+    sourceProjects: [
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Station III; Westküstenmessungen und systematische Abweichung.' },
+      { project: 'NOXIA', relation: 'research-anchor', note: 'Historische Vermessung und mediterrane Wissensnetze.' },
+    ],
+  },
+
+  {
+    id: 'earth-cy-cyprus',
+    name: 'Zypern',
+    countryCode: 'CY',
+    locality: 'Cyprus',
+    locator: { kind: 'address', value: 'Cyprus' },
+    tags: ['history-of-science', 'cross-universe'],
+    presentDayRole: 'Östliche Mittelmeerinsel mit langen maritimen, politischen und kulturellen Verbindungslinien.',
+    noxiaRole: 'Cross-Universe-Anker für sich verändernde Routen, Häfen, Messbedingungen und historische Umbrüche.',
+    sourceProjects: [
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Station VI; Messarbeit vor dem Hintergrund der Veränderungen um 1096.' },
+      { project: 'NOXIA', relation: 'worldbuilding-anchor', note: 'Routen- und Infrastrukturwandel.' },
+    ],
+  },
+
+  {
+    id: 'earth-gr-rhodes',
+    name: 'Rhodos',
+    countryCode: 'GR',
+    locality: 'Rhodes',
+    locator: { kind: 'address', value: 'Rhodes, Greece' },
+    tags: ['history-of-science', 'cross-universe'],
+    presentDayRole: 'Insel im südöstlichen Ägäischen Meer und historischer maritimer Knoten.',
+    noxiaRole: 'Cross-Universe-Anker für Navigation, Nachrichtenwege und historische Fernwirkungen.',
+    sourceProjects: [
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Station VII des Kartografen-Romans.' },
+      { project: 'NOXIA', relation: 'worldbuilding-anchor', note: 'Maritime Kommunikation und Navigation.' },
+    ],
+  },
+
+  {
+    id: 'earth-ly-tripolitania',
+    name: 'Tripolitanien',
+    countryCode: 'LY',
+    locality: 'Tripolitania, Libya',
+    locator: { kind: 'address', value: 'Tripolitania, Libya' },
+    tags: ['history-of-science', 'cross-universe'],
+    presentDayRole: 'Historische Region im nordwestlichen Libyen; als Registry-Anker bewusst regional statt punktgenau.',
+    noxiaRole: 'Cross-Universe-Anker für die letzte Reisephase des Kartografen und für historische Küsten-/Routenräume.',
+    sourceProjects: [
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Station IX; bewusst regional, bis der Roman einen konkreteren Ort kanonisiert.' },
+      { project: 'NOXIA', relation: 'worldbuilding-anchor', note: 'Historischer Küsten- und Routenraum.' },
+    ],
+  },
+
+  {
+    id: 'earth-tn-carthage-tunis',
+    name: 'Karthago / Tunis',
+    countryCode: 'TN',
+    locality: 'Tunis / Carthage',
+    locator: { kind: 'address', value: 'Carthage, Tunis, Tunisia' },
+    tags: ['archaeology', 'history-of-science', 'cross-universe'],
+    presentDayRole: 'Archäologischer und urbaner Küstenraum am Golf von Tunis mit antiken und späteren historischen Schichten.',
+    noxiaRole: 'Cross-Universe-Anker für Hafenräume, Schichtungen von Städten, Küstenvermessung und mediterrane Wissensnetze.',
+    sourceProjects: [
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Station I des Kartografen-Romans.' },
+      { project: 'NOXIA', relation: 'research-anchor', note: 'Hafen-, Küsten- und Siedlungsgeschichte.' },
+    ],
+  },
+
+  {
+    id: 'earth-ly-cyrene',
+    name: 'Kyrene / Cyrene',
+    countryCode: 'LY',
+    locality: 'Shahhat, Libya',
+    locator: { kind: 'address', value: 'Archaeological Site of Cyrene, Shahhat, Libya' },
+    tags: ['archaeology', 'cross-universe'],
+    presentDayRole: 'Archäologischer Ruinenort der antiken Kyrenaika nahe dem heutigen Shahhat.',
+    noxiaRole: 'Cross-Universe-Anker für Ruinenlandschaften, historische Routen, Vermessung und fragmentarische Überlieferung.',
+    sourceProjects: [
+      { project: 'Bayt al-Mîrâ / al-Qiyās wa-l-Ṣabr', relation: 'setting', note: 'Ruinen- und Händlerstation des Kartografen.' },
+      { project: 'NOXIA', relation: 'research-anchor', note: 'Archäologie, Routenwissen und Landschaftsrekonstruktion.' },
+    ],
+  },
 ] as const
 
 export function getEarthLandmark(id: string): EarthLandmark | undefined {
