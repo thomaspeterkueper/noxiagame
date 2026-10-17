@@ -131,11 +131,18 @@ function stableHash01(value: string) {
   return ((h >>> 0) % 100000) / 100000
 }
 
-// Emit bounded semantic keys, never remembered sentences or observation prose.
-function abstractMotifKeys(value: string): string[] {
-  return [...new Set(value.toLowerCase().match(/[\p{L}\p{N}_:-]{4,}/gu) ?? [])]
-    .filter(key => key.length <= 48)
-    .slice(0, 8)
+/** Shared bounded Unicode motif normalization; prose is never retained verbatim. */
+export function abstractMotifKeys(value: string): string[] {
+  const stop = new Set(['about', 'there', 'their', 'would', 'could', 'from', 'with', 'have', 'that', 'this',
+    'eine', 'einer', 'eines', 'einem', 'einen', 'auch', 'aber', 'oder', 'nicht', 'dass',
+    'sind', 'wird', 'werden', 'und', 'der', 'die', 'das', 'dem', 'den', 'des', 'für', 'mit', 'von'])
+  return [...new Set((value.toLowerCase().match(/[\\p{L}\\p{N}_:-]{4,}/gu) ?? [])
+    .filter(word => word.length <= 48 && !stop.has(word))
+    .map(word => {
+      if (/^reparat(?:ur|uren)$|^reparier(?:en|t|te|ten)$/.test(word)) return 'repar'
+      if (/^repair(?:ed|ing|s)?$/.test(word)) return 'repair'
+      return word
+    }))].slice(0, 32)
 }
 
 function memoryMotifs(memory: NpcMemory): string[] {
