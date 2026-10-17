@@ -96,6 +96,17 @@ function walkableSegments(scene: LocalSurfaceScene) {
   return segments
 }
 
+/** Samples the complete traversed segment, not just its endpoint. */
+function traversableSegment(scene: LocalSurfaceScene, a: LocalSurfacePoint, b: LocalSurfacePoint) {
+  const length = distance(a, b)
+  const steps = Math.max(1, Math.ceil(length / 0.75))
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    if (!isLocalScenePointWalkable(scene, { xM: a.xM + (b.xM - a.xM) * t, yM: a.yM + (b.yM - a.yM) * t })) return false
+  }
+  return true
+}
+
 function projectToSegment(point: LocalSurfacePoint, segment: Segment): Projection {
   const dx = segment.b.xM - segment.a.xM
   const dy = segment.b.yM - segment.a.yM
@@ -181,7 +192,7 @@ export function routeAcrossLocalScene(
   if (directDistance < 0.05) return { points: [start], distanceM: 0, usesNetwork: false }
 
   const maxConnectorM = Math.max(2, options?.maxConnectorM ?? 45)
-  const segments = walkableSegments(scene)
+  const segments = walkableSegments(scene).filter(segment => traversableSegment(scene, segment.a, segment.b))
   if (!segments.length) return { points: [start, end], distanceM: directDistance, usesNetwork: false }
 
   const startProjection = nearestProjection(start, segments)
