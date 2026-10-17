@@ -294,7 +294,9 @@ function distanceToPolygonEdge(point: LocalSurfacePoint, polygon: readonly Local
 
 export function isLocalScenePointWalkable(scene: LocalSurfaceScene, point: LocalSurfacePoint, clearanceM = 0.8) {
   if (Math.abs(point.xM) > scene.radiusM || Math.abs(point.yM) > scene.radiusM) return false
-  return !scene.buildings.some(building => pointBlockedByBuilding(point, building, clearanceM))
+  // Inferred massing is a rendering hint, not surveyed collision geometry.
+  // Treat only observed/canonical buildings as physical obstacles.
+  return !scene.buildings.some(building => building.provenance !== 'derived' && pointBlockedByBuilding(point, building, clearanceM))
 }
 
 /**
@@ -317,7 +319,20 @@ export function resolveLocalSceneStep(
   // Whoever already stands inside a blocked area – after a scene change, a
   // reload or new building data – must be able to walk out again. Blocking
   // only applies when entering from walkable ground.
-  if (!isLocalScenePointWalkable(scene, current, clearanceM)) return clamped
+  if (!isLocalScenePointWalkable(scene, current, clearanceM)) {
+    const blockers = scene.buildings.filter(building => building.provenance !== 'derived' && pointBlockedByBuilding(current, building, clearanceM))
+    const penetration = (point: LocalSurfacePoint, building: LocalSurfaceBuilding) => {
+      const outline = building.footprint
+      if (outline && outline.length >= 3) return distanceToPolygonEdge(point, outline)
+      const local = rotateIntoBuilding(point, building)
+      return Math.max(0, Math.min(building.widthM / 2 + clearanceM - Math.abs(local.xM), building.depthM / 2 + clearanceM - Math.abs(local.yM)))
+    }
+    // A character spawned inside observed geometry can escape, but must not
+    // push farther inside any blocking footprint or enter a different one.
+    if (scene.buildings.some(building => building.provenance !== 'derived' && !blockers.includes(building) && pointBlockedByBuilding(clamped, building, clearanceM))) return current
+    if (blockers.every(building => !pointBlockedByBuilding(clamped, building, clearanceM) || penetration(clamped, building) < penetration(current, building) - 0.001)) return clamped
+    return current
+  }
 
   const xOnly = { xM: clamped.xM, yM: current.yM }
   if (isLocalScenePointWalkable(scene, xOnly, clearanceM)) return xOnly
