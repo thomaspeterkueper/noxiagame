@@ -1,12 +1,8 @@
 name: Sync active Moon terrain metrics
 
+# Schreibt mit SUPABASE_SERVICE_ROLE_KEY in die Produktionsdatenbank.
+# Nur manuell auslösen (NOXIA-AGENT-INFRA-0001, Maßnahme M3) – kein automatischer Lauf beim Merge.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'scripts/sync-active-terrain.ts'
-      - '.github/workflows/sync-active-moon-terrain.yml'
   workflow_dispatch:
 
 permissions:

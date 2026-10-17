@@ -1,12 +1,8 @@
 name: Validate active Moon terrain
 
+# Liest mit SUPABASE_SERVICE_ROLE_KEY aus der Produktionsdatenbank (Service-Key = Vollzugriff).
+# Nur manuell auslösen (NOXIA-AGENT-INFRA-0001, Maßnahme M3) – kein automatischer Lauf beim Merge.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'scripts/validate-active-moon-terrain.mjs'
-      - '.github/workflows/validate-active-moon-terrain.yml'
   workflow_dispatch:
 
 permissions:

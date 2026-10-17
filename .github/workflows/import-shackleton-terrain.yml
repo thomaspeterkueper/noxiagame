@@ -1,13 +1,9 @@
 name: Import Shackleton polar terrain
 
+# Schreibt mit SUPABASE_SERVICE_ROLE_KEY in die Produktionsdatenbank.
+# Nur manuell auslösen (NOXIA-AGENT-INFRA-0001, Maßnahme M3) – kein automatischer Lauf beim Merge.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'scripts/import-shackleton-polar-site04.mjs'
-      - '.github/workflows/import-shackleton-terrain.yml'
 
 permissions:
   contents: read
