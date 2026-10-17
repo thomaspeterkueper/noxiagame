@@ -1,4 +1,4 @@
-import { createDreamAssociation, selectDreamSourceIds, type DreamAssociation } from '../cognition/dreamRecombination'
+import { createDreamAssociation, selectDreamSourceMotifs, type DreamAssociation } from '../cognition/dreamRecombination'
 
 /**
  * Experimental offline NPC dream synthesis. No network, persistence or canonical knowledge writes.
@@ -44,6 +44,7 @@ export function synthesizeNpcDream(input: {
   sources: readonly DreamSource[]
   budget?: DreamBudget
   emotionalSensitivity?: number // NPC trait 0..1; affects subjective response, not source truth
+  allowForeignImpulse?: boolean // explicitly opt-in; at most one marked, lore-approved source
 }): DreamEpisode | null {
   const { npcId, tick, worldYear, sleeping } = input
   if (!npcId.trim()) throw new Error('Missing NPC')
@@ -65,11 +66,13 @@ export function synthesizeNpcDream(input: {
       s.availableFromYear <= worldYear && s.observedAtTick <= tick && s.text.trim() &&
       s.worldProjection?.accessible === true && s.worldProjection.availableFromYear <= worldYear &&
       (s.emotionalIntensity === undefined || (Number.isFinite(s.emotionalIntensity) && s.emotionalIntensity >= 0 && s.emotionalIntensity <= 1)))
-  const chosenIds = selectDreamSourceIds({
+  const selectedSources = selectDreamSourceMotifs({
     npcId, atTick: tick, motifKeys: memoryKeys,
     sources: eligibleSources.map(s => ({ id: s.id, motifs: motifKeys(s.text) })),
     limit: budget.maxSources,
+    allowForeignImpulse: input.allowForeignImpulse === true,
   })
+  const chosenIds = selectedSources.map(selection => selection.id)
   const byId = new Map(eligibleSources.map(s => [s.id, s]))
   const sources = chosenIds.map(id => byId.get(id)!).filter(Boolean)
   if (!memories.length && !sources.length) return null
@@ -98,6 +101,7 @@ export function synthesizeNpcDream(input: {
     atTick: tick,
     motifs: Object.freeze([...association.motifs]),
     sourceIds: Object.freeze(sources.map(s => s.id)),
+    sourceImpulseKinds: Object.freeze(selectedSources.map(selection => ({ ...selection }))),
     memoryIds: Object.freeze(memories.map(m => m.id)),
     interpretation: 'Subjective associations; requires independent verification.',
     emotionalTone,
