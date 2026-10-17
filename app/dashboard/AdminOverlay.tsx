@@ -17,6 +17,7 @@
 //   Rot   (#c94040) = fremder Spieler
 
 import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
+import { UI_LAYER } from '@/lib/ui/layers'
 import React from 'react'
 
 import { useState, useEffect } from 'react'
@@ -177,7 +178,7 @@ export default function AdminOverlay({ locationSlug, onClose, userId, canSell, o
   const S: Record<string, React.CSSProperties> = {
     backdrop: {
       position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.75)',
-      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: UI_LAYER.interior, display: 'flex', alignItems: 'center', justifyContent: 'center',
     },
     panel: {
       background: '#0d1a26', border: '1px solid #2a4e7a', borderRadius: '12px',
