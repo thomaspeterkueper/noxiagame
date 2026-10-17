@@ -78,21 +78,6 @@ function rankExternalSources(input: {
     tieSeed: input.npcId + ':' + input.atTick + ':' })
 }
 
-/** Shared deterministic input selection for cached external dream impulses.
- * Callers must filter provenance, licensing and in-world access first.
- */
-export function selectDreamSourceIds(input: {
-  npcId: string
-  atTick: number
-  motifKeys: readonly string[]
-  sources: readonly { id: string; motifs: readonly string[] }[]
-  limit: number
-}): string[] {
-  return rankExternalSources(input)
-    .slice(0, Math.max(0, Math.min(12, input.limit)))
-    .map(item => item.id)
-}
-
 /** Optional, at most one explicitly marked unrelated impulse from already-approved sources. */
 export function selectDreamSourceMotifs(input: {
   npcId: string
