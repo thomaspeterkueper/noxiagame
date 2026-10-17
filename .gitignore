@@ -58,3 +58,9 @@ next-env.d.ts
 .vercel
 /.hospitality-test
 /.interior-test
+
+# generated TypeScript test outputs
+/.dream-test/
+/.dream-recombination-test/
+/.knowledge-transmission-test/
+/.population-test/
