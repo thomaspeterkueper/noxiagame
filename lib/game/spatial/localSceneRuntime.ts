@@ -231,7 +231,7 @@ export function routeAcrossLocalScene(
   }
 
   const result = dijkstra(graph, startKey, endKey)
-  if (!result) return { points: [start, end], distanceM: directDistance, usesNetwork: false }
+  if (!result) return { points: traversableSegment(scene, start, end) ? [start, end] : [start], distanceM: traversableSegment(scene, start, end) ? directDistance : 0, usesNetwork: false }
 
   const points: LocalSurfacePoint[] = []
   pushUnique(points, start)
