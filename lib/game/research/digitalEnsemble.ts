@@ -19,6 +19,7 @@ export interface EnsemblePrediction {
   expected: 0 | 1
   predicted: 0 | 1
   votes: number
+  undecided: boolean
   activeNodes: number
 }
 export interface EnsembleResult {
@@ -52,7 +53,7 @@ function predict(sample: EnsembleSample, nodes: readonly EnsembleNode[], seed: n
     activeNodes++
   }
   // Tie/no sensors -> deterministic negative class, never fabricated confidence.
-  return { sampleId: sample.id, expected: sample.label, predicted: votes > 0 ? 1 : 0, votes, activeNodes }
+  return { sampleId: sample.id, expected: sample.label, predicted: votes > 0 ? 1 : 0, votes, undecided: votes === 0, activeNodes }
 }
 export function benchmarkDigitalEnsemble(input: {
   samples: readonly EnsembleSample[]
@@ -76,6 +77,6 @@ export function benchmarkDigitalEnsemble(input: {
     if (!sample.id || (sample.label !== 0 && sample.label !== 1)) throw new Error('invalid sample')
     return predict(sample, input.nodes, input.seed, amplitude, unavailable)
   })
-  const correct = predictions.filter(p => p.activeNodes > 0 && p.predicted === p.expected).length
+  const correct = predictions.filter(p => p.activeNodes > 0 && !p.undecided && p.predicted === p.expected).length
   return { accuracy: predictions.length ? correct / predictions.length : 0, correct, total: predictions.length, predictions }
 }
