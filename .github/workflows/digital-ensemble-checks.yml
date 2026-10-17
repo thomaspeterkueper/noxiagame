@@ -22,6 +22,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Compile isolated benchmark and test
-        run: pnpm exec tsc --target es2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --types node --outDir .ensemble-test lib/game/research/digitalEnsemble.ts lib/game/research/digitalEnsemble.test.ts
+        run: pnpm exec tsc --target es2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --types node --outDir .ensemble-test lib/game/research/digitalEnsemble.ts lib/game/research/digitalEnsemble.test.ts lib/game/research/digitalEnsembleComparison.ts lib/game/research/digitalEnsembleComparison.test.ts
       - name: Run deterministic replay and failure tests
-        run: node .ensemble-test/digitalEnsemble.test.js
+        run: |
+          node .ensemble-test/digitalEnsemble.test.js
+          node .ensemble-test/digitalEnsembleComparison.test.js
