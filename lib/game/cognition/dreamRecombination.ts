@@ -49,6 +49,35 @@ export function createDreamAssociation(input: {
   }
 }
 
+/** One deterministic ranking policy for memory, pattern and external source candidates.
+ * A source may use the hashed tie-break; lived memories retain lexical ties.
+ */
+function rankDreamSignals<T>(items: readonly T[], options: {
+  score: (item: T) => number
+  key: (item: T) => string
+  tieSeed?: string
+}): T[] {
+  return [...items].sort((a, b) => options.score(b) - options.score(a) ||
+    (options.tieSeed === undefined ? 0 :
+      stableHash01(options.tieSeed + options.key(a)) -
+      stableHash01(options.tieSeed + options.key(b))) ||
+    options.key(a).localeCompare(options.key(b)))
+}
+
+function rankExternalSources(input: {
+  npcId: string
+  atTick: number
+  motifKeys: readonly string[]
+  sources: readonly { id: string; motifs: readonly string[] }[]
+}): { id: string; score: number }[] {
+  const keys = new Set(input.motifKeys.flatMap(abstractMotifKeys))
+  return rankDreamSignals(input.sources.map(source => ({
+    id: source.id,
+    score: source.motifs.flatMap(abstractMotifKeys).filter(key => keys.has(key)).length,
+  })), { score: source => source.score, key: source => source.id,
+    tieSeed: input.npcId + ':' + input.atTick + ':' })
+}
+
 /** Shared deterministic input selection for cached external dream impulses.
  * Callers must filter provenance, licensing and in-world access first.
  */
@@ -59,16 +88,7 @@ export function selectDreamSourceIds(input: {
   sources: readonly { id: string; motifs: readonly string[] }[]
   limit: number
 }): string[] {
-  const keys = new Set(input.motifKeys.flatMap(abstractMotifKeys))
-  return input.sources
-    .map(source => ({
-      id: source.id,
-      score: source.motifs.flatMap(abstractMotifKeys).filter(key => keys.has(key)).length,
-    }))
-    .sort((a, b) => b.score - a.score ||
-      stableHash01(input.npcId + ':' + input.atTick + ':' + a.id) -
-      stableHash01(input.npcId + ':' + input.atTick + ':' + b.id) ||
-      a.id.localeCompare(b.id))
+  return rankExternalSources(input)
     .slice(0, Math.max(0, Math.min(12, input.limit)))
     .map(item => item.id)
 }
@@ -84,13 +104,7 @@ export function selectDreamSourceMotifs(input: {
 }): readonly { id: string; kind: 'related' | 'foreign-impulse' }[] {
   const limit = Math.max(0, Math.min(12, input.limit))
   if (!limit) return []
-  const keys = new Set(input.motifKeys.flatMap(abstractMotifKeys))
-  const ranked = input.sources.map(source => ({
-    id: source.id,
-    score: source.motifs.flatMap(abstractMotifKeys).filter(key => keys.has(key)).length,
-  })).sort((a, b) => b.score - a.score ||
-    stableHash01(input.npcId + ':' + input.atTick + ':' + a.id) -
-    stableHash01(input.npcId + ':' + input.atTick + ':' + b.id) || a.id.localeCompare(b.id))
+  const ranked = rankExternalSources(input)
   const selected: { id: string; kind: 'related' | 'foreign-impulse' }[] = ranked.filter(s => s.score > 0).slice(0, limit)
     .map(s => ({ id: s.id, kind: 'related' as const }))
   if (input.allowForeignImpulse && selected.length < limit) {
@@ -173,15 +187,15 @@ export function recombineDuringDream(input: {
   const maxPatterns = Math.max(0, Math.min(12, input.maxPatterns ?? 4))
   const maxCandidates = Math.max(0, Math.min(12, input.maxCandidates ?? 4))
 
-  const memories = input.memoryState.memories
-    .filter(memory => memory.state !== 'forgotten')
-    .slice()
-    .sort((a, b) => memoryScore(b) - memoryScore(a) || a.id.localeCompare(b.id))
+  const memories = rankDreamSignals(
+    input.memoryState.memories.filter(memory => memory.state !== 'forgotten'),
+    { score: memoryScore, key: memory => memory.id },
+  )
     .slice(0, maxMemories)
 
-  const patterns = input.patterns
-    .slice()
-    .sort((a, b) => patternScore(b) - patternScore(a) || a.key.localeCompare(b.key))
+  const patterns = rankDreamSignals(input.patterns,
+    { score: patternScore, key: pattern => pattern.key },
+  )
     .slice(0, maxPatterns)
 
   type CandidateSource = {
@@ -216,9 +230,10 @@ export function recombineDuringDream(input: {
 
   const threshold = unit(0.66 - input.creativity.associativeRange * 0.12 - input.creativity.cognitiveFlexibility * 0.08)
 
-  const candidates = sources
-    .filter(source => source.rawScore >= threshold)
-    .sort((a, b) => b.rawScore - a.rawScore || a.key.localeCompare(b.key))
+  const candidates = rankDreamSignals(
+    sources.filter(source => source.rawScore >= threshold),
+    { score: source => source.rawScore, key: source => source.key },
+  )
     .slice(0, maxCandidates)
     .map(source => {
       const sourceMemoryIds = [source.memoryA.id, ...(source.memoryB ? [source.memoryB.id] : [])]
