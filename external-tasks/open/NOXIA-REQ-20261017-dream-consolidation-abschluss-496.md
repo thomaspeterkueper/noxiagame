@@ -52,4 +52,4 @@ Ein klares Ende für #496 festlegen. Der PR umfasst bereits 51 Commits und 21 Da
 
 - Alle CI-Workflows grün, `test:dreams` und `test:dream-recombination` laufen gemeinsam über ein Script.
 - Danach Draft-Status aufheben und mit **Squash-Merge** nach `main`, damit die vielen Fix-/Test-Paare nicht einzeln in der Historie landen.
-- Überholte Drafts schließen: #488 (ersetzt durch #496), #490 (würde über 4.000 Zeilen löschen), #491–#493 (Validierungen bereits gemergter PRs).
+- Überholte Drafts schließen: #488 (ersetzt durch #496), #490 (Inhalt – Node 24, `test:dreams` – in #496 aufgegangen; korrigiert 2026-10-17: ändert nur 2 Dateien, +10/−22, nicht wie zuvor angegeben über 4.000 Zeilen), #484 und #485 (inhaltlich über #494/#495 gemergt), #491–#493 (Validierungen bereits gemergter PRs).

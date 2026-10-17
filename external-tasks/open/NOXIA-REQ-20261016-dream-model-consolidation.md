@@ -55,7 +55,7 @@ Ein einziges Traummodell, in dem eigene Erfahrung und begrenzte externe Impulse 
 
 - Der Workflow `npc-dream-checks.yml` nutzt pnpm und Node 22, `noxia-core-causality.yml` npm und Node 24, Vercel Node 24. Vereinheitlichen.
 - Statt jede Datei einzeln als Pfad und Testlauf zu listen: Script `test:dreams` in `package.json` und Pfadmuster `lib/game/**/dream*`, `lib/game/cognition/npcDream*`.
-- Hinweis: `docs/agent-infra-0001` hat keine gemeinsame Basis mit `main` und würde im Diff `NOXIA-REQ-20261016-dream-memory-external-knowledge.md` löschen – vor einem Merge auf `main` rebasen.
+- ~~Hinweis: `docs/agent-infra-0001` hat keine gemeinsame Basis mit `main` …~~ Korrigiert 2026-10-17: Die Aussage beruhte auf einer flachen Kopie ohne Merge-Base. Die Merge-Base ist `583f76f2`, der Branch fügt nur Dateien hinzu. Seine Inhalte wurden mit dem Phase-0-Abschluss nach `main` übernommen.
 
 ## Nicht-Ziele
 
