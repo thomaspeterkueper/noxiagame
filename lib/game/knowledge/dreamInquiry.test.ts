@@ -16,7 +16,7 @@ assert.equal(proposeDreamInquiry({ dream, awake: false, atTick: 11, curiosity: 0
 assert.equal(proposeDreamInquiry({ dream, awake: true, atTick: 11, curiosity: 0.1 }), null)
 assert.throws(() => proposeDreamInquiry({ dream, awake: true, atTick: 9, curiosity: 0.9 }))
 const nightmare = synthesizeNpcDream({
-  npcId: 'a', tick: 10, worldYear: 2150, sleeping: true, emotionalSensitivity: 1,
+  npcId: 'a', tick: 10, worldYear: 2150, sleeping: true, emotionalSensitivity: 1, allowForeignImpulse: true,
   memories: [], sources: [{ id: 's', text: 'an unknown signal', sourceUri: 'https://example.org',
     observedAtTick: 9, availableFromYear: 2100, license: 'CC-BY', emotionalIntensity: 1,
     worldProjection: { availableFromYear: 2120, accessible: true } }],
