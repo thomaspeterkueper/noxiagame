@@ -323,7 +323,12 @@ export function resolveLocalSceneStep(
     const blockers = scene.buildings.filter(building => building.provenance !== 'derived' && pointBlockedByBuilding(current, building, clearanceM))
     const penetration = (point: LocalSurfacePoint, building: LocalSurfaceBuilding) => {
       const outline = building.footprint
-      if (outline && outline.length >= 3) return distanceToPolygonEdge(point, outline)
+      if (outline && outline.length >= 3) {
+        const edgeDistance = distanceToPolygonEdge(point, outline)
+        // Signed penetration: inside the footprint is positive, while the
+        // external clearance band approaches zero as the actor moves away.
+        return pointInPolygon(point, outline) ? clearanceM + edgeDistance : Math.max(0, clearanceM - edgeDistance)
+      }
       const local = rotateIntoBuilding(point, building)
       return Math.max(0, Math.min(building.widthM / 2 + clearanceM - Math.abs(local.xM), building.depthM / 2 + clearanceM - Math.abs(local.yM)))
     }
