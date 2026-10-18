@@ -107,6 +107,80 @@ function traversableSegment(scene: LocalSurfaceScene, a: LocalSurfacePoint, b: L
   return true
 }
 
+/** Bounded local A* detour; never returns a path through an observed obstacle. */
+function obstacleDetour(scene: LocalSurfaceScene, start: LocalSurfacePoint, end: LocalSurfacePoint): LocalSceneRoute {
+  const blocked = (): LocalSceneRoute => ({ points: [start], distanceM: 0, usesNetwork: false })
+  if (traversableSegment(scene, start, end)) return { points: [start, end], distanceM: distance(start, end), usesNetwork: false }
+  if (!isLocalScenePointWalkable(scene, start) || !isLocalScenePointWalkable(scene, end)) return blocked()
+  const step = 2
+  const margin = 24
+  const minX = Math.max(-scene.radiusM, Math.floor((Math.min(start.xM, end.xM) - margin) / step) * step)
+  const minY = Math.max(-scene.radiusM, Math.floor((Math.min(start.yM, end.yM) - margin) / step) * step)
+  const maxX = Math.min(scene.radiusM, Math.ceil((Math.max(start.xM, end.xM) + margin) / step) * step)
+  const maxY = Math.min(scene.radiusM, Math.ceil((Math.max(start.yM, end.yM) + margin) / step) * step)
+  const cols = Math.floor((maxX - minX) / step) + 1
+  const rows = Math.floor((maxY - minY) / step) + 1
+  if (cols * rows > 20000) return blocked()
+  const point = (x: number, y: number) => ({ xM: minX + x * step, yM: minY + y * step })
+  const key = (x: number, y: number) => y * cols + x
+  const coords = (id: number) => ({ x: id % cols, y: Math.floor(id / cols) })
+  const startId = cols * rows
+  const goalId = startId + 1
+  const open = new Set<number>([startId])
+  const g = new Map<number, number>([[startId, 0]])
+  const parent = new Map<number, number>()
+  const locations = (id: number) => id === startId ? start : id === goalId ? end : point(coords(id).x, coords(id).y)
+  const goalCells: number[] = []
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const p = point(x, y)
+    if (distance(p, end) <= step * 1.5 && traversableSegment(scene, p, end)) goalCells.push(key(x, y))
+    if (distance(p, start) <= step * 1.5 && traversableSegment(scene, start, p)) {
+      const id = key(x, y)
+      g.set(id, distance(start, p))
+      parent.set(id, startId)
+      open.add(id)
+    }
+  }
+  const goalSet = new Set(goalCells)
+  let iterations = 0
+  while (open.size && iterations++ < 20000) {
+    let best = -1
+    let score = Infinity
+    for (const id of open) {
+      const p = locations(id)
+      const f = (g.get(id) ?? Infinity) + distance(p, end)
+      if (f < score) { best = id; score = f }
+    }
+    if (best < 0) break
+    open.delete(best)
+    if (goalSet.has(best)) {
+      const total = (g.get(best) ?? 0) + distance(locations(best), end)
+      const route: LocalSurfacePoint[] = [end]
+      let cursor: number | undefined = best
+      while (cursor !== undefined) {
+        route.push(locations(cursor))
+        cursor = parent.get(cursor)
+      }
+      route.reverse()
+      return { points: route, distanceM: total, usesNetwork: false }
+    }
+    const { x, y } = coords(best)
+    if (best === startId) continue
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+      const nx = x + dx, ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue
+      const id = key(nx, ny)
+      if (!traversableSegment(scene, locations(best), point(nx, ny))) continue
+      const tentative = (g.get(best) ?? Infinity) + distance(locations(best), point(nx, ny))
+      if (tentative >= (g.get(id) ?? Infinity)) continue
+      g.set(id, tentative)
+      parent.set(id, best)
+      open.add(id)
+    }
+  }
+  return blocked()
+}
+
 function projectToSegment(point: LocalSurfacePoint, segment: Segment): Projection {
   const dx = segment.b.xM - segment.a.xM
   const dy = segment.b.yM - segment.a.yM
@@ -193,13 +267,13 @@ export function routeAcrossLocalScene(
 
   const maxConnectorM = Math.max(2, options?.maxConnectorM ?? 45)
   const segments = walkableSegments(scene).filter(segment => traversableSegment(scene, segment.a, segment.b))
-  if (!segments.length) return { points: traversableSegment(scene, start, end) ? [start, end] : [start], distanceM: traversableSegment(scene, start, end) ? directDistance : 0, usesNetwork: false }
+  if (!segments.length) return obstacleDetour(scene, start, end)
 
   const safeSegments = segments.filter(segment => traversableSegment(scene, start, projectToSegment(start, segment).point) || traversableSegment(scene, end, projectToSegment(end, segment).point))
   const startProjection = nearestProjection(start, safeSegments.filter(segment => traversableSegment(scene, start, projectToSegment(start, segment).point)))
   const endProjection = nearestProjection(end, safeSegments.filter(segment => traversableSegment(scene, end, projectToSegment(end, segment).point)))
   if (!startProjection || !endProjection || startProjection.offDistance > maxConnectorM || endProjection.offDistance > maxConnectorM) {
-    return { points: traversableSegment(scene, start, end) ? [start, end] : [start], distanceM: traversableSegment(scene, start, end) ? directDistance : 0, usesNetwork: false }
+    return obstacleDetour(scene, start, end)
   }
 
   const graph = new Map<string, Edge[]>()
@@ -231,7 +305,7 @@ export function routeAcrossLocalScene(
   }
 
   const result = dijkstra(graph, startKey, endKey)
-  if (!result) return { points: traversableSegment(scene, start, end) ? [start, end] : [start], distanceM: traversableSegment(scene, start, end) ? directDistance : 0, usesNetwork: false }
+  if (!result) return obstacleDetour(scene, start, end)
 
   const points: LocalSurfacePoint[] = []
   pushUnique(points, start)
