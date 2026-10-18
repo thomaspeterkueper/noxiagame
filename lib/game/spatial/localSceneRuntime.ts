@@ -193,7 +193,7 @@ export function routeAcrossLocalScene(
 
   const maxConnectorM = Math.max(2, options?.maxConnectorM ?? 45)
   const segments = walkableSegments(scene).filter(segment => traversableSegment(scene, segment.a, segment.b))
-  if (!segments.length) return { points: [start, end], distanceM: directDistance, usesNetwork: false }
+  if (!segments.length) return { points: traversableSegment(scene, start, end) ? [start, end] : [start], distanceM: traversableSegment(scene, start, end) ? directDistance : 0, usesNetwork: false }
 
   const safeSegments = segments.filter(segment => traversableSegment(scene, start, projectToSegment(start, segment).point) || traversableSegment(scene, end, projectToSegment(end, segment).point))
   const startProjection = nearestProjection(start, safeSegments.filter(segment => traversableSegment(scene, start, projectToSegment(start, segment).point)))
@@ -218,16 +218,16 @@ export function routeAcrossLocalScene(
   const endAlongA = endProjection.t * endProjection.segment.length
   const endAlongB = (1 - endProjection.t) * endProjection.segment.length
 
-  addEdge(graph, startKey, startProjection.segment.aKey, startProjection.offDistance + startAlongA)
-  addEdge(graph, startKey, startProjection.segment.bKey, startProjection.offDistance + startAlongB)
-  addEdge(graph, endProjection.segment.aKey, endKey, endProjection.offDistance + endAlongA)
-  addEdge(graph, endProjection.segment.bKey, endKey, endProjection.offDistance + endAlongB)
+  if (traversableSegment(scene, startProjection.point, startProjection.segment.a)) addEdge(graph, startKey, startProjection.segment.aKey, startProjection.offDistance + startAlongA)
+  if (traversableSegment(scene, startProjection.point, startProjection.segment.b)) addEdge(graph, startKey, startProjection.segment.bKey, startProjection.offDistance + startAlongB)
+  if (traversableSegment(scene, endProjection.segment.a, endProjection.point)) addEdge(graph, endProjection.segment.aKey, endKey, endProjection.offDistance + endAlongA)
+  if (traversableSegment(scene, endProjection.segment.b, endProjection.point)) addEdge(graph, endProjection.segment.bKey, endKey, endProjection.offDistance + endAlongB)
 
   if (startProjection.segment === endProjection.segment) {
     const sameSegmentDistance = startProjection.offDistance
       + Math.abs(startProjection.t - endProjection.t) * startProjection.segment.length
       + endProjection.offDistance
-    addEdge(graph, startKey, endKey, sameSegmentDistance)
+    if (traversableSegment(scene, startProjection.point, endProjection.point)) addEdge(graph, startKey, endKey, sameSegmentDistance)
   }
 
   const result = dijkstra(graph, startKey, endKey)
