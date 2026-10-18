@@ -1,7 +1,7 @@
 ---
 id: EXT-NOXIA-OTA-20260914-FLEX-PHOTOSYNTHESIS-STATE-MODEL
 title: Use ESA FLEX as scientific reference for dynamic biosphere state modelling in noχ¹ᐃ
-status: open
+status: done
 source: OTA
 target: NOXIA
 created: 2026-09-14
@@ -102,3 +102,8 @@ Done when:
 4. accumulated biomass/yield remains distinct from instantaneous activity;
 5. any future SIF/FLEX ingestion keeps raw observation separate from calibrated simulation state;
 6. implementation reuses the existing Earth/tick/state architecture rather than creating a parallel simulation path.
+
+
+## Completion
+
+Implemented by PR #506 (`bc5890b009b69593e017d9fed90e3965bb9197fb`). NOXIA now reserves a dynamic biosphere functional state on the existing world-tile model, advances it through the shared tick contract, keeps vegetation class separate from current photosynthetic function/stress/phenology/biomass, and separates raw SIF observations from explicitly calibrated biological proxies. No parallel clock or persistence authority was introduced.
