@@ -1,4 +1,4 @@
-// lib/game/world/types.ts
+import type { BiosphereFunctionalState } from './biosphereState'\n// lib/game/world/types.ts
 // Erstellt:     10.07.2026
 // Version:      0.1.0
 //
@@ -60,6 +60,8 @@ export interface TileEnvironment {
 
 export interface TileNaturalState {
   terrain: TerrainType
+  /** Dynamic biological function; optional because barren/off-world tiles may have none. */
+  biosphere?: BiosphereFunctionalState | null
   geologyKey?: string | null
   buildSuitability: BuildSuitability
   environment: TileEnvironment
