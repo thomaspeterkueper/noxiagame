@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { simulateColonyTick } from '@/lib/game/colonySimulation'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
@@ -9,6 +10,12 @@ import WalkableColony from './WalkableColony'
 import ColonyConversationLayer from './ColonyConversationLayer'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
 import EarthWalkableSurface from '@/app/earth/EarthWalkableSurface'
+
+// Neue Weltkarte (Teilprojekt „Erdkarte – eine Welt“) als zweite Ansicht neben
+// der bisherigen Erdszene. PixiJS erst laden, wenn sie geöffnet wird.
+const WorldLab = dynamic(() => import('@/app/world-lab/WorldLab'), { ssr: false })
+const EARTH_VIEW_KEY = 'noxia-earth-view-v1'
+const earthViewToggle = <style>{`.noxia-earth-view-toggle{position:fixed;z-index:1130;left:50%;top:calc(var(--noxia-topbar-h,44px) + 12px);transform:translateX(-50%);border:1px solid #5d7b79;border-radius:7px;background:#17383ae6;color:#eef2ed;font:700 11px system-ui;padding:7px 12px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2)}.noxia-earth-view-toggle:hover{background:#1f4a4d}`}</style>
 
 const chrome=<style>{`
 /*
@@ -30,6 +37,9 @@ const chrome=<style>{`
 export default function DashboardPrimaryColony(){
  const location=useGameStore(s=>s.location)
  const mode=useGameModeStore(s=>s.mode),interiorBuildingId=useGameModeStore(s=>s.interiorBuildingId),enterColony=useGameModeStore(s=>s.enterColony),enterPlanning=useGameModeStore(s=>s.enterPlanning),enterInterior=useGameModeStore(s=>s.enterInterior),resetForLocation=useGameModeStore(s=>s.resetForLocation)
+ // Zuletzt gewählte Erdansicht; die Erdszene erscheint erst nach Klick (mode 'colony'), also nie im Server-Stand.
+ const [earthView,setEarthView]=useState<'scene'|'world'>(()=>{try{return typeof window!=='undefined'&&window.localStorage.getItem(EARTH_VIEW_KEY)==='world'?'world':'scene'}catch{return 'scene'}})
+ const chooseEarthView=(view:'scene'|'world')=>{setEarthView(view);try{window.localStorage.setItem(EARTH_VIEW_KEY,view)}catch{/* ohne Speicher: nur für diesen Besuch */}}
  const userId=useColonyStateStore(s=>s.userId),locations=useColonyStateStore(s=>s.locations),entities=useColonyStateStore(s=>s.entities),builds=useColonyStateStore(s=>s.builds),residents=useColonyStateStore(s=>s.residents),loading=useColonyStateStore(s=>s.loading),error=useColonyStateStore(s=>s.error),refresh=useColonyStateStore(s=>s.refresh)
 
  useEffect(()=>{resetForLocation()},[location,resetForLocation])
@@ -60,7 +70,8 @@ export default function DashboardPrimaryColony(){
  // physical world underneath the player. A future walkable Earth view must
  // project the same persisted WGS84/materialized place data.
  if(isEarth){
-   if(mode==='colony')return <EarthWalkableSurface residents={residents} onClose={enterPlanning}/>
+   if(mode==='colony'&&earthView==='world')return <WorldLab embedded onLeave={()=>chooseEarthView('scene')}/>
+   if(mode==='colony')return <>{earthViewToggle}<EarthWalkableSurface residents={residents} onClose={enterPlanning}/><button className="noxia-earth-view-toggle" onClick={()=>chooseEarthView('world')}>◇ Neue Weltkarte</button></>
    return null
  }
  if(isDedicatedSurface)return null

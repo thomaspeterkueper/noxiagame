@@ -24,7 +24,11 @@ const PLACES: Array<{ label: string; at: GeoPoint }> = [
   { label: 'Selmecke', at: { lat: 51.33745, lon: 7.97975 } },
 ]
 
-export default function WorldLab() {
+/**
+ * `embedded`: im Spiel unter der oberen Leiste statt als eigene Seite; `onLeave`
+ * führt dann zurück zur bisherigen Erdszene statt zum Dashboard.
+ */
+export default function WorldLab({ embedded = false, onLeave }: { embedded?: boolean; onLeave?: () => void } = {}) {
   const host = useRef<HTMLDivElement | null>(null)
   const engine = useRef<WorldEngine | null>(null)
   const [hud, setHud] = useState<Hud | null>(null)
@@ -119,11 +123,11 @@ export default function WorldLab() {
     }
   }, [])
 
-  return <div className="world-lab">
+  return <div className={embedded ? 'world-lab embedded' : 'world-lab'}>
     <div ref={host} className="stage" />
     <div className="panel">
       <small>PROTOTYP · EINE WELT</small>
-      <b>Kacheln statt Szenen</b>
+      <b>{embedded ? 'Weltkarte' : 'Kacheln statt Szenen'}</b>
       <span>WASD laufen · Shift schneller · Mausrad zoomt</span>
       <div className="places">{PLACES.map(place => <button key={place.label} onClick={() => engine.current?.jump(place.at)}>{place.label}</button>)}</div>
       {hud && <dl>
@@ -141,10 +145,12 @@ export default function WorldLab() {
       <button className="refresh" disabled={refresh.busy} onClick={() => void refreshHere('Von Hand')}>{refresh.busy ? 'Lädt …' : 'Kartendaten hier nachladen'}</button>
       {refresh.text && <p className="note">{refresh.text}</p>}
       {error && <p className="error">{error}</p>}
-      <a href="/dashboard">← zurück ins Spiel</a>
+      {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
+      .world-lab.embedded{inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120}
+      .panel .leave{border:0;background:none;padding:0;text-align:left;font-size:11px;color:#d9bb6a;cursor:pointer;margin-top:4px}
       .stage{position:absolute;inset:0}
       .panel{position:absolute;left:14px;top:14px;width:250px;padding:12px 14px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px;display:grid;gap:4px}
       .panel small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}

@@ -6,7 +6,9 @@ Dieses Teilprojekt läuft als Prototyp **neben** der bestehenden begehbaren Erds
 
 ## Stand
 
-Seite: `/world-lab` (nur angemeldet erreichbar, nicht aus dem Spiel verlinkt).
+Seite: `/world-lab` (nur angemeldet erreichbar).
+
+Im Spiel (Thomas, 18.10.2026: „daneben als Weltkarte“): Auf der Erde zeigt das Dashboard weiter die bisherige begehbare Erdszene; ein Knopf „◇ Neue Weltkarte“ oben in der Mitte schaltet auf die neue Karte, „← Bisherige Erdszene“ im Feld der Karte zurück. Die Wahl bleibt im Browser gespeichert (`noxia-earth-view-v1`). Eingebaut in `app/dashboard/DashboardPrimaryColony.tsx`; `EarthWalkableSurface.tsx` ist unverändert. Die alte Szene wird erst ersetzt, wenn die neue Karte Bewohner, Ansprechen und Betreten kann (Aufgabe 5).
 
 | Baustein | Ort |
 |---|---|
