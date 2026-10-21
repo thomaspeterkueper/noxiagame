@@ -51,6 +51,9 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
       }).catch(() => { if (!controller.signal.aborted) setKgStatus('unavailable') })
     return () => controller.abort()
   }, [selected])
+  useEffect(() => {
+    if (!selected && modules.length > 0) setSelected(modules[0].id)
+  }, [modules, selected])
   const playerKnowledge = useMemo(() => projectPlayerKnowledge(modules, completedModules), [modules, completedModules])
   const completed = useMemo(() => new Set(playerKnowledge.filter(m => m.completed).map(m => m.id)), [playerKnowledge])
   const groups = useMemo(() => {
@@ -64,6 +67,7 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
   const recommended = modules.filter(m => !completed.has(m.id))
     .filter(m => !query || [titleOf(m), groupOf(m), m.summary || ''].join(' ').toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de')))
     .slice(0, 4)
+  const completedEntityIds = useMemo(() => [...new Set(playerKnowledge.filter(m => m.completed).flatMap(m => m.sourceEntityIds))], [playerKnowledge])
   const detail = modules.find(m => m.id === selected)
   const detailKnowledge = playerKnowledge.find(m => m.id === selected)
   const button = { border: '1px solid #c9ba9f', borderRadius: 9, background: '#fff', padding: '0.7rem 0.85rem', cursor: 'pointer', color: '#2a4e7a', fontWeight: 700 as const }
@@ -100,7 +104,8 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
           </button>
         })}
       </div> : <p style={{ lineHeight: 1.6, color: C.muted }}>Noch keine SSF-Module synchronisiert. Der Wissensbaum wächst, sobald Inhalte verfügbar sind. Deine bisher abgeschlossenen Module bleiben erhalten.</p>}
-      <small style={{ color: C.muted }}>Die Fachgebiete sind eine erste Kartenansicht; kanonische KG-Verbindungen werden erst nach Abgleich mit dem Knowledge Graph angezeigt.</small>
+      <small style={{ color: C.muted }}>Fachgebiete dienen der Orientierung; nur bestätigte KG-Relationen erscheinen als Linien.</small>
+      {detail && <AcademyKnowledgeGraph key={detail.id} sourceEntityIds={detailKnowledge?.sourceEntityIds ?? []} completedEntityIds={completedEntityIds} edges={kgLinks} status={kgStatus} />}
     </section>
     <section style={{ marginBottom: 17 }}>
       <h3 style={{ margin: '0 0 9px', color: '#2a4e7a' }}>Als Nächstes entdecken</h3>
@@ -116,7 +121,6 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
         <strong>{titleOf(detail)}</strong>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 5 }}>Dein Lernstatus: {detailKnowledge?.completed ? 'Modul abgeschlossen' : 'Noch offen'} · {detailKnowledge?.sourceEntityIds.length ?? 0} KG-Quellreferenzen. Ein Abschluss ist kein automatischer Kompetenznachweis.</div>
         <p style={{ fontSize: 12, lineHeight: 1.6 }}>{detail.description || detail.summary || 'Details findest du in der SSF-Bibliothek.'}</p>
-        <AcademyKnowledgeGraph sourceEntityIds={detailKnowledge?.sourceEntityIds ?? []} edges={kgLinks} status={kgStatus} />
         {kgLinks.length > 0 && <div style={{ marginBottom: 9, fontSize: 12 }}>
           <strong>Belegte KG-Beziehungen</strong>
           {kgLinks.slice(0, 8).map((edge, i) => <div key={i} style={{ marginTop: 5, wordBreak: 'break-word' }}>{edge.from} → {edge.relation} → {edge.to}</div>)}
