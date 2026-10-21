@@ -48,7 +48,7 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
 
   return <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem', color: C.ink }}>
     <header style={{ marginBottom: 18 }}>
-      <div style={{ color: C.gold, letterSpacing: '0.14em', fontSize: 11, fontWeight: 800 }}>NOχ¹ᐃ · AKADEMIE</div>
+      <div style={{ color: C.gold, letterSpacing: '0.14em', fontSize: 11, fontWeight: 800 }}>noχ¹ᐃ · AKADEMIE</div>
       <h2 style={{ margin: '0.3rem 0', fontSize: '1.45rem', color: '#233c52' }}>Dein Wissensuniversum</h2>
       <p style={{ margin: 0, color: C.muted, lineHeight: 1.6, fontSize: 13 }}>Erkunde Zusammenhänge, finde deinen nächsten Lernpfad und besuche die SSF-Bibliothek. Prüfungen gibt es erst bei qualifizierenden Freischaltungen.</p>
     </header>
