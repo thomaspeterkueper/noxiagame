@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { projectPlayerKnowledge } from '@/lib/knowledge/academyPlayerKnowledge'
+import AcademyKnowledgeGraph from './AcademyKnowledgeGraph'
 
 type Module = {
   id: string
@@ -115,6 +116,7 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
         <strong>{titleOf(detail)}</strong>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 5 }}>Dein Lernstatus: {detailKnowledge?.completed ? 'Modul abgeschlossen' : 'Noch offen'} · {detailKnowledge?.sourceEntityIds.length ?? 0} KG-Quellreferenzen. Ein Abschluss ist kein automatischer Kompetenznachweis.</div>
         <p style={{ fontSize: 12, lineHeight: 1.6 }}>{detail.description || detail.summary || 'Details findest du in der SSF-Bibliothek.'}</p>
+        <AcademyKnowledgeGraph sourceEntityIds={detailKnowledge?.sourceEntityIds ?? []} edges={kgLinks} status={kgStatus} />
         {kgLinks.length > 0 && <div style={{ marginBottom: 9, fontSize: 12 }}>
           <strong>Belegte KG-Beziehungen</strong>
           {kgLinks.slice(0, 8).map((edge, i) => <div key={i} style={{ marginTop: 5, wordBreak: 'break-word' }}>{edge.from} → {edge.relation} → {edge.to}</div>)}
