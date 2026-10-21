@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { projectPlayerKnowledge } from '@/lib/knowledge/academyPlayerKnowledge'
 
 type Module = {
   id: string
+  legacyId?: string | null
   title?: string
   name?: string
   summary?: string
@@ -48,7 +50,8 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
       }).catch(() => { if (!controller.signal.aborted) setKgStatus('unavailable') })
     return () => controller.abort()
   }, [selected])
-  const completed = useMemo(() => new Set(completedModules), [completedModules])
+  const playerKnowledge = useMemo(() => projectPlayerKnowledge(modules, completedModules), [modules, completedModules])
+  const completed = useMemo(() => new Set(playerKnowledge.filter(m => m.completed).map(m => m.id)), [playerKnowledge])
   const groups = useMemo(() => {
     const grouped = new Map<string, Module[]>()
     for (const m of modules) {
@@ -61,6 +64,7 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
     .filter(m => !query || [titleOf(m), groupOf(m), m.summary || ''].join(' ').toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de')))
     .slice(0, 4)
   const detail = modules.find(m => m.id === selected)
+  const detailKnowledge = playerKnowledge.find(m => m.id === selected)
   const button = { border: '1px solid #c9ba9f', borderRadius: 9, background: '#fff', padding: '0.7rem 0.85rem', cursor: 'pointer', color: '#2a4e7a', fontWeight: 700 as const }
 
   return <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem', color: C.ink }}>
@@ -71,7 +75,7 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
     </header>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(145px,1fr))', gap: 9, marginBottom: 18 }}>
       {[
-        { label: 'Abgeschlossene Module', value: completedModules.length },
+        { label: 'Abgeschlossene Module', value: playerKnowledge.filter(m => m.completed).length },
         { label: 'SSF-Fachgebiete', value: groups.length },
         { label: 'Entdeckbare Module', value: modules.filter(m => !completed.has(m.id)).length },
       ].map(item => <div key={item.label} style={{ background: '#fff', border: '1px solid ' + C.border, borderRadius: 10, padding: 13 }}>
@@ -109,6 +113,7 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
       </button>) : <p style={{ fontSize: 13, color: C.muted }}>{query ? 'Keine passenden offenen Module gefunden.' : 'Aktuell keine weiteren offenen SSF-Module verfügbar.'}</p>}
       {detail && <aside style={{ background: '#f0f4f6', padding: 14, borderRadius: 9, border: '1px solid ' + C.border }}>
         <strong>{titleOf(detail)}</strong>
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 5 }}>Dein Lernstatus: {detailKnowledge?.completed ? 'Modul abgeschlossen' : 'Noch offen'} · {detailKnowledge?.sourceEntityIds.length ?? 0} KG-Quellreferenzen. Ein Abschluss ist kein automatischer Kompetenznachweis.</div>
         <p style={{ fontSize: 12, lineHeight: 1.6 }}>{detail.description || detail.summary || 'Details findest du in der SSF-Bibliothek.'}</p>
         {kgLinks.length > 0 && <div style={{ marginBottom: 9, fontSize: 12 }}>
           <strong>Belegte KG-Beziehungen</strong>
