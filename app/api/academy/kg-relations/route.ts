@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const modules = await fetchSsfKnowledgeModules()
   const module = modules.find(m => m.id === moduleId || m.legacyId === moduleId)
   if (!module) return NextResponse.json({ edges: [], status: 'module_unavailable' })
-  const ids = [...new Set(module.sourceEntityIds)].filter(id => typeof id === 'string' && id.length > 0 && id.length < 150).slice(0, 5)
+  const ids = [...new Set(Array.isArray(module.sourceEntityIds) ? module.sourceEntityIds : [])].filter(id => typeof id === 'string' && id.length > 0 && id.length < 150).slice(0, 5)
   const edges = []
   for (const id of ids) {
     try {
