@@ -487,6 +487,10 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   }, [])
 
   useEffect(() => {
+    if (tab === 'akademie' && !task && !loading) void generateTask()
+  }, [tab])
+
+  useEffect(() => {
     if (task?.kind === 'calc' && !loading && result === null)
       setTimeout(() => inputRef.current?.focus(), 80)
   }, [task, loading, result])
