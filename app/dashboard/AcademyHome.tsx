@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 type Module = {
   id: string
@@ -13,6 +13,7 @@ type Module = {
   difficulty?: number
   durationMinutes?: number
   ssfUrl?: string
+  sourceEntityIds?: string[]
 }
 
 type Props = {
@@ -31,6 +32,22 @@ const titleOf = (m: Module) => m.title || m.name || m.id
 export default function AcademyHome({ modules, completedModules, onBrowse, onTasks, onCourses }: Props) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const [kgLinks, setKgLinks] = useState<Array<{from: string; to: string; relation: string}>>([])
+  const [kgStatus, setKgStatus] = useState('')
+  useEffect(() => {
+    if (!selected) { setKgLinks([]); setKgStatus(''); return }
+    const controller = new AbortController()
+    setKgLinks([])
+    setKgStatus('loading')
+    fetch('/api/academy/kg-relations?moduleId=' + encodeURIComponent(selected), { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (controller.signal.aborted) return
+        setKgLinks(Array.isArray(data.edges) ? data.edges : [])
+        setKgStatus(typeof data.status === 'string' ? data.status : 'unavailable')
+      }).catch(() => { if (!controller.signal.aborted) setKgStatus('unavailable') })
+    return () => controller.abort()
+  }, [selected])
   const completed = useMemo(() => new Set(completedModules), [completedModules])
   const groups = useMemo(() => {
     const grouped = new Map<string, Module[]>()
@@ -93,6 +110,12 @@ export default function AcademyHome({ modules, completedModules, onBrowse, onTas
       {detail && <aside style={{ background: '#f0f4f6', padding: 14, borderRadius: 9, border: '1px solid ' + C.border }}>
         <strong>{titleOf(detail)}</strong>
         <p style={{ fontSize: 12, lineHeight: 1.6 }}>{detail.description || detail.summary || 'Details findest du in der SSF-Bibliothek.'}</p>
+        {kgLinks.length > 0 && <div style={{ marginBottom: 9, fontSize: 12 }}>
+          <strong>Belegte KG-Beziehungen</strong>
+          {kgLinks.slice(0, 8).map((edge, i) => <div key={i} style={{ marginTop: 5, wordBreak: 'break-word' }}>{edge.from} → {edge.relation} → {edge.to}</div>)}
+        </div>}
+        {kgStatus === 'loading' && <p style={{ fontSize: 12, color: C.muted }}>Prüfe KG-Verknüpfungen …</p>}
+        {kgStatus && kgStatus !== 'loading' && kgLinks.length === 0 && <p style={{ fontSize: 12, color: C.muted }}>Noch keine validierten KG-Beziehungen verfügbar.</p>}
         {detail.ssfUrl && <a href={detail.ssfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2a4e7a', fontWeight: 700 }}>Dieses Modul in SSF öffnen ↗</a>}
       </aside>}
     </section>
