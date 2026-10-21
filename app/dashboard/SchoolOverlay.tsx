@@ -660,7 +660,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
             </div>
           </div>
 
-          {tab === 'wissen' && <AcademyHome modules={ssfModules} completedModules={completedModules} onBrowse={() => setTab('ssf')} onTasks={() => { setTab('akademie'); if (!task) void generateTask() }} onCourses={() => setTab('kurse')} />}
+          {tab === 'wissen' && <AcademyHome modules={ssfModules} completedModules={completedModules} onBrowse={() => setTab('ssf')} onTasks={() => setTab('akademie')} onCourses={() => setTab('kurse')} />}
           {tab === 'kurse' && (
             <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const }}>
               {activeKursId ? (
