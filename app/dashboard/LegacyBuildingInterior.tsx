@@ -92,6 +92,10 @@ const CANTEEN_ROOM: RoomDef =
 
 const BUILDING_ROOMS: Record<string, RoomDef[]> = {
   landing_pad: [...LANDING_PAD_ROOMS, CANTEEN_ROOM],
+  q1_harbour_district: [
+    { id: 'quay', label: 'Kai', icon: '⚓', wallHue: 205, detail: 'dock', items: () => ['Anleger und Ladekräne', 'Hafenmeisterei'] },
+    CANTEEN_ROOM,
+  ],
   docking_bay: [...DOCKING_BAY_ROOMS, CANTEEN_ROOM],
   habitat: [
     { id: 'entry', label: 'Eingangsschleuse', icon: '🚪', wallHue: 200, detail: 'plain', items: () => ['Druckluftschleuse', 'Stiefelablage'] },

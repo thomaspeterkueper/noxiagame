@@ -74,6 +74,8 @@ const FACILITIES: Record<string, FacilityDefinition> = {
       { id: 'cargo', label: 'Cargo-Terminal', kind: 'logistics', description: 'Frachtumschlag und Handel am Standort.', interactionIds: ['market', 'logistics'] },
       { id: 'service', label: 'Service & Wartung', kind: 'technical', description: 'Technische Arbeiten an Schiffen und Modulen.', interactionIds: ['shipyard', 'parts'] },
       { id: 'dock', label: 'Lande-/Dockbereich', kind: 'vehicle', description: 'Zugang zum aktiven Schiff und zu angedockten Fahrzeugen.', interactionIds: ['ship'] },
+      // Hafenkantine (NOXIA-LIVING-0013): Kind-Gebäude des Hafens, Innenraum in app/dashboard/PortCanteenInterior.tsx.
+      { id: 'canteen', label: 'Hafenkantine', kind: 'social', description: 'Wasser und Ration, rund um die Uhr. Grundversorgung am Hafen – nicht mehr.', interactionIds: [] },
     ],
     interactions: [
       active('navigation', 'Navigation öffnen', 'navigation', 'Sonnensystem, Reichweite und Flugplanung öffnen.'),

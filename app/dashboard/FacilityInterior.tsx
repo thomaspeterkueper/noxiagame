@@ -7,6 +7,7 @@ import { getInteriorTemplateForBuildingType } from '@/lib/game/buildings/interio
 import InteriorTopologyScene from './InteriorTopologyScene'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
+import PortCanteenInterior from './PortCanteenInterior'
 
 type Props = ComponentProps<typeof LegacyBuildingInterior>
 type LegacyAction = NonNullable<Props['onAction']> extends (kind: infer K) => void ? K : never
@@ -101,7 +102,7 @@ export default function FacilityInterior(props: Props) {
         <div className="facility-status"><span>Weltobjekt</span><b>persistent</b></div>
       </header>
 
-      {template ? <InteriorTopologyScene
+      {zone?.id === 'canteen' ? <div style={{ padding: '0.5rem', background: '#0b1113' }}><PortCanteenInterior parentEntityId={props.entity.id} portTypeId={props.entity.entity_id} /></div> : template ? <InteriorTopologyScene
         template={template}
         roomId={roomId}
         occupants={occupants.filter(person=>person.interiorPresence).map(person=>({

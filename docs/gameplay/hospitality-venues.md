@@ -20,7 +20,7 @@ Im Spiel erreichbar ist heute nur das Café. `bar` steht im Gebäudekatalog weit
 
 Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Für Spieler ist sie jetzt betretbar (Request G-1):
 
-- **Zugang:** vom Hafengebäude aus – „Kantine betreten“ im Raumhafen-Overlay (Erde, Mond, Phobos, Deimos) und als Raum „Hafenkantine“ im Kolonie-Innenraum von Landeplatz und Andockmodul (Mars, Prometheus). Ob eine Kantine im Hafen steht, sagt `GET /api/game/hospitality/canteen?parentEntityId=…`; ohne Kantine gibt es keinen Eintritt.
+- **Zugang:** vom Hafengebäude aus – „Kantine betreten“ im Raumhafen-Overlay (Erde, Mond, Phobos, Deimos), Bereich „Hafenkantine“ im Facility-Innenraum des Landeplatzes (Mars) und Raum „Hafenkantine“ im Kolonie-Innenraum von Andockmodul (Prometheus) und Hafenviertel (Q1). Ob eine Kantine im Hafen steht, sagt `GET /api/game/hospitality/canteen?parentEntityId=…`; ohne Kantine gibt es keinen Eintritt.
 - **Innenraum** (`app/dashboard/PortCanteenInterior.tsx`): Ausgabe, kein Sitzplatz, rund um die Uhr.
 - **Automat** (kleine Landeplätze: Mond, Phobos): stumm. Eine Anzeige mit Karte, Preisen und Notration, sonst nichts.
 - **Kantinenschwarm** (Raumhafen, Andockmodul, Hafenviertel): zwei Roboterkörper eines Schwarms, erkennbar Maschine. Sie sprechen im Plural und beantworten acht feste Fragen (`lib/game/hospitality/canteen.ts`) – keine Gesprächs-KI. Ihr Gedächtnis ist je Ort und besteht nur aus dem, was sie selbst gesehen haben: Bestellungen dieses Spielers in Kantinen des Ortes (`player_hospitality_orders`), Gäste und Notrationen der letzten 24 Stunden (`person_consumption_events`). „Kennt ihr mich?“ – „Wir haben Sie hier schon zweimal bedient, zuletzt vor einer Stunde: Ration.“ Nach Arbeit verweisen sie an die Verwaltung; keine Deutungen, kein Klatsch.
@@ -82,7 +82,8 @@ Der Gast weiß im Gespräch, was er selbst bestellt hat; andere sehen ihn dort, 
 - **Am Tresen spricht das Personal zuerst:** Tritt der Spieler an den Tresen, begrüßt ihn die nächste Person vom Personal von sich aus – einmal je Besuch (Feld `opening` der Gesprächsroute, höchstens zwei Sätze, im Ton des Hauses). Am Automaten begrüßt niemand.
 - **Jemand setzt sich dazu:** Sitzt der Spieler, kommt ein Gast an seinen Tisch, wenn er erst danach vom Tresen losgeht, dort ein Platz frei ist und er Gesellschaft mag (`seatForGuest`, `likesCompany` – etwa jeder zweite, fest je Person). Der Gast weiß im Gespräch, dass er sich dazugesetzt hat. Das Gespräch beginnt der Spieler.
 - **Nur echte Gäste.** Dazusetzen kann sich nur, wer wirklich gekauft hat. Solange Bewohner selten kaufen (Request R-3), geschieht das selten.
-- Sitzen hat noch keine Wirkung auf den Spieler (Erholung: Requests R-7, R-9), und bestellt wird weiter am Tresen, nicht am Tisch.
+- **Bedienung am Tisch:** Wer in einem Lokal mit Personal sitzt, bekommt nach kurzer Zeit Besuch: Die nächste Person vom Personal geht um die Möbel herum an den Tisch, bleibt dort eine Weile (`TABLE_SERVICE`: nach 12 s, 6 s Weg, 50 s am Tisch) und nimmt die Bestellung auf – die Karte ist dann am Tisch offen, Bestelltes steht auf dem Tisch. Danach geht sie zurück hinter den Tresen. Im Gespräch weiß sie, dass sie zum Bedienen gekommen ist. Nicht am Automaten und nicht in der Hotellobby.
+- Sitzen hat noch keine Wirkung auf den Spieler (Erholung: Requests R-7, R-9).
 
 ### Lokal ohne Personal
 

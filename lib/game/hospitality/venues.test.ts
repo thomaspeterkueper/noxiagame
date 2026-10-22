@@ -10,6 +10,9 @@ import {
   nearestFreeSeat,
   seatBeside,
   seatForGuest,
+  tableServicePhase,
+  tableServiceSpot,
+  TABLE_SERVICE,
   likesCompany,
   ARRIVAL_ORIENTATION_FACTS,
   MAX_CONVERSATION_FACTS,
@@ -360,6 +363,17 @@ const hotelStaff = placeVenueFigures(hotelLayout, [{ id: 'r', worksHere: true }]
 const hotelFacts = venueConversationFacts({ layout: hotelLayout, buildingName: 'Hotel Sol', self: hotelStaff[0], figures: hotelStaff, playerPos: hotelLayout.servicePoint, arrivalPoint: false, menu: [{ label: 'Zimmer für eine Nacht', priceCredits: 40 }], rooms: free, upper: { homes: 0, guestRooms: 4 } })
 check(hotelFacts.includes(roomsFact(free, true)) && !hotelFacts.includes(upperFloorFact({ homes: 0, guestRooms: 4 }, true)) && hotelFacts.length <= MAX_CONVERSATION_FACTS, 'with room data the rooms fact replaces the upper-floor fact')
 check(ROOM_ITEM_CODE === 'room_night', 'the room is a menu item')
+
+// ── Bedienung am Tisch ──────────────────────────────────────────────────────
+check(tableServicePhase(5, 'cafe', 'staffed') === 'none' && tableServicePhase(15, 'cafe', 'staffed') === 'coming' && tableServicePhase(30, 'cafe', 'staffed') === 'at-table' && tableServicePhase(500, 'cafe', 'staffed') === 'gone', 'staff comes to the table shortly after the player sits down and leaves again')
+check(tableServicePhase(30, 'cafe', 'self-service') === 'none' && tableServicePhase(30, 'hotel', 'staffed') === 'none', 'no table service at the automat or in a hotel lobby')
+const mySeat = nearestFreeSeat(cafe, [], cafe.start)!, home = pair.find(f => f.roomRole === 'staff')!.spot
+const serving = tableServiceSpot(cafe, mySeat, 'at-table', 40, home)
+check(Math.hypot(serving.x - mySeat.x, serving.y - mySeat.y) < 40 && !isVenueBlocked(cafe, serving) && tableServiceSpot(cafe, mySeat, 'gone', 400, home) === home, 'the waiter stands beside the seat on free floor and returns home afterwards')
+const coming = tableServiceSpot(cafe, mySeat, 'coming', TABLE_SERVICE.comeAfterS + TABLE_SERVICE.walkS / 2, home)
+check(coming.label === 'auf dem Weg zum Tisch' && !isVenueBlocked(cafe, coming), 'on the way the waiter walks around the furniture')
+const servingFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: pair.find(f => f.roomRole === 'staff')!, figures: pair, playerPos: mySeat, arrivalPoint: false, playerSeat: mySeat, servingPlayer: true, menu: cafeMenu })
+check(servingFacts.some(f => f.includes('nimmst die Bestellung auf')), 'the waiter knows why they are at the table')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
