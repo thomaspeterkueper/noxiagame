@@ -18,6 +18,10 @@ describe('Academy KG relation contract', () => {
     expect(normalizeKgRelations({ ok: false, data: { id: 'ENTITY:A', outgoing: [record] } }, 'ENTITY:A')).toEqual([])
     expect(normalizeKgRelations({ ...response('ENTITY:A', [record]), query: 'unexpected' }, 'ENTITY:A')).toEqual([])
   })
+  it('rejects unknown schema versions and self-loop records', () => {
+    expect(normalizeKgRelations({ ...response('ENTITY:A', [record]), schema: 'UNRECOGNIZED' }, 'ENTITY:A')).toEqual([])
+    expect(normalizeKgRelations(response('ENTITY:A', [{ from: 'ENTITY:A', to: 'ENTITY:A', relation: 'RELATES_TO' }]), 'ENTITY:A')).toEqual([])
+  })
   it('deduplicates incoming and outgoing without inferring new edges', () => {
     expect(normalizeKgRelations(response('ENTITY:A', [record, record], [record]), 'ENTITY:A')).toHaveLength(1)
   })
