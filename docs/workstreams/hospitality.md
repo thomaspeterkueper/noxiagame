@@ -25,6 +25,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Kantinenschwarm mit Gedächtnis aus echten Bestellungen, stummer Automat; Startcafé 23–6 Uhr nach Ortszeit des Spielers geschlossen (Branch `feat/canteen-swarm-and-local-hours`).
 - Hotel: Lobby mit Empfang, Zimmer buchen als Posten `room_night` über die Bestellroute, Belegung aus echten Buchungen, Gebäudeansicht (Branch `feat/hotel-rooms`). Beschreibung: `hospitality-venues.md` Abschnitt 1b.
 - Hotel baubar: Migration `20261014090000_hotel_rooms.sql` (Gebäudeart, 6 Zimmer, Kartenzeile, Belegungsprüfung im Server) – entschieden von Thomas am 14.10.2026, von Gastronomie selbst gebaut (Branch `feat/hotel-buildable`). **Live eingespielt am 14.10.2026.** Transaktionaler Production-Smoke-Test: 6 Zimmer automatisch, erste Buchung erfolgreich, Doppelbuchung desselben Profils abgewiesen, siebter Gast bei sechs belegten Zimmern abgewiesen; Probe vollständig zurückgerollt.
+- Bedienung am Tisch (Aufgabe 8) und Kantinenzugang auf dem Mars (Facility-Innenraum) und in Q1 (Hafenviertel) (Branch `feat/canteen-access-mars-q1`, 22.10.2026).
 
 ## Gestellte Requests
 
@@ -80,13 +81,13 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 
 5. Öffnungszeiten, Treppe und Mitbekommenes einmal live prüfen; bisher nur Regeltests.
 
-6. Empfang und Lobby fürs Hotel als eigener Innenraum, sobald R-7 entschieden ist.
+6. ✅ Empfang und Lobby fürs Hotel (13.10.2026, Abschnitt 1b).
 
 7. „Auskunft“ als Posten am Tresen (SunDog: Info kaufen und verkaufen), sobald R-8 entschieden ist.
 
-8. Bedienung am Tisch: Personal kommt zum sitzenden Spieler und nimmt die Bestellung auf.
+8. ✅ Bedienung am Tisch (22.10.2026), nur Regeltests.
 
-9. Hafenkantine in Q1: Das Hafenviertel hat noch keinen Weg hinein. Dazu Notration-Knopf, sobald der Server sie für Spieler ausgibt.
+9. ✅ Hafenkantine in Q1 und auf dem Mars erreichbar (22.10.2026; der Mars-Landeplatz läuft über `FacilityInterior`, dort fehlte der Zugang bisher). Offen bleibt der Notration-Knopf, sobald der Server sie für Spieler ausgibt.
 
 10. ✅ Migration `20261014090000_hotel_rooms.sql` live eingespielt (14.10.2026). Production-Smoke-Test in zurückgerollter Transaktion bestanden: Hotel erhält 6 Zimmer, Zimmerbuchung funktioniert, Doppelbuchung wird abgewiesen, Vollbelegung wird bei 6/6 erzwungen. **Noch offen:** ein persistentes Hotel regulär über die Spieloberfläche bauen und dort die Buchung visuell/end-to-end prüfen.
 

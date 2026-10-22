@@ -26,6 +26,8 @@ import {
   freeSeats,
   nearestFreeSeat,
   seatForGuest,
+  tableServicePhase,
+  tableServiceSpot,
   type VenueSpot,
   type VenueRooms,
   ROOM_ITEM_CODE,
@@ -254,19 +256,29 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const playerHour=hours.clock==='player'?new Date(nowMs).getHours():hour
   const service=venueService(layout,figures,playerHour,hours)
   const closedReason=venueClosedReason(layout,figures,playerHour,hours)
+  // Wer sitzt, wird bedient: Jemand vom Personal kommt an den Tisch.
+  const seatedForS=seat?(nowMs-satAt)/1000:0
+  const tablePhase=seat?tableServicePhase(seatedForS,layout.kind,service):'none'
+  const waiterId=useMemo(()=>{
+    if(!seat||tablePhase==='none'||tablePhase==='gone')return null
+    return figures.filter(f=>f.roomRole==='staff'&&f.visibleToPlayer).map(f=>({id:f.id,d:Math.hypot(f.spot.x-seat.x,f.spot.y-seat.y)})).sort((a,b)=>a.d-b.d)[0]?.id??null
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[seat?.id,tablePhase,figures.length])
+  const served=useMemo(()=>waiterId&&seat?figures.map(f=>f.id===waiterId?{...f,spot:tableServiceSpot(layout,seat,tablePhase,seatedForS,f.spot)}:f):figures,[figures,waiterId,seat,tablePhase,seatedForS,layout])
+  const atTable=tablePhase==='at-table'
   const closed=loaded&&service==='closed'
   const hasMenu=Boolean(menu?.items.length)&&service!=='closed'
   const shown=useMemo<ShownFigure[]>(()=>{
     const byId=new Map(everyone.map(r=>[r.id,r]))
     if(service==='closed')return[]
-    return figures.filter(f=>f.visibleToPlayer).flatMap(figure=>{
+    return served.filter(f=>f.visibleToPlayer).flatMap(figure=>{
       const resident=byId.get(figure.id)
       return resident?[{figure,resident,moment:moments.get(figure.id)??null}]:[]
     })
-  },[figures,moments,everyone,service])
+  },[served,moments,everyone,service])
 
   const nearestNpc=useMemo(()=>shown.map(item=>({...item,d:Math.hypot(item.figure.spot.x-pos.x,item.figure.spot.y-pos.y)})).sort((a,b)=>a.d-b.d)[0]??null,[shown,pos])
-  const nearService=isAtServicePoint(layout,pos)
+  const nearService=isAtServicePoint(layout,pos)||atTable
   const showMenu=!closed&&(nearService||menuOpen)
   const nearExit=Math.hypot(pos.x-layout.exit.x,pos.y-layout.exit.y)<48
   const counter=layout.furniture.find(item=>item.kind==='counter')
@@ -313,7 +325,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   async function converse(selected:ColonyResident|null,opening:boolean){
     if(!selected||(!opening&&!message.trim())||sending)return
     // Die Figur bekommt nur mit, was sie von ihrem Platz aus wissen kann.
-    const self=figures.find(f=>f.id===selected.id)
+    const self=served.find(f=>f.id===selected.id)
     if(!self)return
     const text=opening?'':message.trim().slice(0,80)
     const history=opening?[]:historyState
@@ -332,7 +344,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           headline:'Gespräch '+layout.locative+' '+buildingName,
           source:'NOXIA '+layout.kind+' interior',
           locationName:buildingName,
-          localFacts:venueConversationFacts({layout,buildingName,self,figures,playerPos:pos,playerSeat:seat,joinedPlayer:joined===self.id,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour:playerHour,hours,upper,rooms}),
+          localFacts:venueConversationFacts({layout,buildingName,self,figures:served,servingPlayer:self.id===waiterId&&atTable,playerPos:pos,playerSeat:seat,joinedPlayer:joined===self.id,arrivalPoint,menu:hasMenu?menu?.items:[],playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),ownOrder:moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,hour:playerHour,hours,upper,rooms}),
           placeKnowledge,
           // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
           hearsay:self.roomRole==='staff'?heard:[],
@@ -376,6 +388,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   },[joined])
   const openSeats=closed?[]:freeSeats(layout,figures,seat?[seat.id]:[])
   const nextSeat=closed||seat?null:nearestFreeSeat(layout,figures,pos)
+  const waiterName=waiterId?everyone.find(r=>r.id===waiterId)?.displayName??null:null
+  useEffect(()=>{if(atTable&&waiterName)setStatus(waiterName+' kommt an deinen Tisch und nimmt die Bestellung auf.')},[atTable,waiterName])
 
   return <div className="cafe-interior">
     <NpcVisualStyles/>
@@ -401,7 +415,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt, sonst vor dem Spieler am Tresen.
           const target=entry.forId?shown.find(item=>item.resident.id===entry.forId)?.figure.spot:null
           const same=orders.slice(0,index).filter(other=>other.forId===entry.forId).length
-          const at=target?{x:target.x+16+same*12,y:target.y+(target.kind==='staff'?14:-4)}:{x:layout.servicePoint.x-30+same*14,y:layout.servicePoint.y-22}
+          const at=target?{x:target.x+16+same*12,y:target.y+(target.kind==='staff'?14:-4)}:seat?{x:seat.x+14+same*12,y:seat.y-6}:{x:layout.servicePoint.x-30+same*14,y:layout.servicePoint.y-22}
           return <div key={entry.key} className="item" style={{left:at.x-9,top:at.y-9}} title={entry.label}><HospitalityItemIcon code={entry.itemCode} size={18} title={entry.label}/></div>
         })}
         {openSeats.map(spot=><button key={spot.id} className="seat-hit" style={{left:spot.x-11,top:spot.y-11}} title={'Hier hinsetzen – '+spot.label} aria-label={'Hinsetzen '+spot.label} onClick={()=>sitAt(spot)}/>)}
@@ -447,7 +461,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
               {!room.affordable&&<small>zu teuer</small>}
             </button>
           </div>})()}
-          {!nearService&&<p>Zum Bestellen musst du {service==='self-service'?'am Automaten':layout.servicePoint.locative} stehen.</p>}
+          {!nearService&&<p>{seat&&tablePhase!=='none'&&tablePhase!=='gone'?'Jemand vom Personal kommt gleich an deinen Tisch.':seat&&service==='staffed'&&layout.kind!=='hotel'?'Bleib sitzen – gleich kommt jemand an den Tisch.':'Zum Bestellen musst du '+(service==='self-service'?'am Automaten':layout.servicePoint.locative)+' stehen.'}</p>}
           </>}
         </div>}
         {status&&<div className="status">{status}</div>}

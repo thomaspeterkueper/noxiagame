@@ -744,6 +744,33 @@ export function roomsFact(rooms: VenueRooms, staff: boolean): string {
   return fit(`Oben gibt es ${rooms.capacity} Gästezimmer, davon ${free === 0 ? 'keins' : free === rooms.capacity ? 'alle' : String(free)} frei; gebucht wird am Empfang${mine}`)
 }
 
+// ── Bedienung am Tisch ──────────────────────────────────────────────────────
+// Wer sitzt, wird bedient: Kurz nach dem Hinsetzen kommt jemand vom Personal
+// an den Tisch, nimmt die Bestellung auf und geht wieder hinter den Tresen.
+// Nur in Lokalen mit Personal – am Automaten und am Empfang nicht.
+export const TABLE_SERVICE = { comeAfterS: 12, walkS: 6, stayS: 50 } as const
+export type TableServicePhase = 'none' | 'coming' | 'at-table' | 'gone'
+
+export function tableServicePhase(seatedForS: number, kind: VenueKind, service: VenueService): TableServicePhase {
+  if (service !== 'staffed' || kind === 'hotel') return 'none'
+  const t = seatedForS - TABLE_SERVICE.comeAfterS
+  if (t < 0) return 'none'
+  if (t < TABLE_SERVICE.walkS) return 'coming'
+  if (t < TABLE_SERVICE.walkS + TABLE_SERVICE.stayS) return 'at-table'
+  return 'gone'
+}
+
+/** Wo das Personal steht, das den Tisch bedient: neben dem Platz des Gastes. */
+export function tableServiceSpot(layout: VenueLayout, seat: VenueSpot, phase: TableServicePhase, seatedForS: number, home: VenueSpot): VenueSpot {
+  const beside: VenueSpot = { id: 'serving', kind: 'standing', x: seat.x, y: seat.y + 34, roomId: layout.playerRoomId, label: `${seat.label}, um zu bedienen`, posture: 'standing' }
+  if (phase === 'at-table') return beside
+  if (phase === 'coming') {
+    const p = pointAlongPath(venuePath(layout, home, beside), (seatedForS - TABLE_SERVICE.comeAfterS) / TABLE_SERVICE.walkS)
+    return { ...beside, x: p.x, y: p.y, label: 'auf dem Weg zum Tisch' }
+  }
+  return home
+}
+
 // ── Wo steht der Spieler? ───────────────────────────────────────────────────
 /** Ortsangabe für den Spieler, wie sie jemand im Raum beschreiben würde. */
 export function describePlayerPosition(layout: VenueLayout, pos: VenuePoint): string {
@@ -810,6 +837,8 @@ export interface ConversationFactsInput {
   rooms?: VenueRooms | null
   /** Welche Öffnungszeit für den Spieler gilt (Startcafé: seine Ortszeit). */
   hours?: VenueHours
+  /** Steht diese Figur gerade am Tisch des Spielers, um zu bedienen? */
+  servingPlayer?: boolean
   /** Sitzt der Spieler? Dann sein Platz. */
   playerSeat?: VenueSpot | null
   /** Hat sich diese Figur eben zum Spieler gesetzt? */
@@ -880,7 +909,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     const seat = input.playerSeat
     if (seat) {
       const together = self.spot.label === seat.label && self.spot.posture === 'sitting'
-      facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
+      facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (input.servingPlayer ? '; du bist an den Tisch gekommen und nimmst die Bestellung auf' : together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
     } else facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
     facts.push(othersFact(layout, self, input.figures))
   }
