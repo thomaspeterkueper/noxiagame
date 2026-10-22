@@ -3,7 +3,7 @@ export type AcademyKgEdge = { from: string; to: string; relation: string; source
 export function normalizeKgRelations(payload: unknown, requestedId: string): AcademyKgEdge[] {
   if (!payload || typeof payload !== 'object') return []
   const envelope = payload as Record<string, unknown>
-  if (envelope.ok !== true || typeof envelope.schema !== 'string' || envelope.query !== 'findRelations') return []
+  if (envelope.ok !== true || envelope.schema !== 'KUEPER-KG-QUERY-0.1' || envelope.query !== 'findRelations') return []
   const data = envelope.data
   if (!data || typeof data !== 'object') return []
   const result = data as Record<string, unknown>
@@ -18,6 +18,8 @@ export function normalizeKgRelations(payload: unknown, requestedId: string): Aca
     const relation = typeof item.relation === 'string' ? item.relation : item.type
     if (typeof from !== 'string' || typeof to !== 'string' || typeof relation !== 'string') continue
     if (from !== requestedId && to !== requestedId) continue
+    if (from === to) continue
+    if (typeof item.from !== 'string' || typeof item.to !== 'string') continue
     if (![from, to, relation].every(s => s.length > 0 && s.length < 200)) continue
     const key = [from, to, relation].join('|')
     if (!seen.has(key)) { seen.add(key); edges.push({ from, to, relation, source: 'KG' }) }
