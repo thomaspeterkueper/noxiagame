@@ -1,4 +1,5 @@
-import type { BiosphereFunctionalState } from './biosphereState'\n// lib/game/world/types.ts
+import type { BiosphereFunctionalState } from './biosphereState'
+// lib/game/world/types.ts
 // Erstellt:     10.07.2026
 // Version:      0.1.0
 //
