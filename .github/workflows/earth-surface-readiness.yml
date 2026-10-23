@@ -10,6 +10,9 @@ on:
       - 'lib/game/core/logisticsCargoMassAuthority.ts'
       - 'app/api/game/surface-transport/cargo-readiness/route.ts'
       - 'app/api/game/earth/surface-transport/readiness/route.ts'
+      - 'app/api/game/earth/surface-transport/draft/route.ts'
+      - 'app/api/game/earth/surface-transport/start/route.ts'
+      - 'app/earth/EarthSurfaceLogisticsConsole.tsx'
       - 'app/api/game/moon/surface-transport/cargo-readiness/route.ts'
       - '.github/workflows/earth-surface-readiness.yml'
   push:
@@ -22,6 +25,9 @@ on:
       - 'lib/game/core/logisticsCargoMassAuthority.ts'
       - 'app/api/game/surface-transport/cargo-readiness/route.ts'
       - 'app/api/game/earth/surface-transport/readiness/route.ts'
+      - 'app/api/game/earth/surface-transport/draft/route.ts'
+      - 'app/api/game/earth/surface-transport/start/route.ts'
+      - 'app/earth/EarthSurfaceLogisticsConsole.tsx'
       - 'app/api/game/moon/surface-transport/cargo-readiness/route.ts'
       - '.github/workflows/earth-surface-readiness.yml'
 
@@ -51,3 +57,10 @@ jobs:
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib --outDir .earth-readiness-test
           && node .earth-readiness-test/game/earthSurfaceEngineering.test.js
+      - name: Lint Earth surface transport client
+        # The legacy console predates the React set-state-in-effect rule and already
+        # contains initialization/readiness effects tracked outside this PR. Keep all
+        # other lint rules active while avoiding unrelated scope expansion here.
+        run: >-
+          pnpm exec eslint app/earth/EarthSurfaceLogisticsConsole.tsx
+          --rule 'react-hooks/set-state-in-effect: off'
