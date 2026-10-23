@@ -431,3 +431,25 @@ Merge: `4422eb41f328dc2d7e2631e42ca46e5d5a3007eb`.
 Die segmentweise Unterscheidung Straße/Offroad ist noch nicht dargestellt, weil diese Klassifikation derzeit nicht autoritativ im persistierten RouteSnapshot steckt. Sie wird nicht aus der Gesamt-Polyline zurückgeraten.
 
 Der Request bleibt `open`. Nach dem manuellen Transport und der kanonischen Kartenintegration verbleiben insbesondere automatische Transportregeln, der Surface-Port-Handover in der Earth-UX sowie weitere konkrete Commodity-Abbildungen.
+
+### PR #519 – Earth-Ascent auf aktuelle Engineering-r2-Authority korrigiert
+
+Die Prüfung des Surface-Port-/Shuttle-Handover-Pfads hat einen sicherheitsrelevanten Integrationsfehler sichtbar gemacht: NOXIA konsumierte noch `ENG-EARTH-LEO-ASCENT-r1 / ENG-SCV-0003`, obwohl KUEPER Engineering r1 inzwischen ausdrücklich als superseded markiert und für neue Starts gesperrt hat.
+
+Mit PR #519 gilt jetzt fail-closed die aktuelle Authority:
+
+- `ENG-EARTH-LEO-ASCENT-r2`,
+- Frame `ENG-SCV-0004`,
+- max. Startmasse 748.340 kg,
+- mindestens 170 m/s Release,
+- 395–405 km circular Earth LEO,
+- expliziter r2-Propellant-State,
+- expliziter r2-High-Lift-State,
+- Engineering-cleared ASCE Launch-Site-Class,
+- aufgelöste Zielbahnebene und Zielinklination.
+
+Historische r1-Daten werden nicht umetikettiert; der r1-Referenzframe bleibt historisch und wird als superseded gekennzeichnet. Der neue r2-Referenzframe ist getrennt, inaktiv und besitzt keine erfundene Startbereitschaft.
+
+Merge: `b45124118b5ae6923bfe6fdb958bf15fbbf5b9d9`.
+
+Damit ist der Engineering-Vertrag für Earth Surface → 400 km LEO korrekt integriert. Für eine spielbare Earth-Shuttle-Kette müssen die konkreten NOXIA-Flight-Article-/Staging-/Port-Zustände weiterhin autoritativ aufgelöst werden; fehlende Propellant-, High-Lift-, Site-, Massen- oder Target-Plane-Fakten bleiben blockiert.
