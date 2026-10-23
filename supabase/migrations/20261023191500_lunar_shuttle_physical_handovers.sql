@@ -71,7 +71,7 @@ declare
   v_zone text;
 begin
   if lower(new.body_slug) not in ('moon','phobos','earth','mars') then return new; end if;
-  if not exists(select 1 from public.docking_ports where station_slug=lower(new.body_slug) and active) then return new; end if;
+  if not exists(select 1 from public.docking_ports where station_slug=lower(new.body_slug) and not offline) then return new; end if;
 
   v_class:=public.noxia_ship_docking_class(new.ship_id);
   v_zone:=case v_class
