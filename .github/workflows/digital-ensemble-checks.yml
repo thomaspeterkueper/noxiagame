@@ -1,0 +1,30 @@
+name: Digital ensemble research checks
+on:
+  pull_request:
+    paths:
+      - 'lib/game/research/digitalEnsemble*'
+      - '.github/workflows/digital-ensemble-checks.yml'
+  push:
+    paths:
+      - 'lib/game/research/digitalEnsemble*'
+      - '.github/workflows/digital-ensemble-checks.yml'
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile isolated benchmark and test
+        run: pnpm exec tsc --target es2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --types node --outDir .ensemble-test lib/game/research/digitalEnsemble.ts lib/game/research/digitalEnsemble.test.ts lib/game/research/digitalEnsembleComparison.ts lib/game/research/digitalEnsembleComparison.test.ts lib/game/research/digitalEnsembleStress.ts lib/game/research/digitalEnsembleStress.test.ts
+      - name: Run deterministic replay and failure tests
+        run: |
+          node .ensemble-test/digitalEnsemble.test.js
+          node .ensemble-test/digitalEnsembleComparison.test.js
+          node .ensemble-test/digitalEnsembleStress.test.js
