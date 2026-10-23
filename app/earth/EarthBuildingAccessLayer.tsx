@@ -6,6 +6,7 @@
 // aber trotzdem -> wirkte wie "Navigation starten tut nichts". Erde jetzt
 // aus der Zielliste gefiltert, analog zur Kolonien-Tab-Variante.
 import { useEffect, useState, type ReactNode } from 'react'
+import { UI_LAYER } from '@/lib/ui/layers'
 import SchoolOverlay from '@/app/dashboard/SchoolOverlay'
 import WarehouseOverlay from '@/app/dashboard/WarehouseOverlay'
 import LandingOverlay from '@/app/dashboard/LandingOverlay'
@@ -51,7 +52,7 @@ function FacilityPanel({
 }) {
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2300, background: 'rgba(2,7,12,.86)', display: 'grid', placeItems: 'center', padding: 20 }}
+      style={{ position: 'fixed', inset: 0, zIndex: UI_LAYER.interior, background: 'rgba(2,7,12,.86)', display: 'grid', placeItems: 'center', padding: 20 }}
       onClick={event => event.target === event.currentTarget && onClose()}
     >
       <div style={{ width: 'min(640px,94vw)', maxHeight: '86vh', overflow: 'auto', background: '#eef1ed', border: '1px solid #78919a', borderRadius: 12, color: '#1b3540', boxShadow: '0 18px 60px rgba(0,0,0,.35)' }}>
@@ -143,7 +144,7 @@ export default function EarthBuildingAccessLayer({
   if (!request) return null
 
   if (loading && !data) {
-    return <div style={{ position: 'fixed', inset: 0, zIndex: 2300, background: 'rgba(2,7,12,.82)', display: 'grid', placeItems: 'center', color: '#eef4f1', font: '700 13px system-ui' }}>Gebäude wird betreten …</div>
+    return <div style={{ position: 'fixed', inset: 0, zIndex: UI_LAYER.interior, background: 'rgba(2,7,12,.82)', display: 'grid', placeItems: 'center', color: '#eef4f1', font: '700 13px system-ui' }}>Gebäude wird betreten …</div>
   }
 
   if (data?.error) {

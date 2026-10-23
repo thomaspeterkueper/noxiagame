@@ -13,6 +13,7 @@
 // Ersetzt die Fliegen-Buttons im Dashboard-Kolonien-Tab.
 
 import { useEffect, useState } from 'react'
+import { UI_LAYER } from '@/lib/ui/layers'
 import { LOC_ICON, LOC_NAME } from './ui'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { pilotFee } from '@/lib/game/pilotQualification'
@@ -68,7 +69,7 @@ export default function LandingOverlay({
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.85)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(2,4,8,0.85)', zIndex: UI_LAYER.interior, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div style={{
