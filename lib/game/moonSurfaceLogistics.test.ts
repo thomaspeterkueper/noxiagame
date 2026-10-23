@@ -32,6 +32,50 @@ assert(prepared.speedMultiplier < hardened.speedMultiplier, 'hardened road must 
 assert(offroad.energyMultiplier > prepared.energyMultiplier, 'offroad must impose a larger relative energy burden')
 assert(prepared.energyMultiplier > hardened.energyMultiplier, 'prepared track must remain more costly than hardened road')
 
+
+const flatMetrics = {
+  distanceM: 1000,
+  ascentM: 0,
+  descentM: 0,
+  meanAbsSlopeDeg: 0,
+  maxAbsSlopeDeg: 0,
+}
+const engineeringVehicle = {
+  frameId: 'eng-lunar-cargo-rover-r1',
+  role: 'cargo-rover' as const,
+  safeLongitudinalSlopeDeg: 10,
+}
+const engineeringOffroad = assessMoonSurfaceRoute({
+  routeClass: 'offroad',
+  metrics: flatMetrics,
+  vehicle: engineeringVehicle,
+})
+const engineeringPrepared = assessMoonSurfaceRoute({
+  routeClass: 'prepared-track',
+  metrics: flatMetrics,
+  vehicle: engineeringVehicle,
+})
+const engineeringHardened = assessMoonSurfaceRoute({
+  routeClass: 'hardened-road',
+  metrics: flatMetrics,
+  vehicle: engineeringVehicle,
+})
+
+assert(Math.abs(engineeringOffroad.speedMultiplier - 5 / 12) < 1e-12, 'LCR-6 offroad speed must use Engineering 5 km/h anchor')
+assert(Math.abs(engineeringPrepared.speedMultiplier - 10 / 12) < 1e-12, 'LCR-6 prepared-track speed must use Engineering 10 km/h anchor')
+assert(Math.abs(engineeringHardened.speedMultiplier - 15 / 12) < 1e-12, 'LCR-6 hardened-road speed must use Engineering 15 km/h anchor')
+assert(engineeringOffroad.energyMultiplier === 1.55, 'LCR-6 offroad energy factor must come from Engineering')
+assert(engineeringPrepared.energyMultiplier === 1.15, 'LCR-6 prepared-track energy factor must come from Engineering')
+assert(engineeringHardened.energyMultiplier === 1, 'LCR-6 hardened-road energy factor must come from Engineering')
+assert(engineeringOffroad.wearMultiplier === 1.8, 'LCR-6 offroad wear factor must come from Engineering')
+assert(engineeringPrepared.wearMultiplier === 1.2, 'LCR-6 prepared-track wear factor must come from Engineering')
+assert(engineeringHardened.wearMultiplier === 1, 'LCR-6 hardened-road wear factor must come from Engineering')
+assert(engineeringOffroad.allowedSlopeDeg === 10, 'canonical Engineering frame must use its safe slope without fallback route fractions')
+assert(
+  engineeringOffroad.engineeringSourceId === 'ENG-LUNAR-SURFACE-LOGISTICS-r1:ENG-VEH-0003',
+  'assessment must retain Engineering provenance',
+)
+
 const steep = assessMoonSurfaceRoute({
   routeClass: 'offroad',
   metrics: { ...metrics, maxAbsSlopeDeg: 10 },
