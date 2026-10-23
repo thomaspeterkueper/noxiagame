@@ -23,7 +23,7 @@ export const ASCENT_ORBIT_NODES: Readonly<Record<string, AscentOrbitNode>> = {
     label: 'Earth · 400 km LEO',
     orbitClass: 'leo-circular',
     altitudeKm: 400,
-    sourceReference: 'KUEPER-ENGINEERING spacecraft/asce mission-baseline-book-0.7 mission target',
+    sourceReference: 'KUEPER-ENGINEERING systems/earth-leo-ascent-authority-r2.json',
   },
   'moon-llo-100': {
     slug: 'moon-llo-100',
