@@ -32,6 +32,7 @@ export type VehicleInstanceSnapshot = {
 
 export type StarterCargoRoverProvisioning = {
   slotKey: 'starter_cargo_rover'
+  engineeringSource: 'ENG-LUNAR-SURFACE-LOGISTICS-r1:ENG-VEH-0003'
   vehicle: PersistedVehicleInstance
   inventory: Record<string, unknown>
   eventId?: string

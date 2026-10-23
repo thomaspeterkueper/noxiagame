@@ -1,5 +1,9 @@
 -- Harden learning and knowledge authorization.
 -- Clients may read only their own progress/history; authoritative writes stay server-side.
+--
+-- Fresh-replay note: hosted production historically received the knowledge RPCs
+-- outside the repository baseline. Therefore harden them here only when present;
+-- the canonical current definitions are reconciled by a later migration.
 
 alter table public.player_learning_progress enable row level security;
 
@@ -35,13 +39,24 @@ for select
 to authenticated
 using ((select auth.uid()) = profile_id);
 
--- This SECURITY DEFINER RPC changes authoritative knowledge state. It must not
--- be callable from public/authenticated clients.
-revoke execute on function public.award_knowledge(uuid, integer, text, text) from public, anon, authenticated;
-grant execute on function public.award_knowledge(uuid, integer, text, text) to service_role;
-alter function public.award_knowledge(uuid, integer, text, text)
-  set search_path = public, pg_temp;
+-- Hosted production already had these RPCs when this migration originally ran.
+-- A clean replay may not, because the old hosted rollout was not part of the
+-- repository baseline. Do not make fresh schema construction depend on that
+-- historical side effect.
+do $hardening$
+begin
+  if to_regprocedure('public.award_knowledge(uuid,integer,text,text)') is not null then
+    revoke execute on function public.award_knowledge(uuid, integer, text, text)
+      from public, anon, authenticated;
+    grant execute on function public.award_knowledge(uuid, integer, text, text)
+      to service_role;
+    alter function public.award_knowledge(uuid, integer, text, text)
+      set search_path = public, pg_temp;
+  end if;
 
--- Keep the related read helper deterministic with an explicit search_path.
-alter function public.get_knowledge_level(integer)
-  set search_path = public, pg_temp;
+  if to_regprocedure('public.get_knowledge_level(integer)') is not null then
+    alter function public.get_knowledge_level(integer)
+      set search_path = public, pg_temp;
+  end if;
+end
+$hardening$;
