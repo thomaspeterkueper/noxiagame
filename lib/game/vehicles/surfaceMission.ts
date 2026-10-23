@@ -91,8 +91,7 @@ export function traversalFromMoonAssessment(assessment: MoonRouteAssessment): Su
     passable: assessment.passable,
     speedMultiplier: assessment.speedMultiplier,
     energyMultiplier: assessment.energyMultiplier,
-    // Moon routing does not yet claim an engineering wear model.
-    wearMultiplier: 1,
+    wearMultiplier: assessment.wearMultiplier,
     reason: assessment.reason,
   }
 }
