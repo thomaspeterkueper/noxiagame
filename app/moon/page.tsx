@@ -1,4 +1,5 @@
 import MoonSurfaceTransportPlanner from './MoonSurfaceTransportPlanner'
+import MoonAscentShuttlePanel from './MoonAscentShuttlePanel'
 import ShackletonSurfaceMap from './ShackletonSurfaceMap'
 
 export const metadata = {
@@ -9,5 +10,6 @@ export default function MoonPage() {
   return <>
     <ShackletonSurfaceMap />
     <MoonSurfaceTransportPlanner />
+    <MoonAscentShuttlePanel />
   </>
 }
