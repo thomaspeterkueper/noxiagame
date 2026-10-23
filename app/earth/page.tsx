@@ -2,7 +2,6 @@ import EarthRegionPreview from './EarthRegionPreview'
 import EarthInfrastructurePlanner from './EarthInfrastructurePlanner'
 import EarthLandmarkMap from './EarthLandmarkMap'
 import EarthLandmarkExplorer from './EarthLandmarkExplorer'
-import EarthSurfaceLiveMap from './EarthSurfaceLiveMap'
 import EarthSurfaceLogisticsConsole from './EarthSurfaceLogisticsConsole'
 import EarthSurfaceMissionDraftPanel from './EarthSurfaceMissionDraftPanel'
 import EarthVehicleStagingPanel from './EarthVehicleStagingPanel'
@@ -18,7 +17,6 @@ export default function EarthPage() {
     <EarthInfrastructurePlanner />
     <EarthLandmarkMap />
     <EarthLandmarkExplorer />
-    <EarthSurfaceLiveMap />
     <EarthVehicleStagingPanel />
     <EarthSurfaceLogisticsConsole />
     <EarthSurfaceMissionDraftPanel />
