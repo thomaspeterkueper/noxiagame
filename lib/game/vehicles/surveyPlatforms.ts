@@ -34,8 +34,11 @@ export type SurveyPlatformProfile = {
 }
 
 /**
- * The existing VEX-47 is the first canonical mobile survey carrier.
- * Only non-contact airborne instruments are enabled here. Contact/seismic
+ * The VEX series canonically begins with VEX-01. VEX-47 is the first model
+ * currently bound as a full NOXIA mobile survey carrier. Earlier generations
+ * remain in the series progression matrix until their exact Engineering and
+ * payload contracts are defined. Only non-contact airborne instruments are
+ * enabled here. Contact/seismic
  * equipment needs a separate deployment mechanism rather than pretending the
  * drone itself performs a borehole or seismic survey.
  */
