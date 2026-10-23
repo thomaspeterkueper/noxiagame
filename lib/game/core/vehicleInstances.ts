@@ -61,6 +61,14 @@ export type EarthVehicleStagingResult = {
   idempotent: boolean
 }
 
+export type SurfaceVehicleStagingResult = {
+  vehicleId: string
+  targetInventoryId: string
+  vehicle: PersistedVehicleInstance
+  inventory: Record<string, unknown>
+  idempotent: boolean
+}
+
 function coreError(command: string, error: { message?: string; code?: string; details?: string | null }) {
   const suffix = [error.code, error.message, error.details].filter(Boolean).join(' · ')
   return new Error(`${command} failed${suffix ? `: ${suffix}` : ''}`)
@@ -212,4 +220,22 @@ export async function stageEarthVehicleCommand(input: {
   })
   if (error) throw coreError('noxia_stage_earth_vehicle', error)
   return data as unknown as EarthVehicleStagingResult
+}
+
+/** Explicit initial/current-node staging shared by surface worlds. This is not movement. */
+export async function stageSurfaceVehicleCommand(input: {
+  commandId: string
+  actorProfileId: string
+  vehicleId: string
+  targetInventoryId: string
+}): Promise<SurfaceVehicleStagingResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_stage_surface_vehicle', {
+    p_command_id: input.commandId,
+    p_actor_profile_id: input.actorProfileId,
+    p_vehicle_instance_id: input.vehicleId,
+    p_target_inventory_id: input.targetInventoryId,
+  })
+  if (error) throw coreError('noxia_stage_surface_vehicle', error)
+  return data as unknown as SurfaceVehicleStagingResult
 }
