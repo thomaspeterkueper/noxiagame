@@ -6,6 +6,7 @@ import { getToken } from '@/lib/supabase/auth'
 type ShuttlePayload={
   shuttle?:{
     ship?:{id:string;name:string;ship_type_id:string;location:string;status:string;cargo_max:number}
+    vehicle?:{id:string;frame_id:string;label:string;status:string;current_node_inventory_id:string|null}
     article?:{
       engineering_frame_id:string
       engineering_authority_ref:string
@@ -18,7 +19,9 @@ type ShuttlePayload={
       mission_equipment_mass_resolved:boolean
       target_plane_resolved:boolean
     }
-    inventory?:{id:string;label:string;capacity:number|null}
+    inventory?:{id:string;label:string;capacity:number|null;totalAmount?:number;items?:Array<{resource:string;label?:string;unit?:string;amount:number;available?:number}>}
+    surfacePort?:{id:string;label:string;capacity:number|null;totalAmount?:number;items?:Array<{resource:string;label?:string;unit?:string;amount:number;available?:number}>}
+    orbitalInterface?:{id:string;label:string;capacity:number|null;totalAmount?:number;items?:Array<{resource:string;label?:string;unit?:string;amount:number;available?:number}>}
   }|null
   error?:string
 }
@@ -36,6 +39,8 @@ export default function MoonAscentShuttlePanel(){
   const [shuttle,setShuttle]=useState<ShuttlePayload['shuttle']>(null)
   const [readiness,setReadiness]=useState<ReadinessPayload|null>(null)
   const [busy,setBusy]=useState(false)
+  const [cargoResource,setCargoResource]=useState('metal')
+  const [cargoAmount,setCargoAmount]=useState(1)
   const [message,setMessage]=useState<string|null>(null)
 
   async function authHeaders(){
@@ -66,23 +71,40 @@ export default function MoonAscentShuttlePanel(){
 
   useEffect(()=>{void load()},[])
 
-  async function action(kind:'provision'|'board'){
+  async function action(kind:'provision'|'board'|'stage'|'load'|'unload'){
     setBusy(true);setMessage(null)
     try{
       const headers=await authHeaders()
       const shipId=shuttle?.ship?.id
-      const url=kind==='provision'?'/api/game/moon/ascent-shuttle':'/api/game/ascent/crew'
-      const body=kind==='provision'?{action:'provision'}:{action:'board-self',shipId}
+      const url=kind==='board'?'/api/game/ascent/crew':'/api/game/moon/ascent-shuttle'
+      const body=kind==='provision'
+        ? {action:'provision'}
+        : kind==='board'
+          ? {action:'board-self',shipId}
+          : kind==='stage'
+            ? {action:'stage-surface-port',portInventoryId:shuttle?.surfacePort?.id}
+            : {action:'surface-transfer',portInventoryId:shuttle?.surfacePort?.id,resource:cargoResource,amount:cargoAmount,direction:kind==='load'?'port-to-shuttle':'shuttle-to-port'}
       const r=await fetch(url,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(body)})
       const p=await r.json() as {ok?:boolean;error?:string}
       if(!r.ok||!p.ok) throw new Error(p.error??'Aktion fehlgeschlagen')
-      setMessage(kind==='provision'?'Lunar Ascent Shuttle Mk.I wurde als reales Flight Article angelegt.':'Du bist als Commander/Pilot an Bord.')
+      setMessage(
+        kind==='provision'?'Lunar Ascent Shuttle Mk.I wurde als reales Flight Article angelegt.'
+          : kind==='board'?'Du bist als Commander/Pilot an Bord.'
+            : kind==='stage'?'Shuttle wurde physisch am Shuttle-Port bereitgestellt.'
+              : kind==='load'?'Cargo wurde explizit vom Shuttle-Port ins Shuttle übertragen.'
+                :'Cargo wurde explizit zurück ins Shuttle-Port-Lager übertragen.'
+      )
       await load()
     }catch(error){setMessage(error instanceof Error?error.message:String(error))}
     finally{setBusy(false)}
   }
 
   const article=shuttle?.article
+  const stagedAtPort=Boolean(shuttle?.surfacePort?.id&&shuttle?.vehicle?.current_node_inventory_id===shuttle.surfacePort.id)
+  const portItems=shuttle?.surfacePort?.items??[]
+  const shipItems=shuttle?.inventory?.items??[]
+  const portAvailable=Number(portItems.find(item=>item.resource===cargoResource)?.available??0)
+  const shipAvailable=Number(shipItems.find(item=>item.resource===cargoResource)?.available??0)
   const evidence=readiness?.evidence??{}
   const unresolved=[
     article?.actual_start_mass_kg==null?'Startmasse':null,
@@ -101,11 +123,19 @@ export default function MoonAscentShuttlePanel(){
         <div><b>{readiness?.crew?.boarded?'Crew an Bord':'Crew nicht an Bord'}</b><span>{readiness?.crew?.role??'—'}</span></div>
       </div>
       {!readiness?.crew?.boarded&&<button onClick={()=>void action('board')} disabled={busy}>Als Commander an Bord gehen</button>}
+      <div className="handover">
+        <div><b>Surface Handover</b><span>{shuttle.surfacePort?.label??'Shuttle-Port-Lager unresolved'} · {stagedAtPort?'Shuttle bereitgestellt':'Shuttle nicht am Port'}</span></div>
+        {!stagedAtPort&&shuttle.surfacePort?.id&&<button onClick={()=>void action('stage')} disabled={busy}>Shuttle am Port bereitstellen</button>}
+        <select value={cargoResource} onChange={e=>setCargoResource(e.currentTarget.value)}><option value="metal">Metall</option><option value="water">Wasser</option><option value="energy">Energie</option><option value="components">Bauteile</option></select>
+        <input type="number" min={1} value={cargoAmount} onChange={e=>setCargoAmount(Math.max(1,Math.floor(Number(e.currentTarget.value)||1)))}/>
+        <button onClick={()=>void action('load')} disabled={busy||!stagedAtPort||portAvailable<cargoAmount}>Port → Shuttle ({portAvailable})</button>
+        <button onClick={()=>void action('unload')} disabled={busy||!stagedAtPort||shipAvailable<cargoAmount}>Shuttle → Port ({shipAvailable})</button>
+      </div>
       <div className="facts">
         <span>Startmasse: {article?.actual_start_mass_kg??'unresolved'} kg</span>
         <span>Crew/Cargo/Equipment: {article?.crew_cargo_mission_equipment_kg??'unresolved'} kg</span>
         <span>Propellant: {article?.usable_ascent_propellant_kg??'unresolved'} kg</span>
-        <span>Cargo: {readiness?.cargo?.empty?'leer / 0 kg':'nicht leer'}</span>
+        <span>Cargo: {readiness?.cargo?.empty?'leer / 0 kg':'nicht leer'} · Ship {shuttle.inventory?.totalAmount??0} / Port {shuttle.surfacePort?.totalAmount??0}</span>
       </div>
       {unresolved.length>0&&<div className="warning"><b>Physischer Missionszustand fehlt</b><span>{unresolved.join(' · ')}</span><p>Engineering ist freigegeben; NOXIA erfindet diese Werte nicht. Erst ein konkreter Mass-/Propellant-/Plane-Resolver darf den Flight Article auf startbereit setzen.</p></div>}
       <div className="evidence">{Object.entries(evidence).map(([key,value])=><span key={key} data-state={value}>{key}: {value}</span>)}</div>
@@ -117,7 +147,7 @@ export default function MoonAscentShuttlePanel(){
       button{border:1px solid #465b66;background:#13222a;color:#dbe5e9;padding:8px 12px;border-radius:8px;cursor:pointer}.primary{background:#5d4d2b;border-color:#8b7340;color:#f4dfaa}button:disabled{opacity:.45}
       .provision{margin-top:12px;padding:12px;background:#151f24;border:1px dashed #45545d;border-radius:10px}.provision p,.warning p{margin:4px 0 0;color:#929fa6;font-size:11px}
       .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.grid div,.facts{background:#101e26;border:1px solid #2a3c46;border-radius:9px;padding:9px}.grid b{display:block;font-size:12px}.grid span,.facts span{font-size:10px;color:#93a2aa}
-      .facts{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}.warning{margin-top:10px;padding:10px;border:1px solid #665938;background:#221f16;border-radius:9px}.warning span{display:block;color:#d7bd7a;font-size:11px;margin-top:4px}
+      .facts{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}.handover{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px;background:#101e26;border:1px solid #2a3c46;border-radius:9px}.handover div{display:grid;margin-right:auto}.handover b{font-size:11px}.handover span{font-size:10px;color:#93a2aa}.handover select,.handover input{background:#091117;color:#e8edf0;border:1px solid #344852;border-radius:7px;padding:7px}.handover input{width:70px}.warning{margin-top:10px;padding:10px;border:1px solid #665938;background:#221f16;border-radius:9px}.warning span{display:block;color:#d7bd7a;font-size:11px;margin-top:4px}
       .evidence{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.evidence span{font:10px monospace;padding:3px 6px;border:1px solid #40505a;border-radius:12px}.evidence span[data-state="ready"]{color:#83c99a;border-color:#315a4a}.evidence span[data-state="blocked"]{color:#e38b83;border-color:#684247}.message{color:#cbd8de;font-size:11px}
       @media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.provision{align-items:start;flex-direction:column}}
     `}</style>
