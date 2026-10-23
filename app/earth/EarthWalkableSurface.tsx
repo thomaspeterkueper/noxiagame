@@ -9,7 +9,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import { EARTH_LOCAL_ENRICHMENT_PROFILE, buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
-import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, resolveLocalSceneStep, routeAcrossLocalScene } from '@/lib/game/spatial/localSceneRuntime'
+import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, isLocalScenePointWalkable, nearestWalkableLocalScenePoint, resolveLocalSceneStep, routeAcrossLocalScene } from '@/lib/game/spatial/localSceneRuntime'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
@@ -260,6 +260,21 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   },[data?.region,origin,playerGeo,playerRegionId,player,setSharedPlayerPosition,viewDecided])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
+  // Reconcile a persisted WGS84 position only after the final scene geometry arrives.
+  const lastSpawnCheck=useRef('')
+  useEffect(()=>{
+    if(!scene||!origin||!viewDecided||detailStatus==='loading'||!playerGeo)return
+    const local=geoToLocalMeters(playerGeo,origin)
+    const current={xM:local.eastM,yM:local.northM}
+    if(isLocalScenePointWalkable(scene,current))return
+    const key=`${origin.lat}:${origin.lon}:${playerGeo.lat}:${playerGeo.lon}:${scene.buildings.length}`
+    if(lastSpawnCheck.current===key)return
+    lastSpawnCheck.current=key
+    const safe=nearestWalkableLocalScenePoint(scene,current)
+    if(safe&&Math.hypot(safe.xM-current.xM,safe.yM-current.yM)>0.01){
+      setSharedPlayerPosition((data?.region as any)?.id??null,safe,localMetersToGeo({eastM:safe.xM,northM:safe.yM},origin))
+    }
+  },[scene,origin,viewDecided,detailStatus,playerGeo,data?.region,setSharedPlayerPosition])
   const namedPoiTargets=useMemo(()=>origin?features.flatMap(feature=>{
     if(feature.geometry.kind!=='point'||!feature.properties?.name)return[]
     const point=feature.geometry.coordinates as GeoPoint
@@ -634,6 +649,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }finally{setSending(false)}
   }
 
+  if(detailStatus==='loading')return <div className="earth-walkable-loading">Gebäude, Wege und Gewässer dieses Ortes werden geladen …</div>
   if(!data)return <div className="earth-walkable-loading">{detailStatus==='loading'?'Gebäude, Wege und Gewässer dieses Ortes werden geladen …':'Lokale Earth-Szene wird aufgebaut …'}</div>
   if(!data.ok||!scene)return <div className="earth-walkable-loading">Earth-Szene nicht verfügbar: {data.error??'keine Region'}</div>
   // Steht die Spielfigur vom letzten Besuch weit vom Mittelpunkt dieser ersten

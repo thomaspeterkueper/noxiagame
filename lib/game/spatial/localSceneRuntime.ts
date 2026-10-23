@@ -299,6 +299,20 @@ export function isLocalScenePointWalkable(scene: LocalSurfaceScene, point: Local
   return !scene.buildings.some(building => building.provenance !== 'derived' && pointBlockedByBuilding(point, building, clearanceM))
 }
 
+/** Find a nearby safe spawn after geographic scene data changes. Never move a valid actor. */
+export function nearestWalkableLocalScenePoint(scene: LocalSurfaceScene, current: LocalSurfacePoint, maxRadiusM = 32): LocalSurfacePoint | null {
+  if (isLocalScenePointWalkable(scene, current)) return current
+  for (let radius = 1; radius <= maxRadiusM; radius += 1) {
+    const count = Math.max(16, Math.ceil(2 * Math.PI * radius / 1.5))
+    for (let i = 0; i < count; i++) {
+      const angle = 2 * Math.PI * i / count
+      const candidate = { xM: current.xM + radius * Math.cos(angle), yM: current.yM + radius * Math.sin(angle) }
+      if (isLocalScenePointWalkable(scene, candidate)) return candidate
+    }
+  }
+  return null
+}
+
 /**
  * Resolves one player/NPC step against the same scene geometry on every body.
  * If a diagonal move clips a footprint, axis sliding is attempted before the
