@@ -5,6 +5,8 @@
 // cargo and transport jobs. This module only defines how the Moon domain interprets
 // terrain-derived route metrics and which surface logistics roles must exist.
 
+import { resolveMoonSurfaceEngineeringEntry } from './moonSurfaceEngineering'
+
 export type MoonSurfaceRouteClass = 'offroad' | 'prepared-track' | 'hardened-road'
 export type MoonSurfaceVehicleRole = 'cargo-rover' | 'heavy-hauler'
 
@@ -103,8 +105,9 @@ export function deriveMoonRouteMetrics(samples: readonly MoonTerrainProfileSampl
 }
 
 export interface MoonVehicleMobilityEnvelope {
-  /** Role only; mass, payload and engineering identity remain outside this module. */
   role: MoonSurfaceVehicleRole
+  /** Exact Engineering frame identity when one is available. Unknown/test frames remain supported fail-safe. */
+  frameId?: string
   /** Safe longitudinal slope for the current vehicle/load state, supplied by Engineering/Core mapping. */
   safeLongitudinalSlopeDeg: number
 }
@@ -124,7 +127,10 @@ export interface MoonRouteAssessment {
   speedMultiplier: number
   /** Relative traction/rolling/terrain energy burden; not an absolute kWh value. */
   energyMultiplier: number
+  /** Relative wear burden from the Engineering route-class envelope, or neutral fallback. */
+  wearMultiplier: number
   allowedSlopeDeg: number
+  engineeringSourceId: string | null
 }
 
 interface RouteClassPolicy {
@@ -136,9 +142,9 @@ interface RouteClassPolicy {
 }
 
 /**
- * Provisional gameplay coefficients, deliberately dimensionless. They express the
- * ordering between route classes without pretending to be engineering vehicle data.
- * Replace/tune them when KUEPER Engineering returns validated mobility envelopes.
+ * Fallback gameplay coefficients for unresolved/test vehicle frames. Canonical
+ * lunar Engineering frames use their exact route-class speed/energy/wear anchors;
+ * these values remain only for callers that deliberately have no Engineering id.
  */
 export const MOON_ROUTE_CLASS_POLICY: Readonly<Record<MoonSurfaceRouteClass, RouteClassPolicy>> = {
   offroad: {
@@ -187,18 +193,33 @@ export function assessMoonSurfaceRoute(input: MoonRouteAssessmentInput): MoonRou
   }
 
   const policy = MOON_ROUTE_CLASS_POLICY[routeClass]
+  const engineering = vehicle.frameId
+    ? resolveMoonSurfaceEngineeringEntry(vehicle.frameId)
+    : null
+  const engineeringRoute = engineering?.routeClasses[routeClass]
+  const engineeringReferenceSpeedKph = engineering?.frame.surfaceMobility?.referenceSpeedKph
+
   const roughness = clamp01(input.roughness01 ?? 0)
-  const allowedSlopeDeg = vehicle.safeLongitudinalSlopeDeg * policy.usableSlopeFraction
+  const engineeringSafeSlopeDeg = engineering?.frame.surfaceMobility?.safeLongitudinalSlopeDeg
+  const allowedSlopeDeg = engineering && engineeringSafeSlopeDeg != null
+    ? Math.min(vehicle.safeLongitudinalSlopeDeg, engineeringSafeSlopeDeg)
+    : vehicle.safeLongitudinalSlopeDeg * policy.usableSlopeFraction
   const passable = metrics.maxAbsSlopeDeg <= allowedSlopeDeg
   const slopeRatio = allowedSlopeDeg > 0 ? Math.min(1.5, metrics.meanAbsSlopeDeg / allowedSlopeDeg) : 1.5
 
+  const baseSpeedFactor = engineeringRoute && engineeringReferenceSpeedKph
+    ? engineeringRoute.referenceSpeedKph / engineeringReferenceSpeedKph
+    : policy.speedFactor
+  const baseEnergyFactor = engineeringRoute?.energyFactor ?? policy.energyFactor
+  const wearMultiplier = engineeringRoute?.wearFactor ?? 1
+
   const speedMultiplier = Math.max(
     0.08,
-    policy.speedFactor
+    baseSpeedFactor
       * (1 - roughness * policy.roughnessSpeedPenalty)
       * (1 - Math.min(0.7, slopeRatio * 0.5)),
   )
-  const energyMultiplier = policy.energyFactor
+  const energyMultiplier = baseEnergyFactor
     * (1 + roughness * policy.roughnessEnergyPenalty)
     * (1 + slopeRatio * 0.8)
 
@@ -207,7 +228,9 @@ export function assessMoonSurfaceRoute(input: MoonRouteAssessmentInput): MoonRou
     reason: passable ? 'ok' : 'slope-limit',
     speedMultiplier,
     energyMultiplier,
+    wearMultiplier,
     allowedSlopeDeg,
+    engineeringSourceId: engineering?.sourceId ?? null,
   }
 }
 
