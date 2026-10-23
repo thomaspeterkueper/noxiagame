@@ -7,6 +7,8 @@ on:
       - 'lib/game/resourceScanning.ts'
       - 'lib/game/vehicles/surveyPlatforms.ts'
       - 'lib/game/vehicles/surveyPlatforms.test.ts'
+      - 'lib/game/vehicles/vexSeries.ts'
+      - 'lib/game/vehicles/vexSeries.test.ts'
       - '.github/workflows/survey-domain.yml'
   push:
     branches: [main]
@@ -15,6 +17,8 @@ on:
       - 'lib/game/resourceScanning.ts'
       - 'lib/game/vehicles/surveyPlatforms.ts'
       - 'lib/game/vehicles/surveyPlatforms.test.ts'
+      - 'lib/game/vehicles/vexSeries.ts'
+      - 'lib/game/vehicles/vexSeries.test.ts'
       - '.github/workflows/survey-domain.yml'
 
 jobs:
@@ -34,5 +38,6 @@ jobs:
       - name: Validate survey platform contract
         run: |
           rm -rf .survey-test
-          pnpm exec tsc lib/game/vehicles/surveyPlatforms.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .survey-test
+          pnpm exec tsc lib/game/vehicles/surveyPlatforms.test.ts lib/game/vehicles/vexSeries.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .survey-test
           node .survey-test/game/vehicles/surveyPlatforms.test.js
+          node .survey-test/game/vehicles/vexSeries.test.js
