@@ -16,12 +16,14 @@ async function snapshot(profileId:string){
     .select('ship_id,vehicle_instance_id,created_at').eq('owner_profile_id',profileId).maybeSingle()
   if(error) throw error
   if(!slot) return null
-  const [{data:ship,error:shipError},{data:article,error:articleError}]=await Promise.all([
+  const [{data:ship,error:shipError},{data:article,error:articleError},{data:vehicle,error:vehicleError}]=await Promise.all([
     sb.from('ships').select('id,name,ship_type_id,location,status,cargo_max,is_active').eq('id',slot.ship_id).maybeSingle(),
     sb.from('spacecraft_flight_articles').select('*').eq('ship_id',slot.ship_id).maybeSingle(),
+    sb.from('vehicle_instances').select('id,frame_id,label,status,current_node_inventory_id,location_id').eq('id',slot.vehicle_instance_id).maybeSingle(),
   ])
   if(shipError) throw shipError
   if(articleError) throw articleError
+  if(vehicleError) throw vehicleError
   const {data:inventory,error:inventoryError}=await sb.from('logistics_inventories')
     .select('id,label,capacity,metadata').eq('storage_kind','ship_cargo').eq('subject_type','ship').eq('subject_id',slot.ship_id).maybeSingle()
   if(inventoryError) throw inventoryError
@@ -46,7 +48,7 @@ async function snapshot(profileId:string){
   if(shipCargo.error) throw shipCargo.error
   if(surfaceCargo.error) throw surfaceCargo.error
   if(orbitalCargo.error) throw orbitalCargo.error
-  return {slot,ship,article,inventory:shipCargo.data??inventory,surfacePort:surfaceCargo.data??surfacePort,orbitalInterface:orbitalCargo.data??orbitalInterface}
+  return {slot,ship,vehicle,article,inventory:shipCargo.data??inventory,surfacePort:surfaceCargo.data??surfacePort,orbitalInterface:orbitalCargo.data??orbitalInterface}
 }
 
 export async function GET(req:NextRequest){
