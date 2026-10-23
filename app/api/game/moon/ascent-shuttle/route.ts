@@ -25,10 +25,12 @@ async function snapshot(profileId:string){
   const {data:inventory,error:inventoryError}=await sb.from('logistics_inventories')
     .select('id,label,capacity,metadata').eq('storage_kind','ship_cargo').eq('subject_type','ship').eq('subject_id',slot.ship_id).maybeSingle()
   if(inventoryError) throw inventoryError
+  const {data:moonLocation,error:moonLocationError}=await sb.from('locations').select('id').eq('slug','moon').single()
+  if(moonLocationError) throw moonLocationError
   const [{data:surfacePort,error:surfacePortError},{data:orbitalInterface,error:orbitalError}]=await Promise.all([
     sb.from('logistics_inventories')
       .select('id,label,inventory_kind,subject_type,metadata')
-      .eq('location_id',article?.departure_site_ref ? article.departure_site_ref : ship ? (await sb.from('locations').select('id').eq('slug','moon').single()).data?.id : '')
+      .eq('location_id',moonLocation.id)
       .eq('inventory_kind','surface_port').eq('label','Shuttle-Port-Lager').eq('active',true).limit(1).maybeSingle(),
     sb.from('logistics_inventories')
       .select('id,label,inventory_kind,subject_type,metadata')
