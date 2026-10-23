@@ -18,11 +18,13 @@ export type PersistedSpacecraftFlightArticle = {
   crew_cargo_mission_equipment_kg: number | null
   usable_ascent_propellant_kg: number | null
   propellant_state_ref: string | null
+  high_lift_state_ref: string | null
   departure_site_ref: string | null
   departure_site_class: string | null
   release_speed_m_s: number | null
   target_plane_ref: string | null
   target_plane_resolved: boolean
+  target_inclination_deg: number | null
   state_status: 'configured' | 'measured' | 'ready' | 'retired'
   provenance: Record<string, unknown>
   created_at: string
@@ -94,9 +96,11 @@ export function flightArticlePhysicalState(
     cargoMassResolved: article.cargo_mass_resolved,
     missionEquipmentMassResolved: article.mission_equipment_mass_resolved,
     propellantStateRef: article.propellant_state_ref,
+    highLiftStateRef: article.high_lift_state_ref,
     departureSiteClass: article.departure_site_class,
     releaseSpeedMS: article.release_speed_m_s == null ? null : Number(article.release_speed_m_s),
     targetPlaneResolved: article.target_plane_resolved,
+    targetInclinationDeg: article.target_inclination_deg == null ? null : Number(article.target_inclination_deg),
   }
 }
 
