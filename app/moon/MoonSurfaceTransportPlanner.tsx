@@ -96,6 +96,8 @@ export default function MoonSurfaceTransportPlanner() {
   const [cargoReadiness, setCargoReadiness] = useState<CargoReadinessPayload | null>(null)
   const [checkingCargo, setCheckingCargo] = useState(false)
   const [provisioning, setProvisioning] = useState(false)
+  const [staging, setStaging] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -159,9 +161,80 @@ export default function MoonSurfaceTransportPlanner() {
     }
   }
 
+  async function stageVehicleAtSource() {
+    if (!vehicleId || !sourceId || staging) return
+    setStaging(true)
+    setMessage(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const response = await fetch('/api/game/vehicles', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'stage-surface-vehicle',
+          commandId: crypto.randomUUID(),
+          vehicleId,
+          targetInventoryId: sourceId,
+        }),
+      })
+      const payload = await response.json() as { ok?: boolean; error?: string }
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Fahrzeug konnte nicht an der Quelle bereitgestellt werden')
+      setMessage('Fahrzeug wurde am Quellknoten bereitgestellt. Das ist nur Staging, keine Fahrt.')
+      await loadCore(vehicleId)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setStaging(false)
+    }
+  }
+
+  async function startSurfaceMission() {
+    if (!vehicleId || !sourceId || !destinationId || !resource || starting) return
+    setStarting(true)
+    setMessage(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const response = await fetch('/api/game/moon/surface-transport/mission', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          sourceInventoryId: sourceId,
+          destinationInventoryId: destinationId,
+          vehicleId,
+          resource,
+          amount,
+        }),
+      })
+      const payload = await response.json() as {
+        ok?: boolean
+        error?: string
+        code?: string
+        job?: { id?: string; arrives_at?: string | null }
+        draft?: { metrics?: { distanceM?: number; maxAbsSlopeDeg?: number }; estimate?: { etaSeconds?: number | null; energyRequired?: number | null } }
+      }
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? payload.code ?? 'Moon-Surface-Mission konnte nicht gestartet werden')
+      const distanceM = payload.draft?.metrics?.distanceM
+      const etaSeconds = payload.draft?.estimate?.etaSeconds
+      setMessage(
+        `Transport gestartet${distanceM != null ? ` · ${Math.round(distanceM)} m` : ''}${etaSeconds != null ? ` · ETA ${etaSeconds} s` : ''}. Fracht wurde vom Quellknoten ins Rover-Inventar geladen.`
+      )
+      await loadCore(vehicleId)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setStarting(false)
+    }
+  }
+
   useEffect(() => { void loadCore() }, [])
 
-  const nodeInventories = useMemo(() => inventories.filter(item => item.inventory_kind !== 'vehicle'), [inventories])
+  const nodeInventories = useMemo(
+    () => inventories.filter(item => item.inventory_kind !== 'vehicle' && item.subject_type === 'tile_entity'),
+    [inventories],
+  )
   const vehicleInventoryByVehicleId = useMemo(() => new Map(inventories
     .filter(item => item.inventory_kind === 'vehicle' && item.subject_id)
     .map(item => [item.subject_id as string, item.id])), [inventories])
@@ -273,12 +346,15 @@ export default function MoonSurfaceTransportPlanner() {
   else if (!selectedVehicle) blocker = 'Kein reales Moon-Surface-Fahrzeug ausgewählt.'
   else if (!selectedVehicleInventoryId) blocker = 'Das Cargo-Inventar des ausgewählten Fahrzeugs ist im Core noch nicht aufgelöst.'
   else if (!vehicleReady) blocker = 'Das ausgewählte Fahrzeug ist nicht bereit oder bereits einem aktiven Transport zugewiesen.'
-  else if (!vehicleAtSource) blocker = 'Das Fahrzeug befindet sich laut Core nicht am gewählten Quellknoten.'
   else if (checkingReadiness) blocker = 'Engineering-Frame wird geprüft …'
   else if (!readiness?.ready) blocker = readiness?.reason
     ? `${readiness.error ?? 'Surface-Profil nicht aufgelöst'} (${readiness.reason})`
     : readiness?.error ?? 'Für diesen Fahrzeug-Frame fehlen kanonische Moon-Surface-Engineeringwerte.'
-  else blocker = 'Frachtmasse und Engineering-Frame sind freigegeben; als letzter Schritt fehlt die LOLA-Routenauflösung zum Core-routeSnapshot.'
+  else if (!vehicleAtSource) blocker = 'Fahrzeug muss vor dem Start explizit am Quellknoten bereitgestellt werden.'
+  else blocker = null
+
+  const canStage = Boolean(source && selectedVehicle && vehicleReady && !vehicleAtSource && !staging && !starting)
+  const canStart = !blocker && !starting && !staging
 
   return <section className="planner">
     <header>
@@ -326,6 +402,7 @@ export default function MoonSurfaceTransportPlanner() {
           <span>Condition: {Math.round(selectedVehicle.condition * 100)}%</span>
           <span>Wear: {Math.round(selectedVehicle.wear * 100)}%</span>
           <span>Am Quellknoten: {vehicleAtSource ? 'ja' : 'nein'}</span>
+          {canStage && <button onClick={() => void stageVehicleAtSource()} disabled={staging}>{staging ? 'Staging …' : 'An Quelle bereitstellen'}</button>}
           <span>Engineering: {checkingReadiness ? 'prüft …' : readiness?.ready ? 'freigegeben' : readiness?.reason ?? readiness?.code ?? 'unresolved'}</span>
         </div> : <div className="notice"><b>Kein Fahrzeug gewählt</b><span>Ein vorhandener Core-Rover kann ausgewählt werden. Falls noch keiner existiert, kann der Starter-Rover oben einmalig provisioniert werden.</span></div>}
       </div>
@@ -333,8 +410,8 @@ export default function MoonSurfaceTransportPlanner() {
 
     <div className="gate">
       <div><small>STARTFREIGABE</small><strong>{blocker ? 'BLOCKIERT' : 'BEREIT'}</strong></div>
-      <p>{blocker ?? 'Alle Voraussetzungen erfüllt.'}</p>
-      <button className="primary" disabled>Transportjob anlegen</button>
+      <p>{blocker ?? 'Frachtmasse und Engineering sind freigegeben. Die LOLA-Route wird beim Start serverseitig neu gesampelt und muss die Steigungs-, Energie- und Wear-Gates bestehen.'}</p>
+      <button className="primary" disabled={!canStart} onClick={() => void startSurfaceMission()}>{starting ? 'Route wird geprüft …' : 'Transportjob anlegen'}</button>
     </div>
 
     <style jsx>{`
