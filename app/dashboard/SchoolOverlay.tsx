@@ -13,6 +13,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
+import AcademyHome from './AcademyHome'
 import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
 import { unlockLabel, type SsfUnlock } from '@/lib/ssfKnowledge'
 
@@ -439,7 +440,7 @@ function KursListe({ onSelect, jwt }: { onSelect: (id: string) => void; jwt: () 
 }
 
 export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned, canSell, onSellClick }: SchoolOverlayProps) {
-  const [tab, setTab]               = useState<'akademie' | 'kurse' | 'module' | 'ssf' | 'handbuch'>('akademie')
+  const [tab, setTab]               = useState<'wissen' | 'akademie' | 'kurse' | 'module' | 'ssf' | 'handbuch'>('wissen')
   const [completedModules, setCompleted] = useState<string[]>([])
   const [moduleLoading, setModuleLoading] = useState(false)
   const [activeKursId, setActiveKursId] = useState<string | null>(null)
@@ -477,13 +478,17 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
 
   useEffect(() => {
     loadKnowledge()
-    loadKnowledgeLevel().then(lvl => generateTask(lvl))
+    loadKnowledgeLevel()
     loadCompletedModules()
     fetch('/api/ssf/modules').then(r => r.json()).then((d: unknown) => {
       const list = Array.isArray(d) ? d : ((d as Record<string,unknown>).modules ?? [])
       setSsfModules(list as SsfModule[])
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (tab === 'akademie' && !task && !loading) void generateTask()
+  }, [tab])
 
   useEffect(() => {
     if (task?.kind === 'calc' && !loading && result === null)
@@ -644,9 +649,9 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
         <div style={{ width: '40%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ padding: '0.9rem 1.5rem 0', borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end' }}>
-              {(['akademie', 'kurse', 'module', 'ssf', 'handbuch'] as const).map(t => (
+              {(['wissen', 'akademie', 'kurse', 'module', 'ssf', 'handbuch'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{ padding: '0.5rem 1.25rem', border: `1px solid ${tab === t ? C.border : 'transparent'}`, borderBottom: tab === t ? `1px solid ${C.bg}` : `1px solid ${C.border}`, borderRadius: '6px 6px 0 0', cursor: 'pointer', fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, background: tab === t ? C.bg : C.bgAlt, color: tab === t ? C.accent : C.textMuted }}>
-                  {t === 'akademie' ? 'Aufgaben' : t === 'kurse' ? 'Kurse' : t === 'module' ? 'Module' : t === 'ssf' ? 'SSF' : 'Handbuch'}
+                  {t === 'wissen' ? 'Mein Wissen' : t === 'akademie' ? 'Aufgaben' : t === 'kurse' ? 'Kurse' : t === 'module' ? 'Module' : t === 'ssf' ? 'SSF' : 'Handbuch'}
                 </button>
               ))}
               <div style={{ marginLeft: 'auto', paddingBottom: '0.5rem' }}>
@@ -655,6 +660,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
             </div>
           </div>
 
+          {tab === 'wissen' && <AcademyHome modules={ssfModules} completedModules={completedModules} onBrowse={() => setTab('ssf')} onTasks={() => setTab('akademie')} onCourses={() => setTab('kurse')} />}
           {tab === 'kurse' && (
             <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const }}>
               {activeKursId ? (
