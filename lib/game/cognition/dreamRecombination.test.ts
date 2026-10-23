@@ -1,5 +1,5 @@
 import { createNpcMemory, type NpcMemoryState } from './npcRelationalMemory'
-import { recombineDuringDream } from './dreamRecombination'
+import { abstractMotifKeys, recombineDuringDream, selectDreamSourceMotifs } from './dreamRecombination'
 import type { SensoryPattern } from './sensoryPatternLearning'
 
 let failures = 0
@@ -81,6 +81,8 @@ const result = recombineDuringDream({
   maxCandidates: 6,
 })
 
+check(result.candidates.every(candidate => candidate.motifs.length <= 12), 'memory recombination keeps its original twelve-motif cap')
+check(result.candidates.every(candidate => Array.isArray(candidate.sourceIds)), 'sourceIds always present')
 check(result.candidates.length > 0, 'dream can generate bounded association candidates')
 check(result.candidates.every(candidate => candidate.canonical === false), 'dream associations are never canonical truth')
 check(result.candidates.every(candidate => candidate.provenance === 'dream_recombination'), 'dream provenance is explicit')
@@ -88,8 +90,35 @@ check(result.candidates.some(candidate => candidate.sourcePatternKeys.includes(p
 check(!result.candidates.some(candidate =>
   candidate.sourceMemoryIds.includes(first.memory.id) && candidate.sourceMemoryIds.includes(copied.memory.id),
 ), 'derived copy is not treated as independent novelty')
+check(result.candidates.every(candidate => candidate.motifs.every(motif => motif.split(/\s+/).length < 8)), 'dream motifs never contain eight-word prose spans')
+check(result.candidates.every(candidate => candidate.motifs.every(motif => motif.length <= 48)), 'dream motif keys stay bounded')
 check(state.memories.length === 3, 'dream recombination does not create new memories')
 check(state.traces.length === 3, 'dream recombination does not mutate provenance graph')
 
+const impulseInput = {
+  npcId: 'child', atTick: 100, motifKeys: ['bridge'],
+  sources: [
+    { id: 'related', motifs: ['bridge'] },
+    { id: 'unexpected', motifs: ['ocean'] },
+  ],
+  limit: 2,
+}
+check(JSON.stringify(selectDreamSourceMotifs(impulseInput)) ===
+  JSON.stringify([{ id: 'related', kind: 'related' }]), 'unrelated impulse is excluded by default')
+check(JSON.stringify(selectDreamSourceMotifs({ ...impulseInput, allowForeignImpulse: true })) ===
+  JSON.stringify([{ id: 'related', kind: 'related' }, { id: 'unexpected', kind: 'foreign-impulse' }]),
+  'optional foreign impulse is explicitly marked')
+check(selectDreamSourceMotifs({ ...impulseInput, limit: 1, allowForeignImpulse: true }).length === 1,
+  'foreign impulse never exceeds the source budget')
+check(selectDreamSourceMotifs({ ...impulseInput, motifKeys: ['unmatched'] }).length === 0,
+  'unrelated sources never enter unmarked')
+
+check(abstractMotifKeys('I repaired a bridge').filter(key =>
+  abstractMotifKeys('bridge repair').includes(key)).length >= 2,
+  'English repair inflections match')
+check(abstractMotifKeys('Reparatur reparieren').filter(key => key === 'repar').length === 1,
+  'German repair variants share one key')
+check(!abstractMotifKeys('Die Brücke und der Fluss').includes('und'),
+  'German stopwords are excluded')
 if (failures) throw new Error(String(failures) + ' dream recombination test(s) failed')
 console.log('Dream recombination v0.1: tests passed; canonical_outputs=0; memory_writes=0; external_llm_calls=0')
