@@ -413,4 +413,21 @@ Für den Request bleiben vor allem folgende Punkte offen:
    - bestehende gemeinsame Handover-/Multi-Leg-Semantik verwenden,
    - kein intersolares Schiff direkt am planetaren Shuttle-Port.
 
-Der manuelle Earth-Transportpfad ist damit für autoritativ massenauflösbare Güter technisch bis zum atomaren Core-Start geschlossen. Der Request bleibt `open`, weil Kartenintegration, automatische Regeln und weitere konkrete Commodity-Abbildungen noch ausstehen.
+Der manuelle Earth-Transportpfad ist damit für autoritativ massenauflösbare Güter technisch bis zum atomaren Core-Start geschlossen.
+
+### PR #518 – Logistik in die kanonische Earth-Karte integriert
+
+Die zuvor separat gerenderte `EarthSurfaceLiveMap` wird auf `/earth` nicht mehr angezeigt. Stattdessen besitzt `EarthRegionPreview` jetzt einen schaltbaren Layer `Surface-Logistik`:
+
+- persistierte `route_snapshot.geometry` wird mit dem ebenfalls persistierten `earthSpatialOrigin` exakt in die vorhandene Earth-Projektion überführt,
+- Start und Ziel der persistierten Route sind sichtbar,
+- der Fahrzeugfortschritt verwendet ausschließlich `deriveSurfaceMissionProgress` und `pointAlongSurfaceRoute`,
+- es gibt keine zweite Tick-, Bewegungs- oder Positions-State-Machine,
+- fehlende Route-Geometrie wird nicht durch eine erfundene Ersatzroute ersetzt,
+- die separate Logistikkarte ist aus der aktiven Earth-Seitenkomposition entfernt.
+
+Merge: `4422eb41f328dc2d7e2631e42ca46e5d5a3007eb`.
+
+Die segmentweise Unterscheidung Straße/Offroad ist noch nicht dargestellt, weil diese Klassifikation derzeit nicht autoritativ im persistierten RouteSnapshot steckt. Sie wird nicht aus der Gesamt-Polyline zurückgeraten.
+
+Der Request bleibt `open`. Nach dem manuellen Transport und der kanonischen Kartenintegration verbleiben insbesondere automatische Transportregeln, der Surface-Port-Handover in der Earth-UX sowie weitere konkrete Commodity-Abbildungen.
