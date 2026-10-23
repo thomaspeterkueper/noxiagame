@@ -61,6 +61,16 @@ const SHIP_DOCKING_PROFILES: Readonly<Record<string, ShipDockingProfile>> = {
     vesselClass: 'surface-transfer-shuttle',
     label: 'ASCE 0.3P',
   },
+  lunar_ascent_shuttle_mk1: {
+    canonicalFrameId: 'ENG-SCV-0002',
+    vesselClass: 'surface-transfer-shuttle',
+    label: 'Lunar Ascent Shuttle Mk.I',
+  },
+  'ENG-SCV-0002': {
+    canonicalFrameId: 'ENG-SCV-0002',
+    vesselClass: 'surface-transfer-shuttle',
+    label: 'Lunar Ascent Shuttle Mk.I',
+  },
 }
 
 export function getShipDockingProfile(shipTypeOrFrameId: string | null | undefined): ShipDockingProfile | null {
