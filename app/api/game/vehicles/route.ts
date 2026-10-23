@@ -8,6 +8,7 @@ import {
   provisionEarthStarterCargoRoverCommand,
   provisionStarterCargoRoverCommand,
   stageEarthVehicleCommand,
+  stageSurfaceVehicleCommand,
 } from '@/lib/game/core/vehicleInstances'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -41,13 +42,13 @@ function vehicleError(error: unknown) {
   if (message.includes('NOXIA_STARTER_CARGO_ROVER_LOCATION_UNSUPPORTED')) {
     return NextResponse.json({ error: 'Der Starter-Cargo-Rover kann derzeit nur am verifizierten Mond-/Shackleton-Standort bereitgestellt werden.', code: 'STARTER_LOCATION_UNSUPPORTED' }, { status: 409 })
   }
-  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_COMMAND_CONFLICT') || message.includes('NOXIA_VEHICLE_PROVISION_COMMAND_CONFLICT')) {
+  if (message.includes('NOXIA_SURFACE_VEHICLE_STAGING_COMMAND_CONFLICT') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_COMMAND_CONFLICT') || message.includes('NOXIA_VEHICLE_PROVISION_COMMAND_CONFLICT')) {
     return NextResponse.json({ error: 'Die Command-ID wurde bereits mit anderen Parametern verwendet.', code: 'COMMAND_CONFLICT' }, { status: 409 })
   }
-  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_NOT_READY')) {
+  if (message.includes('NOXIA_SURFACE_VEHICLE_STAGING_NOT_READY') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_NOT_READY')) {
     return NextResponse.json({ error: 'Das Fahrzeug ist derzeit nicht bereit zum Staging.', code: 'VEHICLE_NOT_READY' }, { status: 409 })
   }
-  if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_ACTIVE_TRANSPORT')) {
+  if (message.includes('NOXIA_SURFACE_VEHICLE_STAGING_ACTIVE_TRANSPORT') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_ACTIVE_TRANSPORT')) {
     return NextResponse.json({ error: 'Das Fahrzeug ist bereits einem aktiven Transport zugewiesen.', code: 'ACTIVE_TRANSPORT' }, { status: 409 })
   }
   if (message.includes('NOXIA_EARTH_VEHICLE_STAGING_LOCATION_UNSUPPORTED') || message.includes('NOXIA_EARTH_VEHICLE_STAGING_TARGET_WRONG_LOCATION')) {
@@ -123,6 +124,7 @@ export async function POST(req: NextRequest) {
   const supportedAction = action === 'provision-starter-cargo-rover'
     || action === 'provision-earth-starter-cargo-rover'
     || action === 'stage-earth-vehicle'
+    || action === 'stage-surface-vehicle'
   if (!supportedAction) {
     return NextResponse.json({ error: 'Ungültige Fahrzeug-Aktion.' }, { status: 400 })
   }
@@ -131,6 +133,14 @@ export async function POST(req: NextRequest) {
   if (!commandId) return NextResponse.json({ error: 'Ungültige commandId.' }, { status: 400 })
 
   try {
+    if (action === 'stage-surface-vehicle') {
+      const vehicleId = uuid(body.vehicleId)
+      const targetInventoryId = uuid(body.targetInventoryId)
+      if (!vehicleId || !targetInventoryId) return NextResponse.json({ error: 'Ungültige Staging-Parameter.' }, { status: 400 })
+      const staging = await stageSurfaceVehicleCommand({ commandId, actorProfileId: user.id, vehicleId, targetInventoryId })
+      return NextResponse.json({ ok: true, commandId, staging })
+    }
+
     if (action === 'stage-earth-vehicle') {
       const vehicleId = uuid(body.vehicleId)
       const targetInventoryId = uuid(body.targetInventoryId)
