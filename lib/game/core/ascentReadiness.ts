@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { resolveAuthoritativeLogisticsCargoMass } from '@/lib/game/core/logisticsCargoMassAuthority'
 import {
   assessSurfaceToOrbitAscentReadiness,
   type AscentEngineeringAuthority,
@@ -57,6 +58,7 @@ export interface AscentCrewEvidence { boarded: boolean; role: string | null }
 export interface AscentCargoEvidence {
   empty: boolean
   totalLegacyAmount: number
+  totalPhysicalCargoKg: number | null
   unresolvedResources: string[]
   rationale: string
 }
@@ -122,7 +124,7 @@ export async function resolveAscentReadiness(
   let noActiveDockingConnection = false
   let noConflictingMission = false
   let crewRow: { role: string; active: boolean } | null = null
-  let cargoRows: { resource: string; amount: number }[] = []
+  let cargoRows: { resource: string; amount: number; unit: string | null }[] = []
 
   if (ship) {
     const [
@@ -134,7 +136,7 @@ export async function resolveAscentReadiness(
       supabase.from('docking_connections').select('id').eq('ship_id', ship.id).eq('status', 'docked').limit(1).maybeSingle(),
       supabase.from('ascent_missions').select('id').eq('ship_id', ship.id).eq('status', 'active').limit(1).maybeSingle(),
       supabase.from('ship_crew_manifest').select('role,active').eq('ship_id', ship.id).eq('profile_id', actorProfileId).eq('active', true).maybeSingle(),
-      supabase.from('ship_cargo').select('resource,amount').eq('ship_id', ship.id).gt('amount', 0),
+      supabase.from('ship_cargo').select('resource,amount,resources(unit)').eq('ship_id', ship.id).gt('amount', 0),
     ])
     if (dockingError) throw new Error(`ascent readiness docking lookup failed: ${dockingError.message}`)
     if (missionError) throw new Error(`ascent readiness mission lookup failed: ${missionError.message}`)
@@ -143,14 +145,36 @@ export async function resolveAscentReadiness(
     noActiveDockingConnection = !docking
     noConflictingMission = !mission && ship.status !== 'transit'
     crewRow = crew as { role: string; active: boolean } | null
-    cargoRows = (cargo ?? []).map(row => ({ resource: String(row.resource), amount: Number(row.amount) }))
+    cargoRows = (cargo ?? []).map(row => {
+      const resources = (row as unknown as { resources?: { unit?: string | null } | { unit?: string | null }[] }).resources
+      const unit = Array.isArray(resources) ? resources[0]?.unit ?? null : resources?.unit ?? null
+      return { resource: String(row.resource), amount: Number(row.amount), unit }
+    })
   }
 
   const canonicalCrewReady = Boolean(crewRow?.active && (crewRow.role === 'commander' || crewRow.role === 'pilot'))
   const cargoEmpty = cargoRows.length === 0
   const totalLegacyAmount = cargoRows.reduce((sum, row) => sum + Math.max(0, row.amount), 0)
-  const unresolvedResources = [...new Set(cargoRows.map(row => row.resource))]
-  const canonicalCargoReady = cargoEmpty
+  const cargoMassResolutions = cargoRows.map(row => ({
+    row,
+    resolution: resolveAuthoritativeLogisticsCargoMass({
+      commodityId: row.resource,
+      amount: row.amount,
+      unit: row.unit,
+    }).resolution,
+  }))
+  const unresolvedResources = [...new Set(
+    cargoMassResolutions
+      .filter(entry => entry.resolution.status !== 'resolved')
+      .map(entry => entry.row.resource),
+  )]
+  const totalPhysicalCargoKg = unresolvedResources.length === 0
+    ? cargoMassResolutions.reduce(
+        (sum, entry) => sum + (entry.resolution.status === 'resolved' ? entry.resolution.massKg : 0),
+        0,
+      )
+    : null
+  const canonicalCargoReady = cargoEmpty || unresolvedResources.length === 0
   const crewReady = options.crewReady == null ? canonicalCrewReady : options.crewReady === true
   const cargoReady = options.cargoReady == null ? canonicalCargoReady : options.cargoReady === true
 
@@ -209,7 +233,7 @@ export async function resolveAscentReadiness(
     docking: ship ? (noActiveDockingConnection ? 'ready' : 'blocked') : 'unresolved',
     missionConflict: ship ? (noConflictingMission ? 'ready' : 'blocked') : 'unresolved',
     crew: options.crewReady == null ? (canonicalCrewReady ? 'ready' : 'blocked') : (crewReady ? 'ready' : 'blocked'),
-    cargo: options.cargoReady == null ? (cargoEmpty ? 'ready' : 'unresolved') : (cargoReady ? 'ready' : 'blocked'),
+    cargo: options.cargoReady == null ? (canonicalCargoReady ? 'ready' : 'unresolved') : (cargoReady ? 'ready' : 'blocked'),
     engineering: engineeringEvidence,
   }
 
@@ -224,10 +248,13 @@ export async function resolveAscentReadiness(
     cargo: {
       empty: cargoEmpty,
       totalLegacyAmount,
+      totalPhysicalCargoKg,
       unresolvedResources,
       rationale: cargoEmpty
         ? 'Kein positiver Cargo-Bestand an Bord; bekannte Frachtmasse ist 0 kg.'
-        : 'Nichtleere Legacy-Fracht bleibt gesperrt, bis ihre Gameplay-Mengen explizit auf physikalische Massenbasen abgebildet sind.',
+        : unresolvedResources.length === 0
+          ? `Alle Bordgüter besitzen eine autoritative physische Massenbasis; Gesamtfracht ${totalPhysicalCargoKg} kg.`
+          : `Nicht alle Bordgüter besitzen eine autoritative physische Massenbasis. Unresolved: ${unresolvedResources.join(', ')}.`,
     },
     engineeringRequest: engineeringRequestForDeparture(normalizedDeparture),
     engineeringAuthorityRef: normalizedDeparture === 'earth'
