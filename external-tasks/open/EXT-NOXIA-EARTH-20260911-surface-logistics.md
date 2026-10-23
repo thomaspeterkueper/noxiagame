@@ -315,3 +315,102 @@ Der Request bleibt daher `open`; die bereits abgeschlossenen Earth- und Core-Bau
 - KUEPER Engineering: `external-tasks/open/EXT-NOXIA-ENG-20260913-cargo-mass-basis.md`
 - KUEPER Engineering: `external-tasks/open/EXT-NOXIA-ENG-20260913-earth-surface-logistics-vehicles.md`
 - Earth map/buildability implementation in the current `main` branch
+
+
+## Fortschritt 2026-10-23 – aktueller Stand
+
+Dieser Abschnitt ersetzt die oben noch enthaltenen September-Hinweise zu damals offenen Engineering- und Progress-Abhängigkeiten. Die historischen Abschnitte bleiben als Verlauf erhalten.
+
+### Engineering-Abhängigkeiten geschlossen
+
+Die beiden für den manuellen Earth-Transport relevanten Engineering-Handoffs sind inzwischen abgeschlossen:
+
+- KUEPER Engineering: `external-tasks/done/EXT-NOXIA-ENG-20260913-earth-surface-logistics-vehicles.md`
+  - Revision `ENG-EARTH-SURFACE-LOGISTICS-r1`,
+  - `eng-earth-cargo-rover-r1` / ECR-8,
+  - `eng-earth-heavy-hauler-r1` / EHH-22,
+  - in NOXIA read-only über `lib/game/earthSurfaceEngineering.ts` integriert.
+- KUEPER Engineering: `external-tasks/done/EXT-NOXIA-ENG-20260913-cargo-mass-basis.md`
+  - maschinenlesbare Quelle: `components/logistics/engineering-commodities-r1.json`,
+  - Wasser als konkrete Bulk-Commodity ist physikalisch massenauflösbar,
+  - abstraktes `energy`, `metal` und `components` bleibt ausdrücklich ohne pauschale Cargo-Masse.
+
+### PR #516 – erste produktive Cargo-Mass-Autorität
+
+Mit PR #516 ist die NOXIA-eigene Gameplay-ID-Zuordnung für `water` produktiv:
+
+- `water` → Engineering `ENG-COM-0001` ("Liquid water, bulk"),
+- explizite `kg`- oder `t`-Mengen können in den kg-basierten Vehicle-Cargo-Vertrag aufgelöst werden,
+- der historische globale `resources.unit='t'`-Default wird weiterhin **nicht** als allgemeine physikalische Wahrheit verwendet,
+- `energy`, `metal`, `components` sowie nicht explizit definierte Volumen-/Gameplay-Einheiten bleiben fail-closed.
+
+Merge: `f38388842e5b18dad9797e33c7b5155df455e95e`.
+
+### Serverautoritiver Earth-Missionspfad
+
+Auf `main` existiert inzwischen der vollständige serverseitige Draft-/Start-Pfad:
+
+- `lib/game/earthSurfaceMissionDraftServer.ts`,
+- `app/api/game/earth/surface-transport/draft/route.ts`,
+- `app/api/game/earth/surface-transport/start/route.ts`,
+- `lib/game/core/atomicTransportStart.ts`.
+
+Der Server prüft unmittelbar vor dem Start erneut:
+
+1. Source-/Destination-Inventar und Earth-Location,
+2. räumliche `tile_entity`-Knoten,
+3. Fahrzeugbesitz, Status und Staging am Quellknoten,
+4. exakten Engineering-Frame + `SurfaceOperationProfile`,
+5. freien Quellbestand,
+6. autoritative Cargo-Masse,
+7. aktuelle OSM-/Earth-Route,
+8. gemeinsame Surface-Mission für Kapazität, ETA, Energie und Wear.
+
+Der Client liefert dabei **keinen** autoritativen RouteSnapshot, keine ETA, keine Energie-/Wear-Werte und keine Fahrzeugphysik.
+
+### PR #517 – manueller Transport im Earth-Cockpit
+
+Mit PR #517 ist `app/earth/EarthSurfaceLogisticsConsole.tsx` an diesen vorhandenen Serverpfad angeschlossen:
+
+- lokale Gates bleiben Vorschau,
+- nach grünen Gates kann ein serverautoritiver Mission-Draft angefordert werden,
+- angezeigt werden Server-ETA, Distanz, Frachtmasse, Energiebedarf, Wear und Engineering-Frame,
+- anschließend kann der Auftrag atomar gestartet werden,
+- eine stabile `commandId` schützt HTTP-Retries vor Doppelstarts,
+- nach Erfolg werden Core-Inventare, Fahrzeuge und TransportJobs neu geladen,
+- die Earth-Routingrolle wird aus dem freigegebenen Engineering-Profil abgeleitet.
+
+Merge: `2e2b3e895340fca37e3c734c625780f23b0b55fc`.
+
+Der Earth-Readiness-CI prüft nun auch die Surface-Transport-Konsole sowie Draft-/Start-Integration.
+
+### Progress-Visualisierung
+
+Der historische PR #119 wurde am 2026-09-15 **ohne Merge geschlossen**, weil er durch den weiterentwickelten `main`-Stand überholt war. Seine generischen Grundlagen `surfaceProgress` und `surfaceRouteGeometry` liegen inzwischen in weiterentwickelter Form auf `main`.
+
+Daher wird #119 nicht wiederbelebt. Die noch ausstehende Earth-Kartenintegration soll die aktuellen gemeinsamen Bausteine und den persistierten RouteSnapshot verwenden.
+
+### Verbleibender Earth-Scope
+
+Für den Request bleiben vor allem folgende Punkte offen:
+
+1. **Kartenintegration**
+   - Source-/Destination-Markierungen,
+   - persistierte Route/Polyline,
+   - Road-/Offroad-Abschnitte,
+   - Fahrzeug-/Jobfortschritt aus der gemeinsamen Core-Projektion,
+   - keine zweite Positions- oder Tick-State-Machine.
+
+2. **Weitere konkrete Commodities**
+   - `metal`, `components` und transportierte Energieträger erst nach konkreter Produkt-/Materialform,
+   - keine Pauschalmasse für abstrakte Sammelkategorien.
+
+3. **Automatische Transportregeln**
+   - Earth-UX und Earth-Routeneignung,
+   - Regelmodell, Persistenz, Reservierung und Ausführung bleiben Core-owned.
+
+4. **Surface-Port-Handover in der Earth-UX**
+   - bestehende gemeinsame Handover-/Multi-Leg-Semantik verwenden,
+   - kein intersolares Schiff direkt am planetaren Shuttle-Port.
+
+Der manuelle Earth-Transportpfad ist damit für autoritativ massenauflösbare Güter technisch bis zum atomaren Core-Start geschlossen. Der Request bleibt `open`, weil Kartenintegration, automatische Regeln und weitere konkrete Commodity-Abbildungen noch ausstehen.
