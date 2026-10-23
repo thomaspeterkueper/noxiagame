@@ -2,34 +2,37 @@ import type { AscentEngineeringAuthority } from '@/lib/game/ascentControl'
 import type { ResolvedAscentOrbitNode } from '@/lib/game/ascentTargets'
 
 /**
- * Consumer projection of KUEPER Engineering authority ENG-EARTH-LEO-ASCENT-r1.
+ * Consumer projection of KUEPER Engineering authority ENG-EARTH-LEO-ASCENT-r2.
  *
- * Engineering remains source of truth. NOXIA copies only the stable, approved
- * consumer boundaries needed to fail closed at runtime; it does not reproduce
- * the underlying propulsion model or derive new physical values.
+ * Engineering remains source of truth. NOXIA copies only the stable approved
+ * consumer gates needed to fail closed at runtime. The superseded r1 authority
+ * must never authorize a new ascent.
  */
-export const EARTH_LEO_ASCENT_AUTHORITY_R1 = {
-  authorityId: 'ENG-EARTH-LEO-ASCENT-r1',
-  engineeringFrameId: 'ENG-SCV-0003',
+export const EARTH_LEO_ASCENT_AUTHORITY_R2 = {
+  authorityId: 'ENG-EARTH-LEO-ASCENT-r2',
+  engineeringFrameId: 'ENG-SCV-0004',
   departureBody: 'earth',
   targetBody: 'earth',
   targetOrbitClass: 'leo-circular',
   minCircularAltitudeKm: 395,
   maxCircularAltitudeKm: 405,
-  maxStartMassKg: 674660,
-  requiredReleaseSpeedMS: 160,
-  requiredPropellantStateRef: 'ENG-EARTH-LEO-ASCENT-r1:reference-propellant-state',
+  maxStartMassKg: 748_340,
+  requiredReleaseSpeedMS: 170,
+  requiredPropellantStateRef: 'ENG-EARTH-LEO-ASCENT-r2:reference-propellant-state',
+  requiredHighLiftStateRef: 'ENG-EARTH-LEO-ASCENT-r2:reference-high-lift-state',
   requiredLaunchSiteClass: 'engineering-cleared-asce-launch-assist-site',
   sourceRepository: 'thomaspeterkueper/kueper-engineering',
-  sourceReference: 'systems/earth-leo-ascent-authority-r1.json',
+  sourceReference: 'systems/earth-leo-ascent-authority-r2.json',
 } as const
 
 export type EarthAscentEngineeringResult =
   | 'authorized'
   | 'frame-unmapped'
+  | 'authority-mismatch'
   | 'over-mass'
   | 'mass-unresolved'
   | 'insufficient-propellant-authority'
+  | 'unsupported-high-lift-state'
   | 'unsupported-launch-site'
   | 'insufficient-release-speed'
   | 'unsupported-orbit'
@@ -43,9 +46,11 @@ export interface EarthAscentPhysicalState {
   cargoMassResolved: boolean
   missionEquipmentMassResolved: boolean
   propellantStateRef: string | null
+  highLiftStateRef: string | null
   departureSiteClass: string | null
   releaseSpeedMS: number | null
   targetPlaneResolved: boolean
+  targetInclinationDeg: number | null
 }
 
 export interface EarthAscentEngineeringAssessment {
@@ -63,7 +68,7 @@ export function resolveEarthAscentEngineeringAuthority(input: {
   target: ResolvedAscentOrbitNode | null
   physicalState: EarthAscentPhysicalState | null
 }): EarthAscentEngineeringAssessment {
-  const a = EARTH_LEO_ASCENT_AUTHORITY_R1
+  const a = EARTH_LEO_ASCENT_AUTHORITY_R2
   const blockers: string[] = []
 
   if (input.departureSurfaceSlug.trim().toLowerCase() !== a.departureBody) {
@@ -76,14 +81,21 @@ export function resolveEarthAscentEngineeringAuthority(input: {
     }
   }
 
-  if (
-    input.engineeringFrameId !== a.engineeringFrameId
-    || (input.engineeringAuthorityRef != null && input.engineeringAuthorityRef !== a.authorityId)
-  ) {
+  if (input.engineeringFrameId !== a.engineeringFrameId) {
     return {
       result: 'frame-unmapped',
       authority: null,
-      blockers: ['flight-article-not-mapped-to-eng-scv-0003'],
+      blockers: ['flight-article-not-mapped-to-eng-scv-0004'],
+      authorityId: a.authorityId,
+      engineeringFrameId: a.engineeringFrameId,
+    }
+  }
+
+  if (input.engineeringAuthorityRef !== a.authorityId) {
+    return {
+      result: 'authority-mismatch',
+      authority: null,
+      blockers: ['flight-article-authority-not-eng-earth-leo-ascent-r2'],
       authorityId: a.authorityId,
       engineeringFrameId: a.engineeringFrameId,
     }
@@ -121,30 +133,43 @@ export function resolveEarthAscentEngineeringAuthority(input: {
   ) {
     blockers.push('physical-start-mass-unresolved')
   } else if (state.actualStartMassKg > a.maxStartMassKg) {
-    blockers.push('start-mass-exceeds-674660-kg')
+    blockers.push('start-mass-exceeds-748340-kg')
   }
 
+  // These are NOXIA consumer-resolution tokens anchored to the exact r2 authority.
+  // They assert that trusted state has been resolved to the Engineering reference
+  // envelope; they do not invent propellant or high-lift physics.
   if (state.propellantStateRef !== a.requiredPropellantStateRef) {
-    blockers.push('r1-reference-propellant-state-unresolved')
+    blockers.push('r2-reference-propellant-state-unresolved')
+  }
+  if (state.highLiftStateRef !== a.requiredHighLiftStateRef) {
+    blockers.push('r2-reference-high-lift-state-unresolved')
   }
   if (state.departureSiteClass !== a.requiredLaunchSiteClass) {
     blockers.push('launch-site-not-mapped-to-asce-site-class')
   }
   if (state.releaseSpeedMS == null || state.releaseSpeedMS < a.requiredReleaseSpeedMS) {
-    blockers.push('release-speed-below-160-ms-or-unresolved')
+    blockers.push('release-speed-below-170-ms-or-unresolved')
   }
-  if (!state.targetPlaneResolved) {
-    blockers.push('target-plane-unresolved')
+  if (
+    !state.targetPlaneResolved
+    || state.targetInclinationDeg == null
+    || !Number.isFinite(state.targetInclinationDeg)
+    || state.targetInclinationDeg < 0
+    || state.targetInclinationDeg > 180
+  ) {
+    blockers.push('target-plane-or-inclination-unresolved')
   }
 
   if (blockers.length) {
     let result: EarthAscentEngineeringResult = 'unavailable'
-    if (blockers.some(b => b.startsWith('target-') || b === 'target-plane-unresolved')) result = 'unsupported-orbit'
+    if (blockers.some(blocker => blocker.startsWith('target-'))) result = 'unsupported-orbit'
     else if (blockers.includes('physical-start-mass-unresolved')) result = 'mass-unresolved'
-    else if (blockers.includes('start-mass-exceeds-674660-kg')) result = 'over-mass'
-    else if (blockers.includes('r1-reference-propellant-state-unresolved')) result = 'insufficient-propellant-authority'
+    else if (blockers.includes('start-mass-exceeds-748340-kg')) result = 'over-mass'
+    else if (blockers.includes('r2-reference-propellant-state-unresolved')) result = 'insufficient-propellant-authority'
+    else if (blockers.includes('r2-reference-high-lift-state-unresolved')) result = 'unsupported-high-lift-state'
     else if (blockers.includes('launch-site-not-mapped-to-asce-site-class')) result = 'unsupported-launch-site'
-    else if (blockers.includes('release-speed-below-160-ms-or-unresolved')) result = 'insufficient-release-speed'
+    else if (blockers.includes('release-speed-below-170-ms-or-unresolved')) result = 'insufficient-release-speed'
 
     return {
       result,
