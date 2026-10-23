@@ -5,7 +5,7 @@ import { getAccessibleInventorySnapshot, listAccessibleInventories, LOGISTICS_RE
 import { resolveAuthoritativeLogisticsCargoMass } from '@/lib/game/core/logisticsCargoMassAuthority'
 import { getPlayerVehicleSnapshot, projectPersistedVehicle } from '@/lib/game/core/vehicleInstances'
 import { resolveMoonSurfaceEngineeringProfile } from '@/lib/game/moonSurfaceEngineering'
-import { deriveMoonRouteMetrics, assessMoonSurfaceRoute } from '@/lib/game/moonSurfaceLogistics'
+import { deriveMoonRouteMetrics, assessMoonSurfaceRoute, type MoonSurfaceVehicleRole } from '@/lib/game/moonSurfaceLogistics'
 import { prepareProspectiveSurfaceMission } from '@/lib/game/vehicles/surfaceMissionDraft'
 import { traversalFromMoonAssessment } from '@/lib/game/vehicles/surfaceMission'
 import { resolveSurfaceLogisticsEndpoints } from '@/lib/game/vehicles/surfaceLogisticsNodes'
@@ -38,9 +38,8 @@ function items(snapshot:unknown){
 export async function buildAuthoritativeMoonSurfaceMissionDraft(actorProfileId:string,intent:ReturnType<typeof parseMoonSurfaceMissionIntent>){
   const supabase=createServiceClient()
   const {sourceInventoryId,destinationInventoryId,vehicleId,resource,amount}=intent
-  const [sourceSnapshot,destinationSnapshot,vehicleSnapshot]=await Promise.all([
+  const [sourceSnapshot,vehicleSnapshot]=await Promise.all([
     getAccessibleInventorySnapshot(actorProfileId,sourceInventoryId),
-    getAccessibleInventorySnapshot(actorProfileId,destinationInventoryId),
     getPlayerVehicleSnapshot(actorProfileId,vehicleId),
   ])
   if(!vehicleSnapshot) fail(404,'VEHICLE_NOT_FOUND','Fahrzeug nicht gefunden.')
@@ -61,6 +60,10 @@ export async function buildAuthoritativeMoonSurfaceMissionDraft(actorProfileId:s
 
   const profile=resolveMoonSurfaceEngineeringProfile(vehicle.frame_id)
   if(profile.status==='unresolved') fail(409,'ENGINEERING_FRAME_UNAVAILABLE','Für diesen Frame fehlt ein freigegebenes Moon-Surface-Profil.',{reason:profile.reason,details:profile.details})
+  const role: MoonSurfaceVehicleRole | null = profile.frame.role === 'cargo-rover' || profile.frame.role === 'heavy-hauler'
+    ? profile.frame.role
+    : null
+  if(!role) fail(409,'MOON_SURFACE_ROLE_UNSUPPORTED','Der Engineering-Frame besitzt keine unterstützte Moon-Surface-Rolle.')
 
   const sourceItem=items(sourceSnapshot).find(i=>i.resource===resource)
   const available=Number(sourceItem?.available??sourceItem?.amount??0)
@@ -113,12 +116,12 @@ export async function buildAuthoritativeMoonSurfaceMissionDraft(actorProfileId:s
     samples.push({distanceM:distanceM*t,elevationM:s.zM})
   }
   const metrics=deriveMoonRouteMetrics(samples)
-  const assessment=assessMoonSurfaceRoute({routeClass:'offroad',metrics,vehicle:{role:profile.frame.role,frameId:profile.frame.id,safeLongitudinalSlopeDeg:profile.frame.surfaceMobility!.safeLongitudinalSlopeDeg}})
+  const assessment=assessMoonSurfaceRoute({routeClass:'offroad',metrics,vehicle:{role,frameId:profile.frame.id,safeLongitudinalSlopeDeg:profile.frame.surfaceMobility!.safeLongitudinalSlopeDeg}})
   const routeId=`moon:${sourceInventoryId.slice(0,8)}:${destinationInventoryId.slice(0,8)}:${vehicleId.slice(0,8)}:${resource}:${amount}`
   const plan={routeId,originInventoryId:sourceInventoryId,destinationInventoryId,segments:[{id:'direct-lola-offroad',distanceKm:distanceM/1000,traversal:traversalFromMoonAssessment(assessment)}]}
   const draft=prepareProspectiveSurfaceMission({frame:profile.frame,instance:projectPersistedVehicle(vehicle),operationProfile:profile.operationProfile,plan,projectedCargo:[cargo.resolution.cargo]})
   if(!draft.estimate.feasible||!draft.routeSnapshot) fail(409,'SURFACE_MISSION_INFEASIBLE','Moon-Surface-Mission ist nicht freigegeben.',{estimate:draft.estimate,metrics,assessment})
   const vehicleInventoryId=(vehicleSnapshot.inventory as Record<string,unknown>|null)?.id
   if(typeof vehicleInventoryId!=='string'||!UUID_RE.test(vehicleInventoryId)) fail(409,'VEHICLE_CARGO_INVENTORY_UNRESOLVED','Fahrzeug-Cargoinventar fehlt.')
-  return {ok:true as const,ready:true as const,locationId:location.id,sourceInventoryId,destinationInventoryId,vehicleId,vehicleInventoryId,vehicleRole:profile.frame.role,resource,amount,metrics,assessment,estimate:draft.estimate,routeSnapshot:{...draft.routeSnapshot,moonRouteClass:'offroad',terrainDatasetId:dataset.id,engineeringSourceId:profile.sourceId,cargoMassSource:cargo.source}}
+  return {ok:true as const,ready:true as const,locationId:location.id,sourceInventoryId,destinationInventoryId,vehicleId,vehicleInventoryId,vehicleRole:role,resource,amount,metrics,assessment,estimate:draft.estimate,routeSnapshot:{...draft.routeSnapshot,moonRouteClass:'offroad',terrainDatasetId:dataset.id,engineeringSourceId:profile.sourceId,cargoMassSource:cargo.source}}
 }
