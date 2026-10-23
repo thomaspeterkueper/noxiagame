@@ -13,6 +13,9 @@ on:
       - 'app/api/game/earth/surface-transport/draft/route.ts'
       - 'app/api/game/earth/surface-transport/start/route.ts'
       - 'app/earth/EarthSurfaceLogisticsConsole.tsx'
+      - 'app/earth/EarthSurfaceLogisticsOverlay.tsx'
+      - 'app/earth/EarthRegionPreview.tsx'
+      - 'app/earth/page.tsx'
       - 'app/api/game/moon/surface-transport/cargo-readiness/route.ts'
       - '.github/workflows/earth-surface-readiness.yml'
   push:
@@ -28,6 +31,9 @@ on:
       - 'app/api/game/earth/surface-transport/draft/route.ts'
       - 'app/api/game/earth/surface-transport/start/route.ts'
       - 'app/earth/EarthSurfaceLogisticsConsole.tsx'
+      - 'app/earth/EarthSurfaceLogisticsOverlay.tsx'
+      - 'app/earth/EarthRegionPreview.tsx'
+      - 'app/earth/page.tsx'
       - 'app/api/game/moon/surface-transport/cargo-readiness/route.ts'
       - '.github/workflows/earth-surface-readiness.yml'
 
@@ -64,3 +70,5 @@ jobs:
         run: >-
           pnpm exec eslint app/earth/EarthSurfaceLogisticsConsole.tsx
           --rule 'react-hooks/set-state-in-effect: off'
+      - name: Lint canonical Earth logistics overlay
+        run: pnpm exec eslint app/earth/EarthSurfaceLogisticsOverlay.tsx app/earth/page.tsx
