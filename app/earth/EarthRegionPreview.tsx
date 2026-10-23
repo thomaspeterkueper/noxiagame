@@ -16,6 +16,7 @@ import { SELMECKE_REFERENCE_SITE } from '@/lib/world/spatial/earthReferenceSites
 import { createSpaceportPlanningOverlay } from '@/lib/world/spatial/spaceportPlanningOverlay'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
+import EarthSurfaceLogisticsOverlay from './EarthSurfaceLogisticsOverlay'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 
 type GeoPoint = { lat:number; lon:number }
@@ -43,14 +44,14 @@ function readyLabel(iso?:string|null){
 type BuildingDef = { id:string; name:string; cost:number; buildTimeTicks:number; footprint:{widthM:number;depthM:number;clearanceM:number}; requirements?:BuildRequirements }
 type SpatialEntity = { id:string; entity_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string; ownerLabel?:string; isOwn?:boolean }
 type PendingBuild = { id:string; buildable_id:string; x_m:number|null; y_m:number|null; rotation_deg:number|null; footprint_width_m:number|null; footprint_depth_m:number|null; status:string; name?:string; created_at?:string|null; completes_at?:string|null; buildTimeTicks?:number|null }
-type SpatialPayload = { location?:{slug:string;name:string}; profile?:{credits:number}; knowledge?:{source?:string;analysis?:{geodetic:boolean;precision:boolean}}; available?:BuildingDef[]; entities?:SpatialEntity[]; builds?:PendingBuild[]; error?:string }
+type SpatialPayload = { location?:{id?:string;slug:string;name:string}; profile?:{credits:number}; knowledge?:{source?:string;analysis?:{geodetic:boolean;precision:boolean}}; available?:BuildingDef[]; entities?:SpatialEntity[]; builds?:PendingBuild[]; error?:string }
 type SelectedSpot = { mapX:number;mapY:number;xM:number;yM:number }
 type TerrainCell = { row:number;col:number;xM:number;yM:number;elevationM:number;slopeDeg:number|null;state:'buildable'|'restricted'|'invalid'|'unresolved';reason:string|null }
 type TerrainPayload = { ok:boolean; sourceResolutionM?:number; sampledRows?:number; sampledCols?:number; cells?:TerrainCell[]; error?:string }
-type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slope'|'noxia'|'landmarks'|'sites'|'corridor'
+type LayerKey = 'relief'|'landuse'|'water'|'infrastructure'|'buildability'|'slope'|'noxia'|'landmarks'|'sites'|'corridor'|'logistics'
 
 const layerOrder=['island','farmland','vegetation','forest','rock','beach','urban','water','industrial','public','building','waterway','rail','road','settlement']
-const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,landmarks:true,sites:true,corridor:true}
+const defaultLayers:Record<LayerKey,boolean>={relief:true,landuse:true,water:true,infrastructure:true,buildability:false,slope:false,noxia:true,landmarks:true,sites:true,corridor:true,logistics:true}
 const BUILD_PLAN_VISIBLE_WIDTH_M=SURFACE_LOCAL_CAMERA.visibleWidthM
 const LOCAL_DETAIL_RADIUS_KM=1.35
 const SELMECKE_DEFAULT_FOCUS:GeoPoint=SELMECKE_REFERENCE_SITE.point
@@ -463,6 +464,8 @@ export default function EarthRegionPreview(){
             <circle cx={corridorOverlay.endX} cy={corridorOverlay.endY} r={9/zoom} fill="#fff3bd" fillOpacity=".72" stroke="#70571b" strokeWidth={2/zoom} strokeDasharray={`${3/zoom} ${2/zoom}`}/>
           </g>}
 
+          {layers.logistics&&<EarthSurfaceLogisticsOverlay locationId={spatial?.location?.id} projection={projection} zoom={zoom}/>}
+
           {layers.landmarks&&landmarks.map(item=>{
             const cross=item.landmark.tags.includes('cross-universe')
             const selected=item.landmark.id===selectedLandmarkId
@@ -511,7 +514,7 @@ export default function EarthRegionPreview(){
       </svg>
 
       <div className="earth-map-tools"><div className="earth-compass" aria-label="Karte ist nach Norden ausgerichtet"><span>N</span><b>↑</b></div>{scale&&<div className="earth-scale"><span>{scale.meters>=1000?`${scale.meters/1000} km`:`${scale.meters} m`}</span><i style={{width:`${Math.max(26,Math.min(150,scale.pixels))}px`}}/></div>}<button className="earth-center-player" disabled={!earthPlayerGeo} onClick={()=>void centerOnPlayer()}>{earthPlayerGeo?'◎ Zentrieren':'◎ Position unbekannt'}</button></div>
-      <div className="earth-layer-control"><button className="earth-layer-trigger" onClick={()=>setLayersOpen(v=>!v)}>☷ Layer</button>{layersOpen&&<div className="earth-layer-menu">{([['relief','Relief / DEM'],['landuse','Landnutzung'],['water','Wasser'],['infrastructure','Infrastruktur'],['buildability','Bebaubarkeit'],['slope','Neigung'],['noxia','NOXIA-Bauten'],['landmarks','Landmarks / Werkbezug'],['sites','Prüfstandorte'],['corridor','Korridor B · Vorprüfung']] as [LayerKey,string][]).map(([key,label])=><button key={key} className={layers[key]?'active':''} onClick={()=>toggleLayer(key)}><span>{layers[key]?'●':'○'}</span>{label}</button>)}<div className="earth-layer-note">Planungsebene · nicht kanonisch · kein Bauauftrag</div><div className="earth-layer-disabled">○ Ressourcen · Daten folgen</div></div>}</div>
+      <div className="earth-layer-control"><button className="earth-layer-trigger" onClick={()=>setLayersOpen(v=>!v)}>☷ Layer</button>{layersOpen&&<div className="earth-layer-menu">{([['relief','Relief / DEM'],['landuse','Landnutzung'],['water','Wasser'],['infrastructure','Infrastruktur'],['buildability','Bebaubarkeit'],['slope','Neigung'],['noxia','NOXIA-Bauten'],['logistics','Surface-Logistik'],['landmarks','Landmarks / Werkbezug'],['sites','Prüfstandorte'],['corridor','Korridor B · Vorprüfung']] as [LayerKey,string][]).map(([key,label])=><button key={key} className={layers[key]?'active':''} onClick={()=>toggleLayer(key)}><span>{layers[key]?'●':'○'}</span>{label}</button>)}<div className="earth-layer-note">Planungsebene · nicht kanonisch · kein Bauauftrag</div><div className="earth-layer-disabled">○ Ressourcen · Daten folgen</div></div>}</div>
       {layers.corridor&&corridorOverlay&&<div className="earth-corridor-status"><b>Korridor B</b><span>Vorprüfung · nicht kanonisch</span></div>}
       {focusLoading&&<div className="earth-detail-status">Kartendetails werden geladen …</div>}
       {focusError&&<div className="earth-detail-status error">{focusError}</div>}
