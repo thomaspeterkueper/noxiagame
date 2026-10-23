@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
         const engineeringResult = resolved.engineeringAssessment?.result ?? 'unavailable'
         return NextResponse.json({
           error: engineeringResult === 'frame-unmapped'
-            ? 'Dieses NOXIA-Schiff ist nicht dem freigegebenen ASCE-Frame ENG-SCV-0003 zugeordnet.'
+            ? 'Dieses NOXIA-Schiff ist nicht dem freigegebenen ASCE-Frame ENG-SCV-0004 zugeordnet.'
             : 'Die Engineering-Freigabe ist vorhanden, aber der konkrete physische Abflugzustand erfüllt die Authority noch nicht vollständig.',
           code: 'ASCENT_READINESS_BLOCKED',
           shipId,

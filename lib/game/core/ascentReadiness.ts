@@ -9,7 +9,7 @@ import {
 } from '@/lib/game/ascentControl'
 import { resolveAscentOrbitNode } from '@/lib/game/ascentTargets'
 import {
-  EARTH_LEO_ASCENT_AUTHORITY_R1,
+  EARTH_LEO_ASCENT_AUTHORITY_R2,
   resolveEarthAscentEngineeringAuthority,
   type EarthAscentEngineeringAssessment,
 } from '@/lib/game/core/earthAscentEngineeringAuthority'
@@ -217,7 +217,8 @@ export async function resolveAscentReadiness(
 
   const blockedEngineeringResults = new Set([
     'frame-unmapped', 'authority-mismatch', 'unsupported-launch-site', 'unsupported-orbit',
-    'over-mass', 'payload-over-envelope', 'insufficient-propellant', 'insufficient-release-speed',
+    'over-mass', 'payload-over-envelope', 'insufficient-propellant', 'unsupported-high-lift-state',
+    'insufficient-release-speed',
   ])
   const engineeringEvidence: AscentReadinessEvidenceState = engineering
     ? 'ready'
@@ -258,7 +259,7 @@ export async function resolveAscentReadiness(
     },
     engineeringRequest: engineeringRequestForDeparture(normalizedDeparture),
     engineeringAuthorityRef: normalizedDeparture === 'earth'
-      ? EARTH_LEO_ASCENT_AUTHORITY_R1.authorityId
+      ? EARTH_LEO_ASCENT_AUTHORITY_R2.authorityId
       : normalizedDeparture === 'moon'
         ? LUNAR_ASCENT_AUTHORITY_R1.authorityId
         : null,
