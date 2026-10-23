@@ -25,6 +25,9 @@ type ShuttlePayload={
   }|null
   error?:string
 }
+type AscentPayload={mission?:{id:string;phase:string;status:string}|null;orbitalPresence?:{orbit_node_slug?:string;body_slug?:string}|null;executionReady?:boolean;error?:string}
+type DockPort={id:string;label:string;status:string;reservedForVesselId?:string|null;occupiedByVesselId?:string|null;cargoEnabled?:boolean}
+type DockConnection={id:string;port_id:string;status:string}
 type ReadinessPayload={
   ok?:boolean
   assessment?:{ready?:boolean;blockers?:string[]}
@@ -38,6 +41,9 @@ type ReadinessPayload={
 export default function MoonAscentShuttlePanel(){
   const [shuttle,setShuttle]=useState<ShuttlePayload['shuttle']>(null)
   const [readiness,setReadiness]=useState<ReadinessPayload|null>(null)
+  const [ascent,setAscent]=useState<AscentPayload|null>(null)
+  const [ports,setPorts]=useState<DockPort[]>([])
+  const [connection,setConnection]=useState<DockConnection|null>(null)
   const [busy,setBusy]=useState(false)
   const [cargoResource,setCargoResource]=useState('metal')
   const [cargoAmount,setCargoAmount]=useState(1)
@@ -58,14 +64,23 @@ export default function MoonAscentShuttlePanel(){
       setShuttle(p.shuttle??null)
       const shipId=p.shuttle?.ship?.id
       if(shipId){
-        const rr=await fetch('/api/game/ascent/readiness',{
-          method:'POST',headers:{...headers,'Content-Type':'application/json'},
-          body:JSON.stringify({shipId,departureSurfaceSlug:'moon',targetOrbitNodeSlug:'moon-llo-100'}),
-          cache:'no-store',
-        })
-        const rp=await rr.json() as ReadinessPayload
-        setReadiness(rp)
-      }else setReadiness(null)
+        const [rr,ar,pr,cr]=await Promise.all([
+          fetch('/api/game/ascent/readiness',{
+            method:'POST',headers:{...headers,'Content-Type':'application/json'},
+            body:JSON.stringify({shipId,departureSurfaceSlug:'moon',targetOrbitNodeSlug:'moon-llo-100'}),
+            cache:'no-store',
+          }),
+          fetch('/api/game/ascent?shipId='+encodeURIComponent(shipId),{headers,cache:'no-store'}),
+          fetch('/api/game/docking?stationSlug=moon',{headers,cache:'no-store'}),
+          fetch('/api/game/docking?shipId='+encodeURIComponent(shipId),{headers,cache:'no-store'}),
+        ])
+        setReadiness(await rr.json() as ReadinessPayload)
+        setAscent(await ar.json() as AscentPayload)
+        setPorts(((await pr.json()) as {ports?:DockPort[]}).ports??[])
+        setConnection(((await cr.json()) as {connection?:DockConnection|null}).connection??null)
+      }else{
+        setReadiness(null);setAscent(null);setPorts([]);setConnection(null)
+      }
     }catch(error){setMessage(error instanceof Error?error.message:String(error))}
   }
 
@@ -99,6 +114,18 @@ export default function MoonAscentShuttlePanel(){
     finally{setBusy(false)}
   }
 
+  async function operation(url:string,body:Record<string,unknown>,success:string){
+    setBusy(true);setMessage(null)
+    try{
+      const h=await authHeaders()
+      const r=await fetch(url,{method:'POST',headers:{...h,'Content-Type':'application/json'},body:JSON.stringify(body)})
+      const p=await r.json() as {ok?:boolean;error?:string;code?:string}
+      if(!r.ok||!p.ok) throw new Error(p.error??p.code??'Aktion fehlgeschlagen')
+      setMessage(success);await load()
+    }catch(error){setMessage(error instanceof Error?error.message:String(error))}
+    finally{setBusy(false)}
+  }
+
   const article=shuttle?.article
   const stagedAtPort=Boolean(shuttle?.surfacePort?.id&&shuttle?.vehicle?.current_node_inventory_id===shuttle.surfacePort.id)
   const portItems=shuttle?.surfacePort?.items??[]
@@ -106,6 +133,11 @@ export default function MoonAscentShuttlePanel(){
   const portAvailable=Number(portItems.find(item=>item.resource===cargoResource)?.available??0)
   const shipAvailable=Number(shipItems.find(item=>item.resource===cargoResource)?.available??0)
   const evidence=readiness?.evidence??{}
+  const moonA1=ports.find(port=>port.id==='moon-a1')
+  const shipId=shuttle?.ship?.id
+  const orbitalArrived=Boolean(ascent?.orbitalPresence)
+  const reservedByThis=Boolean(shipId&&moonA1?.reservedForVesselId===shipId)
+  const occupiedByThis=Boolean(shipId&&(moonA1?.occupiedByVesselId===shipId||connection?.port_id==='moon-a1'))
   const unresolved=[
     article?.actual_start_mass_kg==null?'Startmasse':null,
     article?.crew_cargo_mission_equipment_kg==null?'Crew/Cargo/Equipment-Masse':null,
@@ -131,6 +163,14 @@ export default function MoonAscentShuttlePanel(){
         <button onClick={()=>void action('load')} disabled={busy||!stagedAtPort||portAvailable<cargoAmount}>Port → Shuttle ({portAvailable})</button>
         <button onClick={()=>void action('unload')} disabled={busy||!stagedAtPort||shipAvailable<cargoAmount}>Shuttle → Port ({shipAvailable})</button>
       </div>
+      <div className="orbital">
+        <div><b>Ascent / Lunar Orbital Interface</b><span>{ascent?.mission?.phase??(orbitalArrived?'orbital-arrival':'surface')} · moon-a1: {occupiedByThis?'docked':reservedByThis?'reserved':moonA1?.status??'unresolved'}</span></div>
+        {readiness?.assessment?.ready&&!ascent?.mission&&shipId&&<button className="primary" onClick={()=>void operation('/api/game/ascent',{action:'authorize',shipId,departureSurfaceSlug:'moon',targetOrbitNodeSlug:'moon-llo-100'},'Ascent wurde autorisiert.')} disabled={busy}>Ascent autorisieren</button>}
+        {ascent?.executionReady&&shipId&&<button className="primary" onClick={()=>void operation('/api/game/ascent',{action:'advance',shipId},'Ascent wurde um eine serverautorisierte Phase fortgesetzt.')} disabled={busy}>Nächste Ascent-Phase</button>}
+        {orbitalArrived&&!reservedByThis&&!occupiedByThis&&shipId&&<button onClick={()=>void operation('/api/game/docking',{action:'reserve',shipId,portId:'moon-a1'},'moon-a1 wurde reserviert.')} disabled={busy||moonA1?.status!=='available'}>moon-a1 reservieren</button>}
+        {reservedByThis&&!occupiedByThis&&shipId&&<button onClick={()=>void operation('/api/game/docking',{action:'dock',shipId,portId:'moon-a1'},'Shuttle ist physisch an moon-a1 angedockt.')} disabled={busy}>Andocken</button>}
+        {occupiedByThis&&connection&&shuttle?.inventory?.id&&shuttle?.orbitalInterface?.id&&<button onClick={()=>void operation('/api/game/logistics/handover',{action:'transfer-connected',connectionId:connection.id,sourceInventoryId:shuttle.inventory!.id,targetInventoryId:shuttle.orbitalInterface!.id,resource:cargoResource,amount:cargoAmount},'Cargo wurde über die aktive Docking-Verbindung ins Lunar Orbital Interface übertragen.')} disabled={busy||shipAvailable<cargoAmount}>Shuttle → Orbital Depot ({shipAvailable})</button>}
+      </div>
       <div className="facts">
         <span>Startmasse: {article?.actual_start_mass_kg??'unresolved'} kg</span>
         <span>Crew/Cargo/Equipment: {article?.crew_cargo_mission_equipment_kg??'unresolved'} kg</span>
@@ -147,7 +187,7 @@ export default function MoonAscentShuttlePanel(){
       button{border:1px solid #465b66;background:#13222a;color:#dbe5e9;padding:8px 12px;border-radius:8px;cursor:pointer}.primary{background:#5d4d2b;border-color:#8b7340;color:#f4dfaa}button:disabled{opacity:.45}
       .provision{margin-top:12px;padding:12px;background:#151f24;border:1px dashed #45545d;border-radius:10px}.provision p,.warning p{margin:4px 0 0;color:#929fa6;font-size:11px}
       .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.grid div,.facts{background:#101e26;border:1px solid #2a3c46;border-radius:9px;padding:9px}.grid b{display:block;font-size:12px}.grid span,.facts span{font-size:10px;color:#93a2aa}
-      .facts{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}.handover{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px;background:#101e26;border:1px solid #2a3c46;border-radius:9px}.handover div{display:grid;margin-right:auto}.handover b{font-size:11px}.handover span{font-size:10px;color:#93a2aa}.handover select,.handover input{background:#091117;color:#e8edf0;border:1px solid #344852;border-radius:7px;padding:7px}.handover input{width:70px}.warning{margin-top:10px;padding:10px;border:1px solid #665938;background:#221f16;border-radius:9px}.warning span{display:block;color:#d7bd7a;font-size:11px;margin-top:4px}
+      .facts{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}.orbital{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px;background:#121b24;border:1px solid #2d4355;border-radius:9px}.orbital div{display:grid;margin-right:auto}.orbital b{font-size:11px}.orbital span{font-size:10px;color:#93a2aa}.handover{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px;background:#101e26;border:1px solid #2a3c46;border-radius:9px}.handover div{display:grid;margin-right:auto}.handover b{font-size:11px}.handover span{font-size:10px;color:#93a2aa}.handover select,.handover input{background:#091117;color:#e8edf0;border:1px solid #344852;border-radius:7px;padding:7px}.handover input{width:70px}.warning{margin-top:10px;padding:10px;border:1px solid #665938;background:#221f16;border-radius:9px}.warning span{display:block;color:#d7bd7a;font-size:11px;margin-top:4px}
       .evidence{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.evidence span{font:10px monospace;padding:3px 6px;border:1px solid #40505a;border-radius:12px}.evidence span[data-state="ready"]{color:#83c99a;border-color:#315a4a}.evidence span[data-state="blocked"]{color:#e38b83;border-color:#684247}.message{color:#cbd8de;font-size:11px}
       @media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.provision{align-items:start;flex-direction:column}}
     `}</style>
