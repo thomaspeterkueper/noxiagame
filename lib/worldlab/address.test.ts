@@ -16,3 +16,15 @@ describe('parseAddressQuery', () => {
     expect(parseAddressQuery('%str')).toBeNull()
   })
 })
+
+describe('streetKey', () => {
+  it('treats ß and ss, Str. and spacing alike', async () => {
+    const { streetKey, streetPrefix } = await import('./address')
+    expect(streetKey('Hauptstrasse')).toBe(streetKey('Hauptstraße'))
+    expect(streetKey('Hauptstr.')).toBe(streetKey('Hauptstraße'))
+    expect(streetKey('Zur Hubertushalle')).toBe(streetKey('zur  hubertushalle'))
+    expect(streetKey('Bogenstraße')).not.toBe(streetKey('Hauptstraße'))
+    expect(streetPrefix('Hauptstrasse')).toBe('Hauptstra')
+    expect(streetPrefix('Bogenstraße')).toBe('Bogenstra')
+  })
+})

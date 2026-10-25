@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { parseAddressQuery } from '@/lib/worldlab/address'
+import { parseAddressQuery, streetKey, streetPrefix } from '@/lib/worldlab/address'
 
 type Point = { lat: number; lon: number }
 const centroid = (points: Point[]): Point => ({ lat: points.reduce((s, p) => s + p.lat, 0) / points.length, lon: points.reduce((s, p) => s + p.lon, 0) / points.length })
@@ -26,9 +26,9 @@ export async function GET(req: NextRequest) {
   if (query.number) {
     // Hausnummer über jsonb-Enthaltensein (der Doppelpunkt im Schlüssel verträgt sich nicht mit ->>), Straße hier vergleichen.
     const { data } = await supabase.from('region_features').select('geometry,properties')
-      .eq('feature_type', 'building').contains('properties', { 'addr:housenumber': query.number }).limit(200)
-    const wanted = query.street.toLocaleLowerCase('de')
-    const hits = (data ?? []).filter(row => String(row.properties?.['addr:street'] ?? '').toLocaleLowerCase('de') === wanted
+      .eq('feature_type', 'building').contains('properties', { 'addr:housenumber': query.number }).limit(1000)
+    const wanted = streetKey(query.street)
+    const hits = (data ?? []).filter(row => streetKey(String(row.properties?.['addr:street'] ?? '')) === wanted
       && Array.isArray(row.geometry?.coordinates) && row.geometry.coordinates.length)
       .map(row => ({ row, at: centroid(row.geometry.coordinates as Point[]) }))
       .sort((a, b) => distance(a.at) - distance(b.at))
@@ -39,8 +39,10 @@ export async function GET(req: NextRequest) {
     }
   }
   // Ohne Hausnummer (oder nicht gefunden): Mitte der Straße.
-  const { data: roads } = await supabase.from('region_features').select('geometry,properties')
-    .eq('feature_type', 'road').ilike('properties->>name', query.street).limit(20)
+  // „Hauptstrasse“ soll „Hauptstraße“ finden: grob nach dem Anfang vorauswählen, genau mit streetKey vergleichen.
+  const { data: candidates } = await supabase.from('region_features').select('geometry,properties')
+    .eq('feature_type', 'road').ilike('properties->>name', streetPrefix(query.street) + '%').limit(400)
+  const roads = (candidates ?? []).filter(row => streetKey(String(row.properties?.name ?? '')) === streetKey(query.street))
   const points = (roads ?? []).flatMap(row => Array.isArray(row.geometry?.coordinates) ? row.geometry.coordinates as Point[] : [])
     .sort((a, b) => distance(a) - distance(b))
   if (!points.length) return NextResponse.json({ error: `„${query.street}${query.number ? ' ' + query.number : ''}“ ist in den geladenen Kartendaten nicht bekannt.` }, { status: 404 })

@@ -19,3 +19,17 @@ export function parseAddressQuery(raw: string): AddressQuery | null {
   if (street.length < 2 || /[%_\\]/.test(street)) return null
   return { kind: 'address', street, number: withNumber ? withNumber[2].replace(/\s+/g, '') : null }
 }
+
+/**
+ * Vergleichsschlüssel für Straßennamen: Groß/klein, ß/ss, „Str.“, Leerzeichen
+ * und Bindestriche spielen keine Rolle („Hauptstrasse“ = „Hauptstraße“).
+ */
+export function streetKey(name: string): string {
+  return name.toLocaleLowerCase('de').replace(/ß/g, 'ss').replace(/str\.?(?=$|\s)/g, 'strasse').replace(/[\s.-]+/g, '')
+}
+
+/** Anfang eines Straßennamens bis vor die erste Stelle, an der ß/ss stehen kann – für eine grobe Vorauswahl in der Datenbank. */
+export function streetPrefix(name: string): string {
+  const cut = name.search(/ß|ss|\s|-/i)
+  return (cut > 0 ? name.slice(0, cut) : name).slice(0, 40)
+}

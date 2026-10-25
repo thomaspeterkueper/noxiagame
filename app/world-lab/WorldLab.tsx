@@ -400,7 +400,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .world-lab.embedded{inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120}
       .panel .leave{border:0;background:none;padding:0;text-align:left;font-size:11px;color:#d9bb6a;cursor:pointer;margin-top:4px}
       .stage{position:absolute;inset:0}
-      .panel{position:absolute;left:14px;top:14px;width:250px;padding:12px 14px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px;display:grid;gap:4px}
+      .panel{position:absolute;left:14px;top:14px;width:270px;box-sizing:border-box;padding:12px 14px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
       .panel small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .panel b{font-size:14px}
       .panel span{font-size:10px;color:#9fb5b0}
@@ -409,7 +409,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:4px 0;font-size:11px}
       dt{color:#9fb5b0}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
       .error{margin:4px 0;font-size:11px;color:#f0b9a0}
-      .refresh{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;margin-top:4px}
+      .refresh{width:100%;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;margin-top:4px}
       .refresh:disabled{opacity:.6;cursor:default}
       .note{margin:2px 0;font-size:10px;color:#9fb5b0}
       .dest{display:flex;gap:5px;margin:6px 0 2px}
@@ -419,7 +419,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .panel .street{font-size:11px;color:#dfe9e4}
       .target{display:grid;gap:2px;margin:6px 0 0}
       .target span{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
-      .target select{border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 6px;font-size:11px;max-width:100%}
+      .target select{width:100%;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 6px;font-size:11px}
       .tip{position:fixed;z-index:1200;pointer-events:none;display:grid;gap:1px;padding:6px 8px;background:#0d1c22ee;border:1px solid #40595a;border-radius:6px;font-size:11px;color:#eef2ed;max-width:260px}
       .tip span{color:#9fb5b0}.tip small{color:#d9bb6a;font-size:10px}
       @media(max-width:700px){
