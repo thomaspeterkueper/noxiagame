@@ -7,8 +7,8 @@ function check(ok: boolean, label: string) { if (!ok) { failures += 1; console.e
 function person(id: string, activityState: Person['activityState']): Person {
   return { id, displayName: id, birthYear: null, currentLocationId: 'mars', simulationTier: 'active', activityState, lastAction: null, lastDecisionFactors: {}, lastTick: 1 }
 }
-function assignment(id: string, personId: string, assignmentType: PersonAssignment['assignmentType'], tileEntityId: string | null): PersonAssignment {
-  return { id, personId, assignmentType, locationId: 'mars', tileEntityId, employerActorId: null, roleCode: null, startsTick: null, endsTick: null, isActive: true }
+function assignment(id: string, personId: string, assignmentType: PersonAssignment['assignmentType'], tileEntityId: string | null, regionFeatureId: string | null = null): PersonAssignment {
+  return { id, personId, assignmentType, locationId: 'mars', tileEntityId, regionFeatureId, employerActorId: null, roleCode: null, startsTick: null, endsTick: null, isActive: true }
 }
 
 const worker = person('worker', 'working')
@@ -38,6 +38,19 @@ const temporaryIdle = resolvedPresenceCandidate(person('temporary-idle', 'idle')
   assignment('tmp', 'temporary-idle', 'temporary', 'clinic-waiting'),
 ])
 check(temporaryIdle?.tileEntityId === 'clinic-waiting', 'explicit temporary assignment resolves idle presence')
+
+
+const regionVisitor = resolvedPresenceCandidate(person('region-visitor', 'socialising'), [
+  assignment('rv-home', 'region-visitor', 'home', 'hab-3'),
+  assignment('rv-visit', 'region-visitor', 'temporary', null, 'church-1'),
+])
+check(regionVisitor?.regionFeatureId === 'church-1' && !regionVisitor.tileEntityId, 'temporary visit resolves to real region feature')
+
+const regionWorker = resolvedPresenceCandidate(person('region-worker', 'working'), [
+  assignment('rw-home', 'region-worker', 'home', 'hab-4'),
+  assignment('rw-work', 'region-worker', 'work', null, 'church-1'),
+])
+check(regionWorker?.regionFeatureId === 'church-1', 'working person resolves to real-region work place')
 
 const unresolved = resolvedPresenceCandidates([
   person('a', 'working'), person('b', 'working'), person('c', 'idle'),
