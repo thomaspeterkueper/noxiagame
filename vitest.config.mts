@@ -35,6 +35,7 @@ export default defineConfig({
       'lib/worldlab/rects.test.ts',
       'lib/worldlab/railLine.test.ts',
       'lib/worldlab/utm.test.ts',
+      'lib/worldlab/parcelGeometry.test.ts',
       'lib/worldlab/alkis.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',
       'lib/game/landmarks/interiors.test.ts',

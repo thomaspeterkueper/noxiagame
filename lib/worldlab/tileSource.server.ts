@@ -59,7 +59,7 @@ export async function loadTile(supabase: Supabase, tile: TileId): Promise<Simpli
 async function tileParcels(supabase: Supabase, tile: TileId, lat: number) {
   const origin = tileOrigin(tile)
   const nw = mercToGeo(origin), se = mercToGeo({ x: origin.x + TILE_SIZE_MERC, y: origin.y - TILE_SIZE_MERC })
-  const { data, error } = await supabase.from('earth_parcels').select('id,ring')
+  const { data, error } = await supabase.from('earth_parcels').select('id,ring').is('retired_at', null)
     .lte('min_lat', nw.lat).gte('max_lat', se.lat).lte('min_lon', se.lon).gte('max_lon', nw.lon).limit(4000)
   if (error || !data?.length) return []
   const k = mercPerGroundMetre(lat)

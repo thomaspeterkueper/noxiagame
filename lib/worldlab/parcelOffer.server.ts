@@ -4,7 +4,8 @@
 // könnte man im Garten eines anderen bauen.
 
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileOrigin, TILE_SIZE_MERC, type GeoPoint } from './mercator'
-import { landRate, parcelNotForSale } from './alkis'
+import { cadastreAttribution, landRate, parcelNotForSale } from './alkis'
+import { mergeRings } from './parcelGeometry'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, offerFor, type Supabase } from './buildingOffer.server'
 import { loadTile } from './tileSource.server'
@@ -33,7 +34,7 @@ export function ringAreaM2(ring: readonly GeoPoint[]) {
 
 /** Flurstück, in dem ein Punkt liegt (nur gespeicherte Flurstücke). */
 export async function parcelAt(supabase: Supabase, p: GeoPoint): Promise<ParcelRow | null> {
-  const { data } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon')
+  const { data } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon').is('retired_at', null)
     .lte('min_lat', p.lat).gte('max_lat', p.lat).lte('min_lon', p.lon).gte('max_lon', p.lon).limit(20)
   return ((data ?? []) as ParcelRow[]).find(row => Array.isArray(row.ring) && insideRing(p, row.ring)) ?? null
 }
@@ -41,7 +42,7 @@ export async function parcelAt(supabase: Supabase, p: GeoPoint): Promise<ParcelR
 /** Flurstücke, die ein Rechteck (Mitte, Maße, Drehung) berühren, mit Eigentümer. */
 export async function parcelsAround(supabase: Supabase, p: GeoPoint, radiusM: number) {
   const dLat = radiusM / 111320, dLon = radiusM / (111320 * Math.cos(p.lat * Math.PI / 180))
-  const { data } = await supabase.from('earth_parcels').select('id,ring,usage')
+  const { data } = await supabase.from('earth_parcels').select('id,ring,usage').is('retired_at', null)
     .lte('min_lat', p.lat + dLat).gte('max_lat', p.lat - dLat).lte('min_lon', p.lon + dLon).gte('max_lon', p.lon - dLon).limit(200)
   const rows = (data ?? []) as Array<{ id: string; ring: GeoPoint[]; usage: string | null }>
   const { data: owners } = rows.length ? await supabase.from('earth_parcel_owners').select('parcel_id,profile_id').in('parcel_id', rows.map(row => row.id)) : { data: [] }
@@ -69,7 +70,13 @@ async function buildingsOn(supabase: Supabase, ring: readonly GeoPoint[]) {
 
 export interface ParcelOffer {
   id: string; label: string; areaM2: number; usage: string | null
+  /** Quellenvermerk (Kataster des Landes oder „im Spiel vermessen“) */
+  source: string
   owned: boolean; own: boolean
+  /** von einem Spieler zum Verkauf angeboten */
+  listed?: boolean
+  /** eigene Nachbarflurstücke mit gemeinsamer Grenze – zum Zusammenlegen */
+  neighbours?: Array<{ id: string; label: string; areaM2: number }>
   forSale: boolean; reason?: string; price?: number; seller?: string
   buildings: Array<{ source: string; name: string; residents: number }>
   residents: number; rentPerInterval: number
@@ -77,13 +84,26 @@ export interface ParcelOffer {
 }
 
 export async function parcelOffer(supabase: Supabase, id: string, profileId: string | null): Promise<ParcelOffer | null> {
-  const { data: row } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon').eq('id', id).maybeSingle()
+  const { data: row } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon,source').eq('id', id).is('retired_at', null).maybeSingle()
   if (!row) return null
-  const parcel = row as ParcelRow
+  const parcel = row as ParcelRow & { source: string | null }
   const areaM2 = Math.round(parcel.area_m2 ?? ringAreaM2(parcel.ring))
-  const base = { id: parcel.id, label: parcel.label ?? 'Flurstück', areaM2, usage: parcel.usage, buildings: [] as ParcelOffer['buildings'], residents: 0, rentPerInterval: 0 }
-  const { data: owner } = await supabase.from('earth_parcel_owners').select('profile_id').eq('parcel_id', id).maybeSingle()
-  if (owner) return { ...base, owned: true, own: owner.profile_id === profileId, forSale: false, reason: owner.profile_id === profileId ? 'gehört dir' : 'gehört einem anderen Spieler' }
+  const source = parcel.source === 'noxia' ? 'im Spiel neu vermessen (aus amtlichen Flurstücken)' : cadastreAttribution(parcel.source)
+  const base = { id: parcel.id, label: parcel.label ?? 'Flurstück', areaM2, usage: parcel.usage, source, buildings: [] as ParcelOffer['buildings'], residents: 0, rentPerInterval: 0 }
+  const { data: owner } = await supabase.from('earth_parcel_owners').select('profile_id,profiles(username)').eq('parcel_id', id).maybeSingle()
+  if (owner) {
+    const own = owner.profile_id === profileId
+    const ownerName = (owner as { profiles?: { username?: string } | null }).profiles?.username ?? 'ein anderer Spieler'
+    const { data: listing } = await supabase.from('earth_property_listings').select('price').eq('kind', 'parcel').eq('ref', id).maybeSingle()
+    const sources = await buildingsOn(supabase, parcel.ring)
+    for (const ref of sources) {
+      const { data: entity } = await supabase.from('tile_entities').select('display_name,residential_capacity').eq('source_ref', ref).maybeSingle()
+      if (entity) base.buildings.push({ source: ref, name: String(entity.display_name ?? 'Gebäude'), residents: 0 })
+    }
+    const neighbours = own ? await ownNeighbours(supabase, parcel, profileId!) : undefined
+    if (listing) return { ...base, owned: true, own, listed: true, neighbours, forSale: !own, price: Number(listing.price), seller: own ? 'du' : ownerName, reason: own ? 'von dir angeboten' : undefined }
+    return { ...base, owned: true, own, neighbours, seller: own ? 'du' : ownerName, forSale: false, reason: own ? 'gehört dir' : `gehört ${ownerName}` }
+  }
   const blocked = parcelNotForSale(parcel.usage)
   if (blocked) return { ...base, owned: false, own: false, forSale: false, reason: blocked }
 
@@ -107,4 +127,19 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   const seller = (publicActor as { actors?: { display_name?: string } | null } | null)?.actors?.display_name ?? 'Gemeinde'
   const price = Math.max(500, Math.round((areaM2 * landRate(parcel.usage) + value) / 50) * 50)
   return { ...base, owned: false, own: false, forSale: true, price, seller, items }
+}
+
+/** Eigene Flurstücke, die mit diesem eine Grenze teilen (zusammenlegbar). */
+async function ownNeighbours(supabase: Supabase, parcel: ParcelRow, profileId: string) {
+  const centre = { lat: parcel.centre_lat, lon: parcel.centre_lon }
+  const radius = Math.sqrt(Math.max(ringAreaM2(parcel.ring), 100)) * 2 + 60
+  const around = await parcelsAround(supabase, centre, radius)
+  const out: NonNullable<ParcelOffer['neighbours']> = []
+  for (const other of around) {
+    if (other.id === parcel.id || other.owner !== profileId || !Array.isArray(other.ring)) continue
+    if (!mergeRings(parcel.ring, other.ring)) continue
+    const { data } = await supabase.from('earth_parcels').select('label,area_m2').eq('id', other.id).maybeSingle()
+    out.push({ id: other.id, label: String(data?.label ?? 'Flurstück'), areaM2: Math.round(Number(data?.area_m2 ?? ringAreaM2(other.ring))) })
+  }
+  return out
 }
