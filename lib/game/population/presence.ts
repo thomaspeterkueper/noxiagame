@@ -3,7 +3,7 @@ import type { EncounterCandidate } from './encounters'
 import { isAsleepAction } from './circadian'
 
 function activeAtLocation(person: Person, assignment: PersonAssignment): boolean {
-  return assignment.isActive && assignment.locationId === person.currentLocationId && Boolean(assignment.tileEntityId)
+  return assignment.isActive && assignment.locationId === person.currentLocationId && Boolean(assignment.tileEntityId || assignment.regionFeatureId)
 }
 
 function assignmentPriority(person: Person, assignment: PersonAssignment): number {
@@ -46,9 +46,12 @@ export function resolvedPresenceCandidate(
     .filter(item => item.priority >= 0)
     .sort((a, b) => (b.priority - a.priority) || a.assignment.id.localeCompare(b.assignment.id))
 
-  const tileEntityId = resolved[0]?.assignment.tileEntityId ?? null
-  if (!tileEntityId) return null
-  return { person, tileEntityId }
+  const assignment = resolved[0]?.assignment
+  if (!assignment) return null
+  const tileEntityId = assignment.tileEntityId ?? null
+  const regionFeatureId = assignment.regionFeatureId ?? null
+  if (!tileEntityId && !regionFeatureId) return null
+  return { person, tileEntityId, regionFeatureId }
 }
 
 export function resolvedPresenceCandidates(
