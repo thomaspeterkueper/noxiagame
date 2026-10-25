@@ -216,3 +216,13 @@ Gespräch im Startcafé, 25.10.2026: Der Spieler sagt „Nenn mich Thomas“, Mi
 - Lernen des Namens: serverseitig aus der Spieleräußerung (Muster „nenn mich …“, „ich heiße …“, „ich bin …“) oder über einen Marker der Figur wie bei `[[ACTION:ACCEPT_CREDITS]]; die Oberfläche könnte ergänzend „Vorstellen“ als Knopf anbieten, wenn ihr das lieber ist.
 - Gefälligkeiten: `recipientPersonId` der Bestellroute (Aufgabe 9) schreibt den Eintrag; die Gesprächsroute liest ihn. Hängt mit R-8 (Wissensspuren) zusammen – dies wäre der erste Satz solcher Spuren.
 - Bis dahin: Die Gesprächsroute sollte der Figur sagen, dass sie sich nur an die letzten Wortwechsel erinnert, damit sie kein „das merke ich mir“ verspricht – das übernimmt Gastronomie.
+
+### R-13 (Gastronomie, 25.10.2026): Bestehende Gebäude kaufen und zum Lokal umbauen
+
+Entscheidung (Thomas, 25.10.2026): Auf der Erde soll ein Café nicht als eigenes Gebäude gebaut werden. Man kauft ein bestehendes Gebäude des realen Ortes und baut es zum Café, zur Bar, zum Restaurant oder Hotel um – sofern es nicht schon eines ist. Das selbst gebaute Startcafé soll weg, sobald das geht.
+
+- **Gebäude als Kaufobjekt:** Ein reales Gebäude aus `region_features` (Grundriss, Adresse) wird beim Kauf zu einer `tile_entities`-Zeile mit Verweis auf das Kartengebäude (W-4). Preis nach Fläche und Lage (Vorschlag: Grundfläche × Satz je Ort; die Innenstadt teurer); Verkäufer ist vorerst der Ort (`location_public_actors`), später der jeweilige Eigentümer.
+- **Umbau als Nutzung:** Statt neuer Gebäudearten eine Nutzung am Gebäude (`cafe`, `bar`, `restaurant`, `hotel`); Umbaukosten und Bauzeit wie heute die Baukosten (Café 900, Bar 1 800, Restaurant 2 400, Hotel 3 600 Credits), Personalplätze und `transient_capacity` nach Größe. Ein Gebäude, das in den Kartendaten schon Lokal ist (`amenity` cafe/bar/restaurant, `tourism` hotel), ist nicht umbaubar – es ist bereits eines und gehört zunächst dem Ort.
+- **Startcafé:** Übergang – entweder auf ein reales Gebäude an der Hauptstraße übertragen (das Personal, die Käufe und die Kennung `tile_entities.id` behalten, nur Grundriss und Adresse wechseln), oder beim ersten gekauften Café stilllegen. Vorschlag: übertragen, damit Mika und die Historie bleiben.
+- **Wohnung über dem Lokal (R-6)** ergibt sich dann aus dem gekauften Haus: Geschosse über dem Erdgeschoss sind Wohnungen.
+- Gastronomie liefert: Lokalart aus der Nutzung lesen, Grundriss nach Gebäudegröße, Bar- und Restaurantraum für die realen Lokale (Metropol, Balkan Grill), sobald sie Gebäude mit Nutzung sind.

@@ -16,6 +16,17 @@ Bezug: `docs/gameplay/settlement-tiers.md` (Rolle des Cafés), `NOXIA-LIVING-001
 
 Im Spiel erreichbar ist heute nur das Café. `bar` steht im Gebäudekatalog weiter auf `planned`, `restaurant` hat dort noch keinen Eintrag. Beides bleibt so, bis die Lokale eine echte Funktion haben (Regel „keine leeren Hüllen“). Sobald ein Gebäude mit `entity_id` `bar` oder `restaurant` existiert, öffnet es ohne weitere Arbeit den passenden Raum.
 
+### Lokale auf der Erde: kaufen und umbauen statt neu bauen
+
+Entscheidung (Thomas, 25.10.2026): Auf der Erde wird ein Lokal nicht auf freier Fläche gebaut. Man **kauft ein bestehendes Gebäude** des realen Ortes und baut es zum Café, zur Bar, zum Restaurant oder Hotel um – sofern es nicht schon eines ist. Das selbst gebaute Startcafé an der Hauptstraße ist ein Übergangszustand und soll verschwinden, sobald der Kaufweg steht.
+
+Folgen für die Gastronomie (bleibt hier):
+- Die Lokalart leitet sich künftig aus dem gekauften Gebäude ab, nicht aus einer eigenen Kachel: ein Gebäude trägt eine Nutzung (`cafe`, `bar`, `restaurant`, `hotel`), der Innenraum öffnet wie bisher über `venueKindForBuildingType`.
+- Reale Lokale aus den Kartendaten sind von Anfang an Lokale: In Sundern das „Metropol“ (Bar, Hauptstraße 76) und der „Balkan Grill“ (Restaurant, Hauptstraße 68). Sie sind nicht umbaubar, aber betretbar, sobald sie ein NOXIA-Gebäude mit Nutzung sind – mit Bar- bzw. Restaurantraum, Karte nach R-2 und Personal nach LIVING-0010.
+- Beim Umbau Grundriss nach Gebäudegröße: kleines Haus → Café-Raum, großes → Restaurant oder Hotel mit `transient_capacity` aus der Geschossfläche (Vorschlag, noch nicht gebaut).
+
+Kaufen, Eigentum, Umbaukosten und die Verbindung Kartengebäude ↔ `tile_entities` liegen bei Bevölkerung und Ökonomie (R-13) und Weltkarte (W-4).
+
 ## 1a. Hafenkantine
 
 Seit 13.10.2026 steht in jedem Hafengebäude eine staatliche Hafenkantine (`port_canteen`, NOXIA-LIVING-0013). Für Spieler ist sie jetzt betretbar (Request G-1):
