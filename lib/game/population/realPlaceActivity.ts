@@ -210,11 +210,15 @@ export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:nu
 
   const {data:host,error:hostError}=await supabase
     .from('people')
-    .select('id,current_location_id')
+    .select('id,current_location_id,activity_state,last_action')
     .eq('person_key','earth-sundern-st-johannes-priest-001')
     .maybeSingle()
   if(hostError)throw hostError
   if(!host){result.skipped=true;return result}
+  if(host.activity_state==='travelling' || (host.activity_state==='resting' && String(host.last_action??'').includes('sleep'))){
+    result.skipped=true
+    return result
+  }
 
   const {data:work,error:workError}=await supabase
     .from('person_assignments')
