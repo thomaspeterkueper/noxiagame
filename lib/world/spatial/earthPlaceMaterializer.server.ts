@@ -310,55 +310,43 @@ way[landuse=residential](${box});
 
 async function loadNormalizedFeatures(bounds: Bounds) {
   const failures: string[] = []
-  const query = queryFor(bounds)
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-          'user-agent': 'NOXIA/0.1 earth-place-materializer',
-        },
-        body: new URLSearchParams({ data: query }),
-        signal: controller.signal,
-        cache: 'no-store',
-      })
-      if (!response.ok) {
-        failures.push(`${new URL(endpoint).host}: HTTP ${response.status}`)
-        continue
+  // The synchronous API must stay below the gateway timeout. A compact OSM
+  // snapshot is preferable to a 504 and an empty, unusable place.
+  const profiles = [
+    { name: 'compact-v2', query: compactQueryFor(bounds) },
+    { name: EARTH_IMPORT_PROFILE, query: queryFor(bounds) },
+  ]
+  for (const profile of profiles) {
+    for (const endpoint of OVERPASS_ENDPOINTS.slice(0, 2)) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 9_000)
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded',
+            'user-agent': 'NOXIA/0.1 earth-place-materializer',
+          },
+          body: new URLSearchParams({ data: profile.query }),
+          signal: controller.signal,
+          cache: 'no-store',
+        })
+        if (!response.ok) {
+          failures.push(`${profile.name} ${new URL(endpoint).host}: HTTP ${response.status}`)
+          continue
+        }
+        const payload = await response.json() as { elements?: OverpassElement[] }
+        const features = toFeatures(payload.elements ?? [], bounds)
+        if (features.length) {
+          return { features, source: `overpass:${new URL(endpoint).host}:${profile.name}` }
+        }
+        failures.push(`${profile.name} ${new URL(endpoint).host}: empty result`)
+      } catch (error) {
+        failures.push(`${profile.name} ${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
+      } finally {
+        clearTimeout(timer)
       }
-      const payload = await response.json() as { elements?: OverpassElement[] }
-      return { features: toFeatures(payload.elements ?? [], bounds), source: `overpass:${new URL(endpoint).host}:${EARTH_IMPORT_PROFILE}` }
-    } catch (error) {
-      failures.push(`${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
-    } finally {
-      clearTimeout(timer)
     }
-  }
-  // A full import can exceed the public instances' runtime budget. Retry with
-  // a deliberately smaller, provenance-preserving cartographic subset.
-  const compact = compactQueryFor(bounds)
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'NOXIA/0.1 earth-place-materializer' },
-        body: new URLSearchParams({ data: compact }),
-        signal: controller.signal,
-        cache: 'no-store',
-      })
-      if (!response.ok) { failures.push(`compact ${new URL(endpoint).host}: HTTP ${response.status}`); continue }
-      const payload = await response.json() as { elements?: OverpassElement[] }
-      const features = toFeatures(payload.elements ?? [], bounds)
-      if (features.length) return { features, source: `overpass:${new URL(endpoint).host}:compact-v1` }
-      failures.push(`compact ${new URL(endpoint).host}: empty result`)
-    } catch (error) {
-      failures.push(`compact ${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
-    } finally { clearTimeout(timer) }
   }
   throw new Error(`Kartennormalisierung fehlgeschlagen: ${failures.join('; ')}`)
 }
