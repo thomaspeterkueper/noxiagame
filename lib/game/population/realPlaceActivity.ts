@@ -128,7 +128,22 @@ async function ensureVisitor(
   if(existingError)throw existingError
 
   const current=existing?.[0]
-  if(current && current.region_feature_id===regionFeatureId && current.role_code===roleCode && Number(current.starts_tick)===window.startTick)return false
+  if(current && current.region_feature_id===regionFeatureId && current.role_code===roleCode){
+    const {error}=await supabase.from('people').update({
+      activity_state:'socialising',
+      last_action:`visit:${window.kind}`,
+      last_decision_factors:{
+        destinationRegionFeatureId:regionFeatureId,
+        hostPersonId,
+        activityKind:window.kind,
+        attendanceDoesNotImplyBelief:true,
+      },
+      last_tick:tick,
+      updated_at:new Date().toISOString(),
+    }).eq('id',personId)
+    if(error)throw error
+    return false
+  }
   if(current){
     const {error}=await supabase.from('person_assignments').update({
       is_active:false,
@@ -146,7 +161,7 @@ async function ensureVisitor(
     region_feature_id:regionFeatureId,
     employer_actor_id:null,
     role_code:roleCode,
-    starts_tick:window.startTick,
+    starts_tick:tick,
     ends_tick:window.endTick,
     is_active:true,
   }).select('id').single()
