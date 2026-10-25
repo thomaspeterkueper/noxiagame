@@ -75,6 +75,8 @@ export interface ParcelOffer {
   owned: boolean; own: boolean
   /** von einem Spieler zum Verkauf angeboten */
   listed?: boolean
+  /** Steuer auf Verkäufe unter Spielern (Satz des Verwaltungsbezirks, vorerst der Gemeinde) */
+  taxRate?: number; district?: string | null
   /** eigene Nachbarflurstücke mit gemeinsamer Grenze – zum Zusammenlegen */
   neighbours?: Array<{ id: string; label: string; areaM2: number }>
   forSale: boolean; reason?: string; price?: number; seller?: string
@@ -84,7 +86,7 @@ export interface ParcelOffer {
 }
 
 export async function parcelOffer(supabase: Supabase, id: string, profileId: string | null): Promise<ParcelOffer | null> {
-  const { data: row } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon,source').eq('id', id).is('retired_at', null).maybeSingle()
+  const { data: row } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon,source,props').eq('id', id).is('retired_at', null).maybeSingle()
   if (!row) return null
   const parcel = row as ParcelRow & { source: string | null }
   const areaM2 = Math.round(parcel.area_m2 ?? ringAreaM2(parcel.ring))
@@ -101,6 +103,9 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
       if (entity) base.buildings.push({ source: ref, name: String(entity.display_name ?? 'Gebäude'), residents: 0 })
     }
     const neighbours = own ? await ownNeighbours(supabase, parcel, profileId!) : undefined
+    const district = String((row as { props?: Record<string, unknown> }).props?.gemeinde ?? '') || null
+    const { data: rate } = await supabase.rpc('earth_property_tax_rate', { p_district: district ?? '*' })
+    Object.assign(base, { taxRate: Number(rate ?? 0.05), district })
     if (listing) return { ...base, owned: true, own, listed: true, neighbours, forSale: !own, price: Number(listing.price), seller: own ? 'du' : ownerName, reason: own ? 'von dir angeboten' : undefined }
     return { ...base, owned: true, own, neighbours, seller: own ? 'du' : ownerName, forSale: false, reason: own ? 'gehört dir' : `gehört ${ownerName}` }
   }
