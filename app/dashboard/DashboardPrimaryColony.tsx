@@ -15,7 +15,8 @@ import EarthWalkableSurface from '@/app/earth/EarthWalkableSurface'
 // der bisherigen Erdszene. PixiJS erst laden, wenn sie geöffnet wird.
 const WorldLab = dynamic(() => import('@/app/world-lab/WorldLab'), { ssr: false })
 const EARTH_VIEW_KEY = 'noxia-earth-view-v1'
-const earthViewToggle = <style>{`.noxia-earth-view-toggle{position:fixed;z-index:1130;left:50%;top:calc(var(--noxia-topbar-h,44px) + 12px);transform:translateX(-50%);border:1px solid #5d7b79;border-radius:7px;background:#17383ae6;color:#eef2ed;font:700 11px system-ui;padding:7px 12px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2)}.noxia-earth-view-toggle:hover{background:#1f4a4d}`}</style>
+// Knopf unten links: oben in der Mitte liegt die Ortsleiste (EarthRegionSwitcherOverlay, Ebene 2260) und deckte ihn zu.
+const earthViewToggle = <style>{`.noxia-earth-view-toggle{position:fixed;z-index:2270;left:14px;bottom:24px;border:1px solid #5d7b79;border-radius:7px;background:#17383ae6;color:#eef2ed;font:700 11px system-ui;padding:7px 12px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2)}.noxia-earth-view-toggle:hover{background:#1f4a4d}.noxia-earth-view-toggle{font-size:13px;padding:10px 16px;border-color:#d9bb6a}`}</style>
 
 const chrome=<style>{`
 /*
