@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingFacts, buildingPrice, notForSaleReason, plannedResidents } from './buildingOffer'
+import { buildingFacts, buildingPrice, locationFactor, notForSaleReason, plannedResidents } from './buildingOffer'
 
 describe('buildingOffer', () => {
   // Rechteck 12 m (Ost) × 8 m (Nord) bei Sundern
@@ -40,5 +40,18 @@ describe('buildingOffer', () => {
     expect(notForSaleReason({ building: 'commercial', amenity: 'bar', name: 'Metropol' }, 'hall')).toBe('Lokal des Ortes')
     expect(notForSaleReason({ building: 'restaurant', amenity: 'restaurant' }, 'house')).toBe('Lokal des Ortes')
     expect(notForSaleReason({ building: 'commercial' }, 'hall')).toBeNull()
+  })
+
+  it('prices the town centre higher', () => {
+    const sundern = [{ name: 'Sundern', place: 'town', lat: 51.329832, lon: 8.0072645 }]
+    // Hauptstraße 72, etwa 510 m von der Ortsmitte
+    const near = locationFactor({ lat: 51.32565445, lon: 8.00417605 }, sundern)
+    expect(near.place).toBe('Sundern')
+    expect(near.factor).toBeGreaterThan(1.3)
+    expect(near.factor).toBeLessThan(1.4)
+    expect(locationFactor({ lat: 51.329832, lon: 8.0072645 }, sundern).factor).toBe(1.6)
+    expect(locationFactor({ lat: 51.36, lon: 8.0 }, sundern)).toEqual({ factor: 1, place: null, distanceM: null })
+    const base = buildingPrice({ areaM2: 100, levels: 2, kind: 'house', rentPerInterval: 0 })
+    expect(buildingPrice({ areaM2: 100, levels: 2, kind: 'house', rentPerInterval: 0, locationFactor: 1.5 })).toBe(Math.round(base * 1.5 / 50) * 50)
   })
 })

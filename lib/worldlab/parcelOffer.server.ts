@@ -7,7 +7,7 @@ import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileOrigin, TILE_SIZE
 import { cadastreAttribution, landRate, parcelNotForSale } from './alkis'
 import { mergeRings } from './parcelGeometry'
 import { buildingValue } from './buildingOffer'
-import { acquireItem, offerFor, type Supabase } from './buildingOffer.server'
+import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
 import { loadTile } from './tileSource.server'
 
 export type ParcelRow = { id: string; ring: GeoPoint[]; label: string | null; usage: string | null; area_m2: number | null; centre_lat: number; centre_lon: number }
@@ -119,13 +119,15 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
     base.buildings.push({ source, name: offer.name ?? 'Gebäude', residents: offer.residents ?? 0 })
     base.residents += offer.residents ?? 0
     base.rentPerInterval += offer.rentPerInterval ?? 0
-    value += buildingValue({ areaM2: offer.facts.areaM2, levels: offer.facts.levels, kind: offer.facts.kind, rentPerInterval: offer.rentPerInterval ?? 0 })
+    value += buildingValue({ areaM2: offer.facts.areaM2, levels: offer.facts.levels, kind: offer.facts.kind, rentPerInterval: offer.rentPerInterval ?? 0, locationFactor: offer.location?.factor })
     items.push(await acquireItem(supabase, source, offer))
   }
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   const { data: publicActor } = earth ? await supabase.from('location_public_actors').select('actor_id,actors(display_name)').eq('location_id', earth.id).maybeSingle() : { data: null }
   const seller = (publicActor as { actors?: { display_name?: string } | null } | null)?.actors?.display_name ?? 'Gemeinde'
-  const price = Math.max(500, Math.round((areaM2 * landRate(parcel.usage) + value) / 50) * 50)
+  // Lage (Innenstadt teurer) auch auf den Boden; die Häuser tragen ihren Aufschlag schon im Wert.
+  const location = await locationAt(supabase, { lat: Number(parcel.centre_lat), lon: Number(parcel.centre_lon) })
+  const price = Math.max(500, Math.round((areaM2 * landRate(parcel.usage) * location.factor + value) / 50) * 50)
   return { ...base, owned: false, own: false, forSale: true, price, seller, items }
 }
 

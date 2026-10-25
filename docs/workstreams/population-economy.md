@@ -240,7 +240,8 @@ Entscheidung (Thomas, 25.10.2026): Auf der Erde soll ein Café nicht als eigenes
 4. **Startcafé übertragen**, nicht gelöscht: dieselbe `tile_entities.id`, Personal, 63 Käufe und Eigentümer bleiben; Grundriss und Adresse sind jetzt die des realen Hauses **Hauptstraße 72** (Geschäftshaus, 12 × 11,6 m, gleich gegenüber dem alten Platz), 2 Personalplätze, 3 Wohnplätze im Obergeschoss. Die Verankerung des Personals auf der Karte ist mitgezogen.
 
 Offen:
-- **Lage im Preis** (Innenstadt teurer): `land_value` der Kachel gibt es für reale Häuser noch nicht. Vorschlag: Satz je m² nach Abstand zur Ortsmitte – **Thomas**.
+- ✅ **Lage im Preis** (entschieden Thomas, 25.10.2026: Vorschlag übernommen): Aufschlag auf Bau- und Bodenwert nach Abstand zur nächsten Ortsmitte (OSM-Ortspunkt `place=*` aus `region_features`), linear fallend bis zum Rand – Stadt +100 % bis 3 km, Kleinstadt +60 % bis 1,2 km, Stadtteil +30 % bis 800 m, Dorf +25 % bis 500 m, Weiler +10 % bis 250 m (`locationFactor` in `lib/worldlab/buildingOffer.ts`, mit Tests). Gilt für Häuser und Flurstücke; die Miete bleibt außen vor. Hauptstraße 72 liegt rund 510 m von der Mitte Sunderns: Faktor 1,34. Das Angebot liefert `location: { factor, place, distanceM }`.
+  **Später konkreter auszuarbeiten (Thomas, 25.10.2026):** Bodenschätze, Infrastruktur (Anschluss an Straße, Bahn, Versorgung), Fertigungsanlagen in der Nähe und Erholungswert als weitere Lagefaktoren.
 - Umbaukosten gehen wie Baukosten in eine Senke ohne Gegenkonto (wie R-12, Aufgabe 6) – ob künftig an eine Baufirma oder die Gemeinde, ist offen.
 - Bewohner kaufen in Bar und Restaurant noch nichts: `npc_service_catalog` kennt nur `cafe` (siehe Antwort zu R-2, zieht mit LIVING-0012 Schritt 3 um).
 - Die übrigen selbst gebauten Cafés (Q1, Peru) sind nicht betroffen.

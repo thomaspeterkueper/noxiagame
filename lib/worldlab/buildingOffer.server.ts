@@ -5,7 +5,7 @@
 
 import type { createServiceClient } from '@/lib/supabase/service'
 import { geoToLocalMeters } from '@/lib/world/spatial/earthSpatial'
-import { buildingFacts, buildingPrice, notForSaleReason, plannedResidents, RENT_PER_RESIDENT, type BuildingFacts } from './buildingOffer'
+import { buildingFacts, buildingPrice, locationFactor, notForSaleReason, plannedResidents, RENT_PER_RESIDENT, type BuildingFacts, type GeoPoint, type SettlementPoint } from './buildingOffer'
 
 export type Supabase = ReturnType<typeof createServiceClient>
 export type FeatureRow = { id: string; region_id: string; geometry: { kind?: string; coordinates?: unknown }; properties: Record<string, unknown> | null }
@@ -21,11 +21,38 @@ export interface Offer {
   /** Bewohner, die beim Kauf als Personen einziehen (das Haus war bisher ohne Personen im Spiel). */
   newResidents?: number
   rentPerInterval?: number
+  /** Lageaufschlag (1 = ohne), nächste Ortsmitte und Abstand dorthin. */
+  location?: { factor: number; place: string | null; distanceM: number | null }
   name?: string
   /** OSM-Tags des Grundrisses (Lokalart, Anschrift, Geschosse). */
   tags?: Record<string, unknown>
   facts?: BuildingFacts
   features?: FeatureRow[]
+}
+
+// Ortsmitten (OSM place=*) aus region_features; wenige Dutzend, kurz zwischengespeichert.
+let settlementCache: { at: number; rows: SettlementPoint[] } | null = null
+async function settlements(supabase: Supabase): Promise<SettlementPoint[]> {
+  if (settlementCache && Date.now() - settlementCache.at < 10 * 60_000) return settlementCache.rows
+  const { data } = await supabase.from('region_features').select('geometry,properties').eq('feature_type', 'settlement').limit(2000)
+  const seen = new Set<string>()
+  const rows = (data ?? []).flatMap(row => {
+    const props = (row.properties ?? {}) as Record<string, unknown>
+    const at = (row.geometry as { coordinates?: { lat?: number; lon?: number } } | null)?.coordinates
+    const name = String(props.name ?? '').trim(), place = String(props.place ?? '')
+    if (!name || !at || !Number.isFinite(at.lat) || !Number.isFinite(at.lon)) return []
+    const key = `${name}:${place}:${at.lat!.toFixed(4)}:${at.lon!.toFixed(4)}`
+    if (seen.has(key)) return []
+    seen.add(key)
+    return [{ name, place, lat: Number(at.lat), lon: Number(at.lon) }]
+  })
+  settlementCache = { at: Date.now(), rows }
+  return rows
+}
+
+/** Lageaufschlag für einen Punkt der Erde (Innenstadt teurer). */
+export async function locationAt(supabase: Supabase, point: GeoPoint) {
+  return locationFactor(point, await settlements(supabase))
 }
 
 export async function offerFor(supabase: Supabase, source: string): Promise<Offer> {
@@ -72,12 +99,14 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
   const newResidents = people.length ? 0 : plannedResidents(facts.kind, facts.areaM2, facts.levels)
   rentPerInterval += newResidents * RENT_PER_RESIDENT
 
+  const location = await locationAt(supabase, facts.centre)
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   const { data: publicActor } = earth ? await supabase.from('location_public_actors').select('actor_id,actors(display_name)').eq('location_id', earth.id).maybeSingle() : { data: null }
   const actor = publicActor as { actors?: { display_name?: string } | null } | null
   return {
     forSale: true, name, facts, features, tags: properties,
-    price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval }),
+    price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval, locationFactor: location.factor }),
+    location,
     seller: actor?.actors?.display_name ?? 'Gemeinde',
     residents: people.length + newResidents, newResidents, rentPerInterval,
   }

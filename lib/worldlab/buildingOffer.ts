@@ -67,15 +67,52 @@ export function plannedResidents(kind: BlockKind, areaM2: number, levels: number
 export const MIN_PRICE = 800
 
 /** Wert des Hauses ohne Grundstück: Geschossfläche × Satz + Mietertrag (für den Kauf eines Flurstücks). */
-export function buildingValue(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number }): number {
-  return input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind] + Math.max(0, input.rentPerInterval) * RENT_PERIODS
+export function buildingValue(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number; locationFactor?: number }): number {
+  const factor = input.locationFactor ?? 1
+  return input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind] * factor + Math.max(0, input.rentPerInterval) * RENT_PERIODS
 }
 
-export function buildingPrice(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number }): number {
+export function buildingPrice(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number; locationFactor?: number }): number {
+  const factor = input.locationFactor ?? 1
   const floor = input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind]
   const land = input.areaM2 * LAND_RATE
   const rent = Math.max(0, input.rentPerInterval) * RENT_PERIODS
-  return Math.max(MIN_PRICE, Math.round((floor + land + rent) / 50) * 50)
+  return Math.max(MIN_PRICE, Math.round(((floor + land) * factor + rent) / 50) * 50)
+}
+
+// ── Lage (Thomas, 25.10.2026: Innenstadt teurer) ────────────────────────────
+// Erster Schritt: Aufschlag nach Abstand zur Ortsmitte (OSM-Ortspunkt, place=*),
+// linear fallend bis zum Rand. Später kommen Bodenschätze, Infrastruktur,
+// Fertigungsanlagen und Erholungswert dazu (siehe R-13 in population-economy.md).
+export type PlaceKind = 'city' | 'town' | 'suburb' | 'village' | 'hamlet'
+export interface SettlementPoint { name: string; place: string; lat: number; lon: number }
+
+/** Aufschlag in der Mitte und Radius, bis zu dem er auf null fällt. */
+export const PLACE_PREMIUM: Record<PlaceKind, { premium: number; radiusM: number }> = {
+  city: { premium: 1.0, radiusM: 3000 },
+  town: { premium: 0.6, radiusM: 1200 },
+  suburb: { premium: 0.3, radiusM: 800 },
+  village: { premium: 0.25, radiusM: 500 },
+  hamlet: { premium: 0.1, radiusM: 250 },
+}
+
+export function distanceM(a: GeoPoint, b: GeoPoint): number {
+  const k = Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180)
+  return Math.hypot((a.lat - b.lat) * M_PER_DEG, (a.lon - b.lon) * M_PER_DEG * k)
+}
+
+/** Faktor ≥ 1 auf Bau- und Bodenwert; die stärkste Ortsmitte in Reichweite zählt. */
+export function locationFactor(point: GeoPoint, settlements: readonly SettlementPoint[]): { factor: number; place: string | null; distanceM: number | null } {
+  let best = { factor: 1, place: null as string | null, distanceM: null as number | null }
+  for (const s of settlements) {
+    const rule = PLACE_PREMIUM[s.place as PlaceKind]
+    if (!rule || !Number.isFinite(s.lat) || !Number.isFinite(s.lon)) continue
+    const d = distanceM(point, s)
+    if (d >= rule.radiusM) continue
+    const factor = 1 + rule.premium * (1 - d / rule.radiusM)
+    if (factor > best.factor) best = { factor: Math.round(factor * 100) / 100, place: s.name, distanceM: Math.round(d) }
+  }
+  return best
 }
 
 // Öffentliche Gebäude und Gotteshäuser verkauft die Gemeinde nicht.
