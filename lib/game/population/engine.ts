@@ -66,6 +66,7 @@ function assignmentFromRow(row: any): PersonAssignment {
     assignmentType: row.assignment_type,
     locationId: row.location_id,
     tileEntityId: row.tile_entity_id ?? null,
+    regionFeatureId: row.region_feature_id ?? null,
     employerActorId: row.employer_actor_id ?? null,
     roleCode: row.role_code ?? null,
     startsTick: row.starts_tick ?? null,
