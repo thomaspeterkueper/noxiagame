@@ -201,7 +201,17 @@ Bestätigt von Thomas, 25.10.2026. Beobachtungen am Bild von Sundern (Fabrikgel�
 
 **Anschluss Gastronomie (dort gebaut, sobald die Gebäudetafel aus W-2 steht):** Beim Klick auf ein Lokal in der rechten Spalte Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – aus `venueHoursFor`/`venueOpenAt` (`lib/game/hospitality/venues.ts`), damit man vor dem Hineingehen weiß, dass das Café um 20 Uhr Koloniezeit schließt.
 
-### W-4 (Gastronomie, 25.10.2026): Reale Gebäude anklickbar, kaufbar und mit NOXIA-Gebäuden verknüpft
+### W-4 (Gastronomie, 25.10.2026): Reale Gebäude anklickbar, kaufbar und mit NOXIA-Gebäuden verknüpft – erledigt (25.10.2026)
+
+Umgesetzt:
+- **Stabile Kennung:** Jedes reale Gebäude trägt in den Kacheldaten seine OSM-Kennung (`i`, z. B. `osm:way:123`, aus `noxia_source_id`); `tile_entities.source_ref` verweist darauf. Die Feature-Id taugt nicht als Kennung – Regionen werden neu aufgebaut und bekommen dabei neue Zeilen.
+- **Am realen Grundriss:** Ein NOXIA-Gebäude mit `source_ref` (gekauft, umgebaut – oder künftig das übertragene Startcafé) wird auf dem Grundriss des Hauses gezeichnet, mit Namensschild (W-3); sein eigenes Bild entfällt dann (`drawBlock` in `worldEngine.ts`).
+- **Gebäudetafel:** Adresse, **Größe** (Grundfläche aus dem echten Grundriss, Geschosse) und **heutige Nutzung aus OSM**: zuerst Angaben am Haus selbst (`amenity`, `shop`, `tourism`, `office`, `craft`), dann ein Laden oder Lokal im Haus („Restaurant „Balkan Grill““), dann `building=*` („Mehrfamilienhaus“); ohne Angabe „keine Angabe in OSM (Bauform: …)“. Kennung in der Kachel als `u` (z. B. `a:bar`), Bezeichnungen in `lib/worldlab/buildingUse.ts` (mit Tests). Darunter „Kaufen“ bzw. Flurstück, bei NOXIA-Gebäuden „Betreten“; beim eigenen gekauften Haus „Nutzung: wie bisher: Wohnhaus“ bzw. nach Umbau „Café (vorher: Wohnhaus)“.
+- Für R-13 bereit: `isVenueUse(u)` sagt, ob ein Haus laut OSM schon Café, Bar, Kneipe, Restaurant, Hotel oder Pension ist.
+- Nicht im Browser geprüft (braucht Anmeldung und Datenbank) – Thomas prüft an einer Bar in Sundern (etwa „Metropol“), ob die Nutzung stimmt.
+- Offen bei Bevölkerung und Ökonomie (R-13): Lokale aus OSM nicht verkaufen/umbauen, Startcafé übertragen, Gebäude aus OSM-Relationen kaufbar machen.
+
+Ursprünglicher Request:
 
 Entscheidung Thomas, 25.10.2026 (siehe R-13 bei Bevölkerung und Ökonomie): Lokale entstehen auf der Erde durch Kauf und Umbau bestehender Gebäude, nicht durch Neubau. Dafür braucht die Karte:
 

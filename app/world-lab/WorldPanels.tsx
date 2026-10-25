@@ -18,6 +18,7 @@ import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
+import { buildingSizeLine, buildingUseLine } from '@/lib/worldlab/buildingUse'
 import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
@@ -26,7 +27,7 @@ import LandmarkGlyph from './LandmarkGlyph'
 export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
-  | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind; poi?: WorldLandmark }
+  | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind; poi?: WorldLandmark; /** Nutzung aus OSM (`buildingUse.ts`) und OSM-Name des Hauses */ use?: string; osmName?: string }
   | { kind: 'landmark'; landmark: WorldLandmark }
   | { kind: 'site'; id: string }
   | { kind: 'plot'; source: string }
@@ -56,7 +57,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
   if (pick.type === 'noxia') return own ? { kind: 'building', at: { lat: own.lat, lon: own.lon }, title: own.name, noxiaId: own.id } : { kind: 'none' }
-  return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id, source: pick.source, areaM2: pick.areaM2, levels: pick.levels, block: pick.kind, poi: pick.poi }
+  return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id, source: pick.source, areaM2: pick.areaM2, levels: pick.levels, block: pick.kind, poi: pick.poi, use: pick.use, osmName: pick.name }
 }
 
 type Line = { role: 'user' | 'assistant'; content: string }
@@ -66,7 +67,7 @@ type Line = { role: 'user' | 'assistant'; content: string }
  * Bevölkerung und Ökonomie). Solange die Schnittstelle nicht antwortet, zeigt die
  * Tafel nichts zum Kauf.
  */
-type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string }
+type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
 type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; owned: boolean; own: boolean; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 
@@ -215,6 +216,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     return () => { stale = true }
   }, [offerSource, building, offers])
   const offer = offerSource ? offers[offerSource] ?? null : null
+  // Reales Gebäude (aus den Kacheldaten, nicht nur ein NOXIA-Bild): Größe und heutige Nutzung aus OSM (W-4).
+  const realUse = building?.block && building.areaM2
+    ? buildingUseLine({ code: building.use, name: building.osmName, kind: building.block, poi: building.poi ? { name: building.poi.name, label: landmarkLabel(building.poi.kind, building.poi.tags) } : undefined })
+    : null
 
   async function buy() {
     if (!building || !offerSource || buying) return
@@ -459,6 +464,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
     {building && <>
       <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}{building.poi && <span>Hier: {building.poi.name} · {landmarkLabel(building.poi.kind, building.poi.tags)}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      {realUse && <dl>
+        <dt>Größe</dt><dd>{buildingSizeLine(offer?.areaM2 ?? building.areaM2 ?? 0, offer?.levels ?? building.levels ?? 1)}</dd>
+        {!own?.own && <><dt>Nutzung</dt><dd>{realUse.text}</dd></>}
+      </dl>}
       {own && entry
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
@@ -466,7 +475,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
       {train && <div className="row"><span>Zug: {train.atStation ? `Der Zug steht am Gleis und fährt ${minutes(train.nextDepartureS)}.` : `Nächster Zug kommt ${minutes(train.nextArrivalS)}.`}</span></div>}
       {own?.own && own.source && <>
-        <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd><dt>Nutzung</dt><dd>{own.typeId === 'acquired_building' ? 'wie bisher' : own.name.split(' · ')[0]}</dd><dt>Bewohner</dt><dd>{residentsHere || 'keine'}</dd></dl>
+        <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd><dt>Nutzung</dt><dd>{own.typeId === 'acquired_building' ? (realUse?.known ? `wie bisher: ${realUse.text}` : 'wie bisher') : own.name.split(' · ')[0] + (realUse?.known ? ` (vorher: ${realUse.text})` : '')}</dd><dt>Bewohner</dt><dd>{residentsHere || 'keine'}</dd></dl>
         {buyError && <p>{buyError}</p>}
         {!showConversions
           ? <div className="row"><span/><button disabled={buying} onClick={() => setShowConversions(true)}>Umbauen …</button></div>

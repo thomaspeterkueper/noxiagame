@@ -7,6 +7,7 @@
 // gemessen ab der Nordwestecke der Kachel.
 
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from './mercator'
+import { buildingUseCode } from './buildingUse'
 
 export interface SourceFeature {
   id: string
@@ -40,6 +41,8 @@ export interface TileBlock {
   nm?: string
   /** Kennung der Quelle, z. B. „osm:way:123“ – für Kauf und Eigentum. */
   i?: string
+  /** Heutige Nutzung aus OSM als kurze Kennung, z. B. „a:bar“, „s:bakery“, „b:apartments“ (`lib/worldlab/buildingUse.ts`). */
+  u?: string
 }
 export interface SimplifiedTile {
   z: number
@@ -369,6 +372,8 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       else if (number) block.h = number.slice(0, 20)
       if (typeof properties.name === 'string' && properties.name.trim()) block.nm = properties.name.trim().slice(0, 80)
       if (typeof properties.noxia_source_id === 'string' && properties.noxia_source_id.startsWith('osm:')) block.i = properties.noxia_source_id.slice(0, 40)
+      const use = buildingUseCode(properties)
+      if (use) block.u = use
       out.blocks.push(block)
       continue
     }

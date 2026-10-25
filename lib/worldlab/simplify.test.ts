@@ -181,6 +181,17 @@ describe('world lab: simplification', () => {
     expect(house.blocks[0].nm).toBe('SSF')
   })
 
+  it('keeps the present use of a building from OSM (W-4)', () => {
+    const square = polygon([[40, 40], [52, 40], [52, 48], [40, 48], [40, 40]])
+    const bar = buildTile([{ id: 'b', featureType: 'building', geometry: square, properties: { building: 'yes', amenity: 'bar', name: 'Metropol', noxia_source_id: 'osm:way:7' } }], tile, TILE_Z)
+    expect(bar.blocks[0].u).toBe('a:bar')
+    expect(bar.blocks[0].i).toBe('osm:way:7')
+    const flats = buildTile([{ id: 'f', featureType: 'building', geometry: square, properties: { building: 'apartments' } }], tile, TILE_Z)
+    expect(flats.blocks[0].u).toBe('b:apartments')
+    const plain = buildTile([{ id: 'p', featureType: 'building', geometry: square, properties: { building: 'yes' } }], tile, TILE_Z)
+    expect(plain.blocks[0].u).toBeUndefined()
+  })
+
   it('keeps named landmarks with their describing tags', () => {
     const church: SourceFeature = { id: 'c', featureType: 'landmark', geometry: { kind: 'point', coordinates: at(60, 60) }, properties: { name: 'St. Johannes', visual_class: 'place_of_worship', religion: 'christian', height: '20' } }
     const placed = buildTile([church], tile, TILE_Z)

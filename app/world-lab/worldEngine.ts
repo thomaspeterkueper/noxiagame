@@ -16,6 +16,7 @@ import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
+import { polygonArea } from '@/lib/worldlab/simplify'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
 
 type Pixi = typeof import('pixi.js')
@@ -56,7 +57,7 @@ export interface WorldEngineOptions {
 /** Was unter dem Zeiger lag, als geklickt wurde. */
 export type WorldPick =
   | { type: 'person'; id: string }
-  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; poi?: WorldLandmark; source?: string; areaM2: number; levels: number; /** Flurstück, auf dem das Haus steht */ parcel?: string }
+  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; poi?: WorldLandmark; source?: string; areaM2: number; levels: number; /** Heutige Nutzung aus OSM (Kennung, `lib/worldlab/buildingUse.ts`) */ use?: string; /** Flurstück, auf dem das Haus steht */ parcel?: string }
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
   | { type: 'site'; id: string }
@@ -475,7 +476,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Für Klicks: was dieses Gebäude ist. Ein Wahrzeichen in oder dicht an ihm
     // wird beim Klick gesucht (es kann in der Nachbarkachel liegen).
     g.eventMode = 'static'
-    ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id, source: block.i, areaM2: Math.round(block.w * block.d), levels: block.l }
+    ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id, source: block.i, areaM2: Math.round(block.f && block.f.length >= 8 ? polygonArea(Array.from({ length: block.f.length / 2 }, (_, i) => ({ x: block.f![i * 2], y: block.f![i * 2 + 1] }))) : block.w * block.d), levels: block.l, use: block.u }
     ;(g as unknown as { box: Box }).box = { cx, cy, hw, hd, cos, sin }
     // Hindernis für die Spielfigur (Grundriss, ein halber Meter Abstand)
     if (footprints) {
