@@ -128,6 +128,15 @@ Entschieden: Reale Gebäude, die noch niemandem gehören, kann man **kaufen**; d
   - **Bauprüfung (`lib/worldlab/buildingConflict.server.ts`, in `/api/game/build/spatial`):** Wo ein echtes Haus steht, wird nicht gebaut („erst kaufen und abreißen“); eine freie Fläche nach Abriss bebaut nur, wem sie gehört. Die Kacheldaten dafür lädt `lib/worldlab/tileSource.server.ts` (gemeinsam mit `/api/world-lab/tile`).
   - Offen: Die neuen Bewohner haben noch keine Arbeit – ohne Einkommen reicht ihr Startbestand für etwa fünf Mieten (Bevölkerung und Ökonomie, Stellenmarkt).
 
+### Flurstücke statt Häuser (Thomas, 25.10.2026: „wäre ja blöd, wenn ich im Garten eines anderen etwas bauen könnte“)
+
+- **Quelle:** amtliches Liegenschaftskataster NRW, WFS NW ALKIS Vereinfacht (`ave:Flurstueck`, Datenlizenz Deutschland – Zero – 2.0, ohne Eigentümerangaben). Antwort am 25.10.2026 aus Vercel geprüft (Sundern, Elsternhagen 26: Flur 2, Flurstück 355, 660 m², Wohnbaufläche) und als Test hinterlegt.
+- **Abruf:** `/api/world-lab/parcels` holt je Zelle (~450 × 420 m) einmal, die Karte stößt das für die Gegend um die Figur selbst an (nur in NRW). Gespeichert in `earth_parcels`, geholte Zellen in `earth_parcel_cells`. Leser `lib/worldlab/alkis.ts`, Umrechnung UTM 32 → WGS84 `lib/worldlab/utm.ts` (beide mit Tests). Prüfaufruf ohne Speichern: `GET /api/world-lab/parcels?lat=…&lon=…&dry=1`.
+- **Karte:** Flurstücksgrenzen als feine Linien ab Zoom 2,2; eigene golden, fremde Spieler-Flurstücke blau umrandet. Klick auf den Boden öffnet die Tafel des Flurstücks (Bezeichnung, Fläche, Nutzung, Eigentümer, Häuser, Bewohner, Preis).
+- **Kaufen:** In NRW kauft man das Flurstück samt Häusern (`/api/game/parcel-offer`, `buy_earth_parcel`); Klick auf ein Haus führt dorthin („Wird mit dem Flurstück verkauft“). Preis = Fläche × Bodenwert nach Nutzung (Wohnbaufläche 4, Gewerbe 3, Landwirtschaft 0,6, Wald 0,4 Cr/m²) + Wert der Häuser (Geschossfläche, Miete). Nicht verkäuflich: Verkehrsflächen, Gewässer, Friedhöfe und Flächen besonderer funktionaler Prägung, Flurstücke mit öffentlichen Gebäuden oder fremden Häusern. Außerhalb des Katasters bleibt der Kauf einzelner Häuser.
+- **Bauen:** Wo Flurstücke bekannt sind, muss der Neubau ganz auf eigenen Flurstücken stehen; auf eigenem Flurstück kann man an der angeklickten Stelle bauen. Ohne Kataster gilt ein geschätzter Garten von 6 m um fremde Häuser (`lib/worldlab/buildingConflict.server.ts`).
+- Offen: andere Bundesländer mit offenem Kataster (z. B. Berlin, Hamburg, Sachsen, Thüringen) anbinden; Flurstücke zusammenlegen/teilen; Verkauf an andere Spieler.
+
 ### Bereinigung 25.10.2026 (Thomas: „meine selbst gebauten Gebäude passen nicht mehr“)
 
 McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wohnblöcke, Habitat, Schule, Fabrik, Warenhaus, Bank, Raumhafen-Kern, 3 Solarfelder), ohne Erstattung. Die fünf Bewohner (4 aus dem Wohnblock, 1 aus dem Habitat) wohnen jetzt im staatlichen Wohnblock Selmecke (`203e82d7…`, 8 von 12 Plätzen), Mietverhältnis als Bereinigung (`origin = backfill`), Präsenz mitverschoben. Café („Thomas“) und die staatlichen Bauten in Selmecke bleiben.

@@ -65,6 +65,11 @@ export function plannedResidents(kind: BlockKind, areaM2: number, levels: number
 }
 export const MIN_PRICE = 800
 
+/** Wert des Hauses ohne Grundstück: Geschossfläche × Satz + Mietertrag (für den Kauf eines Flurstücks). */
+export function buildingValue(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number }): number {
+  return input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind] + Math.max(0, input.rentPerInterval) * RENT_PERIODS
+}
+
 export function buildingPrice(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number }): number {
   const floor = input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind]
   const land = input.areaM2 * LAND_RATE

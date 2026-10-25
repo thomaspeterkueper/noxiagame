@@ -59,6 +59,8 @@ export interface SimplifiedTile {
   trees?: number[]
   /** Wahrzeichen (Kirche, Bibliothek, Museum …): Lage, Name, Art und ausgewählte OSM-Angaben. */
   places?: TilePlace[]
+  /** Flurstücke (Kataster): Kennung und Grenze in Metern der Kachel */
+  parcels?: Array<{ i: string; p: number[] }>
   /** Gleise: Punkte (x/y abwechselnd); s = 1 für Abstell- und Anschlussgleise */
   rails?: Array<{ p: number[]; s?: 1 }>
 }

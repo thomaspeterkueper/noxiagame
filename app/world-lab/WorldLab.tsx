@@ -25,6 +25,7 @@ import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConvers
 import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
 import { blockArt } from '@/lib/worldlab/blocks'
 import { detailCell } from '@/lib/worldlab/detailCells'
+import { inNrw, parcelCell } from '@/lib/worldlab/alkis'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
 import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson, type WorldPick, type WorldPlot, type WorldSite } from './worldEngine'
@@ -80,6 +81,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [hover, setHover] = useState<{ pick: WorldPick; x: number; y: number } | null>(null)
   const [targetId, setTargetId] = useState('')
   const [plots, setPlots] = useState<WorldPlot[]>([])
+  const [parcelOwners, setParcelOwners] = useState<Array<{ id: string; own: boolean }>>([])
   const [buildsVersion, setBuildsVersion] = useState(0)
 
   // Bewohner: im Spiel vom Dashboard gereicht, auf der eigenen Seite selbst geholt.
@@ -177,7 +179,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
           const json = response.ok ? await response.json() : null
           const list = (json?.buildings ?? []) as NoxiaBuilding[]
           noxiaRef.current = list
-          if (!disposed) { setNoxia(list); setPlots(Array.isArray(json?.plots) ? json.plots : []) }
+          if (!disposed) { setNoxia(list); setPlots(Array.isArray(json?.plots) ? json.plots : []); setParcelOwners(Array.isArray(json?.parcels) ? json.parcels : []) }
           return list
         },
         onPick: pick => { if (!disposed) { engine.current?.stopWalking(); setTargetId(''); setPanel(panelForPick(pick, noxiaRef.current)) } },
@@ -342,6 +344,28 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     return () => { live = false; clearInterval(timer) }
   }, [buildsVersion])
   useEffect(() => { engineReady?.setPlots(plots) }, [engineReady, plots])
+  useEffect(() => { engineReady?.setParcelOwners(parcelOwners) }, [engineReady, parcelOwners])
+
+  // Flurstücke (NRW): Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
+  const parcelCells = useRef(new Set<string>())
+  useEffect(() => {
+    if (!hud || !engineReady) return
+    const here = { lat: hud.lat, lon: hud.lon }
+    if (!inNrw(here)) return
+    const cell = parcelCell(here)
+    if (parcelCells.current.has(cell.key)) return
+    parcelCells.current.add(cell.key)
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/world-lab/parcels', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(here) })
+        const json = await response.json().catch(() => null)
+        if (json?.ok && !json.cached && json.parcels > 0) { fresh.current = String(Date.now()); engineReady.reloadTiles() }
+        if (json && json.ok === false) console.error('[world-lab] Flurstücke', json.error)
+      } catch (reason) { console.error('[world-lab] Flurstücke', reason) }
+    })()
+  }, [hud, engineReady])
   // Fortschritt alle 5 s neu (aus Start- und Endzeit, nichts wird erfunden)
   useEffect(() => {
     const update = () => setSites(builds.flatMap(build => {
