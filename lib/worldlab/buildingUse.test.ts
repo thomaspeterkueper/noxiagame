@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingSizeLine, buildingUseCode, buildingUseLine, isVenueUse } from './buildingUse'
+import { buildingSizeLine, buildingUseCode, buildingUseLine } from './buildingUse'
 
 describe('world lab: present use of real buildings (W-4)', () => {
   it('reads the use from the building tags, the whole-house use first', () => {
@@ -21,13 +21,6 @@ describe('world lab: present use of real buildings (W-4)', () => {
     const unknown = buildingUseLine({ kind: 'house' })
     expect(unknown.known).toBe(false)
     expect(unknown.text).toContain('Wohnhaus')
-  })
-
-  it('knows which buildings already are venues (R-13: not convertible)', () => {
-    expect(isVenueUse('a:cafe')).toBe(true)
-    expect(isVenueUse('t:hotel')).toBe(true)
-    expect(isVenueUse('s:bakery')).toBe(false)
-    expect(isVenueUse(undefined)).toBe(false)
   })
 
   it('writes the size line', () => {

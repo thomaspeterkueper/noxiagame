@@ -47,11 +47,6 @@ export function buildingUseCode(properties: Record<string, unknown>): string | u
   return BUILDING_LABEL[building] ? `b:${building}` : undefined
 }
 
-/** Lokale im Sinne von R-13: schon Café, Bar, Restaurant oder Hotel – nicht umbaubar. */
-export function isVenueUse(code: string | undefined): boolean {
-  return code === 'a:cafe' || code === 'a:bar' || code === 'a:pub' || code === 'a:restaurant' || code === 't:hotel' || code === 't:guest_house'
-}
-
 function labelFor(code: string): string | null {
   const [prefix, value = ''] = code.split(':')
   if (prefix === 'a') { const label = landmarkLabel(value); return label === 'Wahrzeichen' ? null : label }
