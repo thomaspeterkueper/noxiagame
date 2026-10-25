@@ -40,17 +40,25 @@ function regionFeaturePosition(geometry:any):{lat:number;lon:number}|null{
   return null
 }
 
-function activeRegionFeatureWork(person:Person,assignments:readonly PersonAssignment[]):PersonAssignment|null{
-  if(person.activityState!=='working'&&person.activityState!=='inspecting')return null
-  return assignments
+function preferredRegionFeatureAssignment(person:Person,assignments:readonly PersonAssignment[]):PersonAssignment|null{
+  const active=assignments
     .filter(assignment=>
       assignment.personId===person.id
       && assignment.isActive
-      && assignment.assignmentType==='work'
       && assignment.locationId===person.currentLocationId
       && Boolean(assignment.regionFeatureId)
     )
-    .sort((a,b)=>a.id.localeCompare(b.id))[0]??null
+  if(!active.length)return null
+  const preferredTypes = person.activityState==='socialising'
+    ? ['temporary','work']
+    : person.activityState==='working'||person.activityState==='inspecting'
+      ? ['work','temporary']
+      : ['temporary']
+  for(const type of preferredTypes){
+    const found=active.filter(assignment=>assignment.assignmentType===type).sort((a,b)=>a.id.localeCompare(b.id))[0]
+    if(found)return found
+  }
+  return null
 }
 
 export async function projectSurfacePresence(supabase:SupabaseLike,tick:number,peopleRows:any[],assignmentRows:any[]):Promise<SurfacePresenceProjectionResult>{
@@ -60,7 +68,7 @@ export async function projectSurfacePresence(supabase:SupabaseLike,tick:number,p
 
   const regionAssignmentByPerson=new Map<string,PersonAssignment>()
   for(const person of people){
-    const assignment=activeRegionFeatureWork(person,assignments)
+    const assignment=preferredRegionFeatureAssignment(person,assignments)
     if(assignment)regionAssignmentByPerson.set(person.id,assignment)
   }
   const regionFeatureIds=[...new Set([...regionAssignmentByPerson.values()].map(a=>a.regionFeatureId).filter((id):id is string=>Boolean(id)))]
