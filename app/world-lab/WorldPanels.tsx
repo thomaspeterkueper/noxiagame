@@ -26,7 +26,7 @@ import LandmarkGlyph from './LandmarkGlyph'
 export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
-  | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind }
+  | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind; poi?: WorldLandmark }
   | { kind: 'landmark'; landmark: WorldLandmark }
   | { kind: 'site'; id: string }
   | { kind: 'plot'; source: string }
@@ -54,7 +54,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
   if (pick.type === 'noxia') return own ? { kind: 'building', at: { lat: own.lat, lon: own.lon }, title: own.name, noxiaId: own.id } : { kind: 'none' }
-  return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id, source: pick.source, areaM2: pick.areaM2, levels: pick.levels, block: pick.kind }
+  return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id, source: pick.source, areaM2: pick.areaM2, levels: pick.levels, block: pick.kind, poi: pick.poi }
 }
 
 type Line = { role: 'user' | 'assistant'; content: string }
@@ -109,6 +109,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [visits, setVisits] = useState<Record<string, string>>({})
   /** Namen von Zielen, die keine NOXIA-Gebäude sind (Wahrzeichen). */
   const [visitNames, setVisitNames] = useState<Record<string, string>>({})
+  /** Wer gerade vorausgeht */
+  const [leading, setLeading] = useState<Record<string, boolean>>({})
   const [offers, setOffers] = useState<Record<string, Offer | null>>({})
   const [buying, setBuying] = useState(false)
   const [buyError, setBuyError] = useState('')
@@ -227,6 +229,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     })()
     return () => { stale = true }
   }, [ownAcquiredId, showConversions, conversions])
+  // Bahnhof: wann der Zug fährt (Fahrplan nach Uhrzeit)
+  const train = useMemo(() => { void tick; return building && engine ? engine.trainAt(building.title) : null }, [building, engine, tick])
+  const minutes = (seconds: number) => seconds < 60 ? 'gleich' : `in ${Math.round(seconds / 60)} min`
   const residentsHere = own ? residents.filter(resident => resident.assignments.some(item => item.type === 'home' && item.tileEntityId === own.id)).length : 0
 
   async function convert(type: string) {
@@ -359,8 +364,16 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
           if (action.playerFollows) walkTo(() => engine.personAt(person.id), 3)
         }
-      } else if (action?.type === 'lead_walk' && action.playerFollows) {
-        walkTo(() => engine.personAt(person.id), 3)
+      } else if (action?.type === 'lead_walk') {
+        // Die Person geht wirklich voraus (wie in der bisherigen Erdszene); wer folgt, bleibt dicht dahinter.
+        const seconds = Math.max(5, Math.min(60, Number(action.durationSeconds ?? 30)))
+        const metres = Math.max(5, Math.min(80, Number(action.maxDistanceMeters ?? 45)))
+        const id = person.id
+        engine.leadPerson(id, metres, seconds)
+        setLeading(current => ({ ...current, [id]: true }))
+        if (action.playerFollows) walkTo(() => engine.personAt(id), 3)
+        // Danach geht sie wieder ihrer Wege.
+        setTimeout(() => { engine.releasePerson(id); setLeading(current => { const next = { ...current }; delete next[id]; return next }) }, (seconds + 20) * 1000)
       }
     } catch {
       setConversations(current => ({ ...current, [person.id]: [...(current[person.id] ?? []), { role: 'assistant' as const, content: 'Gespräch derzeit nicht erreichbar.' }].slice(-10) }))
@@ -383,7 +396,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   return <aside className="world-panel" role="dialog">
     {person && <>
       <div className="head"><div><small>PERSON</small><b>{personSceneLabel(person)}</b><span>{role(person)}</span></div><button onClick={close} aria-label="Schließen">×</button></div>
-      <dl><dt>Tut gerade</dt><dd>{visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
+      <dl><dt>Tut gerade</dt><dd>{leading[person.id] ? 'geht voraus' : visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
         ? <div className="row"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Ansprechen …" autoFocus/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
@@ -391,12 +404,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     </>}
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
     {building && <>
-      <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}{building.poi && <span>Hier: {building.poi.name} · {landmarkLabel(building.poi.kind, building.poi.tags)}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       {own && entry
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+      {train && <div className="row"><span>Zug: {train.atStation ? `Der Zug steht am Gleis und fährt ${minutes(train.nextDepartureS)}.` : `Nächster Zug kommt ${minutes(train.nextArrivalS)}.`}</span></div>}
       {own?.own && own.source && <>
         <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd><dt>Nutzung</dt><dd>{own.typeId === 'acquired_building' ? 'wie bisher' : own.name.split(' · ')[0]}</dd><dt>Bewohner</dt><dd>{residentsHere || 'keine'}</dd></dl>
         {buyError && <p>{buyError}</p>}

@@ -12,6 +12,7 @@ import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
 import { boxFootprint, insidePolygon, RoadGraph, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
+import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
@@ -20,6 +21,8 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 type Pixi = typeof import('pixi.js')
 
 export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung, wenn es ein gekauftes reales Gebäude ist. */ source?: string }
+/** Bahnstrecke: beginnt am Bahnhof, wenn einer an ihrem Ende liegt. */
+export type WorldRailLine = { points: GeoPoint[]; lengthM: number; station: { name: string; at: GeoPoint } | null }
 /** Freie Fläche nach Abriss eines gekauften Gebäudes. */
 export type WorldPlot = { source: string; own: boolean; name: string; lat: number; lon: number; w: number; d: number; rotation: number }
 export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number
@@ -53,7 +56,7 @@ export interface WorldEngineOptions {
 /** Was unter dem Zeiger lag, als geklickt wurde. */
 export type WorldPick =
   | { type: 'person'; id: string }
-  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; source?: string; areaM2: number; levels: number }
+  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; poi?: WorldLandmark; source?: string; areaM2: number; levels: number }
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
   | { type: 'site'; id: string }
@@ -69,10 +72,16 @@ export interface WorldSurroundings { landmarks: Array<{ landmark: WorldLandmark;
 type Box = { cx: number; cy: number; hw: number; hd: number; cos: number; sin: number }
 
 /** Wahrzeichen aus den Kartendaten (Kirche, Bibliothek, Museum …). */
-export interface WorldLandmark { at: GeoPoint; name: string; kind: string; tags: Record<string, string> }
+export interface WorldLandmark { at: GeoPoint; name: string; kind: string; tags: Record<string, string>; /** Laden oder Lokal statt Wahrzeichen */ poi?: boolean }
 
 /** Eine Person auf der Karte. `anchor`: Haus, vor dem sie sich aufhält; sonst geht sie die Straßen entlang. */
-export interface WorldPerson { id: string; label: string; anchor?: GeoPoint | null; /** Halbe Größe des Hauses, vor dem sie steht (m). */ anchorRadiusM?: number; tint?: number }
+export interface WorldPerson {
+  id: string; label: string; anchor?: GeoPoint | null; /** Halbe Größe des Hauses, vor dem sie steht (m). */ anchorRadiusM?: number; tint?: number
+  /** Tätigkeit: unterwegs geht man zügig, untätig langsam mit Pausen (wie in der bisherigen Erdszene). */
+  activity?: 'move' | 'work' | 'idle' | 'other'
+  /** Arbeitet gerade in einem betretbaren Gebäude: drinnen, auf der Karte nicht zu sehen. */
+  inside?: boolean
+}
 
 export interface WorldEngine {
   jump: (at: GeoPoint) => void
@@ -82,6 +91,8 @@ export interface WorldEngine {
   personAt: (id: string) => GeoPoint | null
   /** Person geht in `seconds` Sekunden zu `to` und bleibt dort, bis `release` sie freigibt. */
   sendPerson: (id: string, to: GeoPoint, seconds: number) => void
+  /** Die Person geht die Straße entlang voraus (Gespräch: lead_walk). */
+  leadPerson: (id: string, distanceM: number, seconds: number) => void
   releasePerson: (id: string) => void
   /** Spielfigur geht selbst zu einem Ziel, bis sie `withinM` Meter nah ist; Tasten brechen ab. */
   walkTo: (target: () => GeoPoint | null, withinM: number, onArrive?: () => void) => void
@@ -98,6 +109,10 @@ export interface WorldEngine {
   reloadTiles: () => void
   /** Name über der eigenen Figur. */
   setPlayerName: (name: string) => void
+  /** Bahnstrecken mit Zug (Fahrplan nach Uhrzeit, siehe lib/worldlab/railLine.ts). */
+  setRailLines: (lines: WorldRailLine[]) => void
+  /** Zug einer Strecke, deren Bahnhof so heißt (für die Tafel des Bahnhofs). */
+  trainAt: (stationName: string) => TrainState | null
   /** Freie Flächen nach Abriss: der OSM-Grundriss wird dort nicht mehr gezeichnet. */
   setPlots: (plots: WorldPlot[]) => void
   /** Baustellen zeigen (ersetzt die vorigen). */
@@ -228,6 +243,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const labels = new PIXI.Container({ isRenderGroup: true })
   // Baustellen und Weg zum Ziel: über den Straßen, unter Häusern und Figuren.
   const overlay = new PIXI.Container({ isRenderGroup: true })
+  const poiLabels = new PIXI.Container()
+  labels.addChild(poiLabels)
   world.addChild(ground, lines, overlay, objects, labels)
   app.stage.addChild(world)
 
@@ -458,11 +475,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
 
   /** Wahrzeichen in einem Gebäude oder bis 12 m davor (Kacheln rundum). */
-  function landmarkIn(box: Box): WorldLandmark | undefined {
+  function landmarkIn(box: Box, poi = false): WorldLandmark | undefined {
     const tx = anchorTile.x + Math.floor(box.cx / tileSizeM), ty = anchorTile.y + Math.floor(box.cy / tileSizeM)
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
       for (const place of entry?.data.places ?? []) {
+        if (Boolean(place.p) !== poi) continue
         const px = entry!.ox + place.x - box.cx, py = entry!.oy + place.y - box.cy
         if (Math.abs(px * box.cos + py * box.sin) <= box.hw + 12 && Math.abs(-px * box.sin + py * box.cos) <= box.hd + 12) return landmarkOf(place, entry!.ox, entry!.oy)
       }
@@ -470,7 +488,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return undefined
   }
   function landmarkOf(place: TilePlace, ox: number, oy: number): WorldLandmark {
-    return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: place.k, tags: place.t ?? {} }
+    return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: place.k, tags: place.t ?? {}, ...(place.p ? { poi: true } : {}) }
   }
 
   function drawGround(entry: Loaded) {
@@ -496,6 +514,30 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
     const l = new PIXI.Graphics()
     for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
+    // Gleise: Schotterbett, Schwellen, zwei Schienen (unter den Straßen: Bahnübergänge)
+    for (const rail of data.rails ?? []) {
+      const w: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < rail.p.length; i += 2) w.push({ x: ox + rail.p[i], y: oy + rail.p[i + 1] })
+      const bed = path(rail.p)
+      l.moveTo(bed[0], bed[1]); for (let i = 2; i < bed.length; i += 2) l.lineTo(bed[i], bed[i + 1])
+      l.stroke({ width: (rail.s ? 2.4 : 3.2) * 0.75, color: 0x9a8f80, cap: 'round', join: 'round' })
+      for (let i = 1; i < w.length; i++) {
+        const a = w[i - 1], b = w[i], length = Math.hypot(b.x - a.x, b.y - a.y)
+        if (length < 0.01) continue
+        const ux = (b.x - a.x) / length, uy = (b.y - a.y) / length, nx = -uy, ny = ux
+        for (let t = 0.4; t < length; t += 1.4) {
+          const cx = a.x + ux * t, cy = a.y + uy * t
+          const s1 = iso(cx + nx * 1.25, cy + ny * 1.25), s2 = iso(cx - nx * 1.25, cy - ny * 1.25)
+          l.moveTo(s1.x, s1.y).lineTo(s2.x, s2.y)
+        }
+        l.stroke({ width: 0.3, color: 0x6b5440 })
+        for (const side of [0.72, -0.72]) {
+          const r1 = iso(a.x + nx * side, a.y + ny * side), r2 = iso(b.x + nx * side, b.y + ny * side)
+          l.moveTo(r1.x, r1.y).lineTo(r2.x, r2.y)
+        }
+        l.stroke({ width: 0.16, color: 0x3d4347 })
+      }
+    }
     for (const road of data.roads) {
       const style = ROAD_STYLES[road.c], p = path(road.p)
       l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
@@ -532,9 +574,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     for (const place of data.places ?? []) {
       const at = iso(ox + place.x, oy + place.y)
       const badge = new PIXI.Graphics()
-      badge.moveTo(0, 0).lineTo(0, -6).stroke({ width: 0.5, color: 0x17313c })
-      badge.circle(0, -8, 2.6).fill(0xf4ecd2).stroke({ width: 0.6, color: 0x17313c })
-      badge.circle(0, -8, 0.9).fill(0x8a5a2b)
+      if (place.p) {
+        // Laden oder Lokal: kleines Schild in Blaugrün
+        badge.moveTo(0, 0).lineTo(0, -4).stroke({ width: 0.4, color: 0x17313c })
+        badge.roundRect(-1.8, -7.4, 3.6, 3.4, 0.8).fill(0x2f7f86).stroke({ width: 0.5, color: 0x17313c })
+      } else {
+        badge.moveTo(0, 0).lineTo(0, -6).stroke({ width: 0.5, color: 0x17313c })
+        badge.circle(0, -8, 2.6).fill(0xf4ecd2).stroke({ width: 0.6, color: 0x17313c })
+        badge.circle(0, -8, 0.9).fill(0x8a5a2b)
+      }
       badge.position.set(at.x, at.y)
       badge.zIndex = ox + place.x + oy + place.y + 0.5
       badge.eventMode = 'static'
@@ -542,11 +590,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       ;(badge as unknown as { pick: WorldPick }).pick = { type: 'landmark', landmark: landmarkOf(place, ox, oy) }
       addObject(badge)
       entry.trees.push(badge)
-      const name = new PIXI.Text({ text: place.n, style: { fontFamily: 'system-ui, sans-serif', fontSize: 26, fontWeight: '700', fill: 0x5a3a1c, stroke: { color: 0xf8f4e8, width: 6, join: 'round' } } })
+      const name = new PIXI.Text({ text: place.n, style: { fontFamily: 'system-ui, sans-serif', fontSize: place.p ? 22 : 26, fontWeight: '700', fill: place.p ? 0x1f4f54 : 0x5a3a1c, stroke: { color: 0xf8f4e8, width: 6, join: 'round' } } })
       name.anchor.set(0.5, 1)
       name.scale.set(0.12)
-      name.position.set(at.x, at.y - 11)
-      labels.addChild(name)
+      name.position.set(at.x, at.y - (place.p ? 8 : 11))
+      // Läden erst bei näherem Hinsehen beschriften, sonst drängen sich die Namen.
+      ;(place.p ? poiLabels : labels).addChild(name)
       entry.labels.push(name)
     }
     // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
@@ -787,6 +836,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     route: Array<{ x: number; y: number }> | null; routeLength: number
     /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer. */
     sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number } | null
+    /** Zurückgelegter Weg auf der eigenen Straße (m) und Zeit des letzten Schritts */
+    runM: number; lastAt: number
   }
   const walkers = new Map<string, Walker>()
   const PERSON_COLORS = [0x4f7fb3, 0xa4553f, 0x5f8f4a, 0x8a6aa8, 0x3f8f8a, 0xb08a3a]
@@ -847,7 +898,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       label.scale.set(0.12)
       labels.addChild(label)
       const start = spec.anchor ? toWorld(spec.anchor) : { x: player.x + (seed % 40) - 20, y: player.y + ((seed >> 8) % 40) - 20 }
-      const walker: Walker = { spec, figure, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null }
+      const walker: Walker = { spec, figure, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null, runM: seed % 997, lastAt: 0 }
       walkers.set(spec.id, walker)
       placeDepth(figure, start.x + start.y)
     }
@@ -877,8 +928,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
           }
         }
         if (walker.route && walker.routeLength > 1) {
-          const speed = 1.1 + (walker.seed % 5) * 0.12
-          const run = (now / 1000 * speed + walker.seed % 997) % (walker.routeLength * 2)
+          // Tempo nach Tätigkeit; wer nichts zu tun hat, bleibt immer wieder stehen.
+          const activity = walker.spec.activity ?? 'other'
+          const base = activity === 'move' || activity === 'work' ? 1.45 : activity === 'idle' ? 0.35 : 0.85
+          const pause = activity === 'idle' && (Math.sin(now / 1000 * 0.22 + (walker.seed % 628) / 100) + 1) / 2 < 0.42
+          const speed = pause ? 0 : base * (0.9 + (walker.seed % 5) * 0.05)
+          const dt = walker.lastAt ? Math.min(0.25, (now - walker.lastAt) / 1000) : 0
+          walker.lastAt = now
+          walker.runM += speed * dt
+          const run = walker.runM % (walker.routeLength * 2)
           const at = along(walker.route, run <= walker.routeLength ? run : walker.routeLength * 2 - run)
           // Auf dem Gehweg: etwas neben der Straßenmitte
           x = at.x + ((walker.seed % 2) ? 2.2 : -2.2); y = at.y + ((walker.seed % 2) ? -2.2 : 2.2)
@@ -889,10 +947,33 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       walker.figure.position.set(foot.x, foot.y)
       placeDepth(walker.figure, x + y)
       walker.label.position.set(foot.x, foot.y - 9.5)
-      const near = Math.hypot(x - player.x, y - player.y) < 200
+      const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent)
       walker.figure.visible = near
       walker.label.visible = near && zoom >= 2.2
     }
+  }
+
+  /** Weg entlang der nächsten Straße, vom Spieler weg, etwa `distanceM` lang. */
+  function roadAhead(from: { x: number; y: number }, distanceM: number) {
+    let best: { points: Array<{ x: number; y: number }>; index: number; d: number } | null = null
+    for (const entry of loaded.values()) for (const road of entry.data.roads) {
+      const points: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < road.p.length; i += 2) points.push({ x: entry.ox + road.p[i], y: entry.oy + road.p[i + 1] })
+      points.forEach((p, index) => { const d = Math.hypot(p.x - from.x, p.y - from.y); if (!best || d < best.d) best = { points, index, d } })
+    }
+    if (!best) return []
+    const { points, index } = best as { points: Array<{ x: number; y: number }>; index: number; d: number }
+    // Richtung: weg vom Spieler (der folgt hinterher)
+    const forward = index + 1 < points.length ? points[index + 1] : null, backward = index > 0 ? points[index - 1] : null
+    const away = (p: { x: number; y: number } | null) => p ? Math.hypot(p.x - player.x, p.y - player.y) : -1
+    const step = away(forward) >= away(backward) ? 1 : -1
+    const out: Array<{ x: number; y: number }> = [points[index]]
+    let walked = Math.hypot(points[index].x - from.x, points[index].y - from.y)
+    for (let i = index + step; i >= 0 && i < points.length && walked < distanceM; i += step) {
+      walked += Math.hypot(points[i].x - out[out.length - 1].x, points[i].y - out[out.length - 1].y)
+      out.push(points[i])
+    }
+    return out
   }
 
   // ── Hindernisse ─────────────────────────────────────────────────────
@@ -987,6 +1068,66 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const end = iso(to.x, to.y)
     routeLine.circle(end.x, end.y, 2.4).stroke({ width: 0.8, color: 0xe0b23c })
     routeInfo = { lengthM: Math.round(lengthM), viaRoads: path.length > 3 }
+  }
+
+  // ── Zug ─────────────────────────────────────────────────────────────
+  // Je Strecke ein Zug aus Triebwagen und zwei Wagen; Lage aus dem Fahrplan
+  // (Uhrzeit), damit jeder ihn an derselben Stelle sieht.
+  let railLines: WorldRailLine[] = []
+  const trainCars: PixiGraphics[][] = []
+  const CAR_LENGTH = 15, CAR_GAP = 1, CAR_WIDTH = 2.9, CAR_HEIGHT = 3.6
+  function setTrains(list: WorldRailLine[]) {
+    for (const cars of trainCars) for (const car of cars) car.destroy()
+    trainCars.length = 0
+    railLines = list
+    for (let i = 0; i < list.length; i++) trainCars.push([0, 1, 2].map(() => { const g = new PIXI.Graphics(); g.visible = false; return g }))
+  }
+  function drawCar(g: PixiGraphics, cx: number, cy: number, ux: number, uy: number, body: number, roof: number, front: boolean) {
+    g.clear()
+    const nx = -uy, ny = ux, hl = CAR_LENGTH / 2, hw = CAR_WIDTH / 2
+    const c = [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]].map(([l, w]) => ({ x: cx + ux * l + nx * w, y: cy + uy * l + ny * w }))
+    const base = c.map(p => iso(p.x, p.y)), top = c.map(p => iso(p.x, p.y, CAR_HEIGHT))
+    // Nur die Seiten zur Kamera (Süd-Ost): Normalen mit positivem x+y
+    for (let i = 0; i < 4; i++) {
+      const a = c[i], b = c[(i + 1) % 4]
+      // Nach außen zeigende Richtung der Seite; sichtbar ist, was zur Kamera (x+y wächst) zeigt.
+      const outX = (a.x + b.x) / 2 - cx, outY = (a.y + b.y) / 2 - cy
+      if (outX + outY <= 0) continue
+      const lit = outX > outY
+      g.poly([base[i].x, base[i].y, base[(i + 1) % 4].x, base[(i + 1) % 4].y, top[(i + 1) % 4].x, top[(i + 1) % 4].y, top[i].x, top[i].y]).fill(lit ? body : shade(body, 0.8)).stroke({ width: 0.25, color: 0x1d2326, alpha: 0.7 })
+      // Fensterband
+      const w1 = 0.55, w2 = 0.8
+      const lerp = (p: { x: number; y: number }, q: { x: number; y: number }, t: number) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t })
+      const aw = lerp(base[i], top[i], w1), bw = lerp(base[(i + 1) % 4], top[(i + 1) % 4], w1), at = lerp(base[i], top[i], w2), bt = lerp(base[(i + 1) % 4], top[(i + 1) % 4], w2)
+      g.poly([aw.x, aw.y, bw.x, bw.y, bt.x, bt.y, at.x, at.y]).fill({ color: 0x2b3c48, alpha: 0.85 })
+    }
+    g.poly(top.flatMap(p => [p.x, p.y])).fill(roof).stroke({ width: 0.25, color: 0x1d2326, alpha: 0.7 })
+    if (front) { const f = iso(cx + ux * hl, cy + uy * hl, CAR_HEIGHT * 0.45); g.circle(f.x, f.y, 0.35).fill(0xfff3b0) }
+  }
+  function moveTrains() {
+    const now = Date.now()
+    for (let i = 0; i < railLines.length; i++) {
+      const line = railLines[i], cars = trainCars[i]
+      if (!line || !cars) continue
+      const state = trainState(line.lengthM, now)
+      // Der Triebwagen fährt vorn. Vom Bahnhof weg (und am Streckenende) liegt der Zug
+      // hinter der Spitze; zum Bahnhof hin (und am Bahnhof) vor ihr.
+      const away = state.direction === 1 || (state.direction === 0 && state.distanceM > 0)
+      const forward = away ? 1 : -1
+      const total = cars.length * CAR_LENGTH + (cars.length - 1) * CAR_GAP
+      const head = away ? Math.max(total, Math.min(line.lengthM, state.distanceM)) : Math.max(0, Math.min(line.lengthM - total, state.distanceM))
+      for (let k = 0; k < cars.length; k++) {
+        const d = away ? head - CAR_LENGTH / 2 - k * (CAR_LENGTH + CAR_GAP) : head + CAR_LENGTH / 2 + k * (CAR_LENGTH + CAR_GAP)
+        const { at, heading } = pointAlong(line.points, d)
+        const p = toWorld(at)
+        const car = cars[k]
+        if (Math.hypot(p.x - player.x, p.y - player.y) > 450) { car.visible = false; continue }
+        const ux = Math.cos(heading) * forward, uy = -Math.sin(heading) * forward
+        drawCar(car, p.x, p.y, ux, uy, k === 0 ? 0xc8102e : 0xe8e2d4, k === 0 ? 0x5a5f63 : 0x8a8f92, k === 0)
+        car.visible = true
+        placeDepth(car, p.x + p.y + CAR_LENGTH / 2)
+      }
+    }
   }
 
   // ── Freie Flächen (nach Abriss) ─────────────────────────────────────
@@ -1084,7 +1225,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const box = (node as unknown as { box?: Box } | null)?.box
     if (pick?.type === 'building' && box) {
       const landmark = landmarkIn(box)
-      return landmark ? { ...pick, name: landmark.name, landmark } : pick
+      if (landmark) return { ...pick, name: landmark.name, landmark }
+      const poi = landmarkIn(box, true)
+      return poi ? { ...pick, poi } : pick
     }
     return pick ?? null
   }
@@ -1158,6 +1301,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
     stepAutoWalk(dt)
     moveWalkers(logicStart)
+    moveTrains()
     // Die Kamera gleitet hinterher statt zu springen.
     const follow = 1 - Math.exp(-dt * 9)
     camera.x += (player.x - camera.x) * follow
@@ -1172,6 +1316,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
+    poiLabels.visible = zoom >= 2.4
     const centre = iso(camera.x, camera.y)
     world.scale.set(zoom)
     world.position.set(app.screen.width / 2 - centre.x * zoom, app.screen.height / 2 - centre.y * zoom)
@@ -1203,7 +1348,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     position: () => toGeo(player),
     setPeople,
-    personAt(id) { const walker = walkers.get(id); return walker ? toGeo(walker) : null },
+    personAt(id) { const walker = walkers.get(id); return walker && !(walker.spec.inside && !walker.sent) ? toGeo(walker) : null },
+    leadPerson(id, distanceM, seconds) {
+      const walker = walkers.get(id)
+      if (!walker) return
+      const path = [{ x: walker.x, y: walker.y }, ...roadAhead({ x: walker.x, y: walker.y }, distanceM)]
+      const length = path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - path[i].x, p.y - path[i].y), 0)
+      if (length < 1) return
+      walker.sent = { path, length, start: performance.now(), seconds: Math.max(3, seconds) }
+    },
     sendPerson(id, to, seconds) {
       const walker = walkers.get(id)
       if (!walker) return
@@ -1218,6 +1371,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
     setPlayerName(name) { playerName.text = name.slice(0, 40) },
     setSites(list) { sites = list; drawSites() },
+    setRailLines(list) { setTrains(list) },
+    trainAt(stationName) { const line = railLines.find(item => item.station?.name === stationName); return line ? trainState(line.lengthM, Date.now()) : null },
     setPlots(list) {
       const before = [...cleared].sort().join('|')
       plots = list; cleared = new Set(list.map(plot => plot.source))

@@ -7,8 +7,8 @@ import { earthPlaceSlug } from './earthPlaceIdentity'
 import { EARTH_LOCAL_ENRICHMENT_PROFILE } from './earthLocalScene'
 
 type GeoPoint={lat:number;lon:number}
-type OverpassElement={type?:'node'|'way'|'relation';id?:number;tags?:Record<string,string>;geometry?:GeoPoint[];members?:Array<{geometry?:GeoPoint[]}>}
-type PreparedFeature={feature_type:string;geometry:{kind:'line'|'polygon';coordinates:GeoPoint[]};properties:Record<string,unknown>}
+type OverpassElement={type?:'node'|'way'|'relation';id?:number;lat?:number;lon?:number;tags?:Record<string,string>;geometry?:GeoPoint[];members?:Array<{geometry?:GeoPoint[]}>}
+type PreparedFeature={feature_type:string;geometry:{kind:'line'|'polygon';coordinates:GeoPoint[]}|{kind:'point';coordinates:GeoPoint};properties:Record<string,unknown>}
 
 const PROFILE=EARTH_LOCAL_ENRICHMENT_PROFILE
 /** Marks a region row that only carries the local detail layer, no regional geography. */
@@ -23,12 +23,27 @@ const WATERWAY_PATTERN=new RegExp('^('+LOCAL_WATERWAYS+')$')
 function bounds(lat:number,lon:number,radiusKm:number){const latDelta=radiusKm/111.32;const cosLat=Math.max(.05,Math.abs(Math.cos(lat*Math.PI/180)));const lonDelta=radiusKm/(111.32*cosLat);return{south:lat-latDelta,west:lon-lonDelta,north:lat+latDelta,east:lon+lonDelta}}
 function simplify(points:GeoPoint[],max=56){if(points.length<=max)return points;const step=(points.length-1)/(max-1);return Array.from({length:max},(_,index)=>points[Math.round(index*step)])}
 function polygon(points:GeoPoint[]){if(points.length<3)return false;const a=points[0],b=points[points.length-1];return Math.abs(a.lat-b.lat)<1e-8&&Math.abs(a.lon-b.lon)<1e-8}
+// Benannte Läden und Lokale (Weltkarte, 25.10.2026): Ziele für Spieler und Gespräche.
+const POI_AMENITIES='cafe|restaurant|bar|pub|biergarten|fast_food|ice_cream|bank|pharmacy|post_office|doctors|dentist|fuel|cinema|kindergarten|school'
+const POI_AMENITY_PATTERN=new RegExp('^('+POI_AMENITIES+')$')
+function poiClass(tags:Record<string,string>){if(!tags.name)return null;if(tags.shop)return'shop';if(POI_AMENITY_PATTERN.test(tags.amenity??''))return tags.amenity;if(tags.tourism==='hotel'||tags.tourism==='guest_house')return tags.tourism;if(tags.craft)return'craft';if(tags.office)return'office';return null}
 function featureType(tags:Record<string,string>){if(tags.building)return'building';if(HIGHWAY_PATTERN.test(tags.highway??''))return'road';if(WATERWAY_PATTERN.test(tags.waterway??''))return'waterway';return null}
 function toFeatures(elements:OverpassElement[]){
   const out:PreparedFeature[]=[]
   for(const element of elements){
     if(element.id==null)continue
     const tags=element.tags??{}
+    // Laden oder Lokal: als Punkt (Knoten selbst, sonst Mitte der Fläche); ein Gebäude mit Laden zählt zusätzlich als Gebäude.
+    const poi=poiClass(tags)
+    if(poi){
+      const ring=element.geometry??element.members?.flatMap(member=>member.geometry??[])??[]
+      const at=element.type==='node'&&Number.isFinite(element.lat)&&Number.isFinite(element.lon)?{lat:element.lat!,lon:element.lon!}
+        :ring.length?{lat:ring.reduce((sum,p)=>sum+p.lat,0)/ring.length,lon:ring.reduce((sum,p)=>sum+p.lon,0)/ring.length}:null
+      if(at){
+        const sourceId='osm:'+String(element.type)+':'+String(element.id)+':poi'
+        out.push({feature_type:'poi',geometry:{kind:'point',coordinates:at},properties:{...tags,noxia_source:'OpenStreetMap',noxia_source_id:sourceId,noxia_provenance:'observed',noxia_enrichment:PROFILE,visual_seed:sourceId,visual_class:poi}})
+      }
+    }
     const type=featureType(tags)
     if(!type)continue
     const geometries=element.type==='relation'?(element.members??[]).map(member=>member.geometry??[]):[element.geometry??[]]
@@ -51,7 +66,7 @@ function toFeatures(elements:OverpassElement[]){
 function query(lat:number,lon:number,radiusKm:number){
   const b=bounds(lat,lon,radiusKm)
   const box=[b.south,b.west,b.north,b.east].join(',')
-  return '[out:json][timeout:12];(way[building]('+box+');relation[building]('+box+');way[highway~"'+LOCAL_HIGHWAYS+'"]('+box+');way[waterway~"'+LOCAL_WATERWAYS+'"]('+box+'););out geom;'
+  return '[out:json][timeout:12];(way[building]('+box+');relation[building]('+box+');way[highway~"'+LOCAL_HIGHWAYS+'"]('+box+');way[waterway~"'+LOCAL_WATERWAYS+'"]('+box+');nwr[name][shop]('+box+');nwr[name][amenity~"'+POI_AMENITIES+'"]('+box+');nwr[name][tourism~"hotel|guest_house"]('+box+');nwr[name][craft]('+box+');nwr[name][office]('+box+'););out geom;'
 }
 
 export async function enrichEarthLocalScene(input:{slug:string;lat:number;lon:number;radiusKm?:number}){

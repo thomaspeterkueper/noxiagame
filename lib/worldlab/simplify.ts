@@ -24,9 +24,9 @@ export type AreaKind =
   | 'grounds' | 'track' | 'pitch' | 'sand' | 'hardcourt' | 'clay'
 export type BlockKind = 'house' | 'row' | 'hall' | 'factory' | 'church' | 'shed'
 
-export interface TilePlace { x: number; y: number; n: string; k: string; t?: Record<string, string> }
+export interface TilePlace { x: number; y: number; n: string; k: string; t?: Record<string, string>; /** 1: Laden oder Lokal (kein Wahrzeichen) */ p?: 1 }
 /** OSM-Angaben, die ein Wahrzeichen beschreiben (Tafel, Innenraum). */
-const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia']
+const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia', 'shop', 'cuisine', 'amenity', 'craft', 'office', 'tourism']
 
 export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string }
 export interface TileArea { k: AreaKind; p: number[] }
@@ -59,6 +59,8 @@ export interface SimplifiedTile {
   trees?: number[]
   /** Wahrzeichen (Kirche, Bibliothek, Museum …): Lage, Name, Art und ausgewählte OSM-Angaben. */
   places?: TilePlace[]
+  /** Gleise: Punkte (x/y abwechselnd); s = 1 für Abstell- und Anschlussgleise */
+  rails?: Array<{ p: number[]; s?: 1 }>
 }
 
 const ROAD_CLASS: Record<string, RoadClass> = {
@@ -325,13 +327,13 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     if (seen.has(key)) continue
     const coordinates = feature.geometry?.coordinates
     // Wahrzeichen: Punkt mit Namen; gehört der Kachel, in der es liegt.
-    if (feature.featureType === 'landmark' && feature.geometry.kind === 'point' && typeof properties.name === 'string') {
+    if ((feature.featureType === 'landmark' || feature.featureType === 'poi') && feature.geometry.kind === 'point' && typeof properties.name === 'string') {
       const at = local(feature.geometry.coordinates as GeoPoint)
       if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
       seen.add(key)
       const tags: Record<string, string> = {}
       for (const tag of PLACE_TAGS) if (typeof properties[tag] === 'string' && properties[tag]) tags[tag] = String(properties[tag]).slice(0, 200)
-      ;(out.places ??= []).push({ x: round1(at.x), y: round1(at.y), n: properties.name.slice(0, 80), k: String(properties.visual_class ?? 'landmark'), ...(Object.keys(tags).length ? { t: tags } : {}) })
+      ;(out.places ??= []).push({ x: round1(at.x), y: round1(at.y), n: properties.name.slice(0, 80), k: String(properties.visual_class ?? 'landmark'), ...(Object.keys(tags).length ? { t: tags } : {}), ...(feature.featureType === 'poi' ? { p: 1 as const } : {}) })
       continue
     }
     // Einzelbaum: gehört der Kachel, in der er steht.
@@ -390,6 +392,9 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       const road: TileRoad = { c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : 1.5)) }
       if (typeof properties.name === 'string' && properties.name.trim() && roadClass !== 'path') road.n = properties.name.trim().slice(0, 60)
       out.roads.push(road)
+    } else if (feature.featureType === 'rail' && feature.geometry.kind === 'line') {
+      if (properties.tunnel === 'yes') continue
+      ;(out.rails ??= []).push({ p: flat(simplifyLine(points, 1.5)), ...(properties.service ? { s: 1 as const } : {}) })
     } else if (feature.featureType === 'waterway' && feature.geometry.kind === 'line') {
       out.rivers.push(flat(simplifyLine(points, 2)))
     } else if (areaKind(feature.featureType, properties) && feature.geometry.kind === 'polygon' && points.length >= 3) {

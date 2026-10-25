@@ -104,11 +104,11 @@ Ziel: Die alte Szene (`EarthWalkableSurface.tsx`) kann gehen, wenn die Weltkarte
 | 6 | `visit_place` auch zu Wahrzeichen | EWS:486, 595 | erledigt 25.10. (Begleitung beim Betreten nur bei NOXIA-Gebäuden – der Wahrzeichen-Innenraum kennt keine) |
 | 7 | Baustellen: gestrichelte Fläche mit Fortschritt, Tafel mit Bauphase | EWS:276, 666 | erledigt 25.10. (eigene Bauten aus `/api/game/build/spatial`) |
 | 8 | Zielliste mit Weglänge und gezeichneter Route | EWS:264–295, 711, 737 | erledigt 25.10.: eigene und andere NOXIA-Gebäude bis 6 km, Baustellen, Wahrzeichen der geladenen Kacheln; Weg als gestrichelte Linie zu jeder Tafel mit Ort ab 25 m; ab 1,5 km „Hinspringen“ |
-| 9 | `lead_walk`: die Person geht voraus | EWS:545, 616 | offen |
-| 10 | Personen nach Tätigkeit: Tempo, Pausen, drinnen | EWS:355–390 | offen |
-| 11 | Mitgehörte Gespräche zweier Personen | EWS:199–216, 495 | offen |
-| 12 | Benannte Orte, die keine Wahrzeichen sind (Läden, Cafés), als Ziele | EWS:264 | offen – braucht benannte Punkte in den Kacheln |
-| 13 | Schienen und Regionalzug | EWS:289, 663, 715 | offen – Kacheln ohne Gleise |
+| 9 | `lead_walk`: die Person geht voraus | EWS:545, 616 | erledigt 25.10. (`leadPerson`: entlang der nächsten Straße, vom Spieler weg; danach geht sie wieder ihrer Wege) |
+| 10 | Personen nach Tätigkeit: Tempo, Pausen, drinnen | EWS:355–390 | erledigt 25.10. (unterwegs 1,45 m/s, untätig 0,35 m/s mit Pausen; wer in einem betretbaren Gebäude arbeitet, ist drinnen) |
+| 11 | Mitgehörte Gespräche zweier Personen | EWS:199–216, 495 | erledigt 25.10. (zwei Personen bis 6 m auseinander, du bis 10 m daneben; reale Meldungen und NOXIA-Neuigkeiten) |
+| 12 | Läden und Lokale als Ziele | EWS:264 | erledigt 25.10.: Ortsdetail-Import `local-scene-v3` holt benannte Läden, Cafés, Restaurants, Banken, Apotheken, Hotels, Handwerk und Büros als `poi`; kleines blaugrünes Schild, Namen ab Zoom 2,4; Zielliste „Läden und Lokale“; Gesprächsziel für `visit_place`; im Haus eines Ladens zeigt die Gebäudetafel „Hier: …“. Alte Zellen holen die Läden beim nächsten Besuch nach. |
+| 13 | Schienen und Zug | EWS:289, 663, 715 | erledigt 25.10.: Gleise mit Schotter, Schwellen und Schienen in den Kacheln; `/api/world-lab/rail` verbindet die Hauptgleise zu Linien und lässt sie am Bahnhof beginnen – die Röhrtalbahn (Strecke 9283) am alten Bahnhof Sundern (Sauerland), Richtung Neheim. Ein Zug (Triebwagen + 2 Wagen, 40 km/h, 2 min Aufenthalt an beiden Enden) fährt nach Uhrzeit, alle sehen ihn gleich; die Tafel des Bahnhofs zeigt den nächsten Zug. Die gespeicherte Strecke endet bei 51,400 / 7,997 am Rand der Region Sauerland – bis Neheim fehlt das Stück.|
 | 14 | Startort | EWS:220–246 | erledigt: die Position ist gespeichert (`earthPlayerPositionStore`); „⌂“ springt zum eigenen Gebäude |
 | 15 | Linke Tafel auf schmalen Bildschirmen | EWS:787 | erledigt 25.10. |
 

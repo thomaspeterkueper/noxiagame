@@ -20,6 +20,9 @@ import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
+import { getBuildingEntryDefinition } from '@/lib/game/buildings/entry'
+import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
+import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
 import { blockArt } from '@/lib/worldlab/blocks'
 import { detailCell } from '@/lib/worldlab/detailCells'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
@@ -201,9 +204,16 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     const people: WorldPerson[] = residents.slice(0, 18).map(resident => {
       const surface = surfaceByPerson.get(resident.id)
       const place = resident.assignments.map(item => item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
+      // Tätigkeit wie in der bisherigen Erdszene; wer in einem betretbaren Gebäude arbeitet, ist drinnen.
+      const state = String(resident.activityState ?? '').toLowerCase()
+      const atWork = /work|produc|serv|operat/.test(state)
+      const activity: WorldPerson['activity'] = /travel|move|commut|deliver|patrol/.test(state) ? 'move' : atWork ? 'work' : /idle|rest|sleep/.test(state) ? 'idle' : 'other'
+      const workplace = resident.assignments.map(item => item.type === 'work' && item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
+      const inside = Boolean(atWork && workplace && getBuildingEntryDefinition(workplace.typeId))
       return {
         id: resident.id,
         label: personSceneLabel(resident),
+        activity, inside,
         anchor: surface ? { lat: surface.lat, lon: surface.lon } : place ? { lat: place.lat, lon: place.lon } : null,
         anchorRadiusM: surface ? 3 : place ? Math.max(place.w, place.d) / 2 : undefined,
       }
@@ -241,6 +251,57 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .then(json => setPlaceName(String(json?.name ?? '')))
       .catch(() => {})
   }, [hud])
+
+  // Mitgehörte Gespräche (wie in der bisherigen Erdszene): reale Meldungen und NOXIA-Neuigkeiten.
+  const [awareness, setAwareness] = useState<WorldAwarenessItem[]>([])
+  useEffect(() => {
+    let live = true
+    void Promise.all([
+      fetch('/api/game/world-awareness', { cache: 'no-store' }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] })),
+      fetch('/api/game/world', { cache: 'no-store' }).then(r => r.ok ? r.json() : { news: [] }).catch(() => ({ news: [] })),
+    ]).then(([real, world]) => {
+      if (!live) return
+      const news = Array.isArray(world?.news) ? (world.news as Array<{ text?: string }>).slice(0, 8).map((item, index) => ({
+        id: `noxia-world:${index}:${String(item?.text ?? '').slice(0, 24)}`, sourceId: 'noxia-world', title: String(item?.text ?? '').trim(), summary: '', url: '',
+        publishedAt: new Date().toISOString(), topics: ['general'], kind: 'colony',
+      } as unknown as WorldAwarenessItem)).filter(item => item.title) : []
+      setAwareness([...news, ...(Array.isArray(real?.items) ? real.items : [])].slice(0, 28))
+    })
+    return () => { live = false }
+  }, [])
+  // Zwei Personen nah beieinander (bis 6 m), du bis 10 m daneben: du hörst mit.
+  const overheard = useMemo(() => {
+    void tick
+    if (!engineReady || !awareness.length || panel.kind === 'person' || panel.kind === 'inside' || panel.kind === 'landmarkInside') return null
+    const here = engineReady.position()
+    const people = residents.slice(0, 18).flatMap(resident => { const at = engineReady.personAt(resident.id); return at ? [{ resident, at }] : [] })
+    let best: { a: typeof people[number]; b: typeof people[number]; score: number; playerDistance: number } | null = null
+    for (let i = 0; i < people.length; i++) for (let j = i + 1; j < people.length; j++) {
+      const pair = metresBetween(people[i].at, people[j].at)
+      if (pair > 6) continue
+      const playerDistance = Math.min(metresBetween(here, people[i].at), metresBetween(here, people[j].at))
+      if (playerDistance > 10) continue
+      const score = pair + playerDistance * 0.25
+      if (!best || score < best.score) best = { a: people[i], b: people[j], score, playerDistance }
+    }
+    if (!best) return null
+    const role = best.a.resident.assignments.find(item => item.type === 'work')?.roleCode ?? best.a.resident.activityState ?? 'general'
+    const conversation = awarenessConversationForResident(best.a.resident.id, role, awareness, new Date().toISOString().slice(0, 10))
+    return conversation ? { first: best.a.resident, second: best.b.resident, conversation, source: sourceForAwarenessItem(conversation.item), playerDistance: best.playerDistance } : null
+  }, [tick, engineReady, awareness, panel.kind, residents])
+
+  // Bahnstrecken mit Zug: neu holen, wenn die Figur mehr als 3 km weitergegangen ist.
+  const railAt = useRef<GeoPoint | null>(null)
+  useEffect(() => {
+    if (!hud || !engineReady) return
+    const here = { lat: hud.lat, lon: hud.lon }
+    if (railAt.current && metresBetween(railAt.current, here) < 3000) return
+    railAt.current = here
+    void fetch(`/api/world-lab/rail?lat=${here.lat.toFixed(3)}&lon=${here.lon.toFixed(3)}`)
+      .then(response => response.ok ? response.json() : null)
+      .then(json => { if (Array.isArray(json?.lines)) engineReady.setRailLines(json.lines) })
+      .catch(() => {})
+  }, [hud, engineReady])
 
   // Baustellen: eigene laufende Bauten (wie die bisherige Erdszene), alle 30 s neu.
   useEffect(() => {
@@ -296,7 +357,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       if (distanceM <= 6000) list.push({ id: 'n:' + building.id, label: building.name + (building.own ? '' : ' · ' + (building.ownerLabel ?? 'NOXIA')), distanceM, group: building.own ? 'Deine Gebäude' : 'NOXIA-Gebäude', panel: { kind: 'building', at: { lat: building.lat, lon: building.lon }, title: building.name, noxiaId: building.id } })
     }
     for (const site of sites) list.push({ id: 's:' + site.id, label: site.name + ' · im Bau', distanceM: metresBetween(here, site.at), group: 'Baustellen', panel: { kind: 'site', id: site.id } })
-    for (const item of engineReady?.landmarks() ?? []) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
+    for (const item of engineReady?.landmarks() ?? []) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: item.landmark.poi ? 'Läden und Lokale' : 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
     return list.sort((a, b) => a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noxia, sites, engineReady, hereKey, tilesLoaded])
@@ -381,6 +442,13 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       {onPlanning && <button className="leave" onClick={onPlanning}>← Karte</button>}
       {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
     </div>
+    {overheard && <div className="overheard">
+      <small>GESPRÄCH IN HÖRWEITE · {overheard.conversation.item.kind === 'colony' ? 'NOXIA' : 'HEUTE'}</small>
+      <b>{personSceneLabel(overheard.first)} + {personSceneLabel(overheard.second)}</b>
+      <p><strong>{personSceneLabel(overheard.first)}:</strong> „{overheard.conversation.opener}“</p>
+      <p><strong>{personSceneLabel(overheard.second)}:</strong> „{overheard.conversation.followUp}“</p>
+      <span>{overheard.conversation.item.kind === 'colony' ? 'NOXIA-Weltgeschehen' : `Reale Meldung · ${overheard.source?.name ?? overheard.conversation.item.sourceId}`} · ca. {Math.round(overheard.playerDistance)} m entfernt</span>
+    </div>}
     {hoverText && hover && panel.kind !== 'inside' && panel.kind !== 'landmarkInside' && <div className="tip" style={{ left: hover.x + 12, top: hover.y + 12 }}>
       <b>{hoverText.title}</b><span>{hoverText.detail}</span>{hoverText.at && engineReady && <small>{kmText(engineReady.distanceTo(hoverText.at))} von dir</small>}
     </div>}
@@ -432,6 +500,10 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .target{display:grid;gap:2px;margin:6px 0 0}
       .target span{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .target select{width:100%;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 6px;font-size:11px}
+      .overheard{position:absolute;left:14px;bottom:24px;width:min(360px,calc(100% - 28px));display:grid;gap:3px;padding:10px 12px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;font-size:11.5px;z-index:4}
+      .overheard small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
+      .overheard p{margin:0;line-height:1.4}
+      .overheard span{color:#9fb5b0;font-size:10px}
       .tip{position:fixed;z-index:1200;pointer-events:none;display:grid;gap:1px;padding:6px 8px;background:#0d1c22ee;border:1px solid #40595a;border-radius:6px;font-size:11px;color:#eef2ed;max-width:260px}
       .tip span{color:#9fb5b0}.tip small{color:#d9bb6a;font-size:10px}
       @media(max-width:700px){

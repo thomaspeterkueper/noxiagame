@@ -24,7 +24,8 @@ function hash(value:string){
   return h>>>0
 }
 /** Shared profile id of the local detail layer (footprints, paths, watercourses). */
-export const EARTH_LOCAL_ENRICHMENT_PROFILE='local-scene-v2'
+// v3 (25.10.2026): zusätzlich benannte Läden und Lokale als Punkte (feature_type 'poi')
+export const EARTH_LOCAL_ENRICHMENT_PROFILE='local-scene-v3'
 
 function inside(point:LocalSurfacePoint,radiusM:number){return Math.abs(point.xM)<=radiusM&&Math.abs(point.yM)<=radiusM}
 // A forest or meadow that encloses the scene has no vertex inside it, and a
