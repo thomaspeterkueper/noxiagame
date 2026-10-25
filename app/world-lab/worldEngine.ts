@@ -11,9 +11,10 @@ import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, N
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
+import { boxFootprint, insidePolygon, RoadGraph, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
-import type { BlockKind, SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
+import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
 
 type Pixi = typeof import('pixi.js')
@@ -46,9 +47,15 @@ export interface WorldEngineOptions {
 /** Was unter dem Zeiger lag, als geklickt wurde. */
 export type WorldPick =
   | { type: 'person'; id: string }
-  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string }
+  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark }
+  | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
+
+type Box = { cx: number; cy: number; hw: number; hd: number; cos: number; sin: number }
+
+/** Wahrzeichen aus den Kartendaten (Kirche, Bibliothek, Museum …). */
+export interface WorldLandmark { at: GeoPoint; name: string; kind: string; tags: Record<string, string> }
 
 /** Eine Person auf der Karte. `anchor`: Haus, vor dem sie sich aufhält; sonst geht sie die Straßen entlang. */
 export interface WorldPerson { id: string; label: string; anchor?: GeoPoint | null; /** Halbe Größe des Hauses, vor dem sie steht (m). */ anchorRadiusM?: number; tint?: number }
@@ -239,7 +246,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number }>; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -365,7 +372,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return ring
   }
 
-  function drawBlock(block: TileBlock, ox: number, oy: number) {
+  function drawBlock(block: TileBlock, ox: number, oy: number, footprints?: Loaded['footprints']) {
     const style = BLOCK_STYLES[block.k]
     const g = new PIXI.Graphics()
     let cos = Math.cos(block.a), sin = Math.sin(block.a)
@@ -397,10 +404,33 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
     // Tiefe: der vorderste Fußpunkt entscheidet, was vor wem steht.
     g.zIndex = Math.max(...c.map(p => p.x + p.y))
-    // Für Klicks: was dieses Gebäude ist.
+    // Für Klicks: was dieses Gebäude ist. Ein Wahrzeichen in oder dicht an ihm
+    // wird beim Klick gesucht (es kann in der Nachbarkachel liegen).
     g.eventMode = 'static'
     ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id }
+    ;(g as unknown as { box: Box }).box = { cx, cy, hw, hd, cos, sin }
+    // Hindernis für die Spielfigur (Grundriss, ein halber Meter Abstand)
+    if (footprints) {
+      const ring = block.f && block.f.length >= 8 ? Array.from({ length: block.f.length / 2 }, (_, i) => ({ x: ox + block.f![i * 2], y: oy + block.f![i * 2 + 1] })) : boxFootprint(cx, cy, hw, hd, block.a, 0.5)
+      footprints.push({ ring, minX: Math.min(...ring.map(p => p.x)), maxX: Math.max(...ring.map(p => p.x)), minY: Math.min(...ring.map(p => p.y)), maxY: Math.max(...ring.map(p => p.y)) })
+    }
     return g
+  }
+
+  /** Wahrzeichen in einem Gebäude oder bis 12 m davor (Kacheln rundum). */
+  function landmarkIn(box: Box): WorldLandmark | undefined {
+    const tx = anchorTile.x + Math.floor(box.cx / tileSizeM), ty = anchorTile.y + Math.floor(box.cy / tileSizeM)
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
+      for (const place of entry?.data.places ?? []) {
+        const px = entry!.ox + place.x - box.cx, py = entry!.oy + place.y - box.cy
+        if (Math.abs(px * box.cos + py * box.sin) <= box.hw + 12 && Math.abs(-px * box.sin + py * box.cos) <= box.hd + 12) return landmarkOf(place, entry!.ox, entry!.oy)
+      }
+    }
+    return undefined
+  }
+  function landmarkOf(place: TilePlace, ox: number, oy: number): WorldLandmark {
+    return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: place.k, tags: place.t ?? {} }
   }
 
   function drawGround(entry: Loaded) {
@@ -458,6 +488,27 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       labels.addChild(text)
       entry.labels.push(text)
     }
+    // Wahrzeichen: Schild mit Namen (klickbar), steht am Ort des Wahrzeichens.
+    for (const place of data.places ?? []) {
+      const at = iso(ox + place.x, oy + place.y)
+      const badge = new PIXI.Graphics()
+      badge.moveTo(0, 0).lineTo(0, -6).stroke({ width: 0.5, color: 0x17313c })
+      badge.circle(0, -8, 2.6).fill(0xf4ecd2).stroke({ width: 0.6, color: 0x17313c })
+      badge.circle(0, -8, 0.9).fill(0x8a5a2b)
+      badge.position.set(at.x, at.y)
+      badge.zIndex = ox + place.x + oy + place.y + 0.5
+      badge.eventMode = 'static'
+      badge.hitArea = new PIXI.Rectangle(-4, -12, 8, 13)
+      ;(badge as unknown as { pick: WorldPick }).pick = { type: 'landmark', landmark: landmarkOf(place, ox, oy) }
+      addObject(badge)
+      entry.trees.push(badge)
+      const name = new PIXI.Text({ text: place.n, style: { fontFamily: 'system-ui, sans-serif', fontSize: 26, fontWeight: '700', fill: 0x5a3a1c, stroke: { color: 0xf8f4e8, width: 6, join: 'round' } } })
+      name.anchor.set(0.5, 1)
+      name.scale.set(0.12)
+      name.position.set(at.x, at.y - 11)
+      labels.addChild(name)
+      entry.labels.push(name)
+    }
     // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
     const trees = data.trees ?? []
     if (treeTextures.length) for (let i = 0; i + 1 < trees.length; i += 2) {
@@ -477,7 +528,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], labels: [], done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], labels: [], footprints: [], done: false })
     building.push(key)
   }
 
@@ -496,7 +547,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const to = Math.min(entry.data.blocks.length, from + Math.max(1, Math.floor(budget)))
       if (to > from) {
         const chunk: Container[] = []
-        for (let i = from; i < to; i++) chunk.push(drawBlock(entry.data.blocks[i], entry.ox, entry.oy))
+        for (let i = from; i < to; i++) chunk.push(drawBlock(entry.data.blocks[i], entry.ox, entry.oy, entry.footprints))
         for (const block of chunk) addObject(block)
         entry.blocks.push(...chunk)
         budget -= to - from
@@ -744,18 +795,67 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
   }
 
+  // ── Hindernisse ─────────────────────────────────────────────────────
+  // Häuser der geladenen Kacheln sind Hindernisse. Geprüft werden nur die
+  // Kacheln um den Punkt (ein Haus gehört der Kachel seiner Mitte, ragt aber hinaus).
+  function blocked(p: { x: number; y: number }) {
+    const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
+      if (!entry) continue
+      for (const f of entry.footprints) {
+        if (p.x < f.minX || p.x > f.maxX || p.y < f.minY || p.y > f.maxY) continue
+        if (insidePolygon(p, f.ring)) return true
+      }
+    }
+    return false
+  }
+  function movePlayer(nx: number, ny: number) {
+    const next = stepWithObstacles(player, { x: nx, y: ny }, blocked)
+    const moved = Math.hypot(next.x - player.x, next.y - player.y)
+    player.x = next.x; player.y = next.y
+    return moved
+  }
+
   // ── Selbst gehen ────────────────────────────────────────────────────
-  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void } | null = null
+  // Nahe Ziele (unter 30 m) gerade, weite entlang der Straßen der geladenen
+  // Kacheln. Bewegt sich das Ziel weit weg (Person), wird neu geplant.
+  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; stuck: number } | null = null
+  function planRoute(to: { x: number; y: number }) {
+    if (Math.hypot(to.x - player.x, to.y - player.y) < 30) return [to]
+    const graph = new RoadGraph()
+    for (const entry of loaded.values()) {
+      if (Math.hypot(entry.ox + tileSizeM / 2 - (player.x + to.x) / 2, entry.oy + tileSizeM / 2 - (player.y + to.y) / 2) > Math.hypot(to.x - player.x, to.y - player.y) / 2 + tileSizeM) continue
+      for (const road of entry.data.roads) {
+        const pts: Array<{ x: number; y: number }> = []
+        for (let i = 0; i + 1 < road.p.length; i += 2) pts.push({ x: entry.ox + road.p[i], y: entry.oy + road.p[i + 1] })
+        graph.addLine(pts)
+      }
+    }
+    const route = graph.size ? graph.route({ x: player.x, y: player.y }, to) : null
+    return route ? route.slice(1) : [to]
+  }
   function stepAutoWalk(dt: number) {
     if (!autoWalk) return
     const target = autoWalk.target()
     if (!target) { autoWalk = null; return }
     const to = toWorld(target)
-    const dx = to.x - player.x, dy = to.y - player.y, distance = Math.hypot(dx, dy)
-    if (distance <= autoWalk.withinM) { const done = autoWalk.onArrive; autoWalk = null; done?.(); return }
-    const step = Math.min(distance - autoWalk.withinM * 0.8, WALK_M_PER_S * dt)
-    player.x += dx / distance * step
-    player.y += dy / distance * step
+    if (Math.hypot(to.x - player.x, to.y - player.y) <= autoWalk.withinM) { const done = autoWalk.onArrive; autoWalk = null; done?.(); return }
+    if (!autoWalk.planFor || Math.hypot(to.x - autoWalk.planFor.x, to.y - autoWalk.planFor.y) > 12) {
+      autoWalk.path = planRoute(to); autoWalk.planFor = to
+    }
+    let next = autoWalk.path[0] ?? to
+    if (autoWalk.path.length > 1 && Math.hypot(next.x - player.x, next.y - player.y) < 1.5) { autoWalk.path.shift(); next = autoWalk.path[0] }
+    if (autoWalk.path.length <= 1) next = to
+    const dx = next.x - player.x, dy = next.y - player.y, distance = Math.hypot(dx, dy)
+    if (distance < 0.01) return
+    const step = Math.min(distance, WALK_M_PER_S * dt)
+    const moved = movePlayer(player.x + dx / distance * step, player.y + dy / distance * step)
+    // Hängt die Figur an einer Wand fest, den nächsten Wegpunkt nehmen.
+    autoWalk.stuck = moved < step * 0.2 ? autoWalk.stuck + dt : 0
+    if (autoWalk.stuck > 0.8 && autoWalk.path.length > 1) { autoWalk.path.shift(); autoWalk.stuck = 0 }
+    // Ziel liegt hinter einer Wand (Schild mitten im Haus): so nah wie möglich gilt als angekommen.
+    else if (autoWalk.stuck > 1.2) { const done = autoWalk.onArrive; autoWalk = null; done?.() }
   }
 
   // ── Klicks ──────────────────────────────────────────────────────────
@@ -771,6 +871,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     let node: Container | null = hit
     while (node && !(node as unknown as { pick?: WorldPick }).pick) node = node.parent
     const pick = (node as unknown as { pick?: WorldPick } | null)?.pick
+    const box = (node as unknown as { box?: Box } | null)?.box
+    if (pick?.type === 'building' && box) {
+      const landmark = landmarkIn(box)
+      options.onPick(landmark ? { ...pick, name: landmark.name, landmark } : pick)
+      return
+    }
     if (pick) { options.onPick(pick); return }
     // Boden: Bildpunkt → Bodenpunkt (Höhe 0)
     const centre = iso(camera.x, camera.y)
@@ -816,8 +922,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const wx = sx + sy, wy = sy - sx
       const length = Math.hypot(wx, wy)
       const speed = WALK_M_PER_S * (keys.has('shift') ? RUN_FACTOR : 1)
-      player.x += wx / length * speed * dt
-      player.y += wy / length * speed * dt
+      movePlayer(player.x + wx / length * speed * dt, player.y + wy / length * speed * dt)
     }
     stepAutoWalk(dt)
     moveWalkers(logicStart)
@@ -869,7 +974,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (walker) walker.sent = { from: { x: walker.x, y: walker.y }, to: toWorld(to), start: performance.now(), seconds: Math.max(1, seconds) }
     },
     releasePerson(id) { const walker = walkers.get(id); if (walker) walker.sent = null },
-    walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive } },
+    walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, stuck: 0 } },
     stopWalking() { autoWalk = null },
     setInputEnabled(enabled) { inputEnabled = enabled; if (!enabled) { keys.clear(); autoWalk = null } },
     distanceTo(at) { const p = toWorld(at); return Math.hypot(p.x - player.x, p.y - player.y) },

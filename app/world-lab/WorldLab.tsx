@@ -168,7 +168,7 @@ export default function WorldLab({ embedded = false, onLeave, residents: givenRe
   }, [engineReady, residents, noxia])
 
   // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
-  useEffect(() => { engineReady?.setInputEnabled(panel.kind !== 'inside') }, [engineReady, panel.kind])
+  useEffect(() => { engineReady?.setInputEnabled(panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind])
 
   // Position teilen (alle 2 s): die bisherige Erdszene startet dann am selben Ort.
   useEffect(() => {

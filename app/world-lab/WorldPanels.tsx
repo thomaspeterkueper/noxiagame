@@ -9,24 +9,31 @@
 // die zu einem Ort geht) ist keine Tafel, sondern ein Vermerk, der im Innenraum
 // genutzt wird.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
+import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
+import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
 import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
-import type { NoxiaBuilding, WorldEngine, WorldPick } from './worldEngine'
+import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick } from './worldEngine'
 
 export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
   | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string }
+  | { kind: 'landmark'; landmark: WorldLandmark }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
+  | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
 
 const TALK_RANGE_M = 8
 const ENTER_RANGE_M = 8
+/** Wahrzeichen: Abstand zum Schild (es steht meist mitten im Gebäude). */
+const LANDMARK_ENTER_M = 14
 const BLOCK_NAMES: Record<BlockKind, string> = { house: 'Wohnhaus', row: 'Mehrfamilienhaus', hall: 'Halle', factory: 'Fabrik', church: 'Kirche', shed: 'Schuppen' }
 
 function role(resident: ColonyResident) { return resident.assignments.find(item => item.type === 'work')?.roleCode ?? resident.activityState ?? 'general' }
@@ -35,6 +42,9 @@ function role(resident: ColonyResident) { return resident.assignments.find(item 
 export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'person') return { kind: 'person', id: pick.id }
   if (pick.type === 'ground') return { kind: 'none' }
+  if (pick.type === 'landmark') return { kind: 'landmark', landmark: pick.landmark }
+  // Ein Wahrzeichen-Gebäude (Kirche, Bibliothek) öffnet das Wahrzeichen, außer es ist ein NOXIA-Gebäude.
+  if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
   if (pick.type === 'noxia') return own ? { kind: 'building', at: { lat: own.lat, lon: own.lon }, title: own.name, noxiaId: own.id } : { kind: 'none' }
   return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id }
@@ -62,6 +72,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const building = panel.kind === 'building' ? panel : null
   const own = building?.noxiaId ? noxia.find(item => item.id === building.noxiaId) ?? null : null
   const entry = own ? getBuildingEntryDefinition(own.typeId) : null
+  const landmark = panel.kind === 'landmark' ? panel.landmark : null
+  const room = landmark ? landmarkRoomKind(landmark.kind) : null
 
   // Abstände je Anzeige neu (tick)
   const personDistance = useMemo(() => {
@@ -77,9 +89,14 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const half = own ? Math.max(own.w, own.d) / 2 : 6
     return Math.max(0, engine.distanceTo(building.at) - half)
   }, [building, own, engine, tick])
+  const landmarkDistance = useMemo(() => {
+    void tick
+    return landmark && engine ? engine.distanceTo(landmark.at) : null
+  }, [landmark, engine, tick])
+  const landmarkNear = landmarkDistance !== null && landmarkDistance <= LANDMARK_ENTER_M
 
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
-  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind
+  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
   if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage('') }
 
@@ -87,7 +104,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.closest?.('input,textarea,select')) return
-      if (event.key === 'Escape' && panel.kind !== 'inside') close()
+      if (event.key === 'Escape' && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') close()
+      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && landmark && room && landmarkNear) setPanel({ kind: 'landmarkInside', room, landmark })
       if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && panel.kind === 'building' && entry && own && buildingDistance !== null && buildingDistance <= ENTER_RANGE_M) enter()
     }
     window.addEventListener('keydown', onKey)
@@ -157,6 +175,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       close()
     }}/>
   }
+  if (panel.kind === 'landmarkInside') {
+    return <LandmarkWalkableInterior kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}/>
+  }
   if (panel.kind === 'none') return null
 
   return <aside className="world-panel" role="dialog">
@@ -176,6 +197,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{buildingDistance === null ? '' : `${Math.round(buildingDistance)} m entfernt.`}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+    </>}
+    {landmark && <>
+      <div className="head"><div><small>REALER ORT · {landmarkLabel(landmark.kind, landmark.tags).toUpperCase()}</small><b>{landmark.name}</b></div><button onClick={close} aria-label="Schließen">×</button></div>
+      {landmarkFacts(landmark.tags).length > 0 && <dl>{landmarkFacts(landmark.tags).map(fact => <Fragment key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></Fragment>)}</dl>}
+      {room && landmarkNear
+        ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark })}>Betreten</button></div>
+        : <div className="row"><span>{room ? `${Math.round(landmarkDistance ?? 0)} m entfernt.` : 'Kann man nicht betreten.'}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
     </>}
     <style jsx>{`
       .world-panel{position:absolute;right:14px;top:14px;width:300px;max-height:calc(100% - 28px);overflow:auto;padding:12px 14px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;color:#eef2ed;font:12px system-ui;z-index:5}

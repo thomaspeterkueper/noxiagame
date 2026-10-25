@@ -179,6 +179,12 @@ describe('world lab: simplification', () => {
     expect(house.blocks[0].nm).toBe('SSF')
   })
 
+  it('keeps named landmarks with their describing tags', () => {
+    const church: SourceFeature = { id: 'c', featureType: 'landmark', geometry: { kind: 'point', coordinates: at(60, 60) }, properties: { name: 'St. Johannes', visual_class: 'place_of_worship', religion: 'christian', height: '20' } }
+    const placed = buildTile([church], tile, TILE_Z)
+    expect(placed.places).toEqual([{ x: 60, y: 60, n: 'St. Johannes', k: 'place_of_worship', t: { religion: 'christian' } }])
+  })
+
   it('stays small', () => {
     expect(JSON.stringify(built).length).toBeLessThan(900)
   })

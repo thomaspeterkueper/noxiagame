@@ -24,6 +24,10 @@ export type AreaKind =
   | 'grounds' | 'track' | 'pitch' | 'sand' | 'hardcourt' | 'clay'
 export type BlockKind = 'house' | 'row' | 'hall' | 'factory' | 'church' | 'shed'
 
+export interface TilePlace { x: number; y: number; n: string; k: string; t?: Record<string, string> }
+/** OSM-Angaben, die ein Wahrzeichen beschreiben (Tafel, Innenraum). */
+const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia']
+
 export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string }
 export interface TileArea { k: AreaKind; p: number[] }
 export interface TileBlock {
@@ -51,6 +55,8 @@ export interface SimplifiedTile {
   tracks?: number[][]
   /** Einzelbäume und Bäume aus Alleen: Standorte x/y abwechselnd, nur die in dieser Kachel. */
   trees?: number[]
+  /** Wahrzeichen (Kirche, Bibliothek, Museum …): Lage, Name, Art und ausgewählte OSM-Angaben. */
+  places?: TilePlace[]
 }
 
 const ROAD_CLASS: Record<string, RoadClass> = {
@@ -316,6 +322,16 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     const key = String(properties.noxia_source_id ?? feature.id)
     if (seen.has(key)) continue
     const coordinates = feature.geometry?.coordinates
+    // Wahrzeichen: Punkt mit Namen; gehört der Kachel, in der es liegt.
+    if (feature.featureType === 'landmark' && feature.geometry.kind === 'point' && typeof properties.name === 'string') {
+      const at = local(feature.geometry.coordinates as GeoPoint)
+      if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
+      seen.add(key)
+      const tags: Record<string, string> = {}
+      for (const tag of PLACE_TAGS) if (typeof properties[tag] === 'string' && properties[tag]) tags[tag] = String(properties[tag]).slice(0, 200)
+      ;(out.places ??= []).push({ x: round1(at.x), y: round1(at.y), n: properties.name.slice(0, 80), k: String(properties.visual_class ?? 'landmark'), ...(Object.keys(tags).length ? { t: tags } : {}) })
+      continue
+    }
     // Einzelbaum: gehört der Kachel, in der er steht.
     if (feature.featureType === 'tree' && feature.geometry.kind === 'point') {
       const at = local(feature.geometry.coordinates as GeoPoint)
