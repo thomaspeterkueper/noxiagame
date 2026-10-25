@@ -192,6 +192,14 @@ Bestätigt von Thomas, 25.10.2026. Beobachtungen am Bild von Sundern (Fabrikgel�
 
 **Anschluss Gastronomie (dort gebaut, sobald die Gebäudetafel aus W-2 steht):** Beim Klick auf ein Lokal in der rechten Spalte Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – aus `venueHoursFor`/`venueOpenAt` (`lib/game/hospitality/venues.ts`), damit man vor dem Hineingehen weiß, dass das Café um 20 Uhr Koloniezeit schließt.
 
+### W-4 (Gastronomie, 25.10.2026): Reale Gebäude anklickbar, kaufbar und mit NOXIA-Gebäuden verknüpft
+
+Entscheidung Thomas, 25.10.2026 (siehe R-13 bei Bevölkerung und Ökonomie): Lokale entstehen auf der Erde durch Kauf und Umbau bestehender Gebäude, nicht durch Neubau. Dafür braucht die Karte:
+
+- Jedes reale Gebäude aus `region_features` hat eine stabile Kennung (OSM-Id oder Feature-Id), auf die eine `tile_entities`-Zeile verweisen kann; ein gekauftes oder umgebautes Haus zeigt sein Schild und seine Nutzung auf der Karte, steht aber am Grundriss des realen Hauses.
+- Klick auf ein reales Gebäude → Gebäudetafel (W-2) mit Adresse, Größe, heutiger Nutzung aus OSM (Wohnhaus, Laden, Bar „Metropol“) und, wenn frei, „Kaufen“; ist es NOXIA-Gebäude, „Betreten“.
+- Das selbst gebaute Startcafé soll von der Karte verschwinden, sobald es auf ein reales Gebäude übertragen ist (Übergang in R-13).
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
