@@ -292,6 +292,22 @@ const KIND_BY_BUILDING: Readonly<Record<string, VenueKind>> = {
   hotel: 'hotel',
 }
 
+/**
+ * Lokalart aus den Kartendaten eines realen Gebäudes (OpenStreetMap-Tags).
+ * Vorbereitung für R-13: Ein gekauftes Haus, das schon Lokal ist, öffnet den
+ * passenden Raum; ein Wohnhaus hat keine Lokalart (null) und wird erst durch
+ * Umbau eines. Pub und Biergarten sind Bars, Imbiss und Eisdiele Cafés.
+ */
+export function venueKindForRealPlace(tags: Record<string, unknown> | null | undefined): VenueKind | null {
+  const amenity = String(tags?.amenity ?? '').toLowerCase()
+  const tourism = String(tags?.tourism ?? '').toLowerCase()
+  if (['cafe', 'fast_food', 'ice_cream'].includes(amenity)) return 'cafe'
+  if (['bar', 'pub', 'biergarten', 'nightclub'].includes(amenity)) return 'bar'
+  if (amenity === 'restaurant') return 'restaurant'
+  if (['hotel', 'guest_house', 'motel', 'hostel'].includes(tourism)) return 'hotel'
+  return null
+}
+
 /** Unbekannte Gebäudetypen fallen auf das Café zurück – der bisherige Stand. */
 export function venueKindForBuildingType(buildingTypeId: string | null | undefined): VenueKind {
   return KIND_BY_BUILDING[String(buildingTypeId ?? '').toLowerCase()] ?? 'cafe'
