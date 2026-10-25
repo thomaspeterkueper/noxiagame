@@ -6,6 +6,7 @@ import type { Person, PopulationEvent } from './types'
 export interface EncounterCandidate {
   person: Person
   tileEntityId?: string | null
+  regionFeatureId?: string | null
 }
 
 export interface PopulationEncounter {
@@ -13,6 +14,7 @@ export interface PopulationEncounter {
   tick: number
   locationId: string
   tileEntityId: string | null
+  regionFeatureId: string | null
   personAId: string
   personBId: string
   eventA: PopulationEvent
@@ -63,7 +65,9 @@ function normalizedCandidates(candidates: readonly EncounterCandidate[]): Encoun
 function areCoLocated(a: EncounterCandidate, b: EncounterCandidate): boolean {
   if (a.person.id === b.person.id) return false
   if (a.person.currentLocationId !== b.person.currentLocationId) return false
-  if (a.tileEntityId && b.tileEntityId && a.tileEntityId !== b.tileEntityId) return false
+  const aPlace = a.tileEntityId ? 'tile:' + a.tileEntityId : a.regionFeatureId ? 'region:' + a.regionFeatureId : null
+  const bPlace = b.tileEntityId ? 'tile:' + b.tileEntityId : b.regionFeatureId ? 'region:' + b.regionFeatureId : null
+  if (aPlace && bPlace && aPlace !== bPlace) return false
   return true
 }
 
@@ -110,8 +114,11 @@ export function derivePopulationEncounters(input: {
       const tileEntityId = a.tileEntityId && b.tileEntityId && a.tileEntityId === b.tileEntityId
         ? a.tileEntityId
         : null
+      const regionFeatureId = a.regionFeatureId && b.regionFeatureId && a.regionFeatureId === b.regionFeatureId
+        ? a.regionFeatureId
+        : null
       const id = `encounter:${input.tick}:${personAId}:${personBId}`
-      const payload = { encounterId: id, coLocated: true, tileEntityId }
+      const payload = { encounterId: id, coLocated: true, tileEntityId, regionFeatureId }
 
       const event = (actorPersonId: string, relatedPersonId: string): PopulationEvent => ({
         id: `${id}:${actorPersonId}`,
@@ -130,6 +137,7 @@ export function derivePopulationEncounters(input: {
         tick: input.tick,
         locationId: a.person.currentLocationId,
         tileEntityId,
+        regionFeatureId,
         personAId,
         personBId,
         eventA: event(personAId, personBId),
