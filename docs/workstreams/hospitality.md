@@ -72,6 +72,8 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 - Oberfläche: Rede in der Sprache der Figur oder übersetzt mit Kennzeichnung – Vorschlag bitte von hier.
 - Karten im Lokal mehrsprachig bzw. in der Ortssprache; Küche je Ort (später).
 - R-11 an Bevölkerung und Ökonomie: Alter als Wissen des Spielers, Spieljahr als Funktion.
+- W-3 an Weltkarte: Lesbarkeit der neuen Karte (Figur, Straßen, Anklickbares, Schilder), doppelte Leisten.
+- W-2 an Weltkarte: Layout der neuen Karte – eine Spalte rechts, nur was gerade gebraucht wird, Entwicklerdinge versteckt.
 - W-1 an Weltkarte: Straßennamen und Hausnummern in der Spielansicht, Zielwahl nach Adresse.
 
 ## Offene Aufgaben
@@ -93,6 +95,8 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 9. ✅ Hafenkantine in Q1 und auf dem Mars erreichbar (22.10.2026; der Mars-Landeplatz läuft über `FacilityInterior`, dort fehlte der Zugang bisher). Offen bleibt der Notration-Knopf, sobald der Server sie für Spieler ausgibt.
 
 10. ✅ Migration `20261014090000_hotel_rooms.sql` live eingespielt (14.10.2026). Production-Smoke-Test in zurückgerollter Transaktion bestanden: Hotel erhält 6 Zimmer, Zimmerbuchung funktioniert, Doppelbuchung wird abgewiesen, Vollbelegung wird bei 6/6 erzwungen. **Noch offen:** ein persistentes Hotel regulär über die Spieloberfläche bauen und dort die Buchung visuell/end-to-end prüfen.
+
+11. Gebäudetafel in der neuen Weltkarte: beim Klick auf ein Lokal Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – sobald W-2 dort eine rechte Spalte liefert.
 
 ## Nicht in diesem Teilprojekt
 

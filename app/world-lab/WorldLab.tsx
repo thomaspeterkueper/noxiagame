@@ -55,7 +55,22 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
   const noxiaRef = useRef<NoxiaBuilding[]>([])
   const [surfacePeople, setSurfacePeople] = useState<Array<{ id: string; lat: number; lon: number }>>([])
-  const [showStats, setShowStats] = useState(!embedded)
+  // Entwicklerdinge (Messwerte, Nachladen, alte Szene) nur mit ?dev=1 – einmal gesetzt, bleibt es (W-2).
+  const [dev] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      const flag = new URLSearchParams(window.location.search).get('dev')
+      if (flag === '1') window.localStorage.setItem('noxia-world-dev', '1')
+      if (flag === '0') window.localStorage.removeItem('noxia-world-dev')
+      return !embedded || window.localStorage.getItem('noxia-world-dev') === '1'
+    } catch { return !embedded }
+  })
+  const [devOpen, setDevOpen] = useState(!embedded)
+  // Bedienhinweise nur beim ersten Öffnen, danach hinter „?“
+  const [helpOpen, setHelpOpen] = useState(() => { try { return typeof window !== 'undefined' && window.localStorage.getItem('noxia-world-help-v1') !== 'seen' } catch { return false } })
+  function closeHelp() { setHelpOpen(false); try { window.localStorage.setItem('noxia-world-help-v1', 'seen') } catch { /* ohne Speicher */ } }
+  /** Kurzer Satz für Spieler (Einzelheiten gehen in die Konsole). */
+  const [playerNote, setPlayerNote] = useState('')
   const [destination, setDestination] = useState('')
   const [destinationNote, setDestinationNote] = useState('')
   const [placeName, setPlaceName] = useState('')
@@ -97,12 +112,16 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     tried.current.add(cell.lat + '/' + cell.lon)
     busy.current = true
     setRefresh({ busy: true, text: reason + ' – Kartendaten werden geholt …' })
+    if (reason !== 'Start') setPlayerNote('Kartendaten für diese Gegend werden geholt …')
     try {
       const { token } = await getSessionInfo()
       if (!token) throw new Error('nicht angemeldet')
       const response = await fetch('/api/world-lab/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(at) })
-      const json = await response.json()
-      if (!response.ok) throw new Error(json?.error ?? String(response.status))
+      // Bei Zeitüberschreitung antwortet der Server mit einer Textseite statt JSON (W-2).
+      const raw = await response.text()
+      let json: { error?: string; regions?: Array<{ ok: boolean; error?: string }>; detail?: { ok?: boolean; cached?: boolean; total?: number; error?: string } } | null = null
+      try { json = JSON.parse(raw) } catch { console.error('[world-lab] refresh: keine JSON-Antwort', response.status, raw.slice(0, 300)) }
+      if (!response.ok || !json) throw new Error(json?.error ?? 'HTTP ' + response.status)
       const parts: string[] = []
       for (const region of json.regions ?? []) parts.push(region.ok ? 'Region erneuert' : 'Region nicht erneuert (' + (region.error ?? 'Fehler') + ')')
       if (json.detail?.ok) parts.push(json.detail.cached ? 'Ortsdetail war schon da' : json.detail.total + ' Objekte Ortsdetail geholt')
@@ -110,8 +129,11 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       fresh.current = String(Date.now())
       engine.current?.reloadTiles()
       setRefresh({ busy: false, text: parts.join(' · ') })
+      setPlayerNote(json.detail?.ok === false ? 'Kartendienst gerade nicht erreichbar – manche Häuser fehlen noch.' : '')
     } catch (reason) {
+      console.error('[world-lab] Nachladen fehlgeschlagen', reason)
       setRefresh({ busy: false, text: 'Nachladen fehlgeschlagen: ' + String((reason as Error)?.message ?? reason) })
+      setPlayerNote('Kartendienst gerade nicht erreichbar – manche Häuser fehlen noch.')
     } finally { busy.current = false }
   }
 
@@ -162,7 +184,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         onHover: next => { if (!disposed) setHover(next) },
         noxiaVisual: typeId => getBuildingVisual(typeId, 'earth'),
         onHud: next => { if (!disposed) { setHud(next); setTick(value => value + 1) } },
-        onError: message => { if (!disposed) setError(message) },
+        onError: message => { if (!disposed) { setError(message); console.error('[world-lab]', message); setPlayerNote('Ein Teil der Karte konnte gerade nicht geladen werden.') } },
       })
       if (disposed) { started.destroy(); return }
       engine.current = started
@@ -406,7 +428,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       const { token } = await getSessionInfo()
       const here = engine.current.position()
       const response = await fetch(`/api/world-lab/address?q=${encodeURIComponent(text)}&near=${here.lat},${here.lon}`, { headers: { Authorization: 'Bearer ' + token } })
-      const json = await response.json()
+      const json = await response.json().catch(() => ({ error: 'Suche gerade nicht möglich.' }))
       if (!response.ok) { setDestinationNote(json?.error ?? 'Nicht gefunden.'); return }
       engine.current.jump({ lat: json.lat, lon: json.lon })
       choosePanel(json.building ? { kind: 'building', at: { lat: json.lat, lon: json.lon }, title: json.label, address: json.label } : { kind: 'none' })
@@ -416,15 +438,16 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
 
   return <div className={embedded ? 'world-lab embedded' : 'world-lab'}>
     <div ref={host} className="stage" />
-    <div className="panel">
-      <small>{embedded ? 'WELTKARTE' : 'PROTOTYP · EINE WELT'}</small>
-      <span>WASD oder Pfeile laufen · Shift schneller · Mausrad zoomt · Klick auf Person oder Haus</span>
-      <div className="places">
-        {home && <button onClick={() => { engine.current?.jump({ lat: home.lat, lon: home.lon }); choosePanel({ kind: 'building', at: { lat: home.lat, lon: home.lon }, title: home.name, noxiaId: home.id }) }}>⌂ {home.name}</button>}
-        {here && metresBetween(here, PLACES[0].at) < 20000 && PLACES.map(place => <button key={place.label} onClick={() => engine.current?.jump(place.at)}>{place.label}</button>)}
-      </div>
-      <button className="leave" onClick={() => setShowStats(value => !value)}>{showStats ? 'Messwerte ausblenden' : 'Messwerte zeigen'}</button>
-      {hud && showStats && <dl>
+    {/* Links nichts Dauerhaftes (W-2): Hilfe beim ersten Öffnen, Entwicklerwerte nur mit ?dev=1 */}
+    {helpOpen && <div className="help" role="dialog" aria-label="Bedienung">
+      <b>Weltkarte</b>
+      <span>WASD oder Pfeiltasten laufen · Shift schneller · Mausrad zoomt</span>
+      <span>Klick auf Person, Haus oder Schild öffnet rechts die Tafel · Esc schließt sie</span>
+      <button onClick={closeHelp}>Verstanden</button>
+    </div>}
+    {dev && devOpen && <div className="panel">
+      <small>ENTWICKLUNG</small>
+      {hud && <dl>
         <dt>Bilder je Sekunde</dt><dd>{Math.round(hud.frame.fps)}</dd>
         <dt>Langsamstes Bild</dt><dd>{hud.frame.worstMs.toFixed(0)} ms</dd>
         <dt>Ruckler (letzte 120)</dt><dd>{hud.frame.stutters}</dd>
@@ -439,9 +462,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       <button className="refresh" disabled={refresh.busy} onClick={() => void refreshHere('Von Hand')}>{refresh.busy ? 'Lädt …' : 'Kartendaten hier nachladen'}</button>
       {refresh.text && <p className="note">{refresh.text}</p>}
       {error && <p className="error">{error}</p>}
-      {onPlanning && <button className="leave" onClick={onPlanning}>← Karte</button>}
       {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
-    </div>
+    </div>}
     {overheard && <div className="overheard">
       <small>GESPRÄCH IN HÖRWEITE · {overheard.conversation.item.kind === 'colony' ? 'NOXIA' : 'HEUTE'}</small>
       <b>{personSceneLabel(overheard.first)} + {personSceneLabel(overheard.second)}</b>
@@ -454,9 +476,17 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     </div>}
     <div className="right">
       <div className="where">
-        <small>DU BIST HIER</small>
+        <div className="where-head"><small>DU BIST HIER</small><span className="tools">
+          {onPlanning && <button onClick={onPlanning} title="Zur Planungskarte">▦</button>}
+          <button onClick={() => setHelpOpen(true)} title="Bedienung" aria-label="Bedienung">?</button>
+          {dev && <button onClick={() => setDevOpen(value => !value)} title="Entwicklung" aria-label="Entwicklung">⚙</button>}
+        </span></div>
         <b>{placeName || 'Erde'}</b>
         {street && <span className="street">{street}</span>}
+        {playerNote && <span className="player-note">{playerNote}</span>}
+        {/* Mit offener Tafel nur Ort und Straße – die Tafel darunter ist dann das Wichtige. */}
+        {panel.kind === 'none' && <>
+        {home && <button className="home" onClick={() => { engine.current?.jump({ lat: home.lat, lon: home.lon }); choosePanel({ kind: 'building', at: { lat: home.lat, lon: home.lon }, title: home.name, noxiaId: home.id }) }}>⌂ {home.name}</button>}
         <label className="target"><span>Ziel</span>
           <select value={targetId} onChange={event => chooseTarget(event.target.value)}>
             <option value="">— kein Ziel —</option>
@@ -468,15 +498,24 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
           <button type="submit">Los</button>
         </form>
         {destinationNote && <p className="note">{destinationNote}</p>}
+        </>}
       </div>
       <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
       .world-lab.embedded{inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120}
+      .help{position:absolute;left:14px;bottom:24px;width:min(300px,calc(100% - 28px));display:grid;gap:4px;padding:10px 12px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;font-size:11px;z-index:6}
+      .help span{color:#bcd0cb}
+      .help button{justify-self:start;margin-top:4px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer}
+      .where-head{display:flex;justify-content:space-between;align-items:center}
+      .tools{display:flex;gap:4px}
+      .tools button{width:20px;height:20px;border:1px solid #40595a;background:#17383a;color:#d9bb6a;border-radius:4px;font-size:11px;line-height:1;cursor:pointer;padding:0}
+      .home{justify-self:start;margin-top:6px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer}
+      .player-note{font-size:10.5px;color:#f0d9a0}
       .panel .leave{border:0;background:none;padding:0;text-align:left;font-size:11px;color:#d9bb6a;cursor:pointer;margin-top:4px}
       .stage{position:absolute;inset:0}
-      .panel{position:absolute;left:14px;top:14px;width:270px;box-sizing:border-box;padding:12px 14px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+      .panel{position:absolute;left:14px;bottom:24px;max-height:calc(100% - 48px);overflow:auto;width:270px;box-sizing:border-box;padding:12px 14px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
       .panel small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .panel b{font-size:14px}
       .panel span{font-size:10px;color:#9fb5b0}

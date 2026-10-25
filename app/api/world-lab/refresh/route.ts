@@ -20,6 +20,13 @@ import { DETAIL_RADIUS_KM, detailCell, groundDistanceM } from '@/lib/worldlab/de
 export const maxDuration = 120
 
 const noStore = { 'Cache-Control': 'private, no-store, max-age=0' }
+/** Zeitbudget: Vercel bricht nach 120 s ab und schickt dann eine Textseite statt JSON. */
+const BUDGET_MS = 95_000
+const TIMED_OUT = Symbol('timeout')
+function withinBudget<T>(promise: Promise<T>, started: number): Promise<T | typeof TIMED_OUT> {
+  const left = Math.max(1000, BUDGET_MS - (Date.now() - started))
+  return Promise.race([promise, new Promise<typeof TIMED_OUT>(resolve => setTimeout(() => resolve(TIMED_OUT), left))])
+}
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization')
@@ -44,8 +51,9 @@ export async function POST(req: NextRequest) {
     && groundDistanceM(point, { lat: Number(row.center_lat), lon: Number(row.center_lon) }) <= Number(row.radius_km ?? 0) * 1000)
 
   const cell = detailCell(point)
+  const started = Date.now()
   const [regions, detail] = await Promise.all([
-    Promise.allSettled(outdated.map(row => {
+    Promise.allSettled(outdated.map(row => withinBudget((() => {
       const configured = getEarthRegion(String(row.slug))
       return materializeEarthPlace({
         slug: String(row.slug),
@@ -54,9 +62,9 @@ export async function POST(req: NextRequest) {
         lon: Number(row.center_lon),
         radiusKm: Number(row.radius_km ?? 2.2),
       })
-    })),
-    enrichEarthLocalScene({ slug: earthPlaceSlug(cell), lat: cell.lat, lon: cell.lon, radiusKm: DETAIL_RADIUS_KM })
-      .then(result => ({ ok: true as const, result }), (reason: unknown) => ({ ok: false as const, error: reason instanceof Error ? reason.message : String(reason) })),
+    })(), started).then(value => { if (value === TIMED_OUT) throw new Error('Zeitüberschreitung'); return value }))),
+    withinBudget(enrichEarthLocalScene({ slug: earthPlaceSlug(cell), lat: cell.lat, lon: cell.lon, radiusKm: DETAIL_RADIUS_KM }), started)
+      .then(result => result === TIMED_OUT ? { ok: false as const, error: 'Zeitüberschreitung' } : { ok: true as const, result }, (reason: unknown) => ({ ok: false as const, error: reason instanceof Error ? reason.message : String(reason) })),
   ])
 
   return NextResponse.json({

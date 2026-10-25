@@ -61,6 +61,9 @@ export default function EarthRegionSwitcherOverlay(){
   const[searching,setSearching]=useState(false)
   const[error,setError]=useState<string|null>(null)
   const[placesOpen,setPlacesOpen]=useState(false)
+  // W-3 (Gastronomie, 25.10.2026): keine zweite Leiste über der Karte – zugeklappt
+  // ein schmaler Knopf in der Kopfzeile, aufgeklappt die Suche und die Orte darunter.
+  const[expanded,setExpanded]=useState(false)
 
   useEffect(()=>{
     setViewLabel(readCookie(EARTH_VIEW_LABEL_COOKIE))
@@ -87,8 +90,14 @@ export default function EarthRegionSwitcherOverlay(){
 
   const searchDisabled=searching||query.trim().length<2
 
-  return <div aria-label="Erdnavigation" style={{position:'fixed',zIndex:2260,top:51,left:'50%',transform:'translateX(-50%)',display:'grid',gap:4,width:'min(860px,calc(100vw - 24px))',pointerEvents:'auto'}}>
+  if(!expanded)return <button type="button" aria-label="Erdnavigation öffnen" aria-expanded={false} onClick={()=>setExpanded(true)} title="Ort suchen, springen, vorgemerkte Orte"
+    style={{position:'fixed',zIndex:2260,top:'calc((var(--noxia-topbar-h,44px) - 28px) / 2)',left:'50%',transform:'translateX(-50%)',maxWidth:'min(340px,calc(100vw - 260px))',height:28,display:'flex',alignItems:'center',gap:6,padding:'0 12px',border:'1px solid rgba(104,131,138,.72)',borderRadius:14,background:'rgba(7,17,27,.92)',color:'#dce9e9',font:'800 10px system-ui,sans-serif',cursor:'pointer',overflow:'hidden',whiteSpace:'nowrap'}}>
+    <span style={{color:'#d7b96e'}}>⌖</span><span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{viewLabel?.split(',')[0]??'Erde'}</span><span style={{color:'#8eaaaf'}}>▾</span>
+  </button>
+
+  return <div aria-label="Erdnavigation" style={{position:'fixed',zIndex:2260,top:'calc((var(--noxia-topbar-h,44px) - 34px) / 2)',left:'50%',transform:'translateX(-50%)',display:'grid',gap:4,width:'min(860px,calc(100vw - 24px))',pointerEvents:'auto'}}>
     <div style={{display:'flex',gap:4,alignItems:'center',padding:3,border:'1px solid rgba(104,131,138,.72)',borderRadius:9,background:'rgba(7,17,27,.92)',boxShadow:'0 8px 24px rgba(0,0,0,.22)',backdropFilter:'blur(12px)'}}>
+      <button type="button" title="Zuklappen" aria-label="Erdnavigation schließen" style={{...navButton,padding:'7px 8px'}} onClick={()=>{setExpanded(false);setPlacesOpen(false);setResults([]);setError(null)}}>×</button>
       <button type="button" title="Aktuellen Ort neu zentrieren" style={{...navButton,background:'rgba(31,79,95,.72)',cursor:'default'}} onClick={()=>window.location.reload()}>Aktuell · {viewLabel?.split(',')[0]??'Erde'}</button>
       <button type="button" title="Zum Home-Ort zurückkehren" style={{...navButton,color:'#e6d29a',borderColor:'rgba(168,137,61,.55)'}} onClick={()=>selectPoint(SELMECKE.lat,SELMECKE.lon,SELMECKE.label,SAUERLAND_REGION)}>⌂ Home</button>
       <button type="button" aria-expanded={placesOpen} aria-controls="noxia-earth-place-menu" title="Vorgemerkte Orte öffnen" style={navButton} onClick={()=>setPlacesOpen(open=>!open)}>Orte ▾</button>
@@ -100,6 +109,10 @@ export default function EarthRegionSwitcherOverlay(){
     {placesOpen&&<div id="noxia-earth-place-menu" aria-label="Vorgemerkte Erdorte" style={{justifySelf:'end',width:'min(520px,100%)',border:'1px solid rgba(91,118,126,.82)',borderRadius:9,background:'rgba(8,21,31,.97)',boxShadow:'0 14px 34px rgba(0,0,0,.34)',padding:7,display:'grid',gap:5}}>
       <div style={{font:'800 10px system-ui,sans-serif',color:'#b8ccd0',padding:'4px 6px'}}>Orte · Vorgemerkte Ziele</div>
       {[
+        // Sprungziele aus der Weltkarte (W-2: gehören hierher, nicht in eine eigene Tafel)
+        {id:'sundern-mitte',label:'Sundern Mitte',detail:'Hauptstraße, Rathaus, Kirche',point:{lat:51.3262,lon:8.0}},
+        {id:'sundern-cafe',label:'Café in Sundern',detail:'Spieler-Café an der Hauptstraße',point:{lat:51.32554,lon:8.00454}},
+        {id:'selmecke',label:SELMECKE.label,detail:'NOXIA-Referenzstandort · Raumhafen',point:{lat:SELMECKE.lat,lon:SELMECKE.lon}},
         {id:'schmitten',label:'Schmitten im Taunus',detail:'DaVaRus Heimatregion · Großer Feldberg',point:DAVARU_TAUNUS_HOME_REGION.placeCenter},
         {id:'herceg-novi',label:'Herceg Novi, Montenegro',detail:'Möglicher Romanschauplatz · Bucht von Kotor',point:HERCEG_NOVI_EARTH_PLACE.center},
       ].map(place=><button key={place.id} type="button" onClick={()=>selectPoint(place.point.lat,place.point.lon,place.label)} style={{border:'1px solid rgba(104,131,138,.35)',borderRadius:6,background:'rgba(26,55,68,.75)',color:'#e8efed',padding:'9px',textAlign:'left',cursor:'pointer',display:'grid',gap:3}}>

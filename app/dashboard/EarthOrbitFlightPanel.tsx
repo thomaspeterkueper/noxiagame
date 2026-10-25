@@ -180,8 +180,11 @@ export default function EarthOrbitFlightPanel() {
   return (
     <div style={{ position: 'fixed', right: 14, bottom: 120, zIndex: 2290, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }}>
       {!open ? (
+        // Aufgerufen über die Spielleiste (Aktionen → Erde → LEO), daher unsichtbar (W-3).
         <button
           type="button"
+          data-noxia-action="orbit"
+          hidden
           onClick={() => setOpen(true)}
           style={{
             border: '1px solid rgba(201,169,97,.55)',

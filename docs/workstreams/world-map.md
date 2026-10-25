@@ -150,6 +150,48 @@ Beobachtung Thomas, 25.10.2026 (in der Erdszene bei Sundern): Die Straßen haben
 - Dazu Hausnummern an Gebäuden mit `addr:housenumber`, mindestens beim Anklicken – für Gastronomie wichtig, weil Spieler Lokale und Hotels dort bauen wollen, wo im echten Ort eines steht (Beispiel: Hauptstraße 102 in Sundern), und das Ziel-Feld heute nur Koordinaten versteht.
 - Zielwahl: „Hauptstraße 102“ im Ziel-Feld sollte auf das Gebäude springen (Geokodierung aus `region_features`, keine fremde Dienstanfrage).
 
+### W-2 (Gastronomie, 25.10.2026): Layout der neuen Karte – Informationen rechts, nur das Nötige – erledigt (25.10.2026)
+
+Umgesetzt (`app/world-lab/WorldLab.tsx`, `WorldPanels.tsx`):
+- **Eine Spalte rechts:** oben „Du bist hier“ (Ort, Straße); ohne Auswahl darunter ⌂ eigenes Gebäude, Ziel und Adressfeld; mit Auswahl nur Ort und Straße, darunter die Tafel (Person, Gebäude mit „Betreten“ über `EarthBuildingAccessLayer`, Ort, Baustelle, Fläche). Klick auf eine Person räumt das Ziel weg.
+- **Links nichts Dauerhaftes:** Bedienhinweise beim ersten Öffnen (danach hinter „?“ oben in der Spalte); Sprungziele (Sundern Mitte, Café, Selmecke) stehen jetzt in der Ortsleiste unter „Orte“; Messwerte, „Kartendaten nachladen“ und „Bisherige Erdszene“ nur mit `?dev=1` (bleibt gespeichert, `?dev=0` schaltet ab) hinter „⚙“.
+- **Fehler:** Ursache der Meldung „Unexpected token 'A' … is not valid JSON“: `/api/world-lab/refresh` lief über 120 s (Vercel-Grenze; Region neu bauen plus Overpass-Spiegel), Vercel antwortete dann mit einer Textseite. Jetzt Zeitbudget 95 s auf dem Server (Teilergebnis statt Abbruch), die Karte liest Antworten sicher; Spieler sehen einen kurzen Satz in der Spalte, Einzelheiten stehen in der Konsole (`[world-lab]`).
+- **Für Gastronomie (Aufgabe 11):** Die Gebäudetafel ist der Zweig `building` in `WorldPanels.tsx`; für NOXIA-Gebäude mit Innenraum steht dort `own` und `entry` bereit – Öffnungszeiten (`venueHoursFor`/`venueOpenAt`) gehören in die Zeile über „Betreten“.
+
+
+Beobachtung Thomas, 25.10.2026 (neue Weltkarte im Spiel, Sundern): Das Layout passt noch nicht. Informationen sollen hauptsächlich rechts stehen, und nicht zu viel auf einmal – nur, was gerade gebraucht wird.
+
+Stand im Bild: links eine große Tafel (Bedienhinweise, Sprungziele, Messwerte, „Kartendaten nachladen“, zwei Rücklinks), oben die Ortsleiste, rechts oben Ort und Ziel mit Adressfeld – drei Flächen, die die Karte einrahmen. Vorschlag:
+
+- **Eine Spalte rechts** (wie Personentafel und Zieltafel in der Erdszene), die ihren Inhalt nach Lage wechselt: nichts gewählt → Ort, Ziel, Adressfeld; Person gewählt → Personentafel; Gebäude gewählt → Gebäudetafel mit „Betreten“; beim Laufen bleibt sie leer bis auf Ort und Ziel.
+- **Links nichts Dauerhaftes.** Bedienhinweise nur einmal beim ersten Öffnen oder hinter einem „?“. Sprungziele (factory, Sundern Mitte, Café, Selmecke) in die Ortsleiste oben unter „Orte“, wo sie schon hingehören. Messwerte, „Kartendaten nachladen“ und „Bisherige Erdszene“ sind Entwicklerdinge – hinter einen kleinen Schalter oder nur mit `?dev=1`.
+- **Fehler nicht als Fließtext in der Tafel** („Unexpected token 'A' … is not valid JSON“ – der Server antwortet mit einer Fehlerseite statt JSON; bitte prüfen, warum). Für Spieler ein kurzer Satz, Einzelheiten in die Konsole.
+- Abstimmung mit Gastronomie: Betreten eines Lokals und die Personentafel sollen in der neuen Karte so laufen wie in der Erdszene (`EarthBuildingAccessLayer`, Klick auf Person räumt das Ziel weg).
+
+### W-3 (Gastronomie, 25.10.2026): Lesbarkeit der neuen Karte und doppelte Leisten – erledigt (25.10.2026)
+
+Umgesetzt:
+- **Figur:** Standardzoom näher (3,4 statt 2,6), Figuren 1,3–1,35-mal größer, goldener Boden-Ring unter der eigenen Figur; Häuser vor der Figur werden durchscheinend (Aufgabe 10).
+- **Straßen:** Gehweg mit Bordstein an allen Fahrstraßen, zuerst gezeichnet, damit Kreuzungen als Platz ineinanderlaufen; Flüsse mit erdigem Ufersaum.
+- **Anklickbar:** Häuser, Personen, Schilder, Baustellen und Flächen hellen beim Überfahren auf, der Zeiger wird zur Hand.
+- **Schilder:** NOXIA-Gebäude (auch gekaufte und umgebaute) tragen ein Namensschild über dem Dach; fremde Häuser nicht.
+- **Leisten:** Die Ortsleiste ist zugeklappt ein schmaler Knopf in der Kopfzeile („⌖ Ort ▾“); aufgeklappt Suche, Home und Orte darunter. „Erde → LEO“ und „Weltlage“ stehen nicht mehr frei im Bild, sondern in der Spielleiste unter „Aktionen“ (`data-noxia-action="orbit"`/`"world"`, `DashboardCockpit.tsx`).
+
+
+Bestätigt von Thomas, 25.10.2026. Beobachtungen am Bild von Sundern (Fabrikgelände, Figur McKnight):
+
+**Karte**
+- Die Figur ist winzig und steckt halb im Glasbau. Entweder näher heran beim Laufen (Standardzoom), oder Boden-Ring unter der Figur und das Haus davor durchscheinend (Aufgabe 10 – hier sieht man, warum).
+- Straßen sind nur Linien im Grün: Bürgersteige, Kreuzungen, Flussufer fehlen. Fleißarbeit, aber der Unterschied zwischen Stadt und Diagramm.
+- Nichts zeigt, was anklickbar ist. Leichtes Aufhellen beim Überfahren und Mauszeiger als Hand für Häuser und Personen.
+- NOXIA-Gebäude (Café, Fabrik, Hotel) tragen kein Schild. Ein kleines Namensschild wie bei den Personen; fremde Häuser nicht.
+
+**Leisten**
+- Zwei Navigationsleisten übereinander: oben Aktuell · Home · Orte · Springen, unten Karte · Orte · Profil … – zweimal „Orte“ mit verschiedener Bedeutung. Die obere in die Kopfzeile neben Credits und Standort, oder in „Orte“ unten.
+- „Erde → LEO“ und „Weltlage“ stehen rechts unten frei im Bild; sie gehören in die Spielleiste unter „Aktionen“.
+
+**Anschluss Gastronomie (dort gebaut, sobald die Gebäudetafel aus W-2 steht):** Beim Klick auf ein Lokal in der rechten Spalte Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – aus `venueHoursFor`/`venueOpenAt` (`lib/game/hospitality/venues.ts`), damit man vor dem Hineingehen weiß, dass das Café um 20 Uhr Koloniezeit schließt.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

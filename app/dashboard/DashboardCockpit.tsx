@@ -7,7 +7,7 @@ import { useGameModeStore } from '@/lib/store/gameModeStore'
 
 type CockpitPanel = 'locations' | 'ship' | 'profile'
 type UtilityPanel = 'view' | 'actions' | 'music' | 'info'
-type ActionId = 'briefing' | 'found' | 'friends' | 'logout'
+type ActionId = 'briefing' | 'found' | 'friends' | 'orbit' | 'world' | 'logout'
 type LegalLink = { label: string; href: string }
 type Targets = Partial<Record<CockpitPanel, HTMLElement>> & {
   feed?: HTMLElement
@@ -28,6 +28,9 @@ const ACTION_META: Record<ActionId, { icon: string; label: string; description: 
   briefing: { icon: '☰', label: 'Einweisung', description: 'Aufgaben und Orientierung' },
   found: { icon: '🚀', label: 'Gründen', description: 'Neuen Standort gründen' },
   friends: { icon: '💬', label: 'Freunde', description: 'Kontakte und Nachrichten' },
+  // W-3: standen vorher frei rechts unten im Bild
+  orbit: { icon: '↑', label: 'Erde → LEO', description: 'Raumflug in die Erdumlaufbahn' },
+  world: { icon: '◎', label: 'Weltlage', description: 'Messbare Weltbedingungen' },
   logout: { icon: '↪', label: 'Abmelden', description: 'Sitzung beenden' },
 }
 
@@ -59,6 +62,8 @@ function findTargets(): Targets {
       briefing: findAction('briefing', 'einweisung'),
       found: findAction('found', 'gründen'),
       friends: findAction('friends', 'freunde'),
+      orbit: document.querySelector<HTMLButtonElement>('button[data-noxia-action="orbit"]') ?? undefined,
+      world: document.querySelector<HTMLButtonElement>('button[data-noxia-action="world"]') ?? undefined,
       logout: findAction('logout', 'abmelden'),
     },
   }
@@ -68,7 +73,8 @@ function sameTargets(a: Targets, b: Targets) {
   return a.locations === b.locations && a.ship === b.ship && a.profile === b.profile &&
     a.feed === b.feed && a.isometric === b.isometric && a.siteToggle === b.siteToggle &&
     a.actions.briefing === b.actions.briefing && a.actions.found === b.actions.found &&
-    a.actions.friends === b.actions.friends && a.actions.logout === b.actions.logout
+    a.actions.friends === b.actions.friends && a.actions.logout === b.actions.logout &&
+    a.actions.orbit === b.actions.orbit && a.actions.world === b.actions.world
 }
 
 function parseFriendBadge(button?: HTMLButtonElement) {
