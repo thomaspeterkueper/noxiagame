@@ -172,6 +172,14 @@ Entscheidung Thomas, 25.10.2026: Über einer Figur steht in der Spielansicht nur
 
 ### R-12 (Erdkarte, 25.10.2026): Bestehende Gebäude der Erdkarte kaufen
 
+**Stand 25.10.2026, mittags: auf Wunsch von Thomas im Teilprojekt Erdkarte gebaut** (er brauchte es sofort). Bitte prüfen und übernehmen – vor allem Preisformel, Bewohner realer Häuser und die Buchung.
+- Migration `20261025110000_earth_real_building_purchase.sql`: `buy_earth_building` (atomar: Guthaben prüfen, Spieler −Preis, öffentlicher Akteur der Erde +Preis als `npc_ledger`-Eintrag `income` mit Referenz `building_purchase:<osm>:player:<id>`, neue `tile_entities`-Zeile `acquired_building` mit `source_ref`, Wohnzuweisungen mit `region_feature_id` des Grundrisses ziehen mit, Mietverhältnisse bekommen das Unternehmen des Spielers als Vermieter); `demolish_earth_building` (nur eigene gekaufte, nur unbewohnt; Grundriss nach `earth_cleared_buildings`).
+- Preis (`lib/worldlab/buildingOffer.ts`, mit Tests): Geschossfläche × Satz je Art (Wohnhaus 12, Mehrfamilienhaus 10, Schuppen 6, Halle 5, Fabrik 4 Cr/m²) + Grundfläche × 2 Cr/m² + 10 × Miete je Abrechnung; mindestens 800 Cr. Ein Einfamilienhaus von 100 m² kostet so etwa 2 600 Cr.
+- Nicht verkäuflich: Gotteshäuser, öffentliche Gebäude (Rathaus, Schule, Krankenhaus, Bahnhof, Bücherei …), `historic`, und alles, worauf schon ein NOXIA-Gebäude steht.
+- Wohnplätze eines gekauften Wohnhauses: 1 je 40 m² Geschossfläche (`residential_capacity`). Heute wohnt in realen Häusern noch niemand – der Wohnungsmarkt vergibt dort noch keine Plätze.
+- Schnittstelle: `GET/POST /api/game/building-offer` wie oben vorgeschlagen, dazu `POST { action: 'demolish', entityId }`.
+- Offen hier: Wer zieht in reale Häuser (Wohnungsmarkt)? Miete an Spieler als Vermieter (`player_corp`) wirklich abrechnen. Umbauen mit Bewohnern statt Abriss.
+
 Entscheidung Thomas, 25.10.2026: Reale Gebäude der Erdkarte, die noch niemandem im Spiel gehören, kann ein Spieler **kaufen**. Ersetzen geht nur über den Kauf.
 
 - **Geld geht an die Gemeinde** (öffentlicher Akteur des Ortes, auf der Erde z. B. Sundern) – als Transfer nach NOXIA-FIN-0001, keine Senke.

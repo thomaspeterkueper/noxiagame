@@ -120,7 +120,18 @@ Entschieden: Reale Gebäude, die noch niemandem gehören, kann man **kaufen**; d
 
 - Buchung, Preis, Eigentum und Miete gehören zu Bevölkerung und Ökonomie: Request R-12 in `population-economy.md` (mit Vorschlag für die Schnittstelle `/api/game/building-offer`).
 - Gebaut in der Karte: Jedes Gebäude trägt seine OSM-Kennung (`i` in den Kacheldaten), Grundfläche und Geschosse. Die Gebäudetafel fragt das Angebot ab und zeigt Eigentümer, Bewohner, Miete, Preis und „Kaufen“, sobald die Schnittstelle antwortet; bis dahin nichts. Nach dem Kauf holt die Karte die NOXIA-Gebäude neu (`reloadNoxia`), das Haus erscheint als eigenes.
-- Offen (Karte, nach R-12): „Abreißen“ und „Hier bauen“ in der Tafel eines eigenen gekauften Gebäudes.
+- **Gebaut 25.10.2026 (auf Wunsch von Thomas hier statt bei Bevölkerung und Ökonomie, siehe R-12):** Kaufen, Abreißen, Bauen auf der freien Fläche.
+  - Gekaufte Gebäude behalten ihr Aussehen (`acquired_building`, Zuordnung über die OSM-Kennung `source_ref`), Tafel zeigt „Eigentümer: du“ und „Abreißen …“ (mit Rückfrage; „und neu bauen“ öffnet gleich die Fläche).
+  - Abgerissene Gebäude zeichnet die Karte nicht mehr (`earth_cleared_buildings`, über `/api/world-lab/buildings` → `plots`); an ihrer Stelle liegt eine gestrichelte freie Fläche. Der Eigentümer sieht dort die Bautypen, deren Grundfläche hineinpasst, und baut über `/api/game/build/spatial` (Lage und Drehung des alten Hauses).
+  - Offen: Umbauen ohne Abriss (Bewohner bleiben); andere Spieler dürfen auf fremden freien Flächen noch bauen, die Bauprüfung kennt keinen Grundstückseigentümer.
+
+### Bereinigung 25.10.2026 (Thomas: „meine selbst gebauten Gebäude passen nicht mehr“)
+
+McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wohnblöcke, Habitat, Schule, Fabrik, Warenhaus, Bank, Raumhafen-Kern, 3 Solarfelder), ohne Erstattung. Die fünf Bewohner (4 aus dem Wohnblock, 1 aus dem Habitat) wohnen jetzt im staatlichen Wohnblock Selmecke (`203e82d7…`, 8 von 12 Plätzen), Mietverhältnis als Bereinigung (`origin = backfill`), Präsenz mitverschoben. Café („Thomas“) und die staatlichen Bauten in Selmecke bleiben.
+
+### Tafeln rechts (Thomas, 25.10.2026)
+
+„Du bist hier“, Zielliste und Adresssuche stehen wieder rechts oben wie in der alten Szene, die Tafel des gewählten Objekts direkt darunter. Links bleiben Hilfe, Schnellziele, Messwerte und die Rückwege.
 
 ## Requests aus anderen Teilprojekten
 

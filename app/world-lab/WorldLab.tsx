@@ -24,7 +24,7 @@ import { blockArt } from '@/lib/worldlab/blocks'
 import { detailCell } from '@/lib/worldlab/detailCells'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
-import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson, type WorldPick, type WorldSite } from './worldEngine'
+import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson, type WorldPick, type WorldPlot, type WorldSite } from './worldEngine'
 
 /** Ein laufender Bau aus /api/game/build/spatial (nur die Felder, die die Karte braucht). */
 type BuildRow = { id: string; name?: string; buildable_id: string; status?: string; created_at?: string; completes_at?: string; latitude_deg?: number | null; longitude_deg?: number | null; footprint_width_m?: number | null; footprint_depth_m?: number | null; rotation_deg?: number | null }
@@ -61,6 +61,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [sites, setSites] = useState<WorldSite[]>([])
   const [hover, setHover] = useState<{ pick: WorldPick; x: number; y: number } | null>(null)
   const [targetId, setTargetId] = useState('')
+  const [plots, setPlots] = useState<WorldPlot[]>([])
+  const [buildsVersion, setBuildsVersion] = useState(0)
 
   // Bewohner: im Spiel vom Dashboard gereicht, auf der eigenen Seite selbst geholt.
   const storeResidents = useColonyStateStore(state => state.residents)
@@ -150,7 +152,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
           const json = response.ok ? await response.json() : null
           const list = (json?.buildings ?? []) as NoxiaBuilding[]
           noxiaRef.current = list
-          if (!disposed) setNoxia(list)
+          if (!disposed) { setNoxia(list); setPlots(Array.isArray(json?.plots) ? json.plots : []) }
           return list
         },
         onPick: pick => { if (!disposed) { engine.current?.stopWalking(); setTargetId(''); setPanel(panelForPick(pick, noxiaRef.current)) } },
@@ -255,7 +257,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     void load()
     const timer = setInterval(() => void load(), 30000)
     return () => { live = false; clearInterval(timer) }
-  }, [])
+  }, [buildsVersion])
+  useEffect(() => { engineReady?.setPlots(plots) }, [engineReady, plots])
   // Fortschritt alle 5 s neu (aus Start- und Endzeit, nichts wird erfunden)
   useEffect(() => {
     const update = () => setSites(builds.flatMap(build => {
@@ -271,7 +274,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   useEffect(() => { engineReady?.setSites(sites) }, [engineReady, sites])
 
   // Weg zum Ort der offenen Tafel zeigen, sobald er mehr als 25 m entfernt ist.
-  const routeTarget = panelLocation(panel, sites)
+  const routeTarget = panelLocation(panel, sites, plots)
   const routeKey = routeTarget ? routeTarget.lat.toFixed(6) + ',' + routeTarget.lon.toFixed(6) : ''
   const routeFar = Boolean(routeTarget && engineReady && engineReady.distanceTo(routeTarget) > 25)
   useEffect(() => {
@@ -353,21 +356,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   return <div className={embedded ? 'world-lab embedded' : 'world-lab'}>
     <div ref={host} className="stage" />
     <div className="panel">
-      <small>DU BIST HIER</small>
-      <b>{placeName || (embedded ? 'Weltkarte' : 'Kacheln statt Szenen')}</b>
-      {street && <span className="street">{street}</span>}
+      <small>{embedded ? 'WELTKARTE' : 'PROTOTYP · EINE WELT'}</small>
       <span>WASD oder Pfeile laufen · Shift schneller · Mausrad zoomt · Klick auf Person oder Haus</span>
-      <label className="target"><span>Ziel</span>
-        <select value={targetId} onChange={event => chooseTarget(event.target.value)}>
-          <option value="">— kein Ziel —</option>
-          {groups.map(group => <optgroup key={group} label={group}>{targets.filter(item => item.group === group).map(item => <option key={item.id} value={item.id}>{item.label} · {kmText(item.distanceM)}</option>)}</optgroup>)}
-        </select>
-      </label>
-      <form className="dest" onSubmit={event => { event.preventDefault(); void goToAddress() }}>
-        <input value={destination} onChange={event => setDestination(event.target.value)} placeholder="Ziel, z. B. Hauptstraße 102" maxLength={100}/>
-        <button type="submit">Los</button>
-      </form>
-      {destinationNote && <p className="note">{destinationNote}</p>}
       <div className="places">
         {home && <button onClick={() => { engine.current?.jump({ lat: home.lat, lon: home.lon }); choosePanel({ kind: 'building', at: { lat: home.lat, lon: home.lon }, title: home.name, noxiaId: home.id }) }}>⌂ {home.name}</button>}
         {here && metresBetween(here, PLACES[0].at) < 20000 && PLACES.map(place => <button key={place.label} onClick={() => engine.current?.jump(place.at)}>{place.label}</button>)}
@@ -394,7 +384,25 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     {hoverText && hover && panel.kind !== 'inside' && panel.kind !== 'landmarkInside' && <div className="tip" style={{ left: hover.x + 12, top: hover.y + 12 }}>
       <b>{hoverText.title}</b><span>{hoverText.detail}</span>{hoverText.at && engineReady && <small>{kmText(engineReady.distanceTo(hoverText.at))} von dir</small>}
     </div>}
-    <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
+    <div className="right">
+      <div className="where">
+        <small>DU BIST HIER</small>
+        <b>{placeName || 'Erde'}</b>
+        {street && <span className="street">{street}</span>}
+        <label className="target"><span>Ziel</span>
+          <select value={targetId} onChange={event => chooseTarget(event.target.value)}>
+            <option value="">— kein Ziel —</option>
+            {groups.map(group => <optgroup key={group} label={group}>{targets.filter(item => item.group === group).map(item => <option key={item.id} value={item.id}>{item.label} · {kmText(item.distanceM)}</option>)}</optgroup>)}
+          </select>
+        </label>
+        <form className="dest" onSubmit={event => { event.preventDefault(); void goToAddress() }}>
+          <input value={destination} onChange={event => setDestination(event.target.value)} placeholder="Adresse, z. B. Hauptstraße 102" maxLength={100}/>
+          <button type="submit">Los</button>
+        </form>
+        {destinationNote && <p className="note">{destinationNote}</p>}
+      </div>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
+    </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
       .world-lab.embedded{inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120}
@@ -416,14 +424,19 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .dest input{flex:1;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 7px;font-size:11px}
       .dest button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer}
       .panel a{font-size:11px;color:#d9bb6a;text-decoration:none;margin-top:4px}
-      .panel .street{font-size:11px;color:#dfe9e4}
+      .right{position:absolute;right:14px;top:14px;width:300px;max-height:calc(100% - 28px);display:flex;flex-direction:column;gap:8px;z-index:5}
+      .where{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;padding:10px 12px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px}
+      .where small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
+      .where b{font-size:14px}
+      .street{font-size:11px;color:#dfe9e4}
       .target{display:grid;gap:2px;margin:6px 0 0}
       .target span{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .target select{width:100%;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 6px;font-size:11px}
       .tip{position:fixed;z-index:1200;pointer-events:none;display:grid;gap:1px;padding:6px 8px;background:#0d1c22ee;border:1px solid #40595a;border-radius:6px;font-size:11px;color:#eef2ed;max-width:260px}
       .tip span{color:#9fb5b0}.tip small{color:#d9bb6a;font-size:10px}
       @media(max-width:700px){
-        .panel{left:10px;right:10px;top:10px;width:auto;max-height:42%;overflow:auto;padding:10px 12px}
+        .panel{display:none}
+        .right{left:10px;right:10px;top:auto;bottom:10px;width:auto;max-height:55%}
         .panel dl{display:none}
         .tip{display:none}
       }

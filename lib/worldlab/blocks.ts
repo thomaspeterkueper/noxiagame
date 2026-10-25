@@ -134,4 +134,6 @@ export const NOXIA_DEFAULT_LOOK: NoxiaLook = { roof: 0x3b5b86 }
 export const NOXIA_LOOKS: Record<string, Partial<NoxiaLook>> = {
   // Bogenstraße 15: Bungalow von 1971 mit dunkelblauem Walmdach (Thomas, 13.10.2026)
   ssf_headquarters_sundern: { roof: 0x24324a, levels: 1 },
+  // Gekauftes reales Gebäude: sieht aus wie vorher, nur der Eigentümer ist neu.
+  acquired_building: { roof: undefined },
 }

@@ -278,13 +278,13 @@ export function samplesAlong(points: readonly P[], step: number): P[] {
 }
 
 /** Fläche eines Vielecks (Shoelace, Betrag). */
-function polygonArea(points: readonly P[]): number {
+export function polygonArea(points: readonly P[]): number {
   let sum = 0
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) sum += (points[j].x + points[i].x) * (points[j].y - points[i].y)
   return Math.abs(sum) / 2
 }
 
-function levels(properties: Record<string, unknown>, kind: BlockKind): number {
+export function blockLevels(properties: Record<string, unknown>, kind: BlockKind): number {
   const tagged = Number(properties['building:levels'])
   if (Number.isFinite(tagged) && tagged >= 1) return Math.min(8, Math.round(tagged))
   // Gesamthöhe in Metern (OSM height), abzüglich Dach, durch Geschosshöhe – grob wie blocks.ts.
@@ -352,7 +352,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       seen.add(key)
       if (box.w * box.d < 18) continue
       const kind = worldBlockKind(properties, box.w, box.d)
-      const block: TileBlock = { x: round1(box.x), y: round1(box.y), w: round1(box.w), d: round1(box.d), a: Math.round(box.a * 1000) / 1000, k: kind, l: levels(properties, kind) }
+      const block: TileBlock = { x: round1(box.x), y: round1(box.y), w: round1(box.w), d: round1(box.d), a: Math.round(box.a * 1000) / 1000, k: kind, l: blockLevels(properties, kind) }
       // Große Bauten mit verwinkeltem Grundriss nicht zum Rechteck aufblähen:
       // Das Rechteck um ein L-förmiges Werk deckt sonst Nachbarflächen zu.
       if ((kind === 'hall' || kind === 'factory') && points.length > 5) {

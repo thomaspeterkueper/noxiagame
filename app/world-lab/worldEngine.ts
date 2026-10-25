@@ -19,7 +19,9 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 
 type Pixi = typeof import('pixi.js')
 
-export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string }
+export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung, wenn es ein gekauftes reales Gebäude ist. */ source?: string }
+/** Freie Fläche nach Abriss eines gekauften Gebäudes. */
+export type WorldPlot = { source: string; own: boolean; name: string; lat: number; lon: number; w: number; d: number; rotation: number }
 export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number
   /** Gezeigter Weg zum Ziel: Länge und ob er dem Straßennetz folgt. */
   route: { lengthM: number; viaRoads: boolean } | null }
@@ -55,6 +57,7 @@ export type WorldPick =
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
   | { type: 'site'; id: string }
+  | { type: 'plot'; source: string }
   | { type: 'ground'; at: GeoPoint }
 
 /** Baustelle (laufender Bau) auf der Karte. */
@@ -95,6 +98,8 @@ export interface WorldEngine {
   reloadTiles: () => void
   /** Name über der eigenen Figur. */
   setPlayerName: (name: string) => void
+  /** Freie Flächen nach Abriss: der OSM-Grundriss wird dort nicht mehr gezeichnet. */
+  setPlots: (plots: WorldPlot[]) => void
   /** Baustellen zeigen (ersetzt die vorigen). */
   setSites: (sites: WorldSite[]) => void
   /** Weg zu einem Ziel als Linie zeigen (null: keiner). */
@@ -413,7 +418,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const cx = ox + block.x, cy = oy + block.y
     // Steht hier ein NOXIA-Gebäude, übernimmt es den echten Grundriss: gleiche
     // Lage, Größe und Drehung wie die Nachbarn, aber sein eigenes Dach.
-    const owner = noxiaOn(cx, cy, hw, hd, cos, sin)
+    // Gekaufte reale Gebäude gehören über ihre OSM-Kennung, die übrigen NOXIA-Gebäude über ihre Lage.
+    const owner = (block.i ? noxia.find(building => building.source === block.i) : undefined) ?? noxiaOn(cx, cy, hw, hd, cos, sin)
     const look = owner ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] } : null
     const eave = (look?.levels ?? block.l) * style.storeyM
     let c: Array<{ x: number; y: number }>
@@ -580,7 +586,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const to = Math.min(entry.data.blocks.length, from + Math.max(1, Math.floor(budget)))
       if (to > from) {
         const chunk: Container[] = []
-        for (let i = from; i < to; i++) chunk.push(drawBlock(entry.data.blocks[i], entry.ox, entry.oy, entry.footprints))
+        for (let i = from; i < to; i++) {
+          const block = entry.data.blocks[i]
+          if (block.i && cleared.has(block.i)) continue   // abgerissen
+          chunk.push(drawBlock(block, entry.ox, entry.oy, entry.footprints))
+        }
         for (const block of chunk) addObject(block)
         entry.blocks.push(...chunk)
         budget -= to - from
@@ -978,6 +988,31 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     routeInfo = { lengthM: Math.round(lengthM), viaRoads: path.length > 3 }
   }
 
+  // ── Freie Flächen (nach Abriss) ─────────────────────────────────────
+  let plots: WorldPlot[] = []
+  let cleared = new Set<string>()
+  const plotLayer = new PIXI.Container()
+  overlay.addChildAt(plotLayer, 0)
+  function drawPlots() {
+    for (const child of plotLayer.removeChildren()) child.destroy({ children: true })
+    for (const plot of plots) {
+      const c = toWorld({ lat: plot.lat, lon: plot.lon })
+      const a = plot.rotation * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a)
+      const hw = plot.w / 2, hd = plot.d / 2
+      const corners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([lx, ly]) => iso(c.x + lx * cos - ly * sin, c.y + lx * sin + ly * cos))
+      const g = new PIXI.Graphics()
+      g.poly(corners.flatMap(p => [p.x, p.y])).fill({ color: 0xb59a6a, alpha: plot.own ? 0.55 : 0.35 })
+      for (let i = 0; i < 4; i++) {
+        const p = corners[i], q = corners[(i + 1) % 4], length = Math.hypot(q.x - p.x, q.y - p.y)
+        for (let t = 0; t < length; t += 3) { const e = Math.min(length, t + 1.6); g.moveTo(p.x + (q.x - p.x) * t / length, p.y + (q.y - p.y) * t / length).lineTo(p.x + (q.x - p.x) * e / length, p.y + (q.y - p.y) * e / length) }
+      }
+      g.stroke({ width: 0.7, color: plot.own ? 0xf3e2b0 : 0x7d6a48 })
+      g.eventMode = 'static'
+      ;(g as unknown as { pick: WorldPick }).pick = { type: 'plot', source: plot.source }
+      plotLayer.addChild(g)
+    }
+  }
+
   // ── Baustellen ──────────────────────────────────────────────────────
   let sites: WorldSite[] = []
   function drawSites() {
@@ -1182,6 +1217,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
     setPlayerName(name) { playerName.text = name.slice(0, 40) },
     setSites(list) { sites = list; drawSites() },
+    setPlots(list) {
+      const before = [...cleared].sort().join('|')
+      plots = list; cleared = new Set(list.map(plot => plot.source))
+      drawPlots()
+      if ([...cleared].sort().join('|') !== before) reload()
+    },
     setRouteTarget(at) { routeTarget = at; routeAt = 0; if (!at) { routeLine.clear(); routeInfo = null } },
     surroundings(at, radiusM) { return surroundingsOf(toWorld(at), radiusM) },
     landmarks() {

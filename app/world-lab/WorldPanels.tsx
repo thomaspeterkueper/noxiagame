@@ -20,7 +20,7 @@ import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/in
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
 import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
-import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldSite } from './worldEngine'
+import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
 
 export type Panel =
@@ -29,6 +29,7 @@ export type Panel =
   | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind }
   | { kind: 'landmark'; landmark: WorldLandmark }
   | { kind: 'site'; id: string }
+  | { kind: 'plot'; source: string }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
 
@@ -48,6 +49,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'ground') return { kind: 'none' }
   if (pick.type === 'landmark') return { kind: 'landmark', landmark: pick.landmark }
   if (pick.type === 'site') return { kind: 'site', id: pick.id }
+  if (pick.type === 'plot') return { kind: 'plot', source: pick.source }
   // Ein Wahrzeichen-Gebäude (Kirche, Bibliothek) öffnet das Wahrzeichen, außer es ist ein NOXIA-Gebäude.
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
@@ -70,20 +72,28 @@ function credits(value: number) { return Math.round(value).toLocaleString('de-DE
 const JUMP_FROM_M = 1500
 
 /** Ort einer Tafel (für Weg und Entfernung), wenn sie einen hat. */
-export function panelLocation(panel: Panel, sites: WorldSite[]): GeoPoint | null {
+export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot[] = []): GeoPoint | null {
+  if (panel.kind === 'plot') { const plot = plots.find(item => item.source === panel.source); return plot ? { lat: plot.lat, lon: plot.lon } : null }
   if (panel.kind === 'building') return panel.at
   if (panel.kind === 'landmark') return panel.landmark.at
   if (panel.kind === 'site') return sites.find(site => site.id === panel.id)?.at ?? null
   return null
 }
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, placeName, route, tick }: {
+/** Baubarer Typ aus /api/game/build/spatial (available). */
+type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean } }
+
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, placeName, route, tick }: {
   engine: WorldEngine | null
   panel: Panel
   setPanel: (panel: Panel) => void
   residents: ColonyResident[]
   noxia: NoxiaBuilding[]
   sites: WorldSite[]
+  /** Freie Flächen nach Abriss */
+  plots: WorldPlot[]
+  /** Nach Kauf, Abriss oder Bau: Gebäude und Baustellen neu holen. */
+  onWorldChanged: () => void
   /** Ortsname der Gegend (z. B. „Sundern“). */
   placeName: string
   /** Gezeigter Weg zum Ziel der Tafel. */
@@ -102,6 +112,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [offers, setOffers] = useState<Record<string, Offer | null>>({})
   const [buying, setBuying] = useState(false)
   const [buyError, setBuyError] = useState('')
+  const [confirmDemolish, setConfirmDemolish] = useState(false)
+  const [buildables, setBuildables] = useState<Buildable[] | null>(null)
 
   const person = panel.kind === 'person' ? residents.find(resident => resident.id === panel.id) ?? null : null
   const building = panel.kind === 'building' ? panel : null
@@ -139,9 +151,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   }
 
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
-  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind
+  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
-  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError('') }
+  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false) }
 
   // Kaufangebot je Gebäude einmal abfragen (nur fremde, nicht NOXIA-Gebäude mit OSM-Kennung).
   const offerSource = building && !building.noxiaId && building.source ? building.source : null
@@ -177,8 +189,65 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       if (!response.ok || !json.entityId) { setBuyError(String(json.error ?? 'Kauf nicht möglich.')); return }
       setOffers(current => { const next = { ...current }; delete next[offerSource]; return next })
       await engine?.reloadNoxia()
+      onWorldChanged()
       setPanel({ ...building, noxiaId: String(json.entityId) })
     } catch { setBuyError('Kauf derzeit nicht erreichbar.') } finally { setBuying(false) }
+  }
+
+  /** Eigenes gekauftes Gebäude abreißen; danach steht dort eine freie Fläche zum Bauen. */
+  async function demolish(thenBuild: boolean) {
+    if (!own?.own || !own.source || buying) return
+    setBuying(true); setBuyError('')
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/building-offer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'demolish', entityId: own.id }) })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setBuyError(String(json.error ?? 'Abriss nicht möglich.')); return }
+      const source = own.source
+      await engine?.reloadNoxia()
+      onWorldChanged()
+      setPanel(thenBuild ? { kind: 'plot', source } : { kind: 'none' })
+    } catch { setBuyError('Abriss derzeit nicht erreichbar.') } finally { setBuying(false); setConfirmDemolish(false) }
+  }
+
+  // Freie Fläche: was passt hier hin? (Bautypen der Erde, deren Grundfläche hineinpasst)
+  const plot = panel.kind === 'plot' ? plots.find(item => item.source === panel.source) ?? null : null
+  useEffect(() => {
+    if (!plot?.own || buildables) return
+    let stale = false
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        const response = await fetch('/api/game/build/spatial?location=earth', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const json = response.ok ? await response.json() : null
+        if (!stale) setBuildables(Array.isArray(json?.available) ? json.available : [])
+      } catch { if (!stale) setBuildables([]) }
+    })()
+    return () => { stale = true }
+  }, [plot?.own, buildables])
+  const fitting = useMemo(() => {
+    if (!plot || !buildables) return []
+    const long = Math.max(plot.w, plot.d) + 2, short = Math.min(plot.w, plot.d) + 2
+    return buildables.filter(item => {
+      const w = item.footprint?.widthM ?? 0, d = item.footprint?.depthM ?? 0
+      return Math.max(w, d) <= long && Math.min(w, d) <= short
+    }).sort((a, b) => a.cost - b.cost)
+  }, [plot, buildables])
+
+  async function buildHere(item: Buildable) {
+    if (!plot || buying) return
+    setBuying(true); setBuyError('')
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/build/spatial', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ buildableId: item.id, location: 'earth', latDeg: plot.lat, lonDeg: plot.lon, rotationDeg: plot.rotation }),
+      })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setBuyError(String(json.error ?? 'Bau nicht möglich.')); return }
+      onWorldChanged()
+      setPanel(json.buildId ? { kind: 'site', id: String(json.buildId) } : { kind: 'none' })
+    } catch { setBuyError('Bauen derzeit nicht erreichbar.') } finally { setBuying(false) }
   }
 
   const close = useCallback(() => setPanel({ kind: 'none' }), [setPanel])
@@ -295,6 +364,12 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+      {own?.own && own.source && <>
+        <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd></dl>
+        {!confirmDemolish
+          ? <div className="row"><span>{buyError || 'Abreißen geht nur, wenn niemand darin wohnt.'}</span><button disabled={buying} onClick={() => setConfirmDemolish(true)}>Abreißen …</button></div>
+          : <div className="row"><span>Wirklich abreißen? Das lässt sich nicht rückgängig machen.</span><button disabled={buying} onClick={() => void demolish(false)}>Abreißen</button><button disabled={buying} onClick={() => void demolish(true)}>und neu bauen</button></div>}
+      </>}
       {!own && offer && (offer.forSale
         ? <>
           <dl>
@@ -316,6 +391,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}
+    {panel.kind === 'plot' && <>
+      <div className="head"><div><small>FREIE FLÄCHE</small><b>{plot?.name ?? 'Freie Fläche'}</b>{plot && <span>{Math.round(plot.w)} × {Math.round(plot.d)} m · {plot.own ? 'dein Grundstück' : 'gehört einem anderen Spieler'}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      {plot?.own && (buildables === null ? <p>Bautypen werden geladen …</p>
+        : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
+          : <p>Kein Bautyp passt auf diese Fläche.</p>)}
+      {buyError && <p>{buyError}</p>}
+    </>}
     {panel.kind === 'site' && <>
       <div className="head"><div><small>BAUSTELLE</small><b>{site?.name ?? 'Baustelle'}</b>{site && <span>{site.phase}{site.progress !== null ? ` · ${Math.round(site.progress * 100)} %` : ''}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       {site && <div className="bar"><i style={{ width: `${Math.round((site.progress ?? 0) * 100)}%` }}/></div>}
@@ -323,7 +405,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         : <div className="row"><span>Der Bau ist fertig.</span></div>}
     </>}
     <style jsx>{`
-      .world-panel{position:absolute;right:14px;top:14px;width:300px;max-height:calc(100% - 28px);overflow:auto;padding:12px 14px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;color:#eef2ed;font:12px system-ui;z-index:5}
+      .world-panel{position:relative;box-sizing:border-box;width:100%;min-height:0;overflow:auto;padding:12px 14px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;color:#eef2ed;font:12px system-ui;z-index:5}
       .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
       .head small{display:block;font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .head b{display:block;font-size:15px}
@@ -337,12 +419,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:4px 0 8px;font-size:11px}
       dt{color:#9fb5b0}dd{margin:0}
       p{margin:4px 0;font-size:11.5px;line-height:1.45}
-      .row{display:flex;gap:6px;align-items:center;margin-top:8px}
+      .row{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
+      .build-list{max-height:220px;overflow:auto}
       .row span{flex:1;font-size:11px;color:#9fb5b0}
       .row input{flex:1;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:6px 8px;font-size:12px}
       .row button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
       .row button:disabled{opacity:.5;cursor:default}
-      @media(max-width:700px){.world-panel{left:10px;right:10px;top:auto;bottom:10px;width:auto;max-height:45%}}
+      
     `}</style>
   </aside>
 }
