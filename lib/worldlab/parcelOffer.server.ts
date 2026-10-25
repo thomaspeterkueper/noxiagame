@@ -124,7 +124,7 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
     base.buildings.push({ source, name: offer.name ?? 'Gebäude', residents: offer.residents ?? 0 })
     base.residents += offer.residents ?? 0
     base.rentPerInterval += offer.rentPerInterval ?? 0
-    value += buildingValue({ areaM2: offer.facts.areaM2, levels: offer.facts.levels, kind: offer.facts.kind, rentPerInterval: offer.rentPerInterval ?? 0, locationFactor: offer.location?.factor })
+    value += buildingValue({ areaM2: offer.facts.areaM2, levels: offer.facts.levels, kind: offer.facts.kind, rentPerInterval: offer.rentPerInterval ?? 0, locationFactor: offer.location?.factor }) + (offer.fitOut ?? 0)
     items.push(await acquireItem(supabase, source, offer))
   }
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()

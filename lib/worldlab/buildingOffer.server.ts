@@ -5,7 +5,8 @@
 
 import type { createServiceClient } from '@/lib/supabase/service'
 import { geoToLocalMeters } from '@/lib/world/spatial/earthSpatial'
-import { buildingFacts, buildingPrice, locationFactor, notForSaleReason, plannedResidents, RENT_PER_RESIDENT, type BuildingFacts, type GeoPoint, type SettlementPoint } from './buildingOffer'
+import { realVenueKind } from './venueConversion'
+import { buildingFacts, buildingPrice, fitOutValue, locationFactor, notForSaleReason, plannedResidents, RENT_PER_RESIDENT, type BuildingFacts, type GeoPoint, type SettlementPoint } from './buildingOffer'
 
 export type Supabase = ReturnType<typeof createServiceClient>
 export type FeatureRow = { id: string; region_id: string; geometry: { kind?: string; coordinates?: unknown }; properties: Record<string, unknown> | null }
@@ -21,6 +22,9 @@ export interface Offer {
   /** Bewohner, die beim Kauf als Personen einziehen (das Haus war bisher ohne Personen im Spiel). */
   newResidents?: number
   rentPerInterval?: number
+  /** Lokalart eines Hauses, das laut Kartendaten schon Lokal ist, und sein Ausbauwert im Preis. */
+  venue?: string | null
+  fitOut?: number
   /** Lageaufschlag (1 = ohne), nächste Ortsmitte und Abstand dorthin. */
   location?: { factor: number; place: string | null; distanceM: number | null }
   name?: string
@@ -71,10 +75,13 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
   const why = notForSaleReason(properties, facts.kind)
   if (why) return { forSale: false, reason: why, name, facts, tags: properties }
   const [{ data: owned }, { data: cleared }] = await Promise.all([
-    supabase.from('tile_entities').select('id').eq('source_ref', source).limit(1),
+    supabase.from('tile_entities').select('id,is_state_owned').eq('source_ref', source).limit(1),
     supabase.from('earth_cleared_buildings').select('source_ref').eq('source_ref', source).limit(1),
   ])
-  if (owned?.length) return { forSale: false, reason: 'gehört bereits jemandem', name, facts, tags: properties }
+  // Ein reales Lokal, das (noch) dem Ort gehört, ist verkäuflich (Thomas, 25.10.2026).
+  const venue = realVenueKind(properties)
+  const ownedByTown = Boolean(owned?.length && venue && (owned[0] as { is_state_owned?: boolean }).is_state_owned)
+  if (owned?.length && !ownedByTown) return { forSale: false, reason: 'gehört bereits jemandem', name, facts, tags: properties }
   if (cleared?.length) return { forSale: false, reason: 'abgerissen', name, facts, tags: properties }
 
   // Steht schon ein NOXIA-Gebäude darauf (die Karte zeichnet es auf diesem Grundriss)?
@@ -83,7 +90,7 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
     .eq('entity_type', 'building').eq('status', 'active')
     .gte('latitude_deg', facts.centre.lat - span).lte('latitude_deg', facts.centre.lat + span)
     .gte('longitude_deg', facts.centre.lon - span * 1.7).lte('longitude_deg', facts.centre.lon + span * 1.7).limit(1)
-  if (onTop?.length) return { forSale: false, reason: 'gehört bereits jemandem', name, facts }
+  if (onTop?.length && !ownedByTown) return { forSale: false, reason: 'gehört bereits jemandem', name, facts }
 
   // Bewohner: Wohnzuweisungen an diesen Grundriss; ihre Miete erhöht den Preis.
   const ids = features.map(row => row.id)
@@ -96,7 +103,8 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
     rentPerInterval = (tenancies ?? []).reduce((sum, row) => sum + Number(row.rent_per_billing ?? 0), 0)
   }
   // Echte Wohnhäuser sind bewohnt: wer dort lebt, zieht beim Kauf als Person ins Spiel ein und zahlt Miete.
-  const newResidents = people.length ? 0 : plannedResidents(facts.kind, facts.areaM2, facts.levels)
+  // Ein Lokal bringt keine neuen Bewohner mit; seine Wohnungen im Obergeschoss vergibt der Wohnungsmarkt.
+  const newResidents = people.length || venue ? 0 : plannedResidents(facts.kind, facts.areaM2, facts.levels)
   rentPerInterval += newResidents * RENT_PER_RESIDENT
 
   const location = await locationAt(supabase, facts.centre)
@@ -105,8 +113,8 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
   const actor = publicActor as { actors?: { display_name?: string } | null } | null
   return {
     forSale: true, name, facts, features, tags: properties,
-    price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval, locationFactor: location.factor }),
-    location,
+    price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval, locationFactor: location.factor, fitOut: fitOutValue(properties) }),
+    location, venue, fitOut: fitOutValue(properties),
     seller: actor?.actors?.display_name ?? 'Gemeinde',
     residents: people.length + newResidents, newResidents, rentPerInterval,
   }
@@ -119,7 +127,7 @@ export async function acquireItem(supabase: Supabase, source: string, offer: Off
   const regionId = offer.features?.[0]?.region_id
   const { data: region } = regionId ? await supabase.from('celestial_regions').select('slug,center_lat,center_lon').eq('id', regionId).maybeSingle() : { data: null }
   const local = region ? geoToLocalMeters(facts.centre, { lat: Number(region.center_lat), lon: Number(region.center_lon) }) : { eastM: 0, northM: 0 }
-  const living = facts.kind === 'house' || facts.kind === 'row'
+  const living = (facts.kind === 'house' || facts.kind === 'row') && !offer.venue
   return {
     source, lat: facts.centre.lat, lon: facts.centre.lon, w: facts.w, d: facts.d, rotation: facts.rotationDeg,
     name: offer.name ?? null, region: region?.slug ?? null, x: local.eastM, y: local.northM,

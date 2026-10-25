@@ -98,9 +98,9 @@ export function venuePlan(usage: VenueUsage, house: VenueHouse): VenuePlan {
 
 /** Grund, warum ein Haus nicht zu diesem Lokal umgebaut werden kann – oder null. */
 export function venueConversionBlocker(usage: VenueUsage, input: { areaM2: number; tags?: Record<string, unknown> | null; currentUsage?: string | null }): string | null {
-  const already = realVenueKind(input.tags)
-  if (already) return 'Das Haus ist schon ein Lokal und gehört dem Ort.'
-  if (input.currentUsage === usage) return 'Das Haus hat diese Nutzung schon.'
+  // Ein gekauftes reales Lokal ist schon ausgebaut: dieselbe Lokalart braucht keinen Umbau,
+  // eine andere Nutzung ist erlaubt (Thomas, 25.10.2026: reale Lokale sind kaufbar).
+  if (input.currentUsage === usage || realVenueKind(input.tags) === usage) return 'Das Haus hat diese Nutzung schon.'
   if (!(input.areaM2 >= VENUE_USAGES[usage].minAreaM2)) return `Zu klein: mindestens ${VENUE_USAGES[usage].minAreaM2} m² Grundfläche.`
   return null
 }

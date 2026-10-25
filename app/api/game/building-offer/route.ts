@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     forSale: offer.forSale, reason: offer.reason, price: offer.price, seller: offer.seller,
     residents: offer.residents, newResidents: offer.newResidents, rentPerInterval: offer.rentPerInterval, name: offer.name,
-    areaM2: offer.facts?.areaM2, levels: offer.facts?.levels, location: offer.location,
+    areaM2: offer.facts?.areaM2, levels: offer.facts?.levels, location: offer.location, venue: offer.venue ?? null, fitOut: offer.fitOut ?? 0,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
 

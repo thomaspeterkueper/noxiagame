@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingFacts, buildingPrice, locationFactor, notForSaleReason, plannedResidents } from './buildingOffer'
+import { buildingFacts, buildingPrice, fitOutValue, locationFactor, notForSaleReason, plannedResidents } from './buildingOffer'
 
 describe('buildingOffer', () => {
   // Rechteck 12 m (Ost) × 8 m (Nord) bei Sundern
@@ -36,10 +36,13 @@ describe('buildingOffer', () => {
     expect(notForSaleReason({ building: 'house' }, 'house')).toBeNull()
   })
 
-  it('keeps real venues with the town', () => {
-    expect(notForSaleReason({ building: 'commercial', amenity: 'bar', name: 'Metropol' }, 'hall')).toBe('Lokal des Ortes')
-    expect(notForSaleReason({ building: 'restaurant', amenity: 'restaurant' }, 'house')).toBe('Lokal des Ortes')
-    expect(notForSaleReason({ building: 'commercial' }, 'hall')).toBeNull()
+  it('sells real venues, with the fit-out on top', () => {
+    expect(notForSaleReason({ building: 'commercial', amenity: 'bar', name: 'Metropol' }, 'hall')).toBeNull()
+    expect(fitOutValue({ amenity: 'bar' })).toBe(1800)
+    expect(fitOutValue({ amenity: 'restaurant' })).toBe(2400)
+    expect(fitOutValue({ building: 'commercial' })).toBe(0)
+    const plain = buildingPrice({ areaM2: 150, levels: 2, kind: 'hall', rentPerInterval: 0 })
+    expect(buildingPrice({ areaM2: 150, levels: 2, kind: 'hall', rentPerInterval: 0, fitOut: 1800 })).toBe(plain + 1800)
   })
 
   it('prices the town centre higher', () => {

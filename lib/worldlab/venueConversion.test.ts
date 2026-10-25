@@ -32,9 +32,10 @@ describe('venueConversion', () => {
     expect(venuePlan('restaurant', { areaM2: 300, levels: 1 }).staffCapacity).toBe(4)
   })
 
-  it('real venues are not convertible', () => {
+  it('a real venue needs no conversion to its own kind', () => {
     expect(realVenueKind({ amenity: 'bar', name: 'Metropol' })).toBe('bar')
-    expect(venueConversionBlocker('cafe', { areaM2: 150, tags: { amenity: 'restaurant' } })).toMatch(/schon ein Lokal/)
+    expect(venueConversionBlocker('restaurant', { areaM2: 150, tags: { amenity: 'restaurant' }, currentUsage: 'restaurant' })).toMatch(/schon/)
+    expect(venueConversionBlocker('cafe', { areaM2: 150, tags: { amenity: 'restaurant' }, currentUsage: 'restaurant' })).toBeNull()
     expect(venueConversionBlocker('restaurant', { areaM2: 50, tags: { building: 'house' } })).toMatch(/Zu klein/)
     expect(venueConversionBlocker('cafe', { areaM2: 139, tags: { building: 'commercial' }, currentUsage: 'acquired_building' })).toBeNull()
     expect(venueConversionBlocker('cafe', { areaM2: 139, tags: {}, currentUsage: 'cafe' })).toMatch(/schon/)

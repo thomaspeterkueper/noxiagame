@@ -230,7 +230,7 @@ R-13 ist gebaut (`population-economy.md`). Für die Tafel in `app/world-lab/Worl
 
 - `GET /api/game/building-offer?conversions=<id>` liefert je Nutzung jetzt zusätzlich `buildTicks`, `venue` und `note` (z. B. „2 Personal · 3 Wohnplätze“). Für Lokale gilt **nicht** mehr „halbe Baukosten“, sondern der volle Preis mit Bauzeit; der Hinweis „Hülle und Bewohner bleiben, halbe Baukosten.“ stimmt nur noch für andere Nutzungen. Bitte Bauzeit und `note` anzeigen.
 - Während eines Umbaus hat das Haus `conversion_plan` (`type`, `ready_at`), bleibt aber `acquired_building`. Vorschlag: „Wird zum Café umgebaut – fertig um …“ in der Tafel; dafür `conversion_plan` in `/api/world-lab/buildings` mitliefern.
-- Reale Lokale (Metropol, Balkan Grill in Sundern) sind jetzt NOXIA-Gebäude des Ortes; die Tafel zeigt sie als „Bar · Metropol“ mit „Betreten“. Andere reale Lokale ohne Eintrag melden „Nicht verkäuflich: Lokal des Ortes“.
+- Reale Lokale (Metropol, Balkan Grill in Sundern) sind jetzt NOXIA-Gebäude des Ortes; die Tafel zeigt sie als „Bar · Metropol“ mit „Betreten“. Seit dem Nachtrag (Thomas, 25.10.2026) sind reale Lokale kaufbar, mit Ausbauwert im Preis: das Angebot liefert dafür `venue` (Lokalart) und `fitOut` (Credits) – bitte in der Tafel zeigen, z. B. „Bar, schon ausgebaut (+1 800 Cr)“. Bei Metropol und Balkan Grill steht „Kaufen“ neben „Betreten“.
 - Das Startcafé ist vom alten 24 × 24-m-Platz auf das reale Haus Hauptstraße 72 gezogen (W-4, letzter Punkt); auf der Karte sollte es jetzt den Grundriss dieses Hauses belegen.
 
 ## Nicht in diesem Teilprojekt

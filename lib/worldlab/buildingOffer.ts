@@ -6,7 +6,7 @@
 // Gebucht wird in der Datenbank (buy_earth_building), nicht hier.
 
 import { blockLevels, orientedBox, polygonArea, worldBlockKind, type BlockKind } from './simplify'
-import { realVenueKind } from './venueConversion'
+import { realVenueKind, VENUE_USAGES } from './venueConversion'
 
 export type GeoPoint = { lat: number; lon: number }
 
@@ -72,12 +72,22 @@ export function buildingValue(input: { areaM2: number; levels: number; kind: Blo
   return input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind] * factor + Math.max(0, input.rentPerInterval) * RENT_PERIODS
 }
 
-export function buildingPrice(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number; locationFactor?: number }): number {
+export function buildingPrice(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number; locationFactor?: number; fitOut?: number }): number {
   const factor = input.locationFactor ?? 1
   const floor = input.areaM2 * Math.max(1, input.levels) * FLOOR_RATE[input.kind]
   const land = input.areaM2 * LAND_RATE
   const rent = Math.max(0, input.rentPerInterval) * RENT_PERIODS
-  return Math.max(MIN_PRICE, Math.round(((floor + land) * factor + rent) / 50) * 50)
+  return Math.max(MIN_PRICE, Math.round(((floor + land) * factor + rent + Math.max(0, input.fitOut ?? 0)) / 50) * 50)
+}
+
+/**
+ * Ausbau, den ein Haus schon hat (Thomas, 25.10.2026: Cafés, Restaurants u. a.
+ * sind kaufbar, aber teurer, weil schon ausgebaut): ein reales Lokal kostet den
+ * Umbau mit, den man sich spart – Café 900, Bar 1 800, Restaurant 2 400, Hotel 3 600.
+ */
+export function fitOutValue(properties: Record<string, unknown> | null | undefined): number {
+  const kind = realVenueKind(properties)
+  return kind ? VENUE_USAGES[kind].cost : 0
 }
 
 // ── Lage (Thomas, 25.10.2026: Innenstadt teurer) ────────────────────────────
@@ -124,7 +134,5 @@ export function notForSaleReason(properties: Record<string, unknown>, kind: Bloc
   const building = String(properties.building ?? '').toLowerCase()
   const amenity = String(properties.amenity ?? '').toLowerCase()
   if (kind === 'church' || PUBLIC_BUILDINGS.has(building) || PUBLIC_AMENITIES.has(amenity) || properties.historic) return 'öffentliches Gebäude oder Wahrzeichen'
-  // Lokale der Kartendaten (Café, Bar, Restaurant, Hotel) gehören dem Ort (R-13).
-  if (realVenueKind(properties)) return 'Lokal des Ortes'
   return null
 }
