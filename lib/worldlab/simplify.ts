@@ -24,7 +24,7 @@ export type AreaKind =
   | 'grounds' | 'track' | 'pitch' | 'sand' | 'hardcourt' | 'clay'
 export type BlockKind = 'house' | 'row' | 'hall' | 'factory' | 'church' | 'shed'
 
-export interface TileRoad { c: RoadClass; p: number[] }
+export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string }
 export interface TileArea { k: AreaKind; p: number[] }
 export interface TileBlock {
   x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
@@ -359,7 +359,9 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     if (feature.featureType === 'road' && feature.geometry.kind === 'line') {
       const roadClass = ROAD_CLASS[String(properties.highway ?? '')]
       if (!roadClass || properties.tunnel === 'yes') continue
-      out.roads.push({ c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : 1.5)) })
+      const road: TileRoad = { c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : 1.5)) }
+      if (typeof properties.name === 'string' && properties.name.trim() && roadClass !== 'path') road.n = properties.name.trim().slice(0, 60)
+      out.roads.push(road)
     } else if (feature.featureType === 'waterway' && feature.geometry.kind === 'line') {
       out.rivers.push(flat(simplifyLine(points, 2)))
     } else if (areaKind(feature.featureType, properties) && feature.geometry.kind === 'polygon' && points.length >= 3) {

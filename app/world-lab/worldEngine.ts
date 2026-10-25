@@ -10,6 +10,7 @@ import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, 
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
+import { streetLabels } from '@/lib/worldlab/streetLabels'
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock } from '@/lib/worldlab/simplify'
@@ -59,6 +60,7 @@ const PRELOAD_MARGIN = 40         // Bildeinheiten: knapp außerhalb schon laden
 const HEIGHT_MARGIN = 50          // Bildeinheiten: hohe Gebäude, deren Fuß unter dem Bildrand steht
 const KEEP_MARGIN_TILES = 0.6     // erst so weit außerhalb fällt eine Kachel weg
 const MAX_ZOOM = 7
+const LABEL_MIN_ZOOM = 1.6
 const FETCHED_CACHE = 600         // so viele Kacheldaten bleiben im Speicher
 // Aufbau neuer Kacheln, verteilt über mehrere Bilder: je Bild höchstens so viele
 // Einheiten (ein Gebäudeblock = 1, der Boden einer Kachel = 20 + Linien/Flächen).
@@ -158,7 +160,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const lines = new PIXI.Container({ isRenderGroup: true })
   const objects = new PIXI.Container({ isRenderGroup: true })
   objects.sortableChildren = true
-  world.addChild(ground, lines, objects)
+  // Straßennamen über allem, erst ab einer Zoomstufe, in der sie lesbar sind
+  // und sich nicht drängen (LABEL_MIN_ZOOM).
+  const labels = new PIXI.Container({ isRenderGroup: true })
+  world.addChild(ground, lines, objects, labels)
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -206,7 +211,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -411,6 +416,17 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     lines.addChild(l)
     entry.ground = g
     entry.lines = l
+    // Straßennamen: in Laufrichtung, Text groß gesetzt und verkleinert, damit er scharf bleibt.
+    for (const label of streetLabels(data.roads, (x, y) => iso(ox + x, oy + y))) {
+      const text = new PIXI.Text({ text: label.name, style: { fontFamily: 'system-ui, sans-serif', fontSize: 30, fontWeight: '600', fill: 0x3d4a52, stroke: { color: 0xf4f1e8, width: 7, join: 'round' } } })
+      text.anchor.set(0.5)
+      text.scale.set(0.14)
+      const at = iso(ox + label.x, oy + label.y)
+      text.position.set(at.x, at.y)
+      text.rotation = label.angle
+      labels.addChild(text)
+      entry.labels.push(text)
+    }
     // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
     const trees = data.trees ?? []
     if (treeTextures.length) for (let i = 0; i + 1 < trees.length; i += 2) {
@@ -430,7 +446,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], labels: [], done: false })
     building.push(key)
   }
 
@@ -462,6 +478,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     entry.ground?.destroy()
     entry.lines?.destroy()
     for (const tree of entry.trees) tree.destroy()
+    for (const label of entry.labels) label.destroy()
     for (const block of entry.blocks) block.destroy()
     loaded.delete(key)
     pruneBands()
@@ -622,6 +639,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     placePlayerDepth()
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
+    labels.visible = zoom >= LABEL_MIN_ZOOM
     const centre = iso(camera.x, camera.y)
     world.scale.set(zoom)
     world.position.set(app.screen.width / 2 - centre.x * zoom, app.screen.height / 2 - centre.y * zoom)
