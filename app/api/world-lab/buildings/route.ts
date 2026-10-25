@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   if (!earth) return NextResponse.json({ buildings: [] })
   const [{ data: rows }, { data: definitions }] = await Promise.all([
-    supabase.from('tile_entities').select('id,entity_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,profile_id,owner_class,source_ref,display_name,profiles(username),actors(display_name)')
+    supabase.from('tile_entities').select('id,entity_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,profile_id,owner_class,source_ref,display_name,conversion_plan,profiles(username),actors(display_name)')
       // Straßenstücke aus dem alten Bausystem gehören nicht in die Karte – Straßen kommen aus OpenStreetMap.
       .eq('location_id', earth.id).eq('entity_type', 'building').eq('status', 'active').neq('entity_id', 'road').not('latitude_deg', 'is', null).limit(1000),
     supabase.from('building_definitions').select('key,name'),
@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     buildings: (rows ?? []).map((row: any) => ({
       id: row.id, typeId: row.entity_id, name: row.display_name ? (row.entity_id === 'acquired_building' ? row.display_name : `${names.get(String(row.entity_id)) ?? row.entity_id} · ${row.display_name}`) : names.get(String(row.entity_id)) ?? row.entity_id, source: row.source_ref ?? undefined,
+      // Laufender Umbau zum Lokal (R-13): Ziel und Fertigstellung; das Haus bleibt bis dahin, was es war.
+      conversion: row.conversion_plan?.type ? { type: String(row.conversion_plan.type), name: names.get(String(row.conversion_plan.type)) ?? String(row.conversion_plan.type), readyAt: row.conversion_plan.ready_at ? String(row.conversion_plan.ready_at) : null } : undefined,
       lat: Number(row.latitude_deg), lon: Number(row.longitude_deg),
       w: Number(row.footprint_width_m ?? 18), d: Number(row.footprint_depth_m ?? 14), rotation: Number(row.rotation_deg ?? 0),
       // Eigentümer wie in /api/game/build/spatial

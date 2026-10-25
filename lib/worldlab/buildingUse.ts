@@ -87,3 +87,39 @@ export function buildingSizeLine(areaM2: number, levels: number): string {
   const floors = Math.max(1, Math.round(levels))
   return `${area.toLocaleString('de-DE')} m² Grundfläche · ${floors} ${floors === 1 ? 'Geschoss' : 'Geschosse'}`
 }
+
+// ---- Lokale: Umbau und Kauf (W-5, zu R-13) ----
+
+const VENUE_LABEL: Record<string, string> = { cafe: 'Café', bar: 'Bar', restaurant: 'Restaurant', hotel: 'Hotel' }
+
+/** „Café“, „Bar“ … für eine Lokalart aus R-13 (`venue`, `conversion_plan.type`). */
+export function venueKindLabel(kind: string | null | undefined): string | null {
+  return kind ? VENUE_LABEL[kind] ?? null : null
+}
+
+/** Zeile eines Umbaus in der Liste: „Bar · 1.800 Cr · Bauzeit 2 Std. · 2 Personal · 3 Wohnplätze“. */
+export function conversionLine(item: { name: string; cost: number; buildTicks?: number; note?: string }): string {
+  const parts = [item.name, `${Math.round(item.cost).toLocaleString('de-DE')} Cr`]
+  if (item.buildTicks && item.buildTicks > 0) parts.push(`Bauzeit ${item.buildTicks} Std.`)
+  else parts.push('sofort')
+  if (item.note) parts.push(item.note)
+  return parts.join(' · ')
+}
+
+/** „fertig um 21:40“ (heute) bzw. „fertig am 26.10. um 09:10“; bei vergangener Zeit „gleich fertig“. Ein Tick ist eine Stunde Echtzeit. */
+export function readyAtLabel(readyAt: string | null | undefined, now: Date = new Date()): string | null {
+  if (!readyAt) return null
+  const at = new Date(readyAt)
+  if (Number.isNaN(at.getTime())) return null
+  if (at.getTime() <= now.getTime()) return 'gleich fertig'
+  const time = at.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  const sameDay = at.toDateString() === now.toDateString()
+  return sameDay ? `fertig um ${time}` : `fertig am ${at.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} um ${time}`
+}
+
+/** „Bar, schon ausgebaut (+1.800 Cr)“ für ein reales Lokal im Angebot. */
+export function venueOfferLine(venue: string | null | undefined, fitOut: number | null | undefined): string | null {
+  const label = venueKindLabel(venue)
+  if (!label) return null
+  return fitOut && fitOut > 0 ? `${label}, schon ausgebaut (+${Math.round(fitOut).toLocaleString('de-DE')} Cr)` : `${label}, schon ausgebaut`
+}

@@ -18,7 +18,7 @@ import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
-import { buildingSizeLine, buildingUseLine } from '@/lib/worldlab/buildingUse'
+import { buildingSizeLine, buildingUseLine, conversionLine, readyAtLabel, venueOfferLine } from '@/lib/worldlab/buildingUse'
 import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
@@ -67,7 +67,7 @@ type Line = { role: 'user' | 'assistant'; content: string }
  * Bevölkerung und Ökonomie). Solange die Schnittstelle nicht antwortet, zeigt die
  * Tafel nichts zum Kauf.
  */
-type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number }
+type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
 type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
@@ -200,7 +200,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     } catch { setBuyError(failText) } finally { setBuying(false) }
   }
 
-  const [conversions, setConversions] = useState<Record<string, Array<{ id: string; name: string; cost: number }>>>({})
+  const [conversions, setConversions] = useState<Record<string, Array<{ id: string; name: string; cost: number; buildTicks?: number; venue?: boolean; note?: string }>>>({})
   const [showConversions, setShowConversions] = useState(false)
 
   const person = panel.kind === 'person' ? residents.find(resident => resident.id === panel.id) ?? null : null
@@ -331,6 +331,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       const json = await response.json().catch(() => ({}))
       if (!response.ok) { setBuyError(String(json.error ?? 'Umbau nicht möglich.')); return }
       setShowConversions(false)
+      setConversions(current => { const next = { ...current }; delete next[own.id]; return next })
       await engine?.reloadNoxia()
       onWorldChanged()
     } catch { setBuyError('Umbau derzeit nicht erreichbar.') } finally { setBuying(false) }
@@ -523,14 +524,17 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {own?.own && own.source && <>
         <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd><dt>Nutzung</dt><dd>{own.typeId === 'acquired_building' ? (realUse?.known ? `wie bisher: ${realUse.text}` : 'wie bisher') : own.name.split(' · ')[0] + (realUse?.known ? ` (vorher: ${realUse.text})` : '')}</dd><dt>Bewohner</dt><dd>{residentsHere || 'keine'}</dd></dl>
         {buyError && <p>{buyError}</p>}
-        {!showConversions
-          ? <div className="row"><span/><button disabled={buying} onClick={() => setShowConversions(true)}>Umbauen …</button></div>
-          : <div className="build-list">
-            {!(own.id in conversions) ? <p>Nutzungen werden geladen …</p>
-              : conversions[own.id].length ? conversions[own.id].map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}</span><button disabled={buying} onClick={() => void convert(item.id)}>Umbauen</button></div>)
-                : <p>Keine andere Nutzung passt in dieses Gebäude.</p>}
-            <div className="row"><span>Hülle und Bewohner bleiben, halbe Baukosten.</span><button onClick={() => setShowConversions(false)}>Zurück</button></div>
-          </div>}
+        {own.conversion
+          ? <div className="row"><span>Umbau läuft: {own.conversion.name} – {readyAtLabel(own.conversion.readyAt) ?? 'Fertigstellung unbekannt'}.</span></div>
+          : !showConversions
+            ? <div className="row"><span/><button disabled={buying} onClick={() => setShowConversions(true)}>Umbauen …</button></div>
+            : <div className="build-list">
+              {!(own.id in conversions) ? <p>Nutzungen werden geladen …</p>
+                : conversions[own.id].length ? conversions[own.id].map(item => <div key={item.id} className="row"><span>{conversionLine(item)}</span><button disabled={buying} onClick={() => void convert(item.id)}>Umbauen</button></div>)
+                  : <p>Keine andere Nutzung passt in dieses Gebäude.</p>}
+              {/* R-13: Lokale kosten den vollen Preis und brauchen Bauzeit; andere Nutzungen halbe Baukosten, sofort. */}
+              <div className="row"><span>{(conversions[own.id] ?? []).some(item => item.venue) ? 'Lokale: voller Preis, mit Bauzeit. Andere Nutzungen: halbe Baukosten, sofort. Hülle und Bewohner bleiben.' : 'Hülle und Bewohner bleiben, halbe Baukosten.'}</span><button onClick={() => setShowConversions(false)}>Zurück</button></div>
+            </div>}
         {!confirmDemolish
           ? <div className="row"><span>{residentsHere ? 'Beim Abriss ziehen die Bewohner in staatlichen Wohnraum.' : ''}</span><button disabled={buying} onClick={() => setConfirmDemolish(true)}>Abreißen …</button></div>
           : <div className="row"><span>Wirklich abreißen? Das lässt sich nicht rückgängig machen.</span><button disabled={buying} onClick={() => void demolish(false)}>Abreißen</button><button disabled={buying} onClick={() => void demolish(true)}>und neu bauen</button></div>}
@@ -542,7 +546,16 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         {!offer?.listed && !offer?.parcelId && Number(askPrice) > 0 && <p>Beim Verkauf {afterTax(Number(askPrice), offer?.taxRate)}.</p>}
       </>}
       {own && !own.own && offer?.parcelId && <div className="row"><span>Gehört mit dem Flurstück {offer.seller ?? 'einem anderen Spieler'}.</span><button onClick={() => setPanel({ kind: 'parcel', id: offer.parcelId!, at: building.at })}>Flurstück ansehen</button></div>}
-      {own && !own.own && offer && !offer.parcelId && (offer.forSale
+      {own && !own.own && offer && !offer.parcelId && offer.forSale && !offer.entityId && <>
+        {/* Lokal des Ortes (R-13): verkäuflich wie ein freies Haus, Ausbauwert im Preis */}
+        <dl>
+          <dt>Eigentümer</dt><dd>{offer.seller ?? 'Gemeinde'}</dd>
+          {venueOfferLine(offer.venue, offer.fitOut) && <><dt>Lokal</dt><dd>{venueOfferLine(offer.venue, offer.fitOut)}</dd></>}
+          <dt>Preis</dt><dd><b>{credits(offer.price ?? 0)}</b></dd>
+        </dl>
+        <div className="row"><span>{buyError || 'Das Geld geht an die Gemeinde. Personal bleibt.'}</span><button disabled={buying} onClick={() => void buy()}>{buying ? '…' : 'Kaufen'}</button></div>
+      </>}
+      {own && !own.own && offer && !offer.parcelId && (offer.entityId || !offer.forSale) && (offer.forSale
         ? <>
           <dl><dt>Eigentümer</dt><dd>{offer.seller}</dd><dt>Preis</dt><dd><b>{credits(offer.price ?? 0)}</b></dd></dl>
           <div className="row"><span>{buyError || `Angebot von ${offer.seller} – das Geld geht an ihn (abzüglich Steuer). Bewohner bleiben.`}</span><button disabled={buying} onClick={() => void buildingSale({ action: 'buy-listed', entityId: offer.entityId, price: offer.price }, own.source!, 'Kauf nicht möglich.')}>{buying ? '…' : 'Kaufen'}</button></div>
@@ -553,6 +566,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         ? <>
           <dl>
             <dt>Eigentümer</dt><dd>{offer.seller ?? 'Gemeinde'}</dd>
+            {venueOfferLine(offer.venue, offer.fitOut) && <><dt>Lokal</dt><dd>{venueOfferLine(offer.venue, offer.fitOut)}</dd></>}
             <dt>Bewohner</dt><dd>{offer.residents ? `${offer.residents} – bleiben und zahlen Miete an dich` : 'keine'}</dd>
             {offer.rentPerInterval ? <><dt>Miete</dt><dd>{credits(offer.rentPerInterval)} je Abrechnung</dd></> : null}
             <dt>Preis</dt><dd><b>{credits(offer.price ?? 0)}</b></dd>

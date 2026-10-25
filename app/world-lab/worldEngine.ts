@@ -21,7 +21,7 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 
 type Pixi = typeof import('pixi.js')
 
-export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung, wenn es ein gekauftes reales Gebäude ist. */ source?: string }
+export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung, wenn es ein gekauftes reales Gebäude ist. */ source?: string; /** Laufender Umbau zum Lokal (R-13) */ conversion?: { type: string; name: string; readyAt: string | null } }
 /** Bahnstrecke: beginnt am Bahnhof, wenn einer an ihrem Ende liegt. */
 export type WorldRailLine = { points: GeoPoint[]; lengthM: number; station: { name: string; at: GeoPoint } | null }
 /** Freie Fläche nach Abriss eines gekauften Gebäudes. */

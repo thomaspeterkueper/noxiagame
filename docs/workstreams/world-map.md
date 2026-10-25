@@ -224,7 +224,16 @@ Entscheidung Thomas, 25.10.2026 (siehe R-13 bei Bevölkerung und Ökonomie): Lok
 - Klick auf ein reales Gebäude → Gebäudetafel (W-2) mit Adresse, Größe, heutiger Nutzung aus OSM (Wohnhaus, Laden, Bar „Metropol“) und, wenn frei, „Kaufen“; ist es NOXIA-Gebäude, „Betreten“.
 - Das selbst gebaute Startcafé soll von der Karte verschwinden, sobald es auf ein reales Gebäude übertragen ist (Übergang in R-13).
 
-### W-5 (Bevölkerung und Ökonomie, 25.10.2026): Umbau zum Lokal in der Gebäudetafel (zu R-13/W-4)
+### W-5 (Bevölkerung und Ökonomie, 25.10.2026): Umbau zum Lokal in der Gebäudetafel (zu R-13/W-4) – erledigt (25.10.2026)
+
+Umgesetzt (`app/world-lab/WorldPanels.tsx`, Texte in `lib/worldlab/buildingUse.ts` mit Tests):
+- **Umbauliste:** je Nutzung Preis, Bauzeit („Bauzeit 2 Std.“ – ein Tick ist eine Stunde) oder „sofort“ und der Hinweis aus `note` („2 Personal · 3 Wohnplätze“). Unten steht, was gilt: bei Lokalen voller Preis mit Bauzeit, bei anderen Nutzungen halbe Baukosten, sofort.
+- **Laufender Umbau:** `/api/world-lab/buildings` liefert `conversion` (Ziel, Name, `readyAt` aus `conversion_plan`); die Tafel zeigt „Umbau läuft: Bar – fertig um 21:40“ statt „Umbauen …“.
+- **Reale Lokale kaufen:** Metropol und Balkan Grill (Lokale des Ortes) zeigen „Betreten“ und darunter Eigentümer, „Lokal: Bar, schon ausgebaut (+1.800 Cr)“, Preis und „Kaufen“ – über den normalen Kaufweg (`POST { source }`), nicht über Angebote unter Spielern. Freie reale Lokale ohne NOXIA-Gebäude zeigen dieselbe Zeile.
+- **Startcafé:** in der Datenbank geprüft (25.10.2026): `cafe` „Hauptstraße 72“ mit `source_ref = osm:way:191141346`, das Haus ist in den Kartendaten; vom alten Platz ist nichts übrig. Die Karte zeichnet es damit auf diesem Grundriss. Ebenso Metropol (`osm:way:191141349`, Hauptstraße 76) und Balkan Grill (`osm:way:332679123`, Hauptstraße 68).
+- Nicht im Browser geprüft (braucht Anmeldung): Thomas klickt Metropol an und prüft „Kaufen“ neben „Betreten“.
+
+Ursprünglicher Request:
 
 R-13 ist gebaut (`population-economy.md`). Für die Tafel in `app/world-lab/WorldPanels.tsx`:
 
