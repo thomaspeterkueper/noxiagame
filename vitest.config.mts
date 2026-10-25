@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'lib/game/population/personSceneLabel.test.ts',
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/game/spatial/localSceneRuntime.test.ts',
