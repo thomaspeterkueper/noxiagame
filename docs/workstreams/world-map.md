@@ -69,7 +69,13 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 2. ~~Zeichenvorlage festlegen, Blöcke auf Bilder umstellen.~~ Erledigt: Fassaden von vorn, 2:1 geometrisch richtig, 16 px je Meter (siehe `world-map-zeichenvorlage.md`). Wände und Dächer nehmen gezeichnete Bilder an; bis Thomas' eigene Zeichnungen da sind, zeigt die Karte die Vorlagen (`?art=farbe` für einfarbige Quader). Offen: Thomas zeichnet die ersten Bilder.
 3. Kacheln vorab erzeugen und als Dateien ablegen statt bei jedem ersten Abruf aus der Datenbank zu rechnen.
 4. Kollision und Wegenetz (im Prototyp läuft die Figur durch alles hindurch).
-5. Personen, Ansprechen, „Gehe hin“, Betreten von Gebäuden – erst wenn die Darstellung trägt.
+5. ~~Personen, Ansprechen, „Gehe hin“, Betreten~~ Gebaut (25.10.2026), `app/world-lab/WorldPanels.tsx`:
+   - Bewohner (bis 18, wie in der alten Szene) stehen vor ihrem NOXIA-Zuhause oder ihrer Arbeit, die anderen gehen die Straßen der geladenen Kacheln entlang. Beschriftung wie in der alten Szene (`personSceneLabel`).
+   - Klick auf Person: Tafel mit Tätigkeit und Gespräch; ansprechen ab 8 m (`/api/game/npc-conversation`, dieselben Felder wie die alte Szene), sonst „Gehe hin“. Antworten mit `visit_place` schicken die Person zum Gebäude; wer mitgeht, ist beim Betreten Begleitung.
+   - Klick auf Gebäude: Name, Anschrift (OSM `addr:*`), bei NOXIA-Gebäuden „Betreten“ ab 8 m (oder F/Enter), sonst „Gehe hin“. Betreten öffnet `EarthBuildingAccessLayer` wie in der alten Szene.
+   - **Immer nur eine Tafel** (Thomas, 25.10.2026: in der alten Karte lagen Tafeln übereinander): jede neue ersetzt die vorige und beendet ein laufendes Hingehen; Klick auf den Boden oder Esc schließt; der Innenraum ersetzt alles und sperrt solange Tasten und Klicks der Karte.
+   - Spielfigur teilt ihre Position (WGS84) mit der alten Szene (`earthPlayerPositionStore`).
+   - Offen: Wahrzeichen (Bibliothek, Kirche) betreten wie in der alten Szene; Personen weichen Häusern noch nicht aus; „Gehe hin“ geht gerade Linie (Aufgabe 4).
 6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
 7. ~~Datenlücke~~ Teilweise erledigt: `/world-lab` holt Ortsdetail (Gebäude, Wohnstraßen, Wege) selbst nach – beim Start für die Zelle um die Figur, in bebauten Kacheln ohne Gebäude selbsttätig, sonst mit „Kartendaten hier nachladen“. Offen: prüfen, ob Overpass zuverlässig antwortet; Zellen ohne Bebauung werden nicht geholt.
 8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Die veraltete Region Sauerland erneuert `/world-lab` beim Start selbst. Offen: prüfen, ob das Röhrtalstadion erscheint (`internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`).
@@ -82,7 +88,11 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 
 ## Requests aus anderen Teilprojekten
 
-### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht
+### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht – in der Weltkarte erledigt (25.10.2026)
+
+Umgesetzt in der neuen Weltkarte: Straßennamen entlang der Straße ab Zoom 1,6 (`lib/worldlab/streetLabels.ts`); Anschrift beim Klick auf ein Gebäude; Ziel-Feld „Hauptstraße 102“ springt zum Gebäude (`GET /api/world-lab/address`, aus `region_features`, nächster Treffer zur Spielfigur, ohne fremde Dienste). Nicht umgesetzt in der bisherigen Erdszene (`EarthWalkableSurface`) – die soll durch die Weltkarte ersetzt werden.
+
+Ursprünglicher Request:
 
 Beobachtung Thomas, 25.10.2026 (in der Erdszene bei Sundern): Die Straßen haben im Spiel keine Namen. Die Namen sind da – `region_features` führt für Straßen `properties.name` (z. B. Hauptstraße, Bogenstraße), und das Ortswissen der Figuren nennt sie bereits.
 

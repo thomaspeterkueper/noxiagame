@@ -38,11 +38,39 @@ export interface WorldEngineOptions {
   loadNoxia?: () => Promise<NoxiaBuilding[]>
   noxiaVisual?: (typeId: string) => { mapAsset?: string; mapScale?: number } | null | undefined
   onHud: (hud: Hud) => void
+  /** Klick auf die Karte (kein Ziehen). */
+  onPick?: (pick: WorldPick) => void
   onError: (message: string) => void
 }
 
+/** Was unter dem Zeiger lag, als geklickt wurde. */
+export type WorldPick =
+  | { type: 'person'; id: string }
+  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string }
+  | { type: 'noxia'; noxiaId: string; at: GeoPoint }
+  | { type: 'ground'; at: GeoPoint }
+
+/** Eine Person auf der Karte. `anchor`: Haus, vor dem sie sich aufhält; sonst geht sie die Straßen entlang. */
+export interface WorldPerson { id: string; label: string; anchor?: GeoPoint | null; /** Halbe Größe des Hauses, vor dem sie steht (m). */ anchorRadiusM?: number; tint?: number }
+
 export interface WorldEngine {
   jump: (at: GeoPoint) => void
+  /** Personen setzen (ersetzt die bisherige Liste). */
+  setPeople: (people: WorldPerson[]) => void
+  /** Wo eine Person gerade steht. */
+  personAt: (id: string) => GeoPoint | null
+  /** Person geht in `seconds` Sekunden zu `to` und bleibt dort, bis `release` sie freigibt. */
+  sendPerson: (id: string, to: GeoPoint, seconds: number) => void
+  releasePerson: (id: string) => void
+  /** Spielfigur geht selbst zu einem Ziel, bis sie `withinM` Meter nah ist; Tasten brechen ab. */
+  walkTo: (target: () => GeoPoint | null, withinM: number, onArrive?: () => void) => void
+  stopWalking: () => void
+  /** Tasten und Klicks der Karte an/aus (aus, solange ein Innenraum offen ist). */
+  setInputEnabled: (enabled: boolean) => void
+  /** Abstand der Spielfigur in Metern (zu einem Punkt oder zum Rand eines Grundrisses). */
+  distanceTo: (at: GeoPoint) => number
+  /** Nächste benannte Straße zur Spielfigur (für Gespräche). */
+  nearestStreet: () => string | null
   /** Wo die Spielfigur steht. */
   position: () => GeoPoint
   /** Alle Kacheln verwerfen und neu holen (nach einem Nachladen von Kartendaten). */
@@ -369,6 +397,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
     // Tiefe: der vorderste Fußpunkt entscheidet, was vor wem steht.
     g.zIndex = Math.max(...c.map(p => p.x + p.y))
+    // Für Klicks: was dieses Gebäude ist.
+    g.eventMode = 'static'
+    ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id }
     return g
   }
 
@@ -589,14 +620,172 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         stand = g
       }
       building.stand = stand
+      stand.eventMode = 'static'
+      ;(stand as unknown as { pick: WorldPick }).pick = { type: 'noxia', noxiaId: building.id, at: { lat: building.lat, lon: building.lon } }
       stand.visible = !building.claimed
       addObject(stand)
     }
   })()
 
+  // ── Personen ────────────────────────────────────────────────────────
+  // Jede Person ist eine kleine Figur mit Beschriftung. Wer ein Zuhause oder
+  // eine Arbeit in der Nähe hat, steht davor; die anderen gehen eine Straße
+  // der geladenen Kacheln auf und ab. Gespräche können sie irgendwohin schicken.
+  type Walker = {
+    spec: WorldPerson; figure: PixiGraphics; label: InstanceType<typeof PIXI.Text>
+    x: number; y: number; seed: number
+    route: Array<{ x: number; y: number }> | null; routeLength: number
+    sent: { from: { x: number; y: number }; to: { x: number; y: number }; start: number; seconds: number } | null
+  }
+  const walkers = new Map<string, Walker>()
+  const PERSON_COLORS = [0x4f7fb3, 0xa4553f, 0x5f8f4a, 0x8a6aa8, 0x3f8f8a, 0xb08a3a]
+  const hash = (text: string) => { let h = 2166136261; for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619); return h >>> 0 }
+  function makeFigure(color: number) {
+    const g = new PIXI.Graphics()
+    g.ellipse(0, 0, 3, 1.5).fill({ color: 0x000000, alpha: 0.2 })
+    g.roundRect(-1.5, -6.1, 3, 5.1, 1.3).fill(color).stroke({ width: 0.45, color: 0x2e2a24 })
+    g.circle(0, -7.2, 1.4).fill(0xe8c4a0).stroke({ width: 0.4, color: 0x2e2a24 })
+    g.eventMode = 'static'
+    // Größer als die Figur, damit man sie auch beim Herauszoomen trifft.
+    g.hitArea = new PIXI.Rectangle(-4.5, -11, 9, 13)
+    return g
+  }
+  /** Eine Straße für eine Person: aus den geladenen Kacheln, fest nach ihrer Kennung gewählt. */
+  function pickRoute(seed: number) {
+    const near: Array<Array<{ x: number; y: number }>> = []
+    for (const entry of loaded.values()) {
+      if (Math.hypot(entry.ox + tileSizeM / 2 - player.x, entry.oy + tileSizeM / 2 - player.y) > tileSizeM * 1.6) continue
+      for (const road of entry.data.roads) {
+        if (road.c === 'main' || road.p.length < 4) continue
+        const pts: Array<{ x: number; y: number }> = []
+        for (let i = 0; i < road.p.length; i += 2) pts.push({ x: entry.ox + road.p[i], y: entry.oy + road.p[i + 1] })
+        near.push(pts)
+      }
+    }
+    if (!near.length) return null
+    return near[seed % near.length]
+  }
+  function along(route: Array<{ x: number; y: number }>, distance: number) {
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1], b = route[i], length = Math.hypot(b.x - a.x, b.y - a.y)
+      if (distance <= length) return { x: a.x + (b.x - a.x) * distance / Math.max(length, 0.001), y: a.y + (b.y - a.y) * distance / Math.max(length, 0.001) }
+      distance -= length
+    }
+    return route[route.length - 1]
+  }
+  /** Tiefe eines bewegten Objekts nachtragen (wie bei der Spielfigur: nur wenn nötig). */
+  function placeDepth(object: Container, depth: number) {
+    const band = bandFor(depth)
+    if (object.parent !== band) { object.zIndex = depth; band.addChild(object); return }
+    const list = band.children, index = list.indexOf(object)
+    const before = index > 0 ? list[index - 1].zIndex : -Infinity
+    const after = index < list.length - 1 ? list[index + 1].zIndex : Infinity
+    if (band.sortDirty || depth < before || depth > after) object.zIndex = depth
+  }
+  function setPeople(list: WorldPerson[]) {
+    const keep = new Set(list.map(person => person.id))
+    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy(); walker.label.destroy(); walkers.delete(id) }
+    for (const spec of list) {
+      const known = walkers.get(spec.id)
+      if (known) { known.spec = spec; known.label.text = spec.label; continue }
+      const seed = hash(spec.id)
+      const figure = makeFigure(spec.tint ?? PERSON_COLORS[seed % PERSON_COLORS.length])
+      ;(figure as unknown as { pick: WorldPick }).pick = { type: 'person', id: spec.id }
+      const label = new PIXI.Text({ text: spec.label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 26, fontWeight: '600', fill: 0x1f2a30, stroke: { color: 0xf8f6ef, width: 6, join: 'round' } } })
+      label.anchor.set(0.5, 1)
+      label.scale.set(0.12)
+      labels.addChild(label)
+      const start = spec.anchor ? toWorld(spec.anchor) : { x: player.x + (seed % 40) - 20, y: player.y + ((seed >> 8) % 40) - 20 }
+      const walker: Walker = { spec, figure, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null }
+      walkers.set(spec.id, walker)
+      placeDepth(figure, start.x + start.y)
+    }
+  }
+  function moveWalkers(now: number) {
+    for (const walker of walkers.values()) {
+      let x = walker.x, y = walker.y
+      if (walker.sent) {
+        const t = Math.min(1, (now - walker.sent.start) / 1000 / walker.sent.seconds)
+        x = walker.sent.from.x + (walker.sent.to.x - walker.sent.from.x) * t
+        y = walker.sent.from.y + (walker.sent.to.y - walker.sent.from.y) * t
+      } else if (walker.spec.anchor) {
+        // Vor dem Haus auf der Kameraseite (Süd-Ost), nicht darin – dort sieht man sie.
+        const home = toWorld(walker.spec.anchor)
+        const out = (walker.spec.anchorRadiusM ?? 6) + 3
+        const spread = ((walker.seed % 5) - 2) * 2.2
+        const sway = now / 1000 * 0.35 + walker.seed % 7
+        x = home.x + out * 0.71 + spread * 0.71 + Math.cos(sway) * 1.2
+        y = home.y + out * 0.71 - spread * 0.71 + Math.sin(sway * 0.8) * 1.2
+      } else {
+        // Neue Straße, wenn noch keine da ist oder die Figur weit weg zurückblieb.
+        if (!walker.route || Math.hypot(walker.x - player.x, walker.y - player.y) > 260) {
+          const route = pickRoute(walker.seed)
+          if (route) {
+            walker.route = route
+            walker.routeLength = route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - route[i].x, p.y - route[i].y), 0)
+          }
+        }
+        if (walker.route && walker.routeLength > 1) {
+          const speed = 1.1 + (walker.seed % 5) * 0.12
+          const run = (now / 1000 * speed + walker.seed % 997) % (walker.routeLength * 2)
+          const at = along(walker.route, run <= walker.routeLength ? run : walker.routeLength * 2 - run)
+          // Auf dem Gehweg: etwas neben der Straßenmitte
+          x = at.x + ((walker.seed % 2) ? 2.2 : -2.2); y = at.y + ((walker.seed % 2) ? -2.2 : 2.2)
+        }
+      }
+      walker.x = x; walker.y = y
+      const foot = iso(x, y)
+      walker.figure.position.set(foot.x, foot.y)
+      placeDepth(walker.figure, x + y)
+      walker.label.position.set(foot.x, foot.y - 9.5)
+      const near = Math.hypot(x - player.x, y - player.y) < 200
+      walker.figure.visible = near
+      walker.label.visible = near && zoom >= 2.2
+    }
+  }
+
+  // ── Selbst gehen ────────────────────────────────────────────────────
+  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void } | null = null
+  function stepAutoWalk(dt: number) {
+    if (!autoWalk) return
+    const target = autoWalk.target()
+    if (!target) { autoWalk = null; return }
+    const to = toWorld(target)
+    const dx = to.x - player.x, dy = to.y - player.y, distance = Math.hypot(dx, dy)
+    if (distance <= autoWalk.withinM) { const done = autoWalk.onArrive; autoWalk = null; done?.(); return }
+    const step = Math.min(distance - autoWalk.withinM * 0.8, WALK_M_PER_S * dt)
+    player.x += dx / distance * step
+    player.y += dy / distance * step
+  }
+
+  // ── Klicks ──────────────────────────────────────────────────────────
+  // Ein Klick ist ein Zeigerdruck ohne nennenswertes Ziehen. Getroffen wird das
+  // oberste Objekt unter dem Zeiger (Person, Gebäude), sonst der Boden.
+  let pressAt: { x: number; y: number } | null = null
+  const pointerDown = (event: PointerEvent) => { pressAt = { x: event.offsetX, y: event.offsetY } }
+  const pointerUp = (event: PointerEvent) => {
+    if (!inputEnabled) { pressAt = null; return }
+    if (!pressAt || Math.hypot(event.offsetX - pressAt.x, event.offsetY - pressAt.y) > 6 || !options.onPick) { pressAt = null; return }
+    pressAt = null
+    const hit = app.renderer.events.rootBoundary.hitTest(event.offsetX, event.offsetY)
+    let node: Container | null = hit
+    while (node && !(node as unknown as { pick?: WorldPick }).pick) node = node.parent
+    const pick = (node as unknown as { pick?: WorldPick } | null)?.pick
+    if (pick) { options.onPick(pick); return }
+    // Boden: Bildpunkt → Bodenpunkt (Höhe 0)
+    const centre = iso(camera.x, camera.y)
+    const u = (event.offsetX - app.screen.width / 2) / zoom + centre.x, v = (event.offsetY - app.screen.height / 2) / zoom + centre.y
+    const groundX = (u + v / ISO_Y) / 2, groundY = (v / ISO_Y - u) / 2
+    options.onPick({ type: 'ground', at: toGeo({ x: groundX, y: groundY }) })
+  }
+  app.canvas.addEventListener('pointerdown', pointerDown)
+  app.canvas.addEventListener('pointerup', pointerUp)
+
   // ── Eingabe ─────────────────────────────────────────────────────────
   const keys = new Set<string>()
+  let inputEnabled = true
   const down = (event: KeyboardEvent) => {
+    if (!inputEnabled) return
     const target = event.target as HTMLElement | null
     if (target?.closest?.('input,textarea,select')) return
     const key = event.key.toLowerCase()
@@ -623,12 +812,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (keys.has('a')) sx -= 1
     if (keys.has('d')) sx += 1
     if (sx || sy) {
+      autoWalk = null
       const wx = sx + sy, wy = sy - sx
       const length = Math.hypot(wx, wy)
       const speed = WALK_M_PER_S * (keys.has('shift') ? RUN_FACTOR : 1)
       player.x += wx / length * speed * dt
       player.y += wy / length * speed * dt
     }
+    stepAutoWalk(dt)
+    moveWalkers(logicStart)
     // Die Kamera gleitet hinterher statt zu springen.
     const follow = 1 - Math.exp(-dt * 9)
     camera.x += (player.x - camera.x) * follow
@@ -657,7 +849,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const rebuildsPerS = (rebuilds - hudRebuilds) / seconds
       hudRebuilds = rebuilds
       const hereTile = loaded.get(tileKey(tileAt(geoToMerc(geo))))
-      const here = { loaded: Boolean(hereTile?.done), blocks: hereTile?.data.blocks.length ?? 0, built: Boolean(hereTile?.data.areas.some(area => area.k === 'built')) }
+      const here = { loaded: Boolean(hereTile?.done), blocks: hereTile?.data.blocks.length ?? 0, built: Boolean(hereTile?.data.areas.some(area => area.k === 'built' || area.k === 'garden')) }
       options.onHud({ frame: stats.summary(), rebuildsPerS, here, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom })
     }
     logicMs = performance.now() - logicStart
@@ -670,6 +862,28 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       lastViewKey = ''
     },
     position: () => toGeo(player),
+    setPeople,
+    personAt(id) { const walker = walkers.get(id); return walker ? toGeo(walker) : null },
+    sendPerson(id, to, seconds) {
+      const walker = walkers.get(id)
+      if (walker) walker.sent = { from: { x: walker.x, y: walker.y }, to: toWorld(to), start: performance.now(), seconds: Math.max(1, seconds) }
+    },
+    releasePerson(id) { const walker = walkers.get(id); if (walker) walker.sent = null },
+    walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive } },
+    stopWalking() { autoWalk = null },
+    setInputEnabled(enabled) { inputEnabled = enabled; if (!enabled) { keys.clear(); autoWalk = null } },
+    distanceTo(at) { const p = toWorld(at); return Math.hypot(p.x - player.x, p.y - player.y) },
+    nearestStreet() {
+      let best: string | null = null, bestD = 60
+      for (const entry of loaded.values()) for (const road of entry.data.roads) {
+        if (!road.n) continue
+        for (let i = 0; i + 1 < road.p.length; i += 2) {
+          const d = Math.hypot(entry.ox + road.p[i] - player.x, entry.oy + road.p[i + 1] - player.y)
+          if (d < bestD) { bestD = d; best = road.n }
+        }
+      }
+      return best
+    },
     reloadTiles() {
       for (const [key, entry] of loaded) dropTile(key, entry)
       fetched.clear()
@@ -680,6 +894,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     destroy() {
       disposed = true
+      app.canvas.removeEventListener('pointerdown', pointerDown)
+      app.canvas.removeEventListener('pointerup', pointerUp)
       for (const run of cleanup) run()
       try { app.destroy(true, { children: true }) } catch { /* schon weg */ }
     },

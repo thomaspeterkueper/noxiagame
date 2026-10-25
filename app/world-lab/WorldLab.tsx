@@ -1,7 +1,9 @@
 'use client'
 
 // app/world-lab/WorldLab.tsx
-// Prototyp „eine Welt“ mit PixiJS. Abgetrennt vom Spiel: liest nur, schreibt nichts.
+// Weltkarte „eine Welt“ mit PixiJS – eigene Seite /world-lab und im Spiel
+// neben der bisherigen Erdszene. Personen, Ansprechen und Betreten in
+// WorldPanels.tsx (immer nur eine Tafel offen).
 //
 // Was hier anders ist als in der begehbaren Szene:
 //   - Es gibt keine Szene, die ersetzt wird. Die Welt besteht aus Kacheln, die
@@ -9,14 +11,18 @@
 //   - Gezeichnet wird über die Grafikkarte; Bewegung läuft je Bild, nicht je Tastendruck.
 //   - Reale Orte sind stark vereinfacht: Blöcke aus einem Baukasten (lib/worldlab/blocks.ts).
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
+import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
+import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
+import WorldPanels, { panelForPick, type Panel } from './WorldPanels'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { blockArt } from '@/lib/worldlab/blocks'
 import { detailCell } from '@/lib/worldlab/detailCells'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
-import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine } from './worldEngine'
+import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson } from './worldEngine'
 
 const PLACES: Array<{ label: string; at: GeoPoint }> = [
   { label: 'Sundern Mitte', at: { lat: 51.3262, lon: 8.0 } },
@@ -28,10 +34,31 @@ const PLACES: Array<{ label: string; at: GeoPoint }> = [
  * `embedded`: im Spiel unter der oberen Leiste statt als eigene Seite; `onLeave`
  * führt dann zurück zur bisherigen Erdszene statt zum Dashboard.
  */
-export default function WorldLab({ embedded = false, onLeave }: { embedded?: boolean; onLeave?: () => void } = {}) {
+export default function WorldLab({ embedded = false, onLeave, residents: givenResidents }: { embedded?: boolean; onLeave?: () => void; residents?: ColonyResident[] } = {}) {
   const host = useRef<HTMLDivElement | null>(null)
   const engine = useRef<WorldEngine | null>(null)
+  const [engineReady, setEngineReady] = useState<WorldEngine | null>(null)
   const [hud, setHud] = useState<Hud | null>(null)
+  const [tick, setTick] = useState(0)
+  const [panel, setPanel] = useState<Panel>({ kind: 'none' })
+  const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
+  const noxiaRef = useRef<NoxiaBuilding[]>([])
+  const [showStats, setShowStats] = useState(!embedded)
+  const [destination, setDestination] = useState('')
+  const [destinationNote, setDestinationNote] = useState('')
+
+  // Bewohner: im Spiel vom Dashboard gereicht, auf der eigenen Seite selbst geholt.
+  const storeResidents = useColonyStateStore(state => state.residents)
+  const refreshColony = useColonyStateStore(state => state.refresh)
+  useEffect(() => { if (!givenResidents) void refreshColony('earth') }, [givenResidents, refreshColony])
+  const residents = useMemo(() => givenResidents ?? storeResidents ?? [], [givenResidents, storeResidents])
+
+  // Spielfigur: dieselbe Position wie in der bisherigen Erdszene (WGS84).
+  const sharedGeo = useEarthPlayerPositionStore(state => state.geo)
+  const setSharedPosition = useEarthPlayerPositionStore(state => state.setPosition)
+  const sharedRegion = useEarthPlayerPositionStore(state => state.regionId)
+  const sharedLocal = useEarthPlayerPositionStore(state => state.position)
+  const startGeo = useRef(sharedGeo)
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState<{ busy: boolean; text: string }>({ busy: false, text: '' })
   const busy = useRef(false)
@@ -87,7 +114,7 @@ export default function WorldLab({ embedded = false, onLeave }: { embedded?: boo
       const params = new URLSearchParams(window.location.search)
       const start: GeoPoint = Number.isFinite(Number(params.get('lat'))) && params.get('lat')
         ? { lat: Number(params.get('lat')), lon: Number(params.get('lon')) }
-        : PLACES[0].at
+        : startGeo.current ?? PLACES[0].at
       const started = await startWorldEngine(PIXI, {
         host: host.current,
         start,
@@ -106,14 +133,19 @@ export default function WorldLab({ embedded = false, onLeave }: { embedded?: boo
           if (!token) return []
           const response = await fetch('/api/world-lab/buildings', { headers: { Authorization: 'Bearer ' + token } })
           const json = response.ok ? await response.json() : null
-          return (json?.buildings ?? []) as NoxiaBuilding[]
+          const list = (json?.buildings ?? []) as NoxiaBuilding[]
+          noxiaRef.current = list
+          if (!disposed) setNoxia(list)
+          return list
         },
+        onPick: pick => { if (!disposed) { engine.current?.stopWalking(); setPanel(panelForPick(pick, noxiaRef.current)) } },
         noxiaVisual: typeId => getBuildingVisual(typeId, 'earth'),
-        onHud: next => { if (!disposed) setHud(next) },
+        onHud: next => { if (!disposed) { setHud(next); setTick(value => value + 1) } },
         onError: message => { if (!disposed) setError(message) },
       })
       if (disposed) { started.destroy(); return }
       engine.current = started
+      setEngineReady(started)
     })().catch(reason => { if (!disposed) setError('Die Ansicht konnte nicht gestartet werden: ' + String(reason?.message ?? reason)) })
 
     return () => {
@@ -123,14 +155,67 @@ export default function WorldLab({ embedded = false, onLeave }: { embedded?: boo
     }
   }, [])
 
+  // Personen auf die Karte: wer ein Zuhause oder eine Arbeit in einem NOXIA-Gebäude
+  // hat, steht davor; die anderen gehen die Straßen entlang. Höchstens 18, wie bisher.
+  useEffect(() => {
+    if (!engineReady) return
+    const byId = new Map(noxia.map(building => [building.id, building]))
+    const people: WorldPerson[] = residents.slice(0, 18).map(resident => {
+      const place = resident.assignments.map(item => item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
+      return { id: resident.id, label: personSceneLabel(resident), anchor: place ? { lat: place.lat, lon: place.lon } : null, anchorRadiusM: place ? Math.max(place.w, place.d) / 2 : undefined }
+    })
+    engineReady.setPeople(people)
+  }, [engineReady, residents, noxia])
+
+  // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
+  useEffect(() => { engineReady?.setInputEnabled(panel.kind !== 'inside') }, [engineReady, panel.kind])
+
+  // Position teilen (alle 2 s): die bisherige Erdszene startet dann am selben Ort.
+  useEffect(() => {
+    if (!engineReady) return
+    const timer = setInterval(() => {
+      const geo = engineReady.position()
+      setSharedPosition(sharedRegion, sharedLocal, geo)
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [engineReady, setSharedPosition, sharedRegion, sharedLocal])
+
+  /** Neue Tafel: ersetzt die alte und beendet ein laufendes Hingehen. */
+  function choosePanel(next: Panel) {
+    engine.current?.stopWalking()
+    setPanel(next)
+  }
+
+  async function goToAddress() {
+    const text = destination.trim()
+    if (!text || !engine.current) return
+    setDestinationNote('Suche …')
+    try {
+      const { token } = await getSessionInfo()
+      const here = engine.current.position()
+      const response = await fetch(`/api/world-lab/address?q=${encodeURIComponent(text)}&near=${here.lat},${here.lon}`, { headers: { Authorization: 'Bearer ' + token } })
+      const json = await response.json()
+      if (!response.ok) { setDestinationNote(json?.error ?? 'Nicht gefunden.'); return }
+      engine.current.jump({ lat: json.lat, lon: json.lon })
+      choosePanel(json.building ? { kind: 'building', at: { lat: json.lat, lon: json.lon }, title: json.label, address: json.label } : { kind: 'none' })
+      setDestinationNote(json.numberMissing ? `Hausnummer nicht gefunden – du stehst an der ${json.label}.` : `Du stehst bei ${json.label}.`)
+    } catch { setDestinationNote('Suche gerade nicht möglich.') }
+  }
+
   return <div className={embedded ? 'world-lab embedded' : 'world-lab'}>
     <div ref={host} className="stage" />
     <div className="panel">
       <small>PROTOTYP · EINE WELT</small>
       <b>{embedded ? 'Weltkarte' : 'Kacheln statt Szenen'}</b>
-      <span>WASD laufen · Shift schneller · Mausrad zoomt</span>
+      <span>WASD laufen · Shift schneller · Mausrad zoomt · Klick auf Person oder Haus</span>
+      <form className="dest" onSubmit={event => { event.preventDefault(); void goToAddress() }}>
+        <input value={destination} onChange={event => setDestination(event.target.value)} placeholder="Ziel, z. B. Hauptstraße 102" maxLength={100}/>
+        <button type="submit">Los</button>
+      </form>
+      {destinationNote && <p className="note">{destinationNote}</p>}
       <div className="places">{PLACES.map(place => <button key={place.label} onClick={() => engine.current?.jump(place.at)}>{place.label}</button>)}</div>
-      {hud && <dl>
+      <button className="leave" onClick={() => setShowStats(value => !value)}>{showStats ? 'Messwerte ausblenden' : 'Messwerte zeigen'}</button>
+      {hud && showStats && <dl>
         <dt>Bilder je Sekunde</dt><dd>{Math.round(hud.frame.fps)}</dd>
         <dt>Langsamstes Bild</dt><dd>{hud.frame.worstMs.toFixed(0)} ms</dd>
         <dt>Ruckler (letzte 120)</dt><dd>{hud.frame.stutters}</dd>
@@ -147,6 +232,7 @@ export default function WorldLab({ embedded = false, onLeave }: { embedded?: boo
       {error && <p className="error">{error}</p>}
       {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
     </div>
+    <WorldPanels engine={engineReady} panel={panel} setPanel={choosePanel} residents={residents} noxia={noxia} tick={tick}/>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
       .world-lab.embedded{inset:var(--noxia-topbar-h,44px) 0 0;z-index:1120}
@@ -164,6 +250,9 @@ export default function WorldLab({ embedded = false, onLeave }: { embedded?: boo
       .refresh{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;margin-top:4px}
       .refresh:disabled{opacity:.6;cursor:default}
       .note{margin:2px 0;font-size:10px;color:#9fb5b0}
+      .dest{display:flex;gap:5px;margin:6px 0 2px}
+      .dest input{flex:1;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 7px;font-size:11px}
+      .dest button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer}
       .panel a{font-size:11px;color:#d9bb6a;text-decoration:none;margin-top:4px}
     `}</style>
   </div>

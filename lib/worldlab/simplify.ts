@@ -30,6 +30,10 @@ export interface TileBlock {
   x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
   /** Echter Grundriss (Meter in der Kachel, x/y abwechselnd) – nur bei Hallen und Fabriken, deren Form kein Rechteck ist. */
   f?: number[]
+  /** Anschrift aus OSM (`addr:street` + `addr:housenumber`), z. B. „Bogenstraße 15“. */
+  h?: string
+  /** Name des Gebäudes aus OSM, z. B. „Metallwerk Sundern (MESU)“. */
+  nm?: string
 }
 export interface SimplifiedTile {
   z: number
@@ -337,6 +341,11 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
         const ring = simplifyLine(points, 1)
         if (ring.length >= 4 && polygonArea(ring) < 0.9 * box.w * box.d) block.f = flat(ring)
       }
+      const street = typeof properties['addr:street'] === 'string' ? properties['addr:street'].trim() : ''
+      const number = typeof properties['addr:housenumber'] === 'string' ? properties['addr:housenumber'].trim() : ''
+      if (street && number) block.h = `${street} ${number}`.slice(0, 80)
+      else if (number) block.h = number.slice(0, 20)
+      if (typeof properties.name === 'string' && properties.name.trim()) block.nm = properties.name.trim().slice(0, 80)
       out.blocks.push(block)
       continue
     }

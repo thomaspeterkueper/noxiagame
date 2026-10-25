@@ -173,6 +173,12 @@ describe('world lab: simplification', () => {
     expect(buildTile([ring], tile, TILE_Z).tracks).toHaveLength(1)
   })
 
+  it('keeps address and name of a building', () => {
+    const house = buildTile([{ id: 'h', featureType: 'building', geometry: polygon([[40, 40], [52, 40], [52, 48], [40, 48], [40, 40]]), properties: { 'addr:street': 'Bogenstraße', 'addr:housenumber': '15', name: 'SSF' } }], tile, TILE_Z)
+    expect(house.blocks[0].h).toBe('Bogenstraße 15')
+    expect(house.blocks[0].nm).toBe('SSF')
+  })
+
   it('stays small', () => {
     expect(JSON.stringify(built).length).toBeLessThan(900)
   })
