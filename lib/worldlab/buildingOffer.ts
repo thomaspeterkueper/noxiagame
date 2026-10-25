@@ -47,7 +47,22 @@ export const FLOOR_RATE: Record<BlockKind, number> = { house: 12, row: 10, hall:
 /** Credits je m² Grundstück (Grundfläche). */
 export const LAND_RATE = 2
 /** Mieteinnahmen erhöhen den Preis: so viele Abrechnungen Miete kommen dazu. */
-export const RENT_PERIODS = 10
+export const RENT_PERIODS = 6
+/** Miete je Bewohner und Abrechnung (720 Ticks) in einem gekauften Wohnhaus. */
+export const RENT_PER_RESIDENT = 200
+/** Geschossfläche je Bewohner (m²). */
+export const M2_PER_RESIDENT = 40
+
+/**
+ * Wie viele Menschen in einem echten Wohnhaus leben (Thomas, 25.10.2026: sie
+ * ziehen beim Kauf als Personen ins Spiel ein): 1 je 40 m² Geschossfläche,
+ * Einfamilienhaus höchstens 4, Mehrfamilienhaus höchstens 8. Andere Arten: niemand.
+ */
+export function plannedResidents(kind: BlockKind, areaM2: number, levels: number): number {
+  if (kind !== 'house' && kind !== 'row') return 0
+  const byArea = Math.floor(areaM2 * Math.max(1, levels) / M2_PER_RESIDENT)
+  return Math.max(1, Math.min(kind === 'house' ? 4 : 8, byArea))
+}
 export const MIN_PRICE = 800
 
 export function buildingPrice(input: { areaM2: number; levels: number; kind: BlockKind; rentPerInterval: number }): number {

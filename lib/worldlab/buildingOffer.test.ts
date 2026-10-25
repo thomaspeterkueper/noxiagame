@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingFacts, buildingPrice, notForSaleReason } from './buildingOffer'
+import { buildingFacts, buildingPrice, notForSaleReason, plannedResidents } from './buildingOffer'
 
 describe('buildingOffer', () => {
   // Rechteck 12 m (Ost) × 8 m (Nord) bei Sundern
@@ -19,8 +19,15 @@ describe('buildingOffer', () => {
   it('prices floor, land and rent', () => {
     const empty = buildingPrice({ areaM2: 96, levels: 2, kind: 'house', rentPerInterval: 0 })
     expect(empty).toBe(Math.round((96 * 2 * 12 + 96 * 2) / 50) * 50)
-    expect(buildingPrice({ areaM2: 96, levels: 2, kind: 'house', rentPerInterval: 480 })).toBe(empty + 4800)
+    expect(buildingPrice({ areaM2: 96, levels: 2, kind: 'house', rentPerInterval: 480 })).toBe(empty + 2900)
     expect(buildingPrice({ areaM2: 10, levels: 1, kind: 'shed', rentPerInterval: 0 })).toBe(800)
+  })
+
+  it('estimates residents of real houses', () => {
+    expect(plannedResidents('house', 96, 2)).toBe(4)
+    expect(plannedResidents('house', 30, 1)).toBe(1)
+    expect(plannedResidents('row', 300, 3)).toBe(8)
+    expect(plannedResidents('hall', 500, 2)).toBe(0)
   })
 
   it('keeps public buildings off the market', () => {

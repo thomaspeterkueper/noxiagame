@@ -64,7 +64,7 @@ type Line = { role: 'user' | 'assistant'; content: string }
  * Bevölkerung und Ökonomie). Solange die Schnittstelle nicht antwortet, zeigt die
  * Tafel nichts zum Kauf.
  */
-type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; rentPerInterval?: number; reason?: string }
+type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string }
 
 function credits(value: number) { return Math.round(value).toLocaleString('de-DE') + ' Cr' }
 
@@ -114,6 +114,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [buyError, setBuyError] = useState('')
   const [confirmDemolish, setConfirmDemolish] = useState(false)
   const [buildables, setBuildables] = useState<Buildable[] | null>(null)
+  const [conversions, setConversions] = useState<Record<string, Array<{ id: string; name: string; cost: number }>>>({})
+  const [showConversions, setShowConversions] = useState(false)
 
   const person = panel.kind === 'person' ? residents.find(resident => resident.id === panel.id) ?? null : null
   const building = panel.kind === 'building' ? panel : null
@@ -153,7 +155,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
   const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
-  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false) }
+  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false) }
 
   // Kaufangebot je Gebäude einmal abfragen (nur fremde, nicht NOXIA-Gebäude mit OSM-Kennung).
   const offerSource = building && !building.noxiaId && building.source ? building.source : null
@@ -208,6 +210,37 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       onWorldChanged()
       setPanel(thenBuild ? { kind: 'plot', source } : { kind: 'none' })
     } catch { setBuyError('Abriss derzeit nicht erreichbar.') } finally { setBuying(false); setConfirmDemolish(false) }
+  }
+
+  // Umbauen: Nutzungen, die in das gekaufte Gebäude passen (halber Neubaupreis)
+  const ownAcquiredId = own?.own && own.source ? own.id : null
+  useEffect(() => {
+    if (!ownAcquiredId || !showConversions || ownAcquiredId in conversions) return
+    let stale = false
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        const response = await fetch('/api/game/building-offer?conversions=' + ownAcquiredId, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const json = response.ok ? await response.json() : null
+        if (!stale) setConversions(current => ({ ...current, [ownAcquiredId]: Array.isArray(json?.conversions) ? json.conversions : [] }))
+      } catch { if (!stale) setConversions(current => ({ ...current, [ownAcquiredId]: [] })) }
+    })()
+    return () => { stale = true }
+  }, [ownAcquiredId, showConversions, conversions])
+  const residentsHere = own ? residents.filter(resident => resident.assignments.some(item => item.type === 'home' && item.tileEntityId === own.id)).length : 0
+
+  async function convert(type: string) {
+    if (!own || buying) return
+    setBuying(true); setBuyError('')
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/building-offer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'convert', entityId: own.id, type }) })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setBuyError(String(json.error ?? 'Umbau nicht möglich.')); return }
+      setShowConversions(false)
+      await engine?.reloadNoxia()
+      onWorldChanged()
+    } catch { setBuyError('Umbau derzeit nicht erreichbar.') } finally { setBuying(false) }
   }
 
   // Freie Fläche: was passt hier hin? (Bautypen der Erde, deren Grundfläche hineinpasst)
@@ -365,9 +398,18 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
       {own?.own && own.source && <>
-        <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd></dl>
+        <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd><dt>Nutzung</dt><dd>{own.typeId === 'acquired_building' ? 'wie bisher' : own.name.split(' · ')[0]}</dd><dt>Bewohner</dt><dd>{residentsHere || 'keine'}</dd></dl>
+        {buyError && <p>{buyError}</p>}
+        {!showConversions
+          ? <div className="row"><span/><button disabled={buying} onClick={() => setShowConversions(true)}>Umbauen …</button></div>
+          : <div className="build-list">
+            {!(own.id in conversions) ? <p>Nutzungen werden geladen …</p>
+              : conversions[own.id].length ? conversions[own.id].map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}</span><button disabled={buying} onClick={() => void convert(item.id)}>Umbauen</button></div>)
+                : <p>Keine andere Nutzung passt in dieses Gebäude.</p>}
+            <div className="row"><span>Hülle und Bewohner bleiben, halbe Baukosten.</span><button onClick={() => setShowConversions(false)}>Zurück</button></div>
+          </div>}
         {!confirmDemolish
-          ? <div className="row"><span>{buyError || 'Abreißen geht nur, wenn niemand darin wohnt.'}</span><button disabled={buying} onClick={() => setConfirmDemolish(true)}>Abreißen …</button></div>
+          ? <div className="row"><span>{residentsHere ? 'Beim Abriss ziehen die Bewohner in staatlichen Wohnraum.' : ''}</span><button disabled={buying} onClick={() => setConfirmDemolish(true)}>Abreißen …</button></div>
           : <div className="row"><span>Wirklich abreißen? Das lässt sich nicht rückgängig machen.</span><button disabled={buying} onClick={() => void demolish(false)}>Abreißen</button><button disabled={buying} onClick={() => void demolish(true)}>und neu bauen</button></div>}
       </>}
       {!own && offer && (offer.forSale

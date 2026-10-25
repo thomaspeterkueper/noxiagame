@@ -4,7 +4,10 @@
 //
 // GET  ?source=osm:way:123          → Angebot: Preis, Verkäufer, Bewohner, Miete – oder warum nicht verkäuflich
 // POST { source }                    → kaufen (Preis rechnet der Server neu, Buchung atomar in buy_earth_building)
-// POST { action: 'demolish', entityId } → eigenes gekauftes Gebäude abreißen (demolish_earth_building)
+// POST { action: 'demolish', entityId } → eigenes gekauftes Gebäude abreißen (demolish_earth_building);
+//                                        Bewohner ziehen in staatlichen Wohnraum
+// POST { action: 'convert', entityId, type } → Nutzung ändern, halbe Baukosten (convert_earth_building)
+// GET  ?conversions=<entityId>           → Bautypen, die in das gekaufte Gebäude passen
 //
 // Maße und Preis kommen aus den gespeicherten OSM-Daten (lib/worldlab/buildingOffer.ts),
 // nie aus Angaben des Spielers.
@@ -13,15 +16,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { geoToLocalMeters } from '@/lib/world/spatial/earthSpatial'
-import { buildingFacts, buildingPrice, notForSaleReason, type BuildingFacts } from '@/lib/worldlab/buildingOffer'
+import { getBuildingFootprint } from '@/lib/game/spatial/footprints'
+import { buildingFacts, buildingPrice, notForSaleReason, plannedResidents, RENT_PER_RESIDENT, type BuildingFacts } from '@/lib/worldlab/buildingOffer'
 
 type Supabase = ReturnType<typeof createServiceClient>
 type FeatureRow = { id: string; region_id: string; geometry: { kind?: string; coordinates?: unknown }; properties: Record<string, unknown> | null }
 
 const SOURCE = /^osm:(way|relation):\d+$/
 const BLOCK_NAMES: Record<string, string> = { house: 'Wohnhaus', row: 'Mehrfamilienhaus', hall: 'Halle', factory: 'Fabrik', church: 'Kirche', shed: 'Schuppen' }
-/** Wohnfläche je Platz (m²) für die Kapazität eines Wohnhauses. */
-const M2_PER_RESIDENT = 40
+/** Umbau kostet die Hälfte des Neubaus (Thomas, 25.10.2026). */
+const CONVERSION_SHARE = 0.5
 
 const ERRORS: Record<string, [number, string]> = {
   NOXIA_CREDITS_INSUFFICIENT: [400, 'Nicht genug Credits.'],
@@ -31,6 +35,9 @@ const ERRORS: Record<string, [number, string]> = {
   NOXIA_BUILDING_NOT_OWNED: [403, 'Das Gebäude gehört dir nicht.'],
   NOXIA_BUILDING_NOT_ACQUIRED: [409, 'Nur gekaufte reale Gebäude können hier abgerissen werden.'],
   NOXIA_BUILDING_NOT_FOUND: [404, 'Gebäude nicht gefunden.'],
+  NOXIA_BUILDING_STAFFED: [409, 'Im Gebäude arbeiten noch Menschen – Abriss nicht möglich.'],
+  NOXIA_NO_STATE_HOUSING: [409, 'Für die Bewohner gibt es keinen freien staatlichen Wohnraum – Abriss nicht möglich.'],
+  NOXIA_TYPE_INVALID: [400, 'Diese Nutzung gibt es nicht.'],
 }
 function failure(message: string) {
   const code = Object.keys(ERRORS).find(key => message.includes(key))
@@ -44,6 +51,8 @@ interface Offer {
   price?: number
   seller?: string
   residents?: number
+  /** Bewohner, die beim Kauf als Personen einziehen (das Haus war bisher ohne Personen im Spiel). */
+  newResidents?: number
   rentPerInterval?: number
   name?: string
   facts?: BuildingFacts
@@ -90,6 +99,9 @@ async function offerFor(supabase: Supabase, source: string): Promise<Offer> {
     const { data: tenancies } = await supabase.from('person_tenancies').select('rent_per_billing').in('person_id', people).eq('status', 'active')
     rentPerInterval = (tenancies ?? []).reduce((sum, row) => sum + Number(row.rent_per_billing ?? 0), 0)
   }
+  // Echte Wohnhäuser sind bewohnt: wer dort lebt, zieht beim Kauf als Person ins Spiel ein und zahlt Miete.
+  const newResidents = people.length ? 0 : plannedResidents(facts.kind, facts.areaM2, facts.levels)
+  rentPerInterval += newResidents * RENT_PER_RESIDENT
 
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   const { data: publicActor } = earth ? await supabase.from('location_public_actors').select('actor_id,actors(display_name)').eq('location_id', earth.id).maybeSingle() : { data: null }
@@ -98,17 +110,39 @@ async function offerFor(supabase: Supabase, source: string): Promise<Offer> {
     forSale: true, name, facts, features,
     price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval }),
     seller: actor?.actors?.display_name ?? 'Gemeinde',
-    residents: people.length, rentPerInterval,
+    residents: people.length + newResidents, newResidents, rentPerInterval,
   }
 }
 
+/** Bautypen, die in ein gekauftes Gebäude passen (Grundfläche), mit halbem Preis. */
+async function conversions(supabase: Supabase, entityId: string) {
+  const { data: row } = await supabase.from('tile_entities').select('entity_id,footprint_width_m,footprint_depth_m,source_ref').eq('id', entityId).maybeSingle()
+  if (!row?.source_ref) return []
+  const long = Math.max(Number(row.footprint_width_m), Number(row.footprint_depth_m)) + 2
+  const short = Math.min(Number(row.footprint_width_m), Number(row.footprint_depth_m)) + 2
+  const { data: definitions } = await supabase.from('building_definitions').select('key,name,cost_credits,allowed_locations,category').eq('is_active', true)
+  return (definitions ?? []).flatMap(def => {
+    const allowed = def.allowed_locations as string[] | null
+    if (allowed?.length && !allowed.includes('earth')) return []
+    if (def.key === row.entity_id || def.category === 'unique' || /spaceport|pad|landing|dock|harbour/.test(String(def.key))) return []
+    const footprint = getBuildingFootprint(String(def.key))
+    if (Math.max(footprint.widthM, footprint.depthM) > long || Math.min(footprint.widthM, footprint.depthM) > short) return []
+    return [{ id: String(def.key), name: String(def.name), cost: Math.round(Number(def.cost_credits ?? 0) * CONVERSION_SHARE) }]
+  }).sort((a, b) => a.cost - b.cost)
+}
+
 export async function GET(req: NextRequest) {
+  const convertFor = req.nextUrl.searchParams.get('conversions')
+  if (convertFor) {
+    if (!await verifiedBearerUserId(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ conversions: await conversions(createServiceClient(), convertFor) }, { headers: { 'Cache-Control': 'no-store' } })
+  }
   const source = String(req.nextUrl.searchParams.get('source') ?? '')
   if (!SOURCE.test(source)) return NextResponse.json({ forSale: false, reason: 'unbekanntes Gebäude' })
   const offer = await offerFor(createServiceClient(), source)
   return NextResponse.json({
     forSale: offer.forSale, reason: offer.reason, price: offer.price, seller: offer.seller,
-    residents: offer.residents, rentPerInterval: offer.rentPerInterval, name: offer.name,
+    residents: offer.residents, newResidents: offer.newResidents, rentPerInterval: offer.rentPerInterval, name: offer.name,
     areaM2: offer.facts?.areaM2, levels: offer.facts?.levels,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
@@ -122,6 +156,16 @@ export async function POST(req: NextRequest) {
   if (body.action === 'demolish') {
     if (!body.entityId) return NextResponse.json({ error: 'Gebäude fehlt.' }, { status: 400 })
     const { data, error } = await supabase.rpc('demolish_earth_building', { p_profile_id: profileId, p_entity_id: body.entityId })
+    if (error) return failure(error.message)
+    return NextResponse.json(data)
+  }
+
+  if (body.action === 'convert') {
+    const type = String((body as { type?: string }).type ?? '')
+    if (!body.entityId || !type) return NextResponse.json({ error: 'Gebäude oder Nutzung fehlt.' }, { status: 400 })
+    const option = (await conversions(supabase, body.entityId)).find(item => item.id === type)
+    if (!option) return NextResponse.json({ error: 'Diese Nutzung passt nicht in das Gebäude.' }, { status: 409 })
+    const { data, error } = await supabase.rpc('convert_earth_building', { p_profile_id: profileId, p_entity_id: body.entityId, p_type: type, p_cost: option.cost })
     if (error) return failure(error.message)
     return NextResponse.json(data)
   }
@@ -143,8 +187,10 @@ export async function POST(req: NextRequest) {
     p_width: facts.w, p_depth: facts.d, p_rotation: facts.rotationDeg,
     p_display_name: offer.name ?? null, p_region_slug: region?.slug ?? null,
     p_x_m: local.eastM, p_y_m: local.northM,
-    p_residential_capacity: living ? Math.max(1, Math.floor(facts.areaM2 * facts.levels / M2_PER_RESIDENT)) : 0,
+    p_residential_capacity: living ? Math.max(offer.residents ?? 0, plannedResidents(facts.kind, facts.areaM2, facts.levels)) : 0,
     p_feature_ids: (offer.features ?? []).map(row => row.id),
+    p_new_residents: offer.newResidents ?? 0,
+    p_rent_per_resident: RENT_PER_RESIDENT,
   })
   if (error) return failure(error.message)
   const result = data as { entity_id: string; price: number; credits: number; residents: number }

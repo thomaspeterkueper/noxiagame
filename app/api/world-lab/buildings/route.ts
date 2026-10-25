@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), String(row.name)]))
   return NextResponse.json({
     buildings: (rows ?? []).map((row: any) => ({
-      id: row.id, typeId: row.entity_id, name: row.display_name ?? names.get(String(row.entity_id)) ?? row.entity_id, source: row.source_ref ?? undefined,
+      id: row.id, typeId: row.entity_id, name: row.display_name ? (row.entity_id === 'acquired_building' ? row.display_name : `${names.get(String(row.entity_id)) ?? row.entity_id} · ${row.display_name}`) : names.get(String(row.entity_id)) ?? row.entity_id, source: row.source_ref ?? undefined,
       lat: Number(row.latitude_deg), lon: Number(row.longitude_deg),
       w: Number(row.footprint_width_m ?? 18), d: Number(row.footprint_depth_m ?? 14), rotation: Number(row.rotation_deg ?? 0),
       // Eigentümer wie in /api/game/build/spatial

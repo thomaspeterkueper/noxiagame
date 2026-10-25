@@ -420,7 +420,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Lage, Größe und Drehung wie die Nachbarn, aber sein eigenes Dach.
     // Gekaufte reale Gebäude gehören über ihre OSM-Kennung, die übrigen NOXIA-Gebäude über ihre Lage.
     const owner = (block.i ? noxia.find(building => building.source === block.i) : undefined) ?? noxiaOn(cx, cy, hw, hd, cos, sin)
-    const look = owner ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] } : null
+    // Gekaufte reale Gebäude behalten ihr Aussehen, auch nach einem Umbau.
+    const look = owner ? (owner.source ? { ...NOXIA_DEFAULT_LOOK, roof: undefined } : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }) : null
     const eave = (look?.levels ?? block.l) * style.storeyM
     let c: Array<{ x: number; y: number }>
     if (block.f && block.f.length >= 8) {

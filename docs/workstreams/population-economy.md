@@ -178,7 +178,8 @@ Entscheidung Thomas, 25.10.2026: Über einer Figur steht in der Spielansicht nur
 - Nicht verkäuflich: Gotteshäuser, öffentliche Gebäude (Rathaus, Schule, Krankenhaus, Bahnhof, Bücherei …), `historic`, und alles, worauf schon ein NOXIA-Gebäude steht.
 - Wohnplätze eines gekauften Wohnhauses: 1 je 40 m² Geschossfläche (`residential_capacity`). Heute wohnt in realen Häusern noch niemand – der Wohnungsmarkt vergibt dort noch keine Plätze.
 - Schnittstelle: `GET/POST /api/game/building-offer` wie oben vorgeschlagen, dazu `POST { action: 'demolish', entityId }`.
-- Offen hier: Wer zieht in reale Häuser (Wohnungsmarkt)? Miete an Spieler als Vermieter (`player_corp`) wirklich abrechnen. Umbauen mit Bewohnern statt Abriss.
+- Nachtrag 25.10.2026 (Thomas: „echte Personen, neu angelegt“; Migration `20261025120000_earth_building_residents_and_conversion.sql`): Beim Kauf eines Wohnhauses ziehen 1–4 (Mehrfamilienhaus bis 8) neue Personen ein (`simulation_tier = background`, Konto mit 980 Cr Startbestand als `endowment`, Mietvertrag 200 Cr je 720 Ticks an `profile_economic_actors` des Käufers, `origin = market`). Abriss bringt sie in staatlichen Wohnraum. Umbauen = Nutzung ändern zu halben Baukosten (abgebucht wie ein Bau, ohne Gegenbuchung – dieselbe Senke wie `/api/game/build/spatial`).
+- Offen hier: Arbeit und Einkommen für die neuen Bewohner (sonst nach etwa fünf Mieten Räumung); ob Bau- und Umbaukosten an einen Empfänger (Baufirma, Gemeinde) gehen sollen statt in eine Senke.
 
 Entscheidung Thomas, 25.10.2026: Reale Gebäude der Erdkarte, die noch niemandem im Spiel gehören, kann ein Spieler **kaufen**. Ersetzen geht nur über den Kauf.
 

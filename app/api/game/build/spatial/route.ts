@@ -6,6 +6,7 @@ import { getBuildRequirements } from '@/lib/knowledge/buildRequirements'
 import { getNoxiaKnowledgeState } from '@/lib/knowledge/service'
 import { overlaps } from '@/lib/game/spatial/geometry'
 import { getBuildingFootprint } from '@/lib/game/spatial/footprints'
+import { realBuildingConflict } from '@/lib/worldlab/buildingConflict.server'
 import {
   geoToLocalMeters,
   localMetersToGeo,
@@ -562,6 +563,14 @@ export async function POST(req: NextRequest) {
     }, footprint.clearanceM)
   })
   if (collision) return NextResponse.json({ error: 'Baufläche überschneidet ein bestehendes oder geplantes Gebäude.', collisionId: collision.id }, { status: 409 })
+
+  // Erde: Wo ein echtes Haus steht, erst kaufen und abreißen; freie Flächen nach
+  // Abriss gehören dem, der abgerissen hat (Thomas, 25.10.2026).
+  if (locationSlug === 'earth' && canonicalGeo) {
+    const conflict = await realBuildingConflict(serviceClient as unknown as Parameters<typeof realBuildingConflict>[0], canonicalGeo, footprint.widthM, footprint.depthM, rotation, user.id)
+    if (conflict?.kind === 'real') return NextResponse.json({ error: `Hier steht ein echtes Gebäude (${conflict.name}). Erst kaufen und abreißen.` }, { status: 409 })
+    if (conflict?.kind === 'plot') return NextResponse.json({ error: 'Diese Fläche gehört einem anderen Spieler.' }, { status: 409 })
+  }
 
   const completesAt = new Date(Date.now() + Math.max(1, def.buildTimeTicks) * TICK_INTERVAL_SECONDS * 1000)
   const { data: build, error: buildError } = await serviceClient.from('player_builds').insert({
