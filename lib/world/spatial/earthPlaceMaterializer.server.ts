@@ -294,6 +294,20 @@ nwr[name][man_made~"tower|lighthouse|observatory"](${box});
 );out center geom;`
 }
 
+// Reduced regional profile for large or overloaded Overpass requests.
+// Preserve observable settlement, roads, waterways and forest outlines rather
+// than silently presenting an empty map as a successfully imported location.
+function compactQueryFor(bounds: Bounds) {
+  const box = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
+  return `[out:json][timeout:18];(
+node[place~"city|town|village|hamlet"](${box});
+way[highway~"primary|secondary|tertiary|residential"](${box});
+way[waterway~"river|stream"](${box});
+way[natural=wood](${box});way[landuse=forest](${box});
+way[landuse=residential](${box});
+);out center geom;`
+}
+
 async function loadNormalizedFeatures(bounds: Bounds) {
   const failures: string[] = []
   const query = queryFor(bounds)
@@ -322,6 +336,29 @@ async function loadNormalizedFeatures(bounds: Bounds) {
     } finally {
       clearTimeout(timer)
     }
+  }
+  // A full import can exceed the public instances' runtime budget. Retry with
+  // a deliberately smaller, provenance-preserving cartographic subset.
+  const compact = compactQueryFor(bounds)
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'NOXIA/0.1 earth-place-materializer' },
+        body: new URLSearchParams({ data: compact }),
+        signal: controller.signal,
+        cache: 'no-store',
+      })
+      if (!response.ok) { failures.push(`compact ${new URL(endpoint).host}: HTTP ${response.status}`); continue }
+      const payload = await response.json() as { elements?: OverpassElement[] }
+      const features = toFeatures(payload.elements ?? [], bounds)
+      if (features.length) return { features, source: `overpass:${new URL(endpoint).host}:compact-v1` }
+      failures.push(`compact ${new URL(endpoint).host}: empty result`)
+    } catch (error) {
+      failures.push(`compact ${new URL(endpoint).host}: ${error instanceof Error ? error.message : String(error)}`)
+    } finally { clearTimeout(timer) }
   }
   throw new Error(`Kartennormalisierung fehlgeschlagen: ${failures.join('; ')}`)
 }
