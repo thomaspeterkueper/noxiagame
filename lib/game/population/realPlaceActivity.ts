@@ -240,8 +240,9 @@ export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:nu
     .or(`person_id.eq.${host.id},other_person_id.eq.${host.id}`)
     .gte('affinity',0.5)
   if(relationError)throw relationError
-  const candidateIds=[...new Set((relations??[]).map((row:any)=>row.person_id===host.id?row.other_person_id:row.person_id))]
-    .filter(Boolean)
+  const candidateIds:string[]=[...new Set<string>((relations??[])
+    .map((row:any)=>String(row.person_id===host.id?row.other_person_id:row.person_id))
+    .filter((value:string)=>Boolean(value)))]
     .sort()
 
   for(const window of windows){
