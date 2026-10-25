@@ -71,7 +71,8 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 4. ~~Kollision und Wegenetz~~ Gebaut (25.10.2026), `lib/worldlab/walking.ts` (mit Tests):
    - Häuser der geladenen Kacheln sind Hindernisse (echter Grundriss oder Rechteck mit 0,5 m Abstand); die Figur gleitet an Wänden entlang, mit Tasten wie mit „Gehe hin“.
    - „Gehe hin“ geht bis 30 m gerade, weiter entlang der Straßen (Straßennetz der geladenen Kacheln, Suche A*); bewegt sich das Ziel (Person) mehr als 12 m, wird neu geplant. Hängt die Figur fest, nimmt sie den nächsten Wegpunkt; liegt das Ziel hinter einer Wand, gilt „so nah wie möglich“ als angekommen.
-   - Offen: Personen der Karte weichen Häusern noch nicht aus; Fußwege ohne Straße (Wiesen, Plätze) kennt das Netz nicht – dort geht die Figur gerade.
+   - Personen, die ein Gespräch irgendwohin schickt, gehen ebenfalls die Straßen entlang (Dauer wächst mit dem Umweg, höchstens dreifach).
+   - Offen: Fußwege ohne Straße (Wiesen, Plätze) kennt das Netz nicht – dort geht man gerade.
 5. ~~Personen, Ansprechen, „Gehe hin“, Betreten~~ Gebaut (25.10.2026), `app/world-lab/WorldPanels.tsx`:
    - Bewohner (bis 18, wie in der alten Szene) stehen vor ihrem NOXIA-Zuhause oder ihrer Arbeit, die anderen gehen die Straßen der geladenen Kacheln entlang. Beschriftung wie in der alten Szene (`personSceneLabel`).
    - Klick auf Person: Tafel mit Tätigkeit und Gespräch; ansprechen ab 8 m (`/api/game/npc-conversation`, dieselben Felder wie die alte Szene), sonst „Gehe hin“. Antworten mit `visit_place` schicken die Person zum Gebäude; wer mitgeht, ist beim Betreten Begleitung.
@@ -81,13 +82,35 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
    - Wahrzeichen (25.10.2026): benannte Orte aus den Kartendaten stehen als Schild mit Namen auf der Karte. Schild oder Gebäude darum (bis 12 m) öffnet die Tafel „Realer Ort“ mit Steckbrief (Adresse, Öffnungszeiten, Konfession, Baujahr, Träger). Bibliothek und Gotteshaus kann man bis 14 m vom Schild betreten – derselbe Innenraum wie in der alten Szene (`LandmarkWalkableInterior`). Bezeichnungen in `lib/worldlab/landmarks.ts`.
 6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
 7. ~~Datenlücke~~ Teilweise erledigt: `/world-lab` holt Ortsdetail (Gebäude, Wohnstraßen, Wege) selbst nach – beim Start für die Zelle um die Figur, in bebauten Kacheln ohne Gebäude selbsttätig, sonst mit „Kartendaten hier nachladen“. Offen: prüfen, ob Overpass zuverlässig antwortet; Zellen ohne Bebauung werden nicht geholt.
-8. Sportplätze: Import und Darstellung gebaut (Sportanlage, Laufbahn, Spielfeld; Importprofil 4). Die veraltete Region Sauerland erneuert `/world-lab` beim Start selbst. Offen: prüfen, ob das Röhrtalstadion erscheint (`internal-tasks/open/REQ-NOXIA-20261013-world-map-sport-reimport.md`).
+8. ~~Sportplätze~~ Erledigt: Import und Darstellung gebaut (Importprofil 4). Datenbank geprüft am 25.10.2026: 24 Sportflächen in Sundern, darunter Röhrtalstadion und Sportplatz Sundern (Request nach `internal-tasks/done/`).
 9. Kirchen haben jetzt einen Turm an der Stirnseite (geschätzt, OSM sagt nicht, wo er steht), Höhen aus OSM `height` werden genutzt. Einzelbilder für besondere Gebäude (Kirche, Bahnhof, Café, NOXIA-Gebäude): ganzes Bild in derselben Ansicht mit Fußpunkt, statt aus Wandstücken zusammengesetzt. Maße stehen in der Zeichenvorlage.
-10. Häuser vor der Figur durchscheinend machen, damit sie in engen Gassen sichtbar bleibt (die richtige Höhe verdeckt mehr Straße).
-11. Gescheiterte Kartenabrufe nachholen: gebaut als stündlicher Lauf `/api/cron/world-places` (vercel.json, Minute 25). Er nimmt je Lauf höchstens zwei leere Orte aus `celestial_regions` und versucht sie über die bestehenden Importwege erneut, jeden frühestens drei Stunden nach dem letzten Versuch. Betroffen beim Start: Frankfurt (50,1106 / 8,6821), Darmstadt (49,9915 / 8,6667), Datong (40,0923 / 113,2953) und fünf leere Ortsdetail-Zellen in Sundern, u. a. die Innenstadt (51,327 / 8,0032). Offen: nach einigen Läufen prüfen, ob alle gefüllt sind; Ergebnis steht im Vercel-Log unter `[world-places]`.
+10. ~~Häuser vor der Figur durchscheinend~~ Erledigt (25.10.2026): Ein Haus, das vor der Figur gezeichnet wird und sie überdeckt, wird durchscheinend (Deckkraft 0,4); geprüft alle 120 ms in den Kacheln um die Figur (`updateSeeThrough`).
+11. ~~Gescheiterte Kartenabrufe nachholen~~ Erledigt – geprüft am 25.10.2026: keine leere Erdregion mehr; Frankfurt 5 267 Objekte, Darmstadt (als „Langen“ benannt, der Punkt liegt nördlich der Stadt) 1 456, Datong 842, Sunderner Innenstadt 1 285. Gebaut als gebaut als stündlicher Lauf `/api/cron/world-places` (vercel.json, Minute 25). Er nimmt je Lauf höchstens zwei leere Orte aus `celestial_regions` und versucht sie über die bestehenden Importwege erneut, jeden frühestens drei Stunden nach dem letzten Versuch. Betroffen beim Start: Frankfurt (50,1106 / 8,6821), Darmstadt (49,9915 / 8,6667), Datong (40,0923 / 113,2953) und fünf leere Ortsdetail-Zellen in Sundern, u. a. die Innenstadt (51,327 / 8,0032). Offen: nach einigen Läufen prüfen, ob alle gefüllt sind; Ergebnis steht im Vercel-Log unter `[world-places]`.
 12. ~~Fabriken und Sportplatz~~ Erledigt (13.10.2026): Industriebauten als Fabrik mit Wellblech, Fensterband, Rolltor und Sheddach; verwinkelte Hallen und Fabriken mit echtem Grundriss (das Rechteck um das Metallwerk deckte vorher den Sportplatz zu). Fußballplätze bekommen Mittellinie, Anstoßkreis, Straf- und Torräume. Offen: Laufbahnen und andere Sportarten (Tennis, Reitplatz) ohne Markierung.
 13. ~~Andere Plätze und Parks~~ Erledigt (14.10.2026): Importprofil 5 holt Spielplätze, Gärten, Freibäder, Friedhöfe, Kleingärten, Rasen, Festplätze und Parkplätze (`feature_type = 'place_area'`); jede Sportart hat ihre Fläche. Regionen mit Profil 4 werden beim Öffnen von `/world-lab` neu aufgebaut.
 14. ~~Laufbahnen, Einzelbäume, Alleen~~ Erledigt (14.10.2026): Laufbahnen als Fläche mit heller Kante oder, wenn OSM sie als Linie führt, als rotes Band mit Bahnlinie. Importprofil 6 holt Einzelbäume (`natural=tree`) und Alleen (`natural=tree_row`, alle 8 m ein Baum); Bäume stehen als Objekte mit Tiefe vor und hinter Häusern, Laub- oder Nadelbaum fest je Ort (`lib/worldlab/treeSprites.ts`).
+
+## Was der Weltkarte zur alten Erdszene fehlt (Vergleich 25.10.2026)
+
+Ziel: Die alte Szene (`EarthWalkableSurface.tsx`) kann gehen, wenn die Weltkarte alles kann, was ein Spieler dort tut. Bauen, Verkaufen, Minikarte, Tag/Nacht, Fahrzeuge, Ton und Touch-Steuerung hat auch die alte Szene nicht – sie blockieren nichts. Café, Bank, Schule usw. laufen in beiden über `EarthBuildingAccessLayer`.
+
+| # | Was fehlt | Alt | Aufwand |
+|---|---|---|---|
+| 1 | „← Karte“ zur Planungskarte (`enterPlanning`); die Weltkarte führt nur zur alten Szene zurück | EWS:648 | klein |
+| 2 | Gesprächskontext: Ortsname statt fest „Sundern“, Wasser/Wald, Orte und Baustellen in 45 m | EWS:337–347, 450–493 | klein |
+| 3 | Name über der eigenen Figur, Box „Du bist hier“ (Ort, Abstand) | EWS:174, 735 | klein |
+| 4 | Hinweis beim Überfahren eines Gebäudes (Name, Eigentümer, Abstand) | EWS:764 | klein |
+| 5 | Tafel für Wahrzeichen ohne Innenraum mit Beschreibung und Symbol je Art | EWS:47–67, 750 | klein |
+| 6 | `visit_place` auch zu Wahrzeichen und Orten, Begleitung dorthin | EWS:486, 595 | klein |
+| 7 | Baustellen: gestrichelte Fläche mit Bauphase und Fortschritt | EWS:276, 666 | mittel |
+| 8 | Zielliste (eigene Gebäude, Baustellen, Orte bis 6 km) mit Weglänge und gezeichneter Route | EWS:264–295, 711, 737 | mittel |
+| 9 | `lead_walk`: die Person geht voraus, man folgt (heute geht nur man selbst zur Person) | EWS:545, 616 | mittel |
+| 10 | Personen nach Tätigkeit: Tempo, Pausen; wer in einem betretbaren Gebäude arbeitet, ist drinnen | EWS:355–390 | mittel |
+| 11 | Mitgehörte Gespräche zweier Personen über Meldungen und Neuigkeiten | EWS:199–216, 495 | mittel |
+| 12 | Benannte Orte, die keine Wahrzeichen sind (Läden, Cafés), als Ziele | EWS:264 | mittel |
+| 13 | Schienen und Regionalzug (Kacheln haben noch keine Gleise) | EWS:289, 663, 715 | mittel |
+| 14 | Startort merken; „Home“ setzt zurück | EWS:220–246 | klein |
+| 15 | Linke Tafel auf schmalen Bildschirmen | EWS:787 | klein |
 
 ## Gebäude kaufen (Thomas, 25.10.2026)
 

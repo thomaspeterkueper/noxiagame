@@ -1,6 +1,6 @@
 # REQ-NOXIA-20261013 – Sundern mit Sportflächen neu importieren
 
-Status: open  
+Status: done  
 Repository: noxiagame  
 Scope: Earth / Prototyp „eine Welt“ (`docs/workstreams/world-map.md`, Aufgabe 8)  
 Priority: Normal  
@@ -31,3 +31,7 @@ Die bestehende begehbare Erdszene und die Regionsvorschau zeichnen `sport` nicht
 ## Erledigt, wenn
 
 Das Röhrtalstadion in `/world-lab` als grünes Feld mit heller Randlinie vor dem Metallwerk liegt. Dann diese Datei nach `internal-tasks/done/` verschieben und Aufgabe 8 in `docs/workstreams/world-map.md` abhaken.
+
+## Erledigt (25.10.2026)
+
+Datenbank geprüft: Die Region Sauerland (`earth-sauerland`, zuletzt erneuert am 25.10.2026) enthält 24 Sportflächen, darunter „Röhrtalstadion“ (`sports_centre`), „Sportplatz Sundern“ (Fußball), ein `stadium`, Tennis-, Reit- und Schießanlagen. Ob das Stadion in der Karte richtig liegt, prüft Thomas beim nächsten Gang durch Sundern.

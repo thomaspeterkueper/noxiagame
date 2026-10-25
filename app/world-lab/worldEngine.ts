@@ -630,6 +630,41 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (band.sortDirty || depth < before || depth > after) playerSprite.zIndex = depth
   }
 
+  /**
+   * Häuser, die vor der Figur gezeichnet werden und sie verdecken, werden
+   * durchscheinend (sonst verschwindet sie in engen Gassen hinter der richtigen
+   * Höhe). Geprüft wird alle 120 ms in den Kacheln um die Figur.
+   */
+  const SEE_THROUGH_ALPHA = 0.4
+  const faded = new Set<Container>()
+  const isoBounds = new WeakMap<Container, { minX: number; maxX: number; minY: number; maxY: number }>()
+  let seeThroughAt = 0
+  function updateSeeThrough(now: number) {
+    if (now - seeThroughAt < 120) return
+    seeThroughAt = now
+    const foot = iso(player.x, player.y)
+    // Figur samt Beschriftungsabstand, in Bildkoordinaten der Welt
+    const left = foot.x - 2.5, right = foot.x + 2.5, top = foot.y - 10, bottom = foot.y + 1
+    const depth = playerSprite.zIndex
+    const now_ = new Set<Container>()
+    const tx = anchorTile.x + Math.floor(player.x / tileSizeM), ty = anchorTile.y + Math.floor(player.y / tileSizeM)
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
+      if (!entry) continue
+      for (const block of entry.blocks) {
+        if (block.destroyed || block.zIndex <= depth) continue
+        let b = isoBounds.get(block)
+        if (!b) { const r = block.getLocalBounds(); b = { minX: r.minX, maxX: r.maxX, minY: r.minY, maxY: r.maxY }; isoBounds.set(block, b) }
+        if (b.maxX < left || b.minX > right || b.maxY < top || b.minY > bottom) continue
+        now_.add(block)
+      }
+    }
+    for (const block of faded) if (!now_.has(block) && !block.destroyed) block.alpha = 1
+    for (const block of now_) block.alpha = SEE_THROUGH_ALPHA
+    faded.clear()
+    for (const block of now_) faded.add(block)
+  }
+
   // ── NOXIA-Gebäude ───────────────────────────────────────────────────
   // Ein NOXIA-Gebäude, das auf einem echten Gebäude steht, wird mit dessen
   // Grundriss gezeichnet (siehe drawBlock); das eigene Bild oder der Ersatzblock
@@ -708,7 +743,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     spec: WorldPerson; figure: PixiGraphics; label: InstanceType<typeof PIXI.Text>
     x: number; y: number; seed: number
     route: Array<{ x: number; y: number }> | null; routeLength: number
-    sent: { from: { x: number; y: number }; to: { x: number; y: number }; start: number; seconds: number } | null
+    /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer. */
+    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number } | null
   }
   const walkers = new Map<string, Walker>()
   const PERSON_COLORS = [0x4f7fb3, 0xa4553f, 0x5f8f4a, 0x8a6aa8, 0x3f8f8a, 0xb08a3a]
@@ -779,8 +815,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       let x = walker.x, y = walker.y
       if (walker.sent) {
         const t = Math.min(1, (now - walker.sent.start) / 1000 / walker.sent.seconds)
-        x = walker.sent.from.x + (walker.sent.to.x - walker.sent.from.x) * t
-        y = walker.sent.from.y + (walker.sent.to.y - walker.sent.from.y) * t
+        const at = along(walker.sent.path, walker.sent.length * t)
+        x = at.x; y = at.y
       } else if (walker.spec.anchor) {
         // Vor dem Haus auf der Kameraseite (Süd-Ost), nicht darin – dort sieht man sie.
         const home = toWorld(walker.spec.anchor)
@@ -843,18 +879,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Nahe Ziele (unter 30 m) gerade, weite entlang der Straßen der geladenen
   // Kacheln. Bewegt sich das Ziel weit weg (Person), wird neu geplant.
   let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; stuck: number } | null = null
-  function planRoute(to: { x: number; y: number }) {
-    if (Math.hypot(to.x - player.x, to.y - player.y) < 30) return [to]
+  function planRoute(to: { x: number; y: number }, from: { x: number; y: number } = player) {
+    if (Math.hypot(to.x - from.x, to.y - from.y) < 30) return [to]
     const graph = new RoadGraph()
     for (const entry of loaded.values()) {
-      if (Math.hypot(entry.ox + tileSizeM / 2 - (player.x + to.x) / 2, entry.oy + tileSizeM / 2 - (player.y + to.y) / 2) > Math.hypot(to.x - player.x, to.y - player.y) / 2 + tileSizeM) continue
+      if (Math.hypot(entry.ox + tileSizeM / 2 - (from.x + to.x) / 2, entry.oy + tileSizeM / 2 - (from.y + to.y) / 2) > Math.hypot(to.x - from.x, to.y - from.y) / 2 + tileSizeM) continue
       for (const road of entry.data.roads) {
         const pts: Array<{ x: number; y: number }> = []
         for (let i = 0; i + 1 < road.p.length; i += 2) pts.push({ x: entry.ox + road.p[i], y: entry.oy + road.p[i + 1] })
         graph.addLine(pts)
       }
     }
-    const route = graph.size ? graph.route({ x: player.x, y: player.y }, to) : null
+    const route = graph.size ? graph.route({ x: from.x, y: from.y }, to) : null
     return route ? route.slice(1) : [to]
   }
   function stepAutoWalk(dt: number) {
@@ -956,6 +992,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const foot = iso(player.x, player.y)
     playerSprite.position.set(foot.x, foot.y)
     placePlayerDepth()
+    updateSeeThrough(logicStart)
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
@@ -993,7 +1030,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     personAt(id) { const walker = walkers.get(id); return walker ? toGeo(walker) : null },
     sendPerson(id, to, seconds) {
       const walker = walkers.get(id)
-      if (walker) walker.sent = { from: { x: walker.x, y: walker.y }, to: toWorld(to), start: performance.now(), seconds: Math.max(1, seconds) }
+      if (!walker) return
+      // Entlang der Straßen statt quer durch Häuser; weitere Wege dauern entsprechend länger.
+      const from = { x: walker.x, y: walker.y }
+      const path = [from, ...planRoute(toWorld(to), from)]
+      const length = path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - path[i].x, p.y - path[i].y), 0)
+      const straight = Math.hypot(path[path.length - 1].x - from.x, path[path.length - 1].y - from.y) || 1
+      walker.sent = { path, length, start: performance.now(), seconds: Math.max(1, seconds) * Math.min(3, Math.max(1, length / straight)) }
     },
     releasePerson(id) { const walker = walkers.get(id); if (walker) walker.sent = null },
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, stuck: 0 } },
