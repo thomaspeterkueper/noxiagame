@@ -426,11 +426,27 @@ export default function EarthRegionPreview(){
     finally{setPlacing(false)}
   }
 
+  async function focusVuiteboeuf(){
+    if(focusLoading)return
+    setFocusLoading(true)
+    setFocusError(null)
+    try{
+      const response=await fetch('/api/earth/geocode?q=Vuiteboeuf%2C%20Vaud%2C%20Switzerland')
+      const result=await response.json() as {ok:boolean;results?:Array<{lat:number;lon:number;label:string}>;error?:string}
+      const place=result.results?.find(item=>/Vuiteb[oœ]euf/i.test(item.label)&&/Switzerland|Schweiz|Suisse|Svizzera/i.test(item.label))
+      if(!response.ok||!result.ok||!place)throw new Error(result.error??'Vuiteboeuf wurde in den Geodaten nicht gefunden.')
+      // The existing focus flow fetches the actual OSM terrain rather than inventing a landmark geometry.
+      setFocusLoading(false)
+      await focusGeoPoint({lat:place.lat,lon:place.lon},'Vuiteboeuf · GEORGE-Schauplatz')
+    }catch(error){setFocusError(error instanceof Error?error.message:String(error))}
+    finally{setFocusLoading(false)}
+  }
+
   if(!data)return <div className="earth-loading">Reale Sauerland-Daten werden geladen …</div>
   if(!data.ok)return <div className="earth-loading">Geodaten derzeit nicht erreichbar: {data.error}</div>
 
   return <div className="earth-shell">
-    <div className="earth-head"><div><small>NOXIA EARTH · SAUERLAND 2086</small><h1>Technikstandort Deutschland · Sauerland</h1><p>Stelle wählen, Gelände prüfen, Gebäude metrisch ausrichten und bauen. Fertige Weltobjekte können direkt auf der Karte ausgewählt werden.</p></div><div className="earth-actions"><button onClick={()=>toggleLayer('sites')}>{layers.sites?'Standorte ausblenden':'Standorte einblenden'}</button><div className="earth-credits"><b>{spatial?.profile?.credits?.toLocaleString('de-DE')??'–'}</b><span>Credits</span></div><div className="earth-stats"><b>{placed.length}</b><span>NOXIA-Bauten</span></div></div></div>
+    <div className="earth-head"><div><small>NOXIA EARTH · SAUERLAND 2086</small><h1>Technikstandort Deutschland · Sauerland</h1><p>Stelle wählen, Gelände prüfen, Gebäude metrisch ausrichten und bauen. Fertige Weltobjekte können direkt auf der Karte ausgewählt werden.</p></div><div className="earth-actions"><button disabled={focusLoading} onClick={()=>void focusVuiteboeuf()} title="Realen Ort Vuiteboeuf auf der Erdkarte öffnen; GEORGE-Fabrik noch in Planung">Vuiteboeuf · GEORGE</button><button onClick={()=>toggleLayer('sites')}>{layers.sites?'Standorte ausblenden':'Standorte einblenden'}</button><div className="earth-credits"><b>{spatial?.profile?.credits?.toLocaleString('de-DE')??'–'}</b><span>Credits</span></div><div className="earth-stats"><b>{placed.length}</b><span>NOXIA-Bauten</span></div></div></div>
 
     <div className="earth-map"
       onWheel={e=>{e.preventDefault();zoomAroundCenter(e.deltaY<0?1:-1)}}
