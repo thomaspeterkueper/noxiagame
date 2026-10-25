@@ -129,6 +129,19 @@ export async function fundPlayerCorp(input: {
 }
 
 
+/**
+ * Lokale stellen Personal ein, bis ihre Personalplätze besetzt sind (Aufgabe 2,
+ * Migration 20261025210000_venue_staffing.sql). Jeden Tick, vor der Lohnrunde.
+ */
+export async function runVenueStaffingTick(supabase: any, tick: number) {
+  const { data, error } = await supabase.rpc('run_venue_staffing', { p_tick: tick })
+  if (error) {
+    console.error('runVenueStaffingTick failed', { tick, code: error.code })
+    return { ok: false, hired: 0, created: 0 }
+  }
+  return data ?? { ok: true, hired: 0, created: 0 }
+}
+
 export async function runNpcConsumptionTick(supabase: any, tick: number) {
   if (tick % 6 !== 0) {
     return { ok: true, due: false, bought: 0, no_money: 0, no_seller: 0, total_credits: 0, tax_credits: 0 }

@@ -87,7 +87,7 @@ R-13 ist gebaut (`population-economy.md`, Migration `20261025180000`). Am Gebäu
 - `footprint_width_m` × `footprint_depth_m` = Grundriss des realen Hauses (wie erbeten gefüllt); `building_levels` (Geschosse, falls in OSM angegeben), `source_tags` (OSM-Tags: `name`, `amenity`, `addr:*` …), `source_ref` (OSM-Kennung).
 - `staff_capacity` (Personalplätze nach Größe), `transient_capacity` (Hotelzimmer aus den Obergeschossen), `residential_capacity` (Wohnungen in den Obergeschossen, R-6).
 - **Startcafé** = dieselbe Kennung wie bisher, jetzt Hauptstraße 72 (12 × 11,6 m ≈ 139 m² → „normal“), `display_name` „Hauptstraße 72“.
-- **Metropol** (`bar`, ≈ 186 m²) und **Balkan Grill** (`restaurant`, ≈ 158 m²) sind staatliche Gebäude mit Karte. Nachtrag: Spieler können sie (und jedes andere reale Lokal) kaufen; Kennung und Nutzung bleiben, nur der Eigentümer wechselt. Sie haben noch kein Personal und sind daher geschlossen; Personal kommt mit dem Arbeitsmarkt (Aufgabe 2 bei uns).
+- **Metropol** (`bar`, ≈ 186 m²) und **Balkan Grill** (`restaurant`, ≈ 158 m²) sind staatliche Gebäude mit Karte. Nachtrag: Spieler können sie (und jedes andere reale Lokal) kaufen; Kennung und Nutzung bleiben, nur der Eigentümer wechselt. Seit 25.10.2026 stellen Lokale selbst Personal ein (Aufgabe 2 bei uns): Arbeitszuweisungen `work` mit `tile_entity_id` des Lokals, Rolle `service`; neu angelegte Personen haben den Schlüssel `earth-local:<Lokal>:<n>` und wohnen oft über dem Lokal. Das Personal erscheint also wie Mika über `/api/game/population?tileEntityId=…`.
 
 Fragen an euch:
 1. Soll der Innenraum ein Haus „im Umbau“ zeigen (Baustelle, „öffnet um …“) statt nur nicht betretbar zu sein? `conversion_plan.ready_at` steht dafür bereit.

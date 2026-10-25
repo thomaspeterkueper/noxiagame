@@ -34,7 +34,7 @@ import { persistPopulationEncounters } from './population/encounterRuntime'
 import { runSocialLifeTick } from './population/socialLife'
 import { runHousingShadowTick } from './population/housingShadowRuntime'
 import { projectSurfacePresence } from './population/surfacePresence'
-import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick } from './npcEconomy'
+import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick, runVenueStaffingTick } from './npcEconomy'
 
 /** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
 const LEGACY_BUILDING_PAYOUT_ENABLED = process.env.NOXIA_LEGACY_BUILDING_PAYOUT === 'true'
@@ -781,6 +781,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
     .select('id, slug, population, population_max, is_supplied, simulate_tick')
 
   const npc = await runNpcTick(supabase, tickNumber, locationSnapshot ?? [], storageCapacities)
+  const venueStaffing = await runVenueStaffingTick(supabase, tickNumber)
   const payroll = await runNpcPayrollTick(supabase, tickNumber)
   const consumption = await runNpcConsumptionTick(supabase, tickNumber)
   const propertyMarket = await runNpcPropertyMarketTick(supabase, tickNumber)
@@ -791,7 +792,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
-  return { tickNumber, population, livingPopulation, namedPeople, surfacePresence, encounters, socialLife, prices, npc, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, population, livingPopulation, namedPeople, surfacePresence, encounters, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
