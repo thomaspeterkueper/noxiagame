@@ -25,7 +25,7 @@ import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConvers
 import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
 import { blockArt } from '@/lib/worldlab/blocks'
 import { detailCell } from '@/lib/worldlab/detailCells'
-import { inNrw, parcelCell } from '@/lib/worldlab/alkis'
+import { hasCadastre, parcelCell } from '@/lib/worldlab/alkis'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
 import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson, type WorldPick, type WorldPlot, type WorldSite } from './worldEngine'
@@ -346,12 +346,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   useEffect(() => { engineReady?.setPlots(plots) }, [engineReady, plots])
   useEffect(() => { engineReady?.setParcelOwners(parcelOwners) }, [engineReady, parcelOwners])
 
-  // Flurstücke (NRW): Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
+  // Flurstücke (Länder mit offenem Kataster): Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
   const parcelCells = useRef(new Set<string>())
   useEffect(() => {
     if (!hud || !engineReady) return
     const here = { lat: hud.lat, lon: hud.lon }
-    if (!inNrw(here)) return
+    if (!hasCadastre(here)) return
     const cell = parcelCell(here)
     if (parcelCells.current.has(cell.key)) return
     parcelCells.current.add(cell.key)
@@ -524,7 +524,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {destinationNote && <p className="note">{destinationNote}</p>}
         </>}
       </div>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { fresh.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}

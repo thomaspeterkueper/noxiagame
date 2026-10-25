@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parcelCell, parcelLabel, parcelNotForSale, parcelRequestUrl, parcelUsage, parseParcels, landRate } from './alkis'
-import { toUtm32 } from './utm'
+import { CADASTRE_SERVICES, cadastreAttribution, cadastreServicesAt, parcelCell, parcelLabel, parcelNotForSale, parcelRequestUrl, parcelUsage, parseParcels, landRate } from './alkis'
+import { toUtm, toUtm32 } from './utm'
 
 function ringPosList(points: Array<[number, number]>) {
   return points.map(([lat, lon]) => { const u = toUtm32(lat, lon); return `${u.e.toFixed(3)} ${u.n.toFixed(3)}` }).join(' ')
@@ -90,5 +90,29 @@ describe('alkis', () => {
     const url = parcelRequestUrl(cell)
     expect(url).toContain('TYPENAMES=ave%3AFlurstueck')
     expect(url).toContain('BBOX=4')
+  })
+
+  it('picks the Land services, both at borders', () => {
+    expect(cadastreServicesAt({ lat: 51.3255, lon: 8.0045 }).map(item => item.key)).toEqual(['nw'])
+    expect(cadastreServicesAt({ lat: 52.52, lon: 13.405 }).map(item => item.key)).toContain('bb')
+    expect(cadastreServicesAt({ lat: 51.0, lon: 9.2 }).map(item => item.key)).toEqual(['nw', 'he'])
+    expect(cadastreServicesAt({ lat: 48.14, lon: 11.58 })).toEqual([]) // Bayern: kein offener Dienst
+    expect(cadastreAttribution('alkis_bb')).toContain('GeoBasis-DE/LGB')
+  })
+  it('asks Mecklenburg-Vorpommern in UTM 33 and reads it back', () => {
+    const mv = CADASTRE_SERVICES.find(item => item.key === 'mv')!
+    const url = parcelRequestUrl(parcelCell({ lat: 54.0887, lon: 12.1405 }), 0, 1000, mv)
+    expect(url).toContain('EPSG%3A%3A25833')
+    expect(url.startsWith(mv.url)).toBe(true)
+    const pos = [[54.0887, 12.1405], [54.0887, 12.141], [54.0891, 12.141], [54.0887, 12.1405]].map(([lat, lon]) => { const u = toUtm(lat, lon, 33); return `${u.e} ${u.n}` }).join(' ')
+    const gml = `<Flurstueck gml:id="X"><flstkennz>130001</flstkennz><flur>1</flur><exterior><LinearRing><posList>${pos}</posList></LinearRing></exterior></Flurstueck>`
+    const [parcel] = parseParcels(gml, 33)
+    expect(parcel.ring[0].lat).toBeCloseTo(54.0887, 6)
+    expect(parcel.ring[0].lon).toBeCloseTo(12.1405, 6)
+  })
+  it('reads other Länder spellings', () => {
+    expect(parcelLabel({ gemarkung: 'Mainz', flur: 'Flur 17', flstnrzae: '54', flstnrnen: '10' })).toBe('Gemarkung Mainz, Flur 17, Flurstück 54/10')
+    expect(parcelNotForSale('Flaeche Besonderer Funktionaler Praegung/Regierung und Verwaltung')).toBeTruthy()
+    expect(parcelNotForSale('Strassenverkehr')).toBeTruthy()
   })
 })

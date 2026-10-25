@@ -8,6 +8,8 @@
 //                                        Bewohner ziehen in staatlichen Wohnraum
 // POST { action: 'convert', entityId, type } → Nutzung ändern, halbe Baukosten (convert_earth_building)
 // GET  ?conversions=<entityId>           → Bautypen, die in das gekaufte Gebäude passen
+// POST { action: 'list', entityId, price } / { action: 'unlist', entityId } → eigenes Haus (ohne Kataster) anbieten
+// POST { action: 'buy-listed', entityId, price } → von einem Spieler angebotenes Haus kaufen (Geld an ihn)
 //
 // Maße und Preis kommen aus den gespeicherten OSM-Daten (lib/worldlab/buildingOffer.ts),
 // nie aus Angaben des Spielers.
@@ -34,6 +36,12 @@ const ERRORS: Record<string, [number, string]> = {
   NOXIA_BUILDING_STAFFED: [409, 'Im Gebäude arbeiten noch Menschen – Abriss nicht möglich.'],
   NOXIA_NO_STATE_HOUSING: [409, 'Für die Bewohner gibt es keinen freien staatlichen Wohnraum – Abriss nicht möglich.'],
   NOXIA_TYPE_INVALID: [400, 'Diese Nutzung gibt es nicht.'],
+  NOXIA_PROPERTY_NOT_OWNED: [403, 'Das Gebäude gehört dir nicht.'],
+  NOXIA_SOLD_WITH_PARCEL: [409, 'Dieses Haus wird mit dem Flurstück verkauft.'],
+  NOXIA_LISTING_NOT_FOUND: [409, 'Das Angebot gibt es nicht mehr.'],
+  NOXIA_OWN_LISTING: [409, 'Das ist dein eigenes Angebot.'],
+  NOXIA_PRICE_CHANGED: [409, 'Der Preis hat sich geändert – bitte neu ansehen.'],
+  NOXIA_PRICE_INVALID: [400, 'Ungültiger Preis.'],
 }
 function failure(message: string) {
   const code = Object.keys(ERRORS).find(key => message.includes(key))
@@ -71,6 +79,19 @@ export async function GET(req: NextRequest) {
   // Wo es Flurstücke gibt, kauft man das Flurstück samt Haus (Thomas, 25.10.2026).
   const parcel = offer.facts ? await parcelAt(supabase, offer.facts.centre) : null
   if (parcel) return NextResponse.json({ forSale: false, parcelId: parcel.id, reason: 'wird mit dem Flurstück verkauft', name: offer.name }, { headers: { 'Cache-Control': 'no-store' } })
+  // Gehört einem Spieler: vielleicht bietet er es an
+  const { data: entity } = await supabase.from('tile_entities').select('id,profile_id,profiles(username)').eq('source_ref', source).maybeSingle()
+  if (entity) {
+    const profileId = req.headers.get('authorization') ? await verifiedBearerUserId(req) : null
+    const own = entity.profile_id === profileId
+    const owner = (entity as { profiles?: { username?: string } | null }).profiles?.username ?? 'ein anderer Spieler'
+    const { data: listing } = await supabase.from('earth_property_listings').select('price').eq('kind', 'building').eq('ref', entity.id).maybeSingle()
+    return NextResponse.json({
+      forSale: Boolean(listing) && !own, listed: Boolean(listing), own, entityId: entity.id, price: listing ? Number(listing.price) : undefined,
+      seller: own ? 'du' : owner, reason: own ? (listing ? 'von dir angeboten' : 'gehört dir') : listing ? undefined : `gehört ${owner}`, name: offer.name,
+      areaM2: offer.facts?.areaM2, levels: offer.facts?.levels,
+    }, { headers: { 'Cache-Control': 'no-store' } })
+  }
   return NextResponse.json({
     forSale: offer.forSale, reason: offer.reason, price: offer.price, seller: offer.seller,
     residents: offer.residents, newResidents: offer.newResidents, rentPerInterval: offer.rentPerInterval, name: offer.name,
@@ -87,6 +108,23 @@ export async function POST(req: NextRequest) {
   if (body.action === 'demolish') {
     if (!body.entityId) return NextResponse.json({ error: 'Gebäude fehlt.' }, { status: 400 })
     const { data, error } = await supabase.rpc('demolish_earth_building', { p_profile_id: profileId, p_entity_id: body.entityId })
+    if (error) return failure(error.message)
+    return NextResponse.json(data)
+  }
+
+  if (body.action === 'list' || body.action === 'unlist') {
+    const price = body.action === 'list' ? Math.round(Number((body as { price?: number }).price)) : null
+    if (!body.entityId) return NextResponse.json({ error: 'Gebäude fehlt.' }, { status: 400 })
+    if (body.action === 'list' && !(Number.isFinite(price) && price! >= 1)) return NextResponse.json({ error: 'Bitte einen Preis angeben.' }, { status: 400 })
+    const { data, error } = await supabase.rpc('list_earth_property', { p_profile_id: profileId, p_kind: 'building', p_ref: body.entityId, p_price: price })
+    if (error) return failure(error.message)
+    return NextResponse.json(data)
+  }
+
+  if (body.action === 'buy-listed') {
+    const price = Math.round(Number((body as { price?: number }).price))
+    if (!body.entityId || !Number.isFinite(price)) return NextResponse.json({ error: 'Gebäude oder Preis fehlt.' }, { status: 400 })
+    const { data, error } = await supabase.rpc('buy_listed_earth_property', { p_buyer_id: profileId, p_kind: 'building', p_ref: body.entityId, p_price: price })
     if (error) return failure(error.message)
     return NextResponse.json(data)
   }
