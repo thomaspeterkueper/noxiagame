@@ -185,8 +185,11 @@ export default function DashboardWorldDevelopmentOverlay() {
 
   return <>
     <style>{styles}</style>
+    {/* Aufgerufen über die Spielleiste (Aktionen → Weltlage), daher unsichtbar (W-3). */}
     <button
       type="button"
+      data-noxia-action="world"
+      hidden
       className={`noxia-world-development-toggle${open ? ' active' : ''}`}
       onClick={() => setOpen(value => !value)}
       aria-expanded={open}
@@ -255,6 +258,7 @@ export default function DashboardWorldDevelopmentOverlay() {
 }
 
 const styles = `
+  .noxia-world-development-toggle[hidden] { display: none !important; }
   .noxia-world-development-toggle {
     position: fixed;
     z-index: 2240;

@@ -250,9 +250,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
 
   const player = { ...toWorld(startGeo) }
   const camera = { ...player }
-  let zoom = 2.6
+  // Beim Laufen näher heran (W-3: die Figur war zu klein)
+  let zoom = 3.4
 
   const playerSprite = new PIXI.Graphics()
+  // Boden-Ring: man findet sich auch zwischen Häusern (W-3)
+  playerSprite.ellipse(0, 0, 4.6, 2.3).stroke({ width: 0.7, color: 0xf2c94c, alpha: 0.95 })
   playerSprite.ellipse(0, 0, 3.2, 1.6).fill({ color: 0x000000, alpha: 0.22 })
   playerSprite.roundRect(-1.6, -6.4, 3.2, 5.4, 1.4).fill(0xd7ad3c).stroke({ width: 0.5, color: 0x5c481c })
   playerSprite.circle(0, -7.6, 1.5).fill(0xf0c9a0).stroke({ width: 0.4, color: 0x5c481c })
@@ -277,6 +280,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   function pruneBands() {
     for (const [index, band] of bands) if (!band.children.length) { band.destroy(); bands.delete(index) }
   }
+  playerSprite.scale.set(1.35)
   playerSprite.zIndex = player.x + player.y
   addObject(playerSprite)
   const playerName = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 24, fontWeight: '800', fill: 0xf3f7f8, stroke: { color: 0x173845, width: 6, join: 'round' } } })
@@ -513,7 +517,25 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       g.stroke({ width: outline.widthM * 0.75, color: outline.color, cap: 'square' })
     }
     const l = new PIXI.Graphics()
+    // Ufer: ein erdiger Saum unter dem Wasser (W-3)
+    for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: (RIVER_STYLE.widthM + 2.6) * 0.75, color: 0x9a8f6a, cap: 'round', join: 'round' }) }
     for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
+    // Bürgersteige: Bordstein und Gehweg unter allen Fahrstraßen, zuerst gezeichnet,
+    // damit Kreuzungen als Platz ineinanderlaufen (W-3).
+    for (const road of data.roads) {
+      if (road.c === 'path') continue
+      const style = ROAD_STYLES[road.c], p = path(road.p)
+      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
+      l.stroke({ width: (style.widthM + 4.2) * 0.75, color: 0xa39d90, cap: 'round', join: 'round' })
+      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
+      l.stroke({ width: (style.widthM + 3.6) * 0.75, color: 0xd9d4c8, cap: 'round', join: 'round' })
+    }
+    for (const road of data.roads) {
+      if (road.c === 'path') continue
+      const style = ROAD_STYLES[road.c], p = path(road.p)
+      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
+      l.stroke({ width: (style.widthM + 0.5) * 0.75, color: 0x8f8a7e, cap: 'round', join: 'round' })
+    }
     // Gleise: Schotterbett, Schwellen, zwei Schienen (unter den Straßen: Bahnübergänge)
     for (const rail of data.rails ?? []) {
       const w: Array<{ x: number; y: number }> = []
@@ -772,6 +794,26 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     building.claimed = true
     if (building.stand) building.stand.visible = false
   }
+  // Namensschilder an NOXIA-Gebäuden (W-3), fremde Häuser nicht.
+  const noxiaSigns: Container[] = []
+  function placeSigns() {
+    for (const sign of noxiaSigns.splice(0)) sign.destroy({ children: true })
+    for (const building of noxia) {
+      const height = (NOXIA_LOOKS[building.typeId]?.levels ?? 2) * 3.2 + 3
+      const at = iso(building.x, building.y, height)
+      const sign = new PIXI.Container()
+      const text = new PIXI.Text({ text: building.name, style: { fontFamily: 'system-ui, sans-serif', fontSize: 22, fontWeight: '800', fill: 0xf3e8c8 } })
+      text.anchor.set(0.5, 0.5)
+      text.scale.set(0.12)
+      const w = text.width + 3, h = text.height + 1.6
+      const plate = new PIXI.Graphics()
+      plate.roundRect(-w / 2, -h / 2, w, h, 1).fill({ color: 0x173845, alpha: 0.92 }).stroke({ width: 0.3, color: 0xd9bb6a })
+      sign.addChild(plate, text)
+      sign.position.set(at.x, at.y)
+      labels.addChild(sign)
+      noxiaSigns.push(sign)
+    }
+  }
   async function placeStands(list: NoxiaPlaced[]) {
     for (const building of list) {
       if (disposed || !noxia.includes(building)) return
@@ -806,6 +848,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
   }
   void placeStands(noxia)
+  placeSigns()
   /** NOXIA-Gebäude neu holen (nach Kauf oder Bau) und die Kacheln neu zeichnen. */
   async function reloadNoxia() {
     let list: NoxiaBuilding[] = []
@@ -816,6 +859,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     for (const building of list) noxia.push({ ...building, rotation: Number(building.rotation ?? 0) || 0, ...toWorld({ lat: building.lat, lon: building.lon }), claimed: false, stand: null })
     reload()
     void placeStands([...noxia])
+    placeSigns()
   }
   function reload() {
     for (const [key, entry] of loaded) dropTile(key, entry)
@@ -850,6 +894,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     g.eventMode = 'static'
     // Größer als die Figur, damit man sie auch beim Herauszoomen trifft.
     g.hitArea = new PIXI.Rectangle(-4.5, -11, 9, 13)
+    g.scale.set(1.3)
     return g
   }
   /** Eine Straße für eine Person: aus den geladenen Kacheln, fest nach ihrer Kennung gewählt. */
@@ -946,7 +991,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const foot = iso(x, y)
       walker.figure.position.set(foot.x, foot.y)
       placeDepth(walker.figure, x + y)
-      walker.label.position.set(foot.x, foot.y - 9.5)
+      walker.label.position.set(foot.x, foot.y - 12)
       const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent)
       walker.figure.visible = near
       walker.label.visible = near && zoom >= 2.2
@@ -1216,11 +1261,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // oberste Objekt unter dem Zeiger (Person, Gebäude), sonst der Boden.
   let pressAt: { x: number; y: number } | null = null
   const pointerDown = (event: PointerEvent) => { pressAt = { x: event.offsetX, y: event.offsetY } }
+  /** Objekt unter einem Bildpunkt, das eine Auswahl trägt. */
+  function pickNode(x: number, y: number): Container | null {
+    let node: Container | null = app.renderer.events.rootBoundary.hitTest(x, y)
+    while (node && !(node as unknown as { pick?: WorldPick }).pick) node = node.parent
+    return node
+  }
   /** Oberstes Objekt unter einem Bildpunkt (ohne Boden). */
   function pickAt(x: number, y: number): WorldPick | null {
-    const hit = app.renderer.events.rootBoundary.hitTest(x, y)
-    let node: Container | null = hit
-    while (node && !(node as unknown as { pick?: WorldPick }).pick) node = node.parent
+    const node = pickNode(x, y)
     const pick = (node as unknown as { pick?: WorldPick } | null)?.pick
     const box = (node as unknown as { box?: Box } | null)?.box
     if (pick?.type === 'building' && box) {
@@ -1231,17 +1280,31 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
     return pick ?? null
   }
+  // Was anklickbar ist, hellt beim Überfahren auf; der Zeiger wird zur Hand (W-3).
   let hoverAt = 0, hovering = false
+  let lit: Container | null = null
+  const glow = new PIXI.ColorMatrixFilter()
+  glow.brightness(1.22, false)
+  function light(node: Container | null) {
+    if (node === lit) return
+    if (lit && !lit.destroyed) lit.filters = null
+    lit = node
+    if (node) node.filters = [glow]
+    app.canvas.style.cursor = node ? 'pointer' : ''
+  }
   const pointerMove = (event: PointerEvent) => {
-    if (!options.onHover || event.pointerType === 'touch') return
+    if (event.pointerType === 'touch') return
     const now = performance.now()
     if (now - hoverAt < 60) return
     hoverAt = now
-    const pick = inputEnabled ? pickAt(event.offsetX, event.offsetY) : null
+    const node = inputEnabled ? pickNode(event.offsetX, event.offsetY) : null
+    light(node)
+    if (!options.onHover) return
+    const pick = node ? pickAt(event.offsetX, event.offsetY) : null
     if (pick) { hovering = true; options.onHover({ pick, x: event.clientX, y: event.clientY }) }
     else if (hovering) { hovering = false; options.onHover(null) }
   }
-  const pointerLeave = () => { if (hovering) { hovering = false; options.onHover?.(null) } }
+  const pointerLeave = () => { light(null); if (hovering) { hovering = false; options.onHover?.(null) } }
   const pointerUp = (event: PointerEvent) => {
     if (!inputEnabled) { pressAt = null; return }
     if (!pressAt || Math.hypot(event.offsetX - pressAt.x, event.offsetY - pressAt.y) > 6 || !options.onPick) { pressAt = null; return }
@@ -1311,7 +1374,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     playerSprite.position.set(foot.x, foot.y)
     placePlayerDepth()
     updateSeeThrough(logicStart)
-    playerName.position.set(foot.x, foot.y - 10)
+    playerName.position.set(foot.x, foot.y - 13)
     updateRoute(logicStart)
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
