@@ -150,6 +150,17 @@ Beobachtung Thomas, 25.10.2026 (in der Erdszene bei Sundern): Die Straßen haben
 - Dazu Hausnummern an Gebäuden mit `addr:housenumber`, mindestens beim Anklicken – für Gastronomie wichtig, weil Spieler Lokale und Hotels dort bauen wollen, wo im echten Ort eines steht (Beispiel: Hauptstraße 102 in Sundern), und das Ziel-Feld heute nur Koordinaten versteht.
 - Zielwahl: „Hauptstraße 102“ im Ziel-Feld sollte auf das Gebäude springen (Geokodierung aus `region_features`, keine fremde Dienstanfrage).
 
+### W-2 (Gastronomie, 25.10.2026): Layout der neuen Karte – Informationen rechts, nur das Nötige
+
+Beobachtung Thomas, 25.10.2026 (neue Weltkarte im Spiel, Sundern): Das Layout passt noch nicht. Informationen sollen hauptsächlich rechts stehen, und nicht zu viel auf einmal – nur, was gerade gebraucht wird.
+
+Stand im Bild: links eine große Tafel (Bedienhinweise, Sprungziele, Messwerte, „Kartendaten nachladen“, zwei Rücklinks), oben die Ortsleiste, rechts oben Ort und Ziel mit Adressfeld – drei Flächen, die die Karte einrahmen. Vorschlag:
+
+- **Eine Spalte rechts** (wie Personentafel und Zieltafel in der Erdszene), die ihren Inhalt nach Lage wechselt: nichts gewählt → Ort, Ziel, Adressfeld; Person gewählt → Personentafel; Gebäude gewählt → Gebäudetafel mit „Betreten“; beim Laufen bleibt sie leer bis auf Ort und Ziel.
+- **Links nichts Dauerhaftes.** Bedienhinweise nur einmal beim ersten Öffnen oder hinter einem „?“. Sprungziele (factory, Sundern Mitte, Café, Selmecke) in die Ortsleiste oben unter „Orte“, wo sie schon hingehören. Messwerte, „Kartendaten nachladen“ und „Bisherige Erdszene“ sind Entwicklerdinge – hinter einen kleinen Schalter oder nur mit `?dev=1`.
+- **Fehler nicht als Fließtext in der Tafel** („Unexpected token 'A' … is not valid JSON“ – der Server antwortet mit einer Fehlerseite statt JSON; bitte prüfen, warum). Für Spieler ein kurzer Satz, Einzelheiten in die Konsole.
+- Abstimmung mit Gastronomie: Betreten eines Lokals und die Personentafel sollen in der neuen Karte so laufen wie in der Erdszene (`EarthBuildingAccessLayer`, Klick auf Person räumt das Ziel weg).
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
