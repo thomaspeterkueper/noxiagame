@@ -208,6 +208,8 @@ Offen und hier zu entscheiden:
 
 ### R-12 (Gastronomie, 25.10.2026): Was eine Figur vom Spieler weiß – Name, Gefälligkeiten
 
+**Entscheidung (Thomas, 25.10.2026): Dass sich Figuren erinnern, ist wichtig für das Spielgefühl – bitte vorziehen.**
+
 Gespräch im Startcafé, 25.10.2026: Der Spieler sagt „Nenn mich Thomas“, Mika antwortet „das merke ich mir“ – und kann es nicht. `npc_player_conversation_memory` hält nur die letzten drei Wortwechsel als Text (`recent_exchanges`); der Name ist beim nächsten Besuch sehr wahrscheinlich schon aus dem Fenster gerutscht, und ein ausgegebener Kaffee bleibt ebenso nur als Satz hängen. Die Figur verspricht also etwas, das das Spiel nicht hält.
 
 - Spiegel zu `player_person_identity_knowledge`: ein Wissenssatz je Person und Spieler – Name, unter dem sie den Spieler kennt (`known_player_name`), gelernt aus dem Gespräch (Quelle, Tick), dazu zählbare Gefälligkeiten (ausgegeben, geholfen) mit Zeit. Keine freie Textablage, sondern Felder, die die Gesprächsroute als Fakt mitgibt („Der Spieler heißt Thomas; er hat dir am 25.10. einen Kaffee ausgegeben“).
