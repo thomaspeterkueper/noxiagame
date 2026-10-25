@@ -31,6 +31,7 @@ export default defineConfig({
       'lib/worldlab/buildingUse.test.ts',
       'lib/worldlab/placeName.test.ts',
       'lib/worldlab/buildingOffer.test.ts',
+      'lib/worldlab/venueConversion.test.ts',
       'lib/worldlab/rects.test.ts',
       'lib/worldlab/railLine.test.ts',
       'lib/worldlab/utm.test.ts',

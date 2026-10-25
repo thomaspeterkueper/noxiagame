@@ -6,8 +6,10 @@
 // POST { source }                    → kaufen (Preis rechnet der Server neu, Buchung atomar in buy_earth_building)
 // POST { action: 'demolish', entityId } → eigenes gekauftes Gebäude abreißen (demolish_earth_building);
 //                                        Bewohner ziehen in staatlichen Wohnraum
-// POST { action: 'convert', entityId, type } → Nutzung ändern, halbe Baukosten (convert_earth_building)
-// GET  ?conversions=<entityId>           → Bautypen, die in das gekaufte Gebäude passen
+// POST { action: 'convert', entityId, type } → Nutzung ändern. Lokale (Café, Bar, Restaurant, Hotel):
+//                                        Umbau mit vollen Baukosten und Bauzeit (start_earth_venue_conversion, R-13);
+//                                        andere Nutzungen: halbe Baukosten, sofort (convert_earth_building)
+// GET  ?conversions=<entityId>           → Nutzungen, die in das gekaufte Gebäude passen
 //
 // Maße und Preis kommen aus den gespeicherten OSM-Daten (lib/worldlab/buildingOffer.ts),
 // nie aus Angaben des Spielers.
@@ -18,6 +20,7 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { getBuildingFootprint } from '@/lib/game/spatial/footprints'
 import { acquireItem, offerFor, type Supabase } from '@/lib/worldlab/buildingOffer.server'
 import { parcelAt } from '@/lib/worldlab/parcelOffer.server'
+import { isVenueUsage, venueConversionBlocker, venuePlan } from '@/lib/worldlab/venueConversion'
 
 const SOURCE = /^osm:(way|relation):\d+$/
 /** Umbau kostet die Hälfte des Neubaus (Thomas, 25.10.2026). */
@@ -34,6 +37,8 @@ const ERRORS: Record<string, [number, string]> = {
   NOXIA_BUILDING_STAFFED: [409, 'Im Gebäude arbeiten noch Menschen – Abriss nicht möglich.'],
   NOXIA_NO_STATE_HOUSING: [409, 'Für die Bewohner gibt es keinen freien staatlichen Wohnraum – Abriss nicht möglich.'],
   NOXIA_TYPE_INVALID: [400, 'Diese Nutzung gibt es nicht.'],
+  NOXIA_CONVERSION_PENDING: [409, 'Das Gebäude wird gerade umgebaut.'],
+  NOXIA_BUILDING_IS_REAL_VENUE: [409, 'Das Haus ist schon ein Lokal und gehört dem Ort.'],
 }
 function failure(message: string) {
   const code = Object.keys(ERRORS).find(key => message.includes(key))
@@ -41,20 +46,48 @@ function failure(message: string) {
   return NextResponse.json({ error: text, code: code ?? null }, { status })
 }
 
-/** Bautypen, die in ein gekauftes Gebäude passen (Grundfläche), mit halbem Preis. */
-async function conversions(supabase: Supabase, entityId: string) {
-  const { data: row } = await supabase.from('tile_entities').select('entity_id,footprint_width_m,footprint_depth_m,source_ref').eq('id', entityId).maybeSingle()
-  if (!row?.source_ref) return []
-  const long = Math.max(Number(row.footprint_width_m), Number(row.footprint_depth_m)) + 2
-  const short = Math.min(Number(row.footprint_width_m), Number(row.footprint_depth_m)) + 2
-  const { data: definitions } = await supabase.from('building_definitions').select('key,name,cost_credits,allowed_locations,category').eq('is_active', true)
-  return (definitions ?? []).flatMap(def => {
+type Conversion = { id: string; name: string; cost: number; buildTicks: number; venue: boolean; note?: string; plan?: ReturnType<typeof venuePlan> }
+
+/**
+ * Nutzungen, die in ein gekauftes Gebäude passen.
+ * Lokale (R-13): volle Baukosten und Bauzeit, Mindestgröße statt Musterfläche,
+ * nicht für Häuser, die laut Kartendaten schon Lokal sind. Personal-, Gäste-
+ * und Wohnplätze nach Größe des Hauses (lib/worldlab/venueConversion.ts).
+ * Andere Nutzungen: halber Neubaupreis, sofort (R-12).
+ */
+async function conversions(supabase: Supabase, entityId: string): Promise<Conversion[]> {
+  const { data: row } = await supabase.from('tile_entities').select('entity_id,footprint_width_m,footprint_depth_m,source_ref,source_tags,building_levels,conversion_plan').eq('id', entityId).maybeSingle()
+  if (!row?.source_ref || row.conversion_plan) return []
+  const width = Number(row.footprint_width_m), depth = Number(row.footprint_depth_m)
+  const long = Math.max(width, depth) + 2
+  const short = Math.min(width, depth) + 2
+  let tags = (row.source_tags ?? null) as Record<string, unknown> | null
+  let levels = row.building_levels == null ? null : Number(row.building_levels)
+  if (!tags || levels == null) {
+    // Ohne gespeicherte Tags oder Geschosse: aus den Kartendaten (wie beim Kauf).
+    const offer = await offerFor(supabase, String(row.source_ref))
+    tags = tags ?? offer.tags ?? null
+    levels = levels ?? offer.facts?.levels ?? 1
+  }
+  // Grundfläche wie im Innenraum (footprint_width_m × footprint_depth_m).
+  const areaM2 = width * depth
+  const { count: residents } = await supabase.from('person_assignments').select('id', { count: 'exact', head: true })
+    .eq('tile_entity_id', entityId).eq('is_active', true).eq('assignment_type', 'home')
+  const { data: definitions } = await supabase.from('building_definitions').select('key,name,cost_credits,build_time_ticks,allowed_locations,category').eq('is_active', true)
+  return (definitions ?? []).flatMap((def): Conversion[] => {
+    const key = String(def.key)
     const allowed = def.allowed_locations as string[] | null
     if (allowed?.length && !allowed.includes('earth')) return []
-    if (def.key === row.entity_id || def.category === 'unique' || /spaceport|pad|landing|dock|harbour/.test(String(def.key))) return []
-    const footprint = getBuildingFootprint(String(def.key))
+    if (key === row.entity_id || def.category === 'unique' || /spaceport|pad|landing|dock|harbour/.test(key)) return []
+    if (isVenueUsage(key)) {
+      if (venueConversionBlocker(key, { areaM2, tags, currentUsage: String(row.entity_id) })) return []
+      const plan = venuePlan(key, { areaM2, levels, residents: residents ?? 0 })
+      const note = [`${plan.staffCapacity} Personal`, plan.transientCapacity ? `${plan.transientCapacity} Zimmer` : null, plan.residentialCapacity ? `${plan.residentialCapacity} Wohnplätze` : null].filter(Boolean).join(' · ')
+      return [{ id: key, name: String(def.name), cost: plan.cost, buildTicks: plan.buildTicks, venue: true, note, plan }]
+    }
+    const footprint = getBuildingFootprint(key)
     if (Math.max(footprint.widthM, footprint.depthM) > long || Math.min(footprint.widthM, footprint.depthM) > short) return []
-    return [{ id: String(def.key), name: String(def.name), cost: Math.round(Number(def.cost_credits ?? 0) * CONVERSION_SHARE) }]
+    return [{ id: key, name: String(def.name), cost: Math.round(Number(def.cost_credits ?? 0) * CONVERSION_SHARE), buildTicks: 0, venue: false }]
   }).sort((a, b) => a.cost - b.cost)
 }
 
@@ -62,7 +95,8 @@ export async function GET(req: NextRequest) {
   const convertFor = req.nextUrl.searchParams.get('conversions')
   if (convertFor) {
     if (!await verifiedBearerUserId(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    return NextResponse.json({ conversions: await conversions(createServiceClient(), convertFor) }, { headers: { 'Cache-Control': 'no-store' } })
+    const list = (await conversions(createServiceClient(), convertFor)).map(item => ({ id: item.id, name: item.name, cost: item.cost, buildTicks: item.buildTicks, venue: item.venue, note: item.note }))
+    return NextResponse.json({ conversions: list }, { headers: { 'Cache-Control': 'no-store' } })
   }
   const source = String(req.nextUrl.searchParams.get('source') ?? '')
   if (!SOURCE.test(source)) return NextResponse.json({ forSale: false, reason: 'unbekanntes Gebäude' })
@@ -96,6 +130,14 @@ export async function POST(req: NextRequest) {
     if (!body.entityId || !type) return NextResponse.json({ error: 'Gebäude oder Nutzung fehlt.' }, { status: 400 })
     const option = (await conversions(supabase, body.entityId)).find(item => item.id === type)
     if (!option) return NextResponse.json({ error: 'Diese Nutzung passt nicht in das Gebäude.' }, { status: 409 })
+    if (option.venue && option.plan) {
+      const { data, error } = await supabase.rpc('start_earth_venue_conversion', {
+        p_profile_id: profileId, p_entity_id: body.entityId, p_type: type, p_cost: option.plan.cost, p_build_ticks: option.plan.buildTicks,
+        p_staff_capacity: option.plan.staffCapacity, p_transient_capacity: option.plan.transientCapacity, p_residential_capacity: option.plan.residentialCapacity,
+      })
+      if (error) return failure(error.message)
+      return NextResponse.json(data)
+    }
     const { data, error } = await supabase.rpc('convert_earth_building', { p_profile_id: profileId, p_entity_id: body.entityId, p_type: type, p_cost: option.cost })
     if (error) return failure(error.message)
     return NextResponse.json(data)

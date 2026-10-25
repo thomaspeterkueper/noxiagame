@@ -17,6 +17,8 @@ import {
 import { EARTH_SAUERLAND_REGION, getEarthRegion } from '@/lib/world/spatial/regions'
 import { resolveRuntimeTerrainSampler } from '@/lib/game/spatial/runtimeTerrainSampler.server'
 import type { TerrainDatasetDescriptor, WorldFrame } from '@/lib/game/spatial/types'
+import { isConversionOnlyOnEarth } from '@/lib/worldlab/venueConversion'
+
 
 const serviceClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
@@ -361,6 +363,8 @@ export async function GET(req: NextRequest) {
 
   const available = [...catalog.values()]
     .filter(def => !def.allowedLocations?.length || def.allowedLocations.includes(locationSlug))
+    // Auf der Erde entstehen Lokale durch Kauf und Umbau eines realen Hauses (R-13).
+    .filter(def => locationSlug !== 'earth' || !isConversionOnlyOnEarth(def.id))
     .map(def => {
       const requirement = buildRequirement(def.id, locationSlug, knowledge)
       const creditsOk = credits >= def.cost
@@ -451,6 +455,9 @@ export async function POST(req: NextRequest) {
   if (!def) return NextResponse.json({ error: 'Unbekannter oder inaktiver Bautyp' }, { status: 400 })
   if (def.allowedLocations?.length && !def.allowedLocations.includes(locationSlug)) {
     return NextResponse.json({ error: `${def.name} kann hier nicht gebaut werden.` }, { status: 400 })
+  }
+  if (locationSlug === 'earth' && isConversionOnlyOnEarth(buildableId)) {
+    return NextResponse.json({ error: `${def.name}: Auf der Erde werden Lokale nicht neu gebaut – kauf ein Haus und bau es um.` }, { status: 400 })
   }
 
   const knowledge = await getNoxiaKnowledgeState(user.id)

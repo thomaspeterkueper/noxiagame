@@ -22,6 +22,8 @@ export interface Offer {
   newResidents?: number
   rentPerInterval?: number
   name?: string
+  /** OSM-Tags des Grundrisses (Lokalart, Anschrift, Geschosse). */
+  tags?: Record<string, unknown>
   facts?: BuildingFacts
   features?: FeatureRow[]
 }
@@ -40,13 +42,13 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
   const name = String(properties.name ?? '').trim() || (street && number ? `${street} ${number}` : BLOCK_NAMES[facts.kind] ?? 'Gebäude')
 
   const why = notForSaleReason(properties, facts.kind)
-  if (why) return { forSale: false, reason: why, name, facts }
+  if (why) return { forSale: false, reason: why, name, facts, tags: properties }
   const [{ data: owned }, { data: cleared }] = await Promise.all([
     supabase.from('tile_entities').select('id').eq('source_ref', source).limit(1),
     supabase.from('earth_cleared_buildings').select('source_ref').eq('source_ref', source).limit(1),
   ])
-  if (owned?.length) return { forSale: false, reason: 'gehört bereits jemandem', name, facts }
-  if (cleared?.length) return { forSale: false, reason: 'abgerissen', name, facts }
+  if (owned?.length) return { forSale: false, reason: 'gehört bereits jemandem', name, facts, tags: properties }
+  if (cleared?.length) return { forSale: false, reason: 'abgerissen', name, facts, tags: properties }
 
   // Steht schon ein NOXIA-Gebäude darauf (die Karte zeichnet es auf diesem Grundriss)?
   const span = Math.max(facts.w, facts.d) / 2 / 111320
@@ -74,7 +76,7 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
   const { data: publicActor } = earth ? await supabase.from('location_public_actors').select('actor_id,actors(display_name)').eq('location_id', earth.id).maybeSingle() : { data: null }
   const actor = publicActor as { actors?: { display_name?: string } | null } | null
   return {
-    forSale: true, name, facts, features,
+    forSale: true, name, facts, features, tags: properties,
     price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval }),
     seller: actor?.actors?.display_name ?? 'Gemeinde',
     residents: people.length + newResidents, newResidents, rentPerInterval,

@@ -1,6 +1,7 @@
 // lib/game/buildings/index.ts
 // Erstellt:     22.06.2026
-// Aktualisiert: 06.09.2026 — Earth-Testgebäude für Placement-/Map-Playtests freigeschaltet
+// Aktualisiert: 25.10.2026 — Bar baubar, Restaurant neu (R-1/R-13)
+// Vorher:       06.09.2026 — Earth-Testgebäude für Placement-/Map-Playtests freigeschaltet
 // Version:      1.5.0
 
 import type { BuildingDef, ResourceType } from './types'
@@ -144,11 +145,18 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     planned: true, planHint: 'Produktionsketten — Alpha 0.3',
   },
 
+  // Lokale (R-1, R-13): auf der Erde nur durch Umbau eines gekauften Hauses
+  // (lib/worldlab/venueConversion.ts), anderswo als Neubau.
   bar: {
     id: 'bar', name: 'Bar', category: 'service',
-    description: 'Erhöht Zufriedenheit und Bevölkerungswachstum',
+    description: 'Schankraum mit Tresen, Stehtischen und Sitznische · abends geöffnet',
     cost: 1800, buildTimeTicks: 2,
-    planned: true, planHint: 'Zufriedenheit — Alpha 0.4',
+  },
+
+  restaurant: {
+    id: 'restaurant', name: 'Restaurant', category: 'service',
+    description: 'Speiseraum mit Küche · mittags und abends geöffnet',
+    cost: 2400, buildTimeTicks: 2,
   },
 
   oxygen_recycler: {

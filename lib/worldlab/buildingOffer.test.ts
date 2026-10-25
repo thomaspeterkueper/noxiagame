@@ -35,4 +35,10 @@ describe('buildingOffer', () => {
     expect(notForSaleReason({ building: 'yes', amenity: 'townhall' }, 'row')).toBeTruthy()
     expect(notForSaleReason({ building: 'house' }, 'house')).toBeNull()
   })
+
+  it('keeps real venues with the town', () => {
+    expect(notForSaleReason({ building: 'commercial', amenity: 'bar', name: 'Metropol' }, 'hall')).toBe('Lokal des Ortes')
+    expect(notForSaleReason({ building: 'restaurant', amenity: 'restaurant' }, 'house')).toBe('Lokal des Ortes')
+    expect(notForSaleReason({ building: 'commercial' }, 'hall')).toBeNull()
+  })
 })

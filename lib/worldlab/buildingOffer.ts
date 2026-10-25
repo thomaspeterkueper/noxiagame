@@ -6,6 +6,7 @@
 // Gebucht wird in der Datenbank (buy_earth_building), nicht hier.
 
 import { blockLevels, orientedBox, polygonArea, worldBlockKind, type BlockKind } from './simplify'
+import { realVenueKind } from './venueConversion'
 
 export type GeoPoint = { lat: number; lon: number }
 
@@ -86,5 +87,7 @@ export function notForSaleReason(properties: Record<string, unknown>, kind: Bloc
   const building = String(properties.building ?? '').toLowerCase()
   const amenity = String(properties.amenity ?? '').toLowerCase()
   if (kind === 'church' || PUBLIC_BUILDINGS.has(building) || PUBLIC_AMENITIES.has(amenity) || properties.historic) return 'öffentliches Gebäude oder Wahrzeichen'
+  // Lokale der Kartendaten (Café, Bar, Restaurant, Hotel) gehören dem Ort (R-13).
+  if (realVenueKind(properties)) return 'Lokal des Ortes'
   return null
 }

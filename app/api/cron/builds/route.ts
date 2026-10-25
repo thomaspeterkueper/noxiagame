@@ -1,6 +1,7 @@
 // app/api/cron/builds/route.ts
 // Erstellt: 31.05.2026
-// Aktualisiert: 09.10.2026 — Bugfix: Bau-Abschluss wird dem Spieler gemeldet (publishBuildCompleted
+// Aktualisiert: 25.10.2026 — schließt fällige Umbauten gekaufter Häuser ab (R-13)
+// Vorher:       09.10.2026 — Bugfix: Bau-Abschluss wird dem Spieler gemeldet (publishBuildCompleted
 //               wurde nie aufgerufen, der Toast „Bau abgeschlossen!" konnte nie erscheinen)
 // Vorher:       10.09.2026 — atomarer Build-Abschluss über NOXIA Game Core
 // Version:      1.2.1
@@ -74,10 +75,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Umbau gekaufter Häuser zum Lokal (R-13): fällige Umbauten abschließen.
+    let conversions = 0
+    const { data: converted, error: conversionError } = await supabase.rpc('complete_due_earth_conversions')
+    if (conversionError) {
+      console.error('Umbauten fehlgeschlagen:', conversionError)
+      failed.push('earth_conversions')
+    } else {
+      conversions = Number((converted as { completed?: number } | null)?.completed ?? 0)
+    }
+
     return NextResponse.json({
       ok: true,
       tick: 'builds',
       completed: completed.length,
+      conversions,
       failed: failed.length,
       builds: completed,
     })

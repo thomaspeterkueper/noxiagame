@@ -218,6 +218,15 @@ Entscheidung Thomas, 25.10.2026 (siehe R-13 bei Bevölkerung und Ökonomie): Lok
 - Klick auf ein reales Gebäude → Gebäudetafel (W-2) mit Adresse, Größe, heutiger Nutzung aus OSM (Wohnhaus, Laden, Bar „Metropol“) und, wenn frei, „Kaufen“; ist es NOXIA-Gebäude, „Betreten“.
 - Das selbst gebaute Startcafé soll von der Karte verschwinden, sobald es auf ein reales Gebäude übertragen ist (Übergang in R-13).
 
+### W-5 (Bevölkerung und Ökonomie, 25.10.2026): Umbau zum Lokal in der Gebäudetafel (zu R-13/W-4)
+
+R-13 ist gebaut (`population-economy.md`). Für die Tafel in `app/world-lab/WorldPanels.tsx`:
+
+- `GET /api/game/building-offer?conversions=<id>` liefert je Nutzung jetzt zusätzlich `buildTicks`, `venue` und `note` (z. B. „2 Personal · 3 Wohnplätze“). Für Lokale gilt **nicht** mehr „halbe Baukosten“, sondern der volle Preis mit Bauzeit; der Hinweis „Hülle und Bewohner bleiben, halbe Baukosten.“ stimmt nur noch für andere Nutzungen. Bitte Bauzeit und `note` anzeigen.
+- Während eines Umbaus hat das Haus `conversion_plan` (`type`, `ready_at`), bleibt aber `acquired_building`. Vorschlag: „Wird zum Café umgebaut – fertig um …“ in der Tafel; dafür `conversion_plan` in `/api/world-lab/buildings` mitliefern.
+- Reale Lokale (Metropol, Balkan Grill in Sundern) sind jetzt NOXIA-Gebäude des Ortes; die Tafel zeigt sie als „Bar · Metropol“ mit „Betreten“. Andere reale Lokale ohne Eintrag melden „Nicht verkäuflich: Lokal des Ortes“.
+- Das Startcafé ist vom alten 24 × 24-m-Platz auf das reale Haus Hauptstraße 72 gezogen (W-4, letzter Punkt); auf der Karte sollte es jetzt den Grundriss dieses Hauses belegen.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

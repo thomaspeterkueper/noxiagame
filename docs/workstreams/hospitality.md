@@ -79,6 +79,21 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 - R-12 an Bevölkerung und Ökonomie: Name des Spielers und Gefälligkeiten als Wissen der Figur (heute nur drei Wortwechsel Gedächtnis).
 - R-13 an Bevölkerung und Ökonomie, W-4 an Weltkarte: Lokale durch Kauf und Umbau bestehender Gebäude statt Neubau; Startcafé übertragen (Entscheidung Thomas, 25.10.2026).
 
+### G-4 (Bevölkerung und Ökonomie, 25.10.2026): Lokale in gekauften Häusern – was jetzt am Gebäude steht (zu R-13)
+
+R-13 ist gebaut (`population-economy.md`, Migration `20261025180000`). Am Gebäude stehen jetzt:
+
+- `entity_id` = Nutzung (`cafe`, `bar`, `restaurant`, `hotel`); `venueKindForBuildingType` passt also unverändert. Ein Haus im Umbau bleibt `acquired_building` und hat `conversion_plan` (`type`, `ready_at`) – nicht betretbar, bis der Umbau fertig ist.
+- `footprint_width_m` × `footprint_depth_m` = Grundriss des realen Hauses (wie erbeten gefüllt); `building_levels` (Geschosse, falls in OSM angegeben), `source_tags` (OSM-Tags: `name`, `amenity`, `addr:*` …), `source_ref` (OSM-Kennung).
+- `staff_capacity` (Personalplätze nach Größe), `transient_capacity` (Hotelzimmer aus den Obergeschossen), `residential_capacity` (Wohnungen in den Obergeschossen, R-6).
+- **Startcafé** = dieselbe Kennung wie bisher, jetzt Hauptstraße 72 (12 × 11,6 m ≈ 139 m² → „normal“), `display_name` „Hauptstraße 72“.
+- **Metropol** (`bar`, ≈ 186 m²) und **Balkan Grill** (`restaurant`, ≈ 158 m²) sind staatliche Gebäude mit Karte. Sie haben noch kein Personal und sind daher geschlossen; Personal kommt mit dem Arbeitsmarkt (Aufgabe 2 bei uns).
+
+Fragen an euch:
+1. Soll der Innenraum ein Haus „im Umbau“ zeigen (Baustelle, „öffnet um …“) statt nur nicht betretbar zu sein? `conversion_plan.ready_at` steht dafür bereit.
+2. Lest ihr den Namen eines realen Lokals aus `display_name` (z. B. „Metropol“) statt aus der Gebäudeart? Im Gespräch hieße es sonst „die Bar“.
+3. Passt die Größe „normal“ für Metropol und Balkan Grill, oder soll `venueSizeForArea` die echte Grundfläche (Polygon) statt Breite × Tiefe nehmen? Wir können die echte Fläche als Spalte nachreichen.
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.
