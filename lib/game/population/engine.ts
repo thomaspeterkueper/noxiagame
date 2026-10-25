@@ -17,6 +17,7 @@ import { activityForAction, encounterNeedDelta, needDelta, passiveNeedDrift, var
 import { encounterEventType, encounterOutcome, ENCOUNTER_EVENT_TYPES, type EncounterOutcome } from './socialFriction'
 import { encounterQualities, decayAffect, affectProfileFromTraits } from '../cognition/personAffect'
 import { fadeRelationships, pairCompatibility } from './relationshipDynamics'
+import { runStJohannesSocialPlaceTick } from './realPlaceActivity'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
@@ -439,20 +440,34 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     processed += 1
   }
 
+  const realPlaceActivity = await runStJohannesSocialPlaceTick(supabase, tick)
+
+  // Scheduled place activity can create a temporary real-place assignment and
+  // change activity after the ordinary decision pass. Reload only the compact
+  // state needed for authoritative presence/encounter derivation.
+  const [{ data: finalPeopleRows, error: finalPeopleError }, { data: finalAssignmentRows, error: finalAssignmentError }] = await Promise.all([
+    supabase.from('people').select('*').in('id', personIds),
+    supabase.from('person_assignments').select('*').eq('is_active', true).in('person_id', personIds),
+  ])
+  if (finalPeopleError) throw finalPeopleError
+  if (finalAssignmentError) throw finalAssignmentError
+  const finalPeople:Person[]=(finalPeopleRows??[]).map(personFromRow)
+  const finalAssignments:PersonAssignment[]=(finalAssignmentRows??[]).map(assignmentFromRow)
+
   const interiorPresence = await projectInteriorPresence(
     supabase,
     tick,
-    peopleRows.map((person:any)=>({
+    (finalPeopleRows??[]).map((person:any)=>({
       id:person.id,
-      activity_state:(currentPeople.get(person.id)?.activityState ?? person.activity_state) as PersonActivityState,
+      activity_state:person.activity_state as PersonActivityState,
     })),
-    assignmentRows,
+    finalAssignmentRows??[],
   )
 
-  const currentCandidates = resolvedPresenceCandidates([...currentPeople.values()], assignments)
+  const currentCandidates = resolvedPresenceCandidates(finalPeople, finalAssignments)
   const encounters = derivePopulationEncounters({ tick, candidates: currentCandidates, previousCandidates })
   let relationshipsProjected = 0
   for (const encounter of encounters) relationshipsProjected += await persistEncounter(supabase, encounter, { needsByPerson, traitsByPerson, affectSnapshot, supplyByLocation })
 
-  return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, interiorPresence, affectAvailable: affectSnapshot.available, skipped: false }
+  return { processed, namedNeedsAdvanced, encounters: encounters.length, relationshipsProjected, interiorPresence, realPlaceActivity, affectAvailable: affectSnapshot.available, skipped: false }
 }
