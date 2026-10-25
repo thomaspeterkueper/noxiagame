@@ -28,6 +28,7 @@ export default defineConfig({
       'lib/worldlab/address.test.ts',
       'lib/worldlab/walking.test.ts',
       'lib/worldlab/landmarks.test.ts',
+      'lib/worldlab/placeName.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',
       'lib/game/landmarks/interiors.test.ts',
       'lib/game/spatial/buildingMassing.test.ts',

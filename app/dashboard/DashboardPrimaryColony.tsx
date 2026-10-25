@@ -70,7 +70,7 @@ export default function DashboardPrimaryColony(){
  // physical world underneath the player. A future walkable Earth view must
  // project the same persisted WGS84/materialized place data.
  if(isEarth){
-   if(mode==='colony'&&earthView==='world')return <WorldLab embedded residents={residents} onLeave={()=>chooseEarthView('scene')}/>
+   if(mode==='colony'&&earthView==='world')return <WorldLab embedded residents={residents} onLeave={()=>chooseEarthView('scene')} onPlanning={enterPlanning}/>
    if(mode==='colony')return <>{earthViewToggle}<EarthWalkableSurface residents={residents} onClose={enterPlanning}/><button className="noxia-earth-view-toggle" onClick={()=>chooseEarthView('world')}>◇ Neue Weltkarte</button></>
    return null
  }

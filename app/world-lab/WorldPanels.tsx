@@ -20,13 +20,15 @@ import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/in
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
 import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
-import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick } from './worldEngine'
+import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldSite } from './worldEngine'
+import LandmarkGlyph from './LandmarkGlyph'
 
 export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
   | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind }
   | { kind: 'landmark'; landmark: WorldLandmark }
+  | { kind: 'site'; id: string }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
 
@@ -34,6 +36,8 @@ const TALK_RANGE_M = 8
 const ENTER_RANGE_M = 8
 /** Wahrzeichen: Abstand zum Schild (es steht meist mitten im Gebäude). */
 const LANDMARK_ENTER_M = 14
+/** Kennung eines Wahrzeichens als Gesprächsziel. */
+function landmarkRef(landmark: WorldLandmark) { return `landmark:${landmark.at.lat.toFixed(6)},${landmark.at.lon.toFixed(6)}` }
 const BLOCK_NAMES: Record<BlockKind, string> = { house: 'Wohnhaus', row: 'Mehrfamilienhaus', hall: 'Halle', factory: 'Fabrik', church: 'Kirche', shed: 'Schuppen' }
 
 function role(resident: ColonyResident) { return resident.assignments.find(item => item.type === 'work')?.roleCode ?? resident.activityState ?? 'general' }
@@ -43,6 +47,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'person') return { kind: 'person', id: pick.id }
   if (pick.type === 'ground') return { kind: 'none' }
   if (pick.type === 'landmark') return { kind: 'landmark', landmark: pick.landmark }
+  if (pick.type === 'site') return { kind: 'site', id: pick.id }
   // Ein Wahrzeichen-Gebäude (Kirche, Bibliothek) öffnet das Wahrzeichen, außer es ist ein NOXIA-Gebäude.
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
@@ -61,12 +66,28 @@ type Offer = { forSale: boolean; price?: number; seller?: string; residents?: nu
 
 function credits(value: number) { return Math.round(value).toLocaleString('de-DE') + ' Cr' }
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, tick }: {
+/** Ab dieser Entfernung bietet die Tafel „Hinspringen“ statt nur „Gehe hin“. */
+const JUMP_FROM_M = 1500
+
+/** Ort einer Tafel (für Weg und Entfernung), wenn sie einen hat. */
+export function panelLocation(panel: Panel, sites: WorldSite[]): GeoPoint | null {
+  if (panel.kind === 'building') return panel.at
+  if (panel.kind === 'landmark') return panel.landmark.at
+  if (panel.kind === 'site') return sites.find(site => site.id === panel.id)?.at ?? null
+  return null
+}
+
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, placeName, route, tick }: {
   engine: WorldEngine | null
   panel: Panel
   setPanel: (panel: Panel) => void
   residents: ColonyResident[]
   noxia: NoxiaBuilding[]
+  sites: WorldSite[]
+  /** Ortsname der Gegend (z. B. „Sundern“). */
+  placeName: string
+  /** Gezeigter Weg zum Ziel der Tafel. */
+  route: { lengthM: number; viaRoads: boolean } | null
   /** Steigt laufend (Anzeige der Karte), damit Abstände neu berechnet werden. */
   tick: number
 }) {
@@ -76,6 +97,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [walking, setWalking] = useState(false)
   /** Wer gerade wohin unterwegs ist (aus einem Gespräch): Person → NOXIA-Gebäude. */
   const [visits, setVisits] = useState<Record<string, string>>({})
+  /** Namen von Zielen, die keine NOXIA-Gebäude sind (Wahrzeichen). */
+  const [visitNames, setVisitNames] = useState<Record<string, string>>({})
   const [offers, setOffers] = useState<Record<string, Offer | null>>({})
   const [buying, setBuying] = useState(false)
   const [buyError, setBuyError] = useState('')
@@ -106,9 +129,17 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     return landmark && engine ? engine.distanceTo(landmark.at) : null
   }, [landmark, engine, tick])
   const landmarkNear = landmarkDistance !== null && landmarkDistance <= LANDMARK_ENTER_M
+  const site = panel.kind === 'site' ? sites.find(item => item.id === panel.id) ?? null : null
+  const siteDistance = useMemo(() => { void tick; return site && engine ? engine.distanceTo(site.at) : null }, [site, engine, tick])
+  /** Entfernung, Weg und – bei weiten Zielen – „Hinspringen“. */
+  function away(distance: number | null, at: GeoPoint) {
+    if (distance === null) return null
+    const text = distance >= 1000 ? `${(distance / 1000).toFixed(1).replace('.', ',')} km entfernt` : `${Math.round(distance)} m entfernt`
+    return <>{text}{route && route.lengthM > distance + 5 ? ` · Weg ${route.lengthM} m${route.viaRoads ? ' über Straßen' : ''}` : ''}{distance >= JUMP_FROM_M && <button className="link" onClick={() => engine?.jump(at)}>Hinspringen</button>}</>
+  }
 
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
-  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind
+  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
   if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError('') }
 
@@ -178,11 +209,25 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     if (!person || !engine || !message.trim() || sending) return
     const playerMessage = message.trim().slice(0, 80)
     const history = conversations[person.id] ?? []
-    const street = engine.nearestStreet()
-    const nearbyPlaces = noxia
-      .map(item => ({ item, distanceM: engine.distanceTo({ lat: item.lat, lon: item.lon }) }))
-      .filter(entry => entry.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 10)
-      .map((entry, index) => ({ key: 'p' + index, targetRef: entry.item.id, name: entry.item.name, kind: entry.item.typeId, distanceM: Math.round(entry.distanceM) }))
+    // Was die Person von ihrem Platz aus sehen kann (45 m): NOXIA-Gebäude,
+    // Wahrzeichen, Baustellen, Wasser, Wald – wie in der bisherigen Erdszene.
+    const at = engine.personAt(person.id) ?? engine.position()
+    const around = engine.surroundings(at, 45)
+    const street = around.street ?? engine.nearestStreet()
+    const metres = (target: GeoPoint) => Math.hypot((target.lat - at.lat) * 111320, (target.lon - at.lon) * 111320 * Math.cos(at.lat * Math.PI / 180))
+    const places = [
+      ...noxia.map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'aktiv' })),
+      ...around.landmarks.map(item => ({ targetRef: landmarkRef(item.landmark), name: item.landmark.name, kind: landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, status: 'sichtbar' })),
+    ].filter(place => place.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 10)
+    const nearbyPlaces = places.map((place, index) => ({ key: 'p' + index, targetRef: place.targetRef, name: place.name, kind: place.kind, distanceM: Math.round(place.distanceM) }))
+    const localFacts = [
+      `Ort: ${placeName}`,
+      ...(street ? [`Ihr steht an der ${street}.`] : []),
+      ...(around.water ? ['Wasserlauf oder Wasserfläche in der Nähe'] : []),
+      ...(around.forest ? ['Wald in der Nähe'] : []),
+      ...places.map(place => `In der Nähe: ${place.name} · ${place.kind} · ca. ${Math.max(1, Math.round(place.distanceM))} m entfernt · ${place.status}`),
+      ...sites.filter(item => metres(item.at) <= 45).map(item => `In der Nähe: ${item.name} · Baustelle · ca. ${Math.max(1, Math.round(metres(item.at)))} m entfernt · im Bau`),
+    ].slice(0, 16)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -192,7 +237,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         body: JSON.stringify({
           player: playerMessage, npcId: person.id, npcName: person.displayName, npcRole: role(person),
           headline: `Gespräch auf der Straße${street ? ' – ' + street : ''}`, source: 'NOXIA Weltkarte',
-          locationName: street ? `${street}, Sundern` : 'Sundern', localFacts: street ? [`Ihr steht an der ${street}.`] : [],
+          locationName: street ? `${street}, ${placeName}` : placeName, localFacts,
           nearbyPlaces, history,
         }),
       })
@@ -202,11 +247,14 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       if (response.ok) setMessage('')
       const action = json?.worldAction
       if (action?.type === 'visit_place') {
-        const target = noxia.find(item => item.id === action.targetRef)
+        const building = noxia.find(item => item.id === action.targetRef)
+        const landmark = around.landmarks.find(item => landmarkRef(item.landmark) === action.targetRef)?.landmark
+        const target = building ? { lat: building.lat, lon: building.lon } : landmark?.at
         if (target) {
           const seconds = Math.max(4, Math.min(35, Number(action.durationSeconds ?? 8)))
-          engine.sendPerson(person.id, { lat: target.lat, lon: target.lon }, seconds)
-          setVisits(current => ({ ...current, [person.id]: target.id }))
+          engine.sendPerson(person.id, target, seconds)
+          setVisits(current => ({ ...current, [person.id]: String(action.targetRef) }))
+          if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
           if (action.playerFollows) walkTo(() => engine.personAt(person.id), 3)
         }
       } else if (action?.type === 'lead_walk' && action.playerFollows) {
@@ -233,7 +281,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   return <aside className="world-panel" role="dialog">
     {person && <>
       <div className="head"><div><small>PERSON</small><b>{personSceneLabel(person)}</b><span>{role(person)}</span></div><button onClick={close} aria-label="Schließen">×</button></div>
-      <dl><dt>Tut gerade</dt><dd>{visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
+      <dl><dt>Tut gerade</dt><dd>{visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
         ? <div className="row"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Ansprechen …" autoFocus/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
@@ -245,7 +293,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {own && entry
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
-          : <div className="row"><span>{buildingDistance === null ? '' : `${Math.round(buildingDistance)} m entfernt.`}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
+          : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
       {!own && offer && (offer.forSale
         ? <>
@@ -260,11 +308,19 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         : offer.reason ? <div className="row"><span>Nicht verkäuflich: {offer.reason}</span></div> : null)}
     </>}
     {landmark && <>
-      <div className="head"><div><small>REALER ORT · {landmarkLabel(landmark.kind, landmark.tags).toUpperCase()}</small><b>{landmark.name}</b></div><button onClick={close} aria-label="Schließen">×</button></div>
+      <div className="head"><LandmarkGlyph kind={landmark.kind} tags={landmark.tags} size={34}/><div className="grow"><small>REALER ORT · {landmarkLabel(landmark.kind, landmark.tags).toUpperCase()}</small><b>{landmark.name}</b></div><button onClick={close} aria-label="Schließen">×</button></div>
+      {landmark.tags.description && <p>{landmark.tags.description}</p>}
       {landmarkFacts(landmark.tags).length > 0 && <dl>{landmarkFacts(landmark.tags).map(fact => <Fragment key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></Fragment>)}</dl>}
       {room && landmarkNear
         ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark })}>Betreten</button></div>
-        : <div className="row"><span>{room ? `${Math.round(landmarkDistance ?? 0)} m entfernt.` : 'Kann man nicht betreten.'}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
+        : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
+      <span className="source">Quelle: OpenStreetMap</span>
+    </>}
+    {panel.kind === 'site' && <>
+      <div className="head"><div><small>BAUSTELLE</small><b>{site?.name ?? 'Baustelle'}</b>{site && <span>{site.phase}{site.progress !== null ? ` · ${Math.round(site.progress * 100)} %` : ''}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      {site && <div className="bar"><i style={{ width: `${Math.round((site.progress ?? 0) * 100)}%` }}/></div>}
+      {site ? <div className="row"><span>{away(siteDistance, site.at)}</span>{siteDistance !== null && siteDistance > 12 && <button onClick={() => walkTo(() => site.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>
+        : <div className="row"><span>Der Bau ist fertig.</span></div>}
     </>}
     <style jsx>{`
       .world-panel{position:absolute;right:14px;top:14px;width:300px;max-height:calc(100% - 28px);overflow:auto;padding:12px 14px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;color:#eef2ed;font:12px system-ui;z-index:5}
@@ -272,6 +328,11 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       .head small{display:block;font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .head b{display:block;font-size:15px}
       .head span{display:block;font-size:11px;color:#9fb5b0;margin-top:2px}
+      .head .grow{flex:1}
+      .source{display:block;margin-top:8px;font-size:10px;color:#7f9792}
+      .bar{height:6px;border-radius:3px;background:#2d2410;overflow:hidden;margin:6px 0}
+      .bar i{display:block;height:100%;background:#f0d27a}
+      .row .link{border:0;background:none;color:#d9bb6a;padding:0 0 0 6px;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline}
       .head button{border:0;background:none;color:#9fb5b0;font-size:18px;cursor:pointer;line-height:1}
       dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:4px 0 8px;font-size:11px}
       dt{color:#9fb5b0}dd{margin:0}

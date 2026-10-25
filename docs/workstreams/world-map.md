@@ -94,23 +94,25 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 
 Ziel: Die alte Szene (`EarthWalkableSurface.tsx`) kann gehen, wenn die Weltkarte alles kann, was ein Spieler dort tut. Bauen, Verkaufen, Minikarte, Tag/Nacht, Fahrzeuge, Ton und Touch-Steuerung hat auch die alte Szene nicht – sie blockieren nichts. Café, Bank, Schule usw. laufen in beiden über `EarthBuildingAccessLayer`.
 
-| # | Was fehlt | Alt | Aufwand |
+| # | Was fehlt | Alt | Stand |
 |---|---|---|---|
-| 1 | „← Karte“ zur Planungskarte (`enterPlanning`); die Weltkarte führt nur zur alten Szene zurück | EWS:648 | klein |
-| 2 | Gesprächskontext: Ortsname statt fest „Sundern“, Wasser/Wald, Orte und Baustellen in 45 m | EWS:337–347, 450–493 | klein |
-| 3 | Name über der eigenen Figur, Box „Du bist hier“ (Ort, Abstand) | EWS:174, 735 | klein |
-| 4 | Hinweis beim Überfahren eines Gebäudes (Name, Eigentümer, Abstand) | EWS:764 | klein |
-| 5 | Tafel für Wahrzeichen ohne Innenraum mit Beschreibung und Symbol je Art | EWS:47–67, 750 | klein |
-| 6 | `visit_place` auch zu Wahrzeichen und Orten, Begleitung dorthin | EWS:486, 595 | klein |
-| 7 | Baustellen: gestrichelte Fläche mit Bauphase und Fortschritt | EWS:276, 666 | mittel |
-| 8 | Zielliste (eigene Gebäude, Baustellen, Orte bis 6 km) mit Weglänge und gezeichneter Route | EWS:264–295, 711, 737 | mittel |
-| 9 | `lead_walk`: die Person geht voraus, man folgt (heute geht nur man selbst zur Person) | EWS:545, 616 | mittel |
-| 10 | Personen nach Tätigkeit: Tempo, Pausen; wer in einem betretbaren Gebäude arbeitet, ist drinnen | EWS:355–390 | mittel |
-| 11 | Mitgehörte Gespräche zweier Personen über Meldungen und Neuigkeiten | EWS:199–216, 495 | mittel |
-| 12 | Benannte Orte, die keine Wahrzeichen sind (Läden, Cafés), als Ziele | EWS:264 | mittel |
-| 13 | Schienen und Regionalzug (Kacheln haben noch keine Gleise) | EWS:289, 663, 715 | mittel |
-| 14 | Startort merken; „Home“ setzt zurück | EWS:220–246 | klein |
-| 15 | Linke Tafel auf schmalen Bildschirmen | EWS:787 | klein |
+| 1 | „← Karte“ zur Planungskarte | EWS:648 | erledigt 25.10. (`onPlanning`) |
+| 2 | Gesprächskontext: Ortsname, Straße, Wasser/Wald, NOXIA-Gebäude, Wahrzeichen und Baustellen in 45 m um die Person | EWS:337–347, 450–493 | erledigt 25.10. (`engine.surroundings`) |
+| 3 | Name über der eigenen Figur, „Du bist hier“ mit Ort und Straße | EWS:174, 735 | erledigt 25.10. (Ortsname aus `/api/world-lab/where`) |
+| 4 | Hinweis beim Überfahren (Name, Eigentümer bzw. Art, Abstand) | EWS:764 | erledigt 25.10. (`onHover`) |
+| 5 | Wahrzeichen ohne Innenraum: Beschreibung, Symbol je Art, Quelle | EWS:47–67, 750 | erledigt 25.10. (Symbol in der Tafel; auf der Karte weiter ein einheitliches Schild) |
+| 6 | `visit_place` auch zu Wahrzeichen | EWS:486, 595 | erledigt 25.10. (Begleitung beim Betreten nur bei NOXIA-Gebäuden – der Wahrzeichen-Innenraum kennt keine) |
+| 7 | Baustellen: gestrichelte Fläche mit Fortschritt, Tafel mit Bauphase | EWS:276, 666 | erledigt 25.10. (eigene Bauten aus `/api/game/build/spatial`) |
+| 8 | Zielliste mit Weglänge und gezeichneter Route | EWS:264–295, 711, 737 | erledigt 25.10.: eigene und andere NOXIA-Gebäude bis 6 km, Baustellen, Wahrzeichen der geladenen Kacheln; Weg als gestrichelte Linie zu jeder Tafel mit Ort ab 25 m; ab 1,5 km „Hinspringen“ |
+| 9 | `lead_walk`: die Person geht voraus | EWS:545, 616 | offen |
+| 10 | Personen nach Tätigkeit: Tempo, Pausen, drinnen | EWS:355–390 | offen |
+| 11 | Mitgehörte Gespräche zweier Personen | EWS:199–216, 495 | offen |
+| 12 | Benannte Orte, die keine Wahrzeichen sind (Läden, Cafés), als Ziele | EWS:264 | offen – braucht benannte Punkte in den Kacheln |
+| 13 | Schienen und Regionalzug | EWS:289, 663, 715 | offen – Kacheln ohne Gleise |
+| 14 | Startort | EWS:220–246 | erledigt: die Position ist gespeichert (`earthPlayerPositionStore`); „⌂“ springt zum eigenen Gebäude |
+| 15 | Linke Tafel auf schmalen Bildschirmen | EWS:787 | erledigt 25.10. |
+
+Dazu: Pfeiltasten laufen wie WASD (hatte keine der beiden Ansichten).
 
 ## Gebäude kaufen (Thomas, 25.10.2026)
 

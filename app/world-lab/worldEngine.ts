@@ -19,8 +19,10 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 
 type Pixi = typeof import('pixi.js')
 
-export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number }
-export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number }
+export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string }
+export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number
+  /** Gezeigter Weg zum Ziel: Länge und ob er dem Straßennetz folgt. */
+  route: { lengthM: number; viaRoads: boolean } | null }
 
 export interface WorldSettings {
   /** Kantenglättung (MSAA). Messschalter: ?aa=0 */
@@ -41,6 +43,8 @@ export interface WorldEngineOptions {
   onHud: (hud: Hud) => void
   /** Klick auf die Karte (kein Ziehen). */
   onPick?: (pick: WorldPick) => void
+  /** Zeiger über einem Objekt (Bildschirmpunkt) oder über nichts. */
+  onHover?: (hover: { pick: WorldPick; x: number; y: number } | null) => void
   onError: (message: string) => void
 }
 
@@ -50,7 +54,14 @@ export type WorldPick =
   | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; source?: string; areaM2: number; levels: number }
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
+  | { type: 'site'; id: string }
   | { type: 'ground'; at: GeoPoint }
+
+/** Baustelle (laufender Bau) auf der Karte. */
+export interface WorldSite { id: string; name: string; at: GeoPoint; w: number; d: number; rotation: number; progress: number | null; phase: string }
+
+/** Was um einen Punkt herum ist – für Gespräche und Orientierung. */
+export interface WorldSurroundings { landmarks: Array<{ landmark: WorldLandmark; distanceM: number }>; water: boolean; forest: boolean; street: string | null }
 
 type Box = { cx: number; cy: number; hw: number; hd: number; cos: number; sin: number }
 
@@ -82,6 +93,16 @@ export interface WorldEngine {
   position: () => GeoPoint
   /** Alle Kacheln verwerfen und neu holen (nach einem Nachladen von Kartendaten). */
   reloadTiles: () => void
+  /** Name über der eigenen Figur. */
+  setPlayerName: (name: string) => void
+  /** Baustellen zeigen (ersetzt die vorigen). */
+  setSites: (sites: WorldSite[]) => void
+  /** Weg zu einem Ziel als Linie zeigen (null: keiner). */
+  setRouteTarget: (at: GeoPoint | null) => void
+  /** Wahrzeichen, Wasser, Wald und Straße um einen Punkt (nur geladene Kacheln). */
+  surroundings: (at: GeoPoint, radiusM: number) => WorldSurroundings
+  /** Alle Wahrzeichen der geladenen Kacheln mit Abstand zur Figur. */
+  landmarks: () => Array<{ landmark: WorldLandmark; distanceM: number }>
   /** NOXIA-Gebäude neu holen (nach Kauf oder Bau). */
   reloadNoxia: () => Promise<void>
   destroy: () => void
@@ -200,7 +221,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Straßennamen über allem, erst ab einer Zoomstufe, in der sie lesbar sind
   // und sich nicht drängen (LABEL_MIN_ZOOM).
   const labels = new PIXI.Container({ isRenderGroup: true })
-  world.addChild(ground, lines, objects, labels)
+  // Baustellen und Weg zum Ziel: über den Straßen, unter Häusern und Figuren.
+  const overlay = new PIXI.Container({ isRenderGroup: true })
+  world.addChild(ground, lines, overlay, objects, labels)
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -234,6 +257,14 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
   playerSprite.zIndex = player.x + player.y
   addObject(playerSprite)
+  const playerName = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 24, fontWeight: '800', fill: 0xf3f7f8, stroke: { color: 0x173845, width: 6, join: 'round' } } })
+  playerName.anchor.set(0.5, 1)
+  playerName.scale.set(0.12)
+  labels.addChild(playerName)
+  // Weg zum Ziel und Baustellen liegen auf dem Boden, über den Straßen.
+  const routeLine = new PIXI.Graphics()
+  const siteLayer = new PIXI.Container()
+  overlay.addChild(siteLayer, routeLine)
 
   // NOXIA-Gebäude zuerst holen, damit jede Kachel beim Aufbau weiß, welches
   // echte Gebäude einem Spieler gehört.
@@ -878,7 +909,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Selbst gehen ────────────────────────────────────────────────────
   // Nahe Ziele (unter 30 m) gerade, weite entlang der Straßen der geladenen
   // Kacheln. Bewegt sich das Ziel weit weg (Person), wird neu geplant.
-  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; stuck: number } | null = null
+  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; planAt: number; stuck: number } | null = null
   function planRoute(to: { x: number; y: number }, from: { x: number; y: number } = player) {
     if (Math.hypot(to.x - from.x, to.y - from.y) < 30) return [to]
     const graph = new RoadGraph()
@@ -899,8 +930,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (!target) { autoWalk = null; return }
     const to = toWorld(target)
     if (Math.hypot(to.x - player.x, to.y - player.y) <= autoWalk.withinM) { const done = autoWalk.onArrive; autoWalk = null; done?.(); return }
-    if (!autoWalk.planFor || Math.hypot(to.x - autoWalk.planFor.x, to.y - autoWalk.planFor.y) > 12) {
-      autoWalk.path = planRoute(to); autoWalk.planFor = to
+    // Neu planen, wenn das Ziel sich bewegt hat oder (bei weiten Zielen) neue Kacheln geladen sind.
+    const now = performance.now()
+    if (!autoWalk.planFor || Math.hypot(to.x - autoWalk.planFor.x, to.y - autoWalk.planFor.y) > 12 || (autoWalk.path.length <= 1 && now - autoWalk.planAt > 4000)) {
+      autoWalk.path = planRoute(to); autoWalk.planFor = to; autoWalk.planAt = now
     }
     let next = autoWalk.path[0] ?? to
     if (autoWalk.path.length > 1 && Math.hypot(next.x - player.x, next.y - player.y) < 1.5) { autoWalk.path.shift(); next = autoWalk.path[0] }
@@ -916,25 +949,125 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     else if (autoWalk.stuck > 1.2) { const done = autoWalk.onArrive; autoWalk = null; done?.() }
   }
 
+  // ── Weg zum Ziel ────────────────────────────────────────────────────
+  // Gestrichelte Linie vom Spieler zum Ziel, entlang der Straßen; jede Sekunde neu.
+  let routeTarget: GeoPoint | null = null, routeAt = 0
+  let routeInfo: { lengthM: number; viaRoads: boolean } | null = null
+  function updateRoute(now: number) {
+    if (!routeTarget || now - routeAt < 1000) return
+    routeAt = now
+    const to = toWorld(routeTarget)
+    const path = [{ x: player.x, y: player.y }, ...planRoute(to)]
+    if (Math.hypot(path[path.length - 1].x - to.x, path[path.length - 1].y - to.y) > 1) path.push(to)
+    let lengthM = 0
+    routeLine.clear()
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1], b = path[i], length = Math.hypot(b.x - a.x, b.y - a.y)
+      // Striche von 3 m mit 2 m Lücke
+      for (let t = 0; t < length; t += 5) {
+        const p = iso(a.x + (b.x - a.x) * t / length, a.y + (b.y - a.y) * t / length)
+        const e = Math.min(length, t + 3)
+        const q = iso(a.x + (b.x - a.x) * e / length, a.y + (b.y - a.y) * e / length)
+        routeLine.moveTo(p.x, p.y).lineTo(q.x, q.y)
+      }
+      lengthM += length
+    }
+    routeLine.stroke({ width: 1.1, color: 0xe0b23c, alpha: 0.95, cap: 'round' })
+    const end = iso(to.x, to.y)
+    routeLine.circle(end.x, end.y, 2.4).stroke({ width: 0.8, color: 0xe0b23c })
+    routeInfo = { lengthM: Math.round(lengthM), viaRoads: path.length > 3 }
+  }
+
+  // ── Baustellen ──────────────────────────────────────────────────────
+  let sites: WorldSite[] = []
+  function drawSites() {
+    for (const child of siteLayer.removeChildren()) child.destroy({ children: true })
+    for (const site of sites) {
+      const c = toWorld(site.at)
+      const a = site.rotation * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a)
+      const hw = Math.max(4, site.w / 2), hd = Math.max(4, site.d / 2)
+      const corners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([lx, ly]) => iso(c.x + lx * cos - ly * sin, c.y + lx * sin + ly * cos))
+      const g = new PIXI.Graphics()
+      g.poly(corners.flatMap(p => [p.x, p.y])).fill({ color: 0xd7a941, alpha: 0.55 })
+      // gestrichelter Rand
+      for (let i = 0; i < 4; i++) {
+        const p = corners[i], q = corners[(i + 1) % 4], length = Math.hypot(q.x - p.x, q.y - p.y)
+        for (let t = 0; t < length; t += 4) { const e = Math.min(length, t + 2.5); g.moveTo(p.x + (q.x - p.x) * t / length, p.y + (q.y - p.y) * t / length).lineTo(p.x + (q.x - p.x) * e / length, p.y + (q.y - p.y) * e / length) }
+      }
+      g.stroke({ width: 0.8, color: 0x6e5317 })
+      // Fortschrittsbalken in der Mitte
+      const m = iso(c.x, c.y)
+      g.roundRect(m.x - 7, m.y - 1.2, 14, 2.4, 1).fill(0x2d2410)
+      if (site.progress !== null) g.roundRect(m.x - 7, m.y - 1.2, 14 * Math.max(0, Math.min(1, site.progress)), 2.4, 1).fill(0xf0d27a)
+      g.eventMode = 'static'
+      ;(g as unknown as { pick: WorldPick }).pick = { type: 'site', id: site.id }
+      siteLayer.addChild(g)
+    }
+  }
+
+  // ── Umgebung ────────────────────────────────────────────────────────
+  function surroundingsOf(p: { x: number; y: number }, radiusM: number): WorldSurroundings {
+    const landmarks: WorldSurroundings['landmarks'] = []
+    let water = false, forest = false, street: string | null = null, streetD = Math.min(60, radiusM)
+    const near = (x: number, y: number) => Math.hypot(x - p.x, y - p.y) <= radiusM
+    for (const entry of loaded.values()) {
+      if (Math.abs(entry.ox + tileSizeM / 2 - p.x) > tileSizeM / 2 + radiusM || Math.abs(entry.oy + tileSizeM / 2 - p.y) > tileSizeM / 2 + radiusM) continue
+      for (const place of entry.data.places ?? []) {
+        const d = Math.hypot(entry.ox + place.x - p.x, entry.oy + place.y - p.y)
+        if (d <= radiusM) landmarks.push({ landmark: landmarkOf(place, entry.ox, entry.oy), distanceM: d })
+      }
+      for (const area of entry.data.areas) {
+        if ((area.k !== 'water' && area.k !== 'forest') || (area.k === 'water' ? water : forest)) continue
+        const ring = Array.from({ length: area.p.length / 2 }, (_, i) => ({ x: entry.ox + area.p[i * 2], y: entry.oy + area.p[i * 2 + 1] }))
+        if (insidePolygon(p, ring) || ring.some(q => near(q.x, q.y))) { if (area.k === 'water') water = true; else forest = true }
+      }
+      if (!water) for (const river of entry.data.rivers) for (let i = 0; i + 1 < river.length; i += 2) if (near(entry.ox + river[i], entry.oy + river[i + 1])) { water = true; break }
+      for (const road of entry.data.roads) {
+        if (!road.n) continue
+        for (let i = 0; i + 1 < road.p.length; i += 2) {
+          const d = Math.hypot(entry.ox + road.p[i] - p.x, entry.oy + road.p[i + 1] - p.y)
+          if (d < streetD) { streetD = d; street = road.n }
+        }
+      }
+    }
+    landmarks.sort((a, b) => a.distanceM - b.distanceM)
+    return { landmarks, water, forest, street }
+  }
+
   // ── Klicks ──────────────────────────────────────────────────────────
   // Ein Klick ist ein Zeigerdruck ohne nennenswertes Ziehen. Getroffen wird das
   // oberste Objekt unter dem Zeiger (Person, Gebäude), sonst der Boden.
   let pressAt: { x: number; y: number } | null = null
   const pointerDown = (event: PointerEvent) => { pressAt = { x: event.offsetX, y: event.offsetY } }
-  const pointerUp = (event: PointerEvent) => {
-    if (!inputEnabled) { pressAt = null; return }
-    if (!pressAt || Math.hypot(event.offsetX - pressAt.x, event.offsetY - pressAt.y) > 6 || !options.onPick) { pressAt = null; return }
-    pressAt = null
-    const hit = app.renderer.events.rootBoundary.hitTest(event.offsetX, event.offsetY)
+  /** Oberstes Objekt unter einem Bildpunkt (ohne Boden). */
+  function pickAt(x: number, y: number): WorldPick | null {
+    const hit = app.renderer.events.rootBoundary.hitTest(x, y)
     let node: Container | null = hit
     while (node && !(node as unknown as { pick?: WorldPick }).pick) node = node.parent
     const pick = (node as unknown as { pick?: WorldPick } | null)?.pick
     const box = (node as unknown as { box?: Box } | null)?.box
     if (pick?.type === 'building' && box) {
       const landmark = landmarkIn(box)
-      options.onPick(landmark ? { ...pick, name: landmark.name, landmark } : pick)
-      return
+      return landmark ? { ...pick, name: landmark.name, landmark } : pick
     }
+    return pick ?? null
+  }
+  let hoverAt = 0, hovering = false
+  const pointerMove = (event: PointerEvent) => {
+    if (!options.onHover || event.pointerType === 'touch') return
+    const now = performance.now()
+    if (now - hoverAt < 60) return
+    hoverAt = now
+    const pick = inputEnabled ? pickAt(event.offsetX, event.offsetY) : null
+    if (pick) { hovering = true; options.onHover({ pick, x: event.clientX, y: event.clientY }) }
+    else if (hovering) { hovering = false; options.onHover(null) }
+  }
+  const pointerLeave = () => { if (hovering) { hovering = false; options.onHover?.(null) } }
+  const pointerUp = (event: PointerEvent) => {
+    if (!inputEnabled) { pressAt = null; return }
+    if (!pressAt || Math.hypot(event.offsetX - pressAt.x, event.offsetY - pressAt.y) > 6 || !options.onPick) { pressAt = null; return }
+    pressAt = null
+    const pick = pickAt(event.offsetX, event.offsetY)
     if (pick) { options.onPick(pick); return }
     // Boden: Bildpunkt → Bodenpunkt (Höhe 0)
     const centre = iso(camera.x, camera.y)
@@ -944,18 +1077,23 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
   app.canvas.addEventListener('pointerdown', pointerDown)
   app.canvas.addEventListener('pointerup', pointerUp)
+  app.canvas.addEventListener('pointermove', pointerMove)
+  app.canvas.addEventListener('pointerleave', pointerLeave)
 
   // ── Eingabe ─────────────────────────────────────────────────────────
   const keys = new Set<string>()
+  // Pfeiltasten wie WASD
+  const ARROWS: Record<string, string> = { arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' }
+  const keyName = (event: KeyboardEvent) => { const key = event.key.toLowerCase(); return ARROWS[key] ?? key }
   let inputEnabled = true
   const down = (event: KeyboardEvent) => {
     if (!inputEnabled) return
     const target = event.target as HTMLElement | null
     if (target?.closest?.('input,textarea,select')) return
-    const key = event.key.toLowerCase()
+    const key = keyName(event)
     if (['w', 'a', 's', 'd', 'shift'].includes(key)) { keys.add(key); if (key !== 'shift') event.preventDefault() }
   }
-  const up = (event: KeyboardEvent) => keys.delete(event.key.toLowerCase())
+  const up = (event: KeyboardEvent) => keys.delete(keyName(event))
   const blur = () => keys.clear()
   const wheel = (event: WheelEvent) => { event.preventDefault(); zoom = Math.max(minZoom(), Math.min(MAX_ZOOM, zoom * (event.deltaY > 0 ? 0.9 : 1.1))) }
   const minZoom = () => Math.min(MAX_ZOOM, minZoomForTiles(app.screen.width, app.screen.height, tileSizeM, MAX_VIEW_TILES))
@@ -993,6 +1131,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     playerSprite.position.set(foot.x, foot.y)
     placePlayerDepth()
     updateSeeThrough(logicStart)
+    playerName.position.set(foot.x, foot.y - 10)
+    updateRoute(logicStart)
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
@@ -1014,7 +1154,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       hudRebuilds = rebuilds
       const hereTile = loaded.get(tileKey(tileAt(geoToMerc(geo))))
       const here = { loaded: Boolean(hereTile?.done), blocks: hereTile?.data.blocks.length ?? 0, built: Boolean(hereTile?.data.areas.some(area => area.k === 'built' || area.k === 'garden')) }
-      options.onHud({ frame: stats.summary(), rebuildsPerS, here, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom })
+      options.onHud({ frame: stats.summary(), rebuildsPerS, here, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom, route: routeInfo })
     }
     logicMs = performance.now() - logicStart
   })
@@ -1039,7 +1179,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       walker.sent = { path, length, start: performance.now(), seconds: Math.max(1, seconds) * Math.min(3, Math.max(1, length / straight)) }
     },
     releasePerson(id) { const walker = walkers.get(id); if (walker) walker.sent = null },
-    walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, stuck: 0 } },
+    walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
+    setPlayerName(name) { playerName.text = name.slice(0, 40) },
+    setSites(list) { sites = list; drawSites() },
+    setRouteTarget(at) { routeTarget = at; routeAt = 0; if (!at) { routeLine.clear(); routeInfo = null } },
+    surroundings(at, radiusM) { return surroundingsOf(toWorld(at), radiusM) },
+    landmarks() {
+      const out: Array<{ landmark: WorldLandmark; distanceM: number }> = []
+      for (const entry of loaded.values()) for (const place of entry.data.places ?? []) {
+        out.push({ landmark: landmarkOf(place, entry.ox, entry.oy), distanceM: Math.hypot(entry.ox + place.x - player.x, entry.oy + place.y - player.y) })
+      }
+      return out
+    },
     stopWalking() { autoWalk = null },
     setInputEnabled(enabled) { inputEnabled = enabled; if (!enabled) { keys.clear(); autoWalk = null } },
     distanceTo(at) { const p = toWorld(at); return Math.hypot(p.x - player.x, p.y - player.y) },
@@ -1060,6 +1211,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       disposed = true
       app.canvas.removeEventListener('pointerdown', pointerDown)
       app.canvas.removeEventListener('pointerup', pointerUp)
+      app.canvas.removeEventListener('pointermove', pointerMove)
+      app.canvas.removeEventListener('pointerleave', pointerLeave)
       for (const run of cleanup) run()
       try { app.destroy(true, { children: true }) } catch { /* schon weg */ }
     },
