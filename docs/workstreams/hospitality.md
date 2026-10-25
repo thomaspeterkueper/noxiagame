@@ -75,6 +75,7 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 - W-3 an Weltkarte: Lesbarkeit der neuen Karte (Figur, Straßen, Anklickbares, Schilder), doppelte Leisten.
 - W-2 an Weltkarte: Layout der neuen Karte – eine Spalte rechts, nur was gerade gebraucht wird, Entwicklerdinge versteckt.
 - W-1 an Weltkarte: Straßennamen und Hausnummern in der Spielansicht, Zielwahl nach Adresse.
+- R-12 an Bevölkerung und Ökonomie: Name des Spielers und Gefälligkeiten als Wissen der Figur (heute nur drei Wortwechsel Gedächtnis).
 
 ## Offene Aufgaben
 

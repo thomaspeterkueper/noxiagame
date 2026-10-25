@@ -205,3 +205,12 @@ Offen und hier zu entscheiden:
 - **Wer wohnt in einem realen Haus?** Heute wohnen die Bewohner der Erde nur in NOXIA-Wohnblöcken; OSM-Häuser sind leer. Vorschlag: Ein Wohnhaus hat eine Kapazität aus Fläche × Geschosse (etwa 1 Platz je 40 m² Wohnfläche); Bewohner bekommt es erst, wenn der Wohnungsmarkt (NOXIA-LIVING-0010) dort Plätze vergibt. Dann ist „bewohnt“ eine echte Spielgröße und keine Schätzung.
 - **Preisformel.** Vorschlag: Bodenwert (`land_value` der Kachel) × Grundfläche + Bauwert (Fläche × Geschosse × Satz je Art) + Mietertrag × Faktor (z. B. zehn Jahresmieten).
 - **Was nicht verkäuflich ist:** Vorschlag: Kirchen, Rathaus, Schulen, Bahnhof und andere Wahrzeichen (öffentliche Gebäude) nicht; Industrie ja.
+
+### R-12 (Gastronomie, 25.10.2026): Was eine Figur vom Spieler weiß – Name, Gefälligkeiten
+
+Gespräch im Startcafé, 25.10.2026: Der Spieler sagt „Nenn mich Thomas“, Mika antwortet „das merke ich mir“ – und kann es nicht. `npc_player_conversation_memory` hält nur die letzten drei Wortwechsel als Text (`recent_exchanges`); der Name ist beim nächsten Besuch sehr wahrscheinlich schon aus dem Fenster gerutscht, und ein ausgegebener Kaffee bleibt ebenso nur als Satz hängen. Die Figur verspricht also etwas, das das Spiel nicht hält.
+
+- Spiegel zu `player_person_identity_knowledge`: ein Wissenssatz je Person und Spieler – Name, unter dem sie den Spieler kennt (`known_player_name`), gelernt aus dem Gespräch (Quelle, Tick), dazu zählbare Gefälligkeiten (ausgegeben, geholfen) mit Zeit. Keine freie Textablage, sondern Felder, die die Gesprächsroute als Fakt mitgibt („Der Spieler heißt Thomas; er hat dir am 25.10. einen Kaffee ausgegeben“).
+- Lernen des Namens: serverseitig aus der Spieleräußerung (Muster „nenn mich …“, „ich heiße …“, „ich bin …“) oder über einen Marker der Figur wie bei `[[ACTION:ACCEPT_CREDITS]]; die Oberfläche könnte ergänzend „Vorstellen“ als Knopf anbieten, wenn ihr das lieber ist.
+- Gefälligkeiten: `recipientPersonId` der Bestellroute (Aufgabe 9) schreibt den Eintrag; die Gesprächsroute liest ihn. Hängt mit R-8 (Wissensspuren) zusammen – dies wäre der erste Satz solcher Spuren.
+- Bis dahin: Die Gesprächsroute sollte der Figur sagen, dass sie sich nur an die letzten Wortwechsel erinnert, damit sie kein „das merke ich mir“ verspricht – das übernimmt Gastronomie.
