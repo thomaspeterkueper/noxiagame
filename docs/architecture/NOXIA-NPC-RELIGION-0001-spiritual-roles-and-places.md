@@ -94,8 +94,33 @@ Ein gewöhnlicher Kirchenbesuch benötigt keine vollständige Simulation einer R
 
 ## Nächste sichere Schritte
 
-1. vorhandene reale Kirchen auf der Earth-Surface mit dem gemeinsamen Interior verknüpfen;
-2. bei realen Moscheen/Tempeln/Synagogen dieselbe Fallback-Familie verwenden;
-3. einzelne geistliche NPCs aus normalen Personen + Work Assignment erzeugen;
+1. ✅ erster geistlicher NPC an realer Kirche produktiv: Elias Hartmann · St. Johannes Sundern;
+2. reale Kirchen/Moscheen/Tempel/Synagogen weiter über die gemeinsame Fallback-Familie anbinden;
+3. als nächsten Vergleichspilot eine nichtchristliche geistliche Rolle in derselben Architektur anlegen;
 4. erst danach Kalender-/Veranstaltungslogik ergänzen;
 5. Resonanzplätze der Omnizedenz als eigene Weltorte definieren, sobald reale/fiktive Standortentscheidungen vorliegen.
+
+
+## Pilot: Elias Hartmann · St. Johannes Sundern
+
+Der erste vollständige geistliche NPC ist produktiv angelegt:
+
+- `person_key = earth-sundern-st-johannes-priest-001`
+- Rolle: `priest`, öffentlich „Pfarrer · St. Johannes“
+- Arbeitsort: reales importiertes OSM-Feature St. Johannes, kein dupliziertes `tile_entity`
+- Wohnung: reguläre Mietwohnung im bestehenden Earth-Wohnungsmarkt
+- Bedürfnisse, Wirtschaftsakteur und Life State: normale Living-Population-Systeme
+- Alltag: normaler Person-Tick; keine eigene Religionssimulation
+- soziale Basis: eine schwache lokale Bekanntschaft zu Mika Berger, keine vorgefertigte Freundschaft
+- Surface Presence: bei Arbeit `region_feature_anchor` an St. Johannes
+- World-Lab: autoritative `person_surface_presence` hat Vorrang vor Gebäude-Fallbacks
+
+Damit ist der Pilot nicht nur Seed-Datenbestand, sondern in derselben Personen-, Wohn-, Beziehungs-,
+Beobachtungs- und Kartenarchitektur wie andere Bewohner verankert.
+
+### Bewusste Grenze
+
+Der Gemeindeträger existiert als institutioneller Arbeitgeberbezug, aber die geistliche Stelle ist
+noch nicht in die automatische Payroll aufgenommen. Einnahmen und Finanzierung religiöser
+Institutionen sind noch nicht modelliert; deshalb wird hier keine künstliche Geldquelle eingeführt.
+
