@@ -25,7 +25,7 @@ import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick } from './wor
 export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
-  | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string }
+  | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind }
   | { kind: 'landmark'; landmark: WorldLandmark }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
@@ -47,10 +47,19 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
   if (pick.type === 'noxia') return own ? { kind: 'building', at: { lat: own.lat, lon: own.lon }, title: own.name, noxiaId: own.id } : { kind: 'none' }
-  return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id }
+  return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id, source: pick.source, areaM2: pick.areaM2, levels: pick.levels, block: pick.kind }
 }
 
 type Line = { role: 'user' | 'assistant'; content: string }
+
+/**
+ * Kaufangebot für ein reales Gebäude, das noch niemandem gehört (Request R-12 an
+ * Bevölkerung und Ökonomie). Solange die Schnittstelle nicht antwortet, zeigt die
+ * Tafel nichts zum Kauf.
+ */
+type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; rentPerInterval?: number; reason?: string }
+
+function credits(value: number) { return Math.round(value).toLocaleString('de-DE') + ' Cr' }
 
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, tick }: {
   engine: WorldEngine | null
@@ -67,6 +76,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [walking, setWalking] = useState(false)
   /** Wer gerade wohin unterwegs ist (aus einem Gespräch): Person → NOXIA-Gebäude. */
   const [visits, setVisits] = useState<Record<string, string>>({})
+  const [offers, setOffers] = useState<Record<string, Offer | null>>({})
+  const [buying, setBuying] = useState(false)
+  const [buyError, setBuyError] = useState('')
 
   const person = panel.kind === 'person' ? residents.find(resident => resident.id === panel.id) ?? null : null
   const building = panel.kind === 'building' ? panel : null
@@ -98,7 +110,45 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
   const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
-  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage('') }
+  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError('') }
+
+  // Kaufangebot je Gebäude einmal abfragen (nur fremde, nicht NOXIA-Gebäude mit OSM-Kennung).
+  const offerSource = building && !building.noxiaId && building.source ? building.source : null
+  useEffect(() => {
+    if (!offerSource || !building || offerSource in offers) return
+    let stale = false
+    void (async () => {
+      let offer: Offer | null = null
+      try {
+        const { token } = await getSessionInfo()
+        const query = new URLSearchParams({ source: offerSource, lat: String(building.at.lat), lon: String(building.at.lon), areaM2: String(building.areaM2 ?? 0), levels: String(building.levels ?? 1), kind: building.block ?? 'house' })
+        const response = await fetch('/api/game/building-offer?' + query, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+        const json = response.ok ? await response.json().catch(() => null) : null
+        offer = json && typeof json.forSale === 'boolean' ? json as Offer : null
+      } catch { offer = null }
+      if (!stale) setOffers(current => ({ ...current, [offerSource]: offer }))
+    })()
+    return () => { stale = true }
+  }, [offerSource, building, offers])
+  const offer = offerSource ? offers[offerSource] ?? null : null
+
+  async function buy() {
+    if (!building || !offerSource || buying) return
+    setBuying(true); setBuyError('')
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/building-offer', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: offerSource, lat: building.at.lat, lon: building.at.lon }),
+      })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok || !json.entityId) { setBuyError(String(json.error ?? 'Kauf nicht möglich.')); return }
+      setOffers(current => { const next = { ...current }; delete next[offerSource]; return next })
+      await engine?.reloadNoxia()
+      setPanel({ ...building, noxiaId: String(json.entityId) })
+    } catch { setBuyError('Kauf derzeit nicht erreichbar.') } finally { setBuying(false) }
+  }
 
   const close = useCallback(() => setPanel({ kind: 'none' }), [setPanel])
   useEffect(() => {
@@ -197,6 +247,17 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{buildingDistance === null ? '' : `${Math.round(buildingDistance)} m entfernt.`}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+      {!own && offer && (offer.forSale
+        ? <>
+          <dl>
+            <dt>Eigentümer</dt><dd>{offer.seller ?? 'Gemeinde'}</dd>
+            <dt>Bewohner</dt><dd>{offer.residents ? `${offer.residents} – bleiben und zahlen Miete an dich` : 'keine'}</dd>
+            {offer.rentPerInterval ? <><dt>Miete</dt><dd>{credits(offer.rentPerInterval)} je Abrechnung</dd></> : null}
+            <dt>Preis</dt><dd><b>{credits(offer.price ?? 0)}</b></dd>
+          </dl>
+          <div className="row"><span>{buyError || 'Das Geld geht an die Gemeinde.'}</span><button disabled={buying} onClick={() => void buy()}>{buying ? '…' : 'Kaufen'}</button></div>
+        </>
+        : offer.reason ? <div className="row"><span>Nicht verkäuflich: {offer.reason}</span></div> : null)}
     </>}
     {landmark && <>
       <div className="head"><div><small>REALER ORT · {landmarkLabel(landmark.kind, landmark.tags).toUpperCase()}</small><b>{landmark.name}</b></div><button onClick={close} aria-label="Schließen">×</button></div>

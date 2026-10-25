@@ -47,7 +47,7 @@ export interface WorldEngineOptions {
 /** Was unter dem Zeiger lag, als geklickt wurde. */
 export type WorldPick =
   | { type: 'person'; id: string }
-  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark }
+  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; source?: string; areaM2: number; levels: number }
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
@@ -82,6 +82,8 @@ export interface WorldEngine {
   position: () => GeoPoint
   /** Alle Kacheln verwerfen und neu holen (nach einem Nachladen von Kartendaten). */
   reloadTiles: () => void
+  /** NOXIA-Gebäude neu holen (nach Kauf oder Bau). */
+  reloadNoxia: () => Promise<void>
   destroy: () => void
 }
 
@@ -407,7 +409,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Für Klicks: was dieses Gebäude ist. Ein Wahrzeichen in oder dicht an ihm
     // wird beim Klick gesucht (es kann in der Nachbarkachel liegen).
     g.eventMode = 'static'
-    ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id }
+    ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id, source: block.i, areaM2: Math.round(block.w * block.d), levels: block.l }
     ;(g as unknown as { box: Box }).box = { cx, cy, hw, hd, cos, sin }
     // Hindernis für die Spielfigur (Grundriss, ein halber Meter Abstand)
     if (footprints) {
@@ -644,9 +646,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     building.claimed = true
     if (building.stand) building.stand.visible = false
   }
-  void (async () => {
-    for (const building of noxia) {
-      if (disposed) return
+  async function placeStands(list: NoxiaPlaced[]) {
+    for (const building of list) {
+      if (disposed || !noxia.includes(building)) return
       const visual = options.noxiaVisual?.(building.typeId)
       const foot = iso(building.x, building.y)
       let stand: Container | null = null
@@ -676,7 +678,27 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       stand.visible = !building.claimed
       addObject(stand)
     }
-  })()
+  }
+  void placeStands(noxia)
+  /** NOXIA-Gebäude neu holen (nach Kauf oder Bau) und die Kacheln neu zeichnen. */
+  async function reloadNoxia() {
+    let list: NoxiaBuilding[] = []
+    try { list = options.loadNoxia ? await options.loadNoxia() : [] } catch { return }
+    if (disposed) return
+    for (const building of noxia) building.stand?.destroy()
+    noxia.length = 0
+    for (const building of list) noxia.push({ ...building, rotation: Number(building.rotation ?? 0) || 0, ...toWorld({ lat: building.lat, lon: building.lon }), claimed: false, stand: null })
+    reload()
+    void placeStands([...noxia])
+  }
+  function reload() {
+    for (const [key, entry] of loaded) dropTile(key, entry)
+    fetched.clear()
+    inFlight.clear()
+    generation++
+    building = []
+    lastViewKey = ''
+  }
 
   // ── Personen ────────────────────────────────────────────────────────
   // Jede Person ist eine kleine Figur mit Beschriftung. Wer ein Zuhause oder
@@ -989,14 +1011,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       }
       return best
     },
-    reloadTiles() {
-      for (const [key, entry] of loaded) dropTile(key, entry)
-      fetched.clear()
-      inFlight.clear()
-      generation++
-      building = []
-      lastViewKey = ''
-    },
+    reloadTiles: reload,
+    reloadNoxia,
     destroy() {
       disposed = true
       app.canvas.removeEventListener('pointerdown', pointerDown)

@@ -38,6 +38,8 @@ export interface TileBlock {
   h?: string
   /** Name des Gebäudes aus OSM, z. B. „Metallwerk Sundern (MESU)“. */
   nm?: string
+  /** Kennung der Quelle, z. B. „osm:way:123“ – für Kauf und Eigentum. */
+  i?: string
 }
 export interface SimplifiedTile {
   z: number
@@ -362,6 +364,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       if (street && number) block.h = `${street} ${number}`.slice(0, 80)
       else if (number) block.h = number.slice(0, 20)
       if (typeof properties.name === 'string' && properties.name.trim()) block.nm = properties.name.trim().slice(0, 80)
+      if (typeof properties.noxia_source_id === 'string' && properties.noxia_source_id.startsWith('osm:')) block.i = properties.noxia_source_id.slice(0, 40)
       out.blocks.push(block)
       continue
     }

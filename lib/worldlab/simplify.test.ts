@@ -64,6 +64,8 @@ describe('world lab: simplification', () => {
     expect(built.blocks.map(block => block.k).sort()).toEqual(['church', 'factory', 'house'])
     const house = built.blocks.find(block => block.k === 'house')!
     expect([house.x, house.y, house.w, house.d]).toEqual([46, 44, 12, 8])
+    expect(house.i).toBe('osm:way:1')
+    expect(built.blocks.find(block => block.k === 'church')!.i).toBeUndefined()
     expect(built.blocks.find(block => block.k === 'church')!.l).toBe(5)
     // das Haus jenseits der Kachelgrenze gehört dem Nachbarn – und nur ihm
     const neighbour = buildTile(features, { x: tile.x + 1, y: tile.y }, TILE_Z)

@@ -89,6 +89,14 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 13. ~~Andere Plätze und Parks~~ Erledigt (14.10.2026): Importprofil 5 holt Spielplätze, Gärten, Freibäder, Friedhöfe, Kleingärten, Rasen, Festplätze und Parkplätze (`feature_type = 'place_area'`); jede Sportart hat ihre Fläche. Regionen mit Profil 4 werden beim Öffnen von `/world-lab` neu aufgebaut.
 14. ~~Laufbahnen, Einzelbäume, Alleen~~ Erledigt (14.10.2026): Laufbahnen als Fläche mit heller Kante oder, wenn OSM sie als Linie führt, als rotes Band mit Bahnlinie. Importprofil 6 holt Einzelbäume (`natural=tree`) und Alleen (`natural=tree_row`, alle 8 m ein Baum); Bäume stehen als Objekte mit Tiefe vor und hinter Häusern, Laub- oder Nadelbaum fest je Ort (`lib/worldlab/treeSprites.ts`).
 
+## Gebäude kaufen (Thomas, 25.10.2026)
+
+Entschieden: Reale Gebäude, die noch niemandem gehören, kann man **kaufen**; das Geld geht an die Gemeinde. Bewohner bleiben und zahlen Miete an den neuen Eigentümer; Mieteinnahmen erhöhen den Kaufpreis. **Abreißen nur selbst gekaufte Gebäude**, danach an der Stelle bauen.
+
+- Buchung, Preis, Eigentum und Miete gehören zu Bevölkerung und Ökonomie: Request R-12 in `population-economy.md` (mit Vorschlag für die Schnittstelle `/api/game/building-offer`).
+- Gebaut in der Karte: Jedes Gebäude trägt seine OSM-Kennung (`i` in den Kacheldaten), Grundfläche und Geschosse. Die Gebäudetafel fragt das Angebot ab und zeigt Eigentümer, Bewohner, Miete, Preis und „Kaufen“, sobald die Schnittstelle antwortet; bis dahin nichts. Nach dem Kauf holt die Karte die NOXIA-Gebäude neu (`reloadNoxia`), das Haus erscheint als eigenes.
+- Offen (Karte, nach R-12): „Abreißen“ und „Hier bauen“ in der Tafel eines eigenen gekauften Gebäudes.
+
 ## Requests aus anderen Teilprojekten
 
 ### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht – in der Weltkarte erledigt (25.10.2026)

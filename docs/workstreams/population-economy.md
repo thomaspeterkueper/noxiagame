@@ -169,3 +169,30 @@ Entscheidung Thomas, 25.10.2026: Über einer Figur steht in der Spielansicht nur
 - Spalte oder eigener Wissenssatz: `known_age_years` bzw. `known_birth_year` je Spieler und Person, gelernt wie der Name (im Gespräch genannt, aus Dokumenten, von Dritten); Quelle und Tick wie beim Namen.
 - `GET /api/game/population` und `/api/game/hospitality/guests` liefern dann `knownAgeYears`; die Oberfläche hängt es an (`personSceneLabel` nimmt das Feld schon an).
 - Dazu das Spieljahr: Alter = Spieljahr − Geburtsjahr. Das Spieljahr (2086 in der Kopfzeile) hat im Code keine gemeinsame Quelle; bitte eine Funktion dafür.
+
+### R-12 (Erdkarte, 25.10.2026): Bestehende Gebäude der Erdkarte kaufen
+
+Entscheidung Thomas, 25.10.2026: Reale Gebäude der Erdkarte, die noch niemandem im Spiel gehören, kann ein Spieler **kaufen**. Ersetzen geht nur über den Kauf.
+
+- **Geld geht an die Gemeinde** (öffentlicher Akteur des Ortes, auf der Erde z. B. Sundern) – als Transfer nach NOXIA-FIN-0001, keine Senke.
+- **Bewohnte Gebäude:** Die Bewohner bleiben und zahlen künftig Miete an den neuen Eigentümer.
+- **Mieteinnahmen erhöhen den Kaufpreis.** Ein vermietetes Haus kostet mehr als ein leeres gleicher Größe.
+- **Abreißen nur selbst gekaufter Gebäude.** Danach darf man an der Stelle bauen (Bau über `/api/game/build`, Platz ist der alte Grundriss).
+
+Was die Erdkarte schon hat und liefert:
+- Jedes Gebäude der Karte trägt seine OSM-Kennung (`osm:way:<id>`, in den Kacheldaten als `i`), dazu Grundfläche (m²), Geschosse, Art (Wohnhaus, Mehrfamilienhaus, Halle, Fabrik, Kirche, Schuppen), Anschrift und Lage.
+- Gebäude, die ein NOXIA-Gebäude belegt (Grundriss überdeckt), zeichnet die Karte schon als NOXIA-Gebäude mit Eigentümerfarbe. Ein gekauftes Haus erscheint also automatisch als eigenes, sobald es als `tile_entities`-Zeile mit Lage und Grundriss existiert.
+- Die Tafel eines Gebäudes fragt das Angebot ab und zeigt „Kaufen“, sobald die Schnittstelle unten antwortet. Bis dahin zeigt sie nichts zum Kauf (gebaut, `app/world-lab/WorldPanels.tsx`).
+
+Gebraucht wird (Vorschlag für die Schnittstelle, Änderungen gern – bitte in `world-map.md` vermerken):
+
+`GET /api/game/building-offer?source=osm:way:123&lat=…&lon=…&areaM2=…&levels=…&kind=house`
+→ `{ forSale: true, price, seller: "Gemeinde Sundern", residents, rentPerInterval, reason? }` oder `{ forSale: false, reason: "gehört bereits …" | "Wahrzeichen" | … }`
+
+`POST /api/game/building-offer` mit `{ source, lat, lon }` (Werte zu Fläche und Art prüft der Server selbst nach)
+→ `{ entityId }`. Atomar: Preis neu berechnen, Guthaben prüfen, Transfer Käufer → Gemeinde, `tile_entities`-Zeile anlegen (Eigentümer Spieler, Lage, Drehung, Grundriss, `residential_capacity`, Quelle `osm:…`, eindeutig je Quelle), Mietverhältnisse der Bewohner auf den neuen Vermieter umstellen.
+
+Offen und hier zu entscheiden:
+- **Wer wohnt in einem realen Haus?** Heute wohnen die Bewohner der Erde nur in NOXIA-Wohnblöcken; OSM-Häuser sind leer. Vorschlag: Ein Wohnhaus hat eine Kapazität aus Fläche × Geschosse (etwa 1 Platz je 40 m² Wohnfläche); Bewohner bekommt es erst, wenn der Wohnungsmarkt (NOXIA-LIVING-0010) dort Plätze vergibt. Dann ist „bewohnt“ eine echte Spielgröße und keine Schätzung.
+- **Preisformel.** Vorschlag: Bodenwert (`land_value` der Kachel) × Grundfläche + Bauwert (Fläche × Geschosse × Satz je Art) + Mietertrag × Faktor (z. B. zehn Jahresmieten).
+- **Was nicht verkäuflich ist:** Vorschlag: Kirchen, Rathaus, Schulen, Bahnhof und andere Wahrzeichen (öffentliche Gebäude) nicht; Industrie ja.
