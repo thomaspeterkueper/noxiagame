@@ -101,7 +101,7 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 
 11. Gebäudetafel in der neuen Weltkarte: beim Klick auf ein Lokal Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – sobald W-2 dort eine rechte Spalte liefert.
 
-12. Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen, ~~Grundriss nach Gebäudegröße~~ (gebaut), Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill).
+12. Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen, ~~Grundriss nach Gebäudegröße~~ (gebaut), ~~Lokalart aus OSM-Tags~~ (`venueKindForRealPlace`, gebaut), Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill).
 
 ## Nicht in diesem Teilprojekt
 

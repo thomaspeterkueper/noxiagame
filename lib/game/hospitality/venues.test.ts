@@ -45,6 +45,7 @@ import {
   placeVenueFigures,
   venueConversationFacts,
   venueKindForBuildingType,
+  venueKindForRealPlace,
   venueService,
   type VenueKind,
   type VenueLayout,
@@ -391,6 +392,10 @@ for (const kind of kinds) {
   }
   check(!/vier Tische/.test(venueLayoutForSize(VENUE_LAYOUTS.cafe, 'large').roomFact) && /sechs Tische/.test(venueLayoutForSize(VENUE_LAYOUTS.cafe, 'large').roomFact), 'the room fact counts the tables of the variant')
 }
+
+// ── Lokalart aus den Kartendaten ────────────────────────────────────────────
+check(venueKindForRealPlace({ amenity: 'bar', name: 'Metropol' }) === 'bar' && venueKindForRealPlace({ amenity: 'restaurant' }) === 'restaurant' && venueKindForRealPlace({ amenity: 'pub' }) === 'bar' && venueKindForRealPlace({ tourism: 'guest_house' }) === 'hotel', 'real venues from the map open the matching room')
+check(venueKindForRealPlace({ building: 'apartments' }) === null && venueKindForRealPlace(null) === null, 'a dwelling is no venue until converted')
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
