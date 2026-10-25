@@ -23,7 +23,7 @@ Entscheidung (Thomas, 25.10.2026): Auf der Erde wird ein Lokal nicht auf freier 
 Folgen für die Gastronomie (bleibt hier):
 - Die Lokalart leitet sich künftig aus dem gekauften Gebäude ab, nicht aus einer eigenen Kachel: ein Gebäude trägt eine Nutzung (`cafe`, `bar`, `restaurant`, `hotel`), der Innenraum öffnet wie bisher über `venueKindForBuildingType`.
 - Reale Lokale aus den Kartendaten sind von Anfang an Lokale: In Sundern das „Metropol“ (Bar, Hauptstraße 76) und der „Balkan Grill“ (Restaurant, Hauptstraße 68). Sie sind nicht umbaubar, aber betretbar, sobald sie ein NOXIA-Gebäude mit Nutzung sind – mit Bar- bzw. Restaurantraum, Karte nach R-2 und Personal nach LIVING-0010.
-- Beim Umbau Grundriss nach Gebäudegröße: kleines Haus → Café-Raum, großes → Restaurant oder Hotel mit `transient_capacity` aus der Geschossfläche (Vorschlag, noch nicht gebaut).
+- **Grundriss nach Gebäudegröße (gebaut):** Die Grundfläche des Hauses (`footprint_width_m × footprint_depth_m`) wählt die Variante – unter 110 m² klein (halb so viele Tische, mindestens zwei), ab 260 m² groß (Café sechs Tische, Hotel-Lobby drei), dazwischen die Vorlage (`venueSizeForArea`, `venueLayoutForSize`). Das Restaurant ist mit acht Tischen voll. Ohne Grundfläche gilt die Vorlage. Das Personal nennt die Tischzahl der Variante.
 
 Kaufen, Eigentum, Umbaukosten und die Verbindung Kartengebäude ↔ `tile_entities` liegen bei Bevölkerung und Ökonomie (R-13) und Weltkarte (W-4).
 

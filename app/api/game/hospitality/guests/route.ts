@@ -78,13 +78,15 @@ function metres(from: { lat: number; lon: number }, to: { lat: number; lon: numb
 /** Uhrzeit, Obergeschoss und was das Personal mitbekommen hat. Fehlt etwas, bleibt es weg. */
 async function venueState(supabase: any, tileEntityId: string, profileId: string) {
   const [{ data: tile }, { data: tickRow }] = await Promise.all([
-    supabase.from('tile_entities').select('id,location_id,latitude_deg,longitude_deg,residential_capacity,transient_capacity').eq('id', tileEntityId).maybeSingle(),
+    supabase.from('tile_entities').select('id,location_id,latitude_deg,longitude_deg,residential_capacity,transient_capacity,footprint_width_m,footprint_depth_m').eq('id', tileEntityId).maybeSingle(),
     supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
   ])
   const tick = Number(tickRow?.tick_number)
   const hour = Number.isFinite(tick) ? ((Math.trunc(tick) % 24) + 24) % 24 : null
   const upper = { homes: Math.max(0, Number(tile?.residential_capacity ?? 0)), guestRooms: Math.max(0, Number(tile?.transient_capacity ?? 0)) }
-  if (!tile) return { hour, upper, heard: [] as string[], rooms: null }
+  // Grundfläche des Hauses – bestimmt, wie viele Tische hineinpassen.
+  const areaM2 = tile?.footprint_width_m && tile?.footprint_depth_m ? Number(tile.footprint_width_m) * Number(tile.footprint_depth_m) : null
+  if (!tile) return { hour, upper, heard: [] as string[], rooms: null, areaM2 }
 
   const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString()
   const [{ data: sales }, { data: builds }, { data: events }, { data: adults }, { data: working }, { data: definitions }] = await Promise.all([
@@ -121,5 +123,5 @@ async function venueState(supabase: any, tileEntityId: string, profileId: string
     const mineAt = byGuest.get(profileId)
     rooms = { capacity: upper.guestRooms, occupied: Math.min(upper.guestRooms, byGuest.size), mineForS: mineAt ? Math.max(0, Math.round((mineAt + ROOM_NIGHT_S * 1000 - Date.now()) / 1000)) : null }
   }
-  return { hour, upper, heard, rooms }
+  return { hour, upper, heard, rooms, areaM2 }
 }

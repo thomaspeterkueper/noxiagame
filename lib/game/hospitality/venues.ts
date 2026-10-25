@@ -301,6 +301,65 @@ export function venueLayoutForBuildingType(buildingTypeId: string | null | undef
   return VENUE_LAYOUTS[venueKindForBuildingType(buildingTypeId)]
 }
 
+// ── Größe nach Gebäude ──────────────────────────────────────────────────────
+// Ein Lokal entsteht auf der Erde im gekauften Haus (Entscheidung Thomas,
+// 25.10.2026). Ein kleines Haus hat weniger Tische, ein großes mehr. Die
+// Grundfläche kommt aus dem Gebäude (footprint); ohne Angabe gilt die Vorlage.
+export type VenueSize = 'small' | 'standard' | 'large'
+export const VENUE_SIZE_AREA = { smallBelowM2: 110, largeFromM2: 260 } as const
+
+export function venueSizeForArea(areaM2: number | null | undefined): VenueSize {
+  if (areaM2 == null || !Number.isFinite(areaM2) || areaM2 <= 0) return 'standard'
+  if (areaM2 < VENUE_SIZE_AREA.smallBelowM2) return 'small'
+  if (areaM2 >= VENUE_SIZE_AREA.largeFromM2) return 'large'
+  return 'standard'
+}
+
+/** Zusätzliche Tische für die große Variante – an freien Stellen der Vorlage. */
+const EXTRA_TABLES: Readonly<Record<VenueKind, Array<[number, number]>>> = {
+  cafe: [[350, 390], [520, 290]],
+  // Das Restaurant ist mit acht Tischen schon voll; größer wird nur die Küche – später.
+  restaurant: [],
+  bar: [],
+  hotel: [[470, 300]],
+}
+
+const NUMBER_WORDS_TABLES = ['keinen Tisch', 'einen Tisch', 'zwei Tische', 'drei Tische', 'vier Tische', 'fünf Tische', 'sechs Tische', 'sieben Tische', 'acht Tische', 'neun Tische', 'zehn Tische']
+
+const SIZED_LAYOUTS = new Map<string, VenueLayout>()
+
+/**
+ * Die Vorlage in klein, normal oder groß. Klein lässt die letzten Tische weg
+ * (mindestens zwei bleiben), groß stellt weitere auf. Hocker, Tresen, Empfang
+ * und Treppe bleiben, wie sie sind.
+ */
+export function venueLayoutForSize(layout: VenueLayout, size: VenueSize): VenueLayout {
+  if (size === 'standard') return layout
+  const key = layout.kind + ':' + size + ':' + layout.furniture.some(f => f.kind === 'stairs')
+  const cached = SIZED_LAYOUTS.get(key)
+  if (cached) return cached
+  const tableNumbers = [...new Set(layout.furniture.filter(f => f.kind === 'table').map(f => Number(f.id.replace('table-', ''))).filter(Number.isFinite))].sort((a, b) => a - b)
+  let furniture = layout.furniture
+  let spots = layout.spots
+  if (size === 'small') {
+    const keep = Math.max(2, Math.ceil(tableNumbers.length / 2))
+    const drop = new Set(tableNumbers.slice(keep))
+    const dropped = (id: string) => { const m = /^(table|chair)-(\d+)/.exec(id); return Boolean(m) && drop.has(Number(m![2])) }
+    furniture = furniture.filter(f => !dropped(f.id))
+    spots = spots.filter(spot => !dropped(spot.id))
+  } else {
+    const start = (tableNumbers[tableNumbers.length - 1] ?? 0) + 1
+    const extra = EXTRA_TABLES[layout.kind].map(([x, y], index) => tableWithChairs(start + index, x, y))
+    furniture = [...furniture, ...extra.flatMap(t => t.furniture)]
+    spots = [...spots, ...extra.flatMap(t => t.spots)]
+  }
+  const count = new Set(furniture.filter(f => f.kind === 'table').map(f => f.id)).size
+  const roomFact = layout.roomFact.replace(/\b(ein|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn)(en)? Tische?\b/, NUMBER_WORDS_TABLES[count] ?? `${count} Tische`)
+  const sized = { ...layout, furniture, spots, roomFact }
+  SIZED_LAYOUTS.set(key, sized)
+  return sized
+}
+
 // ── Obergeschoss ────────────────────────────────────────────────────────────
 // Ein Lokal kann unten Lokal und oben etwas anderes sein: Wohnungen (der Wirt
 // wohnt über seinem Café) oder Gästezimmer (dann ist es ein Hotel mit Lokal).
@@ -317,16 +376,16 @@ export function hasUpperFloor(upper: VenueUpperFloor | null | undefined): upper 
 }
 
 const STAIRS: VenueFurniture = { id: 'stairs', kind: 'stairs', x: 38, y: 46, w: 58, h: 40 }
-const UPPER_LAYOUTS = new Map<VenueKind, VenueLayout>()
+const UPPER_LAYOUTS = new WeakMap<VenueLayout, VenueLayout>()
 
 /** Derselbe Raum mit einer Treppe nach oben in der hinteren linken Ecke. */
 export function withUpperFloor(layout: VenueLayout): VenueLayout {
   // Ein Haus, das die Treppe schon hat (Hotel), bekommt keine zweite.
   if (layout.furniture.some(item => item.kind === 'stairs')) return layout
-  const cached = UPPER_LAYOUTS.get(layout.kind)
+  const cached = UPPER_LAYOUTS.get(layout)
   if (cached) return cached
   const upper = { ...layout, furniture: [...layout.furniture, STAIRS] }
-  UPPER_LAYOUTS.set(layout.kind, upper)
+  UPPER_LAYOUTS.set(layout, upper)
   return upper
 }
 
