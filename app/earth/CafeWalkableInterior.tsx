@@ -1,6 +1,7 @@
 'use client'
 
 import HospitalityItemIcon from './HospitalityItemIcon'
+import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import { venueIntroduction } from '@/lib/game/hospitality/introductions'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -382,13 +383,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     if(!joined)return
     const guest=everyone.find(r=>r.id===joined)
     if(!guest)return
-    setStatus(guest.displayName+' setzt sich zu dir an den Tisch.')
+    setStatus(personSceneLabel(guest)+' setzt sich zu dir an den Tisch.')
     if(!selected||!historyState.length){setSelected(guest);setHistory([]);setTreat(false)}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[joined])
   const openSeats=closed?[]:freeSeats(layout,figures,seat?[seat.id]:[])
   const nextSeat=closed||seat?null:nearestFreeSeat(layout,figures,pos)
-  const waiterName=waiterId?everyone.find(r=>r.id===waiterId)?.displayName??null:null
+  const waiterName=waiterId?(()=>{const w=everyone.find(r=>r.id===waiterId);return w?personSceneLabel(w):null})():null
   useEffect(()=>{if(atTable&&waiterName)setStatus(waiterName+' kommt an deinen Tisch und nimmt die Bestellung auf.')},[atTable,waiterName])
 
   return <div className="cafe-interior">
@@ -405,7 +406,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         {shown.map(({figure,resident,moment})=>{
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className="npc" style={{left:figure.spot.x-12,top:figure.spot.y-34}}>
-            <NpcFigure id={resident.id} name={resident.displayName} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setHistory([]);setTreat(false)}}/>
+            <NpcFigure id={resident.id} name={personSceneLabel(resident)} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setHistory([]);setTreat(false)}}/>
           </div>
         })}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
@@ -425,11 +426,12 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       </div>
       <aside>
         <small>{layout.noun.toUpperCase()} · LOKAL</small>
-        <h3>{selected?.displayName??'Gastraum'}</h3>
+        <h3>{selected?personSceneLabel(selected):'Gastraum'}</h3>
+        {selected&&selected.identityState!=='known'&&selected.observableDescription&&selected.observableDescription!==personSceneLabel(selected)&&<p className="desc">{selected.observableDescription}</p>}
         {!selected&&closed&&<p>{closedReason==='hours'?'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(layout.kind,hours)+' '+clockLabel(hours)+'; jetzt ist es '+playerHour+' Uhr.'+(arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''):'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}</p>}
         {!selected&&!closed&&!showMenu&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{loaded&&service==='self-service'?' Hier bedient kein Personal – bestellt wird am Automaten.':''}</p>}
         {selected&&<>
-          <div className="history">{historyState.map((entry,index)=><p key={index}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}</div>
+          <div className="history">{historyState.map((entry,index)=><p key={index}><b>{entry.role==='user'?'Du':personSceneLabel(selected)}:</b> „{entry.content}“</p>)}</div>
           <div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
         </>}
         {!closed&&<div className="moves">
@@ -445,7 +447,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           <p>Du hast {menu.credits} Credits.</p>
           {selected&&shown.some(entry=>entry.resident.id===selected.id)&&<div className="for">
             <button className={treat?'':'on'} onClick={()=>setTreat(false)}>Für mich</button>
-            <button className={treat?'on':''} onClick={()=>setTreat(true)}>Für {selected.displayName.length>22?'diese Person':selected.displayName}</button>
+            <button className={treat?'on':''} onClick={()=>setTreat(true)}>Für {personSceneLabel(selected)}</button>
           </div>}
           <div className="tiles">{menu.items.filter(item=>item.itemCode!==ROOM_ITEM_CODE).map(item=><button key={item.itemCode} className="tile" disabled={!item.affordable||!nearService||ordering!==null} onClick={()=>void order(item)} title={item.affordable?item.label:'Dafür reichen deine Credits nicht.'}>
             <HospitalityItemIcon code={item.itemCode} size={44} title={item.label}/>
@@ -465,7 +467,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           </>}
         </div>}
         {status&&<div className="status">{status}</div>}
-        {nearestNpc&&<div className="near">Nächste Person: {nearestNpc.resident.displayName} · {nearestNpc.figure.spot.label}</div>}
+        {nearestNpc&&<div className="near">Nächste Person: {personSceneLabel(nearestNpc.resident)} · {nearestNpc.figure.spot.label}</div>}
       </aside>
     </main>
     <style jsx>{`
@@ -474,7 +476,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 .player.sitting i{height:16px;margin-top:6px}
 .moves{display:flex;gap:6px;margin-top:10px}
 .moves button{flex:1;padding:6px 8px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;cursor:pointer;font-size:11px}
-.player{position:absolute;z-index:10;width:20px;height:28px}.player i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}.player span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}.context{position:absolute;z-index:20;border:1px solid #d0b66a;background:#153438;color:#f4e8c4;border-radius:5px;padding:5px 7px;font:800 8px monospace;cursor:pointer}.item{position:absolute;z-index:9;pointer-events:auto;filter:drop-shadow(0 1px 1px #0006)}.for{display:flex;gap:6px;margin-top:6px}.menu .rooms{margin-top:8px;display:grid;gap:4px}.menu .rooms p{margin:0;font-size:11px;color:#9fb5b0}
+.player{position:absolute;z-index:10;width:20px;height:28px}.player i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}.player span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}.context{position:absolute;z-index:20;border:1px solid #d0b66a;background:#153438;color:#f4e8c4;border-radius:5px;padding:5px 7px;font:800 8px monospace;cursor:pointer}.item{position:absolute;z-index:9;pointer-events:auto;filter:drop-shadow(0 1px 1px #0006)}.for{display:flex;gap:6px;margin-top:6px}.desc{margin:-4px 0 6px;font-size:11px;color:#9fb5b0}
+.menu .rooms{margin-top:8px;display:grid;gap:4px}.menu .rooms p{margin:0;font-size:11px;color:#9fb5b0}
 .menu .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:6px}
 .menu button.tile{display:flex;flex-direction:column;align-items:center;gap:3px;margin:0;padding:8px 4px 7px;text-align:center}
 .menu button.tile:disabled :global(svg){opacity:.35;filter:grayscale(1)}

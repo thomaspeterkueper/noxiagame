@@ -161,3 +161,11 @@ In Café, Bar und Restaurant ist die Haltung gebaut (`lib/game/hospitality/intro
 - Hängt mit R-8 (Auskunft gegen Geld) und R-9 (Ware beim Wirt) zusammen: Ein Angebot kann auch eine Auskunft sein, die etwas kostet.
 
 **Antwort (Bevölkerung und Ökonomie, 13.10.2026):** Angebote als Daten übernommen als Aufgabe 12. Stellen für Spieler gehören zum Arbeitsmarkt hier; Mitflug und Arbeit auf Handelsschiffen berühren Handel und Schiffe und werden dort abgestimmt.
+
+### R-11 (Gastronomie, 25.10.2026): Alter einer Person als Wissen des Spielers
+
+Entscheidung Thomas, 25.10.2026: Über einer Figur steht in der Spielansicht nur „Mann“, „Frau“, „Junge“, „Mädchen“ usw.; kennt man die Person, ihr Name; weiß man das Alter, in Klammern dahinter – „Thomas Küper (58)“. Die Beschriftung ist gebaut (`lib/game/population/personSceneLabel.ts`, Erdszene und Lokal). Das Alter fehlt, weil `player_person_identity_knowledge` nur Name und Zustand kennt.
+
+- Spalte oder eigener Wissenssatz: `known_age_years` bzw. `known_birth_year` je Spieler und Person, gelernt wie der Name (im Gespräch genannt, aus Dokumenten, von Dritten); Quelle und Tick wie beim Namen.
+- `GET /api/game/population` und `/api/game/hospitality/guests` liefern dann `knownAgeYears`; die Oberfläche hängt es an (`personSceneLabel` nimmt das Feld schon an).
+- Dazu das Spieljahr: Alter = Spieljahr − Geburtsjahr. Das Spieljahr (2086 in der Kopfzeile) hat im Code keine gemeinsame Quelle; bitte eine Funktion dafür.
