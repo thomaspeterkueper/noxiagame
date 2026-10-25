@@ -161,6 +161,22 @@ Stand im Bild: links eine große Tafel (Bedienhinweise, Sprungziele, Messwerte, 
 - **Fehler nicht als Fließtext in der Tafel** („Unexpected token 'A' … is not valid JSON“ – der Server antwortet mit einer Fehlerseite statt JSON; bitte prüfen, warum). Für Spieler ein kurzer Satz, Einzelheiten in die Konsole.
 - Abstimmung mit Gastronomie: Betreten eines Lokals und die Personentafel sollen in der neuen Karte so laufen wie in der Erdszene (`EarthBuildingAccessLayer`, Klick auf Person räumt das Ziel weg).
 
+### W-3 (Gastronomie, 25.10.2026): Lesbarkeit der neuen Karte und doppelte Leisten
+
+Bestätigt von Thomas, 25.10.2026. Beobachtungen am Bild von Sundern (Fabrikgelände, Figur McKnight):
+
+**Karte**
+- Die Figur ist winzig und steckt halb im Glasbau. Entweder näher heran beim Laufen (Standardzoom), oder Boden-Ring unter der Figur und das Haus davor durchscheinend (Aufgabe 10 – hier sieht man, warum).
+- Straßen sind nur Linien im Grün: Bürgersteige, Kreuzungen, Flussufer fehlen. Fleißarbeit, aber der Unterschied zwischen Stadt und Diagramm.
+- Nichts zeigt, was anklickbar ist. Leichtes Aufhellen beim Überfahren und Mauszeiger als Hand für Häuser und Personen.
+- NOXIA-Gebäude (Café, Fabrik, Hotel) tragen kein Schild. Ein kleines Namensschild wie bei den Personen; fremde Häuser nicht.
+
+**Leisten**
+- Zwei Navigationsleisten übereinander: oben Aktuell · Home · Orte · Springen, unten Karte · Orte · Profil … – zweimal „Orte“ mit verschiedener Bedeutung. Die obere in die Kopfzeile neben Credits und Standort, oder in „Orte“ unten.
+- „Erde → LEO“ und „Weltlage“ stehen rechts unten frei im Bild; sie gehören in die Spielleiste unter „Aktionen“.
+
+**Anschluss Gastronomie (dort gebaut, sobald die Gebäudetafel aus W-2 steht):** Beim Klick auf ein Lokal in der rechten Spalte Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – aus `venueHoursFor`/`venueOpenAt` (`lib/game/hospitality/venues.ts`), damit man vor dem Hineingehen weiß, dass das Café um 20 Uhr Koloniezeit schließt.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
