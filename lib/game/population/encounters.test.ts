@@ -56,10 +56,32 @@ const differentRooms = derivePopulationEncounters({
 })
 check(differentRooms.length === 0, 'known different tiles do not create an encounter')
 
+
+const sameRealPlace = derivePopulationEncounters({
+  tick: 16,
+  previousCandidates: [],
+  candidates: [
+    { person: person('priest', 'earth'), regionFeatureId: 'st-johannes' },
+    { person: person('visitor', 'earth', 'socialising'), regionFeatureId: 'st-johannes' },
+  ],
+})
+check(sameRealPlace.length === 1, 'people at the same real region feature can meet')
+check(sameRealPlace[0]?.regionFeatureId === 'st-johannes' && sameRealPlace[0]?.tileEntityId === null, 'encounter preserves real-place provenance')
+
+const differentRealPlaces = derivePopulationEncounters({
+  tick: 17,
+  previousCandidates: [],
+  candidates: [
+    { person: person('a-real', 'earth'), regionFeatureId: 'church-a' },
+    { person: person('b-real', 'earth'), regionFeatureId: 'church-b' },
+  ],
+})
+check(differentRealPlaces.length === 0, 'different real places do not create an encounter')
+
 let duplicateRejected = false
 try {
   derivePopulationEncounters({
-    tick: 16,
+    tick: 18,
     previousCandidates: [],
     candidates: [amara, amara],
   })
