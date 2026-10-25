@@ -43,6 +43,7 @@ export default function WorldLab({ embedded = false, onLeave, residents: givenRe
   const [panel, setPanel] = useState<Panel>({ kind: 'none' })
   const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
   const noxiaRef = useRef<NoxiaBuilding[]>([])
+  const [surfacePeople, setSurfacePeople] = useState<Array<{ id: string; lat: number; lon: number }>>([])
   const [showStats, setShowStats] = useState(!embedded)
   const [destination, setDestination] = useState('')
   const [destinationNote, setDestinationNote] = useState('')
@@ -155,17 +156,43 @@ export default function WorldLab({ embedded = false, onLeave, residents: givenRe
     }
   }, [])
 
-  // Personen auf die Karte: wer ein Zuhause oder eine Arbeit in einem NOXIA-Gebäude
-  // hat, steht davor; die anderen gehen die Straßen entlang. Höchstens 18, wie bisher.
+  // Autoritative Personenpositionen der gemeinsamen Surface-Presence-Schicht.
+  // Das deckt auch reale OSM-Orte ab, z. B. eine Arbeitszuweisung an eine Kirche,
+  // ohne dafür ein künstliches NOXIA-Gebäude zu duplizieren.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/world-lab/people', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+        if (!response.ok) return
+        const json = await response.json()
+        if (!cancelled) setSurfacePeople(Array.isArray(json?.people) ? json.people : [])
+      } catch { /* World-Lab bleibt auch ohne Präsenzabruf nutzbar. */ }
+    })()
+    return () => { cancelled = true }
+  }, [residents])
+
+  // Personen auf die Karte: autoritative Surface-Präsenz hat Vorrang.
+  // Fehlt sie, bleibt die bisherige Fallback-Regel über NOXIA-Zuhause/Arbeit;
+  // nur ganz ohne Anker geht die Person die Straßen entlang.
   useEffect(() => {
     if (!engineReady) return
     const byId = new Map(noxia.map(building => [building.id, building]))
+    const surfaceByPerson = new Map(surfacePeople.map(person => [person.id, person]))
     const people: WorldPerson[] = residents.slice(0, 18).map(resident => {
+      const surface = surfaceByPerson.get(resident.id)
       const place = resident.assignments.map(item => item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
-      return { id: resident.id, label: personSceneLabel(resident), anchor: place ? { lat: place.lat, lon: place.lon } : null, anchorRadiusM: place ? Math.max(place.w, place.d) / 2 : undefined }
+      return {
+        id: resident.id,
+        label: personSceneLabel(resident),
+        anchor: surface ? { lat: surface.lat, lon: surface.lon } : place ? { lat: place.lat, lon: place.lon } : null,
+        anchorRadiusM: surface ? 3 : place ? Math.max(place.w, place.d) / 2 : undefined,
+      }
     })
     engineReady.setPeople(people)
-  }, [engineReady, residents, noxia])
+  }, [engineReady, residents, noxia, surfacePeople])
 
   // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
   useEffect(() => { engineReady?.setInputEnabled(panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind])
