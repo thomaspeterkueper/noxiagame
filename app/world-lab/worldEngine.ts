@@ -56,11 +56,12 @@ export interface WorldEngineOptions {
 /** Was unter dem Zeiger lag, als geklickt wurde. */
 export type WorldPick =
   | { type: 'person'; id: string }
-  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; poi?: WorldLandmark; source?: string; areaM2: number; levels: number }
+  | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; poi?: WorldLandmark; source?: string; areaM2: number; levels: number; /** Flurstück, auf dem das Haus steht */ parcel?: string }
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
   | { type: 'site'; id: string }
   | { type: 'plot'; source: string }
+  | { type: 'parcel'; id: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
 
 /** Baustelle (laufender Bau) auf der Karte. */
@@ -115,6 +116,8 @@ export interface WorldEngine {
   trainAt: (stationName: string) => TrainState | null
   /** Freie Flächen nach Abriss: der OSM-Grundriss wird dort nicht mehr gezeichnet. */
   setPlots: (plots: WorldPlot[]) => void
+  /** Flurstücke mit Eigentümer: eigene golden umrandet, fremde blau. */
+  setParcelOwners: (owners: Array<{ id: string; own: boolean }>) => void
   /** Baustellen zeigen (ersetzt die vorigen). */
   setSites: (sites: WorldSite[]) => void
   /** Weg zu einem Ziel als Linie zeigen (null: keiner). */
@@ -245,6 +248,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const overlay = new PIXI.Container({ isRenderGroup: true })
   const poiLabels = new PIXI.Container()
   labels.addChild(poiLabels)
+  // Flurstücke: Grenzen unter den Straßen, Eigentum darüber
+  const parcelLayer = new PIXI.Container()
+  lines.addChild(parcelLayer)
+  const ownedLayer = new PIXI.Container()
   world.addChild(ground, lines, overlay, objects, labels)
   app.stage.addChild(world)
 
@@ -305,7 +312,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number }>; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -581,6 +588,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     lines.addChild(l)
     entry.ground = g
     entry.lines = l
+    // Flurstücksgrenzen: feine Linien unter den Straßen, erst bei näherem Hinsehen
+    if (data.parcels?.length) {
+      const pg = new PIXI.Graphics()
+      for (const parcel of data.parcels) {
+        const p = path(parcel.p)
+        pg.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) pg.lineTo(p[i], p[i + 1]); pg.closePath()
+      }
+      pg.stroke({ width: 0.22, color: 0x4f5e46, alpha: 0.55 })
+      parcelLayer.addChild(pg)
+      entry.parcels = pg
+      drawOwned(entry)
+    }
     // Straßennamen: in Laufrichtung, Text groß gesetzt und verkleinert, damit er scharf bleibt.
     for (const label of streetLabels(data.roads, (x, y) => iso(ox + x, oy + y))) {
       const text = new PIXI.Text({ text: label.name, style: { fontFamily: 'system-ui, sans-serif', fontSize: 30, fontWeight: '600', fill: 0x3d4a52, stroke: { color: 0xf4f1e8, width: 7, join: 'round' } } })
@@ -639,7 +658,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], labels: [], footprints: [], done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false })
     building.push(key)
   }
 
@@ -674,6 +693,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   function dropTile(key: string, entry: Loaded) {
     entry.ground?.destroy()
     entry.lines?.destroy()
+    entry.parcels?.destroy()
+    entry.owned?.destroy()
     for (const tree of entry.trees) tree.destroy()
     for (const label of entry.labels) label.destroy()
     for (const block of entry.blocks) block.destroy()
@@ -1180,6 +1201,36 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   let cleared = new Set<string>()
   const plotLayer = new PIXI.Container()
   overlay.addChildAt(plotLayer, 0)
+  overlay.addChildAt(ownedLayer, 0)
+  let parcelOwners = new Map<string, boolean>()
+  function drawOwned(entry: Loaded) {
+    entry.owned?.destroy(); entry.owned = null
+    if (!parcelOwners.size || !entry.data.parcels?.length) return
+    const g = new PIXI.Graphics()
+    let any = false
+    for (const parcel of entry.data.parcels) {
+      const own = parcelOwners.get(parcel.i)
+      if (own === undefined) continue
+      any = true
+      const pts: number[] = []
+      for (let i = 0; i + 1 < parcel.p.length; i += 2) { const q = iso(entry.ox + parcel.p[i], entry.oy + parcel.p[i + 1]); pts.push(q.x, q.y) }
+      g.poly(pts).fill({ color: own ? 0xf2c94c : 0x6c9bd2, alpha: 0.13 }).stroke({ width: 0.55, color: own ? 0xd9a62a : 0x4a78b0, alpha: 0.9 })
+    }
+    if (!any) { g.destroy(); return }
+    ownedLayer.addChild(g)
+    entry.owned = g
+  }
+  /** Flurstück an einem Weltpunkt (nur geladene Kacheln). */
+  function parcelAtWorld(p: { x: number; y: number }): string | null {
+    const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
+    const entry = loaded.get(tileKey({ x: tx, y: ty }))
+    for (const parcel of entry?.data.parcels ?? []) {
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < parcel.p.length; i += 2) ring.push({ x: entry!.ox + parcel.p[i], y: entry!.oy + parcel.p[i + 1] })
+      if (insidePolygon(p, ring)) return parcel.i
+    }
+    return null
+  }
   function drawPlots() {
     for (const child of plotLayer.removeChildren()) child.destroy({ children: true })
     for (const plot of plots) {
@@ -1273,6 +1324,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const pick = (node as unknown as { pick?: WorldPick } | null)?.pick
     const box = (node as unknown as { box?: Box } | null)?.box
     if (pick?.type === 'building' && box) {
+      const parcel = parcelAtWorld({ x: box.cx, y: box.cy })
+      if (parcel) pick.parcel = parcel
       const landmark = landmarkIn(box)
       if (landmark) return { ...pick, name: landmark.name, landmark }
       const poi = landmarkIn(box, true)
@@ -1315,7 +1368,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const centre = iso(camera.x, camera.y)
     const u = (event.offsetX - app.screen.width / 2) / zoom + centre.x, v = (event.offsetY - app.screen.height / 2) / zoom + centre.y
     const groundX = (u + v / ISO_Y) / 2, groundY = (v / ISO_Y - u) / 2
-    options.onPick({ type: 'ground', at: toGeo({ x: groundX, y: groundY }) })
+    const parcel = parcelAtWorld({ x: groundX, y: groundY })
+    options.onPick(parcel ? { type: 'parcel', id: parcel, at: toGeo({ x: groundX, y: groundY }) } : { type: 'ground', at: toGeo({ x: groundX, y: groundY }) })
   }
   app.canvas.addEventListener('pointerdown', pointerDown)
   app.canvas.addEventListener('pointerup', pointerUp)
@@ -1380,6 +1434,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
     poiLabels.visible = zoom >= 2.4
+    parcelLayer.visible = zoom >= 2.2
     const centre = iso(camera.x, camera.y)
     world.scale.set(zoom)
     world.position.set(app.screen.width / 2 - centre.x * zoom, app.screen.height / 2 - centre.y * zoom)
@@ -1436,6 +1491,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     setSites(list) { sites = list; drawSites() },
     setRailLines(list) { setTrains(list) },
     trainAt(stationName) { const line = railLines.find(item => item.station?.name === stationName); return line ? trainState(line.lengthM, Date.now()) : null },
+    setParcelOwners(list) {
+      parcelOwners = new Map(list.map(item => [item.id, item.own]))
+      for (const entry of loaded.values()) drawOwned(entry)
+    },
     setPlots(list) {
       const before = [...cleared].sort().join('|')
       plots = list; cleared = new Set(list.map(plot => plot.source))

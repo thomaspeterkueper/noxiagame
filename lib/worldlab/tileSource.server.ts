@@ -4,7 +4,7 @@
 // Regionen und ihre Objekte werden 10 Minuten im Speicher gehalten.
 
 import type { createServiceClient } from '@/lib/supabase/service'
-import { mercToGeo, tileOrigin, TILE_SIZE_MERC, TILE_Z, type TileId } from './mercator'
+import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, TILE_Z, type TileId } from './mercator'
 import { buildTile, type SimplifiedTile, type SourceFeature } from './simplify'
 
 type Supabase = ReturnType<typeof createServiceClient>
@@ -49,5 +49,26 @@ export async function loadTile(supabase: Supabase, tile: TileId): Promise<Simpli
     return Math.hypot(north, east) <= region.radiusKm * 1000 + 600
   })
   const features = (await Promise.all(regions.map(region => regionFeatures(supabase, region.id)))).flat()
-  return buildTile(features, tile, TILE_Z)
+  const out = buildTile(features, tile, TILE_Z)
+  const parcels = await tileParcels(supabase, tile, centre.lat)
+  if (parcels.length) out.parcels = parcels
+  return out
+}
+
+/** Flurstücke, die die Kachel berühren (jedes Flurstück in jeder Kachel, die es berührt). */
+async function tileParcels(supabase: Supabase, tile: TileId, lat: number) {
+  const origin = tileOrigin(tile)
+  const nw = mercToGeo(origin), se = mercToGeo({ x: origin.x + TILE_SIZE_MERC, y: origin.y - TILE_SIZE_MERC })
+  const { data, error } = await supabase.from('earth_parcels').select('id,ring')
+    .lte('min_lat', nw.lat).gte('max_lat', se.lat).lte('min_lon', se.lon).gte('max_lon', nw.lon).limit(4000)
+  if (error || !data?.length) return []
+  const k = mercPerGroundMetre(lat)
+  const round1 = (v: number) => Math.round(v * 10) / 10
+  return data.flatMap(row => {
+    const ring = Array.isArray(row.ring) ? row.ring as Array<{ lat: number; lon: number }> : []
+    if (ring.length < 3) return []
+    const p: number[] = []
+    for (const point of ring) { const m = geoToMerc(point); p.push(round1((m.x - origin.x) / k), round1((origin.y - m.y) / k)) }
+    return [{ i: String(row.id), p }]
+  })
 }

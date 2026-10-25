@@ -30,6 +30,7 @@ export type Panel =
   | { kind: 'landmark'; landmark: WorldLandmark }
   | { kind: 'site'; id: string }
   | { kind: 'plot'; source: string }
+  | { kind: 'parcel'; id: string; at: GeoPoint }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
 
@@ -50,6 +51,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'landmark') return { kind: 'landmark', landmark: pick.landmark }
   if (pick.type === 'site') return { kind: 'site', id: pick.id }
   if (pick.type === 'plot') return { kind: 'plot', source: pick.source }
+  if (pick.type === 'parcel') return { kind: 'parcel', id: pick.id, at: pick.at }
   // Ein Wahrzeichen-Gebäude (Kirche, Bibliothek) öffnet das Wahrzeichen, außer es ist ein NOXIA-Gebäude.
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
@@ -64,7 +66,9 @@ type Line = { role: 'user' | 'assistant'; content: string }
  * Bevölkerung und Ökonomie). Solange die Schnittstelle nicht antwortet, zeigt die
  * Tafel nichts zum Kauf.
  */
-type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string }
+type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string }
+/** Angebot für ein Flurstück (/api/game/parcel-offer) */
+type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; owned: boolean; own: boolean; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 
 function credits(value: number) { return Math.round(value).toLocaleString('de-DE') + ' Cr' }
 
@@ -73,6 +77,7 @@ const JUMP_FROM_M = 1500
 
 /** Ort einer Tafel (für Weg und Entfernung), wenn sie einen hat. */
 export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot[] = []): GeoPoint | null {
+  if (panel.kind === 'parcel') return panel.at
   if (panel.kind === 'plot') { const plot = plots.find(item => item.source === panel.source); return plot ? { lat: plot.lat, lon: plot.lon } : null }
   if (panel.kind === 'building') return panel.at
   if (panel.kind === 'landmark') return panel.landmark.at
@@ -116,6 +121,38 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [buyError, setBuyError] = useState('')
   const [confirmDemolish, setConfirmDemolish] = useState(false)
   const [buildables, setBuildables] = useState<Buildable[] | null>(null)
+  const [parcelInfo, setParcelInfo] = useState<Record<string, ParcelInfo | null>>({})
+  const [parcelVersion, setParcelVersion] = useState(0)
+  const parcelId = panel.kind === 'parcel' ? panel.id : null
+  useEffect(() => {
+    if (!parcelId) return
+    let stale = false
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        const response = await fetch('/api/game/parcel-offer?id=' + encodeURIComponent(parcelId), { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store' })
+        const json = response.ok ? await response.json().catch(() => null) : null
+        if (!stale) setParcelInfo(current => ({ ...current, [parcelId]: json && typeof json.forSale === 'boolean' ? json as ParcelInfo : null }))
+      } catch { if (!stale) setParcelInfo(current => ({ ...current, [parcelId]: null })) }
+    })()
+    return () => { stale = true }
+  }, [parcelId, parcelVersion])
+  const parcel = parcelId ? parcelInfo[parcelId] : undefined
+
+  async function buyParcel() {
+    if (!parcelId || buying) return
+    setBuying(true); setBuyError('')
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/parcel-offer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: parcelId }) })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setBuyError(String(json.error ?? 'Kauf nicht möglich.')); return }
+      await engine?.reloadNoxia()
+      onWorldChanged()
+      setParcelVersion(value => value + 1)
+    } catch { setBuyError('Kauf derzeit nicht erreichbar.') } finally { setBuying(false) }
+  }
+
   const [conversions, setConversions] = useState<Record<string, Array<{ id: string; name: string; cost: number }>>>({})
   const [showConversions, setShowConversions] = useState(false)
 
@@ -155,7 +192,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   }
 
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
-  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind
+  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind === 'parcel' ? 'g:' + panel.id : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
   if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false) }
 
@@ -251,7 +288,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   // Freie Fläche: was passt hier hin? (Bautypen der Erde, deren Grundfläche hineinpasst)
   const plot = panel.kind === 'plot' ? plots.find(item => item.source === panel.source) ?? null : null
   useEffect(() => {
-    if (!plot?.own || buildables) return
+    if (!(plot?.own || parcel?.own) || buildables) return
     let stale = false
     void (async () => {
       try {
@@ -262,7 +299,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       } catch { if (!stale) setBuildables([]) }
     })()
     return () => { stale = true }
-  }, [plot?.own, buildables])
+  }, [plot?.own, parcel?.own, buildables])
   const fitting = useMemo(() => {
     if (!plot || !buildables) return []
     const long = Math.max(plot.w, plot.d) + 2, short = Math.min(plot.w, plot.d) + 2
@@ -271,6 +308,23 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       return Math.max(w, d) <= long && Math.min(w, d) <= short
     }).sort((a, b) => a.cost - b.cost)
   }, [plot, buildables])
+
+  /** Auf eigenem Flurstück bauen: an der angeklickten Stelle, ausgerichtet an der Straße (Drehung 0). */
+  async function buildOnParcel(item: Buildable) {
+    if (panel.kind !== 'parcel' || buying) return
+    setBuying(true); setBuyError('')
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/build/spatial', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ buildableId: item.id, location: 'earth', latDeg: panel.at.lat, lonDeg: panel.at.lon, rotationDeg: 0 }),
+      })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setBuyError(String(json.error ?? 'Bau nicht möglich.')); return }
+      onWorldChanged()
+      setPanel(json.buildId ? { kind: 'site', id: String(json.buildId) } : { kind: 'none' })
+    } catch { setBuyError('Bauen derzeit nicht erreichbar.') } finally { setBuying(false) }
+  }
 
   async function buildHere(item: Buildable) {
     if (!plot || buying) return
@@ -426,7 +480,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <div className="row"><span>{residentsHere ? 'Beim Abriss ziehen die Bewohner in staatlichen Wohnraum.' : ''}</span><button disabled={buying} onClick={() => setConfirmDemolish(true)}>Abreißen …</button></div>
           : <div className="row"><span>Wirklich abreißen? Das lässt sich nicht rückgängig machen.</span><button disabled={buying} onClick={() => void demolish(false)}>Abreißen</button><button disabled={buying} onClick={() => void demolish(true)}>und neu bauen</button></div>}
       </>}
-      {!own && offer && (offer.forSale
+      {!own && offer?.parcelId && <div className="row"><span>Wird mit dem Flurstück verkauft.</span><button onClick={() => setPanel({ kind: 'parcel', id: offer.parcelId!, at: building.at })}>Flurstück ansehen</button></div>}
+      {!own && offer && !offer.parcelId && (offer.forSale
         ? <>
           <dl>
             <dt>Eigentümer</dt><dd>{offer.seller ?? 'Gemeinde'}</dd>
@@ -446,6 +501,28 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark })}>Betreten</button></div>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
+    </>}
+    {panel.kind === 'parcel' && <>
+      <div className="head"><div><small>FLURSTÜCK</small><b>{parcel?.label ?? 'Flurstück'}</b>{parcel && <span>{parcel.areaM2.toLocaleString('de-DE')} m²{parcel.usage ? ' · ' + parcel.usage : ''}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      {parcel === undefined && <p>Wird geladen …</p>}
+      {parcel === null && <p>Keine Angaben zu diesem Flurstück.</p>}
+      {parcel && <>
+        <dl>
+          <dt>Eigentümer</dt><dd>{parcel.own ? 'du' : parcel.owned ? 'ein anderer Spieler' : (parcel.seller ?? 'Gemeinde')}</dd>
+          <dt>Gebäude</dt><dd>{parcel.buildings.length ? parcel.buildings.map(item => item.name).join(', ') : 'keine'}</dd>
+          {parcel.residents > 0 && <><dt>Bewohner</dt><dd>{parcel.residents} – bleiben und zahlen Miete an dich</dd></>}
+          {parcel.rentPerInterval > 0 && <><dt>Miete</dt><dd>{credits(parcel.rentPerInterval)} je Abrechnung</dd></>}
+          {parcel.forSale && <><dt>Preis</dt><dd><b>{credits(parcel.price ?? 0)}</b></dd></>}
+        </dl>
+        {parcel.forSale && <div className="row"><span>{buyError || 'Das Geld geht an die Gemeinde.'}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
+        {!parcel.forSale && !parcel.own && <div className="row"><span>Nicht verkäuflich: {parcel.reason}</span></div>}
+        {parcel.own && <>
+          <p>Hier bauen (an der angeklickten Stelle):</p>
+          {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}
+          {buyError && <p>{buyError}</p>}
+        </>}
+        <span className="source">Quelle: ALKIS NRW (dl-de/zero-2.0)</span>
+      </>}
     </>}
     {panel.kind === 'plot' && <>
       <div className="head"><div><small>FREIE FLÄCHE</small><b>{plot?.name ?? 'Freie Fläche'}</b>{plot && <span>{Math.round(plot.w)} × {Math.round(plot.d)} m · {plot.own ? 'dein Grundstück' : 'gehört einem anderen Spieler'}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>

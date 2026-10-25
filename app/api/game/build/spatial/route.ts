@@ -570,6 +570,8 @@ export async function POST(req: NextRequest) {
     const conflict = await realBuildingConflict(serviceClient as unknown as Parameters<typeof realBuildingConflict>[0], canonicalGeo, footprint.widthM, footprint.depthM, rotation, user.id)
     if (conflict?.kind === 'real') return NextResponse.json({ error: `Hier steht ein echtes Gebäude (${conflict.name}). Erst kaufen und abreißen.` }, { status: 409 })
     if (conflict?.kind === 'plot') return NextResponse.json({ error: 'Diese Fläche gehört einem anderen Spieler.' }, { status: 409 })
+    if (conflict?.kind === 'parcel') return NextResponse.json({ error: `Der Bau muss ganz auf deinen eigenen Flurstücken stehen (hier: ${conflict.name}).` }, { status: 409 })
+    if (conflict?.kind === 'garden') return NextResponse.json({ error: `Zu nah an ${conflict.name} – das ist der Garten eines anderen.` }, { status: 409 })
   }
 
   const completesAt = new Date(Date.now() + Math.max(1, def.buildTimeTicks) * TICK_INTERVAL_SECONDS * 1000)
