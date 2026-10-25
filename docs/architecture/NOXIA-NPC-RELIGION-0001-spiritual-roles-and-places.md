@@ -124,3 +124,43 @@ Der Gemeindeträger existiert als institutioneller Arbeitgeberbezug, aber die ge
 noch nicht in die automatische Payroll aufgenommen. Einnahmen und Finanzierung religiöser
 Institutionen sind noch nicht modelliert; deshalb wird hier keine künstliche Geldquelle eingeführt.
 
+
+
+## St. Johannes als sozialer Ort
+
+Der Pilot ist um echte Ortsaktivität erweitert.
+
+Grundregel:
+- keine zweite Religionsuhr und kein eigener Religion-Tick;
+- Zeitfenster werden ausschließlich aus dem autoritativen Simulationstick abgeleitet;
+- reale Orte werden über `region_feature_id` besucht, nicht als künstliche `tile_entities` dupliziert;
+- temporäre Besuche erzeugen normale Presence und können normale Encounter auslösen;
+- Encounter verändern Beziehungen/Erinnerungen über dieselbe Population-Pipeline wie an anderen Orten.
+
+Für St. Johannes existieren zunächst zwei kleine Aktivitätsfenster:
+- eine regelmäßige offene Gemeinde-/Gesprächszeit;
+- eine wöchentliche Gottesdienst-/Andachtszeit.
+
+Der erste mögliche Besucher stammt ausschließlich aus einer bereits vorhandenen lokalen Beziehung
+zu Elias. Teilnahme an einem solchen Termin wird **nicht** als Beweis für Religionszugehörigkeit,
+Glauben oder Zustimmung interpretiert. Der Zustand trägt deshalb explizit
+`attendanceDoesNotImplyBelief=true`.
+
+Schlaf und Reisen haben Vorrang. Ist Elias nicht verfügbar, findet im Pilot kein von ihm
+getragenes Fenster statt.
+
+Die erste Version hält die Teilnehmerzahl absichtlich klein. Wachstum soll später aus
+tatsächlichen Beziehungen, wiederholten Besuchen und gegebenenfalls expliziter Ortsaffinität
+entstehen — nicht aus zufälliger Zuweisung von Religion.
+
+### Technische Wiederverwendung
+
+Die Erweiterung ist nicht kirchenspezifisch:
+- `PersonAssignment.regionFeatureId` kann reale Arbeits- und Besuchsorte tragen;
+- Surface Presence kennt `region_feature_anchor`;
+- Population Presence und Encounter erkennen gemeinsame reale Orte;
+- dieselbe Mechanik kann später Museen, Parks, Moscheen, Synagogen, Tempel und andere
+  reale Gemeinschaftsorte tragen.
+
+Damit bleibt Religion Domäneninhalt; Ortsbesuch, Co-Location und Begegnung bleiben
+allgemeine Simulationsmechanik.
