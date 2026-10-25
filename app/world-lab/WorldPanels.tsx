@@ -67,13 +67,18 @@ type Line = { role: 'user' | 'assistant'; content: string }
  * Bevölkerung und Ökonomie). Solange die Schnittstelle nicht antwortet, zeigt die
  * Tafel nichts zum Kauf.
  */
-type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string }
+type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; owned: boolean; own: boolean; listed?: boolean; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
 function credits(value: number) { return Math.round(value).toLocaleString('de-DE') + ' Cr' }
+/** Was der Verkäufer nach der Steuer erhält (Satz des Bezirks, sonst 5 %) */
+function afterTax(price: number, rate = 0.05) {
+  const percent = (rate * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })
+  return `du erhältst ${credits(price - Math.round(price * rate))} (nach ${percent} % Steuer)`
+}
 
 /** Ab dieser Entfernung bietet die Tafel „Hinspringen“ statt nur „Gehe hin“. */
 const JUMP_FROM_M = 1500
@@ -532,14 +537,15 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         {offer?.parcelId
           ? <div className="row"><span>Verkauf nur mit dem Flurstück.</span><button onClick={() => setPanel({ kind: 'parcel', id: offer.parcelId!, at: building.at })}>Flurstück ansehen</button></div>
           : offer?.listed
-            ? <div className="row"><span>Angeboten für {credits(offer.price ?? 0)}.</span><button disabled={buying} onClick={() => void buildingSale({ action: 'unlist', entityId: own.id }, own.source!, 'Zurückziehen nicht möglich.')}>Zurückziehen</button></div>
+            ? <div className="row"><span>Angeboten für {credits(offer.price ?? 0)} – {afterTax(offer.price ?? 0, offer.taxRate)}.</span><button disabled={buying} onClick={() => void buildingSale({ action: 'unlist', entityId: own.id }, own.source!, 'Zurückziehen nicht möglich.')}>Zurückziehen</button></div>
             : offer && <div className="row"><input value={askPrice} inputMode="numeric" onChange={event => setAskPrice(event.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="Preis in Cr"/><button disabled={buying || !Number(askPrice)} onClick={() => void buildingSale({ action: 'list', entityId: own.id, price: Number(askPrice) }, own.source!, 'Anbieten nicht möglich.')}>Zum Verkauf anbieten</button></div>}
+        {!offer?.listed && !offer?.parcelId && Number(askPrice) > 0 && <p>Beim Verkauf {afterTax(Number(askPrice), offer?.taxRate)}.</p>}
       </>}
       {own && !own.own && offer?.parcelId && <div className="row"><span>Gehört mit dem Flurstück {offer.seller ?? 'einem anderen Spieler'}.</span><button onClick={() => setPanel({ kind: 'parcel', id: offer.parcelId!, at: building.at })}>Flurstück ansehen</button></div>}
       {own && !own.own && offer && !offer.parcelId && (offer.forSale
         ? <>
           <dl><dt>Eigentümer</dt><dd>{offer.seller}</dd><dt>Preis</dt><dd><b>{credits(offer.price ?? 0)}</b></dd></dl>
-          <div className="row"><span>{buyError || `Angebot von ${offer.seller} – das Geld geht an ihn. Bewohner bleiben.`}</span><button disabled={buying} onClick={() => void buildingSale({ action: 'buy-listed', entityId: offer.entityId, price: offer.price }, own.source!, 'Kauf nicht möglich.')}>{buying ? '…' : 'Kaufen'}</button></div>
+          <div className="row"><span>{buyError || `Angebot von ${offer.seller} – das Geld geht an ihn (abzüglich Steuer). Bewohner bleiben.`}</span><button disabled={buying} onClick={() => void buildingSale({ action: 'buy-listed', entityId: offer.entityId, price: offer.price }, own.source!, 'Kauf nicht möglich.')}>{buying ? '…' : 'Kaufen'}</button></div>
         </>
         : <div className="row"><span>Nicht verkäuflich: {offer.reason ?? 'gehört einem anderen Spieler'}</span></div>)}
       {!own && offer?.parcelId && <div className="row"><span>Wird mit dem Flurstück verkauft.</span><button onClick={() => setPanel({ kind: 'parcel', id: offer.parcelId!, at: building.at })}>Flurstück ansehen</button></div>}
@@ -576,15 +582,16 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           {parcel.rentPerInterval > 0 && <><dt>Miete</dt><dd>{credits(parcel.rentPerInterval)} je Abrechnung</dd></>}
           {parcel.forSale && <><dt>Preis</dt><dd><b>{credits(parcel.price ?? 0)}</b></dd></>}
         </dl>
-        {parcel.forSale && <div className="row"><span>{buyError || (parcel.listed ? `Angebot von ${parcel.seller} – das Geld geht an ihn, Häuser und Bewohner gehen mit.` : 'Das Geld geht an die Gemeinde.')}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
+        {parcel.forSale && <div className="row"><span>{buyError || (parcel.listed ? `Angebot von ${parcel.seller} – das Geld geht an ihn (abzüglich Steuer), Häuser und Bewohner gehen mit.` : 'Das Geld geht an die Gemeinde.')}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
         {!parcel.forSale && !parcel.own && <div className="row"><span>Nicht verkäuflich: {parcel.reason}</span></div>}
         {parcel.own && <>
           <p>Hier bauen (an der angeklickten Stelle):</p>
           {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}
           {buyError && <p>{buyError}</p>}
           {parcel.listed
-            ? <div className="row"><span>Angeboten für {credits(parcel.price ?? 0)}.</span><button disabled={buying} onClick={() => void parcelAction({ action: 'unlist' }, 'Zurückziehen nicht möglich.')}>Zurückziehen</button></div>
+            ? <div className="row"><span>Angeboten für {credits(parcel.price ?? 0)} – {afterTax(parcel.price ?? 0, parcel.taxRate)}.</span><button disabled={buying} onClick={() => void parcelAction({ action: 'unlist' }, 'Zurückziehen nicht möglich.')}>Zurückziehen</button></div>
             : <div className="row"><input value={askPrice} inputMode="numeric" onChange={event => setAskPrice(event.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="Preis in Cr"/><button disabled={buying || !Number(askPrice)} onClick={() => void parcelAction({ action: 'list', price: Number(askPrice) }, 'Anbieten nicht möglich.')}>Zum Verkauf anbieten</button></div>}
+          {!parcel.listed && Number(askPrice) > 0 && <p>Beim Verkauf {afterTax(Number(askPrice), parcel.taxRate)}{parcel.district ? ` (Satz von ${parcel.district})` : ''}.</p>}
           <p>Vermessen ({credits(SURVEY_FEE)} an die Gemeinde):</p>
           <div className="row"><span>Teilen an der angeklickten Stelle</span><button disabled={buying} onClick={() => void parcelAction({ action: 'split', at: panel.at, direction: 'across' }, 'Teilen nicht möglich.')}>quer</button><button disabled={buying} onClick={() => void parcelAction({ action: 'split', at: panel.at, direction: 'along' }, 'Teilen nicht möglich.')}>längs</button></div>
           {(parcel.neighbours ?? []).map(item => <div key={item.id} className="row"><span>Zusammenlegen mit {item.label} ({item.areaM2.toLocaleString('de-DE')} m²)</span><button disabled={buying} onClick={() => void parcelAction({ action: 'merge', with: item.id }, 'Zusammenlegen nicht möglich.')}>Zusammenlegen</button></div>)}

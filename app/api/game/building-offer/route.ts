@@ -121,7 +121,9 @@ export async function GET(req: NextRequest) {
     const own = entity.profile_id === profileId
     const owner = (entity as { profiles?: { username?: string } | null }).profiles?.username ?? 'ein anderer Spieler'
     const { data: listing } = await supabase.from('earth_property_listings').select('price').eq('kind', 'building').eq('ref', entity.id).maybeSingle()
+    const { data: taxRate } = await supabase.rpc('earth_property_tax_rate', { p_district: '*' })
     return NextResponse.json({
+      taxRate: Number(taxRate ?? 0.05),
       forSale: Boolean(listing) && !own, listed: Boolean(listing), own, entityId: entity.id, price: listing ? Number(listing.price) : undefined,
       seller: own ? 'du' : owner, reason: own ? (listing ? 'von dir angeboten' : 'gehört dir') : listing ? undefined : `gehört ${owner}`, name: offer.name,
       areaM2: offer.facts?.areaM2, levels: offer.facts?.levels,

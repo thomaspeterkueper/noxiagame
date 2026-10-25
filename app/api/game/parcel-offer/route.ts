@@ -74,9 +74,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === 'split' || body.action === 'merge') {
-    const { data: row } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2').eq('id', id).is('retired_at', null).maybeSingle()
+    const { data: row } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,props').eq('id', id).is('retired_at', null).maybeSingle()
     if (!row) return NextResponse.json({ error: 'Flurstück nicht gefunden.' }, { status: 404 })
     const ring = row.ring as GeoPoint[]
+    // Gemeinde bleibt erhalten – sie ist der Verwaltungsbezirk für die Steuer beim Weiterverkauf
+    const district = (row.props as Record<string, unknown> | null)?.gemeinde
     let retire: string[], parts: ReturnType<typeof parcelRow>[]
     if (body.action === 'split') {
       const at = { lat: Number(body.at?.lat), lon: Number(body.at?.lon) }
@@ -87,17 +89,17 @@ export async function POST(req: NextRequest) {
       if (small) return NextResponse.json({ error: `Jeder Teil braucht mindestens ${MIN_PART_M2} m².` }, { status: 400 })
       const label = baseLabel(String(row.label ?? 'Flurstück'))
       retire = [id]
-      parts = pieces.map((piece, i) => parcelRow(piece, `${label} – Teil ${i + 1}`, row.usage, { split_from: id }))
+      parts = pieces.map((piece, i) => parcelRow(piece, `${label} – Teil ${i + 1}`, row.usage, { gemeinde: district, split_from: id }))
     } else {
       const otherId = String(body.with ?? '').slice(0, 64)
       if (!otherId || otherId === id) return NextResponse.json({ error: 'Zweites Flurstück fehlt.' }, { status: 400 })
-      const { data: other } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2').eq('id', otherId).is('retired_at', null).maybeSingle()
+      const { data: other } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,props').eq('id', otherId).is('retired_at', null).maybeSingle()
       if (!other) return NextResponse.json({ error: 'Zweites Flurstück nicht gefunden.' }, { status: 404 })
       const merged = mergeRings(ring, other.ring as GeoPoint[])
       if (!merged) return NextResponse.json({ error: 'Die Flurstücke haben keine gemeinsame Grenze.' }, { status: 400 })
       const larger = Number(row.area_m2 ?? 0) >= Number(other.area_m2 ?? 0) ? row : other
       retire = [id, otherId]
-      parts = [parcelRow(merged, `${baseLabel(String(larger.label ?? 'Flurstück'))} – zusammengelegt`, larger.usage, { merged_from: retire })]
+      parts = [parcelRow(merged, `${baseLabel(String(larger.label ?? 'Flurstück'))} – zusammengelegt`, larger.usage, { gemeinde: district ?? (other.props as Record<string, unknown> | null)?.gemeinde, merged_from: retire })]
     }
     const { data, error } = await supabase.rpc('reshape_earth_parcels', { p_profile_id: profileId, p_retire: retire, p_new: parts, p_fee: SURVEY_FEE })
     if (error) return failure(error.message, 'Vermessung fehlgeschlagen.')
