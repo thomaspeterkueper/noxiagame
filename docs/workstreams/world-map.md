@@ -80,6 +80,16 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 13. ~~Andere Plätze und Parks~~ Erledigt (14.10.2026): Importprofil 5 holt Spielplätze, Gärten, Freibäder, Friedhöfe, Kleingärten, Rasen, Festplätze und Parkplätze (`feature_type = 'place_area'`); jede Sportart hat ihre Fläche. Regionen mit Profil 4 werden beim Öffnen von `/world-lab` neu aufgebaut.
 14. ~~Laufbahnen, Einzelbäume, Alleen~~ Erledigt (14.10.2026): Laufbahnen als Fläche mit heller Kante oder, wenn OSM sie als Linie führt, als rotes Band mit Bahnlinie. Importprofil 6 holt Einzelbäume (`natural=tree`) und Alleen (`natural=tree_row`, alle 8 m ein Baum); Bäume stehen als Objekte mit Tiefe vor und hinter Häusern, Laub- oder Nadelbaum fest je Ort (`lib/worldlab/treeSprites.ts`).
 
+## Requests aus anderen Teilprojekten
+
+### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht
+
+Beobachtung Thomas, 25.10.2026 (in der Erdszene bei Sundern): Die Straßen haben im Spiel keine Namen. Die Namen sind da – `region_features` führt für Straßen `properties.name` (z. B. Hauptstraße, Bogenstraße), und das Ortswissen der Figuren nennt sie bereits.
+
+- Straßennamen entlang der Straße zeichnen, wie auf einem Stadtplan: in Laufrichtung, lesbar gedreht, einmal je Abschnitt und nur ab einer Zoomstufe, in der sie nicht übereinanderliegen. Das gilt für die bisherige Erdszene (`EarthWalkableSurface`) und die neue Weltkarte (`/world-lab`), je nachdem, welche bleibt.
+- Dazu Hausnummern an Gebäuden mit `addr:housenumber`, mindestens beim Anklicken – für Gastronomie wichtig, weil Spieler Lokale und Hotels dort bauen wollen, wo im echten Ort eines steht (Beispiel: Hauptstraße 102 in Sundern), und das Ziel-Feld heute nur Koordinaten versteht.
+- Zielwahl: „Hauptstraße 102“ im Ziel-Feld sollte auf das Gebäude springen (Geokodierung aus `region_features`, keine fremde Dienstanfrage).
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

@@ -72,6 +72,7 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 - Oberfläche: Rede in der Sprache der Figur oder übersetzt mit Kennzeichnung – Vorschlag bitte von hier.
 - Karten im Lokal mehrsprachig bzw. in der Ortssprache; Küche je Ort (später).
 - R-11 an Bevölkerung und Ökonomie: Alter als Wissen des Spielers, Spieljahr als Funktion.
+- W-1 an Weltkarte: Straßennamen und Hausnummern in der Spielansicht, Zielwahl nach Adresse.
 
 ## Offene Aufgaben
 
