@@ -27,6 +27,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Hotel baubar: Migration `20261014090000_hotel_rooms.sql` (Gebäudeart, 6 Zimmer, Kartenzeile, Belegungsprüfung im Server) – entschieden von Thomas am 14.10.2026, von Gastronomie selbst gebaut (Branch `feat/hotel-buildable`). **Live eingespielt am 14.10.2026.** Transaktionaler Production-Smoke-Test: 6 Zimmer automatisch, erste Buchung erfolgreich, Doppelbuchung desselben Profils abgewiesen, siebter Gast bei sechs belegten Zimmern abgewiesen; Probe vollständig zurückgerollt.
 - Bedienung am Tisch (Aufgabe 8) und Kantinenzugang auf dem Mars (Facility-Innenraum) und in Q1 (Hafenviertel) (Branch `feat/canteen-access-mars-q1`, 22.10.2026).
 - Figurenbeschriftung: nur Mann/Frau/Junge/Mädchen, bei Bekannten der Name, Alter in Klammern sobald bekannt (`personSceneLabel`, Erdszene und Lokal; Branch `feat/short-person-labels`, 25.10.2026). Die lange Beschreibung steht nur noch in der Personentafel.
+- Grundriss nach Gebäudegröße: klein/normal/groß aus der Grundfläche des Hauses (Branch `feat/venue-size-variants`, 25.10.2026) – Vorarbeit für R-13.
 
 ## Gestellte Requests
 
@@ -100,7 +101,7 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 
 11. Gebäudetafel in der neuen Weltkarte: beim Klick auf ein Lokal Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – sobald W-2 dort eine rechte Spalte liefert.
 
-12. Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen, Grundriss nach Gebäudegröße, Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill).
+12. Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen, ~~Grundriss nach Gebäudegröße~~ (gebaut), Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill).
 
 ## Nicht in diesem Teilprojekt
 

@@ -35,6 +35,8 @@ import {
   canBookRoom,
   roomsFree,
   withUpperFloor,
+  venueSizeForArea,
+  venueLayoutForSize,
   type VenueUpperFloor,
   type GuestMoment,
   type VenueFigure,
@@ -70,7 +72,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[upper,setUpper]=useState<VenueUpperFloor|null>(null)
   const[heard,setHeard]=useState<string[]>([])
   const[rooms,setRooms]=useState<VenueRooms|null>(null)
-  const layout=useMemo(()=>{const base=venueLayoutForBuildingType(buildingTypeId);return hasUpperFloor(upper)?withUpperFloor(base):base},[buildingTypeId,upper])
+  const[areaM2,setAreaM2]=useState<number|null>(null)
+  const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(buildingTypeId),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[buildingTypeId,upper,areaM2])
   const arrivalPoint=SOCIAL_INFRASTRUCTURE[layout.kind]?.arrivalPoint===true
   const[pos,setPos]=useState<Point>(layout.start)
   const[residents,setResidents]=useState<ColonyResident[]>([])
@@ -147,6 +150,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setHour(typeof data.hour==='number'?data.hour:null)
           setUpper(data.upper&&typeof data.upper==='object'?{homes:Number(data.upper.homes??0),guestRooms:Number(data.upper.guestRooms??0)}:null)
           setHeard(Array.isArray(data.heard)?data.heard.map(String):[])
+          setAreaM2(typeof data.areaM2==='number'&&data.areaM2>0?data.areaM2:null)
           setRooms(data.rooms&&typeof data.rooms==='object'?{capacity:Number(data.rooms.capacity??0),occupied:Number(data.rooms.occupied??0),mineForS:data.rooms.mineForS==null?null:Number(data.rooms.mineForS)}:null)
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
         }

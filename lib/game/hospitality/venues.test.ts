@@ -25,6 +25,8 @@ import {
   upperFloorFact,
   venueClosedReason,
   venueOpenAt,
+  venueSizeForArea,
+  venueLayoutForSize,
   venueHoursText,
   roomsFact,
   roomsFree,
@@ -374,6 +376,21 @@ const coming = tableServiceSpot(cafe, mySeat, 'coming', TABLE_SERVICE.comeAfterS
 check(coming.label === 'auf dem Weg zum Tisch' && !isVenueBlocked(cafe, coming), 'on the way the waiter walks around the furniture')
 const servingFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: pair.find(f => f.roomRole === 'staff')!, figures: pair, playerPos: mySeat, arrivalPoint: false, playerSeat: mySeat, servingPlayer: true, menu: cafeMenu })
 check(servingFacts.some(f => f.includes('nimmst die Bestellung auf')), 'the waiter knows why they are at the table')
+
+// ── Größe nach Gebäude ──────────────────────────────────────────────────────
+check(venueSizeForArea(null) === 'standard' && venueSizeForArea(80) === 'small' && venueSizeForArea(150) === 'standard' && venueSizeForArea(400) === 'large', 'the floor area picks the size; without it the template applies')
+for (const kind of kinds) {
+  const base = VENUE_LAYOUTS[kind]
+  const tablesOf = (l: VenueLayout) => l.furniture.filter(f => f.kind === 'table').length
+  const small = venueLayoutForSize(base, 'small'), large = venueLayoutForSize(base, 'large')
+  check(venueLayoutForSize(base, 'standard') === base && venueLayoutForSize(base, 'small') === small, kind + ': standard is the template, variants are built once')
+  check(tablesOf(small) <= tablesOf(base) && tablesOf(small) >= Math.min(2, tablesOf(base)) && tablesOf(large) >= tablesOf(base), kind + ': small has fewer tables, large has more')
+  for (const variant of [small, large]) {
+    check(variant.spots.filter(spot => spot.kind === 'seat').every(spot => reachable(variant, spot, VENUE_PLAYER_RADIUS + 26)) && reachable(variant, variant.servicePoint, 12), kind + ': every seat and the counter stay reachable in the variants')
+    check(variant.furniture.filter(f => f.kind === 'table').every(a => variant.furniture.filter(f => f.kind !== 'pass' && f !== a && !f.id.startsWith('chair-')).every(b => !overlaps(a, b))), kind + ': added tables do not overlap other furniture')
+  }
+  check(!/vier Tische/.test(venueLayoutForSize(VENUE_LAYOUTS.cafe, 'large').roomFact) && /sechs Tische/.test(venueLayoutForSize(VENUE_LAYOUTS.cafe, 'large').roomFact), 'the room fact counts the tables of the variant')
+}
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
