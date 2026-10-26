@@ -571,7 +571,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
             {offer.rentPerInterval ? <><dt>Miete</dt><dd>{credits(offer.rentPerInterval)} je Abrechnung</dd></> : null}
             <dt>Preis</dt><dd><b>{credits(offer.price ?? 0)}</b></dd>
           </dl>
-          <div className="row"><span>{buyError || 'Das Geld geht an die Gemeinde.'}</span><button disabled={buying} onClick={() => void buy()}>{buying ? '…' : 'Kaufen'}</button></div>
+          <div className="row"><span>{buyError || `Das Geld geht an ${offer.seller ?? 'die Gemeinde'}.`}</span><button disabled={buying} onClick={() => void buy()}>{buying ? '…' : 'Kaufen'}</button></div>
         </>
         : offer.reason ? <div className="row"><span>Nicht verkäuflich: {offer.reason}</span></div> : null)}
     </>}
@@ -596,7 +596,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           {parcel.rentPerInterval > 0 && <><dt>Miete</dt><dd>{credits(parcel.rentPerInterval)} je Abrechnung</dd></>}
           {parcel.forSale && <><dt>Preis</dt><dd><b>{credits(parcel.price ?? 0)}</b></dd></>}
         </dl>
-        {parcel.forSale && <div className="row"><span>{buyError || (parcel.listed ? `Angebot von ${parcel.seller} – das Geld geht an ihn (abzüglich Steuer), Häuser und Bewohner gehen mit.` : 'Das Geld geht an die Gemeinde.')}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
+        {parcel.forSale && <div className="row"><span>{buyError || (parcel.listed ? `Angebot von ${parcel.seller} – das Geld geht an ihn (abzüglich Steuer), Häuser und Bewohner gehen mit.` : `Das Geld geht an ${parcel.seller ?? 'die Gemeinde'}.`)}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
         {!parcel.forSale && !parcel.own && <div className="row"><span>Nicht verkäuflich: {parcel.reason}</span></div>}
         {parcel.own && <>
           <p>Hier bauen (an der angeklickten Stelle):</p>

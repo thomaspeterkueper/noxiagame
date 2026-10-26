@@ -293,7 +293,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     })
     return () => { live = false }
   }, [])
-  // Zwei Personen nah beieinander (bis 6 m), du bis 10 m daneben: du hörst mit.
+  // Zwei Personen nah beieinander (bis 8 m), du bis 25 m daneben (Hörweite): du hörst mit.
   const overheard = useMemo(() => {
     void tick
     if (!engineReady || !awareness.length || panel.kind === 'person' || panel.kind === 'inside' || panel.kind === 'landmarkInside') return null
@@ -302,9 +302,9 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     let best: { a: typeof people[number]; b: typeof people[number]; score: number; playerDistance: number } | null = null
     for (let i = 0; i < people.length; i++) for (let j = i + 1; j < people.length; j++) {
       const pair = metresBetween(people[i].at, people[j].at)
-      if (pair > 6) continue
+      if (pair > 8) continue
       const playerDistance = Math.min(metresBetween(here, people[i].at), metresBetween(here, people[j].at))
-      if (playerDistance > 10) continue
+      if (playerDistance > 25) continue
       const score = pair + playerDistance * 0.25
       if (!best || score < best.score) best = { a: people[i], b: people[j], score, playerDistance }
     }
@@ -488,7 +488,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       {error && <p className="error">{error}</p>}
       {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
     </div>}
-    {overheard && <div className="overheard">
+    {overheard && <div className={helpOpen ? 'overheard raised' : 'overheard'}>
       <small>GESPRÄCH IN HÖRWEITE · {overheard.conversation.item.kind === 'colony' ? 'NOXIA' : 'HEUTE'}</small>
       <b>{personSceneLabel(overheard.first)} + {personSceneLabel(overheard.second)}</b>
       <p><strong>{personSceneLabel(overheard.first)}:</strong> „{overheard.conversation.opener}“</p>
@@ -564,6 +564,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .target span{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .target select{width:100%;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 6px;font-size:11px}
       .overheard{position:absolute;left:14px;bottom:24px;width:min(360px,calc(100% - 28px));display:grid;gap:3px;padding:10px 12px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;font-size:11.5px;z-index:4}
+      .overheard.raised{bottom:200px}
       .overheard small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .overheard p{margin:0;line-height:1.4}
       .overheard span{color:#9fb5b0;font-size:10px}

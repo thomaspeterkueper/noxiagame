@@ -4,6 +4,7 @@
 // Gemeinsam für den Kauf eines Hauses und eines Flurstücks samt Häusern.
 
 import type { createServiceClient } from '@/lib/supabase/service'
+import { municipalityLabel } from './municipality.server'
 import { geoToLocalMeters } from '@/lib/world/spatial/earthSpatial'
 import { realVenueKind } from './venueConversion'
 import { buildingFacts, buildingPrice, fitOutValue, locationFactor, notForSaleReason, plannedResidents, RENT_PER_RESIDENT, type BuildingFacts, type GeoPoint, type SettlementPoint } from './buildingOffer'
@@ -115,7 +116,7 @@ export async function offerFor(supabase: Supabase, source: string): Promise<Offe
     forSale: true, name, facts, features, tags: properties,
     price: buildingPrice({ areaM2: facts.areaM2, levels: facts.levels, kind: facts.kind, rentPerInterval, locationFactor: location.factor, fitOut: fitOutValue(properties) }),
     location, venue, fitOut: fitOutValue(properties),
-    seller: actor?.actors?.display_name ?? 'Gemeinde',
+    seller: await municipalityLabel(supabase, String(properties['addr:city'] ?? '')) ?? actor?.actors?.display_name ?? 'Gemeinde',
     residents: people.length + newResidents, newResidents, rentPerInterval,
   }
 }
