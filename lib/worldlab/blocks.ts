@@ -33,6 +33,7 @@ export const AREA_COLORS: Record<AreaKind, number> = {
   field: 0xbfcf93, built: 0xcfc9b4, garden: 0x9fc283, forest: 0x6f9a62, water: 0x6fb1d6,
   park: 0x8fbd72, playground: 0xdcc898, cemetery: 0x8eae78, allotments: 0xa3c27c, parking: 0xb4b3ae, pool: 0x74c4e6,
   grounds: 0xb9c6a0, track: 0xb5654a, pitch: 0x5f9e4c, sand: 0xd9c49a, hardcourt: 0xa8a49d, clay: 0xc06e4a,
+  plaza: 0xd9d4c8,
 }
 /** Randlinie für Flächen, die eine haben (Spielfeld: helle Markierung, Becken: heller Rand). */
 export const AREA_OUTLINES: Partial<Record<AreaKind, { widthM: number; color: number }>> = {
@@ -66,6 +67,7 @@ export const AREA_PATTERNS: Partial<Record<AreaKind, AreaPattern>> = {
 export const ROAD_STYLES: Record<RoadClass, { widthM: number; color: number }> = {
   main: { widthM: 9, color: 0xf2ead8 },
   street: { widthM: 6, color: 0xe9e2d0 },
+  service: { widthM: 3.6, color: 0xe2dbc8 },
   path: { widthM: 2.2, color: 0xd8cfb8 },
 }
 /** Laufbahn als Linie: rotes Band mit sechs Bahnen (7,3 m). */
