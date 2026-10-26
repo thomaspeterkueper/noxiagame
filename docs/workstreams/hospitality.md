@@ -130,6 +130,8 @@ Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie an
 
 12. Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen, ~~Grundriss nach Gebäudegröße~~ (gebaut), ~~Lokalart aus OSM-Tags~~ (`venueKindForRealPlace`, gebaut), Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill).
 
+13. NOXIA-INTERIOR-0001: allgemeinen Teil aus `CafeWalkableInterior` als `WalkableInterior` herauslösen (Bewegung, Sitzen, Personen, Tafel, Gespräch, Bedienplatz, Angebotskacheln); das Lokal bleibt dabei unverändert spielbar. Danach können andere Gebäude mit eigener Einrichtung und eigenem Wissen dasselbe Bauteil nutzen.
+
 ## Nicht in diesem Teilprojekt
 
 - Wirt als Bewohner mit Stelle und Lohn, Stellenzahl aus den Personalplätzen.
