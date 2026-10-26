@@ -25,7 +25,7 @@ describe('landmark interiors', () => {
     expect(landmarkRoomKind('museum')).toBeNull()
   })
 
-  for (const kind of ['library', 'worship'] as const) {
+  for (const kind of ['library', 'worship', 'shop', 'workshop'] as const) {
     it(`${kind}: entrance is free and every spot can be reached on foot`, () => {
       const layout = landmarkRoomLayout(kind)
       expect(isLandmarkRoomBlocked(layout, layout.start)).toBe(false)
@@ -57,7 +57,7 @@ describe('landmark interiors', () => {
   })
 
   it('finds a path around furniture to every waypoint, for player and staff', () => {
-    for (const kind of ['library', 'worship'] as const) {
+    for (const kind of ['library', 'worship', 'shop', 'workshop'] as const) {
       const layout = landmarkRoomLayout(kind)
       const points = landmarkWaypoints(layout)
       expect(points.length).toBeGreaterThan(3)

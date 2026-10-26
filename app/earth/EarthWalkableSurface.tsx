@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 12.10.2026 — reale Gebäude als eigene, einmal je Szene aufgebaute Ebene mit Walmdächern und Fensterreihen; 2,5D-Gebäude: reale Häuser mit Höhe, belichteten Wänden, Dachform und Schatten; NOXIA-Gebäude mit ihrem Gebäudebild; Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.9.0
+// Aktualisiert: 26.10.2026 — Betriebe aus realen Gewerbe-Orten: Marker mit erfundenem Namen und Funktion, betretbar (Laden/Werkstatt) mit Personal; realer Name nur im Tooltip; 12.10.2026 — reale Gebäude als eigene, einmal je Szene aufgebaute Ebene mit Walmdächern und Fensterreihen; 2,5D-Gebäude: reale Häuser mit Höhe, belichteten Wänden, Dachform und Schatten; NOXIA-Gebäude mit ihrem Gebäudebild; Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.10.0
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -20,6 +20,7 @@ import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/gam
 import EarthBuildingAccessLayer from './EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from './LandmarkWalkableInterior'
 import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { establishmentFor, establishmentKnowledge, type Establishment } from '@/lib/game/business/establishments'
 import { extrudeFootprint } from '@/lib/game/spatial/buildingMassing'
 import EarthBuildingMassingLayer, { HEIGHT_PX_PER_M } from './EarthBuildingMassingLayer'
 import type { LocalSurfaceBuilding } from '@/lib/game/spatial/localSurfaceScene'
@@ -64,6 +65,20 @@ function landmarkGlyph(kind:string,tags?:Record<string,any>){
     case'hospital':return <path {...ink} d="M-5 -5 H5 V5 H-5 Z M0 -3 V3 M-3 0 H3"/>
     case'station':return <path {...ink} d="M-4 -5 H4 Q5 -5 5 -4 V2 Q5 3 4 3 H-4 Q-5 3 -5 2 V-4 Q-5 -5 -4 -5 Z M-5 -1 H5 M-3 6 L-2 3 M3 6 L2 3"/>
     default:return <path {...ink} d="M0 -6 L1.8 -1.8 L6 -1.8 L2.6 1 L4 5.5 L0 2.8 L-4 5.5 L-2.6 1 L-6 -1.8 L-1.8 -1.8 Z"/>
+  }
+}
+// Betriebe: schlichtes Zeichen je Funktion im selben Abzeichen wie Landmarks.
+function businessGlyph(business:Establishment){
+  const ink={fill:'none',stroke:'#17313c',strokeWidth:1.5,strokeLinecap:'round' as const,strokeLinejoin:'round' as const}
+  switch(business.kind){
+    case'autohaus':case'werkstatt':case'tankstelle':return <path {...ink} d="M-7 2 L-5 -3 H5 L7 2 V5 H-7 Z M-4 5 V7 M4 5 V7 M-7 2 H7"/>
+    case'tierbedarf':case'tierarzt':return <path {...ink} d="M-4 -4 A1.6 1.6 0 1 0 -4 -4.1 M0 -6 A1.6 1.6 0 1 0 0 -6.1 M4 -4 A1.6 1.6 0 1 0 4 -4.1 M0 4 Q-5 4 -4 0 Q-2 -2 0 -2 Q2 -2 4 0 Q5 4 0 4 Z"/>
+    case'baeckerei':case'metzgerei':case'supermarkt':return <path {...ink} d="M-6 -2 H6 L5 6 H-5 Z M-3 -2 V-5 Q0 -8 3 -5 V-2"/>
+    case'apotheke':return <path {...ink} d="M-5 -5 H5 V5 H-5 Z M0 -3 V3 M-3 0 H3"/>
+    case'bank':case'buero':case'post':return <path {...ink} d="M-6 -2 L0 -6 L6 -2 Z M-4 -2 V4 M0 -2 V4 M4 -2 V4 M-6 5 H6"/>
+    case'industrie':case'handwerk':return <path {...ink} d="M-7 6 V-1 L-3 1 V-1 L1 1 V-1 L5 1 V6 Z M-6 -1 V-6 H-4 V-1"/>
+    case'hotel':return <path {...ink} d="M-6 6 V-5 H6 V6 M-3 -2 H-1 M1 -2 H3 M-3 2 H-1 M1 2 H3 M-1 6 V3 H1 V6"/>
+    default:return <path {...ink} d="M-6 -2 H6 V6 H-6 Z M-6 -2 L-4 -6 H4 L6 -2 M-2 6 V2 H2 V6"/>
   }
 }
 function zoomedCamera(focus:ScenePoint){const p=iso(focus);return `translate(${VIEW_W/2} ${VIEW_H/2}) scale(${SCENE_ZOOM}) translate(${(-p.x).toFixed(1)} ${(-p.y).toFixed(1)})`}
@@ -267,8 +282,11 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     const point=feature.geometry.coordinates as GeoPoint
     const metric=geoToLocalMeters(point,origin)
     if(Math.abs(metric.eastM)>SCENE_RADIUS_M||Math.abs(metric.northM)>SCENE_RADIUS_M)return[]
-    return[{id:`poi:${feature.id}`,name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType),isLandmark:feature.featureType==='landmark',tags:(feature.properties??{}) as Record<string,any>}]
-  }).slice(0,30):[],[origin,features])
+    const tags=(feature.properties??{}) as Record<string,any>
+    const business=feature.featureType==='poi'?establishmentFor(tags,String(tags.noxia_source_id??feature.id)):null
+    // Ein Betrieb trägt im Spiel seinen erfundenen Namen; der reale bleibt im Tooltip.
+    return[{id:`poi:${feature.id}`,name:business?business.name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType),isLandmark:feature.featureType==='landmark',business,tags}]
+  }).slice(0,40):[],[origin,features])
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
     const{xM,yM}=scenePosition(entity,origin)
     if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>TARGET_RANGE_M||Math.abs(yM)>TARGET_RANGE_M)return[]
@@ -309,7 +327,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     return routeAcrossLocalScene(scene,player,{xM:player.xM+dx*t,yM:player.yM+dy*t},{maxConnectorM:140})
   },[scene,navigationTarget,player])
   const targetDistance=navigationTarget?Math.hypot(navigationTarget.xM-player.xM,navigationTarget.yM-player.yM):null
-  const selectedLandmark=namedPoiTargets.find(target=>target.id===navigationTargetId&&target.isLandmark)??null
+  const selectedLandmark=namedPoiTargets.find(target=>target.id===navigationTargetId&&(target.isLandmark||target.business))??null
   const openLandmark=namedPoiTargets.find(target=>target.id===openLandmarkId)??null
   const selectedBuildingTarget=buildingTargets.find(target=>target.id===navigationTargetId)??null
   const selectedBuildingEntry=selectedBuildingTarget?getBuildingEntryDefinition(selectedBuildingTarget.entity.entity_id):null
@@ -714,7 +732,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         {npcPositions.map(({resident,xM,yM})=><g key={resident.id} transform={unzoomedAt({xM,yM})}><WalkableActor point={{xM,yM}} label={personSceneLabel(resident)} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('');setAutoWalkTargetId('');setNavigationTargetId('')}}/></g>)}
 
         {localTrainPoint&&<WalkableTrain point={localTrainPoint} label="Regional"/>}
-        {namedPoiTargets.filter(target=>target.isLandmark).map(target=>{
+        {namedPoiTargets.filter(target=>target.isLandmark||target.business).map(target=>{
           const p=iso({xM:target.xM,yM:target.yM})
           const active=navigationTargetId===target.id
           const width=Math.max(48,Math.min(150,target.name.length*5.4+14))
@@ -722,9 +740,9 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
             <g transform={`translate(${p.x.toFixed(1)} ${(p.y-16).toFixed(1)})`}>
               <path d="M0 16 L-5 8 H5 Z" fill={active?'#e0c05e':'#f4ecd2'} stroke="#17313c" strokeWidth="1"/>
               <circle r="11" fill={active?'#e0c05e':'#f4ecd2'} stroke="#17313c" strokeWidth="1.4"/>
-              {landmarkGlyph(target.kind,target.tags)}
+              {target.business?businessGlyph(target.business):landmarkGlyph(target.kind,target.tags)}
               <g pointerEvents="none" transform="translate(0 -15)"><rect x={-width/2} y="-11" width={width} height="13" rx="4" fill="#173845ee" stroke="#8fa7b0" strokeWidth=".8"/><text y="-2" textAnchor="middle" fontSize="7.5" fontWeight="800" fill="#f3f7f8">{target.name.length>26?target.name.slice(0,25)+'…':target.name}</text></g>
-              <title>{target.name} · {landmarkLabel(target.kind,target.tags)}</title>
+              <title>{target.business?`${target.name} · ${target.business.function} · heute laut OSM: ${target.business.realName}`:`${target.name} · ${landmarkLabel(target.kind,target.tags)}`}</title>
             </g>
           </g>
         })}
@@ -739,16 +757,20 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           <option value="">{spatialStatus==='loading'?'— Ziele werden geladen —':spatialStatus==='failed'?'— Gebäude nicht geladen —':'— kein Ziel —'}</option>
           {navigationTargets.map(target=>{const away=Math.hypot(target.xM-player.xM,target.yM-player.yM);return <option key={target.id} value={target.id}>{target.name}{away>SCENE_RADIUS_M?` · ${(away/1000).toFixed(1).replace('.',',')} km`:''}</option>})}
         </select></label>
-        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
+        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${selectedLandmark.business?selectedLandmark.business.function:landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
       </div>
-      {openLandmark&&landmarkRoomKind(openLandmark.kind)&&<LandmarkWalkableInterior kind={landmarkRoomKind(openLandmark.kind)!} name={openLandmark.name} typeLabel={landmarkLabel(openLandmark.kind,openLandmark.tags)} onClose={()=>setOpenLandmarkId('')} facts={[
+      {openLandmark?.business&&<LandmarkWalkableInterior kind={openLandmark.business.room} name={openLandmark.name} typeLabel={openLandmark.business.function} staffRole={openLandmark.business.staffRole} realName={openLandmark.business.realName} services={openLandmark.business.services} knowledge={establishmentKnowledge(openLandmark.business,data.region?.name??'diesem Ort')} onClose={()=>setOpenLandmarkId('')} facts={[
+        ['Adresse',[openLandmark.tags['addr:street'],openLandmark.tags['addr:housenumber']].filter(Boolean).join(' ')],
+        ['Geöffnet',openLandmark.tags.opening_hours],
+      ].flatMap(([label,value])=>value?[{label:String(label),value:String(value)}]:[])}/>}
+      {openLandmark&&!openLandmark.business&&landmarkRoomKind(openLandmark.kind)&&<LandmarkWalkableInterior kind={landmarkRoomKind(openLandmark.kind)!} name={openLandmark.name} typeLabel={landmarkLabel(openLandmark.kind,openLandmark.tags)} onClose={()=>setOpenLandmarkId('')} facts={[
         ['Adresse',[openLandmark.tags['addr:street'],openLandmark.tags['addr:housenumber']].filter(Boolean).join(' ')],
         ['Geöffnet',openLandmark.tags.opening_hours],
         ['Konfession',openLandmark.tags.denomination],
         ['Erbaut',openLandmark.tags.start_date],
         ['Träger',openLandmark.tags.operator],
       ].flatMap(([label,value])=>value?[{label:String(label),value:String(value)}]:[])}/>}
-      {openLandmark&&!landmarkRoomKind(openLandmark.kind)&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
+      {openLandmark&&!openLandmark.business&&!landmarkRoomKind(openLandmark.kind)&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
         <div className="head"><div><small>REALER ORT · {landmarkLabel(openLandmark.kind,openLandmark.tags).toUpperCase()}</small><b>{openLandmark.name}</b></div><button onClick={()=>setOpenLandmarkId('')}>×</button></div>
         <svg viewBox="-14 -14 28 28" width="54" height="54" aria-hidden="true"><circle r="12" fill="#f4ecd2" stroke="#17313c" strokeWidth="1.2"/>{landmarkGlyph(openLandmark.kind,openLandmark.tags)}</svg>
         {openLandmark.tags.description&&<p>{String(openLandmark.tags.description)}</p>}
