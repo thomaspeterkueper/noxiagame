@@ -252,6 +252,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Flurstücke: Grenzen unter den Straßen, Eigentum darüber
   const parcelLayer = new PIXI.Container()
   lines.addChild(parcelLayer)
+  // Ränder (Ufer, Bordstein, Gehweg, Gleise) aller Kacheln unter den Oberflächen (Wasser,
+  // Fahrbahn) aller Kacheln: Straßen laufen über Kachelgrenzen, sonst legt die später
+  // geladene Kachel ihren Gehweg über die Fahrbahn der Nachbarkachel.
+  const edgeLayer = new PIXI.Container()
+  const surfaceLayer = new PIXI.Container()
+  lines.addChild(edgeLayer, surfaceLayer)
   const ownedLayer = new PIXI.Container()
   world.addChild(ground, lines, overlay, objects, labels)
   app.stage.addChild(world)
@@ -313,7 +319,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -525,24 +531,28 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       g.stroke({ width: outline.widthM * 0.75, color: outline.color, cap: 'square' })
     }
     const l = new PIXI.Graphics()
-    // Ufer: ein erdiger Saum unter dem Wasser (W-3)
-    for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: (RIVER_STYLE.widthM + 2.6) * 0.75, color: 0x9a8f6a, cap: 'round', join: 'round' }) }
-    for (const river of data.rivers) { const p = path(river); l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: RIVER_STYLE.widthM * 0.75, color: RIVER_STYLE.color, cap: 'round', join: 'round' }) }
-    // Bürgersteige: Bordstein und Gehweg unter allen Fahrstraßen, zuerst gezeichnet,
-    // damit Kreuzungen als Platz ineinanderlaufen (W-3).
+    const sf = new PIXI.Graphics()
+    const stroke = (target: PixiGraphics, p: number[], width: number, color: number) => {
+      target.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) target.lineTo(p[i], p[i + 1])
+      target.stroke({ width: width * 0.75, color, cap: 'round', join: 'round' })
+    }
+    // Gewässer: Breite nach Art (Fluss, Bach, Graben); Ufer als erdiger Saum darunter (W-3)
+    data.rivers.forEach((river, i) => {
+      const width = data.rw?.[i] ?? RIVER_STYLE.widthM
+      stroke(l, path(river), width + Math.min(2.6, 0.8 + width * 0.35), 0x9a8f6a)
+      stroke(sf, path(river), width, RIVER_STYLE.color)
+    })
+    // Bürgersteige: Bordstein und Gehweg nur an Fahrstraßen (nicht an Zufahrten,
+    // Parkplatzgassen, Fußgängerzonen), damit Kreuzungen als Platz ineinanderlaufen (W-3).
     for (const road of data.roads) {
-      if (road.c === 'path') continue
+      if (road.c !== 'street' && road.c !== 'main') continue
       const style = ROAD_STYLES[road.c], p = path(road.p)
-      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
-      l.stroke({ width: (style.widthM + 4.2) * 0.75, color: 0xa39d90, cap: 'round', join: 'round' })
-      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
-      l.stroke({ width: (style.widthM + 3.6) * 0.75, color: 0xd9d4c8, cap: 'round', join: 'round' })
+      stroke(l, p, style.widthM + 4.2, 0xa39d90)
+      stroke(l, p, style.widthM + 3.6, 0xd9d4c8)
     }
     for (const road of data.roads) {
       if (road.c === 'path') continue
-      const style = ROAD_STYLES[road.c], p = path(road.p)
-      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
-      l.stroke({ width: (style.widthM + 0.5) * 0.75, color: 0x8f8a7e, cap: 'round', join: 'round' })
+      stroke(l, path(road.p), ROAD_STYLES[road.c].widthM + 0.5, 0x8f8a7e)
     }
     // Gleise: Schotterbett, Schwellen, zwei Schienen (unter den Straßen: Bahnübergänge)
     for (const rail of data.rails ?? []) {
@@ -568,27 +578,30 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         l.stroke({ width: 0.16, color: 0x3d4347 })
       }
     }
-    for (const road of data.roads) {
-      const style = ROAD_STYLES[road.c], p = path(road.p)
-      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
-      l.stroke({ width: style.widthM * 0.75, color: style.color, cap: 'round', join: 'round' })
+    for (const road of data.roads) stroke(sf, path(road.p), ROAD_STYLES[road.c].widthM, ROAD_STYLES[road.c].color)
+    // Kreisverkehr: begrünte Mittelinsel mit Bordstein
+    for (const island of data.islands ?? []) {
+      const p = path(island)
+      sf.poly(p).fill(AREA_COLORS.garden)
+      sf.poly(p).stroke({ width: 0.35, color: 0xa39d90 })
     }
     for (const track of data.tracks ?? []) {
       const p = path(track)
-      const lane = (width: number, color: number) => { l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1]); l.stroke({ width: width * 0.75, color, cap: 'round', join: 'round' }) }
-      lane(TRACK_STYLE.widthM + 0.6, TRACK_STYLE.laneColor)
-      lane(TRACK_STYLE.widthM, TRACK_STYLE.color)
-      lane(0.25, TRACK_STYLE.laneColor)
+      stroke(sf, p, TRACK_STYLE.widthM + 0.6, TRACK_STYLE.laneColor)
+      stroke(sf, p, TRACK_STYLE.widthM, TRACK_STYLE.color)
+      stroke(sf, p, 0.25, TRACK_STYLE.laneColor)
     }
     for (const mark of data.marks ?? []) {
       const p = path(mark)
-      l.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) l.lineTo(p[i], p[i + 1])
-      l.stroke({ width: 0.12 * 0.75 * 4, color: 0xf2f5ec, cap: 'butt', join: 'miter' })
+      sf.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) sf.lineTo(p[i], p[i + 1])
+      sf.stroke({ width: 0.12 * 0.75 * 4, color: 0xf2f5ec, cap: 'butt', join: 'miter' })
     }
     ground.addChild(g)
-    lines.addChild(l)
+    edgeLayer.addChild(l)
+    surfaceLayer.addChild(sf)
     entry.ground = g
     entry.lines = l
+    entry.surface = sf
     // Flurstücksgrenzen: feine Linien unter den Straßen, erst bei näherem Hinsehen
     if (data.parcels?.length) {
       const pg = new PIXI.Graphics()
@@ -659,7 +672,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false })
     building.push(key)
   }
 
@@ -694,6 +707,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   function dropTile(key: string, entry: Loaded) {
     entry.ground?.destroy()
     entry.lines?.destroy()
+    entry.surface?.destroy()
     entry.parcels?.destroy()
     entry.owned?.destroy()
     for (const tree of entry.trees) tree.destroy()

@@ -202,3 +202,39 @@ describe('world lab: simplification', () => {
     expect(JSON.stringify(built).length).toBeLessThan(900)
   })
 })
+
+describe('world lab: streets and water (Thomas, 26.10.2026: „Straßen etwas wild, Kreisel, Wasser“)', () => {
+  const line = (points: Array<[number, number]>) => ({ kind: 'line' as const, coordinates: points.map(([x, y]) => at(x, y)) })
+  const circle = (cx: number, cy: number, r: number) => Array.from({ length: 17 }, (_, i) => [cx + r * Math.cos(i / 16 * 2 * Math.PI), cy + r * Math.sin(i / 16 * 2 * Math.PI)] as [number, number])
+  const features: SourceFeature[] = [
+    { id: 'aisle', featureType: 'road', geometry: line([[10, 10], [60, 10]]), properties: { highway: 'service', service: 'parking_aisle', name: 'Parkplatz' } },
+    { id: 'zone', featureType: 'road', geometry: line([[20, 20], [60, 20], [60, 50], [20, 50], [20, 20]]), properties: { highway: 'pedestrian', area: 'yes' } },
+    { id: 'ring', featureType: 'road', geometry: line(circle(120, 120, 14)), properties: { highway: 'tertiary', junction: 'roundabout' } },
+    { id: 'pipe', featureType: 'waterway', geometry: line([[0, 90], [100, 90]]), properties: { waterway: 'stream', tunnel: 'culvert' } },
+    { id: 'brook', featureType: 'waterway', geometry: line([[0, 100], [100, 100]]), properties: { waterway: 'stream' } },
+  ]
+  const out = buildTile(features, tile, TILE_Z)
+
+  it('draws parking aisles as narrow service lanes without a name', () => {
+    const aisle = out.roads.find(road => road.c === 'service')
+    expect(aisle).toBeDefined()
+    expect(aisle!.n).toBeUndefined()
+  })
+  it('draws a pedestrian area as a paved plaza, not as a road around it', () => {
+    expect(out.areas.some(area => area.k === 'plaza')).toBe(true)
+    expect(out.roads.filter(road => road.c === 'service')).toHaveLength(1)
+  })
+  it('marks roundabouts and gives them a green island', () => {
+    expect(out.roads.find(road => road.r === 1)).toBeDefined()
+    expect(out.islands).toHaveLength(1)
+    const island = out.islands![0]
+    const xs = island.filter((_, i) => i % 2 === 0)
+    // Radius 14 m minus halbe Fahrbahn (3 m) und Rand (0,8 m) ≈ 10 m
+    expect(Math.max(...xs) - 120).toBeGreaterThan(9)
+    expect(Math.max(...xs) - 120).toBeLessThan(11)
+  })
+  it('skips culverts and keeps brooks narrow', () => {
+    expect(out.rivers).toHaveLength(1)
+    expect(out.rw).toEqual([2.4])
+  })
+})

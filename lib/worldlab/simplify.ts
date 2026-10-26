@@ -16,20 +16,23 @@ export interface SourceFeature {
   properties?: Record<string, unknown> | null
 }
 
-export type RoadClass = 'main' | 'street' | 'path'
+/** service: Zufahrt, Parkplatzgasse, Fußgängerzone – schmal, ohne Bordstein und Gehweg */
+export type RoadClass = 'main' | 'street' | 'service' | 'path'
 export type AreaKind =
   | 'water' | 'forest' | 'field' | 'built' | 'garden'
   // Orte des Alltags
   | 'park' | 'playground' | 'cemetery' | 'allotments' | 'parking' | 'pool'
   // Sport: Anlage, Laufbahn, Rasenplatz, Sand (Reiten, Beach), Hartplatz (Skaten, Basketball), Asche (Tennis)
   | 'grounds' | 'track' | 'pitch' | 'sand' | 'hardcourt' | 'clay'
+  // Gepflasterter Platz (Fußgängerzone als Fläche)
+  | 'plaza'
 export type BlockKind = 'house' | 'row' | 'hall' | 'factory' | 'church' | 'shed'
 
 export interface TilePlace { x: number; y: number; n: string; k: string; t?: Record<string, string>; /** 1: Laden oder Lokal (kein Wahrzeichen) */ p?: 1 }
 /** OSM-Angaben, die ein Wahrzeichen beschreiben (Tafel, Innenraum). */
 const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia', 'shop', 'cuisine', 'amenity', 'craft', 'office', 'tourism']
 
-export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string }
+export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string; /** 1: Kreisverkehr */ r?: 1 }
 export interface TileArea { k: AreaKind; p: number[] }
 export interface TileBlock {
   x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
@@ -52,6 +55,10 @@ export interface SimplifiedTile {
   size: number
   roads: TileRoad[]
   rivers: number[][]
+  /** Breite je Gewässerlinie in Metern (gleicher Index wie rivers); fehlt: 5 m */
+  rw?: number[]
+  /** Mittelinseln von Kreisverkehren (Vieleck, Meter der Kachel) */
+  islands?: number[][]
   /** Platzmarkierungen (weiße Linien, x/y abwechselnd) – nur in der Kachel, in der die Platzmitte liegt. */
   marks?: number[][]
   areas: TileArea[]
@@ -70,7 +77,7 @@ export interface SimplifiedTile {
 
 const ROAD_CLASS: Record<string, RoadClass> = {
   motorway: 'main', trunk: 'main', primary: 'main', secondary: 'main',
-  tertiary: 'street', residential: 'street', unclassified: 'street', living_street: 'street', service: 'street', pedestrian: 'street',
+  tertiary: 'street', residential: 'street', unclassified: 'street', living_street: 'street', service: 'service', pedestrian: 'service',
   footway: 'path', path: 'path', track: 'path', cycleway: 'path',
 }
 const AREA_KIND: Record<string, AreaKind> = {
@@ -113,6 +120,31 @@ function areaKind(featureType: string, properties: Record<string, unknown>): Are
 
 type P = { x: number; y: number }
 const round1 = (value: number) => Math.round(value * 10) / 10
+
+/** Halbe Fahrbahnbreite je Klasse (wie ROAD_STYLES in blocks.ts) */
+const ROAD_HALF_WIDTH: Record<RoadClass, number> = { main: 4.5, street: 3, service: 1.8, path: 1.1 }
+
+/** Breite einer Gewässerlinie nach Art (Meter). */
+export function waterwayWidth(properties: Record<string, unknown>) {
+  const width = Number(String(properties.width ?? '').replace(',', '.'))
+  if (Number.isFinite(width) && width > 0.3 && width < 60) return Math.round(width * 10) / 10
+  const kind = String(properties.waterway ?? properties.visual_class ?? '')
+  if (kind === 'river') return 10
+  if (kind === 'canal') return 7
+  if (kind === 'stream') return 2.4
+  if (kind === 'ditch' || kind === 'drain') return 1.2
+  return 3
+}
+
+/** Ring gleichmäßig nach innen versetzen (um die Mitte skaliert); null, wenn zu klein. */
+export function insetRing(ring: readonly P[], by: number): P[] | null {
+  if (ring.length < 3) return null
+  const cx = ring.reduce((sum, p) => sum + p.x, 0) / ring.length, cy = ring.reduce((sum, p) => sum + p.y, 0) / ring.length
+  const radius = ring.reduce((sum, p) => sum + Math.hypot(p.x - cx, p.y - cy), 0) / ring.length
+  if (radius - by < 1.5) return null
+  const k = (radius - by) / radius
+  return ring.map(p => ({ x: cx + (p.x - cx) * k, y: cy + (p.y - cy) * k }))
+}
 
 /**
  * Schneidet ein Vieleck auf das Quadrat [lo, hi]² zu (Sutherland–Hodgman).
@@ -393,17 +425,37 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       ;(out.tracks ??= []).push(flat(simplifyLine(points, 0.5)))
       continue
     }
-    if (feature.featureType === 'road' && feature.geometry.kind === 'line') {
+    if (feature.featureType === 'road' && (feature.geometry.kind === 'line' || feature.geometry.kind === 'polygon')) {
       const roadClass = ROAD_CLASS[String(properties.highway ?? '')]
-      if (!roadClass || properties.tunnel === 'yes') continue
-      const road: TileRoad = { c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : 1.5)) }
-      if (typeof properties.name === 'string' && properties.name.trim() && roadClass !== 'path') road.n = properties.name.trim().slice(0, 60)
+      if (!roadClass || (properties.tunnel && properties.tunnel !== 'no')) continue
+      const closed = points.length >= 4 && Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y) < 0.5
+      // Fußgängerzone als Fläche (area=yes): gepflasterter Platz statt einer Linie rundherum
+      if ((properties.area === 'yes' || feature.geometry.kind === 'polygon') && closed) {
+        if (properties.highway === 'pedestrian' || properties.highway === 'footway') {
+          const clipped = clipToSquare(simplifyLine(points, 1), -0.2, size + 0.2)
+          if (clipped.length >= 4) out.areas.push({ k: 'plaza', p: flat(clipped) })
+        }
+        continue
+      }
+      if (feature.geometry.kind !== 'line') continue
+      const roundabout = /^(roundabout|circular)$/.test(String(properties.junction ?? ''))
+      const road: TileRoad = { c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : roundabout ? 0.6 : 1.5)) }
+      if (roundabout) road.r = 1
+      if (typeof properties.name === 'string' && properties.name.trim() && roadClass !== 'path' && properties.service !== 'parking_aisle' && properties.service !== 'driveway') road.n = properties.name.trim().slice(0, 60)
       out.roads.push(road)
+      // Geschlossener Kreisverkehr: Mittelinsel (Ring um die halbe Fahrbahn plus Rand nach innen versetzt)
+      if (roundabout && closed) {
+        const island = insetRing(points.slice(0, -1), ROAD_HALF_WIDTH[roadClass] + 0.8)
+        if (island) (out.islands ??= []).push(flat(island))
+      }
     } else if (feature.featureType === 'rail' && feature.geometry.kind === 'line') {
       if (properties.tunnel === 'yes') continue
       ;(out.rails ??= []).push({ p: flat(simplifyLine(points, 1.5)), ...(properties.service ? { s: 1 as const } : {}) })
     } else if (feature.featureType === 'waterway' && feature.geometry.kind === 'line') {
+      // Verrohrte Bäche (tunnel=culvert) liegen unter der Erde
+      if (properties.tunnel && properties.tunnel !== 'no') continue
       out.rivers.push(flat(simplifyLine(points, 2)))
+      ;(out.rw ??= []).push(waterwayWidth(properties))
     } else if (areaKind(feature.featureType, properties) && feature.geometry.kind === 'polygon' && points.length >= 3) {
       // Sportflächen sind klein und rechteckig – feiner vereinfachen, damit das Feld eckig bleibt.
       const simplified = simplifyLine(points, feature.featureType === 'sport' || feature.featureType === 'place_area' ? 1 : 4)
@@ -429,10 +481,11 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
   // Laufbahn, Spielfeld, Wasser zuoberst.
   const order: Record<AreaKind, number> = {
     field: 0, garden: 1, built: 1, park: 2, cemetery: 2, allotments: 2, parking: 2, forest: 3,
-    grounds: 4, playground: 5, track: 5, sand: 6, hardcourt: 6, clay: 6, pitch: 6, pool: 7, water: 8,
+    plaza: 2, grounds: 4, playground: 5, track: 5, sand: 6, hardcourt: 6, clay: 6, pitch: 6, pool: 7, water: 8,
   }
   out.areas.sort((a, b) => order[a.k] - order[b.k])
-  const roadOrder: Record<RoadClass, number> = { path: 0, street: 1, main: 2 }
+  const roadOrder: Record<RoadClass, number> = { path: 0, service: 1, street: 2, main: 3 }
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])
+  if (out.rw && out.rw.length !== out.rivers.length) delete out.rw
   return out
 }
