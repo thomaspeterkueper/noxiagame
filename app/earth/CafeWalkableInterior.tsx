@@ -60,11 +60,14 @@ type ShownFigure = { figure:VenueFigure; resident:ColonyResident; moment:GuestMo
 type Visit = { resident:ColonyResident; ageSeconds:number; fetchedAt:number; label:string }
 
 const SPEED=12
+// Sekunden, bis am Tisch Bestelltes gebracht wird.
+const BRING_S=9
 
 type MenuItem = { itemCode:string; label:string; priceCredits:number; affordable:boolean }
 type Menu = { credits:number; items:MenuItem[] }
 // Eine Bestellung dieses Besuchs. forId: wem sie ausgegeben wurde (null = für sich selbst).
-type PlacedOrder = { key:string; itemCode:string; label:string; forId:string|null }
+// at: Zeitpunkt der Bestellung; tableService: am Tisch bestellt, das Personal bringt es.
+type PlacedOrder = { key:string; itemCode:string; label:string; forId:string|null; at:number; tableService:boolean }
 
 export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose}:Props){
   // Zustand des Lokals: Koloniestunde, Obergeschoss, was das Personal mitbekommen hat.
@@ -312,10 +315,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         if(item.itemCode===ROOM_ITEM_CODE){
           // Ein Zimmer steht nicht auf dem Tresen: Es ist ab jetzt deins, eine Nacht lang.
           if(!data.duplicate)setRooms(current=>current?{...current,occupied:current.occupied+1,mineForS:24*3600}:current)
-        }else if(!data.duplicate)setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null}].slice(-8))
+        }else if(!data.duplicate)setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null,at:Date.now(),tableService:atTable&&!isAtServicePoint(layout,pos)}].slice(-8))
         // Die Kopfzeile des Spiels zeigt denselben Kontostand.
         useGameStore.setState({credits})
-        setStatus((item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?item.label+' für '+recipient.displayName+' bestellt':item.label+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
+        setStatus((item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?item.label+' für '+personSceneLabel(recipient)+' bestellt':atTable&&!isAtServicePoint(layout,pos)?item.label+' bestellt, wird gleich gebracht':item.label+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
       }else{
         setStatus(String(data.error??'Die Bestellung konnte nicht gebucht werden. Es wurde nichts abgebucht.'))
         if(data.code==='NOXIA_CREDITS_INSUFFICIENT')setMenu(current=>current?{...current,items:current.items.map(entry=>entry.itemCode===item.itemCode?{...entry,affordable:false}:entry)}:current)
@@ -417,10 +420,12 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         {closed&&<div className="closed"><b>GESCHLOSSEN</b><span>{closedReason==='hours'?'Öffnet um '+hours.open+' Uhr '+clockLabel(hours)+'.'+(arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''):'Hier arbeitet gerade niemand.'}</span></div>}
         {(()=>{const stairs=layout.furniture.find(item=>item.kind==='stairs');if(!stairs)return null;const label=hasUpperFloor(upper)?(upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'):layout.kind==='hotel'?'ZIMMER ↑':null;return label?<div className="label" style={{left:stairs.x+stairs.w/2,top:stairs.y+stairs.h/2}}>{label}</div>:null})()}
         {orders.map((entry,index)=>{
-          // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt, sonst vor dem Spieler am Tresen.
+          // Was bestellt wurde, steht sichtbar da: vor der Person, der es gilt; sonst beim Spieler –
+          // am Tisch, wenn er sitzt, in der Hand, wenn er geht. Am Tisch Bestelltes bringt das Personal nach kurzer Zeit.
           const target=entry.forId?shown.find(item=>item.resident.id===entry.forId)?.figure.spot:null
           const same=orders.slice(0,index).filter(other=>other.forId===entry.forId).length
-          const at=target?{x:target.x+16+same*12,y:target.y+(target.kind==='staff'?14:-4)}:seat?{x:seat.x+14+same*12,y:seat.y-6}:{x:layout.servicePoint.x-30+same*14,y:layout.servicePoint.y-22}
+          if(!target&&entry.tableService&&nowMs-entry.at<BRING_S*1000)return null
+          const at=target?{x:target.x+16+same*12,y:target.y+(target.kind==='staff'?14:-4)}:seat?{x:seat.x+14+same*12,y:seat.y-6}:{x:pos.x+14+same*12,y:pos.y-14}
           return <div key={entry.key} className="item" style={{left:at.x-9,top:at.y-9}} title={entry.label}><HospitalityItemIcon code={entry.itemCode} size={18} title={entry.label}/></div>
         })}
         {openSeats.map(spot=><button key={spot.id} className="seat-hit" style={{left:spot.x-11,top:spot.y-11}} title={'Hier hinsetzen – '+spot.label} aria-label={'Hinsetzen '+spot.label} onClick={()=>sitAt(spot)}/>)}
