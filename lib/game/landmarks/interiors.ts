@@ -1,6 +1,6 @@
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 26.10.2026 — Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
-// Version:      1.2.0
+// Aktualisiert: 26.10.2026 — jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
+// Version:      1.3.0
 
 export type LandmarkRoomKind = 'library' | 'worship'
 export type LandmarkPoint = { x: number; y: number }
@@ -66,8 +66,6 @@ function libraryLayout(): LandmarkRoomLayout {
     lamps: [{ x: 488, y: 146, r: 70, warm: true }, { x: 638, y: 146, r: 70, warm: true }, { x: 545, y: 255, r: 80, warm: true }, { x: 195, y: 160, r: 90 }, { x: 195, y: 240, r: 90 }, { x: 380, y: 400, r: 90 }],
     staff: { id: 'librarian', role: 'Bibliothekar(in)', x: 545, y: 378, greeting: 'Guten Tag. Suchst du etwas Bestimmtes, oder soll ich dir etwas empfehlen?' },
     spots: [
-      { id: 'shelves', label: 'REGALE', x: 195, y: 108, action: 'books', text: 'Romane, Erzählungen und Sachbücher. Zieh einen Band heraus, um Titel und Klappentext zu lesen.' },
-      { id: 'low', label: 'NEUZUGÄNGE', x: 150, y: 330, action: 'books', text: 'Ein niedriges Regal mit den Neuzugängen, daneben ein kleiner Teppich zum Stöbern.' },
       { id: 'reading', label: 'LESETISCH', x: 488, y: 196, action: 'sit', text: 'Ein ruhiger Platz unter der Leselampe. Niemand drängt dich weiter.' },
       { id: 'lounge', label: 'LESEECKE', x: 560, y: 290, action: 'sit', text: 'Zwei Sessel und ein Sofa auf dem roten Teppich – der bequemste Platz im Haus.' },
       { id: 'globe', label: 'GLOBUS', x: 660, y: 330, text: 'Ein alter Globus. Das Sauerland ist auf ihm nicht einmal ein Punkt.' },
@@ -146,4 +144,17 @@ export function landmarkStaffName(landmarkName: string) {
   let h = 2166136261
   for (let i = 0; i < landmarkName.length; i++) { h ^= landmarkName.charCodeAt(i); h = Math.imul(h, 16777619) }
   return STAFF_NAMES[(h >>> 0) % STAFF_NAMES.length]
+}
+
+/** Regal, vor dem die Figur steht (Abstand zur Kante), und was darin steht. */
+export function shelfAt(layout: LandmarkRoomLayout, p: LandmarkPoint, reach = 26) {
+  let best: { item: LandmarkFurniture; shelf: 'romane' | 'sachbuecher'; distance: number } | null = null
+  for (const item of layout.furniture) {
+    if (item.kind !== 'shelf' && item.kind !== 'shelf-low') continue
+    const dx = Math.max(item.x - p.x, 0, p.x - (item.x + item.w))
+    const dy = Math.max(item.y - p.y, 0, p.y - (item.y + item.h))
+    const distance = Math.hypot(dx, dy)
+    if (distance <= reach && (!best || distance < best.distance)) best = { item, shelf: item.kind === 'shelf-low' ? 'sachbuecher' : 'romane', distance }
+  }
+  return best
 }

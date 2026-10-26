@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 26.10.2026 — Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.0.0
+// Aktualisiert: 26.10.2026 — an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.1.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -13,6 +13,7 @@ import {
   landmarkRoomLayout,
   landmarkStaffName,
   nearestLandmarkSpot,
+  shelfAt,
   type LandmarkFurniture,
   type LandmarkPoint,
   type LandmarkRoomKind,
@@ -98,9 +99,12 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
   }, [layout, onClose, talking])
 
   const near = nearestLandmarkSpot(layout, pos)
+  const shelf = layout.kind === 'library' ? shelfAt(layout, pos) : null
+  const shelfBooks = shelf ? LIBRARY_BOOKS.filter(entry => entry.shelf === shelf.shelf) : []
+  const shelfLabel = shelf ? LIBRARY_SHELVES.find(entry => entry.id === shelf.shelf)?.label ?? 'Regal' : ''
   const nearExit = Math.hypot(pos.x - layout.exit.x, pos.y - layout.exit.y) < 46
   const nearStaff = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
-  const shown = active && near?.id === active.id ? active : null
+  const shown = !shelf && active && near?.id === active.id ? active : null
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   useEffect(() => { if (!nearStaff && talking) setTalking(false) }, [nearStaff, talking])
 
@@ -164,8 +168,8 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
         {layout.lamps.map((lamp, index) => <div key={index} className={'lamp' + (lamp.warm ? ' warm' : '')} style={{ left: lamp.x - lamp.r, top: lamp.y - lamp.r, width: lamp.r * 2, height: lamp.r * 2 }}/>)}
         <div className="door"><span>AUSGANG</span></div>
         {layout.furniture.map(item => <div key={item.id} className={'f ' + item.kind} style={{ left: item.x, top: item.y, width: item.w, height: item.h }}>
-          {item.kind === 'shelf' && <i className="books"/>}
-          {item.kind === 'shelf-low' && <i className="books low"/>}
+          {item.kind === 'shelf' && <i className="spines"/>}
+          {item.kind === 'shelf-low' && <i className="spines low"/>}
           {item.kind === 'table' && <><i className="book-open"/><i className="lamp-small"/></>}
           {item.kind === 'pinboard' && <><i className="note n1"/><i className="note n2"/><i className="note n3"/></>}
           {furnitureLabel(item) && <span className="label">{furnitureLabel(item)}</span>}
@@ -175,35 +179,35 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           <NpcFigure id={`landmark-staff:${name}`} name={staffName} role={staff.role} showLabel={nearStaff || talking} showRoleLabel selected={talking} onClick={() => { if (nearStaff) startTalk() }}/>
         </div>}
         <div className={'player' + (seated ? ' seated' : '')} style={{ left: pos.x - 10, top: pos.y - 24 }}><i/><span>Du</span></div>
-        {near && near.action !== 'staff' && <button className="context" style={{ left: near.x - 40, top: near.y + 12 }} onClick={() => { setActive(near); setTalking(false) }}>{near.label}</button>}
+        {shelf && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>STÖBERN</button>}
+        {!shelf && near && near.action !== 'staff' && <button className="context" style={{ left: near.x - 40, top: near.y + 12 }} onClick={() => { setActive(near); setTalking(false) }}>{near.label}</button>}
         {staff && nearStaff && !talking && <button className="context" style={{ left: staff.x - 40, top: staff.y + 14 }} onClick={startTalk}>ANSPRECHEN</button>}
         {nearExit && <button className="context exit" style={{ left: layout.exit.x - 60, top: layout.exit.y - 56 }} onClick={onClose}>{layout.noun.toUpperCase()} VERLASSEN</button>}
       </div>
       <aside>
         <small>{typeLabel.toUpperCase()} · REALER ORT</small>
-        <h3>{talking && staff ? staffName : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>
+        <h3>{talking && staff ? staffName : shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>
         {talking && staff && <>
           <p className="muted">{staff.role} · an der Ausleihe</p>
           <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : staffName}:</b> „{entry.content}“</p>)}</div>
-          {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false); setActive(layout.spots.find(spot => spot.action === 'books') ?? null) }}>
-            <span>{tip.author}</span><b>{tip.title}</b><i>{tip.genre}</i><small>Im Regal ansehen →</small>
+          {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false) }}>
+            <span>{tip.author}</span><b>{tip.title}</b><i>{tip.genre}</i><small>Klappentext lesen →</small>
           </button>}
           <div className="row"><button className="act" onClick={giveTip}>Buchtipp erbitten</button><button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Kurze Frage …"/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
-        {!talking && !shown && <p>Du kannst dich frei im Raum bewegen. Tritt an einen Bereich heran, um ihn näher anzusehen{staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.</p>}
-        {!talking && shown && <p>{shown.text}</p>}
-        {!talking && shown?.action === 'books' && !book && <div className="books">{LIBRARY_SHELVES.map(shelf => <section key={shelf.id}>
-          <h4>{shelf.label}</h4>
-          {LIBRARY_BOOKS.filter(entry => entry.shelf === shelf.id).map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
-        </section>)}</div>}
-        {!talking && shown?.action === 'books' && book && <div className="book">
+        {!talking && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
+          {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
+        </section></div></>}
+        {!talking && book && (shelf || !shown) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
-          <button className="act" onClick={() => setBookId('')}>← Zurück ins Regal</button>
+          <button className="act" onClick={() => setBookId('')}>← Zurück</button>
         </div>}
+        {!talking && !shown && !shelf && !book && <p>Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern{staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.</p>}
+        {!talking && shown && <p>{shown.text}</p>}
         {!talking && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
         {!talking && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
         {!talking && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
@@ -236,8 +240,8 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       .f .label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:800 7px monospace;letter-spacing:.12em;color:#f3ead6;text-shadow:0 1px 0 #0006;pointer-events:none}
       .f.shelf{background:#4a2c1c;border:2px solid #2d1a10}
       .f.shelf-low{background:#6b4a33;border:2px solid #3b2518;box-shadow:2px 2px 0 #0003}
-      .books{position:absolute;inset:3px;background:repeating-linear-gradient(90deg,#8a3a2e 0 4px,#2f5d6b 4px 7px,#c9a24a 7px 9px,#3f6b3a 9px 13px,#6a3d7a 13px 15px,#b7532f 15px 19px,#2a4a7a 19px 22px)}
-      .books.low{background:repeating-linear-gradient(90deg,#d8b24f 0 5px,#2f5d6b 5px 8px,#b24a3d 8px 12px,#3f6b3a 12px 14px)}
+      .spines{position:absolute;inset:3px;background:repeating-linear-gradient(90deg,#8a3a2e 0 4px,#2f5d6b 4px 7px,#c9a24a 7px 9px,#3f6b3a 9px 13px,#6a3d7a 13px 15px,#b7532f 15px 19px,#2a4a7a 19px 22px)}
+      .spines.low{background:repeating-linear-gradient(90deg,#d8b24f 0 5px,#2f5d6b 5px 8px,#b24a3d 8px 12px,#3f6b3a 12px 14px)}
       .f.table{background:#8c6b47;border:2px solid #5d4428;border-radius:5px}
       .book-open{position:absolute;left:14px;top:14px;width:22px;height:14px;background:linear-gradient(90deg,#f5efe0 0 48%,#d9cfb8 48% 52%,#f5efe0 52%);border:1px solid #6b5438;border-radius:1px}
       .lamp-small{position:absolute;right:10px;top:8px;width:14px;height:10px;background:#2f6a4a;border-radius:7px 7px 2px 2px;box-shadow:0 0 10px 3px #ffe9a080}
