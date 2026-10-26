@@ -1,16 +1,18 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 26.10.2026 — an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.1.0
+// Aktualisiert: 26.10.2026 — „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.2.0
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { NpcFigure, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
   LANDMARK_ROOM,
   isLandmarkRoomBlocked,
+  landmarkPath,
   landmarkRoomLayout,
+  landmarkWaypoints,
   landmarkStaffName,
   nearestLandmarkSpot,
   shelfAt,
@@ -36,6 +38,23 @@ type ChatEntry = { role: 'user' | 'assistant'; content: string }
 
 const SPEED = 12
 const STAFF_REACH = 64
+const WALK_STEP = 6
+const STAFF_STEP = 5
+/** Sekunden zwischen zwei Einsortier-Runden der angestellten Person, wenn nichts anstand. */
+const RESHELVE_EVERY_S = 45
+const READER_NAMES = ['Paul Siebert', 'Nele Arndt', 'Jakob Heine', 'Ida Kraus']
+
+type Walker = { path: LandmarkPoint[]; index: number; onArrive?: () => void }
+type StaffTask = { kind: 'bring'; book: LibraryBook } | { kind: 'reshelve' } | { kind: 'visit'; label: string } | { kind: 'return' }
+
+/** Ein Schritt entlang eines Weges; liefert die neue Position und ob das Ziel erreicht ist. */
+function advance(walker: Walker, here: LandmarkPoint, step: number): { pos: LandmarkPoint; done: boolean } {
+  const goal = walker.path[walker.index]
+  if (!goal) return { pos: here, done: true }
+  const dx = goal.x - here.x, dy = goal.y - here.y, d = Math.hypot(dx, dy)
+  if (d <= step) { walker.index++; return { pos: { x: goal.x, y: goal.y }, done: walker.index >= walker.path.length } }
+  return { pos: { x: here.x + dx / d * step, y: here.y + dy / d * step }, done: false }
+}
 
 /** Was die Bibliothekarin über den Bestand weiß – kompakt genug für das Gesprächs-API. */
 function catalogueLines(books: readonly LibraryBook[], maxChars = 136) {
@@ -69,7 +88,34 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [tip, setTip] = useState<LibraryBook | null>(null)
-  const tipSeed = useRef(Math.floor(Date.now() / 86_400_000))
+  const tipSeed = useRef(0)
+  const waypoints = useMemo(() => landmarkWaypoints(layout), [layout])
+  const posRef = useRef(pos)
+  const playerWalk = useRef<Walker | null>(null)
+  // Angestellte Person: Position, aktuelle Aufgabe, Weg.
+  const [staffPos, setStaffPos] = useState<LandmarkPoint>(layout.staff ?? layout.start)
+  const staffPosRef = useRef(staffPos)
+  const [staffTask, setStaffTask] = useState<StaffTask | null>(null)
+  const staffTaskRef = useRef<StaffTask | null>(null)
+  const staffWalk = useRef<Walker | null>(null)
+  const staffIdleSince = useRef(0)
+  const [playerMoving, setPlayerMoving] = useState(false)
+  useEffect(() => { tipSeed.current = Math.floor(Date.now() / 86_400_000); staffIdleSince.current = Date.now() }, [])
+  const [staffMoving, setStaffMoving] = useState(false)
+  // Buch in der Hand des Spielers (gebracht oder aus dem Regal genommen).
+  const [held, setHeld] = useState<LibraryBook | null>(null)
+  const [status, setStatus] = useState('')
+  // Lesegast: sitzt in der Leseecke, wechselt ab und zu den Platz.
+  const readerName = useMemo(() => READER_NAMES[(landmarkStaffName(name).length + name.length) % READER_NAMES.length], [name])
+  const readerSeats = useMemo(() => layout.spots.filter(spot => spot.action === 'sit'), [layout])
+  const [readerPos, setReaderPos] = useState<LandmarkPoint>(() => readerSeats[readerSeats.length - 1] ? { x: readerSeats[readerSeats.length - 1].x + 30, y: readerSeats[readerSeats.length - 1].y } : layout.start)
+  const readerPosRef = useRef(readerPos)
+  const readerWalk = useRef<Walker | null>(null)
+  const [readerMoving, setReaderMoving] = useState(false)
+  useEffect(() => { posRef.current = pos }, [pos])
+  useEffect(() => { staffPosRef.current = staffPos }, [staffPos])
+  useEffect(() => { readerPosRef.current = readerPos }, [readerPos])
+  useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
   const book = LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
   const staff = layout.staff
 
@@ -82,6 +128,8 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       if (!['w', 'a', 's', 'd'].includes(key)) return
       event.preventDefault()
       event.stopPropagation()
+      playerWalk.current = null
+      setPlayerMoving(false)
       setSeated(false)
       setPos(current => {
         const step = event.shiftKey ? SPEED * 1.6 : SPEED
@@ -98,15 +146,90 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
     return () => window.removeEventListener('keydown', onKey, true)
   }, [layout, onClose, talking])
 
+  const walkTo = useCallback((target: LandmarkPoint, onArrive?: () => void) => {
+    setSeated(false)
+    playerWalk.current = { path: landmarkPath(layout, posRef.current, target), index: 1, onArrive }
+    setPlayerMoving(true)
+  }, [layout])
+
+  const staffGo = useCallback((target: LandmarkPoint, onArrive?: () => void) => {
+    staffWalk.current = { path: landmarkPath(layout, staffPosRef.current, target), index: 1, onArrive }
+    setStaffMoving(true)
+  }, [layout])
+
+  /** Die angestellte Person bringt ein Buch an den Platz des Spielers und kehrt zum Tresen zurück. */
+  const bringBook = useCallback((book: LibraryBook) => {
+    if (!staff || staffTaskRef.current?.kind === 'bring') return
+    setStaffTask({ kind: 'bring', book })
+    const beside = { x: posRef.current.x + 26, y: posRef.current.y + 4 }
+    staffGo(isLandmarkRoomBlocked(layout, beside) ? posRef.current : beside, () => {
+      setHeld(book)
+      setStatus(`${staffName} legt dir „${book.title}“ hin.`)
+      setHistory(current => [...current, { role: 'assistant' as const, content: `Hier, „${book.title}“. Lass dir Zeit damit.` }].slice(-12))
+      setStaffTask({ kind: 'return' })
+      staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() })
+    })
+  }, [layout, staff, staffGo, staffName])
+
+  // Bewegung aller Figuren: 25 Schritte je Sekunde.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const pw = playerWalk.current
+      if (pw) {
+        const { pos: next, done } = advance(pw, posRef.current, WALK_STEP)
+        posRef.current = next; setPos(next)
+        if (done) { playerWalk.current = null; setPlayerMoving(false); pw.onArrive?.() }
+      }
+      const sw = staffWalk.current
+      if (sw) {
+        const { pos: next, done } = advance(sw, staffPosRef.current, STAFF_STEP)
+        staffPosRef.current = next; setStaffPos(next)
+        if (done) { staffWalk.current = null; setStaffMoving(false); sw.onArrive?.() }
+      } else if (staff && !staffTaskRef.current && !talking && Date.now() - staffIdleSince.current > RESHELVE_EVERY_S * 1000) {
+        // Nichts zu tun: ein Stapel Rückgaben wird einsortiert.
+        const shelves = waypoints.filter(point => point.kind === 'Regal')
+        const target = shelves[Math.floor(Math.random() * shelves.length)]
+        if (target) {
+          setStaffTask({ kind: 'reshelve' })
+          staffGo(target, () => setTimeout(() => staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }), 2500))
+        } else staffIdleSince.current = Date.now()
+      }
+      const rw = readerWalk.current
+      if (rw) {
+        const { pos: next, done } = advance(rw, readerPosRef.current, STAFF_STEP)
+        readerPosRef.current = next; setReaderPos(next)
+        if (done) { readerWalk.current = null; setReaderMoving(false) }
+      }
+    }, 40)
+    return () => clearInterval(timer)
+  }, [staff, staffGo, talking, waypoints])
+
+  // Der Lesegast wechselt gelegentlich den Platz oder holt sich etwas aus dem Regal.
+  useEffect(() => {
+    if (readerSeats.length < 2) return
+    const timer = setInterval(() => {
+      if (readerWalk.current || Math.random() < .4) return
+      const shelf = waypoints.find(point => point.id === 'shelf:romane')
+      const seat = readerSeats[Math.floor(Math.random() * readerSeats.length)]
+      const seatPos = { x: seat.x + 30, y: seat.y }
+      const target = Math.random() < .3 && shelf ? shelf : (isLandmarkRoomBlocked(layout, seatPos) ? seat : seatPos)
+      readerWalk.current = { path: landmarkPath(layout, readerPosRef.current, target), index: 1 }
+      setReaderMoving(true)
+      if (target === shelf) setTimeout(() => { readerWalk.current = { path: landmarkPath(layout, readerPosRef.current, seatPos), index: 1 }; setReaderMoving(true) }, 7000)
+    }, 25_000)
+    return () => clearInterval(timer)
+  }, [layout, readerSeats, waypoints])
+
   const near = nearestLandmarkSpot(layout, pos)
   const shelf = layout.kind === 'library' ? shelfAt(layout, pos) : null
   const shelfBooks = shelf ? LIBRARY_BOOKS.filter(entry => entry.shelf === shelf.shelf) : []
   const shelfLabel = shelf ? LIBRARY_SHELVES.find(entry => entry.id === shelf.shelf)?.label ?? 'Regal' : ''
   const nearExit = Math.hypot(pos.x - layout.exit.x, pos.y - layout.exit.y) < 46
-  const nearStaff = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
+  const nearStaff = Boolean(staff && Math.hypot(pos.x - staffPos.x, pos.y - staffPos.y) <= STAFF_REACH)
+  const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
-  useEffect(() => { if (!nearStaff && talking) setTalking(false) }, [nearStaff, talking])
+  const talkingNow = talking && (nearStaff || staffTask?.kind === 'bring')
 
   function startTalk() {
     if (!staff) return
@@ -119,6 +242,11 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
     tipSeed.current += 7
     const next = pickTip(tipSeed.current)
     setTip(next)
+    if (seated && staffTaskRef.current === null) {
+      setHistory(current => [...current, { role: 'assistant' as const, content: `Bleib sitzen – ich bringe dir „${next.title}“, ${next.genre.split('/')[0].trim()}.` }].slice(-12))
+      bringBook(next)
+      return
+    }
     setHistory(current => [...current, { role: 'assistant' as const, content: `Schau dir mal „${next.title}“ an – ${next.genre.split('/')[0].trim()}. ${next.teaser}` }].slice(-12))
   }
 
@@ -144,9 +272,12 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           localFacts: [
             `Du arbeitest an der Ausleihe der ${name} und kennst den Bestand genau.`,
             `Alle Bücher hier sind von Thomas Peter Küper. Du empfiehlst auf Nachfrage passende Titel aus dem Bestand und erfindest keine anderen.`,
+            seated ? 'Der Spieler sitzt gerade an einem Leseplatz. Wenn du ihm ein Buch anbietest oder er eins möchte, sag „ich bringe dir …“ und nenne den genauen Titel – du bringst es dann wirklich.' : 'Der Spieler steht. Ein Buch bringst du nur an einen Leseplatz; sonst zeigst du ihm das Regal.',
+            held ? `Der Spieler hat gerade „${held.title}“ in der Hand.` : '',
             ...catalogueLines(fiction).map(line => `Romane und Erzählungen: ${line}`),
           ].slice(0, 16),
           placeKnowledge: catalogueLines(nonfiction).map(line => `Sachbücher: ${line}`),
+          nearbyPlaces: waypoints.filter(point => point.id !== 'exit' && point.kind !== 'Tresen').slice(0, 9).map((point, index) => ({ key: `p${index}`, targetRef: point.id, name: point.label, kind: point.kind, distanceM: Math.round(Math.hypot(point.x - staffPos.x, point.y - staffPos.y) / 16) })),
           history: history.slice(-10),
         }),
       })
@@ -154,6 +285,23 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, ich bin gerade beschäftigt – frag mich gleich noch einmal.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
+      // Versprochen ist versprochen: „ich bringe …“ löst den Gang aus, ein genannter Titel wird erkannt.
+      if (/\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
+        const named = LIBRARY_BOOKS.find(entry => reply.toLowerCase().includes(entry.title.toLowerCase()))
+        bringBook(named ?? tip ?? pickTip(tipSeed.current += 3))
+      } else if (data.worldAction?.type === 'visit_place') {
+        const target = waypoints.find(point => point.id === data.worldAction.targetRef)
+        if (target && staff) {
+          setStaffTask({ kind: 'visit', label: target.label })
+          staffGo(target, () => setTimeout(() => staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }), 6000))
+          if (data.worldAction.playerFollows) walkTo({ x: target.x - 24, y: target.y })
+        }
+      } else if (data.worldAction?.type === 'lead_walk' && staff) {
+        const shelf = waypoints.find(point => point.id === 'shelf:romane') ?? waypoints[0]
+        setStaffTask({ kind: 'visit', label: shelf.label })
+        staffGo(shelf, () => setTimeout(() => staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }), 6000))
+        walkTo({ x: shelf.x - 24, y: shelf.y })
+      }
     } finally { setSending(false) }
   }
 
@@ -175,19 +323,23 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           {furnitureLabel(item) && <span className="label">{furnitureLabel(item)}</span>}
         </div>)}
         {layout.kind === 'worship' && Array.from({ length: Math.min(9, candles) }, (_, index) => <i key={index} className="flame" style={{ left: 654 + (index % 5) * 8, top: 88 + Math.floor(index / 5) * 9 }}/>)}
-        {staff && <div className="npc" style={{ left: staff.x - 12, top: staff.y - 34 }}>
-          <NpcFigure id={`landmark-staff:${name}`} name={staffName} role={staff.role} showLabel={nearStaff || talking} showRoleLabel selected={talking} onClick={() => { if (nearStaff) startTalk() }}/>
+        {staff && <div className="npc" style={{ left: staffPos.x - 12, top: staffPos.y - 34 }}>
+          <NpcFigure id={`landmark-staff:${name}`} name={staffName} role={staffTask?.kind === 'bring' ? 'bringt ein Buch' : staffTask?.kind === 'reshelve' ? 'sortiert ein' : staff.role} moving={staffMoving} showLabel={nearStaff || talkingNow || Boolean(staffTask)} showRoleLabel selected={talkingNow} onClick={() => { if (nearStaff) startTalk() }}/>
+          {staffTask?.kind === 'bring' && <i className="carry"/>}
         </div>}
-        <div className={'player' + (seated ? ' seated' : '')} style={{ left: pos.x - 10, top: pos.y - 24 }}><i/><span>Du</span></div>
+        {layout.kind === 'library' && readerSeats.length > 0 && <div className="npc" style={{ left: readerPos.x - 12, top: readerPos.y - 34 }}>
+          <NpcFigure id={`landmark-reader:${name}`} name={readerName} role={readerMoving ? 'unterwegs' : 'liest'} moving={readerMoving} showLabel={Math.hypot(readerPos.x - pos.x, readerPos.y - pos.y) < 70} showRoleLabel onClick={() => setStatus(`${readerName} schaut kurz auf, nickt dir zu und liest weiter.`)}/>
+        </div>}
+        <div className={'player' + (seated ? ' seated' : '') + (playerMoving ? ' moving' : '')} style={{ left: pos.x - 10, top: pos.y - 24 }}><i/><span>Du</span>{held && <b className="held" title={held.title}/>}</div>
         {shelf && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>STÖBERN</button>}
         {!shelf && near && near.action !== 'staff' && <button className="context" style={{ left: near.x - 40, top: near.y + 12 }} onClick={() => { setActive(near); setTalking(false) }}>{near.label}</button>}
-        {staff && nearStaff && !talking && <button className="context" style={{ left: staff.x - 40, top: staff.y + 14 }} onClick={startTalk}>ANSPRECHEN</button>}
+        {staff && nearStaff && !talkingNow && <button className="context" style={{ left: staff.x - 40, top: staff.y + 14 }} onClick={startTalk}>ANSPRECHEN</button>}
         {nearExit && <button className="context exit" style={{ left: layout.exit.x - 60, top: layout.exit.y - 56 }} onClick={onClose}>{layout.noun.toUpperCase()} VERLASSEN</button>}
       </div>
       <aside>
         <small>{typeLabel.toUpperCase()} · REALER ORT</small>
-        <h3>{talking && staff ? staffName : shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>
-        {talking && staff && <>
+        <h3>{talkingNow && staff ? staffName : shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>
+        {talkingNow && staff && <>
           <p className="muted">{staff.role} · an der Ausleihe</p>
           <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : staffName}:</b> „{entry.content}“</p>)}</div>
           {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false) }}>
@@ -196,22 +348,33 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           <div className="row"><button className="act" onClick={giveTip}>Buchtipp erbitten</button><button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Kurze Frage …"/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
-        {!talking && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
+        {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
         </section></div></>}
-        {!talking && book && (shelf || !shown) && <div className="book">
+        {!talkingNow && book && (shelf || !shown) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
           <button className="act" onClick={() => setBookId('')}>← Zurück</button>
         </div>}
-        {!talking && !shown && !shelf && !book && <p>Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern{staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.</p>}
-        {!talking && shown && <p>{shown.text}</p>}
-        {!talking && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
-        {!talking && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
-        {!talking && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
-        {!talking && facts.length > 0 && <dl>{facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl>}
+        {status && <div className="status">{status}</div>}
+        {!talkingNow && held && !book && <div className="book held-card">
+          <span>IN DEINER HAND</span>
+          <b>{held.title}</b>
+          <i>{held.genre}</i>
+          {seated ? <p>{held.teaser}</p> : <p>Setz dich an einen Leseplatz, um darin zu lesen.</p>}
+          {atCounter ? <button className="act" onClick={() => { setHeld(null); setStatus(`Du gibst „${held.title}“ an der Ausleihe zurück.`) }}>Zurückgeben</button> : <button className="act quiet" onClick={() => setHeld(null)}>Weglegen</button>}
+        </div>}
+        {!talkingNow && !shown && !shelf && !book && !held && <p>Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern{staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.</p>}
+        {!talkingNow && shown && <p>{shown.text}</p>}
+        {!talkingNow && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
+        {!talkingNow && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
+        {!talkingNow && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
+        {!talkingNow && <div className="moves"><small>GEHE ZU …</small><div>
+          {waypoints.map(point => <button key={point.id} onClick={() => walkTo(point, () => { if (point.id === 'exit') onClose(); else if (point.kind === 'Sitzplatz') setSeated(true) })}>{point.label}</button>)}
+        </div></div>}
+        {!talkingNow && facts.length > 0 && <dl>{facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl>}
         <div className="note">Typischer Grundriss für diese Ortsart – nicht der vermessene Innenraum des realen Gebäudes. Ortsdaten: OpenStreetMap.</div>
       </aside>
     </main>
@@ -262,6 +425,14 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       .note.n1{left:6px;background:#f7e9a8}.note.n2{left:30px;background:#dfe9f5;top:1px}.note.n3{left:56px;background:#f4cfc9}
       .flame{position:absolute;width:4px;height:7px;border-radius:50% 50% 45% 45%;background:#ffd76a;box-shadow:0 0 6px 2px #ffb84a99}
       .npc{position:absolute;z-index:2}
+      .npc .carry{position:absolute;left:18px;top:14px;width:9px;height:12px;background:#b24a3d;border:1px solid #3b1a14;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
+      .player .held{position:absolute;left:16px;top:10px;width:8px;height:11px;background:#2f5d6b;border:1px solid #1a3038;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
+      .status{padding:7px 9px;border:1px solid #6b8793;border-radius:6px;background:#0b1a24;color:#dfe9ee;font-size:10px}
+      .moves{display:grid;gap:4px;border-top:1px solid #2f4a4b;padding-top:8px}
+      .moves div{display:flex;flex-wrap:wrap;gap:4px}
+      .moves button{border:1px solid #476476;border-radius:5px;background:#102b3c;color:#dce9ee;padding:4px 7px;font:700 9px system-ui;cursor:pointer}
+      .moves button:hover{background:#173b50}
+      .held-card{border-color:#2f5d6b}
       .player{position:absolute;width:20px;height:28px;pointer-events:none;z-index:3}
       .player i{position:absolute;left:3px;top:8px;width:14px;height:18px;border-radius:7px 7px 3px 3px;background:#d4ad43;border:1.5px solid #594717}
       .player i::before{content:'';position:absolute;left:1.5px;top:-9px;width:8px;height:8px;border-radius:50%;background:#f0c49c;border:1.5px solid #493c18}

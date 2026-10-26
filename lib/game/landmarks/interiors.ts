@@ -1,6 +1,6 @@
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 26.10.2026 — jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
-// Version:      1.3.0
+// Aktualisiert: 26.10.2026 — Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
+// Version:      1.4.0
 
 export type LandmarkRoomKind = 'library' | 'worship'
 export type LandmarkPoint = { x: number; y: number }
@@ -157,4 +157,58 @@ export function shelfAt(layout: LandmarkRoomLayout, p: LandmarkPoint, reach = 26
     if (distance <= reach && (!best || distance < best.distance)) best = { item, shelf: item.kind === 'shelf-low' ? 'sachbuecher' : 'romane', distance }
   }
   return best
+}
+
+const PATH_STEP = 8
+const PATH_RADIUS = 7
+
+/** Weg von `from` nach `to` um die Möbel herum, als Liste von Punkten (Breitensuche auf einem 8-px-Raster). */
+export function landmarkPath(layout: LandmarkRoomLayout, from: LandmarkPoint, to: LandmarkPoint): LandmarkPoint[] {
+  const free = (p: LandmarkPoint) => !isLandmarkRoomBlocked(layout, p, PATH_RADIUS)
+  const snap = (p: LandmarkPoint): LandmarkPoint | null => {
+    const base = { x: Math.round(p.x / PATH_STEP) * PATH_STEP, y: Math.round(p.y / PATH_STEP) * PATH_STEP }
+    let best: LandmarkPoint | null = null, bestD = Infinity
+    for (let dx = -6; dx <= 6; dx++) for (let dy = -6; dy <= 6; dy++) {
+      const c = { x: base.x + dx * PATH_STEP, y: base.y + dy * PATH_STEP }
+      const d = Math.hypot(c.x - p.x, c.y - p.y)
+      if (d < bestD && free(c)) { best = c; bestD = d }
+    }
+    return best
+  }
+  const start = snap(from), goal = snap(to)
+  if (!start || !goal) return [from, to]
+  const key = (p: LandmarkPoint) => p.x + ':' + p.y
+  const previous = new Map<string, LandmarkPoint | null>([[key(start), null]])
+  const queue: LandmarkPoint[] = [start]
+  while (queue.length) {
+    const p = queue.shift() as LandmarkPoint
+    if (p.x === goal.x && p.y === goal.y) break
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const next = { x: p.x + dx * PATH_STEP, y: p.y + dy * PATH_STEP }
+      if (previous.has(key(next)) || !free(next)) continue
+      if (dx && dy && (!free({ x: p.x + dx * PATH_STEP, y: p.y }) || !free({ x: p.x, y: p.y + dy * PATH_STEP }))) continue
+      previous.set(key(next), p)
+      queue.push(next)
+    }
+  }
+  if (!previous.has(key(goal))) return [from, to]
+  const cells: LandmarkPoint[] = []
+  for (let p: LandmarkPoint | null = goal; p; p = previous.get(key(p)) ?? null) cells.unshift(p)
+  return [from, ...cells, to]
+}
+
+export type LandmarkWaypoint = { id: string; label: string; x: number; y: number; kind: string }
+
+/** Ziele im Raum für „Gehe zu …“ und für das Personal: alle Bereiche, der Tresen, die Regale, der Ausgang. */
+export function landmarkWaypoints(layout: LandmarkRoomLayout): LandmarkWaypoint[] {
+  const out: LandmarkWaypoint[] = layout.spots.map(spot => ({ id: `spot:${spot.id}`, label: spot.label.charAt(0) + spot.label.slice(1).toLowerCase(), x: spot.x, y: spot.y, kind: spot.action === 'sit' ? 'Sitzplatz' : spot.action === 'staff' ? 'Tresen' : 'Bereich' }))
+  const shelves = layout.furniture.filter(item => item.kind === 'shelf' || item.kind === 'shelf-low')
+  if (shelves.length) {
+    const first = shelves.find(item => item.kind === 'shelf') ?? shelves[0]
+    out.push({ id: 'shelf:romane', label: 'Regale (Romane)', x: first.x + Math.min(60, first.w / 2), y: first.y + first.h + 18, kind: 'Regal' })
+    const low = shelves.find(item => item.kind === 'shelf-low')
+    if (low) out.push({ id: 'shelf:sachbuecher', label: 'Regal (Sachbücher)', x: low.x + Math.min(60, low.w / 2), y: low.y + low.h + 18, kind: 'Regal' })
+  }
+  out.push({ id: 'exit', label: 'Ausgang', x: layout.exit.x, y: layout.exit.y - 14, kind: 'Ausgang' })
+  return out.filter(point => !isLandmarkRoomBlocked(layout, point))
 }
