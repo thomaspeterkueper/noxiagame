@@ -146,7 +146,7 @@ begin
 end;
 $$;
 
--- Fahrt: Akku sinkt mit der Strecke (1 % je 2 km), Zustand langsam (1 % je 25 km). Keine Buchung.
+-- Fahrt: Akku sinkt mit der Strecke (1 % je 10 km, also 1 000 km je Ladung), Zustand langsam (1 % je 100 km). Keine Buchung.
 create or replace function public.vehicle_drive(p_profile_id uuid, p_distance_m bigint, p_lat double precision, p_lon double precision)
 returns jsonb
 language plpgsql
@@ -161,9 +161,9 @@ begin
   select * into v_vehicle from public.player_vehicles where profile_id=p_profile_id and active limit 1 for update;
   if not found then raise exception 'NOXIA_VEHICLE_NONE'; end if;
   if v_vehicle.condition_pct < 15 then raise exception 'NOXIA_VEHICLE_BROKEN'; end if;
-  v_charge_cost := ceil(p_distance_m / 2000.0)::integer;
+  v_charge_cost := ceil(p_distance_m / 10000.0)::integer;
   if v_vehicle.charge_pct < v_charge_cost then raise exception 'NOXIA_VEHICLE_CHARGE_LOW'; end if;
-  v_wear := floor((v_vehicle.odometer_m + p_distance_m) / 25000.0)::integer - floor(v_vehicle.odometer_m / 25000.0)::integer;
+  v_wear := floor((v_vehicle.odometer_m + p_distance_m) / 100000.0)::integer - floor(v_vehicle.odometer_m / 100000.0)::integer;
   update public.player_vehicles
     set charge_pct = charge_pct - v_charge_cost,
         condition_pct = greatest(0, condition_pct - v_wear),
