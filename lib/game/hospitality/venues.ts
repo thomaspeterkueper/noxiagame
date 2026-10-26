@@ -27,7 +27,7 @@ export type VenueKind = 'cafe' | 'bar' | 'restaurant' | 'hotel'
 export interface VenuePoint { x: number; y: number }
 
 export type VenueFurnitureKind =
-  | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs'
+  | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs' | 'lectern' | 'board'
 
 export interface VenueFurniture {
   id: string
@@ -53,7 +53,8 @@ export interface VenueSpot {
 }
 
 export interface VenueLayout {
-  kind: VenueKind
+  /** Lokalart – oder eine andere Gebäudeart, wenn der Grundriss für den allgemeinen Innenraum (NOXIA-INTERIOR-0001) gebaut ist. */
+  kind: VenueKind | (string & {})
   template: InteriorTemplate
   /** „Café“, „Bar“, „Restaurant“ */
   noun: string
@@ -90,7 +91,7 @@ const TABLE_H = 48
 const CHAIR = 18
 
 /** Ein Tisch mit je einem Stuhl links und rechts. */
-function tableWithChairs(n: number, x: number, y: number): { furniture: VenueFurniture[]; spots: VenueSpot[] } {
+export function tableWithChairs(n: number, x: number, y: number): { furniture: VenueFurniture[]; spots: VenueSpot[] } {
   const left = { x: x - CHAIR - 4, y: y + (TABLE_H - CHAIR) / 2 }
   const right = { x: x + TABLE_W + 4, y: y + (TABLE_H - CHAIR) / 2 }
   const seat = (side: 'l' | 'r', c: VenuePoint): VenueSpot => ({
@@ -112,16 +113,16 @@ function tableWithChairs(n: number, x: number, y: number): { furniture: VenueFur
   }
 }
 
-function tables(positions: Array<[number, number]>) {
+export function tables(positions: Array<[number, number]>) {
   const sets = positions.map(([x, y], index) => tableWithChairs(index + 1, x, y))
   return { furniture: sets.flatMap(s => s.furniture), spots: sets.flatMap(s => s.spots) }
 }
 
-function staffSpot(id: string, x: number, y: number, roomId: string, label: string): VenueSpot {
+export function staffSpot(id: string, x: number, y: number, roomId: string, label: string): VenueSpot {
   return { id, kind: 'staff', x, y, roomId, label, posture: 'standing' }
 }
 
-function standingSpot(id: string, x: number, y: number, label: string): VenueSpot {
+export function standingSpot(id: string, x: number, y: number, label: string): VenueSpot {
   return { id, kind: 'standing', x, y, roomId: 'guest-room', label, posture: 'standing' }
 }
 
@@ -365,7 +366,7 @@ export function venueLayoutForSize(layout: VenueLayout, size: VenueSize): VenueL
     spots = spots.filter(spot => !dropped(spot.id))
   } else {
     const start = (tableNumbers[tableNumbers.length - 1] ?? 0) + 1
-    const extra = EXTRA_TABLES[layout.kind].map(([x, y], index) => tableWithChairs(start + index, x, y))
+    const extra = (EXTRA_TABLES[layout.kind as VenueKind] ?? []).map(([x, y], index) => tableWithChairs(start + index, x, y))
     furniture = [...furniture, ...extra.flatMap(t => t.furniture)]
     spots = [...spots, ...extra.flatMap(t => t.spots)]
   }
@@ -607,15 +608,15 @@ export function placeVenueFigures(layout: VenueLayout, residents: readonly Venue
 export type VenueService = 'staffed' | 'self-service' | 'closed'
 
 /** `hour` ist die Koloniestunde; ohne Angabe gelten keine Öffnungszeiten. */
-export function venueService(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null, hours: VenueHours = venueHoursFor(layout.kind)): VenueService {
+export function venueService(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null, hours: VenueHours = venueHoursFor(layout.kind as VenueKind)): VenueService {
   if (figures.some(figure => figure.roomRole === 'staff')) {
-    return hour == null || venueOpenAt(layout.kind, hour, hours) ? 'staffed' : 'closed'
+    return hour == null || venueOpenAt(layout.kind as VenueKind, hour, hours) ? 'staffed' : 'closed'
   }
   return layout.kind === 'cafe' ? 'self-service' : 'closed'
 }
 
 /** Warum ein Lokal zu ist: außerhalb der Öffnungszeit oder weil niemand dort arbeitet. */
-export function venueClosedReason(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null, hours: VenueHours = venueHoursFor(layout.kind)): 'hours' | 'no-staff' | null {
+export function venueClosedReason(layout: VenueLayout, figures: readonly VenueFigure[], hour?: number | null, hours: VenueHours = venueHoursFor(layout.kind as VenueKind)): 'hours' | 'no-staff' | null {
   if (venueService(layout, figures, hour, hours) !== 'closed') return null
   return figures.some(figure => figure.roomRole === 'staff') ? 'hours' : 'no-staff'
 }
@@ -826,7 +827,7 @@ export function roomsFact(rooms: VenueRooms, staff: boolean): string {
 export const TABLE_SERVICE = { comeAfterS: 12, walkS: 6, stayS: 50 } as const
 export type TableServicePhase = 'none' | 'coming' | 'at-table' | 'gone'
 
-export function tableServicePhase(seatedForS: number, kind: VenueKind, service: VenueService): TableServicePhase {
+export function tableServicePhase(seatedForS: number, kind: string, service: VenueService): TableServicePhase {
   if (service !== 'staffed' || kind === 'hotel') return 'none'
   const t = seatedForS - TABLE_SERVICE.comeAfterS
   if (t < 0) return 'none'
@@ -888,7 +889,7 @@ function fit(text: string): string {
   return text.length <= MAX_CONVERSATION_FACT_CHARS ? text : text.slice(0, MAX_CONVERSATION_FACT_CHARS - 1).trimEnd() + '…'
 }
 
-function othersFact(layout: VenueLayout, self: VenueFigure, figures: readonly VenueFigure[]): string {
+export function othersFact(layout: VenueLayout, self: VenueFigure, figures: readonly VenueFigure[]): string {
   const seen = figures.filter(other => other.id !== self.id && other.spot.x >= 0 && canSeeRoom(layout, self.spot.roomId, other.spot.roomId))
   if (seen.length === 0) return 'Außer dir und deinem Gegenüber siehst du gerade niemanden im Raum'
   const groups = new Map<string, number>()
@@ -967,7 +968,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   const { layout, self } = input
   const staff = self.roomRole === 'staff'
   const name = String(input.buildingName ?? '').replace(/\s+/g, ' ').trim().slice(0, input.hour == null ? 60 : 44)
-  const clock = input.hour == null ? '' : `; es ist etwa ${hourOfDay(input.hour)} Uhr, geöffnet ist ${venueHoursText(layout.kind, input.hours ?? venueHoursFor(layout.kind))}`
+  const clock = input.hour == null ? '' : `; es ist etwa ${hourOfDay(input.hour)} Uhr, geöffnet ist ${venueHoursText(layout.kind as VenueKind, input.hours ?? venueHoursFor(layout.kind as VenueKind))}`
   const seesGuestRoom = canSeeRoom(layout, self.spot.roomId, layout.playerRoomId)
   const posture = self.spot.posture === 'sitting' ? 'sitzt' : 'stehst'
 
