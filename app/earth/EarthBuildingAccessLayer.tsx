@@ -16,6 +16,7 @@ import { getToken } from '@/lib/supabase/auth'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
 import type { BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import CafeWalkableInterior from './CafeWalkableInterior'
+import AcademyWalkableInterior from './AcademyWalkableInterior'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type ResourceRow = { resource: string; stock: number; consumption: number; production: number }
@@ -112,11 +113,13 @@ export default function EarthBuildingAccessLayer({
   const [data, setData] = useState<AccessData | null>(null)
   const [loading, setLoading] = useState(false)
   const [spaceportMode, setSpaceportMode] = useState<SpaceportMode>('hub')
+  const [schoolOpen, setSchoolOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!request) return
     setSpaceportMode('hub')
+    setSchoolOpen(false)
     setMessage(null)
     let cancelled = false
     setLoading(true)
@@ -176,6 +179,18 @@ export default function EarthBuildingAccessLayer({
 
   if (request.kind === 'academy') {
     const water = resources.find(resource => resource.resource === 'water')
+    // Die Akademie ist begehbar (NOXIA-INTERIOR-0001); der Lernraum öffnet darüber.
+    if (!schoolOpen) {
+      return (
+        <AcademyWalkableInterior
+          entityId={request.entityId}
+          buildingName={request.buildingName}
+          companion={companion}
+          onClose={onClose}
+          onOpenSchool={() => setSchoolOpen(true)}
+        />
+      )
+    }
     return (
       <SchoolOverlay
         locationSlug="earth"
@@ -186,7 +201,7 @@ export default function EarthBuildingAccessLayer({
           waterCons: Number(water?.consumption ?? 0),
           credits,
         }}
-        onClose={onClose}
+        onClose={() => setSchoolOpen(false)}
         onKnowledgeEarned={() => {}}
       />
     )

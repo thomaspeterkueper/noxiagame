@@ -35,6 +35,7 @@ import {
   type VenueFigure,
   type VenueRooms,
   type VenueUpperFloor,
+  type VenueKind,
 } from '@/lib/game/hospitality/venues'
 
 type Props = {
@@ -79,9 +80,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const ctxRef=useRef<InteriorContext|null>(null)
 
   const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(buildingTypeId),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[buildingTypeId,upper,areaM2])
-  const arrivalPoint=SOCIAL_INFRASTRUCTURE[layout.kind]?.arrivalPoint===true
+  const kind=layout.kind as VenueKind
+  const arrivalPoint=SOCIAL_INFRASTRUCTURE[kind]?.arrivalPoint===true
   // Das Startcafé geht nach der Uhr des Spielers (23–6 Uhr zu), alle anderen Lokale nach Koloniezeit.
-  const hours=venueHoursFor(layout.kind,arrivalPoint)
+  const hours=venueHoursFor(kind,arrivalPoint)
   const playerHour=hours.clock==='player'?new Date(nowMs).getHours():hour
 
   // Ortswissen: was Ansässige über die Gegend wissen.
@@ -178,13 +180,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 
   const fitting:InteriorFitting={
     kind:layout.kind,layout,noun:layout.noun,locative:layout.locative,sectionLabel:'LOKAL',
-    headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(layout.kind,hours):undefined,
+    headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(kind,hours):undefined,
     service,
     closedText:figures=>{
       const reason=venueClosedReason(layout,figures,playerHour,hours)
       if(!reason)return null
       return reason==='hours'
-        ?{headline:'GESCHLOSSEN',detail:'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(layout.kind,hours)+' '+clockLabel(hours)+'; jetzt ist es '+playerHour+' Uhr.'+canteenHint}
+        ?{headline:'GESCHLOSSEN',detail:'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(kind,hours)+' '+clockLabel(hours)+'; jetzt ist es '+playerHour+' Uhr.'+canteenHint}
         :{headline:'GESCHLOSSEN',detail:'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}
     },
     furnitureLabel:(kind,svc)=>kind==='counter'?(svc==='self-service'?'AUTOMAT':'TRESEN'):kind==='kitchen'?'KÜCHE':kind==='desk'?'EMPFANG':kind==='stairs'?(hasUpperFloor(upper)?(upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'):layout.kind==='hotel'?'ZIMMER ↑':null):null,
@@ -203,7 +205,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
     hearsay:self=>self.roomRole==='staff'?heard:[],
     // Jedes Haus führt Neue auf seine Art ein – nur wer hier arbeitet.
-    introduction:self=>self.roomRole==='staff'?venueIntroduction(layout.kind,upper?.guestRooms??0):undefined,
+    introduction:self=>self.roomRole==='staff'?venueIntroduction(kind,upper?.guestRooms??0):undefined,
     things,
     idleText:menuState==='ready'&&menu?.items.length?undefined:undefined,
     greetsAtService:true,
