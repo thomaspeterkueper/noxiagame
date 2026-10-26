@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkStaffName, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
+import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath, landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
 function reachable(layout: LandmarkRoomLayout) {
@@ -54,5 +54,19 @@ describe('landmark interiors', () => {
     expect(cells.some(cell => Math.hypot(cell.x - layout.staff!.x, cell.y - layout.staff!.y) <= LANDMARK_SPOT_REACH)).toBe(true)
     expect(landmarkStaffName('Stadtbibliothek Sundern')).toBe(landmarkStaffName('Stadtbibliothek Sundern'))
     expect(landmarkRoomLayout('worship').staff).toBeNull()
+  })
+
+  it('finds a path around furniture to every waypoint, for player and staff', () => {
+    for (const kind of ['library', 'worship'] as const) {
+      const layout = landmarkRoomLayout(kind)
+      const points = landmarkWaypoints(layout)
+      expect(points.length).toBeGreaterThan(3)
+      for (const point of points) {
+        const path = landmarkPath(layout, layout.start, point)
+        expect(path.length, `${kind}/${point.id}`).toBeGreaterThan(2)
+        for (const step of path.slice(1, -1)) expect(isLandmarkRoomBlocked(layout, step, 7), `${kind}/${point.id}`).toBe(false)
+      }
+      if (layout.staff) expect(landmarkPath(layout, layout.staff, points[0]).length).toBeGreaterThan(2)
+    }
   })
 })
