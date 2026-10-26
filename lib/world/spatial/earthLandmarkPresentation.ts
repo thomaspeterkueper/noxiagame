@@ -24,6 +24,8 @@ export const EARTH_LANDMARK_MAP_POINTS: Readonly<Record<string, EarthLandmarkMap
   'earth-de-menden-gesamtschule': { lat: 51.42996, lon: 7.79372, precision: 'real_location' },
   // Bogenstraße 15: identical to the placed Foundation House (world_unique_objects).
   'earth-de-sundern-ssf-hq': { lat: 51.3407577, lon: 8.001473, precision: 'real_location' },
+  // Mörfelder Landstraße 103, Frankfurt: Koordinate von Thomas (26.10.2026).
+  'earth-de-frankfurt-camaleo-artlounge': { lat: 50.09647354905676, lon: 8.684100267156287, precision: 'real_location' },
   'earth-de-darmstadt-esoc': { lat: 49.8728, lon: 8.6227, precision: 'real_location' },
   'earth-de-darmstadt-eumetsat': { lat: 49.8627, lon: 8.6276, precision: 'real_location' },
   'earth-de-cologne-eac': { lat: 50.852, lon: 7.126, precision: 'real_location' },
