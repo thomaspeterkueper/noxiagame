@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath, landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
+import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
+  landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
 function reachable(layout: LandmarkRoomLayout) {
@@ -25,7 +26,7 @@ describe('landmark interiors', () => {
     expect(landmarkRoomKind('museum')).toBeNull()
   })
 
-  for (const kind of ['library', 'worship', 'shop', 'workshop'] as const) {
+  for (const kind of ['library', 'worship', 'shop', 'workshop', 'artlounge'] as const) {
     it(`${kind}: entrance is free and every spot can be reached on foot`, () => {
       const layout = landmarkRoomLayout(kind)
       expect(isLandmarkRoomBlocked(layout, layout.start)).toBe(false)
@@ -57,7 +58,7 @@ describe('landmark interiors', () => {
   })
 
   it('finds a path around furniture to every waypoint, for player and staff', () => {
-    for (const kind of ['library', 'worship', 'shop', 'workshop'] as const) {
+    for (const kind of ['library', 'worship', 'shop', 'workshop', 'artlounge'] as const) {
       const layout = landmarkRoomLayout(kind)
       const points = landmarkWaypoints(layout)
       expect(points.length).toBeGreaterThan(3)
@@ -68,5 +69,16 @@ describe('landmark interiors', () => {
       }
       if (layout.staff) expect(landmarkPath(layout, layout.staff, points[0]).length).toBeGreaterThan(2)
     }
+  })
+
+  it('CAMALEO-ArtLounge: Flügel, Sitzplätze und ein Büro im Hinterzimmer', () => {
+    const layout = landmarkRoomLayout('artlounge')
+    expect(layout.furniture.some(item => item.kind === 'piano')).toBe(true)
+    expect(layout.furniture.filter(item => item.id.startsWith('seat-')).length).toBeGreaterThanOrEqual(10)
+    expect(layout.furniture.some(item => item.kind === 'desk')).toBe(true)
+    const office = layout.spots.find(spot => spot.id === 'office')!
+    const path = landmarkPath(layout, layout.start, office)
+    expect(path.length).toBeGreaterThan(2)
+    expect(landmarkRoomKind('artlounge')).toBe('artlounge')
   })
 })

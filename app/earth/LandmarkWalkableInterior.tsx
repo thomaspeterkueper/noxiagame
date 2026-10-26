@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 26.10.2026 — Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.4.0
+// Aktualisiert: 26.10.2026 — ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.5.0
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -313,7 +313,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
     } finally { setSending(false) }
   }
 
-  const furnitureLabel = (item: LandmarkFurniture) => item.kind === 'counter' ? (kind === 'library' ? 'AUSLEIHE' : kind === 'workshop' ? 'ANNAHME' : 'KASSE') : null
+  const furnitureLabel = (item: LandmarkFurniture) => item.kind === 'counter' ? (kind === 'library' ? 'AUSLEIHE' : kind === 'workshop' ? 'ANNAHME' : kind === 'artlounge' ? 'THEKE' : 'KASSE') : null
 
   return <div className="landmark-interior">
     <NpcVisualStyles/>
@@ -408,6 +408,12 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       .zone.rug{background:#4e6a8a;background-image:repeating-linear-gradient(45deg,#5a789a 0 6px,#4e6a8a 6px 12px);border:2px solid #3b526c;border-radius:3px}
       .zone.chancel{background:#d9d1bf;border-bottom:4px solid #b7ad97}
       .zone.concrete{background:#9a9b96;background-image:linear-gradient(#90918c 1px,transparent 1px),linear-gradient(90deg,#90918c 1px,transparent 1px);background-size:120px 120px}
+      .zone.parquet{background:repeating-linear-gradient(90deg,#b98a57 0 38px,#a97a4a 38px 40px);box-shadow:inset 0 2px 0 #0002}
+      .f.piano{background:#15151a;border:2px solid #000;border-radius:10px 46px 10px 10px;box-shadow:inset 0 -14px 0 #2a2a33,3px 4px 0 #0004}
+      .f.piano::after{content:'';position:absolute;left:6px;right:46px;bottom:3px;height:9px;background:repeating-linear-gradient(90deg,#f4f0e6 0 5px,#222 5px 6px)}
+      .f.chair{background:#7a2f3a;border:2px solid #4a1a22;border-radius:6px;box-shadow:inset 0 5px 0 #6a2530,2px 3px 0 #0003}
+      .f.wall{background:#d9d2c3;border:1px solid #a89f8c;border-radius:1px}
+      .f.artwork{background:linear-gradient(135deg,#d8b24f,#c24a3d 50%,#5f8ea6);border:2px solid #3b2518;box-shadow:none;border-radius:1px}
       .zone.oilstain{background:radial-gradient(ellipse,#3a3a36aa,transparent 70%)}
       .room.shop{background:#c9c2b2}
       .room.workshop{background:#9a9b96}

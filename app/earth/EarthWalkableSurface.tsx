@@ -31,7 +31,7 @@ import { PersonPortrait } from '@/lib/grid/PersonPortrait'
 
 type GeoPoint={lat:number;lon:number}
 type Feature={id:string;featureType:string;geometry:{kind:'point'|'line'|'polygon';coordinates:GeoPoint|GeoPoint[]};properties?:Record<string,any>}
-type Payload={ok:boolean;region?:{id?:string;name:string;origin:GeoPoint};queryCenter?:GeoPoint;localDetail?:{slug:string;lat:number;lon:number};bounds?:{south:number;west:number;north:number;east:number};features?:Feature[];error?:string}
+type Payload={ok:boolean;region?:{id?:string;name:string;origin:GeoPoint};queryCenter?:GeoPoint;localDetail?:{slug:string;lat:number;lon:number};bounds?:{south:number;west:number;north:number;east:number};features?:Feature[];narrativeLandmarks?:Array<{id:string;name:string;locality:string;noxiaRole:string;presentDayRole:string;walkableInterior:string|null;locator:{value:string};point:GeoPoint}>;error?:string}
 type SpatialEntity={id:string;entity_id:string;name?:string;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;ownerLabel?:string;isOwn?:boolean;status?:string;latitude_deg?:number|null;longitude_deg?:number|null}
 type SpatialBuild={id:string;buildable_id:string;name?:string;latitude_deg?:number|null;longitude_deg?:number|null;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null;status?:string;created_at?:string|null;completes_at?:string|null}
 type Props={residents:ColonyResident[];onClose:()=>void}
@@ -47,11 +47,12 @@ const HEIGHT_PX=12
 // Earth scenes zoom the ground in; figures and labels keep their screen size.
 const SCENE_ZOOM=2.4
 const LANDMARK_LABEL:Record<string,string>={library:'Bibliothek',place_of_worship:'Gotteshaus',museum:'Museum',gallery:'Galerie',attraction:'Sehenswürdigkeit',viewpoint:'Aussichtspunkt',castle:'Burg / Schloss',fort:'Festung',city_gate:'Stadttor',ruins:'Ruine',archaeological_site:'Ausgrabungsstätte',monument:'Denkmal',memorial:'Gedenkstätte',university:'Universität',townhall:'Rathaus',theatre:'Theater',arts_centre:'Kulturzentrum',hospital:'Krankenhaus',station:'Bahnhof',tower:'Turm',lighthouse:'Leuchtturm',observatory:'Sternwarte'}
-function landmarkLabel(kind:string,tags?:Record<string,any>){if(kind==='place_of_worship'){const religion=String(tags?.religion??'');return religion==='christian'?'Kirche':religion==='muslim'?'Moschee':religion==='jewish'?'Synagoge':religion==='buddhist'||religion==='hindu'?'Tempel':'Gotteshaus'}return LANDMARK_LABEL[kind]??'Landmark'}
+function landmarkLabel(kind:string,tags?:Record<string,any>){if(kind==='artlounge')return'Kultur · ArtLounge';if(kind==='place_of_worship'){const religion=String(tags?.religion??'');return religion==='christian'?'Kirche':religion==='muslim'?'Moschee':religion==='jewish'?'Synagoge':religion==='buddhist'||religion==='hindu'?'Tempel':'Gotteshaus'}return LANDMARK_LABEL[kind]??'Landmark'}
 // One plain glyph per landmark class, drawn inside a 20 px badge.
 function landmarkGlyph(kind:string,tags?:Record<string,any>){
   const ink={fill:'none',stroke:'#17313c',strokeWidth:1.5,strokeLinecap:'round' as const,strokeLinejoin:'round' as const}
   switch(kind){
+    case'artlounge':return <path {...ink} d="M-6 5 V-3 Q-6 -6 -3 -6 H3 Q6 -6 6 -3 V5 Z M-3 -1 V5 M0 -1 V5 M3 -1 V5 M-6 1 H6"/>
     case'library':return <path {...ink} d="M-6 -4 Q-3 -6 0 -4 Q3 -6 6 -4 V5 Q3 3 0 5 Q-3 3 -6 5 Z M0 -4 V5"/>
     case'place_of_worship':return String(tags?.religion??'')==='christian'
       ?<path {...ink} d="M0 -7 V-2 M-2 -5 H2 M-5 6 V0 L0 -3 L5 0 V6 Z M-1.5 6 V3 H1.5 V6"/>
@@ -277,7 +278,17 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   },[data?.region,origin,playerGeo,playerRegionId,player,setSharedPlayerPosition,viewDecided])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
-  const namedPoiTargets=useMemo(()=>origin?features.flatMap(feature=>{
+  // Kanonische Landmarks mit begehbarem Innenraum (z. B. CAMALEO-ArtLounge) wie Gebäude betretbar.
+  const canonicalInteriorTargets=useMemo(()=>origin?(data?.narrativeLandmarks??[]).flatMap(landmark=>{
+    if(!landmark.walkableInterior)return[]
+    const metric=geoToLocalMeters(landmark.point,origin)
+    if(Math.abs(metric.eastM)>SCENE_RADIUS_M||Math.abs(metric.northM)>SCENE_RADIUS_M)return[]
+    const[street,...rest]=landmark.locator.value.split(',')
+    const match=street.match(/^(.*?)\s+(\d+\w*)$/)
+    const tags:Record<string,any>={'addr:street':match?match[1]:street,'addr:housenumber':match?match[2]:'',description:landmark.noxiaRole}
+    return[{id:`canon:${landmark.id}`,name:landmark.name,xM:metric.eastM,yM:metric.northM,kind:landmark.walkableInterior,isLandmark:true,business:null,tags}]
+  }):[],[origin,data?.narrativeLandmarks])
+  const namedPoiTargets=useMemo(()=>origin?[...canonicalInteriorTargets,...features.flatMap(feature=>{
     if(feature.geometry.kind!=='point'||!feature.properties?.name)return[]
     const point=feature.geometry.coordinates as GeoPoint
     const metric=geoToLocalMeters(point,origin)
@@ -286,7 +297,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     const business=feature.featureType==='poi'?establishmentFor(tags,String(tags.noxia_source_id??feature.id)):null
     // Ein Betrieb trägt im Spiel seinen erfundenen Namen; der reale bleibt im Tooltip.
     return[{id:`poi:${feature.id}`,name:business?business.name:String(feature.properties.name),xM:metric.eastM,yM:metric.northM,kind:String(feature.properties?.visual_class??feature.featureType),isLandmark:feature.featureType==='landmark',business,tags}]
-  }).slice(0,40):[],[origin,features])
+  })].slice(0,40+canonicalInteriorTargets.length):[],[origin,features,canonicalInteriorTargets])
   const buildingTargets=useMemo(()=>spatialEntities.flatMap(entity=>{
     const{xM,yM}=scenePosition(entity,origin)
     if(!Number.isFinite(xM)||!Number.isFinite(yM)||Math.abs(xM)>TARGET_RANGE_M||Math.abs(yM)>TARGET_RANGE_M)return[]

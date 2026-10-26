@@ -42,6 +42,8 @@ export type EarthLandmark = {
   sourceProjects: EarthLandmarkProjectLink[]
   externalUrl?: string
   externalLinkLabel?: string
+  /** Begehbarer Innenraum (Raumart aus lib/game/landmarks/interiors.ts). */
+  walkableInterior?: 'artlounge'
 }
 
 /**
@@ -123,6 +125,7 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
     locality: 'Frankfurt am Main',
     locator: { kind: 'address', value: 'Mörfelder Landstraße 103, 60598 Frankfurt am Main, Germany' },
     tags: ['canonical-foundation', 'culture'],
+    walkableInterior: 'artlounge',
     presentDayRole: 'Realer Kultur- und Veranstaltungsort in Frankfurt-Sachsenhausen mit kleinen Konzerten, Lesungen und Ausstellungen; Frankfurter Wirkungsort von Thomas Peter Küper.',
     noxiaRole: 'Einzigartiger, nicht duplizierbarer Kulturort auf der Erde: kleine Konzerte, Lesungen und Ausstellungen. Frankfurter Anker des Autors im NOXIA-Kanon.',
     sourceProjects: [

@@ -1,10 +1,10 @@
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 26.10.2026 — Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
-// Version:      1.5.0
+// Aktualisiert: 26.10.2026 — CAMALEO-ArtLounge als begehbarer Raum (Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
+// Version:      1.6.0
 
-export type LandmarkRoomKind = 'library' | 'worship' | 'shop' | 'workshop'
+export type LandmarkRoomKind = 'library' | 'worship' | 'shop' | 'workshop' | 'artlounge'
 export type LandmarkPoint = { x: number; y: number }
-export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate'
+export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
 export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' }
 /** Bodenzone – rein optisch, blockiert nicht. */
@@ -13,7 +13,7 @@ export type LandmarkZone = { id: string; kind: LandmarkZoneKind; x: number; y: n
 export type LandmarkLamp = { x: number; y: number; r: number; warm?: boolean }
 /** Angestellte Person im Raum – steht an einem festen Platz und ist ansprechbar. */
 export type LandmarkStaff = { id: string; role: string; x: number; y: number; greeting: string }
-export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain'
+export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet'
 export type LandmarkRoomLayout = {
   kind: LandmarkRoomKind
   noun: string
@@ -156,15 +156,75 @@ function workshopLayout(): LandmarkRoomLayout {
   }
 }
 
+
+/**
+ * CAMALEO-ArtLounge (Frankfurt, Mörfelder Landstraße 103): Erdgeschoss als
+ * kleiner Veranstaltungsraum – Flügel auf der Bühne, Reihenbestuhlung,
+ * Bilder an der Wand, Theke am Eingang; Büro im Hinterzimmer links oben
+ * (Tür zum Saal). Typischer Grundriss, nicht der vermessene Innenraum.
+ */
+function artLoungeLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = []
+  // Hinterzimmer (Büro): Trennwand mit Türlücke zwischen x=174 und x=226.
+  furniture.push({ id: 'office-wall-a', kind: 'wall', x: 24, y: 196, w: 150, h: 8 })
+  furniture.push({ id: 'office-wall-b', kind: 'wall', x: 226, y: 196, w: 40, h: 8 })
+  furniture.push({ id: 'office-wall-c', kind: 'wall', x: 258, y: 28, w: 8, h: 176 })
+  furniture.push({ id: 'office-desk', kind: 'desk', x: 50, y: 70, w: 120, h: 44 })
+  furniture.push({ id: 'office-chair', kind: 'chair', x: 96, y: 124, w: 26, h: 26 })
+  furniture.push({ id: 'office-board', kind: 'pinboard', x: 50, y: 32, w: 90, h: 10 })
+  furniture.push({ id: 'office-crate', kind: 'crate', x: 200, y: 130, w: 40, h: 32 })
+  furniture.push({ id: 'office-plant', kind: 'plant', x: 220, y: 40, w: 26, h: 26 })
+  // Bühne rechts oben mit kleinem Flügel und Hocker.
+  furniture.push({ id: 'grand-piano', kind: 'piano', x: 520, y: 52, w: 130, h: 96 })
+  furniture.push({ id: 'piano-stool', kind: 'chair', x: 570, y: 158, w: 24, h: 24 })
+  // Ausstellung: Bilder an der Saalwand links und an der Rückwand.
+  for (let i = 0; i < 3; i++) furniture.push({ id: `artwork-${i}`, kind: 'artwork', x: 300 + i * 66, y: 34, w: 50, h: 10 })
+  for (let i = 0; i < 3; i++) furniture.push({ id: `artwork-l-${i}`, kind: 'artwork', x: 26, y: 252 + i * 54, w: 10, h: 40 })
+  // Sitzplätze: drei Reihen zu je fünf Stühlen, Blick zum Flügel.
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 5; col++) {
+    furniture.push({ id: `seat-${row}-${col}`, kind: 'chair', x: 330 + col * 58, y: 236 + row * 52, w: 26, h: 26 })
+  }
+  // Theke am Eingang, kleine Stehtische links, Pflanzen.
+  furniture.push({ id: 'counter', kind: 'counter', x: 470, y: 392, w: 150, h: 30 })
+  furniture.push({ id: 'table-0', kind: 'table', x: 90, y: 300, w: 70, h: 44 })
+  furniture.push({ id: 'table-1', kind: 'table', x: 90, y: 380, w: 70, h: 44 })
+  furniture.push({ id: 'plant-0', kind: 'plant', x: 700, y: 410, w: 26, h: 26 })
+  furniture.push({ id: 'plant-1', kind: 'plant', x: 700, y: 220, w: 26, h: 26 })
+  return {
+    kind: 'artlounge',
+    noun: 'ArtLounge',
+    start: { x: 380, y: 430 },
+    exit: { x: 380, y: 452 },
+    furniture,
+    zones: [
+      { id: 'floor', kind: 'parquet', x: 24, y: 28, w: 712, h: 348 },
+      { id: 'stage', kind: 'rug', x: 480, y: 40, w: 230, h: 150 },
+      { id: 'office', kind: 'carpet', x: 24, y: 28, w: 234, h: 168 },
+      { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 },
+    ],
+    lamps: [{ x: 585, y: 100, r: 110, warm: true }, { x: 430, y: 290, r: 120, warm: true }, { x: 110, y: 110, r: 90 }, { x: 360, y: 60, r: 80, warm: true }, { x: 555, y: 400, r: 90, warm: true }],
+    staff: { id: 'host', role: 'Gastgeber(in)', x: 545, y: 378, greeting: 'Willkommen in der ArtLounge! Heute Abend ist der Flügel frei – und die Stühle sind fast schon gestellt.' },
+    spots: [
+      { id: 'piano', label: 'FLÜGEL', x: 585, y: 196, text: 'Ein kleiner Flügel auf der Bühne. Hier gibt es Konzerte im kleinen Kreis – der Raum trägt jeden Ton.' },
+      { id: 'seats', label: 'SITZPLÄTZE', x: 372, y: 275, action: 'sit', text: 'Reihenbestuhlung für Konzerte und Lesungen. Von hier hört man alles.' },
+      { id: 'exhibit', label: 'AUSSTELLUNG', x: 80, y: 270, action: 'learn', text: 'Bilder an der Wand – die Ausstellung wechselt, der Raum bleibt.' },
+      { id: 'tables', label: 'STEHTISCHE', x: 190, y: 340, action: 'sit', text: 'Zwei kleine Tische für das Gespräch nach der Veranstaltung.' },
+      { id: 'office', label: 'BÜRO', x: 110, y: 168, text: 'Das Hinterzimmer: Schreibtisch, Pinnwand mit Terminen, ein Karton mit Programmheften. Hier wird geplant.' },
+      { id: 'desk', label: 'THEKE', x: 545, y: 440, action: 'staff', text: 'Die Theke am Eingang. Hier arbeitet jemand, der das Programm kennt.' },
+    ],
+  }
+}
+
 /** Landmark classes that have a walkable interior; all others show the place card. */
 export function landmarkRoomKind(landmarkClass: string): LandmarkRoomKind | null {
   if (landmarkClass === 'library') return 'library'
   if (landmarkClass === 'place_of_worship') return 'worship'
+  if (landmarkClass === 'artlounge') return 'artlounge'
   return null
 }
 
 export function landmarkRoomLayout(kind: LandmarkRoomKind): LandmarkRoomLayout {
-  return kind === 'library' ? libraryLayout() : kind === 'worship' ? worshipLayout() : kind === 'shop' ? shopLayout() : workshopLayout()
+  return kind === 'library' ? libraryLayout() : kind === 'worship' ? worshipLayout() : kind === 'shop' ? shopLayout() : kind === 'artlounge' ? artLoungeLayout() : workshopLayout()
 }
 
 export function isLandmarkRoomBlocked(layout: LandmarkRoomLayout, p: LandmarkPoint, radius = LANDMARK_PLAYER_RADIUS) {

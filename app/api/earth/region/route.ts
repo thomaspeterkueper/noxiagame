@@ -86,6 +86,7 @@ function narrativeLandmarksFor(bounds: { south:number; west:number; north:number
     noxiaRole: landmark.noxiaRole,
     sourceProjects: landmark.sourceProjects,
     locator: landmark.locator,
+    walkableInterior: landmark.walkableInterior ?? null,
     point,
   }))
 }
