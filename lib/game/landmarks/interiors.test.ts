@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
+import { LANDMARK_LEVELS, LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
   landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
@@ -80,5 +80,22 @@ describe('landmark interiors', () => {
     const path = landmarkPath(layout, layout.start, office)
     expect(path.length).toBeGreaterThan(2)
     expect(landmarkRoomKind('artlounge')).toBe('artlounge')
+  })
+
+  it('CAMALEO-ArtLounge hat drei Geschosse, verbunden durch die Treppe', () => {
+    expect(LANDMARK_LEVELS.artlounge).toBe(3)
+    for (let level = 0; level < 3; level++) {
+      const layout = landmarkRoomLayout('artlounge', level)
+      expect(layout.level).toBe(level)
+      const stairs = layout.spots.filter(spot => spot.action === 'stairs')
+      expect(stairs.length).toBeGreaterThan(0)
+      for (const spot of stairs) {
+        expect(isLandmarkRoomBlocked(layout, spot)).toBe(false)
+        expect(spot.toLevel).not.toBe(level)
+      }
+      const arrival = landmarkRoomLayout('artlounge', level, true).start
+      expect(isLandmarkRoomBlocked(layout, arrival)).toBe(false)
+      for (const spot of layout.spots) expect(landmarkPath(layout, arrival, spot).length, `${level}/${spot.id}`).toBeGreaterThan(2)
+    }
   })
 })

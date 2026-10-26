@@ -282,7 +282,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const canonicalInteriorTargets=useMemo(()=>origin?(data?.narrativeLandmarks??[]).flatMap(landmark=>{
     if(!landmark.walkableInterior)return[]
     const metric=geoToLocalMeters(landmark.point,origin)
-    if(Math.abs(metric.eastM)>SCENE_RADIUS_M||Math.abs(metric.northM)>SCENE_RADIUS_M)return[]
+    // Wie Gebäude erreichbar, auch wenn der Ort außerhalb des gezeichneten Ausschnitts liegt.
+    if(Math.abs(metric.eastM)>TARGET_RANGE_M||Math.abs(metric.northM)>TARGET_RANGE_M)return[]
     const[street,...rest]=landmark.locator.value.split(',')
     const match=street.match(/^(.*?)\s+(\d+\w*)$/)
     const tags:Record<string,any>={'addr:street':match?match[1]:street,'addr:housenumber':match?match[2]:'',description:landmark.noxiaRole}

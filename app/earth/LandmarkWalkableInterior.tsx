@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { NpcFigure, NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
+  LANDMARK_LEVELS,
   LANDMARK_ROOM,
   isLandmarkRoomBlocked,
   landmarkPath,
@@ -82,8 +83,14 @@ function pickTip(seed: number) {
   return LIBRARY_BOOKS[Math.abs(seed) % LIBRARY_BOOKS.length]
 }
 
-export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName }: Props) {
-  const layout = useMemo(() => { const base = landmarkRoomLayout(kind); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
+/** Mehrgeschossige Häuser: jedes Geschoss ist eine eigene Instanz, der Wechsel setzt Figur und Personal zurück. */
+export default function LandmarkWalkableInterior(props: Props) {
+  const [floor, setFloor] = useState({ level: 0, byStairs: false })
+  return <LandmarkRoom key={floor.level} {...props} level={floor.level} byStairs={floor.byStairs} onLevel={level => setFloor({ level, byStairs: true })}/>
+}
+
+function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
+  const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
   const [pos, setPos] = useState<LandmarkPoint>(layout.start)
@@ -321,6 +328,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
     <main>
       <div className={'room ' + layout.kind} style={{ width: LANDMARK_ROOM.width, height: LANDMARK_ROOM.height }}>
         {layout.zones.map(zone => <div key={zone.id} className={'zone ' + zone.kind} style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}/>)}
+        {layout.floorName && (LANDMARK_LEVELS[layout.kind] ?? 1) > 1 && <span className="floor-tag">{layout.floorName.toUpperCase()}</span>}
         {layout.lamps.map((lamp, index) => <div key={index} className={'lamp' + (lamp.warm ? ' warm' : '')} style={{ left: lamp.x - lamp.r, top: lamp.y - lamp.r, width: lamp.r * 2, height: lamp.r * 2 }}/>)}
         <div className="door"><span>AUSGANG</span></div>
         {layout.furniture.map(item => <div key={item.id} className={'f ' + item.kind} style={{ left: item.x, top: item.y, width: item.w, height: item.h }}>
@@ -382,6 +390,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
         {!talkingNow && shown && <p>{shown.text}</p>}
         {!talkingNow && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
         {!talkingNow && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
+        {!talkingNow && shown?.action === 'stairs' && shown.toLevel !== undefined && <button className="act" onClick={() => onLevel(shown.toLevel as number)}>{shown.toLevel === 0 ? 'Ins Erdgeschoss' : shown.toLevel > level ? `Ins ${shown.toLevel}. Obergeschoss` : `Ins ${shown.toLevel}. Obergeschoss hinunter`}</button>}
         {!talkingNow && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
         {!talkingNow && <div className="moves"><small>GEHE ZU …</small><div>
           {waypoints.map(point => <button key={point.id} onClick={() => walkTo(point, () => { if (point.id === 'exit') onClose(); else if (point.kind === 'Sitzplatz') setSeated(true) })}>{point.label}</button>)}
@@ -408,6 +417,8 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       .zone.rug{background:#4e6a8a;background-image:repeating-linear-gradient(45deg,#5a789a 0 6px,#4e6a8a 6px 12px);border:2px solid #3b526c;border-radius:3px}
       .zone.chancel{background:#d9d1bf;border-bottom:4px solid #b7ad97}
       .zone.concrete{background:#9a9b96;background-image:linear-gradient(#90918c 1px,transparent 1px),linear-gradient(90deg,#90918c 1px,transparent 1px);background-size:120px 120px}
+      .floor-tag{position:absolute;left:50%;top:6px;transform:translateX(-50%);font:800 8px monospace;letter-spacing:.14em;color:#f3ead6;background:#17313ccc;padding:3px 8px;border-radius:3px;z-index:3;pointer-events:none}
+      .f.stairs{background:repeating-linear-gradient(180deg,#c9b48f 0 8px,#a8916a 8px 10px);border:2px solid #6b5230;box-shadow:3px 4px 0 #0003}
       .zone.parquet{background:repeating-linear-gradient(90deg,#b98a57 0 38px,#a97a4a 38px 40px);box-shadow:inset 0 2px 0 #0002}
       .f.piano{background:#15151a;border:2px solid #000;border-radius:10px 46px 10px 10px;box-shadow:inset 0 -14px 0 #2a2a33,3px 4px 0 #0004}
       .f.piano::after{content:'';position:absolute;left:6px;right:46px;bottom:3px;height:9px;background:repeating-linear-gradient(90deg,#f4f0e6 0 5px,#222 5px 6px)}

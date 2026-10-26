@@ -27,7 +27,7 @@ Dafür trennt die Registry ausdrücklich:
 
 - Solar Science Foundation · Hauptsitz, Sundern
 - CAMALEO-ArtLounge, Mörfelder Landstraße 103, Frankfurt am Main (Kultur: kleine Konzerte, Lesungen, Ausstellungen)
-  - Begehbar (`walkableInterior: 'artlounge'`): Erdgeschoss mit kleinem Flügel auf der Bühne, Reihenbestuhlung, Ausstellungswand, Theke; Büro im Hinterzimmer. Raum in `lib/game/landmarks/interiors.ts`.
+  - Begehbar (`walkableInterior: 'artlounge'`), Stadthaus mit drei Geschossen, Treppe rechts: EG ArtLounge (kleiner Flügel auf der Bühne, Reihenbestuhlung, Ausstellungswand, Theke; Büro im Hinterzimmer), 1. OG Galerie und 2. OG Dachstudio (vorläufig, noch nicht final eingerichtet). Raum in `lib/game/landmarks/interiors.ts`.
 - ESA · ESOC, Darmstadt
 - EUMETSAT · Hauptsitz, Darmstadt
 - ESA · European Astronaut Centre, Köln

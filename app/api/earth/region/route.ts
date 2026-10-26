@@ -75,8 +75,10 @@ function isLocalDetailRow(row: { properties?: unknown }) {
   return Boolean((row.properties as Record<string, unknown> | null)?.noxia_enrichment)
 }
 
-function narrativeLandmarksFor(bounds: { south:number; west:number; north:number; east:number }) {
-  return earthLandmarksInBounds(bounds).map(({ landmark, point }) => ({
+function narrativeLandmarksFor(bounds: { south:number; west:number; north:number; east:number }, extra?: { south:number; west:number; north:number; east:number }) {
+  const found = earthLandmarksInBounds(bounds)
+  if (extra) for (const entry of earthLandmarksInBounds(extra)) if (!found.some(item => item.landmark.id === entry.landmark.id)) found.push(entry)
+  return found.map(({ landmark, point }) => ({
     id: landmark.id,
     name: landmark.name,
     locality: landmark.locality,
@@ -269,7 +271,7 @@ export async function GET(req: NextRequest) {
           source: storedRegion.source,
           inheritedFrom: null,
         } : null),
-        narrativeLandmarks: narrativeLandmarksFor(storedBounds),
+        narrativeLandmarks: narrativeLandmarksFor(storedBounds, bounds),
         attribution: inheritedFrom
           ? `© OpenStreetMap contributors · ODbL · NOXIA inherited geography (${inheritedFrom})`
           : '© OpenStreetMap contributors · ODbL · NOXIA materialized geography',
