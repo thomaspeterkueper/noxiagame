@@ -1,6 +1,6 @@
 # NOXIA-INTERIOR-0001 – Ein Bedienmodell für alle Gebäude
 
-Status: accepted (Richtung), Umsetzung proposed
+Status: accepted; Schritte 1 und 2 umgesetzt am 26.10.2026 (`app/interiors/WalkableInterior.tsx`, Einrichtung = `InteriorFitting`; das Lokal ist die erste Einrichtung in `app/earth/CafeWalkableInterior.tsx`)
 Datum: 2026-10-26
 Bezug: `docs/gameplay/hospitality-venues.md`, `coordination/open/20261017-1418-core-to-interiors-cultural-places.md`, Requests W-2/W-3 (Weltkarte)
 
@@ -34,3 +34,11 @@ Heute gibt es vier Innenraum-Systeme nebeneinander: `CafeWalkableInterior` (Loka
 ## Abgrenzung
 
 Gastronomie baut Schritt 1 und 2 und hält das Lokal dabei spielbar. Schritt 3 liegt bei den Teilprojekten der jeweiligen Gebäude (Innenräume, Bevölkerung und Ökonomie, Erde).
+
+## Umsetzung (26.10.2026)
+
+`app/interiors/WalkableInterior.tsx` ist der Motor: Bewegung, Hinsetzen, Wege, Personen mit Kurzname und Porträt, Gespräch über `/api/game/npc-conversation`, Begrüßung am Bedienplatz, Besucher, die kommen und gehen, Bedienung am Tisch, Dinge im Raum (beim Spieler, bei einer Person, gebracht), rechte Tafel, geschlossen-Tafel, Stil für Boden, Wand, Fenster, Pflanzen, Teppich, Licht.
+
+Eine Einrichtung (`InteriorFitting`) liefert: `kind` (Stilklasse), `layout` (Grundriss aus `lib/game/hospitality/venues.ts`), Namen, `service(figures)`, `closedText(figures)`, `furnitureLabel`, Dekor, Tresenaufbau, `visits` (Besucher aus echten Daten), `facts(self, ctx)`, `placeKnowledge`, `hearsay(self)`, `introduction(self)`, `things` (Bestelltes), `renderOffer(ctx)` (Karte, Zimmer, später Kurse und Schalter), `goToServiceLabel`, `greetsAtService`, `tableService`. Der Motor meldet seinen Augenblick (`InteriorContext`: Position, Platz, am Tisch, am Bedienplatz, gewählte Person, Figuren) an die Einrichtung zurück.
+
+So baut man ein weiteres Gebäude ein: Grundriss als `VenueLayout` (Möbel, Plätze, Bedienplatz, Sichtbereiche aus der Innenraum-Vorlage), eine Stilklasse mit Farben in der CSS des Motors, eine Einrichtung mit eigenem Wissen und Angebot – etwa 150 Zeilen, kein Motor-Code. Verhalten des Lokals unverändert, im Browser geprüft.
