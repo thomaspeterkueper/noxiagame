@@ -31,6 +31,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Gemütlichere Räume (26.10.2026, Branch `feat/cozy-interiors`): Holzdielen, Täfelung, Sprossenfenster mit Himmel, runde Holztische mit Vase bzw. Kerze, Bistrostühle, Tresen mit Marmorplatte, Kaffeemaschine und Kuchenvitrine, Flaschenregal in der Bar, Schlüsselbrett im Hotel, Pflanzen, Teppich, warme Lichtkegel über den Tischen, dezentes grünes Ausgangsschild. Im Browser geprüft (alle vier Räume).
 - Gezeichnete Porträts (26.10.2026, Branch `feat/person-portraits`): `lib/grid/PersonPortrait.tsx` zeichnet je Person ein Gesicht aus `person_appearance` – Kopfform nach Körperbau, Frisur und Haarfarbe, Bart, Altersgruppe (Kind rundlich, jung mit Wangenrot, älter mit Falten und Grau), Kleidung nach Rolle; Augen- und Mundform fest aus der Personenkennung. In Lokal und Erdszene neben dem Namen. Kann später durch Bilddateien ersetzt werden, wo es welche gibt.
 - Akademie als zweite Einrichtung des Innenraum-Motors (26.10.2026, Branch `feat/academy-interior`): Lernraum, Sekretariat, Personal kennt die echten Lernmodule, Module als Kacheln, Lernraum darüber. Im Browser geprüft.
+- Verwaltung als dritte Einrichtung (26.10.2026, Branch `feat/admin-interior`): Foyer, Schalter, Aushang mit Einwohnern und Steuern, Personal kennt die öffentlichen Zahlen, Rathaus-Tafel darüber. Im Browser geprüft.
 
 ## Gestellte Requests
 
