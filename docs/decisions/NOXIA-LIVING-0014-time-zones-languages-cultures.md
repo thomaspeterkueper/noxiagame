@@ -75,4 +75,4 @@ Kanon (Thomas, 14.10.2026):
 Entschieden am 14.10.2026: Übersetzung nahezu perfekt; Mars nach Sol; eigene Sprache auf dem Mars aus der Sprachvielfalt der Siedler.
 Entschieden am 26.10.2026: Die Sprache heißt Marsianisch (Englisch, dazu Chinesisch und etwas Mishkenaz, plus Technikjargon der ersten Expeditionen); Mond und Stationen nach UTC; lokale Dialekte überall, wo Menschen länger isoliert leben.
 
-1. Wortliste Marsianisch: erste 20–30 Wörter mit Thomas abstimmen, Mishkenaz-Anteile aus dem Buchkanon.
+1. Wortliste Marsianisch: erster Entwurf mit 30 Wörtern und Dialektbeispielen in `docs/lore/marsianisch-wortliste.md` (26.10.2026). Mishkenaz-Anteile stammen aus *Mishkenaz und die Zeit* (Evidentiale *-saha*, *-nga*, *-log*; Verlustformen *tum-*, *nev-*, *khe-*; *hoveh*, *machzor*) – Bedeutungsverschiebungen auf dem Mars mit Thomas abstimmen.

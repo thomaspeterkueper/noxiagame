@@ -1,12 +1,12 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 26.10.2026 — an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.1.0
+// Aktualisiert: 26.10.2026 — Porträt der Ansprechperson oben in der Seitenleiste, sobald man sie anspricht (NpcPortrait wie in der Koloniesicht)
+// Version:      2.2.0
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
-import { NpcFigure, NpcVisualStyles } from '@/lib/grid/NpcVisual'
+import { NpcFigure, NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
   LANDMARK_ROOM,
   isLandmarkRoomBlocked,
@@ -186,7 +186,9 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       </div>
       <aside>
         <small>{typeLabel.toUpperCase()} · REALER ORT</small>
-        <h3>{talking && staff ? staffName : shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>
+        {talking && staff
+          ? <div className="portrait"><NpcPortrait id={`landmark-staff:${name}`} name={staffName} role={staff.role}/></div>
+          : <h3>{shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>}
         {talking && staff && <>
           <p className="muted">{staff.role} · an der Ausleihe</p>
           <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : staffName}:</b> „{entry.content}“</p>)}</div>
@@ -272,6 +274,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       aside{flex:none;width:300px;display:grid;gap:9px;padding:14px;border:1px solid #476263;border-radius:9px;background:#10272acc;font-size:11px;line-height:1.45}
       aside small{font:800 8px monospace;letter-spacing:.12em;color:#d7b96e}
       aside h3{margin:0;font-size:15px}
+      aside .portrait{margin:0}
       aside p{margin:0;color:#d5e0dd}
       aside p.muted{color:#8ea4a6;font-size:10px}
       .history{display:grid;gap:6px;max-height:220px;overflow:auto}

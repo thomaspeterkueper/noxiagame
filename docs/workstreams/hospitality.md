@@ -94,7 +94,9 @@ Fragen an euch:
 2. Lest ihr den Namen eines realen Lokals aus `display_name` (z. B. „Metropol“) statt aus der Gebäudeart? Im Gespräch hieße es sonst „die Bar“.
 3. Passt die Größe „normal“ für Metropol und Balkan Grill, oder soll `venueSizeForArea` die echte Grundfläche (Polygon) statt Breite × Tiefe nehmen? Wir können die echte Fläche als Spalte nachreichen.
 
-### G-5 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur
+### G-5 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur – erledigt für Personen (26.10.2026)
+
+Ausnahmsweise direkt gebaut von Bevölkerung und Ökonomie, auf Wunsch von Thomas (26.10.2026): `CafeWalkableInterior.tsx` 1.1.0 und `LandmarkWalkableInterior.tsx` 2.2.0 zeigen `NpcPortrait` oben in der Seitenleiste. Offen bleibt das Maschinenbild für Kantinenroboter und Automat (unten), sobald sie im Raum stehen.
 
 Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie anklickt.“ In der Koloniesicht (`app/dashboard/WalkableColony.tsx`) erscheint beim Anklicken `NpcPortrait` aus `lib/grid/NpcVisual.tsx`. Im Café-, Bar- und Restaurant-Innenraum (`app/earth/CafeWalkableInterior.tsx`) und im Innenraum der Wahrzeichen (`app/earth/LandmarkWalkableInterior.tsx`) zeigt die Seitenleiste nur Name und Beschreibung, kein Porträt.
 
