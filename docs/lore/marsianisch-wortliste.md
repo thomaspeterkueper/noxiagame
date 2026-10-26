@@ -9,7 +9,7 @@ Notation wie im Baumeister-Universum: **[R]** reale Vorlage (heute schon so verw
 
 Marsianisch ist Englisch im Gerüst, mit Missions- und Technikjargon der ersten großen Expeditionen, chinesischen Alltagswörtern aus den großen Crews und einer kleinen, aber festen Mishkenaz-Schicht. Die Mishkenaz-Wörter kommen über wenige Menschen in den ersten Expeditionen auf den Mars und halten sich, weil sie etwas sagen können, was die anderen Sprachen nicht so knapp sagen: **woher man etwas weiß** und **welche Art von Fehlen** gemeint ist. Auf einem Planeten, auf dem falsche Information tödlich sein kann und vieles fehlt, ist das kein Schmuck, sondern Werkzeug.
 
-Grundregel für die Gesprächs-KI: Figuren benutzen diese Wörter nur, wenn sie Marsianisch sprechen (auf dem Mars geboren oder lange dort), und nur aus dieser Liste. Die Übersetzung gibt sie sinngemäß wieder, lässt das Wort aber stehen.
+Grundregel für die Gesprächs-KI: Figuren benutzen diese Wörter nur, wenn sie Marsianisch sprechen (auf dem Mars geboren oder lange dort), und nur aus dieser Liste. Die Mishkenaz-Vor- und Nachsilben dürfen sie frei mit Wörtern jeder Sprache verbinden. Die Übersetzung gibt sie sinngemäß wieder, lässt das Wort aber stehen.
 
 ## Zeit (Sol)
 
@@ -29,7 +29,7 @@ Grundregel für die Gesprächs-KI: Figuren benutzen diese Wörter nur, wenn sie 
 | **hoveh** | [W] Mishkenaz „das Atmende“ (Gegenwart) | drinnen unter Druck, atembare Luft; der sichere Ort | „Bleib im hoveh.“ · „Endlich hoveh.“ |
 | **cyc** / **cyclen** | [S] aus *cycle* | eine Schleuse durchlaufen | „Ich cyc in zehn.“ |
 | **psi** / **gepsit** | [S] aus *psi* (Druckeinheit) | Anzugsdruck prüfen; übertragen: jemanden auf Herz und Nieren prüfen | „Hast du gepsit?“ |
-| **khe** | [W] Mishkenaz *khe-* „blockiert – vorhanden, aber nicht erreichbar“ | Schleuse oder Weg gesperrt; übertragen: jemand ist da, aber nicht ansprechbar | „Nordschleuse khe.“ |
+| **khe** | [W] Mishkenaz *khe-* „blockiert – vorhanden, aber nicht erreichbar“ | Schleuse oder Weg gesperrt; übertragen: jemand ist da, aber nicht ansprechbar; auch als Vorsilbe | „Nordschleuse khe.“ · „Khe-lock.“ · „Der ist heute khe-talk.“ |
 | **reg** | [S] aus *Regolith* | Staub, Dreck, Boden; auch: das Draußen | „Du trägst reg rein.“ |
 | **dustday** | [S] | Staubsturmtag, an dem niemand rausgeht – halber Feiertag | „Dustday, wir spielen Karten.“ |
 
@@ -44,7 +44,9 @@ Grundregel für die Gesprächs-KI: Figuren benutzen diese Wörter nur, wenn sie 
 
 ## Woher man es weiß (Mishkenaz-Evidentiale)
 
-Auf dem Mars als Nachsilbe an fast jedes Wort gehängt, auch an englische. Auf einer Station, wo ein Gerücht über ein Leck Panik auslöst, sagt man dazu, ob man es gesehen oder gehört hat.
+**Entschieden (Thomas, 26.10.2026):** Mishkenaz-Formen dürfen in englische und andersprachige Wörter eingebaut werden – als Nachsilbe (*-saha*, *-nga*, *-log*) wie als Vorsilbe (*tum-*, *nev-*, *khe-*). Beispiele: „storm-saha“, „filter-log“, „tum-water“, „khe-lock“, „guanxi-nga“, „Druck-saha“. Das gilt auch für die Dialekte.
+
+Auf dem Mars als Nachsilbe an fast jedes Wort gehängt, gleich aus welcher Sprache. Auf einer Station, wo ein Gerücht über ein Leck Panik auslöst, sagt man dazu, ob man es gesehen oder gehört hat.
 
 | Wort | Herkunft | Bedeutung | Beispiel |
 |---|---|---|---|
@@ -56,7 +58,7 @@ Auf dem Mars als Nachsilbe an fast jedes Wort gehängt, auch an englische. Auf e
 
 | Wort | Herkunft | Bedeutung | Beispiel |
 |---|---|---|---|
-| **tum** | [W] Mishkenaz *tum-* „hungernd – Abwesenheit ohne je erfüllte Gegenwart“ | hungrig, knapp, Mangel | „Bin tum.“ · „Wasser ist tum diese Woche.“ |
+| **tum** | [W] Mishkenaz *tum-* „hungernd – Abwesenheit ohne je erfüllte Gegenwart“ | hungrig, knapp, Mangel; auch als Vorsilbe | „Bin tum.“ · „Tum-water diese Woche.“ · „Tum-guanxi“ (keine Beziehungen) |
 | **tumbox** | [S] mit [W] *tum* | die Notration aus der Kantine; der Automat dafür | „Bis zum Lohn gibt's tumbox.“ |
 | **nev** | [W] Mishkenaz *nev-* „verloren – war einmal da“ | die Toten und Verschollenen des Mars; respektvoll, nie leichtfertig | „Er ist nev, seit dem Sturm von '87.“ |
 
@@ -88,7 +90,6 @@ Nach NOXIA-LIVING-0014 hat jeder länger isolierte Ort seinen Dialekt. Erste Ide
 
 ## Offen
 
-- [OFFEN] Ist *-saha / -nga / -log* als Nachsilbe an englischen Wörtern für dich stimmig, oder sollen Mishkenaz-Formen nur in festen Wendungen vorkommen?
 - [OFFEN] *nev* für die Toten – passt die Bedeutungsverschiebung zum Kanon, oder ist das Wort zu schwer für den Alltag?
 - [OFFEN] Welche Mishkenaz-Wörter sind in den ersten Expeditionen über welche Person auf den Mars gekommen? Das könnte eine Figur werden.
 - [OFFEN] Gibt es Wörter aus deinen Büchern (Band 1, Mars 2087), die hierher gehören?
