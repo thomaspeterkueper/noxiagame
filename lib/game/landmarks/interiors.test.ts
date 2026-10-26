@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
+import { LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkStaffName, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
 function reachable(layout: LandmarkRoomLayout) {
@@ -45,4 +45,14 @@ describe('landmark interiors', () => {
       expect(nearestLandmarkSpot(layout, { x: -500, y: -500 })).toBeNull()
     })
   }
+
+  it('library staff stands free and reachable, with a stable name per house', () => {
+    const layout = landmarkRoomLayout('library')
+    expect(layout.staff).not.toBeNull()
+    expect(isLandmarkRoomBlocked(layout, { x: layout.staff!.x, y: layout.staff!.y })).toBe(false)
+    const cells = reachable(layout)
+    expect(cells.some(cell => Math.hypot(cell.x - layout.staff!.x, cell.y - layout.staff!.y) <= LANDMARK_SPOT_REACH)).toBe(true)
+    expect(landmarkStaffName('Stadtbibliothek Sundern')).toBe(landmarkStaffName('Stadtbibliothek Sundern'))
+    expect(landmarkRoomLayout('worship').staff).toBeNull()
+  })
 })
