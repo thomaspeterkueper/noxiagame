@@ -18,6 +18,9 @@ import type { BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import CafeWalkableInterior from './CafeWalkableInterior'
 import AcademyWalkableInterior from './AcademyWalkableInterior'
 import AdminWalkableInterior from './AdminWalkableInterior'
+import SpaceportWalkableInterior from './SpaceportWalkableInterior'
+import BuildingOverlayShell from '@/app/dashboard/BuildingOverlayShell'
+import PortCanteenInterior from '@/app/dashboard/PortCanteenInterior'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type ResourceRow = { resource: string; stock: number; consumption: number; production: number }
@@ -116,6 +119,7 @@ export default function EarthBuildingAccessLayer({
   const [spaceportMode, setSpaceportMode] = useState<SpaceportMode>('hub')
   const [schoolOpen, setSchoolOpen] = useState(false)
   const [deskOpen, setDeskOpen] = useState(false)
+  const [hubOpen, setHubOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -123,6 +127,7 @@ export default function EarthBuildingAccessLayer({
     setSpaceportMode('hub')
     setSchoolOpen(false)
     setDeskOpen(false)
+    setHubOpen(false)
     setMessage(null)
     let cancelled = false
     setLoading(true)
@@ -415,6 +420,23 @@ export default function EarthBuildingAccessLayer({
     )
   }
 
+  // Der Raumhafen ist begehbar (NOXIA-INTERIOR-0001); Navigation, Fracht, Wartung öffnen darüber.
+  if (spaceportMode === 'hub' && !hubOpen) {
+    const destinations = (data?.locations ?? []).filter((l: any) => l.slug !== 'earth').map((l: any) => ({ name: String(l.name ?? l.slug), population: Number(l.population ?? 0) }))
+    return (
+      <SpaceportWalkableInterior
+        entityId={request.entityId}
+        buildingName={request.buildingName}
+        companion={companion}
+        facts={data ? { locationName, destinations, hasShip: Boolean(shipTypeId), shipTypeId: shipTypeId ?? null, shipRangeKm: Number(shipRange) || null, inTransit: Boolean(inTransit), canteen: true } : null}
+        onClose={onClose}
+        onOpen={what => { if (what === 'canteen') setHubOpen(true); else setSpaceportMode(what) }}
+      />
+    )
+  }
+  if (hubOpen) {
+    return <BuildingOverlayShell eyebrow="GEBÄUDE · HAFENKANTINE" title={request.buildingName} subtitle="Grundversorgung im Hafen" onClose={() => setHubOpen(false)} footer="Staatliche Grundversorgung · NOXIA-LIVING-0013"><PortCanteenInterior parentEntityId={request.entityId} portTypeId={request.buildingTypeId} onClose={() => setHubOpen(false)} /></BuildingOverlayShell>
+  }
   return (
     <SpaceportOverlay
       buildingTypeId={request.buildingTypeId}
