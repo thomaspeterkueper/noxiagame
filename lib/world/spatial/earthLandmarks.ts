@@ -6,6 +6,7 @@ export type EarthLandmarkTag =
   | 'archaeology'
   | 'history-of-science'
   | 'cross-universe'
+  | 'culture'
 
 export type EarthLandmarkProjectRelation = 'setting' | 'reference' | 'research-anchor' | 'worldbuilding-anchor'
 
@@ -114,6 +115,20 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
     ],
     externalUrl: 'https://solarsciencefoundation.vercel.app/',
     externalLinkLabel: 'Offizielle SSF-Website öffnen',
+  },
+  {
+    id: 'earth-de-frankfurt-camaleo-artlounge',
+    name: 'CAMALEO-ArtLounge',
+    countryCode: 'DE',
+    locality: 'Frankfurt am Main',
+    locator: { kind: 'address', value: 'Mörfelder Landstraße 103, 60598 Frankfurt am Main, Germany' },
+    tags: ['canonical-foundation', 'culture'],
+    presentDayRole: 'Realer Kultur- und Veranstaltungsort in Frankfurt-Sachsenhausen mit kleinen Konzerten, Lesungen und Ausstellungen; Frankfurter Wirkungsort von Thomas Peter Küper.',
+    noxiaRole: 'Einzigartiger, nicht duplizierbarer Kulturort auf der Erde: kleine Konzerte, Lesungen und Ausstellungen. Frankfurter Anker des Autors im NOXIA-Kanon.',
+    sourceProjects: [
+      { project: 'NOXIA', relation: 'setting', note: 'Kanonischer Kulturort in Frankfurt am Main.' },
+      { project: 'CAMALEO', relation: 'setting', note: 'Physischer Referenzort von CAMALEO in Frankfurt.' },
+    ],
   },
   {
     id: 'earth-de-darmstadt-esoc',

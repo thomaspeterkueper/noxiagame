@@ -37,6 +37,10 @@ assert.deepEqual(
 
 assert.ok(getEarthLandmarksByTag('spaceflight').length >= 3)
 assert.ok(getEarthLandmarksByTag('real-science').some(landmark => landmark.id === 'earth-de-darmstadt-esoc'))
+const artLounge = getEarthLandmark('earth-de-frankfurt-camaleo-artlounge')
+assert.ok(artLounge)
+assert.ok(artLounge.tags.includes('culture'))
+assert.ok(artLounge.locator.value.includes('Mörfelder Landstraße 103'))
 assert.equal(getEarthLandmark('does-not-exist'), undefined)
 
 console.log('earth landmark registry tests passed')

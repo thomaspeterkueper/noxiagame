@@ -26,6 +26,7 @@ Dafür trennt die Registry ausdrücklich:
 ### NOXIA / reale Wissenschaft
 
 - Solar Science Foundation · Hauptsitz, Sundern
+- CAMALEO-ArtLounge, Mörfelder Landstraße 103, Frankfurt am Main (Kultur: kleine Konzerte, Lesungen, Ausstellungen)
 - ESA · ESOC, Darmstadt
 - EUMETSAT · Hauptsitz, Darmstadt
 - ESA · European Astronaut Centre, Köln
