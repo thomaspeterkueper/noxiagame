@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 26.10.2026 — Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.3.0
+// Aktualisiert: 26.10.2026 — Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.4.0
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -33,6 +33,13 @@ type Props = {
   typeLabel: string
   facts: Array<{ label: string; value: string }>
   onClose: () => void
+  /** Betrieb: was die angestellte Person über ihr Haus weiß (für das Gespräch). */
+  knowledge?: string[]
+  /** Betrieb: Leistungen, mit ehrlichem Status. */
+  services?: Array<{ id: string; label: string; note: string; available: boolean }>
+  staffRole?: string
+  /** Realer Name laut OSM – nur zur Einordnung in der Seitenleiste. */
+  realName?: string
 }
 type ChatEntry = { role: 'user' | 'assistant'; content: string }
 
@@ -75,8 +82,9 @@ function pickTip(seed: number) {
   return LIBRARY_BOOKS[Math.abs(seed) % LIBRARY_BOOKS.length]
 }
 
-export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts, onClose }: Props) {
-  const layout = useMemo(() => landmarkRoomLayout(kind), [kind])
+export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName }: Props) {
+  const layout = useMemo(() => { const base = landmarkRoomLayout(kind); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
+  const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
   const [pos, setPos] = useState<LandmarkPoint>(layout.start)
   const [active, setActive] = useState<LandmarkSpot | null>(null)
@@ -221,7 +229,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
   }, [layout, readerSeats, waypoints])
 
   const near = nearestLandmarkSpot(layout, pos)
-  const shelf = layout.kind === 'library' ? shelfAt(layout, pos) : null
+  const shelf = isLibrary ? shelfAt(layout, pos) : null
   const shelfBooks = shelf ? LIBRARY_BOOKS.filter(entry => entry.shelf === shelf.shelf) : []
   const shelfLabel = shelf ? LIBRARY_SHELVES.find(entry => entry.id === shelf.shelf)?.label ?? 'Regal' : ''
   const nearExit = Math.hypot(pos.x - layout.exit.x, pos.y - layout.exit.y) < 46
@@ -265,18 +273,18 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           player: text,
           npcId: `landmark-staff:${name}`,
           npcName: staffName,
-          npcRole: 'Bibliothekar(in)',
-          headline: `Gespräch am Ausleihtresen der ${name}`,
-          source: 'NOXIA library interior',
+          npcRole: staff?.role ?? 'Personal',
+          headline: isLibrary ? `Gespräch am Ausleihtresen der ${name}` : `Gespräch bei ${name}`,
+          source: isLibrary ? 'NOXIA library interior' : 'NOXIA establishment interior',
           locationName: name,
-          localFacts: [
+          localFacts: isLibrary ? [
             `Du arbeitest an der Ausleihe der ${name} und kennst den Bestand genau.`,
             `Alle Bücher hier sind von Thomas Peter Küper. Du empfiehlst auf Nachfrage passende Titel aus dem Bestand und erfindest keine anderen.`,
             seated ? 'Der Spieler sitzt gerade an einem Leseplatz. Wenn du ihm ein Buch anbietest oder er eins möchte, sag „ich bringe dir …“ und nenne den genauen Titel – du bringst es dann wirklich.' : 'Der Spieler steht. Ein Buch bringst du nur an einen Leseplatz; sonst zeigst du ihm das Regal.',
             held ? `Der Spieler hat gerade „${held.title}“ in der Hand.` : '',
             ...catalogueLines(fiction).map(line => `Romane und Erzählungen: ${line}`),
-          ].slice(0, 16),
-          placeKnowledge: catalogueLines(nonfiction).map(line => `Sachbücher: ${line}`),
+          ].slice(0, 16) : knowledge.slice(0, 16),
+          placeKnowledge: isLibrary ? catalogueLines(nonfiction).map(line => `Sachbücher: ${line}`) : [],
           nearbyPlaces: waypoints.filter(point => point.id !== 'exit' && point.kind !== 'Tresen').slice(0, 9).map((point, index) => ({ key: `p${index}`, targetRef: point.id, name: point.label, kind: point.kind, distanceM: Math.round(Math.hypot(point.x - staffPos.x, point.y - staffPos.y) / 16) })),
           history: history.slice(-10),
         }),
@@ -286,7 +294,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
       // Versprochen ist versprochen: „ich bringe …“ löst den Gang aus, ein genannter Titel wird erkannt.
-      if (/\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
+      if (isLibrary && /\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
         const named = LIBRARY_BOOKS.find(entry => reply.toLowerCase().includes(entry.title.toLowerCase()))
         bringBook(named ?? tip ?? pickTip(tipSeed.current += 3))
       } else if (data.worldAction?.type === 'visit_place') {
@@ -305,7 +313,7 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
     } finally { setSending(false) }
   }
 
-  const furnitureLabel = (item: LandmarkFurniture) => item.kind === 'counter' ? 'AUSLEIHE' : null
+  const furnitureLabel = (item: LandmarkFurniture) => item.kind === 'counter' ? (kind === 'library' ? 'AUSLEIHE' : kind === 'workshop' ? 'ANNAHME' : 'KASSE') : null
 
   return <div className="landmark-interior">
     <NpcVisualStyles/>
@@ -342,12 +350,13 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           ? <div className="portrait"><NpcPortrait id={`landmark-staff:${name}`} name={staffName} role={staff.role}/></div>
           : <h3>{shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>}
         {talkingNow && staff && <>
-          <p className="muted">{staff.role} · an der Ausleihe</p>
+          <p className="muted">{staff.role}{isLibrary ? ' · an der Ausleihe' : ` · ${name}`}</p>
           <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : staffName}:</b> „{entry.content}“</p>)}</div>
           {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false) }}>
             <span>{tip.author}</span><b>{tip.title}</b><i>{tip.genre}</i><small>Klappentext lesen →</small>
           </button>}
-          <div className="row"><button className="act" onClick={giveTip}>Buchtipp erbitten</button><button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
+          {services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
+          <div className="row">{isLibrary && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Kurze Frage …"/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
@@ -368,7 +377,8 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
           {seated ? <p>{held.teaser}</p> : <p>Setz dich an einen Leseplatz, um darin zu lesen.</p>}
           {atCounter ? <button className="act" onClick={() => { setHeld(null); setStatus(`Du gibst „${held.title}“ an der Ausleihe zurück.`) }}>Zurückgeben</button> : <button className="act quiet" onClick={() => setHeld(null)}>Weglegen</button>}
         </div>}
-        {!talkingNow && !shown && !shelf && !book && !held && <p>Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern{staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && <p>{isLibrary ? `Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern${staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.` : `Du kannst dich frei umsehen${staff ? `; ${staffName} hilft dir am Tresen weiter` : ''}.`}</p>}
+        {!talkingNow && !shown && !shelf && realName && <p className="muted">Heute steht hier laut OpenStreetMap „{realName}“. Im Spiel (2086) ist der Betrieb eine erfundene Nachfolgerin.</p>}
         {!talkingNow && shown && <p>{shown.text}</p>}
         {!talkingNow && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
         {!talkingNow && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
@@ -397,6 +407,22 @@ export default function LandmarkWalkableInterior({ kind, name, typeLabel, facts,
       .zone.carpet{background:#8d3a36;background-image:radial-gradient(#a24a44 1.2px,transparent 1.3px);background-size:9px 9px;border:3px solid #6e2a28;border-radius:4px;box-shadow:inset 0 0 0 6px #7a3230}
       .zone.rug{background:#4e6a8a;background-image:repeating-linear-gradient(45deg,#5a789a 0 6px,#4e6a8a 6px 12px);border:2px solid #3b526c;border-radius:3px}
       .zone.chancel{background:#d9d1bf;border-bottom:4px solid #b7ad97}
+      .zone.concrete{background:#9a9b96;background-image:linear-gradient(#90918c 1px,transparent 1px),linear-gradient(90deg,#90918c 1px,transparent 1px);background-size:120px 120px}
+      .zone.oilstain{background:radial-gradient(ellipse,#3a3a36aa,transparent 70%)}
+      .room.shop{background:#c9c2b2}
+      .room.workshop{background:#9a9b96}
+      .f.goods{background:#6b4a33;border:2px solid #3b2518}
+      .f.goods::after{content:'';position:absolute;inset:3px;background:repeating-linear-gradient(90deg,#d8b24f 0 6px,#5f8ea6 6px 10px,#c24a3d 10px 15px,#6fae5a 15px 18px,#efe6d2 18px 22px)}
+      .f.lift{background:#5a5f66;border:2px solid #2f3338;border-radius:3px;box-shadow:inset 0 0 0 6px #4a4f55,3px 4px 0 #0003}
+      .f.vehicle{background:linear-gradient(180deg,#8fb3c9,#4f7f9c);border:2px solid #1f3f52;border-radius:12px 12px 8px 8px;box-shadow:inset 0 -6px 0 #2b5368,3px 4px 0 #0004}
+      .f.vehicle::before,.f.vehicle::after{content:'';position:absolute;top:-4px;width:14px;height:8px;border-radius:3px;background:#222}
+      .f.vehicle::before{left:16px}.f.vehicle::after{right:16px}
+      .f.bench{background:#8c6b47;border:2px solid #5d4428}
+      .f.bench::after{content:'';position:absolute;left:8px;top:6px;width:60%;height:8px;background:repeating-linear-gradient(90deg,#c9c9c9 0 4px,transparent 4px 9px)}
+      .f.gate{background:repeating-linear-gradient(90deg,#4c5a66 0 10px,#5f6d79 10px 20px);border:2px solid #2f3b45;box-shadow:none}
+      .f.crate{background:#a8864f;border:2px solid #6b5230;box-shadow:inset 0 0 0 3px #b99766,3px 4px 0 #0003}
+      .services{display:flex;flex-wrap:wrap;gap:4px}
+      .services small{font-size:8px;opacity:.8}
       .lamp{position:absolute;border-radius:50%;background:radial-gradient(circle,#ffffff66 0%,#ffffff22 40%,transparent 70%);pointer-events:none;mix-blend-mode:screen}
       .lamp.warm{background:radial-gradient(circle,#ffd98a77 0%,#ffcc6e2a 40%,transparent 70%)}
       .door{position:absolute;left:330px;bottom:-6px;width:100px;height:8px;background:#e8dfc8;border-radius:2px}

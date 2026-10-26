@@ -1,18 +1,19 @@
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 26.10.2026 — Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
-// Version:      1.4.0
+// Aktualisiert: 26.10.2026 — Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
+// Version:      1.5.0
 
-export type LandmarkRoomKind = 'library' | 'worship'
+export type LandmarkRoomKind = 'library' | 'worship' | 'shop' | 'workshop'
 export type LandmarkPoint = { x: number; y: number }
-export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter'
+export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
 export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' }
 /** Bodenzone – rein optisch, blockiert nicht. */
-export type LandmarkZone = { id: string; kind: 'carpet' | 'tiles' | 'rug' | 'chancel'; x: number; y: number; w: number; h: number }
+export type LandmarkZone = { id: string; kind: LandmarkZoneKind; x: number; y: number; w: number; h: number }
 /** Deckenlampe: heller Lichtkegel auf dem Boden. */
 export type LandmarkLamp = { x: number; y: number; r: number; warm?: boolean }
 /** Angestellte Person im Raum – steht an einem festen Platz und ist ansprechbar. */
 export type LandmarkStaff = { id: string; role: string; x: number; y: number; greeting: string }
+export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain'
 export type LandmarkRoomLayout = {
   kind: LandmarkRoomKind
   noun: string
@@ -109,6 +110,52 @@ function worshipLayout(): LandmarkRoomLayout {
   }
 }
 
+function shopLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = []
+  for (let i = 0; i < 5; i++) furniture.push({ id: `wall-goods-${i}`, kind: 'goods', x: 60 + i * 130, y: 34, w: 100, h: 22 })
+  for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) furniture.push({ id: `gondola-${row}-${col}`, kind: 'goods', x: 110 + col * 260, y: 130 + row * 100, w: 200, h: 24 })
+  furniture.push({ id: 'counter', kind: 'counter', x: 470, y: 392, w: 170, h: 30 })
+  furniture.push({ id: 'plant-0', kind: 'plant', x: 36, y: 410, w: 26, h: 26 })
+  furniture.push({ id: 'plant-1', kind: 'plant', x: 700, y: 410, w: 26, h: 26 })
+  furniture.push({ id: 'crate-0', kind: 'crate', x: 60, y: 330, w: 36, h: 30 })
+  return {
+    kind: 'shop', noun: 'Laden', start: { x: 380, y: 430 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [{ id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 }, { id: 'floor', kind: 'tiles', x: 24, y: 28, w: 712, h: 348 }],
+    lamps: [{ x: 210, y: 100, r: 110 }, { x: 550, y: 100, r: 110 }, { x: 210, y: 260, r: 110 }, { x: 550, y: 260, r: 110 }, { x: 555, y: 400, r: 90, warm: true }],
+    staff: { id: 'clerk', role: 'Verkäufer(in)', x: 555, y: 378, greeting: 'Hallo! Kann ich helfen, oder schaust du dich erst um?' },
+    spots: [
+      { id: 'display', label: 'AUSLAGE', x: 210, y: 92, text: 'Die Auslage an der Rückwand. Vieles davon kann man im Spiel noch nicht kaufen – fragen kostet nichts.' },
+      { id: 'aisle', label: 'REGALGANG', x: 380, y: 170, text: 'Regale mit Waren auf beiden Seiten.' },
+      { id: 'desk', label: 'KASSE', x: 555, y: 440, action: 'staff', text: 'Die Kasse. Hier steht jemand, der den Betrieb kennt.' },
+    ],
+  }
+}
+
+function workshopLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = []
+  furniture.push({ id: 'gate', kind: 'gate', x: 24, y: 28, w: 240, h: 12 })
+  furniture.push({ id: 'lift-0', kind: 'lift', x: 70, y: 100, w: 150, h: 70 })
+  furniture.push({ id: 'vehicle-0', kind: 'vehicle', x: 86, y: 112, w: 118, h: 46 })
+  furniture.push({ id: 'lift-1', kind: 'lift', x: 70, y: 230, w: 150, h: 70 })
+  for (let i = 0; i < 3; i++) furniture.push({ id: `bench-${i}`, kind: 'bench', x: 420 + i * 100, y: 34, w: 84, h: 26 })
+  furniture.push({ id: 'shelf-parts', kind: 'goods', x: 640, y: 120, w: 24, h: 160 })
+  furniture.push({ id: 'crate-0', kind: 'crate', x: 300, y: 300, w: 40, h: 32 })
+  furniture.push({ id: 'crate-1', kind: 'crate', x: 346, y: 310, w: 32, h: 28 })
+  furniture.push({ id: 'counter', kind: 'counter', x: 470, y: 392, w: 170, h: 30 })
+  return {
+    kind: 'workshop', noun: 'Werkstatt', start: { x: 380, y: 430 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [{ id: 'floor', kind: 'concrete', x: 24, y: 28, w: 712, h: 428 }, { id: 'stain-0', kind: 'oilstain', x: 250, y: 140, w: 60, h: 40 }, { id: 'stain-1', kind: 'oilstain', x: 150, y: 330, w: 50, h: 34 }, { id: 'entry', kind: 'tiles', x: 420, y: 376, w: 316, h: 80 }],
+    lamps: [{ x: 145, y: 135, r: 120 }, { x: 145, y: 265, r: 120 }, { x: 520, y: 80, r: 110 }, { x: 555, y: 400, r: 90, warm: true }],
+    staff: { id: 'master', role: 'Meister(in)', x: 555, y: 378, greeting: 'Moment, Hände abwischen. So – was kann ich für dich tun?' },
+    spots: [
+      { id: 'lift', label: 'HEBEBÜHNE', x: 145, y: 195, text: 'Eine Hebebühne mit einem Fahrzeug darauf. Darunter riecht es nach Öl.' },
+      { id: 'bench', label: 'WERKBANK', x: 520, y: 92, text: 'Werkbänke mit Werkzeug, sauber aufgereiht.' },
+      { id: 'parts', label: 'ERSATZTEILE', x: 610, y: 200, text: 'Ein Regal mit Ersatzteilen, nach Nummern sortiert.' },
+      { id: 'desk', label: 'ANNAHME', x: 555, y: 440, action: 'staff', text: 'Die Annahme. Hier steht jemand, der den Betrieb kennt.' },
+    ],
+  }
+}
+
 /** Landmark classes that have a walkable interior; all others show the place card. */
 export function landmarkRoomKind(landmarkClass: string): LandmarkRoomKind | null {
   if (landmarkClass === 'library') return 'library'
@@ -117,7 +164,7 @@ export function landmarkRoomKind(landmarkClass: string): LandmarkRoomKind | null
 }
 
 export function landmarkRoomLayout(kind: LandmarkRoomKind): LandmarkRoomLayout {
-  return kind === 'library' ? libraryLayout() : worshipLayout()
+  return kind === 'library' ? libraryLayout() : kind === 'worship' ? worshipLayout() : kind === 'shop' ? shopLayout() : workshopLayout()
 }
 
 export function isLandmarkRoomBlocked(layout: LandmarkRoomLayout, p: LandmarkPoint, radius = LANDMARK_PLAYER_RADIUS) {

@@ -1,6 +1,6 @@
 // lib/world/spatial/earthLocalEnrichment.server.ts
-// Aktualisiert: 12.10.2026 — Overpass-Spiegel parallel statt nacheinander abfragen (erste gültige Antwort gewinnt), zusätzlicher Spiegel
-// Version:      1.2.0
+// Aktualisiert: 26.10.2026 — Profil local-scene-v4: Tierarzt, Tankstelle/Waschanlage, benannte Industrie- und Werkstattgebäude als poi (Grundlage für Betriebe im Spiel); Overpass-Spiegel parallel statt nacheinander abfragen (erste gültige Antwort gewinnt), zusätzlicher Spiegel
+// Version:      1.3.0
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { earthPlaceSlug } from './earthPlaceIdentity'
@@ -24,9 +24,9 @@ function bounds(lat:number,lon:number,radiusKm:number){const latDelta=radiusKm/1
 function simplify(points:GeoPoint[],max=56){if(points.length<=max)return points;const step=(points.length-1)/(max-1);return Array.from({length:max},(_,index)=>points[Math.round(index*step)])}
 function polygon(points:GeoPoint[]){if(points.length<3)return false;const a=points[0],b=points[points.length-1];return Math.abs(a.lat-b.lat)<1e-8&&Math.abs(a.lon-b.lon)<1e-8}
 // Benannte Läden und Lokale (Weltkarte, 25.10.2026): Ziele für Spieler und Gespräche.
-const POI_AMENITIES='cafe|restaurant|bar|pub|biergarten|fast_food|ice_cream|bank|pharmacy|post_office|doctors|dentist|fuel|cinema|kindergarten|school'
+const POI_AMENITIES='cafe|restaurant|bar|pub|biergarten|fast_food|ice_cream|bank|pharmacy|post_office|doctors|dentist|fuel|car_wash|veterinary|cinema|kindergarten|school'
 const POI_AMENITY_PATTERN=new RegExp('^('+POI_AMENITIES+')$')
-function poiClass(tags:Record<string,string>){if(!tags.name)return null;if(tags.shop)return'shop';if(POI_AMENITY_PATTERN.test(tags.amenity??''))return tags.amenity;if(tags.tourism==='hotel'||tags.tourism==='guest_house')return tags.tourism;if(tags.craft)return'craft';if(tags.office)return'office';return null}
+function poiClass(tags:Record<string,string>){if(!tags.name)return null;if(tags.shop)return'shop';if(POI_AMENITY_PATTERN.test(tags.amenity??''))return tags.amenity;if(tags.tourism==='hotel'||tags.tourism==='guest_house')return tags.tourism;if(tags.craft)return'craft';if(tags.office)return'office';if(tags.industrial||/^(industrial|manufacture|warehouse|factory)$/.test(tags.building??''))return'industrial';return null}
 function featureType(tags:Record<string,string>){if(tags.building)return'building';if(HIGHWAY_PATTERN.test(tags.highway??''))return'road';if(WATERWAY_PATTERN.test(tags.waterway??''))return'waterway';return null}
 function toFeatures(elements:OverpassElement[]){
   const out:PreparedFeature[]=[]
@@ -66,7 +66,7 @@ function toFeatures(elements:OverpassElement[]){
 function query(lat:number,lon:number,radiusKm:number){
   const b=bounds(lat,lon,radiusKm)
   const box=[b.south,b.west,b.north,b.east].join(',')
-  return '[out:json][timeout:12];(way[building]('+box+');relation[building]('+box+');way[highway~"'+LOCAL_HIGHWAYS+'"]('+box+');way[waterway~"'+LOCAL_WATERWAYS+'"]('+box+');nwr[name][shop]('+box+');nwr[name][amenity~"'+POI_AMENITIES+'"]('+box+');nwr[name][tourism~"hotel|guest_house"]('+box+');nwr[name][craft]('+box+');nwr[name][office]('+box+'););out geom;'
+  return '[out:json][timeout:12];(way[building]('+box+');relation[building]('+box+');way[highway~"'+LOCAL_HIGHWAYS+'"]('+box+');way[waterway~"'+LOCAL_WATERWAYS+'"]('+box+');nwr[name][shop]('+box+');nwr[name][amenity~"'+POI_AMENITIES+'"]('+box+');nwr[name][tourism~"hotel|guest_house"]('+box+');nwr[name][industrial]('+box+');way[name][building~"industrial|manufacture|warehouse|factory"]('+box+');nwr[name][craft]('+box+');nwr[name][office]('+box+'););out geom;'
 }
 
 export async function enrichEarthLocalScene(input:{slug:string;lat:number;lon:number;radiusKm?:number}){
