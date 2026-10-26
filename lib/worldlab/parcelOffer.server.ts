@@ -6,6 +6,7 @@
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileOrigin, TILE_SIZE_MERC, type GeoPoint } from './mercator'
 import { cadastreAttribution, landRate, parcelNotForSale } from './alkis'
 import { mergeRings } from './parcelGeometry'
+import { municipalityLabel } from './municipality.server'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
 import { loadTile } from './tileSource.server'
@@ -129,7 +130,9 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   }
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   const { data: publicActor } = earth ? await supabase.from('location_public_actors').select('actor_id,actors(display_name)').eq('location_id', earth.id).maybeSingle() : { data: null }
-  const seller = (publicActor as { actors?: { display_name?: string } | null } | null)?.actors?.display_name ?? 'Gemeinde'
+  // Verkäufer ist die Stadt/Gemeinde laut Kataster; gebucht wird beim öffentlichen Akteur.
+  const seller = await municipalityLabel(supabase, String((row as { props?: Record<string, unknown> }).props?.gemeinde ?? ''))
+    ?? (publicActor as { actors?: { display_name?: string } | null } | null)?.actors?.display_name ?? 'Gemeinde'
   // Lage (Innenstadt teurer) auch auf den Boden; die Häuser tragen ihren Aufschlag schon im Wert.
   const location = await locationAt(supabase, { lat: Number(parcel.centre_lat), lon: Number(parcel.centre_lon) })
   const price = Math.max(500, Math.round((areaM2 * landRate(parcel.usage) * location.factor + value) / 50) * 50)
