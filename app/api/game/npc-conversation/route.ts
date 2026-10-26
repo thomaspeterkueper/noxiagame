@@ -1,6 +1,12 @@
+// app/api/game/npc-conversation/route.ts
+// Aktualisiert: 26.10.2026 — Gesprächsgedächtnis verblasst mit der Zeit und wird beim Wiederaufgreifen eines Themas wieder scharf (conversationRecall); Personal an Wahrzeichen bekommt eine Personenzeile und erinnert sich
+// Version:      1.1.0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
+import { createHash } from 'node:crypto'
+import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY_MESSAGES = 10
@@ -19,15 +25,6 @@ type PersistedExchange = {
   location?: unknown
 }
 
-function conversationMemoryLines(exchanges: PersistedExchange[]) {
-  return exchanges.slice(-3).flatMap((exchange, index) => {
-    const previousPlayer = clean(exchange?.player, MAX_PLAYER_CHARS)
-    const previousNpc = clean(exchange?.npc, MAX_REPLY_CHARS)
-    const location = clean(exchange?.location, 100)
-    const prefix = `[eigene Gesprächserinnerung #${index + 1}${location ? ` · Ort: ${location}` : ''}]`
-    return [previousPlayer ? `${prefix} Der Spieler sagte: ${previousPlayer}` : '', previousNpc ? `${prefix} Du antwortetest: ${previousNpc}` : ''].filter(Boolean)
-  })
-}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -65,6 +62,38 @@ function creditConsentFromConversation(player: string, history: Array<{ role: st
   }
 }
 
+function deterministicUuid(seed: string) {
+  const hex = createHash('sha256').update(seed).digest('hex').slice(0, 32).split('')
+  hex[12] = '5'
+  hex[16] = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16)
+  const value = hex.join('')
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`
+}
+
+/** Personenzeile für Personal an einem Wahrzeichen; angelegt beim ersten Gespräch, danach stabil. */
+async function ensureLandmarkStaffPerson(personKey: string, displayName: string, role: string): Promise<string | null> {
+  const id = deterministicUuid(`noxia-landmark-staff:${personKey}`)
+  const { data: existing } = await serviceClient.from('people').select('id').eq('id', id).maybeSingle()
+  if (existing) return id
+  const { data: earth } = await serviceClient.from('locations').select('id').eq('slug', 'earth').maybeSingle()
+  if (!earth) return null
+  const { error } = await serviceClient.from('people').insert({
+    id,
+    display_name: displayName,
+    current_location_id: earth.id,
+    simulation_tier: 'background',
+    activity_state: 'working',
+    last_action: 'landmark_staff',
+    last_decision_factors: { landmarkStaff: true, personKey },
+    person_key: personKey,
+    public_role: role,
+    traits: { origin: 'landmark_staff' },
+    observable_description: role,
+  })
+  if (error) { console.error('landmark staff person insert failed', { personKey, code: error.code }); return null }
+  return id
+}
+
 async function getUserFromRequest(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -84,8 +113,13 @@ export async function POST(request: NextRequest) {
   // Eröffnung: Die Figur spricht den Spieler von sich aus an (z. B. der Wirt am Tresen).
   const opening = body.opening === true
   const player = opening ? '(tritt heran und hat noch nichts gesagt)' : clean(body.player)
-  const npcIdRaw = clean(body.npcId, 64)
-  const npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
+  const npcIdRaw = clean(body.npcId, 120)
+  let npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
+  // Personal an realen Wahrzeichen (Bibliothek, …) ist keine simulierte Person,
+  // bekommt aber eine feste Personenzeile, damit es sich wie alle erinnert.
+  if (!npcId && npcIdRaw.startsWith('landmark-staff:')) {
+    npcId = await ensureLandmarkStaffPerson(npcIdRaw, clean(body.npcName, 48) || 'Angestellte(r)', clean(body.npcRole, 48) || 'Personal')
+  }
   const perceivedNpcName = clean(body.npcName, 48) || 'Bewohner'
   const perceivedNpcRole = clean(body.npcRole, 48) || 'Kolonist'
   let npcName = perceivedNpcName
@@ -170,9 +204,12 @@ export async function POST(request: NextRequest) {
         : 'unknown'
   }
 
-  const priorEncounterLines = history.length === 0 && Array.isArray(persistedMemory?.recent_exchanges)
-    ? conversationMemoryLines(persistedMemory.recent_exchanges as PersistedExchange[])
-    : []
+  // Erinnerung an frühere Begegnungen: frisch wörtlich, älter nur dem Sinn nach,
+  // alt nur als Spur – und wieder scharf, wenn der Spieler das Thema anspricht.
+  const recall = Array.isArray(persistedMemory?.recent_exchanges)
+    ? recallLines({ exchanges: persistedMemory.recent_exchanges as PersistedExchange[], now: Date.now(), retention: Number(persistedMemory?.recent_encounter_score ?? 0), playerMessage: player, maxLines: history.length === 0 ? 5 : 3 })
+    : { lines: [], rewarmed: [] as number[] }
+  const priorEncounterLines = history.length === 0 ? recall.lines.map(line => line.text) : recall.lines.filter(line => line.stage === 'fresh' && recall.rewarmed.includes(line.index)).map(line => line.text)
 
   const system = [
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
@@ -313,9 +350,9 @@ export async function POST(request: NextRequest) {
         ),
       )
 
-      const previous = Array.isArray(persistedMemory?.recent_exchanges) ? persistedMemory.recent_exchanges : []
+      const previous: PersistedExchange[] = Array.isArray(persistedMemory?.recent_exchanges) ? persistedMemory.recent_exchanges : []
       const recentExchanges = [
-        ...previous,
+        ...pruneExchanges(previous, { now: now.getTime(), retention: recentEncounterScore, rewarmed: recall.rewarmed, limit: memoryLimit }),
         {
           player,
           npc: reply,
