@@ -243,6 +243,10 @@ R-13 ist gebaut (`population-economy.md`). Für die Tafel in `app/world-lab/Worl
 - Reale Lokale (Metropol, Balkan Grill in Sundern) sind jetzt NOXIA-Gebäude des Ortes; die Tafel zeigt sie als „Bar · Metropol“ mit „Betreten“. Seit dem Nachtrag (Thomas, 25.10.2026) sind reale Lokale kaufbar, mit Ausbauwert im Preis: das Angebot liefert dafür `venue` (Lokalart) und `fitOut` (Credits) – bitte in der Tafel zeigen, z. B. „Bar, schon ausgebaut (+1 800 Cr)“. Bei Metropol und Balkan Grill steht „Kaufen“ neben „Betreten“.
 - Das Startcafé ist vom alten 24 × 24-m-Platz auf das reale Haus Hauptstraße 72 gezogen (W-4, letzter Punkt); auf der Karte sollte es jetzt den Grundriss dieses Hauses belegen.
 
+### W-6 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur
+
+Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie anklickt.“ Sobald in der neuen Weltkarte Personen stehen: beim Anklicken `NpcPortrait` aus `lib/grid/NpcVisual.tsx` in der Tafel rechts, wie in der Koloniesicht (`app/dashboard/WalkableColony.tsx`). Gleiches für die alte Erdszene (`app/earth/EarthWalkableSurface.tsx`), falls dort Personen erscheinen, solange sie läuft.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

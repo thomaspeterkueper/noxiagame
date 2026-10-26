@@ -29,7 +29,7 @@ Kanon (Thomas, 14.10.2026):
 - **Mars: Sol-Zeit (Kanon).** Ein Sol dauert 24 h 39 min 35 s. Der Tag der Bewohner richtet sich nach dem Licht – Schichtpläne, Gewächshäuser, Solarstrom und Schlaf folgen der Sonne, nicht einer Erduhr. So arbeiten schon heute die Teams der Mars-Rover, die „auf Marszeit“ leben.
   - Folge im Spiel: Gegenüber der Erde verschiebt sich der Marstag jeden Tag um knapp 40 Minuten. Wer auf dem Mars frühstückt, tut das nach gut fünf Wochen wieder zur selben Erdzeit. Verabredungen zwischen Erde und Mars verschieben sich spürbar – ein Stück Wirklichkeit, das man nicht erklären muss.
   - Technisch: Der Takt bleibt eine Erdstunde je Tick (ein Cron für alle). Die Tageszeit auf dem Mars wird aus dem Tick abgeleitet, nicht gezählt: `marsStunde = ((tick × 3600 s) / 88 775 s × 24) mod 24`, mit Bezug auf einen festen Nullpunkt (z. B. Mars Sol Date). `circadian.ts` rechnet heute mit `DAY_TICKS = 24` für alle Orte und bekommt dafür eine Ortsuhr.
-  - Phobos und Deimos folgen dem Mars (Sol). Mond und Stationen: offen – Vorschlag Erdzeit UTC, weil der Mondtag 29,5 Erdtage dauert und keinen Alltag trägt.
+  - Phobos und Deimos folgen dem Mars (Sol). **Mond und Stationen: UTC (Kanon, Thomas 26.10.2026)** – der Mondtag dauert 29,5 Erdtage und trägt keinen Alltag.
 - Grundsatz bleibt: Bewohner leben nach Weltzeit ihres Ortes, Spielerbedürfnisse nach aktiver Spielzeit (LIVING-0012), Spielertüren wie das Startcafé nach der Ortszeit des Spielers.
 
 ### 2. Sprachen
@@ -37,10 +37,15 @@ Kanon (Thomas, 14.10.2026):
 - **Personen:** `person_languages(person_id, language_code, proficiency, is_native)`, Sprachcode nach BCP 47 (`de`, `zh` bzw. `cmn`, `yue`, `en`, `ar` …), Kenntnis 0–1. Eine Person kann mehrere Sprachen sprechen, unterschiedlich gut.
 - **Herkunft vor Ort:** Die Muttersprache folgt aus Biografie und Herkunft, nicht aus dem Aufenthaltsort. Wer in Sundern lebt, aber in Wuhan aufgewachsen ist, spricht Mandarin als Muttersprache und Deutsch je nach Lebensjahren dort.
 - **Orte:** `location_languages(location_id, language_code, share)` – Verteilung der Sprachen am Ort als Ausgangswert für neu entstehende Bewohner. Auf der Erde aus realen Daten (Sundern: Deutsch, dazu Türkisch, Polnisch, Englisch …; Shanghai: Mandarin, Shanghainesisch, Englisch …). Neue Bewohner werden aus dieser Verteilung gewürfelt, deterministisch wie bisher.
-- **Kolonien – eigene Kolonialsprache (Kanon):** Auf dem Mars wächst aus den Herkunftssprachen der Siedler eine eigenständigere Sprache, je nach Ort und Bevölkerung verschieden – Tharsis klingt anders als eine Station mit anderer Herkunftsmischung. Vorbild: die Galut-Schichten von Mishkenaz.
-  - Im Modell: eigener Sprachcode je Kolonialsprache (privater BCP-47-Bereich, z. B. `x-mars-tharsis`), mit einer Liste ihrer Spendersprachen und Anteile, abgeleitet aus der tatsächlichen Herkunft der Bewohner am Ort.
-  - In Mars Geborene sprechen sie als Muttersprache, Zugezogene lernen sie mit den Jahren dazu (Kenntnis wächst mit der Zeit am Ort).
-  - Eigene Wörter für Dinge, die es nur dort gibt (Staubsturm, Druckschleuse, Sol, Regolith, Notration), entstehen zuerst. Name der Sprache: Kanonfrage.
+- **Marsianisch (Kanon, Thomas 26.10.2026):** Die Sprache des Mars heißt Marsianisch. Sie ist eine Mischung aus Technik und dem Mischmasch der ersten großen Expeditionen: Grundlage ist **Englisch, dazu Chinesisch und etwas Mishkenaz – Mishkenaz darf nicht fehlen.** Vorbild sind die Galut-Schichten von Mishkenaz: Aus den Schichten der Siedlung wächst eine eigene Sprache.
+  - Technik als Wortquelle: Abkürzungen aus Missionsfunk, Schleusen- und Lebenserhaltungsjargon, Maßeinheiten und Uhrzeiten in Sol werden Alltagswörter.
+  - Im Modell: eigener Sprachcode (privater BCP-47-Bereich, z. B. `x-marsianisch`) mit Spendersprachen und Gewicht (Englisch hoch, Chinesisch mittel, Mishkenaz klein, Technik eigene Wortschicht).
+  - In Mars Geborene sprechen Marsianisch als Muttersprache, Zugezogene lernen es mit den Jahren dazu (Kenntnis wächst mit der Zeit am Ort).
+  - Die Gesprächs-KI bekommt dafür eine kleine, feste Wortliste als Fakten (Kanon), statt Wörter zu erfinden. Die Liste wird mit Thomas abgestimmt; Mishkenaz-Wörter nur aus dem Buchkanon.
+- **Lokale Dialekte überall (Kanon, Thomas 26.10.2026):** Wo Menschen über längere Zeit isolierter leben, entwickelt sich ein lokaler Dialekt – auf dem Mars als Dialekte des Marsianischen (Tharsis klingt anders als Phobos), aber genauso auf dem Mond, auf Stationen und in abgelegenen Orten.
+  - Ein Dialekt hängt an einem Ort, nicht an einer Gebäudeart oder Herkunft. Seine Eigenständigkeit wächst mit der Dauer der Abgeschiedenheit, sinkt mit Verkehr (Ankünfte, Zuzug) und hängt von der Herkunftsmischung der Bewohner ab – alles abgeleitet aus vorhandenen Daten, nichts gezählt.
+  - Im Modell: Dialekt als Unterart der Ortssprache (`x-marsianisch-tharsis`, `de-x-sundern` …). Wer lange am Ort lebt, spricht ihn; wer neu ist, nicht.
+  - Wirkung: Bei nahezu perfekter Übersetzung ist ein Dialekt ein Zeichen von Herkunft und Zugehörigkeit – wie die Sprache selbst (Abschnitt 3). Wer am Ort den Dialekt spricht, ist von dort.
 - **Spieler:** Sprache(n) des Spielers – zunächst die Sprache der Oberfläche, später ggf. erlernbar (Anschluss an die Akademie und SSF).
 
 ### 3. Gespräche
@@ -67,8 +72,7 @@ Kanon (Thomas, 14.10.2026):
 
 ## Offene Fragen (Kanon)
 
-Entschieden am 14.10.2026: Übersetzung nahezu perfekt; Mars nach Sol; eigene Kolonialsprache aus der Sprachvielfalt der Siedler.
+Entschieden am 14.10.2026: Übersetzung nahezu perfekt; Mars nach Sol; eigene Sprache auf dem Mars aus der Sprachvielfalt der Siedler.
+Entschieden am 26.10.2026: Die Sprache heißt Marsianisch (Englisch, dazu Chinesisch und etwas Mishkenaz, plus Technikjargon der ersten Expeditionen); Mond und Stationen nach UTC; lokale Dialekte überall, wo Menschen länger isoliert leben.
 
-1. Name der Marssprache bzw. der Kolonialsprachen – gibt es ihn schon im Buchkanon?
-2. Mond und Stationen: Erdzeit UTC (Vorschlag) oder eine eigene Stationszeit?
-3. Kolonialsprache auch auf dem Mond und den Stationen, oder nur auf dem Mars, wo Menschen über Generationen leben?
+1. Wortliste Marsianisch: erste 20–30 Wörter mit Thomas abstimmen, Mishkenaz-Anteile aus dem Buchkanon.

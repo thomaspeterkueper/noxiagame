@@ -94,6 +94,14 @@ Fragen an euch:
 2. Lest ihr den Namen eines realen Lokals aus `display_name` (z. B. „Metropol“) statt aus der Gebäudeart? Im Gespräch hieße es sonst „die Bar“.
 3. Passt die Größe „normal“ für Metropol und Balkan Grill, oder soll `venueSizeForArea` die echte Grundfläche (Polygon) statt Breite × Tiefe nehmen? Wir können die echte Fläche als Spalte nachreichen.
 
+### G-5 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur
+
+Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie anklickt.“ In der Koloniesicht (`app/dashboard/WalkableColony.tsx`) erscheint beim Anklicken `NpcPortrait` aus `lib/grid/NpcVisual.tsx`. Im Café-, Bar- und Restaurant-Innenraum (`app/earth/CafeWalkableInterior.tsx`) und im Innenraum der Wahrzeichen (`app/earth/LandmarkWalkableInterior.tsx`) zeigt die Seitenleiste nur Name und Beschreibung, kein Porträt.
+
+- Beim Anklicken einer Figur oben in der Seitenleiste `NpcPortrait` mit derselben Erscheinung (`appearance`) wie die Figur im Raum.
+- Rolle nur, wenn die Person bekannt ist (`identityState === 'known'`), wie in der Koloniesicht; Name nach `personSceneLabel`.
+- Kantinenroboter und Automat (NOXIA-LIVING-0013) bekommen ein eigenes Maschinenbild statt eines Menschenporträts.
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.
