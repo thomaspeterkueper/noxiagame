@@ -28,6 +28,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Bedienung am Tisch (Aufgabe 8) und Kantinenzugang auf dem Mars (Facility-Innenraum) und in Q1 (Hafenviertel) (Branch `feat/canteen-access-mars-q1`, 22.10.2026).
 - Figurenbeschriftung: nur Mann/Frau/Junge/Mädchen, bei Bekannten der Name, Alter in Klammern sobald bekannt (`personSceneLabel`, Erdszene und Lokal; Branch `feat/short-person-labels`, 25.10.2026). Die lange Beschreibung steht nur noch in der Personentafel.
 - Grundriss nach Gebäudegröße: klein/normal/groß aus der Grundfläche des Hauses (Branch `feat/venue-size-variants`, 25.10.2026) – Vorarbeit für R-13.
+- Gemütlichere Räume (26.10.2026, Branch `feat/cozy-interiors`): Holzdielen, Täfelung, Sprossenfenster mit Himmel, runde Holztische mit Vase bzw. Kerze, Bistrostühle, Tresen mit Marmorplatte, Kaffeemaschine und Kuchenvitrine, Flaschenregal in der Bar, Schlüsselbrett im Hotel, Pflanzen, Teppich, warme Lichtkegel über den Tischen, dezentes grünes Ausgangsschild. Im Browser geprüft (alle vier Räume).
 
 ## Gestellte Requests
 
