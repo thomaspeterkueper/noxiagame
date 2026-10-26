@@ -17,6 +17,7 @@ import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/
 import type { BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import CafeWalkableInterior from './CafeWalkableInterior'
 import AcademyWalkableInterior from './AcademyWalkableInterior'
+import AdminWalkableInterior from './AdminWalkableInterior'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type ResourceRow = { resource: string; stock: number; consumption: number; production: number }
@@ -114,12 +115,14 @@ export default function EarthBuildingAccessLayer({
   const [loading, setLoading] = useState(false)
   const [spaceportMode, setSpaceportMode] = useState<SpaceportMode>('hub')
   const [schoolOpen, setSchoolOpen] = useState(false)
+  const [deskOpen, setDeskOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!request) return
     setSpaceportMode('hub')
     setSchoolOpen(false)
+    setDeskOpen(false)
     setMessage(null)
     let cancelled = false
     setLoading(true)
@@ -162,7 +165,11 @@ export default function EarthBuildingAccessLayer({
   const locationName = location?.name ?? 'Erde'
 
   if (request.kind === 'administration') {
-    return <AdminOverlay locationSlug="earth" onClose={onClose} />
+    // Die Verwaltung ist begehbar (NOXIA-INTERIOR-0001); die Rathaus-Tafel öffnet darüber.
+    if (!deskOpen) {
+      return <AdminWalkableInterior entityId={request.entityId} buildingName={request.buildingName} locationSlug="earth" companion={companion} onClose={onClose} onOpenDesk={() => setDeskOpen(true)} />
+    }
+    return <AdminOverlay locationSlug="earth" onClose={() => setDeskOpen(false)} />
   }
 
   if (request.kind === 'bank') {
