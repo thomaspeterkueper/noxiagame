@@ -50,3 +50,11 @@ So baut man ein weiteres Gebäude ein: Grundriss als `VenueLayout` (Möbel, Plä
 ## Dritte Einrichtung: Verwaltung (26.10.2026)
 
 `app/earth/AdminWalkableInterior.tsx`, Grundriss und Wissen in `lib/game/administration/adminInterior.ts`: Foyer mit Schalter (zwei Plätze), Wartebank, Aushang, Besprechungstisch; Büros dahinter (eine dritte Kraft arbeitet dort unsichtbar). Das Personal kennt die öffentlichen Zahlen des Ortes aus `/api/game/admin` – Einwohner, Gouverneur, Steuersätze – und ob der Spieler hier gemeldet ist; über Konten und Käufe anderer weiß es nichts. Der Aushang zeigt dieselben Zahlen; „Schalter öffnen“ legt die bestehende Rathaus-Tafel (`AdminOverlay`: Heimatort, Steuern, Kasse) darüber. Eintritt: Art `administration`.
+
+## Vierte Einrichtung: Raumhafen (26.10.2026)
+
+`app/earth/SpaceportWalkableInterior.tsx`, Grundriss und Wissen in `lib/game/spaceport/spaceportInterior.ts`: Ankunftshalle mit Anzeigetafel, Schalter der Flugleitung (zwei Plätze), vier Wartebänken und Durchgang zu Cargo und Wartung (dort arbeitet Personal sichtbar). Die Flugleitung kennt die echten Zielorte (`locations` aus dem Gebäudezugang), ob der Gast ein Schiff hat und dass es eine Kantine gibt; Preise nennt sie nicht. Das Angebot sind die bestehenden Hafenfunktionen als Kacheln: Abflug & Navigation (`LandingOverlay`), Fracht & Handel (`WarehouseOverlay`), Wartung & Werft, Hafenkantine (`PortCanteenInterior`) – alle öffnen darüber und führen zurück in die Halle. Das alte `SpaceportOverlay` (Knopfliste) ist auf der Erde damit abgelöst; Mond, Phobos und Deimos nutzen es weiter, bis ihre Oberflächen den Motor einbinden.
+
+## Stand nach vier Einrichtungen
+
+Lokal, Akademie, Verwaltung, Raumhafen laufen auf demselben Motor: gleiche Bedienung, verschiedene Einrichtung, verschiedenes Wissen, verschiedenes Angebot. Je Gebäude 60–90 Zeilen Grundriss und Wissen, 80–100 Zeilen Einrichtung, eine Stilklasse. Nicht umgestellt: die realen Orte (`LandmarkWalkableInterior`, wird gerade vom Teilprojekt Erde ausgebaut – Bibliothek, Betriebe; Umstellung dort, wenn es passt), die Kolonie-Räume (`LegacyBuildingInterior`) und die Facility-Zonen (Mars).
