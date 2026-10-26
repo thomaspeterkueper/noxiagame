@@ -29,6 +29,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Figurenbeschriftung: nur Mann/Frau/Junge/Mädchen, bei Bekannten der Name, Alter in Klammern sobald bekannt (`personSceneLabel`, Erdszene und Lokal; Branch `feat/short-person-labels`, 25.10.2026). Die lange Beschreibung steht nur noch in der Personentafel.
 - Grundriss nach Gebäudegröße: klein/normal/groß aus der Grundfläche des Hauses (Branch `feat/venue-size-variants`, 25.10.2026) – Vorarbeit für R-13.
 - Gemütlichere Räume (26.10.2026, Branch `feat/cozy-interiors`): Holzdielen, Täfelung, Sprossenfenster mit Himmel, runde Holztische mit Vase bzw. Kerze, Bistrostühle, Tresen mit Marmorplatte, Kaffeemaschine und Kuchenvitrine, Flaschenregal in der Bar, Schlüsselbrett im Hotel, Pflanzen, Teppich, warme Lichtkegel über den Tischen, dezentes grünes Ausgangsschild. Im Browser geprüft (alle vier Räume).
+- Gezeichnete Porträts (26.10.2026, Branch `feat/person-portraits`): `lib/grid/PersonPortrait.tsx` zeichnet je Person ein Gesicht aus `person_appearance` – Kopfform nach Körperbau, Frisur und Haarfarbe, Bart, Altersgruppe (Kind rundlich, jung mit Wangenrot, älter mit Falten und Grau), Kleidung nach Rolle; Augen- und Mundform fest aus der Personenkennung. In Lokal und Erdszene neben dem Namen. Kann später durch Bilddateien ersetzt werden, wo es welche gibt.
 
 ## Gestellte Requests
 
