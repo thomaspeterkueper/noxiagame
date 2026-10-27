@@ -1,8 +1,11 @@
 'use client'
 
 // TransitPanel.tsx
-// Aktualisiert: 31.05.2026 — Transit-Panel
-// Version:      0.2.0
+// Aktualisiert: 27.10.2026 — liegt per Portal über allen Kartenansichten (auch 2,5D-Oberflächen);
+//               kurze Startszene vom Landeplatz vor dem Flug-Overlay; Orte ohne festen
+//               Eintrag (z. B. Mishkan Avi) mit Namen und Farbe ihres Himmelskörpers
+// Vorher:       31.05.2026 — Transit-Panel
+// Version:      0.3.0
 // app/dashboard/TransitPanel.tsx
 // Erstellt: 30.05.2026
 // Aktualisiert: 31.05.2026
@@ -14,8 +17,11 @@
 // Bei fehlendem Bild: automatischer Fallback auf 🚀-Emoji
 // shipTypeId kommt aus gameStore (wird mit loadFromServer befüllt)
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useGameStore } from '@/lib/store/gameStore'
+import { useColonyStateStore } from '@/lib/store/colonyStateStore'
+import { resolveLocationBody } from '@/lib/game/locationBody'
 import { ShipSVG, ShipSpriteStyles } from '@/lib/ships/ShipSVG'
 
 const LOC_NAME:  Record<string, string> = { earth: 'Erde', moon: 'Mond', mars: 'Mars', phobos: 'Phobos', prometheus: 'Prometheus' }
@@ -29,6 +35,27 @@ const LOC_GLOW:  Record<string, string> = {
   phobos:     'radial-gradient(circle at 35% 35%, #8a8278 0%, #4a4238 55%, transparent 75%)',
   prometheus: 'radial-gradient(circle at 35% 35%, #e0c070 0%, #a07830 55%, transparent 75%)',
 }
+
+// Orte ohne eigenen Eintrag (neue Mars-Orte, gegründete Orte) nehmen Farbe und
+// Symbol ihres Himmelskörpers; Name und Unterzeile kommen aus den Ortsdaten.
+function useLocationLook(slug: string): { key: string; name: string; sub: string } {
+  const location = useColonyStateStore(state => state.locations.find(item => item.slug === slug) ?? null)
+  const body = LOC_COLOR[slug] ? slug : (resolveLocationBody(location) ?? 'mars')
+  const key = LOC_COLOR[body] ? body : 'mars'
+  const name = LOC_NAME[slug] ?? location?.name ?? slug
+  const sub = LOC_SUB[slug] ?? (LOC_NAME[body] ? LOC_NAME[body] : '')
+  return { key, name, sub }
+}
+
+// Startszene: Boden und Himmel nach Himmelskörper des Abflugorts.
+const LAUNCH_SCENE: Record<string, { sky: string; ground: string; pad: string; dust: string }> = {
+  earth:      { sky: 'linear-gradient(180deg,#0b1a33 0%,#3c6ea8 70%,#8db7da 100%)', ground: '#5d6b5a', pad: '#8d969b', dust: 'rgba(220,214,200,.75)' },
+  moon:       { sky: 'linear-gradient(180deg,#000 0%,#05070b 100%)',                 ground: '#77736c', pad: '#a8a39a', dust: 'rgba(200,196,188,.7)' },
+  mars:       { sky: 'linear-gradient(180deg,#2a1610 0%,#a8653f 72%,#d79a6b 100%)', ground: '#8a4a2c', pad: '#b38a72', dust: 'rgba(214,140,96,.75)' },
+  phobos:     { sky: 'linear-gradient(180deg,#000 0%,#120c0a 100%)',                 ground: '#4f4740', pad: '#837a70', dust: 'rgba(150,140,128,.7)' },
+  prometheus: { sky: 'linear-gradient(180deg,#000 0%,#0a0d16 100%)',                 ground: '#2a3240', pad: '#5c6a7c', dust: 'rgba(160,180,210,.55)' },
+}
+const LAUNCH_MS = 2800
 
 const SHIP_IMG: Record<string, string> = {
   freighter_mk1: '/images/ships/freighter_side.png',
@@ -62,6 +89,29 @@ export default function TransitPanel({ onArrival }: { onArrival: (dest: string) 
   // Engine glow pulse
   const [glowScale, setGlowScale] = useState(1)
 
+  // Portal erst im Browser (document gibt es beim Server-Rendern nicht).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  // Startszene nur, wenn die Reise gerade jetzt beginnt – nicht beim Neuladen
+  // mitten im Flug und nicht bei „reduzierter Bewegung“.
+  const [launching, setLaunching] = useState(false)
+  const wasInTransit = useRef(inTransit)
+  useEffect(() => {
+    const started = inTransit && !wasInTransit.current
+    wasInTransit.current = inTransit
+    if (!started) { if (!inTransit) setLaunching(false); return }
+    const fresh = transitTotal > 0 && transitLeft >= transitTotal - 1
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (!fresh || reduce) return
+    setLaunching(true)
+    const timer = setTimeout(() => setLaunching(false), LAUNCH_MS)
+    return () => clearTimeout(timer)
+  }, [inTransit])
+
+  const fromLook = useLocationLook(transitFrom ?? 'moon')
+  const toLook = useLocationLook(transitTo ?? 'mars')
+
   // Tick-Interval: läuft jede Sekunde solange inTransit
   useEffect(() => {
     if (!inTransit) return
@@ -76,7 +126,7 @@ export default function TransitPanel({ onArrival }: { onArrival: (dest: string) 
     return () => clearInterval(i)
   }, [inTransit])
 
-  if (!inTransit) return null
+  if (!inTransit || !mounted) return null
 
   const from     = transitFrom ?? 'moon'
   const to       = transitTo   ?? 'mars'
@@ -86,9 +136,15 @@ export default function TransitPanel({ onArrival }: { onArrival: (dest: string) 
   const timeStr  = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`
   const shipSrc  = SHIP_IMG[shipTypeId ?? 'freighter_mk1']
 
-  return (
+  if (launching) return createPortal(
+    <LaunchScene fromKey={fromLook.key} fromName={fromLook.name} toName={toLook.name} shipTypeId={shipTypeId} onSkip={() => setLaunching(false)} />,
+    document.body,
+  )
+
+  return createPortal(
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 200,
+      position: 'fixed', inset: 0, zIndex: 5000,
+      animation: 'noxia-transit-fade .45s ease-out',
       background: 'rgba(4,8,16,0.92)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       backdropFilter: 'blur(6px)',
@@ -307,6 +363,54 @@ export default function TransitPanel({ onArrival }: { onArrival: (dest: string) 
           </div>
         </div>
       </div>
+      <style>{`@keyframes noxia-transit-fade{from{opacity:0}to{opacity:1}}`}</style>
+    </div>,
+    document.body,
+  )
+}
+
+// ── Startszene: Abheben vom Landeplatz (2,8 s, Klick überspringt) ─────────────
+function LaunchScene({ fromKey, fromName, toName, shipTypeId, onSkip }: { fromKey: string; fromName: string; toName: string; shipTypeId: string | null; onSkip: () => void }) {
+  const scene = LAUNCH_SCENE[fromKey] ?? LAUNCH_SCENE.mars
+  return (
+    <div role="dialog" aria-label={`Start von ${fromName}`} onClick={onSkip} style={{
+      position: 'fixed', inset: 0, zIndex: 5000, overflow: 'hidden', cursor: 'pointer',
+      background: scene.sky, fontFamily: "'Courier Prime', 'Courier New', monospace",
+    }}>
+      <ShipSpriteStyles />
+      {/* Boden in Schrägsicht */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%', background: `linear-gradient(180deg, ${scene.ground} 0%, #000 160%)` }} />
+      {/* Landeplatz: Ellipse mit Ringen und Markierung */}
+      <div style={{ position: 'absolute', left: '50%', bottom: '14%', width: 300, height: 92, marginLeft: -150, borderRadius: '50%', background: scene.pad, boxShadow: 'inset 0 0 0 6px rgba(0,0,0,.18), inset 0 0 0 22px rgba(255,255,255,.08)' }}>
+        <div style={{ position: 'absolute', inset: '28% 40%', border: '3px solid rgba(255,214,120,.75)', borderRadius: '50%' }} />
+        {/* Schatten des Schiffs, schrumpft beim Abheben */}
+        <div className="nl-shadow" style={{ position: 'absolute', left: '50%', top: '50%', width: 120, height: 30, marginLeft: -60, marginTop: -15, borderRadius: '50%', background: 'rgba(0,0,0,.45)', filter: 'blur(3px)' }} />
+      </div>
+      {/* Staubwolke */}
+      <div className="nl-dust" style={{ position: 'absolute', left: '50%', bottom: 'calc(14% + 20px)', width: 120, height: 40, marginLeft: -60, borderRadius: '50%', background: scene.dust, filter: 'blur(10px)', opacity: 0 }} />
+      {/* Schiff: Seitenansicht, Bug nach oben */}
+      <div className="nl-ship" style={{ position: 'absolute', left: '50%', bottom: 'calc(14% + 44px)', width: 0, height: 0 }}>
+        <div style={{ transform: 'translate(-50%, -50%) rotate(-90deg)', filter: 'drop-shadow(0 0 12px rgba(255,200,120,.35))' }}>
+          <ShipSVG frame={(shipTypeId ?? 'freighter_mk1') as 'freighter_mk1' | 'fast_courier' | 'heavy_hauler'} flying size={96} />
+        </div>
+      </div>
+      {/* Beschriftung */}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '12%', textAlign: 'center', color: '#f2e6c8', textShadow: '0 1px 6px rgba(0,0,0,.6)' }}>
+        <div style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', opacity: .75 }}>noχ¹ᐃ · Start</div>
+        <div style={{ fontSize: 22, marginTop: 6 }}>{fromName} → {toName}</div>
+        <div className="nl-status" style={{ fontSize: 11, marginTop: 8, opacity: .8 }}>Landeplatz frei · Triebwerke zünden</div>
+      </div>
+      <div style={{ position: 'absolute', right: 16, bottom: 14, fontSize: 9, letterSpacing: '.1em', color: 'rgba(242,230,200,.55)' }}>Klicken zum Überspringen</div>
+      <style>{`
+        .nl-ship{animation:nl-lift ${LAUNCH_MS}ms cubic-bezier(.55,0,.85,.4) forwards}
+        @keyframes nl-lift{0%{transform:translate(0,0)}12%{transform:translate(-1px,0)}16%{transform:translate(1px,0)}22%{transform:translate(0,-2px)}100%{transform:translate(0,-120vh)}}
+        .nl-shadow{animation:nl-shadow ${LAUNCH_MS}ms ease-in forwards}
+        @keyframes nl-shadow{0%,20%{transform:scale(1);opacity:1}100%{transform:scale(.25);opacity:0}}
+        .nl-dust{animation:nl-dust ${LAUNCH_MS}ms ease-out forwards}
+        @keyframes nl-dust{0%{opacity:0;transform:scale(.4)}20%{opacity:.9;transform:scale(1.4)}60%{opacity:.6;transform:scale(3.2)}100%{opacity:0;transform:scale(4.5)}}
+        .nl-status{animation:nl-blink .5s steps(2) infinite}
+        @keyframes nl-blink{50%{opacity:.4}}
+      `}</style>
     </div>
   )
 }
@@ -317,6 +421,7 @@ export default function TransitPanel({ onArrival }: { onArrival: (dest: string) 
 // können einfach durch Ablegen von public/images/locations/<slug>.png eingebunden werden)
 function StationCard({ slug, dim = false }: { slug: string; dim?: boolean }) {
   const [imgFailed, setImgFailed] = useState(false)
+  const look = useLocationLook(slug)
 
   return (
     <div style={{
@@ -330,15 +435,15 @@ function StationCard({ slug, dim = false }: { slug: string; dim?: boolean }) {
         borderRadius: '50%',
         margin: '0 auto 8px',
         overflow: 'hidden',
-        border: `1px solid ${LOC_COLOR[slug]}40`,
-        boxShadow: `0 0 18px ${LOC_COLOR[slug]}25`,
-        background: LOC_GLOW[slug], // sichtbar als Fallback
+        border: `1px solid ${LOC_COLOR[look.key]}40`,
+        boxShadow: `0 0 18px ${LOC_COLOR[look.key]}25`,
+        background: LOC_GLOW[look.key], // sichtbar als Fallback
         position: 'relative',
       }}>
         {!imgFailed && (
           <img
             src={`/images/locations/${slug}.png`}
-            alt={LOC_NAME[slug]}
+            alt={look.name}
             style={{
               width: '100%', height: '100%',
               objectFit: 'cover',
@@ -360,7 +465,7 @@ function StationCard({ slug, dim = false }: { slug: string; dim?: boolean }) {
         letterSpacing: '0.06em',
         marginBottom: 2,
       }}>
-        {LOC_ICON[slug]} {LOC_NAME[slug]}
+        {LOC_ICON[look.key]} {look.name}
       </div>
 
       {/* Sub-Name */}
@@ -370,7 +475,7 @@ function StationCard({ slug, dim = false }: { slug: string; dim?: boolean }) {
         letterSpacing: '0.04em',
         fontStyle: 'italic',
       }}>
-        {LOC_SUB[slug]}
+        {look.sub}
       </div>
 
       {/* Status-Badge */}
@@ -381,8 +486,8 @@ function StationCard({ slug, dim = false }: { slug: string; dim?: boolean }) {
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         padding: '2px 7px',
-        border: `1px solid ${LOC_COLOR[slug]}40`,
-        color: dim ? 'rgba(90,122,154,0.5)' : LOC_COLOR[slug],
+        border: `1px solid ${LOC_COLOR[look.key]}40`,
+        color: dim ? 'rgba(90,122,154,0.5)' : LOC_COLOR[look.key],
       }}>
         {dim ? 'Abflug' : 'Ziel'}
       </div>
