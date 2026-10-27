@@ -3,6 +3,7 @@
 
 import { memoryFromPopulationEvent, projectRelationship, type PersonMemory } from './personSocialMemory'
 import type { PersonRelationship, PopulationEvent } from './population/types'
+import { nextEncounterRecency } from './population/relationshipRecency'
 
 export interface SocialMemoryProjectionResult {
   considered: number
@@ -90,11 +91,11 @@ export async function persistPopulationEventMemory(supabase: any, event: Populat
   const previousInteractionTick = relationRow?.last_interaction_tick == null
     ? null
     : Number(relationRow.last_interaction_tick)
-  const gap = previousInteractionTick == null ? Number.POSITIVE_INFINITY : Math.max(0, memory.tick - previousInteractionTick)
-  const previousRecent = Number(relationRow?.recent_encounter_score ?? 0)
-  const recencyGain = gap <= 24 ? 0.22 : gap <= 72 ? 0.12 : 0.05
-  const recencyRetention = gap <= 72 ? 0.88 : 0.55
-  const recentEncounterScore = Math.max(0, Math.min(1, previousRecent * recencyRetention + recencyGain))
+  const recentEncounterScore = nextEncounterRecency(
+    Number(relationRow?.recent_encounter_score ?? 0),
+    previousInteractionTick,
+    memory.tick,
+  )
 
   const row = {
     id: projected.id,
