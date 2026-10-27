@@ -36,6 +36,10 @@ excluded_actions:
 
 Schul-Einrichtung nach dem Muster der Akademie: Grundriss `basic_school` (Sekretariat, Klassenzimmer, Werkraum, Schulküche, Schulgarten, Pausenhof), Wissen der Lehrkräfte (Stundenplan, eigene Fächer, welche Übungen der Vorrat gerade erlaubt), Angebot als Kacheln in drei Gruppen: Grundlagen (öffnet `SchoolOverlay` mit SSF-Modulen), Handwerk, Alltag (starten Übungen über die Core-Schnittstelle). Capabilities `learn`, `teach`, `research`, `practice` in `INTERIOR_CAPABILITY_REGISTRY` ergänzen (seit NOXIA-INTERIOR-0001 offen).
 
+## Schnittstelle (fertig, 27.10.2026)
+
+`GET /api/game/practice?tileEntityId=…` liefert Übungen mit `materialsAvailable`, den Vorrat, die laufende Übung des Spielers, seine Kompetenzen und Bescheinigungen. `POST { action: 'start', tileEntityId, recipeCode, guideProfileId? }` und `POST { action: 'complete', sessionId }`; Ablehnungen kommen als `reason` (`needs-guide`, `materials-missing`, `below-min-level`, `already-practising`, `guide-not-competent`, `not-due`) für die geschlossen-Tafel bzw. Statuszeile.
+
 ## Abgrenzung
 
 Keine eigene Lern- oder Kompetenzlogik – nur Anzeige und Aufruf der Core-Schnittstelle. Keine Inhalte erfinden.
