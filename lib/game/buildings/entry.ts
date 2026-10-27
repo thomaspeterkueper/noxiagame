@@ -60,6 +60,12 @@ const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
     label: 'Hotel betreten',
     hint: 'Lobby, Empfang und Zimmer öffnen',
   },
+  // Gekauftes reales Haus (R-13): im Umbau eine Baustelle, sonst ein leeres Haus.
+  acquired_building: {
+    kind: 'hospitality',
+    label: 'Haus betreten',
+    hint: 'Gekauftes Haus – Baustelle oder leer, bis der Umbau fertig ist',
+  },
   warehouse_storage: {
     kind: 'warehouse',
     label: 'Lager betreten',

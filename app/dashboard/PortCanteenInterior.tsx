@@ -104,7 +104,10 @@ export default function PortCanteenInterior({ parentEntityId, portTypeId: portTy
       <div className="you"><i /><span>Du</span></div>
     </div>
     <aside>
-      <small>{CANTEEN_SERVICE_NAME[kind].toUpperCase()}</small>
+      <div className="machine-portrait">{kind==='robot'
+        ? <svg viewBox="0 0 48 48" width="48" height="48" aria-label="Kantinenschwarm"><circle cx="24" cy="24" r="23" fill="#1b2a2e" stroke="#2fd0c3" strokeWidth="2" /><rect x="13" y="10" width="22" height="18" rx="4" fill="#9aa3a6" stroke="#3b4447" strokeWidth="1.5" /><rect x="17" y="16" width="14" height="5" rx="1.5" fill="#2fd0c3" /><rect x="10" y="30" width="28" height="12" rx="4" fill="#b4bcbe" stroke="#3b4447" strokeWidth="1.5" /><circle cx="24" cy="36" r="2.5" fill="#5f6a6d" /></svg>
+        : <svg viewBox="0 0 48 48" width="48" height="48" aria-label="Ausgabeautomat"><circle cx="24" cy="24" r="23" fill="#1b2a2e" stroke="#2fd0c3" strokeWidth="2" /><rect x="12" y="8" width="24" height="32" rx="3" fill="#56656a" stroke="#1f2a2e" strokeWidth="1.5" /><rect x="15" y="11" width="18" height="8" rx="1.5" fill="#0f2a2c" /><rect x="15" y="22" width="8" height="6" fill="#30404a" /><rect x="25" y="22" width="8" height="6" fill="#30404a" /><rect x="15" y="32" width="18" height="5" fill="#1b2326" stroke="#2fd0c3" strokeWidth=".8" /></svg>}
+        <div><small>{CANTEEN_SERVICE_NAME[kind].toUpperCase()}</small><b>{kind==='robot'?'Vernetzte Ausgaberoboter':'Stummer Automat'}</b></div></div>
       {state === 'loading' && <p>Die Ausgabe wird geholt …</p>}
       {state === 'failed' && <p>Die Kantine ist gerade nicht erreichbar.</p>}
       {state === 'none' && <p>In diesem Hafen gibt es keine Kantine.</p>}
@@ -139,6 +142,7 @@ export default function PortCanteenInterior({ parentEntityId, portTypeId: portTy
       .you i{display:block;width:14px;height:22px;margin:auto;background:#d7ad3c;border:2px solid #5c481c;border-radius:8px 8px 4px 4px}
       .you span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:#13262b;border:1px solid #d7ad3c;border-radius:4px;padding:1px 4px;font:700 8px monospace}
       aside{display:grid;align-content:start;gap:6px;font-size:12px}
+      .machine-portrait{display:flex;gap:10px;align-items:center}.machine-portrait b{display:block;font-size:13px}
       aside small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       aside p{margin:0;line-height:1.45}
       .talk{display:grid;gap:4px;padding:8px;background:#0f1a1d;border:1px solid #2d4445;border-radius:6px;min-height:40px}

@@ -66,6 +66,9 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[heard,setHeard]=useState<string[]>([])
   const[rooms,setRooms]=useState<VenueRooms|null>(null)
   const[areaM2,setAreaM2]=useState<number|null>(null)
+  // Umbau (R-13): Ziel-Lokalart und Fertigstellung; Anzeigename des Hauses (z. B. „Metropol“, „Hauptstraße 72“).
+  const[conversion,setConversion]=useState<{type:string;readyAt:string|null}|null>(null)
+  const[displayName,setDisplayName]=useState<string|null>(null)
   const[placeKnowledge,setPlaceKnowledge]=useState<string[]>([])
   const[visits,setVisits]=useState<Visit[]>([])
   const[menu,setMenu]=useState<Menu|null>(null)
@@ -79,7 +82,12 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const pendingRequest=useRef<{itemCode:string;requestId:string}|null>(null)
   const ctxRef=useRef<InteriorContext|null>(null)
 
-  const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(buildingTypeId),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[buildingTypeId,upper,areaM2])
+  const effectiveType=conversion?.type??buildingTypeId
+  const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(effectiveType),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[effectiveType,upper,areaM2])
+  // Der Name des Hauses: aus den Daten, sonst der übergebene Name ohne Art-Präfix („Bar · Metropol“ → „Metropol“).
+  const houseName=displayName??buildingName.split(' · ').pop()??buildingName
+  const underConversion=Boolean(conversion)
+  const emptyHouse=!conversion&&String(buildingTypeId??'')==='acquired_building'
   const kind=layout.kind as VenueKind
   const arrivalPoint=SOCIAL_INFRASTRUCTURE[kind]?.arrivalPoint===true
   // Das Startcafé geht nach der Uhr des Spielers (23–6 Uhr zu), alle anderen Lokale nach Koloniezeit.
@@ -114,6 +122,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setUpper(data.upper&&typeof data.upper==='object'?{homes:Number(data.upper.homes??0),guestRooms:Number(data.upper.guestRooms??0)}:null)
           setHeard(Array.isArray(data.heard)?data.heard.map(String):[])
           setAreaM2(typeof data.areaM2==='number'&&data.areaM2>0?data.areaM2:null)
+          setConversion(data.conversion&&typeof data.conversion==='object'&&data.conversion.type?{type:String(data.conversion.type),readyAt:data.conversion.readyAt?String(data.conversion.readyAt):null}:null)
+          setDisplayName(typeof data.displayName==='string'&&data.displayName.trim()?data.displayName.trim():null)
           setRooms(data.rooms&&typeof data.rooms==='object'?{capacity:Number(data.rooms.capacity??0),occupied:Number(data.rooms.occupied??0),mineForS:data.rooms.mineForS==null?null:Number(data.rooms.mineForS)}:null)
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
         }
@@ -175,7 +185,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   }
 
   const things:PlacedThing[]=orders.map(entry=>({key:entry.key,icon:<HospitalityItemIcon code={entry.itemCode} size={18} title={entry.label}/>,title:entry.label,forId:entry.forId,at:entry.at,broughtToTable:entry.tableService}))
-  const service=(figures:readonly VenueFigure[])=>venueService(layout,figures,playerHour,hours)
+  const service=(figures:readonly VenueFigure[])=>underConversion||emptyHouse?'closed':venueService(layout,figures,playerHour,hours)
+  const readyText=conversion?.readyAt?new Date(conversion.readyAt).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'}):null
   const canteenHint=arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''
 
   const fitting:InteriorFitting={
@@ -183,6 +194,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(kind,hours):undefined,
     service,
     closedText:figures=>{
+      if(underConversion)return{headline:'IM UMBAU',detail:'Dieses Haus wird gerade zum '+layout.noun+' umgebaut'+(readyText?'; fertig etwa '+readyText+'.':'.')+' Bis dahin ist hier Baustelle.'}
+      if(emptyHouse)return{headline:'LEER',detail:'Dieses Haus gehört jemandem, hat aber noch keine Nutzung. Ein Umbau zum Lokal wird auf der Karte am Gebäude beauftragt.'}
       const reason=venueClosedReason(layout,figures,playerHour,hours)
       if(!reason)return null
       return reason==='hours'
@@ -194,7 +207,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     counterDressing:<><i className="machine"/><i className="vitrine"><HospitalityItemIcon code="cake" size={14}/><HospitalityItemIcon code="snack" size={14}/></i></>,
     visits,
     facts:(self,ctx)=>venueConversationFacts({
-      layout,buildingName,self,figures:ctx.figures,servingPlayer:self.id===ctx.waiterId&&ctx.atTable,playerPos:ctx.pos,playerSeat:ctx.seat,joinedPlayer:ctx.joined===self.id,arrivalPoint,
+      layout,buildingName:houseName,self,figures:ctx.figures,servingPlayer:self.id===ctx.waiterId&&ctx.atTable,playerPos:ctx.pos,playerSeat:ctx.seat,joinedPlayer:ctx.joined===self.id,arrivalPoint,
       menu:menu?.items.length&&ctx.service!=='closed'?menu.items:[],
       playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
@@ -245,5 +258,5 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     },
   }
 
-  return <WalkableInterior entityId={entityId} buildingName={buildingName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
+  return <WalkableInterior entityId={entityId} buildingName={houseName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
 }
