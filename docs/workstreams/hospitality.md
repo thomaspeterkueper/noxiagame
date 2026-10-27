@@ -33,6 +33,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Akademie als zweite Einrichtung des Innenraum-Motors (26.10.2026, Branch `feat/academy-interior`): Lernraum, Sekretariat, Personal kennt die echten Lernmodule, Module als Kacheln, Lernraum darüber. Im Browser geprüft.
 - Verwaltung als dritte Einrichtung (26.10.2026, Branch `feat/admin-interior`): Foyer, Schalter, Aushang mit Einwohnern und Steuern, Personal kennt die öffentlichen Zahlen, Rathaus-Tafel darüber. Im Browser geprüft.
 - Raumhafen als vierte Einrichtung (26.10.2026, Branch `feat/spaceport-interior`): Ankunftshalle, Flugleitung kennt die echten Ziele, Navigation/Fracht/Wartung/Kantine als Kacheln darüber. Im Browser geprüft.
+- G-4 beantwortet und gebaut (27.10.2026, Branch `feat/venue-conversion-site`): Haus im Umbau als Baustelle mit Fertigstellung, leeres gekauftes Haus, Hausname aus `display_name`; G-5 abgeschlossen mit Maschinenbild in der Kantine.
 
 ## Gestellte Requests
 
@@ -99,7 +100,12 @@ Fragen an euch:
 2. Lest ihr den Namen eines realen Lokals aus `display_name` (z. B. „Metropol“) statt aus der Gebäudeart? Im Gespräch hieße es sonst „die Bar“.
 3. Passt die Größe „normal“ für Metropol und Balkan Grill, oder soll `venueSizeForArea` die echte Grundfläche (Polygon) statt Breite × Tiefe nehmen? Wir können die echte Fläche als Spalte nachreichen.
 
-### G-5 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur – erledigt für Personen (26.10.2026)
+**Antwort Gastronomie (27.10.2026):**
+1. Ja – gebaut: Ein Haus mit `conversion_plan` ist betretbar („Haus betreten“, `acquired_building` → hospitality), zeigt den Grundriss der Zielart abgedunkelt mit „IM UMBAU – wird gerade zum Hotel umgebaut; fertig etwa Di., 07:43“ (aus `ready_at`). Ein gekauftes Haus ohne Plan zeigt „LEER“ mit dem Hinweis, dass der Umbau auf der Karte beauftragt wird. `GET /api/game/hospitality/guests` liefert dafür `conversion` und `displayName`.
+2. Ja – der Innenraum nimmt `display_name` („Metropol“, „Hauptstraße 72“) für Kopfzeile und Gespräch; fällt er, wird vom übergebenen Namen das Art-Präfix („Bar · “) abgeschnitten.
+3. „Normal“ passt für beide (110–260 m²). Die echte Fläche nehmen wir gern: Spalte `footprint_area_m2` nachreichen, dann liest `venueState` sie vor Breite × Tiefe. Bis dahin bleibt Breite × Tiefe.
+
+### G-5 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur – erledigt (27.10.2026: Maschinenbild für Kantinenschwarm und Automat in der Kantinen-Tafel; Personen seit 26.10. mit gezeichneten Porträts)
 
 Ausnahmsweise direkt gebaut von Bevölkerung und Ökonomie, auf Wunsch von Thomas (26.10.2026): `CafeWalkableInterior.tsx` 1.1.0 und `LandmarkWalkableInterior.tsx` 2.2.0 zeigen `NpcPortrait` oben in der Seitenleiste. Offen bleibt das Maschinenbild für Kantinenroboter und Automat (unten), sobald sie im Raum stehen.
 
