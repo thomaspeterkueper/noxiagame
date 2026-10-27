@@ -67,7 +67,13 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
 
 1. ~~Messen, wo die Zeit bleibt; Zeichenleistung umbauen; Ladebereich an den Zoom koppeln.~~ Erledigt (siehe „Leistung“). Offen: Thomas misst in `/world-lab` beim Laufen durch Sundern (Bildrate, langsamstes Bild, Ruckler; bei Bedarf mit `?aa=0` und `?res=1`) und prüft dabei, ob Straßen und Blöcke an der richtigen Stelle stehen. Reicht es nicht für stabile 60, zeigt die Anzeige, ob Prozessor oder Grafikkarte die Grenze ist.
 2. ~~Zeichenvorlage festlegen, Blöcke auf Bilder umstellen.~~ Erledigt: Fassaden von vorn, 2:1 geometrisch richtig, 16 px je Meter (siehe `world-map-zeichenvorlage.md`). Wände und Dächer nehmen gezeichnete Bilder an; bis Thomas' eigene Zeichnungen da sind, zeigt die Karte die Vorlagen (`?art=farbe` für einfarbige Quader). Offen: Thomas zeichnet die ersten Bilder.
-3. Kacheln vorab erzeugen und als Dateien ablegen statt bei jedem ersten Abruf aus der Datenbank zu rechnen.
+3. ~~Kacheln vorab erzeugen~~ Gebaut (27.10.2026): Die Grundkachel (Straßen, Flächen, Gebäude, Orte) liegt fertig in der Tabelle `world_tiles`; Flurstücke werden je Abruf frisch dazugelesen, weil Spieler sie ändern. `loadTile` in `lib/worldlab/tileSource.server.ts` nimmt die abgelegte Kachel, solange sie gültig ist, sonst rechnet es sie und legt sie ab. Gültig heißt:
+   - gleiches Kachelformat (`TILE_FORMAT` in `lib/worldlab/tileFormat.ts`). **Wer `simplify.ts`, `lineDetails.server.ts` oder `mercator.ts` ändert, muss `TILE_FORMAT` erhöhen** – `tileFormat.test.ts` schlägt sonst fehl und nennt den neuen Fingerabdruck;
+   - dieselben Regionen, keine davon mit geänderten Objekten: Trigger auf `region_features` zählen `world_tile_region_revs` je Region hoch (jeder Schreibweg: Import, Ortsdetail, Nachladen, Cron);
+   - keine neue genaue Linie im Ausschnitt: ein Trigger auf `earth_line_details` löscht die betroffenen Kacheln.
+   - Vorab erzeugt: `/api/cron/world-tiles` (stündlich, Minute 40) legt 5 × 5 Kacheln um jedes NOXIA-Gebäude der Erde ab, je Lauf höchstens 60 neue. Ergebnis im Vercel-Log unter `[world-tiles]`.
+   - Als Tabelle statt als Dateien, weil die Gültigkeit je Kachel geprüft werden muss; das CDN vor `/api/world-lab/tile` bleibt.
+   - Geprüft: Trigger in der Datenbank (Probezeile, zurückgerollt), Gültigkeitsregeln mit Tests. Noch nicht geprüft: Ablegen und Lesen gegen die echte Datenbank – nach dem nächsten Deploy `select count(*) from world_tiles` ansehen.
 4. ~~Kollision und Wegenetz~~ Gebaut (25.10.2026), `lib/worldlab/walking.ts` (mit Tests):
    - Häuser der geladenen Kacheln sind Hindernisse (echter Grundriss oder Rechteck mit 0,5 m Abstand); die Figur gleitet an Wänden entlang, mit Tasten wie mit „Gehe hin“.
    - „Gehe hin“ geht bis 30 m gerade, weiter entlang der Straßen (Straßennetz der geladenen Kacheln, Suche A*); bewegt sich das Ziel (Person) mehr als 12 m, wird neu geplant. Hängt die Figur fest, nimmt sie den nächsten Wegpunkt; liegt das Ziel hinter einer Wand, gilt „so nah wie möglich“ als angekommen.
@@ -80,7 +86,7 @@ Auf Thomas' Rechner mit echten Daten (13.10.2026): je nach Zoom 11 bis 50 Bilder
    - **Immer nur eine Tafel** (Thomas, 25.10.2026: in der alten Karte lagen Tafeln übereinander): jede neue ersetzt die vorige und beendet ein laufendes Hingehen; Klick auf den Boden oder Esc schließt; der Innenraum ersetzt alles und sperrt solange Tasten und Klicks der Karte.
    - Spielfigur teilt ihre Position (WGS84) mit der alten Szene (`earthPlayerPositionStore`).
    - Wahrzeichen (25.10.2026): benannte Orte aus den Kartendaten stehen als Schild mit Namen auf der Karte. Schild oder Gebäude darum (bis 12 m) öffnet die Tafel „Realer Ort“ mit Steckbrief (Adresse, Öffnungszeiten, Konfession, Baujahr, Träger). Bibliothek und Gotteshaus kann man bis 14 m vom Schild betreten – derselbe Innenraum wie in der alten Szene (`LandmarkWalkableInterior`). Bezeichnungen in `lib/worldlab/landmarks.ts`.
-6. Weite Strecken: Der Zeichenanker liegt fest am Startpunkt; für Reisen über viele Kilometer muss er mitwandern.
+6. ~~Weite Strecken~~ Gebaut (27.10.2026): Der Zeichenanker wandert mit (`lib/worldlab/reanchor.ts`, mit Tests). Grund: Kacheln haben den Maßstab ihrer eigenen Breite, die Welt den des Ankers – nach einem Sprung von Sundern nach Frankfurt lagen die Kacheln 2,6 % zu dicht (rund 5 m Überlappung je Kachel). Steht die Figur mehr als 5 km vom Anker, startet die Ansicht die Zeichenmaschine an ihrer Position neu, mit dem bisherigen Zoom: nach „Hinspringen“ sofort, beim Laufen erst, wenn die Figur 1,5 s stillsteht und nicht „Gehe hin“ läuft. Innerhalb von 5 km bleibt der Fehler unter 0,25 m je Kachel. Beim Neustart gehen laufende Begleitungen (Person geht voraus) verloren.
 7. ~~Datenlücke~~ Teilweise erledigt: `/world-lab` holt Ortsdetail (Gebäude, Wohnstraßen, Wege) selbst nach – beim Start für die Zelle um die Figur, in bebauten Kacheln ohne Gebäude selbsttätig, sonst mit „Kartendaten hier nachladen“. Offen: prüfen, ob Overpass zuverlässig antwortet; Zellen ohne Bebauung werden nicht geholt.
 8. ~~Sportplätze~~ Erledigt: Import und Darstellung gebaut (Importprofil 4). Datenbank geprüft am 25.10.2026: 24 Sportflächen in Sundern, darunter Röhrtalstadion und Sportplatz Sundern (Request nach `internal-tasks/done/`).
 9. Kirchen haben jetzt einen Turm an der Stirnseite (geschätzt, OSM sagt nicht, wo er steht), Höhen aus OSM `height` werden genutzt. Einzelbilder für besondere Gebäude (Kirche, Bahnhof, Café, NOXIA-Gebäude): ganzes Bild in derselben Ansicht mit Fußpunkt, statt aus Wandstücken zusammengesetzt. Maße stehen in der Zeichenvorlage.
@@ -173,6 +179,10 @@ Für alle drei fehlten die Hausdaten. Die zehn Ortsdetail-Zellen sind am 27.10.2
 1. Sobald die Zellen gefüllt sind: je Gebiet echte Hallen und freie Flächen auswerten; Lageplan vorschlagen (Fabrik, Werft, Lager, Labor in echte Hallen über `source_ref`; Landeplätze, Raumhafen und Solar auf freie Fläche, zusammen rund 300 × 200 m), Thomas entscheidet.
 2. Umzug der Bauten (Lage, Drehung, `source_ref`) als Migration. Wohnzuweisungen und Arbeitsplätze hängen an `tile_entity_id` und ziehen mit; Anwesenheit und Wege der Personen gehören zu Bevölkerung und Ökonomie (Request dort, sobald der Ort feststeht).
 3. Danach prüfen, ob die alte Lage im Naturschutzgebiet leer ist.
+
+### Startcafé mit NOXIA-Dach (Thomas, 27.10.2026)
+
+Das Startcafé im realen Haus Hauptstraße 72 trägt das NOXIA-Dach wie die öffentlichen Gebäude (W-7). Gekaufte und umgebaute Häuser behalten ihr reales Aussehen. Weil beide in der Datenbank sonst gleich aussehen (Spielergebäude mit `source_ref`), gibt es dafür das Merkmal `tile_entities.noxia_roof` (Migration `20261027160000_tile_entities_noxia_roof.sql`); `/api/world-lab/buildings` liefert es als `noxiaRoof`.
 
 ## Requests aus anderen Teilprojekten
 

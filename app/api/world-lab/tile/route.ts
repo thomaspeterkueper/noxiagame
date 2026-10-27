@@ -3,8 +3,9 @@
 // GET ?x=…&y=… (Kachelraster Stufe 17). Nur lesend, keine Spielwirkung.
 //
 // Die Antwort darf lange zwischengespeichert werden: Dieselbe Kachel sieht für
-// alle gleich aus. Später werden die Kacheln einmal erzeugt und als Dateien
-// abgelegt; dieser Abruf ist der Zwischenschritt dahin.
+// alle gleich aus. Die Grundkachel kommt aus world_tiles (einmal erzeugt, siehe
+// lib/worldlab/tileSource.server.ts und /api/cron/world-tiles); nur Flurstücke
+// werden je Abruf frisch gelesen.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'

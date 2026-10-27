@@ -7,6 +7,7 @@ import type { createServiceClient } from '@/lib/supabase/service'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, TILE_Z, type TileId } from './mercator'
 import { buildTile, type SimplifiedTile, type SourceFeature } from './simplify'
 import { lineDetailFeatures } from './lineDetails.server'
+import { storedTileValid, TILE_FORMAT } from './tileFormat'
 
 type Supabase = ReturnType<typeof createServiceClient>
 type Region = { id: string; lat: number; lon: number; radiusKm: number }
@@ -19,7 +20,7 @@ let regionCache: { at: number; regions: Promise<Region[]> } | null = null
 const featureCache = new Map<string, { at: number; features: Promise<SourceFeature[]> }>()
 
 /** Zwischenspeicher leeren (nach einem Nachladen der Kartendaten). */
-export function clearTileSourceCache() { regionCache = null; featureCache.clear() }
+export function clearTileSourceCache() { regionCache = null; featureCache.clear(); revsCache = null }
 
 function earthRegions(supabase: Supabase): Promise<Region[]> {
   if (regionCache && Date.now() - regionCache.at < REGION_TTL_MS) return regionCache.regions
@@ -56,7 +57,32 @@ function regionFeatures(supabase: Supabase, regionId: string): Promise<SourceFea
   return features
 }
 
-export async function loadTile(supabase: Supabase, tile: TileId): Promise<SimplifiedTile> {
+// ── Abgelegte Kacheln (Aufgabe 3, world_tiles) ─────────────────────────
+// Zähler je Region: steigt, sobald sich ihre Objekte ändern (Trigger in der Datenbank).
+// 30 Sekunden im Speicher – so lange kann eine eben nachgeladene Region noch alt erscheinen.
+const REVS_TTL_MS = 30_000
+let revsCache: { at: number; revs: Promise<Map<string, number>> } | null = null
+function regionRevs(supabase: Supabase): Promise<Map<string, number>> {
+  if (revsCache && Date.now() - revsCache.at < REVS_TTL_MS) return revsCache.revs
+  const revs = (async () => {
+    const { data, error } = await supabase.from('world_tile_region_revs').select('region_id,rev').limit(10_000)
+    if (error) throw error
+    return new Map((data ?? []).map(row => [String(row.region_id), Number(row.rev)]))
+  })()
+  const entry = { at: Date.now(), revs }
+  revsCache = entry
+  revs.catch(() => { if (revsCache === entry) revsCache = null })
+  return revs
+}
+
+/** Rand um die Kachel, in dem genaue Linien sie betreffen (Grad). */
+const LINE_MARGIN = { lat: 0.0003, lon: 0.0005 }
+
+/** Wie stand die Kachel zuletzt? `stored`: aus world_tiles, `built`: neu gerechnet. Für Messung und Cron. */
+export type TileOrigin = 'stored' | 'built'
+
+/** Grundkachel ohne Flurstücke: aus world_tiles, sonst neu gerechnet und abgelegt. */
+export async function loadBaseTile(supabase: Supabase, tile: TileId, options: { rebuild?: boolean } = {}): Promise<{ tile: SimplifiedTile; origin: TileOrigin }> {
   const origin = tileOrigin(tile)
   const centre = mercToGeo({ x: origin.x + TILE_SIZE_MERC / 2, y: origin.y - TILE_SIZE_MERC / 2 })
   const regions = (await earthRegions(supabase)).filter(region => {
@@ -64,13 +90,45 @@ export async function loadTile(supabase: Supabase, tile: TileId): Promise<Simpli
     const east = (region.lon - centre.lon) * 111_195 * Math.cos(centre.lat * Math.PI / 180)
     return Math.hypot(north, east) <= region.radiusKm * 1000 + 600
   })
-  // Genaue Hauptstraßen und Gleise (falls schon geholt) – bei gleicher OSM-Kennung gewinnt die genauere Linie
   const nw = mercToGeo(origin), se = mercToGeo({ x: origin.x + TILE_SIZE_MERC, y: origin.y - TILE_SIZE_MERC })
+  const box = { south: se.lat - LINE_MARGIN.lat, north: nw.lat + LINE_MARGIN.lat, west: nw.lon - LINE_MARGIN.lon, east: se.lon + LINE_MARGIN.lon }
+
+  // Ohne Zähler (Tabelle fehlt, Datenbank hakt) wird gerechnet wie bisher, aber nichts abgelegt.
+  let expected: Record<string, number> | null = null
+  try {
+    const revs = await regionRevs(supabase)
+    expected = Object.fromEntries(regions.map(region => [region.id, revs.get(region.id) ?? 0]))
+  } catch { expected = null }
+
+  if (expected && !options.rebuild) {
+    const { data: stored } = await supabase.from('world_tiles').select('format,region_revs,data').eq('z', TILE_Z).eq('x', tile.x).eq('y', tile.y).maybeSingle()
+    if (stored && storedTileValid(stored as { format: string; region_revs: Record<string, number> }, TILE_FORMAT, expected)) {
+      return { tile: stored.data as SimplifiedTile, origin: 'stored' }
+    }
+  }
+
+  // Genaue Hauptstraßen und Gleise (falls schon geholt) – bei gleicher OSM-Kennung gewinnt die genauere Linie
   const [regionLists, details] = await Promise.all([
     Promise.all(regions.map(region => regionFeatures(supabase, region.id))),
-    lineDetailFeatures(supabase, { south: se.lat - 0.0003, north: nw.lat + 0.0003, west: nw.lon - 0.0005, east: se.lon + 0.0005 }),
+    lineDetailFeatures(supabase, box),
   ])
-  const out = buildTile([...regionLists.flat(), ...details], tile, TILE_Z)
+  const built = buildTile([...regionLists.flat(), ...details], tile, TILE_Z)
+  if (expected) {
+    // Ablegen darf scheitern – dann wird beim nächsten Mal wieder gerechnet.
+    await supabase.from('world_tiles').upsert({
+      z: TILE_Z, x: tile.x, y: tile.y, format: TILE_FORMAT, region_revs: expected, data: built,
+      min_lat: box.south, max_lat: box.north, min_lon: box.west, max_lon: box.east, built_at: new Date().toISOString(),
+    }, { onConflict: 'z,x,y' }).then(() => undefined, () => undefined)
+  }
+  return { tile: built, origin: 'built' }
+}
+
+export async function loadTile(supabase: Supabase, tile: TileId): Promise<SimplifiedTile> {
+  const origin = tileOrigin(tile)
+  const centre = mercToGeo({ x: origin.x + TILE_SIZE_MERC / 2, y: origin.y - TILE_SIZE_MERC / 2 })
+  // Kopie: die abgelegte Grundkachel bekommt die Flurstücke nicht mit.
+  const out: SimplifiedTile = { ...(await loadBaseTile(supabase, tile)).tile }
+  // Flurstücke ändern sich durch Spieler (Kauf, Teilen) und werden immer frisch gelesen.
   const parcels = await tileParcels(supabase, tile, centre.lat)
   if (parcels.length) out.parcels = parcels
   return out
