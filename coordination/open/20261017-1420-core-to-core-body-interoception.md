@@ -61,3 +61,35 @@ Nur der beschriebene Umfang. Neue Ideen als eigener Auftrag.
 - Migration:
 - Deployment:
 - Aufwand: Anzahl Commits, CI-Runs, Preview-Deployments
+
+
+## Update 2026-10-27 — canonical coarse baseline now on main
+
+A new minimal canonical layer now exists on `main`:
+
+- `lib/game/cognition/personInteroception.ts`
+- `lib/game/population/interoceptionRuntime.ts`
+- `person_regulation_state`
+- `docs/decisions/NOXIA-LIVING-0011-interoception-memory-family.md`
+
+This baseline deliberately models **dimensionless regulatory signals**, not literal
+hormone concentrations:
+
+- stress axis
+- social bonding tone
+- reward drive
+- arousal
+
+It derives them from already authoritative needs, affect and relationship evidence.
+
+Therefore the older body/interoception branches referenced in this request must **not**
+be merged wholesale. They are now candidates for a later, finer-resolution physical
+body layer beneath this stable interface. Any salvage must preserve:
+
+1. no dopamine/oxytocin/cortisol = single emotion shortcuts;
+2. no body signal may directly create belief, love, consent, partnership or family intent;
+3. observer-visible body/affect remains separate from internal state;
+4. deeper physiology is activated only where Adaptive Detail Resolution warrants it.
+
+The earlier note that no canonical interoception baseline existed is superseded by this
+section. A full `person_body` layer is still not live.
