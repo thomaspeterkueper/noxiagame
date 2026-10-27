@@ -29,6 +29,11 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass-api.de/api/interpreter',
 ]
+/** Weitere Spiegel nur im geduldigen Modus (stündlicher Lauf, 27.10.2026). */
+const PATIENT_EXTRA_ENDPOINTS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter']
+/** Geduldiger Modus: Wartezeit je Server und Rechenzeit, um die der Server gebeten wird. */
+const PATIENT_TIMEOUT_MS = 50_000
+const PATIENT_SERVER_TIMEOUT_S = 45
 const MAX_POINTS_PER_FEATURE = 36
 // 4: Sportflächen (leisure=pitch|stadium|track|sports_centre, ohne Golf) als 'sport'
 // 5: Orte des Alltags als 'place_area' (Spielplatz, Garten, Freibad, Friedhof,
@@ -308,6 +313,43 @@ way[landuse=residential](${box});
 );out center geom;`
 }
 
+/**
+ * Geduldig (nur ohne wartenden Spieler, z. B. stündlicher Lauf): alle Spiegel
+ * gleichzeitig, bis 50 s Wartezeit, 45 s Rechenzeit auf dem Server. Bei
+ * überlasteten Servern (27.10.2026: alle Abrufe scheiterten nach 9 s) kommt so
+ * noch eine Antwort; je Profil gewinnt die erste brauchbare.
+ */
+async function loadNormalizedFeaturesPatiently(bounds: Bounds) {
+  const failures: string[] = []
+  const endpoints = [...OVERPASS_ENDPOINTS, ...PATIENT_EXTRA_ENDPOINTS]
+  const longer = (query: string) => query.replace(/\[timeout:\d+\]/, `[timeout:${PATIENT_SERVER_TIMEOUT_S}]`)
+  for (const profile of [{ name: 'compact-v2', query: longer(compactQueryFor(bounds)) }, { name: EARTH_IMPORT_PROFILE, query: longer(queryFor(bounds)) }]) {
+    const controllers = endpoints.map(() => new AbortController())
+    try {
+      return await Promise.any(endpoints.map(async (endpoint, index) => {
+        const host = new URL(endpoint).host
+        const timer = setTimeout(() => controllers[index].abort(), PATIENT_TIMEOUT_MS)
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'NOXIA/0.1 earth-place-materializer' },
+            body: new URLSearchParams({ data: profile.query }), signal: controllers[index].signal, cache: 'no-store',
+          })
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          const payload = await response.json() as { elements?: OverpassElement[]; remark?: string }
+          const features = toFeatures(payload.elements ?? [], bounds)
+          if (!features.length) throw new Error(payload.remark ?? 'empty result')
+          return { features, source: `overpass:${host}:${profile.name}` }
+        } catch (error) {
+          failures.push(`${profile.name} ${host}: ${error instanceof Error ? error.message : String(error)}`)
+          throw error
+        } finally { clearTimeout(timer) }
+      }))
+    } catch { /* nächstes Profil */ } finally { for (const controller of controllers) controller.abort() }
+  }
+  throw new Error(`Kartennormalisierung fehlgeschlagen: ${failures.join('; ')}`)
+}
+
 async function loadNormalizedFeatures(bounds: Bounds) {
   const failures: string[] = []
   // The synchronous API must stay below the gateway timeout. A compact OSM
@@ -358,6 +400,8 @@ export async function materializeEarthPlace(input: {
   lon: number
   radiusKm?: number
   refreshGeography?: boolean
+  /** Ohne wartenden Spieler (stündlicher Lauf): länger warten, alle Spiegel. */
+  patient?: boolean
 }) {
   const requestedRadiusKm = Math.min(2.5, Math.max(2.2, input.radiusKm ?? 2.2))
   const supabase = createServiceClient()
@@ -452,7 +496,7 @@ export async function materializeEarthPlace(input: {
 
   const checkedAt = new Date().toISOString()
   try {
-    const loaded = await loadNormalizedFeatures(targetBounds)
+    const loaded = input.patient ? await loadNormalizedFeaturesPatiently(targetBounds) : await loadNormalizedFeatures(targetBounds)
     if (!loaded.features.length) throw new Error('Keine verwertbaren Realwelt-Features gefunden')
     const rows = loaded.features.map(feature => ({ ...feature, region_id: regionId }))
     const insertedIds: string[] = []

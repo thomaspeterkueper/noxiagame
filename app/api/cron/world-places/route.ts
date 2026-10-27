@@ -46,12 +46,15 @@ export async function GET(req: NextRequest) {
   }
 
   const results: Array<{ slug: string; ok: boolean; total?: number; error?: string }> = []
+  // Geduldiger Abruf (bis rund 100 s je Ort): einen weiteren Ort nur beginnen, wenn das Zeitbudget (300 s) reicht.
+  const started = Date.now()
   for (const row of candidates) {
+    if (Date.now() - started > 150_000) break
     const lat = Number(row.center_lat), lon = Number(row.center_lon)
     try {
       const outcome = row.source === EARTH_LOCAL_DETAIL_SOURCE
-        ? await enrichEarthLocalScene({ slug: row.slug, lat, lon, radiusKm: Number(row.radius_km ?? 0.5) })
-        : await materializeEarthPlace({ slug: row.slug, label: getEarthRegion(row.slug)?.name ?? row.label ?? row.slug, lat, lon, radiusKm: Number(row.radius_km ?? 2.2) })
+        ? await enrichEarthLocalScene({ slug: row.slug, lat, lon, radiusKm: Number(row.radius_km ?? 0.5), patient: true })
+        : await materializeEarthPlace({ slug: row.slug, label: getEarthRegion(row.slug)?.name ?? row.label ?? row.slug, lat, lon, radiusKm: Number(row.radius_km ?? 2.2), patient: true })
       results.push({ slug: row.slug, ok: Boolean((outcome as { ok?: boolean }).ok), total: (outcome as { total?: number }).total ?? 0 })
     } catch (reason) {
       results.push({ slug: row.slug, ok: false, error: reason instanceof Error ? reason.message : String(reason) })

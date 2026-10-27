@@ -69,7 +69,7 @@ function query(lat:number,lon:number,radiusKm:number){
   return '[out:json][timeout:12];(way[building]('+box+');relation[building]('+box+');way[highway~"'+LOCAL_HIGHWAYS+'"]('+box+');way[waterway~"'+LOCAL_WATERWAYS+'"]('+box+');nwr[name][shop]('+box+');nwr[name][amenity~"'+POI_AMENITIES+'"]('+box+');nwr[name][tourism~"hotel|guest_house"]('+box+');nwr[name][industrial]('+box+');way[name][building~"industrial|manufacture|warehouse|factory"]('+box+');nwr[name][craft]('+box+');nwr[name][office]('+box+'););out geom;'
 }
 
-export async function enrichEarthLocalScene(input:{slug:string;lat:number;lon:number;radiusKm?:number}){
+export async function enrichEarthLocalScene(input:{slug:string;lat:number;lon:number;radiusKm?:number;/** Ohne wartenden Spieler (stündlicher Lauf): bis 55 s Wartezeit, 50 s Rechenzeit auf dem Server. */patient?:boolean}){
   const supabase=createServiceClient()
   const radiusKm=Math.min(.5,Math.max(.2,input.radiusKm??.34))
   const {data:found,error:regionError}=await supabase.from('celestial_regions').select('id,slug,enrichment_version').eq('slug',input.slug).maybeSingle()
@@ -105,12 +105,13 @@ export async function enrichEarthLocalScene(input:{slug:string;lat:number;lon:nu
   const failures:string[]=[]
   let prepared:PreparedFeature[]|null=null
   let source=''
-  const overpassQuery=query(input.lat,input.lon,radiusKm)
+  const overpassQuery=input.patient?query(input.lat,input.lon,radiusKm).replace('[timeout:12]','[timeout:50]'):query(input.lat,input.lon,radiusKm)
+  const endpointTimeoutMs=input.patient?55000:ENDPOINT_TIMEOUT_MS
   const controllers=ENDPOINTS.map(()=>new AbortController())
   try{
     const winner=await Promise.any(ENDPOINTS.map(async(endpoint,index)=>{
       const host=new URL(endpoint).host
-      const timer=setTimeout(()=>controllers[index].abort(),ENDPOINT_TIMEOUT_MS)
+      const timer=setTimeout(()=>controllers[index].abort(),endpointTimeoutMs)
       try{
         const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','user-agent':'NOXIA/0.1 earth-local-enrichment'},body:new URLSearchParams({data:overpassQuery}),signal:controllers[index].signal,cache:'no-store'})
         if(!response.ok)throw new Error('HTTP '+response.status)
