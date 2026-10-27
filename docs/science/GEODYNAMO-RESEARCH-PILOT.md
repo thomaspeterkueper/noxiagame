@@ -22,3 +22,18 @@
 4. Erst nach Modellvergleich, deterministischen Tests, wissenschaftlicher Kuratierung und Engine-Grenzprüfung darf über Gameplaywirkung entschieden werden.
 
 **Primäranker:** `DOC:KUE:KUE-SCI-0200-2026-DE` und `ONT:KG:PERMIAN-GEOMAGNETIC-0.1`. Die end-Guadalupium-Krise (~261 Ma) wird nicht mit der end-Perm-Krise (~252 Ma) verwechselt.
+
+
+## Vergleichspilot: Erde, Mars und NOXIA
+
+`lib/game/science/geodynamoScenarios.ts` bietet drei ausdrücklich als **Illustration** markierte Szenarien. Die Werte wurden als Testeingaben erfunden und sind **keine Rekonstruktion** realer paläomagnetischer Messreihen.
+
+| Szenario | Eingabestatus | Demonstrierter Unterschied |
+|---|---|---|
+| Earth reversal toy | erdinspiriert, Umkehrdaten hypothetisch | mehrere Polwechsel bei unveränderter illustrativer Feldstärke |
+| Mars current toy | marsinspiriert, Zahlen exemplarisch | kein heutiger globaler intrinsischer Dipol; lokale remanente Krustenfelder bleiben möglich |
+| NOXIA fictional alpha | vollständig fiktiv | feldstärkerelevanter Wärmeflussparameter und eigene vorgegebene Ereignisse |
+
+Die Funktion `compareGeodynamoScenarios()` berechnet ausschließlich Forschungsresultate im Arbeitsspeicher; keine Schreibzugriffe und keine Mechanik der produktiven NOXIA-Welt.
+
+**Testausführung:** `pnpm exec vitest run --config vitest.geodynamo.config.mts`. Die eigene Testkonfiguration ist erforderlich, weil der Haupt-Vitest-Runner eine geschlossene Include-Liste führt.
