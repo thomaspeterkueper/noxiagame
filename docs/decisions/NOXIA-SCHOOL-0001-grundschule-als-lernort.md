@@ -67,6 +67,7 @@ Eine abgeschlossene Lerneinheit erzeugt eine **Bescheinigung** (Ausstellerin = d
 ### 6. Personal, Öffnung, Geld
 
 - Anleiten kann jede Person mit hoher Kompetenz (Schwelle je `skill_code`), nicht nur eine Lehrkraft. Wer gut kocht, darf in der Küche anleiten – Spieler wie NPC. Das hält Werkraum und Küche auch dort offen, wo es kein Schulpersonal gibt.
+- Unterrichten ist eine eigene Tätigkeit, die Spieler wählen können (Thomas, 27.10.: „es gibt viele, die gerne unterrichten“). Wer anleitet, sieht im Raum, wer gerade übt, kann eine Übung für andere öffnen und bekommt selbst Erfahrung. Über die Zeit entsteht eine Anleiter-Bescheinigung je Kompetenz – Anerkennung, die der Stellenmarkt lesen kann. Ein Anteil der Pauschale je Lernendem kann an Anleitende gehen, die keine angestellte Lehrkraft sind; Lernen bleibt für die Lernenden kostenlos.
 - Personal: Lehrkräfte = `person_assignments` (`role_code='educator'`) am Schulgebäude, Arbeitgeber der öffentliche Akteur des Ortes, Lohn aus `role_wage_rates`, finanziert über Steuern – keine Geldschöpfung.
 - Öffnung: Schulzeiten werktags morgens bis früher Nachmittag (Ortszeit). Ohne Lehrkraft: Klassenzimmer im Selbstlernbetrieb (Module ja, Prüfung ja), **Werkraum und Küche geschlossen** (Sicherheit) – analog zur Regel „Café ohne Personal ist geschlossen“.
 - Lernen ist in noxia immer kostenlos – für Kinder, Erwachsene, NPCs und Spieler. Keine Gebühren.

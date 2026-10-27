@@ -2,10 +2,10 @@
 title: "Kompetenzen wachsen: Übungen, Spieler-Kompetenzen, Bescheinigungen, Schulpersonal"
 source_area: core
 target_area: core
-status: open
+status: active
 priority: normal
 created: 2026-10-27
-claimed_by: null
+claimed_by: core (Chat Grundschule, 27.10.2026)
 depends_on: []
 touches: [person_skills, person_assignments, role_wage_rates, noxia_taxed_purchase]
 input_sha: 840755e
