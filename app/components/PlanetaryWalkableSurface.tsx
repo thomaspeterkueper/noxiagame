@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { buildPlanetaryLocalScene } from '@/lib/game/spatial/planetaryLocalScene'
+import { buildSurfaceDecor } from '@/lib/game/spatial/surfaceDecor'
+import { SurfaceTerrainLayer, TERRAIN_PALETTES } from '@/app/components/SurfaceTerrainLayer'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import {
   advanceAlongLocalSceneRoute,
@@ -14,7 +16,7 @@ import {
   routeAcrossLocalScene,
 } from '@/lib/game/spatial/localSceneRuntime'
 import type { PreparedCorridor, PlanetarySurfaceEntity, MobileSurfaceObject } from '@/app/components/PlanetarySurfaceMap'
-import { WALKABLE_VIEW, WalkableActor, WalkableObject, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingTop, surfacePathD as pathD, surfacePointsAttr as attrs, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
+import { WALKABLE_VIEW, WalkableActor, WalkableObject, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingTop, surfacePathD as pathD, surfacePointsAttr as attrs } from '@/app/components/WalkableSurfaceRenderer'
 
 type SpatialPayload={
   frame?:{body?:string;origin_status?:string|null;terrain_dataset_id?:string|null}|null
@@ -38,7 +40,12 @@ const VIEW_W=1200
 const VIEW_H=760
 const ISO_X=.95
 const ISO_Y=.48
-const BUILDING_H=16
+/** Fundament der Gebäude in Bildpunkten (die Gebäude stehen auf dem Boden, nicht auf schwebenden Kästen). */
+const FOUNDATION_H=3
+/** Gelände reicht so weit um die Mitte (m). */
+const TERRAIN_EXTENT_M=650
+const ZOOM_MIN=.8,ZOOM_MAX=3.2
+const isPad=(entityId:string|null|undefined)=>/landing_pad/.test(entityId??'')
 
 function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function residentLabel(resident:ColonyResident){return resident.identityState==='known'?resident.displayName:(resident.observableDescription?.trim()||'Person')}
@@ -55,6 +62,8 @@ export default function PlanetaryWalkableSurface({
   const[autoWalkId,setAutoWalkId]=useState('')
   const[hoveredBuildingId,setHoveredBuildingId]=useState<string|null>(null)
   const[motionTime,setMotionTime]=useState(0)
+  // Näher heran als bisher: Gebäude und Personen waren auf der ganzen Fläche zu klein (27.10.2026).
+  const[zoom,setZoom]=useState(1.7)
   const[personPanelOpen,setPersonPanelOpen]=useState(false)
   const[objectPanelOpen,setObjectPanelOpen]=useState(false)
   const[message,setMessage]=useState('')
@@ -100,6 +109,11 @@ export default function PlanetaryWalkableSurface({
     mobileObjects:[...mobileObjects,...residentObjects],
   }):null,[spatial,body,corridors,mobileObjects,residentObjects])
 
+  // Gelände: hängt nur von Gebäuden und Wegen ab, nicht von bewegten Objekten.
+  const decorKey=scene?scene.buildings.map(b=>b.id+':'+b.center.xM+':'+b.center.yM).join('|')+'#'+scene.paths.length:''
+  const decor=useMemo(()=>scene?buildSurfaceDecor({body,seedKey:locationSlug,extentM:TERRAIN_EXTENT_M,keepOut:{buildings:scene.buildings,paths:scene.paths}}):null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [decorKey,body,locationSlug])
   const interactions=useMemo(()=>scene?localSceneInteractions(scene):[],[scene])
   const selected=interactions.find(item=>item.id===selectedId)??null
   const selectedDistance=scene&&selected?localSceneInteractionDistance(player,selected):null
@@ -191,34 +205,64 @@ export default function PlanetaryWalkableSurface({
   if(error)return <div className="planetary-walkable-loading">{error}</div>
   if(!scene)return <div className="planetary-walkable-loading">Lokale Surface-Szene wird aufgebaut …</div>
 
-  const isMoon=body==='moon'
   return <section className={'planetary-walkable '+body}>
     <header><div><small>{body.toUpperCase()} · LOCAL SCENE</small><b>{title}</b><span>{scene.frameId}</span></div><div className="stats"><span>{scene.buildings.length} Gebäude</span><span>{scene.paths.length} Wege/Korridore</span><span>{scene.mobileObjects.length} Akteure/Objekte</span></div><button onClick={onClose}>← Karte</button></header>
-    <div className="stage">
+    <div className="stage" onWheel={event=>{const factor=event.deltaY>0?1/1.12:1.12;setZoom(value=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,value*factor)))}}>
       <WalkableSurfaceSvg>
-        <defs><radialGradient id={'ground-'+body} cx="45%" cy="38%"><stop offset="0%" stopColor={isMoon?'#777872':'#795b50'}/><stop offset="100%" stopColor={isMoon?'#343735':'#3e2f2b'}/></radialGradient></defs>
-        <rect width={VIEW_W} height={VIEW_H} fill={'url(#ground-'+body+')'}/>
-        <g transform={cameraTransform(player)}>
-        {scene.paths.map(path=><g key={path.id}><path d={pathD(path.points)} fill="none" stroke="#20231f" strokeWidth="13" strokeLinecap="round" opacity=".45"/><path d={pathD(path.points)} fill="none" stroke={path.kind==='road'?'#aaa28f':'#8d887a'} strokeWidth={path.kind==='road'?8:5} strokeLinecap="round"/></g>)}
+        <rect width={VIEW_W} height={VIEW_H} fill={(TERRAIN_PALETTES[body]??TERRAIN_PALETTES.phobos).grainDark}/>
+        <g transform={`translate(${VIEW_W/2} ${VIEW_H/2}) scale(${zoom}) translate(${-iso(player).x} ${-iso(player).y})`}>
+        {decor&&<SurfaceTerrainLayer body={body} decor={decor} extentM={TERRAIN_EXTENT_M}/>}
+        {/* Druckkorridore als Röhren mit Ringen und Lichtern; Rover-Pisten als zwei Fahrspuren */}
+        {scene.paths.map(path=>path.kind==='road'
+          ? <g key={path.id} pointerEvents="none">
+              <path d={pathD(path.points)} fill="none" stroke="#000" strokeWidth="11" strokeLinecap="round" opacity=".35" transform="translate(2 3)"/>
+              <path d={pathD(path.points)} fill="none" stroke="#3c4246" strokeWidth="9" strokeLinecap="round"/>
+              <path d={pathD(path.points)} fill="none" stroke="#a7aeb2" strokeWidth="7" strokeLinecap="round"/>
+              <path d={pathD(path.points)} fill="none" stroke="#d5dadc" strokeWidth="2.2" strokeLinecap="round" transform="translate(0 -1.6)"/>
+              <path d={pathD(path.points)} fill="none" stroke="#5d656a" strokeWidth="7" strokeDasharray="1.2 9"/>
+              <path d={pathD(path.points)} fill="none" stroke="#ffd98a" strokeWidth="1.6" strokeDasharray=".1 27" strokeLinecap="round" transform="translate(0 -3.4)"/>
+            </g>
+          : <g key={path.id} pointerEvents="none">
+              <path d={pathD(path.points)} fill="none" stroke="#000" strokeWidth="9" strokeLinecap="round" opacity=".18"/>
+              <path d={pathD(path.points)} fill="none" stroke="#6b6158" strokeWidth="1.6" strokeDasharray="5 2" transform="translate(0 -2.2)"/>
+              <path d={pathD(path.points)} fill="none" stroke="#6b6158" strokeWidth="1.6" strokeDasharray="5 2" transform="translate(0 2.2)"/>
+            </g>)}
 
         {route&&selected&&<WalkableRoute points={route.points} target={selected.point}/>}
 
-        {scene.buildings.map(building=>{
+        {[...scene.buildings].sort((a,b)=>(a.center.xM+a.center.yM)-(b.center.xM+b.center.yM)).map(building=>{
           const top=buildingTop(building.center,building.widthM,building.depthM)
-          const right=[top[1],top[2],{x:top[2].x,y:top[2].y+BUILDING_H},{x:top[1].x,y:top[1].y+BUILDING_H}]
-          const front=[top[2],top[3],{x:top[3].x,y:top[3].y+BUILDING_H},{x:top[2].x,y:top[2].y+BUILDING_H}]
+          const lifted=top.map(p=>({x:p.x,y:p.y-FOUNDATION_H}))
+          const right=[lifted[1],lifted[2],top[2],top[1]]
+          const front=[lifted[2],lifted[3],top[3],top[2]]
           const interactionId='building:'+building.id
-          const active=selectedId===interactionId
+          const active=selectedId==='building:'+building.id
           const center=iso(building.center)
-          const visual=getBuildingVisual(building.entityId??'',locationSlug)
+          const pad=isPad(building.entityId)
+          const visual=pad?null:getBuildingVisual(building.entityId??'',locationSlug)
           const spriteScale=visual?.mapScale??1.35
-          const spriteW=Math.max(46,Math.max(building.widthM,building.depthM)*2.1*spriteScale)
+          // Bild füllt das Fundament (vorher standen kleine Bilder auf großen Platten).
+          const spriteW=Math.max(46,Math.max(building.widthM,building.depthM)*2.1*spriteScale*1.3)
           const spriteH=spriteW*.75
+          const ring=(rM:number,steps=32)=>Array.from({length:steps},(_,i)=>{const t=i/steps*Math.PI*2;return iso({xM:building.center.xM+Math.cos(t)*rM,yM:building.center.yM+Math.sin(t)*rM})})
           return <g key={building.id} onPointerEnter={()=>setHoveredBuildingId(building.id)} onPointerLeave={()=>setHoveredBuildingId(current=>current===building.id?null:current)} onClick={()=>setSelectedId(interactionId)} style={{cursor:'pointer'}}>
-            <polygon points={attrs(right)} fill="#59615f" stroke="#272d2d" opacity={visual?.mapAsset ? .8 : 1}/>
-            <polygon points={attrs(front)} fill="#444d4d" stroke="#272d2d" opacity={visual?.mapAsset?.8:1}/>
-            <polygon points={attrs(top)} fill={active?'#e0c05e':isMoon?'#b6b4a9':'#a88c7c'} stroke={active?'#fff0a8':'#2d3535'} strokeWidth={active?2:1.4} opacity={visual?.mapAsset ? .35 : 1}/>
-            {visual?.mapAsset&&<image href={visual.mapAsset} x={center.x-spriteW/2} y={center.y-spriteH+8} width={spriteW} height={spriteH} preserveAspectRatio="xMidYMax meet" pointerEvents="none"/>}
+            <polygon points={attrs(top,6)} fill="#000" opacity=".3"/>
+            <polygon points={attrs(right)} fill="#4d5458" stroke="#1d2224" strokeWidth=".6"/>
+            <polygon points={attrs(front)} fill="#3b4245" stroke="#1d2224" strokeWidth=".6"/>
+            <polygon points={attrs(lifted)} fill={active?'#e0c05e':pad?'#71777b':'#6b7174'} stroke={active?'#fff0a8':'#262c2e'} strokeWidth={active?2:1}/>
+            {pad?<>
+              {/* Landeplattform: Warnrand, Zielkreis, Kreuz, blinkende Landelichter */}
+              <polygon points={attrs(top.map(p=>({x:p.x+(center.x-p.x)*.1,y:p.y+(center.y-p.y)*.1-FOUNDATION_H})))} fill="none" stroke="#e8b923" strokeWidth="2.4" strokeDasharray="6 6"/>
+              <polygon points={attrs(top.map(p=>({x:p.x+(center.x-p.x)*.1,y:p.y+(center.y-p.y)*.1-FOUNDATION_H})))} fill="none" stroke="#1b1d1f" strokeWidth="2.4" strokeDasharray="6 6" strokeDashoffset="6"/>
+              <polygon points={attrs(ring(Math.min(building.widthM,building.depthM)*.32),-FOUNDATION_H)} fill="#5c6266" stroke="#f1f1ec" strokeWidth="1.6"/>
+              <line x1={iso({xM:building.center.xM-building.widthM*.22,yM:building.center.yM}).x} y1={iso({xM:building.center.xM-building.widthM*.22,yM:building.center.yM}).y-FOUNDATION_H} x2={iso({xM:building.center.xM+building.widthM*.22,yM:building.center.yM}).x} y2={iso({xM:building.center.xM+building.widthM*.22,yM:building.center.yM}).y-FOUNDATION_H} stroke="#e8b923" strokeWidth="1.8"/>
+              <line x1={iso({xM:building.center.xM,yM:building.center.yM-building.depthM*.22}).x} y1={iso({xM:building.center.xM,yM:building.center.yM-building.depthM*.22}).y-FOUNDATION_H} x2={iso({xM:building.center.xM,yM:building.center.yM+building.depthM*.22}).x} y2={iso({xM:building.center.xM,yM:building.center.yM+building.depthM*.22}).y-FOUNDATION_H} stroke="#e8b923" strokeWidth="1.8"/>
+              {lifted.map((p,i)=><g key={i}><circle cx={p.x} cy={p.y} r="4" fill="#ffd36b" opacity=".25"><animate attributeName="opacity" values=".1;.45;.1" dur="1.6s" begin={`${i*.4}s`} repeatCount="indefinite"/></circle><circle cx={p.x} cy={p.y} r="1.4" fill="#ffe9a8"/></g>)}
+              {/* Frachtcontainer neben der Plattform */}
+              {[0,1,2,3,4].map(i=>{const c=iso({xM:building.center.xM+building.widthM/2+6+(i%2)*7,yM:building.center.yM-building.depthM/2+6+Math.floor(i/2)*5});const colors=['#c8642b','#2f6f7a','#b9a03a','#7a3f3a','#4c6e45'];const w=9,h=6,d=5;return <g key={'k'+i} pointerEvents="none"><polygon points={`${c.x-w},${c.y} ${c.x},${c.y+d} ${c.x},${c.y+d-h} ${c.x-w},${c.y-h}`} fill={colors[i]} stroke="#1b1d1f" strokeWidth=".5" opacity=".95"/><polygon points={`${c.x},${c.y+d} ${c.x+w*.8},${c.y+d*.2} ${c.x+w*.8},${c.y+d*.2-h} ${c.x},${c.y+d-h}`} fill={colors[i]} stroke="#1b1d1f" strokeWidth=".5" style={{filter:'brightness(.75)'}}/><polygon points={`${c.x-w},${c.y-h} ${c.x},${c.y+d-h} ${c.x+w*.8},${c.y+d*.2-h} ${c.x-w*.2},${c.y-h-d*.8}`} fill={colors[i]} stroke="#1b1d1f" strokeWidth=".5" style={{filter:'brightness(1.2)'}}/></g>})}
+            </>:visual?.mapAsset&&<image href={visual.mapAsset} x={center.x-spriteW/2} y={center.y-spriteH+8-FOUNDATION_H} width={spriteW} height={spriteH} preserveAspectRatio="xMidYMax meet" pointerEvents="none"/>}
+            {/* Leuchtfeuer am Kommunikationsmast */}
+            {building.entityId==='surface_comms'&&<g pointerEvents="none"><circle cx={center.x} cy={center.y-spriteH*.78} r="5" fill="#ff4a3a" opacity=".3"><animate attributeName="opacity" values=".05;.6;.05" dur="1.2s" repeatCount="indefinite"/></circle><circle cx={center.x} cy={center.y-spriteH*.78} r="1.6" fill="#ff6a5a"/></g>}
             <rect x={center.x-Math.max(18,building.widthM)} y={center.y-Math.max(20,building.depthM)} width={Math.max(36,building.widthM*2)} height={Math.max(38,building.depthM*2)} fill="transparent" pointerEvents="all"/>
             <title>{building.label??building.entityId??'Gebäude'}</title>
           </g>
@@ -237,7 +281,7 @@ export default function PlanetaryWalkableSurface({
         </g>
       </WalkableSurfaceSvg>
 
-      <div className="hint"><b>WASD</b> bewegen · <b>Shift</b> schneller · Ziel anklicken · <b>F/Enter</b> interagieren</div>
+      <div className="hint"><b>WASD</b> bewegen · <b>Shift</b> schneller · <b>Mausrad</b> zoomen · Ziel anklicken · <b>F/Enter</b> interagieren</div>
       {hoveredBuildingId&&(()=>{const building=scene.buildings.find(item=>item.id===hoveredBuildingId);if(!building)return null;const entity=spatial?.entities?.find(item=>item.id===building.id);return <div className="building-hover"><small>GEBÄUDE</small><b>{building.label??building.entityId??'Gebäude'}</b><span>{entity?.owner_class==='STATE'?'Staatlich':entity?.owner_class==='CORPORATION'?'Corporation':entity?.profile_id?'Privat':'Neutral'} · {Math.round(Math.hypot(building.center.xM-player.xM,building.center.yM-player.yM))} m</span></div>})()}
 
       {selected&&<div className="target">

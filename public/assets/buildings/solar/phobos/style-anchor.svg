@@ -4,7 +4,6 @@
     <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c7ccd1"/><stop offset="1" stop-color="#565d64"/></linearGradient>
     <filter id="dropSh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".5"/></filter>
   </defs>
-  <rect x="0" y="0" width="720" height="720" fill="url(#regoBg)" opacity=".18"/>
   <g filter="url(#dropSh)" transform="translate(360 430)">
     <ellipse cx="0" cy="150" rx="140" ry="30" fill="#000" opacity=".55"/>
     <path d="M-6 -10 L-90 140" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="-90" cy="140" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/><path d="M-6 -10 L90 140" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="90" cy="140" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/><path d="M-6 -10 L0 150" stroke="#3a3f44" stroke-width="3" fill="none" opacity=".85"/><circle cx="0" cy="150" r="7" fill="#100e0c" stroke="#000" stroke-width="1.5"/>
