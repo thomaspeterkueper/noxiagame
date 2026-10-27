@@ -1,8 +1,8 @@
 import { createHash } from 'crypto'
+import { RECENT_ENCOUNTER_TICK_RETENTION } from './relationshipRecency'
 
 type SB = any
 
-const RECENT_DECAY = 0.97
 const FRIEND_FAMILIARITY = 0.45
 const FRIEND_TRUST = 0.56
 const FRIEND_AFFINITY = 0.58
@@ -266,7 +266,7 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
 
   const relationByDirection = new Map<string, any>()
   for (const relation of relationRows ?? []) {
-    relation.recent_encounter_score = clamp01(Number(relation.recent_encounter_score ?? 0) * RECENT_DECAY)
+    relation.recent_encounter_score = clamp01(Number(relation.recent_encounter_score ?? 0) * RECENT_ENCOUNTER_TICK_RETENTION)
     relationByDirection.set(`${relation.person_id}\u0000${relation.other_person_id}`, relation)
   }
 
