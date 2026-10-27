@@ -4,6 +4,7 @@
 // Aktualisiert: 22.09.2026 — Earth-Navigation strikt auf den Earth-Kontext begrenzen
 // Version:      0.7.2
 import React, { useEffect, useState } from 'react'
+import { useGameModeStore } from '@/lib/store/gameModeStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { getToken } from '@/lib/supabase/auth'
 import DashboardClient from './DashboardClient'
@@ -47,6 +48,9 @@ export default function DashboardGate({ locations, prices, orders }: { locations
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const [existingUsername, setExistingUsername] = useState<string | undefined>(undefined)
   const [autoOpenJourney, setAutoOpenJourney] = useState(false)
+  // Erst nach dem Onboarding darf die Karte daneben (DashboardPrimaryColony) zeichnen.
+  const setDashboardReady = useGameModeStore(s => s.setDashboardReady)
+  useEffect(() => { setDashboardReady(onboarded === true && loaded) }, [onboarded, loaded, setDashboardReady])
 
   useEffect(() => {
     loadFromServer()

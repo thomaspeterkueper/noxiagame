@@ -9,6 +9,9 @@ interface GameModeState {
   enterPlanning: () => void
   enterInterior: (buildingId: string) => void
   resetForLocation: () => void
+  /** Onboarding fertig und Standort geladen (DashboardGate). Vorher zeichnet die Karte nichts – sonst überdeckt sie den Eröffnungsdialog (27.10.2026). */
+  dashboardReady: boolean
+  setDashboardReady: (ready: boolean) => void
 }
 
 // Start in der begehbaren Ansicht, nicht in der Übersichtskarte (Thomas, 27.10.2026:
@@ -22,4 +25,6 @@ export const useGameModeStore = create<GameModeState>((set) => ({
   enterPlanning: () => set({ mode: 'planning', interiorBuildingId: null }),
   enterInterior: (buildingId) => set({ mode: 'interior', interiorBuildingId: buildingId }),
   resetForLocation: () => set({ mode: 'colony', interiorBuildingId: null }),
+  dashboardReady: false,
+  setDashboardReady: (ready) => set({ dashboardReady: ready }),
 }))
