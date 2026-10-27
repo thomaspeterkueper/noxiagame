@@ -67,7 +67,8 @@ type Pan = { x: number; y: number }
 type Viewport = { width: number; height: number }
 type LayerKey = 'relief' | 'infrastructure' | 'noxia' | 'routes' | 'logistics'
 
-export type PreparedCorridor = { id: string; points: SurfaceRoutePoint[]; kind?: 'prepared-track' | 'hardened-road' }
+/** `pressurized`: geschlossener Gang mit Luft (Druckkorridor, Cargo-Röhre) – dort geht man ohne Anzug. */
+export type PreparedCorridor = { id: string; points: SurfaceRoutePoint[]; kind?: 'prepared-track' | 'hardened-road'; pressurized?: boolean }
 export type MobileSurfaceObject = { id: string; label: string; xM: number; yM: number; role?: string; phase?: string; status?: string; accent?: string }
 
 type Props = {

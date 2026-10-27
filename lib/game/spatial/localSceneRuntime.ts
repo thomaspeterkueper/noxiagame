@@ -35,6 +35,53 @@ const WALKABLE_PATH_KINDS = new Set<LocalSurfacePath['kind']>([
   'eva-route',
 ])
 
+// ── Druck und Ausrüstung (Thomas, 27.10.2026) ────────────────────────────
+// Auf der Erde sind Gebäude Hindernisse. Auf Himmelskörpern ohne atembare Luft
+// führt der Weg dagegen oft durch andere Gebäude und Druckkorridore; draußen
+// geht man nur im Anzug oder fährt im Fahrzeug.
+
+/** Was die Figur trägt bzw. womit sie unterwegs ist. */
+export type LocalSceneOutfit = 'none' | 'suit' | 'rover'
+export type LocalSceneMovementRules = { pressurized: true; outfit: LocalSceneOutfit }
+
+/** Gänge, in denen Luft ist. Straßen, Pisten, Halte- und Versorgungsleinen liegen draußen. */
+const PRESSURIZED_PATH_KINDS = new Set<LocalSurfacePath['kind']>(['pressurized-corridor', 'surface-tube', 'cargo-transfer-link'])
+/** Breite eines Druckkorridors, in der man sich bewegen kann (Halbbreite, m). */
+export const PRESSURIZED_CORRIDOR_HALF_WIDTH_M = 2.5
+/** Bauten ohne Innenraum mit Luft: Landeplätze, Solarfelder, Masten, Speicher, offene Höfe. */
+const OPEN_STRUCTURE = /landing_pad|launch_pad|(^|_)pad(_|$)|solar|comms|antenna|mast|scanner|battery|rover_yard|vehicle_yard|(^|_)yard(_|$)|tether|anchor/
+
+export function isPressurizedPath(path: LocalSurfacePath) {
+  return PRESSURIZED_PATH_KINDS.has(path.kind)
+}
+
+export function isPressurizedBuilding(building: LocalSurfaceBuilding) {
+  return !OPEN_STRUCTURE.test(String(building.entityId ?? ''))
+}
+
+function insideFootprint(point: LocalSurfacePoint, building: LocalSurfaceBuilding) {
+  return pointBlockedByBuilding(point, building, 0)
+}
+
+/** Steht der Punkt in Luft: in einem druckbeaufschlagten Gebäude oder in einem Druckkorridor? */
+export function isInsidePressurizedSpace(scene: LocalSurfaceScene, point: LocalSurfacePoint) {
+  if (scene.buildings.some(building => isPressurizedBuilding(building) && insideFootprint(point, building))) return true
+  for (const path of scene.paths) {
+    if (!isPressurizedPath(path)) continue
+    for (let index = 1; index < path.points.length; index += 1) {
+      const a = path.points[index - 1], b = path.points[index]
+      const segment = { pathId: path.id, a, b, length: distance(a, b), aKey: '', bKey: '' }
+      if (segment.length >= 0.05 && projectToSegment(point, segment).offDistance <= PRESSURIZED_CORRIDOR_HALF_WIDTH_M) return true
+    }
+  }
+  return false
+}
+
+/** Druckbeaufschlagtes Gebäude, in dem der Punkt steht (dort ist eine Schleuse). */
+export function pressurizedBuildingAt(scene: LocalSurfaceScene, point: LocalSurfacePoint) {
+  return scene.buildings.find(building => isPressurizedBuilding(building) && insideFootprint(point, building)) ?? null
+}
+
 type Segment = {
   pathId: string
   a: LocalSurfacePoint
@@ -74,10 +121,18 @@ function addEdge(graph: Map<string, Edge[]>, from: string, to: string, weight: n
   }
 }
 
-function walkableSegments(scene: LocalSurfaceScene) {
+function pathUsable(path: LocalSurfacePath, rules?: LocalSceneMovementRules) {
+  if (!WALKABLE_PATH_KINDS.has(path.kind) && !(rules && isPressurizedPath(path))) return false
+  if (!rules) return true
+  if (rules.outfit === 'none') return isPressurizedPath(path)
+  if (rules.outfit === 'rover') return !isPressurizedPath(path)
+  return true
+}
+
+function walkableSegments(scene: LocalSurfaceScene, rules?: LocalSceneMovementRules) {
   const segments: Segment[] = []
   for (const path of scene.paths) {
-    if (!WALKABLE_PATH_KINDS.has(path.kind)) continue
+    if (!pathUsable(path, rules)) continue
     for (let index = 1; index < path.points.length; index += 1) {
       const a = path.points[index - 1]
       const b = path.points[index]
@@ -175,13 +230,13 @@ export function routeAcrossLocalScene(
   scene: LocalSurfaceScene,
   start: LocalSurfacePoint,
   end: LocalSurfacePoint,
-  options?: { maxConnectorM?: number },
+  options?: { maxConnectorM?: number; rules?: LocalSceneMovementRules },
 ): LocalSceneRoute {
   const directDistance = distance(start, end)
   if (directDistance < 0.05) return { points: [start], distanceM: 0, usesNetwork: false }
 
   const maxConnectorM = Math.max(2, options?.maxConnectorM ?? 45)
-  const segments = walkableSegments(scene)
+  const segments = walkableSegments(scene, options?.rules)
   if (!segments.length) return { points: [start, end], distanceM: directDistance, usesNetwork: false }
 
   const startProjection = nearestProjection(start, segments)
@@ -292,8 +347,15 @@ function distanceToPolygonEdge(point: LocalSurfacePoint, polygon: readonly Local
   return best
 }
 
-export function isLocalScenePointWalkable(scene: LocalSurfaceScene, point: LocalSurfacePoint, clearanceM = 0.8) {
+export function isLocalScenePointWalkable(scene: LocalSurfaceScene, point: LocalSurfacePoint, clearanceM = 0.8, rules?: LocalSceneMovementRules) {
   if (Math.abs(point.xM) > scene.radiusM || Math.abs(point.yM) > scene.radiusM) return false
+  if (rules) {
+    // Ohne Anzug nur, wo Luft ist; im Anzug überall (Gebäude durch die Schleuse);
+    // im Fahrzeug nur draußen – nicht in Gebäude und Röhren hinein.
+    if (rules.outfit === 'suit') return true
+    const inside = isInsidePressurizedSpace(scene, point)
+    return rules.outfit === 'none' ? inside : !inside
+  }
   // Inferred massing is a rendering hint, not surveyed collision geometry.
   // Treat only observed/canonical buildings as physical obstacles.
   return !scene.buildings.some(building => building.provenance !== 'derived' && pointBlockedByBuilding(point, building, clearanceM))
@@ -309,10 +371,22 @@ export function resolveLocalSceneStep(
   current: LocalSurfacePoint,
   desired: LocalSurfacePoint,
   clearanceM = 0.8,
+  rules?: LocalSceneMovementRules,
 ) {
   const clamped = {
     xM: Math.max(-scene.radiusM, Math.min(scene.radiusM, desired.xM)),
     yM: Math.max(-scene.radiusM, Math.min(scene.radiusM, desired.yM)),
+  }
+  if (rules) {
+    if (isLocalScenePointWalkable(scene, clamped, clearanceM, rules)) return clamped
+    // Wer an einer Stelle steht, die nach den Regeln nicht erlaubt ist (z. B. neue
+    // Szene), darf sich frei bewegen, bis er wieder auf erlaubtem Grund steht.
+    if (!isLocalScenePointWalkable(scene, current, clearanceM, rules)) return clamped
+    const xSlide = { xM: clamped.xM, yM: current.yM }
+    if (isLocalScenePointWalkable(scene, xSlide, clearanceM, rules)) return xSlide
+    const ySlide = { xM: current.xM, yM: clamped.yM }
+    if (isLocalScenePointWalkable(scene, ySlide, clearanceM, rules)) return ySlide
+    return current
   }
   if (isLocalScenePointWalkable(scene, clamped, clearanceM)) return clamped
 
@@ -353,6 +427,7 @@ export function advanceAlongLocalSceneRoute(
   current: LocalSurfacePoint,
   route: LocalSceneRoute,
   stepM = 2,
+  rules?: LocalSceneMovementRules,
 ) {
   let cursor = current
   let remaining = Math.max(0.1, stepM)
@@ -362,7 +437,7 @@ export function advanceAlongLocalSceneRoute(
     if (segmentDistance < 0.05) continue
 
     if (segmentDistance <= remaining) {
-      const next = resolveLocalSceneStep(scene, cursor, waypoint)
+      const next = resolveLocalSceneStep(scene, cursor, waypoint, 0.8, rules)
       if (distance(next, cursor) < 0.01) return cursor
       cursor = next
       remaining -= segmentDistance
@@ -374,7 +449,7 @@ export function advanceAlongLocalSceneRoute(
     return resolveLocalSceneStep(scene, cursor, {
       xM: cursor.xM + (waypoint.xM - cursor.xM) * ratio,
       yM: cursor.yM + (waypoint.yM - cursor.yM) * ratio,
-    })
+    }, 0.8, rules)
   }
 
   return cursor

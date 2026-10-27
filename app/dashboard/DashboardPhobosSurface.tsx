@@ -38,7 +38,7 @@ const PHOBOS_CORRIDORS: PreparedCorridor[] = (() => {
     if (seen.has(physicalKey)) return []
     seen.add(physicalKey)
     const enclosed = edge.corridor === 'pressurized-corridor' || edge.corridor === 'cargo-transfer-link'
-    return [{ id:`phobos-corridor-${index}`, kind:enclosed?'hardened-road':'prepared-track', points:[{xM:from.xM,yM:from.yM},{xM:to.xM,yM:to.yM}] }]
+    return [{ id:`phobos-corridor-${index}`, kind:enclosed?'hardened-road':'prepared-track', pressurized:enclosed, points:[{xM:from.xM,yM:from.yM},{xM:to.xM,yM:to.yM}] }]
   })
 })()
 

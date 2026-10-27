@@ -6,7 +6,7 @@ function finite(value:unknown){
 }
 
 type PlanetarySceneEntity={id:string;entity_id?:string|null;name?:string|null;x_m?:number|null;y_m?:number|null;rotation_deg?:number|null;footprint_width_m?:number|null;footprint_depth_m?:number|null}
-type PlanetarySceneCorridor={id:string;points:Array<{xM:number;yM:number}>;kind?:'prepared-track'|'hardened-road'}
+type PlanetarySceneCorridor={id:string;points:Array<{xM:number;yM:number}>;kind?:'prepared-track'|'hardened-road';pressurized?:boolean}
 type PlanetarySceneMobileObject={id:string;label:string;xM:number;yM:number;role?:string}
 
 export function buildPlanetaryLocalScene(input:{
@@ -34,7 +34,8 @@ export function buildPlanetaryLocalScene(input:{
 
   const paths:LocalSurfacePath[]=(input.corridors??[]).map(corridor=>({
     id:corridor.id,
-    kind:corridor.kind==='hardened-road'?'road':'service-path',
+    // Gänge mit Luft eigens kennzeichnen: „befestigte Straße“ heißt auf dem Mond eine Straße im Freien.
+    kind:corridor.pressurized?'pressurized-corridor':corridor.kind==='hardened-road'?'road':'service-path',
     points:corridor.points,
     className:corridor.kind??'prepared-track',
   }))
