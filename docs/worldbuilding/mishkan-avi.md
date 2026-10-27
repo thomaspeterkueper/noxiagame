@@ -1,6 +1,6 @@
 # Mishkan Avi – Siedlung am Valles Marineris
 
-Status: **Entwurf, nicht im Spiel angelegt.** Name von Thomas (27.10.2026); die übrigen Festlegungen sind Annahmen, denen Thomas zugestimmt hat („beim Rest folge ich deinen Annahmen“, 27.10.2026). Bezug: `docs/characters/adar-berger-line.md`, NOXIA-LIVING-0013, NOXIA-LIVING-0014, `docs/lore/marsianisch-wortliste.md`.
+Status: **Im Spiel angelegt (27.10.2026), noch ohne Bewohner.** Name von Thomas (27.10.2026); die übrigen Festlegungen sind Annahmen, denen Thomas zugestimmt hat („beim Rest folge ich deinen Annahmen“, 27.10.2026). Bezug: `docs/characters/adar-berger-line.md`, NOXIA-LIVING-0013, NOXIA-LIVING-0014, `docs/lore/marsianisch-wortliste.md`.
 
 Notation: **[W]** von Thomas festgelegt, **[S]** Annahme für NOXIA, **[R]** reale Vorlage, **[OFFEN]** zu entscheiden.
 
@@ -51,10 +51,16 @@ Ein neuer Ort ist heute nicht nur ein Datenbankeintrag:
 
 Reihenfolge-Vorschlag:
 
-1. Allgemeinen Mars-Oberflächenort im Code ermöglichen (Darstellung, Reise, Andocken), getestet an Mishkan Avi mit `simulate_tick = false`.
-2. Migration: Ort, Weltrahmen auf MOLA, Konto, Kasse, Gebäude, Kantine mit Automat.
+1. ~~Allgemeinen Mars-Oberflächenort im Code ermöglichen.~~ Erledigt 27.10.2026 (`lib/game/locationBody.ts`, Commit `801a418c`): Körper aus `celestial_body_id`; Reise über die Marsbahn (Bahn-Aliasse in `orbits.ts`, Server meldet Orte aus der DB an); gemeinsame Mars-Ansicht für jeden Mars-Oberflächenort; Geländedatensatz über den Weltrahmen geteilt.
+2. ~~Migration: Ort, Weltrahmen auf MOLA, Konto, Kasse, Gebäude, Kantine mit Automat.~~ Erledigt 27.10.2026 (`20261027100000_mishkan_avi.sql`), mit `simulate_tick = false` bis Bewohner da sind.
 3. Bewohner, danach Zereya und Soraya über die Buchfiguren-Brücke.
 4. Dialekt und Wortliste in die Gespräche.
+
+Noch offen aus dem Umbau:
+
+- **Reise Tharsis Hub ↔ Mishkan Avi** läuft vorerst als kürzester Flug über die Landeplätze (Untergrenze 10 s, wie Mars ↔ Phobos), weil beide Orte die Marsbahn teilen. Eigene Zeiten nach Entfernung und Fahrweg (R0-Route mit Rover für die Nähe) folgen mit einem Mars-Oberflächennetz.
+- **Baurechte:** Mars-Gebäude mit `allowedLocations: ['mars']` sind an Mishkan Avi noch nicht baubar; Gebäude ohne Einschränkung (z. B. Café) schon. Nächster Schritt: `allowedLocations` nach Körper (`body:mars`).
+- Gelände: Der MOLA-Datensatz ist katalogisiert, aber ohne geladene Kacheln – wie am Tharsis Hub. Gebäude stehen auf `terrain_status = unresolved`; es wird kein flaches Ersatzgelände erfunden.
 
 Berührt die Teilprojekte Erdkarte und Gastronomie nicht, wohl aber die Dashboard- und Reiseteile – Zuständigkeit klären.
 
