@@ -340,6 +340,14 @@ Umgesetzt:
 2. **Kein Aufblitzen:** NOXIA-Gebäude mit `source` nicht als eigenen Block zeichnen, solange die Kachel ihres Hauses noch lädt.
 3. **Gilt ebenso für** Metropol und Balkan Grill (Gebäude des Ortes in realen Lokalen) und für alle späteren öffentlichen Gebäude an realen Adressen.
 
+### W-8 (Gastronomie, 28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular
+
+**Befund aus der Gesprächsauswertung (G-6, `docs/reviews/npc-gespraeche-testphase.md`):** Ein Pfarrer im Sauerland ist „auf dem Weg zum Habitat“. Erfunden hat er das nicht: Bei Sundern stehen zwei NOXIA-Gebäude der Art `habitat`. Die Weltkarte gibt der Figur ihren Namen aus `building_definitions` („Habitat“) als Ort in der Nähe mit (`nearbyPlaces`, `localFacts` in `app/world-lab/WorldPanels.tsx`).
+
+**Bitte:** Auf der Erde Namen verwenden, die dort üblich sind, z. B. `habitat` → „Wohnhaus“ und `residential_block` → „Wohnblock“. Das gilt für Beschriftung, Gebäudetafel und Gesprächsfakten. Am einfachsten über eine Namenstabelle je Ort, ein Feld im Gebäudezugang oder `display_name`. Auf Mond und Mars bleibt „Habitat“ richtig.
+
+Die übrigen Ortsbefunde aus G-6 stammen aus der alten Erdszene vom 12.10.2026 („keine Straßen hier“, Herceg Novi). Die neue Weltkarte gibt Straße, Ort und Gebäude mit. Ob sie noch vorkommen, zeigt die tägliche Auswertung.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
