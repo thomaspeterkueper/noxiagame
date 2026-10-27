@@ -45,7 +45,9 @@ Ein neuer Ort ist heute nicht nur ein Datenbankeintrag:
 
 - 63 Stellen im Code lesen `locations`; keine filtert nach Sichtbarkeit. Ein neuer Ort erscheint sofort in Weltabfragen, Reiseliste und Übersichten.
 - Deimos ist an 29 Stellen fest verdrahtet (Oberflächenansicht, Sonnensystem, Andocken, Ankunftskontrolle, Schiffe, Logistikknoten). Für Mishkan Avi braucht es dieselben Stellen – oder besser einen allgemeinen Weg für kleine Mars-Oberflächenorte, damit nicht jeder neue Ort Code braucht.
-- Reisen auf der Marsoberfläche (Tharsis Hub ↔ Mishkan Avi, rund 2 260 km Großkreis): mit Rover, Hopper oder Shuttle? [OFFEN]
+- Reisen auf der Marsoberfläche (Tharsis Hub ↔ Mishkan Avi, rund 2 260 km Großkreis): **je nach Entfernung und Möglichkeiten verschiedene Wege** (Thomas, 27.10.2026), nach den Definitionen im OTA – siehe Abschnitt „Verkehr“.
+
+**Entschieden (Thomas, 27.10.2026): allgemein statt einzeln.** Kleine Mars-Oberflächenorte bekommen einen gemeinsamen Weg im Code; Mishkan Avi ist der erste Fall, nicht ein weiterer Sonderfall wie Deimos.
 
 Reihenfolge-Vorschlag:
 
@@ -55,3 +57,19 @@ Reihenfolge-Vorschlag:
 4. Dialekt und Wortliste in die Gespräche.
 
 Berührt die Teilprojekte Erdkarte und Gastronomie nicht, wohl aber die Dashboard- und Reiseteile – Zuständigkeit klären.
+
+## Verkehr (nach OTA)
+
+Quellen im OverTime Archive (Drive):
+
+- **OTA-TEC-0090 „Mars-Fahrwege“** (v1.3, 18.10.2026): Infrastrukturklassen ohne feste Entwicklungsleiter – **R0** markierte Route, **R1** planierte Piste, **R2** stabilisiert, **R3** gesintert, **R4** Schwerlaststraße, **G1** Schiene/Beamway, **G2** fortgeschrittener Guided Transport. Phasen: frühe Außenstation (R0/R1), industrielles Wachstum (R1/R2, R3/R4 an Knoten, G1 als Kandidat), reifes Netz (R2/R4 plus G1 auf Hochlastkorridoren). Kritikalität C0–C3; eine zweite Spur im selben Korridor ist keine geografische Redundanz. NOXIA leitet Reisezeit, Baukosten und Wartung selbst ab.
+- **OTA-TEC-0038 Erkundungsrover Typ P** (Mond-Standardtyp, Frühphase, bemannt) und **OTA-TEC-0039 VEX-47** (Explorationsdrohne) – die vorhandenen Fahrzeug-Dossiers für die Oberfläche.
+- **OTA-TEC-0091 Mars-Versorgungstrassen** – Energie, Wasser, Daten; gemeinsame Führung mit Fahrwegen nur, wenn ein Straßenschaden nicht alle Lebensadern zugleich trifft.
+- Erde-Mond-Verkehr (CYGNUS CTV, PELICAN, ASCE-Shuttle) ist definiert; ein Dossier für **lange Strecken auf dem Mars** (Hopper, Fluggerät, suborbital) habe ich nicht gefunden. [OFFEN]
+
+Folgerung für Mishkan Avi [S]:
+
+- Außenposten in Phase A: **R0-Route** zum nächsten Ort, R1 nur an Landeplatz und Habitat. Wenig Verkehr, Kritikalität C1 – ein Ausfall verzögert, gefährdet aber nicht.
+- 2 260 km bis Tharsis Hub sind für einen Rover auf R0 eine Fahrt über viele Sol. Regelverkehr daher eher über den Landeplatz (Shuttle oder Hopper), der Rover für die Nähe – Axis Kammer, Grabenrand, Außenstellen.
+- Im Spiel wählt die Reise das Verkehrsmittel nach Entfernung und vorhandenem Fahrweg, nicht nach Ortsnamen: kurze Strecke mit Fahrweg → Rover; lange Strecke ohne Fahrweg → Flug über die Landeplätze.
+
