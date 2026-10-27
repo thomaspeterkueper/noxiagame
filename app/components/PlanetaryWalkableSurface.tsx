@@ -5,7 +5,7 @@ import { getToken } from '@/lib/supabase/auth'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { buildPlanetaryLocalScene } from '@/lib/game/spatial/planetaryLocalScene'
 import { buildSurfaceDecor } from '@/lib/game/spatial/surfaceDecor'
-import { SurfaceTerrainLayer, TERRAIN_PALETTES } from '@/app/components/SurfaceTerrainLayer'
+import { PEBBLE_ZOOM, SurfaceTerrainLayer, TERRAIN_PALETTES } from '@/app/components/SurfaceTerrainLayer'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import {
   advanceAlongLocalSceneRoute,
@@ -44,8 +44,12 @@ const ISO_Y=.48
 const FOUNDATION_H=3
 /** Gelände reicht so weit um die Mitte (m). */
 const TERRAIN_EXTENT_M=650
-const ZOOM_MIN=.8,ZOOM_MAX=3.2
+const ZOOM_MIN=.8,ZOOM_MAX=2.6
 const isPad=(entityId:string|null|undefined)=>/landing_pad/.test(entityId??'')
+/** Kabel zwischen Gebäudearten (nur wenn beide stehen). */
+const CABLES:Array<[string,string]>=[['solar','battery_storage'],['battery_storage','habitat'],['surface_comms','habitat'],['life_support_hub','habitat']]
+/** Gebäude, an denen Kisten und Fässer stehen. */
+const PROP_BUILDINGS=/warehouse|workshop|rover|storage|depot/
 
 function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function residentLabel(resident:ColonyResident){return resident.identityState==='known'?resident.displayName:(resident.observableDescription?.trim()||'Person')}
@@ -111,7 +115,7 @@ export default function PlanetaryWalkableSurface({
 
   // Gelände: hängt nur von Gebäuden und Wegen ab, nicht von bewegten Objekten.
   const decorKey=scene?scene.buildings.map(b=>b.id+':'+b.center.xM+':'+b.center.yM).join('|')+'#'+scene.paths.length:''
-  const decor=useMemo(()=>scene?buildSurfaceDecor({body,seedKey:locationSlug,extentM:TERRAIN_EXTENT_M,keepOut:{buildings:scene.buildings,paths:scene.paths}}):null,
+  const decor=useMemo(()=>scene?buildSurfaceDecor({body,seedKey:locationSlug,extentM:TERRAIN_EXTENT_M,keepOut:{buildings:scene.buildings,paths:scene.paths},activity:{pads:scene.buildings.filter(b=>isPad(b.entityId)),yards:scene.buildings.filter(b=>/rover|vehicle|garage/.test(b.entityId??''))}}):null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [decorKey,body,locationSlug])
   const interactions=useMemo(()=>scene?localSceneInteractions(scene):[],[scene])
@@ -202,8 +206,11 @@ export default function PlanetaryWalkableSurface({
     return()=>window.removeEventListener('keydown',onKey)
   },[scene,canInteract,interact])
 
-  if(error)return <div className="planetary-walkable-loading">{error}</div>
-  if(!scene)return <div className="planetary-walkable-loading">Lokale Surface-Szene wird aufgebaut …</div>
+  // Lade- und Fehleranzeige mit eigener Gestaltung: Die Stilregeln unten gelten erst für die fertige Szene;
+  // ohne sie schien beim Laden die alte 2D-Karte durch (Thomas, 27.10.2026).
+  const loadingStyle:React.CSSProperties={position:'fixed',inset:'var(--noxia-topbar-h,44px) 0 0',zIndex:1500,display:'grid',placeItems:'center',background:(TERRAIN_PALETTES[body]??TERRAIN_PALETTES.phobos).grainDark,color:'#c4d4da',fontFamily:'monospace',letterSpacing:'.08em'}
+  if(error)return <div className="planetary-walkable-loading" style={loadingStyle}>{error}</div>
+  if(!scene)return <div className="planetary-walkable-loading" style={loadingStyle}>{title.toUpperCase()} · LOKALE SZENE WIRD AUFGEBAUT …</div>
 
   return <section className={'planetary-walkable '+body}>
     <header><div><small>{body.toUpperCase()} · LOCAL SCENE</small><b>{title}</b><span>{scene.frameId}</span></div><div className="stats"><span>{scene.buildings.length} Gebäude</span><span>{scene.paths.length} Wege/Korridore</span><span>{scene.mobileObjects.length} Akteure/Objekte</span></div><button onClick={onClose}>← Karte</button></header>
@@ -211,7 +218,9 @@ export default function PlanetaryWalkableSurface({
       <WalkableSurfaceSvg>
         <rect width={VIEW_W} height={VIEW_H} fill={(TERRAIN_PALETTES[body]??TERRAIN_PALETTES.phobos).grainDark}/>
         <g transform={`translate(${VIEW_W/2} ${VIEW_H/2}) scale(${zoom}) translate(${-iso(player).x} ${-iso(player).y})`}>
-        {decor&&<SurfaceTerrainLayer body={body} decor={decor} extentM={TERRAIN_EXTENT_M}/>}
+        {decor&&<SurfaceTerrainLayer body={body} decor={decor} extentM={TERRAIN_EXTENT_M} detailed={zoom>=PEBBLE_ZOOM}/>}
+        {/* Kabel auf dem Boden: Energie vom Solarfeld zum Speicher, Mast und Speicher zum Habitat */}
+        {CABLES.flatMap(([from,to])=>{const a=scene.buildings.find(b=>b.entityId===from),b=scene.buildings.find(item=>item.entityId===to);if(!a||!b)return[];const p=iso(a.center),q=iso(b.center),mid={x:(p.x+q.x)/2+(q.y-p.y)*.12,y:(p.y+q.y)/2+8};return[<path key={from+to} d={`M${p.x} ${p.y} Q${mid.x} ${mid.y} ${q.x} ${q.y}`} fill="none" stroke="#141210" strokeWidth="1.1" opacity=".8" pointerEvents="none"/>]})}
         {/* Druckkorridore als Röhren mit Ringen und Lichtern; Rover-Pisten als zwei Fahrspuren */}
         {scene.paths.map(path=>path.kind==='road'
           ? <g key={path.id} pointerEvents="none">
@@ -250,6 +259,12 @@ export default function PlanetaryWalkableSurface({
             <polygon points={attrs(right)} fill="#4d5458" stroke="#1d2224" strokeWidth=".6"/>
             <polygon points={attrs(front)} fill="#3b4245" stroke="#1d2224" strokeWidth=".6"/>
             <polygon points={attrs(lifted)} fill={active?'#e0c05e':pad?'#71777b':'#6b7174'} stroke={active?'#fff0a8':'#262c2e'} strokeWidth={active?2:1}/>
+            {/* Staub, der an den Kanten auf die Platte geweht ist */}
+            {!active&&[[0,1],[1,2],[2,3],[3,0]].map(([i,j])=>{const a=lifted[i],b=lifted[j];const inA={x:a.x+(center.x-a.x)*.16,y:a.y+(center.y-FOUNDATION_H-a.y)*.16},inB={x:b.x+(center.x-b.x)*.16,y:b.y+(center.y-FOUNDATION_H-b.y)*.16};return <polygon key={'d'+i} points={attrs([a,b,inB,inA])} fill={(TERRAIN_PALETTES[body]??TERRAIN_PALETTES.phobos).ground} opacity=".38" pointerEvents="none"/>})}
+            {/* Kisten und Fässer an Lager, Werkstatt und Fahrzeughof */}
+            {PROP_BUILDINGS.test(building.entityId??'')&&[0,1,2].map(i=>{const corner=lifted[3],toward=lifted[0];const base={x:corner.x+(center.x-corner.x)*.22+(toward.x-corner.x)*(.12+i*.12),y:corner.y+(center.y-FOUNDATION_H-corner.y)*.22+(toward.y-corner.y)*(.12+i*.12)};return i===1
+              ? <g key={'prop'+i} pointerEvents="none"><ellipse cx={base.x+1.5} cy={base.y+.8} rx="3.2" ry="1.3" fill="#000" opacity=".35"/><rect x={base.x-2} y={base.y-5} width="4" height="5" rx="1" fill="#2f6f7a" stroke="#14262b" strokeWidth=".4"/><ellipse cx={base.x} cy={base.y-5} rx="2" ry=".8" fill="#4b8f9b"/></g>
+              : <g key={'prop'+i} pointerEvents="none"><ellipse cx={base.x+2} cy={base.y+.8} rx="4.2" ry="1.4" fill="#000" opacity=".35"/><polygon points={`${base.x-3.5},${base.y-1} ${base.x},${base.y+.8} ${base.x},${base.y-3.4} ${base.x-3.5},${base.y-5.2}`} fill="#b07a3c" stroke="#3a2812" strokeWidth=".4"/><polygon points={`${base.x},${base.y+.8} ${base.x+3},${base.y-.6} ${base.x+3},${base.y-4.8} ${base.x},${base.y-3.4}`} fill="#8d5f2c" stroke="#3a2812" strokeWidth=".4"/><polygon points={`${base.x-3.5},${base.y-5.2} ${base.x},${base.y-3.4} ${base.x+3},${base.y-4.8} ${base.x-.5},${base.y-6.6}`} fill="#c99350" stroke="#3a2812" strokeWidth=".4"/></g>})}
             {pad?<>
               {/* Landeplattform: Warnrand, Zielkreis, Kreuz, blinkende Landelichter */}
               <polygon points={attrs(top.map(p=>({x:p.x+(center.x-p.x)*.1,y:p.y+(center.y-p.y)*.1-FOUNDATION_H})))} fill="none" stroke="#e8b923" strokeWidth="2.4" strokeDasharray="6 6"/>
@@ -273,11 +288,11 @@ export default function PlanetaryWalkableSurface({
           const active=selectedId==='mobile:'+object.id
           const person=interaction?.kind==='person'
           return <g key={object.id} onClick={()=>setSelectedId('mobile:'+object.id)} style={{cursor:'pointer'}}>
-            {person?<WalkableActor point={object.point} selected={active} appearance={object.id.startsWith('resident:')?residents.find(resident=>resident.id===object.id.slice('resident:'.length))?.appearance:undefined} visualSeed={object.id}/>:<WalkableObject point={object.point} selected={active}/>}<title>{object.label}</title>
+            {person?<WalkableActor suited={body!=='earth'} point={object.point} selected={active} appearance={object.id.startsWith('resident:')?residents.find(resident=>resident.id===object.id.slice('resident:'.length))?.appearance:undefined} visualSeed={object.id}/>:<WalkableObject point={object.point} selected={active}/>}<title>{object.label}</title>
           </g>
         })}
 
-        <WalkablePlayer point={player}/>
+        <WalkablePlayer point={player} suited={body!=='earth'}/>
         </g>
       </WalkableSurfaceSvg>
 

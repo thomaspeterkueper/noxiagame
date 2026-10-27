@@ -28,20 +28,31 @@ function circle(xM: number, yM: number, rM: number, steps = 22) {
   }).join(' ')
 }
 
-function SurfaceTerrainLayerInner({ body, decor, extentM }: { body: string; decor: SurfaceDecor; extentM: number }) {
+/** Ab diesem Zoom erscheinen kleine Steine (mehr Einzelheiten, je näher man herangeht). */
+export const PEBBLE_ZOOM = 2
+
+function SurfaceTerrainLayerInner({ body, decor, extentM, detailed = false }: { body: string; decor: SurfaceDecor; extentM: number; detailed?: boolean }) {
   const palette = TERRAIN_PALETTES[body] ?? TERRAIN_PALETTES.phobos
   const corners = [iso({ xM: -extentM, yM: -extentM }), iso({ xM: extentM, yM: -extentM }), iso({ xM: extentM, yM: extentM }), iso({ xM: -extentM, yM: extentM })]
-  const grain = seededRandom(7)
-  const dots = Array.from({ length: 34 }, () => ({ x: grain() * 64, y: grain() * 64, r: 0.4 + grain() * 0.9, light: grain() > 0.45 }))
-  const patternId = 'regolith-' + body
+  // Drei Körnungen mit teilerfremden Kachelgrößen: Das Muster wiederholt sich erst nach
+  // Tausenden Bildpunkten (vorher sah man beim Heranzoomen eine „Tapete“, 27.10.2026).
+  const layers = [{ size: 61, count: 26, seed: 7, rMax: 0.9 }, { size: 97, count: 18, seed: 11, rMax: 1.4 }, { size: 157, count: 9, seed: 13, rMax: 2.6 }]
+    .map(layer => { const grain = seededRandom(layer.seed); return { ...layer, dots: Array.from({ length: layer.count }, () => ({ x: grain() * layer.size, y: grain() * layer.size, r: 0.3 + grain() * layer.rMax, light: grain() > 0.45 })) } })
+  const ground = corners.map(p => `${p.x},${p.y}`).join(' ')
+  // Kleine Steine nur nah heran (Level of Detail)
+  const pebbleRandom = seededRandom(17)
+  const pebbles = detailed ? Array.from({ length: 900 }, () => ({ xM: (pebbleRandom() * 2 - 1) * extentM, yM: (pebbleRandom() * 2 - 1) * extentM, r: 0.25 + pebbleRandom() * 0.55 })) : []
   return <g pointerEvents="none">
     <defs>
-      <pattern id={patternId} width="64" height="64" patternUnits="userSpaceOnUse">
-        <rect width="64" height="64" fill={palette.ground}/>
-        {dots.map((dot, i) => <circle key={i} cx={dot.x} cy={dot.y} r={dot.r} fill={dot.light ? palette.grainLight : palette.grainDark} opacity=".7"/>)}
-      </pattern>
+      {layers.map(layer => <pattern key={layer.size} id={`regolith-${body}-${layer.size}`} width={layer.size} height={layer.size} patternUnits="userSpaceOnUse">
+        {layer.dots.map((dot, i) => <circle key={i} cx={dot.x} cy={dot.y} r={dot.r} fill={dot.light ? palette.grainLight : palette.grainDark} opacity={layer.size > 100 ? '.35' : '.65'}/>)}
+      </pattern>)}
+      <radialGradient id={`scorch-${body}`}><stop offset="0" stopColor="#0d0b0a" stopOpacity=".55"/><stop offset=".65" stopColor="#14110f" stopOpacity=".3"/><stop offset="1" stopColor="#14110f" stopOpacity="0"/></radialGradient>
     </defs>
-    <polygon points={corners.map(p => `${p.x},${p.y}`).join(' ')} fill={`url(#${patternId})`}/>
+    <polygon points={ground} fill={palette.ground}/>
+    {layers.map(layer => <polygon key={layer.size} points={ground} fill={`url(#regolith-${body}-${layer.size})`}/>)}
+    {/* Brandfleck unter Landeplätzen: Triebwerke haben den Staub weggeblasen */}
+    {decor.scorches.map((scorch, i) => { const c = iso(scorch); const e = iso({ xM: scorch.xM + scorch.rM, yM: scorch.yM - scorch.rM }); const rx = Math.abs(e.x - c.x), ry = rx * 0.5; return <ellipse key={'s' + i} cx={c.x} cy={c.y} rx={rx} ry={ry} fill={`url(#scorch-${body})`}/> })}
     {/* Rillen: dunkle Furche mit heller Kante auf der Sonnenseite */}
     {decor.grooves.map((groove, i) => {
       const a = iso(groove.from), b = iso(groove.to)
@@ -51,11 +62,22 @@ function SurfaceTerrainLayerInner({ body, decor, extentM }: { body: string; deco
       </g>
     })}
     {/* Krater: heller Wall, dunkle Schüssel, Schatten auf der sonnenabgewandten Innenseite */}
-    {decor.craters.map((crater, i) => <g key={'c' + i}>
-      <polygon points={circle(crater.xM, crater.yM, crater.rM * 1.22)} fill={palette.rim} opacity=".5"/>
-      <polygon points={circle(crater.xM, crater.yM, crater.rM)} fill={palette.floor}/>
-      <polygon points={circle(crater.xM - crater.rM * 0.16, crater.yM - crater.rM * 0.16, crater.rM * 0.82)} fill="#000" opacity=".22"/>
-    </g>)}
+    {decor.craters.map((crater, i) => { const r = crater.rM, o = r * 0.09; return <g key={'c' + i}>
+      {/* Wall: Schattenseite oben links, Lichtseite unten rechts */}
+      <polygon points={circle(crater.xM - o, crater.yM - o, r * 1.24)} fill={palette.grainDark} opacity=".55"/>
+      <polygon points={circle(crater.xM + o, crater.yM + o, r * 1.24)} fill={palette.rim} opacity=".6"/>
+      <polygon points={circle(crater.xM, crater.yM, r)} fill={palette.floor}/>
+      {/* Innenwand: beleuchtet auf der sonnenabgewandten Seite des Walls, Schatten innen oben links */}
+      <polygon points={circle(crater.xM - o * 1.4, crater.yM - o * 1.4, r * 0.9)} fill={palette.rim} opacity=".28"/>
+      <polygon points={circle(crater.xM + o * 0.6, crater.yM + o * 0.6, r * 0.78)} fill={palette.floor}/>
+      <polygon points={circle(crater.xM + o * 1.6, crater.yM + o * 1.6, r * 0.82)} fill="#000" opacity=".2"/>
+    </g> })}
+    {/* Fahrspuren von Rovern: zwei Reifen mit Profil */}
+    {decor.trails.map((trail, i) => { const d = trail.points.map((p, k) => { const s = iso(p); return `${k ? 'L' : 'M'}${s.x.toFixed(1)} ${s.y.toFixed(1)}` }).join(' '); return <g key={'t' + i} opacity=".55">
+      <path d={d} fill="none" stroke={palette.grainDark} strokeWidth="1.3" strokeDasharray="1.4 .8" transform="translate(0 -1.3)"/>
+      <path d={d} fill="none" stroke={palette.grainDark} strokeWidth="1.3" strokeDasharray="1.4 .8" transform="translate(0 1.3)"/>
+    </g> })}
+    {pebbles.map((pebble, i) => { const p = iso(pebble); return <g key={'p' + i}><ellipse cx={p.x + pebble.r * 0.6} cy={p.y + pebble.r * 0.2} rx={pebble.r * 1.3} ry={pebble.r * 0.5} fill="#000" opacity=".3"/><ellipse cx={p.x} cy={p.y - pebble.r * 0.3} rx={pebble.r} ry={pebble.r * 0.7} fill={palette.rock}/><ellipse cx={p.x + pebble.r * 0.2} cy={p.y - pebble.r * 0.55} rx={pebble.r * 0.45} ry={pebble.r * 0.25} fill={palette.rockLight} opacity=".7"/></g> })}
     {/* Felsbrocken: unregelmäßiger Körper mit Schatten und Lichtkante */}
     {decor.boulders.map((boulder, i) => {
       const random = seededRandom(boulder.seed)

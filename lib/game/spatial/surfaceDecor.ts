@@ -10,7 +10,11 @@ import type { LocalSurfacePoint } from './localSurfaceScene'
 export interface SurfaceCrater { xM: number; yM: number; rM: number }
 export interface SurfaceBoulder { xM: number; yM: number; rM: number; seed: number }
 export interface SurfaceGroove { from: LocalSurfacePoint; to: LocalSurfacePoint }
-export interface SurfaceDecor { craters: SurfaceCrater[]; boulders: SurfaceBoulder[]; grooves: SurfaceGroove[] }
+/** Brandfleck unter einem Landeplatz: dunkler Hof, wo Triebwerke den Staub weggeblasen haben. */
+export interface SurfaceScorch { xM: number; yM: number; rM: number }
+/** Fahrspur eines Rovers im Staub (zwei Reifen, leicht geschwungen). */
+export interface SurfaceTrail { points: LocalSurfacePoint[] }
+export interface SurfaceDecor { craters: SurfaceCrater[]; boulders: SurfaceBoulder[]; grooves: SurfaceGroove[]; scorches: SurfaceScorch[]; trails: SurfaceTrail[] }
 
 export interface SurfaceKeepOut {
   buildings: Array<{ center: LocalSurfacePoint; widthM: number; depthM: number }>
@@ -60,7 +64,11 @@ export function clearanceM(point: LocalSurfacePoint, keepOut: SurfaceKeepOut) {
  * Phobos: viele kleine Krater, Rillen in einer Richtung. Mond: mehr und
  * größere Krater, keine Rillen. Krater halten Abstand zu Gebäuden und Wegen.
  */
-export function buildSurfaceDecor(input: { body: string; seedKey: string; extentM: number; keepOut: SurfaceKeepOut }): SurfaceDecor {
+export function buildSurfaceDecor(input: {
+  body: string; seedKey: string; extentM: number; keepOut: SurfaceKeepOut
+  /** Spuren von Betrieb: Landeplätze (Brandfleck) und Fahrzeughöfe (Fahrspuren ins Gelände). */
+  activity?: { pads?: Array<{ center: LocalSurfacePoint; widthM: number; depthM: number }>; yards?: Array<{ center: LocalSurfacePoint }> }
+}): SurfaceDecor {
   const random = seededRandom(seedOf(input.body + ':' + input.seedKey))
   const extent = input.extentM
   const pick = () => ({ xM: (random() * 2 - 1) * extent, yM: (random() * 2 - 1) * extent })
@@ -95,5 +103,24 @@ export function buildSurfaceDecor(input: { body: string; seedKey: string; extent
       grooves.push({ from: { xM: centre.x - dir.x * half, yM: centre.y - dir.y * half }, to: { xM: centre.x + dir.x * half, yM: centre.y + dir.y * half } })
     }
   }
-  return { craters, boulders, grooves }
+  const scorches: SurfaceScorch[] = (input.activity?.pads ?? []).map(pad => ({ xM: pad.center.xM, yM: pad.center.yM, rM: Math.max(pad.widthM, pad.depthM) * 0.85 }))
+  const trails: SurfaceTrail[] = []
+  for (const yard of input.activity?.yards ?? []) {
+    // Drei bis vier Fahrten ins Gelände: vom Hof weg, mit sanften Kurven, 120–260 m lang.
+    const count = 3 + Math.floor(random() * 2)
+    for (let i = 0; i < count; i++) {
+      let heading = random() * Math.PI * 2
+      let at = { xM: yard.center.xM, yM: yard.center.yM }
+      const points = [at]
+      const length = 120 + random() * 140
+      for (let travelled = 0; travelled < length; travelled += 12) {
+        heading += (random() - 0.5) * 0.5
+        at = { xM: at.xM + Math.cos(heading) * 12, yM: at.yM + Math.sin(heading) * 12 }
+        if (Math.abs(at.xM) > extent || Math.abs(at.yM) > extent) break
+        points.push(at)
+      }
+      if (points.length > 2) trails.push({ points })
+    }
+  }
+  return { craters, boulders, grooves, scorches, trails }
 }

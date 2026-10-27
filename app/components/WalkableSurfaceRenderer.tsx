@@ -70,13 +70,23 @@ export function WalkableRoute({points,target}:{points:LocalSurfacePoint[];target
   </g>
 }
 
-export function WalkablePlayer({point,label}:{point:LocalSurfacePoint;label?:string}){
+/** Raumanzug draußen auf Mond, Phobos, Deimos: Lebenserhaltung auf dem Rücken, Helm mit Visier. */
+function SuitParts({scale=1,headY=-4,headR=4.5}:{scale?:number;headY?:number;headR?:number}){
+  return <g transform={`scale(${scale})`} pointerEvents="none">
+    <rect x="-7.2" y="3" width="4" height="10" rx="1.2" fill="#c9cdd0" stroke="#30383c" strokeWidth=".8"/>
+    <circle cy={headY} r={headR+1.9} fill="#dfe6ea" fillOpacity=".28" stroke="#e8eef1" strokeWidth="1.1"/>
+    <path d={`M${-headR*.9} ${headY-.6} Q0 ${headY-headR*1.3} ${headR*.9} ${headY-.6}`} fill="none" stroke="#f4d58a" strokeWidth="1.3" opacity=".9"/>
+  </g>
+}
+
+export function WalkablePlayer({point,label,suited=false}:{point:LocalSurfacePoint;label?:string;suited?:boolean}){
   const p=projectSurfacePoint(point)
   const labelWidth=label?Math.max(44,Math.min(118,label.length*6.1+16)):0
   return <g transform={`translate(${p.x} ${p.y-9})`}>
     <ellipse cy="11" rx="8" ry="3.5" fill="#000" opacity=".28"/>
     <circle cy="-4" r="4.5" fill="#f0c49c" stroke="#493c18" strokeWidth="1.2"/>
     <path d="M-6 12 Q0 0 6 12 L5 20 L-5 20 Z" fill="#d4ad43" stroke="#594717" strokeWidth="1.2"/>
+    {suited&&<SuitParts/>}
     {label&&<g pointerEvents="none" transform="translate(0 -20)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill="#173845ee" stroke="#e4bd4b" strokeWidth=".9"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff7d8">{label}</text></g>}
   </g>
 }
@@ -145,7 +155,7 @@ function ActorBody({appearance,clothingColor}:{appearance:WalkableActorAppearanc
 }
 
 export function WalkableActor({
-  point,label,selected=false,onClick,appearance,visualSeed='actor',
+  point,label,selected=false,onClick,appearance,visualSeed='actor',suited=false,
 }:{
   point:LocalSurfacePoint
   label?:string
@@ -153,6 +163,8 @@ export function WalkableActor({
   onClick?:()=>void
   appearance?:WalkableActorAppearance
   visualSeed?:string
+  /** Draußen auf Mond, Phobos, Deimos: Raumanzug mit Helm und Rucksack. */
+  suited?:boolean
 }){
   const p=projectSurfacePoint(point)
   const labelWidth=label?Math.max(42,Math.min(112,label.length*6.1+14)):0
@@ -170,6 +182,7 @@ export function WalkableActor({
       {appearance?.hairStyleCode!=='long'&&<ActorHair style={appearance?.hairStyleCode??'short'} color={hair}/>}
       {appearance?.facialHairCode&&appearance.facialHairCode!=='none'&&<path d="M-2.8 -.8 Q0 2.2 2.8 -.8 Q2.2 3.3 0 3.6 Q-2.2 3.3 -2.8 -.8Z" fill={hair} opacity=".9"/>}
       <ActorBody appearance={appearance} clothingColor={clothing}/>
+      {suited&&<SuitParts headY={-3} headR={headRadius}/>}
       {age==='older'&&<path d="M-2.4 -1.8 H-0.5 M.5 -1.8 H2.4 M-.5 -1.8 H.5" stroke="#40515a" strokeWidth=".65" opacity=".8"/>}
       {selected&&<ellipse cy="10" rx="9" ry="12" fill="none" stroke="#e4bd4b" strokeWidth="1.2" strokeDasharray="2 2"/>}
     </g>

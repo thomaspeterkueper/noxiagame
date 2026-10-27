@@ -42,6 +42,9 @@ const chrome=<style>{`
 
 export default function DashboardPrimaryColony(){
  const location=useGameStore(s=>s.location)
+ // Erst zeichnen, wenn der Server den Standort gemeldet hat: Der Speicher beginnt mit „earth“,
+ // sonst blitzt beim Laden die Erdkarte auf, obwohl man auf Phobos steht (Thomas, 27.10.2026).
+ const locationLoaded=useGameStore(s=>s.loaded)
  const mode=useGameModeStore(s=>s.mode),interiorBuildingId=useGameModeStore(s=>s.interiorBuildingId),enterColony=useGameModeStore(s=>s.enterColony),enterPlanning=useGameModeStore(s=>s.enterPlanning),enterInterior=useGameModeStore(s=>s.enterInterior),resetForLocation=useGameModeStore(s=>s.resetForLocation)
  // Zuletzt gewählte Erdansicht; ohne Wahl die neue Weltkarte (Thomas, 27.10.2026: Start in der begehbaren Karte).
  // Die bisherige Erdszene bleibt über den Knopf in der Weltkarte erreichbar.
@@ -79,6 +82,7 @@ export default function DashboardPrimaryColony(){
  // synthetic colony grid: that would preserve the label while changing the
  // physical world underneath the player. A future walkable Earth view must
  // project the same persisted WGS84/materialized place data.
+ if(!locationLoaded)return null
  if(isEarth){
    if(mode==='colony'&&earthView==='world')return <WorldLab embedded residents={residents} onLeave={()=>chooseEarthView('scene')} onPlanning={enterPlanning}/>
    if(mode==='colony')return <>{earthViewToggle}<EarthWalkableSurface residents={residents} onClose={enterPlanning}/><button className="noxia-earth-view-toggle" onClick={()=>chooseEarthView('world')}>◇ Neue Weltkarte</button></>
