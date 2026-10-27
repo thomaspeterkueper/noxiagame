@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
+import { assessPersonDepth } from '@/lib/game/population/personDepth'
 
 export async function GET(req: NextRequest) {
   const tileEntityId = req.nextUrl.searchParams.get('tileEntityId')
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
   const personId = req.nextUrl.searchParams.get('personId')
   const includeLifeState = req.nextUrl.searchParams.get('includeLifeState') === '1'
   const includeFamilyDemand = req.nextUrl.searchParams.get('includeFamilyDemand') === '1'
+  const includeDepth = req.nextUrl.searchParams.get('includeDepth') === '1'
   const supabase = createServiceClient()
 
   if (personId) {
@@ -130,6 +132,27 @@ export async function GET(req: NextRequest) {
   const interiorPresenceByPerson = new Map((interiorPresenceResult.data ?? []).map((row: any) => [row.person_id, row]))
   const lifeByPerson = new Map((lifeResult.data ?? []).map((row: any) => [row.person_id, row]))
 
+  const depthCounts = new Map<string, { relationships:number; memories:number; skills:number; economy:boolean; life:boolean }>()
+  if (includeDepth) {
+    const [relations, memories, skills, economies, lives] = await Promise.all([
+      supabase.from('person_relationships').select('person_id').in('person_id', personIds),
+      supabase.from('person_memories').select('person_id').in('person_id', personIds),
+      supabase.from('person_skills').select('person_id').in('person_id', personIds),
+      supabase.from('person_economic_actors').select('person_id').in('person_id', personIds),
+      supabase.from('person_life_state').select('person_id').in('person_id', personIds),
+    ])
+    const ensure=(id:string)=>{
+      const current=depthCounts.get(id) ?? {relationships:0,memories:0,skills:0,economy:false,life:false}
+      depthCounts.set(id,current)
+      return current
+    }
+    for(const row of relations.data ?? []) ensure(String(row.person_id)).relationships+=1
+    for(const row of memories.data ?? []) ensure(String(row.person_id)).memories+=1
+    for(const row of skills.data ?? []) ensure(String(row.person_id)).skills+=1
+    for(const row of economies.data ?? []) ensure(String(row.person_id)).economy=true
+    for(const row of lives.data ?? []) ensure(String(row.person_id)).life=true
+  }
+
   const residents = people.map(person => {
     const personAssignments = (assignments ?? []).filter(a => a.person_id === person.id)
     const identity = identityByPerson.get(person.id) as any
@@ -145,9 +168,22 @@ export async function GET(req: NextRequest) {
       inferredName: identity?.inferred_name ?? null,
       knownName: identity?.known_name ?? null,
     })
+    const depthEvidence = depthCounts.get(person.id)
+    const depth = includeDepth && depthEvidence ? assessPersonDepth({
+      active: person.simulation_tier === 'active',
+      hasHome: personAssignments.some((a:any)=>a.assignment_type==='home' && a.is_active),
+      hasWork: personAssignments.some((a:any)=>a.assignment_type==='work' && a.is_active),
+      hasEconomy: depthEvidence.economy,
+      hasAppearance: Boolean(rawAppearance),
+      hasLifeState: depthEvidence.life,
+      relationshipCount: depthEvidence.relationships,
+      memoryCount: depthEvidence.memories,
+      skillCount: depthEvidence.skills,
+    }) : null
     return {
       id: person.id,
       personKey: person.person_key,
+      ...(depth ? { personDepth: depth } : {}),
       ...(includeLifeState ? { lifeStage: (lifeByPerson.get(person.id) as any)?.life_stage ?? 'adult' } : {}),
       displayName,
       identityState,
