@@ -7,9 +7,15 @@ Notation wie im Baumeister-Universum: **[R]** reale Vorlage (heute schon so verw
 
 ## Wie Marsianisch klingt
 
-Marsianisch ist Englisch im Gerüst, mit Missions- und Technikjargon der ersten großen Expeditionen, chinesischen Alltagswörtern aus den großen Crews und einer kleinen, aber festen Mishkenaz-Schicht. Die Mishkenaz-Wörter kommen über wenige Menschen in den ersten Expeditionen auf den Mars – zuerst mit Zereyas Tochter (vorläufig, Thomas 26.10.2026) – und halten sich, weil sie etwas sagen können, was die anderen Sprachen nicht so knapp sagen: **woher man etwas weiß** und **welche Art von Fehlen** gemeint ist. Auf einem Planeten, auf dem falsche Information tödlich sein kann und vieles fehlt, ist das kein Schmuck, sondern Werkzeug.
+Marsianisch ist Englisch im Gerüst, mit Missions- und Technikjargon der ersten großen Expeditionen, chinesischen Alltagswörtern aus den großen Crews und einer kleinen, aber festen Mishkenaz-Schicht. Die Mishkenaz-Wörter kommen über wenige Menschen in den ersten Expeditionen auf den Mars – zuerst mit Zereyas Tochter Soraya Adar (vorläufig, Thomas 26.10.2026) – und halten sich, weil sie etwas sagen können, was die anderen Sprachen nicht so knapp sagen: **woher man etwas weiß** und **welche Art von Fehlen** gemeint ist. Auf einem Planeten, auf dem falsche Information tödlich sein kann und vieles fehlt, ist das kein Schmuck, sondern Werkzeug.
 
 Grundregel für die Gesprächs-KI: Figuren benutzen diese Wörter nur, wenn sie Marsianisch sprechen (auf dem Mars geboren oder lange dort), und nur aus dieser Liste. Die Mishkenaz-Vor- und Nachsilben dürfen sie frei mit Wörtern jeder Sprache verbinden. Die Übersetzung gibt sie sinngemäß wieder, lässt das Wort aber stehen.
+
+### Warum gerade diese Mishkenaz-Wörter
+
+Sorayas Zeitprofil (*Mishkenaz und die Zeit*): kaum Zeitpartikeln, oft nur Aspekt, lebendiges *olam*. Kam Mishkenaz mit ihr auf den Mars, dann hat das Marsianische von Mishkenaz vor allem **Aspekte, Herkunftsmarker (Evidentiale) und Verlustformen** übernommen – und kaum die Zeitpartikeln *avar* und *atid*. Das passt zur Liste: Die Zeitwörter kommen aus dem Missionsjargon (*tosol*, *yestersol*, *solmorrow*), das Mishkenaz liefert, *wie* man etwas weiß und *was* fehlt.
+
+Kandidat, noch nicht in der Liste: **olam** [W] „zeitlos, ewig“ – auf dem Mars für Grabinschriften und Schwüre („olam-saha“: für immer, und ich war dabei). [OFFEN]
 
 ## Zeit (Sol)
 
@@ -91,5 +97,5 @@ Nach NOXIA-LIVING-0014 hat jeder länger isolierte Ort seinen Dialekt. Erste Ide
 ## Offen
 
 - [OFFEN] *nev* für die Toten – passt die Bedeutungsverschiebung zum Kanon, oder ist das Wort zu schwer für den Alltag?
-- Herkunft der Mishkenaz-Schicht (Thomas, 26.10.2026, vorläufig): **Mishkenaz kam mit Zereyas Tochter zuerst auf den Mars.** [OFFEN] Name, Jahr und Expedition der Tochter aus dem Buchkanon; welche Wörter sie mitbrachte und wie sie sich in der Crew verbreiteten. Möglicher Anschluss als Figur über `docs/characters/literary-crossovers-2026-10.md` – Bücherkanon bleibt unberührt.
+- Herkunft der Mishkenaz-Schicht (Thomas, 26.10.2026, vorläufig): **Mishkenaz kam mit Zereyas Tochter Soraya Adar (Soraya Bat Zereya, geb. 22.02.2025) zuerst auf den Mars.** 2087 lebt sie mit 62 Jahren dort, gemeinsam mit Zereya. Quellenseite: `docs/characters/adar-berger-line.md`. [OFFEN] Mit welcher Expedition und in welchem Jahr sie kam.
 - [OFFEN] Gibt es Wörter aus deinen Büchern (Band 1, Mars 2087), die hierher gehören?
