@@ -354,6 +354,26 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   useEffect(() => { engineReady?.setPlots(plots) }, [engineReady, plots])
   useEffect(() => { engineReady?.setParcelOwners(parcelOwners) }, [engineReady, parcelOwners])
 
+  // Genaue Hauptstraßen, Kreisel und Gleise: Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
+  const lineCells = useRef(new Set<string>())
+  useEffect(() => {
+    if (!hud || !engineReady) return
+    const here = { lat: hud.lat, lon: hud.lon }
+    const cell = parcelCell(here)
+    if (lineCells.current.has(cell.key)) return
+    lineCells.current.add(cell.key)
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/world-lab/lines', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(here) })
+        const json = await response.json().catch(() => null)
+        if (json?.ok && !json.cached && json.lines > 0) { fresh.current = String(Date.now()); engineReady.reloadTiles() }
+        if (json && json.ok === false) console.error('[world-lab] Linien', json.error)
+      } catch (reason) { console.error('[world-lab] Linien', reason) }
+    })()
+  }, [hud, engineReady])
+
   // Flurstücke (Länder mit offenem Kataster): Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
   const parcelCells = useRef(new Set<string>())
   useEffect(() => {

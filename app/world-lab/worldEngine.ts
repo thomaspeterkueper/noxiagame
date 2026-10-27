@@ -509,6 +509,17 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: place.k, tags: place.t ?? {}, ...(place.p ? { poi: true } : {}) }
   }
 
+  /** Linie (x/y abwechselnd, Meter) um `by` Meter seitlich versetzt (Geländer). */
+  function offsetLine(flat: number[], by: number) {
+    const pts: Array<{ x: number; y: number }> = []
+    for (let i = 0; i + 1 < flat.length; i += 2) pts.push({ x: flat[i], y: flat[i + 1] })
+    return pts.map((p, i) => {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]
+      const length = Math.hypot(b.x - a.x, b.y - a.y) || 1
+      return { x: p.x - (b.y - a.y) / length * by, y: p.y + (b.x - a.x) / length * by }
+    })
+  }
+
   function drawGround(entry: Loaded) {
     const { data, ox, oy } = entry
     const g = new PIXI.Graphics()
@@ -579,6 +590,22 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       }
     }
     for (const road of data.roads) stroke(sf, path(road.p), ROAD_STYLES[road.c].widthM, ROAD_STYLES[road.c].color)
+    // Brücken: Schatten aufs Wasser, Fußweg seitlich, Geländer auf beiden Seiten, Fahrbahn obenauf
+    for (const road of data.roads) {
+      if (!road.b) continue
+      const width = ROAD_STYLES[road.c].widthM, deck = road.c === 'path' ? width + 0.6 : width + 2.4
+      const shadow: number[] = []
+      for (let i = 0; i < road.p.length; i += 2) { const q = iso(ox + road.p[i] + 0.9, oy + road.p[i + 1] + 0.9); shadow.push(q.x, q.y) }
+      sf.moveTo(shadow[0], shadow[1]); for (let i = 2; i < shadow.length; i += 2) sf.lineTo(shadow[i], shadow[i + 1])
+      sf.stroke({ width: deck * 0.75, color: 0x24363d, alpha: 0.28, cap: 'butt', join: 'round' })
+      stroke(sf, path(road.p), deck, 0xcfc9bd)
+      for (const side of [deck / 2, -deck / 2]) {
+        const rail = offsetLine(road.p, side).flatMap(q => { const v = iso(ox + q.x, oy + q.y); return [v.x, v.y] })
+        sf.moveTo(rail[0], rail[1]); for (let i = 2; i < rail.length; i += 2) sf.lineTo(rail[i], rail[i + 1])
+        sf.stroke({ width: 0.45, color: 0x5d6466, cap: 'butt', join: 'round' })
+      }
+      stroke(sf, path(road.p), width, ROAD_STYLES[road.c].color)
+    }
     // Kreisverkehr: begrünte Mittelinsel mit Bordstein
     for (const island of data.islands ?? []) {
       const p = path(island)
