@@ -95,7 +95,6 @@ async function createChild(supabase: SB, partnership: any, tick: number, peopleB
 
   const childId = deterministicUuid(`noxia-family-child:${partnership.id}:${tick}`)
   const displayName = childName(partnership.id, tick, parentA.display_name, parentB.display_name)
-  const personKey = `family_child:${partnership.id}:${tick}`
 
   const { data: existing } = await supabase.from('people').select('id').eq('id', childId).maybeSingle()
   if (!existing) {
@@ -108,7 +107,7 @@ async function createChild(supabase: SB, partnership: any, tick: number, peopleB
       last_action: 'newborn',
       last_decision_factors: { familyBirth: true, partnershipId: partnership.id },
       last_tick: tick,
-      person_key: personKey,
+      person_key: null,
       traits: { family_origin: 'born_in_noxia' },
       observable_description: 'Kind',
     })
@@ -122,6 +121,31 @@ async function createChild(supabase: SB, partnership: any, tick: number, peopleB
       last_family_event_tick: tick,
     })
     if (lifeError) throw lifeError
+
+    // Newborn cognition starts cheap and mostly asleep/routine. Developmental
+    // capacity is derived later from age_ticks; the child is never born with
+    // adult deliberative depth.
+    const { error: cognitiveError } = await supabase.from('person_cognitive_state').insert({
+      person_id: childId,
+      mode: 'sleep',
+      compute_tier: 0,
+      trigger_score: 0,
+      last_consolidation_tick: null,
+      last_insight_tick: null,
+      insight_cooldown_until_tick: null,
+      updated_tick: tick,
+    })
+    if (cognitiveError) throw cognitiveError
+
+    const { error: regulationError } = await supabase.from('person_regulation_state').insert({
+      person_id: childId,
+      stress_axis: 0.35,
+      social_bonding_tone: 0.20,
+      reward_drive: 0.25,
+      arousal: 0.25,
+      updated_tick: tick,
+    })
+    if (regulationError) throw regulationError
 
     const { error: parentError } = await supabase.from('person_parent_child').insert([
       { parent_id: partnership.person_a_id, child_id: childId, partnership_id: partnership.id, created_tick: tick },
@@ -222,13 +246,14 @@ async function updateFamilyDemand(supabase: SB, tick: number) {
 export async function runSocialLifeTick(supabase: SB, tick: number) {
   const result = { aged: 0, friendships: 0, partnerships: 0, familyReady: 0, births: 0, demandLocations: 0 }
 
-  const [{ data: people }, { data: lifeRows }, { data: relationRows }, { data: partnershipRows }, { data: locations }, { data: regulationRows }] = await Promise.all([
+  const [{ data: people }, { data: lifeRows }, { data: relationRows }, { data: partnershipRows }, { data: locations }, { data: regulationRows }, { data: parentChildRows }] = await Promise.all([
     supabase.from('people').select('id, display_name, current_location_id'),
     supabase.from('person_life_state').select('*'),
     supabase.from('person_relationships').select('*'),
     supabase.from('person_partnerships').select('*').eq('status', 'active'),
     supabase.from('locations').select('id, is_supplied, population, population_max'),
     supabase.from('person_regulation_state').select('person_id,stress_axis,social_bonding_tone,reward_drive,arousal'),
+    supabase.from('person_parent_child').select('parent_id,child_id'),
   ])
 
   const peopleById = new Map<string, any>((people ?? []).map((row: any) => [String(row.id), row] as [string, any]))
@@ -243,6 +268,20 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
       arousal:Number(row.arousal),
     } as RegulationState,
   ]))
+  const kinPairs = new Set<string>()
+  const childrenByParent = new Map<string,string[]>()
+  for (const row of parentChildRows ?? []) {
+    kinPairs.add(pairKey(String(row.parent_id),String(row.child_id)))
+    const children = childrenByParent.get(String(row.parent_id)) ?? []
+    children.push(String(row.child_id))
+    childrenByParent.set(String(row.parent_id),children)
+  }
+  // Siblings sharing at least one parent are also excluded from partnership.
+  for (const children of childrenByParent.values()) {
+    for (let i=0;i<children.length;i++) for (let j=i+1;j<children.length;j++) {
+      kinPairs.add(pairKey(children[i],children[j]))
+    }
+  }
 
   const missingLifeRows = (people ?? []).filter((person: any) => !lifeById.has(person.id)).map((person: any) => ({
     person_id: person.id,
@@ -317,7 +356,7 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
   const seenPairs = new Set<string>()
   for (const relation of relationByDirection.values()) {
     const key = pairKey(relation.person_id, relation.other_person_id)
-    if (seenPairs.has(key)) continue
+    if (seenPairs.has(key) || kinPairs.has(key)) continue
     seenPairs.add(key)
     const reciprocal = relationByDirection.get(`${relation.other_person_id}\u0000${relation.person_id}`)
     if (!reciprocal || !qualifiesPartner(relation) || !qualifiesPartner(reciprocal)) continue
