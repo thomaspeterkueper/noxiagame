@@ -1,4 +1,6 @@
 'use client'
+// Aktualisiert: 27.10.2026 — Druckkorridore zwischen Habitat, Lebenserhaltung, Lager und Werkstatt: ohne Anzug kommt man von Gebäude zu Gebäude
+// Version:      1.1.0
 
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore, type LocationSlug, type ResourceType } from '@/lib/store/gameStore'
@@ -23,6 +25,9 @@ import WarehouseOverlay from './WarehouseOverlay'
 type Props = { locations: any[]; prices: any[]; orders: any[] }
 const INTERIOR_ALIAS: Record<string, string> = { landing_pad_moon: 'landing_pad', surface_workshop: 'shipyard', surface_comms: 'command_center' }
 
+/** Bauten mit Luft, die eine Druckröhre verbindet (Shackleton Base Alpha). Landeplatz, Roverhof, Solar und Speicher bleiben draußen. */
+const SHACKLETON_PRESSURIZED_NODES = new Set(['alpha_habitat_1', 'alpha_life_support_1', 'alpha_warehouse_1', 'alpha_workshop_1'])
+
 const SHACKLETON_CORRIDORS: PreparedCorridor[] = (() => {
   const nodes = new Map(SHACKLETON_BASE_ALPHA_NODES.map(node => [node.id, node]))
   const seen = new Set<string>()
@@ -35,6 +40,7 @@ const SHACKLETON_CORRIDORS: PreparedCorridor[] = (() => {
     return [{
       id: `shackleton-corridor-${index}`,
       kind: edge.corridor,
+      pressurized: SHACKLETON_PRESSURIZED_NODES.has(edge.from) && SHACKLETON_PRESSURIZED_NODES.has(edge.to),
       points: [{ xM: from.xM, yM: from.yM }, { xM: to.xM, yM: to.yM }],
     }]
   })

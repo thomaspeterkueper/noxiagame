@@ -129,6 +129,18 @@ Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie an
 - Rolle nur, wenn die Person bekannt ist (`identityState === 'known'`), wie in der Koloniesicht; Name nach `personSceneLabel`.
 - Kantinenroboter und Automat (NOXIA-LIVING-0013) bekommen ein eigenes Maschinenbild statt eines Menschenporträts.
 
+### G-6 (Bevölkerung und Ökonomie, 27.10.2026): Gespräche – Protokoll, Abbruchsatz und Befunde aus der Testphase
+
+Ausnahmsweise direkt gebaut, auf Wunsch von Thomas (27.10.2026). Er wollte, dass Gespräche gespeichert und ausgewertet werden und dass Figuren bei immer wieder ähnlichen Fragen abbrechen. `app/api/game/npc-conversation/route.ts` 1.2.0 schreibt jede Wortmeldung in `npc_conversation_log`. Die Erkennung von Wiederholungen liegt in `lib/game/cognition/conversationRepeat.ts`. Details und Abfragen: `docs/reviews/npc-gespraeche-testphase.md`.
+
+- **Für die Gesprächsfenster:** Die Antwort trägt `conversationEnded: true` bei Abbruch und Abweisung. Das Fenster könnte sich dann schließen oder das Eingabefeld für eine Weile sperren. Heute setzt der Server die Abweisung allein durch.
+- **Befunde aus 69 Wortwechseln zum Gesprächsaufbau:**
+  - Mars-Vokabular auf der Erde („auf dem Weg zum Habitat“ im Sauerland);
+  - eine Figur in Sundern sagt, es gebe keine Straßen;
+  - eine Bestellung wird ergänzt („und die Vorspeise“);
+  - eine unbelegte Wegbeschreibung („vorne links“).
+- Die ersten drei sprechen für fehlenden oder falschen Ortskontext. Bitte prüfen, welche `localFacts` und welcher `locationName` dort mitgegeben werden.
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.

@@ -1,4 +1,6 @@
 'use client'
+// Aktualisiert: 27.10.2026 — Klick auf freie Fläche zeigt Bauhinweis mit Weg in die Bauplanung; WASD läuft bis an die Wand statt ganz stehenzubleiben
+// Version:      1.1.0
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
@@ -76,6 +78,8 @@ export default function PlanetaryWalkableSurface({
   // Draußen nur im Anzug oder im Fahrzeug (Thomas, 27.10.2026). Anzug an jeder Schleuse, Rover am Fahrzeughof.
   const[outfit,setOutfit]=useState<LocalSceneOutfit>('none')
   const[wallNote,setWallNote]=useState('')
+  // Angeklickte freie Fläche (Weltmeter) – Bauen läuft über die Bauplanung (Thomas, 27.10.2026).
+  const[groundSpot,setGroundSpot]=useState<{xM:number;yM:number}|null>(null)
   const rules=useMemo<LocalSceneMovementRules>(()=>({pressurized:true,outfit}),[outfit])
   const[personPanelOpen,setPersonPanelOpen]=useState(false)
   const[objectPanelOpen,setObjectPanelOpen]=useState(false)
@@ -214,7 +218,15 @@ export default function PlanetaryWalkableSurface({
       const step=(event.shiftKey?8:4)*(outfit==='rover'?2.5:1)
       setPlayer(current=>{
         const desired={xM:current.xM+(key==='d'?step:key==='a'?-step:0),yM:current.yM+(key==='s'?step:key==='w'?-step:0)}
-        const next=resolveLocalSceneStep(scene,current,desired,.8,rules)
+        // In Metern unterteilt: bis an die Wand gehen, statt vor ihr ganz stehenzubleiben.
+        const parts=Math.max(1,Math.ceil(step))
+        let next=current
+        for(let i=1;i<=parts;i++){
+          const target={xM:current.xM+(desired.xM-current.xM)*i/parts,yM:current.yM+(desired.yM-current.yM)*i/parts}
+          const moved=resolveLocalSceneStep(scene,next,target,.8,rules)
+          if(Math.hypot(moved.xM-next.xM,moved.yM-next.yM)<.01)break
+          next=moved
+        }
         // Gegen die Wand gelaufen: sagen, warum
         if(Math.hypot(next.xM-current.xM,next.yM-current.yM)<.01)setWallNote(outfit==='none'?'Draußen nur im Anzug oder Rover – Anzüge gibt es an jeder Schleuse.':outfit==='rover'?'Mit dem Rover nicht in Gebäude oder Röhren – am Fahrzeughof abstellen.':'')
         else setWallNote('')
@@ -232,10 +244,19 @@ export default function PlanetaryWalkableSurface({
   if(!scene)return <div className="planetary-walkable-loading" style={loadingStyle}>{title.toUpperCase()} · LOKALE SZENE WIRD AUFGEBAUT …</div>
 
   return <section className={'planetary-walkable '+body}>
-    <header><div><small>{body.toUpperCase()} · LOCAL SCENE</small><b>{title}</b><span>{scene.frameId}</span></div><div className="stats"><span>{scene.buildings.length} Gebäude</span><span>{scene.paths.length} Wege/Korridore</span><span>{scene.mobileObjects.length} Akteure/Objekte</span></div><button onClick={onClose}>← Karte</button></header>
+    <header><div><small>{body.toUpperCase()} · LOCAL SCENE</small><b>{title}</b><span>{scene.frameId}</span></div><div className="stats"><span>{scene.buildings.length} Gebäude</span><span>{scene.paths.length} Wege/Korridore</span><span>{scene.mobileObjects.length} Akteure/Objekte</span></div><button onClick={onClose} title="Zur Karte – dort wird gebaut">← Karte · Bauen</button></header>
     <div className="stage" onWheel={event=>{const factor=event.deltaY>0?1/1.12:1.12;setZoom(value=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,value*factor)))}}>
       <WalkableSurfaceSvg>
-        <rect width={VIEW_W} height={VIEW_H} fill={(TERRAIN_PALETTES[body]??TERRAIN_PALETTES.phobos).grainDark}/>
+        <rect width={VIEW_W} height={VIEW_H} fill={(TERRAIN_PALETTES[body]??TERRAIN_PALETTES.phobos).grainDark} onClick={event=>{
+          // Bildschirm → Weltmeter: Zoom und Kamera zurückrechnen, dann die Iso-Projektion umkehren.
+          const svg=(event.currentTarget as SVGRectElement).ownerSVGElement,matrix=svg?.getScreenCTM()
+          if(!svg||!matrix)return
+          const pt=svg.createSVGPoint();pt.x=event.clientX;pt.y=event.clientY
+          const local=pt.matrixTransform(matrix.inverse()),cam=iso(player)
+          const u=((local.x-VIEW_W/2)/zoom+cam.x-WALKABLE_VIEW.width/2)/WALKABLE_VIEW.isoX
+          const v=((local.y-VIEW_H/2)/zoom+cam.y-WALKABLE_VIEW.height/2)/WALKABLE_VIEW.isoY
+          setSelectedId('');setAutoWalkId('');setGroundSpot({xM:Math.round((u+v)/2),yM:Math.round((v-u)/2)})
+        }}/>
         <g transform={`translate(${VIEW_W/2} ${VIEW_H/2}) scale(${zoom}) translate(${-iso(player).x} ${-iso(player).y})`}>
         {decor&&<SurfaceTerrainLayer body={body} decor={decor} extentM={TERRAIN_EXTENT_M} detailed={zoom>=PEBBLE_ZOOM}/>}
         {/* Kabel auf dem Boden: Energie vom Solarfeld zum Speicher, Mast und Speicher zum Habitat */}
@@ -338,6 +359,13 @@ export default function PlanetaryWalkableSurface({
       </div>
       {hoveredBuildingId&&(()=>{const building=scene.buildings.find(item=>item.id===hoveredBuildingId);if(!building)return null;const entity=spatial?.entities?.find(item=>item.id===building.id);return <div className="building-hover"><small>GEBÄUDE</small><b>{building.label??building.entityId??'Gebäude'}</b><span>{entity?.owner_class==='STATE'?'Staatlich':entity?.owner_class==='CORPORATION'?'Corporation':entity?.profile_id?'Privat':'Neutral'} · {Math.round(Math.hypot(building.center.xM-player.xM,building.center.yM-player.yM))} m</span></div>})()}
 
+      {groundSpot&&!selected&&<div className="target">
+        <small>FREIE FLÄCHE</small>
+        <b>{groundSpot.xM} m / {groundSpot.yM} m</b>
+        <span>Gebaut wird in der Bauplanung auf der Karte – dort Fläche wählen und Gebäude setzen.</span>
+        <button onClick={()=>{setGroundSpot(null);onClose()}}>HIER BAUEN → KARTE</button>
+        <button onClick={()=>setGroundSpot(null)}>SCHLIESSEN</button>
+      </div>}
       {selected&&<div className="target">
         <small>{selected.kind.toUpperCase()} · {route?.usesNetwork?'NETZROUTE':'DIREKTE ROUTE'}</small>
         <b>{selected.label}</b>

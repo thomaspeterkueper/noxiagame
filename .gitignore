@@ -17,6 +17,7 @@
 /.catapult-test
 /.spatial-test
 /.location-body-test
+/.conversation-repeat-test
 
 # next.js
 /.next/

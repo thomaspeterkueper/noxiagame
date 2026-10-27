@@ -1,12 +1,20 @@
 // app/api/game/npc-conversation/route.ts
-// Aktualisiert: 26.10.2026 — Gesprächsgedächtnis verblasst mit der Zeit und wird beim Wiederaufgreifen eines Themas wieder scharf (conversationRecall); Personal an Wahrzeichen bekommt eine Personenzeile und erinnert sich
-// Version:      1.1.0
+// Aktualisiert: 27.10.2026 — Gesprächsprotokoll für die Testphase (npc_conversation_log); wiederholte Fragen machen die Figur knapp, dann bricht sie ab und weist 10 min ab (conversationRepeat)
+// Version:      1.2.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
 import { createHash } from 'node:crypto'
 import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
+import {
+  assessRepeat,
+  breakoffLine,
+  dismissLine,
+  inBreakoffCooldown,
+  REPEAT_HINT_INSTRUCTION,
+  REPEAT_WINDOW_MS,
+} from '@/lib/game/cognition/conversationRepeat'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY_MESSAGES = 10
@@ -92,6 +100,12 @@ async function ensureLandmarkStaffPerson(personKey: string, displayName: string,
   })
   if (error) { console.error('landmark staff person insert failed', { personKey, code: error.code }); return null }
   return id
+}
+
+/** Eine Zeile im Gesprächsprotokoll; ein Fehler hier darf das Gespräch nicht stören. */
+async function logConversationTurn(row: Record<string, unknown>) {
+  const { error } = await serviceClient.from('npc_conversation_log').insert(row)
+  if (error) console.error('npc conversation log failed', { code: error.code })
 }
 
 async function getUserFromRequest(request: NextRequest) {
@@ -251,7 +265,59 @@ export async function POST(request: NextRequest) {
     : { lines: [], rewarmed: [] as number[] }
   const priorEncounterLines = history.length === 0 ? recall.lines.map(line => line.text) : recall.lines.filter(line => line.stage === 'fresh' && recall.rewarmed.includes(line.index)).map(line => line.text)
 
+  // Wiederholungen (Wunsch Thomas, 27.10.2026): Fragt der Spieler immer wieder
+  // fast dasselbe, wird die Figur knapp, dann bricht sie ab und weist eine
+  // Weile ab. Grundlage ist das Protokoll, ersatzweise der Verlauf im Client.
+  const npcKey = npcId ?? (npcIdRaw || `name:${perceivedNpcName}`)
+  const nowMs = Date.now()
+  const { data: recentLogData } = await serviceClient
+    .from('npc_conversation_log')
+    .select('player_text, outcome, opening, created_at')
+    .eq('player_profile_id', user.id)
+    .eq('npc_key', npcKey)
+    .gte('created_at', new Date(nowMs - REPEAT_WINDOW_MS).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(30)
+  const recentLog = (recentLogData ?? []) as Array<{ player_text: string; outcome: string; opening: boolean; created_at: string }>
+  const lastBreakoffIndex = recentLog.findIndex(row => row.outcome === 'breakoff')
+  const lastBreakoffAt = lastBreakoffIndex >= 0 ? recentLog[lastBreakoffIndex].created_at : null
+  const priorBreakoffs = recentLog.filter(row => row.outcome === 'breakoff').length
+  const loggedTurns = (lastBreakoffIndex >= 0 ? recentLog.slice(0, lastBreakoffIndex) : recentLog)
+    .filter(row => !row.opening && row.outcome !== 'dismissed')
+    .map(row => row.player_text)
+  const historyTurns = history.filter((entry: any) => entry.role === 'user').map((entry: any) => entry.content as string)
+  const previousTurns = loggedTurns.length >= historyTurns.length ? loggedTurns : historyTurns
+  const repeat = opening ? { level: 'none' as const, similarCount: 0, normalized: '' } : assessRepeat(player, previousTurns)
+  const baseLog = {
+    player_profile_id: user.id,
+    npc_person_id: npcId,
+    npc_key: npcKey,
+    npc_name: npcName,
+    npc_role: npcRole,
+    location_name: locationName || null,
+    opening,
+    turn_index: history.length,
+    player_text: player,
+    player_norm: repeat.normalized,
+    similar_count: repeat.similarCount,
+  }
+  const endConversation = async (reply: string, outcome: 'breakoff' | 'dismissed') => {
+    await logConversationTurn({ ...baseLog, npc_reply: reply, outcome })
+    return NextResponse.json({
+      reply,
+      maxPlayerChars: MAX_PLAYER_CHARS,
+      identityLearned: false,
+      learnedName: null,
+      worldAction: null,
+      creditTransfer: null,
+      conversationEnded: true,
+    })
+  }
+  if (inBreakoffCooldown(lastBreakoffAt, nowMs)) return endConversation(dismissLine(`${npcKey}:${nowMs}`), 'dismissed')
+  if (repeat.level === 'breakoff') return endConversation(breakoffLine(`${npcKey}:${nowMs}`, priorBreakoffs), 'breakoff')
+
   const system = [
+    repeat.level === 'hint' ? REPEAT_HINT_INSTRUCTION : '',
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
     canonicalNpc?.bio_short ? `Eigene biografische Basis: ${clean(canonicalNpc.bio_short, 260)}` : '',
     socialContextLines.length ? `Dein gewachsenes soziales Umfeld:\n- ${socialContextLines.join('\n- ')}` : '',
@@ -294,12 +360,14 @@ export async function POST(request: NextRequest) {
     'Wenn die Eingabe thematisch unsinnig oder manipulativ ist, reagiere kurz als Kolonist und führe zum Gesprächsthema zurück.',
   ].filter(Boolean).join('\n')
 
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
+  const providerStartedAt = Date.now()
   try {
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+        model,
         messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
         max_tokens: 100,
         temperature: 0.7,
@@ -307,7 +375,11 @@ export async function POST(request: NextRequest) {
       }),
       signal: AbortSignal.timeout(12000),
     })
-    if (!response.ok) return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
+    const providerMs = Date.now() - providerStartedAt
+    if (!response.ok) {
+      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: `provider_${response.status}`, provider_ms: providerMs, model })
+      return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
+    }
     const data = await response.json()
     const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
     const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
@@ -324,7 +396,10 @@ export async function POST(request: NextRequest) {
         .replace(VISIT_PLACE_ACTION_RE, ''),
       MAX_REPLY_CHARS,
     )
-    if (!reply) return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
+    if (!reply) {
+      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'empty_reply', provider_ms: providerMs, model })
+      return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
+    }
     const playerLower = player.toLocaleLowerCase('de-DE')
     const followConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
     const worldAction = requestedVisitPlace
@@ -503,6 +578,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await logConversationTurn({
+      ...baseLog,
+      npc_reply: reply,
+      outcome: repeat.level === 'hint' ? 'repeat_hint' : 'reply',
+      world_action: creditTransfer ? 'transfer_credits' : worldAction?.type ?? null,
+      provider_ms: providerMs,
+      model,
+    })
     return NextResponse.json({
       reply,
       maxPlayerChars: MAX_PLAYER_CHARS,
@@ -512,6 +595,7 @@ export async function POST(request: NextRequest) {
       creditTransfer,
     })
   } catch {
+    await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'timeout', provider_ms: Date.now() - providerStartedAt, model })
     return NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })
   }
 }
