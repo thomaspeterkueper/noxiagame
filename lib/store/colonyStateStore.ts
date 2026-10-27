@@ -36,6 +36,7 @@ export type ColonyBuild = {
 
 export type ColonyResident = {
   id: string
+  personDepth?: { level: 'persistent' | 'situated' | 'developed' | 'focal'; score: number; reasons: string[] }
   displayName: string
   lifeStage?: 'child' | 'adult'
   identityState?: 'unknown' | 'inferred' | 'known'
