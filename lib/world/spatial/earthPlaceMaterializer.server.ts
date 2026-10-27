@@ -319,11 +319,16 @@ way[landuse=residential](${box});
  * überlasteten Servern (27.10.2026: alle Abrufe scheiterten nach 9 s) kommt so
  * noch eine Antwort; je Profil gewinnt die erste brauchbare.
  */
-async function loadNormalizedFeaturesPatiently(bounds: Bounds) {
+async function loadNormalizedFeaturesPatiently(bounds: Bounds, requireFull = false) {
   const failures: string[] = []
   const endpoints = [...OVERPASS_ENDPOINTS, ...PATIENT_EXTRA_ENDPOINTS]
   const longer = (query: string) => query.replace(/\[timeout:\d+\]/, `[timeout:${PATIENT_SERVER_TIMEOUT_S}]`)
-  for (const profile of [{ name: 'compact-v2', query: longer(compactQueryFor(bounds)) }, { name: EARTH_IMPORT_PROFILE, query: longer(queryFor(bounds)) }]) {
+  // Ohne wartenden Spieler zuerst das volle Profil (Wahrzeichen, Sport, Bahn …);
+  // das Notprofil nur, wenn sonst gar nichts käme (28.10.2026: Vuiteboeuf,
+  // Seelenberg und Dvārakā blieben sonst beim Notprofil stehen).
+  const profiles = [{ name: EARTH_IMPORT_PROFILE, query: longer(queryFor(bounds)) }]
+  if (!requireFull) profiles.push({ name: 'compact-v2', query: longer(compactQueryFor(bounds)) })
+  for (const profile of profiles) {
     const controllers = endpoints.map(() => new AbortController())
     try {
       return await Promise.any(endpoints.map(async (endpoint, index) => {
@@ -402,6 +407,8 @@ export async function materializeEarthPlace(input: {
   refreshGeography?: boolean
   /** Ohne wartenden Spieler (stündlicher Lauf): länger warten, alle Spiegel. */
   patient?: boolean
+  /** Nur das volle Profil annehmen (Nachbessern eines Notprofils, 28.10.2026). */
+  requireFull?: boolean
 }) {
   const requestedRadiusKm = Math.min(2.5, Math.max(2.2, input.radiusKm ?? 2.2))
   const supabase = createServiceClient()
@@ -496,7 +503,7 @@ export async function materializeEarthPlace(input: {
 
   const checkedAt = new Date().toISOString()
   try {
-    const loaded = input.patient ? await loadNormalizedFeaturesPatiently(targetBounds) : await loadNormalizedFeatures(targetBounds)
+    const loaded = input.patient ? await loadNormalizedFeaturesPatiently(targetBounds, input.requireFull) : await loadNormalizedFeatures(targetBounds)
     if (!loaded.features.length) throw new Error('Keine verwertbaren Realwelt-Features gefunden')
     const rows = loaded.features.map(feature => ({ ...feature, region_id: regionId }))
     const insertedIds: string[] = []
