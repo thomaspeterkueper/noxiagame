@@ -1,0 +1,21 @@
+name: Seelenberg food route adapter
+on:
+  pull_request:
+    paths:
+      - 'experiments/seelenberg/food-route-adapter*'
+      - '.github/workflows/seelenberg-food-route.yml'
+  push:
+    branches:
+      - 'feat/seelenberg-food-route-adapter'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test experiments/seelenberg/food-route-adapter.test.mjs
+      - run: pnpm test:food-chain
