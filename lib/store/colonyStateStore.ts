@@ -131,7 +131,7 @@ export const useColonyStateStore = create<ColonyState>((set, get) => ({
       const [buildResponse, worldResponse, populationResponse] = await Promise.all([
         fetch('/api/game/build', { headers, cache: 'no-store' }),
         fetch('/api/game/world', { cache: 'no-store' }),
-        fetch(`/api/game/population?locationSlug=${encodeURIComponent(locationSlug)}`, { headers, cache: 'no-store' }),
+        fetch(`/api/game/population?includeDepth=1&locationSlug=${encodeURIComponent(locationSlug)}`, { headers, cache: 'no-store' }),
       ])
 
       if (serial !== requestSerial) return
