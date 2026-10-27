@@ -297,3 +297,17 @@ Die neue Beratungsmappe in der Bank (`bankAdvice` in `lib/game/bank/bankInterior
 Auf der Erde hat ein Spieler aber vor allem gekaufte Häuser und Lokale mit Mieteinnahmen (R-12, R-13). Sie zählen bisher nicht.
 
 **Bitte:** Ertragswert gekaufter Häuser (Miete) und Lokale (Umsatz) als Sicherheit aufnehmen. Danach den Satz „als Sicherheit zählen hier Gebäude mit Förderertrag und Schiffe“ in `bankAdvice` anpassen.
+
+### R-17 (Erdkarte, 28.10.2026): Einstiegsquiz – Ergebnis zeigen und weiter nutzen
+
+Thomas, 27.10.2026: „Was passiert aktuell mit den Antworten der Fragen, die die Person zu Beginn gestellt werden?“ – und auf den Befund hin: „Ja mache das“.
+
+**Stand heute:** `app/api/game/onboarding-quiz/route.ts` erzeugt 7 Fragen aus verschiedenen Fachgebieten (Claude Haiku, sonst fester Ersatzsatz). Die Lösungen liegen nur auf dem Server (`onboarding_quiz_attempts`). Ausgewertet wird nur die Zahl der richtigen Antworten. Daraus wird eine Stufe 1–6, gespeichert in `profiles.knowledge_level`. Welche Antwort gewählt wurde, wird nicht gespeichert. Gelesen wird die Stufe nur von der Akademie (`app/dashboard/SchoolOverlay.tsx`, Schwierigkeit der Aufgaben). Wer überspringt, hat Stufe 1. Keine Freischaltungen, kein Einfluss auf Startort, Geld oder Beruf. Live: ein Versuch, 7/7, Stufe 6.
+
+**Was fehlt:**
+
+1. **Ergebnis zeigen.** Der Server gibt `score`, `total` und `level` zurück, `WelcomeSetup.tsx` (`submitQuiz`) springt aber gleich zu den Startkarten. Vorschlag: eine Zeile vor den Karten, etwa „7 von 7 richtig – du beginnst in der Akademie auf Stufe 6“, mit dem Hinweis, dass sich die Stufe später anpasst.
+2. **Stufe anpassen.** Heute bleibt die Stufe für immer, wie das Quiz sie gesetzt hat. Vorschlag: Die Akademie hebt oder senkt `knowledge_level` nach den letzten Ergebnissen (z. B. 4 von 5 richtig auf derselben Stufe → eine Stufe höher, 1 von 5 → eine tiefer), serverseitig in `app/api/game/school/route.ts`.
+3. **Stärken je Fachgebiet nutzen.** Jede Frage hat ein Fachgebiet (`domain`). Vorschlag: Ergebnis je Fachgebiet im Versuch speichern (nicht die einzelnen Antworten) und als Anregung verwenden – Akademie-Aufgaben aus schwächeren Gebieten, Hinweise auf passende Stellen (R-10, Aufgabe 12). Bleibt diagnostisch: keine Freischaltungen, kein Alter (wie bisher im Code festgehalten).
+
+**Zuständigkeit:** Es gibt kein eigenes Teilprojekt für Akademie und Einstieg. Wissen und Lernschwellen liegen schon hier (R-15). Wenn ein Teilprojekt „Bildung“ entsteht, zieht der Request dorthin um.

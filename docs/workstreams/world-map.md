@@ -186,6 +186,10 @@ McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wo
 - Geprüft in der Datenbank (Transaktion, zurückgerollt): Buchung Sundern → Frankfurt 30 Cr, Ticketerlös in der Kasse, zweite Buchung während der Reise abgelehnt, Ankunft erst nach Ablauf.
 - Offen: echte Bahnhöfe und Flughäfen aus den Kartendaten als Abfahrtsorte statt des Knopfes; weitere Reisebüros in anderen Städten.
 
+## Einstiegsquiz (Thomas, 27.10.2026)
+
+Geprüft, was mit den Antworten des Einstiegsquiz geschieht: Sie setzen nur die Schwierigkeitsstufe der Akademie (`profiles.knowledge_level`). Ergebnis anzeigen, Stufe nachführen und Fachgebiete nutzen: Request **R-17** in `population-economy.md`.
+
 ## Staatliche Basis „Selmecke“ (Thomas, 27.10.2026: „sieht furchtbar aus“)
 
 **Befund:** „Selmecke“ ist in den Kartendaten kein Stadtteil, sondern ein Bach und das **Naturschutzgebiet Selmecke** (Schutzklasse 4, 51,331–51,351 / 7,968–7,980). Die 17 staatlichen Bauten (Verwaltung, Schule, Wohnblock mit 8 Bewohnern, Habitat, Labor, Scanner, Fabrik, Werft, zwei Lager, Solarfeld, Raumhafen mit Kern, Service, Lager und drei Landeplätzen) stehen zum Teil darin, in einem Waldtal ohne echte Häuser und Straßen – nur Feldwege. Deshalb wirkte die Basis wie ein Platzhalter auf der Wiese. Dazu kam ein Zeichenfehler: Bilder großer Bauten wurden mit ihrem Bildmaßstab bis 1,4-fach über die Grundfläche hinaus vergrößert (Landeplatz 120 × 90 m als Scheibe von rund 350 m).
