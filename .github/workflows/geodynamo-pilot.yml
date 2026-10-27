@@ -1,0 +1,25 @@
+name: Geodynamo pilot tests
+on:
+  pull_request:
+    paths:
+      - 'lib/game/science/geodynamoPilot*'
+      - 'docs/science/GEODYNAMO-RESEARCH-PILOT.md'
+      - '.github/workflows/geodynamo-pilot.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/science/geodynamoPilot*'
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run lib/game/science/geodynamoPilot.test.ts
