@@ -89,7 +89,7 @@ Das entspricht den drei Pilot-Tests (Normalbetrieb, blockierte Straße, Zusatzna
 
 - **Haushalte:** Getreide → Mühle → Bäckerei → Handel → Haushalte.
 - **Gastronomie:** Lokale, Kantine und Hotel ziehen aus demselben Ortsbestand. Ein Gericht ist eine Zutatenliste in Gramm je Portion (`DISH_INGREDIENTS_G`, Schlüssel sind die bestehenden Codes aus `npc_service_catalog` und `hospitality_menu`, z. B. `restaurant_main`: 300 g Kartoffeln, 200 g Gemüse, 80 g Brot).
-- **Knappheit:** Regel `households_first` (Grundversorgung zuerst, Gastronomie bekommt den Rest) oder `proportional` (alle anteilig). Vorschlag: `households_first`.
+- **Knappheit – entschieden (Thomas, 27.10.2026): `households_first`.** Grundversorgung zuerst, die Gastronomie bekommt den Rest. `proportional` bleibt nur als Vergleich im Forschungslauf.
 - **Nachweis:** Fällt das Mehl aus, fehlt auch der Gaststätte Brot – erst nach der Sperrung, mit stimmender Massenbilanz.
 - **Aktivierung:** Wirkung auf echte Lokale erst nach geprüfter Core-Integration.
 
@@ -99,5 +99,4 @@ Der Pilot-Branch ist 17 Commits vor und 49 hinter `main`, ändert 17 Dateien nur
 
 ## Offen für Thomas
 
-1. Knappheitsregel: `households_first` (Vorschlag) oder `proportional`?
-2. Weitere Ketten (Milch, Fleisch, Obst, Brauerei) erst nach dem Nachweis in Seelenberg?
+1. Weitere Ketten (Milch, Fleisch, Obst, Brauerei) erst nach dem Nachweis in Seelenberg?
