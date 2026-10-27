@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { simulateColonyTick } from '@/lib/game/colonySimulation'
 import { useGameStore } from '@/lib/store/gameStore'
@@ -38,8 +38,12 @@ const chrome=<style>{`
 export default function DashboardPrimaryColony(){
  const location=useGameStore(s=>s.location)
  const mode=useGameModeStore(s=>s.mode),interiorBuildingId=useGameModeStore(s=>s.interiorBuildingId),enterColony=useGameModeStore(s=>s.enterColony),enterPlanning=useGameModeStore(s=>s.enterPlanning),enterInterior=useGameModeStore(s=>s.enterInterior),resetForLocation=useGameModeStore(s=>s.resetForLocation)
- // Zuletzt gewählte Erdansicht; die Erdszene erscheint erst nach Klick (mode 'colony'), also nie im Server-Stand.
- const [earthView,setEarthView]=useState<'scene'|'world'>(()=>{try{return typeof window!=='undefined'&&window.localStorage.getItem(EARTH_VIEW_KEY)==='world'?'world':'scene'}catch{return 'scene'}})
+ // Zuletzt gewählte Erdansicht; ohne Wahl die neue Weltkarte (Thomas, 27.10.2026: Start in der begehbaren Karte).
+ // Die bisherige Erdszene bleibt über den Knopf in der Weltkarte erreichbar.
+ // Erst nach dem Laden aus dem Speicher lesen: Der Server zeichnet die Weltkarte, sonst passen die Stände nicht zusammen.
+ const storedView=useSyncExternalStore(()=>()=>{},()=>{try{return window.localStorage.getItem(EARTH_VIEW_KEY)}catch{return null}},()=>null)
+ const [chosenView,setEarthView]=useState<'scene'|'world'|null>(null)
+ const earthView:'scene'|'world'=chosenView??(storedView==='scene'?'scene':'world')
  const chooseEarthView=(view:'scene'|'world')=>{setEarthView(view);try{window.localStorage.setItem(EARTH_VIEW_KEY,view)}catch{/* ohne Speicher: nur für diesen Besuch */}}
  const userId=useColonyStateStore(s=>s.userId),locations=useColonyStateStore(s=>s.locations),entities=useColonyStateStore(s=>s.entities),builds=useColonyStateStore(s=>s.builds),residents=useColonyStateStore(s=>s.residents),loading=useColonyStateStore(s=>s.loading),error=useColonyStateStore(s=>s.error),refresh=useColonyStateStore(s=>s.refresh)
 

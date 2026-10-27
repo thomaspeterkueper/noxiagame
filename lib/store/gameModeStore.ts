@@ -11,12 +11,15 @@ interface GameModeState {
   resetForLocation: () => void
 }
 
+// Start in der begehbaren Ansicht, nicht in der Übersichtskarte (Thomas, 27.10.2026:
+// „man startet mit der begehbaren Karte und nicht mit der Übersicht“). Die Übersicht
+// bleibt über „Karte“ im Cockpit erreichbar.
 export const useGameModeStore = create<GameModeState>((set) => ({
-  mode: 'planning',
+  mode: 'colony',
   interiorBuildingId: null,
 
   enterColony: () => set({ mode: 'colony', interiorBuildingId: null }),
   enterPlanning: () => set({ mode: 'planning', interiorBuildingId: null }),
   enterInterior: (buildingId) => set({ mode: 'interior', interiorBuildingId: buildingId }),
-  resetForLocation: () => set({ mode: 'planning', interiorBuildingId: null }),
+  resetForLocation: () => set({ mode: 'colony', interiorBuildingId: null }),
 }))
