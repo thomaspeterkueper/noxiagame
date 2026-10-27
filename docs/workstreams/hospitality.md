@@ -44,6 +44,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Beim Prüfen gefunden und behoben: Der Kundenstuhl am Beratungstisch war nicht besetzbar, weil er im Nebenraum lag.
   - Geprüft im Browser mit Testdaten. Dazu Tests in `learningGates.test.ts` und `bankInterior.test.ts`.
 
+- **28.10.2026 – Bestellen im Gespräch, Toilette, Gesprächsende (G-6):** Was man der Bedienung sagt, wird per Knopf zur echten Buchung; jedes Lokal hat eine WC-Tür (frei für jeden); nach einem Abbruch ist das Eingabefeld gesperrt; im Restaurant heißt der Knopf jetzt „Zum Empfang gehen“. Im Browser am Balkan Grill mit Testdaten geprüft, Tests in `spokenOrder.test.ts`.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -60,6 +62,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-14** (27.10.2026): Personal für die Bank an der Hauptstraße 140 und die anderen leeren öffentlichen Gebäude – `population-economy.md`.
 - **R-15** (27.10.2026): Lernschwellen serverseitig durchsetzen (Sicherheiten, Zinseszins, Arbitrage, Bodenwert) – `population-economy.md`.
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`.
+- **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`.
+- **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.
 - **W-7** (27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen (Bank sah nach dem Laden aus wie ein normales Haus) – `world-map.md`.
 
 ## Requests aus anderen Teilprojekten
@@ -140,6 +144,19 @@ Ausnahmsweise direkt gebaut, auf Wunsch von Thomas (27.10.2026). Er wollte, dass
   - eine Bestellung wird ergänzt („und die Vorspeise“);
   - eine unbelegte Wegbeschreibung („vorne links“).
 - Die ersten drei sprechen für fehlenden oder falschen Ortskontext. Bitte prüfen, welche `localFacts` und welcher `locationName` dort mitgegeben werden.
+
+
+**Antwort Gastronomie (28.10.2026):** Die Befunde stammen aus den echten Wortwechseln im Protokoll.
+- **Erfundene Bestellung** („Wasser und die Vorspeise“): Die Vorspeise steht auf der Karte des Balkan Grill. Vermutlich hat die Bedienung sie angeboten und das „ja“ zum Wasser auf beides bezogen. Der eigentliche Fehler: Gebucht wurde nur über die Knöpfe der Karte, im Gespräch hieß es aber „notiert“. **Gebaut:**
+  - Bestellen im Gespräch. Was man der Bedienung sagt, ergibt darunter einen Knopf „Getränk (Wasser) bestellen – 3 Cr“; erst der bucht (`lib/game/hospitality/spokenOrder.ts`).
+  - Die Bedienung weiß jetzt: „gebucht ist nur, was der Gast bestätigt – nie ‚notiert‘ sagen“. Am Tisch nimmt sie „nur, was der Gast selbst nennt, nichts dazu“.
+- **Wegbeschreibung** („vorne links“, 04.10.2026, Peru-Café): Die Regel gegen unbelegte Richtungsangaben kam am selben Tag in die Gesprächsroute. Seitdem ist der Fall nicht mehr aufgetreten.
+- **Habitat und Ortskontext:** gehören zur Erdkarte, siehe W-8 in `world-map.md`.
+- **`conversationEnded`:** Das Gesprächsfenster der Innenräume sperrt nach einem Abbruch das Eingabefeld („Gespräch beendet“), für die zehn Minuten der Abkühlzeit.
+- **Neu aus dem Protokoll – Toilette:** Eine Passantin schickt einen Spieler zum Balkan Grill. **Gebaut:**
+  - Jedes Lokal hat eine WC-Tür („Zur Toilette“, „WC benutzen“). Standard: frei für jeden.
+  - Das Personal kennt die Hausregel. Fragt jemand danach, steht sie vorn in seinen Fakten (`lib/game/hospitality/venueServices.ts`).
+  - Preise und Dienstleistungen je Haus durch den Betreiber: R-18.
 
 ## Offene Aufgaben
 

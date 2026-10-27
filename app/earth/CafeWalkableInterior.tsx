@@ -16,6 +16,8 @@ import { getSessionInfo } from '@/lib/supabase/auth'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
+import { spokenOrderItems, spokenOrderTitle } from '@/lib/game/hospitality/spokenOrder'
+import { VENUE_WC_DOOR, toiletAccess, venueServiceRules, type VenueServiceRules } from '@/lib/game/hospitality/venueServices'
 import {
   isAtServicePoint,
   venueConversationFacts,
@@ -51,7 +53,7 @@ type Props = {
 const DECOR:Record<string,{plants:Array<[number,number]>;rug:{x:number;y:number;w:number;h:number}|null}>={
   cafe:{plants:[[130,112],[700,400],[470,410]],rug:{x:150,y:125,w:300,h:235}},
   bar:{plants:[[130,112],[470,420]],rug:{x:170,y:110,w:250,h:220}},
-  restaurant:{plants:[[130,112],[540,400]],rug:null},
+  restaurant:{plants:[[130,112],[570,112]],rug:null},
   hotel:{plants:[[130,112],[700,400],[330,112]],rug:{x:150,y:280,w:300,h:110}},
 }
 
@@ -81,6 +83,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // Eine Kennung je Bestellversuch – eine Wiederholung nach Netzfehler bucht nicht doppelt.
   const pendingRequest=useRef<{itemCode:string;requestId:string}|null>(null)
   const ctxRef=useRef<InteriorContext|null>(null)
+  // Hausregeln neben der Karte (Toilette); ohne Daten gilt der Standard: frei für jeden.
+  const[serviceRules,setServiceRules]=useState<VenueServiceRules>(()=>venueServiceRules(null))
+  // Im Gespräch Genanntes, das schon gebucht wurde: „Satz|Posten“.
+  const[spokenDone,setSpokenDone]=useState<string[]>([])
 
   const effectiveType=conversion?.type??buildingTypeId
   const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(effectiveType),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[effectiveType,upper,areaM2])
@@ -124,6 +130,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setAreaM2(typeof data.areaM2==='number'&&data.areaM2>0?data.areaM2:null)
           setConversion(data.conversion&&typeof data.conversion==='object'&&data.conversion.type?{type:String(data.conversion.type),readyAt:data.conversion.readyAt?String(data.conversion.readyAt):null}:null)
           setDisplayName(typeof data.displayName==='string'&&data.displayName.trim()?data.displayName.trim():null)
+          setServiceRules(venueServiceRules(data.services))
           setRooms(data.rooms&&typeof data.rooms==='object'?{capacity:Number(data.rooms.capacity??0),occupied:Number(data.rooms.occupied??0),mineForS:data.rooms.mineForS==null?null:Number(data.rooms.mineForS)}:null)
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
         }
@@ -151,7 +158,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     return()=>{live=false}
   },[entityId])
 
-  async function order(item:MenuItem){
+  async function order(item:MenuItem,said?:{title:string;key:string}){
     const ctx=ctxRef.current
     if(!ctx||ordering||!item.affordable||ctx.closed)return
     const recipient=treat&&ctx.selected&&ctx.shown.some(entry=>entry.resident.id===ctx.selected!.id)?ctx.selected:null
@@ -172,9 +179,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         setMenu(current=>current?{credits,items:current.items.map(entry=>({...entry,affordable:credits>=entry.priceCredits}))}:current)
         if(item.itemCode===ROOM_ITEM_CODE){
           if(!data.duplicate)setRooms(current=>current?{...current,occupied:current.occupied+1,mineForS:24*3600}:current)
-        }else if(!data.duplicate)setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null,at:Date.now(),tableService:fromTable}].slice(-8))
+        }else if(!data.duplicate){if(said)setSpokenDone(current=>[...current,said.key].slice(-20));setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null,at:Date.now(),tableService:fromTable}].slice(-8))}
         useGameStore.setState({credits})
-        ctx.setStatus((item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?item.label+' für '+personSceneLabel(recipient)+' bestellt':fromTable?item.label+' bestellt, wird gleich gebracht':item.label+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
+        const shown=said?.title??item.label
+        ctx.setStatus((item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?shown+' für '+personSceneLabel(recipient)+' bestellt':fromTable?shown+' bestellt, wird gleich gebracht':shown+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
       }else{
         ctx.setStatus(String(data.error??'Die Bestellung konnte nicht gebucht werden. Es wurde nichts abgebucht.'))
         if(data.code==='NOXIA_CREDITS_INSUFFICIENT')setMenu(current=>current?{...current,items:current.items.map(entry=>entry.itemCode===item.itemCode?{...entry,affordable:false}:entry)}:current)
@@ -213,6 +221,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
+      toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,
     }),
     placeKnowledge,
     // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
@@ -222,13 +231,22 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     things,
     idleText:menuState==='ready'&&menu?.items.length?undefined:undefined,
     greetsAtService:true,
-    goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.kind==='hotel'?'Zum Empfang gehen':'Zum Tresen gehen',
+    goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.servicePoint.locative==='am Empfang'?'Zum Empfang gehen':'Zum Tresen gehen',
     tableService:true,
     loaded:true,
+    sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:'Zur Toilette',useLabel:'WC BENUTZEN',use:ctx=>ctx.setStatus(toiletAccess(serviceRules.toilet,{hasOrdered:orders.length>0}).text)},
     renderOffer:ctx=>{
       const hasMenu=Boolean(menu?.items.length)&&ctx.service!=='closed'
       if(!ctx.nearService)return <p className="hint">{ctx.seat&&ctx.tablePhase!=='none'&&ctx.tablePhase!=='gone'?'Jemand vom Personal kommt gleich an deinen Tisch.':ctx.seat&&ctx.service==='staffed'&&layout.kind!=='hotel'?'Bleib sitzen – gleich kommt jemand an den Tisch.':'Zum Bestellen musst du '+(ctx.service==='self-service'?'am Automaten':layout.servicePoint.locative)+' stehen.'}</p>
+      // Im Gespräch mit dem Personal Genanntes: ein Knopf je Posten, erst der bucht.
+      const talkingToStaff=Boolean(ctx.selected&&ctx.shown.some(entry=>entry.resident.id===ctx.selected!.id&&entry.figure.roomRole==='staff'))
+      const spokenText=ctx.lastPlayerText
+      const spoken=hasMenu&&menu&&talkingToStaff?spokenOrderItems(spokenText,menu.items).filter(o=>!spokenDone.includes(spokenText+'|'+o.itemCode)):[]
       return <div className="menu">
+        {spoken.length>0&&menu&&<div className="spoken">
+          <small>IM GESPRÄCH GENANNT</small>
+          {spoken.map(o=>{const item=menu.items.find(entry=>entry.itemCode===o.itemCode)!;return <button key={o.itemCode} className="open-school" disabled={!item.affordable||ordering!==null||(o.itemCode===ROOM_ITEM_CODE&&!canBookRoom(rooms))} onClick={()=>{if(o.itemCode===ROOM_ITEM_CODE)setTreat(false);void order(item,{title:spokenOrderTitle(o),key:spokenText+'|'+o.itemCode})}}>{spokenOrderTitle(o)} {o.itemCode===ROOM_ITEM_CODE?'buchen':'bestellen'} – {item.priceCredits} Cr{item.affordable?'':' (zu teuer)'}</button>})}
+        </div>}
         <small>KARTE</small>
         {menuState==='loading'&&<p>Die Karte wird geholt …</p>}
         {menuState==='failed'&&<p>Die Karte konnte nicht geladen werden. Verlasse das Lokal und komm noch einmal herein.</p>}

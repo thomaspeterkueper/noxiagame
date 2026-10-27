@@ -16,6 +16,7 @@
 // Stimmungswirkung und der Wirt als Bewohner mit Arbeitsvertrag sind nicht
 // gebaut. Anschlussstellen: docs/gameplay/hospitality-venues.md.
 
+import { mentionsToilet, toiletFact, type ToiletRule } from './venueServices'
 import type { InteriorTemplate } from '../buildings/interiors/types'
 import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeStandard'
 import { BAR_STANDARD_INTERIOR } from '../buildings/interiors/templates/barStandard'
@@ -935,10 +936,16 @@ export interface ConversationFactsInput {
   hour?: number | null
   /** Obergeschoss, falls das Gebäude eines hat. */
   upper?: VenueUpperFloor | null
+  /** Hausregel der Toilette; weggelassen = keine Angabe (z. B. Kantine). */
+  toilet?: ToiletRule | null
+  /** Was der Spieler gerade sagt – fragt er nach der Toilette, kommt die Regel vorn in die Fakten. */
+  playerSaid?: string | null
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
-  const tail = ` Credits; bestellt und bezahlt wird ${layout.servicePoint.locative}, nicht im Gespräch`
+  // Gebucht wird nur über die Karte (Knopf am Tresen oder unter dem Gespräch).
+  // Die Figur sagt nicht „notiert“, ohne dass etwas geschieht (Auswertung G-6).
+  const tail = ' Credits; gebucht ist nur, was der Gast bestätigt – nie „notiert“ sagen'
   let list = ''
   for (const item of menu) {
     const next = (list ? list + ', ' : '') + `${item.label} ${item.priceCredits}`
@@ -987,7 +994,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     const seat = input.playerSeat
     if (seat) {
       const together = self.spot.label === seat.label && self.spot.posture === 'sitting'
-      facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (input.servingPlayer ? '; du bist an den Tisch gekommen und nimmst die Bestellung auf' : together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
+      facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (input.servingPlayer ? '; du bist an den Tisch gekommen und nimmst die Bestellung auf – nur, was der Gast selbst nennt, nichts dazu' : together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
     } else facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
     facts.push(othersFact(layout, self, input.figures))
   }
@@ -1019,6 +1026,14 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   facts.push('Über Kontostand, Wissen, Beruf oder Vorhaben deines Gegenübers weißt du nur, was es dir selbst erzählt')
 
   if (staff && input.arrivalPoint) facts.push(...ARRIVAL_ORIENTATION_FACTS)
+
+  // Die Toilette: Wer danach fragt, bekommt die Hausregel vorn, sonst steht sie
+  // am Ende und fällt bei voller Liste weg.
+  if (input.toilet && seesGuestRoom) {
+    const toilet = toiletFact(input.toilet, staff)
+    if (mentionsToilet(input.playerSaid)) facts.splice(1, 0, toilet)
+    else facts.push(toilet)
+  }
 
   return facts.slice(0, MAX_CONVERSATION_FACTS).map(fit)
 }

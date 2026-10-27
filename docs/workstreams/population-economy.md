@@ -311,3 +311,23 @@ Thomas, 27.10.2026: „Was passiert aktuell mit den Antworten der Fragen, die di
 3. **Stärken je Fachgebiet nutzen.** Jede Frage hat ein Fachgebiet (`domain`). Vorschlag: Ergebnis je Fachgebiet im Versuch speichern (nicht die einzelnen Antworten) und als Anregung verwenden – Akademie-Aufgaben aus schwächeren Gebieten, Hinweise auf passende Stellen (R-10, Aufgabe 12). Bleibt diagnostisch: keine Freischaltungen, kein Alter (wie bisher im Code festgehalten).
 
 **Zuständigkeit:** Es gibt kein eigenes Teilprojekt für Akademie und Einstieg. Wissen und Lernschwellen liegen schon hier (R-15). Wenn ein Teilprojekt „Bildung“ entsteht, zieht der Request dorthin um.
+
+### R-18 (Gastronomie, 28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber
+
+Thomas, 28.10.2026: „Der Betreiber eines Lokals oder auch Ladens etc. sollte die Möglichkeit haben, selbst Preise und Dienstleistungen anzupassen; standardmäßig gilt die Toilette als frei für jeden.“ Anlass: In der Gesprächsauswertung (G-6) hat eine Passantin einen Spieler zum Balkan Grill geschickt, um dort auf die Toilette zu gehen.
+
+**Was schon da ist (Gastronomie):**
+- Jedes Lokal hat eine WC-Tür. Der Spieler kann hingehen und sie benutzen.
+- Die Hausregel steht in `lib/game/hospitality/venueServices.ts` (`ToiletRule`: verfügbar, Preis, nur für Gäste). Standard: frei für jeden.
+- Das Personal kennt die Regel. Fragt jemand nach der Toilette, steht sie vorn in seinen Gesprächsfakten.
+- Der Innenraum liest schon `services` aus `GET /api/game/hospitality/guests` (`venueServiceRules(data.services)`). Fehlt das Feld, gilt der Standard.
+
+**Bitte:**
+1. **Speichern je Haus:** Preise der Karte und Dienstleistungen je Haus (`tile_entities.id`), z. B. eine Tabelle `venue_price_overrides(tile_entity_id, item_code, price_credits, active)`. Dazu Dienstleistungen wie `toilet` mit `price_credits` und `guests_only`. Ohne Eintrag gilt die heutige Karte (`hospitality_menu`) bzw. „Toilette frei“.
+2. **Ändern dürfen:** nur der Eigentümer bzw. Betreiber (`profile_id`, Betreiberkonto). Gilt für Lokale ebenso wie für Läden und andere Häuser mit Angebot.
+3. **Liefern:** `services: { toilet: { available, priceCredits, guestsOnly } }` in `/api/game/hospitality/guests`; die Karte mit den Hauspreisen in `/api/game/hospitality/order`.
+4. **Bezahlen:** Eine kostenpflichtige Toilette als Posten über denselben Buchungsweg wie die Karte, z. B. `item_code = 'toilet'`. Der Innenraum zeigt dann „kostet X Cr“, kann es aber erst mit diesem Weg abbuchen.
+5. **Später, Bedienung:** Die Einstellungstafel für den Eigentümer (Preise, Toilette frei / nur Gäste / Gebühr) baut Gastronomie im Innenraum, sobald gespeichert werden kann.
+
+**Anregung (Thomas):** Die Toilettenfrage war vermutlich ein Test, wie das Spiel reagiert. Sie zeigt aber ein echtes Bedürfnis. Wenn Bedürfnisse der Figuren weiter ausgebaut werden (R-9), wäre „Toilette“ ein Grund, ein Lokal zu betreten, ohne etwas zu kaufen. Für den Betreiber ist das eine Entscheidung zwischen Gastfreundschaft und Einnahme.
+

@@ -231,7 +231,7 @@ check(venueService(restaurant, [brigade[2]]) === 'staffed', 'a cook alone still 
 
 const cafeMenu = [{ label: 'Getränk', priceCredits: 3 }, { label: 'Kuchen', priceCredits: 5 }, { label: 'Mahlzeit', priceCredits: 8 }]
 const staffMenuFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: pair[0].roomRole === 'staff' ? pair[0] : pair.find(f => f.roomRole === 'staff')!, figures: pair, playerPos: cafe.servicePoint, arrivalPoint: true, menu: cafeMenu, playerOrders: ['Kuchen', 'Kuchen', 'Getränk'] })
-check(staffMenuFacts.includes('Karte: Getränk 3, Kuchen 5, Mahlzeit 8 Credits; bestellt und bezahlt wird am Tresen, nicht im Gespräch'), 'staff knows the menu and where it is paid')
+check(staffMenuFacts.includes('Karte: Getränk 3, Kuchen 5, Mahlzeit 8 Credits; gebucht ist nur, was der Gast bestätigt – nie „notiert“ sagen'), 'staff knows the menu and where it is paid')
 check(staffMenuFacts.includes('Dein Gegenüber hat hier eben bestellt: 2× Kuchen, Getränk'), 'staff saw what the player ordered')
 check(!staffMenuFacts.some(f => /ausgeschenkt/.test(f)), 'with a menu nobody claims the venue does not serve')
 check(staffMenuFacts.length === MAX_CONVERSATION_FACTS && staffMenuFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS), 'staff facts with menu and orders use the full budget, not more')
@@ -253,7 +253,7 @@ check(automatFacts.includes('Hier bedient kein Personal; bestellt und bezahlt wi
 check(!automatFacts.some(f => f === ARRIVAL_ORIENTATION_FACTS[1]), 'nobody in a self-service cafe explains the way in')
 const longMenu = Array.from({ length: 30 }, (_, i) => ({ label: 'Tagesgericht Nummer ' + i, priceCredits: 10 + i }))
 const longFacts = venueConversationFacts({ layout: restaurant, buildingName: 'Sol', self: brigade[0], figures: brigade, playerPos: restaurant.start, arrivalPoint: false, menu: longMenu })
-check(longFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS) && longFacts.some(f => f.startsWith('Karte: Tagesgericht Nummer 0 10') && f.endsWith('nicht im Gespräch')), 'a long menu is shortened without losing where to pay')
+check(longFacts.every(f => f.length <= MAX_CONVERSATION_FACT_CHARS) && longFacts.some(f => f.startsWith('Karte: Tagesgericht Nummer 0 10') && f.endsWith('nie „notiert“ sagen')), 'a long menu is shortened without losing the booking rule')
 
 // ── Besuch eines Gastes ─────────────────────────────────────────────────────
 check(visitPhase(0).phase === 'ordering' && visitPhase(VISIT_TIMES.orderS - 1).phase === 'ordering', 'a visit starts at the counter')
