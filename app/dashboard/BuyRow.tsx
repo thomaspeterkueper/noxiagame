@@ -2,9 +2,10 @@
 
 // app/dashboard/BuyRow.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 09.10.2026 — Direkthandel zum Marktpreis statt Auktions-Vorbereitung:
+// Aktualisiert: 27.10.2026 — gesperrter Kaufknopf sagt warum (Laderaum voll)
+// Vorher:       09.10.2026 — Direkthandel zum Marktpreis statt Auktions-Vorbereitung:
 //               Bestätigung zeigt Menge × Preis; abgerechnet wird, was der Server bucht.
-// Version:      2.0.0
+// Version:      2.0.1
 //
 // Handelszeile (Kauf/Verkauf einer Ressource) der Handelszentrale.
 // Aus DashboardClient.tsx herausgelöst (Refactor Schritt 2). Bezieht
@@ -75,7 +76,7 @@ export default function BuyRow({ p, last, cargoFree, owned, onBuy, onSell }: {
             style={{ width: '44px', height: '26px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600, border: `1px solid ${T.line}`, borderRadius: '7px', color: T.ink, background: '#fff' }}
           />
           <button aria-label="Menge erhöhen" style={stepBtn} onClick={() => setAmount((a: number) => Math.min(cap, a + 1))}>+</button>
-          <button disabled={!canBuy} style={{ background: T.blue, color: '#fff', border: 'none', padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.4 }} onClick={() => openPrep('buy')}>Kaufen</button>
+          <button disabled={!canBuy} title={canBuy ? undefined : 'Laderaum voll – erst etwas verkaufen'} style={{ background: T.blue, color: '#fff', border: 'none', padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.4 }} onClick={() => openPrep('buy')}>Kaufen</button>
           <button disabled={!canSell} style={{ background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: canSell ? 'pointer' : 'not-allowed', opacity: canSell ? 1 : 0.4 }} onClick={() => openPrep('sell')}>Verk.</button>
         </div>
       </div>
