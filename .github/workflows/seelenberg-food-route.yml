@@ -18,4 +18,5 @@ jobs:
         with:
           node-version: '22'
       - run: node --test experiments/seelenberg/food-route-adapter.test.mjs
+      - run: corepack enable
       - run: pnpm test:food-chain
