@@ -3,7 +3,8 @@ on:
   pull_request:
     paths:
       - 'lib/game/science/geodynamo*'
-      - 'docs/science/GEODYNAMO-RESEARCH-PILOT.md'\n      - 'vitest.geodynamo.config.mts'
+      - 'docs/science/GEODYNAMO-RESEARCH-PILOT.md'
+      - 'vitest.geodynamo.config.mts'
       - '.github/workflows/geodynamo-pilot.yml'
   push:
     branches: [main]
