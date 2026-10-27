@@ -174,6 +174,16 @@ McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wo
 - Geprüft in der Datenbank (Transaktion, zurückgerollt): neues Konto ohne Schiff, Ticket Erde → Mond (−500 Cr), Ankunft auf dem Mond, Rückflug buchbar.
 - Offen: zusätzlich ein Reisebüro in Sundern (Ort entscheidet Thomas); der Schalter zieht mit dem Raumhafen in den Süden um.
 
+## Reisebüro (Thomas, 27.10.2026: „auch für Reisen zu anderen Gegenden der Erde, nicht nur im Weltraum“)
+
+- **Ort:** staatliches Reisebüro in Sundern, Hauptstraße 47 (osm:way:191141345, schräg gegenüber dem Startcafé; in den Kartendaten gibt es in Sundern kein Reisebüro). Gebäudeart `travel_agency` (nicht baubar), Plakette ✈. Änderbar.
+- **Tafel** (`app/components/TravelAgency.tsx`): Reiter „Erde“ und „Weltraum“ (Linienflug-Ticketschalter). In der Gebäudetafel des Reisebüros, sobald man davorsteht.
+- **Erdreisen** (`lib/game/earthTrips.ts` mit Tests): Ziele sind die Orte mit Kartendaten (`celestial_regions` der Erde ohne Ortsdetail-Zellen). Bis 400 km Bahn (8 Cr + 0,15 Cr/km), darüber Flug (60 Cr + 0,04 Cr/km). Dauer nach Spieluhr (60-fach), höchstens 5 min echte Zeit. Beispiele ab Sundern: Menden 11 Cr, Frankfurt 29 Cr (2 min), Herceg Novi 111 Cr, Datong 362 Cr, Tingo María 476 Cr.
+- **Buchung** (`/api/game/earth-trip`, Migration `20261027190000_earth_travel_agency.sql`, live): Preis und Dauer rechnet der Server; Abbuchung beim Spieler, Gutschrift als Ticketerlös in der Koloniekasse der Erde (wie Linienflug, geht als Fiskaltransfer an die öffentlichen Dienste). Während der Fahrt ist die Karte gesperrt und zeigt die Restzeit; bei Ankunft springt die Figur zum Ziel, die Karte baut sich dort neu auf. Eine offene Reise übersteht Neuladen.
+- **Rückweg:** Mehr als 30 km von Sundern zeigt „Du bist hier“ den Knopf „Weiterreisen …“ (steht für Bahnhof/Flughafen vor Ort) mit Heimreise nach Sundern und allen anderen Zielen.
+- Geprüft in der Datenbank (Transaktion, zurückgerollt): Buchung Sundern → Frankfurt 30 Cr, Ticketerlös in der Kasse, zweite Buchung während der Reise abgelehnt, Ankunft erst nach Ablauf.
+- Offen: echte Bahnhöfe und Flughäfen aus den Kartendaten als Abfahrtsorte statt des Knopfes; weitere Reisebüros in anderen Städten.
+
 ## Staatliche Basis „Selmecke“ (Thomas, 27.10.2026: „sieht furchtbar aus“)
 
 **Befund:** „Selmecke“ ist in den Kartendaten kein Stadtteil, sondern ein Bach und das **Naturschutzgebiet Selmecke** (Schutzklasse 4, 51,331–51,351 / 7,968–7,980). Die 17 staatlichen Bauten (Verwaltung, Schule, Wohnblock mit 8 Bewohnern, Habitat, Labor, Scanner, Fabrik, Werft, zwei Lager, Solarfeld, Raumhafen mit Kern, Service, Lager und drei Landeplätzen) stehen zum Teil darin, in einem Waldtal ohne echte Häuser und Straßen – nur Feldwege. Deshalb wirkte die Basis wie ein Platzhalter auf der Wiese. Dazu kam ein Zeichenfehler: Bilder großer Bauten wurden mit ihrem Bildmaßstab bis 1,4-fach über die Grundfläche hinaus vergrößert (Landeplatz 120 × 90 m als Scheibe von rund 350 m).

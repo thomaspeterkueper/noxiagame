@@ -24,6 +24,7 @@ import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
 import TicketCounter from '@/app/components/TicketCounter'
+import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 
 export type Panel =
@@ -36,6 +37,8 @@ export type Panel =
   | { kind: 'parcel'; id: string; at: GeoPoint }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
+  /** Reise buchen fern von Sundern (Heim- und Weiterreise, 27.10.2026) */
+  | { kind: 'travel'; at: GeoPoint }
 
 const TALK_RANGE_M = 8
 const ENTER_RANGE_M = 8
@@ -98,7 +101,9 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 /** Baubarer Typ aus /api/game/build/spatial (available). */
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean } }
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick }: {
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked }: {
+  /** Reise auf der Erde gebucht (Reisebüro) – die Karte zeigt die Fahrt und springt bei Ankunft. */
+  onTripBooked?: (trip: EarthTrip) => void
   engine: WorldEngine | null
   panel: Panel
   setPanel: (panel: Panel) => void
@@ -206,6 +211,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [showConversions, setShowConversions] = useState(false)
   // Ticketschalter im Raumhafen (Linienflug ohne eigenes Schiff, 27.10.2026)
   const [showTickets, setShowTickets] = useState(false)
+  const [showAgency, setShowAgency] = useState(false)
 
   const person = panel.kind === 'person' ? residents.find(resident => resident.id === panel.id) ?? null : null
   const building = panel.kind === 'building' ? panel : null
@@ -243,9 +249,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   }
 
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
-  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind === 'parcel' ? 'g:' + panel.id : panel.kind
+  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind === 'parcel' ? 'g:' + panel.id : panel.kind === 'travel' ? 't:' + panel.at.lat + ',' + panel.at.lon : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
-  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false); setShowTickets(false); setAskPrice('') }
+  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false); setShowTickets(false); setShowAgency(false); setAskPrice('') }
 
   // Kaufangebot je Gebäude einmal abfragen: reale Häuser mit OSM-Kennung – auch gekaufte (Angebote unter Spielern).
   const offerSource = building ? (building.noxiaId ? own?.source ?? null : building.source ?? null) : null
@@ -527,6 +533,11 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+      {own?.typeId === 'travel_agency' && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
+        ? (showAgency
+          ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
+          : <div className="row"><span>Bahn und Flug auf der Erde, Linienflüge ins All.</span><button onClick={() => setShowAgency(true)}>Reise buchen …</button></div>)
+        : <div className="row"><span>Hier kann man Reisen buchen – auf der Erde und ins All.</span></div>)}
       {own && /^spaceport/.test(own.typeId) && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
         ? (showTickets
           ? <><TicketCounter compact/><div className="row"><span/><button onClick={() => setShowTickets(false)}>Schließen</button></div></>
@@ -595,6 +606,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark })}>Betreten</button></div>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
+    </>}
+    {panel.kind === 'travel' && <>
+      <div className="head"><div><small>WEITERREISE</small><b>Reise buchen</b><span>Bahnhof und Flughafen in der Nähe</span></div><button onClick={close} aria-label="Schließen">×</button></div>
+      <TravelAgency from={panel.at} onBooked={trip => { setPanel({ kind: 'none' }); onTripBooked?.(trip) }}/>
     </>}
     {panel.kind === 'parcel' && <>
       <div className="head"><div><small>FLURSTÜCK</small><b>{parcel?.label ?? 'Flurstück'}</b>{parcel && <span>{parcel.areaM2.toLocaleString('de-DE')} m²{parcel.usage ? ' · ' + parcel.usage : ''}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>

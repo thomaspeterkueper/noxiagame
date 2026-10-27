@@ -28,6 +28,7 @@ import { detailCell } from '@/lib/worldlab/detailCells'
 import { hasCadastre, parcelCell } from '@/lib/worldlab/alkis'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
+import type { EarthTrip } from '@/app/components/TravelAgency'
 import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson, type WorldPick, type WorldPlot, type WorldSite } from './worldEngine'
 
 /** Ein laufender Bau aus /api/game/build/spatial (nur die Felder, die die Karte braucht). */
@@ -77,6 +78,9 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   function closeHelp() { setHelpOpen(false); try { window.localStorage.setItem('noxia-world-help-v1', 'seen') } catch { /* ohne Speicher */ } }
   /** Kurzer Satz für Spieler (Einzelheiten gehen in die Konsole). */
   const [playerNote, setPlayerNote] = useState('')
+  // Reise auf der Erde (Reisebüro, 27.10.2026): während der Fahrt ist die Karte gesperrt, bei Ankunft springt die Figur.
+  const [trip, setTrip] = useState<EarthTrip | null>(null)
+  const [tripNow, setTripNow] = useState(() => Date.now())
   const [destination, setDestination] = useState('')
   const [destinationNote, setDestinationNote] = useState('')
   const [placeName, setPlaceName] = useState('')
@@ -280,7 +284,49 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   }, [engineReady, residents, noxia, surfacePeople])
 
   // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
-  useEffect(() => { engineReady?.setInputEnabled(panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind])
+  useEffect(() => { engineReady?.setInputEnabled(!trip && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind, trip])
+  // Offene Reise nach dem Laden wieder aufnehmen
+  useEffect(() => {
+    if (!engineReady) return
+    let live = true
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const at = engineReady.position()
+        const response = await fetch(`/api/game/earth-trip?lat=${at.lat}&lon=${at.lon}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const json = await response.json().catch(() => null)
+        if (live && json?.trip) setTrip(json.trip as EarthTrip)
+      } catch { /* ohne Verbindung keine Reise */ }
+    })()
+    return () => { live = false }
+  }, [engineReady])
+  // Fahrt: Restzeit zählen, bei Ankunft beim Server melden und an das Ziel springen
+  useEffect(() => {
+    if (!trip) return
+    const timer = setInterval(() => setTripNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [trip])
+  const tripLeft = trip ? Math.max(0, Math.ceil((new Date(trip.arrives_at).getTime() - tripNow) / 1000)) : 0
+  const arriving = useRef(false)
+  useEffect(() => {
+    if (!trip || tripLeft > 0 || arriving.current) return
+    arriving.current = true
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        const response = await fetch('/api/game/earth-trip', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'arrive' }) })
+        const json = await response.json().catch(() => null)
+        if (json?.arrived && json.trip) {
+          engine.current?.jump({ lat: Number(json.trip.to_lat), lon: Number(json.trip.to_lon) })
+          setPlayerNote(`Angekommen: ${json.trip.destination_name}.`)
+          setTrip(null)
+        } else if (json?.trip) setTrip(json.trip as EarthTrip)
+        else setTrip(null)
+      } catch { /* nächster Versuch beim nächsten Zählen */ } finally { arriving.current = false }
+    })()
+  }, [trip, tripLeft])
+
 
   // Name über der eigenen Figur (wie in der bisherigen Erdszene)
   useEffect(() => {
@@ -552,6 +598,11 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     {hoverText && hover && panel.kind !== 'inside' && panel.kind !== 'landmarkInside' && <div className="tip" style={{ left: hover.x + 12, top: hover.y + 12 }}>
       <b>{hoverText.title}</b><span>{hoverText.detail}</span>{hoverText.at && engineReady && <small>{kmText(engineReady.distanceTo(hoverText.at))} von dir</small>}
     </div>}
+    {trip && <div className="trip-overlay">
+      <div><small>{trip.mode === 'rail' ? '🚆 MIT DER BAHN' : '✈ IM FLUGZEUG'}</small><b>Unterwegs nach {trip.destination_name}</b>
+        <span>{tripLeft > 0 ? `Ankunft in ${tripLeft >= 60 ? `${Math.floor(tripLeft / 60)} min ${tripLeft % 60} s` : `${tripLeft} s`}` : 'Ankunft …'}</span>
+        <i style={{ width: `${Math.min(100, Math.max(0, 100 - tripLeft / Math.max(1, (new Date(trip.arrives_at).getTime() - new Date(trip.departed_at).getTime()) / 1000) * 100))}%` }}/></div>
+    </div>}
     <div className="right">
       <div className="where">
         <div className="where-head"><small>DU BIST HIER</small><span className="tools">
@@ -564,6 +615,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {playerNote && <span className="player-note">{playerNote}</span>}
         {/* Mit offener Tafel nur Ort und Straße – die Tafel darunter ist dann das Wichtige. */}
         {panel.kind === 'none' && <>
+        {engineReady && metresBetween(engineReady.position(), START_PLACE.at) > 30000 && <button className="home" onClick={() => choosePanel({ kind: 'travel', at: engineReady.position() })}>✈ Weiterreisen …</button>}
         {home && <button className="home" onClick={() => { engine.current?.jump({ lat: home.lat, lon: home.lon }); choosePanel({ kind: 'building', at: { lat: home.lat, lon: home.lon }, title: home.name, noxiaId: home.id }) }}>⌂ {home.name}</button>}
         <label className="target"><span>Ziel</span>
           <select value={targetId} onChange={event => chooseTarget(event.target.value)}>
@@ -578,7 +630,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {destinationNote && <p className="note">{destinationNote}</p>}
         </>}
       </div>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
@@ -609,6 +661,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .dest input{flex:1;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 7px;font-size:11px}
       .dest button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer}
       .panel a{font-size:11px;color:#d9bb6a;text-decoration:none;margin-top:4px}
+      .trip-overlay{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:rgba(5,14,20,.62);backdrop-filter:blur(3px)}.trip-overlay div{display:grid;gap:6px;min-width:280px;padding:16px 18px;border:1px solid #9b8545;border-radius:10px;background:#071521f2;color:#eef5f7;text-align:center}.trip-overlay small{color:#d7b96e;font:800 9px monospace;letter-spacing:.14em}.trip-overlay b{font-size:15px}.trip-overlay span{font-size:11px;color:#9db0b6}.trip-overlay i{display:block;height:4px;border-radius:2px;background:#d7b96e;transition:width 1s linear}
       .right{position:absolute;right:14px;top:14px;width:300px;max-height:calc(100% - 28px);display:flex;flex-direction:column;gap:8px;z-index:5}
       .where{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;padding:10px 12px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px}
       .where small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}

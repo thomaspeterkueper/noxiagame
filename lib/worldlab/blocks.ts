@@ -147,7 +147,7 @@ export const NOXIA_LOOKS: Record<string, Partial<NoxiaLook>> = {
  */
 export const PUBLIC_SYMBOLS: Record<string, string> = {
   bank: '€', admin: '§', school: '✎', academy: '✎', laboratory: '⚗', hospital: '+', clinic: '+',
-  cafe: '☕', bar: '♪', restaurant: '✦', hotel: 'H', port_canteen: '✦', warehouse: '▤', warehouse_storage: '▤',
+  cafe: '☕', bar: '♪', restaurant: '✦', hotel: 'H', port_canteen: '✦', warehouse: '▤', warehouse_storage: '▤', travel_agency: '✈',
 }
 export const PUBLIC_SYMBOL_DEFAULT = '◆'
 export function publicSymbol(typeId: string): string {
