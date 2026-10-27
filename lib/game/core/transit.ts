@@ -8,6 +8,7 @@ import { DOCKING_IDLE_EXPIRE_HOURS } from '@/lib/game/config'
 import { hasOrbit } from '@/lib/game/orbits'
 import { registerLocationBodies } from '@/lib/game/locationBody'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
+import { passengerOffers, type PassengerOffer } from '@/lib/game/passengerOffers'
 import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
 import { hasPilotTraining, pilotFee } from '@/lib/game/pilotQualification'
@@ -158,6 +159,29 @@ async function startPlayerPassengerTransit(profileId: string, destination: strin
     durationSeconds: quote.durationSeconds,
     ticketPrice,
   })
+}
+
+/**
+ * Ticketschalter: Linienflüge vom aktuellen Ort, mit denselben Preisen und
+ * Dauern wie beim Abflug (startPlayerPassengerTransit). Wer ein eigenes Schiff
+ * hat, fliegt über die Navigation – der Schalter sagt das (hasShip).
+ */
+export async function getPassengerOffers(profileId: string): Promise<{ from: string | null; hasShip: boolean; inTransit: boolean; credits: number; offers: PassengerOffer[] }> {
+  const supabase = createServiceClient()
+  const [ship, profile, { data: wallet }, { data: locations }, { data: tickRow }] = await Promise.all([
+    activeShipForProfile(profileId),
+    passengerProfile(profileId),
+    supabase.from('profiles').select('credits').eq('id', profileId).maybeSingle(),
+    supabase.from('locations').select('slug, name, celestial_body_id, location_type'),
+    supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
+  ])
+  if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
+  registerLocationBodies((locations ?? []) as Parameters<typeof registerLocationBodies>[0])
+  const from = ship ? ship.location : profile.current_location
+  const inTransit = ship ? ship.status === 'transit' : Boolean(profile.transit_destination)
+  const navigationProficiency = navigationProficiencyFromUnlocks(await getPlayerUnlocks(profileId))
+  const offers = from ? passengerOffers({ from, destinations: (locations ?? []) as Array<{ slug: string; name: string | null }>, tick: Number(tickRow?.tick_number ?? 0), navigationProficiency }) : []
+  return { from, hasShip: Boolean(ship), inTransit, credits: Number(wallet?.credits ?? 0), offers }
 }
 
 export async function startPlayerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {

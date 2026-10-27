@@ -7,7 +7,7 @@
 
 import { useState, type CSSProperties } from 'react'
 import { position, ORBITS, orbitalBaseSeconds, distance } from '@/lib/game/orbits'
-import { transferQuote } from '@/lib/game/transfer'
+import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { useGameStore, type LocationSlug } from '@/lib/store/gameStore'
 import { T } from './ui'
 
@@ -90,6 +90,9 @@ export default function SolarSystem({
   const travel = useGameStore(s => s.travel)
   const inTransit = useGameStore(s => s.inTransit)
   const cargoEnergy = useGameStore(s => s.cargo.energy)
+  // Ohne eigenes Schiff: Linienflug mit Ticket – keine Reichweite, keine Energie an Bord (27.10.2026)
+  const shipless = !useGameStore(s => s.shipId)
+  const credits = useGameStore(s => s.credits)
   const tick = explore ? scrubTick : currentTick
 
   const ea = disp('earth', tick)
@@ -109,6 +112,7 @@ export default function SolarSystem({
 
   const reachable = (to: string) => {
     if (!ORBITS[currentLocation] || !ORBITS[to]) return false
+    if (shipless) return true
     return distance(currentLocation, to, tick) <= shipRange
   }
 
@@ -224,7 +228,7 @@ export default function SolarSystem({
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.blue }}>Reiseziel wählen</div>
-            <div style={{ fontSize: 11, color: T.inkFaint }}>Energie an Bord: {cargoEnergy} t · Reichweite: {shipRange} Distanz-Einheiten</div>
+            <div style={{ fontSize: 11, color: T.inkFaint }}>{shipless ? `Ohne eigenes Schiff: Linienflug mit Ticket · Guthaben ${credits.toLocaleString('de-DE')} Cr` : `Energie an Bord: ${cargoEnergy} t · Reichweite: ${shipRange} Distanz-Einheiten`}</div>
           </div>
           {inTransit && <div style={{ fontSize: 11, color: T.gold }}>Transit läuft</div>}
         </div>
@@ -236,14 +240,15 @@ export default function SolarSystem({
             const seconds = quote?.durationSeconds ?? null
             const energy = quote?.energy ?? Number.POSITIVE_INFINITY
             const routeDistance = quote?.distance ?? Number.POSITIVE_INFINITY
-            const hasEnergy = cargoEnergy >= energy
+            const ticket = quote ? passengerTicketPrice(quote) : Number.POSITIVE_INFINITY
+            const hasEnergy = shipless ? credits >= ticket : cargoEnergy >= energy
             const disabled = inTransit || !!launching || !canReach || !hasEnergy || !quote
             return (
               <button
                 key={dest.slug}
                 onClick={() => void startTravel(dest.slug)}
                 disabled={disabled}
-                title={!canReach ? 'Außer Reichweite' : !hasEnergy ? `Benötigt ${energy} t Energie` : `Flug nach ${dest.label}`}
+                title={!canReach ? 'Außer Reichweite' : !hasEnergy ? (shipless ? `Ticket kostet ${ticket} Cr` : `Benötigt ${energy} t Energie`) : shipless ? `Linienflug nach ${dest.label}` : `Flug nach ${dest.label}`}
                 style={{
                   border: `1px solid ${disabled ? T.line : T.gold}`,
                   background: disabled ? T.bg : T.surface,
@@ -257,7 +262,7 @@ export default function SolarSystem({
               >
                 <div style={{ fontSize: 13, fontWeight: 700 }}>{dest.icon} {dest.label}</div>
                 <div style={{ fontSize: 10, marginTop: 3, fontFamily: MONO }}>
-                  {launching === dest.slug ? 'Start wird freigegeben …' : `${seconds ?? '–'}s · ${Number.isFinite(energy) ? energy : '–'}t Energie · ${Number.isFinite(routeDistance) ? routeDistance.toFixed(1) : '–'} Dist.`}
+                  {launching === dest.slug ? 'Start wird freigegeben …' : shipless ? `${seconds ?? '–'}s · Ticket ${Number.isFinite(ticket) ? ticket.toLocaleString('de-DE') : '–'} Cr` : `${seconds ?? '–'}s · ${Number.isFinite(energy) ? energy : '–'}t Energie · ${Number.isFinite(routeDistance) ? routeDistance.toFixed(1) : '–'} Dist.`}
                 </div>
                 {!canReach && <div style={{ fontSize: 10, color: T.red, marginTop: 2 }}>außer Reichweite</div>}
                 {canReach && !hasEnergy && <div style={{ fontSize: 10, color: T.red, marginTop: 2 }}>Energie fehlt</div>}

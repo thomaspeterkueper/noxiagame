@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { completePlayerTransit, getPlayerTransitState, startPlayerTransit } from '@/lib/game/core/transit'
+import { completePlayerTransit, getPassengerOffers, getPlayerTransitState, startPlayerTransit } from '@/lib/game/core/transit'
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -66,6 +66,15 @@ function transitError(error: unknown) {
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Ticketschalter: GET ?offers=1 → Linienflüge vom aktuellen Ort (Preis, Dauer)
+  if (req.nextUrl.searchParams.get('offers')) {
+    try {
+      return NextResponse.json({ ok: true, ...await getPassengerOffers(user.id) }, { headers: { 'Cache-Control': 'no-store' } })
+    } catch (error) {
+      return transitError(error)
+    }
+  }
 
   try {
     const state = await getPlayerTransitState(user.id)

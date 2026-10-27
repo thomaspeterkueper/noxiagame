@@ -165,6 +165,15 @@ McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wo
 - Erste Einweisungskarte: „Starte in Sundern“ – Café, Leute ansprechen, Haus kaufen und umbauen (statt „bau deine erste Anlage“).
 - `/earth` bleibt als Planungs- und Entwicklerseite bestehen; der Link „Erde öffnen“ im Scanner führt jetzt ins Dashboard.
 
+## Linienflug ohne eigenes Schiff (Thomas, 27.10.2026: „baue das“)
+
+- Der Server konnte seit 03.10.2026 Passagiere ohne Schiff befördern (Ticket statt Energie, `noxia_start_passenger_transit`), aber im Spiel kam ein neuer Spieler nicht an den Knopf, und alle Konten hatten ein Schiff.
+- **Ticketschalter** (`app/components/TicketCounter.tsx`): in der Gebäudetafel jedes Raumhafen-Baus (`spaceport_*`) in der Weltkarte, sobald man davorsteht – Ziele mit Preis und Flugdauer, „Ticket kaufen“; Spieler mit eigenem Schiff bekommen den Hinweis auf die Navigation. Angebote aus `GET /api/game/transit?offers=1` (`getPassengerOffers`, gleiche Rechnung wie beim Abflug; `lib/game/passengerOffers.ts` mit Tests).
+- **Navigation** (Sonnensystem in Gebäuden auf Mond, Phobos, Deimos, Mars): ohne Schiff keine Sperre nach Schiffsreichweite mehr, Ticketpreis statt Energie.
+- Preise von der Erde: Mond 500, Kepler und Prometheus 700, Deimos und Phobos 825, Mars 850 Cr; neue Spieler haben 5 000 Cr.
+- Geprüft in der Datenbank (Transaktion, zurückgerollt): neues Konto ohne Schiff, Ticket Erde → Mond (−500 Cr), Ankunft auf dem Mond, Rückflug buchbar.
+- Offen: zusätzlich ein Reisebüro in Sundern (Ort entscheidet Thomas); der Schalter zieht mit dem Raumhafen in den Süden um.
+
 ## Staatliche Basis „Selmecke“ (Thomas, 27.10.2026: „sieht furchtbar aus“)
 
 **Befund:** „Selmecke“ ist in den Kartendaten kein Stadtteil, sondern ein Bach und das **Naturschutzgebiet Selmecke** (Schutzklasse 4, 51,331–51,351 / 7,968–7,980). Die 17 staatlichen Bauten (Verwaltung, Schule, Wohnblock mit 8 Bewohnern, Habitat, Labor, Scanner, Fabrik, Werft, zwei Lager, Solarfeld, Raumhafen mit Kern, Service, Lager und drei Landeplätzen) stehen zum Teil darin, in einem Waldtal ohne echte Häuser und Straßen – nur Feldwege. Deshalb wirkte die Basis wie ein Platzhalter auf der Wiese. Dazu kam ein Zeichenfehler: Bilder großer Bauten wurden mit ihrem Bildmaßstab bis 1,4-fach über die Grundfläche hinaus vergrößert (Landeplatz 120 × 90 m als Scheibe von rund 350 m).

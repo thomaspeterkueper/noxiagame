@@ -23,6 +23,7 @@ import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
+import TicketCounter from '@/app/components/TicketCounter'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 
 export type Panel =
@@ -203,6 +204,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 
   const [conversions, setConversions] = useState<Record<string, Array<{ id: string; name: string; cost: number; buildTicks?: number; venue?: boolean; note?: string }>>>({})
   const [showConversions, setShowConversions] = useState(false)
+  // Ticketschalter im Raumhafen (Linienflug ohne eigenes Schiff, 27.10.2026)
+  const [showTickets, setShowTickets] = useState(false)
 
   const person = panel.kind === 'person' ? residents.find(resident => resident.id === panel.id) ?? null : null
   const building = panel.kind === 'building' ? panel : null
@@ -242,7 +245,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
   const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind === 'parcel' ? 'g:' + panel.id : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
-  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false); setAskPrice('') }
+  if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false); setShowTickets(false); setAskPrice('') }
 
   // Kaufangebot je Gebäude einmal abfragen: reale Häuser mit OSM-Kennung – auch gekaufte (Angebote unter Spielern).
   const offerSource = building ? (building.noxiaId ? own?.source ?? null : building.source ?? null) : null
@@ -524,6 +527,11 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
         : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+      {own && /^spaceport/.test(own.typeId) && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
+        ? (showTickets
+          ? <><TicketCounter compact/><div className="row"><span/><button onClick={() => setShowTickets(false)}>Schließen</button></div></>
+          : <div className="row"><span>Ticketschalter: Linienflüge ohne eigenes Schiff.</span><button onClick={() => setShowTickets(true)}>Linienflug buchen …</button></div>)
+        : <div className="row"><span>Hier ist der Ticketschalter für Linienflüge.</span></div>)}
       {train && <div className="row"><span>Zug: {train.atStation ? `Der Zug steht am Gleis und fährt ${minutes(train.nextDepartureS)}.` : `Nächster Zug kommt ${minutes(train.nextArrivalS)}.`}</span></div>}
       {own?.own && own.source && <>
         <dl><dt>Eigentümer</dt><dd>du (gekauft)</dd><dt>Nutzung</dt><dd>{own.typeId === 'acquired_building' ? (realUse?.known ? `wie bisher: ${realUse.text}` : 'wie bisher') : own.name.split(' · ')[0] + (realUse?.known ? ` (vorher: ${realUse.text})` : '')}</dd><dt>Bewohner</dt><dd>{residentsHere || 'keine'}</dd></dl>
