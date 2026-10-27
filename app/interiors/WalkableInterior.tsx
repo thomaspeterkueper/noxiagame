@@ -140,7 +140,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     ;(async()=>{
       try{
         const{token}=await getSessionInfo()
-        const response=await fetch('/api/game/population?tileEntityId='+encodeURIComponent(entityId),{headers:{Authorization:'Bearer '+token},cache:'no-store'})
+        const response=await fetch('/api/game/population?includeDepth=1&tileEntityId='+encodeURIComponent(entityId),{headers:{Authorization:'Bearer '+token},cache:'no-store'})
         const data=await response.json()
         if(live&&response.ok){
           const list=Array.isArray(data.residents)?data.residents:[]
@@ -196,7 +196,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   },[residents,visits])
   const{figures,moments,joined}=useMemo(()=>{
     const ageOf=new Map(visits.map(visit=>[visit.resident.id,visit.ageSeconds+(nowMs-visit.fetchedAt)/1000]))
-    const placed=placeVenueFigures(layout,everyone.map(r=>({id:r.id,worksHere:worksHere(r),isCompanion:Boolean(companion&&r.id===companion.id),presenceRoomId:r.interiorPresence?.roomId??null})))
+    const placed=placeVenueFigures(layout,everyone.map(r=>({id:r.id,worksHere:worksHere(r),isCompanion:Boolean(companion&&r.id===companion.id),presenceRoomId:r.interiorPresence?.roomId??null,displayPriority:r.personDepth?.level==='focal'?3:r.personDepth?.level==='developed'?2:r.personDepth?.level==='situated'?1:0})))
     const moments=new Map<string,GuestMoment>()
     let joined:string|null=null
     const playerSeat=seat?{seat,seatedForS:(nowMs-satAt)/1000}:null
