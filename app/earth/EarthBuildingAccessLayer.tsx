@@ -19,6 +19,8 @@ import CafeWalkableInterior from './CafeWalkableInterior'
 import AcademyWalkableInterior from './AcademyWalkableInterior'
 import AdminWalkableInterior from './AdminWalkableInterior'
 import SpaceportWalkableInterior from './SpaceportWalkableInterior'
+import BankWalkableInterior from './BankWalkableInterior'
+import WarehouseWalkableInterior from './WarehouseWalkableInterior'
 import BuildingOverlayShell from '@/app/dashboard/BuildingOverlayShell'
 import PortCanteenInterior from '@/app/dashboard/PortCanteenInterior'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -177,13 +179,17 @@ export default function EarthBuildingAccessLayer({
     return <AdminOverlay locationSlug="earth" onClose={() => setDeskOpen(false)} />
   }
 
+  if (request.kind === 'bank' && !deskOpen) {
+    // Die Bank ist begehbar (NOXIA-INTERIOR-0001); der Schalter öffnet darüber.
+    return <BankWalkableInterior entityId={request.entityId} buildingName={request.buildingName} locationSlug="earth" locationName={locationName} companion={companion} onClose={onClose} onOpenDesk={() => setDeskOpen(true)} />
+  }
   if (request.kind === 'bank') {
     return (
       <BankOverlay
         locationSlug="earth"
         locationName={locationName}
         credits={credits}
-        onClose={onClose}
+        onClose={() => setDeskOpen(false)}
         onCreditsChanged={() => void loadFromServer()}
       />
     )
@@ -253,11 +259,17 @@ export default function EarthBuildingAccessLayer({
           return false
         }
       }}
-      onClose={request.kind === 'spaceport' ? () => setSpaceportMode('hub') : onClose}
+      onClose={request.kind === 'spaceport' ? () => setSpaceportMode('hub') : () => setDeskOpen(false)}
     />
   )
 
-  if (request.kind === 'warehouse') return warehouse
+  if (request.kind === 'warehouse') {
+    // Das Warenhaus ist begehbar (NOXIA-INTERIOR-0001); der Tresen (Markt) öffnet darüber.
+    if (!deskOpen) {
+      return <WarehouseWalkableInterior entityId={request.entityId} buildingName={request.buildingName} locationName={locationName} prices={data?.prices ?? []} openOrders={(data?.orders ?? []).length} cargo={cargo as any} companion={companion} onClose={onClose} onOpenDesk={() => setDeskOpen(true)} />
+    }
+    return warehouse
+  }
 
   if (request.kind === 'foundation') {
     return (

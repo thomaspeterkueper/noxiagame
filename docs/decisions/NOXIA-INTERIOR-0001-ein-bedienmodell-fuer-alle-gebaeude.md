@@ -58,3 +58,11 @@ So baut man ein weiteres Gebäude ein: Grundriss als `VenueLayout` (Möbel, Plä
 ## Stand nach vier Einrichtungen
 
 Lokal, Akademie, Verwaltung, Raumhafen laufen auf demselben Motor: gleiche Bedienung, verschiedene Einrichtung, verschiedenes Wissen, verschiedenes Angebot. Je Gebäude 60–90 Zeilen Grundriss und Wissen, 80–100 Zeilen Einrichtung, eine Stilklasse. Nicht umgestellt: die realen Orte (`LandmarkWalkableInterior`, wird gerade vom Teilprojekt Erde ausgebaut – Bibliothek, Betriebe; Umstellung dort, wenn es passt), die Kolonie-Räume (`LegacyBuildingInterior`) und die Facility-Zonen (Mars).
+
+## Fünfte und sechste Einrichtung: Bank und Warenhaus (27.10.2026)
+
+**Bank** (`app/earth/BankWalkableInterior.tsx`, `lib/game/bank/bankInterior.ts`): Schalterhalle mit zwei Schaltern, Kurstafel, Wartesesseln, Beratungstisch; Tresor dahinter. Das Personal kennt die Zinssätze immer (`/api/game/bank?action=status`), den Stand des Kunden aber nur, wenn er am Schalter steht – sonst sagt es, dass Kontostände an den Schalter gehören. Angebot: Kurstafel mit Zinsen und eigenem Konto, „Schalter öffnen“ legt das `BankOverlay` (einzahlen, abheben, Kredit, Tilgung) darüber.
+
+**Warenhaus** (`app/earth/WarehouseWalkableInterior.tsx`, `lib/game/warehouse/warehouseInterior.ts`): Lagerhalle mit Preistafel, Tresen der Disposition, Regalen, Kisten (auf denen man sitzen kann); Wareneingang seitlich. Die Disposition kennt die Preise der Tafel, was ausverkauft ist, offene Transportaufträge und die Fracht des Gastes – Preise anderer Orte nicht. Angebot: Preistafel, „Tresen öffnen“ legt das `WarehouseOverlay` (Markt, Aufträge) darüber.
+
+Damit laufen sechs Gebäudearten auf dem Motor. Ein Ladenwechsel zurück aus Schalter oder Markt führt in die Halle, nicht auf die Karte.
