@@ -23,6 +23,7 @@ import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
+import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 
 export type Panel =
   | { kind: 'none' }
@@ -502,6 +503,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   return <aside className="world-panel" role="dialog">
     {person && <>
       <div className="head"><div><small>PERSON</small><b>{personSceneLabel(person)}</b><span>{role(person)}</span></div><button onClick={close} aria-label="Schließen">×</button></div>
+      {/* Porträt wie in der Koloniesicht (W-6) */}
+      <NpcVisualStyles/>
+      <div className="portrait"><NpcPortrait id={person.id} name={personSceneLabel(person)} role={person.identityState === 'known' ? role(person) : null} appearance={person.appearance}/></div>
       <dl><dt>Tut gerade</dt><dd>{leading[person.id] ? 'geht voraus' : visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
@@ -627,6 +631,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         : <div className="row"><span>Der Bau ist fertig.</span></div>}
     </>}
     <style jsx>{`
+      .world-panel .portrait{margin:2px 0 8px}
       .world-panel{position:relative;box-sizing:border-box;width:100%;min-height:0;overflow:auto;padding:12px 14px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;color:#eef2ed;font:12px system-ui;z-index:5}
       .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
       .head small{display:block;font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}

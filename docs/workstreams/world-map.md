@@ -243,11 +243,22 @@ R-13 ist gebaut (`population-economy.md`). Für die Tafel in `app/world-lab/Worl
 - Reale Lokale (Metropol, Balkan Grill in Sundern) sind jetzt NOXIA-Gebäude des Ortes; die Tafel zeigt sie als „Bar · Metropol“ mit „Betreten“. Seit dem Nachtrag (Thomas, 25.10.2026) sind reale Lokale kaufbar, mit Ausbauwert im Preis: das Angebot liefert dafür `venue` (Lokalart) und `fitOut` (Credits) – bitte in der Tafel zeigen, z. B. „Bar, schon ausgebaut (+1 800 Cr)“. Bei Metropol und Balkan Grill steht „Kaufen“ neben „Betreten“.
 - Das Startcafé ist vom alten 24 × 24-m-Platz auf das reale Haus Hauptstraße 72 gezogen (W-4, letzter Punkt); auf der Karte sollte es jetzt den Grundriss dieses Hauses belegen.
 
-### W-6 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur
+### W-6 (Bevölkerung und Ökonomie, 26.10.2026): Porträt beim Anklicken einer Figur – in der Weltkarte erledigt (27.10.2026)
+
+Umgesetzt: Die Personentafel der Weltkarte (`app/world-lab/WorldPanels.tsx`) zeigt oben `NpcPortrait` aus dem Aussehen der Person, wie in der Koloniesicht; die Rolle steht im Porträt nur, wenn die Person bekannt ist (`identityState = 'known'`). Nicht umgesetzt in der alten Erdszene – sie zeigt keine anklickbaren Personen und soll durch die Weltkarte ersetzt werden.
+
 
 Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie anklickt.“ Sobald in der neuen Weltkarte Personen stehen: beim Anklicken `NpcPortrait` aus `lib/grid/NpcVisual.tsx` in der Tafel rechts, wie in der Koloniesicht (`app/dashboard/WalkableColony.tsx`). Gleiches für die alte Erdszene (`app/earth/EarthWalkableSurface.tsx`), falls dort Personen erscheinen, solange sie läuft.
 
-### W-7 (Gastronomie, 27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen
+### W-7 (Gastronomie, 27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen – erledigt (27.10.2026)
+
+Umgesetzt:
+- `/api/world-lab/buildings` liefert `public: true` für Gebäude des Ortes (`owner_class = 'STATE'`, ohne Spieler als Eigentümer). Betroffen heute: Bank (Sparkasse, Hauptstraße 140), Bar Metropol, Restaurant Balkan Grill.
+- **Aussehen** (`drawBlock` in `worldEngine.ts`): öffentliche Gebäude im realen Haus behalten Grundriss und reale Geschosszahl, bekommen aber das Dach aus `NOXIA_LOOKS[typeId]` bzw. `NOXIA_DEFAULT_LOOK`. Gekaufte Häuser sehen weiter aus wie vorher. Das Startcafé (Spielergebäude im realen Haus, nicht gekauft) bleibt wie bisher im Aussehen des realen Hauses.
+- **Symbol:** Über jedem öffentlichen Gebäude steht eine runde Plakette mit dem Zeichen der Gebäudeart (€ Bank, § Verwaltung, ✎ Schule, ☕ Café, ♪ Bar, ✦ Restaurant, H Hotel, sonst ◆; Tabelle `PUBLIC_SYMBOLS` in `lib/worldlab/blocks.ts`). Sie ist in jeder Zoomstufe sichtbar, gleich groß auf dem Bildschirm, und anklickbar (öffnet die Gebäudetafel).
+- **Kein Aufblitzen:** Ein NOXIA-Gebäude mit `source` bekommt seinen Ersatzblock erst, wenn die Kachel an seiner Position fertig gezeichnet ist und das Haus dort nicht vorkam (`standVisible`).
+- Nicht im Browser geprüft (Anmeldung nötig): Thomas bitte bei Sundern auf Sparkasse, Metropol und Balkan Grill schauen.
+
 
 **Beobachtung (Thomas, 27.10.2026, Dashboard-Karte bei Sundern):** „Bank-Gebäude war kurz da, wurde dann durch die Sundern-Gebäude ersetzt.“
 

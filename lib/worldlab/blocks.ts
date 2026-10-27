@@ -139,3 +139,17 @@ export const NOXIA_LOOKS: Record<string, Partial<NoxiaLook>> = {
   // Gekauftes reales Gebäude: sieht aus wie vorher, nur der Eigentümer ist neu.
   acquired_building: { roof: undefined },
 }
+
+/**
+ * Symbol öffentlicher Gebäude des Ortes (W-7): steht als Plakette über dem Haus,
+ * auch weit herausgezoomt, damit man Bank, Verwaltung oder Lokal von Weitem findet.
+ * Nur einfache Schriftzeichen, keine Emojis (die zeichnet nicht jeder Rechner).
+ */
+export const PUBLIC_SYMBOLS: Record<string, string> = {
+  bank: '€', admin: '§', school: '✎', academy: '✎', laboratory: '⚗', hospital: '+', clinic: '+',
+  cafe: '☕', bar: '♪', restaurant: '✦', hotel: 'H', port_canteen: '✦', warehouse: '▤', warehouse_storage: '▤',
+}
+export const PUBLIC_SYMBOL_DEFAULT = '◆'
+export function publicSymbol(typeId: string): string {
+  return PUBLIC_SYMBOLS[typeId] ?? PUBLIC_SYMBOL_DEFAULT
+}

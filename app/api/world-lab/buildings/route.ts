@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
       w: Number(row.footprint_width_m ?? 18), d: Number(row.footprint_depth_m ?? 14), rotation: Number(row.rotation_deg ?? 0),
       // Eigentümer wie in /api/game/build/spatial
       own: row.profile_id === profileId,
+      // Gebäude des Ortes (nicht von Spielern gekauft): auf der Karte mit NOXIA-Dach und Symbol (W-7).
+      public: row.owner_class === 'STATE' && !row.profile_id,
       ownerLabel: row.profile_id === profileId ? 'Dein Gebäude'
         : row.owner_class === 'STATE' ? 'Staatlich'
           : row.owner_class === 'CORPORATION' ? 'Corporation'

@@ -7,7 +7,7 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
+import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
@@ -21,7 +21,7 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 
 type Pixi = typeof import('pixi.js')
 
-export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung, wenn es ein gekauftes reales Gebäude ist. */ source?: string; /** Laufender Umbau zum Lokal (R-13) */ conversion?: { type: string; name: string; readyAt: string | null } }
+export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung des realen Hauses (gekauft oder Gebäude des Ortes). */ source?: string; /** Gebäude des Ortes, nicht von Spielern gekauft (W-7) */ public?: boolean; /** Laufender Umbau zum Lokal (R-13) */ conversion?: { type: string; name: string; readyAt: string | null } }
 /** Bahnstrecke: beginnt am Bahnhof, wenn einer an ihrem Ende liegt. */
 export type WorldRailLine = { points: GeoPoint[]; lengthM: number; station: { name: string; at: GeoPoint } | null }
 /** Freie Fläche nach Abriss eines gekauften Gebäudes. */
@@ -259,7 +259,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const surfaceLayer = new PIXI.Container()
   lines.addChild(edgeLayer, surfaceLayer)
   const ownedLayer = new PIXI.Container()
-  world.addChild(ground, lines, overlay, objects, labels)
+  // Symbole öffentlicher Gebäude (W-7): in jeder Zoomstufe sichtbar, gleich groß auf dem Bildschirm.
+  const marks = new PIXI.Container({ isRenderGroup: true })
+  world.addChild(ground, lines, overlay, objects, labels, marks)
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -456,7 +458,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Gekaufte reale Gebäude gehören über ihre OSM-Kennung, die übrigen NOXIA-Gebäude über ihre Lage.
     const owner = (block.i ? noxia.find(building => building.source === block.i) : undefined) ?? noxiaOn(cx, cy, hw, hd, cos, sin)
     // Gekaufte reale Gebäude behalten ihr Aussehen, auch nach einem Umbau.
-    const look = owner ? (owner.source ? { ...NOXIA_DEFAULT_LOOK, roof: undefined } : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }) : null
+    // Gebäude des Ortes im realen Haus (Bank, Metropol, W-7): realer Grundriss
+    // und reale Höhe, aber NOXIA-Dach, damit man sie als öffentlich erkennt.
+    const look = !owner ? null
+      : owner.source && !owner.public ? { ...NOXIA_DEFAULT_LOOK, roof: undefined }
+        : owner.source ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId], levels: undefined }
+          : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }
     const eave = (look?.levels ?? block.l) * style.storeyM
     let c: Array<{ x: number; y: number }>
     if (block.f && block.f.length >= 8) {
@@ -727,7 +734,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         entry.blocks.push(...chunk)
         budget -= to - from
       }
-      if (entry.blocks.length >= entry.data.blocks.length) { entry.done = true; building.shift() }
+      if (entry.blocks.length >= entry.data.blocks.length) { entry.done = true; building.shift(); refreshStands() }
     }
   }
 
@@ -857,11 +864,28 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     building.claimed = true
     if (building.stand) building.stand.visible = false
   }
+  /** Kachel, in der ein Punkt der Welt liegt, ist fertig gezeichnet. */
+  function tileDoneAt(x: number, y: number) {
+    return Boolean(loaded.get(tileKey({ x: anchorTile.x + Math.floor(x / tileSizeM), y: anchorTile.y + Math.floor(y / tileSizeM) }))?.done)
+  }
+  /**
+   * Eigener Block eines NOXIA-Gebäudes nur, wenn es kein Haus der Karte übernommen hat.
+   * Gehört es zu einem realen Haus (`source`), erst wenn dessen Kachel fertig ist und
+   * das Haus dort nicht vorkam – sonst blitzt der Ersatzblock kurz auf (W-7).
+   */
+  function standVisible(building: NoxiaPlaced) {
+    return !building.claimed && (!building.source || tileDoneAt(building.x, building.y))
+  }
+  function refreshStands() {
+    for (const building of noxia) if (building.stand && building.source) building.stand.visible = standVisible(building)
+  }
   // Namensschilder an NOXIA-Gebäuden (W-3), fremde Häuser nicht.
   const noxiaSigns: Container[] = []
   function placeSigns() {
     for (const sign of noxiaSigns.splice(0)) sign.destroy({ children: true })
+    for (const mark of marks.removeChildren()) mark.destroy({ children: true })
     for (const building of noxia) {
+      if (building.public) placeMark(building)
       const height = (NOXIA_LOOKS[building.typeId]?.levels ?? 2) * 3.2 + 3
       const at = iso(building.x, building.y, height)
       const sign = new PIXI.Container()
@@ -876,6 +900,25 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       labels.addChild(sign)
       noxiaSigns.push(sign)
     }
+  }
+  /** Runde Plakette mit dem Symbol der Gebäudeart über einem öffentlichen Gebäude. */
+  function placeMark(building: NoxiaPlaced) {
+    const at = iso(building.x, building.y, building.source ? 12 : (NOXIA_LOOKS[building.typeId]?.levels ?? 2) * 3.2 + 6)
+    const mark = new PIXI.Container()
+    const disc = new PIXI.Graphics()
+    disc.moveTo(0, 6).lineTo(-2.2, 2).lineTo(2.2, 2).closePath().fill(0xd9bb6a)
+    disc.circle(0, -2, 5).fill({ color: 0x173845, alpha: 0.95 }).stroke({ width: 0.8, color: 0xd9bb6a })
+    const glyph = new PIXI.Text({ text: publicSymbol(building.typeId), style: { fontFamily: 'system-ui, sans-serif', fontSize: 48, fontWeight: '800', fill: 0xf3e8c8 } })
+    glyph.anchor.set(0.5, 0.5)
+    glyph.scale.set(0.13)
+    glyph.position.set(0, -2)
+    mark.addChild(disc, glyph)
+    mark.pivot.set(0, 6)
+    mark.position.set(at.x, at.y)
+    mark.scale.set(2.2 / zoom)
+    mark.eventMode = 'static'
+    ;(mark as unknown as { pick: WorldPick }).pick = { type: 'noxia', noxiaId: building.id, at: { lat: building.lat, lon: building.lon } }
+    marks.addChild(mark)
   }
   async function placeStands(list: NoxiaPlaced[]) {
     for (const building of list) {
@@ -906,7 +949,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       building.stand = stand
       stand.eventMode = 'static'
       ;(stand as unknown as { pick: WorldPick }).pick = { type: 'noxia', noxiaId: building.id, at: { lat: building.lat, lon: building.lon } }
-      stand.visible = !building.claimed
+      stand.visible = standVisible(building)
       addObject(stand)
     }
   }
@@ -1475,6 +1518,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
+    for (const mark of marks.children) mark.scale.set(2.2 / zoom)
     poiLabels.visible = zoom >= 2.4
     parcelLayer.visible = zoom >= 2.2
     const centre = iso(camera.x, camera.y)
