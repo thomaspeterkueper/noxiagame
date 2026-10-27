@@ -507,6 +507,8 @@ export interface VenueResidentInput {
   isCompanion?: boolean
   /** Maßgeblicher Raum aus person_interior_presence, falls vorhanden. */
   presenceRoomId?: string | null
+  /** Nur Darstellungspriorität; verändert weder Entscheidung noch Präsenzwahrheit. */
+  displayPriority?: number
 }
 
 export interface VenueFigure {
@@ -552,7 +554,7 @@ export function placeVenueFigures(layout: VenueLayout, residents: readonly Venue
   }
   const knownRoom = (roomId: string | null | undefined) =>
     roomId && layout.template.rooms.some(room => room.id === roomId) ? roomId : null
-  const sorted = [...residents].sort((a, b) => a.id.localeCompare(b.id))
+  const sorted = [...residents].sort((a, b) => ((b.displayPriority ?? 0) - (a.displayPriority ?? 0)) || a.id.localeCompare(b.id))
   const unique = sorted.filter((resident, index) => index === 0 || sorted[index - 1].id !== resident.id)
 
   const entrySpots = layout.spots.filter(spot => spot.kind === 'standing' && spot.id.startsWith('entry-'))
