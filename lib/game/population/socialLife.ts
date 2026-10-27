@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { RECENT_ENCOUNTER_TICK_RETENTION } from './relationshipRecency'
+import { regulatedFamilyDesire, type RegulationState } from '../cognition/personInteroception'
 
 type SB = any
 
@@ -221,17 +222,27 @@ async function updateFamilyDemand(supabase: SB, tick: number) {
 export async function runSocialLifeTick(supabase: SB, tick: number) {
   const result = { aged: 0, friendships: 0, partnerships: 0, familyReady: 0, births: 0, demandLocations: 0 }
 
-  const [{ data: people }, { data: lifeRows }, { data: relationRows }, { data: partnershipRows }, { data: locations }] = await Promise.all([
+  const [{ data: people }, { data: lifeRows }, { data: relationRows }, { data: partnershipRows }, { data: locations }, { data: regulationRows }] = await Promise.all([
     supabase.from('people').select('id, display_name, current_location_id'),
     supabase.from('person_life_state').select('*'),
     supabase.from('person_relationships').select('*'),
     supabase.from('person_partnerships').select('*').eq('status', 'active'),
     supabase.from('locations').select('id, is_supplied, population, population_max'),
+    supabase.from('person_regulation_state').select('person_id,stress_axis,social_bonding_tone,reward_drive,arousal'),
   ])
 
   const peopleById = new Map<string, any>((people ?? []).map((row: any) => [String(row.id), row] as [string, any]))
   const lifeById = new Map<string, any>((lifeRows ?? []).map((row: any) => [String(row.person_id), row] as [string, any]))
   const locationById = new Map<string, any>((locations ?? []).map((row: any) => [String(row.id), row] as [string, any]))
+  const regulationById = new Map<string,RegulationState>((regulationRows ?? []).map((row:any)=>[
+    String(row.person_id),
+    {
+      stressAxis:Number(row.stress_axis),
+      socialBondingTone:Number(row.social_bonding_tone),
+      rewardDrive:Number(row.reward_drive),
+      arousal:Number(row.arousal),
+    } as RegulationState,
+  ]))
 
   const missingLifeRows = (people ?? []).filter((person: any) => !lifeById.has(person.id)).map((person: any) => ({
     person_id: person.id,
@@ -357,7 +368,10 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
       Number(ab.recent_encounter_score) >= FRIEND_RECENCY && Number(ba.recent_encounter_score) >= FRIEND_RECENCY
     if (!stable) continue
 
-    const desire = Math.min(Number(aLife.family_desire ?? 0.5), Number(bLife.family_desire ?? 0.5))
+    const desire = Math.min(
+      regulatedFamilyDesire(Number(aLife.family_desire ?? 0.5), regulationById.get(partnership.person_a_id)),
+      regulatedFamilyDesire(Number(bLife.family_desire ?? 0.5), regulationById.get(partnership.person_b_id)),
+    )
     const age = tick - Number(partnership.established_tick ?? tick)
     let intent = partnership.family_intent
     let intentTick = partnership.family_intent_updated_tick == null ? null : Number(partnership.family_intent_updated_tick)
