@@ -32,6 +32,7 @@ import { runPopulationTick as runPersonPopulationTick } from './population/engin
 import { runPersonTick } from './personBrain'
 import { persistPopulationEncounters } from './population/encounterRuntime'
 import { runSocialLifeTick } from './population/socialLife'
+import { runInteroceptionTick } from './population/interoceptionRuntime'
 import { runHousingShadowTick } from './population/housingShadowRuntime'
 import { projectSurfacePresence } from './population/surfacePresence'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick, runVenueStaffingTick } from './npcEconomy'
@@ -772,6 +773,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const namedPeople = await runPersonTick(supabase, tickNumber)
   const surfacePresence = await runSurfacePresenceProjection(supabase, tickNumber)
   const encounters = await persistPopulationEncounters(supabase, tickNumber)
+  const interoception = await runInteroceptionTick(supabase, tickNumber)
   const socialLife = await runSocialLifeTick(supabase, tickNumber)
 
   // Aggregate population may update location population/capacity. Load one
@@ -792,7 +794,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
-  return { tickNumber, population, livingPopulation, namedPeople, surfacePresence, encounters, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
