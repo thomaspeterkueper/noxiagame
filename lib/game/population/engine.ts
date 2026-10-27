@@ -17,6 +17,7 @@ import { activityForAction, encounterNeedDelta, needDelta, passiveNeedDrift, var
 import { encounterEventType, encounterOutcome, ENCOUNTER_EVENT_TYPES, type EncounterOutcome } from './socialFriction'
 import { encounterQualities, decayAffect, affectProfileFromTraits } from '../cognition/personAffect'
 import { fadeRelationships, pairCompatibility } from './relationshipDynamics'
+import { nextEncounterRecency } from './relationshipRecency'
 import { runStJohannesSocialPlaceTick } from './realPlaceActivity'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
@@ -253,6 +254,12 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
   const projection = projectEncounterRelationship(event, current, actorRelationships)
   if (!projection) return false
   const relationship = projection.relationship
+  const encounterCount = Number(relationshipRow?.encounter_count_total ?? 0) + 1
+  const recentEncounterScore = nextEncounterRecency(
+    Number(relationshipRow?.recent_encounter_score ?? 0),
+    relationshipRow?.last_interaction_tick == null ? null : Number(relationshipRow.last_interaction_tick),
+    event.tick,
+  )
   const { error: upsertError } = await supabase.from('person_relationships').upsert({
     person_id: relationship.personId,
     other_person_id: relationship.otherPersonId,
@@ -261,6 +268,9 @@ async function persistEncounterDirection(supabase: SupabaseLike, event: Populati
     trust: relationship.trust,
     affinity: relationship.affinity,
     last_interaction_tick: relationship.lastInteractionTick,
+    encounter_count_total: encounterCount,
+    recent_encounter_score: recentEncounterScore,
+    relationship_updated_tick: event.tick,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'person_id,other_person_id' })
   if (upsertError) throw upsertError
