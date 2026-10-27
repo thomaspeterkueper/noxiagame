@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
 import { ADMIN_INTRODUCTION, ADMIN_LAYOUT, adminKnowledge, type AdminPublicFacts } from '@/lib/game/administration/adminInterior'
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
+import { learningGateFacts, statusesFromViews } from '@/lib/game/interiors/learningGates'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
@@ -66,7 +67,7 @@ export default function AdminWalkableInterior({ entityId, buildingName, location
     visits: [],
     facts: (self, ctx) => withExtraFacts(
       baseInteriorFacts({ layout, buildingName, self, figures: ctx.figures, playerPos: ctx.pos, playerSeat: ctx.seat, staffRoleText: 'Du arbeitest hier in der Verwaltung des Ortes' }),
-      self.roomRole === 'staff' ? knowledge : ['Du wartest hier selbst; Auskunft gibt der Schalter'],
+      self.roomRole === 'staff' ? [...knowledge, ...learningGateFacts(statusesFromViews('administration', ctx.gates), ctx.nearService)] : ['Du wartest hier selbst; Auskunft gibt der Schalter'],
     ),
     placeKnowledge: [],
     hearsay: () => [],

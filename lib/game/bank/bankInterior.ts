@@ -2,11 +2,16 @@
 // Grundriss und Wissen der Bank für den allgemeinen Innenraum
 // (NOXIA-INTERIOR-0001): Schalterhalle mit zwei Schaltern, Kurstafel,
 // Wartesesseln und Beratungstisch; Tresor und Büros dahinter. Reine Regeln.
+// Beratung (Thomas, 27.10.2026): am Beratungstisch sitzt die Kundenberatung;
+// die Beratungsmappe rechnet aus den echten Kontodaten (bankAdvice).
 
 import { CIVIC_STANDARD_INTERIOR } from '../buildings/interiors/templates/civicStandard'
 import { VENUE_HEIGHT, VENUE_WIDTH, staffSpot, standingSpot, tableWithChairs, type VenueLayout, type VenueSpot } from '../hospitality/venues'
 
 const advice = tableWithChairs(1, 420, 300)
+/** Der Kundenstuhl am Beratungstisch. */
+export const ADVICE_SEAT_ID = 'advice-l'
+export const ADVICE_STAFF_SPOT_ID = 'staff-advice'
 const chairs = (x: number, y: number, n: number): VenueSpot[] => Array.from({ length: n }, (_, i) => ({ id: `wait-${i + 1}`, kind: 'seat', x: x + 9 + i * 34, y: y + 9, roomId: 'service', label: 'in der Wartezone', posture: 'sitting' }))
 
 export const BANK_LAYOUT: VenueLayout = {
@@ -30,11 +35,13 @@ export const BANK_LAYOUT: VenueLayout = {
   ],
   spots: [
     staffSpot('staff-counter', 530, 92, 'service', 'am Schalter'),
+    // Die Beratung sitzt dem Kunden gegenüber – der rechte Stuhl des Beratungstischs.
+    ...advice.spots.filter(spot => spot.id.endsWith('-r')).map(spot => ({ ...staffSpot('staff-advice', spot.x, spot.y, 'meeting', 'am Beratungstisch'), posture: 'sitting' as const })),
     staffSpot('staff-counter-2', 600, 92, 'service', 'am Schalter'),
     staffSpot('staff-office', 650, 300, 'operations', 'im Büro'),
     { ...standingSpot('entry-1', 150, 395, 'beim Eingang'), roomId: 'service' },
     ...chairs(160, 300, 3),
-    ...advice.spots.map(spot => ({ ...spot, id: spot.id.replace('table-1', 'advice'), roomId: 'meeting', label: 'am Beratungstisch' })),
+    ...advice.spots.filter(spot => spot.id.endsWith('-l')).map(spot => ({ ...spot, id: ADVICE_SEAT_ID, roomId: 'service', label: 'am Beratungstisch' })),
   ],
   roomFact: 'Die Schalterhalle hat zwei Schalter, eine Kurstafel, drei Wartesessel und einen Beratungstisch; der Ausgang liegt beim Eingang',
   guestBackFact: 'Hinter dem Schalter ist eine schwere Tür; was dahinter liegt, siehst du nicht',
@@ -77,5 +84,84 @@ export const BANK_INTRODUCTION = {
     'Wer Credits übrig hat, legt sie an; die Zinsen laufen je Tick',
     'Ein Kredit braucht Sicherheiten – ein eigenes Gebäude zählt – und die Kreditfreigabe aus der Akademie',
     'Wer handeln will, braucht Startkapital: erst kleine Geschäfte, dann die Bank',
+  ],
+}
+
+// ── Beratung ─────────────────────────────────────────────────────────────────
+
+/** Am Beratungstisch: auf dem Kundenstuhl oder direkt daneben. */
+export function isAtAdviceTable(seatId: string | null, pos: { x: number; y: number }): boolean {
+  if (seatId === ADVICE_SEAT_ID) return true
+  const table = BANK_LAYOUT.furniture.find(item => item.kind === 'table')
+  if (!table) return false
+  return Math.hypot(pos.x - (table.x + table.w / 2), pos.y - (table.y + table.h / 2)) < 64
+}
+
+/** Stand des Kunden, wie ihn /api/game/bank?action=status liefert. */
+export interface BankCustomerStatus {
+  credits: number
+  deposit: number
+  loan: number
+  creditLimit: number
+  availableLoan: number
+  depositRate: number
+  loanRate: number
+  hasModule: boolean
+  collateralTotal: number
+  overLimit: number
+}
+
+export function customerStatusFrom(data: Record<string, unknown> | null | undefined): BankCustomerStatus | null {
+  if (!data) return null
+  const n = (v: unknown) => Number.isFinite(Number(v)) ? Number(v) : 0
+  const warning = data.collateralWarning as { overLimit?: unknown } | null | undefined
+  return {
+    credits: n(data.credits), deposit: n(data.deposit), loan: n(data.loan),
+    creditLimit: n(data.creditLimit), availableLoan: n(data.availableLoan),
+    depositRate: n(data.depositRate), loanRate: n(data.loanRate),
+    hasModule: Boolean(data.hasModule), collateralTotal: n(data.collateralTotal),
+    overLimit: n(warning?.overLimit),
+  }
+}
+
+const cr = (v: number) => `${Math.round(v).toLocaleString('de-DE')} Cr`
+const perTick = (v: number) => `${(Math.round(v * 10) / 10).toLocaleString('de-DE')} Cr je Tick`
+
+/**
+ * Die Beratungsmappe: was aus dem eigenen Konto folgt – nur gerechnet, nichts
+ * empfohlen, was die Zahlen nicht tragen. Unpersönlich formuliert, damit die
+ * Tafel (für den Spieler) und die Beratung (als Wissen) dieselben Sätze nutzen.
+ */
+export function bankAdvice(s: BankCustomerStatus): string[] {
+  const lines = [`Konto: Bargeld ${cr(s.credits)}, Guthaben hier ${cr(s.deposit)}, Kredit ${cr(s.loan)}`]
+  if (s.deposit > 0) lines.push(`Das Guthaben bringt etwa ${perTick(s.deposit * s.depositRate)}`)
+  else if (s.credits > 0 && s.depositRate > 0) lines.push(`Bargeld bringt keine Zinsen; angelegt brächte es etwa ${perTick(s.credits * s.depositRate)}`)
+  if (s.loan > 0) lines.push(`Der Kredit kostet etwa ${perTick(s.loan * s.loanRate)} Zinsen`)
+  if (s.loan > 0 && s.deposit > 0 && s.loanRate > s.depositRate) {
+    lines.push(`Tilgen aus dem Guthaben spart etwa ${perTick((s.loanRate - s.depositRate) * Math.min(s.deposit, s.loan))}, weil der Kreditzins höher ist`)
+  }
+  if (s.collateralTotal <= 0) lines.push('Keine Sicherheiten: als Sicherheit zählen hier Gebäude mit Förderertrag und Schiffe – Kreditrahmen 0')
+  else lines.push(`Sicherheiten ${cr(s.collateralTotal)} → Kreditrahmen ${cr(s.creditLimit)}, davon frei ${cr(s.availableLoan)}`)
+  if (s.overLimit > 0) lines.push(`Der Kredit liegt ${cr(s.overLimit)} über dem Rahmen: tilgen oder Sicherheiten erhöhen`)
+  if (!s.hasModule) lines.push('Für einen Kredit fehlt der Nachweis „Was ist Kredit?“; das Modul gibt es hier in der Bank')
+  return lines
+}
+
+/** Was die Beratung über ihr Gegenüber weiß – nur am Beratungstisch. */
+export function bankAdvisorFacts(s: BankCustomerStatus | null): string[] {
+  if (!s) return ['Du berätst gerade; die Kontodaten deines Gegenübers liegen dir noch nicht vor – sag das ehrlich']
+  return [
+    'Du sitzt deinem Gegenüber am Beratungstisch gegenüber und hast seine Beratungsmappe vor dir',
+    ...bankAdvice(s).map(line => 'Mappe: ' + line),
+    'Du rechnest mit den Zahlen der Mappe vor, versprichst keine Gewinne und drängst zu keinem Kredit',
+  ]
+}
+
+export const BANK_ADVISOR_INTRODUCTION = {
+  style: 'bank-advice',
+  stance: 'Du bist die Kundenberatung: ruhig, ehrlich, konkret. Du erklärst anhand der Mappe, was Guthaben bringt und ein Kredit kostet, und nennst, welches Wissen noch fehlt. Ohne Nachweis gibt es keinen Kredit.',
+  leads: [
+    'Erst schauen, was das Konto hergibt – dann entscheiden',
+    'Ein Kredit lohnt nur, wenn das Geld mehr einbringt, als die Zinsen kosten',
   ],
 }

@@ -66,3 +66,39 @@ Lokal, Akademie, Verwaltung, Raumhafen laufen auf demselben Motor: gleiche Bedie
 **Warenhaus** (`app/earth/WarehouseWalkableInterior.tsx`, `lib/game/warehouse/warehouseInterior.ts`): Lagerhalle mit Preistafel, Tresen der Disposition, Regalen, Kisten (auf denen man sitzen kann); Wareneingang seitlich. Die Disposition kennt die Preise der Tafel, was ausverkauft ist, offene Transportaufträge und die Fracht des Gastes – Preise anderer Orte nicht. Angebot: Preistafel, „Tresen öffnen“ legt das `WarehouseOverlay` (Markt, Aufträge) darüber.
 
 Damit laufen sechs Gebäudearten auf dem Motor. Ein Ladenwechsel zurück aus Schalter oder Markt führt in die Halle, nicht auf die Karte.
+
+## Lernschwellen in jedem Gebäude (27.10.2026)
+
+Thomas, 27.10.2026: „so wie es in der Bank schon existiert auch bei anderen Gebäuden Zugang zu Lernmodulen öffnen, damit man bestimmte Dinge überhaupt erst nutzen kann“.
+
+**Was der Motor tut:** Er fragt beim Betreten `GET /api/game/learning/gates?kind=<Stilklasse>` ab. Rechts zeigt er unter „Wissen hier“, was noch fehlt, jeweils mit einem Satz, warum. „Lernen“ öffnet das SSF-Lernmodul (`SsfModuleRenderer`) gleich im Raum, ESC führt zurück. Nach dem Abschluss lädt der Motor den Stand neu und meldet `onLearned` an die Einrichtung, die Bank holt dann ihr Konto neu. Während eines Gesprächs bleibt der Abschnitt ausgeblendet.
+
+**Die Schwellen** (`lib/game/interiors/learningGates.ts`) stammen aus dem Wissenskatalog (`lib/knowledge/data.ts`), der sie den Gebäuden schon zuordnet:
+
+| Gebäude | Freischaltung | Lernmodul | Stand |
+|---|---|---|---|
+| Bank | Kredit aufnehmen | „Was ist Kredit?“ | **required** – die Bank prüft es |
+| Bank | Sicherheiten verstehen | „Was ist ein Sicherheitenwert?“ | helps |
+| Bank | Zinseszins verstehen | „Was ist Zinseszins?“ | helps |
+| Warenhaus | Erweiterter Handel | „Was ist Arbitrage?“ | helps |
+| Verwaltung | Bodenwert verstehen | „Was ist Bodenwert?“ | helps |
+| Raumhafen | Orbitale Navigation, Bahnkrümmung | „Das Sonnensystem“ u. a. | helps – wirkt über die Navigationsgüte |
+
+- **Offen oder gesperrt:** Eine Schwelle ist offen, wenn die Freischaltung (`player_unlocks`) vorliegt oder das Modul abgeschlossen ist (`academy_completions`).
+- **Welches Modul:** Das Modul kommt aus der SSF-Liste, gesucht nach Kennung oder Freischaltung. Hat SSF noch keins, steht dort „Lernmodul folgt“. Erfunden wird nichts.
+- **Wissen des Personals:** Es weiß immer, welches Wissen das Haus verlangt (`learningGateFacts`). Was dem Kunden fehlt, weiß es nur am Schalter oder an der Beratung.
+- **Sperren:** Serverseitig sperren müssen die zuständigen Teilprojekte. Die Requests stehen in R-15 (`population-economy.md`).
+- **Bankschalter:** Das Kreditschloss im `BankOverlay` hat jetzt „Jetzt hier lernen“. Der Knopf schließt den Schalter und öffnet das Modul in der Halle (`learnRequest`).
+
+## Beratung in der Bank (27.10.2026)
+
+- **Beratungstisch:** Am Beratungstisch sitzt die Kundenberatung (Personalplatz `staff-advice`). Der Kunde setzt sich auf den Stuhl gegenüber.
+- **Beratungsmappe:** Rechts steht dann die Beratungsmappe (`bankAdvice`), gerechnet aus dem eigenen Konto:
+  - Bargeld, Guthaben und Kredit
+  - Zinsertrag und Zinskosten je Tick
+  - Ersparnis durch Tilgen aus dem Guthaben
+  - Sicherheiten und Kreditrahmen, Überschreitung des Rahmens
+  - fehlender Nachweis
+- **Gespräch:** „Beratungsgespräch beginnen“ spricht die Beraterin an. Sie hat genau diese Mappe als Wissen, ihre Haltung ist: „rechnet vor, verspricht nichts, drängt zu keinem Kredit“. Den Stand des Kunden kennt sie nur am Beratungstisch.
+- **Ohne Personal:** Arbeitet niemand in der Bank, liegt nur die Mappe aus. Personal ist angefragt (R-14).
+- **Ort:** Die Bank steht jetzt am realen Ort der Sparkasse Sundern, Hauptstraße 140 (`20261027090000_earth_bank_sparkasse.sql`).

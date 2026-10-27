@@ -122,6 +122,7 @@ export default function EarthBuildingAccessLayer({
   const [schoolOpen, setSchoolOpen] = useState(false)
   const [deskOpen, setDeskOpen] = useState(false)
   const [hubOpen, setHubOpen] = useState(false)
+  const [learnRequest, setLearnRequest] = useState<{ gateId: string; at: number } | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function EarthBuildingAccessLayer({
     setSchoolOpen(false)
     setDeskOpen(false)
     setHubOpen(false)
+    setLearnRequest(null)
     setMessage(null)
     let cancelled = false
     setLoading(true)
@@ -181,7 +183,7 @@ export default function EarthBuildingAccessLayer({
 
   if (request.kind === 'bank' && !deskOpen) {
     // Die Bank ist begehbar (NOXIA-INTERIOR-0001); der Schalter öffnet darüber.
-    return <BankWalkableInterior entityId={request.entityId} buildingName={request.buildingName} locationSlug="earth" locationName={locationName} companion={companion} onClose={onClose} onOpenDesk={() => setDeskOpen(true)} />
+    return <BankWalkableInterior entityId={request.entityId} buildingName={request.buildingName} locationSlug="earth" locationName={locationName} companion={companion} onClose={onClose} onOpenDesk={() => setDeskOpen(true)} learnRequest={learnRequest} />
   }
   if (request.kind === 'bank') {
     return (
@@ -191,6 +193,7 @@ export default function EarthBuildingAccessLayer({
         credits={credits}
         onClose={() => setDeskOpen(false)}
         onCreditsChanged={() => void loadFromServer()}
+        onLearnCredit={() => { setDeskOpen(false); setLearnRequest({ gateId: 'bank-credit', at: Date.now() }) }}
       />
     )
   }

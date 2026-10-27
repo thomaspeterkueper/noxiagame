@@ -36,6 +36,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - G-4 beantwortet und gebaut (27.10.2026, Branch `feat/venue-conversion-site`): Haus im Umbau als Baustelle mit Fertigstellung, leeres gekauftes Haus, Hausname aus `display_name`; G-5 abgeschlossen mit Maschinenbild in der Kantine.
 - Bank und Warenhaus als fünfte und sechste Einrichtung (27.10.2026, Branch `feat/bank-warehouse-interiors`): Schalterhalle mit Kurstafel, Lagerhalle mit Preistafel; Personal kennt Konditionen bzw. Preise, Kontostand nur am Schalter. Im Browser geprüft.
 
+- **27.10.2026 – Bank an der Sparkasse, Beratung, Lernschwellen:**
+  - Die staatliche Bank der Erde steht am realen Ort der Sparkasse Sundern, Hauptstraße 140 (`osm:way:246890726`, Migration `20261027090000_earth_bank_sparkasse.sql`, live). Kennung, Konten und Eigentum bleiben.
+  - Am Beratungstisch gibt es die Beratungsmappe aus dem echten Konto und das Gespräch mit der Kundenberatung.
+  - Jedes Gebäude zeigt unter „Wissen hier“ seine Lernschwellen und öffnet das Lernmodul im Raum: Bank, Warenhaus, Verwaltung, Raumhafen.
+  - Der Bankschalter führt beim Kreditschloss direkt ins Modul.
+  - Beim Prüfen gefunden und behoben: Der Kundenstuhl am Beratungstisch war nicht besetzbar, weil er im Nebenraum lag.
+  - Geprüft im Browser mit Testdaten. Dazu Tests in `learningGates.test.ts` und `bankInterior.test.ts`.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -48,6 +56,10 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - R-8 an Bevölkerung und Ökonomie: Gerüchte als Wissen der Personen, Auskunft kaufen und verkaufen.
 - R-9 an Bevölkerung und Ökonomie: Lehren aus SunDog – sichtbare Bedürfnisbalken, Wirkung von Alkohol, Ware beim Wirt, Bilder als gemeinsamer Bestand.
 - R-10 an Bevölkerung und Ökonomie: echte Angebote als Daten (Stelle auf einem Handelsschiff, Aufträge), damit das Personal sie nennen kann; Einführung auch in anderen Gebäuden.
+
+- **R-14** (27.10.2026): Personal für die Bank an der Hauptstraße 140 und die anderen leeren öffentlichen Gebäude – `population-economy.md`.
+- **R-15** (27.10.2026): Lernschwellen serverseitig durchsetzen (Sicherheiten, Zinseszins, Arbitrage, Bodenwert) – `population-economy.md`.
+- **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`.
 
 ## Requests aus anderen Teilprojekten
 

@@ -18,6 +18,8 @@ interface BankOverlayProps {
   gates?:           Record<string, boolean>  // Feature-Gates aus player_unlocks
   canSell?:         boolean  // true wenn Spieler Eigentümer & nicht staatlich (25.08.2026)
   onSellClick?:     () => void
+  /** Im begehbaren Haus: Lernmodul für die Kreditfreigabe gleich hier öffnen (27.10.2026). */
+  onLearnCredit?:   () => void
 }
 
 const BANK_BG: Record<string, { src: string; label: string }> = {
@@ -104,7 +106,7 @@ const BUILDING_NAMES: Record<string, string> = {
 
 export default function BankOverlay({
   locationSlug, locationName, credits: initialCredits, onClose, onCreditsChanged,
-  gates = {}, canSell, onSellClick,
+  gates = {}, canSell, onSellClick, onLearnCredit,
 }: BankOverlayProps) {
   const [tab, setTab]               = useState<Tab>('konto')
   const [status, setStatus]         = useState<BankStatus | null>(null)
@@ -356,7 +358,9 @@ export default function BankOverlay({
                 <strong style={{ color: C.accent }}>ECO-L0-0001 — Was ist ein Kredit?</strong><br />
                 ab um Kredite aufnehmen zu können.
               </div>
-              <div style={{ marginTop: '1rem', fontSize: '0.68rem', color: C.textFaint, fontFamily: MONO }}>→ Dashboard → Akademie → Module</div>
+              {onLearnCredit
+                ? <button onClick={onLearnCredit} style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Jetzt hier lernen →</button>
+                : <div style={{ marginTop: '1rem', fontSize: '0.68rem', color: C.textFaint, fontFamily: MONO }}>→ Dashboard → Akademie → Module</div>}
             </div>
           )}
           {!loading && tab === 'kredit' && (gates.bankCredit || status?.hasModule) && status && (
@@ -369,9 +373,11 @@ export default function BankOverlay({
                     Um Kredite aufzunehmen musst du das Modul <strong>„ECO-L0-0001"</strong> in der Akademie abschließen.
                     Dort lernst du wie Zinseszins und Kreditrisiko funktionieren — praktisch, nicht theoretisch.
                   </div>
-                  <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: C.textMuted, fontFamily: MONO }}>
+                  {onLearnCredit
+                    ? <button onClick={onLearnCredit} style={{ marginTop: '0.75rem', padding: '0.5rem 0.9rem', background: C.accent, color: C.white, border: 'none', borderRadius: 7, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Modul hier in der Bank lernen →</button>
+                    : <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: C.textMuted, fontFamily: MONO }}>
                     Akademie → Aufgaben → ECO-L0-0001
-                  </div>
+                  </div>}
                 </div>
               ) : (
                 <div style={{ background: status.loan > 0 ? C.redLight : C.accentLight, border: `1px solid ${status.loan > 0 ? '#f0a0a0' : '#b8cce8'}`, borderRadius: '8px', padding: '0.85rem 1.1rem', marginBottom: '1.25rem' }}>
@@ -466,6 +472,7 @@ export default function BankOverlay({
               <div style={{ fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.8 }}>
                 Wird freigeschaltet mit<br /><strong style={{ color: C.accent }}>ECO-L0-0001 — Was ist ein Kredit?</strong>
               </div>
+              {onLearnCredit && <button onClick={onLearnCredit} style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Jetzt hier lernen →</button>}
             </div>
           )}
           {!loading && tab === 'sicherheiten' && (gates.bankCredit || status?.hasModule) && !collateral && (
