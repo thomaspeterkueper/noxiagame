@@ -14,6 +14,7 @@ import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
 import SolarSystem from './SolarSystem'
 import SpaceportOverlay from './SpaceportOverlay'
+import { isPassageConnection } from '@/lib/game/spatial/connectionKinds'
 
 type Props = { locations: any[]; prices: any[]; orders: any[] }
 type FieldZone = 'safe' | 'caution' | 'restricted'
@@ -37,6 +38,8 @@ const DEIMOS_CORRIDORS: PreparedCorridor[] = (() => {
     return [{
       id: `deimos-corridor-${index}`,
       kind: 'prepared-track' as const,
+      // Dock, Forschung und Habitat sind durch Durchgänge verbunden (Thomas, 27.10.2026)
+      pressurized: isPassageConnection(edge.corridor),
       points: [{ xM: from.xM, yM: from.yM }, { xM: to.xM, yM: to.yM }],
     }]
   })

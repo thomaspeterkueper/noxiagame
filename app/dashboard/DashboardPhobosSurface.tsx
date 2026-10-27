@@ -6,6 +6,7 @@ import { getToken } from '@/lib/supabase/auth'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
 import PlanetaryWalkableSurface from '@/app/components/PlanetaryWalkableSurface'
 import { deriveStickneyFleetMapMarkers } from '@/lib/game/vehicles/stickneyFleetMotion'
+import { isPassageConnection } from '@/lib/game/spatial/connectionKinds'
 import { deriveSurfaceScienceObjects } from '@/lib/game/science/surfaceScience'
 import PlanetarySurfaceMap, { type MobileSurfaceObject, type PlanetarySurfaceEntity, type PreparedCorridor } from '@/app/components/PlanetarySurfaceMap'
 import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
@@ -37,7 +38,8 @@ const PHOBOS_CORRIDORS: PreparedCorridor[] = (() => {
     const physicalKey = [edge.from, edge.to].sort().join('::')
     if (seen.has(physicalKey)) return []
     seen.add(physicalKey)
-    const enclosed = edge.corridor === 'pressurized-corridor' || edge.corridor === 'cargo-transfer-link'
+    // Durchgänge mit Luft (auch die früheren Halteleinen-Korridore, Thomas 27.10.2026); Kabel bleiben draußen.
+    const enclosed = isPassageConnection(edge.corridor)
     return [{ id:`phobos-corridor-${index}`, kind:enclosed?'hardened-road':'prepared-track', pressurized:enclosed, points:[{xM:from.xM,yM:from.yM},{xM:to.xM,yM:to.yM}] }]
   })
 })()
