@@ -1,5 +1,9 @@
 'use client'
 
+// app/dashboard/DashboardMarsSurface.tsx
+// Aktualisiert: 27.10.2026 — gilt für jeden Ort auf der Marsoberfläche, nicht nur den Tharsis Hub (isMarsSurfaceSite); Titel, Terrain-Sync und Innenraum nach aktuellem Ort, Tharsis-Korridore nur am Tharsis Hub
+// Version:      1.1.0
+
 import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
@@ -11,6 +15,7 @@ import SurfaceContextBadge from '@/app/components/SurfaceContextBadge'
 import BuildingInterior from './BuildingInterior'
 import BuildingOverlayShell from './BuildingOverlayShell'
 import { THARSIS_HUB_SURFACE_CORRIDORS } from '@/lib/game/seeds/tharsisHubSurfaceCorridors'
+import { isMarsSurfaceSite } from '@/lib/game/locationBody'
 
 export default function DashboardMarsSurface(){
   const location=useGameStore(state=>state.location)
@@ -22,35 +27,40 @@ export default function DashboardMarsSurface(){
   const userId=useColonyStateStore(state=>state.userId)
   const [interiorEntity,setInteriorEntity]=useState<PlanetarySurfaceEntity|null>(null)
 
-  const marsLocation=useMemo(()=>locations.find(item=>item.slug==='mars')??null,[locations])
+  const marsLocation=useMemo(()=>locations.find(item=>item.slug===location)??null,[locations,location])
+  // Tharsis Hub (slug 'mars') oder ein weiterer Ort auf der Marsoberfläche, z. B. Mishkan Avi.
+  const active=location==='mars'||isMarsSurfaceSite(marsLocation)
+  const isTharsis=location==='mars'
+  const siteTitle=isTharsis?'Tharsis Hub':String((marsLocation as any)?.name??location)
+  const corridors=isTharsis?THARSIS_HUB_SURFACE_CORRIDORS:[]
   const currentResources=Array.isArray(marsLocation?.location_resources)?marsLocation.location_resources:[]
 
   useEffect(()=>{
-    if(location!=='mars')return
+    if(!active)return
     let cancelled=false
     ;(async()=>{
       try{
         const token=await getToken()
         if(!token||cancelled)return
-        await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({location:'mars'})})
+        await fetch('/api/game/build/spatial/terrain-sync',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({location})})
       }catch{}
     })()
     return()=>{cancelled=true}
-  },[location])
+  },[location,active])
 
-  useEffect(()=>{if(location!=='mars')setInteriorEntity(null)},[location])
+  useEffect(()=>{setInteriorEntity(null)},[location])
 
-  if(location!=='mars')return null
+  if(!active)return null
 
   const openWorldObject=(entity:PlanetarySurfaceEntity)=>setInteriorEntity(entity)
   const interiorName=interiorEntity?.name??interiorEntity?.entity_id??'Mars-Anlage'
 
   if(mode==='colony')return <>
     <PlanetaryWalkableSurface
-      locationSlug="mars"
+      locationSlug={location}
       body="mars"
-      title="Tharsis Hub"
-      corridors={THARSIS_HUB_SURFACE_CORRIDORS}
+      title={siteTitle}
+      corridors={corridors}
       onOpenWorldObject={openWorldObject}
       onClose={enterPlanning}
     />
@@ -64,21 +74,21 @@ export default function DashboardMarsSurface(){
         hasShipyard={Boolean((marsLocation as any)?.has_shipyard)}
         currentTick={0}
         shipRange={shipRange}
-        currentLocationSlug="mars"
+        currentLocationSlug={location}
         onClose={()=>setInteriorEntity(null)}
       />
     </BuildingOverlayShell>}
   </>
 
-  return <section className="noxia-dashboard-mars-surface" aria-label="Marsoberfläche Tharsis">
-    <SurfaceContextBadge title="MOLA · Tharsis Hub" detail="planetozentrischer Mars-Frame · MOLA-Terrain · gemeinsamer Planetary-Surface-Renderer"/>
+  return <section className="noxia-dashboard-mars-surface" aria-label={"Marsoberfläche "+siteTitle}>
+    <SurfaceContextBadge title={"MOLA · "+siteTitle} detail="planetozentrischer Mars-Frame · MOLA-Terrain · gemeinsamer Planetary-Surface-Renderer"/>
     <PlanetarySurfaceMap
-      locationSlug="mars"
+      locationSlug={location}
       body="mars"
-      mapLabel="Spielbare Mars-Karte (Tharsis Hub)"
+      mapLabel={"Spielbare Mars-Karte ("+siteTitle+")"}
       terrainLabel="MGS / MOLA"
       minimumWorldSpanM={700}
-      corridors={THARSIS_HUB_SURFACE_CORRIDORS}
+      corridors={corridors}
       onOpenWorldObject={openWorldObject}
     />
     {interiorEntity&&<BuildingOverlayShell eyebrow="MARS · INNENRAUM" title={interiorName} subtitle="Persistentes Weltgebäude · gemeinsamer Interior-Pfad" onClose={()=>setInteriorEntity(null)} width={1020}>
@@ -91,11 +101,11 @@ export default function DashboardMarsSurface(){
         hasShipyard={Boolean((marsLocation as any)?.has_shipyard)}
         currentTick={0}
         shipRange={shipRange}
-        currentLocationSlug="mars"
+        currentLocationSlug={location}
         onClose={()=>setInteriorEntity(null)}
       />
     </BuildingOverlayShell>}
-    <div className="mars-migration-note">Tharsis-Wege und Gebäude laufen jetzt über dieselbe metrische planetare Surface-Geometrie.</div>
+    {isTharsis&&<div className="mars-migration-note">Tharsis-Wege und Gebäude laufen jetzt über dieselbe metrische planetare Surface-Geometrie.</div>}
     <style jsx>{`
       .noxia-dashboard-mars-surface{position:fixed;top:var(--noxia-topbar-h,44px);right:0;bottom:0;left:0;z-index:1000;overflow:hidden;background:#170d09;overscroll-behavior:contain}
       .noxia-dashboard-mars-surface::before{content:'';position:fixed;inset:var(--noxia-topbar-h,44px) 0 0;pointer-events:none;background:radial-gradient(circle at 45% 32%,rgba(142,82,57,.18),transparent 48%),linear-gradient(180deg,#25130d,#100906 76%);z-index:0}

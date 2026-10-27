@@ -1,8 +1,12 @@
 import 'server-only'
+// lib/game/core/transit.ts
+// Aktualisiert: 27.10.2026 — Oberflächenorte erreichbar: Orte werden vor der Routenprüfung nach Körper angemeldet (registerLocationBodies), Prüfung über hasOrbit
+// Version:      1.1.0
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { DOCKING_IDLE_EXPIRE_HOURS } from '@/lib/game/config'
-import { ORBITS } from '@/lib/game/orbits'
+import { hasOrbit } from '@/lib/game/orbits'
+import { registerLocationBodies } from '@/lib/game/locationBody'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
@@ -109,12 +113,20 @@ async function arrivalStateForShip(shipId: string): Promise<StationArrivalState 
 // Linienflug-Fahrpreis ohne eigenes Schiff: passengerTicketPrice() in
 // lib/game/transfer.ts (gemeinsam mit der Anzeige im Client).
 
+// Oberflächenorte ohne eigene Bahn (z. B. Mishkan Avi auf dem Mars) nutzen die
+// Bahn ihres Körpers. Die Zuordnung kommt aus der DB, nicht aus dem Code.
+async function registerKnownLocationBodies(supabase: ReturnType<typeof createServiceClient>): Promise<void> {
+  const { data } = await supabase.from('locations').select('slug, celestial_body_id, location_type')
+  registerLocationBodies((data ?? []) as any[])
+}
+
 async function startPlayerPassengerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
   const supabase = createServiceClient()
   const profile = await passengerProfile(profileId)
   if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
 
-  if (!ORBITS[profile.current_location] || !ORBITS[destination]) {
+  await registerKnownLocationBodies(supabase)
+  if (!hasOrbit(profile.current_location) || !hasOrbit(destination)) {
     throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${profile.current_location}:${destination}`)
   }
 
@@ -157,7 +169,8 @@ export async function startPlayerTransit(profileId: string, destination: string)
     throw new Error(`NOXIA_TRANSIT_ALREADY_ACTIVE:${ship.dest_location ?? '<unknown>'}`)
   }
 
-  if (!ORBITS[ship.location] || !ORBITS[destination]) {
+  await registerKnownLocationBodies(supabase)
+  if (!hasOrbit(ship.location) || !hasOrbit(destination)) {
     throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${ship.location}:${destination}`)
   }
 

@@ -2,7 +2,8 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 09.10.2026 — Hinweise des neuen Händlerwegs (Spediteur → Qualifikation → Schiff).
+// Aktualisiert: 27.10.2026 — Oberflächenorte ohne eigene Bahn werden für die Reiseberechnung angemeldet (registerLocationBodies).
+// Vorher:       09.10.2026 — Hinweise des neuen Händlerwegs (Spediteur → Qualifikation → Schiff).
 // Vorher:       09.10.2026 — Direkthandel: Stationsmarkt öffnet das Warenhaus, Auktion entfernt.
 // Vorher:       09.10.2026 — ColonyDetail erhält den aktuellen Tick für die Flugkosten.
 // Vorher:       09.10.2026 — Feed zeigt bis zu sechs Meldungen (Kolonie-Chronik).
@@ -23,7 +24,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.24.1-debug
+// Version:      2.25.0-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'
@@ -36,6 +37,7 @@ import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
 import React, { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
+import { registerLocationBodies } from '@/lib/game/locationBody'
 import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel from './TransitPanel'
 import ColonyGrid from './ColonyGrid'
@@ -237,6 +239,8 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   } catch {} } fetchAll() }, [])
 
   const locations = worldData?.locations ?? initialLocations
+  // Oberflächenorte ohne eigene Bahn (Mishkan Avi u. a.) für die Reiseberechnung anmelden – idempotent.
+  registerLocationBodies(locations)
   const news = worldData?.news ?? []
   const stats = worldData?.stats
   const currentLocationData = locations.find((l: any) => l.slug === location)

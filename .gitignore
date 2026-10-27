@@ -16,6 +16,7 @@
 /.earth-planning-test
 /.catapult-test
 /.spatial-test
+/.location-body-test
 
 # next.js
 /.next/

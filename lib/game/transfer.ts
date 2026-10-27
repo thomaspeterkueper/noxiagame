@@ -1,14 +1,14 @@
 // transfer.ts
-// Aktualisiert: 09.10.2026 — Linienflug-Fahrpreis (PASSENGER_TICKET_CR_PER_ENERGY, passengerTicketPrice)
-//               hierher verlegt, damit Server und Anzeige dieselbe Rechnung benutzen
-// Version:      0.2.0
-// Vorher:       Version 0.1.0 — geometry-driven interplanetary transfer model
+// Aktualisiert: 27.10.2026 — Oberflächenorte über Bahn-Aliasse (hasOrbit/orbitKey); Start-/Landeaufwand vom Körper geerbt
+// Version:      0.3.0
+// Vorher:       Version 0.2.0 — Linienflug-Fahrpreis (passengerTicketPrice) hierher verlegt
+//               Version 0.1.0 — geometry-driven interplanetary transfer model
 //
 // Pure, deterministic model. No DB access and no Date.now().
 // The departure tick snapshots orbital geometry. Navigation proficiency only
 // improves the optimisable transfer component; it never removes gravity costs.
 
-import { distance, orbitalBaseSeconds, ORBITS } from './orbits'
+import { distance, hasOrbit, orbitalBaseSeconds, orbitKey } from './orbits'
 
 export interface TransferOptions {
   /** 0..1. Reserved for the learning/knowledge layer. */
@@ -72,7 +72,7 @@ export function transferQuote(
   tick: number,
   options: TransferOptions = {},
 ): TransferQuote | null {
-  if (!ORBITS[from] || !ORBITS[to] || from === to) return null
+  if (!hasOrbit(from) || !hasOrbit(to) || from === to) return null
 
   const navigationProficiency = clamp01(options.navigationProficiency ?? 0)
   const speedMult = Number(options.speedMult ?? 1)
@@ -87,8 +87,9 @@ export function transferQuote(
   const baseSeconds = orbitalBaseSeconds(from, to, tick)
   const durationSeconds = Math.max(1, Math.round((baseSeconds * timeEfficiency) / safeSpeedMult))
 
-  const gravityEnergy = (DEPARTURE_GRAVITY_ENERGY[from] ?? 3)
-    + (ARRIVAL_MANEUVER_ENERGY[to] ?? 1)
+  // Oberflächenorte erben Start- und Landeaufwand ihres Körpers.
+  const gravityEnergy = (DEPARTURE_GRAVITY_ENERGY[from] ?? DEPARTURE_GRAVITY_ENERGY[orbitKey(from) ?? ''] ?? 3)
+    + (ARRIVAL_MANEUVER_ENERGY[to] ?? ARRIVAL_MANEUVER_ENERGY[orbitKey(to) ?? ''] ?? 1)
   const rawTransferEnergy = Math.max(1, Math.sqrt(routeDistance) * 1.5)
   const transferEnergy = Math.max(1, Math.ceil(rawTransferEnergy * energyEfficiency))
   const energy = Math.max(1, gravityEnergy + transferEnergy)

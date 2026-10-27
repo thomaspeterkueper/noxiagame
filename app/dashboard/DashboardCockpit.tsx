@@ -1,9 +1,15 @@
 'use client'
 
+// app/dashboard/DashboardCockpit.tsx
+// Aktualisiert: 27.10.2026 — Kartenansicht auch für weitere Mars-Oberflächenorte (hasDedicatedSurfaceView statt fester Ortsliste)
+// Version:      1.1.0
+
 import React, { useEffect, useState } from 'react'
 import { useMusicContext } from '../_components/MusicProvider'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
+import { useColonyStateStore } from '@/lib/store/colonyStateStore'
+import { hasDedicatedSurfaceView } from '@/lib/game/locationBody'
 
 type CockpitPanel = 'locations' | 'ship' | 'profile'
 type UtilityPanel = 'view' | 'actions' | 'music' | 'info'
@@ -105,6 +111,10 @@ function readAttribution() {
 export default function DashboardCockpit() {
   const { playing, volume, toggle: toggleMusic, setVolume } = useMusicContext()
   const location = useGameStore(state => state.location)
+  const locations = useColonyStateStore(state => state.locations)
+  const currentLocation = locations.find(item => item.slug === location) ?? null
+  // Erde und Orte mit eigener Oberflächenansicht (Mond, Mars, Phobos, Deimos, weitere Mars-Orte).
+  const hasMapView = location === 'earth' || hasDedicatedSurfaceView(location, currentLocation)
   const mode = useGameModeStore(state => state.mode)
   const enterColony = useGameModeStore(state => state.enterColony)
   const enterPlanning = useGameModeStore(state => state.enterPlanning)
@@ -192,7 +202,7 @@ export default function DashboardCockpit() {
   function showMap() {
     setActive(null)
     setUtilityOpen(null)
-    if (['earth','moon','mars','phobos','deimos'].includes(location)) enterPlanning()
+    if (hasMapView) enterPlanning()
   }
 
   function invokeAction(id: ActionId) {
@@ -232,7 +242,7 @@ export default function DashboardCockpit() {
 
     {utilityOpen === 'view' && <aside className="noxia-cockpit-utility noxia-view-panel" aria-label="NOXIA Ansicht">
       <div className="noxia-utility-head"><div><small>NOXIA</small><strong>Ansicht</strong></div><button type="button" onClick={() => setUtilityOpen(null)} aria-label="Ansicht schließen">×</button></div>
-      {['earth','moon','mars','phobos','deimos'].includes(location) ? <div className="noxia-view-options">
+      {hasMapView ? <div className="noxia-view-options">
         <button type="button" className={mode === 'planning' ? 'active' : ''} onClick={() => { enterPlanning(); setUtilityOpen(null) }}><span>▦</span><b>Karte</b><small>{location==='earth'?'Reale, persistierte Erdgeographie':'Gemeinsame planetare Surface-Karte'}</small></button>
         <button type="button" className={mode === 'colony' ? 'active' : ''} onClick={() => { enterColony(); setUtilityOpen(null) }}><span>◇</span><b>Begehbar</b><small>Dieselbe Surface-Geometrie · lokale Interaktionen</small></button>
       </div> : <div className="noxia-view-options">
@@ -273,7 +283,7 @@ export default function DashboardCockpit() {
       </button>}
 
       <button type="button" className={utilityOpen === 'view' ? 'primary active' : 'primary'} onClick={() => {
-        if (!['earth','moon','mars','phobos','deimos'].includes(location) && targets.isometric) {
+        if (!hasMapView && targets.isometric) {
           targets.isometric.click()
           return
         }

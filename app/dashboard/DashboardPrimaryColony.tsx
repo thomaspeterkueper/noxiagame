@@ -1,11 +1,16 @@
 'use client'
 
+// app/dashboard/DashboardPrimaryColony.tsx
+// Aktualisiert: 27.10.2026 — weitere Mars-Oberflächenorte nutzen die gemeinsame Mars-Ansicht statt der alten Kachelkolonie (hasDedicatedSurfaceView)
+// Version:      1.1.0
+
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { simulateColonyTick } from '@/lib/game/colonySimulation'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useGameModeStore } from '@/lib/store/gameModeStore'
 import { useColonyStateStore } from '@/lib/store/colonyStateStore'
+import { hasDedicatedSurfaceView } from '@/lib/game/locationBody'
 import WalkableColony from './WalkableColony'
 import ColonyConversationLayer from './ColonyConversationLayer'
 import ColonyHudOverlay, { ColonyHudStyles } from './ColonyHudOverlay'
@@ -57,7 +62,7 @@ export default function DashboardPrimaryColony(){
 
  const current=locations.find(l=>l.slug===location)
  const isEarth=location==='earth'
- const isDedicatedSurface=['moon','mars','phobos','deimos'].includes(location)
+ const isDedicatedSurface=hasDedicatedSurfaceView(location,current)
  const isStation=current?.location_type==='station'||location==='prometheus'
  const localEntities=useMemo(()=>!current?[]:entities.filter((e:any)=>e.locations?.slug===location||e.location_id===current.id),[entities,current,location])
  const localBuilds=useMemo(()=>!current?[]:builds.filter((b:any)=>b.locations?.slug===location||b.location_id===current.id),[builds,current,location])

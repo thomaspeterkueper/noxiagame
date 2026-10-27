@@ -1,6 +1,6 @@
 // orbits.ts
-// Aktualisiert: 10.09.2026 — Kepler Station als kanonische Erde-Sonne-L5-Station
-// Version:      0.2.1
+// Aktualisiert: 27.10.2026 — Oberflächenorte über Bahn-Aliasse: ein Ort auf einem Körper nutzt dessen Bahn (registerOrbitAlias, orbitParams, hasOrbit)
+// Version:      0.3.0
 // lib/game/orbits.ts
 // Erstellt:     15.06.2026
 //
@@ -65,6 +65,34 @@ export const ORBITS: Record<string, OrbitParams> = {
   deimos:     { parent: 'mars',  radius: 5,   period: 4,   phase: Math.PI      },
 }
 
+// ── Oberflächenorte: Bahn-Aliasse ─────────────────────────────────────────────
+// Ein Ort auf der Oberfläche eines Körpers (z. B. eine Mars-Siedlung) hat keine
+// eigene Bahn, sondern bewegt sich mit seinem Körper. Statt jeden neuen Ort hier
+// einzutragen, meldet der Code, der Orte lädt, „Ort → Körper“ an
+// (lib/game/locationBody.ts). Feste Bahnen in ORBITS haben immer Vorrang.
+const ORBIT_ALIASES: Record<string, string> = {}
+
+export function registerOrbitAlias(slug: string, orbitSlug: string): void {
+  if (!slug || ORBITS[slug] || !ORBITS[orbitSlug]) return
+  ORBIT_ALIASES[slug] = orbitSlug
+}
+
+/** Schlüssel in ORBITS, dessen Bahn für diesen Ort gilt – oder null. */
+export function orbitKey(slug: string): string | null {
+  if (ORBITS[slug]) return slug
+  const alias = ORBIT_ALIASES[slug]
+  return alias && ORBITS[alias] ? alias : null
+}
+
+export function orbitParams(slug: string): OrbitParams | undefined {
+  const key = orbitKey(slug)
+  return key ? ORBITS[key] : undefined
+}
+
+export function hasOrbit(slug: string): boolean {
+  return orbitKey(slug) !== null
+}
+
 // ── Tuning ────────────────────────────────────────────────────────────────────
 export const SEC_PER_UNIT = 0.25
 export const MIN_SECONDS   = 10
@@ -74,7 +102,7 @@ const TWO_PI = Math.PI * 2
 
 // ── Position (deterministisch, 3D-bereit, rekursiv über parent) ──────────────
 export function position(slug: string, tick: number): Vec3 {
-  const o = ORBITS[slug]
+  const o = orbitParams(slug)
   if (!o) return { x: 0, y: 0, z: 0 }
 
   const theta = o.phase + TWO_PI * (tick / o.period)

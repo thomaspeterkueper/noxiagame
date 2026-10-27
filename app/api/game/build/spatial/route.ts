@@ -1,3 +1,6 @@
+// app/api/game/build/spatial/route.ts
+// Aktualisiert: 27.10.2026 — Geländedatensatz des Weltrahmens auch dann, wenn er einem anderen Ort gehört (gemeinsames MOLA für Mars-Orte)
+// Version:      1.1.0
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { BUILDINGS } from '@/lib/game/buildings'
@@ -301,7 +304,14 @@ export async function GET(req: NextRequest) {
   const sites = sitesResult.data
   const rawEntities = entitiesResult.data ?? []
   const rawBuilds = buildsResult.data ?? []
-  const terrainDatasets = terrainDatasetsResult.data
+  let terrainDatasets = terrainDatasetsResult.data
+  // Mehrere Orte auf demselben Körper teilen sich einen Datensatz (z. B. MOLA für
+  // Tharsis Hub und Mishkan Avi). Gehört der Datensatz des Weltrahmens einem
+  // anderen Ort, wird er über seine ID nachgeladen.
+  if (frame?.terrain_dataset_id && !(terrainDatasets ?? []).some((dataset: any) => dataset.id === frame.terrain_dataset_id)) {
+    const { data: sharedDataset } = await serviceClient.from('terrain_datasets').select('*').eq('id', frame.terrain_dataset_id).maybeSingle()
+    if (sharedDataset) terrainDatasets = [...(terrainDatasets ?? []), sharedDataset]
+  }
   const credits = Number(profile?.credits ?? 0)
 
   const catalog = localCatalog()

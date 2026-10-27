@@ -1,5 +1,9 @@
 'use client'
 
+// lib/store/colonyStateStore.ts
+// Aktualisiert: 27.10.2026 — Ortsdaten führen celestial_body_id (Himmelskörper) für Oberflächenorte ohne festen Code-Eintrag
+// Version:      1.1.0
+
 import { create } from 'zustand'
 import { getSessionInfo } from '@/lib/supabase/auth'
 
@@ -8,6 +12,7 @@ export type ColonyWorldLocation = {
   slug: string
   name?: string
   location_type?: string
+  celestial_body_id?: string | null
   population?: number
   location_resources?: unknown[]
 }
