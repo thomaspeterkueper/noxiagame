@@ -158,6 +158,13 @@ McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wo
 
 „Du bist hier“, Zielliste und Adresssuche stehen wieder rechts oben wie in der alten Szene, die Tafel des gewählten Objekts direkt darunter. Links bleiben Hilfe, Schnellziele, Messwerte und die Rückwege.
 
+## Einstieg neuer Spieler (Thomas, 27.10.2026: „passe alles auf das neue System an“)
+
+- Nach dem Onboarding (Name, Avatar, Quiz, drei Karten) geht es ins Dashboard mit der neuen Weltkarte (`/dashboard?starterCafe=<id>`), nicht mehr auf die alte Seite `/earth`. Die Weltkarte öffnet beim ersten Laden den Innenraum des Startcafés (Hauptstraße 72); danach steht die Figur am Café.
+- Die Startposition setzt das Onboarding auf das Café (`/api/game/profile?action=setup` liefert Breite und Länge des Startcafés). Ohne gespeicherte Position beginnt die Weltkarte ebenfalls am Café statt in „Sundern Mitte“.
+- Erste Einweisungskarte: „Starte in Sundern“ – Café, Leute ansprechen, Haus kaufen und umbauen (statt „bau deine erste Anlage“).
+- `/earth` bleibt als Planungs- und Entwicklerseite bestehen; der Link „Erde öffnen“ im Scanner führt jetzt ins Dashboard.
+
 ## Staatliche Basis „Selmecke“ (Thomas, 27.10.2026: „sieht furchtbar aus“)
 
 **Befund:** „Selmecke“ ist in den Kartendaten kein Stadtteil, sondern ein Bach und das **Naturschutzgebiet Selmecke** (Schutzklasse 4, 51,331–51,351 / 7,968–7,980). Die 17 staatlichen Bauten (Verwaltung, Schule, Wohnblock mit 8 Bewohnern, Habitat, Labor, Scanner, Fabrik, Werft, zwei Lager, Solarfeld, Raumhafen mit Kern, Service, Lager und drei Landeplätzen) stehen zum Teil darin, in einem Waldtal ohne echte Häuser und Straßen – nur Feldwege. Deshalb wirkte die Basis wie ein Platzhalter auf der Wiese. Dazu kam ein Zeichenfehler: Bilder großer Bauten wurden mit ihrem Bildmaßstab bis 1,4-fach über die Grundfläche hinaus vergrößert (Landeplatz 120 × 90 m als Scheibe von rund 350 m).

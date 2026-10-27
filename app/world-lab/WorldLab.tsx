@@ -38,9 +38,12 @@ const kmText = (m: number) => m >= 1000 ? (m / 1000).toFixed(1).replace('.', ','
 
 const PLACES: Array<{ label: string; at: GeoPoint }> = [
   { label: 'Sundern Mitte', at: { lat: 51.3262, lon: 8.0 } },
-  { label: 'Café', at: { lat: 51.32554, lon: 8.00454 } },
+  // Startcafé, Hauptstraße 72 (seit 25.10.2026 im realen Haus)
+  { label: 'Café', at: { lat: 51.32565, lon: 8.00418 } },
   { label: 'Selmecke', at: { lat: 51.33745, lon: 7.97975 } },
 ]
+/** Ohne gespeicherte Position beginnt man am Startcafé (27.10.2026: vorher „Sundern Mitte“, rund 300 m entfernt). */
+const START_PLACE = PLACES.find(place => place.label === 'Café') ?? PLACES[0]
 
 /**
  * `embedded`: im Spiel unter der oberen Leiste statt als eigene Seite; `onLeave`
@@ -53,6 +56,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [hud, setHud] = useState<Hud | null>(null)
   const [tick, setTick] = useState(0)
   const [panel, setPanel] = useState<Panel>({ kind: 'none' })
+  // Neuer Spieler: nach dem Onboarding den Innenraum des Startcafés öffnen (?starterCafe=<id>).
+  const starterCafe = useRef<string | null | undefined>(undefined)
   const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
   const noxiaRef = useRef<NoxiaBuilding[]>([])
   const [surfacePeople, setSurfacePeople] = useState<Array<{ id: string; lat: number; lon: number }>>([])
@@ -164,7 +169,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       const params = new URLSearchParams(window.location.search)
       const start: GeoPoint = restartAt ? restartAt.at : Number.isFinite(Number(params.get('lat'))) && params.get('lat')
         ? { lat: Number(params.get('lat')), lon: Number(params.get('lon')) }
-        : startGeo.current ?? PLACES[0].at
+        : startGeo.current ?? START_PLACE.at
       const started = await startWorldEngine(PIXI, {
         host: host.current,
         start,
@@ -186,6 +191,18 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
           const list = (json?.buildings ?? []) as NoxiaBuilding[]
           noxiaRef.current = list
           if (!disposed) { setNoxia(list); setPlots(Array.isArray(json?.plots) ? json.plots : []); setParcelOwners(Array.isArray(json?.parcels) ? json.parcels : []) }
+          // Neuer Spieler: nach dem Onboarding den Innenraum des Startcafés öffnen (?starterCafe=<id>), einmal.
+          if (starterCafe.current === undefined) {
+            const params = new URLSearchParams(window.location.search)
+            starterCafe.current = params.get('starterCafe')
+            if (starterCafe.current) { params.delete('starterCafe'); window.history.replaceState(null, '', window.location.pathname + (params.size ? '?' + params : '') + window.location.hash) }
+          }
+          const cafe = starterCafe.current ? list.find(building => building.id === starterCafe.current) : undefined
+          const cafeEntry = cafe ? getBuildingEntryDefinition(cafe.typeId) : null
+          if (cafe && cafeEntry && !disposed) {
+            starterCafe.current = null
+            setPanel({ kind: 'inside', request: { entityId: cafe.id, buildingTypeId: cafe.typeId, buildingName: cafe.name, kind: cafeEntry.kind }, companionId: null })
+          }
           return list
         },
         onPick: pick => { if (!disposed) { engine.current?.stopWalking(); setTargetId(''); setPanel(panelForPick(pick, noxiaRef.current)) } },

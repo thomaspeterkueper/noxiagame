@@ -218,7 +218,7 @@ export async function GET(req: NextRequest) {
     // Fehlt eines, bleibt der normale Ortsstart auf earth bestehen.
     const { data: starterCafe } = await serviceClient
       .from('tile_entities')
-      .select('id, entity_id, location_id, spatial_region_id, created_at')
+      .select('id, entity_id, location_id, spatial_region_id, created_at, latitude_deg, longitude_deg')
       .eq('entity_type', 'building')
       .eq('entity_id', 'cafe')
       .eq('status', 'active')
@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       username,
       avatar,
-      starter: preferredCafe ? { kind: 'cafe', entityId: preferredCafe.id, location: 'earth' } : { kind: 'location', location: 'earth' },
+      starter: preferredCafe ? { kind: 'cafe', entityId: preferredCafe.id, location: 'earth', lat: preferredCafe.latitude_deg ?? null, lon: preferredCafe.longitude_deg ?? null } : { kind: 'location', location: 'earth' },
     })
   }
 

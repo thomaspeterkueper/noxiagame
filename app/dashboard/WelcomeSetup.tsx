@@ -17,6 +17,7 @@
 // exklusiv gesteuert über DashboardGate.tsx. Dark-UI-Stil (Transit-Ästhetik).
 
 import React from 'react'
+import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 
 import { useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
@@ -36,7 +37,7 @@ const AVATARS = Array.from({ length: 12 }, (_, i) => `pilot_${String(i + 1).padS
 
 // Die drei Einweisungskarten: der Kernloop als Dreizeiler, Noxia-Ton.
 const CARDS = [
-  { icon: '🌍', title: 'Starte auf der Erde', text: 'Hier beginnt alles. Sieh dich um, bau deine erste Anlage, finde deinen Rhythmus.' },
+  { icon: '🌍', title: 'Starte in Sundern', text: 'Du beginnst im Café an der Hauptstraße. Sprich die Leute an, geh durch den Ort – und wenn du so weit bist, kauf ein Haus und bau es um.' },
   { icon: '🌙', title: 'Flieg zum Mond', text: 'Ein Linienflug bringt dich nach Shackleton. Ein eigenes Schiff brauchst du dafür nicht.' },
   { icon: '📈', title: 'Versorge die Kolonie', text: 'Bau Energie und Wasser auf, handle mit dem, was knapp ist — und sieh zu, wie die Kolonie wächst.' },
 ]
@@ -51,6 +52,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [starterCafeId, setStarterCafeId] = useState<string | null>(null)
+  const setStartPosition = useEarthPlayerPositionStore(state => state.setPosition)
 
   // ── Onboarding-Kalibrierungsquiz ──────────────────────────────────────────
   // Rein diagnostisch (siehe app/api/game/onboarding-quiz/route.ts) — kalibriert
@@ -78,6 +80,9 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
     setSaving(false)
     if (data.error) { setError(data.error); return }
     setStarterCafeId(data?.starter?.kind === 'cafe' && data?.starter?.entityId ? String(data.starter.entityId) : null)
+    // Die Figur beginnt in der Weltkarte am Startcafé (nicht in „Sundern Mitte“).
+    const lat = Number(data?.starter?.lat), lon = Number(data?.starter?.lon)
+    if (Number.isFinite(lat) && Number.isFinite(lon) && data?.starter?.lat != null) setStartPosition(null, { xM: 0, yM: 0 }, { lat, lon })
     setStep('quiz')
     loadQuiz()
   }
@@ -307,7 +312,8 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
               onClick={() => {
                 if (cardIdx < CARDS.length - 1) { setCardIdx(cardIdx + 1); return }
                 if (starterCafeId) {
-                  window.location.assign('/earth?starterCafe=' + encodeURIComponent(starterCafeId))
+                  // Neue Weltkarte im Dashboard; sie öffnet den Innenraum des Cafés (27.10.2026: vorher die alte Seite /earth).
+                  window.location.assign('/dashboard?starterCafe=' + encodeURIComponent(starterCafeId))
                   return
                 }
                 onDone({ openJourney: true })
