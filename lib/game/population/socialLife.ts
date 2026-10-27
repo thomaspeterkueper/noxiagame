@@ -1,6 +1,7 @@
 import { createHash } from 'crypto'
 import { RECENT_ENCOUNTER_TICK_RETENTION } from './relationshipRecency'
 import { regulatedFamilyDesire, type RegulationState } from '../cognition/personInteroception'
+import { childDevelopmentState } from '../cognition/childDevelopment'
 
 type SB = any
 
@@ -312,6 +313,26 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
     if (error) throw error
     result.aged = agedRows.length
     for (const row of agedRows) lifeById.set(row.person_id, row)
+
+    const cognitiveRows = agedRows
+      .filter(row => row.life_stage === 'child')
+      .map(row => {
+        const development = childDevelopmentState(Number(row.age_ticks), SOCIAL_YEAR_TICKS, tick)
+        return {
+          person_id: row.person_id,
+          mode: development.sleeping ? 'sleep' : development.computeTier === 0 ? 'reactive' : 'routine',
+          compute_tier: development.computeTier,
+          trigger_score: 0,
+          updated_tick: tick,
+          updated_at: new Date().toISOString(),
+        }
+      })
+    if (cognitiveRows.length) {
+      const { error: cognitiveError } = await supabase
+        .from('person_cognitive_state')
+        .upsert(cognitiveRows, { onConflict: 'person_id' })
+      if (cognitiveError) throw cognitiveError
+    }
   }
 
   const relationByDirection = new Map<string, any>()
