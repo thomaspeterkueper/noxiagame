@@ -32,7 +32,7 @@ export interface TilePlace { x: number; y: number; n: string; k: string; t?: Rec
 /** OSM-Angaben, die ein Wahrzeichen beschreiben (Tafel, Innenraum). */
 const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia', 'shop', 'cuisine', 'amenity', 'craft', 'office', 'tourism']
 
-export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string; /** 1: Kreisverkehr */ r?: 1 }
+export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string; /** 1: Kreisverkehr */ r?: 1; /** 1: Brücke */ b?: 1 }
 export interface TileArea { k: AreaKind; p: number[] }
 export interface TileBlock {
   x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
@@ -358,10 +358,20 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
 
   const out: SimplifiedTile = { z, x: tile.x, y: tile.y, size: round1(size), roads: [], rivers: [], areas: [], blocks: [] }
   const seen = new Set<string>()
+  // Dieselbe Linie aus mehreren Importen (Region grob auf ~13 m, Ortsdetail, genaue
+  // Hauptstraßen und Gleise): die mit den meisten Punkten zählt.
+  const finest = new Map<string, SourceFeature>()
+  for (const feature of features) {
+    if (feature.geometry?.kind !== 'line' || !Array.isArray(feature.geometry.coordinates)) continue
+    const key = String((feature.properties as Record<string, unknown> | null)?.noxia_source_id ?? feature.id)
+    const best = finest.get(key)
+    if (!best || (feature.geometry.coordinates as GeoPoint[]).length > (best.geometry.coordinates as GeoPoint[]).length) finest.set(key, feature)
+  }
   for (const feature of features) {
     const properties = (feature.properties ?? {}) as Record<string, unknown>
     const key = String(properties.noxia_source_id ?? feature.id)
     if (seen.has(key)) continue
+    if (feature.geometry?.kind === 'line' && finest.has(key) && finest.get(key) !== feature) continue
     const coordinates = feature.geometry?.coordinates
     // Wahrzeichen: Punkt mit Namen; gehört der Kachel, in der es liegt.
     if ((feature.featureType === 'landmark' || feature.featureType === 'poi') && feature.geometry.kind === 'point' && typeof properties.name === 'string') {
@@ -441,6 +451,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       const roundabout = /^(roundabout|circular)$/.test(String(properties.junction ?? ''))
       const road: TileRoad = { c: roadClass, p: flat(simplifyLine(points, roadClass === 'path' ? 2.5 : roundabout ? 0.6 : 1.5)) }
       if (roundabout) road.r = 1
+      if (properties.bridge && properties.bridge !== 'no') road.b = 1
       if (typeof properties.name === 'string' && properties.name.trim() && roadClass !== 'path' && properties.service !== 'parking_aisle' && properties.service !== 'driveway') road.n = properties.name.trim().slice(0, 60)
       out.roads.push(road)
       // Geschlossener Kreisverkehr: Mittelinsel (Ring um die halbe Fahrbahn plus Rand nach innen versetzt)

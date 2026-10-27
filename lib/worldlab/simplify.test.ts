@@ -238,3 +238,18 @@ describe('world lab: streets and water (Thomas, 26.10.2026: „Straßen etwas wi
     expect(out.rw).toEqual([2.4])
   })
 })
+
+describe('world lab: finer lines win (Thomas, 27.10.2026: Bahnhof, Kreisel, Brücken)', () => {
+  const line = (points: Array<[number, number]>) => ({ kind: 'line' as const, coordinates: points.map(([x, y]) => at(x, y)) })
+  it('keeps the most detailed copy of the same OSM way', () => {
+    const coarse: SourceFeature = { id: 'a', featureType: 'rail', geometry: line([[10, 10], [150, 150]]), properties: { railway: 'rail', service: 'siding', noxia_source_id: 'osm:way:1' } }
+    const fine: SourceFeature = { id: 'b', featureType: 'rail', geometry: line([[10, 10], [40, 20], [80, 60], [120, 120], [150, 150]]), properties: { railway: 'rail', service: 'siding', noxia_source_id: 'osm:way:1' } }
+    const out = buildTile([coarse, fine], tile, TILE_Z)
+    expect(out.rails).toHaveLength(1)
+    expect(out.rails![0].p.length).toBeGreaterThan(4)
+  })
+  it('marks bridges', () => {
+    const out = buildTile([{ id: 'br', featureType: 'road', geometry: line([[10, 50], [40, 50]]), properties: { highway: 'residential', bridge: 'yes' } }], tile, TILE_Z)
+    expect(out.roads[0].b).toBe(1)
+  })
+})

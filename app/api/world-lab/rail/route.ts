@@ -19,13 +19,17 @@ export async function GET(req: NextRequest) {
   const ids = (regions ?? []).filter(region => metresBetween({ lat, lon }, { lat: Number(region.center_lat), lon: Number(region.center_lon) }) <= Number(region.radius_km ?? 0) * 1000 + 20_000).map(region => String(region.id))
   if (!ids.length) return NextResponse.json({ lines: [] })
 
-  const [{ data: rails }, { data: stations }] = await Promise.all([
+  const [{ data: rails }, { data: stations }, { data: detailed }] = await Promise.all([
     supabase.from('region_features').select('feature_type,geometry,properties').in('region_id', ids).eq('feature_type', 'rail').limit(2000),
     supabase.from('region_features').select('feature_type,geometry,properties').in('region_id', ids).in('feature_type', ['building', 'landmark']).or('properties->>building.eq.train_station,properties->>railway.eq.station').limit(200),
+    // Genaue Gleise (lib/worldlab/lineDetails.server.ts) gehen vor den grob vereinfachten der Regionen
+    supabase.from('earth_line_details').select('id,props,coords').eq('kind', 'rail')
+      .lte('min_lat', lat + 0.3).gte('max_lat', lat - 0.3).lte('min_lon', lon + 0.45).gte('max_lon', lon - 0.45).limit(2000),
   ])
   // Hauptgleise: Abstell-, Anschluss- und Rangiergleise (service=*) fahren keinen Zug.
   const seen = new Set<string>()
-  const pieces = ((rails ?? []) as Row[]).flatMap(row => {
+  const fine: Row[] = ((detailed ?? []) as Array<{ id: string; props: Record<string, unknown>; coords: unknown }>).map(row => ({ feature_type: 'rail', geometry: { kind: 'line', coordinates: row.coords }, properties: { ...row.props, noxia_source_id: row.id } }))
+  const pieces = [...fine, ...((rails ?? []) as Row[])].flatMap(row => {
     const props = row.properties ?? {}
     const key = String(props.noxia_source_id ?? '')
     if (props.service || props.railway !== 'rail' || (key && seen.has(key))) return []

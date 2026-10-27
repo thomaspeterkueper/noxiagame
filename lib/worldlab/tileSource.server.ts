@@ -6,6 +6,7 @@
 import type { createServiceClient } from '@/lib/supabase/service'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, TILE_Z, type TileId } from './mercator'
 import { buildTile, type SimplifiedTile, type SourceFeature } from './simplify'
+import { lineDetailFeatures } from './lineDetails.server'
 
 type Supabase = ReturnType<typeof createServiceClient>
 type Region = { id: string; lat: number; lon: number; radiusKm: number }
@@ -48,8 +49,13 @@ export async function loadTile(supabase: Supabase, tile: TileId): Promise<Simpli
     const east = (region.lon - centre.lon) * 111_195 * Math.cos(centre.lat * Math.PI / 180)
     return Math.hypot(north, east) <= region.radiusKm * 1000 + 600
   })
-  const features = (await Promise.all(regions.map(region => regionFeatures(supabase, region.id)))).flat()
-  const out = buildTile(features, tile, TILE_Z)
+  // Genaue Hauptstraßen und Gleise (falls schon geholt) – bei gleicher OSM-Kennung gewinnt die genauere Linie
+  const nw = mercToGeo(origin), se = mercToGeo({ x: origin.x + TILE_SIZE_MERC, y: origin.y - TILE_SIZE_MERC })
+  const [regionLists, details] = await Promise.all([
+    Promise.all(regions.map(region => regionFeatures(supabase, region.id))),
+    lineDetailFeatures(supabase, { south: se.lat - 0.0003, north: nw.lat + 0.0003, west: nw.lon - 0.0005, east: se.lon + 0.0005 }),
+  ])
+  const out = buildTile([...regionLists.flat(), ...details], tile, TILE_Z)
   const parcels = await tileParcels(supabase, tile, centre.lat)
   if (parcels.length) out.parcels = parcels
   return out
