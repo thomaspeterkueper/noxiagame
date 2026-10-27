@@ -42,4 +42,5 @@ Lebensmittel betreffen jede Kolonie live. Deshalb in drei Stufen, jede für sich
 2. **Notration bei leerem Lager:** Vorschlag: aus einer staatlichen Reserve je Ort, bezahlt aus der Koloniekasse; ist auch die leer, gibt es keine Notration – dann hungert der Ort sichtbar.
 3. **Verbrauchsrate der Bewohner:** Vorschlag 0,5 t je 100 Bewohner und Tick (halb so viel wie Wasser im Modell); vor dem Einschalten eine Messung im Forschungslauf.
 4. **Erde:** Lebensmittel kommen dort aus der Landwirtschaft der realen Umgebung. Vorschlag: zuerst als Bestand der Erde, später als NPC-Höfe auf echten Agrarflächen (OSM `landuse=farmland`).
-5. **Schule:** Sobald Stufe 2 läuft, verbraucht die Kochübung echte Lebensmittel aus dem Schulvorrat, und der Schulgarten erzeugt welche.
+5. **Kette:** Wie Lebensmittel entstehen (Feld, Mühle, Bäckerei, Hydroponik), steht ortsunabhängig in NOXIA-FOOD-0002.
+6. **Schule:** Sobald Stufe 2 läuft, verbraucht die Kochübung echte Lebensmittel aus dem Schulvorrat, und der Schulgarten erzeugt welche.
