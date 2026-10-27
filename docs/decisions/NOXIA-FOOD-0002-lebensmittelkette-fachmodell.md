@@ -1,6 +1,6 @@
 # NOXIA-FOOD-0002 – Lebensmittelkette als ortsunabhängiges Fachmodell
 
-Status: proposed – Fachmodell umgesetzt (`lib/game/food/chain.ts`), Core-Anbindung offen
+Status: accepted (Thomas, 27.10.2026) – verbindliche Grundlage für den Pilot Seelenberg; Core-Anbindung offen
 Datum: 2026-10-27
 Bezug: NOXIA-FOOD-0001 (Lebensmittel als Ware), Pilot Seelenberg (`docs/pilots/seelenberg-living-systems-v1.md` auf `feat/seelenberg-living-systems-pilot`, PR #526), NOXIA-SCHOOL-0001 (Backen, Kochen, Gärtnern als Kompetenzen), NOXIA-ENERGY-0001 (Strom in MWh), `docs/core/RESOURCE_INVENTORY_ECONOMY_MAP.md`
 
@@ -79,7 +79,25 @@ Das entspricht den drei Pilot-Tests (Normalbetrieb, blockierte Straße, Zusatzna
 - Für den Live-Betrieb liegt die Kette im Core (Requests oben); das Fachmodell bleibt die gemeinsame Rechenregel und Testgrundlage.
 - Hinweis: Der Branch `feat/seelenberg-living-systems-pilot` ist hinter `main` (u. a. NOXIA-SCHOOL-0001 und NOXIA-FOOD-0001). Vor dem Merge auf aktuellen `main` bringen, damit diese Arbeiten nicht überschrieben werden.
 
+## Entscheidungen (Thomas, 27.10.2026)
+
+1. **Einheiten:** Fachmodell und Oberfläche in kg, große Mengen automatisch als t angezeigt (`formatMass`). Persistente Warenbuchungen in **ganzzahligen Gramm** (`toGrams`), damit Salz, Hefe und Teilchargen ohne Rundungsfehler laufen. Strom bleibt MWh; andere Güter werden nicht pauschal umgestellt.
+2. **Verbindlich für Seelenberg:** Der Pilot verwendet dieses Fachmodell und entwickelt keine eigenen Produktionsrezepte (`docs/pilots/seelenberg-food-hospitality-integration.md` auf dem Pilot-Branch, Commit `38bda944`).
+3. **Hospitality bleibt erhalten** und wird ein zweiter Verbraucher derselben Ware – kein zweites Warenwirtschaftssystem.
+
+## Zwei Versorgungen aus einem Bestand
+
+- **Haushalte:** Getreide → Mühle → Bäckerei → Handel → Haushalte.
+- **Gastronomie:** Lokale, Kantine und Hotel ziehen aus demselben Ortsbestand. Ein Gericht ist eine Zutatenliste in Gramm je Portion (`DISH_INGREDIENTS_G`, Schlüssel sind die bestehenden Codes aus `npc_service_catalog` und `hospitality_menu`, z. B. `restaurant_main`: 300 g Kartoffeln, 200 g Gemüse, 80 g Brot).
+- **Knappheit:** Regel `households_first` (Grundversorgung zuerst, Gastronomie bekommt den Rest) oder `proportional` (alle anteilig). Vorschlag: `households_first`.
+- **Nachweis:** Fällt das Mehl aus, fehlt auch der Gaststätte Brot – erst nach der Sperrung, mit stimmender Massenbilanz.
+- **Aktivierung:** Wirkung auf echte Lokale erst nach geprüfter Core-Integration.
+
+## Branchstand Seelenberg (geprüft 27.10.2026)
+
+Der Pilot-Branch ist 17 Commits vor und 49 hinter `main`, ändert 17 Dateien nur additiv (Pilot-Dokumente, `experiments/seelenberg/`). Ein Probe-Merge von `main` in den Pilot-Branch läuft ohne Konflikt.
+
 ## Offen für Thomas
 
-1. Einheit: Lebensmittelgüter in kg statt t (die Kette rechnet in Chargen von 100 kg Mehl; ganze Tonnen sind für ein Dorf zu grob). Vorschlag: ja, nur für Lebensmittel; `food` aus NOXIA-FOOD-0001 wird umgerechnet, solange niemand davon abhängt.
+1. Knappheitsregel: `households_first` (Vorschlag) oder `proportional`?
 2. Weitere Ketten (Milch, Fleisch, Obst, Brauerei) erst nach dem Nachweis in Seelenberg?

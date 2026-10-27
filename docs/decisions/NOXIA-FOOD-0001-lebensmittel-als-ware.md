@@ -28,7 +28,7 @@ Lebensmittel betreffen jede Kolonie live. Deshalb in drei Stufen, jede für sich
 ## Stufe 1 (umgesetzt 27.10.2026)
 
 - Migrationen `20261027070000_add_food_resource_type.sql` (Enum) und `20261027070500_food_ware_foundation.sql` (Daten).
-- Einheit Tonnen, wie alle Güter (Lager, Fracht und Handelslose rechnen in Tonnen).
+- Einheit zunächst Tonnen wie alle Güter. **Geändert durch Entscheidung vom 27.10.2026 (NOXIA-FOOD-0002):** Lebensmittel in kg (Anzeige ab 1 t in t), Buchung in ganzzahligen Gramm; Umstellung des Bestands `food` mit der Core-Anbindung.
 - Startbestand: Erde 100 000 t (Landwirtschaft), sonst rund 30 Spieltage künftigen Bedarfs bei vorläufig 0,5 t je 100 Bewohner und Tick, mindestens 200 t.
 - Marktpreise je Tonne: Erde 40/30, sonst 80/60; Richtpreis 160 (`PRICE_BASE`). Solange niemand verbraucht, fallen die Preise Richtung Untergrenze – das ist ehrlich: Überfluss.
 - Hydroponik (`hydroponics`): +2 t/Tick, braucht 1 t Wasser und 1 Energie/Tick, baubar auf Mond, Mars, Phobos, Deimos und Stationen; nicht auf der Erde.

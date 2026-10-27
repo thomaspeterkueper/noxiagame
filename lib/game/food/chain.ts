@@ -107,6 +107,31 @@ export const PROCESSES: Record<string, Process> = {
 
 export type Stock = Partial<Record<Good, number>>
 
+// ── Einheiten (Entscheidung Thomas, 27.10.2026) ─────────────────────────────────────────
+// Fachmodell und Oberfläche rechnen in kg (große Mengen als t angezeigt), persistente
+// Warenbuchungen in ganzzahligen Gramm – Salz, Hefe und Teilchargen ohne Rundungsfehler.
+// Strom bleibt MWh (NOXIA-ENERGY-0001).
+
+export const GRAMS_PER_KG = 1000
+
+/** kg → ganzzahlige Gramm für die Buchung im Core. */
+export function toGrams(kg: number): number {
+  return Math.round(kg * GRAMS_PER_KG)
+}
+
+export function kgFromGrams(grams: number): number {
+  return grams / GRAMS_PER_KG
+}
+
+/** Anzeige: unter 1 kg in g, bis 1 t in kg, darüber in t (deutsche Schreibweise). */
+export function formatMass(kg: number): string {
+  const n = (v: number, digits: number) => v.toLocaleString('de-DE', { maximumFractionDigits: digits })
+  const abs = Math.abs(kg)
+  if (abs < 1) return `${n(kg * GRAMS_PER_KG, 0)} g`
+  if (abs < 1000) return `${n(kg, abs < 10 ? 2 : 1)} kg`
+  return `${n(kg / 1000, 2)} t`
+}
+
 const amount = (s: Stock, g: Good) => s[g] ?? 0
 
 /** Verfahren, die eine Umgebung erlaubt – derselbe Katalog für jeden Ort. */
@@ -203,6 +228,10 @@ export type ChainConfig = {
   orderCoverDays: number
   bakeryLaborHoursPerDay: number
   millLaborHoursPerDay: number
+  /** Brotbedarf der Gastronomie am Ort (Lokale, Kantine, Hotel) – dieselbe Ware, derselbe Laden. */
+  hospitalityBreadKgPerDay?: number
+  /** Wer bei Knappheit zuerst bekommt: Haushalte (Grundversorgung) oder anteilig alle. */
+  allocation?: 'households_first' | 'proportional'
 }
 
 export type Disruption = { link: keyof ChainConfig['leadDays']; fromDay: number; toDay: number; extraDays: number }
@@ -213,7 +242,11 @@ export type DayLog = {
   day: number
   breadNeededKg: number
   breadEatenKg: number
+  /** Fehlmenge der Haushalte. */
   shortfallKg: number
+  hospitalityNeededKg: number
+  hospitalityServedKg: number
+  hospitalityShortfallKg: number
   shopBread: number
   bakeryFlour: number
   orders: string[]
@@ -235,7 +268,9 @@ export function simulateBreadChain(config: ChainConfig, start: ChainNodes, days:
   const nodes: ChainNodes = { granary: { ...start.granary }, mill: { ...start.mill }, bakery: { ...start.bakery }, shop: { ...start.shop } }
   const inTransit: Shipment[] = []
   const log: DayLog[] = []
-  const demand = breadDemandKgPerDay(config)
+  const householdDemand = breadDemandKgPerDay(config)
+  const hospitalityDemand = Math.max(0, config.hospitalityBreadKgPerDay ?? 0)
+  const demand = householdDemand + hospitalityDemand
   const flourPerDay = demand / 1.5
   const grainPerDay = flourPerDay / 0.75
   // Ganze Chargen: Bestellmengen decken mindestens eine Charge.
@@ -283,9 +318,11 @@ export function simulateBreadChain(config: ChainConfig, start: ChainNodes, days:
     if (amount(nodes.bakery, 'bread') > 0) ship('breadToShop', nodes.bakery, 'bread', amount(nodes.bakery, 'bread'), day)
     receive(day) // was am selben Tag ankommt (Lieferzeit 0), steht noch heute im Laden
 
-    // 4. Verbrauch
-    const eaten = Math.min(amount(nodes.shop, 'bread'), demand)
-    nodes.shop.bread = amount(nodes.shop, 'bread') - eaten
+    // 4. Verbrauch: Haushalte und Gastronomie aus demselben Bestand
+    const available = amount(nodes.shop, 'bread')
+    const split = allocateBread(available, householdDemand, hospitalityDemand, config.allocation ?? 'households_first')
+    const eaten = split.households + split.hospitality
+    nodes.shop.bread = available - eaten
 
     // 5. Verderb (nur Brot ist kurzlebig genug, um innerhalb von Wochen zu zählen)
     const spoiled = amount(nodes.shop, 'bread') / (GOODS.bread.shelfLifeDays ?? Infinity)
@@ -302,12 +339,53 @@ export function simulateBreadChain(config: ChainConfig, start: ChainNodes, days:
     }
 
     log.push({
-      day, breadNeededKg: demand, breadEatenKg: eaten, shortfallKg: demand - eaten,
+      day, breadNeededKg: householdDemand, breadEatenKg: eaten, shortfallKg: householdDemand - split.households,
+      hospitalityNeededKg: hospitalityDemand, hospitalityServedKg: split.hospitality, hospitalityShortfallKg: hospitalityDemand - split.hospitality,
       shopBread: amount(nodes.shop, 'bread'), bakeryFlour: amount(nodes.bakery, 'flour'),
       orders, bakeryLimitedBy: bakeRun.limitedBy, spoiledBreadKg: spoiled,
     })
   }
   return { log, nodes, inTransit }
+}
+
+/** Verteilung eines knappen Bestands auf Haushalte und Gastronomie. */
+export function allocateBread(available: number, households: number, hospitality: number, rule: 'households_first' | 'proportional') {
+  const total = households + hospitality
+  if (available >= total) return { households, hospitality }
+  if (rule === 'households_first') {
+    const h = Math.min(available, households)
+    return { households: h, hospitality: Math.min(available - h, hospitality) }
+  }
+  const share = total > 0 ? available / total : 0
+  return { households: households * share, hospitality: hospitality * share }
+}
+
+// ── Gastronomie: Gerichte als Zutaten aus derselben Ware ─────────────────────────────────
+// Lokale, Kantine und Hotel führen kein eigenes Warenlager: ein Gericht verbraucht Zutaten
+// aus dem Ortsbestand. Schlüssel sind die bestehenden Codes aus npc_service_catalog und
+// hospitality_menu. Zutaten in Gramm je Portion, vorläufig.
+
+export const DISH_INGREDIENTS_G: Record<string, Partial<Record<Good, number>>> = {
+  cafe_meal:        { bread: 150, vegetables: 100 },
+  food_hall_meal:   { potatoes: 250, vegetables: 150, bread: 100 },
+  restaurant_main:  { potatoes: 300, vegetables: 200, bread: 80 },
+  bar_snack_drink:  { bread: 80, water: 300 },
+  canteen_ration:   { food: 500 },
+  canteen_emergency_ration: { food: 300 },
+  ration:           { food: 500 },
+  water:            { water: 300 },
+}
+
+/** Zutaten für eine Menge Portionen je Gericht, in ganzen Gramm. Unbekannte Gerichte werden gemeldet. */
+export function dishRequirementsG(portions: Record<string, number>): { grams: Partial<Record<Good, number>>; unknown: string[] } {
+  const grams: Partial<Record<Good, number>> = {}
+  const unknown: string[] = []
+  for (const [code, count] of Object.entries(portions)) {
+    const recipe = DISH_INGREDIENTS_G[code]
+    if (!recipe) { unknown.push(code); continue }
+    for (const [g, perPortion] of Object.entries(recipe) as [Good, number][]) grams[g] = (grams[g] ?? 0) + perPortion * Math.max(0, Math.floor(count))
+  }
+  return { grams, unknown }
 }
 
 /** Summe einer Ware über alle Knoten und Transporte – für die Mengenbilanz. */

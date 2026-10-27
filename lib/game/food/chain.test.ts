@@ -1,5 +1,5 @@
 import {
-  GOODS, PROCESSES, breadDemandKgPerDay, inputsFor, kcalOf, processesFor, runProcess,
+  DISH_INGREDIENTS_G, GOODS, allocateBread, dishRequirementsG, formatMass, kgFromGrams, toGrams, PROCESSES, breadDemandKgPerDay, inputsFor, kcalOf, processesFor, runProcess,
   simulateBreadChain, spoilDay, totalOf, upstreamRequirements,
   type ChainConfig, type ChainNodes, type Disruption, type Good,
 } from './chain'
@@ -70,6 +70,29 @@ check(near(grainEquivalent(disrupted.nodes, disrupted.inTransit, breadOutD), bef
 // Leerer Speicher: ohne Getreide endet die Kette sichtbar
 const empty = simulateBreadChain(config, { ...start(), granary: {} , mill: { flour: flourPerDay * 2 } }, 30)
 check(empty.log.some(d => d.orders.includes('Getreide fehlt im Speicher')) && empty.log.slice(-5).every(d => d.shortfallKg > 0), 'empty granary: missing grain is reported and bread runs out')
+
+// Einheiten: kg im Modell, ganze Gramm in der Buchung, Anzeige wechselt bei 1 t
+check(toGrams(0.0025) === 3 && toGrams(2) === 2000 && kgFromGrams(1500) === 1.5, 'kg and grams convert exactly')
+check(Object.values(PROCESSES).every(p => [...p.inputs, ...p.outputs].filter(f => GOODS[f.good].unit === 'kg').every(f => Number.isInteger(f.amount * 1000))), 'every process flow is a whole number of grams')
+check(formatMass(0.25) === '250 g' && formatMass(146.3) === '146,3 kg' && formatMass(20000) === '20 t', 'display switches g, kg, t')
+
+// Gastronomie aus demselben Bestand
+check(JSON.stringify(allocateBread(100, 80, 40, 'households_first')) === JSON.stringify({ households: 80, hospitality: 20 }), 'scarcity: households first')
+const prop = allocateBread(60, 80, 40, 'proportional')
+check(near(prop.households, 40) && near(prop.hospitality, 20), 'scarcity: proportional sharing')
+const dishes = dishRequirementsG({ restaurant_main: 10, cafe_meal: 4, mystery: 1 })
+check(dishes.grams.potatoes === 3000 && dishes.grams.bread === 1400 && dishes.unknown.includes('mystery'), 'dishes become ingredients in grams; unknown dishes are reported')
+check(Object.values(DISH_INGREDIENTS_G).every(r => Object.values(r).every(v => Number.isInteger(v))), 'dish recipes are whole grams')
+
+const withInn: ChainConfig = { ...config, hospitalityBreadKgPerDay: 40 }
+const innNormal = simulateBreadChain(withInn, start(), 60)
+check(innNormal.log.slice(3).every(d => d.shortfallKg < 1e-6 && d.hospitalityShortfallKg < 1e-6), 'household and inn are both supplied in normal operation')
+const innBlocked = simulateBreadChain(withInn, start(), 60, roadBlocked)
+const hit = innBlocked.log.filter(d => d.hospitalityShortfallKg > 1e-6)
+check(hit.length > 0 && hit.every(d => d.day > 8), 'flour outage reaches the inn as well')
+check(innBlocked.log.every(d => d.hospitalityShortfallKg < 1e-6 || d.hospitalityServedKg < d.hospitalityNeededKg), 'inn shortfall is consistent')
+const breadOutInn = innBlocked.log.reduce((s, d) => s + d.breadEatenKg + d.spoiledBreadKg, 0)
+check(near(grainEquivalent(innBlocked.nodes, innBlocked.inTransit, breadOutInn), before, 1e-3), 'mass balance holds with the inn')
 
 if (failures) { console.error(`${failures} food chain checks failed`); process.exit(1) }
 console.log('food chain: all checks passed')
