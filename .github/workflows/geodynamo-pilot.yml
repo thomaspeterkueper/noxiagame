@@ -2,8 +2,8 @@ name: Geodynamo pilot tests
 on:
   pull_request:
     paths:
-      - 'lib/game/science/geodynamoPilot*'
-      - 'docs/science/GEODYNAMO-RESEARCH-PILOT.md'
+      - 'lib/game/science/geodynamo*'
+      - 'docs/science/GEODYNAMO-RESEARCH-PILOT.md'\n      - 'vitest.geodynamo.config.mts'
       - '.github/workflows/geodynamo-pilot.yml'
   push:
     branches: [main]
@@ -22,4 +22,4 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vitest run lib/game/science/geodynamoPilot.test.ts
+      - run: pnpm exec vitest run --config vitest.geodynamo.config.mts
