@@ -173,8 +173,10 @@ export async function POST(request: NextRequest) {
 
   let persistedMemory: any = null
   let canonicalNpc: any = null
+  let socialContextLines: string[] = []
+  let livedMemoryLines: string[] = []
   if (npcId) {
-    const [{ data: memoryData }, { data: personData }, { data: identityData }] = await Promise.all([
+    const [{ data: memoryData }, { data: personData }, { data: identityData }, { data: relationData }, { data: livedMemoryData }] = await Promise.all([
       serviceClient
         .from('npc_player_conversation_memory')
         .select('encounter_count, recent_exchanges, last_location, last_interaction_at, recent_encounter_score, last_encounter_at')
@@ -183,7 +185,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       serviceClient
         .from('people')
-        .select('id, display_name, public_role')
+        .select('id, display_name, public_role, bio_short')
         .eq('id', npcId)
         .maybeSingle(),
       serviceClient
@@ -192,6 +194,18 @@ export async function POST(request: NextRequest) {
         .eq('profile_id', user.id)
         .eq('person_id', npcId)
         .maybeSingle(),
+      serviceClient
+        .from('person_relationships')
+        .select('other_person_id, relationship_type, familiarity, trust, affinity, last_interaction_tick')
+        .eq('person_id', npcId)
+        .order('familiarity', { ascending: false })
+        .limit(8),
+      serviceClient
+        .from('person_memories')
+        .select('other_person_id, memory_kind, tick, salience, valence')
+        .eq('person_id', npcId)
+        .order('tick', { ascending: false })
+        .limit(8),
     ])
     persistedMemory = memoryData ?? null
     canonicalNpc = personData ?? null
@@ -202,6 +216,32 @@ export async function POST(request: NextRequest) {
       : identityData?.identity_state === 'inferred'
         ? 'inferred'
         : 'unknown'
+
+    const otherIds = [...new Set([
+      ...(relationData ?? []).map((row: any) => row.other_person_id),
+      ...(livedMemoryData ?? []).map((row: any) => row.other_person_id),
+    ].filter(Boolean))]
+    const { data: otherPeople } = otherIds.length
+      ? await serviceClient.from('people').select('id, display_name').in('id', otherIds)
+      : { data: [] as any[] }
+    const otherName = new Map((otherPeople ?? []).map((row: any) => [String(row.id), clean(row.display_name, 48)]))
+
+    socialContextLines = (relationData ?? []).slice(0, 5).map((row: any) => {
+      const name = otherName.get(String(row.other_person_id)) ?? 'eine bekannte Person'
+      const familiarity = Number(row.familiarity ?? 0)
+      const trust = Number(row.trust ?? 0.5)
+      const affinity = Number(row.affinity ?? 0.5)
+      const closeness = familiarity >= 0.7 ? 'sehr vertraut' : familiarity >= 0.4 ? 'gut bekannt' : 'bekannt'
+      const tone = trust < 0.35 || affinity < 0.35 ? 'angespannt' : trust > 0.7 && affinity > 0.65 ? 'vertrauensvoll' : 'neutral bis freundlich'
+      return `${name}: ${closeness}, Verhältnis ${tone}`
+    })
+
+    livedMemoryLines = (livedMemoryData ?? []).slice(0, 5).map((row: any) => {
+      const name = otherName.get(String(row.other_person_id)) ?? 'einer bekannten Person'
+      if (row.memory_kind === 'conflict') return `Kürzlich gab es einen Konflikt mit ${name}.`
+      if (row.memory_kind === 'help') return `Kürzlich gab es eine hilfreiche Begegnung mit ${name}.`
+      return `Kürzlich gab es eine Begegnung mit ${name}.`
+    })
   }
 
   // Erinnerung an frühere Begegnungen: frisch wörtlich, älter nur dem Sinn nach,
@@ -213,6 +253,10 @@ export async function POST(request: NextRequest) {
 
   const system = [
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
+    canonicalNpc?.bio_short ? `Eigene biografische Basis: ${clean(canonicalNpc.bio_short, 260)}` : '',
+    socialContextLines.length ? `Dein gewachsenes soziales Umfeld:\n- ${socialContextLines.join('\n- ')}` : '',
+    livedMemoryLines.length ? `Jüngste eigene Erinnerungsspuren:\n- ${livedMemoryLines.join('\n- ')}` : '',
+    livedMemoryLines.length ? 'Diese Erinnerungsspuren belegen nur, dass eine Begegnung oder ein Konflikt stattfand. Erfinde keinen Gesprächsinhalt, Anlass oder Ausgang, der dort nicht steht.' : '',
     identityState === 'known'
       ? `Der Spieler kennt deinen Namen bereits als ${npcName}.`
       : `Der Spieler kennt deinen Namen noch nicht sicher. Verwende deinen echten Namen nicht beiläufig als bereits bekannt. Wenn du dich natürlich vorstellst oder nach deinem Namen gefragt wirst, sage klar „Ich bin ${npcName}“ oder „Mein Name ist ${npcName}“.`,
