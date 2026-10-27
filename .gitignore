@@ -18,6 +18,7 @@
 /.spatial-test
 /.location-body-test
 /.conversation-repeat-test
+/.conversation-topic-test
 
 # next.js
 /.next/

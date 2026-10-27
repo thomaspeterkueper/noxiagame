@@ -1,6 +1,6 @@
 // app/api/game/npc-conversation/route.ts
-// Aktualisiert: 27.10.2026 — Gesprächsprotokoll für die Testphase (npc_conversation_log); wiederholte Fragen machen die Figur knapp, dann bricht sie ab und weist 10 min ab (conversationRepeat)
-// Version:      1.2.0
+// Aktualisiert: 28.10.2026 — Protokoll mit Anliegen (conversationTopic) und mitgegebener realer Meldung
+// Version:      1.3.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -15,6 +15,7 @@ import {
   REPEAT_HINT_INSTRUCTION,
   REPEAT_WINDOW_MS,
 } from '@/lib/game/cognition/conversationRepeat'
+import { classifyConversationTopic } from '@/lib/game/cognition/conversationTopic'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY_MESSAGES = 10
@@ -300,6 +301,9 @@ export async function POST(request: NextRequest) {
     player_text: player,
     player_norm: repeat.normalized,
     similar_count: repeat.similarCount,
+    topic: classifyConversationTopic(player, { opening }),
+    headline: headline || null,
+    headline_source: source || null,
   }
   const endConversation = async (reply: string, outcome: 'breakoff' | 'dismissed') => {
     await logConversationTurn({ ...baseLog, npc_reply: reply, outcome })
