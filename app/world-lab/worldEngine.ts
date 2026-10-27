@@ -7,6 +7,7 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
@@ -22,7 +23,7 @@ import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/wo
 
 type Pixi = typeof import('pixi.js')
 
-export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung des realen Hauses (gekauft oder Gebäude des Ortes). */ source?: string; /** Gebäude des Ortes, nicht von Spielern gekauft (W-7) */ public?: boolean; /** Laufender Umbau zum Lokal (R-13) */ conversion?: { type: string; name: string; readyAt: string | null } }
+export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: number; lon: number; w: number; d: number; rotation?: number; own?: boolean; ownerLabel?: string; /** OSM-Kennung des realen Hauses (gekauft oder Gebäude des Ortes). */ source?: string; /** Gebäude des Ortes, nicht von Spielern gekauft (W-7) */ public?: boolean; /** Im realen Haus, aber mit NOXIA-Dach (Startcafé) */ noxiaRoof?: boolean; /** Laufender Umbau zum Lokal (R-13) */ conversion?: { type: string; name: string; readyAt: string | null } }
 /** Bahnstrecke: beginnt am Bahnhof, wenn einer an ihrem Ende liegt. */
 export type WorldRailLine = { points: GeoPoint[]; lengthM: number; station: { name: string; at: GeoPoint } | null }
 /** Freie Fläche nach Abriss eines gekauften Gebäudes. */
@@ -53,6 +54,13 @@ export interface WorldEngineOptions {
   /** Zeiger über einem Objekt (Bildschirmpunkt) oder über nichts. */
   onHover?: (hover: { pick: WorldPick; x: number; y: number } | null) => void
   onError: (message: string) => void
+  /** Anfangszoom (beim Neuverankern der bisherige). */
+  zoom?: number
+  /**
+   * Die Figur steht zu weit vom Zeichenanker (Aufgabe 6, `lib/worldlab/reanchor.ts`).
+   * Die Ansicht startet die Welt dann an `at` neu. Wird einmal je Engine gemeldet.
+   */
+  onFarFromAnchor?: (at: GeoPoint, zoom: number) => void
 }
 
 /** Was unter dem Zeiger lag, als geklickt wurde. */
@@ -268,7 +276,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const player = { ...toWorld(startGeo) }
   const camera = { ...player }
   // Beim Laufen näher heran (W-3: die Figur war zu klein)
-  let zoom = 3.4
+  let zoom = options.zoom ?? 3.4
 
   const playerSprite = new PIXI.Graphics()
   // Boden-Ring: man findet sich auch zwischen Häusern (W-3)
@@ -465,7 +473,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Gebäude des Ortes im realen Haus (Bank, Metropol, W-7): realer Grundriss
     // und reale Höhe, aber NOXIA-Dach, damit man sie als öffentlich erkennt.
     const look = !owner ? null
-      : owner.source && !owner.public ? { ...NOXIA_DEFAULT_LOOK, roof: undefined }
+      : owner.source && !owner.public && !owner.noxiaRoof ? { ...NOXIA_DEFAULT_LOOK, roof: undefined }
         : owner.source ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId], levels: undefined }
           : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }
     const eave = (look?.levels ?? block.l) * style.storeyM
@@ -1600,6 +1608,19 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   app.canvas.addEventListener('pointerleave', pointerLeave)
 
   // ── Eingabe ─────────────────────────────────────────────────────────
+  // ── Zeichenanker (Aufgabe 6) ───────────────────────────────────────
+  // Steht die Figur weit vom Anker, meldet die Maschine das einmal; die Ansicht
+  // baut die Welt um die Figur neu auf. Beim Laufen erst im Stillstand.
+  let anchorJumped = false, anchorReported = false, idleS = 0
+  const lastSpot = { x: 0, y: 0 }
+  function checkAnchor(dt: number) {
+    if (anchorReported || !options.onFarFromAnchor) return
+    idleS = Math.hypot(player.x - lastSpot.x, player.y - lastSpot.y) < 0.01 ? idleS + dt : 0
+    lastSpot.x = player.x; lastSpot.y = player.y
+    if (!shouldReanchor({ distanceM: Math.hypot(player.x, player.y), jumped: anchorJumped, idleS, autoWalking: autoWalk !== null })) { anchorJumped = false; return }
+    anchorReported = true
+    options.onFarFromAnchor(toGeo(player), zoom)
+  }
   const keys = new Set<string>()
   // Pfeiltasten wie WASD
   const ARROWS: Record<string, string> = { arrowup: 'w', arrowdown: 's', arrowleft: 'a', arrowright: 'd' }
@@ -1640,6 +1661,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       movePlayer(player.x + wx / length * speed * dt, player.y + wy / length * speed * dt)
     }
     stepAutoWalk(dt)
+    checkAnchor(dt)
     moveWalkers(logicStart)
     moveTrains()
     // Die Kamera gleitet hinterher statt zu springen.
@@ -1687,6 +1709,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const p = toWorld(at)
       player.x = p.x; player.y = p.y; camera.x = p.x; camera.y = p.y
       lastViewKey = ''
+      anchorJumped = true
     },
     position: () => toGeo(player),
     setPeople,

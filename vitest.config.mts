@@ -20,6 +20,7 @@ export default defineConfig({
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/game/spatial/localSceneRuntime.test.ts',
       'lib/worldlab/simplify.test.ts',
+      'lib/worldlab/reanchor.test.ts',
       'lib/worldlab/viewTiles.test.ts',
       'lib/worldlab/frameStats.test.ts',
       'lib/worldlab/facade.test.ts',

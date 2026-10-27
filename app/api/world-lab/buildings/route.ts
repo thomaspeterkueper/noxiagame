@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   if (!earth) return NextResponse.json({ buildings: [] })
   const [{ data: rows }, { data: definitions }] = await Promise.all([
-    supabase.from('tile_entities').select('id,entity_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,profile_id,owner_class,source_ref,display_name,conversion_plan,profiles(username),actors(display_name)')
+    supabase.from('tile_entities').select('id,entity_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,profile_id,owner_class,source_ref,display_name,conversion_plan,noxia_roof,profiles(username),actors(display_name)')
       // Straßenstücke aus dem alten Bausystem gehören nicht in die Karte – Straßen kommen aus OpenStreetMap.
       .eq('location_id', earth.id).eq('entity_type', 'building').eq('status', 'active').neq('entity_id', 'road').not('latitude_deg', 'is', null).limit(1000),
     supabase.from('building_definitions').select('key,name'),
@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
       own: row.profile_id === profileId,
       // Gebäude des Ortes (nicht von Spielern gekauft): auf der Karte mit NOXIA-Dach und Symbol (W-7).
       public: row.owner_class === 'STATE' && !row.profile_id,
+      // Eigenes Gebäude im realen Haus, das trotzdem das NOXIA-Dach trägt (Startcafé, Thomas 27.10.2026).
+      noxiaRoof: row.noxia_roof === true || undefined,
       ownerLabel: row.profile_id === profileId ? 'Dein Gebäude'
         : row.owner_class === 'STATE' ? 'Staatlich'
           : row.owner_class === 'CORPORATION' ? 'Corporation'

@@ -152,13 +152,17 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     if (!tried.current.has(cell.lat + '/' + cell.lon)) void refreshHere('Hier fehlen Gebäude')
   }, [hud])
 
+  // Neu verankerte Welt (Aufgabe 6): Steht die Figur weit vom Zeichenanker, wird
+  // die Zeichenmaschine an ihrer Position neu gestartet, mit dem bisherigen Zoom.
+  const [restartAt, setRestartAt] = useState<{ at: GeoPoint; zoom: number } | null>(null)
+
   useEffect(() => {
     let disposed = false
     ;(async () => {
       const PIXI = await import('pixi.js')
       if (disposed || !host.current) return
       const params = new URLSearchParams(window.location.search)
-      const start: GeoPoint = Number.isFinite(Number(params.get('lat'))) && params.get('lat')
+      const start: GeoPoint = restartAt ? restartAt.at : Number.isFinite(Number(params.get('lat'))) && params.get('lat')
         ? { lat: Number(params.get('lat')), lon: Number(params.get('lon')) }
         : startGeo.current ?? PLACES[0].at
       const started = await startWorldEngine(PIXI, {
@@ -189,6 +193,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         noxiaVisual: typeId => getBuildingVisual(typeId, 'earth'),
         onHud: next => { if (!disposed) { setHud(next); setTick(value => value + 1) } },
         onError: message => { if (!disposed) { setError(message); console.error('[world-lab]', message); setPlayerNote('Ein Teil der Karte konnte gerade nicht geladen werden.') } },
+        zoom: restartAt?.zoom,
+        onFarFromAnchor: (at, zoom) => { if (!disposed) setRestartAt({ at, zoom }) },
       })
       if (disposed) { started.destroy(); return }
       engine.current = started
@@ -199,8 +205,9 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       disposed = true
       engine.current?.destroy()
       engine.current = null
+      setEngineReady(null)
     }
-  }, [])
+  }, [restartAt])
 
   // Autoritative Personenpositionen der gemeinsamen Surface-Presence-Schicht.
   // Das deckt auch reale OSM-Orte ab, z. B. eine Arbeitszuweisung an eine Kirche,
