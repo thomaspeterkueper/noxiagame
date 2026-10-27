@@ -225,7 +225,15 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     if (!engineReady) return
     const byId = new Map(noxia.map(building => [building.id, building]))
     const surfaceByPerson = new Map(surfacePeople.map(person => [person.id, person]))
-    const people: WorldPerson[] = residents.slice(0, 18).map(resident => {
+    const depthRank = (resident: ColonyResident) =>
+      resident.personDepth?.level === 'focal' ? 3
+      : resident.personDepth?.level === 'developed' ? 2
+      : resident.personDepth?.level === 'situated' ? 1
+      : 0
+    const visibleResidents = [...residents]
+      .sort((a, b) => depthRank(b) - depthRank(a) || (b.personDepth?.score ?? 0) - (a.personDepth?.score ?? 0) || a.id.localeCompare(b.id))
+      .slice(0, 18)
+    const people: WorldPerson[] = visibleResidents.map(resident => {
       const surface = surfaceByPerson.get(resident.id)
       const place = resident.assignments.map(item => item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
       // Tätigkeit wie in der bisherigen Erdszene; wer in einem betretbaren Gebäude arbeitet, ist drinnen.
