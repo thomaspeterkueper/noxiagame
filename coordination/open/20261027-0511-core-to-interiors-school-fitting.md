@@ -43,6 +43,8 @@ Keine eigene Lern- oder Kompetenzlogik – nur Anzeige und Aufruf der Core-Schni
 ## Akzeptanzkriterien
 
 - [ ] Gleiche Bedienung wie Lokal/Akademie; etwa 150 Zeilen Einrichtung, kein Motor-Code.
-- [ ] Ohne Lehrkraft: Klassenzimmer Selbstlernbetrieb, Werkraum und Küche zeigen die geschlossen-Tafel mit Grund.
+- [ ] Ohne Lehrkraft und ohne kompetente anleitende Person: Klassenzimmer Selbstlernbetrieb, Werkraum und Küche zeigen die geschlossen-Tafel mit Grund.
+- [ ] Dieselbe Einrichtung funktioniert für baubare `basic_school` auf Mond, Mars und Stationen (wenig oder kein Personal).
+- [ ] Kein Preis auf Lernkacheln – Lernen ist kostenlos.
 - [ ] Laufende Übung zeigt Dinge als Icons im Raum, Ergebnis landet beim Spieler.
 - [ ] Im Browser geprüft.

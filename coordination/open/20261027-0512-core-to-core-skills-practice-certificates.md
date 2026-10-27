@@ -34,11 +34,14 @@ excluded_actions:
 3. **Bescheinigungen:** `skill_certificates` (Aussteller-Akteur, Inhaber, skill_code, Stufe, Datum); `employerDecision` darf sie lesen.
 4. **Schulpersonal und Öffnung:** `educator`-Stellen am öffentlichen Akteur je Schulgebäude, Besetzung analog `run_venue_staffing`; Schulzeiten nach Ortszeit.
 5. **Learning by Doing:** Arbeit am Arbeitsplatz gibt Erfahrung auf die Kompetenz der Rolle.
-6. **Kinder:** Schule als Tagesziel für Kinder-NPCs im Tagesrhythmus.
+6. **Finanzierung je Lernendem:** Pauschale pro Spieltag je aktiv Lernendem vom öffentlichen Akteur (Erde: Ort, sonst Kolonie) an die Schule. Unterschreitet die Zahl der Lernenden eine Schwelle über einen Zeitraum: erst Personal abbauen, dann Schule schließen; Wiederöffnung, wenn wieder gelernt wird.
+7. **Anleiten durch Kompetenz:** Eine Übung, die eine Lehrkraft braucht, darf auch jede anwesende Person (Spieler oder NPC) mit Kompetenz über einer Schwelle anleiten. Anleiten gibt der anleitenden Person selbst etwas Erfahrung.
+8. **Spieler-Kompetenzen:** `profile_skills`, gleiches Schema wie `person_skills` (entschieden).
+9. **Kinder:** Schule als Tagesziel für Kinder-NPCs im Tagesrhythmus.
 
 ## Abgrenzung
 
-Keine Inhalte (Module, Rezepttexte) definieren – nur Mechanik und Schema; fachliche Inhalte kommen aus KG/SSF. Keine Geldschöpfung: Gebühren und Material laufen über `noxia_taxed_purchase` und den öffentlichen Akteur.
+Keine Inhalte (Module, Rezepttexte) definieren – nur Mechanik und Schema; fachliche Inhalte kommen aus KG/SSF. Keine Gebühren – Lernen ist immer kostenlos. Keine Geldschöpfung: Lohn und Material kommen aus der Pauschale je Lernendem vom öffentlichen Akteur.
 
 ## Akzeptanzkriterien
 

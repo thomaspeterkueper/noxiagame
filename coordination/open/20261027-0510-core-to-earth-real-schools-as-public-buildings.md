@@ -45,3 +45,4 @@ Kein Innenraum, kein Unterricht, keine Kompetenzen – das liefern Innenräume u
 - [ ] Die Schule bleibt nicht kaufbar (`notForSaleReason` unverändert).
 - [ ] Betreten der Sunderner Grundschule öffnet einen Innenraum.
 - [ ] Der Selmecke-Seed bleibt unberührt.
+- [ ] Die Schule trägt ihren realen Namen aus OSM (Entscheidung Thomas 27.10.2026).

@@ -1,6 +1,6 @@
 # NOXIA-SCHOOL-0001 – Grundschule als Lernort für Grundlagen, Handwerk und Alltag
 
-Status: proposed
+Status: accepted (Entscheidungen Thomas 27.10.2026; Punkt 1 nach Empfehlung)
 Datum: 2026-10-27
 Anlass: Thomas hat auf der Erdkarte in Sundern die reale Grundschule gefunden – sie ist heute nur ein Punkt ohne Funktion.
 Bezug: NOXIA-INTERIOR-0001 (ein Bedienmodell für alle Gebäude), NOXIA-LIVING-0001 (Kompetenzen als `skill_code + level + experience`), NOXIA-LIVING-0010 (Stellenmarkt prüft Qualifikation), NOXIA-LIVING-0012 (Hunger und Durst), NOXIA-OMNI-0001 (Spielraum als Maß), ADR-sundog-prinzip, `docs/SSF-INTEGRATION.md`, `docs/Spec-gebaeude-katalog.md` (keine leeren Hülsen)
@@ -66,14 +66,25 @@ Eine abgeschlossene Lerneinheit erzeugt eine **Bescheinigung** (Ausstellerin = d
 
 ### 6. Personal, Öffnung, Geld
 
+- Anleiten kann jede Person mit hoher Kompetenz (Schwelle je `skill_code`), nicht nur eine Lehrkraft. Wer gut kocht, darf in der Küche anleiten – Spieler wie NPC. Das hält Werkraum und Küche auch dort offen, wo es kein Schulpersonal gibt.
 - Personal: Lehrkräfte = `person_assignments` (`role_code='educator'`) am Schulgebäude, Arbeitgeber der öffentliche Akteur des Ortes, Lohn aus `role_wage_rates`, finanziert über Steuern – keine Geldschöpfung.
 - Öffnung: Schulzeiten werktags morgens bis früher Nachmittag (Ortszeit). Ohne Lehrkraft: Klassenzimmer im Selbstlernbetrieb (Module ja, Prüfung ja), **Werkraum und Küche geschlossen** (Sicherheit) – analog zur Regel „Café ohne Personal ist geschlossen“.
-- Kinder: Schulbesuch ist kostenlos. Erwachsene und Spieler: Kurse am Nachmittag gegen geringe Gebühr, die an den öffentlichen Akteur geht (Konsumsteuer 19 % nach Erde-Regel). Material zahlt der Schulvorrat.
+- Lernen ist in noxia immer kostenlos – für Kinder, Erwachsene, NPCs und Spieler. Keine Gebühren.
+- Finanzierung je Lernendem: Der Staat (öffentlicher Akteur des Ortes) zahlt der Schule je aktiv Lernendem eine Pauschale pro Spieltag; daraus kommen Lehrerlohn und Material. Geld aus echtem Budget (Steuern), keine Geldschöpfung.
+- Ohne Lernende verfällt die Schule: Sinkt die Zahl der Lernenden über einen Zeitraum unter eine Schwelle, wird zuerst Personal abgebaut, dann schließt die Schule. Das reale Gebäude bleibt stehen (öffentlich, leer); es kann später wieder öffnen, wenn wieder gelernt wird.
 - Kinder-NPCs aus `social_life_families` haben die Schule als Tagesziel im Tagesrhythmus (NOXIA-LIVING-0007); ihre Kompetenzen wachsen sichtbar über die Jahre.
 
 ### 7. Einstieg ins Spiel
 
 Wie jedes Gebäude gibt die Schule einen Einstieg: Das Sekretariat führt Neue ein („Du kannst kochen? Dann melde dich in der Küche – sonst lernst du es hier.“). Die Schule ist damit der natürliche erste Ort für Spieler, die noch nichts können – vor Akademie und Raumhafen.
+
+### 8. Andere Planeten und Stationen
+
+Schulen gibt es überall – Erde, Mond, Mars, Stationen. Dort sind sie baubar (`basic_school`) und haben wenig oder gar kein echtes Personal. Grundlagen laufen im Selbstlernbetrieb über die SSF-Module; Handwerk und Alltag öffnen, sobald eine kompetente Person anleitet (Punkt 6). Die Finanzierung je Lernendem gilt gleich, über das Budget der Kolonie.
+
+### 9. Namen
+
+Reale Schulen behalten erstmal ihren realen Namen aus OSM.
 
 ## Zuständigkeiten (Requests statt selbst bauen)
 
@@ -86,10 +97,10 @@ Wie jedes Gebäude gibt die Schule einen Einstieg: Das Sekretariat führt Neue e
 
 Reihenfolge: Core (Kompetenzen, Übungsmodell) und Erde (Schule wird Gebäude) parallel, dann Innenräume. Grundlagen funktionieren sofort mit den vorhandenen SSF-Modulen; Handwerk und Alltag warten auf Inhalte.
 
-## Offene Entscheidungen für Thomas
+## Entscheidungen (Thomas, 27.10.2026)
 
-1. Kompetenzen der Spieler: eigene Tabelle `profile_skills` (Vorschlag) oder Spieler bekommen eine Person in `people`?
-2. Verblassen: ja (Vorschlag: langsam bis zu einem Sockel) oder nein?
-3. Gebühren für Erwachsene: ja (Vorschlag) oder alles kostenlos, weil öffentlich?
-4. Gilt die Grundschule für alle Orte (auch Mars-Kolonien, dort als baubares `basic_school`) oder zuerst nur für reale Erdschulen?
-5. Name der Schule im Jahr 2086: realer Name oder wie bei Betrieben ein erfundener Name?
+1. Spieler-Kompetenzen: eigene Tabelle `profile_skills` mit demselben Schema und Vokabular wie `person_skills`, beide über dieselbe Funktion beschrieben (Empfehlung; folgt ADR-npcs-sind-spieler: Spieler und Personen sind getrennt, die Regeln sind gleich).
+2. Ungeübte Kompetenzen verblassen langsam bis zu einem Sockel – ja.
+3. Keine Gebühren – Lernen ist in noxia immer kostenlos. Finanzierung indirekt durch den Staat je Lernendem; Schulen ohne Lernende verfallen.
+4. Schulen gelten auch auf anderen Planeten und Stationen, mit weniger oder ohne echtes Personal.
+5. Reale Namen bleiben erstmal.
