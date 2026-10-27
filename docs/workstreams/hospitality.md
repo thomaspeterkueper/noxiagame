@@ -34,6 +34,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - Verwaltung als dritte Einrichtung (26.10.2026, Branch `feat/admin-interior`): Foyer, Schalter, Aushang mit Einwohnern und Steuern, Personal kennt die öffentlichen Zahlen, Rathaus-Tafel darüber. Im Browser geprüft.
 - Raumhafen als vierte Einrichtung (26.10.2026, Branch `feat/spaceport-interior`): Ankunftshalle, Flugleitung kennt die echten Ziele, Navigation/Fracht/Wartung/Kantine als Kacheln darüber. Im Browser geprüft.
 - G-4 beantwortet und gebaut (27.10.2026, Branch `feat/venue-conversion-site`): Haus im Umbau als Baustelle mit Fertigstellung, leeres gekauftes Haus, Hausname aus `display_name`; G-5 abgeschlossen mit Maschinenbild in der Kantine.
+- Bank und Warenhaus als fünfte und sechste Einrichtung (27.10.2026, Branch `feat/bank-warehouse-interiors`): Schalterhalle mit Kurstafel, Lagerhalle mit Preistafel; Personal kennt Konditionen bzw. Preise, Kontostand nur am Schalter. Im Browser geprüft.
 
 ## Gestellte Requests
 
