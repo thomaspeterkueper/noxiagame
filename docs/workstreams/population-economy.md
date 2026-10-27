@@ -252,3 +252,39 @@ Offen:
 - Bewohner kaufen in Bar und Restaurant noch nichts: `npc_service_catalog` kennt nur `cafe` (siehe Antwort zu R-2, zieht mit LIVING-0012 Schritt 3 um).
 - Die übrigen selbst gebauten Cafés (Q1, Peru) sind nicht betroffen.
 - Fragen und Anschluss an Gastronomie: G-4 in `hospitality.md`; an die Erdkarte: W-5 in `world-map.md`.
+
+### R-14 (Gastronomie, 27.10.2026): Personal für die Bank an der Hauptstraße 140
+
+Die staatliche Bank der Erde steht seit `20261027090000_earth_bank_sparkasse.sql` am realen Ort der Sparkasse in Sundern, BeratungsCenter Hauptstraße 140 (`osm:way:246890726`). Kennung, Konten und Eigentum bleiben. Es arbeitet dort aber **niemand**: `person_assignments` hat für die Bank keine aktive Stelle. Der Innenraum zeigt deshalb Automatenbetrieb, und am neuen Beratungstisch gibt es kein Gespräch.
+
+- **Bitte:** Die Bank wie ein Lokal Personal einstellen lassen, bis `staff_capacity` (jetzt 4) besetzt ist. Das könnte über `run_venue_staffing` laufen oder über einen gleichartigen Lauf für öffentliche Gebäude.
+- **Rollen:** 2 × Schalter, 1 × Beratung, 1 × Büro. Der Innenraum verteilt die Plätze in dieser Reihenfolge: Schalter, Beratung, zweiter Schalter, Büro. Wer zuerst kommt, steht am Schalter, wer als Zweites kommt, sitzt an der Beratung.
+- **Lohn:** zahlt der öffentliche Akteur der Erde, wie bei Metropol und Balkan Grill.
+- **Gilt ebenso für:** Akademie, Verwaltung, Raumhafen und Warenhaus, soweit sie leer sind. Ohne Personal kann dort niemand Auskunft geben.
+
+### R-15 (Gastronomie, 27.10.2026): Lernschwellen serverseitig durchsetzen
+
+Thomas, 27.10.2026: „so wie es in der Bank schon existiert auch bei anderen Gebäuden Zugang zu Lernmodulen öffnen, damit man bestimmte Dinge überhaupt erst nutzen kann“.
+
+**Was schon da ist:** Jedes begehbare Gebäude zeigt rechts unter „Wissen hier“, welches Wissen es verlangt oder wofür es hilft. Das Lernmodul öffnet sich gleich im Raum (Liste in `lib/game/interiors/learningGates.ts`, API `GET /api/game/learning/gates?kind=…`). Durchgesetzt wird bisher nur der Kredit (`hasCreditClearance` in `app/api/game/bank/route.ts`). Die übrigen Schwellen stehen als `need: 'helps'`. Sie stammen aus dem Wissenskatalog (`lib/knowledge/data.ts`), der sie den Gebäuden schon zuordnet.
+
+**Bitte:** Entscheiden und serverseitig sperren. Danach in `learningGates.ts` den Eintrag auf `need: 'required'` setzen; Anzeige und Wissen des Personals ziehen dann von selbst nach.
+
+| Schwelle | Modul | Vorschlag, was sie sperrt | Wo |
+|---|---|---|---|
+| `UNL:NOX:bank-collateral` | „Was ist ein Sicherheitenwert?“ | Reiter „Sicherheiten“ und Kredit über 50 % des Rahmens | Bank-API |
+| `UNL:NOX:bank-compound` | „Was ist Zinseszins?“ | Festgeld bzw. Zinseszins-Vorschau, falls es das geben soll | Bank-API |
+| `UNL:NOX:advanced-trading` | „Was ist Arbitrage?“ | Handel zwischen Orten, Kauf- und Verkaufsaufträge über einer Menge | Warenhaus/Markt |
+| `UNL:NOX:land-value` | „Was ist Bodenwert?“ | Kauf eines Hauses oder Flurstücks (`buy_earth_building`, `buy_earth_parcel`) | Verwaltung/Hauskauf |
+
+Für die Raumhafen-Schwellen (`UNL:NOX:NAV:ORBITAL`, `UNL:NOX:NAV:CURVATURE`) ist nichts zu tun: Sie wirken schon über die Navigationsgüte (`lib/knowledge/navigationProficiency.ts`).
+
+**Hinweis:** Für Sicherheitenwert, Arbitrage, Bodenwert und Bahnkrümmung liefert SSF noch kein Modul. Die Tafel sagt dann „Lernmodul folgt“. Eine Sperre ohne Modul würde den Weg ganz verschließen. Deshalb erst sperren, wenn SSF das Modul hat (KB-REQUEST-0003 bei SSF).
+
+### R-16 (Gastronomie, 27.10.2026): Gekaufte Häuser als Sicherheit
+
+Die neue Beratungsmappe in der Bank (`bankAdvice` in `lib/game/bank/bankInterior.ts`) rechnet mit `collateralTotal` aus `calcCollateral`. Als Sicherheit zählen dort nur Fördergebäude (Mine, Solar, Eisbohrer, Wasserrecycler) und Schiffe.
+
+Auf der Erde hat ein Spieler aber vor allem gekaufte Häuser und Lokale mit Mieteinnahmen (R-12, R-13). Sie zählen bisher nicht.
+
+**Bitte:** Ertragswert gekaufter Häuser (Miete) und Lokale (Umsatz) als Sicherheit aufnehmen. Danach den Satz „als Sicherheit zählen hier Gebäude mit Förderertrag und Schiffe“ in `bankAdvice` anpassen.

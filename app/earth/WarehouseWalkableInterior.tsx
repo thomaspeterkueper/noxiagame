@@ -10,6 +10,7 @@ import { useMemo, useRef } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
 import { WAREHOUSE_INTRODUCTION, WAREHOUSE_LAYOUT, warehouseKnowledge, type MarketPriceRow } from '@/lib/game/warehouse/warehouseInterior'
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
+import { learningGateFacts, statusesFromViews } from '@/lib/game/interiors/learningGates'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type Props = { entityId: string; buildingName: string; locationName: string; prices: any[]; openOrders: number; cargo: Record<string, number> | null; companion?: ColonyResident | null; onClose: () => void; onOpenDesk: () => void }
@@ -29,7 +30,7 @@ export default function WarehouseWalkableInterior({ entityId, buildingName, loca
     visits: [],
     facts: (self, ctx) => withExtraFacts(
       baseInteriorFacts({ layout, buildingName, self, figures: ctx.figures, playerPos: ctx.pos, playerSeat: ctx.seat, staffRoleText: 'Du arbeitest hier im Warenhaus' }),
-      self.roomRole === 'staff' ? knowledge : ['Du bist selbst Kunde hier; die Preise stehen auf der Tafel'],
+      self.roomRole === 'staff' ? [...knowledge, ...learningGateFacts(statusesFromViews('warehouse', ctx.gates), ctx.nearService)] : ['Du bist selbst Kunde hier; die Preise stehen auf der Tafel'],
     ),
     placeKnowledge: [],
     hearsay: () => [],

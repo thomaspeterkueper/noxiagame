@@ -11,6 +11,7 @@ import { useMemo, useRef } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
 import { SPACEPORT_INTRODUCTION, SPACEPORT_LAYOUT, spaceportKnowledge, type SpaceportFacts } from '@/lib/game/spaceport/spaceportInterior'
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
+import { learningGateFacts, statusesFromViews } from '@/lib/game/interiors/learningGates'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type Props = {
@@ -37,7 +38,7 @@ export default function SpaceportWalkableInterior({ entityId, buildingName, fact
     visits: [],
     facts: (self, ctx) => withExtraFacts(
       baseInteriorFacts({ layout, buildingName, self, figures: ctx.figures, playerPos: ctx.pos, playerSeat: ctx.seat, staffRoleText: 'Du arbeitest hier im Raumhafen' }),
-      self.roomRole === 'staff' ? knowledge : ['Du wartest hier selbst auf einen Flug; Auskunft gibt die Flugleitung'],
+      self.roomRole === 'staff' ? [...knowledge, ...learningGateFacts(statusesFromViews('spaceport', ctx.gates), ctx.nearService)] : ['Du wartest hier selbst auf einen Flug; Auskunft gibt die Flugleitung'],
     ),
     placeKnowledge: [],
     hearsay: () => [],
