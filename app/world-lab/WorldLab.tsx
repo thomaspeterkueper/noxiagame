@@ -101,6 +101,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const busy = useRef(false)
   const tried = useRef(new Set<string>())
   const fresh = useRef('')
+  /** Kacheln am Rand neu holen, ohne die Regionen auf dem Server neu zu lesen (Flurstücke, genaue Linien) */
+  const bust = useRef('')
 
   /**
    * Holt für die Gegend um die Figur fehlende Kartendaten aus OpenStreetMap
@@ -168,7 +170,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         // ?art=vorlage zeigt nur Vorlagen, ?art=farbe einfarbige Quader (zum Vergleichen der Bildrate).
         art: blockArt(params.get('art') === 'vorlage' ? 'template' : params.get('art') === 'farbe' ? 'none' : 'drawn'),
         loadTile: async tile => {
-          const response = await fetch(`/api/world-lab/tile?x=${tile.x}&y=${tile.y}` + (fresh.current ? '&fresh=' + fresh.current : ''))
+          const response = await fetch(`/api/world-lab/tile?x=${tile.x}&y=${tile.y}` + (fresh.current ? '&fresh=' + fresh.current : '') + (bust.current ? '&bust=' + bust.current : ''))
           if (!response.ok) throw new Error(String(response.status))
           return await response.json() as SimplifiedTile
         },
@@ -368,7 +370,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         if (!token) return
         const response = await fetch('/api/world-lab/lines', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(here) })
         const json = await response.json().catch(() => null)
-        if (json?.ok && !json.cached && json.lines > 0) { fresh.current = String(Date.now()); engineReady.reloadTiles() }
+        if (json?.ok && !json.cached && json.lines > 0) { bust.current = String(Date.now()); engineReady.reloadTiles() }
         if (json && json.ok === false) console.error('[world-lab] Linien', json.error)
       } catch (reason) { console.error('[world-lab] Linien', reason) }
     })()
@@ -389,7 +391,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         if (!token) return
         const response = await fetch('/api/world-lab/parcels', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(here) })
         const json = await response.json().catch(() => null)
-        if (json?.ok && !json.cached && json.parcels > 0) { fresh.current = String(Date.now()); engineReady.reloadTiles() }
+        if (json?.ok && !json.cached && json.parcels > 0) { bust.current = String(Date.now()); engineReady.reloadTiles() }
         if (json && json.ok === false) console.error('[world-lab] Flurstücke', json.error)
       } catch (reason) { console.error('[world-lab] Flurstücke', reason) }
     })()
@@ -552,7 +554,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {destinationNote && <p className="note">{destinationNote}</p>}
         </>}
       </div>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { fresh.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}

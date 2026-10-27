@@ -26,9 +26,12 @@ export async function GET(req: NextRequest) {
   }
   const fresh = params.get('fresh') ?? ''
   if (fresh && fresh !== freshStamp) { freshStamp = fresh; clearTileSourceCache() }
+  // bust: nur am Rand nicht zwischenspeichern (neue Flurstücke, genaue Linien) – die
+  // Regionen im Speicher bleiben, sie haben sich nicht geändert.
+  const bust = params.get('bust') ?? ''
   const supabase = createServiceClient()
   return NextResponse.json(await loadTile(supabase, { x, y }), {
     // Nachgeladene Kacheln nicht am Rand zwischenspeichern; sonst eine Stunde lang.
-    headers: { 'Cache-Control': fresh ? 'private, no-store, max-age=0' : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' },
+    headers: { 'Cache-Control': fresh || bust ? 'private, no-store, max-age=0' : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' },
   })
 }

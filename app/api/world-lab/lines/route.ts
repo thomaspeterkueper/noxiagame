@@ -8,7 +8,6 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { parcelCell } from '@/lib/worldlab/alkis'
 import { fetchLineDetails } from '@/lib/worldlab/lineDetails.server'
-import { clearTileSourceCache } from '@/lib/worldlab/tileSource.server'
 
 export const maxDuration = 60
 
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest) {
       if (error) throw error
     }
     await supabase.from('earth_line_cells').upsert({ cell: cell.key, lines: rows.length, error: null, fetched_at: new Date().toISOString() })
-    clearTileSourceCache()
     return NextResponse.json({ ok: true, cached: false, lines: rows.length })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

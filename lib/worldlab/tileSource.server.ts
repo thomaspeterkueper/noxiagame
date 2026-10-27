@@ -11,33 +11,48 @@ import { lineDetailFeatures } from './lineDetails.server'
 type Supabase = ReturnType<typeof createServiceClient>
 type Region = { id: string; lat: number; lon: number; radiusKm: number }
 const REGION_TTL_MS = 10 * 60_000
-let regionCache: { at: number; regions: Region[] } | null = null
-const featureCache = new Map<string, { at: number; features: SourceFeature[] }>()
+// Zwischengespeichert wird das Versprechen, nicht erst das Ergebnis: Viele Kacheln
+// gleichzeitig (Neuladen der Karte) lesen eine Region so nur einmal, statt sie
+// je Kachel neu zu holen und die Datenbank zu überlasten (27.10.2026: alle
+// Abrufe liefen 300 s in die Zeitüberschreitung).
+let regionCache: { at: number; regions: Promise<Region[]> } | null = null
+const featureCache = new Map<string, { at: number; features: Promise<SourceFeature[]> }>()
 
 /** Zwischenspeicher leeren (nach einem Nachladen der Kartendaten). */
 export function clearTileSourceCache() { regionCache = null; featureCache.clear() }
 
-async function earthRegions(supabase: Supabase): Promise<Region[]> {
+function earthRegions(supabase: Supabase): Promise<Region[]> {
   if (regionCache && Date.now() - regionCache.at < REGION_TTL_MS) return regionCache.regions
-  const { data } = await supabase.from('celestial_regions').select('id,center_lat,center_lon,radius_km').eq('body', 'earth')
-  const regions = (data ?? []).map(row => ({ id: String(row.id), lat: Number(row.center_lat), lon: Number(row.center_lon), radiusKm: Number(row.radius_km ?? 0) }))
-    .filter(region => Number.isFinite(region.lat) && Number.isFinite(region.lon))
-  regionCache = { at: Date.now(), regions }
+  const regions = (async () => {
+    const { data } = await supabase.from('celestial_regions').select('id,center_lat,center_lon,radius_km').eq('body', 'earth')
+    return (data ?? []).map(row => ({ id: String(row.id), lat: Number(row.center_lat), lon: Number(row.center_lon), radiusKm: Number(row.radius_km ?? 0) }))
+      .filter(region => Number.isFinite(region.lat) && Number.isFinite(region.lon))
+  })()
+  const entry = { at: Date.now(), regions }
+  regionCache = entry
+  regions.catch(() => { if (regionCache === entry) regionCache = null })
   return regions
 }
 
-async function regionFeatures(supabase: Supabase, regionId: string): Promise<SourceFeature[]> {
+function regionFeatures(supabase: Supabase, regionId: string): Promise<SourceFeature[]> {
   const cached = featureCache.get(regionId)
   if (cached && Date.now() - cached.at < REGION_TTL_MS) return cached.features
-  const features: SourceFeature[] = []
-  // Der Datenbankzugang liefert höchstens 1000 Zeilen je Abruf.
-  for (let from = 0; from < 20_000; from += 1000) {
-    const { data, error } = await supabase.from('region_features').select('id,feature_type,geometry,properties').eq('region_id', regionId).order('id').range(from, from + 999)
-    if (error || !data?.length) break
-    for (const row of data) features.push({ id: String(row.id), featureType: String(row.feature_type), geometry: row.geometry, properties: row.properties } as SourceFeature)
-    if (data.length < 1000) break
-  }
-  featureCache.set(regionId, { at: Date.now(), features })
+  const features = (async () => {
+    const out: SourceFeature[] = []
+    // Der Datenbankzugang liefert höchstens 1000 Zeilen je Abruf.
+    for (let from = 0; from < 20_000; from += 1000) {
+      const { data, error } = await supabase.from('region_features').select('id,feature_type,geometry,properties').eq('region_id', regionId).order('id').range(from, from + 999)
+      if (error) throw error
+      if (!data?.length) break
+      for (const row of data) out.push({ id: String(row.id), featureType: String(row.feature_type), geometry: row.geometry, properties: row.properties } as SourceFeature)
+      if (data.length < 1000) break
+    }
+    return out
+  })()
+  const entry = { at: Date.now(), features }
+  featureCache.set(regionId, entry)
+  // Fehlschlag nicht zwischenspeichern
+  features.catch(() => { if (featureCache.get(regionId) === entry) featureCache.delete(regionId) })
   return features
 }
 
