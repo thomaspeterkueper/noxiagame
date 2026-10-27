@@ -247,6 +247,22 @@ R-13 ist gebaut (`population-economy.md`). Für die Tafel in `app/world-lab/Worl
 
 Thomas, 26.10.2026: „NPCs sollten immer noch Porträts zeigen, wenn man sie anklickt.“ Sobald in der neuen Weltkarte Personen stehen: beim Anklicken `NpcPortrait` aus `lib/grid/NpcVisual.tsx` in der Tafel rechts, wie in der Koloniesicht (`app/dashboard/WalkableColony.tsx`). Gleiches für die alte Erdszene (`app/earth/EarthWalkableSurface.tsx`), falls dort Personen erscheinen, solange sie läuft.
 
+### W-7 (Gastronomie, 27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen
+
+**Beobachtung (Thomas, 27.10.2026, Dashboard-Karte bei Sundern):** „Bank-Gebäude war kurz da, wurde dann durch die Sundern-Gebäude ersetzt.“
+
+**Was dahintersteckt:**
+- Die staatliche Bank steht seit `20261027090000_earth_bank_sparkasse.sql` im realen Haus der Sparkasse, Hauptstraße 140 (`tile_entities.source_ref = osm:way:246890726`).
+- `drawBlock` in `app/world-lab/worldEngine.ts` ordnet das Haus richtig zu. Beschriftung „Bank · Sparkasse · Hauptstraße 140“ und „Betreten“ stimmen.
+- Das Haus hat aber das Aussehen des realen Hauses, weil `owner.source` gesetzt ist. Diese Regel ist für **gekaufte** Häuser gedacht: „sieht aus wie vorher, nur der Eigentümer ist neu“.
+- Bevor die Kachel geladen ist, zeichnet die Karte die Bank kurz als eigenen 24,8 × 16,2-m-Block mit NOXIA-Dach. Danach verschwindet dieser Block. So entsteht der Eindruck, die Bank sei ersetzt worden.
+
+**Bitte:**
+1. **Aussehen nach Herkunft:** Gebäude des Ortes (`owner_class = 'STATE'`, nicht vom Spieler gekauft), die einem realen Haus zugeordnet sind, mit realem Grundriss und realer Höhe zeichnen, aber mit dem Dach aus `NOXIA_LOOKS[typeId]` bzw. `NOXIA_DEFAULT_LOOK`. Besser noch mit einem Schild bzw. Symbol der Gebäudeart (Bank, Verwaltung, Akademie), damit man öffentliche Gebäude von Weitem findet. Gekaufte Häuser behalten ihr Aussehen wie bisher.
+   - `/api/world-lab/buildings` liefert dafür `ownerLabel: 'Staatlich'`. Ein eigenes Feld (z. B. `public: true`) wäre sauberer.
+2. **Kein Aufblitzen:** NOXIA-Gebäude mit `source` nicht als eigenen Block zeichnen, solange die Kachel ihres Hauses noch lädt.
+3. **Gilt ebenso für** Metropol und Balkan Grill (Gebäude des Ortes in realen Lokalen) und für alle späteren öffentlichen Gebäude an realen Adressen.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

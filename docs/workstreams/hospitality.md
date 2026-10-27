@@ -60,6 +60,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-14** (27.10.2026): Personal für die Bank an der Hauptstraße 140 und die anderen leeren öffentlichen Gebäude – `population-economy.md`.
 - **R-15** (27.10.2026): Lernschwellen serverseitig durchsetzen (Sicherheiten, Zinseszins, Arbitrage, Bodenwert) – `population-economy.md`.
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`.
+- **W-7** (27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen (Bank sah nach dem Laden aus wie ein normales Haus) – `world-map.md`.
 
 ## Requests aus anderen Teilprojekten
 
