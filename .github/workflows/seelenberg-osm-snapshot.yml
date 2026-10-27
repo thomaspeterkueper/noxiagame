@@ -1,0 +1,29 @@
+name: Seelenberg real OSM snapshot
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/seelenberg-living-systems-pilot'
+    paths:
+      - 'experiments/seelenberg/fetch-osm.mjs'
+      - '.github/workflows/seelenberg-osm-snapshot.yml'
+jobs:
+  retrieve-validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch and validate OSM area
+        run: node experiments/seelenberg/fetch-osm.mjs
+      - name: Preserve snapshot and provenance (not a live world import)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seelenberg-osm-snapshot
+          path: experiments/seelenberg/output/
+          retention-days: 14
