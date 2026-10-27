@@ -6,7 +6,7 @@ Quelle: Angaben von Thomas am 27.10.2026 aus den Planungsdokumenten des Baumeist
 
 ## Zereya
 
-- Mutter der Linie. 2087 lebt sie mit 86 Jahren auf dem Mars.
+- Mutter der Linie. Kommt **2086** zum Mars, nach Soraya (Thomas, 27.10.2026). 2087 lebt sie mit 86 Jahren dort.
 - Zeitprofil (*Mishkenaz und die Zeit*): Spiralzeit, Vergangenheit als lebendige Gegenwart, Ahnen als aktive Stimmen; häufig *olam* und *-ref*, selten *atid*.
 
 ## Soraya Adar (Soraya Bat Zereya)
@@ -35,13 +35,13 @@ Drei gemeinsame Kinder, in den Planungsdokumenten über ihre Geburt strukturiert
 
 1. **Keine Namen erfinden.** Weder für die drei Kinder mit Peter Berger noch für Sorayas Nachkommen. NOXIA füllt die offene Tür nicht.
 2. Bewohner der Simulation dürfen nicht als Nachkommen der Linie ausgegeben werden. Entsteht im Spiel eine Figur, die dafür in Frage käme, entscheidet Thomas, ob sie kanonisch wird.
-3. Zeitachse: NOXIA spielt um 2100+. **Beide leben noch** (Thomas, 27.10.2026): Soraya ist um die 75, Zereya um die 99. **Sie leben auf dem Mars in einer Siedlung nahe dem Valles Marineris** (Thomas, 27.10.2026). Welche Siedlung das in NOXIA ist – eine bestehende oder eine neue –, wird vor dem Spawn festgelegt.
+3. Zeitachse: NOXIA spielt um 2100+. **Beide leben noch** (Thomas, 27.10.2026): Soraya ist um die 75, Zereya um die 99. **Sie leben auf dem Mars in einer neuen, sehr kleinen Siedlung direkt am Valles Marineris** (Thomas, 27.10.2026) – nahe dem Monolithen. Die Siedlung gibt es in NOXIA noch nicht; Name, genaue Lage und Einwohnerzahl werden vor dem Spawn festgelegt. Sehr klein heißt: Außenposten (Stufe 0), Hafenkantine mit Automat, ein eigener Dialekt des Marsianischen mit vermutlich stärkerer Mishkenaz-Schicht als anderswo.
 4. Wissen: Figuren der Simulation kennen Zereya und Soraya höchstens als Namen der Gründungszeit (Hörensagen, *-nga*), nicht ihre Biografie, solange sie ihnen nicht begegnet sind.
 
 ## Offen
 
-Entschieden am 27.10.2026: Soraya kam 2085–2086 zum Mars; beide leben um 2100+ in einer Siedlung nahe dem Valles Marineris.
+Entschieden am 27.10.2026: Soraya kam 2085–2086 zum Mars, Zereya 2086; beide leben um 2100+ in einer neuen, sehr kleinen Siedlung direkt am Valles Marineris.
 
-- [OFFEN] Welche Siedlung in NOXIA – bestehende Location oder neue am Valles Marineris?
-- [OFFEN] Wann kam Zereya zum Mars (nach Soraya, spätestens 2087)?
+- [OFFEN] Name und genaue Lage der Siedlung (Abschnitt des Valles Marineris, Bezug zur Axis Kammer).
+- [OFFEN] Wer lebt außer den beiden dort, und wie viele?
 - [OFFEN] Hat Soraya auf dem Mond Spuren hinterlassen – Mishkenaz-Wörter im Mond-Dialekt, Menschen, die sie dort kannten?
