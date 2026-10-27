@@ -152,6 +152,28 @@ McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wo
 
 „Du bist hier“, Zielliste und Adresssuche stehen wieder rechts oben wie in der alten Szene, die Tafel des gewählten Objekts direkt darunter. Links bleiben Hilfe, Schnellziele, Messwerte und die Rückwege.
 
+## Staatliche Basis „Selmecke“ (Thomas, 27.10.2026: „sieht furchtbar aus“)
+
+**Befund:** „Selmecke“ ist in den Kartendaten kein Stadtteil, sondern ein Bach und das **Naturschutzgebiet Selmecke** (Schutzklasse 4, 51,331–51,351 / 7,968–7,980). Die 17 staatlichen Bauten (Verwaltung, Schule, Wohnblock mit 8 Bewohnern, Habitat, Labor, Scanner, Fabrik, Werft, zwei Lager, Solarfeld, Raumhafen mit Kern, Service, Lager und drei Landeplätzen) stehen zum Teil darin, in einem Waldtal ohne echte Häuser und Straßen – nur Feldwege. Deshalb wirkte die Basis wie ein Platzhalter auf der Wiese. Dazu kam ein Zeichenfehler: Bilder großer Bauten wurden mit ihrem Bildmaßstab bis 1,4-fach über die Grundfläche hinaus vergrößert (Landeplatz 120 × 90 m als Scheibe von rund 350 m).
+
+**Gebaut (27.10.2026):**
+- Landeplätze und Solarfeld zeichnet die Karte selbst in echter Größe (`drawPad`, `drawSolar` in `worldEngine.ts`): erhöhte Betonplatte mit Fugen, gelb-schwarzer Warnrand, Zielkreis mit Kreuz, Landelichter; Solarfeld als Reihen geneigter Paneele.
+- Anlagen: NOXIA-Gebäude ohne echtes Haus, die höchstens 45 m auseinander stehen, bekommen ein gemeinsames Betonvorfeld mit Fugen, Zaun und Mastleuchten (`drawFacilities`, Geometrie in `lib/worldlab/facility.ts` mit Tests). Einzelne Bauten bekommen nur eine Betonfläche.
+- Bilder anderer NOXIA-Gebäude werden nicht mehr größer als ihr Grundriss (Bildmaßstab über 1,7 wird gekappt).
+- Geprüft mit einer Testseite (echte Lage und Größe der 17 Bauten, künstlicher Boden): keine Überlappungen mehr, keine Fehler.
+
+**Entschieden (Thomas, 27.10.2026): Die Basis zieht ganz um, in ein Gewerbegebiet im Süden von Sundern.** Kandidaten aus den Kartendaten (Flächennutzung Industrie):
+- bei Wellpappen Tillmann (51,2995 / 7,9831, rund 380 × 430 m, 3,3 km vom Zentrum),
+- westlich davon ein großes Industriegebiet (51,2989 / 7,9620, rund 590 × 470 m, dazu 51,3013 / 7,9635, 440 × 360 m; 4 km),
+- Endorfer Mühle (51,2973 / 8,0430, rund 250 × 510 m, 4,2 km).
+
+Für alle drei fehlten die Hausdaten. Die zehn Ortsdetail-Zellen sind am 27.10.2026 gegen 10:30 Uhr als leere Orte in `celestial_regions` eingereiht (`earth-place-51p29700-7p95959` … `earth-place-51p29700-8p04595`); der stündliche Lauf `/api/cron/world-places` holt zwei je Stunde.
+
+**Nächste Schritte:**
+1. Sobald die Zellen gefüllt sind: je Gebiet echte Hallen und freie Flächen auswerten; Lageplan vorschlagen (Fabrik, Werft, Lager, Labor in echte Hallen über `source_ref`; Landeplätze, Raumhafen und Solar auf freie Fläche, zusammen rund 300 × 200 m), Thomas entscheidet.
+2. Umzug der Bauten (Lage, Drehung, `source_ref`) als Migration. Wohnzuweisungen und Arbeitsplätze hängen an `tile_entity_id` und ziehen mit; Anwesenheit und Wege der Personen gehören zu Bevölkerung und Ökonomie (Request dort, sobald der Ort feststeht).
+3. Danach prüfen, ob die alte Lage im Naturschutzgebiet leer ist.
+
 ## Requests aus anderen Teilprojekten
 
 ### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht – in der Weltkarte erledigt (25.10.2026)

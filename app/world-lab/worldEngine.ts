@@ -17,6 +17,7 @@ import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/li
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
 import { polygonArea } from '@/lib/worldlab/simplify'
+import { apronOutline, facilityClusters, nativeStandKind, padOutline, pointsAlong, type Pt } from '@/lib/worldlab/facility'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
 
 type Pixi = typeof import('pixi.js')
@@ -307,6 +308,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const routeLine = new PIXI.Graphics()
   const siteLayer = new PIXI.Container()
   overlay.addChild(siteLayer, routeLine)
+  // Vorfeld der Anlagen; früh angelegt, weil drawFacilities schon beim ersten Aufbau läuft.
+  const apronLayer = new PIXI.Container()
+  let apronKey = ''
 
   // NOXIA-Gebäude zuerst holen, damit jede Kachel beim Aufbau weiß, welches
   // echte Gebäude einem Spieler gehört.
@@ -877,6 +881,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return !building.claimed && (!building.source || tileDoneAt(building.x, building.y))
   }
   function refreshStands() {
+    drawFacilities()
     for (const building of noxia) if (building.stand && building.source) building.stand.visible = standVisible(building)
   }
   // Namensschilder an NOXIA-Gebäuden (W-3), fremde Häuser nicht.
@@ -926,12 +931,16 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const visual = options.noxiaVisual?.(building.typeId)
       const foot = iso(building.x, building.y)
       let stand: Container | null = null
-      if (visual?.mapAsset) {
+      const native = nativeStandKind(building.typeId)
+      if (native) stand = native === 'pad' ? drawPad(building) : drawSolar(building)
+      if (!stand && visual?.mapAsset) {
         try {
           const texture = await PIXI.Assets.load({ src: visual.mapAsset, data: { resolution: 2 } })
           if (disposed) return
           const sprite = new PIXI.Sprite(texture)
-          const side = (building.w + building.d) * 1.18 * ((visual.mapScale ?? 1.7) / 1.7)
+          // Die Grundfläche ist echt: das Bild darf kleiner, aber nicht größer als sein Grundriss werden
+          // (vorher bis 1,4-fach – die Landeplätze lagen übereinander, 27.10.2026).
+          const side = (building.w + building.d) * 1.18 * Math.min(1, (visual.mapScale ?? 1.7) / 1.7)
           sprite.anchor.set(0.5, 0.86)
           sprite.width = side; sprite.height = side
           sprite.position.set(foot.x, foot.y + (building.w + building.d) / 2 * ISO_Y)
@@ -953,8 +962,85 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       addObject(stand)
     }
   }
+  /** Landeplatz in echter Größe: Betonplattform, Warnrand, Zielkreis, Landelichter (statt eines vergrößerten Bildes). */
+  function drawPad(building: NoxiaPlaced) {
+    const g = new PIXI.Graphics()
+    const f = { x: building.x, y: building.y, w: building.w, d: building.d, rotation: building.rotation }
+    const ring = padOutline(f)
+    const H = 0.9
+    // Seitenwände, die zur Kamera zeigen
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length]
+      const nx = b.y - a.y, ny = -(b.x - a.x)
+      if (nx + ny <= 0) continue
+      const pts = [iso(a.x, a.y), iso(b.x, b.y), iso(b.x, b.y, H), iso(a.x, a.y, H)].flatMap(p => [p.x, p.y])
+      g.poly(pts).fill(nx - ny > 0 ? 0x7c8187 : 0x62676d).stroke({ width: 0.25, color: OUTLINE, alpha: 0.6 })
+    }
+    const top = (pts: readonly Pt[]) => pts.flatMap(p => { const s = iso(p.x, p.y, H); return [s.x, s.y] })
+    g.poly(top(ring)).fill(0x9a9fa4).stroke({ width: 0.35, color: OUTLINE, alpha: 0.7 })
+    const a = building.rotation * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a)
+    const at = (lx: number, ly: number) => ({ x: f.x + lx * cos - ly * sin, y: f.y + lx * sin + ly * cos })
+    const hw = f.w / 2, hd = f.d / 2
+    // Plattenfugen alle 10 m
+    for (let lx = -hw + 10; lx < hw; lx += 10) { const p = iso(at(lx, -hd).x, at(lx, -hd).y, H), q = iso(at(lx, hd).x, at(lx, hd).y, H); g.moveTo(p.x, p.y).lineTo(q.x, q.y) }
+    for (let ly = -hd + 10; ly < hd; ly += 10) { const p = iso(at(-hw, ly).x, at(-hw, ly).y, H), q = iso(at(hw, ly).x, at(hw, ly).y, H); g.moveTo(p.x, p.y).lineTo(q.x, q.y) }
+    g.stroke({ width: 0.15, color: 0x7a7f85, alpha: 0.75 })
+    // Warnrand: gelb-schwarze Streifen 2 m innen
+    const inner = padOutline({ ...f, w: f.w - 4, d: f.d - 4 })
+    for (let i = 0; i < inner.length; i++) {
+      const p0 = inner[i], p1 = inner[(i + 1) % inner.length]
+      const length = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+      for (let t = 0, k = 0; t < length; t += 3, k++) {
+        const e = Math.min(length, t + 3)
+        const s = iso(p0.x + (p1.x - p0.x) * t / length, p0.y + (p1.y - p0.y) * t / length, H), u = iso(p0.x + (p1.x - p0.x) * e / length, p0.y + (p1.y - p0.y) * e / length, H)
+        g.moveTo(s.x, s.y).lineTo(u.x, u.y).stroke({ width: 1.1, color: k % 2 ? 0x1d1f21 : 0xe8b923 })
+      }
+    }
+    // Zielkreis, Kreuz und Mitte
+    const r = Math.min(hw, hd) * 0.6
+    const circle = (radius: number) => Array.from({ length: 48 }, (_, i) => { const t = i / 48 * Math.PI * 2; return at(Math.cos(t) * radius, Math.sin(t) * radius) })
+    g.poly(top(circle(r))).fill({ color: 0x8a9095, alpha: 0.9 }).stroke({ width: 0.9, color: 0xf2f2ee })
+    g.poly(top(circle(r * 0.2))).stroke({ width: 0.7, color: 0xe8b923 })
+    for (const [x0, y0, x1, y1] of [[-r * 0.75, 0, r * 0.75, 0], [0, -r * 0.75, 0, r * 0.75]]) {
+      const p = iso(at(x0, y0).x, at(x0, y0).y, H), q = iso(at(x1, y1).x, at(x1, y1).y, H)
+      g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 0.9, color: 0xe8b923 })
+    }
+    // Landelichter an den Ecken des Achtecks und auf dem Zielkreis
+    for (const p of [...ring, ...circle(r).filter((_, i) => i % 6 === 0)]) {
+      const s = iso(p.x, p.y, H)
+      g.circle(s.x, s.y, 1.8).fill({ color: 0xffd36b, alpha: 0.22 })
+      g.circle(s.x, s.y, 0.6).fill(0xffe9a8)
+    }
+    // Liegt ganz unten in der Tiefe: alles, was darauf steht, wird danach gezeichnet.
+    g.zIndex = Math.min(...ring.map(p => p.x + p.y))
+    return g
+  }
+  /** Solarfeld in echter Größe: Reihen geneigter Paneele (statt eines vergrößerten Bildes). */
+  function drawSolar(building: NoxiaPlaced) {
+    const g = new PIXI.Graphics()
+    const a = building.rotation * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a)
+    const hw = building.w / 2, hd = building.d / 2
+    const at = (lx: number, ly: number, h = 0) => iso(building.x + lx * cos - ly * sin, building.y + lx * sin + ly * cos, h)
+    const ROW = 5.5, DEPTH = 3.4
+    // hintere Reihen zuerst, damit vordere sie überdecken
+    for (let ly = -hd + 1; ly + DEPTH <= hd; ly += ROW) {
+      // Stützen
+      for (let lx = -hw + 2; lx <= hw - 2; lx += 6) { const p = at(lx, ly + DEPTH, 0), q = at(lx, ly + DEPTH, 0.5); g.moveTo(p.x, p.y).lineTo(q.x, q.y) }
+      g.stroke({ width: 0.25, color: 0x5a5f63 })
+      const panel = [at(-hw + 1, ly, 2.0), at(hw - 1, ly, 2.0), at(hw - 1, ly + DEPTH, 0.6), at(-hw + 1, ly + DEPTH, 0.6)].flatMap(p => [p.x, p.y])
+      g.poly(panel).fill(0x223a5a).stroke({ width: 0.25, color: 0xa9bdd2 })
+      for (let lx = -hw + 3; lx < hw - 1; lx += 2) { const p = at(lx, ly, 2.0), q = at(lx, ly + DEPTH, 0.6); g.moveTo(p.x, p.y).lineTo(q.x, q.y) }
+      g.stroke({ width: 0.1, color: 0x6f8fb3, alpha: 0.5 })
+    }
+    const corners = [at(-hw, -hd), at(hw, -hd), at(hw, hd), at(-hw, hd)]
+    void corners
+    g.zIndex = building.x + building.y + (Math.abs(hw * cos) + Math.abs(hd * sin) + Math.abs(hw * sin) + Math.abs(hd * cos)) / 2
+    return g
+  }
+
   void placeStands(noxia)
   placeSigns()
+  drawFacilities()
   /** NOXIA-Gebäude neu holen (nach Kauf oder Bau) und die Kacheln neu zeichnen. */
   async function reloadNoxia() {
     let list: NoxiaBuilding[] = []
@@ -966,6 +1052,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     reload()
     void placeStands([...noxia])
     placeSigns()
+    drawFacilities()
   }
   function reload() {
     for (const [key, entry] of loaded) dropTile(key, entry)
@@ -1287,6 +1374,57 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const plotLayer = new PIXI.Container()
   overlay.addChildAt(plotLayer, 0)
   overlay.addChildAt(ownedLayer, 0)
+  // Vorfeld und Zaun der Anlagen (NOXIA-Gebäude ohne echtes Haus): ganz unten im Overlay.
+  overlay.addChildAt(apronLayer, 0)
+  /** Anlagen: nahe beieinander stehende NOXIA-Gebäude ohne echtes Haus bekommen Beton und Zaun. */
+  function drawFacilities() {
+    const free = noxia.filter(building => !building.source && !building.claimed)
+    const key = free.map(building => building.id).sort().join(',')
+    if (key === apronKey) return
+    apronKey = key
+    for (const child of apronLayer.removeChildren()) child.destroy({ children: true })
+    const items = free.map(building => ({ x: building.x, y: building.y, w: building.w, d: building.d, rotation: building.rotation }))
+    for (const group of facilityClusters(items)) {
+      const members = group.map(index => items[index])
+      const single = members.length === 1
+      const outline = apronOutline(members, single ? 4 : 8)
+      const flat = (ring: readonly Pt[], h = 0) => ring.flatMap(p => { const s = iso(p.x, p.y, h); return [s.x, s.y] })
+      const g = new PIXI.Graphics()
+      // Beton mit Fugen im 8-m-Raster entlang der Hülle (nur die Fläche, keine Textur)
+      g.poly(flat(outline)).fill(0xb4b2a8).stroke({ width: 0.6, color: 0x77746a })
+      const xs = outline.map(p => p.x), ys = outline.map(p => p.y)
+      const inside = (x: number, y: number) => {
+        let hit = false
+        for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+          const a = outline[i], b = outline[j]
+          if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) hit = !hit
+        }
+        return hit
+      }
+      for (let x = Math.ceil(Math.min(...xs) / 8) * 8; x < Math.max(...xs); x += 8) {
+        for (let y = Math.min(...ys); y < Math.max(...ys); y += 2) if (inside(x, y) && inside(x, y + 2)) { const a = iso(x, y), b = iso(x, y + 2); g.moveTo(a.x, a.y).lineTo(b.x, b.y) }
+      }
+      for (let y = Math.ceil(Math.min(...ys) / 8) * 8; y < Math.max(...ys); y += 8) {
+        for (let x = Math.min(...xs); x < Math.max(...xs); x += 2) if (inside(x, y) && inside(x + 2, y)) { const a = iso(x, y), b = iso(x + 2, y); g.moveTo(a.x, a.y).lineTo(b.x, b.y) }
+      }
+      g.stroke({ width: 0.18, color: 0x8f8c82, alpha: 0.7 })
+      if (!single) {
+        // Zaun: Pfosten alle 4 m, zwei Drähte in 1 m und 2,2 m Höhe
+        for (const p of pointsAlong(outline, 4)) { const a = iso(p.x, p.y), b = iso(p.x, p.y, 2.2); g.moveTo(a.x, a.y).lineTo(b.x, b.y) }
+        g.stroke({ width: 0.25, color: 0x3d4347 })
+        g.poly(flat(outline, 2.2)).stroke({ width: 0.2, color: 0x4b5257, alpha: 0.9 })
+        g.poly(flat(outline, 1.0)).stroke({ width: 0.15, color: 0x4b5257, alpha: 0.6 })
+        // Mastleuchten alle 40 m am Zaun
+        for (const p of pointsAlong(outline, 40)) {
+          const foot = iso(p.x, p.y), top = iso(p.x, p.y, 7)
+          g.moveTo(foot.x, foot.y).lineTo(top.x, top.y).stroke({ width: 0.3, color: 0x2f3438 })
+          g.circle(top.x, top.y, 2.2).fill({ color: 0xffe2a0, alpha: 0.18 })
+          g.circle(top.x, top.y, 0.7).fill(0xfff1c8)
+        }
+      }
+      apronLayer.addChild(g)
+    }
+  }
   let parcelOwners = new Map<string, boolean>()
   function drawOwned(entry: Loaded) {
     entry.owned?.destroy(); entry.owned = null
