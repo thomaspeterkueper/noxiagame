@@ -16,7 +16,7 @@
 import { PRICE_MAX, PRICE_MIN } from './config'
 
 /** Richtpreis (Kauf) je Tonne bei ausgeglichener Versorgung. */
-export const PRICE_BASE: Record<string, number> = { water: 120, energy: 60, metal: 40 }
+export const PRICE_BASE: Record<string, number> = { water: 120, energy: 60, metal: 40, food: 160 }
 
 /** Reichweite in Ticks, bei der genau der Richtpreis gilt (48 Ticks = 2 Tage Echtzeit). */
 export const PRICE_COVERAGE_TARGET_TICKS = 48

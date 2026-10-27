@@ -58,8 +58,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import { PRICE_MIN, PRICE_MAX, STOCK_LOW_THRESHOLD } from '@/lib/game/config'
 
-const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
-const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️' }
+const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall', food: 'Lebensmittel' }
+const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️', food: '🌾' }
 
 const TICK_MS = 120
 const STEP_BASE = 1.2

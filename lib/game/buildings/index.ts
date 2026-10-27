@@ -211,6 +211,14 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     allowedLocations: ['mars'],
   },
 
+  hydroponics: {
+    id: 'hydroponics', name: 'Hydroponik', category: 'production',
+    description: '+2 Lebensmittel/Tick · braucht 1 Wasser und 1 Energie/Tick',
+    cost: 2400, buildTimeTicks: 3,
+    produces: { resource: 'food', amount: 2 },
+    allowedLocations: ['moon', 'mars', 'phobos', 'deimos', 'prometheus', 'q1'],
+  },
+
   radiator_field: {
     id: 'radiator_field', name: 'Radiatorfeld', category: 'infrastructure',
     description: 'Thermische Abstrahlung · Staubdegradation/Reinigung/Feldisolation abbildbar',

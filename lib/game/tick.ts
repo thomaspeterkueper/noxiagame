@@ -49,7 +49,7 @@ const BANK_LOAN_RATE    = 0.020   // −2.0%/Tick auf Kredite (Zinseszins)
 
 const AVG_WINDOW_TICKS      = 7
 const HISTORY_RETENTION_TICKS = 336
-const TICK_RESOURCES = ['water', 'energy', 'metal', 'components'] as const
+const TICK_RESOURCES = ['water', 'energy', 'metal', 'components', 'food'] as const
 
 type SB = any
 
@@ -195,6 +195,8 @@ export async function runPopulationTick(
       energy: Math.ceil((pop / 100) * CONSUMPTION_PER_100.energy),
       metal:  Math.ceil((pop / 100) * CONSUMPTION_PER_100.metal),
       components: 0,
+      // Lebensmittel: Verbrauch durch Bewohner erst ab Stufe 3 (NOXIA-FOOD-0001).
+      food: 0,
     }
 
     const isSupplied =

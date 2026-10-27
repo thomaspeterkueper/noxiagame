@@ -36,7 +36,7 @@ export const HANDEL_STANDARD: HandelsParameter = {
   // Die Erde ist als Quelle zugelassen (Entscheidung 12.10.2026). Begrenzt wird der
   // Zustrom durch Fracht, Lagergrenzen am Ziel und die dortige Preisreaktion.
   gesperrteQuellen: [],
-  gueter: ['water', 'energy', 'metal'],
+  gueter: ['water', 'energy', 'metal', 'food'],
 }
 
 export interface HandelsMarkt {

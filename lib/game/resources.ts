@@ -12,7 +12,7 @@ export type Resource =
 export const RESOURCES: Resource[] =
   ['water','energy','metal','components','ice','aluminium','oxygen','hydrogen','food','parts'];
 
-export const MARKET_RESOURCES: Resource[] = ['water','energy','metal','components'];
+export const MARKET_RESOURCES: Resource[] = ['water','energy','metal','components','food'];
 
 export const RESOURCE_PHASE: Record<Resource,'fluid'|'solid'> = {
   water:'fluid', energy:'fluid', oxygen:'fluid', hydrogen:'fluid',

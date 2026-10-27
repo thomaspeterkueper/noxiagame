@@ -3,7 +3,7 @@
 // Aktualisiert: 01.09.2026 — Overlay-Aktionen können interne In-Game-Ziele öffnen
 // Version:      1.6.0
 
-export type ResourceType = 'water' | 'energy' | 'metal' | 'components'
+export type ResourceType = 'water' | 'energy' | 'metal' | 'components' | 'food'
 export type LocationSlug = string
 export type OverlayId = 'BankOverlay' | 'SchoolOverlay' | 'ShipyardOverlay' | 'AdminOverlay' | null
 

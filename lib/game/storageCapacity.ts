@@ -15,19 +15,19 @@
 //
 // Die Tonnagen sind vorläufige Modellparameter.
 
-export type StorageResource = 'water' | 'energy' | 'metal' | 'components'
+export type StorageResource = 'water' | 'energy' | 'metal' | 'components' | 'food'
 export type StorageCapacity = Record<StorageResource, number>
 
-export const STORAGE_RESOURCES: StorageResource[] = ['water', 'energy', 'metal', 'components']
+export const STORAGE_RESOURCES: StorageResource[] = ['water', 'energy', 'metal', 'components', 'food']
 
 /** Grundlager jedes Orts ohne eigenes Lagergebäude (Tanks, Puffer und Halden der Anlagen selbst). */
 export const BASE_STORAGE_T = 300
 
 /** Kapazität je Lagergebäude in Ausbaustufe 1, in Tonnen je Gut. */
 export const STORAGE_BUILDINGS: Record<string, Partial<StorageCapacity>> = {
-  warehouse:         { water: 1000, metal: 1500, components: 500 },
-  warehouse_storage: { water: 1000, metal: 3000, components: 1000 },
-  spaceport_storage: { water: 1000, metal: 1000, components: 1000, energy: 500 },
+  warehouse:         { water: 1000, metal: 1500, components: 500, food: 800 },
+  warehouse_storage: { water: 1000, metal: 3000, components: 1000, food: 1500 },
+  spaceport_storage: { water: 1000, metal: 1000, components: 1000, energy: 500, food: 500 },
   tank:              { water: 2000 },
   battery_storage:   { energy: 1500 },
 }
@@ -41,7 +41,7 @@ export function tierFactor(tier: number): number {
 }
 
 export function emptyCapacity(value = 0): StorageCapacity {
-  return { water: value, energy: value, metal: value, components: value }
+  return { water: value, energy: value, metal: value, components: value, food: value }
 }
 
 /** Lagerkapazität eines Orts aus seinen aktiven Lagergebäuden. */

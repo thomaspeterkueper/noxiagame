@@ -4,7 +4,7 @@ import { ENERGY_GOOD_LABEL } from '@/lib/constants'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '@/lib/store/gameStore'
 
-const RESOURCES = ['water', 'energy', 'metal', 'components'] as const
+const RESOURCES = ['water', 'energy', 'metal', 'components', 'food'] as const
 type Resource = typeof RESOURCES[number]
 
 type Inventory = {
@@ -75,6 +75,7 @@ const LABEL: Record<Resource, string> = {
   energy: ENERGY_GOOD_LABEL,
   metal: 'Metall',
   components: 'Bauteile',
+  food: 'Lebensmittel',
 }
 
 async function authToken(): Promise<string | null> {

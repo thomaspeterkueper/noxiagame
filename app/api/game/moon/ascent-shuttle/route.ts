@@ -82,7 +82,7 @@ export async function POST(req:NextRequest){
       const resource=typeof body.resource==='string'?body.resource:''
       const amount=Number(body.amount)
       const direction=body.direction==='shuttle-to-port'?'shuttle-to-port':'port-to-shuttle'
-      if(!['water','energy','metal','components'].includes(resource)||!Number.isInteger(amount)||amount<=0) return NextResponse.json({error:'Ungültige Cargo-Parameter.'},{status:400})
+      if(!['water','energy','metal','components','food'].includes(resource)||!Number.isInteger(amount)||amount<=0) return NextResponse.json({error:'Ungültige Cargo-Parameter.'},{status:400})
       const {data,error}=await sb.rpc('noxia_transfer_staged_surface_shuttle_cargo',{
         p_command_id:randomUUID(),p_actor_profile_id:u.id,p_ship_id:state.ship.id,p_surface_port_inventory_id:portId,p_resource:resource,p_amount:amount,p_direction:direction,
       })

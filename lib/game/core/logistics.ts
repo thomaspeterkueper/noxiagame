@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createServiceClient } from '@/lib/supabase/service'
 
-export const LOGISTICS_RESOURCES = ['water', 'energy', 'metal', 'components'] as const
+export const LOGISTICS_RESOURCES = ['water', 'energy', 'metal', 'components', 'food'] as const
 export type LogisticsResource = typeof LOGISTICS_RESOURCES[number]
 
 export const TRANSPORT_DOMAINS = ['surface', 'surface_to_orbit', 'orbit', 'inter_node'] as const
