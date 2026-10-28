@@ -40,6 +40,14 @@ type BuildRow = { id: string; name?: string; buildable_id: string; status?: stri
 
 const MEETING_GROUP = 'Omnizedenz-Begegnungsstätten'
 const WORSHIP_GROUP = 'Gottesdienste und Gebete'
+/** Gotteshaus als Wahrzeichen (für Tafel und Innenraum seiner Religion). */
+function worshipLandmark(item: WorshipItem) {
+  const religion = item.tradition === 'catholic' || item.tradition === 'protestant' ? 'christian' : item.tradition
+  return { at: item.at!, name: item.name, kind: 'place_of_worship', tags: { religion, ...(item.tradition === 'catholic' ? { denomination: 'catholic' } : item.tradition === 'protestant' ? { denomination: 'protestant' } : {}) } }
+}
+function worshipPanel(item: WorshipItem): Panel {
+  return { kind: 'landmark', landmark: worshipLandmark(item), source: item.source ?? undefined }
+}
 const metresBetween = (a: GeoPoint, b: GeoPoint) => Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180))
 const kmText = (m: number) => m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(m) + ' m'
 
@@ -572,13 +580,6 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       })),
     ])
   }, [engineReady, meeting, worship, earthWorship])
-  function worshipLandmark(item: WorshipItem) {
-    const religion = item.tradition === 'catholic' || item.tradition === 'protestant' ? 'christian' : item.tradition
-    return { at: item.at!, name: item.name, kind: 'place_of_worship', tags: { religion, ...(item.tradition === 'catholic' ? { denomination: 'catholic' } : item.tradition === 'protestant' ? { denomination: 'protestant' } : {}) } }
-  }
-  function worshipPanel(item: WorshipItem): Panel {
-    return { kind: 'landmark', landmark: worshipLandmark(item), source: item.source ?? undefined }
-  }
   function meetingPanel(place: MeetingPlace): Panel {
     return place.noxiaId
       ? { kind: 'building', at: place.at, title: place.name, noxiaId: place.noxiaId, address: place.address ?? undefined }
