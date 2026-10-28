@@ -35,6 +35,7 @@ import TicketCounter from '@/app/components/TicketCounter'
 import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
+import LearnLink from '@/app/academy/learn/LearnLink'
 
 export type Panel =
   | { kind: 'none' }
@@ -110,7 +111,7 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 }
 
 /** Baubarer Typ aus /api/game/build/spatial (available). */
-type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean } }
+type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean; requiredUnlock?: string | null } }
 
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
@@ -699,7 +700,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         {!parcel.owned && ((parcel.forSale && !parcel.listed) || parcel.partsOnly) && parcel.areaM2 >= 600 && <div className="row"><span>{parcel.partsOnly ? parcel.reason : 'Zu groß oder zu teuer?'} Ein Stück hier abstecken, auch länglich.</span><button disabled={buying} onClick={() => setPanel({ kind: 'land', at: panel.at, parentId: parcel.id })}>Teilstück</button></div>}
         {parcel.own && <>
           <p>Hier bauen (an der angeklickten Stelle):</p>
-          {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}
+          {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false && <> · Wissen fehlt <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}
           {buyError && <p>{buyError}</p>}
           {parcel.listed
             ? <div className="row"><span>Angeboten für {credits(parcel.price ?? 0)} – {afterTax(parcel.price ?? 0, parcel.taxRate)}.</span><button disabled={buying} onClick={() => void parcelAction({ action: 'unlist' }, 'Zurückziehen nicht möglich.')}>Zurückziehen</button></div>
@@ -716,7 +717,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     {panel.kind === 'plot' && <>
       <div className="head"><div><small>FREIE FLÄCHE</small><b>{plot?.name ?? 'Freie Fläche'}</b>{plot && <span>{Math.round(plot.w)} × {Math.round(plot.d)} m · {plot.own ? 'dein Grundstück' : 'gehört einem anderen Spieler'}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       {plot?.own && (buildables === null ? <p>Bautypen werden geladen …</p>
-        : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
+        : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}{item.requirements?.knowledgeOk === false && <> <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
           : <p>Kein Bautyp passt auf diese Fläche.</p>)}
       {buyError && <p>{buyError}</p>}
     </>}

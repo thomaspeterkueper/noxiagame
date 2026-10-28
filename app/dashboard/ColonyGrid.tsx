@@ -24,6 +24,7 @@ import SchoolOverlay from './SchoolOverlay'
 import WalkableColony from './WalkableColony'
 import BuildingInterior from './BuildingInterior'
 import BankOverlay from './BankOverlay'
+import LearnLink from '@/app/academy/learn/LearnLink'
 
 function TileDisplay({ tileType, slug }: { tileType: string; slug: string }) {
   const [src, setSrc] = useState(`/images/grid/${slug}/${tileType}.webp`)
@@ -304,10 +305,8 @@ function BuildPopup({ tileRow, tileCol, tileType, locationSlug, onClose, onBuild
                     {!!item.populationBonus && ` · +${item.populationBonus} Kapazität`}
                   </div>
                 </button>
-                {knowledgeLocked && item.learningUrl && (
-                  <a href={item.learningUrl} style={{ display: 'inline-block', marginTop: '0.45rem', color: '#8a6a00', fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
-                    Jetzt lernen →
-                  </a>
+                {knowledgeLocked && item.requiredUnlock && (
+                  <LearnLink unlock={item.requiredUnlock} style={{ display: 'inline-block', marginTop: '0.45rem', color: '#8a6a00', fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }} />
                 )}
                 {knowledgeLocked && item.requiredLabel && (
                   <div style={{ marginTop: '0.2rem', color: '#6b6357', fontSize: '0.62rem' }}>Benötigt: {item.requiredLabel}</div>

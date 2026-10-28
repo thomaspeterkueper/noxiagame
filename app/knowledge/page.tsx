@@ -9,6 +9,7 @@ import {
   completeLearningModule,
 } from '@/lib/knowledge';
 import type { LearningModuleId } from '@/lib/knowledge';
+import LearnLink from '@/app/academy/learn/LearnLink'
 
 const completedDemoModules: LearningModuleId[] = [
   'LRN:SSF:MAT-1001',
@@ -82,6 +83,7 @@ export default function KnowledgePage() {
                 <small>{building.id}</small>
                 <p>{check.canBuild ? 'Baubar' : 'Noch gesperrt'}</p>
                 {!check.canBuild && check.missingModules.length > 0 && <p>Fehlt: {check.missingModules.join(', ')}</p>}
+                {!check.canBuild && building.requires.map((unlock) => <LearnLink key={unlock} unlock={unlock} style={{ color: '#d9b45a', fontWeight: 700, textDecoration: 'none' }} />)}
               </Panel>
             );
           })}

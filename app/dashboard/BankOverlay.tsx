@@ -8,6 +8,7 @@
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
 import React, { useState, useEffect } from 'react'
+import LearnLink from '@/app/academy/learn/LearnLink'
 
 interface BankOverlayProps {
   locationSlug:     string
@@ -355,12 +356,12 @@ export default function BankOverlay({
               <div style={{ fontSize: '0.9rem', fontWeight: 700, color: C.accent, marginBottom: '0.5rem' }}>Kredit nicht freigeschaltet</div>
               <div style={{ fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.8 }}>
                 Schließe in der <strong>Akademie</strong> das Modul<br />
-                <strong style={{ color: C.accent }}>ECO-L0-0001 — Was ist ein Kredit?</strong><br />
+                <strong style={{ color: C.accent }}>„Was ist Kredit?“</strong><br />
                 ab um Kredite aufnehmen zu können.
               </div>
               {onLearnCredit
                 ? <button onClick={onLearnCredit} style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Jetzt hier lernen →</button>
-                : <div style={{ marginTop: '1rem', fontSize: '0.68rem', color: C.textFaint, fontFamily: MONO }}>→ Dashboard → Akademie → Module</div>}
+                : <div><LearnLink unlock="UNL:NOX:bank-credit" style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO, display: 'inline-block', textDecoration: 'none' }} /></div>}
             </div>
           )}
           {!loading && tab === 'kredit' && (gates.bankCredit || status?.hasModule) && status && (
@@ -370,14 +371,12 @@ export default function BankOverlay({
                 <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: '10px', padding: '1.1rem 1.25rem', marginBottom: '1.25rem' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: C.red, fontFamily: MONO, marginBottom: '6px' }}>⚠ Schulungsnachweis erforderlich</div>
                   <div style={{ fontSize: '0.8rem', color: C.text, lineHeight: 1.7 }}>
-                    Um Kredite aufzunehmen musst du das Modul <strong>„ECO-L0-0001"</strong> in der Akademie abschließen.
+                    Um Kredite aufzunehmen musst du das Modul <strong>„Was ist Kredit?“</strong> in der Akademie abschließen.
                     Dort lernst du wie Zinseszins und Kreditrisiko funktionieren — praktisch, nicht theoretisch.
                   </div>
                   {onLearnCredit
                     ? <button onClick={onLearnCredit} style={{ marginTop: '0.75rem', padding: '0.5rem 0.9rem', background: C.accent, color: C.white, border: 'none', borderRadius: 7, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Modul hier in der Bank lernen →</button>
-                    : <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: C.textMuted, fontFamily: MONO }}>
-                    Akademie → Aufgaben → ECO-L0-0001
-                  </div>}
+                    : <div><LearnLink unlock="UNL:NOX:bank-credit" style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO, display: 'inline-block', textDecoration: 'none' }} /></div>}
                 </div>
               ) : (
                 <div style={{ background: status.loan > 0 ? C.redLight : C.accentLight, border: `1px solid ${status.loan > 0 ? '#f0a0a0' : '#b8cce8'}`, borderRadius: '8px', padding: '0.85rem 1.1rem', marginBottom: '1.25rem' }}>
@@ -470,9 +469,11 @@ export default function BankOverlay({
               <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔒</div>
               <div style={{ fontSize: '0.9rem', fontWeight: 700, color: C.accent, marginBottom: '0.5rem' }}>Sicherheiten nicht verfügbar</div>
               <div style={{ fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.8 }}>
-                Wird freigeschaltet mit<br /><strong style={{ color: C.accent }}>ECO-L0-0001 — Was ist ein Kredit?</strong>
+                Wird freigeschaltet mit<br /><strong style={{ color: C.accent }}>„Was ist Kredit?“</strong>
               </div>
-              {onLearnCredit && <button onClick={onLearnCredit} style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Jetzt hier lernen →</button>}
+              {onLearnCredit
+                ? <button onClick={onLearnCredit} style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO }}>Jetzt hier lernen →</button>
+                : <div><LearnLink unlock="UNL:NOX:bank-credit" style={{ marginTop: '1rem', padding: '0.6rem 1rem', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: MONO, display: 'inline-block', textDecoration: 'none' }} /></div>}
             </div>
           )}
           {!loading && tab === 'sicherheiten' && (gates.bankCredit || status?.hasModule) && !collateral && (
@@ -545,9 +546,10 @@ export default function BankOverlay({
               {/* Schulungsnachweis-Status */}
               <div style={{ marginTop: '1.25rem', padding: '0.65rem 0.85rem', background: collateral.hasModule ? C.greenLight : C.redLight, border: `1px solid ${collateral.hasModule ? '#a0dcb8' : '#f0a0a0'}`, borderRadius: '7px', fontSize: '0.72rem', color: collateral.hasModule ? C.green : C.red, fontFamily: MONO }}>
                 {collateral.hasModule
-                  ? '✓ Schulungsnachweis „ECO-L0-0001" vorhanden — Kredite freigeschaltet'
-                  : '✗ Schulungsnachweis fehlt — Akademie · Modul „ECO-L0-0001" abschließen'}
+                  ? '✓ Schulungsnachweis „Was ist Kredit?“ vorhanden — Kredite freigeschaltet'
+                  : '✗ Schulungsnachweis fehlt — Akademie · Modul „Was ist Kredit?“ abschließen'}
               </div>
+              {!collateral.hasModule && !onLearnCredit && <LearnLink unlock="UNL:NOX:bank-credit" style={{ display: 'inline-block', marginTop: 6, color: C.accent, fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', fontFamily: MONO }} />}
             </>
           )}
         </div>

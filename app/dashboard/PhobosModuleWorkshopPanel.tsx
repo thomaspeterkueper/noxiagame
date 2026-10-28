@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import LearnLink from '@/app/academy/learn/LearnLink'
 
 type Recipe = {
   equipmentKey:string; label:string; requiredUnlocks:string[]; missingUnlocks:string[]; unlocked:boolean; affordable:boolean;
@@ -26,7 +27,7 @@ export default function PhobosModuleWorkshopPanel(){
       <header><div><small>{data.workshop?.label??'Surface Workshop'}</small><strong>Robotikmodule fertigen</strong></div><div className="stock"><span>Metall <b>{data.stock?.metal??0}</b></span><span>Komponenten <b>{data.stock?.components??0}</b></span><span>Energie <b>{data.stock?.energy??0}</b></span></div></header>
       {error&&<p className="error">{error}</p>}
       {running.length>0&&<section className="jobs"><b>Laufende Fertigung</b>{running.map(job=>{const left=Math.max(0,Math.ceil((new Date(job.completes_at).getTime()-now)/1000));return <div key={job.id}><span>{job.equipment_key.replaceAll('-',' ')}</span><em>{left>0?`noch ${duration(left)}`:'Abschluss wird gebucht …'}</em></div>})}</section>}
-      <div className="recipes">{(data.recipes??[]).map(recipe=><article key={recipe.equipmentKey} className={!recipe.unlocked?'locked':''}><div><strong>{recipe.label}</strong><small>{recipe.metalCost} Metall · {recipe.componentCost} Komponenten · {recipe.energyCost} Energie · {duration(recipe.durationSeconds)}</small>{recipe.missingUnlocks.length>0?<p>Technologie fehlt: {recipe.missingUnlocks.map(shortUnlock).join(' / ')}</p>:<p>Technologie verfügbar · serieller Werkstattausstoß</p>}</div><button disabled={busy!==null||!recipe.unlocked||!recipe.affordable} onClick={()=>void start(recipe)}>{busy===recipe.equipmentKey?'Startet …':!recipe.unlocked?'Gesperrt':!recipe.affordable?'Bestand fehlt':'Fertigen'}</button></article>)}</div>
+      <div className="recipes">{(data.recipes??[]).map(recipe=><article key={recipe.equipmentKey} className={!recipe.unlocked?'locked':''}><div><strong>{recipe.label}</strong><small>{recipe.metalCost} Metall · {recipe.componentCost} Komponenten · {recipe.energyCost} Energie · {duration(recipe.durationSeconds)}</small>{recipe.missingUnlocks.length>0?<p>Technologie fehlt: {recipe.missingUnlocks.map(shortUnlock).join(' / ')} {recipe.missingUnlocks.map(u=><LearnLink key={u} unlock={u} label="· Jetzt lernen →" pendingText="· Lernmodul folgt" style={{color:'#e0c38f',fontWeight:700,textDecoration:'none'}}/>)}</p>:<p>Technologie verfügbar · serieller Werkstattausstoß</p>}</div><button disabled={busy!==null||!recipe.unlocked||!recipe.affordable} onClick={()=>void start(recipe)}>{busy===recipe.equipmentKey?'Startet …':!recipe.unlocked?'Gesperrt':!recipe.affordable?'Bestand fehlt':'Fertigen'}</button></article>)}</div>
       <footer>Fertigung erzeugt erst nach Ablauf ein serialisiertes Equipment-Objekt. Freischaltungen stammen ausschließlich aus KG/SSF → player_unlocks.</footer>
     </div>}
     <style jsx>{`

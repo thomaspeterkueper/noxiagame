@@ -13,6 +13,7 @@ import React from 'react'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import LearnLink from '@/app/academy/learn/LearnLink'
 
 const MONO = "'Courier Prime', monospace"
 const SANS = 'system-ui, sans-serif'
@@ -217,6 +218,7 @@ function WissenskarteTab() {
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: C.text }}>{f.label} <span style={{ fontSize: '0.58rem', color: C.textMuted, fontWeight: 400 }}>({TIER_LABEL[f.tier] ?? f.tier})</span></div>
               <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 2 }}>{f.scope}</div>
               <div style={{ fontSize: '0.62rem', color: C.green, marginTop: 3 }}>Alle Voraussetzungen erfüllt — nur noch die Erfahrung/Handlung selbst fehlt.</div>
+              <LearnLink unlock={f.id} label={`„${f.label}“ jetzt lernen →`} pendingText={null} style={{ display: 'inline-block', marginTop: 5, fontSize: '0.72rem', fontWeight: 700, color: C.accent, textDecoration: 'none', fontFamily: MONO }} />
             </div>
           ))}
       </div>
@@ -233,6 +235,7 @@ function WissenskarteTab() {
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: C.text }}>🔒 {f.label} <span style={{ fontSize: '0.58rem', color: C.textMuted, fontWeight: 400 }}>({TIER_LABEL[f.tier] ?? f.tier})</span></div>
               <div style={{ fontSize: '0.68rem', color: C.textMuted, marginTop: 2 }}>{f.scope}</div>
               <div style={{ fontSize: '0.62rem', color: C.accent, marginTop: 3 }}>Dafür fehlt noch: {f.missingUnlocks.map(m => m.label).join(', ')}</div>
+              {f.missingUnlocks.map(m => <div key={m.id}><LearnLink unlock={m.id} label={`Zuerst „${m.label}“ lernen →`} pendingText={null} style={{ display: 'inline-block', marginTop: 5, fontSize: '0.72rem', fontWeight: 700, color: C.accent, textDecoration: 'none', fontFamily: MONO }} /></div>)}
             </div>
           ))}
       </div>
