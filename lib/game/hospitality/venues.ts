@@ -80,6 +80,11 @@ export interface VenueLayout {
   staffBackFact: string
   /** Tanzfläche (Nachtclub): begehbar, kein Möbel; wer darauf steht, kann tanzen. */
   danceFloor?: { x: number; y: number; w: number; h: number }
+  /**
+   * Einlass (Nachtclub): Ohne bezahlten Eintritt bleibt man in diesem Bereich an
+   * der Tür; bezahlt wird beim Türsteher (payAt).
+   */
+  entry?: { zone: { x: number; y: number; w: number; h: number }; payAt: VenuePoint }
 }
 
 export const VENUE_WIDTH = 760
@@ -255,6 +260,31 @@ const NIGHTCLUB_LAYOUT: VenueLayout = {
   guestBackFact: 'Hinter dem Tresen ist eine Tür nur für Personal; was dahinter liegt, weißt du nicht',
   staffBackFact: 'Hinter dem Tresen liegt das Lager; Gäste haben dort keinen Zutritt',
   danceFloor: CLUB_FLOOR,
+  // Thomas, 28.10.2026: „nein, man braucht Eintritt“ – ohne Eintritt kein Weg an der Tür vorbei.
+  entry: { zone: { x: 35, y: 318, w: 205, h: 118 }, payAt: { x: 185, y: 372 } },
+}
+
+/** Kartenposten für den Eintritt; er gilt für eine Nacht. */
+export const ENTRY_ITEM_CODE = 'entry'
+export const ENTRY_VALID_S = 8 * 60 * 60
+
+/** Liegt ein Punkt im Einlassbereich an der Tür? Ohne Einlass gilt überall: ja. */
+export function inEntryZone(layout: VenueLayout, p: VenuePoint): boolean {
+  const z = layout.entry?.zone
+  return !z || (p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h)
+}
+
+/** Darf man an dieser Stelle stehen? Ohne Eintritt nur im Einlassbereich. */
+export function entryAllows(layout: VenueLayout, p: VenuePoint, entryPaid: boolean): boolean {
+  return entryPaid || !layout.entry || inEntryZone(layout, p)
+}
+
+/** Was jemand im Club über den Eintritt weiß. Der Türsteher kassiert und sieht, ob bezahlt ist. */
+export function entryFact(input: { price: number | null; paid: boolean; doorStaff: boolean; staff: boolean }): string {
+  const price = input.price == null ? 'der Preis steht noch nicht fest' : `${input.price} Credits`
+  if (input.doorStaff) return input.paid ? `Dein Gegenüber hat heute Nacht Eintritt bezahlt (${price}); lass es durch` : `Ohne Eintritt kommt niemand an dir vorbei; Eintritt ${price}, bezahlt wird bei dir an der Tür`
+  if (input.staff) return input.paid ? 'Dein Gegenüber hat Eintritt bezahlt' : 'Hier kommt man nur mit bezahltem Eintritt an der Tür vorbei'
+  return 'Hinein kommt man nur mit bezahltem Eintritt an der Tür'
 }
 
 /** Steht ein Punkt auf der Tanzfläche? */
@@ -1024,6 +1054,8 @@ export interface ConversationFactsInput {
   playerSaid?: string | null
   /** Tanzt der Spieler gerade auf der Tanzfläche (Nachtclub)? */
   playerDancing?: boolean
+  /** Einlass (Nachtclub): Preis des Eintritts (null = nicht auf der Karte) und ob der Spieler bezahlt hat. */
+  entry?: { price: number | null; paid: boolean } | null
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -1111,6 +1143,14 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   facts.push('Über Kontostand, Wissen, Beruf oder Vorhaben deines Gegenübers weißt du nur, was es dir selbst erzählt')
 
   if (staff && input.arrivalPoint) facts.push(...ARRIVAL_ORIENTATION_FACTS)
+
+  // Einlass: Der Türsteher bekommt ihn vorn, alle anderen am Ende.
+  if (input.entry && layout.entry) {
+    const doorStaff = staff && self.spot.id === 'staff-door'
+    const fact = entryFact({ ...input.entry, doorStaff, staff })
+    if (doorStaff) facts.splice(1, 0, fact)
+    else facts.push(fact)
+  }
 
   // Die Toilette: Wer danach fragt, bekommt die Hausregel vorn, sonst steht sie
   // am Ende und fällt bei voller Liste weg.

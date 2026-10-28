@@ -1,5 +1,5 @@
 import { validateInteriorTemplate } from '../buildings/interiors/topology'
-import { CONSUMPTION_INTERVAL_S, VISIT_TOTAL_S, spreadVisitAge, onDanceFloor } from './venues'
+import { CONSUMPTION_INTERVAL_S, VISIT_TOTAL_S, spreadVisitAge, onDanceFloor, inEntryZone, entryAllows, ENTRY_VALID_S } from './venues'
 import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeStandard'
 import { getInteriorTemplateForBuildingType } from '../buildings/interiors/registry'
 import { getBuildingEntryDefinition } from '../buildings/entry'
@@ -434,3 +434,23 @@ console.log('hospitality venue checks passed')
   console.log('nightclub checks passed')
 }
 if (VENUE_LAYOUTS.nightclub.roomFact.length > 140) throw new Error('nightclub room fact too long')
+
+// Einlass im Nachtclub (Thomas, 28.10.2026: „man braucht Eintritt“)
+{
+  let f4 = 0
+  const c = (ok: boolean, label: string) => { if (!ok) { f4++; console.error('FAIL', label) } }
+  const L = VENUE_LAYOUTS.nightclub
+  const e = L.entry!
+  c(inEntryZone(L, L.start) && inEntryZone(L, L.exit) && inEntryZone(L, e.payAt) && !isVenueBlocked(L, e.payAt), 'start, exit and the cash point lie in the entry zone')
+  c(venuePath(L, L.start, e.payAt).every(p => inEntryZone(L, p)), 'the way to the doorman stays in the entry zone')
+  c(!entryAllows(L, L.servicePoint, false) && !entryAllows(L, { x: L.danceFloor!.x + 50, y: L.danceFloor!.y + 50 }, false) && entryAllows(L, L.servicePoint, true), 'without entry neither bar nor dance floor, with entry both')
+  c(entryAllows(VENUE_LAYOUTS.cafe, VENUE_LAYOUTS.cafe.servicePoint, false), 'other venues have no entry gate')
+  const staff = placeVenueFigures(L, [{ id: 'a', worksHere: true }, { id: 'b', worksHere: true }])
+  const door = staff.find(f => f.spot.id === 'staff-door')!
+  const unpaid = venueConversationFacts({ layout: L, buildingName: 'Club', self: door, figures: staff, playerPos: e.payAt, arrivalPoint: false, hour: 23, entry: { price: 8, paid: false } })
+  const paid = venueConversationFacts({ layout: L, buildingName: 'Club', self: door, figures: staff, playerPos: e.payAt, arrivalPoint: false, hour: 23, entry: { price: 8, paid: true } })
+  c(unpaid[1].includes('Ohne Eintritt kommt niemand an dir vorbei; Eintritt 8 Credits') && paid[1].includes('hat heute Nacht Eintritt bezahlt'), 'the doorman knows the price and whether the player paid')
+  c(ENTRY_VALID_S >= 7 * 3600, 'entry is valid the whole night')
+  if (f4 > 0) throw new Error(`nightclub entry: ${f4} checks failed`)
+  console.log('nightclub entry checks passed')
+}

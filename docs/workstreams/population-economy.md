@@ -358,7 +358,10 @@ Thomas, 28.10.2026: „ich glaube wir brauchen einen Nachtclub.“ In den Karten
    - Shot (`shot`) 3 Cr
    - Wasser (`water`) 2 Cr
 
-   Der Eintritt ist ein Posten wie die anderen. Ob man ohne Eintritt hineindarf, ist offen. Vorschlag: Der Türsteher weist hin, sperrt aber nicht, bis es Hausregeln gibt (R-18).
+   Der Eintritt ist ein Posten wie die anderen. **Entschieden (Thomas, 28.10.2026): „Man braucht Eintritt.“**
+   - Gastronomie sperrt im Raum: Ohne bezahlten Eintritt bleibt man im Einlassbereich an der Tür. Bezahlt wird beim Türsteher.
+   - Der Eintritt gilt acht Stunden, also die ganze Nacht; `entryPaidForS` steht im Gäste-Abruf.
+   - **Bitte serverseitig ebenso:** `/api/game/hospitality/order` nimmt in einem `nightclub` andere Posten als `entry` nur an, wenn derselbe Spieler dort in den letzten acht Stunden Eintritt bezahlt hat. Sonst Fehler „Erst Eintritt bezahlen“.
 4. **Personal:** `run_venue_staffing` auch für `nightclub` (Rolle `service`; Tür und DJ ergeben sich aus den Plätzen).
 5. **Bewohner gehen aus:** `npc_service_catalog` für `nightclub`, nur nachts und mit Geselligkeit als Anlass (R-5). Sonst bleibt der Club leer, solange Käufe nur aus Hunger und Durst entstehen.
 

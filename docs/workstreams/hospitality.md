@@ -56,6 +56,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Eigene Einführung. Eingang, Symbol ♫, Gebäudetafel und „Eintritt“ bzw. „Shot“ im Gespräch sind angelegt.
   - Im Browser mit Testdaten geprüft.
   - Spielbar wird er mit R-19: Gebäudeart, Umbau, Karte und Personal.
+  - **Eintritt Pflicht** (Thomas: „nein, man braucht Eintritt“). Ohne bezahlten Eintritt hält eine rote Kordel einen an der Tür. Bezahlt wird beim Türsteher, „Eintritt bezahlen – 8 Cr“. Der Eintritt gilt die ganze Nacht, auch nach dem Hinausgehen. Der Türsteher kennt Preis und Stand. Im Browser geprüft. Die Prüfung auf dem Server bei Bestellungen steht in R-19.
 
 ## Gestellte Requests
 
