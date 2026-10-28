@@ -561,6 +561,48 @@ export function isLandmarkRoomBlocked(layout: LandmarkRoomLayout, p: LandmarkPoi
     && p.y + radius > item.y && p.y - radius < item.y + item.h)
 }
 
+/**
+ * Plätze für eine größere Gemeinde: zuerst die festen Plätze (`gatherAt`), dann
+ * Sitzplätze auf Bänken, Stühlen und Kissen, dann freie Bodenpunkte (28 px Raster,
+ * nicht am Eingang, nicht zu dicht).
+ */
+export function crowdSpots(layout: LandmarkRoomLayout, count: number): LandmarkPoint[] {
+  const spots = [...(layout.gatherAt ?? [])].slice(0, count)
+  if (spots.length >= count) return spots
+  const taken = [...spots, ...(layout.hostAt ? [layout.hostAt] : [])]
+  const seeds = spots.length ? spots : [layout.hostAt ?? layout.start]
+  // Sitzplätze zuerst: auf Bänken, Stühlen und Kissen (man sitzt dort, statt im Gang zu stehen).
+  const seats: Array<{ p: LandmarkPoint; d: number }> = []
+  for (const item of layout.furniture) {
+    if (item.kind === 'pew' || item.kind === 'bench') {
+      for (let x = item.x + 16; x <= item.x + item.w - 12; x += 30) seats.push({ p: { x, y: item.y + item.h / 2 }, d: 0 })
+    } else if (item.kind === 'chair' || item.kind === 'cushion') seats.push({ p: { x: item.x + item.w / 2, y: item.y + item.h / 2 }, d: 0 })
+  }
+  for (const seat of seats) seat.d = Math.min(...seeds.map(seed => Math.hypot(seed.x - seat.p.x, seed.y - seat.p.y)))
+  seats.sort((a, b) => a.d - b.d || a.p.y - b.p.y || a.p.x - b.p.x)
+  for (const { p } of seats) {
+    if (spots.length >= count) break
+    if (taken.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 22)) continue
+    spots.push(p); taken.push(p)
+  }
+  const candidates: Array<{ p: LandmarkPoint; d: number }> = []
+  for (let x = LANDMARK_ROOM.left + 20; x <= LANDMARK_ROOM.right - 20; x += 28) {
+    for (let y = LANDMARK_ROOM.top + 20; y <= LANDMARK_ROOM.bottom - 60; y += 28) {
+      const p = { x, y }
+      if (isLandmarkRoomBlocked(layout, p, 8)) continue
+      if (Math.hypot(p.x - layout.start.x, p.y - layout.start.y) < 50) continue
+      candidates.push({ p, d: Math.min(...seeds.map(seed => Math.hypot(seed.x - x, seed.y - y))) })
+    }
+  }
+  candidates.sort((a, b) => a.d - b.d || a.p.y - b.p.y || a.p.x - b.p.x)
+  for (const { p } of candidates) {
+    if (spots.length >= count) break
+    if (taken.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 24)) continue
+    spots.push(p); taken.push(p)
+  }
+  return spots
+}
+
 export function nearestLandmarkSpot(layout: LandmarkRoomLayout, p: LandmarkPoint) {
   let best: LandmarkSpot | null = null
   let bestDistance = LANDMARK_SPOT_REACH

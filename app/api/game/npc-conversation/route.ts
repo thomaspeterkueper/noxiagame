@@ -133,7 +133,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   // Eröffnung: Die Figur spricht den Spieler von sich aus an (z. B. der Wirt am Tresen).
   const opening = body.opening === true
-  const player = opening ? '(tritt heran und hat noch nichts gesagt)' : clean(body.player)
+  // Predigt/Ansprache im Gottesdienst (28.10.2026): die Gastgeberin oder der Gastgeber
+  // spricht zur Gemeinde, der Spieler hört zu. Nur für Personen mit religiöser oder
+  // philosophischer Rolle (geprüft unten über worldviewVoiceFromPublicRole).
+  const sermonRequest = body.sermon && typeof body.sermon === 'object' ? {
+    occasion: clean(body.sermon.occasion, 80),
+    part: clean(body.sermon.part, 60),
+    noun: clean(body.sermon.noun, 30) || 'Predigt',
+  } : null
+  const player = opening ? '(tritt heran und hat noch nichts gesagt)' : sermonRequest ? `(sitzt in der Gemeinde und hört die ${sermonRequest.noun})` : clean(body.player)
   const npcIdRaw = clean(body.npcId, 120)
   let npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
   // Personal an realen Wahrzeichen (Bibliothek, …) ist keine simulierte Person,
@@ -317,10 +325,10 @@ export async function POST(request: NextRequest) {
   const historyTurns = history.filter((entry: any) => entry.role === 'user').map((entry: any) => entry.content as string)
   const useLogged = loggedTurns.length >= historyTurns.length
   const previousTurns = useLogged ? loggedTurns : historyTurns
-  const repeat = opening ? { level: 'none' as const, similarCount: 0, normalized: '' } : assessRepeat(player, previousTurns)
+  const repeat = opening || sermonRequest ? { level: 'none' as const, similarCount: 0, normalized: '' } : assessRepeat(player, previousTurns)
   // Grenztests (Beleidigung, sexuelles Anliegen) zählen nach Anliegen, nicht
   // nach Wortlaut – wer die Worte wechselt, testet trotzdem dieselbe Grenze.
-  const topic = classifyConversationTopic(player, { opening })
+  const topic = classifyConversationTopic(player, { opening: opening || Boolean(sermonRequest) })
   const previousBoundaryTests = useLogged
     ? loggedRows.filter(row => (row.topic ?? classifyConversationTopic(row.player_text)) === 'provocation').length
     : historyTurns.filter((text: string) => classifyConversationTopic(text) === 'provocation').length
@@ -332,7 +340,8 @@ export async function POST(request: NextRequest) {
     npc_name: npcName,
     npc_role: npcRole,
     location_name: locationName || null,
-    opening,
+    // Eine Predigt zählt wie eine Eröffnung nicht als Gesprächszug des Spielers.
+    opening: opening || Boolean(sermonRequest),
     turn_index: history.length,
     player_text: player,
     player_norm: repeat.normalized,
@@ -362,8 +371,9 @@ export async function POST(request: NextRequest) {
   if (boundaryEnds) return endConversation(boundaryBreakoffLine(`${npcKey}:${nowMs}`), 'breakoff')
   if (repeat.level === 'breakoff') return endConversation(breakoffLine(`${npcKey}:${nowMs}`, priorBreakoffs), 'breakoff')
 
+  const sermon = sermonRequest && worldviewVoiceFromPublicRole(npcRole) ? sermonRequest : null
   const system = [
-    repeat.level === 'hint' ? REPEAT_HINT_INSTRUCTION : '',
+    repeat.level === 'hint' && !sermon ? REPEAT_HINT_INSTRUCTION : '',
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
     canonicalNpc?.bio_short ? `Eigene biografische Basis: ${clean(canonicalNpc.bio_short, 260)}` : '',
     socialContextLines.length ? `Dein gewachsenes soziales Umfeld:\n- ${socialContextLines.join('\n- ')}` : '',
@@ -397,6 +407,7 @@ export async function POST(request: NextRequest) {
     introLeads.length ? `Wege in die Welt, die du kennst und auf deine Art weitergibst:\n- ${introLeads.join('\n- ')}` : '',
     introStance || introLeads.length ? 'Wenn jemand neu wirkt, nach Arbeit, Geld, Zielen oder dem Anfang fragt, gib einen oder zwei dieser Hinweise in deinem Ton – nicht alle auf einmal, und frag nach, was die Person reizt. Dein Ton färbt nur die Art; die Tatsachen bleiben dieselben. Erfinde kein konkretes Angebot: keine bestimmte Stelle, kein bestimmtes Schiff, keinen Auftrag, keinen Preis und keine Person, die etwas anbietet, wenn es nicht in deinen Fakten oder im Mitbekommenen steht.' : '',
     'Über Speisen und Getränke weißt du nur, was in den Fakten steht: Name und Preis. Erfinde keine Eigenschaften dazu – nicht warm oder kalt, frisch, hausgemacht, Sorte, Zutaten oder Zubereitung. Kuchen und Snacks sind nie warm und werden nicht „kalt“. Dränge nicht zur Eile beim Essen.',
+    sermon ? `Gerade ist ${sermon.occasion}${sermon.part ? ` (Teil: ${sermon.part})` : ''}. Du hältst jetzt die ${sermon.noun} vor der versammelten Gemeinde – nicht im Zwiegespräch. Sprich 4 bis 6 zusammenhängende Sätze aus deiner Tradition, zu einem Gedanken, der Menschen heute im Alltag berührt. Heilige Texte nur sinngemäß und mit Quelle in Worten (z. B. „im Evangelium nach Lukas“), nie erfunden zitiert. Keine Aufforderung zu Spenden, Mitgliedschaft oder Bekehrung; Gäste und Andersglaubende sind ausdrücklich willkommen. Keine Aktionsmarker, keine Frage an den Spieler.` : '',
     opening ? 'Dein Gegenüber ist gerade zu dir getreten und hat noch nichts gesagt. Sprich es von dir aus an: eine kurze Begrüßung in deinem Ton und eine offene Frage oder ein Angebot, das zu deinem Platz passt – höchstens zwei Sätze. Tu nicht so, als hätte es schon etwas gesagt oder bestellt.' : '',
     npcAge !== null ? `Du bist ${npcAge} Jahre alt. Nenne dein Alter, wenn man dich danach fragt; sonst erwähne es nicht.` : '',
     knownPlayerName ? `Du kennst den Spieler: Er heißt ${knownPlayerName}. Sprich ihn mit diesem Namen an, wenn es passt.` : 'Den Namen des Spielers kennst du noch nicht. Nennt er ihn, merkst du ihn dir.',
@@ -420,7 +431,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model,
         messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
-        max_tokens: 100,
+        max_tokens: sermon ? 360 : 100,
         temperature: 0.7,
         stream: false,
       }),
@@ -445,7 +456,7 @@ export async function POST(request: NextRequest) {
         .replaceAll(ACTION_MARKER, '')
         .replaceAll(CREDIT_ACTION_MARKER, '')
         .replace(VISIT_PLACE_ACTION_RE, ''),
-      MAX_REPLY_CHARS,
+      sermon ? 1100 : MAX_REPLY_CHARS,
     )
     if (!reply) {
       await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'empty_reply', provider_ms: providerMs, model })

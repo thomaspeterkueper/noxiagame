@@ -20,6 +20,7 @@ import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPan
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
 import { DEFAULT_VIEW, loadView, saveView, showPlace, type ViewOptions } from '@/lib/worldlab/viewOptions'
+import { worshipWhen, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import { MEETING_WALK_LIMIT_M, meetingPlaces, nearestMeetingPlace, type MeetingPlace } from '@/lib/worldlab/meetingPlaces'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
@@ -38,6 +39,7 @@ import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type 
 type BuildRow = { id: string; name?: string; buildable_id: string; status?: string; created_at?: string; completes_at?: string; latitude_deg?: number | null; longitude_deg?: number | null; footprint_width_m?: number | null; footprint_depth_m?: number | null; rotation_deg?: number | null }
 
 const MEETING_GROUP = 'Omnizedenz-Begegnungsstätten'
+const WORSHIP_GROUP = 'Gottesdienste und Gebete'
 const metresBetween = (a: GeoPoint, b: GeoPoint) => Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180))
 const kmText = (m: number) => m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(m) + ' m'
 
@@ -66,6 +68,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
   const noxiaRef = useRef<NoxiaBuilding[]>([])
   const [surfacePeople, setSurfacePeople] = useState<PresenceRow[]>([])
+  // Gottesdienste und Gebete (28.10.2026): wo, wann, läuft gerade – jede Minute neu.
+  const [worship, setWorship] = useState<WorshipItem[]>([])
   // Tätigkeit, Schlaf und Wohnung je Person (für sichtbare Wege, 28.10.2026)
   const [surfaceStates, setSurfaceStates] = useState<Array<{ id: string; activityState: string; asleep: boolean; home: { lat: number; lon: number } | null }>>([])
   // Entwicklerdinge (Messwerte, Nachladen, alte Szene) nur mit ?dev=1 – einmal gesetzt, bleibt es (W-2).
@@ -264,6 +268,22 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     }
     void load()
     const timer = setInterval(() => { void load() }, 30000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/world-lab/worship', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+        if (!response.ok) return
+        const json = await response.json()
+        if (!cancelled && Array.isArray(json?.items)) setWorship(json.items)
+      } catch { /* ohne Termine bleibt die Karte nutzbar */ }
+    }
+    void load()
+    const timer = setInterval(() => { void load() }, 60000)
     return () => { cancelled = true; clearInterval(timer) }
   }, [])
   // Bewohnerliste (Tätigkeit, Zuweisungen) ebenfalls nachladen, wenn die Karte sie selbst holt.
@@ -528,15 +548,37 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   // Omnizedenz-Begegnungsstätten (Thomas, 28.10.2026: leicht findbar): Plakette auf
   // der Karte, eigene Gruppe in der Zielliste (jede Entfernung), Schnellknopf.
   const meeting = useMemo(() => meetingPlaces(noxia), [noxia])
+  // Gotteshäuser auf der Erde (ohne Omnizedenz – die hat ihre Begegnungsstätten).
+  const earthWorship = useMemo(() => worship.filter(item => item.location === 'earth' && item.at && item.tradition !== 'omnizedenz'), [worship])
   useEffect(() => {
-    engineReady?.setBeacons(meeting.map(place => ({
-      at: place.at,
-      label: place.town ? 'Omnizedenz · ' + place.town : 'Resonanzplatz',
-      pick: place.noxiaId
-        ? { type: 'noxia', noxiaId: place.noxiaId, at: place.at }
-        : { type: 'building', at: place.at, address: place.address ?? undefined, name: place.name, kind: 'hall', source: place.source ?? undefined, areaM2: 0, levels: 1 },
-    })))
-  }, [engineReady, meeting])
+    const runningAt = (source: string | null) => source ? worship.find(item => item.source === source && item.running)?.running ?? null : null
+    engineReady?.setBeacons([
+      ...meeting.map(place => {
+        const now = runningAt(place.source)
+        return {
+          at: place.at,
+          label: (place.town ? 'Omnizedenz · ' + place.town : 'Resonanzplatz') + (now ? ' · jetzt Runde' : ''),
+          pick: place.noxiaId
+            ? { type: 'noxia' as const, noxiaId: place.noxiaId, at: place.at }
+            : { type: 'building' as const, at: place.at, address: place.address ?? undefined, name: place.name, kind: 'hall' as const, source: place.source ?? undefined, areaM2: 0, levels: 1 },
+        }
+      }),
+      // Läuft ein Gottesdienst oder Gebet, steht eine goldene Plakette mit Glocke über dem Haus.
+      ...earthWorship.filter(item => item.running).map(item => ({
+        at: item.at!,
+        tone: 'worship' as const,
+        label: `Jetzt: ${item.running!.group}`,
+        pick: { type: 'landmark' as const, landmark: worshipLandmark(item) },
+      })),
+    ])
+  }, [engineReady, meeting, worship, earthWorship])
+  function worshipLandmark(item: WorshipItem) {
+    const religion = item.tradition === 'catholic' || item.tradition === 'protestant' ? 'christian' : item.tradition
+    return { at: item.at!, name: item.name, kind: 'place_of_worship', tags: { religion, ...(item.tradition === 'catholic' ? { denomination: 'catholic' } : item.tradition === 'protestant' ? { denomination: 'protestant' } : {}) } }
+  }
+  function worshipPanel(item: WorshipItem): Panel {
+    return { kind: 'landmark', landmark: worshipLandmark(item), source: item.source ?? undefined }
+  }
   function meetingPanel(place: MeetingPlace): Panel {
     return place.noxiaId
       ? { kind: 'building', at: place.at, title: place.name, noxiaId: place.noxiaId, address: place.address ?? undefined }
@@ -566,6 +608,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     const list: Array<{ id: string; label: string; distanceM: number; panel: Panel; group: string }> = []
     // Begegnungsstätten stehen immer in der Liste, auch weit weg (dann mit Reise).
     for (const place of meeting) list.push({ id: 'm:' + place.id, label: place.name + (place.town ? ' · ' + place.town : ''), distanceM: metresBetween(here, place.at), group: MEETING_GROUP, panel: meetingPanel(place) })
+    // Gottesdienste und Gebete: mit nächstem Termin oder „jetzt“, nah zuerst.
+    for (const item of earthWorship) list.push({ id: 'w:' + item.id, label: `${item.name} · ${worshipWhen(item)}`, distanceM: metresBetween(here, item.at!), group: WORSHIP_GROUP, panel: worshipPanel(item) })
     const meetingIds = new Set(meeting.map(place => place.noxiaId).filter(Boolean))
     for (const building of noxia) {
       if (meetingIds.has(building.id)) continue
@@ -574,12 +618,15 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     }
     for (const site of sites) list.push({ id: 's:' + site.id, label: site.name + ' · im Bau', distanceM: metresBetween(here, site.at), group: 'Baustellen', panel: { kind: 'site', id: site.id } })
     for (const item of engineReady?.landmarks() ?? []) if (showPlace(view, item.landmark)) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: item.landmark.poi ? 'Läden und Lokale' : 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
-    return list.sort((a, b) => Number(b.group === MEETING_GROUP) - Number(a.group === MEETING_GROUP) || a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
+    const rank = (group: string) => group === MEETING_GROUP ? 2 : group === WORSHIP_GROUP ? 1 : 0
+    return list.sort((a, b) => rank(b.group) - rank(a.group) || a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting, view])
+  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting, view, earthWorship])
   const groups = [...new Set(targets.map(target => target.group))]
   const home = noxia.find(building => building.own) ?? null
   const nearestMeeting = here ? nearestMeetingPlace(meeting, here) : null
+  // Läuft in der Nähe (bis 6 km) ein Gottesdienst oder Gebet? Dann ein Knopf dorthin.
+  const runningNear = here ? earthWorship.filter(item => item.running).map(item => ({ item, distanceM: metresBetween(here, item.at!) })).filter(entry => entry.distanceM <= MEETING_WALK_LIMIT_M).sort((a, b) => a.distanceM - b.distanceM)[0] ?? null : null
 
   // Position teilen (alle 2 s): die bisherige Erdszene startet dann am selben Ort.
   useEffect(() => {
@@ -600,6 +647,13 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     setTargetId(id)
     const place = id.startsWith('m:') ? meeting.find(item => 'm:' + item.id === id) : undefined
     if (place) { openMeetingPlace(place); return }
+    const service = id.startsWith('w:') ? earthWorship.find(item => 'w:' + item.id === id) : undefined
+    const from = engine.current?.position()
+    if (service && from && metresBetween(from, service.at!) > MEETING_WALK_LIMIT_M) {
+      choosePanel({ kind: 'travel', at: from })
+      setDestinationNote(`${service.name} ist ${kmText(metresBetween(from, service.at!))} entfernt – mit Bahn oder Flugzeug hinreisen. ${worshipWhen(service)}.`)
+      return
+    }
     const target = targets.find(item => item.id === id)
     choosePanel(target ? target.panel : { kind: 'none' })
   }
@@ -696,6 +750,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {panel.kind === 'none' && <>
         {engineReady && metresBetween(engineReady.position(), START_PLACE.at) > 30000 && <button className="home" onClick={() => choosePanel({ kind: 'travel', at: engineReady.position() })}>✈ Weiterreisen …</button>}
         {home && <button className="home" onClick={() => { engine.current?.jump({ lat: home.lat, lon: home.lon }); choosePanel({ kind: 'building', at: { lat: home.lat, lon: home.lon }, title: home.name, noxiaId: home.id }) }}>⌂ {home.name}</button>}
+        {runningNear && <button className="home worship" onClick={() => { setTargetId(''); choosePanel(worshipPanel(runningNear.item)) }} title="Läuft gerade">◉ Jetzt: {runningNear.item.running!.group} · {runningNear.item.name} · {kmText(runningNear.distanceM)}</button>}
         {nearestMeeting && <button className="home meeting" onClick={() => openMeetingPlace(nearestMeeting.place)} title="Nächste Omnizedenz-Begegnungsstätte">◎ {nearestMeeting.place.name.replace('Omnizedenz-Begegnungsstätte', 'Begegnungsstätte')} · {kmText(nearestMeeting.distanceM)}</button>}
         <label className="target"><span>Ziel</span>
           <select value={targetId} onChange={event => chooseTarget(event.target.value)}>
@@ -710,7 +765,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {destinationNote && <p className="note">{destinationNote}</p>}
         </>}
       </div>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople} worship={worship}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
@@ -726,6 +781,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .view-options label{display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer}
       .view-options small{color:#9fb3ad;font-size:10.5px;line-height:1.35}
       .home{justify-self:start;margin-top:6px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer}
+      .home.worship{border-color:#c9a447;background:#4a3412;color:#fff3d6}
       .home.meeting{border-color:#5f9c8c;background:#1f4f54;color:#e8f4ee}
       .player-note{font-size:10.5px;color:#f0d9a0}
       .panel .leave{border:0;background:none;padding:0;text-align:left;font-size:11px;color:#d9bb6a;cursor:pointer;margin-top:4px}

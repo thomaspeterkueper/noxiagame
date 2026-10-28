@@ -30,9 +30,9 @@ const DOING: Record<string, string> = {
   resonance_round: 'Resonanzrunde',
 }
 
-/** „visit:friday_prayer“ → „Freitagsgebet“. */
+/** „visit:friday_prayer“ (Besuch) oder „host:friday_prayer“ (trägt den Termin) → „Freitagsgebet“. */
 export function doingFromAction(lastAction: string | null | undefined): string | undefined {
-  const match = /^visit:([a-z_]+)$/.exec(String(lastAction ?? ''))
+  const match = /^(?:visit|host):([a-z_]+)$/.exec(String(lastAction ?? ''))
   return match ? DOING[match[1]] : undefined
 }
 
@@ -56,7 +56,8 @@ export function peopleAtPlace(
   const people = here.map(row => {
     const doing = doingFromAction(row.lastAction)
     const working = /work|inspect/.test(String(row.activityState ?? ''))
-    return { id: row.id, name: row.displayName, role: row.publicRole || 'Besucher(in)', host: working && !doing, doing }
+    const hosting = String(row.lastAction ?? '').startsWith('host:')
+    return { id: row.id, name: row.displayName, role: row.publicRole || 'Besucher(in)', host: hosting || (working && !doing), doing }
   })
   // Wer den Ort trägt, ist beim Termin mit dabei: gleicher Anlass.
   const event = people.find(person => person.doing)?.doing

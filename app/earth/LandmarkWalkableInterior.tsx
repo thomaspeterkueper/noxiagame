@@ -11,6 +11,7 @@ import { NpcFigure, NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
   LANDMARK_LEVELS,
   LANDMARK_ROOM,
+  crowdSpots,
   isLandmarkRoomBlocked,
   landmarkPath,
   landmarkRoomLayout,
@@ -25,6 +26,7 @@ import {
 } from '@/lib/game/landmarks/interiors'
 import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
+import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
@@ -45,7 +47,11 @@ type Props = {
   realName?: string
   /** Personen der Simulation, die gerade an diesem Ort sind (Arbeit, Termin, Besuch). */
   people?: RoomPerson[]
+  /** Laufender Gottesdienst, Gebet oder Runde (aus /api/world-lab/worship). */
+  occasion?: RoomOccasion
 }
+/** Ein laufender Termin am Ort: Art, Titel, echte Zeiten und wer ihn trägt. */
+export type RoomOccasion = { kind: ActivityKind; label: string; group: string; startedAt: string; endsAt: string; attendees: number; tradition: Tradition; host: { id: string; name: string; role: string } }
 /** Eine Person der Simulation im Raum: wer den Ort trägt (host) steht vorne, Besucher auf den Plätzen. */
 export type RoomPerson = { id: string; name: string; role: string; host: boolean; /** Was gerade los ist, z. B. „Freitagsgebet“. */ doing?: string }
 type ChatEntry = { role: 'user' | 'assistant'; content: string }
@@ -95,7 +101,7 @@ export default function LandmarkWalkableInterior(props: Props) {
   return <LandmarkRoom key={floor.level} {...props} level={floor.level} byStairs={floor.byStairs} onLevel={level => setFloor({ level, byStairs: true })}/>
 }
 
-function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
+function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], occasion, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
   const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
@@ -110,6 +116,14 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const conversationEnd = useConversationEnd()
+  // Ablauf des laufenden Termins nach echter Uhr (Beginn und Ende kommen vom Server).
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => { if (!occasion) return; const timer = setInterval(() => setNowMs(Date.now()), 15000); return () => clearInterval(timer) }, [occasion])
+  const phases = useMemo(() => occasion ? liturgyFor(occasion.kind, occasion.tradition, occasion.label) : [], [occasion])
+  const minute = occasion ? Math.floor((nowMs - Date.parse(occasion.startedAt)) / 60000) : -1
+  const phase = occasion ? phaseAt(phases, minute) : null
+  const [sermon, setSermon] = useState<{ text: string; by: string } | null>(null)
+  const [hearing, setHearing] = useState(false)
   const [tip, setTip] = useState<LibraryBook | null>(null)
   const tipSeed = useRef(0)
   const waypoints = useMemo(() => landmarkWaypoints(layout), [layout])
@@ -143,10 +157,12 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
   const placed = useMemo(() => {
-    const spots = layout.gatherAt ?? []
-    const hostSpot = layout.hostAt ?? spots[0] ?? layout.start
     const hosts = people.filter(person => person.host).slice(0, 1)
-    const others = people.filter(person => !hosts.includes(person)).slice(0, spots.length)
+    const rest = people.filter(person => !hosts.includes(person)).slice(0, 14)
+    // Größere Gemeinde: feste Plätze zuerst, dann freie Plätze daneben.
+    const spots = crowdSpots(layout, rest.length)
+    const hostSpot = layout.hostAt ?? spots[0] ?? layout.start
+    const others = rest.slice(0, spots.length)
     return [
       ...hosts.map(person => ({ person, at: hostSpot })),
       ...others.map((person, index) => ({ person, at: spots[index] })),
@@ -291,6 +307,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       `Du bist gerade in ${name} (${typeLabel}).`,
       person.host ? `Das ist dein Ort: Hier arbeitest du.` : `Du bist hier zu Besuch.`,
       person.doing ? `Gerade ist hier: ${person.doing}.` : '',
+      occasion && phase ? `Ablauf gerade: ${phase.title}. ${person.host ? 'Du leitest den Termin.' : 'Du nimmst teil; das sagt nichts darüber, was du glaubst.'}` : '',
       `Der Spieler steht bei dir im Raum.`,
     ].filter(Boolean)
   }
@@ -312,6 +329,31 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const data = await response.json().catch(() => ({}))
       setHistory([{ role: 'assistant', content: response.ok && data.reply ? String(data.reply) : 'Hallo.' }])
     } finally { setSending(false) }
+  }
+
+  /** Predigt oder Ansprache hören: die Gastgeberin oder der Gastgeber spricht zur Gemeinde. */
+  async function hearSermon() {
+    if (!occasion || hearing) return
+    const host = placed.find(item => item.person.host)?.person
+    if (!host) { setStatus(`${occasion.host.name} ist gerade nicht im Raum.`); return }
+    setHearing(true)
+    setSermon(null)
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/npc-conversation', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sermon: { occasion: occasion.label, part: phase?.title ?? '', noun: speechNoun(occasion.kind) },
+          npcId: host.id, npcName: host.name, npcRole: host.role || occasion.host.role, locationName: name,
+          headline: `${occasion.label} in ${name}`, source: 'NOXIA place interior',
+          localFacts: [`Du bist in ${name} (${typeLabel}).`, `Gerade: ${occasion.label}.`, `Anwesend sind etwa ${placed.length} Menschen; nicht alle teilen deinen Glauben.`],
+          history: [],
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      setSermon({ text: response.ok && data.reply ? String(data.reply) : `${host.name} spricht leise; du verstehst heute nur Bruchstücke.`, by: host.name })
+    } finally { setHearing(false) }
   }
 
   function giveTip() {
@@ -444,6 +486,21 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {talkingNow && (staff || partner)
           ? <div className="portrait"><NpcPortrait id={talkFigureId} name={talkName} role={talkRole}/></div>
           : <h3>{shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>}
+        {!talkingNow && occasion && phase && <div className="occasion">
+          <small>JETZT · {occasion.group.toUpperCase()}</small>
+          <b>{occasion.label}</b>
+          <span>mit {occasion.host.name}{placed.length > 1 ? ` · ${placed.length - 1} weitere hier` : ''}</span>
+          <ol>{phases.filter(item => item.from < 120).map(item => <li key={item.title} className={item === phase ? 'now' : item.to <= minute ? 'done' : ''}>{item.title}</li>)}</ol>
+          <p>{phase.text}</p>
+          <div className="row">
+            {phases.some(item => item.speak) && (phase.speak
+              ? <button className="act" disabled={hearing} onClick={() => void hearSermon()}>{hearing ? 'Hört zu …' : `${speechNoun(occasion.kind)} hören`}</button>
+              : <button className="act quiet" disabled>{(() => { const next = phases.find(item => item.speak); return next && minute < next.from ? `${speechNoun(occasion.kind)} in ~${next.from - minute} min` : `${speechNoun(occasion.kind)} vorbei` })()}</button>)}
+            <button className="act quiet" onClick={() => { const seat = layout.spots.find(spot => spot.action === 'sit'); if (seat) walkTo({ x: seat.x, y: seat.y + 14 }, () => setSeated(true)); else setSeated(true) }}>{seated ? 'Du sitzt' : 'Platz nehmen'}</button>
+          </div>
+          {sermon && <blockquote><b>{sermon.by}:</b> „{sermon.text}“</blockquote>}
+          <em>Gäste sind willkommen. Mitsingen, mitbeten oder einfach still dabeisitzen – alles ist in Ordnung.</em>
+        </div>}
         {talkingNow && (staff || partner) && <>
           <p className="muted">{talkRole}{isLibrary && !partner ? ' · an der Ausleihe' : ` · ${name}`}</p>
           <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : talkName}:</b> „{entry.content}“</p>)}{sending && !history.length && <p className="muted">…</p>}</div>
@@ -586,6 +643,15 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .npc{position:absolute;z-index:2}
       .npc .carry{position:absolute;left:18px;top:14px;width:9px;height:12px;background:#b24a3d;border:1px solid #3b1a14;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .player .held{position:absolute;left:16px;top:10px;width:8px;height:11px;background:#2f5d6b;border:1px solid #1a3038;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
+      .occasion{display:grid;gap:5px;padding:9px 10px;border:1px solid #c9a447;border-radius:7px;background:#2a2010;color:#f6ead0}
+      .occasion small{font:800 8px monospace;letter-spacing:.12em;color:#e9c46a}
+      .occasion b{font-size:13px}
+      .occasion span,.occasion em{font-size:10px;color:#d8c9a6}
+      .occasion ol{margin:2px 0;padding-left:16px;display:grid;gap:1px;font-size:10px;color:#bfae88}
+      .occasion li.done{opacity:.55;text-decoration:line-through}
+      .occasion li.now{color:#fff3d6;font-weight:700}
+      .occasion p{margin:0;font-size:11px;line-height:1.4}
+      .occasion blockquote{margin:2px 0;padding:6px 8px;border-left:3px solid #e9c46a;background:#1d160b;font-size:11px;line-height:1.45}
       .status{padding:7px 9px;border:1px solid #6b8793;border-radius:6px;background:#0b1a24;color:#dfe9ee;font-size:10px}
       .moves{display:grid;gap:4px;border-top:1px solid #2f4a4b;padding-top:8px}
       .moves div{display:flex;flex-wrap:wrap;gap:4px}

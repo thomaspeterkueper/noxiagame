@@ -50,6 +50,9 @@ function preferredRegionFeatureAssignment(person:Person,assignments:readonly Per
       && Boolean(assignment.regionFeatureId)
     )
   if(!active.length)return null
+  // Ein Termin in einem Spielgebäude (z. B. Begegnungsstätte im gekauften Haus) geht vor:
+  // dann verortet die Gebäudezuweisung, nicht Arbeit oder Wohnung im realen Haus.
+  if(person.activityState==='socialising'&&assignments.some(a=>a.personId===person.id&&a.isActive&&a.assignmentType==='temporary'&&a.tileEntityId&&!a.regionFeatureId))return null
   // A home in a real, unbought house is a region feature too (NOXIA-NPC-RELIGION-0002):
   // resting there anchors at the house. A sleeping person keeps no surface row, as before.
   const preferredTypes = person.activityState==='socialising'

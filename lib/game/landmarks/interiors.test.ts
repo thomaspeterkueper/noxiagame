@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_LEVELS, LANDMARK_SPOT_REACH, buildingRoomKind, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
+import { LANDMARK_LEVELS, LANDMARK_SPOT_REACH, buildingRoomKind, crowdSpots, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
   landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
@@ -46,6 +46,17 @@ describe('landmark interiors', () => {
     expect(buildingRoomKind('b:apartments', 'osm:way:1')).toBeNull()
     expect(buildingRoomKind(null)).toBeNull()
   })
+
+  for (const kind of ['worship', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'resonance_place'] as const) {
+    it(`${kind}: room for a congregation of twelve`, () => {
+      const layout = landmarkRoomLayout(kind)
+      const spots = crowdSpots(layout, 12)
+      expect(spots).toHaveLength(12)
+      const onSeat = (p: LandmarkPoint) => layout.furniture.some(item => ['pew', 'bench', 'chair', 'cushion'].includes(item.kind) && p.x >= item.x && p.x <= item.x + item.w && p.y >= item.y && p.y <= item.y + item.h)
+      for (const p of spots) expect(onSeat(p) || !isLandmarkRoomBlocked(layout, p, 6), `${kind} ${p.x},${p.y}`).toBe(true)
+      for (let i = 0; i < spots.length; i++) for (let j = i + 1; j < spots.length; j++) expect(Math.hypot(spots[i].x - spots[j].x, spots[i].y - spots[j].y)).toBeGreaterThan(10)
+    })
+  }
 
   for (const kind of ['worship', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'artlounge', 'resonance_place'] as const) {
     it(`${kind}: host and visitors stand on free, reachable floor`, () => {

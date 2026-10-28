@@ -4,6 +4,9 @@
 // No second clock: windows are derived only from the authoritative simulation tick.
 // Attendance never implies belief or religious identity.
 
+import { pickCongregation, scheduledWindowsFor, type ScheduledRow, type Tradition } from './worship'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseLike = any
 
 export type PlaceActivityKind =
@@ -90,7 +93,7 @@ export type HostPlace =
   | { kind:'work' }
   | { kind:'built'; buildingTypes:readonly string[] }
 
-export interface RealPlaceHost { personKey:string; windows:(tick:number)=>PlaceActivityWindow[]; place:HostPlace }
+export interface RealPlaceHost { personKey:string; windows:(tick:number)=>PlaceActivityWindow[]; place:HostPlace; tradition:Tradition }
 
 // ── Vertreter weiterer Religionen (Thomas, 28.10.2026) ────────────────
 /** Lukaskirche Sundern (evangelisch): Gottesdienst Sonntag 10 Uhr, offene Gesprächszeit Dienstag 18 Uhr. */
@@ -129,15 +132,15 @@ export function foGuangShanActivityWindows(tick:number):PlaceActivityWindow[]{
 
 /** Hosts whose real-place schedule the population tick carries. */
 export const REAL_PLACE_HOSTS: ReadonlyArray<RealPlaceHost> = [
-  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows, place:{kind:'work'} },
-  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows, place:{kind:'work'} },
-  { personKey:'earth-frankfurt-omnizedent-001', windows:frankfurtResonanceRoundWindows, place:{kind:'work'} },
-  { personKey:'mars-tharsis-omnizedent-001', windows:tharsisResonanceRoundWindows, place:{kind:'built',buildingTypes:['resonance_place','omnizedenz_resonance_place']} },
-  { personKey:'earth-sundern-lukaskirche-pastor-001', windows:lukasActivityWindows, place:{kind:'work'} },
-  { personKey:'earth-frankfurt-hamidiye-imam-001', windows:hamidiyeActivityWindows, place:{kind:'work'} },
-  { personKey:'earth-frankfurt-baumweg-rabbi-001', windows:baumwegActivityWindows, place:{kind:'work'} },
-  { personKey:'earth-dwarka-dwarkadhish-pujari-001', windows:dwarkadhishActivityWindows, place:{kind:'work'} },
-  { personKey:'earth-frankfurt-foguangshan-monastic-001', windows:foGuangShanActivityWindows, place:{kind:'work'} },
+  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows, place:{kind:'work'}, tradition:'catholic' },
+  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows, place:{kind:'work'}, tradition:'omnizedenz' },
+  { personKey:'earth-frankfurt-omnizedent-001', windows:frankfurtResonanceRoundWindows, place:{kind:'work'}, tradition:'omnizedenz' },
+  { personKey:'mars-tharsis-omnizedent-001', windows:tharsisResonanceRoundWindows, place:{kind:'built',buildingTypes:['resonance_place','omnizedenz_resonance_place']}, tradition:'omnizedenz' },
+  { personKey:'earth-sundern-lukaskirche-pastor-001', windows:lukasActivityWindows, place:{kind:'work'}, tradition:'protestant' },
+  { personKey:'earth-frankfurt-hamidiye-imam-001', windows:hamidiyeActivityWindows, place:{kind:'work'}, tradition:'muslim' },
+  { personKey:'earth-frankfurt-baumweg-rabbi-001', windows:baumwegActivityWindows, place:{kind:'work'}, tradition:'jewish' },
+  { personKey:'earth-dwarka-dwarkadhish-pujari-001', windows:dwarkadhishActivityWindows, place:{kind:'work'}, tradition:'hindu' },
+  { personKey:'earth-frankfurt-foguangshan-monastic-001', windows:foGuangShanActivityWindows, place:{kind:'work'}, tradition:'buddhist' },
 ]
 
 /** A concrete place: an imported real place or a built tile entity. */
@@ -213,9 +216,14 @@ async function ensureVisitor(
     hostPersonId:string
     window:PlaceActivityWindow
     tick:number
+    /** Gastgeber(in): trägt den Termin (last_action `host:…`), statt ihn zu besuchen. */
+    asHost?:boolean
+    /** Besucher, die gerade arbeiten, kommen nicht (Gastgeber schon). */
+    skipWorking?:boolean
   },
 ){
   const {personId,locationId,place,hostPersonId,window,tick}=input
+  const action=`${input.asHost?'host':'visit'}:${window.kind}`
   const roleCode=`visit:real_place:${window.kind}`
   const decisionFactors={
     destinationRegionFeatureId:place.regionFeatureId,
@@ -233,6 +241,7 @@ async function ensureVisitor(
   if(personError)throw personError
   if(!person || person.simulation_tier!=='active' || person.current_location_id!==locationId)return false
   if(person.activity_state==='travelling' || (person.activity_state==='resting' && String(person.last_action??'').includes('sleep')))return false
+  if(input.skipWorking && person.activity_state==='working')return false
 
   const {data:existing,error:existingError}=await supabase
     .from('person_assignments')
@@ -251,7 +260,7 @@ async function ensureVisitor(
   if(current && samePlace && current.role_code===roleCode){
     const {error}=await supabase.from('people').update({
       activity_state:'socialising',
-      last_action:`visit:${window.kind}`,
+      last_action:action,
       last_decision_factors:decisionFactors,
       last_tick:tick,
       updated_at:new Date().toISOString(),
@@ -284,7 +293,7 @@ async function ensureVisitor(
 
   const {error:updatePersonError}=await supabase.from('people').update({
     activity_state:'socialising',
-    last_action:`visit:${window.kind}`,
+    last_action:action,
     last_decision_factors:decisionFactors,
     last_tick:tick,
     updated_at:new Date().toISOString(),
@@ -313,12 +322,84 @@ async function ensureVisitor(
 
 type RealPlaceTickResult={closed:number,windows:number,events:number,visitors:number,skipped:boolean}
 
+/** Ort als Koordinaten: Erde in Grad, Station/Kolonie in Metern (Kachel-Raster als Rückfall). */
+type Coord = { lat?:number; lon?:number; x?:number; y?:number }
+function coordDistanceM(a:Coord|null,b:Coord|null){
+  if(!a||!b)return null
+  if(a.lat!=null&&a.lon!=null&&b.lat!=null&&b.lon!=null){
+    const k=Math.cos(((a.lat+b.lat)/2)*Math.PI/180)
+    return Math.hypot((a.lat-b.lat)*111320,(a.lon-b.lon)*111320*k)
+  }
+  if(a.x!=null&&a.y!=null&&b.x!=null&&b.y!=null)return Math.hypot(a.x-b.x,a.y-b.y)
+  return null
+}
+type TileRow={id:string;latitude_deg:number|null;longitude_deg:number|null;x_m:number|null;y_m:number|null;tile_row:number|null;tile_col:number|null}
+type FeatureRow={id:string;geometry:{kind?:string;coordinates?:unknown}|null}
+function tileCoord(row:TileRow|undefined):Coord|null{
+  if(!row)return null
+  if(row.latitude_deg!=null&&row.longitude_deg!=null)return {lat:Number(row.latitude_deg),lon:Number(row.longitude_deg)}
+  if(row.x_m!=null&&row.y_m!=null)return {x:Number(row.x_m),y:Number(row.y_m)}
+  // Ältere Gebäude ohne Meterlage: Kachel-Raster (20 m, Ursprung wie bei der Weltplatzierung).
+  if(row.tile_row!=null&&row.tile_col!=null)return {x:-310+Number(row.tile_col)*20,y:230-Number(row.tile_row)*20}
+  return null
+}
+function featureCoord(row:FeatureRow|undefined):Coord|null{
+  const g=row?.geometry
+  if(!g)return null
+  const pts=g.kind==='polygon'&&Array.isArray(g.coordinates)
+    ?(g.coordinates as Array<{lat?:unknown;lon?:unknown}>).map(p=>({lat:Number(p?.lat),lon:Number(p?.lon)})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon))
+    :g.kind==='point'?[{lat:Number((g.coordinates as {lat?:unknown})?.lat),lon:Number((g.coordinates as {lon?:unknown})?.lon)}].filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)):[]
+  if(!pts.length)return null
+  return {lat:pts.reduce((a,p)=>a+p.lat,0)/pts.length,lon:pts.reduce((a,p)=>a+p.lon,0)/pts.length}
+}
+async function coordsFor(supabase:SupabaseLike,tileIds:string[],featureIds:string[]){
+  const [tiles,features]=await Promise.all([
+    tileIds.length?supabase.from('tile_entities').select('id,latitude_deg,longitude_deg,x_m,y_m,tile_row,tile_col').in('id',tileIds):Promise.resolve({data:[]}),
+    featureIds.length?supabase.from('region_features').select('id,geometry').in('id',featureIds):Promise.resolve({data:[]}),
+  ])
+  const out=new Map<string,Coord|null>()
+  for(const row of (tiles.data??[]) as TileRow[])out.set('t:'+row.id,tileCoord(row))
+  for(const row of (features.data??[]) as FeatureRow[])out.set('f:'+row.id,featureCoord(row))
+  return out
+}
+
+/** Menschen eines Ortes mit Wohnung (für die Nachbarschaft eines Termins), einmal je Tick und Ort. */
+type Resident={id:string;home:Coord|null}
+async function residentsOf(supabase:SupabaseLike,locationId:string):Promise<Resident[]>{
+  const {data:people,error}=await supabase.from('people').select('id').eq('current_location_id',locationId).eq('simulation_tier','active').limit(600)
+  if(error)throw error
+  const ids=((people??[]) as Array<{id:string}>).map(row=>String(row.id))
+  if(!ids.length)return []
+  const {data:homes,error:homeError}=await supabase.from('person_assignments').select('person_id,tile_entity_id,region_feature_id').in('person_id',ids).eq('assignment_type','home').eq('is_active',true)
+  if(homeError)throw homeError
+  const homeOf=new Map<string,string>()
+  for(const row of (homes??[]) as Array<{person_id:string;tile_entity_id:string|null;region_feature_id:string|null}>){
+    if(homeOf.has(String(row.person_id)))continue
+    if(row.tile_entity_id)homeOf.set(String(row.person_id),'t:'+row.tile_entity_id)
+    else if(row.region_feature_id)homeOf.set(String(row.person_id),'f:'+row.region_feature_id)
+  }
+  const refs=[...new Set(homeOf.values())]
+  const coords=await coordsFor(supabase,refs.filter(r=>r.startsWith('t:')).map(r=>r.slice(2)),refs.filter(r=>r.startsWith('f:')).map(r=>r.slice(2)))
+  return ids.map(id=>({id,home:coords.get(homeOf.get(id)??'')??null}))
+}
+
 /** Runs every scheduled real-place host. A missing or unavailable host only skips its own windows. */
 export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
   const result:RealPlaceTickResult={closed:0,windows:0,events:0,visitors:0,skipped:true}
   result.closed=await closeExpiredRegionVisits(supabase,tick)
+  // Sondertermine (z. B. Probe-Gottesdienst): population_events `place_activity_scheduled`.
+  const {data:scheduled,error:scheduledError}=await supabase
+    .from('population_events')
+    .select('payload')
+    .eq('event_type','place_activity_scheduled')
+    .lte('tick',tick)
+    .gte('tick',tick-24*14)
+  if(scheduledError)throw scheduledError
+  const residents=new Map<string,Promise<Resident[]>>()
+  const residentsAt=(locationId:string)=>{ if(!residents.has(locationId))residents.set(locationId,residentsOf(supabase,locationId)); return residents.get(locationId)! }
   for(const host of REAL_PLACE_HOSTS){
-    const part=await runHostPlaceTick(supabase,tick,host,host.windows(tick))
+    const extra=scheduledWindowsFor((scheduled??[]) as ScheduledRow[],host.personKey).filter(window=>tick>=window.startTick&&tick<window.endTick)
+    const part=await runHostPlaceTick(supabase,tick,host,[...host.windows(tick),...extra],residentsAt)
     result.windows+=part.windows
     result.events+=part.events
     result.visitors+=part.visitors
@@ -330,11 +411,11 @@ export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
 /** Kept for callers of the first pilot; closes expired visits and runs St. Johannes only. */
 export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:number){
   const closed=await closeExpiredRegionVisits(supabase,tick)
-  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0],stJohannesActivityWindows(tick))
+  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0],stJohannesActivityWindows(tick),(locationId)=>residentsOf(supabase,locationId))
   return {...part,closed}
 }
 
-async function resolveHostPlace(supabase:SupabaseLike,host:{id:string;current_location_id:string},spec:HostPlace):Promise<Place|null>{
+export async function resolveHostPlace(supabase:SupabaseLike,host:{id:string;current_location_id:string},spec:HostPlace):Promise<Place|null>{
   if(spec.kind==='work'){
     // Realer Ort (region_feature) oder ein gekauftes, umgebautes Haus (tile_entity),
     // z. B. die Omnizedenz-Begegnungsstätte Hauptstraße 87 in Sundern.
@@ -365,7 +446,7 @@ async function resolveHostPlace(supabase:SupabaseLike,host:{id:string;current_lo
   return id?{regionFeatureId:null,tileEntityId:String(id)}:null
 }
 
-async function runHostPlaceTick(supabase:SupabaseLike,tick:number,spec:RealPlaceHost,windows:PlaceActivityWindow[]){
+async function runHostPlaceTick(supabase:SupabaseLike,tick:number,spec:RealPlaceHost,windows:PlaceActivityWindow[],residentsAt:(locationId:string)=>Promise<Resident[]>){
   const result:RealPlaceTickResult={closed:0,windows:0,events:0,visitors:0,skipped:false}
   if(!windows.length)return result
   result.windows=windows.length
@@ -385,35 +466,31 @@ async function runHostPlaceTick(supabase:SupabaseLike,tick:number,spec:RealPlace
   const place=await resolveHostPlace(supabase,host,spec.place)
   if(!place){result.skipped=true;return result}
 
-  // Pilot attendance comes only from an already-established local relationship.
-  // It is social provenance, not inferred religious identity.
+  // Gemeinde (28.10.2026): enge Beziehungen der Gastgeberin/des Gastgebers und
+  // ein Teil der Nachbarschaft – soziale Herkunft, keine zugeschriebene Religion.
   const {data:relations,error:relationError}=await supabase
     .from('person_relationships')
-    .select('person_id,other_person_id,familiarity,trust,affinity')
+    .select('person_id,other_person_id,affinity')
     .or(`person_id.eq.${host.id},other_person_id.eq.${host.id}`)
     .gte('affinity',0.5)
   if(relationError)throw relationError
-  const candidateIds:string[]=[...new Set<string>((relations??[])
-    .map((row:any)=>String(row.person_id===host.id?row.other_person_id:row.person_id))
-    .filter((value:string)=>Boolean(value)))]
-    .sort()
+  const relationList=((relations??[]) as Array<{person_id:string;other_person_id:string;affinity:number}>)
+    .map(row=>({id:String(row.person_id===host.id?row.other_person_id:row.person_id),affinity:Number(row.affinity??0)}))
+    .filter(row=>row.id&&row.id!==host.id)
+  const placeCoord=(await coordsFor(supabase,place.tileEntityId?[place.tileEntityId]:[],place.regionFeatureId?[place.regionFeatureId]:[])).get(place.tileEntityId?'t:'+place.tileEntityId:'f:'+place.regionFeatureId)??null
+  const neighbours=(await residentsAt(host.current_location_id)).flatMap(resident=>{
+    const distanceM=coordDistanceM(resident.home,placeCoord)
+    return distanceM==null?[]:[{id:resident.id,distanceM}]
+  })
 
   for(const window of windows){
     if(await ensureEvent(supabase,tick,host.id,host.current_location_id,place,window))result.events+=1
-    // A host whose workplace is elsewhere (e.g. a technician hosting a round at a
-    // built resonance place) goes there for the window, like any visitor.
-    if(spec.place.kind==='built') await ensureVisitor(supabase,{personId:host.id,locationId:host.current_location_id,place,hostPersonId:host.id,window,tick})
-    // Keep the first pilot deliberately small. Future participation should grow
-    // from actual relationships/place affinity, not random religious assignment.
-    const visitorId=candidateIds[0]
-    if(visitorId && await ensureVisitor(supabase,{
-      personId:visitorId,
-      locationId:host.current_location_id,
-      place,
-      hostPersonId:host.id,
-      window,
-      tick,
-    })) result.visitors+=1
+    // Wer den Termin trägt, ist für seine Dauer dort – auch wenn der Arbeitsplatz woanders ist.
+    await ensureVisitor(supabase,{personId:host.id,locationId:host.current_location_id,place,hostPersonId:host.id,window,tick,asHost:true})
+    const congregation=pickCongregation({kind:window.kind,windowStart:window.startTick,relations:relationList,neighbours,exclude:new Set([host.id])})
+    for(const visitorId of congregation){
+      if(await ensureVisitor(supabase,{personId:visitorId,locationId:host.current_location_id,place,hostPersonId:host.id,window,tick,skipWorking:true}))result.visitors+=1
+    }
   }
   return result
 }

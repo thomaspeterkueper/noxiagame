@@ -26,6 +26,15 @@ describe('people at a place', () => {
     expect(peopleAtPlace(rows, { osm: 'osm:way:1', at: church })).toEqual([])
   })
 
+  it('knows the host of a service even when they came from elsewhere', () => {
+    const people = peopleAtPlace([
+      { id: 'elias', displayName: 'Elias Hartmann', lat: 51.33, lon: 8.0, sourceKind: 'region_feature_anchor', publicRole: 'Pfarrer', activityState: 'socialising', lastAction: 'host:service', placeOsm: 'osm:way:1' },
+      { id: 'ana', displayName: 'Ana', lat: 51.33, lon: 8.0, sourceKind: 'region_feature_anchor', activityState: 'socialising', lastAction: 'visit:service', placeOsm: 'osm:way:1' },
+    ], { osm: 'osm:way:1', at: church })
+    expect(people[0]).toMatchObject({ id: 'elias', host: true, doing: 'Gottesdienst' })
+    expect(people[1]).toMatchObject({ host: false })
+  })
+
   it('names what is going on', () => {
     expect(doingFromAction('visit:friday_prayer')).toBe('Freitagsgebet')
     expect(doingFromAction('visit:shabbat')).toBe('Schabbat')

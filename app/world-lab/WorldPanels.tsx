@@ -22,6 +22,7 @@ import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoom
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
 import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
+import { worshipAt, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
 import { VENUE_TYPE_IDS } from '@/lib/game/hospitality/venueStatus'
 import { buildingSizeLine, buildingUseLine, conversionLine, readyAtLabel, venueOfferLine } from '@/lib/worldlab/buildingUse'
@@ -111,9 +112,11 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 /** Baubarer Typ aus /api/game/build/spatial (available). */
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean } }
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [] }: {
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
   presence?: PresenceRow[]
+  /** Gottesdienste und Gebete mit laufendem und nächstem Termin (28.10.2026). */
+  worship?: WorshipItem[]
   /** Reise auf der Erde gebucht (Reisebüro) – die Karte zeigt die Fahrt und springt bei Ankunft. */
   onTripBooked?: (trip: EarthTrip) => void
   engine: WorldEngine | null
@@ -551,7 +554,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     }}/>
   }
   if (panel.kind === 'landmarkInside') {
-    return <LandmarkWalkableInterior kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
+    const service = worshipAt(worship, { source: panel.source, at: panel.landmark.at })
+    const occasion = service?.running ? { ...service.running, tradition: service.tradition, host: service.host } : undefined
+    return <LandmarkWalkableInterior occasion={occasion} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
       people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
   }
   if (panel.kind === 'none') return null
@@ -582,6 +587,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         const placeSource = building.source ?? own?.source
         const here = inside ? peopleAtPlace(presence, { osm: placeSource, at: building.at, radiusM: 45 }) : []
         return inside && <>
+          {(() => { const service = worshipAt(worship, { source: placeSource, at: building.at }); return service && <ScheduleLine item={service}/> })()}
           {here.length > 0 && <p className="muted">Gerade drinnen: {here.map(person => person.name).join(', ')}{here[0]?.doing ? ` · ${here[0].doing}` : ''}</p>}
           {buildingDistance !== null && buildingDistance <= ENTER_RANGE_M + 6
             ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room: buildingRoom, landmark: inside, source: placeSource })}>Betreten</button></div>
@@ -662,6 +668,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     {landmark && <>
       <div className="head"><LandmarkGlyph kind={landmark.kind} tags={landmark.tags} size={34}/><div className="grow"><small>REALER ORT · {landmarkLabel(landmark.kind, landmark.tags).toUpperCase()}</small><b>{landmark.name}</b></div><button onClick={close} aria-label="Schließen">×</button></div>
       {landmark.tags.description && <p>{landmark.tags.description}</p>}
+      {(() => { const service = worshipAt(worship, { source: landmarkSource, at: landmark.at }); return service && <ScheduleLine item={service}/> })()}
       {landmarkFacts(landmark.tags).length > 0 && <dl>{landmarkFacts(landmark.tags).map(fact => <Fragment key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></Fragment>)}</dl>}
       {room && landmarkNear
         ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })}>Betreten</button></div>
@@ -746,4 +753,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       
     `}</style>
   </aside>
+}
+
+/** Termin eines Gotteshauses: läuft gerade (mit Zahl der Besucher) oder nächster Beginn. */
+function ScheduleLine({ item }: { item: WorshipItem }) {
+  if (item.running) return <p className="muted"><b>Jetzt: {item.running.label}</b> mit {item.host.name}{item.running.attendees ? ` · ${item.running.attendees} ${item.running.attendees === 1 ? 'Besucher(in)' : 'Besucher'}` : ''}. Alle sind willkommen – mitfeiern, zuhören oder hinten sitzen.</p>
+  return item.next ? <p className="muted">Nächster Termin: {item.next.label} · {item.next.when} ({item.host.name})</p> : null
 }

@@ -79,7 +79,7 @@ export type WorldPick =
   | { type: 'ground'; at: GeoPoint }
 
 /** Plakette einer Begegnungsstätte: in jeder Zoomstufe sichtbar, ein Klick öffnet den Ort. */
-export interface WorldBeacon { at: GeoPoint; label?: string; pick: WorldPick }
+export interface WorldBeacon { at: GeoPoint; label?: string; pick: WorldPick; /** resonance: Begegnungsstätte (grün), worship: laufender Gottesdienst (gold) */ tone?: 'resonance' | 'worship' }
 
 /** Baustelle (laufender Bau) auf der Karte. */
 export interface WorldSite { id: string; name: string; at: GeoPoint; w: number; d: number; rotation: number; progress: number | null; phase: string }
@@ -1605,13 +1605,21 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const at = iso(c.x, c.y, 14)
       const mark = new PIXI.Container()
       const disc = new PIXI.Graphics()
-      disc.moveTo(0, 6).lineTo(-2.2, 2).lineTo(2.2, 2).closePath().fill(0x9fd3c0)
-      disc.circle(0, -2, 5.4).fill({ color: 0x1f4f54, alpha: 0.96 }).stroke({ width: 0.9, color: 0x9fd3c0 })
-      disc.circle(0, -2, 1.3).fill(0xe8f4ee)
-      disc.circle(0, -2, 3.2).stroke({ width: 0.55, color: 0xe8f4ee })
+      const worship = beacon.tone === 'worship'
+      const rim = worship ? 0xe9c46a : 0x9fd3c0, body = worship ? 0x4a3412 : 0x1f4f54, ink = worship ? 0xfff3d6 : 0xe8f4ee
+      disc.moveTo(0, 6).lineTo(-2.2, 2).lineTo(2.2, 2).closePath().fill(rim)
+      disc.circle(0, -2, 5.4).fill({ color: body, alpha: 0.96 }).stroke({ width: 0.9, color: rim })
+      if (worship) {
+        // Glocke: läuft gerade ein Gottesdienst oder Gebet
+        disc.moveTo(-2.6, 0.2).quadraticCurveTo(-2.6, -4.4, 0, -4.6).quadraticCurveTo(2.6, -4.4, 2.6, 0.2).closePath().fill(ink)
+        disc.circle(0, 0.9, 0.8).fill(ink)
+      } else {
+        disc.circle(0, -2, 1.3).fill(ink)
+        disc.circle(0, -2, 3.2).stroke({ width: 0.55, color: ink })
+      }
       mark.addChild(disc)
       if (beacon.label) {
-        const text = new PIXI.Text({ text: beacon.label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: 0x1f4f54, stroke: { color: 0xf4f1e8, width: 8, join: 'round' } } })
+        const text = new PIXI.Text({ text: beacon.label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: beacon.tone === 'worship' ? 0x4a3412 : 0x1f4f54, stroke: { color: 0xf4f1e8, width: 8, join: 'round' } } })
         text.anchor.set(0.5, 1)
         text.scale.set(0.11)
         text.position.set(0, -8.4)

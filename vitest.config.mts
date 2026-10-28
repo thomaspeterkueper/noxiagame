@@ -21,6 +21,7 @@ export default defineConfig({
       'lib/game/population/visibleMovement.test.ts',
       'lib/game/population/placePresence.test.ts',
       'lib/worldlab/meetingPlaces.test.ts',
+      'lib/game/population/worship.test.ts',
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/game/spatial/localSceneRuntime.test.ts',
