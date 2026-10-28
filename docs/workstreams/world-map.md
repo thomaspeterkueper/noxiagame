@@ -209,6 +209,17 @@ Geprüft, was mit den Antworten des Einstiegsquiz geschieht: Sie setzen nur die 
 
 Für alle drei fehlten die Hausdaten. Die zehn Ortsdetail-Zellen sind am 27.10.2026 gegen 10:30 Uhr als leere Orte in `celestial_regions` eingereiht (`earth-place-51p29700-7p95959` … `earth-place-51p29700-8p04595`); der stündliche Lauf `/api/cron/world-places` holt zwei je Stunde.
 
+**Auswertung 28.10.2026 (8 von 10 Zellen gefüllt; leer noch `51p29700-7p97878` und `51p29700-7p98838`, also die Wiese südwestlich von Tillmann):**
+
+| | A: bei Wellpappen Tillmann | B: Industriegebiet West | C: Endorfer Mühle |
+|---|---|---|---|
+| Hallen | Tillmann Wellpappe 33 500 m² und 10 100 m², daneben eine Halle ohne Namen mit 12 700 m² (wohl ebenfalls Tillmann) | 9 200 m², 3 900 m², 3 500 m², 3 000 m², 2 400 m², ohne Namen (außer Kaiser & Waltermann, 1 800 m²) | sechs Hallen mit 1 600–3 100 m², ohne Namen |
+| Freie Fläche | Industrie-Insel 51,2979 / 7,9803 (217 × 187 m, keine Häuser) und Wiese 51,2968 / 7,9781 (753 × 605 m) – beide in den noch leeren Zellen | Acker 51,2977 / 7,9656 (235 × 224 m, keine Häuser) | Wiese 51,2965 / 8,0400 (374 × 633 m), am Rand Häuser von Endorf |
+| Nachbarn | Segelfluggelände Sundern-Seidfeld gleich nördlich | Naturschutzgebiete Breloh und Im Sümpfel direkt daneben | Dorf Endorf |
+| Weg zum Zentrum | 3,3 km | 4 km | 4,2 km |
+
+Vorschlag: **A**, aber ohne die Hallen von Tillmann (ein reales, arbeitendes Unternehmen). Landeplätze und Raumhafen auf die Industrie-Insel und den Nordrand der Wiese, Solarfeld auf die Wiese; Fabrik, Werft, Lager und Labor als neue Hallen am Rand der Insel, Verwaltung, Schule und Wohnblock an der Straße. Erst festlegen, wenn die zwei leeren Zellen da sind. Ausweichlösung: **B** – dort stehen die Werkbauten in echten Hallen ohne Namen, die freie Fläche ist aber knapp und liegt an zwei Naturschutzgebieten.
+
 **Nächste Schritte:**
 1. Sobald die Zellen gefüllt sind: je Gebiet echte Hallen und freie Flächen auswerten; Lageplan vorschlagen (Fabrik, Werft, Lager, Labor in echte Hallen über `source_ref`; Landeplätze, Raumhafen und Solar auf freie Fläche, zusammen rund 300 × 200 m), Thomas entscheidet.
 2. Umzug der Bauten (Lage, Drehung, `source_ref`) als Migration. Wohnzuweisungen und Arbeitsplätze hängen an `tile_entity_id` und ziehen mit; Anwesenheit und Wege der Personen gehören zu Bevölkerung und Ökonomie (Request dort, sobald der Ort feststeht).
