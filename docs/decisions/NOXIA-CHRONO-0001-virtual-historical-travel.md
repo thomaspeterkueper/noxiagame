@@ -37,3 +37,7 @@ Jede Szene führt Quellenreferenzen mit Einstufung `documented`, `inferred` oder
 ## Desktop-WebGL-Prototyp (28.10.2026)
 
 Route `/chronotravel` rendert nun mit der bereits installierten Bibliothek `three` eine tatsächliche WebGL-Szene. Geometrien für Platz, Obelisk und Gebäude sind bewusst schematisch und nicht archäologisch validiert. Kamera mit WASD und Pfeiltasten, Licht/Schatten, Nebel, drei epochenspezifische Massenmodelle. Nicht live verifiziert: TypeScript-/Next.js-Build, Browser-/GPU-Kompatibilität und Laufzeitverhalten. Keine Mobiloptimierung vorgesehen. Vor Merge bitte `npm run build` und Browser-Smoke-Test mit Epochenschaltung und Tastatursteuerung ausführen.
+
+## Modulare Architektur v1 (28.10.2026)
+
+`app/chronotravel/historicalBuildings.js` generiert Tribünen, Arkaden, Säulen, Loge, einfache Mauersegmente und Häuser aus Three.js-Geometrie. Jahresauswahl: 550 (Tribünen/Loge), 1200 (reduzierte Tribünen und gemischte Bebauung), 1700 (Häuser mit Dachformen am offenen Platz). Alle Abmessungen, Bauformen und Positionen sind **illustrativ, nicht quellengeprüft**. Die Funktion gibt ein Cleanup zurück und erzeugt weder Datenbankobjekte noch echte historische NPCs. Nächste Aufgaben: originale Quellen je Bauwerk, sichere Kollisionsnavigation, Performance-/Render-Test im Browser und ggf. Instancing.
