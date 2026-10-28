@@ -42,7 +42,11 @@ type Props = {
   staffRole?: string
   /** Realer Name laut OSM – nur zur Einordnung in der Seitenleiste. */
   realName?: string
+  /** Personen der Simulation, die gerade an diesem Ort sind (Arbeit, Termin, Besuch). */
+  people?: RoomPerson[]
 }
+/** Eine Person der Simulation im Raum: wer den Ort trägt (host) steht vorne, Besucher auf den Plätzen. */
+export type RoomPerson = { id: string; name: string; role: string; host: boolean; /** Was gerade los ist, z. B. „Freitagsgebet“. */ doing?: string }
 type ChatEntry = { role: 'user' | 'assistant'; content: string }
 
 const SPEED = 12
@@ -90,7 +94,7 @@ export default function LandmarkWalkableInterior(props: Props) {
   return <LandmarkRoom key={floor.level} {...props} level={floor.level} byStairs={floor.byStairs} onLevel={level => setFloor({ level, byStairs: true })}/>
 }
 
-function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
+function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
   const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
@@ -135,6 +139,24 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
   const book = LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
   const staff = layout.staff
+  // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
+  const placed = useMemo(() => {
+    const spots = layout.gatherAt ?? []
+    const hostSpot = layout.hostAt ?? spots[0] ?? layout.start
+    const hosts = people.filter(person => person.host).slice(0, 1)
+    const others = people.filter(person => !hosts.includes(person)).slice(0, spots.length)
+    return [
+      ...hosts.map(person => ({ person, at: hostSpot })),
+      ...others.map((person, index) => ({ person, at: spots[index] })),
+    ]
+  }, [people, layout])
+  const [partnerId, setPartnerId] = useState<string | null>(null)
+  const partner = partnerId ? placed.find(item => item.person.id === partnerId) ?? null : null
+  const nearPerson = useMemo(() => {
+    let best: (typeof placed)[number] | null = null, bestD = STAFF_REACH
+    for (const item of placed) { const d = Math.hypot(item.at.x - pos.x, item.at.y - pos.y); if (d <= bestD) { best = item; bestD = d } }
+    return best
+  }, [placed, pos])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -246,13 +268,47 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
-  const talkingNow = talking && (nearStaff || staffTask?.kind === 'bring')
+  const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
+  const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
+  const talkName = partner ? partner.person.name : staffName
+  const talkRole = partner ? partner.person.role : staff?.role ?? ''
+  const talkFigureId = partner ? partner.person.id : `landmark-staff:${name}`
 
   function startTalk() {
     if (!staff) return
+    if (partnerId) { setPartnerId(null); setHistory([]) }
     setTalking(true)
     setActive(null)
-    if (!history.length) setHistory([{ role: 'assistant', content: staff.greeting }])
+    if (!history.length || partnerId) setHistory([{ role: 'assistant', content: staff.greeting }])
+  }
+
+  /** Was die Person über diesen Ort und den Moment weiß (für das Gespräch). */
+  function personFacts(person: RoomPerson) {
+    return [
+      `Du bist gerade in ${name} (${typeLabel}).`,
+      person.host ? `Das ist dein Ort: Hier arbeitest du.` : `Du bist hier zu Besuch.`,
+      person.doing ? `Gerade ist hier: ${person.doing}.` : '',
+      `Der Spieler steht bei dir im Raum.`,
+    ].filter(Boolean)
+  }
+
+  /** Eine Person der Simulation ansprechen: Sie begrüßt von sich aus, als sie selbst. */
+  async function startTalkWith(person: RoomPerson) {
+    setPartnerId(person.id)
+    setTalking(true)
+    setActive(null)
+    setHistory([])
+    setSending(true)
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/npc-conversation', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening: true, npcId: person.id, npcName: person.name, npcRole: person.role, locationName: name, headline: `Begegnung in ${name}`, source: 'NOXIA place interior', localFacts: personFacts(person), history: [] }),
+      })
+      const data = await response.json().catch(() => ({}))
+      setHistory([{ role: 'assistant', content: response.ok && data.reply ? String(data.reply) : 'Hallo.' }])
+    } finally { setSending(false) }
   }
 
   function giveTip() {
@@ -268,6 +324,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   }
 
   async function talk() {
+    if (partner) { await talkWithPerson(partner.person); return }
     if (!staff || !message.trim() || sending) return
     const text = message.trim().slice(0, 80)
     setSending(true)
@@ -322,6 +379,25 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     } finally { setSending(false) }
   }
 
+  async function talkWithPerson(person: RoomPerson) {
+    if (!message.trim() || sending) return
+    const text = message.trim().slice(0, 80)
+    setSending(true)
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/npc-conversation', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player: text, npcId: person.id, npcName: person.name, npcRole: person.role, locationName: name, headline: `Begegnung in ${name}`, source: 'NOXIA place interior', localFacts: personFacts(person), history: history.slice(-10) }),
+      })
+      const data = await response.json().catch(() => ({}))
+      const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, gerade nicht – gleich wieder.'
+      setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
+      setMessage('')
+      if (data.conversationEnded) setTalking(false)
+    } finally { setSending(false) }
+  }
+
   const furnitureLabel = (item: LandmarkFurniture) => item.kind === 'counter' ? (kind === 'library' ? 'AUSLEIHE' : kind === 'workshop' ? 'ANNAHME' : kind === 'artlounge' ? 'THEKE' : 'KASSE') : null
 
   return <div className="landmark-interior">
@@ -345,6 +421,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <NpcFigure id={`landmark-staff:${name}`} name={staffName} role={staffTask?.kind === 'bring' ? 'bringt ein Buch' : staffTask?.kind === 'reshelve' ? 'sortiert ein' : staff.role} moving={staffMoving} showLabel={nearStaff || talkingNow || Boolean(staffTask)} showRoleLabel selected={talkingNow} onClick={() => { if (nearStaff) startTalk() }}/>
           {staffTask?.kind === 'bring' && <i className="carry"/>}
         </div>}
+        {placed.map(item => <div key={item.person.id} className="npc" style={{ left: item.at.x - 12, top: item.at.y - 34 }}>
+          <NpcFigure id={item.person.id} name={item.person.name} role={item.person.doing ?? item.person.role} moving={false} showLabel={nearPerson?.person.id === item.person.id || partnerId === item.person.id || item.person.host} showRoleLabel selected={talkingNow && partnerId === item.person.id} onClick={() => { if (nearPerson?.person.id === item.person.id) void startTalkWith(item.person) }}/>
+        </div>)}
         {layout.kind === 'library' && readerSeats.length > 0 && <div className="npc" style={{ left: readerPos.x - 12, top: readerPos.y - 34 }}>
           <NpcFigure id={`landmark-reader:${name}`} name={readerName} role={readerMoving ? 'unterwegs' : 'liest'} moving={readerMoving} showLabel={Math.hypot(readerPos.x - pos.x, readerPos.y - pos.y) < 70} showRoleLabel onClick={() => setStatus(`${readerName} schaut kurz auf, nickt dir zu und liest weiter.`)}/>
         </div>}
@@ -352,21 +431,22 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {shelf && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>STÖBERN</button>}
         {!shelf && near && near.action !== 'staff' && <button className="context" style={{ left: near.x - 40, top: near.y + 12 }} onClick={() => { setActive(near); setTalking(false) }}>{near.label}</button>}
         {staff && nearStaff && !talkingNow && <button className="context" style={{ left: staff.x - 40, top: staff.y + 14 }} onClick={startTalk}>ANSPRECHEN</button>}
+        {nearPerson && !(talkingNow && partnerId === nearPerson.person.id) && <button className="context" style={{ left: nearPerson.at.x - 40, top: nearPerson.at.y + 14 }} onClick={() => void startTalkWith(nearPerson.person)}>ANSPRECHEN</button>}
         {nearExit && <button className="context exit" style={{ left: layout.exit.x - 60, top: layout.exit.y - 56 }} onClick={onClose}>{layout.noun.toUpperCase()} VERLASSEN</button>}
       </div>
       <aside>
         <small>{typeLabel.toUpperCase()} · REALER ORT</small>
-        {talkingNow && staff
-          ? <div className="portrait"><NpcPortrait id={`landmark-staff:${name}`} name={staffName} role={staff.role}/></div>
+        {talkingNow && (staff || partner)
+          ? <div className="portrait"><NpcPortrait id={talkFigureId} name={talkName} role={talkRole}/></div>
           : <h3>{shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>}
-        {talkingNow && staff && <>
-          <p className="muted">{staff.role}{isLibrary ? ' · an der Ausleihe' : ` · ${name}`}</p>
-          <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : staffName}:</b> „{entry.content}“</p>)}</div>
+        {talkingNow && (staff || partner) && <>
+          <p className="muted">{talkRole}{isLibrary && !partner ? ' · an der Ausleihe' : ` · ${name}`}</p>
+          <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : talkName}:</b> „{entry.content}“</p>)}{sending && !history.length && <p className="muted">…</p>}</div>
           {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false) }}>
             <span>{tip.author}</span><b>{tip.title}</b><i>{tip.genre}</i><small>Klappentext lesen →</small>
           </button>}
-          {services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
-          <div className="row">{isLibrary && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
+          {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
+          <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Kurze Frage …"/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
@@ -387,6 +467,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           {seated ? <p>{held.teaser}</p> : <p>Setz dich an einen Leseplatz, um darin zu lesen.</p>}
           {atCounter ? <button className="act" onClick={() => { setHeld(null); setStatus(`Du gibst „${held.title}“ an der Ausleihe zurück.`) }}>Zurückgeben</button> : <button className="act quiet" onClick={() => setHeld(null)}>Weglegen</button>}
         </div>}
+        {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length > 0 && <p>{placed.map(item => item.person.name).join(', ')} {placed.length === 1 ? 'ist' : 'sind'} gerade hier. Geh hin und sprich {placed.length === 1 ? 'sie oder ihn' : 'jemanden'} an.</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length === 0 && !isLibrary && kind !== 'artlounge' && <p className="muted">Gerade ist niemand hier, mit dem du sprechen kannst. Zu den Gottesdiensten, Gebeten und Runden ist meist jemand da.</p>}
         {!talkingNow && !shown && !shelf && !book && !held && <p>{isLibrary ? `Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern${staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.` : `Du kannst dich frei umsehen${staff ? `; ${staffName} hilft dir am Tresen weiter` : ''}.`}</p>}
         {!talkingNow && !shown && !shelf && realName && <p className="muted">Heute steht hier laut OpenStreetMap „{realName}“. Im Spiel (2086) ist der Betrieb eine erfundene Nachfolgerin.</p>}
         {!talkingNow && shown && <p>{shown.text}</p>}
@@ -413,6 +495,11 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .room{position:relative;flex:none;overflow:hidden;border:6px solid #3a2f25;border-radius:6px;box-shadow:0 18px 40px #0009}
       .room.library{background:repeating-linear-gradient(90deg,#b99d76 0 38px,#b2956d 38px 40px)}
       .room.worship{background:repeating-conic-gradient(#cfc8b9 0 25%,#c4bcab 0 50%) 0 0/44px 44px}
+      .room.mosque{background:#e6dfcf}
+      .room.synagogue{background:repeating-linear-gradient(90deg,#c9b48f 0 30px,#c1ab85 30px 32px)}
+      .room.hindu_temple{background:#e9dcc2}
+      .room.buddhist_temple{background:#d9cbb0}
+      .room.community_hall{background:#cdbf9f}
       .zone{position:absolute}
       .zone.tiles{background:repeating-conic-gradient(#d8d0c0 0 25%,#cbc2b1 0 50%) 0 0/32px 32px;box-shadow:inset 0 2px 0 #0002}
       .zone.carpet{background:#8d3a36;background-image:radial-gradient(#a24a44 1.2px,transparent 1.3px);background-size:9px 9px;border:3px solid #6e2a28;border-radius:4px;box-shadow:inset 0 0 0 6px #7a3230}
@@ -468,6 +555,25 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .f.plant::after{content:'';position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;background:#8fcc74;opacity:.7}
       .f.globe{background:radial-gradient(circle at 35% 35%,#9ccbe6,#2f6e9c 55%,#1c4466);border:2px solid #5a3b22;border-radius:50%;box-shadow:0 0 0 3px #8a5a3a,3px 4px 0 #0003}
       .f.pinboard{background:#b58a5a;border:2px solid #6b4a2b;box-shadow:none;border-radius:2px}
+      .f.mihrab{background:linear-gradient(180deg,#1f5f6b,#2f7f8c);border:3px solid #c9a24a;border-radius:30px 30px 4px 4px;box-shadow:inset 0 -8px 0 #17474f}
+      .f.minbar{background:repeating-linear-gradient(180deg,#8a6648 0 10px,#6b4a33 10px 12px);border:2px solid #3b2518;border-radius:3px 3px 1px 1px}
+      .f.ablution{background:#b9c3c6;border:2px solid #7d8a8e;box-shadow:none}
+      .f.ablution::after{content:'';position:absolute;left:8px;right:8px;top:4px;height:6px;background:repeating-linear-gradient(90deg,#5f6d79 0 4px,transparent 4px 24px)}
+      .f.shoerack{background:repeating-linear-gradient(90deg,#6b4a33 0 18px,#4a2c1c 18px 20px);border:2px solid #3b2518;box-shadow:none}
+      .f.ark{background:linear-gradient(180deg,#5a3a7a,#3e2558);border:3px solid #c9a24a;border-radius:4px}
+      .f.ark::after{content:'';position:absolute;left:46%;top:4px;bottom:4px;width:2px;background:#c9a24a}
+      .f.eternal-light{background:radial-gradient(circle,#ffe08a,#e2a33a 60%,#8a5a1a);border-radius:50%;box-shadow:0 0 12px #ffcf6a}
+      .f.bimah{background:#8c6b47;border:3px solid #5d4428;border-radius:4px;box-shadow:inset 0 0 0 5px #a07c55,3px 4px 0 #0003}
+      .f.shrine{background:linear-gradient(180deg,#c24a3d,#8f2e26);border:3px solid #d8b24f;border-radius:40px 40px 4px 4px}
+      .f.shrine::after{content:'';position:absolute;left:40%;right:40%;top:14px;bottom:6px;background:#1c1a24;border-radius:10px 10px 2px 2px;box-shadow:0 0 0 3px #d8b24f}
+      .f.diya{background:radial-gradient(circle,#ffd36a,#d07a2a 55%,#7a3a1a);border-radius:50%;box-shadow:0 0 10px #ffb84a}
+      .f.bell{background:radial-gradient(circle at 50% 35%,#f2d27a,#b8862e 65%,#6b4a12);border-radius:40% 40% 50% 50%;border:2px solid #5a3b0a}
+      .f.buddha{background:radial-gradient(ellipse at 50% 70%,#e0b84a,#b8862e 60%,#7a5a1a);border:3px solid #6b4a12;border-radius:50px 50px 8px 8px}
+      .f.cushion{background:radial-gradient(circle,#a83a2a,#7a2a1e);border:2px solid #5a1e14;border-radius:50%;box-shadow:2px 2px 0 #0003}
+      .f.incense{background:#5a4a3a;border:2px solid #2c251d;border-radius:4px}
+      .f.incense::after{content:'';position:absolute;left:30%;right:30%;top:-10px;height:10px;background:linear-gradient(0deg,#d9d9d966,transparent);border-radius:50%}
+      .f.gong{background:radial-gradient(circle,#e6c25a,#a87a1e 70%,#5a3b0a);border:3px solid #3b2518;border-radius:50%}
+      .f.stage{background:#6b4a33;border:2px solid #3b2518;box-shadow:inset 0 -8px 0 #4a2c1c,3px 4px 0 #0003}
       .note{position:absolute;top:2px;width:10px;height:7px;border:1px solid #0003}
       .note.n1{left:6px;background:#f7e9a8}.note.n2{left:30px;background:#dfe9f5;top:1px}.note.n3{left:56px;background:#f4cfc9}
       .flame{position:absolute;width:4px;height:7px;border-radius:50% 50% 45% 45%;background:#ffd76a;box-shadow:0 0 6px 2px #ffb84a99}

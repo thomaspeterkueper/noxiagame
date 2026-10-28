@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const [presenceQ, peopleQ, homesQ] = await Promise.all([
     supabase
       .from('person_surface_presence')
-      .select('person_id,latitude_deg,longitude_deg,spatial_region_id,source_kind,source_ref,confidence,updated_tick,people!inner(display_name,simulation_tier)')
+      .select('person_id,latitude_deg,longitude_deg,spatial_region_id,source_kind,source_ref,confidence,updated_tick,people!inner(display_name,simulation_tier,public_role,activity_state,last_action)')
       .eq('location_id', earth.id)
       .not('latitude_deg', 'is', null)
       .not('longitude_deg', 'is', null)
@@ -90,6 +90,18 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // Gebäude, an dem eine Person gerade ist, als OSM-Kennung – damit ein Innenraum
+  // (Kirche, Moschee, Saal …) zeigen kann, wer drinnen ist (28.10.2026).
+  const featureRefIds = [...new Set((presenceQ.data ?? []).map((row: { source_ref: string | null }) => String(row.source_ref ?? '')).filter(ref => ref.startsWith('region_feature:')).map(ref => ref.slice('region_feature:'.length)))]
+  const tileRefIds = [...new Set((presenceQ.data ?? []).map((row: { source_ref: string | null }) => String(row.source_ref ?? '')).filter(ref => ref.startsWith('tile_entity:')).map(ref => ref.slice('tile_entity:'.length)))]
+  const [featureOsmQ, tileOsmQ] = await Promise.all([
+    featureRefIds.length ? supabase.from('region_features').select('id,properties->>noxia_source_id').in('id', featureRefIds) : Promise.resolve({ data: [] as Array<Record<string, string>>, error: null }),
+    tileRefIds.length ? supabase.from('tile_entities').select('id,source_ref').in('id', tileRefIds) : Promise.resolve({ data: [] as Array<Record<string, string>>, error: null }),
+  ])
+  const osmByRef = new Map<string, string>()
+  for (const row of (featureOsmQ.data ?? []) as Array<Record<string, string>>) if (row.noxia_source_id) osmByRef.set('region_feature:' + row.id, String(row.noxia_source_id))
+  for (const row of (tileOsmQ.data ?? []) as Array<Record<string, string>>) if (row.source_ref) osmByRef.set('tile_entity:' + row.id, String(row.source_ref))
+
   return NextResponse.json({
     people: (presenceQ.data ?? [])
       .filter((row: any) => row.people?.simulation_tier === 'active')
@@ -103,6 +115,10 @@ export async function GET(req: NextRequest) {
         sourceRef: String(row.source_ref),
         confidence: Number(row.confidence ?? 0),
         updatedTick: Number(row.updated_tick ?? 0),
+        publicRole: row.people?.public_role ? String(row.people.public_role) : null,
+        activityState: String(row.people?.activity_state ?? ''),
+        lastAction: row.people?.last_action ? String(row.people.last_action) : null,
+        placeOsm: osmByRef.get(String(row.source_ref)) ?? null,
       }))
       .filter((row: any) => Number.isFinite(row.lat) && Number.isFinite(row.lon)),
     states,

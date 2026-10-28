@@ -8,6 +8,7 @@ const LANDMARK_LABEL: Record<string, string> = {
   archaeological_site: 'Ausgrabungsstätte', monument: 'Denkmal', memorial: 'Gedenkstätte', university: 'Universität',
   townhall: 'Rathaus', theatre: 'Theater', arts_centre: 'Kulturzentrum', hospital: 'Krankenhaus', station: 'Bahnhof',
   tower: 'Turm', lighthouse: 'Leuchtturm', observatory: 'Sternwarte',
+  community_centre: 'Gemeindezentrum', artlounge: 'Kultur · ArtLounge',
 }
 
 // Läden und Lokale (feature_type 'poi')

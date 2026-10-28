@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_LEVELS, LANDMARK_SPOT_REACH, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
+import { LANDMARK_LEVELS, LANDMARK_SPOT_REACH, buildingRoomKind, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
   landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
@@ -26,7 +26,40 @@ describe('landmark interiors', () => {
     expect(landmarkRoomKind('museum')).toBeNull()
   })
 
-  for (const kind of ['library', 'worship', 'shop', 'workshop', 'artlounge'] as const) {
+  it('chooses the worship room by religion', () => {
+    expect(landmarkRoomKind('place_of_worship', { religion: 'christian' })).toBe('worship')
+    expect(landmarkRoomKind('place_of_worship', { religion: 'muslim' })).toBe('mosque')
+    expect(landmarkRoomKind('place_of_worship', { religion: 'jewish' })).toBe('synagogue')
+    expect(landmarkRoomKind('place_of_worship', { religion: 'hindu' })).toBe('hindu_temple')
+    expect(landmarkRoomKind('place_of_worship', { religion: 'buddhist' })).toBe('buddhist_temple')
+    expect(landmarkRoomKind('community_centre')).toBe('community_hall')
+  })
+
+  it('opens real buildings by their use or OSM id', () => {
+    expect(buildingRoomKind('a:community_centre')).toBe('community_hall')
+    expect(buildingRoomKind('a:place_of_worship', null, { religion: 'muslim' })).toBe('mosque')
+    expect(buildingRoomKind('a:place_of_worship')).toBe('worship')
+    expect(buildingRoomKind('b:church')).toBe('worship')
+    expect(buildingRoomKind('b:synagogue')).toBe('synagogue')
+    expect(buildingRoomKind('b:apartments', 'osm:way:265117408')).toBe('artlounge')
+    expect(buildingRoomKind('b:apartments', 'osm:way:1')).toBeNull()
+    expect(buildingRoomKind(null)).toBeNull()
+  })
+
+  for (const kind of ['worship', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'artlounge'] as const) {
+    it(`${kind}: host and visitors stand on free, reachable floor`, () => {
+      const layout = landmarkRoomLayout(kind)
+      const cells = reachable(layout)
+      for (const p of [layout.hostAt, ...(layout.gatherAt ?? [])].filter(Boolean) as LandmarkPoint[]) {
+        expect(isLandmarkRoomBlocked(layout, p, 6), `${kind} ${p.x},${p.y}`).toBe(false)
+        expect(cells.some(cell => Math.hypot(cell.x - p.x, cell.y - p.y) <= 12), `${kind} reach ${p.x},${p.y}`).toBe(true)
+      }
+      expect(layout.hostAt, kind).toBeTruthy()
+      expect((layout.gatherAt ?? []).length, kind).toBeGreaterThanOrEqual(4)
+    })
+  }
+
+  for (const kind of ['library', 'worship', 'shop', 'workshop', 'artlounge', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall'] as const) {
     it(`${kind}: entrance is free and every spot can be reached on foot`, () => {
       const layout = landmarkRoomLayout(kind)
       expect(isLandmarkRoomBlocked(layout, layout.start)).toBe(false)

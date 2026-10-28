@@ -192,3 +192,14 @@ Migrationen: `20261028150000_religious_representatives.sql`, Korrektur `20261028
 - **Spielwoche:** Tag = floor(tick / 24) mod 7, Tag 0 = Montag (`WEEKDAY`, `weekPhase` in `realPlaceActivity.ts`). Weiterhin keine zweite Uhr. Dabei korrigiert: Der Gottesdienst an St. Johannes lag auf Phase 108 = Freitag 12 Uhr; jetzt Sonntag 10 Uhr.
 - **Ortszeit:** Termine zählen in Spielstunden ohne Zeitzone; in Dvārakā liegt die Aarti damit nicht genau auf indischer Ortszeit. Offen, bis es Ortszeiten im Tagesablauf gibt.
 - **Besucher:** wie beim Pilot nur aus bestehenden Beziehungen (Zuneigung ab 0,5); Teilnahme heißt nicht Zugehörigkeit.
+
+## Innenräume (Thomas, 28.10.2026: „haben die Kirchen und Begegnungsstätten schon Innenräume?“ – „ja mach das“)
+
+Vorher bekam jedes Gotteshaus denselben Kirchenraum, die Hubertushalle hatte keinen Raum, und Personen der Simulation erschienen drinnen nicht.
+
+- **Räume je Religion** (`lib/game/landmarks/interiors.ts`): Kirche (`worship`, wie bisher), Moschee (Gebetsteppich, Mihrab, Minbar, Waschraum, Schuhregal), Synagoge (Toraschrein, Ewiges Licht, Bima, Bänke), Hindu-Tempel (Schrein, Aarti-Lampen, Halle mit Säulen, Glocke), buddhistischer Tempel (Buddhafigur, Räucherwerk, Gong, Meditationskissen), Gemeindesaal (Bühne, Stuhlreihen, Tische, Teeküche, Pinnwand). Typische Grundrisse, nicht vermessen; Texte sachlich aus der Innensicht. Test: Jeder Ort im Raum ist zu Fuß erreichbar.
+- **Auswahl:** nach OSM-Religion (`worshipRoomKind`). Kartenpunkte bringen ihre Tags mit; reale Gebäude kennen in der Kachel nur die Nutzung, die Religion holt `/api/world-lab/place-info` aus den Ortsdaten.
+- **Betretbar in der Weltkarte:** neben Wahrzeichen jetzt auch reale Gebäude mit Nutzung Gotteshaus oder Gemeindezentrum (Lukaskirche, Hubertushalle, Dwarkadhish-Tempel …) und das Haus der CAMALEO-ArtLounge (`buildingRoomKind`).
+- **Personen drinnen** (`lib/game/population/placePresence.ts`): Der Raum zeigt, wer laut Simulation dort ist – über die OSM-Kennung des Gebäudes, bei Kartenpunkten über den Abstand (45 m). Wer dort arbeitet, steht vorne (`hostAt`), Besucher auf den Plätzen (`gatherAt`). Bei Terminen steht der Anlass dabei („Freitagsgebet“, „Resonanzrunde“). Die Gebäudetafel nennt schon draußen, wer drinnen ist.
+- **Gespräch:** Ansprechen führt zum Gespräch mit der echten Person (ihre ID, Rolle, Biografie, Gesprächsstimme); sie begrüßt von sich aus und weiß, wo sie ist und was gerade stattfindet.
+- **Grenze:** Wer gerade nicht da ist, steht auch nicht im Raum. Außerhalb der Termine sind Gotteshäuser oft leer, Träger(innen) arbeiten aber tagsüber meist dort.

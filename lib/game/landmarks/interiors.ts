@@ -2,9 +2,14 @@
 // Aktualisiert: 26.10.2026 — CAMALEO-ArtLounge als dreigeschossiges Stadthaus (EG ArtLounge mit Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer; Galerie und Dachstudio oben, Treppe); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
 // Version:      1.7.0
 
-export type LandmarkRoomKind = 'library' | 'worship' | 'shop' | 'workshop' | 'artlounge'
+export type LandmarkRoomKind =
+  | 'library' | 'worship' | 'shop' | 'workshop' | 'artlounge'
+  // Gotteshäuser je Religion und Gemeindesaal (NOXIA-NPC-RELIGION-0001, 28.10.2026).
+  // 'worship' bleibt die christliche Kirche.
+  | 'mosque' | 'synagogue' | 'hindu_temple' | 'buddhist_temple' | 'community_hall'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
+  | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
 export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number }
 /** Bodenzone – rein optisch, blockiert nicht. */
@@ -27,6 +32,10 @@ export type LandmarkRoomLayout = {
   /** Geschoss (0 = Erdgeschoss) und Anzeigename, nur bei mehrgeschossigen Häusern. */
   level?: number
   floorName?: string
+  /** Wo die Person steht, die den Ort trägt (Pfarrerin, Imam …), wenn sie da ist. */
+  hostAt?: LandmarkPoint
+  /** Wo Besucher bei einem Termin sitzen oder stehen (freie Plätze). */
+  gatherAt?: LandmarkPoint[]
 }
 
 export const LANDMARK_ROOM = { width: 760, height: 480, left: 24, right: 736, top: 28, bottom: 456 }
@@ -94,7 +103,9 @@ function worshipLayout(): LandmarkRoomLayout {
   furniture.push({ id: 'plant-1', kind: 'plant', x: 458, y: 60, w: 22, h: 22 })
   return {
     kind: 'worship',
-    noun: 'Gotteshaus',
+    noun: 'Kirche',
+    hostAt: { x: 380, y: 124 },
+    gatherAt: [{ x: 360, y: 200 }, { x: 400, y: 242 }, { x: 360, y: 284 }, { x: 400, y: 326 }, { x: 360, y: 368 }],
     start: { x: 380, y: 432 },
     exit: { x: 380, y: 452 },
     furniture,
@@ -155,6 +166,171 @@ function workshopLayout(): LandmarkRoomLayout {
       { id: 'bench', label: 'WERKBANK', x: 520, y: 92, text: 'Werkbänke mit Werkzeug, sauber aufgereiht.' },
       { id: 'parts', label: 'ERSATZTEILE', x: 610, y: 200, text: 'Ein Regal mit Ersatzteilen, nach Nummern sortiert.' },
       { id: 'desk', label: 'ANNAHME', x: 555, y: 440, action: 'staff', text: 'Die Annahme. Hier steht jemand, der den Betrieb kennt.' },
+    ],
+  }
+}
+
+
+// ── Gotteshäuser je Religion und Gemeindesaal (28.10.2026) ──────────────
+// Typische Grundrisse, nicht der vermessene Innenraum des realen Hauses.
+// Beschreibungen sachlich und aus der Innensicht, ohne Wertung.
+
+function mosqueLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'mihrab', kind: 'mihrab', x: 350, y: 28, w: 60, h: 30 },
+    { id: 'minbar', kind: 'minbar', x: 440, y: 34, w: 40, h: 70 },
+    { id: 'kursi', kind: 'lectern', x: 290, y: 60, w: 24, h: 22 },
+    { id: 'ablution', kind: 'ablution', x: 40, y: 390, w: 150, h: 30 },
+    { id: 'shoes-0', kind: 'shoerack', x: 560, y: 410, w: 130, h: 20 },
+    { id: 'shelf-quran', kind: 'shelf-low', x: 650, y: 150, w: 26, h: 120 },
+    { id: 'plant-0', kind: 'plant', x: 40, y: 330, w: 24, h: 24 },
+  ]
+  return {
+    kind: 'mosque', noun: 'Moschee', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'prayer-hall', kind: 'carpet', x: 60, y: 110, w: 560, h: 250 },
+      { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 },
+    ],
+    lamps: [{ x: 380, y: 200, r: 160, warm: true }, { x: 200, y: 240, r: 110 }, { x: 560, y: 240, r: 110 }, { x: 115, y: 400, r: 70 }],
+    staff: null,
+    hostAt: { x: 380, y: 92 },
+    gatherAt: [{ x: 300, y: 160 }, { x: 360, y: 160 }, { x: 420, y: 160 }, { x: 480, y: 160 }, { x: 330, y: 210 }, { x: 450, y: 210 }],
+    spots: [
+      { id: 'mihrab', label: 'MIHRAB', x: 380, y: 84, text: 'Die Gebetsnische in der Wand zeigt die Richtung nach Mekka, die Qibla. Alle beten in diese Richtung.' },
+      { id: 'minbar', label: 'MINBAR', x: 500, y: 90, text: 'Die Kanzel mit wenigen Stufen. Von hier hält der Imam die Predigt beim Freitagsgebet.' },
+      { id: 'hall', label: 'GEBETSRAUM', x: 380, y: 280, action: 'sit', text: 'Ein weiter Teppich, die Reihen sind in das Muster eingewebt. Man setzt sich auf den Boden.' },
+      { id: 'ablution', label: 'WASCHRAUM', x: 115, y: 440, text: 'Vor dem Gebet wäscht man Hände, Gesicht, Arme und Füße – die rituelle Waschung, Wudu.' },
+      { id: 'shoes', label: 'SCHUHREGAL', x: 625, y: 444, text: 'Die Schuhe bleiben vor dem Gebetsraum. Der Teppich wird nur ohne Schuhe betreten.' },
+    ],
+  }
+}
+
+function synagogueLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'ark', kind: 'ark', x: 330, y: 28, w: 100, h: 34 },
+    { id: 'ner-tamid', kind: 'eternal-light', x: 372, y: 70, w: 16, h: 14 },
+    { id: 'bimah', kind: 'bimah', x: 320, y: 190, w: 120, h: 60 },
+  ]
+  for (let row = 0; row < 4; row++) {
+    furniture.push({ id: `bench-l-${row}`, kind: 'pew', x: 80, y: 130 + row * 60, w: 170, h: 16 })
+    furniture.push({ id: `bench-r-${row}`, kind: 'pew', x: 510, y: 130 + row * 60, w: 170, h: 16 })
+  }
+  furniture.push({ id: 'shelf-books', kind: 'shelf-low', x: 690, y: 140, w: 26, h: 150 })
+  return {
+    kind: 'synagogue', noun: 'Synagoge', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'front', kind: 'chancel', x: 24, y: 28, w: 712, h: 72 },
+      { id: 'aisle', kind: 'rug', x: 290, y: 100, w: 180, h: 260 },
+    ],
+    lamps: [{ x: 380, y: 60, r: 90, warm: true }, { x: 380, y: 220, r: 130 }, { x: 165, y: 220, r: 110 }, { x: 595, y: 220, r: 110 }],
+    staff: null,
+    hostAt: { x: 380, y: 270 },
+    gatherAt: [{ x: 165, y: 158 }, { x: 595, y: 158 }, { x: 165, y: 218 }, { x: 595, y: 218 }, { x: 165, y: 278 }, { x: 595, y: 278 }],
+    spots: [
+      { id: 'ark', label: 'TORASCHREIN', x: 380, y: 90, text: 'Der Toraschrein, Aron ha-Kodesch, an der Ostwand. Hinter dem Vorhang stehen die Torarollen.' },
+      { id: 'ner-tamid', label: 'EWIGES LICHT', x: 300, y: 98, text: 'Das Ewige Licht, Ner Tamid, brennt immer über dem Toraschrein.' },
+      { id: 'bimah', label: 'BIMA', x: 380, y: 288, text: 'Das erhöhte Lesepult in der Mitte. Hier wird beim Gottesdienst aus der Tora gelesen.' },
+      { id: 'bench', label: 'BANK', x: 165, y: 330, action: 'sit', text: 'Die Bänke stehen zur Mitte und zum Schrein hin.' },
+      { id: 'books', label: 'GEBETBÜCHER', x: 660, y: 215, text: 'Gebetbücher, Siddurim, und Ausgaben der Tora für den Gottesdienst.' },
+    ],
+  }
+}
+
+function hinduTempleLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'shrine', kind: 'shrine', x: 300, y: 28, w: 160, h: 64 },
+    { id: 'diya-0', kind: 'diya', x: 270, y: 106, w: 18, h: 18 },
+    { id: 'diya-1', kind: 'diya', x: 472, y: 106, w: 18, h: 18 },
+    { id: 'offering', kind: 'table', x: 340, y: 130, w: 80, h: 26 },
+    { id: 'bell', kind: 'bell', x: 368, y: 360, w: 24, h: 24 },
+    { id: 'pillar-0', kind: 'wall', x: 150, y: 150, w: 22, h: 22 },
+    { id: 'pillar-1', kind: 'wall', x: 588, y: 150, w: 22, h: 22 },
+    { id: 'pillar-2', kind: 'wall', x: 150, y: 290, w: 22, h: 22 },
+    { id: 'pillar-3', kind: 'wall', x: 588, y: 290, w: 22, h: 22 },
+    { id: 'shoes-0', kind: 'shoerack', x: 560, y: 410, w: 130, h: 20 },
+  ]
+  return {
+    kind: 'hindu_temple', noun: 'Tempel', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'sanctum', kind: 'chancel', x: 260, y: 28, w: 240, h: 90 },
+      { id: 'mandapa', kind: 'tiles', x: 60, y: 118, w: 640, h: 230 },
+      { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 },
+    ],
+    lamps: [{ x: 380, y: 70, r: 100, warm: true }, { x: 380, y: 230, r: 150, warm: true }, { x: 170, y: 230, r: 100 }, { x: 590, y: 230, r: 100 }],
+    staff: null,
+    hostAt: { x: 380, y: 112 },
+    gatherAt: [{ x: 300, y: 200 }, { x: 380, y: 200 }, { x: 460, y: 200 }, { x: 330, y: 250 }, { x: 430, y: 250 }, { x: 380, y: 300 }],
+    spots: [
+      { id: 'shrine', label: 'SCHREIN', x: 380, y: 112, text: 'Das Allerheiligste mit dem Götterbild. Gläubige kommen zum Darshan: sehen und gesehen werden.' },
+      { id: 'aarti', label: 'AARTI-LAMPE', x: 300, y: 128, text: 'Bei der Aarti schwenkt der Priester Lichter vor dem Götterbild, dazu Gesang und Glocke.' },
+      { id: 'hall', label: 'HALLE', x: 380, y: 230, action: 'sit', text: 'Die offene Halle vor dem Schrein. Man sitzt auf dem Boden, Schuhe bleiben draußen.' },
+      { id: 'bell', label: 'GLOCKE', x: 380, y: 400, text: 'Beim Eintreten läutet man die Glocke und kündigt sich an.' },
+      { id: 'shoes', label: 'SCHUHREGAL', x: 625, y: 444, text: 'Die Schuhe bleiben am Eingang.' },
+    ],
+  }
+}
+
+function buddhistTempleLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'buddha', kind: 'buddha', x: 330, y: 28, w: 100, h: 58 },
+    { id: 'altar', kind: 'altar', x: 320, y: 96, w: 120, h: 26 },
+    { id: 'incense', kind: 'incense', x: 368, y: 136, w: 24, h: 18 },
+    { id: 'gong', kind: 'gong', x: 560, y: 70, w: 34, h: 34 },
+    { id: 'shoes-0', kind: 'shoerack', x: 560, y: 410, w: 130, h: 20 },
+    { id: 'plant-0', kind: 'plant', x: 250, y: 40, w: 24, h: 24 },
+    { id: 'plant-1', kind: 'plant', x: 486, y: 40, w: 24, h: 24 },
+  ]
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 6; col++) {
+    if (col === 2 || col === 3) continue
+    furniture.push({ id: `cushion-${row}-${col}`, kind: 'cushion', x: 170 + col * 76, y: 200 + row * 56, w: 30, h: 24 })
+  }
+  return {
+    kind: 'buddhist_temple', noun: 'Tempel', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'altar-zone', kind: 'chancel', x: 220, y: 28, w: 320, h: 130 },
+      { id: 'hall', kind: 'parquet', x: 60, y: 158, w: 640, h: 200 },
+      { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 },
+    ],
+    lamps: [{ x: 380, y: 70, r: 110, warm: true }, { x: 380, y: 260, r: 150 }, { x: 577, y: 90, r: 50, warm: true }],
+    staff: null,
+    hostAt: { x: 380, y: 170 },
+    gatherAt: [{ x: 200, y: 236 }, { x: 276, y: 236 }, { x: 504, y: 236 }, { x: 580, y: 236 }, { x: 200, y: 292 }, { x: 580, y: 292 }],
+    spots: [
+      { id: 'buddha', label: 'BUDDHA', x: 380, y: 150, text: 'Die Buddhafigur. Man verneigt sich, nicht vor einem Gott, sondern vor dem Erwachen, für das sie steht.' },
+      { id: 'incense', label: 'RÄUCHERWERK', x: 330, y: 160, text: 'Räucherstäbchen als Gabe. Ihr Duft verteilt sich im ganzen Raum – wie die Wirkung guter Taten.' },
+      { id: 'cushions', label: 'KISSEN', x: 380, y: 260, action: 'sit', text: 'Meditationskissen in Reihen. Hier sitzt man still und folgt dem Atem.' },
+      { id: 'gong', label: 'GONG', x: 520, y: 120, text: 'Der Gong markiert Anfang und Ende der Meditation.' },
+      { id: 'shoes', label: 'SCHUHREGAL', x: 625, y: 444, text: 'Die Schuhe bleiben am Eingang.' },
+    ],
+  }
+}
+
+function communityHallLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'stage', kind: 'stage', x: 220, y: 28, w: 320, h: 56 },
+    { id: 'kitchen', kind: 'counter', x: 560, y: 380, w: 150, h: 30 },
+    { id: 'pinboard', kind: 'pinboard', x: 40, y: 140, w: 14, h: 90 },
+    { id: 'table-0', kind: 'table', x: 90, y: 300, w: 70, h: 40 },
+    { id: 'table-1', kind: 'table', x: 90, y: 370, w: 70, h: 40 },
+    { id: 'plant-0', kind: 'plant', x: 690, y: 40, w: 24, h: 24 },
+  ]
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 8; col++) {
+    if (col === 3 || col === 4) continue
+    furniture.push({ id: `chair-${row}-${col}`, kind: 'chair', x: 230 + col * 40, y: 140 + row * 48, w: 22, h: 20 })
+  }
+  return {
+    kind: 'community_hall', noun: 'Saal', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [{ id: 'floor', kind: 'parquet', x: 24, y: 28, w: 712, h: 348 }, { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 }],
+    lamps: [{ x: 380, y: 60, r: 120, warm: true }, { x: 380, y: 200, r: 150 }, { x: 125, y: 350, r: 90 }, { x: 635, y: 395, r: 70, warm: true }],
+    staff: null,
+    hostAt: { x: 380, y: 104 },
+    gatherAt: [{ x: 250, y: 172 }, { x: 290, y: 172 }, { x: 490, y: 172 }, { x: 530, y: 172 }, { x: 250, y: 220 }, { x: 530, y: 220 }],
+    spots: [
+      { id: 'stage', label: 'BÜHNE', x: 380, y: 104, text: 'Eine kleine Bühne für Vorträge, Musik und Versammlungen.' },
+      { id: 'seats', label: 'STUHLREIHEN', x: 380, y: 200, action: 'sit', text: 'Stuhlreihen, je nach Anlass umgestellt.' },
+      { id: 'tables', label: 'TISCHE', x: 200, y: 330, action: 'sit', text: 'Tische für das Gespräch danach.' },
+      { id: 'kitchen', label: 'TEEKÜCHE', x: 635, y: 440, text: 'Die Teeküche. Es gibt Kaffee und Tee für alle.' },
+      { id: 'board', label: 'PINNWAND', x: 80, y: 185, text: 'Aushänge: Termine, Vereine, Gesprächskreise.' },
     ],
   }
 }
@@ -265,19 +441,60 @@ function artLoungeLayout(level: number, byStairs: boolean): LandmarkRoomLayout {
     exit: { x: 380, y: 452 },
     staff: { id: 'host', role: 'Gastgeber(in)', x: 545, y: 378, greeting: 'Willkommen in der ArtLounge! Heute Abend ist der Flügel frei – und die Stühle sind fast schon gestellt.' },
     floorName: 'Erdgeschoss · ArtLounge',
+    hostAt: { x: 540, y: 236 },
+    gatherAt: [{ x: 372, y: 275 }, { x: 190, y: 340 }, { x: 230, y: 380 }, { x: 300, y: 400 }],
   }
 }
 
+/** Raum eines Gotteshauses nach Religion (OSM `religion`) oder Bauart (`building=mosque` …). */
+export function worshipRoomKind(religion?: string | null, buildingType?: string | null): LandmarkRoomKind {
+  const r = String(religion ?? '').toLowerCase(), b = String(buildingType ?? '').toLowerCase()
+  if (r === 'muslim' || b === 'mosque') return 'mosque'
+  if (r === 'jewish' || b === 'synagogue') return 'synagogue'
+  if (r === 'hindu') return 'hindu_temple'
+  if (r === 'buddhist') return 'buddhist_temple'
+  if (b === 'temple') return 'buddhist_temple'
+  return 'worship'
+}
+
 /** Landmark classes that have a walkable interior; all others show the place card. */
-export function landmarkRoomKind(landmarkClass: string): LandmarkRoomKind | null {
+export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, string>): LandmarkRoomKind | null {
   if (landmarkClass === 'library') return 'library'
-  if (landmarkClass === 'place_of_worship') return 'worship'
+  if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
+  if (landmarkClass === 'community_centre') return 'community_hall'
+  return null
+}
+
+/**
+ * Reale Gebäude der Weltkarte mit begehbarem Raum, nach heutiger Nutzung
+ * (`lib/worldlab/buildingUse.ts`, z. B. „a:place_of_worship“, „b:church“) oder
+ * OSM-Kennung (CAMALEO-ArtLounge). `tags` stammen von einem Wahrzeichen im Haus.
+ */
+export const ARTLOUNGE_OSM_ID = 'osm:way:265117408'
+export function buildingRoomKind(useCode?: string | null, source?: string | null, tags?: Record<string, string>): LandmarkRoomKind | null {
+  if (source === ARTLOUNGE_OSM_ID) return 'artlounge'
+  const [prefix, value = ''] = String(useCode ?? '').split(':')
+  if (prefix === 'a' && value === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
+  if (prefix === 'a' && value === 'community_centre') return 'community_hall'
+  if (prefix === 'b' && ['church', 'chapel', 'cathedral'].includes(value)) return 'worship'
+  if (prefix === 'b' && ['mosque', 'synagogue', 'temple'].includes(value)) return worshipRoomKind(tags?.religion, value)
   return null
 }
 
 export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs = false): LandmarkRoomLayout {
-  return kind === 'library' ? libraryLayout() : kind === 'worship' ? worshipLayout() : kind === 'shop' ? shopLayout() : kind === 'artlounge' ? artLoungeLayout(level, byStairs) : workshopLayout()
+  switch (kind) {
+    case 'library': return libraryLayout()
+    case 'worship': return worshipLayout()
+    case 'shop': return shopLayout()
+    case 'artlounge': return artLoungeLayout(level, byStairs)
+    case 'mosque': return mosqueLayout()
+    case 'synagogue': return synagogueLayout()
+    case 'hindu_temple': return hinduTempleLayout()
+    case 'buddhist_temple': return buddhistTempleLayout()
+    case 'community_hall': return communityHallLayout()
+    default: return workshopLayout()
+  }
 }
 
 export function isLandmarkRoomBlocked(layout: LandmarkRoomLayout, p: LandmarkPoint, radius = LANDMARK_PLAYER_RADIUS) {

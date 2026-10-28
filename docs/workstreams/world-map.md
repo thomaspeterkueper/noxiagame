@@ -378,6 +378,14 @@ Thomas (28.10.2026): „auch wichtig, dass die NPCs auch normal durch die Stadt 
 - `/api/world-lab/people`: zusätzlich `states` (Tätigkeit, Schlaf, Wohnung – Spielgebäude oder realer Grundriss).
 - Gemeinsame Regeln und Tempo: `lib/game/population/visibleMovement.ts`.
 
+### W-10 (Philosophie/NPC, 28.10.2026): Gotteshäuser, Gemeindezentren und ArtLounge betretbar, mit den Personen der Simulation – erledigt (28.10.2026)
+
+Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architecture/NOXIA-NPC-RELIGION-0001-spiritual-roles-and-places.md`, Abschnitt „Innenräume“).
+
+- `WorldPanels.tsx`: Gebäudetafel bietet „Betreten“ für reale Gotteshäuser, Gemeindezentren und das Haus der CAMALEO-ArtLounge (`buildingRoomKind`); Wahrzeichen öffnen den Raum ihrer Religion. Die Tafel nennt, wer gerade drinnen ist.
+- `/api/world-lab/people` liefert je Person zusätzlich Rolle, Tätigkeit, letzte Handlung und die OSM-Kennung des Gebäudes (`placeOsm`); neu `/api/world-lab/place-info` (Religion eines realen Gebäudes).
+- `LandmarkWalkableInterior.tsx`: Personen der Simulation im Raum, ansprechbar mit ihrer echten ID; neue Möbel und Böden.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

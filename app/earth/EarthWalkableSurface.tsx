@@ -775,14 +775,14 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         ['Adresse',[openLandmark.tags['addr:street'],openLandmark.tags['addr:housenumber']].filter(Boolean).join(' ')],
         ['Geöffnet',openLandmark.tags.opening_hours],
       ].flatMap(([label,value])=>value?[{label:String(label),value:String(value)}]:[])}/>}
-      {openLandmark&&!openLandmark.business&&landmarkRoomKind(openLandmark.kind)&&<LandmarkWalkableInterior kind={landmarkRoomKind(openLandmark.kind)!} name={openLandmark.name} typeLabel={landmarkLabel(openLandmark.kind,openLandmark.tags)} onClose={()=>setOpenLandmarkId('')} facts={[
+      {openLandmark&&!openLandmark.business&&landmarkRoomKind(openLandmark.kind,openLandmark.tags)&&<LandmarkWalkableInterior kind={landmarkRoomKind(openLandmark.kind,openLandmark.tags)!} name={openLandmark.name} typeLabel={landmarkLabel(openLandmark.kind,openLandmark.tags)} onClose={()=>setOpenLandmarkId('')} facts={[
         ['Adresse',[openLandmark.tags['addr:street'],openLandmark.tags['addr:housenumber']].filter(Boolean).join(' ')],
         ['Geöffnet',openLandmark.tags.opening_hours],
         ['Konfession',openLandmark.tags.denomination],
         ['Erbaut',openLandmark.tags.start_date],
         ['Träger',openLandmark.tags.operator],
       ].flatMap(([label,value])=>value?[{label:String(label),value:String(value)}]:[])}/>}
-      {openLandmark&&!openLandmark.business&&!landmarkRoomKind(openLandmark.kind)&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
+      {openLandmark&&!openLandmark.business&&!landmarkRoomKind(openLandmark.kind,openLandmark.tags)&&<div className="earth-landmark-room" role="dialog" aria-label={openLandmark.name}>
         <div className="head"><div><small>REALER ORT · {landmarkLabel(openLandmark.kind,openLandmark.tags).toUpperCase()}</small><b>{openLandmark.name}</b></div><button onClick={()=>setOpenLandmarkId('')}>×</button></div>
         <svg viewBox="-14 -14 28 28" width="54" height="54" aria-hidden="true"><circle r="12" fill="#f4ecd2" stroke="#17313c" strokeWidth="1.2"/>{landmarkGlyph(openLandmark.kind,openLandmark.tags)}</svg>
         {openLandmark.tags.description&&<p>{String(openLandmark.tags.description)}</p>}

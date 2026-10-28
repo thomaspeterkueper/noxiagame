@@ -16,7 +16,8 @@ import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
-import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
 import { VENUE_TYPE_IDS } from '@/lib/game/hospitality/venueStatus'
@@ -34,14 +35,14 @@ export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
   | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind; poi?: WorldLandmark; /** Nutzung aus OSM (`buildingUse.ts`) und OSM-Name des Hauses */ use?: string; osmName?: string }
-  | { kind: 'landmark'; landmark: WorldLandmark }
+  | { kind: 'landmark'; landmark: WorldLandmark; /** OSM-Kennung des Hauses, wenn das Wahrzeichen in einem Gebäude steht */ source?: string }
   | { kind: 'site'; id: string }
   | { kind: 'plot'; source: string }
   | { kind: 'parcel'; id: string; at: GeoPoint }
   /** Boden ohne geladenes Flurstück: Flurstück nachladen oder freies Land abstecken (28.10.2026) */
   | { kind: 'land'; at: GeoPoint }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
-  | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
+  | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark; source?: string }
   /** Reise buchen fern von Sundern (Heim- und Weiterreise, 27.10.2026) */
   | { kind: 'travel'; at: GeoPoint }
 
@@ -64,7 +65,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'plot') return { kind: 'plot', source: pick.source }
   if (pick.type === 'parcel') return { kind: 'parcel', id: pick.id, at: pick.at }
   // Ein Wahrzeichen-Gebäude (Kirche, Bibliothek) öffnet das Wahrzeichen, außer es ist ein NOXIA-Gebäude.
-  if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark }
+  if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark, source: pick.source }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
   if (pick.type === 'noxia') return own ? { kind: 'building', at: { lat: own.lat, lon: own.lon }, title: own.name, noxiaId: own.id } : { kind: 'none' }
   return { kind: 'building', at: pick.at, title: own?.name ?? pick.name ?? BLOCK_NAMES[pick.kind], address: pick.address, noxiaId: own?.id, source: pick.source, areaM2: pick.areaM2, levels: pick.levels, block: pick.kind, poi: pick.poi, use: pick.use, osmName: pick.name }
@@ -106,7 +107,9 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 /** Baubarer Typ aus /api/game/build/spatial (available). */
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean } }
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked }: {
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [] }: {
+  /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
+  presence?: PresenceRow[]
   /** Reise auf der Erde gebucht (Reisebüro) – die Karte zeigt die Fahrt und springt bei Ankunft. */
   onTripBooked?: (trip: EarthTrip) => void
   engine: WorldEngine | null
@@ -223,7 +226,35 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const own = building?.noxiaId ? noxia.find(item => item.id === building.noxiaId) ?? null : null
   const entry = own ? getBuildingEntryDefinition(own.typeId) : null
   const landmark = panel.kind === 'landmark' ? panel.landmark : null
-  const room = landmark ? landmarkRoomKind(landmark.kind) : null
+  const room = landmark ? landmarkRoomKind(landmark.kind, landmark.tags) : null
+  const landmarkSource = panel.kind === 'landmark' ? panel.source : undefined
+  // Religion eines realen Gotteshauses (die Kachel kennt nur „Gotteshaus“): aus den Ortsdaten nachladen.
+  const [placeInfo, setPlaceInfo] = useState<Record<string, { name: string | null; religion: string | null; denomination: string | null; building: string | null }>>({})
+  const worshipSource = building && !building.noxiaId && building.source && /^a:place_of_worship$|^b:(church|chapel|cathedral|mosque|synagogue|temple)$/.test(building.use ?? '') ? building.source : null
+  useEffect(() => {
+    if (!worshipSource || placeInfo[worshipSource]) return
+    let live = true
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        const response = await fetch('/api/world-lab/place-info?source=' + encodeURIComponent(worshipSource), { headers: { Authorization: 'Bearer ' + token } })
+        const json = await response.json().catch(() => null)
+        if (live && response.ok && json) setPlaceInfo(current => ({ ...current, [worshipSource]: json }))
+      } catch { /* ohne Angaben öffnet sich der allgemeine Raum */ }
+    })()
+    return () => { live = false }
+  }, [worshipSource, placeInfo])
+  const info = building?.source ? placeInfo[building.source] : undefined
+  const infoTags: Record<string, string> = info ? Object.fromEntries(Object.entries({ religion: info.religion, denomination: info.denomination, building: info.building }).filter(([, value]) => Boolean(value))) as Record<string, string> : {}
+  // Reale Gebäude mit begehbarem Raum: Gotteshaus, Gemeindezentrum, CAMALEO-ArtLounge.
+  const buildingRoom = building && !building.noxiaId ? buildingRoomKind(building.use, building.source, { ...infoTags, ...(building.poi?.tags ?? {}) }) : null
+  function buildingAsLandmark(): WorldLandmark | null {
+    if (!building || !buildingRoom) return null
+    const kind = buildingRoom === 'community_hall' ? 'community_centre' : buildingRoom === 'artlounge' ? 'artlounge' : 'place_of_worship'
+    const religion = buildingRoom === 'mosque' ? 'muslim' : buildingRoom === 'synagogue' ? 'jewish' : buildingRoom === 'hindu_temple' ? 'hindu' : buildingRoom === 'buddhist_temple' ? 'buddhist' : buildingRoom === 'worship' ? 'christian' : undefined
+    const name = building.source === ARTLOUNGE_OSM_ID ? 'CAMALEO-ArtLounge' : building.osmName ?? info?.name ?? building.poi?.name ?? building.title
+    return { at: building.at, name, kind, tags: { ...(religion ? { religion } : {}), ...infoTags, ...(building.poi?.tags ?? {}) } }
+  }
 
   // Abstände je Anzeige neu (tick)
   const personDistance = useMemo(() => {
@@ -414,7 +445,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const onKey = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.closest?.('input,textarea,select')) return
       if (event.key === 'Escape' && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') close()
-      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && landmark && room && landmarkNear) setPanel({ kind: 'landmarkInside', room, landmark })
+      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && landmark && room && landmarkNear) setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })
       if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && panel.kind === 'building' && entry && own && buildingDistance !== null && buildingDistance <= ENTER_RANGE_M) enter()
     }
     window.addEventListener('keydown', onKey)
@@ -510,7 +541,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     }}/>
   }
   if (panel.kind === 'landmarkInside') {
-    return <LandmarkWalkableInterior kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}/>
+    return <LandmarkWalkableInterior kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
+      people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
   }
   if (panel.kind === 'none') return null
 
@@ -535,11 +567,21 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       </dl>}
       {/* Gastronomie, Aufgabe 11: bei Lokalen offen/geschlossen mit Uhrzeit */}
       {own && !own.conversion && VENUE_TYPE_IDS.has(own.typeId) && <VenueStatusLine entityId={own.id} typeId={own.typeId}/>}
+      {!own && buildingRoom && (() => {
+        const inside = buildingAsLandmark()
+        const here = inside ? peopleAtPlace(presence, { osm: building.source, at: building.at, radiusM: 45 }) : []
+        return inside && <>
+          {here.length > 0 && <p className="muted">Gerade drinnen: {here.map(person => person.name).join(', ')}{here[0]?.doing ? ` · ${here[0].doing}` : ''}</p>}
+          {buildingDistance !== null && buildingDistance <= ENTER_RANGE_M + 6
+            ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room: buildingRoom, landmark: inside, source: building.source })}>Betreten</button></div>
+            : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, ENTER_RANGE_M + 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+        </>
+      })()}
       {own && entry
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
-        : <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+        : !buildingRoom && <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
       {own?.typeId === 'travel_agency' && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
         ? (showAgency
           ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
@@ -610,7 +652,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {landmark.tags.description && <p>{landmark.tags.description}</p>}
       {landmarkFacts(landmark.tags).length > 0 && <dl>{landmarkFacts(landmark.tags).map(fact => <Fragment key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></Fragment>)}</dl>}
       {room && landmarkNear
-        ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark })}>Betreten</button></div>
+        ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })}>Betreten</button></div>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}

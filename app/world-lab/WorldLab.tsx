@@ -11,6 +11,7 @@
 //   - Gezeichnet wird über die Grafikkarte; Bewegung läuft je Bild, nicht je Tastendruck.
 //   - Reale Orte sind stark vereinfacht: Blöcke aus einem Baukasten (lib/worldlab/blocks.ts).
 
+import type { PresenceRow } from '@/lib/game/population/placePresence'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
@@ -61,7 +62,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const starterCafe = useRef<string | null | undefined>(undefined)
   const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
   const noxiaRef = useRef<NoxiaBuilding[]>([])
-  const [surfacePeople, setSurfacePeople] = useState<Array<{ id: string; lat: number; lon: number }>>([])
+  const [surfacePeople, setSurfacePeople] = useState<PresenceRow[]>([])
   // Tätigkeit, Schlaf und Wohnung je Person (für sichtbare Wege, 28.10.2026)
   const [surfaceStates, setSurfaceStates] = useState<Array<{ id: string; activityState: string; asleep: boolean; home: { lat: number; lon: number } | null }>>([])
   // Entwicklerdinge (Messwerte, Nachladen, alte Szene) nur mit ?dev=1 – einmal gesetzt, bleibt es (W-2).
@@ -655,7 +656,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {destinationNote && <p className="note">{destinationNote}</p>}
         </>}
       </div>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
