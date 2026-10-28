@@ -46,6 +46,17 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 
 - **28.10.2026 – Bestellen im Gespräch, Toilette, Gesprächsende (G-6):** Was man der Bedienung sagt, wird per Knopf zur echten Buchung; jedes Lokal hat eine WC-Tür (frei für jeden); nach einem Abbruch ist das Eingabefeld gesperrt; im Restaurant heißt der Knopf jetzt „Zum Empfang gehen“. Im Browser am Balkan Grill mit Testdaten geprüft, Tests in `spokenOrder.test.ts`.
 
+- **28.10.2026 – Nachtclub** (Thomas: „ich glaube wir brauchen einen Nachtclub“):
+  - Neue Lokalart `nightclub`. Der Raum hat:
+    - eine leuchtende, begehbare Tanzfläche vor dem DJ-Pult;
+    - einen Tresen, zwei Stehtische und eine violette Lounge;
+    - einen Türsteher beim Eingang und das WC.
+  - Geöffnet 22 bis 5 Uhr.
+  - **Tanzen** ist eine neue Handlung: Auf der Tanzfläche erscheint der Knopf „Tanzen“, die Figur bewegt sich, und das Personal weiß „Dein Gegenüber tanzt gerade“. Gäste auf der Tanzfläche tanzen mit.
+  - Eigene Einführung. Eingang, Symbol ♫, Gebäudetafel und „Eintritt“ bzw. „Shot“ im Gespräch sind angelegt.
+  - Im Browser mit Testdaten geprüft.
+  - Spielbar wird er mit R-19: Gebäudeart, Umbau, Karte und Personal.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -63,6 +74,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-15** (27.10.2026): Lernschwellen serverseitig durchsetzen (Sicherheiten, Zinseszins, Arbitrage, Bodenwert) – `population-economy.md`.
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`.
+- **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`.
 - **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.
 - **W-7** (27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen (Bank sah nach dem Laden aus wie ein normales Haus) – `world-map.md`.
 

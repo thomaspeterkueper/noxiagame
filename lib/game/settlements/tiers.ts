@@ -40,6 +40,8 @@ export const SOCIAL_INFRASTRUCTURE: Record<string, SocialInfrastructureKind> = {
   restaurant: { arrivalPoint: false, hostsConversation: true },
   // Hotel: Zimmer am Empfang, Lobby als Treffpunkt für Reisende.
   hotel: { arrivalPoint: false, hostsConversation: true },
+  // Nachtclub: Begegnungsort bei Nacht, kein Startpunkt.
+  nightclub: { arrivalPoint: false, hostsConversation: true },
   // Das handgebaute Q1-Modul erfüllt die Stufe, ist aber kein Startpunkt.
   q1_everyday_life: { arrivalPoint: false, hostsConversation: false },
 }

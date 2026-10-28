@@ -51,6 +51,15 @@ const INTRODUCTIONS: Readonly<Record<VenueIntroStyle, { stance: string; leads: r
       'In der Akademie legt man Prüfungen ab; mehr Wissen öffnet mehr Möglichkeiten',
     ],
   },
+  nightclub: {
+    stance: 'Du redest kurz und laut, weil die Musik laut ist, und kennst die Nacht. Neuen erzählst du, wer hier feiert und wer hier Kontakte knüpft; gute Leute lernt man nachts kennen. Du hältst Abstand zu Ärger und sagst offen, wenn jemand genug hat.',
+    leads: [
+      'Hier lernt man Leute kennen: Wer etwas aufbauen will, findet nachts Partner, die tagsüber keine Zeit haben',
+      'Betriebe brauchen Leute; wer Personal sucht, hört sich auch hier um',
+      'Wer feiern will, braucht Credits: Erst verdienen, dann ausgeben – Arbeit gibt es in den Betrieben am Ort',
+      'In der Akademie legt man Prüfungen ab; mehr Wissen öffnet mehr Möglichkeiten',
+    ],
+  },
   hotel: {
     stance: 'Du bist zuvorkommend wie am Empfang. Neuen zeigst du zuerst die Gegend: was es zu sehen gibt, wohin sich ein Ausflug lohnt und wie man weiterreist. Geschäfte kommen für dich danach.',
     leads: [

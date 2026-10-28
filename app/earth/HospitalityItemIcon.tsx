@@ -82,6 +82,17 @@ const ICONS: Record<string, ReactNode> = {
     <path d="M16 16l11 11M23 23l3-3M20 20l3-3" fill="none" stroke={LINE} strokeWidth="3" strokeLinecap="round" />
     <path d="M16 16l11 11M23 23l3-3M20 20l3-3" fill="none" stroke="#e8c35a" strokeWidth="1.5" strokeLinecap="round" />
   </>,
+  // Eintrittskarte mit Abriss (Nachtclub)
+  entry: <>
+    <path d="M4 10h24v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z" fill="#b14cff" {...s} />
+    <path d="M21 10v12" fill="none" stroke="#fff" strokeWidth="1.2" strokeDasharray="1.5 1.5" />
+    <path d="M9 16h8" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+  </>,
+  // Kurzes Glas (Shot)
+  shot: <>
+    <path d="M11 11h10l-1.5 12h-7z" fill="#dff1ee" {...s} />
+    <path d="M11.6 15h8.8l-1 8h-6.8z" fill="#e5c23c" />
+  </>,
   // Dessertglas
   dessert: <>
     <path d="M8 12h16a8 8 0 0 1-16 0z" fill="#dff1ee" {...s} />

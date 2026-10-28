@@ -32,6 +32,10 @@ export const VENUE_USAGES: Readonly<Record<VenueUsage, VenueUsageRule>> = {
   bar: { cost: 1800, buildTicks: 2, minAreaM2: 50, staff: { small: 1, standard: 2, large: 3 } },
   restaurant: { cost: 2400, buildTicks: 2, minAreaM2: 70, staff: { small: 2, standard: 3, large: 4 } },
   hotel: { cost: 3600, buildTicks: 3, minAreaM2: 90, staff: { small: 2, standard: 2, large: 3 } },
+  // Nachtclub (Gastronomie, 28.10.2026; Vorschlag in R-19): Tresen, Tür, DJ, zweiter Tresen.
+  // Angeboten wird der Umbau erst, wenn building_definitions eine Zeile `nightclub` hat
+  // und start_earth_venue_conversion den Typ annimmt (R-19).
+  nightclub: { cost: 3000, buildTicks: 3, minAreaM2: 120, staff: { small: 2, standard: 3, large: 4 } },
 }
 
 /** Wohnfläche je Wohnplatz in den Obergeschossen (wie beim Kauf eines Wohnhauses). */

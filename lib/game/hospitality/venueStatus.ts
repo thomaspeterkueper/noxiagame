@@ -6,7 +6,7 @@
 
 import { clockLabel, venueHoursText, venueOpenAt, type VenueHours, type VenueKind } from './venues'
 
-export const VENUE_TYPE_IDS: ReadonlySet<string> = new Set(['cafe', 'bar', 'restaurant', 'hotel'])
+export const VENUE_TYPE_IDS: ReadonlySet<string> = new Set(['cafe', 'bar', 'restaurant', 'hotel', 'nightclub'])
 
 export interface VenueStatusInput {
   kind: VenueKind

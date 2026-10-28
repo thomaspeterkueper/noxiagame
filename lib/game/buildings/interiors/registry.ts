@@ -55,6 +55,7 @@ export const INTERIOR_TEMPLATE_REGISTRY: InteriorTemplateRegistry = {
     cafe: CAFE_STANDARD_INTERIOR.id,
     'café': CAFE_STANDARD_INTERIOR.id,
     bar: BAR_STANDARD_INTERIOR.id,
+    nightclub: BAR_STANDARD_INTERIOR.id,
     restaurant: RESTAURANT_STANDARD_INTERIOR.id,
     hotel: HOTEL_STANDARD_INTERIOR.id,
     habitat: HABITAT_STANDARD_INTERIOR.id,

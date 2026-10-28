@@ -23,12 +23,12 @@ import { BAR_STANDARD_INTERIOR } from '../buildings/interiors/templates/barStand
 import { HOTEL_STANDARD_INTERIOR } from '../buildings/interiors/templates/hotelStandard'
 import { RESTAURANT_STANDARD_INTERIOR } from '../buildings/interiors/templates/restaurantStandard'
 
-export type VenueKind = 'cafe' | 'bar' | 'restaurant' | 'hotel'
+export type VenueKind = 'cafe' | 'bar' | 'restaurant' | 'hotel' | 'nightclub'
 
 export interface VenuePoint { x: number; y: number }
 
 export type VenueFurnitureKind =
-  | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs' | 'lectern' | 'board'
+  | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs' | 'lectern' | 'board' | 'dj-booth' | 'sofa'
 
 export interface VenueFurniture {
   id: string
@@ -78,6 +78,8 @@ export interface VenueLayout {
   guestBackFact: string
   /** Was das Personal über den Personalbereich weiß. */
   staffBackFact: string
+  /** Tanzfläche (Nachtclub): begehbar, kein Möbel; wer darauf steht, kann tanzen. */
+  danceFloor?: { x: number; y: number; w: number; h: number }
 }
 
 export const VENUE_WIDTH = 760
@@ -208,6 +210,59 @@ const BAR_LAYOUT: VenueLayout = {
   staffBackFact: 'Hinter dem Tresen liegt das Lager; Gäste haben dort keinen Zutritt',
 }
 
+// ── Nachtclub ───────────────────────────────────────────────────────────────
+// Thomas, 28.10.2026: „ich glaube wir brauchen einen Nachtclub“. Tanzfläche vor
+// dem DJ-Pult, Tresen an der rechten Wand, Stehtische links, Lounge vorn,
+// Türsteher beim Eingang. Fenster gibt es keine. Die Tanzfläche ist kein Möbel:
+// man geht darüber und kann dort tanzen.
+const CLUB_FLOOR = { x: 190, y: 118, w: 290, h: 190 }
+const clubDanceSpots: VenueSpot[] = [0, 1, 2].flatMap(col => [0, 1].map(row => standingSpot(`dance-${col * 2 + row + 1}`, CLUB_FLOOR.x + 55 + col * 90, CLUB_FLOOR.y + 55 + row * 80, 'auf der Tanzfläche')))
+const clubHighTables: Array<[number, number]> = [[70, 150], [70, 250]]
+const clubLounge = [tableWithChairs(1, 280, 372), tableWithChairs(2, 420, 372)]
+
+const NIGHTCLUB_LAYOUT: VenueLayout = {
+  kind: 'nightclub',
+  template: BAR_STANDARD_INTERIOR,
+  noun: 'Nachtclub',
+  locative: 'im Nachtclub',
+  width: VENUE_WIDTH,
+  height: VENUE_HEIGHT,
+  start: START,
+  exit: EXIT,
+  playerRoomId: 'guest-room',
+  servicePoint: { x: 565, y: 205, label: 'AM TRESEN', locative: 'am Tresen' },
+  windows: [],
+  furniture: [
+    { id: 'dj-booth', kind: 'dj-booth', x: 285, y: 54, w: 100, h: 30 },
+    { id: 'counter', kind: 'counter', x: 590, y: 95, w: 40, h: 230 },
+    { id: 'shelf', kind: 'shelf', x: 700, y: 95, w: 16, h: 230 },
+    ...clubHighTables.map(([x, y], index) => ({ id: `high-table-${index + 1}`, kind: 'high-table' as const, x, y, w: 40, h: 40 })),
+    ...clubLounge.flatMap((t, i) => t.furniture.map(item => ({ ...item, id: item.id.replace(`-${i + 1}`, `-lounge-${i + 1}`), kind: item.kind === 'chair' ? 'sofa' as const : item.kind }))),
+  ],
+  spots: [
+    staffSpot('staff-counter', 665, 160, 'counter', 'hinter dem Tresen'),
+    staffSpot('staff-door', 160, 340, 'guest-room', 'an der Tür'),
+    staffSpot('staff-dj', 335, 48, 'guest-room', 'am DJ-Pult'),
+    staffSpot('staff-counter-2', 665, 270, 'counter', 'hinter dem Tresen'),
+    standingSpot('entry-1', 150, 395, 'beim Eingang'),
+    ...clubDanceSpots,
+    ...clubHighTables.flatMap(([x, y], index) => [
+      standingSpot(`high-table-${index + 1}-r`, x + 54, y + 20, `an Stehtisch ${index + 1}`),
+    ]),
+    ...clubLounge.flatMap((t, i) => t.spots.map(spot => ({ ...spot, id: spot.id.replace(`table-${i + 1}`, `lounge-${i + 1}`), label: 'in der Lounge' }))),
+  ],
+  roomFact: 'Der Club hat Tanzfläche und DJ-Pult, Tresen, zwei Stehtische und eine Lounge; die Musik ist laut; der Ausgang liegt beim Eingang',
+  guestBackFact: 'Hinter dem Tresen ist eine Tür nur für Personal; was dahinter liegt, weißt du nicht',
+  staffBackFact: 'Hinter dem Tresen liegt das Lager; Gäste haben dort keinen Zutritt',
+  danceFloor: CLUB_FLOOR,
+}
+
+/** Steht ein Punkt auf der Tanzfläche? */
+export function onDanceFloor(layout: VenueLayout, p: VenuePoint): boolean {
+  const f = layout.danceFloor
+  return Boolean(f && p.x >= f.x && p.x <= f.x + f.w && p.y >= f.y && p.y <= f.y + f.h)
+}
+
 // ── Restaurant ──────────────────────────────────────────────────────────────
 const restaurantTables = tables([
   [190, 110], [330, 110], [470, 110],
@@ -284,6 +339,7 @@ export const VENUE_LAYOUTS: Readonly<Record<VenueKind, VenueLayout>> = {
   bar: BAR_LAYOUT,
   restaurant: RESTAURANT_LAYOUT,
   hotel: HOTEL_LAYOUT,
+  nightclub: NIGHTCLUB_LAYOUT,
 }
 
 const KIND_BY_BUILDING: Readonly<Record<string, VenueKind>> = {
@@ -292,6 +348,9 @@ const KIND_BY_BUILDING: Readonly<Record<string, VenueKind>> = {
   bar: 'bar',
   restaurant: 'restaurant',
   hotel: 'hotel',
+  nightclub: 'nightclub',
+  club: 'nightclub',
+  disco: 'nightclub',
 }
 
 /**
@@ -304,7 +363,8 @@ export function venueKindForRealPlace(tags: Record<string, unknown> | null | und
   const amenity = String(tags?.amenity ?? '').toLowerCase()
   const tourism = String(tags?.tourism ?? '').toLowerCase()
   if (['cafe', 'fast_food', 'ice_cream'].includes(amenity)) return 'cafe'
-  if (['bar', 'pub', 'biergarten', 'nightclub'].includes(amenity)) return 'bar'
+  if (amenity === 'nightclub') return 'nightclub'
+  if (['bar', 'pub', 'biergarten'].includes(amenity)) return 'bar'
   if (amenity === 'restaurant') return 'restaurant'
   if (['hotel', 'guest_house', 'motel', 'hostel'].includes(tourism)) return 'hotel'
   return null
@@ -340,6 +400,8 @@ const EXTRA_TABLES: Readonly<Record<VenueKind, Array<[number, number]>>> = {
   restaurant: [],
   bar: [],
   hotel: [[470, 300]],
+  // Der Club wächst mit der Tanzfläche, nicht mit Tischen.
+  nightclub: [],
 }
 
 const NUMBER_WORDS_TABLES = ['keinen Tisch', 'einen Tisch', 'zwei Tische', 'drei Tische', 'vier Tische', 'fünf Tische', 'sechs Tische', 'sieben Tische', 'acht Tische', 'neun Tische', 'zehn Tische']
@@ -429,6 +491,8 @@ export const VENUE_HOURS: Readonly<Record<VenueKind, { open: number; close: numb
   bar: { open: 17, close: 2 },
   // Der Empfang ist immer besetzt – Reisende kommen zu jeder Stunde.
   hotel: { open: 0, close: 24 },
+  // Der Club öffnet, wenn die Bars voll werden, und schließt im Morgengrauen.
+  nightclub: { open: 22, close: 5 },
 }
 
 export type VenueHours = { open: number; close: number; clock: 'colony' | 'player' }
@@ -958,6 +1022,8 @@ export interface ConversationFactsInput {
   toilet?: ToiletRule | null
   /** Was der Spieler gerade sagt – fragt er nach der Toilette, kommt die Regel vorn in die Fakten. */
   playerSaid?: string | null
+  /** Tanzt der Spieler gerade auf der Tanzfläche (Nachtclub)? */
+  playerDancing?: boolean
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -1013,7 +1079,8 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     if (seat) {
       const together = self.spot.label === seat.label && self.spot.posture === 'sitting'
       facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (input.servingPlayer ? '; du bist an den Tisch gekommen und nimmst die Bestellung auf – nur, was der Gast selbst nennt, nichts dazu' : together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
-    } else facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
+    } else if (input.playerDancing && onDanceFloor(layout, input.playerPos)) facts.push('Dein Gegenüber tanzt gerade auf der Tanzfläche')
+    else facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
     facts.push(othersFact(layout, self, input.figures))
   }
   // Mit Obergeschoss tritt die Treppe an die Stelle des Personalbereichs – die
