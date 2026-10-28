@@ -131,6 +131,7 @@ Thomas: „wichtig ist mir, dass wir Omnizedenz-Begegnungsstätten leicht findba
 - **Innen:** eigener Raum `resonance_place`: Stuhlkreis ohne Kopfende, Lesen & Denken, stille Ecke, Teeküche, Pinnwand mit den Runden. Die Gastgeberin sitzt im Kreis. Offen für alle; wer laut Simulation drinnen ist, steht dort und ist ansprechbar.
 - **Im Gespräch:** Omnizedent/innen und Resonanzbegleitung nennen auf Nachfrage genau diese Stätten mit Adresse und Termin, keine erfundenen.
 - Die Hubertushalle ist wieder nur Gemeindezentrum.
+- **Tharsis Hub:** Resonanzplatz in Auftrag gegeben (McKnight, normaler Spielerbau, 1500 Cr, x −170 m / y 210 m neben dem Habitat von Theodor Grün). Nach 2 Ticks fertig; ab dann lädt Theodor Grün samstags 19–21 Uhr ein.
 
 ### Sichtbares Gehen
 

@@ -35,4 +35,4 @@ Auf Wunsch von Thomas hier gebaut statt bei Core („hier selbst bauen“).
 - `resonance_place` ist baubar: `building_definitions` (1500 Cr, 2 Ticks, Migration `20261028143000_resonance_place_buildable.sql`) und `lib/game/buildings/index.ts`; Grundfläche 20 × 16 m (`lib/game/spatial/footprints.ts`). Innenraum und Facility-Katalog bestanden schon.
 - Gebaut wird über den normalen Spielerbau (`/api/game/build/spatial`, `player_builds`), bezahlt vom Bauherrn. Kein Seed, keine Geldschöpfung.
 - `realPlaceActivity` kennt jetzt neben realen Orten auch gebaute Gebäude (`HostPlace.kind = 'built'`). Steht im Tharsis Hub ein Resonanzplatz, lädt Theodor Grün dort an Tag 6 der Woche um 19 Uhr zur Resonanzrunde ein und geht selbst hin.
-- Offen: Noch hat niemand auf Tharsis einen Resonanzplatz gebaut.
+- Gebaut (28.10.2026, Abend): Konto McKnight hat über den normalen Spielerbau einen Resonanzplatz im Tharsis Hub in Auftrag gegeben (1500 Cr, Grundfläche 14 × 10 m, Platz x −170 m / y 210 m neben dem Habitat, in dem Theodor Grün wohnt). Fertig nach 2 Ticks über den Bau-Cron (`noxia_complete_build`); danach lädt Theodor Grün samstags 19–21 Uhr zur Resonanzrunde ein.
