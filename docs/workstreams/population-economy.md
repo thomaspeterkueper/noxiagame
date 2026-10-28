@@ -507,3 +507,9 @@ Das ist ein Teil von Aufgabe 12 hier („Angebote für Spieler als Daten“).
 4. **Missbrauch:** Aufgaben je Minute begrenzen. Eine Schicht endet spätestens nach einer Stunde, auch ohne `end`.
 5. **Später:** Wer öfter dort arbeitet, könnte fest angestellt werden (`person_assignments` für Spieler) – das wäre eine eigene Entscheidung.
 
+### R-18 (Erdkarte, 28.10.2026): Staatliche Basis ist umgezogen – Wege und Anwesenheit der Bewohner
+
+Die staatliche Basis der Erde steht seit 28.10.2026 nicht mehr in der Selmecke (51,338 / 7,980), sondern am Segelfluggelände Sundern-Seidfeld (51,302 / 7,979), rund 4 km weiter südlich (Migration `20261028190000_state_base_seidfeld.sql`, alte Lage in `state_base_relocation_20261028`). Die `tile_entities`-ids sind gleich geblieben; Wohnzuweisungen und Stellen ziehen also mit.
+
+**Bitte prüfen:** Wo Lage oder Wege der Bewohner nicht aus `tile_entities` gelesen, sondern gespeichert oder fest eingetragen sind (Anwesenheit, Arbeitswege, Pendeln vom Wohnblock), auf die neue Lage umstellen. Die Hafenkantine der Erde hat jetzt erstmals eine Lage (am Raumhafen).
+

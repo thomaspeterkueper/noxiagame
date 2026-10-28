@@ -55,7 +55,8 @@ const PLACES: Array<{ label: string; at: GeoPoint }> = [
   { label: 'Sundern Mitte', at: { lat: 51.3262, lon: 8.0 } },
   // Startcafé, Hauptstraße 72 (seit 25.10.2026 im realen Haus)
   { label: 'Café', at: { lat: 51.32565, lon: 8.00418 } },
-  { label: 'Selmecke', at: { lat: 51.33745, lon: 7.97975 } },
+  // Staatliche Basis am Segelfluggelände Seidfeld (seit 28.10.2026, vorher Selmecke)
+  { label: 'Raumhafen Seidfeld', at: { lat: 51.3024, lon: 7.9790 } },
 ]
 /** Ohne gespeicherte Position beginnt man am Startcafé (27.10.2026: vorher „Sundern Mitte“, rund 300 m entfernt). */
 const START_PLACE = PLACES.find(place => place.label === 'Café') ?? PLACES[0]

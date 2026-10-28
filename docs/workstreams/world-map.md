@@ -240,6 +240,13 @@ Für alle drei fehlten die Hausdaten. Die zehn Ortsdetail-Zellen sind am 27.10.2
 
 Vorschlag: **A**, aber ohne die Hallen von Tillmann (ein reales, arbeitendes Unternehmen). Landeplätze und Raumhafen auf die Industrie-Insel und den Nordrand der Wiese, Solarfeld auf die Wiese; Fabrik, Werft, Lager und Labor als neue Hallen am Rand der Insel, Verwaltung, Schule und Wohnblock an der Straße. Erst festlegen, wenn die zwei leeren Zellen da sind. Ausweichlösung: **B** – dort stehen die Werkbauten in echten Hallen ohne Namen, die freie Fläche ist aber knapp und liegt an zwei Naturschutzgebieten.
 
+**Umgezogen (28.10.2026, Thomas: „ja A, denke den Segelflugplatz beziehen wir mit ein, sozusagen das, was dort in Zukunft stehen könnte“):** Migration `20261028190000_state_base_seidfeld.sql`, live. Die 17 Bauten und die Hafenkantine der Erde (vorher ohne Lage) stehen jetzt am **Segelfluggelände Sundern-Seidfeld**, alle an der Bahn ausgerichtet (Achse 15,6° nördlich von Ost, `rotation_deg` −15,6):
+- auf dem Flugfeld: zwei große Landeplätze und der kleine, daneben Raumhafen-Kern, Lager, Service und Kantine,
+- Werkhof südöstlich auf dem Acker: Werft, Fabrik, zwei Lager, Labor, Solarfeld,
+- südwestlich: Verwaltung, Schule, Wohnblock, Habitat, Scanner.
+
+Gewählt mit einer Suche auf Acker, Wiese und Flugfeld: mindestens 10 m Abstand zueinander, 5 m zu den Feldwegen, keine Überschneidung mit Häusern aus den Kartendaten; die Hallen von Tillmann bleiben unberührt. Geprüft mit einer Testseite (Weltkarte mit nachgebautem Boden): alle Bauten erscheinen, keine Fehler. Die alte Lage steht in `state_base_relocation_20261028` (Rücknahme möglich); in der Selmecke steht nichts mehr. Sprungziel der Weltkarte heißt jetzt „Raumhafen Seidfeld“. Anwesenheit und Wege der Bewohner: Request R-18 an Bevölkerung und Ökonomie.
+
 **Nächste Schritte:**
 1. Sobald die Zellen gefüllt sind: je Gebiet echte Hallen und freie Flächen auswerten; Lageplan vorschlagen (Fabrik, Werft, Lager, Labor in echte Hallen über `source_ref`; Landeplätze, Raumhafen und Solar auf freie Fläche, zusammen rund 300 × 200 m), Thomas entscheidet.
 2. Umzug der Bauten (Lage, Drehung, `source_ref`) als Migration. Wohnzuweisungen und Arbeitsplätze hängen an `tile_entity_id` und ziehen mit; Anwesenheit und Wege der Personen gehören zu Bevölkerung und Ökonomie (Request dort, sobald der Ort feststeht).
