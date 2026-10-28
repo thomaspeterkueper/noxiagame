@@ -120,6 +120,7 @@ export default function EarthBuildingAccessLayer({
   const [loading, setLoading] = useState(false)
   const [spaceportMode, setSpaceportMode] = useState<SpaceportMode>('hub')
   const [schoolOpen, setSchoolOpen] = useState(false)
+  const [schoolModuleId, setSchoolModuleId] = useState<string | null>(null)
   const [deskOpen, setDeskOpen] = useState(false)
   const [hubOpen, setHubOpen] = useState(false)
   const [learnRequest, setLearnRequest] = useState<{ gateId: string; at: number } | null>(null)
@@ -208,7 +209,7 @@ export default function EarthBuildingAccessLayer({
           buildingName={request.buildingName}
           companion={companion}
           onClose={onClose}
-          onOpenSchool={() => setSchoolOpen(true)}
+          onOpenSchool={moduleId => { setSchoolModuleId(moduleId ?? null); setSchoolOpen(true) }}
         />
       )
     }
@@ -222,8 +223,9 @@ export default function EarthBuildingAccessLayer({
           waterCons: Number(water?.consumption ?? 0),
           credits,
         }}
-        onClose={() => setSchoolOpen(false)}
+        onClose={() => { setSchoolOpen(false); setSchoolModuleId(null) }}
         onKnowledgeEarned={() => {}}
+        initialModuleId={schoolModuleId}
       />
     )
   }

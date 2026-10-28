@@ -16,6 +16,8 @@
 //                dem Gebäude zugeordnet, aber noch nicht als Sperre gebaut.
 // Reine Regeln, keine Datenbank.
 
+import { moduleIdsForUnlock, moduleTeachesUnlock } from '../../knowledge/learningCatalog'
+
 export type LearningNeed = 'required' | 'helps'
 
 export interface LearningGate {
@@ -40,7 +42,7 @@ export interface LearningProgress {
 
 const CREDIT: LearningGate = {
   id: 'bank-credit', label: 'Kredit aufnehmen', unlock: 'UNL:NOX:bank-credit',
-  moduleIds: ['ECO-L0-000001', 'LRN:SSF:ECO-L0-0001'], moduleTitle: 'Was ist Kredit?', need: 'required',
+  moduleIds: moduleIdsForUnlock('UNL:NOX:bank-credit'), moduleTitle: 'Was ist Kredit?', need: 'required',
   why: 'Ohne den Nachweis „Was ist Kredit?“ vergibt die Bank keinen Kredit',
 }
 
@@ -49,33 +51,33 @@ export const BUILDING_LEARNING_GATES: Readonly<Record<string, readonly LearningG
     CREDIT,
     {
       id: 'bank-collateral', label: 'Sicherheiten verstehen', unlock: 'UNL:NOX:bank-collateral',
-      moduleIds: ['ECO-L0-000003', 'LRN:SSF:ECO-L0-0003'], moduleTitle: 'Was ist ein Sicherheitenwert?', need: 'helps',
+      moduleIds: moduleIdsForUnlock('UNL:NOX:bank-collateral'), moduleTitle: 'Was ist ein Sicherheitenwert?', need: 'helps',
       why: 'Wie viel Kredit möglich ist, hängt am Wert der Sicherheiten',
     },
     {
       id: 'bank-compound', label: 'Zinseszins verstehen', unlock: 'UNL:NOX:bank-compound',
-      moduleIds: ['ECO-L0-000002', 'LRN:SSF:ECO-L0-0002'], moduleTitle: 'Was ist Zinseszins?', need: 'helps',
+      moduleIds: moduleIdsForUnlock('UNL:NOX:bank-compound'), moduleTitle: 'Was ist Zinseszins?', need: 'helps',
       why: 'Zinsen laufen je Tick weiter – auf Guthaben wie auf Schulden',
     },
   ],
   warehouse: [
     {
       id: 'advanced-trading', label: 'Erweiterter Handel', unlock: 'UNL:NOX:advanced-trading',
-      moduleIds: ['ECO-L1-000001', 'LRN:SSF:ECO-L1-0001'], moduleTitle: 'Was ist Arbitrage?', need: 'helps',
+      moduleIds: moduleIdsForUnlock('UNL:NOX:advanced-trading'), moduleTitle: 'Was ist Arbitrage?', need: 'helps',
       why: 'Wer Preisunterschiede zwischen Orten versteht, handelt mit Gewinn',
     },
   ],
   administration: [
     {
       id: 'land-value', label: 'Bodenwert verstehen', unlock: 'UNL:NOX:land-value',
-      moduleIds: ['ECO-L1-000002', 'LRN:SSF:ECO-L1-0002'], moduleTitle: 'Was ist Bodenwert?', need: 'helps',
+      moduleIds: moduleIdsForUnlock('UNL:NOX:land-value'), moduleTitle: 'Was ist Bodenwert?', need: 'helps',
       why: 'Bodenwert und Grundsteuer bestimmen, was ein Haus kostet und einbringt',
     },
   ],
   spaceport: [
     {
       id: 'nav-orbital', label: 'Orbitale Navigation', unlock: 'UNL:NOX:NAV:ORBITAL',
-      moduleIds: ['AST-L1-000001'], moduleTitle: 'Das Sonnensystem', need: 'helps',
+      moduleIds: moduleIdsForUnlock('UNL:NOX:NAV:ORBITAL'), moduleTitle: 'Das Sonnensystem', need: 'helps',
       why: 'Wer Umlaufbahnen versteht, navigiert genauer; die Flugkontrolle rechnet damit',
     },
     {
@@ -103,15 +105,21 @@ export interface LearningGateStatus {
   moduleId: string | null
 }
 
-/** Ein Modul aus der SSF-Liste: Kennung oder Freischaltung muss passen. */
-export function moduleForGate(gate: LearningGate, modules: ReadonlyArray<{ id: string; unlocks?: readonly string[] }>): string | null {
-  const byId = modules.find(m => gate.moduleIds.includes(m.id))
+type GateModule = { id: string; legacyId?: string | null; pathId?: string | null; unlocks?: readonly string[] }
+
+/**
+ * Ein Modul aus der SSF-Liste: SSF-Kennung, Legacy-ID oder Freischaltung muss
+ * passen. Die SSF liefert z. B. „LRN:SSF:ECO-L0-000001“ mit Legacy-ID
+ * „ECO-L0-000001“ – beides zählt (28.10.2026).
+ */
+export function moduleForGate(gate: LearningGate, modules: ReadonlyArray<GateModule>): string | null {
+  const byId = modules.find(m => [m.id, m.legacyId, m.pathId].some(id => typeof id === 'string' && gate.moduleIds.includes(id)))
   if (byId) return byId.id
-  const byUnlock = modules.find(m => Array.isArray(m.unlocks) && m.unlocks.includes(gate.unlock))
+  const byUnlock = modules.find(m => moduleTeachesUnlock(m, gate.unlock))
   return byUnlock?.id ?? null
 }
 
-export function gateStatuses(kind: string, progress: LearningProgress | null, modules: ReadonlyArray<{ id: string; unlocks?: readonly string[] }>): LearningGateStatus[] {
+export function gateStatuses(kind: string, progress: LearningProgress | null, modules: ReadonlyArray<GateModule>): LearningGateStatus[] {
   return learningGatesFor(kind).map(gate => ({ gate, open: gateOpen(gate, progress), moduleId: moduleForGate(gate, modules) }))
 }
 

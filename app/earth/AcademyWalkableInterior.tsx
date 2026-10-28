@@ -13,6 +13,7 @@ import { ACADEMY_INTRODUCTION, ACADEMY_LAYOUT, academyKnowledge } from '@/lib/ga
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import type { SsfKnowledgeModule } from '@/lib/ssfKnowledge'
+import { isGameRequirementUnlock, unlockDisplayLabel } from '@/lib/knowledge/learningCatalog'
 
 type Props = {
   entityId: string
@@ -42,6 +43,12 @@ export default function AcademyWalkableInterior({ entityId, buildingName, compan
   }, [])
 
   const knowledge = useMemo(() => academyKnowledge(modules), [modules])
+  // Module mit Voraussetzung im Spiel (Solarfeld, Kredit …) zuerst (28.10.2026).
+  const offered = useMemo(() => {
+    const req = (m: SsfKnowledgeModule) => (m.unlocks ?? []).filter(isGameRequirementUnlock)
+    return [...modules].sort((a, b) => Number(req(b).length > 0) - Number(req(a).length > 0))
+      .map(m => ({ module: m, requirement: req(m).map(unlockDisplayLabel).join(' · ') }))
+  }, [modules])
   const layout = ACADEMY_LAYOUT
 
   const fitting: InteriorFitting = {
@@ -74,11 +81,11 @@ export default function AcademyWalkableInterior({ entityId, buildingName, compan
         {modulesState === 'ready' && modules.length === 0 && <p>Zurzeit werden keine Module angeboten.</p>}
         {modules.length > 0 && <>
           <p>{modules.length} Module. Öffne eines, um im Lernraum zu lernen.</p>
-          <div className="tiles">{modules.slice(0, 12).map(module => <button key={module.id} className="tile" onClick={() => onOpenSchool(module.id)} title={module.summary}>
-            <span className="domain">{module.domain}</span>
+          <div className="tiles">{offered.slice(0, 12).map(({ module, requirement }) => <button key={module.id} className="tile" onClick={() => onOpenSchool(module.id)} title={module.summary}>
+            <span className="domain">{requirement ? '🔓 ' + requirement : module.domain}</span>
             <span>{module.title}</span><b>{module.durationMinutes} min · Stufe {module.difficulty}</b>
           </button>)}</div>
-          {modules.length > 12 && <p>… und {modules.length - 12} weitere im Lernraum.</p>}
+          {modules.length > 12 && <p>… und {modules.length - 12} weitere im Lernraum (Reiter „Module“).</p>}
         </>}
         <button className="open-school" onClick={() => onOpenSchool()}>Lernraum öffnen</button>
       </div>

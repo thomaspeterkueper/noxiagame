@@ -16,6 +16,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
 import { getSsfPathUrl } from '@/lib/knowledge/ssfPaths'
 import { unlockLabel, type SsfUnlock } from '@/lib/ssfKnowledge'
+import ModulePicker from '@/app/academy/learn/ModulePicker'
+import SsfModuleRenderer from '@/app/academy/learn/SsfModuleRenderer'
+import { unlockDisplayLabel } from '@/lib/knowledge/learningCatalog'
 
 interface ColonyContext {
   locationName: string
@@ -32,6 +35,8 @@ interface SchoolOverlayProps {
   onKnowledgeEarned: (pts: number, newTotal: number) => void
   canSell?: boolean       // true wenn Spieler Eigentümer & nicht staatlich (25.08.2026)
   onSellClick?: () => void
+  /** Öffnet direkt den Reiter „Module“ mit diesem Lernmodul (28.10.2026). */
+  initialModuleId?: string | null
 }
 
 type CalcTask = { kind: 'calc'; question: string; answer: number; explanation: string; points: number; topic: string }
@@ -439,8 +444,10 @@ function KursListe({ onSelect, jwt }: { onSelect: (id: string) => void; jwt: () 
   )
 }
 
-export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned, canSell, onSellClick }: SchoolOverlayProps) {
-  const [tab, setTab]               = useState<'akademie' | 'kurse' | 'module' | 'ssf' | 'handbuch'>('akademie')
+export default function SchoolOverlay({ locationSlug, colonyContext, onClose, onKnowledgeEarned, canSell, onSellClick, initialModuleId = null }: SchoolOverlayProps) {
+  const [tab, setTab]               = useState<'akademie' | 'kurse' | 'module' | 'ssf' | 'handbuch'>(initialModuleId ? 'module' : 'akademie')
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(initialModuleId)
+  const [moduleResult, setModuleResult] = useState<string | null>(null)
   const [completedModules, setCompleted] = useState<string[]>([])
   const [moduleLoading, setModuleLoading] = useState(false)
   const [activeKursId, setActiveKursId] = useState<string | null>(null)
@@ -693,23 +700,29 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
           {tab === 'handbuch' && <ManualTab onClose={onClose} />}
           {tab === 'ssf' && <SsfTab />}
           {tab === 'module' && (
-            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '1rem 1.25rem 1.25rem' }}>
-              <div style={{ fontSize: '0.65rem', color: C.textMuted, lineHeight: 1.7, marginBottom: '1rem' }}>
-                Module sind kurze Lerneinheiten (2–4 Min). Jedes Modul schaltet eine Fähigkeit in NOXIA frei.
-              </div>
-              <div style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: '1rem', color: C.textMuted, fontSize: '0.8rem', lineHeight: 1.7 }}>
-                <div style={{ fontWeight: 700, color: C.accent, marginBottom: '0.5rem', fontFamily: MONO }}>
-                  Module werden über die Solar Science Foundation bereitgestellt
-                </div>
-                <p style={{ margin: 0 }}>
-                  Wirtschaftsmodule (Kredit, Zinseszins, Bodenwert) sind als KB-REQUEST-0003 bei der SSF beantragt.
-                  Sobald sie verfügbar sind, erscheinen sie hier automatisch.
-                </p>
-                <a href="https://solarsciencefoundation.vercel.app" target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'inline-block', marginTop: '0.75rem', color: C.gold, fontWeight: 700, textDecoration: 'none', fontSize: '0.78rem' }}>
-                  SSF öffnen →
-                </a>
-              </div>
+            <div style={{ flex: 1, overflowY: 'auto' as const, padding: activeModuleId ? 0 : '1rem 1.25rem 1.25rem' }}>
+              {activeModuleId ? (
+                <>
+                  <div style={{ padding: '0.6rem 1rem', borderBottom: `1px solid ${C.border}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button onClick={() => { setActiveModuleId(null); setModuleResult(null) }} style={{ fontSize: '0.72rem', padding: '4px 10px', background: '#fff', color: C.accent, border: `1px solid ${C.border}`, borderRadius: 6, cursor: 'pointer', fontFamily: MONO }}>← Alle Module</button>
+                    {moduleResult && <span style={{ fontSize: '0.72rem', color: C.green, fontWeight: 700 }}>{moduleResult}</span>}
+                  </div>
+                  <SsfModuleRenderer key={activeModuleId} moduleId={activeModuleId} onComplete={result => {
+                    const freed = result.unlocks.length ? ` · Freigeschaltet: ${result.unlocks.map(unlockDisplayLabel).join(', ')}` : ''
+                    const blocked = (result.blocked ?? []).length ? ` · Noch gesperrt: ${(result.blocked ?? []).map(b => `${unlockDisplayLabel(b.id)} (zuerst ${b.missingUnlocks.map(unlockDisplayLabel).join(', ')})`).join(', ')}` : ''
+                    setModuleResult(`✓ Abgeschlossen${result.points > 0 ? ` · +${result.points} Wissen` : ''}${freed}${blocked}`)
+                    if (result.points > 0) onKnowledgeEarned(result.points, (total ?? 0) + result.points)
+                    loadKnowledge(); loadCompletedModules()
+                  }} />
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '0.65rem', color: C.textMuted, lineHeight: 1.7, marginBottom: '0.75rem' }}>
+                    Lernmodule der Solar Science Foundation. Wähle ein Modul, um es hier im Lernraum durchzuarbeiten.
+                  </div>
+                  <ModulePicker onSelect={id => { setModuleResult(null); setActiveModuleId(id) }} />
+                </>
+              )}
             </div>
           )}
           {tab === 'akademie' && DEBUG_RAW && (

@@ -81,6 +81,7 @@ export default defineConfig({
       'lib/game/population/settlementCapabilities.test.ts',
       'lib/game/population/settlementCapabilityGraph.test.ts',
       'lib/game/population/settlementCapabilityProjection.test.ts',
+      'lib/knowledge/learningCatalog.test.ts',
     ],
   },
 })

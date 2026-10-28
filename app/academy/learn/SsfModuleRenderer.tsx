@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { SsfKnowledgeModuleDetail, SsfModuleAssessment } from '@/lib/ssfKnowledge'
 import GravityWellInteractive from './GravityWellInteractive'
+import { unlockDisplayLabel, isGameRequirementUnlock } from '@/lib/knowledge/learningCatalog'
 
 const C = {
   text: '#1a1a18', muted: '#6b6357', faint: '#9e9485', border: '#ddd6c8',
@@ -16,7 +17,7 @@ export default function SsfModuleRenderer({
   onComplete,
 }: {
   moduleId: string
-  onComplete?: (result: { points: number; unlocks: string[] }) => void
+  onComplete?: (result: { points: number; unlocks: string[]; blocked?: { id: string; missingUnlocks: string[] }[] }) => void
 }) {
   const [module, setModule] = useState<SsfKnowledgeModuleDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -70,6 +71,7 @@ export default function SsfModuleRenderer({
       onComplete?.({
         points: Number(data.points_awarded ?? 0),
         unlocks: Array.isArray(data.unlocks_granted) ? data.unlocks_granted : [],
+        blocked: Array.isArray(data.unlocks_blocked) ? data.unlocks_blocked : [],
       })
     } catch {
       setError('Der Modulabschluss konnte nicht gespeichert werden.')
@@ -144,7 +146,7 @@ export default function SsfModuleRenderer({
           <button onClick={complete} disabled={completing || done} style={{ padding: '0.75rem 1.1rem', border: 0, borderRadius: 8, background: done ? C.green : C.gold, color: '#fff', fontWeight: 700, cursor: completing || done ? 'default' : 'pointer' }}>
             {done ? '✓ Abgeschlossen' : completing ? 'Speichere …' : 'Modul abschließen →'}
           </button>
-          {module.unlocks.length > 0 && <div style={{ marginTop: 8, color: C.gold, fontSize: '0.8rem', fontWeight: 700 }}>Freischaltung: {module.unlocks.join(' · ')}</div>}
+          {module.unlocks.some(isGameRequirementUnlock) && <div style={{ marginTop: 8, color: C.gold, fontSize: '0.8rem', fontWeight: 700 }}>Freischaltung: {module.unlocks.filter(isGameRequirementUnlock).map(unlockDisplayLabel).join(' · ')}</div>}
         </div>
       )}
       {error && module && <div style={{ marginTop: 10, color: C.red }}>{error}</div>}

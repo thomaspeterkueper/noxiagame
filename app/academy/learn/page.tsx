@@ -4,7 +4,13 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import KursRenderer from '@/app/dashboard/KursRenderer'
 import SsfModuleRenderer from './SsfModuleRenderer'
+import ModulePicker from './ModulePicker'
 import { resolveModuleForUnlock, type SsfKnowledgeModule } from '@/lib/ssfKnowledge'
+import { unlockDisplayLabel } from '@/lib/knowledge/learningCatalog'
+
+// Aktualisiert: 28.10.2026 — ohne passenden Parameter (oder wenn für eine
+// Voraussetzung kein Modul gefunden wird) zeigt die Akademie jetzt die
+// Lernmodule zum Auswählen statt nur einer Fehlermeldung.
 
 function InGameLearningContent() {
   const router = useRouter()
@@ -17,18 +23,29 @@ function InGameLearningContent() {
   const [localPath, setLocalPath] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [completed, setCompleted] = useState<{ points: number; unlocks: string[] } | null>(null)
+  const [completed, setCompleted] = useState<{ points: number; unlocks: string[]; blocked?: { id: string; missingUnlocks: string[] }[] } | null>(null)
+  const [modules, setModules] = useState<SsfKnowledgeModule[] | undefined>(undefined)
+  const [picking, setPicking] = useState(false)
+
+  function selectModule(id: string) {
+    setCompleted(null); setError(null); setPicking(false); setLocalPath(null)
+    setModuleId(id)
+    const params = new URLSearchParams()
+    params.set('module', id)
+    if (unlock) params.set('unlock', unlock)
+    router.replace(`/academy/learn?${params.toString()}`)
+  }
 
   const title = useMemo(() => {
     if (moduleId) return `Lernmodul ${moduleId}`
-    if (unlock) return `Benötigtes Wissen: ${unlock}`
+    if (unlock) return `Benötigtes Wissen: ${unlockDisplayLabel(unlock)}`
     return 'NOXIA Akademie'
   }, [moduleId, unlock])
 
   useEffect(() => {
     let cancelled = false
     async function resolve() {
-      setLoading(true); setError(null); setLocalPath(null)
+      setLoading(true); setError(null); setLocalPath(null); setPicking(false)
       if (requestedModuleId) {
         setModuleId(requestedModuleId)
         setLoading(false)
@@ -41,6 +58,7 @@ function InGameLearningContent() {
         const modules: SsfKnowledgeModule[] = Array.isArray(payload)
           ? payload
           : (payload.modules ?? payload.items ?? [])
+        if (!cancelled) setModules(modules)
 
         let match: SsfKnowledgeModule | undefined
         if (directPath) match = modules.find(m => m.pathId === directPath)
@@ -60,7 +78,11 @@ function InGameLearningContent() {
           return
         }
 
-        if (!cancelled) setError('Für diese Voraussetzung wurde noch kein SSF-Lernmodul gefunden.')
+        // Kein direkter Treffer: Auswahl anzeigen statt Sackgasse.
+        if (!cancelled) {
+          if (unlock) setError(`Für „${unlockDisplayLabel(unlock)}“ liefert die SSF noch kein eigenes Lernmodul. Wähle unten ein Modul.`)
+          setPicking(true)
+        }
       } catch {
         if (!cancelled) setError('SSF-Lernmodule konnten nicht geladen werden.')
       } finally {
@@ -83,15 +105,26 @@ function InGameLearningContent() {
         </div>
 
         {loading && <div style={{ background: '#fff', border: '1px solid #ddd6c8', borderRadius: 10, padding: '1rem' }}>Lernmodul wird geladen …</div>}
-        {error && <div style={{ background: '#fff', border: '1px solid #e2b9b9', color: '#a52d2d', borderRadius: 10, padding: '1rem', lineHeight: 1.6 }}>{error}</div>}
+        {error && <div style={{ background: '#fff', border: '1px solid #e2b9b9', color: '#a52d2d', borderRadius: 10, padding: '1rem', lineHeight: 1.6, marginBottom: '0.8rem' }}>{error}</div>}
 
-        {moduleId && !loading && !error && (
-          <div style={{ background: '#fff', border: '1px solid #ddd6c8', borderRadius: 12, overflow: 'hidden', minHeight: 520 }}>
-            <SsfModuleRenderer moduleId={moduleId} onComplete={setCompleted} />
+        {picking && !loading && (
+          <div style={{ background: '#fff', border: '1px solid #ddd6c8', borderRadius: 12, padding: '1rem 1.1rem' }}>
+            <ModulePicker modules={modules} highlightUnlock={unlock} onSelect={selectModule} />
           </div>
         )}
 
-        {localPath && !loading && !error && (
+        {moduleId && !loading && !picking && (
+          <>
+            <div style={{ marginBottom: '0.6rem' }}>
+              <button onClick={() => { setPicking(true); setCompleted(null) }} style={{ border: '1px solid #ddd6c8', background: '#fff', borderRadius: 8, padding: '0.45rem 0.8rem', cursor: 'pointer', color: '#2a4e7a', fontWeight: 700, fontSize: '0.8rem' }}>☰ Anderes Lernmodul wählen</button>
+            </div>
+            <div style={{ background: '#fff', border: '1px solid #ddd6c8', borderRadius: 12, overflow: 'hidden', minHeight: 520 }}>
+              <SsfModuleRenderer key={moduleId} moduleId={moduleId} onComplete={setCompleted} />
+            </div>
+          </>
+        )}
+
+        {localPath && !loading && !picking && (
           <div style={{ background: '#fff', border: '1px solid #ddd6c8', borderRadius: 12, overflow: 'hidden', minHeight: 520 }}>
             <KursRenderer kursId={localPath} onComplete={(punkte) => setCompleted({ points: punkte, unlocks: [] })} onClose={() => router.back()} />
           </div>
@@ -100,7 +133,10 @@ function InGameLearningContent() {
         {completed && (
           <div style={{ marginTop: '0.8rem', background: '#e8f7ef', border: '1px solid #a9d8bb', borderRadius: 8, padding: '0.8rem 1rem', color: '#1a7a4a', fontWeight: 700 }}>
             Lernmodul abgeschlossen{completed.points > 0 ? ` · +${completed.points} Wissen` : ''}
-            {completed.unlocks.length > 0 && <div style={{ marginTop: 4 }}>Freigeschaltet: {completed.unlocks.join(' · ')}</div>}
+            {completed.unlocks.length > 0 && <div style={{ marginTop: 4 }}>Freigeschaltet: {completed.unlocks.map(unlockDisplayLabel).join(' · ')}</div>}
+            {(completed.blocked?.length ?? 0) > 0 && <div style={{ marginTop: 6, color: '#8a6a00', fontWeight: 600 }}>
+              Noch nicht freigeschaltet: {completed.blocked!.map(b => `${unlockDisplayLabel(b.id)} (es fehlt zuerst: ${b.missingUnlocks.map(unlockDisplayLabel).join(', ')})`).join(' · ')}
+            </div>}
             <button onClick={() => router.back()} style={{ marginTop: 9, border: '1px solid #8fc7a6', background: '#fff', color: '#1a7a4a', borderRadius: 7, padding: '0.5rem 0.8rem', cursor: 'pointer', fontWeight: 700 }}>Zurück zum Bauen →</button>
           </div>
         )}

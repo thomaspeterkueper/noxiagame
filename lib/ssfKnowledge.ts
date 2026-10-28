@@ -2,7 +2,12 @@
 // Aktualisiert: 31.08.2026 — strukturierte SSF-Interactives
 // Aktualisiert: 01.09.2026 — EXT-KG-NOX-20260901-POWER-GENERATION-MAPPING:
 //                              resolveModuleForUnlock() + legacyId
-// Version:      0.7.0
+// Aktualisiert: 28.10.2026 — NOXIA-Lernverzeichnis als Rückfall: Module ohne
+//                              eingetragene NOXIA-Freischaltung (z. B. Kredit)
+//                              werden ihrer Freischaltung wieder zugeordnet
+// Version:      0.8.0
+
+import { effectiveModuleUnlocks, moduleTeachesUnlock } from './knowledge/learningCatalog'
 
 export type SsfUnlock = string | { key: string; condition?: unknown }
 
@@ -107,9 +112,13 @@ export function normalizeModule<T extends SsfKnowledgeModule>(m: T): T {
     ...m,
     legacyId: typeof m.legacyId === 'string' && m.legacyId ? m.legacyId : null,
     pathId: typeof m.pathId === 'string' && m.pathId ? m.pathId : null,
-    unlocks: Array.isArray(m.unlocks)
-      ? (m.unlocks as unknown as SsfUnlock[]).map(unlockLabel)
-      : [],
+    // SSF-Angaben plus NOXIA-Lernverzeichnis (lib/knowledge/learningCatalog.ts)
+    unlocks: effectiveModuleUnlocks({
+      id: m.id,
+      legacyId: m.legacyId,
+      pathId: m.pathId,
+      unlocks: Array.isArray(m.unlocks) ? (m.unlocks as unknown as SsfUnlock[]).map(unlockLabel) : [],
+    }),
   }
 }
 
@@ -120,12 +129,13 @@ export function resolveModuleForUnlock(
   modules: SsfKnowledgeModule[],
   unlockId: string,
 ): SsfKnowledgeModule | null {
+  // Zuerst die SSF-Angabe, dann NOXIAs eigenes Verzeichnis (Kennung/Legacy-ID).
   for (const candidate of modules) {
     if (Array.isArray(candidate.unlocks) && candidate.unlocks.some((u) => unlockLabel(u as SsfUnlock) === unlockId)) {
       return candidate
     }
   }
-  return null
+  return modules.find((candidate) => moduleTeachesUnlock(candidate, unlockId)) ?? null
 }
 
 export async function fetchSsfKnowledgeModules(): Promise<SsfKnowledgeModule[]> {

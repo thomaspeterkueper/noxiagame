@@ -3,6 +3,7 @@
 // Version:      0.7.0
 
 import { NextRequest, NextResponse } from 'next/server'
+import { equivalentModuleIds } from '@/lib/knowledge/learningCatalog'
 import { createClient } from '@supabase/supabase-js'
 import { bankMutationCommand, type BankMutationAction } from '@/lib/game/core/commands'
 
@@ -47,16 +48,26 @@ async function getAccount(userId: string, locationId: string) {
   return data ?? EMPTY_ACCOUNT
 }
 
+// Kreditfreigabe: jede bekannte Kennung des Kreditmoduls (Kurzkennung wie
+// SSF-Kennung „LRN:SSF:ECO-L0-000001“) oder die Freischaltung UNL:NOX:bank-credit
+// zählt (28.10.2026; spiegelt Migration 20261028160000).
 async function hasCreditClearance(userId: string): Promise<boolean> {
   try {
-    const { data, error } = await serviceClient
-      .from('academy_completions')
-      .select('module_id')
-      .eq('profile_id', userId)
-      .eq('module_id', CREDIT_MODULE_ID)
-      .maybeSingle()
-    if (error) return false
-    return !!data
+    const [completions, unlocks] = await Promise.all([
+      serviceClient
+        .from('academy_completions')
+        .select('module_id')
+        .eq('profile_id', userId)
+        .in('module_id', equivalentModuleIds(CREDIT_MODULE_ID))
+        .limit(1),
+      serviceClient
+        .from('player_unlocks')
+        .select('unlock_id')
+        .eq('profile_id', userId)
+        .eq('unlock_id', 'UNL:NOX:bank-credit')
+        .limit(1),
+    ])
+    return (completions.data?.length ?? 0) > 0 || (unlocks.data?.length ?? 0) > 0
   } catch {
     return false
   }

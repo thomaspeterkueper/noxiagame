@@ -1,8 +1,11 @@
 // app/api/game/knowledge/route.ts
 // Erstellt:     20.06.2026
 // Aktualisiert: 31.08.2026 — SSF-Unlock-Sync idempotent + NOXIA-Prerequisites
-// Version:      2.6.0
+// Aktualisiert: 28.10.2026 — Freischaltungen auch aus NOXIAs Lernverzeichnis,
+//                              wenn die SSF für ein Modul keine meldet (Kredit)
+// Version:      2.7.0
 
+import { unlocksForModule } from '@/lib/knowledge/learningCatalog'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { resolveGrantableUnlocks, getMissingUnlockPrerequisites, UNLOCK_REGISTRY } from '@/lib/knowledge/unlockRegistry'
@@ -168,6 +171,10 @@ export async function GET(req: NextRequest) {
 
     // SSF ist Content-/Mapping-Authority; NOXIA erzwingt seine eigene
     // Unlock-Hierarchie vor dem Persistieren in player_unlocks.
+    // Rückfall (28.10.2026): NOXIAs Lernverzeichnis ordnet bekannte Module ihrer
+    // Freischaltung zu, auch wenn die SSF für das Modul keine meldet oder nicht
+    // erreichbar ist.
+    const candidateIds = new Set<string>(unlocksForModule(moduleId))
     try {
       const ssfBase = (process.env.SSF_BASE_URL ?? 'https://solarsciencefoundation.vercel.app').replace(/\/$/, '')
       const ssfRes = await fetch(`${ssfBase}/api/noxia/unlocks/check`, {
@@ -181,30 +188,32 @@ export async function GET(req: NextRequest) {
 
       if (ssfRes.ok) {
         const ssfData = await ssfRes.json() as { unlocks?: { id: string }[] }
-        const candidateIds = (ssfData.unlocks ?? []).map(u => u.id)
-
-        const { data: existingUnlocks } = await supabase
-          .from('player_unlocks')
-          .select('unlock_id')
-          .eq('profile_id', user.id)
-
-        const existingIds = new Set((existingUnlocks ?? []).map((u: any) => u.unlock_id as string))
-        const resolved = resolveGrantableUnlocks(candidateIds, existingIds)
-        blockedUnlocks.push(...resolved.blocked)
-
-        const toInsert = resolved.grantable.map(id => ({
-          profile_id:    user.id,
-          unlock_id:     id,
-          granted_at:    new Date().toISOString(),
-          source_module: moduleId,
-        }))
-
-        if (toInsert.length > 0) {
-          await supabase.from('player_unlocks').insert(toInsert)
-        }
+        for (const u of ssfData.unlocks ?? []) if (u?.id) candidateIds.add(u.id)
       }
     } catch (unlockErr) {
       console.error('[knowledge] SSF unlock check failed (non-fatal):', unlockErr)
+    }
+
+    if (candidateIds.size > 0) {
+      const { data: existingUnlocks } = await supabase
+        .from('player_unlocks')
+        .select('unlock_id')
+        .eq('profile_id', user.id)
+
+      const existingIds = new Set((existingUnlocks ?? []).map((u: any) => u.unlock_id as string))
+      const resolved = resolveGrantableUnlocks([...candidateIds], existingIds)
+      blockedUnlocks.push(...resolved.blocked)
+
+      const toInsert = resolved.grantable.map(id => ({
+        profile_id:    user.id,
+        unlock_id:     id,
+        granted_at:    new Date().toISOString(),
+        source_module: moduleId,
+      }))
+
+      if (toInsert.length > 0) {
+        await supabase.from('player_unlocks').insert(toInsert)
+      }
     }
 
     // Wissenspunkte nur beim ersten Abschluss vergeben (L0=50, L1=100, L2=200)
