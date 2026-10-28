@@ -74,7 +74,7 @@ type Line = { role: 'user' | 'assistant'; content: string }
  */
 type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
@@ -622,6 +622,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           {parcel.residents > 0 && <><dt>Bewohner</dt><dd>{parcel.residents} – bleiben und zahlen Miete an dich</dd></>}
           {parcel.rentPerInterval > 0 && <><dt>Miete</dt><dd>{credits(parcel.rentPerInterval)} je Abrechnung</dd></>}
           {parcel.forSale && <><dt>Preis</dt><dd><b>{credits(parcel.price ?? 0)}</b></dd></>}
+          {parcel.land && parcel.land.potential.length > 0 && <><dt>Ertrag</dt><dd>{parcel.land.potential.join(' · ')} <small>(geschätzt)</small></dd></>}
         </dl>
         {parcel.forSale && <div className="row"><span>{buyError || (parcel.listed ? `Angebot von ${parcel.seller} – das Geld geht an ihn (abzüglich Steuer), Häuser und Bewohner gehen mit.` : `Das Geld geht an ${parcel.seller ?? 'die Gemeinde'}.`)}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
         {!parcel.forSale && !parcel.own && <div className="row"><span>Nicht verkäuflich: {parcel.reason}</span></div>}
@@ -637,6 +638,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           <div className="row"><span>Teilen an der angeklickten Stelle</span><button disabled={buying} onClick={() => void parcelAction({ action: 'split', at: panel.at, direction: 'across' }, 'Teilen nicht möglich.')}>quer</button><button disabled={buying} onClick={() => void parcelAction({ action: 'split', at: panel.at, direction: 'along' }, 'Teilen nicht möglich.')}>längs</button></div>
           {(parcel.neighbours ?? []).map(item => <div key={item.id} className="row"><span>Zusammenlegen mit {item.label} ({item.areaM2.toLocaleString('de-DE')} m²)</span><button disabled={buying} onClick={() => void parcelAction({ action: 'merge', with: item.id }, 'Zusammenlegen nicht möglich.')}>Zusammenlegen</button></div>)}
         </>}
+        {parcel.land?.activity && <p className="hint">{parcel.own ? 'Bewirtschaften' : 'Nach dem Kauf'}: {parcel.land.activity} – kommt mit Baustoffen und Rohstoffen ins Spiel (NOXIA-MAT-0001).</p>}
         <span className="source">Quelle: {parcel.source ?? 'Liegenschaftskataster'}</span>
       </>}
     </>}
@@ -661,6 +663,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       .head b{display:block;font-size:15px}
       .head span{display:block;font-size:11px;color:#9fb5b0;margin-top:2px}
       .head .grow{flex:1}
+      .hint{margin:6px 0 0;font-size:11px;color:#c9d6c2;line-height:1.4}
       .source{display:block;margin-top:8px;font-size:10px;color:#7f9792}
       .bar{height:6px;border-radius:3px;background:#2d2410;overflow:hidden;margin:6px 0}
       .bar i{display:block;height:100%;background:#f0d27a}
