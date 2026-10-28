@@ -2,8 +2,9 @@
 
 // app/dashboard/BankOverlay.tsx
 // Erstellt:     22.06.2026
-// Aktualisiert: 25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
-// Version:      1.7.0
+// Aktualisiert: 28.10.2026 — Zinsen pro Tag statt pro Tick; Festgeld anlegen und kündigen (nach Lernmodul Zinseszins)
+// Vorher:       25.08.2026 — Verkaufen-Button (canSell/onSellClick) ergänzt
+// Version:      1.8.0
 //
 // v1.1.0 – Sicherheiten-Tab, Zinseszins-Chart, Nachweis-Gate für Kredit
 // v1.0.0 – Initiale Version: Einlagen, Kredite, Buchungshistorie
@@ -72,6 +73,10 @@ interface BankStatus {
   collateralTotal:   number
   collateralWarning: CollateralWarning | null
   ledger:            LedgerEntry[]
+  termOffers?:       { days: number; rateDaily: number }[]
+  termMin?:          number
+  hasTermClearance?: boolean
+  termDeposits?:     { id: string; principal: number; rateDaily: number; termDays: number; status: 'open' | 'paid' | 'broken'; interestAtMaturity: number; interestPaid: number; daysLeft: number }[]
 }
 
 interface LedgerEntry {
@@ -99,6 +104,10 @@ const ENTRY_LABELS: Record<string, { label: string; color: string }> = {
   loan_repaid:      { label: 'Tilgung',     color: '#1a7a4a' },
   interest_deposit: { label: 'Zinsen',      color: '#8a6a00' },
   interest_loan:    { label: 'Kreditzinsen',color: '#b52a2a' },
+  term_open:        { label: 'Festgeld',    color: '#2a4e7a' },
+  term_payout:      { label: 'Festgeld fällig', color: '#1a7a4a' },
+  term_break:       { label: 'Festgeld gekündigt', color: '#8a6a00' },
+  correction:       { label: 'Korrektur',   color: '#6a6a6a' },
 }
 
 const BUILDING_NAMES: Record<string, string> = {
@@ -159,6 +168,30 @@ export default function BankOverlay({
       const d = await r.json()
       if (!d.error) setCompound(d)
     } catch {}
+  }
+
+  async function termAction(action: 'term_open' | 'term_break', extra: { termDays?: number; termId?: string }) {
+    const amt = parseInt(amount, 10)
+    if (action === 'term_open' && (!Number.isFinite(amt) || amt <= 0)) { setMsg({ text: 'Ungültiger Betrag', ok: false }); return }
+    setBusy(true); setMsg(null)
+    try {
+      const jwt = await getJwt()
+      const r = await fetch('/api/game/bank', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, location: locationSlug, amount: action === 'term_open' ? amt : 0, ...extra }),
+      })
+      const d = await r.json()
+      if (d.error) { setMsg({ text: d.error, ok: false }); return }
+      setMsg({ text: d.msg ?? 'Erledigt', ok: true })
+      if (action === 'term_open') setAmount('')
+      if (typeof d.credits === 'number') { setCredits(d.credits); onCreditsChanged(d.credits) }
+      await loadAll()
+    } catch {
+      setMsg({ text: 'Fehler bei der Transaktion', ok: false })
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function doAction(action: 'deposit' | 'withdraw' | 'loan' | 'repay') {
@@ -263,8 +296,8 @@ export default function BankOverlay({
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 {[
-                  { label: 'Einlage',     value: `${status.deposit.toLocaleString('de')} Cr`,      sub: `+${(status.depositRate*100).toFixed(1)}%/Tick`,      color: C.green },
-                  { label: 'Kredit',      value: `${status.loan.toLocaleString('de')} Cr`,          sub: status.loan > 0 ? `−${(status.loanRate*100).toFixed(1)}%/Tick (Zinseszins)` : 'Kein Kredit', color: status.loan > 0 ? C.red : C.textFaint },
+                  { label: 'Einlage',     value: `${status.deposit.toLocaleString('de')} Cr`,      sub: `+${(status.depositRate*100).toFixed(1)}%/Tag`,      color: C.green },
+                  { label: 'Kredit',      value: `${status.loan.toLocaleString('de')} Cr`,          sub: status.loan > 0 ? `−${(status.loanRate*100).toFixed(1)}%/Tag (Zinseszins)` : 'Kein Kredit', color: status.loan > 0 ? C.red : C.textFaint },
                   { label: 'Kreditlimit', value: `${status.creditLimit.toLocaleString('de')} Cr`,   sub: `${(status.collateralTotal).toLocaleString('de')} Cr Sicherheiten × 70%`, color: C.accent },
                   { label: 'Verfügbar',   value: `${status.availableLoan.toLocaleString('de')} Cr`, sub: status.hasModule ? 'Sofort abrufbar' : '⚠ Schulungsnachweis fehlt', color: status.hasModule && status.availableLoan > 0 ? C.accent : C.textFaint },
                 ].map(({ label, value, sub, color }) => (
@@ -313,9 +346,9 @@ export default function BankOverlay({
           {!loading && tab === 'einlage' && status && (
             <>
               <div style={{ background: C.greenLight, border: '1px solid #a0dcb8', borderRadius: '8px', padding: '0.85rem 1.1rem', marginBottom: '1.25rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.green, fontFamily: MONO, marginBottom: '4px' }}>Einlagenkonto · {(status.depositRate * 100).toFixed(1)}%/Tick</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.green, fontFamily: MONO, marginBottom: '4px' }}>Einlagenkonto · {(status.depositRate * 100).toFixed(1)}%/Tag</div>
                 <div style={{ fontSize: '0.8rem', color: C.text, lineHeight: 1.65 }}>
-                  Aktuelle Einlage: <strong style={{ color: C.green }}>{status.deposit.toLocaleString('de')} Cr</strong>. Zinsen werden automatisch pro Tick gutgeschrieben. Jederzeit auszahlbar.
+                  Aktuelle Einlage: <strong style={{ color: C.green }}>{status.deposit.toLocaleString('de')} Cr</strong>. Zinsen werden einmal am Tag gutgeschrieben, bezahlt von der Bank. Jederzeit auszahlbar.
                 </div>
               </div>
 
@@ -345,6 +378,50 @@ export default function BankOverlay({
                 ))}
                 <button onClick={() => setAmount(String(credits))}
                   style={{ flex: 1, padding: '4px 0', background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: '6px', fontSize: '0.68rem', color: C.textMuted, cursor: 'pointer', fontFamily: MONO }}>Max</button>
+              </div>
+
+              {/* ── FESTGELD ─────────────────────────────────────────────── */}
+              <div style={{ marginTop: '1.5rem', borderTop: `1px solid ${C.border}`, paddingTop: '1rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.accent, fontFamily: MONO, marginBottom: '6px' }}>Festgeld</div>
+                {!status.hasTermClearance ? (
+                  <div style={{ fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.6 }}>
+                    Festgeld bringt mehr Zins als die Einlage, ist aber für eine feste Zeit gebunden. Angeboten wird es nach dem Lernmodul „Was ist Zinseszins?“.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '0.78rem', color: C.text, lineHeight: 1.6, marginBottom: '0.6rem' }}>
+                      Betrag oben eingeben, Laufzeit wählen. Ab {status.termMin ?? 100} Cr, Zins bei Fälligkeit. Vorzeitig kündbar, dann ohne Zins.
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                      {(status.termOffers ?? []).map(offer => {
+                        const ok = amtValid && amt >= (status.termMin ?? 100) && amt <= credits
+                        return (
+                          <button key={offer.days} onClick={() => termAction('term_open', { termDays: offer.days })} disabled={busy || !ok}
+                            style={{ flex: 1, padding: '0.6rem', background: ok ? C.accent : C.border, color: ok ? C.white : C.textFaint, border: 'none', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed', fontFamily: MONO }}>
+                            {offer.days} Tage · {(offer.rateDaily * 100).toFixed(1)} %/Tag
+                            {ok && <div style={{ fontSize: '0.65rem', fontWeight: 400, marginTop: 2 }}>+{Math.floor(amt * offer.rateDaily * offer.days)} Cr</div>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+                {(status.termDeposits ?? []).length > 0 && (
+                  <div style={{ marginTop: '0.8rem' }}>
+                    {(status.termDeposits ?? []).map(t => (
+                      <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${C.border}`, fontSize: '0.75rem', fontFamily: MONO }}>
+                        <span>{t.principal.toLocaleString('de')} Cr · {t.termDays} Tage</span>
+                        <span style={{ color: C.textMuted }}>
+                          {t.status === 'open' ? `noch ${t.daysLeft} Tag${t.daysLeft === 1 ? '' : 'e'} · +${t.interestAtMaturity} Cr` : t.status === 'paid' ? `ausgezahlt · +${t.interestPaid} Cr` : 'gekündigt'}
+                        </span>
+                        {t.status === 'open' && (
+                          <button onClick={() => termAction('term_break', { termId: t.id })} disabled={busy}
+                            style={{ padding: '3px 8px', background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: '6px', fontSize: '0.65rem', color: C.textMuted, cursor: 'pointer', fontFamily: MONO }}>Kündigen</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -422,7 +499,7 @@ export default function BankOverlay({
 
               {/* Zinseszins-Visualisierung */}
               <div style={{ fontSize: '0.62rem', color: C.textFaint, letterSpacing: '0.12em', textTransform: 'uppercase' as const, fontFamily: MONO, marginBottom: '0.6rem' }}>
-                Zinseszins-Entwicklung · {amtValid && amt >= 100 ? `${amt.toLocaleString('de')} Cr` : '1.000 Cr'} über {previewTicks} Ticks
+                Zinseszins-Entwicklung · {amtValid && amt >= 100 ? `${amt.toLocaleString('de')} Cr` : '1.000 Cr'} über {previewTicks} Tage
               </div>
               {compound && (() => {
                 const data = compound.loan.slice(0, previewTicks)
@@ -439,12 +516,12 @@ export default function BankOverlay({
                     </div>
                     {/* Tick-Labels */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: C.textFaint, fontFamily: MONO }}>
-                      <span>Tick 1</span>
-                      <span style={{ color: C.red, fontWeight: 700 }}>Tick {previewTicks}: {data[previewTicks-1]?.balance.toLocaleString('de')} Cr</span>
+                      <span>Tag 1</span>
+                      <span style={{ color: C.red, fontWeight: 700 }}>Tag {previewTicks}: {data[previewTicks-1]?.balance.toLocaleString('de')} Cr</span>
                     </div>
                     <div style={{ marginTop: '8px', fontSize: '0.68rem', color: C.textMuted, lineHeight: 1.5 }}>
-                      Zinslast/Tick: <span style={{ color: C.red, fontWeight: 700 }}>−{Math.round((amtValid && amt >= 100 ? amt : 1000) * compound.loanRate).toLocaleString('de')} Cr</span>
-                      <span style={{ marginLeft: '12px' }}>+{((compound.loanRate) * 100).toFixed(1)}%/Tick Zinseszins</span>
+                      Zinslast/Tag: <span style={{ color: C.red, fontWeight: 700 }}>−{Math.round((amtValid && amt >= 100 ? amt : 1000) * compound.loanRate).toLocaleString('de')} Cr</span>
+                      <span style={{ marginLeft: '12px' }}>+{((compound.loanRate) * 100).toFixed(1)}%/Tag Zinseszins</span>
                     </div>
                   </div>
                 )
@@ -555,7 +632,7 @@ export default function BankOverlay({
         </div>
 
         <div style={{ padding: '0.5rem 1.5rem', borderTop: `1px solid ${C.border}`, fontSize: '0.62rem', color: C.textFaint, fontFamily: MONO, background: C.bgAlt, flexShrink: 0 }}>
-          Solar Central Bank · Einlagen gesichert · Zinsen werden pro Tick automatisch gebucht
+          Solar Central Bank · Einlagen gesichert · Zinsen werden einmal am Tag gebucht
         </div>
       </div>
     </div>

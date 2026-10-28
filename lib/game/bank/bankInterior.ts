@@ -50,14 +50,14 @@ export const BANK_LAYOUT: VenueLayout = {
 
 export interface BankPublicFacts {
   locationName: string
-  /** Zinssätze je Tick, als Anteil (0.01 = 1 %). */
+  /** Zinssätze je Tag, als Anteil (0.01 = 1 %). Seit 28.10.2026 pro Tag statt pro Tick. */
   depositRate: number
   loanRate: number
   /** Stand des Gastes – nur, wenn er am Schalter steht; sonst null. */
   customer?: { deposit: number; loan: number; creditLimit: number; availableLoan: number; hasModule: boolean } | null
 }
 
-const pct = (v: number) => `${Math.round(v * 10000) / 100} % je Tick`
+const pct = (v: number) => `${Math.round(v * 10000) / 100} % je Tag`
 
 /** Was das Personal der Bank weiß: die Konditionen immer, den Stand des Kunden nur am Schalter. */
 export function bankKnowledge(input: BankPublicFacts | null): string[] {
@@ -81,7 +81,7 @@ export const BANK_INTRODUCTION = {
   style: 'bank',
   stance: 'Du bist höflich, diskret und präzise; du wirbst nicht für Kredite. Neuen erklärst du, dass Guthaben Zinsen bringt und ein Kredit Sicherheiten braucht, und rätst, erst zu verdienen, dann zu leihen.',
   leads: [
-    'Wer Credits übrig hat, legt sie an; die Zinsen laufen je Tick',
+    'Wer Credits übrig hat, legt sie an; die Zinsen kommen einmal am Tag. Wer das Lernmodul zum Zinseszins kennt, kann Festgeld für 7 oder 30 Tage anlegen – mehr Zins, aber gebunden',
     'Ein Kredit braucht Sicherheiten – ein eigenes Gebäude zählt – und die Kreditfreigabe aus der Akademie',
     'Wer handeln will, braucht Startkapital: erst kleine Geschäfte, dann die Bank',
   ],
@@ -125,7 +125,7 @@ export function customerStatusFrom(data: Record<string, unknown> | null | undefi
 }
 
 const cr = (v: number) => `${Math.round(v).toLocaleString('de-DE')} Cr`
-const perTick = (v: number) => `${(Math.round(v * 10) / 10).toLocaleString('de-DE')} Cr je Tick`
+const perTick = (v: number) => `${(Math.round(v * 10) / 10).toLocaleString('de-DE')} Cr je Tag`
 
 /**
  * Die Beratungsmappe: was aus dem eigenen Konto folgt – nur gerechnet, nichts

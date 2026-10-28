@@ -41,6 +41,14 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
       - Bauen direkt in der begehbaren Ansicht (Fläche vorwählen, Gebäude setzen);
       - 17 Eisbohrer und eine Mine auf dem Mond ohne Lage (`x_m`/`y_m` leer) – unklar, wo sie stehen.
 17. ✅ **Verhaltensaufzeichnung der Testphase (28.10.2026, Wunsch Thomas, ausnahmsweise; querschnittlich, kein festes Teilprojekt).** `player_activity_log` mit Sichten für Sitzungen, tote Klicks und Wutklicks, Fehler, Klicks und Laufwege (Migration `20261028110000`, live). Erfasst wird allgemein über `lib/telemetry/playerActivity.ts` im Root-Layout. Laufwege melden die begehbaren Ansichten von Mond und Mars, die Innenräume und die Koloniesicht; die begehbare Erdoberfläche noch nicht. Die tägliche Auswertung um 7:34 Uhr liest Gespräche und Verhalten. Doku: `docs/reviews/spielerverhalten-testphase.md`. Offen vor öffentlichem Start: Hinweis, Ablehnen-Möglichkeit, Aufbewahrung.
+18. ✅ **Bankzinsen ohne Gegenkonto behoben (28.10.2026, entschieden von Thomas: „Tageszins, Bank zahlt“, „Neu berechnen“).**
+    - **Befund:** `runBankInterestTick` schrieb Einlagen 0,5 % je Tick (Stunde) gut, ohne dass jemand zahlte, Kredite liefen mit 2 % je Stunde. Aus 1 500 eingezahlten Credits wurden rund 577 000.
+    - **Neu:** Die Solar Central Bank ist ein Akteur mit eigenem Konto. Ihre Startreserve beträgt 5 000 Cr, ausgewiesen als `bootstrap:bank:solar-central-bank`.
+    - **`run_bank_daily`** läuft einmal am Tag. Einlagen bekommen 0,1 %/Tag, bezahlt aus dem Bankkonto; reicht es nicht, gibt es weniger, und das Bankbuch sagt es. Kredite laufen mit 0,5 %/Tag auf.
+    - **Tilgen:** Zuerst werden die Zinsen bezahlt, sie gehen an die Bank. Die Hauptsumme bleibt Kreditgeld: Die Auszahlung schafft es, die Tilgung vernichtet es.
+    - **Altguthaben neu berechnet:** eingezahlt plus 0,1 %/Tag seit Einzahlung, 1 066 und 553 Cr; die Korrektur steht im Bankbuch.
+    - **Nebenbefund:** `academy_completions` verlangte Kennungen aus `academy_modules` (alte Namen). Abschlüsse der SSF-Module scheiterten still; niemand konnte den Kreditnachweis `ECO-L0-000001` erbringen. Der Fremdschlüssel ist entfernt.
+    - **Sätze:** in `noxia_bank_rates()` und `app/api/game/bank/route.ts`, anpassbar.
 
 ## Requests aus anderen Teilprojekten
 
@@ -329,7 +337,12 @@ Für die Raumhafen-Schwellen (`UNL:NOX:NAV:ORBITAL`, `UNL:NOX:NAV:CURVATURE`) is
 
 - Von den vier Schwellen hat nur „Was ist Zinseszins?“ (`ECO-L0-000002`) ein SSF-Modul. Sicherheitenwert, Arbitrage und Bodenwert haben keins; eine Sperre würde den Weg ganz verschließen, wie im Request vermerkt.
 - Für die Zinseszins-Schwelle gibt es noch nichts Sinnvolles zu sperren. Die Zinseszins-Vorschau der Bank erklärt das Prinzip; sie hinter dem Modul zu verstecken, das sie erklärt, wäre verkehrt herum.
-- **[OFFEN, Thomas]** Vorschlag: Festgeld (gesperrte Einlage mit höherem Zins) als neues Produkt, das erst nach dem Zinseszins-Modul geöffnet wird.
+- ✅ **Festgeld – entschieden (Thomas, 28.10.2026: „Festgeld klingt gut, später auch Börse“), gebaut am selben Tag** (Migration `20261028190000`):
+  - 7 Tage zu 0,2 %/Tag oder 30 Tage zu 0,3 %/Tag, einfacher Zins bei Fälligkeit, ab 100 Cr.
+  - Vorzeitig kündbar, dann ohne Zins.
+  - Erst nach „Was ist Zinseszins?“: Modulabschluss `ECO-L0-000002` oder Freischaltung `UNL:NOX:bank-compound`.
+  - In der Bank unter „Einlage“.
+- **Börse:** später, eigener Baustein [OFFEN].
 - Die übrigen drei Schwellen werden gesperrt, sobald SSF die Module liefert (KB-REQUEST-0003).
 
 ### R-16 (Gastronomie, 27.10.2026): Gekaufte Häuser als Sicherheit

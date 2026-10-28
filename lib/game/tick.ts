@@ -1,6 +1,7 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
-// Aktualisiert: 12.10.2026 — Fracht geht an die Spedition (role 'carrier'); Frachtdauer aus der
+// Aktualisiert: 28.10.2026 — Bankzinsen einmal am Tag in der Datenbank (run_bank_daily), Bank zahlt aus eigenem Konto
+// Zuvor:        12.10.2026 — Fracht geht an die Spedition (role 'carrier'); Frachtdauer aus der
 //               Entfernung; davor am selben Tag: Handelsfirma (lib/game/npcTrade.ts, Tabelle npc_shipments): kaufen,
 //               verschiffen, verkaufen; Firmenkäufe werden bezahlt
 // Zuvor am selben Tag: Bugfix Firmenbuchungen: Ware von Firmenanlagen entsteht nur noch im
@@ -8,7 +9,7 @@
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.8.0
+// Version:      3.9.0
 
 import {
   CONSUMPTION_PER_100,
@@ -43,9 +44,6 @@ const LEGACY_BUILDING_PAYOUT_ENABLED = process.env.NOXIA_LEGACY_BUILDING_PAYOUT 
 export const TICK_INTERVAL_SECONDS = 3600
 export const TICK_MAX_CATCHUP      = 48
 
-// ── Bank-Zinssätze (müssen identisch zu bank/route.ts sein) ─────────────────
-const BANK_DEPOSIT_RATE = 0.005   // +0.5%/Tick auf Einlagen
-const BANK_LOAN_RATE    = 0.020   // −2.0%/Tick auf Kredite (Zinseszins)
 
 const AVG_WINDOW_TICKS      = 7
 const HISTORY_RETENTION_TICKS = 336
@@ -631,77 +629,17 @@ async function runHandel(supabase: SB, actorId: string, tick: number, kasse: num
 }
 
 // ── Bank-Zinsen ───────────────────────────────────────────────────────────────
-// Läuft einmal pro Tick für alle Konten mit Einlage oder Kredit.
-// Zinsen werden als Ledger-Einträge gebucht — append-only, vollständig auditierbar.
+// Einmal am Tag (alle 24 Ticks) in der Datenbank: run_bank_daily zahlt Einlagezinsen
+// aus dem Konto der Solar Central Bank, lässt Kreditzinsen auflaufen und zahlt fälliges
+// Festgeld aus (Migration 20261028190000; vorher 0,5 % je Stunde ohne Gegenkonto).
 
 export async function runBankInterestTick(supabase: SB, tickNumber: number) {
-  const { data: accounts, error } = await supabase
-    .from('bank_accounts')
-    .select('id, profile_id, location_id, deposit, loan')
-    .or('deposit.gt.0,loan.gt.0')
-
+  const { data, error } = await supabase.rpc('run_bank_daily', { p_tick: tickNumber })
   if (error) {
-    console.error('runBankInterestTick: load error', error)
+    console.error('runBankInterestTick failed', { tick: tickNumber, code: error.code })
     return { processed: 0 }
   }
-
-  let processed = 0
-
-  for (const acc of accounts ?? []) {
-    const deposit = Number(acc.deposit ?? 0)
-    const loan    = Number(acc.loan    ?? 0)
-    const ledgerEntries: { profile_id: string; location_id: string; entry_type: string; amount: number; balance_after: number; note: string; tick: number }[] = []
-    const updates: Record<string, number> = {}
-
-    // Zinsgutschrift auf Einlage
-    if (deposit > 0) {
-      const interest = Math.floor(deposit * BANK_DEPOSIT_RATE)
-      if (interest > 0) {
-        updates.deposit = deposit + interest
-        ledgerEntries.push({
-          profile_id:    acc.profile_id,
-          location_id:   acc.location_id,
-          entry_type:    'interest_deposit',
-          amount:        interest,
-          balance_after: updates.deposit,
-          note:          `Zinsgutschrift +${(BANK_DEPOSIT_RATE * 100).toFixed(1)}% (Tick ${tickNumber})`,
-          tick:          tickNumber,
-        })
-      }
-    }
-
-    // Zinslast auf Kredit (Zinseszins)
-    if (loan > 0) {
-      const interest = Math.ceil(loan * BANK_LOAN_RATE)
-      updates.loan = loan + interest
-      ledgerEntries.push({
-        profile_id:    acc.profile_id,
-        location_id:   acc.location_id,
-        entry_type:    'interest_loan',
-        amount:        interest,
-        balance_after: updates.loan,
-        note:          `Kreditzinsen −${(BANK_LOAN_RATE * 100).toFixed(1)}% Zinseszins (Tick ${tickNumber})`,
-        tick:          tickNumber,
-      })
-    }
-
-    // Sequenzieller Update + Ledger-Einträge; nicht transaktional
-    if (Object.keys(updates).length > 0) {
-      const { error: updateErr } = await supabase
-        .from('bank_accounts')
-        .update(updates)
-        .eq('id', acc.id)
-
-      if (!updateErr && ledgerEntries.length > 0) {
-        const { error: ledgerErr } = await supabase.from('bank_ledger').insert(ledgerEntries)
-        if (ledgerErr) console.error('runBankInterestTick: ledger error', ledgerErr)
-      }
-
-      if (!updateErr) processed++
-    }
-  }
-
-  return { processed }
+  return data ?? { processed: 0 }
 }
 
 

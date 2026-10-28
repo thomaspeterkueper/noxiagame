@@ -1,6 +1,6 @@
 // app/api/game/bank/route.ts
-// Aktualisiert: 28.10.2026 — Gekaufte Häuser (Miete) und Lokale (Umsatz) zählen als Sicherheit (R-16)
-// Version:      0.7.0
+// Aktualisiert: 28.10.2026 — Zinsen pro Tag statt pro Tick (Sätze aus noxia_bank_rates); Festgeld anlegen und kündigen; zuvor: Häuser und Lokale als Sicherheit (R-16)
+// Version:      0.8.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { equivalentModuleIds } from '@/lib/knowledge/learningCatalog'
@@ -12,8 +12,13 @@ const serviceClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const DEPOSIT_RATE        = 0.005
-const LOAN_RATE           = 0.020
+// Sätze pro Tag – identisch zu noxia_bank_rates() in der Datenbank (Migration 20261028190000).
+const DEPOSIT_RATE        = 0.001
+const LOAN_RATE           = 0.005
+const TERM_OFFERS         = [{ days: 7, rateDaily: 0.002 }, { days: 30, rateDaily: 0.003 }] as const
+const TERM_MIN            = 100
+const TERM_MODULE_ID      = 'ECO-L0-000002'
+const TERM_UNLOCK_ID      = 'UNL:NOX:bank-compound'
 const COLLATERAL_RATIO    = 0.70
 const SHIP_RESIDUAL_RATIO = 0.60
 const MAX_CREDIT_LIMIT    = 50_000
@@ -71,6 +76,15 @@ async function hasCreditClearance(userId: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** Festgeld erst nach „Was ist Zinseszins?“ (R-15): Modulabschluss oder Freischaltung. */
+async function hasTermClearance(userId: string): Promise<boolean> {
+  const [{ data: done }, { data: unlock }] = await Promise.all([
+    serviceClient.from('academy_completions').select('module_id').eq('profile_id', userId).eq('module_id', TERM_MODULE_ID).maybeSingle(),
+    serviceClient.from('player_unlocks').select('unlock_id').eq('profile_id', userId).eq('unlock_id', TERM_UNLOCK_ID).maybeSingle(),
+  ])
+  return Boolean(done || unlock)
 }
 
 async function calcCollateral(userId: string): Promise<{
@@ -199,6 +213,11 @@ function bankCommandError(error: unknown) {
   if (message.includes('NOXIA_BANK_NO_OUTSTANDING_LOAN')) return NextResponse.json({ error: 'Kein ausstehender Kredit' }, { status: 400 })
   if (message.includes('NOXIA_BANK_CREDITS_INSUFFICIENT')) return NextResponse.json({ error: 'Nicht genug Credits' }, { status: 400 })
   if (message.includes('NOXIA_PROFILE_NOT_FOUND')) return NextResponse.json({ error: 'Profil nicht gefunden' }, { status: 404 })
+  if (message.includes('NOXIA_BANK_TERM_CLEARANCE_REQUIRED')) return NextResponse.json({ error: 'Festgeld gibt es nach dem Lernmodul „Was ist Zinseszins?“.', moduleId: TERM_MODULE_ID }, { status: 403 })
+  if (message.includes('NOXIA_BANK_TERM_MIN')) return NextResponse.json({ error: `Festgeld ab ${TERM_MIN} Cr.` }, { status: 400 })
+  if (message.includes('NOXIA_BANK_TERM_INVALID')) return NextResponse.json({ error: 'Diese Laufzeit gibt es nicht.' }, { status: 400 })
+  if (message.includes('NOXIA_BANK_TERM_NOT_FOUND')) return NextResponse.json({ error: 'Festgeld nicht gefunden.' }, { status: 404 })
+  if (message.includes('NOXIA_BANK_TERM_CLOSED')) return NextResponse.json({ error: 'Dieses Festgeld ist schon abgeschlossen.' }, { status: 409 })
   console.error('bank command failed:', message)
   return NextResponse.json({ error: 'Banktransaktion fehlgeschlagen' }, { status: 500 })
 }
@@ -207,6 +226,8 @@ type BankRequestInput = {
   action: string
   location: string | null
   amount: number
+  termDays?: number
+  termId?: string | null
 }
 
 async function handleBankRequest(req: NextRequest, input: BankRequestInput) {
@@ -256,6 +277,7 @@ async function handleBankRequest(req: NextRequest, input: BankRequestInput) {
   if (action === 'compound_preview') {
     const principal = amount > 0 ? amount : 1000
     return NextResponse.json({
+      // 20 Tage, ein Schritt je Tag.
       loan: compoundPreview(principal, LOAN_RATE, 20),
       deposit: compoundPreview(principal, DEPOSIT_RATE, 20),
       loanRate: LOAN_RATE,
@@ -268,8 +290,24 @@ async function handleBankRequest(req: NextRequest, input: BankRequestInput) {
   const creditLimit = Math.min(MAX_CREDIT_LIMIT, Math.round(collateral.total * COLLATERAL_RATIO))
   const availableLoan = Math.max(0, creditLimit - loan)
 
+  // ── Festgeld ──────────────────────────────────────────────────────────────
+  if (action === 'term_open' || action === 'term_break') {
+    try {
+      const { data, error } = action === 'term_open'
+        ? await serviceClient.rpc('open_term_deposit', { p_profile_id: user.id, p_location_id: loc.id, p_amount: amount, p_term_days: Number(input.termDays ?? 0) })
+        : await serviceClient.rpc('break_term_deposit', { p_profile_id: user.id, p_id: String(input.termId ?? '') })
+      if (error) throw error
+      const msg = action === 'term_open'
+        ? `${amount} Cr als Festgeld für ${input.termDays} Tage angelegt. Zinsen bei Fälligkeit: ${Number((data as any)?.interest_at_maturity ?? 0)} Cr`
+        : `Festgeld gekündigt: ${Number((data as any)?.returned ?? 0)} Cr zurück, ohne Zins`
+      return NextResponse.json({ ok: true, ...(data as object), msg })
+    } catch (error) {
+      return bankCommandError(error)
+    }
+  }
+
   if (action === 'status') {
-    const [ledgerResult, hasModule] = await Promise.all([
+    const [ledgerResult, hasModule, termResult, termClearance, tickRow] = await Promise.all([
       serviceClient
         .from('bank_ledger')
         .select('*')
@@ -278,7 +316,17 @@ async function handleBankRequest(req: NextRequest, input: BankRequestInput) {
         .order('created_at', { ascending: false })
         .limit(20),
       hasCreditClearance(user.id),
+      serviceClient.from('bank_term_deposits').select('id, principal, rate_daily, term_days, opened_tick, matures_tick, status, interest_paid, opened_at')
+        .eq('profile_id', user.id).eq('location_id', loc.id).order('opened_at', { ascending: false }).limit(10),
+      hasTermClearance(user.id),
+      serviceClient.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
     ])
+    const currentTick = Number(tickRow.data?.tick_number ?? 0)
+    const termDeposits = (termResult.data ?? []).map((t: any) => ({
+      id: t.id, principal: t.principal, rateDaily: Number(t.rate_daily), termDays: t.term_days, status: t.status,
+      interestAtMaturity: Math.floor(t.principal * Number(t.rate_daily) * t.term_days), interestPaid: t.interest_paid,
+      daysLeft: t.status === 'open' ? Math.max(0, Math.ceil((t.matures_tick - currentTick) / 24)) : 0,
+    }))
 
     const collateralWarning = loan > creditLimit && loan > 0
       ? {
@@ -298,6 +346,12 @@ async function handleBankRequest(req: NextRequest, input: BankRequestInput) {
       availableLoan,
       depositRate: DEPOSIT_RATE,
       loanRate: LOAN_RATE,
+      ratePeriod: 'day',
+      termOffers: TERM_OFFERS,
+      termMin: TERM_MIN,
+      termModuleId: TERM_MODULE_ID,
+      hasTermClearance: termClearance,
+      termDeposits,
       hasModule,
       moduleId: CREDIT_MODULE_ID,
       collateralTotal: collateral.total,
@@ -344,7 +398,7 @@ async function handleBankRequest(req: NextRequest, input: BankRequestInput) {
         loan: result.loan,
         availableLoan: nextAvailableLoan,
         collateralWarning,
-        msg: `${result.amount} Cr Kredit aufgenommen. Zinssatz: ${(LOAN_RATE * 100).toFixed(1)}%/Tick`,
+        msg: `${result.amount} Cr Kredit aufgenommen. Zinssatz: ${(LOAN_RATE * 100).toFixed(1)} %/Tag`,
       })
     }
 
@@ -367,6 +421,8 @@ export async function GET(req: NextRequest) {
     action: searchParams.get('action') ?? 'status',
     location: searchParams.get('location'),
     amount: Number.parseInt(searchParams.get('amount') ?? '0', 10),
+    termDays: Number.parseInt(searchParams.get('termDays') ?? '0', 10),
+    termId: searchParams.get('termId'),
   })
 }
 
@@ -382,5 +438,7 @@ export async function POST(req: NextRequest) {
     action: typeof body?.action === 'string' ? body.action : 'status',
     location: typeof body?.location === 'string' ? body.location : null,
     amount: Number.parseInt(String(body?.amount ?? '0'), 10),
+    termDays: Number.parseInt(String(body?.termDays ?? '0'), 10),
+    termId: typeof body?.termId === 'string' ? body.termId : null,
   })
 }

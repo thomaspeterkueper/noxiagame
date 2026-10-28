@@ -97,8 +97,8 @@ export default function BankWalkableInterior({ entityId, buildingName, locationS
       return <div className="menu">
         <small>KURSTAFEL</small>
         {status ? <dl className="notice">
-          <dt>Einlagen</dt><dd>{Math.round(Number(status.depositRate) * 10000) / 100} % je Tick</dd>
-          <dt>Kredit</dt><dd>{Math.round(Number(status.loanRate) * 10000) / 100} % je Tick</dd>
+          <dt>Einlagen</dt><dd>{Math.round(Number(status.depositRate) * 10000) / 100} % je Tag</dd>
+          <dt>Kredit</dt><dd>{Math.round(Number(status.loanRate) * 10000) / 100} % je Tag</dd>
           <dt>Dein Guthaben hier</dt><dd>{Number(status.deposit ?? 0)} Cr</dd>
           <dt>Dein Kredit</dt><dd>{Number(status.loan ?? 0)} Cr</dd>
           <dt>Kreditrahmen</dt><dd>{Number(status.creditLimit ?? 0)} Cr</dd>
