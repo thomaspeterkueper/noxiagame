@@ -19,6 +19,7 @@
 /.location-body-test
 /.conversation-repeat-test
 /.conversation-topic-test
+/.activity-rules-test
 
 # next.js
 /.next/

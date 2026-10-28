@@ -40,6 +40,7 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - **Offen:**
       - Bauen direkt in der begehbaren Ansicht (Fläche vorwählen, Gebäude setzen);
       - 17 Eisbohrer und eine Mine auf dem Mond ohne Lage (`x_m`/`y_m` leer) – unklar, wo sie stehen.
+17. ✅ **Verhaltensaufzeichnung der Testphase (28.10.2026, Wunsch Thomas, ausnahmsweise; querschnittlich, kein festes Teilprojekt).** `player_activity_log` mit Sichten für Sitzungen, tote Klicks und Wutklicks, Fehler, Klicks und Laufwege (Migration `20261028110000`, live). Erfasst wird allgemein über `lib/telemetry/playerActivity.ts` im Root-Layout. Laufwege melden die begehbaren Ansichten von Mond und Mars, die Innenräume und die Koloniesicht; die begehbare Erdoberfläche noch nicht. Die tägliche Auswertung um 7:34 Uhr liest Gespräche und Verhalten. Doku: `docs/reviews/spielerverhalten-testphase.md`. Offen vor öffentlichem Start: Hinweis, Ablehnen-Möglichkeit, Aufbewahrung.
 
 ## Requests aus anderen Teilprojekten
 

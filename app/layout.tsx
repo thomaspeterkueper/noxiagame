@@ -1,7 +1,7 @@
 import React from 'react'
 // app/layout.tsx
-// Aktualisiert: 2026-08-29 — Dashboard-Chrome liegt ausschließlich im Dashboard
-// Version:      1.3.1
+// Aktualisiert: 28.10.2026 — Verhaltensaufzeichnung der Testphase (PlayerActivityRecorder)
+// Version:      1.4.0
 
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Courier_Prime, Playfair_Display } from 'next/font/google'
@@ -11,6 +11,7 @@ import MusicProvider from './_components/MusicProvider'
 import MusicControls from './_components/MusicControls'
 import SiteFooter from './_components/SiteFooter'
 import LearningLinkInterceptor from './_components/LearningLinkInterceptor'
+import PlayerActivityRecorder from './_components/PlayerActivityRecorder'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head />
       <body className="min-h-full flex flex-col">
         <LearningLinkInterceptor />
+        <PlayerActivityRecorder />
         <MusicProvider>
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>{children}</div>

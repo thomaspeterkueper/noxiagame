@@ -1,11 +1,12 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 26.10.2026 — ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.5.0
+// Aktualisiert: 28.10.2026 — Laufweg der Spielfigur für die Verhaltensaufzeichnung; 26.10.2026: ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.6.0
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
+import { reportPlayerPosition } from '@/lib/telemetry/playerActivity'
 import { NpcFigure, NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
   LANDMARK_LEVELS,
@@ -94,6 +95,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
   const [pos, setPos] = useState<LandmarkPoint>(layout.start)
+  useEffect(() => { reportPlayerPosition('landmark:' + kind, pos.x / 10, pos.y / 10) }, [pos, kind])
   const [active, setActive] = useState<LandmarkSpot | null>(null)
   const [candles, setCandles] = useState(3)
   const [seated, setSeated] = useState(false)
