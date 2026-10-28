@@ -1,7 +1,7 @@
 // lib/game/cognition/conversationRepeat.ts
 // Erstellt:     27.10.2026
-// Aktualisiert: 27.10.2026 — Wiederholte Fragen erkennen; Abbruchsatz statt endloser Wiederholung (Wunsch Thomas)
-// Version:      1.0.0
+// Aktualisiert: 28.10.2026 — Grenztests zählen unabhängig vom Wortlaut: ab dem dritten bricht die Figur ab (Wunsch Thomas)
+// Version:      1.1.0
 //
 // Erkannt wird zweierlei: fast gleicher Wortlaut und dasselbe Thema in anderen
 // Worten. Bestellungen, Grüße und Dank zählen nicht.
@@ -19,6 +19,8 @@ export const REPEAT_BREAKOFF_AT = 3
 export const SIMILARITY_THRESHOLD = 0.6
 /** Wie lange die Figur nach einem Abbruch abweist (Echtzeit). */
 export const BREAKOFF_COOLDOWN_MS = 10 * 60_000
+/** Beim wievielten Grenztest (Beleidigung, sexuelles Anliegen) die Figur abbricht. */
+export const BOUNDARY_BREAKOFF_AT = 3
 /** Wie weit frühere Fragen aus dem Gedächtnis zählen (Echtzeit). */
 export const REPEAT_WINDOW_MS = 30 * 60_000
 
@@ -158,6 +160,29 @@ function pick(lines: ReadonlyArray<string>, seed: string): string {
 /** Abbruchsatz; der erste Abbruch einer Figur ist immer Thomas' Satz. */
 export function breakoffLine(seed: string, priorBreakoffs: number): string {
   return priorBreakoffs <= 0 ? BREAKOFF_LINES[0] : pick(BREAKOFF_LINES, seed)
+}
+
+const BOUNDARY_BREAKOFF_LINES = [
+  'Das reicht. So rede ich nicht weiter mit dir.',
+  'Nein. Ich hab dir das jetzt klar gesagt – wir sind hier fertig.',
+  'Lass das. Ich hab zu tun, und darüber rede ich nicht.',
+]
+
+/**
+ * Grenztests (Wunsch Thomas, 28.10.2026): Wer eine Figur beleidigt oder
+ * sexuell bedrängt, wechselt oft die Worte („technische Frage“), damit greift
+ * die Wiederholungserkennung nicht. Gezählt wird deshalb das Anliegen, nicht
+ * der Wortlaut: Ist dies der dritte Grenztest seit dem letzten Abbruch,
+ * bricht die Figur ab. Die Einordnung liefert classifyConversationTopic
+ * (Anliegen „provocation“); hier wird nur gezählt.
+ */
+export function boundaryBreakoff(currentIsBoundaryTest: boolean, previousBoundaryTests: number): boolean {
+  return currentIsBoundaryTest && previousBoundaryTests + 1 >= BOUNDARY_BREAKOFF_AT
+}
+
+/** Abbruchsatz nach wiederholten Grenztests. */
+export function boundaryBreakoffLine(seed: string): string {
+  return pick(BOUNDARY_BREAKOFF_LINES, seed)
 }
 
 /** Kurze Abweisung während der Abkühlzeit nach einem Abbruch. */

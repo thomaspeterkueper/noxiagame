@@ -37,6 +37,7 @@ Umgesetzt in `lib/game/cognition/conversationRepeat.ts` (Test: `npm run test:con
 - **Stufen:**
   - **2 ähnliche Fragen zuvor:** Die Figur wird knapp, sagt, dass sie das schon beantwortet hat, lässt leichte Ungeduld spüren und fragt nach etwas anderem.
   - **3 oder mehr:** Abbruch ohne Sprachmodell. Der erste Abbruch ist immer: „Ich habe keine Zeit, sie hier mit dir zu vertrödeln.“ Spätere Abbrüche wählen aus wenigen Varianten.
+  - **Grenztests (seit 28.10.2026, Route 1.4.0):** Beleidigungen und sexuelle Anliegen (Anliegen `provocation`) zählen unabhängig vom Wortlaut. Beim dritten Grenztest seit dem letzten Abbruch bricht die Figur ab, ohne Sprachmodell, mit einem eigenen Satz („Das reicht. So rede ich nicht weiter mit dir.“). Grund: Am 27.10. wechselte ein Spieler die Worte („technische Frage“), damit griff der Wiederholungszähler nicht. Tanzen oder Nähe zählen nicht als Grenztest. Sie gelten als Beziehungswunsch und laufen über die Wiederholungserkennung.
   - **Danach 10 Minuten Abkühlzeit:** Die Figur weist kurz ab („Später vielleicht. Jetzt nicht.“), auch wenn man sie neu anspricht.
 - Die Antwort trägt `conversationEnded: true`. Die Gesprächsfenster werten das noch nicht aus. Die Abweisung kommt trotzdem, weil der Server sie durchsetzt.
 
