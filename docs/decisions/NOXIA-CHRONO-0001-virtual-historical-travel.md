@@ -33,3 +33,7 @@ Jede Szene führt Quellenreferenzen mit Einstufung `documented`, `inferred` oder
 3. Renderer/Assets: drei Zeitstände auf identischem realen Ortsanker; Unsicherheits-Overlay.
 4. Historische NPC-Schicht mit zeitlich begrenztem Wissen, Dialogen, sozialem Kontext und Reiseleiterrolle.
 5. In-World-Agentur, Tickets und Lernmodul in der Akademie; Tests für Multiplayer, Manipulationsschutz und Performance.
+
+## Desktop-WebGL-Prototyp (28.10.2026)
+
+Route `/chronotravel` rendert nun mit der bereits installierten Bibliothek `three` eine tatsächliche WebGL-Szene. Geometrien für Platz, Obelisk und Gebäude sind bewusst schematisch und nicht archäologisch validiert. Kamera mit WASD und Pfeiltasten, Licht/Schatten, Nebel, drei epochenspezifische Massenmodelle. Nicht live verifiziert: TypeScript-/Next.js-Build, Browser-/GPU-Kompatibilität und Laufzeitverhalten. Keine Mobiloptimierung vorgesehen. Vor Merge bitte `npm run build` und Browser-Smoke-Test mit Epochenschaltung und Tastatursteuerung ausführen.
