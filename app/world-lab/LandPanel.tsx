@@ -7,15 +7,17 @@
 //     dann die Flurstückstafel öffnen (Kaufen, Bauen wie gehabt).
 //   * Sonst: ein Grundstück abstecken (Größe wählen, an der Straße ausgerichtet),
 //     Preis ansehen, kaufen. Es wird ein eigenes Flurstück – Bauen geht dann dort.
+//   * `parentId`: ein Teilstück aus einem Flurstück der Gemeinde abstecken (Sundern:
+//     ganze Flurstücke kosten Zehntausende). Auch längliche Stücke, drehbar.
 
 import { useEffect, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { hasCadastre } from '@/lib/worldlab/alkis'
-import { LAND_SIZES } from '@/lib/worldlab/landPlot'
+import { LAND_SHAPES } from '@/lib/worldlab/landPlot'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { WorldEngine } from './worldEngine'
 
-type LandOffer = { available: boolean; reason?: string; ring: GeoPoint[]; areaM2: number; usage: string; price?: number; seller?: string; place?: string | null }
+type LandOffer = { available: boolean; reason?: string; ring: GeoPoint[]; areaM2: number; usage: string; price?: number; seller?: string; place?: string | null; parent?: { id: string; label: string | null } }
 type Opened = { kind: 'parcel'; id: string; at: GeoPoint }
 
 const credits = (value: number) => Math.round(value).toLocaleString('de-DE') + ' Cr'
@@ -30,17 +32,22 @@ async function waitForParcel(engine: WorldEngine, at: GeoPoint, tries: number, i
   return null
 }
 
-export default function LandPanel({ engine, at, close, open, onParcelsChanged, onWorldChanged }: {
+export default function LandPanel({ engine, at, parentId, close, open, onParcelsChanged, onWorldChanged }: {
   engine: WorldEngine | null
   at: GeoPoint
+  /** Teilstück aus diesem Flurstück abstecken */
+  parentId?: string
   close: () => void
   open: (panel: Opened) => void
   onParcelsChanged?: () => void
   onWorldChanged: () => void
 }) {
-  const cadastre = hasCadastre(at)
+  // Kataster ohne Teilstück: erst das Flurstück an der Stelle finden
+  const cadastre = hasCadastre(at) && !parentId
   const [note, setNote] = useState<string | null>(null)
-  const [size, setSize] = useState<number>(30)
+  const [shape, setShape] = useState(parentId ? 4 : 1)
+  const [turned, setTurned] = useState(false)
+  const w = turned ? LAND_SHAPES[shape].d : LAND_SHAPES[shape].w, d = turned ? LAND_SHAPES[shape].w : LAND_SHAPES[shape].d
   const [offer, setOffer] = useState<LandOffer | null | undefined>(undefined)
   const [buying, setBuying] = useState(false)
   const [error, setError] = useState('')
@@ -79,14 +86,15 @@ export default function LandPanel({ engine, at, close, open, onParcelsChanged, o
     setOffer(undefined); setError('')
     void (async () => {
       try {
-        const params = new URLSearchParams({ lat: String(at.lat), lon: String(at.lon), w: String(size), d: String(size), rot: String(rotation.current ?? 0) })
+        const params = new URLSearchParams({ lat: String(at.lat), lon: String(at.lon), w: String(w), d: String(d), rot: String(rotation.current ?? 0) })
+        if (parentId) params.set('parent', parentId)
         const response = await fetch('/api/game/land-offer?' + params, { cache: 'no-store' })
         const json = response.ok ? await response.json().catch(() => null) as LandOffer | null : null
         if (!stale) setOffer(json && Array.isArray(json.ring) ? json : null)
       } catch { if (!stale) setOffer(null) }
     })()
     return () => { stale = true }
-  }, [cadastre, size, at.lat, at.lon])
+  }, [cadastre, w, d, parentId, at.lat, at.lon])
 
   // Umriss auf der Karte
   useEffect(() => {
@@ -100,7 +108,7 @@ export default function LandPanel({ engine, at, close, open, onParcelsChanged, o
     try {
       const { token } = await getSessionInfo()
       if (!token) { setError('Zum Kaufen bitte anmelden.'); return }
-      const response = await fetch('/api/game/land-offer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: at.lat, lon: at.lon, w: size, d: size, rotation: rotation.current ?? 0, price: offer.price }) })
+      const response = await fetch('/api/game/land-offer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: at.lat, lon: at.lon, w, d, rotation: rotation.current ?? 0, price: offer.price, parentId }) })
       const json = await response.json().catch(() => ({}))
       if (!response.ok) { setError(String(json.error ?? 'Kauf nicht möglich.')); if (json.price) setOffer({ ...offer, price: Number(json.price) }); return }
       onParcelsChanged?.()
@@ -112,10 +120,10 @@ export default function LandPanel({ engine, at, close, open, onParcelsChanged, o
   }
 
   return <>
-    <div className="head"><div><small>{cadastre ? 'FLURSTÜCK' : 'FREIES LAND'}</small><b>{cadastre ? 'Boden' : 'Grundstück abstecken'}</b>{!cadastre && offer && <span>{size} × {size} m · {offer.areaM2.toLocaleString('de-DE')} m² · {offer.usage}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+    <div className="head"><div><small>{cadastre ? 'FLURSTÜCK' : parentId ? 'TEILSTÜCK' : 'FREIES LAND'}</small><b>{cadastre ? 'Boden' : parentId ? (offer?.parent?.label ?? 'Teilstück abstecken') : 'Grundstück abstecken'}</b>{!cadastre && offer && <span>{w} × {d} m · {offer.areaM2.toLocaleString('de-DE')} m² · {offer.usage}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
     {cadastre && <p>{note ?? 'Flurstücke werden geladen …'}</p>}
     {!cadastre && <>
-      <div className="row"><span>Größe</span>{LAND_SIZES.map(side => <button key={side} disabled={buying} className={side === size ? 'on' : undefined} onClick={() => setSize(side)}>{side} m</button>)}</div>
+      <div className="row shapes"><span>Größe</span>{LAND_SHAPES.map((item, i) => <button key={i} disabled={buying} className={i === shape ? 'on' : undefined} onClick={() => setShape(i)}>{item.w}×{item.d}</button>)}{LAND_SHAPES[shape].w !== LAND_SHAPES[shape].d && <button disabled={buying} className={turned ? 'on' : undefined} onClick={() => setTurned(value => !value)} title="Lange Seite an die Straße oder quer dazu">↻ drehen</button>}</div>
       {offer === undefined && <p>Wird geprüft …</p>}
       {offer === null && <p>Das Angebot ist gerade nicht erreichbar.</p>}
       {offer && <>
@@ -126,9 +134,9 @@ export default function LandPanel({ engine, at, close, open, onParcelsChanged, o
         {offer.available
           ? <div className="row"><span>{error || 'Wird dein Grundstück: bauen, teilen, weiterverkaufen.'}</span><button disabled={buying} onClick={() => void buy()}>{buying ? '…' : 'Kaufen'}</button></div>
           : <div className="row"><span>{offer.reason ?? 'Hier kann man kein Land kaufen.'}</span></div>}
-        {!offer.available && <p className="hint">Eine andere Stelle anklicken oder die Größe ändern.</p>}
+        {!offer.available && <p className="hint">{parentId ? 'Eine andere Stelle im Flurstück anklicken, drehen oder eine andere Größe wählen.' : 'Eine andere Stelle anklicken oder die Größe ändern.'}</p>}
       </>}
-      <span className="source">Hier gibt es kein offenes Kataster – das Grundstück wird im Spiel abgesteckt.</span>
+      <span className="source">{parentId ? 'Das Stück wird aus dem Flurstück der Gemeinde abgesteckt; der Rest bleibt bei ihr.' : 'Hier gibt es kein offenes Kataster – das Grundstück wird im Spiel abgesteckt.'}</span>
     </>}
   </>
 }

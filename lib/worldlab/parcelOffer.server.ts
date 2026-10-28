@@ -11,7 +11,7 @@ import { municipalityLabel } from './municipality.server'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
 import { loadTile } from './tileSource.server'
-import { looksLikeStreetParcel, toLocal, type P } from './landPlot'
+import { looksLikeStreetParcel, smallestContaining, toLocal, type P } from './landPlot'
 
 export type ParcelRow = { id: string; ring: GeoPoint[]; label: string | null; usage: string | null; area_m2: number | null; centre_lat: number; centre_lon: number }
 
@@ -39,7 +39,8 @@ export function ringAreaM2(ring: readonly GeoPoint[]) {
 export async function parcelAt(supabase: Supabase, p: GeoPoint): Promise<ParcelRow | null> {
   const { data } = await supabase.from('earth_parcels').select('id,ring,label,usage,area_m2,centre_lat,centre_lon').is('retired_at', null)
     .lte('min_lat', p.lat).gte('max_lat', p.lat).lte('min_lon', p.lon).gte('max_lon', p.lon).limit(20)
-  return ((data ?? []) as ParcelRow[]).find(row => Array.isArray(row.ring) && insideRing(p, row.ring)) ?? null
+  // Ein abgestecktes Teilstück geht dem Flurstück vor, in dem es liegt.
+  return smallestContaining((data ?? []) as ParcelRow[], row => Array.isArray(row.ring) && insideRing(p, row.ring), row => Number(row.area_m2 ?? ringAreaM2(row.ring)))
 }
 
 /** Flurstücke, die ein Rechteck (Mitte, Maße, Drehung) berühren, mit Eigentümer. */
@@ -107,6 +108,8 @@ export interface ParcelOffer {
   /** eigene Nachbarflurstücke mit gemeinsamer Grenze – zum Zusammenlegen */
   neighbours?: Array<{ id: string; label: string; areaM2: number }>
   forSale: boolean; reason?: string; price?: number; seller?: string
+  /** Ganzes Flurstück nicht mehr zu haben, Teilstücke schon */
+  partsOnly?: boolean
   buildings: Array<{ source: string; name: string; residents: number }>
   residents: number; rentPerInterval: number
   items?: Array<Awaited<ReturnType<typeof acquireItem>>>
@@ -119,7 +122,8 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   const areaM2 = Math.round(parcel.area_m2 ?? ringAreaM2(parcel.ring))
   const source = parcel.source === 'noxia' ? 'im Spiel neu vermessen (aus amtlichen Flurstücken)'
     : parcel.source === 'noxia_land' ? 'im Spiel abgesteckt (hier gibt es kein offenes Kataster)'
-      : cadastreAttribution(parcel.source)
+      : parcel.source === 'noxia_part' ? 'im Spiel abgesteckt aus einem amtlichen Flurstück'
+        : cadastreAttribution(parcel.source)
   const props = (row as { props?: Record<string, unknown> }).props ?? {}
   const land = landUse(parcel.usage, typeof props.nutzbez === 'string' ? props.nutzbez : null, areaM2)
   const base = { id: parcel.id, label: parcel.label ?? 'Flurstück', areaM2, usage: parcel.usage, source, land, buildings: [] as ParcelOffer['buildings'], residents: 0, rentPerInterval: 0 }
@@ -142,6 +146,9 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   }
   const blocked = parcelNotForSale(parcel.usage) ?? (parcel.usage ? null : await streetWithoutUsage(supabase, parcel.ring))
   if (blocked) return { ...base, owned: false, own: false, forSale: false, reason: blocked }
+  // Sind schon Teilstücke abgesteckt, verkauft die Gemeinde nur noch weitere Teilstücke, nicht das Ganze.
+  const { count: parts } = await supabase.from('earth_parcels').select('id', { count: 'exact', head: true }).contains('parent_ids', [parcel.id]).is('retired_at', null)
+  if (parts) return { ...base, owned: false, own: false, forSale: false, partsOnly: true, reason: `${parts} Teilstück${parts === 1 ? '' : 'e'} schon verkauft – nur noch weitere Teilstücke` }
 
   const sources = await buildingsOn(supabase, parcel.ring)
   const items: NonNullable<ParcelOffer['items']> = []

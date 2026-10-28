@@ -8,8 +8,14 @@ import type { GeoPoint } from './mercator'
 
 export type P = { x: number; y: number }
 
-/** Wählbare Größen (Seitenlänge in m). */
-export const LAND_SIZES = [20, 30, 40, 60] as const
+/**
+ * Wählbare Formen (Breite entlang der Straße × Tiefe, m). Auch längliche Stücke
+ * (Thomas, 28.10.2026: „ja auch längliche stücke“); „drehen“ tauscht die Seiten.
+ */
+export const LAND_SHAPES: ReadonlyArray<{ w: number; d: number }> = [
+  { w: 20, d: 20 }, { w: 30, d: 30 }, { w: 40, d: 40 }, { w: 60, d: 60 },
+  { w: 15, d: 40 }, { w: 20, d: 40 }, { w: 20, d: 60 }, { w: 30, d: 60 }, { w: 40, d: 80 },
+]
 export const LAND_MIN_M = 10
 export const LAND_MAX_M = 80
 /** Abstand zu fremden Häusern ohne Kataster (wie die Bauprüfung). */
@@ -125,4 +131,27 @@ export function looksLikeStreetParcel(parcel: readonly P[], roads: ReadonlyArray
     }
   }
   return insideM >= 15 && polygonAreaM2(parcel) / insideM < 16
+}
+
+/** Liegt `inner` ganz in `outer`? (alle Ecken drin, keine Kante kreuzt) */
+export function polygonInside(inner: readonly P[], outer: readonly P[]): boolean {
+  if (!inner.every(p => insidePolygon(p, outer))) return false
+  for (let i = 0; i < inner.length; i++) for (let j = 0; j < outer.length; j++) {
+    if (segmentsCross(inner[i], inner[(i + 1) % inner.length], outer[j], outer[(j + 1) % outer.length])) return false
+  }
+  return true
+}
+
+/**
+ * Von mehreren Flurstücken, die einen Punkt enthalten, das kleinste: ein
+ * abgestecktes Teilstück liegt im Flurstück der Gemeinde und geht ihm vor.
+ */
+export function smallestContaining<T>(items: readonly T[], contains: (item: T) => boolean, area: (item: T) => number): T | null {
+  let best: T | null = null, bestArea = Infinity
+  for (const item of items) {
+    if (!contains(item)) continue
+    const a = area(item)
+    if (a < bestArea) { best = item; bestArea = a }
+  }
+  return best
 }

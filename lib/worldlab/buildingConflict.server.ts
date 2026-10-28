@@ -11,7 +11,8 @@ import type { createServiceClient } from '@/lib/supabase/service'
 import { geoToMerc, tileAt, tileOrigin, TILE_SIZE_MERC, type GeoPoint } from './mercator'
 import { rectsOverlap } from './rects'
 import { loadTile } from './tileSource.server'
-import { insideRing, parcelsAround } from './parcelOffer.server'
+import { insideRing, parcelsAround, ringAreaM2 } from './parcelOffer.server'
+import { smallestContaining } from './landPlot'
 
 type Supabase = ReturnType<typeof createServiceClient>
 export type BuildingConflict =
@@ -42,14 +43,14 @@ export async function realBuildingConflict(supabase: Supabase, at: GeoPoint, wid
   const withCadastre = parcels.some(row => row.source !== 'noxia_land')
   if (withCadastre) {
     for (const point of footprintPoints(at, widthM, depthM, rotationDeg)) {
-      const parcel = parcels.find(row => Array.isArray(row.ring) && insideRing(point, row.ring))
+      const parcel = smallestContaining(parcels, row => Array.isArray(row.ring) && insideRing(point, row.ring), row => ringAreaM2(row.ring))
       if (!parcel) return { kind: 'parcel', name: 'kein Flurstück' }
       if (parcel.owner !== profileId) return { kind: 'parcel', name: parcel.owner ? 'einem anderen Spieler' : 'der Gemeinde' }
     }
   } else {
     // Ohne Kataster: keine Ecke auf fremdem abgestecktem Land
     for (const point of footprintPoints(at, widthM, depthM, rotationDeg)) {
-      const parcel = parcels.find(row => Array.isArray(row.ring) && insideRing(point, row.ring))
+      const parcel = smallestContaining(parcels, row => Array.isArray(row.ring) && insideRing(point, row.ring), row => ringAreaM2(row.ring))
       if (parcel && parcel.owner !== profileId) return { kind: 'parcel', name: 'einem anderen Spieler' }
     }
   }
