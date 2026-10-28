@@ -7,6 +7,8 @@ export type LandmarkRoomKind =
   // Gotteshäuser je Religion und Gemeindesaal (NOXIA-NPC-RELIGION-0001, 28.10.2026).
   // 'worship' bleibt die christliche Kirche.
   | 'mosque' | 'synagogue' | 'hindu_temple' | 'buddhist_temple' | 'community_hall'
+  // Omnizedenz-Begegnungsstätte (gekauftes, umgebautes Haus oder gebauter Resonanzplatz).
+  | 'resonance_place'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
@@ -335,6 +337,59 @@ function communityHallLayout(): LandmarkRoomLayout {
   }
 }
 
+/**
+ * Omnizedenz-Begegnungsstätte (NOXIA-NPC-RELIGION-0002, 28.10.2026): Stuhlkreis
+ * ohne Bühne und ohne Altar – niemand steht vorn. Lesen & Denken, Teeküche,
+ * eine stille Ecke, Pinnwand mit den Resonanzrunden. Kein Kultort.
+ */
+function resonancePlaceLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'circle-table', kind: 'table', x: 345, y: 170, w: 70, h: 44 },
+    { id: 'shelf-0', kind: 'shelf', x: 40, y: 34, w: 150, h: 22 },
+    { id: 'shelf-1', kind: 'shelf-low', x: 40, y: 120, w: 22, h: 110 },
+    { id: 'armchair-0', kind: 'armchair', x: 90, y: 110, w: 34, h: 34 },
+    { id: 'armchair-1', kind: 'armchair', x: 90, y: 170, w: 34, h: 34 },
+    { id: 'pinboard', kind: 'pinboard', x: 330, y: 34, w: 100, h: 10 },
+    { id: 'kitchen', kind: 'counter', x: 560, y: 380, w: 150, h: 30 },
+    { id: 'cushion-0', kind: 'cushion', x: 620, y: 90, w: 26, h: 22 },
+    { id: 'cushion-1', kind: 'cushion', x: 660, y: 90, w: 26, h: 22 },
+    { id: 'cushion-2', kind: 'cushion', x: 640, y: 130, w: 26, h: 22 },
+    { id: 'plant-0', kind: 'plant', x: 700, y: 40, w: 24, h: 24 },
+    { id: 'plant-1', kind: 'plant', x: 36, y: 410, w: 26, h: 26 },
+    { id: 'plant-2', kind: 'plant', x: 440, y: 290, w: 24, h: 24 },
+  ]
+  // Zwölf Stühle im Kreis um den niedrigen Tisch.
+  const centre = { x: 380, y: 192 }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2
+    furniture.push({ id: `chair-${i}`, kind: 'chair', x: Math.round(centre.x + Math.cos(a) * 108 - 11), y: Math.round(centre.y + Math.sin(a) * 82 - 10), w: 22, h: 20 })
+  }
+  const seat = (i: number) => {
+    const a = (i / 12) * Math.PI * 2
+    return { x: Math.round(centre.x + Math.cos(a) * 80), y: Math.round(centre.y + Math.sin(a) * 60) }
+  }
+  return {
+    kind: 'resonance_place', noun: 'Begegnungsstätte', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'floor', kind: 'parquet', x: 24, y: 28, w: 712, h: 348 },
+      { id: 'circle', kind: 'rug', x: 250, y: 96, w: 260, h: 192 },
+      { id: 'reading', kind: 'carpet', x: 24, y: 28, w: 180, h: 220 },
+      { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 },
+    ],
+    lamps: [{ x: 380, y: 192, r: 150, warm: true }, { x: 110, y: 140, r: 80, warm: true }, { x: 650, y: 110, r: 70, warm: true }, { x: 635, y: 395, r: 70 }],
+    staff: null,
+    // Die Omnizedentin sitzt mit im Kreis, nicht davor.
+    hostAt: seat(9),
+    gatherAt: [seat(0), seat(2), seat(4), seat(6), seat(7), seat(11)],
+    spots: [
+      { id: 'circle', label: 'STUHLKREIS', x: 380, y: 192, action: 'sit', text: 'Ein Kreis ohne Kopfende. Bei der Resonanzrunde spricht, wer etwas sagen mag – zuhören zählt genauso.' },
+      { id: 'reading', label: 'LESEN & DENKEN', x: 110, y: 90, action: 'books', text: 'Bücher zu Philosophie, Ethik und Religionen – auch über die Omnizedenz. Kostenlos, zum Lesen hier oder Ausleihen.' },
+      { id: 'board', label: 'PINNWAND', x: 380, y: 60, text: 'Offene Resonanzrunden: Sundern mittwochs 19 Uhr, Frankfurt (ArtLounge) freitags 19 Uhr, Tharsis Hub samstags 19 Uhr. Alle sind willkommen, niemand muss etwas glauben.' },
+      { id: 'quiet', label: 'STILLE ECKE', x: 650, y: 120, action: 'sit', text: 'Kissen für die Stille. Hier darf man einfach sitzen.' },
+      { id: 'kitchen', label: 'TEEKÜCHE', x: 635, y: 440, text: 'Tee und Wasser für alle.' },
+    ],
+  }
+}
 
 /** Mehrgeschossige Häuser: Anzahl Geschosse je Raumart (alle anderen haben eines). */
 export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3 }
@@ -463,6 +518,7 @@ export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, st
   if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
   if (landmarkClass === 'community_centre') return 'community_hall'
+  if (landmarkClass === 'resonance_place') return 'resonance_place'
   return null
 }
 
@@ -493,6 +549,7 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'hindu_temple': return hinduTempleLayout()
     case 'buddhist_temple': return buddhistTempleLayout()
     case 'community_hall': return communityHallLayout()
+    case 'resonance_place': return resonancePlaceLayout()
     default: return workshopLayout()
   }
 }

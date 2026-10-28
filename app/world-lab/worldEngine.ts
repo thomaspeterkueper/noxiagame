@@ -75,6 +75,9 @@ export type WorldPick =
   | { type: 'parcel'; id: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
 
+/** Plakette einer Begegnungsstätte: in jeder Zoomstufe sichtbar, ein Klick öffnet den Ort. */
+export interface WorldBeacon { at: GeoPoint; label?: string; pick: WorldPick }
+
 /** Baustelle (laufender Bau) auf der Karte. */
 export interface WorldSite { id: string; name: string; at: GeoPoint; w: number; d: number; rotation: number; progress: number | null; phase: string }
 
@@ -133,6 +136,8 @@ export interface WorldEngine {
   setParcelOwners: (owners: Array<{ id: string; own: boolean }>) => void
   /** Baustellen zeigen (ersetzt die vorigen). */
   setSites: (sites: WorldSite[]) => void
+  /** Plaketten der Omnizedenz-Begegnungsstätten (ersetzt die vorigen). */
+  setBeacons: (beacons: WorldBeacon[]) => void
   /** Weg zu einem Ziel als Linie zeigen (null: keiner). */
   setRouteTarget: (at: GeoPoint | null) => void
   /** Wahrzeichen, Wasser, Wald und Straße um einen Punkt (nur geladene Kacheln). */
@@ -279,7 +284,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const ownedLayer = new PIXI.Container()
   // Symbole öffentlicher Gebäude (W-7): in jeder Zoomstufe sichtbar, gleich groß auf dem Bildschirm.
   const marks = new PIXI.Container({ isRenderGroup: true })
-  world.addChild(ground, lines, overlay, objects, labels, marks)
+  // Begegnungsstätten (Omnizedenz, 28.10.2026): eigene Plaketten, ebenfalls in jeder Zoomstufe.
+  const beacons = new PIXI.Container({ isRenderGroup: true })
+  world.addChild(ground, lines, overlay, objects, labels, marks, beacons)
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -1564,6 +1571,36 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
   }
 
+  // ── Begegnungsstätten ───────────────────────────────────────────────
+  let beaconList: WorldBeacon[] = []
+  function drawBeacons() {
+    for (const child of beacons.removeChildren()) child.destroy({ children: true })
+    for (const beacon of beaconList) {
+      const c = toWorld(beacon.at)
+      const at = iso(c.x, c.y, 14)
+      const mark = new PIXI.Container()
+      const disc = new PIXI.Graphics()
+      disc.moveTo(0, 6).lineTo(-2.2, 2).lineTo(2.2, 2).closePath().fill(0x9fd3c0)
+      disc.circle(0, -2, 5.4).fill({ color: 0x1f4f54, alpha: 0.96 }).stroke({ width: 0.9, color: 0x9fd3c0 })
+      disc.circle(0, -2, 1.3).fill(0xe8f4ee)
+      disc.circle(0, -2, 3.2).stroke({ width: 0.55, color: 0xe8f4ee })
+      mark.addChild(disc)
+      if (beacon.label) {
+        const text = new PIXI.Text({ text: beacon.label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: 0x1f4f54, stroke: { color: 0xf4f1e8, width: 8, join: 'round' } } })
+        text.anchor.set(0.5, 1)
+        text.scale.set(0.11)
+        text.position.set(0, -8.4)
+        mark.addChild(text)
+      }
+      mark.pivot.set(0, 6)
+      mark.position.set(at.x, at.y)
+      mark.scale.set(2.6 / zoom)
+      mark.eventMode = 'static'
+      ;(mark as unknown as { pick: WorldPick }).pick = beacon.pick
+      beacons.addChild(mark)
+    }
+  }
+
   // ── Umgebung ────────────────────────────────────────────────────────
   function surroundingsOf(p: { x: number; y: number }, radiusM: number): WorldSurroundings {
     const landmarks: WorldSurroundings['landmarks'] = []
@@ -1734,6 +1771,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
     for (const mark of marks.children) mark.scale.set(2.2 / zoom)
+    for (const beacon of beacons.children) beacon.scale.set(2.6 / zoom)
     poiLabels.visible = zoom >= 2.4
     parcelLayer.visible = zoom >= 2.2
     const centre = iso(camera.x, camera.y)
@@ -1798,6 +1836,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
     setPlayerName(name) { playerName.text = name.slice(0, 40) },
     setSites(list) { sites = list; drawSites() },
+    setBeacons(list) { beaconList = list; drawBeacons() },
     setRailLines(list) { setTrains(list) },
     trainAt(stationName) { const line = railLines.find(item => item.station?.name === stationName); return line ? trainState(line.lengthM, Date.now()) : null },
     setParcelOwners(list) {

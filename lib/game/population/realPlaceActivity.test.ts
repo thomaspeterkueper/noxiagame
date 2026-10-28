@@ -19,7 +19,7 @@ check(frankfurtResonanceRoundWindows(115).length===1 && frankfurtResonanceRoundW
 check(frankfurtResonanceRoundWindows(67).length===0,'Frankfurt and Sundern rounds are on different days')
 check(tharsisResonanceRoundWindows(139).length===1 && tharsisResonanceRoundWindows(141).length===0,'Tharsis resonance round: day 6, 19:00, two hours')
 check(REAL_PLACE_HOSTS.find(host=>host.personKey==='mars-tharsis-omnizedent-001')?.place.kind==='built','Tharsis round needs a built resonance place')
-check(REAL_PLACE_HOSTS.filter(host=>host.place.kind==='work_region_feature').length===8,'earth hosts keep their real work places')
+check(REAL_PLACE_HOSTS.filter(host=>host.place.kind==='work').length===8,'earth hosts keep their real work places')
 check(weekdayOfTick(weekPhase(WEEKDAY.sunday,10))===WEEKDAY.sunday && weekdayOfTick(24*7)===WEEKDAY.monday,'week starts on Monday')
 check(hamidiyeActivityWindows(weekPhase(WEEKDAY.friday,13)).some(window=>window.kind==='friday_prayer'),'Friday prayer on Friday 13:00')
 check(hamidiyeActivityWindows(weekPhase(WEEKDAY.thursday,13)).length===0,'no Friday prayer on Thursday')

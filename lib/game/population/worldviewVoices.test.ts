@@ -41,4 +41,13 @@ describe('worldview voices', () => {
     expect(text).toMatch(/keine Religion/)
     expect(text).toMatch(/keine physikalischen Kräfte/)
   })
+
+  it('names the real meeting places and nothing else', () => {
+    const text = worldviewConversationLines('omnizedent').join(' ')
+    expect(text).toMatch(/Hauptstraße 87, Sundern/)
+    expect(text).toMatch(/ArtLounge/)
+    expect(text).toMatch(/mittwochs 19–21 Uhr/)
+    expect(worldviewConversationLines('resonance_host').join(' ')).toMatch(/Begegnungsstätte/)
+    expect(worldviewConversationLines('clergy').join(' ')).not.toMatch(/Hauptstraße 87/)
+  })
 })

@@ -33,6 +33,7 @@ describe('landmark interiors', () => {
     expect(landmarkRoomKind('place_of_worship', { religion: 'hindu' })).toBe('hindu_temple')
     expect(landmarkRoomKind('place_of_worship', { religion: 'buddhist' })).toBe('buddhist_temple')
     expect(landmarkRoomKind('community_centre')).toBe('community_hall')
+    expect(landmarkRoomKind('resonance_place')).toBe('resonance_place')
   })
 
   it('opens real buildings by their use or OSM id', () => {
@@ -46,7 +47,7 @@ describe('landmark interiors', () => {
     expect(buildingRoomKind(null)).toBeNull()
   })
 
-  for (const kind of ['worship', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'artlounge'] as const) {
+  for (const kind of ['worship', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'artlounge', 'resonance_place'] as const) {
     it(`${kind}: host and visitors stand on free, reachable floor`, () => {
       const layout = landmarkRoomLayout(kind)
       const cells = reachable(layout)
@@ -59,7 +60,7 @@ describe('landmark interiors', () => {
     })
   }
 
-  for (const kind of ['library', 'worship', 'shop', 'workshop', 'artlounge', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall'] as const) {
+  for (const kind of ['library', 'worship', 'shop', 'workshop', 'artlounge', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'resonance_place'] as const) {
     it(`${kind}: entrance is free and every spot can be reached on foot`, () => {
       const layout = landmarkRoomLayout(kind)
       expect(isLandmarkRoomBlocked(layout, layout.start)).toBe(false)

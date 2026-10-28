@@ -74,7 +74,7 @@ Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `
 | DaVaRu (Daniel van Runen) | Gastgeber | Tempel des DaVaRu, Schmitten | besteht als Person, Tempel noch nicht platziert |
 | Aristeas Lux | Gast | Tempel des DaVaRu | besteht als Person |
 | Dava | `davaru_companion` | Schmitten | geplant |
-| Johanna Lind | `omnizedent` | Sundern; Resonanzrunde in der realen Hubertushalle; wohnt im öffentlichen Wohnblock | **produktiv** (`earth-sundern-omnizedent-001`) |
+| Johanna Lind | `omnizedent` | Sundern; Resonanzrunde in der Omnizedenz-Begegnungsstätte Hauptstraße 87 (bis 28.10.2026 Hubertushalle); wohnt im öffentlichen Wohnblock | **produktiv** (`earth-sundern-omnizedent-001`) |
 | Theodor Grün | Techniker, Omnizedent aus Überzeugung | Tharsis Hub; arbeitet an der Wasseraufbereitung, wohnt im öffentlichen Habitat | **produktiv** (`mars-tharsis-omnizedent-001`), Runde startet, sobald ein Resonanzplatz gebaut ist |
 | Samira Haddad | `omnizedent` | Frankfurt-Sachsenhausen; Resonanzrunde in der CAMALEO-ArtLounge (Mörfelder Landstraße 103), wohnt Ziegelhüttenweg 15 | **produktiv** (`earth-frankfurt-omnizedent-001`) |
 | weitere Omnizedent/innen | `omnizedent` | Dvārakā | wartet auf Gebäudedaten |
@@ -118,6 +118,19 @@ Thomas: „alles gleich wichtig, auch wichtig, dass die NPCs auch normal durch d
 - **Mars:** `resonance_place` ist baubar (1500 Cr, 2 Ticks, `20261028143000_resonance_place_buildable.sql`), über den normalen Spielerbau. `realPlaceActivity` kennt dafür gebaute Gebäude als Ort; Theodor Grün geht an Tag 6 um 19 Uhr hin und lädt ein.
 - **Erongo (zurückgestellt):** Die Region `earth-namibia-erongo` hat bisher nur Straßen, Bahn, Gewerbeflächen und Wasser, keine einzelnen Gebäude und keinen Wohnraum. Gebäude kommen über den Ortsdetail-Import ins Spiel, wenn jemand den Ort auf der Weltkarte besucht. Danach wird eine Figur wie in Frankfurt angelegt (realer Ort für die Runde, reales Wohnhaus).
 - **Wohnung im realen Haus als Ort:** Wer ruht und nicht schläft, wird jetzt auch an einer Wohnung im realen Haus verortet (`surfacePresence.ts`), nicht nur an Spielgebäuden.
+
+### Begegnungsstätten leicht findbar (28.10.2026, Abend)
+
+Thomas: „wichtig ist mir, dass wir Omnizedenz-Begegnungsstätten leicht findbar machen, wir können auch ein Haus in Sundern kaufen und entsprechend umbauen“. Gewählt: Konto McKnight, Haus Hauptstraße 87.
+
+- **Kauf über den normalen Spielweg.** In NRW kauft man das Flurstück samt Haus: Flurstück `05102802000122______` (Gemarkung Sundern, Flur 20, Flurstück 122, 310 m², Mischnutzung) mit `osm:way:459501013` für 6000 Cr (Preis wie `parcelOffer`: Boden × Lage 1,45 plus Hauswert; Steuer 19 % an die Gemeinde). Danach `convert_earth_building` zu `resonance_place` für 750 Cr (halber Neubaupreis). McKnight hat jetzt 79 399 Cr.
+- **Grundfläche:** Der Resonanzplatz braucht jetzt 14 × 10 m statt 20 × 16 m (`footprints.ts`), damit er in ein normales Stadthaus passt. Das Haus misst 22,4 × 13,3 m.
+- **Ort und Gastgeberin:** Das Haus heißt „Omnizedenz-Begegnungsstätte Sundern“. Johanna Linds Arbeitsort ist das umgebaute Haus; ihre Resonanzrunde (mittwochs 19–21 Uhr) findet dort statt (Migration `20261028163000_omnizedenz_begegnungsstaette_sundern.sql`). `realPlaceActivity` nimmt als Arbeitsort jetzt auch ein gekauftes Haus (`HostPlace.kind = 'work'`, realer Ort oder Spielgebäude).
+- **Liste der Stätten:** `lib/worldlab/meetingPlaces.ts` (Test vorhanden). Feste Stätten: Sundern Hauptstraße 87, CAMALEO-ArtLounge Frankfurt (freitags 19–21 Uhr). Dazu kommt jedes gebaute oder umgebaute `resonance_place`, auch auf dem Mars (Tharsis Hub samstags 19–21 Uhr, sobald gebaut).
+- **Auf der Karte:** Jede Stätte hat eine eigene Plakette (Kreis mit Wellen, „Omnizedenz · Ort“), in jeder Zoomstufe sichtbar. In der Zielliste stehen sie als erste Gruppe „Omnizedenz-Begegnungsstätten“, in jeder Entfernung; liegt eine weiter als 6 km weg, öffnet sich die Reisebuchung statt eines Fußwegs. Ein Knopf „◎ Begegnungsstätte …“ unter „Du bist hier“ führt zur nächsten.
+- **Innen:** eigener Raum `resonance_place`: Stuhlkreis ohne Kopfende, Lesen & Denken, stille Ecke, Teeküche, Pinnwand mit den Runden. Die Gastgeberin sitzt im Kreis. Offen für alle; wer laut Simulation drinnen ist, steht dort und ist ansprechbar.
+- **Im Gespräch:** Omnizedent/innen und Resonanzbegleitung nennen auf Nachfrage genau diese Stätten mit Adresse und Termin, keine erfundenen.
+- Die Hubertushalle ist wieder nur Gemeindezentrum.
 
 ### Sichtbares Gehen
 

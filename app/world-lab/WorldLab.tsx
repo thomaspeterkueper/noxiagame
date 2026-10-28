@@ -19,6 +19,7 @@ import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPanels'
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
+import { MEETING_WALK_LIMIT_M, meetingPlaces, nearestMeetingPlace, type MeetingPlace } from '@/lib/worldlab/meetingPlaces'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { getBuildingEntryDefinition } from '@/lib/game/buildings/entry'
@@ -35,6 +36,7 @@ import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type 
 /** Ein laufender Bau aus /api/game/build/spatial (nur die Felder, die die Karte braucht). */
 type BuildRow = { id: string; name?: string; buildable_id: string; status?: string; created_at?: string; completes_at?: string; latitude_deg?: number | null; longitude_deg?: number | null; footprint_width_m?: number | null; footprint_depth_m?: number | null; rotation_deg?: number | null }
 
+const MEETING_GROUP = 'Omnizedenz-Begegnungsstätten'
 const metresBetween = (a: GeoPoint, b: GeoPoint) => Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180))
 const kmText = (m: number) => m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(m) + ' m'
 
@@ -515,6 +517,36 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     engineReady.setRouteTarget(routeFar && routeKey ? { lat: Number(routeKey.split(',')[0]), lon: Number(routeKey.split(',')[1]) } : null)
   }, [engineReady, routeKey, routeFar])
 
+  // Omnizedenz-Begegnungsstätten (Thomas, 28.10.2026: leicht findbar): Plakette auf
+  // der Karte, eigene Gruppe in der Zielliste (jede Entfernung), Schnellknopf.
+  const meeting = useMemo(() => meetingPlaces(noxia), [noxia])
+  useEffect(() => {
+    engineReady?.setBeacons(meeting.map(place => ({
+      at: place.at,
+      label: place.town ? 'Omnizedenz · ' + place.town : 'Resonanzplatz',
+      pick: place.noxiaId
+        ? { type: 'noxia', noxiaId: place.noxiaId, at: place.at }
+        : { type: 'building', at: place.at, address: place.address ?? undefined, name: place.name, kind: 'hall', source: place.source ?? undefined, areaM2: 0, levels: 1 },
+    })))
+  }, [engineReady, meeting])
+  function meetingPanel(place: MeetingPlace): Panel {
+    return place.noxiaId
+      ? { kind: 'building', at: place.at, title: place.name, noxiaId: place.noxiaId, address: place.address ?? undefined }
+      : { kind: 'building', at: place.at, title: place.name, address: place.address ?? undefined, source: place.source ?? undefined, osmName: place.name }
+  }
+  /** Hingehen, wenn nah; sonst hinreisen (Bahn oder Flug), statt über Hunderte Kilometer zu laufen. */
+  function openMeetingPlace(place: MeetingPlace) {
+    const from = engine.current?.position()
+    const distanceM = from ? metresBetween(from, place.at) : 0
+    if (from && distanceM > MEETING_WALK_LIMIT_M) {
+      choosePanel({ kind: 'travel', at: from })
+      setDestinationNote(`${place.name} liegt in ${place.town || 'einem anderen Ort'} (${kmText(distanceM)}) – mit Bahn oder Flugzeug hinreisen, dann steht sie unter „Ziel“ in der Nähe.`)
+      return
+    }
+    setDestinationNote(place.round ? `${place.name}: offene Resonanzrunde ${place.round}. Alle sind willkommen.` : '')
+    choosePanel(meetingPanel(place))
+  }
+
   // Zielliste: NOXIA-Gebäude (eigene zuerst), Baustellen, Wahrzeichen der Umgebung.
   const here = useMemo(() => hud ? { lat: hud.lat, lon: hud.lon } : null, [hud])
   // Liste nur neu, wenn die Figur gut 100 m weiter ist oder neue Kacheln da sind.
@@ -524,17 +556,22 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     void hereKey; void tilesLoaded
     if (!here) return []
     const list: Array<{ id: string; label: string; distanceM: number; panel: Panel; group: string }> = []
+    // Begegnungsstätten stehen immer in der Liste, auch weit weg (dann mit Reise).
+    for (const place of meeting) list.push({ id: 'm:' + place.id, label: place.name + (place.town ? ' · ' + place.town : ''), distanceM: metresBetween(here, place.at), group: MEETING_GROUP, panel: meetingPanel(place) })
+    const meetingIds = new Set(meeting.map(place => place.noxiaId).filter(Boolean))
     for (const building of noxia) {
+      if (meetingIds.has(building.id)) continue
       const distanceM = metresBetween(here, { lat: building.lat, lon: building.lon })
       if (distanceM <= 6000) list.push({ id: 'n:' + building.id, label: building.name + (building.own ? '' : ' · ' + (building.ownerLabel ?? 'NOXIA')), distanceM, group: building.own ? 'Deine Gebäude' : 'NOXIA-Gebäude', panel: { kind: 'building', at: { lat: building.lat, lon: building.lon }, title: building.name, noxiaId: building.id } })
     }
     for (const site of sites) list.push({ id: 's:' + site.id, label: site.name + ' · im Bau', distanceM: metresBetween(here, site.at), group: 'Baustellen', panel: { kind: 'site', id: site.id } })
     for (const item of engineReady?.landmarks() ?? []) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: item.landmark.poi ? 'Läden und Lokale' : 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
-    return list.sort((a, b) => a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
+    return list.sort((a, b) => Number(b.group === MEETING_GROUP) - Number(a.group === MEETING_GROUP) || a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noxia, sites, engineReady, hereKey, tilesLoaded])
+  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting])
   const groups = [...new Set(targets.map(target => target.group))]
   const home = noxia.find(building => building.own) ?? null
+  const nearestMeeting = here ? nearestMeetingPlace(meeting, here) : null
 
   // Position teilen (alle 2 s): die bisherige Erdszene startet dann am selben Ort.
   useEffect(() => {
@@ -553,6 +590,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   }
   function chooseTarget(id: string) {
     setTargetId(id)
+    const place = id.startsWith('m:') ? meeting.find(item => 'm:' + item.id === id) : undefined
+    if (place) { openMeetingPlace(place); return }
     const target = targets.find(item => item.id === id)
     choosePanel(target ? target.panel : { kind: 'none' })
   }
@@ -643,6 +682,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {panel.kind === 'none' && <>
         {engineReady && metresBetween(engineReady.position(), START_PLACE.at) > 30000 && <button className="home" onClick={() => choosePanel({ kind: 'travel', at: engineReady.position() })}>✈ Weiterreisen …</button>}
         {home && <button className="home" onClick={() => { engine.current?.jump({ lat: home.lat, lon: home.lon }); choosePanel({ kind: 'building', at: { lat: home.lat, lon: home.lon }, title: home.name, noxiaId: home.id }) }}>⌂ {home.name}</button>}
+        {nearestMeeting && <button className="home meeting" onClick={() => openMeetingPlace(nearestMeeting.place)} title="Nächste Omnizedenz-Begegnungsstätte">◎ {nearestMeeting.place.name.replace('Omnizedenz-Begegnungsstätte', 'Begegnungsstätte')} · {kmText(nearestMeeting.distanceM)}</button>}
         <label className="target"><span>Ziel</span>
           <select value={targetId} onChange={event => chooseTarget(event.target.value)}>
             <option value="">— kein Ziel —</option>
@@ -668,6 +708,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .tools{display:flex;gap:4px}
       .tools button{width:20px;height:20px;border:1px solid #40595a;background:#17383a;color:#d9bb6a;border-radius:4px;font-size:11px;line-height:1;cursor:pointer;padding:0}
       .home{justify-self:start;margin-top:6px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer}
+      .home.meeting{border-color:#5f9c8c;background:#1f4f54;color:#e8f4ee}
       .player-note{font-size:10.5px;color:#f0d9a0}
       .panel .leave{border:0;background:none;padding:0;text-align:left;font-size:11px;color:#d9bb6a;cursor:pointer;margin-top:4px}
       .stage{position:absolute;inset:0}

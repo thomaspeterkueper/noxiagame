@@ -81,12 +81,13 @@ export function tharsisResonanceRoundWindows(tick:number):PlaceActivityWindow[]{
 
 /**
  * Where a host's activity takes place.
- * - `work_region_feature`: the real imported place of the host's work (church, hall, lounge).
+ * - `work`: the host's workplace – a real imported place (church, hall, lounge) or a
+ *   bought and converted real house (tile entity).
  * - `built`: a built building of one of these types at the host's location
  *   (e.g. a resonance place on Mars). Without such a building the windows are skipped.
  */
 export type HostPlace =
-  | { kind:'work_region_feature' }
+  | { kind:'work' }
   | { kind:'built'; buildingTypes:readonly string[] }
 
 export interface RealPlaceHost { personKey:string; windows:(tick:number)=>PlaceActivityWindow[]; place:HostPlace }
@@ -128,15 +129,15 @@ export function foGuangShanActivityWindows(tick:number):PlaceActivityWindow[]{
 
 /** Hosts whose real-place schedule the population tick carries. */
 export const REAL_PLACE_HOSTS: ReadonlyArray<RealPlaceHost> = [
-  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows, place:{kind:'work_region_feature'} },
-  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows, place:{kind:'work_region_feature'} },
-  { personKey:'earth-frankfurt-omnizedent-001', windows:frankfurtResonanceRoundWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows, place:{kind:'work'} },
+  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows, place:{kind:'work'} },
+  { personKey:'earth-frankfurt-omnizedent-001', windows:frankfurtResonanceRoundWindows, place:{kind:'work'} },
   { personKey:'mars-tharsis-omnizedent-001', windows:tharsisResonanceRoundWindows, place:{kind:'built',buildingTypes:['resonance_place','omnizedenz_resonance_place']} },
-  { personKey:'earth-sundern-lukaskirche-pastor-001', windows:lukasActivityWindows, place:{kind:'work_region_feature'} },
-  { personKey:'earth-frankfurt-hamidiye-imam-001', windows:hamidiyeActivityWindows, place:{kind:'work_region_feature'} },
-  { personKey:'earth-frankfurt-baumweg-rabbi-001', windows:baumwegActivityWindows, place:{kind:'work_region_feature'} },
-  { personKey:'earth-dwarka-dwarkadhish-pujari-001', windows:dwarkadhishActivityWindows, place:{kind:'work_region_feature'} },
-  { personKey:'earth-frankfurt-foguangshan-monastic-001', windows:foGuangShanActivityWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-sundern-lukaskirche-pastor-001', windows:lukasActivityWindows, place:{kind:'work'} },
+  { personKey:'earth-frankfurt-hamidiye-imam-001', windows:hamidiyeActivityWindows, place:{kind:'work'} },
+  { personKey:'earth-frankfurt-baumweg-rabbi-001', windows:baumwegActivityWindows, place:{kind:'work'} },
+  { personKey:'earth-dwarka-dwarkadhish-pujari-001', windows:dwarkadhishActivityWindows, place:{kind:'work'} },
+  { personKey:'earth-frankfurt-foguangshan-monastic-001', windows:foGuangShanActivityWindows, place:{kind:'work'} },
 ]
 
 /** A concrete place: an imported real place or a built tile entity. */
@@ -334,18 +335,22 @@ export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:nu
 }
 
 async function resolveHostPlace(supabase:SupabaseLike,host:{id:string;current_location_id:string},spec:HostPlace):Promise<Place|null>{
-  if(spec.kind==='work_region_feature'){
+  if(spec.kind==='work'){
+    // Realer Ort (region_feature) oder ein gekauftes, umgebautes Haus (tile_entity),
+    // z. B. die Omnizedenz-Begegnungsstätte Hauptstraße 87 in Sundern.
     const {data:work,error:workError}=await supabase
       .from('person_assignments')
-      .select('region_feature_id')
+      .select('region_feature_id,tile_entity_id')
       .eq('person_id',host.id)
       .eq('assignment_type','work')
       .eq('is_active',true)
-      .not('region_feature_id','is',null)
-      .limit(1)
+      .limit(5)
     if(workError)throw workError
-    const id=work?.[0]?.region_feature_id
-    return id?{regionFeatureId:String(id),tileEntityId:null}:null
+    const row=(work??[]).find((item:{tile_entity_id:string|null;region_feature_id:string|null})=>item.tile_entity_id||item.region_feature_id)
+    if(!row)return null
+    return row.tile_entity_id
+      ?{regionFeatureId:null,tileEntityId:String(row.tile_entity_id)}
+      :{regionFeatureId:String(row.region_feature_id),tileEntityId:null}
   }
   const {data:built,error:builtError}=await supabase
     .from('tile_entities')

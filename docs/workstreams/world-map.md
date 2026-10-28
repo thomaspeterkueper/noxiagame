@@ -388,6 +388,16 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 - `/api/world-lab/people` liefert je Person zusätzlich Rolle, Tätigkeit, letzte Handlung und die OSM-Kennung des Gebäudes (`placeOsm`); neu `/api/world-lab/place-info` (Religion eines realen Gebäudes).
 - `LandmarkWalkableInterior.tsx`: Personen der Simulation im Raum, ansprechbar mit ihrer echten ID; neue Möbel und Böden.
 
+### W-11 (Philosophie/NPC, 28.10.2026): Omnizedenz-Begegnungsstätten leicht findbar – erledigt (28.10.2026)
+
+Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architecture/NOXIA-NPC-RELIGION-0002-philosophie-npcs-davaru-omnizedenten.md`, „Begegnungsstätten leicht findbar“).
+
+- `lib/worldlab/meetingPlaces.ts`: feste Stätten plus jedes Gebäude der Art `resonance_place`.
+- `worldEngine.ts`: neue Ebene `beacons` mit `setBeacons()` – Plakette je Stätte, in jeder Zoomstufe gleich groß, Klick öffnet den Ort.
+- `WorldLab.tsx`: Zielgruppe „Omnizedenz-Begegnungsstätten“ ganz oben und ohne Entfernungsgrenze (über 6 km: Reisebuchung), Knopf zur nächsten Stätte.
+- `WorldPanels.tsx`: Resonanzplätze öffnen den begehbaren Raum `resonance_place` mit den Personen der Simulation, für alle Spieler; Zeichen in `LandmarkGlyph.tsx`.
+- Reales Haus Hauptstraße 87, Sundern, über den Flurstückskauf (McKnight) erworben und umgebaut.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
