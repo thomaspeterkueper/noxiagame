@@ -75,8 +75,9 @@ Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `
 | Aristeas Lux | Gast | Tempel des DaVaRu | besteht als Person |
 | Wegbegleiter/in | `davaru_companion` | Schmitten | geplant, Bezeichnung offen |
 | Johanna Lind | `omnizedent` | Sundern; Resonanzrunde in der realen Hubertushalle; wohnt im öffentlichen Wohnblock | **produktiv** (`earth-sundern-omnizedent-001`) |
-| Teodor Varga | Techniker, Omnizedent aus Überzeugung | Tharsis Hub; arbeitet an der Wasseraufbereitung, wohnt im öffentlichen Habitat | **produktiv** (`mars-tharsis-omnizedent-001`), Resonanzplatz fehlt noch |
-| weitere Omnizedent/innen | `omnizedent` | Frankfurt, Erongo, Dvārakā | geplant |
+| Theodor Grün | Techniker, Omnizedent aus Überzeugung | Tharsis Hub; arbeitet an der Wasseraufbereitung, wohnt im öffentlichen Habitat | **produktiv** (`mars-tharsis-omnizedent-001`), Runde startet, sobald ein Resonanzplatz gebaut ist |
+| Samira Haddad | `omnizedent` | Frankfurt-Sachsenhausen; Resonanzrunde in der CAMALEO-ArtLounge (Mörfelder Landstraße 103), wohnt Ziegelhüttenweg 15 | **produktiv** (`earth-frankfurt-omnizedent-001`) |
+| weitere Omnizedent/innen | `omnizedent` | Erongo, Dvārakā | wartet auf Gebäudedaten (siehe unten) |
 | Vergleichspilot | `imam` oder `rabbi` | z. B. Frankfurt | Schritt 3 aus RELIGION-0001 |
 
 Namen weiterer Figuren werden erst bei der Anlage festgelegt.
@@ -87,7 +88,7 @@ Angelegt mit Migration `20261028124500_omnizedent_pilots_sundern_tharsis.sql`, n
 
 - **Johanna Lind, Sundern.** Arbeitsort ist die real importierte Hubertushalle (OSM-Gemeindezentrum), kein dupliziertes Gebäude. Arbeitgeber ist der „Resonanzkreis Sundern“, ein kleiner Gemeinschaftsakteur. Wie beim Pfarrer gibt es keinen Lohnsatz und damit kein künstliches Einkommen. Wöchentlich trägt sie die **Offene Resonanzrunde** (Tag 3 der Woche, 19 Uhr, zwei Stunden). Das läuft über dieselbe Ortsaktivität wie St. Johannes, die dafür auf eine Gastgeberliste (`REAL_PLACE_HOSTS`) verallgemeinert wurde, ohne zweite Uhr. Gottesdienst und Resonanzrunde überschneiden sich nicht.
 - **Lose Bekanntschaft Johanna – Elias.** Bewusst unter der Besuchsschwelle (Zuneigung 0,48 statt 0,5): Keiner geht automatisch zum Termin des anderen. Ob daraus mehr wird, entscheiden echte Begegnungen.
-- **Teodor Varga, Tharsis Hub.** Er arbeitet als Techniker an der bisher unbesetzten Wasseraufbereitung (Lohn aus dem öffentlichen Dienst nach `role_wage_rates`). Omnizedent ist er aus Überzeugung, nicht von Beruf. Das passt zu einer Kolonie von 30 Menschen. Einen Resonanzplatz gibt es auf dem Mars noch nicht; der braucht ein echtes, baubares Gebäude: `internal-tasks/open/REQ-NOXIA-20261028-resonance-place-buildable.md`.
+- **Theodor Grün, Tharsis Hub.** Er arbeitet als Techniker an der bisher unbesetzten Wasseraufbereitung (Lohn aus dem öffentlichen Dienst nach `role_wage_rates`). Omnizedent ist er aus Überzeugung, nicht von Beruf. Das passt zu einer Kolonie von 30 Menschen. Der Resonanzplatz ist seit 28.10.2026 baubar (siehe unten); sobald einer im Tharsis Hub steht, lädt er dort ein.
 - **Gesprächshaltung.** Beide öffentlichen Rollen werden von `worldviewVoices` als `omnizedent` erkannt (Test vorhanden).
 
 ## Spielmechanik (spätere Etappen)
@@ -107,3 +108,21 @@ Angelegt mit Migration `20261028124500_omnizedent_pilots_sundern_tharsis.sql`, n
 ## Offen
 
 - **Bezeichnung der Davaru-Rolle:** „Wegbegleitung des DaVaRu“ bleibt Arbeitsbegriff, bis ein eigener Name gefunden ist. Der Code-Schlüssel `davaru_companion` kann bleiben; nur das Label ändert sich dann.
+
+### Stand 28.10.2026, Nachmittag
+
+Thomas: „alles gleich wichtig, auch wichtig, dass die NPCs auch normal durch die Stadt oder Station laufen“. Entscheidung: Die Teile aus anderen Arbeitsbereichen (Erdkarte, Station, Baukatalog) werden hier gebaut und dort dokumentiert.
+
+- **Umbenennung:** Teodor Varga heißt Theodor Grün (Migration `20261028133500_rename_tharsis_omnizedent.sql`, Person und Wirtschaftsakteur).
+- **Frankfurt:** Samira Haddad, Omnizedentin (Migration `20261028141500_omnizedent_frankfurt_artlounge.sql`). Arbeitsort ist das reale Haus der CAMALEO-ArtLounge, Wohnung ein reales Mehrfamilienhaus in der Nähe – beides als Zuweisung an den OSM-Grundriss, ohne Eigentumswechsel. So wohnen auch Bewohner nicht gekaufter echter Häuser; kauft ein Spieler das Haus, bleibt sie dort mit ihm als Vermieter. Resonanzrunde an Tag 5 der Woche, 19 Uhr. Arbeitgeber „Resonanzkreis Frankfurt“, kein Lohnsatz.
+- **Mars:** `resonance_place` ist baubar (1500 Cr, 2 Ticks, `20261028143000_resonance_place_buildable.sql`), über den normalen Spielerbau. `realPlaceActivity` kennt dafür gebaute Gebäude als Ort; Theodor Grün geht an Tag 6 um 19 Uhr hin und lädt ein.
+- **Erongo:** Die Region `earth-namibia-erongo` hat bisher nur Straßen, Bahn, Gewerbeflächen und Wasser, keine einzelnen Gebäude und keinen Wohnraum. Gebäude kommen über den Ortsdetail-Import ins Spiel, wenn jemand den Ort auf der Weltkarte besucht. Danach wird eine Figur wie in Frankfurt angelegt (realer Ort für die Runde, reales Wohnhaus).
+- **Wohnung im realen Haus als Ort:** Wer ruht und nicht schläft, wird jetzt auch an einer Wohnung im realen Haus verortet (`surfacePresence.ts`), nicht nur an Spielgebäuden.
+
+### Sichtbares Gehen
+
+Vorher sprang jede Figur zwischen Wohnung, Arbeit und Termin; wer frei hatte oder schlief, lief auf einer zufälligen Straße in Spielernähe auf und ab. Die Simulation bestimmt weiter nur, *wo* jemand ist; die Karte zeichnet den Weg dazwischen (erlaubt nach NOXIA-VISUAL-0001). Gemeinsame Regeln in `lib/game/population/visibleMovement.ts` (Test vorhanden).
+
+- **Erde (Weltkarte):** Die Karte lädt Orte und Tätigkeiten alle 30 s nach, die Bewohnerliste jede Minute. Ändert sich der Ort einer Person, geht sie entlang der Straßen dorthin (8 m/s zeitgerafft, 4–90 s). Schlafende sind in ihrer Wohnung, nicht auf der Straße. Wer frei hat, geht auf den Straßen um die eigene Wohnung spazieren. Nach einem Gespräch geht die Figur zurück an ihren Ort, statt zu springen. `/api/world-lab/people` liefert dafür je Person Tätigkeit, Schlaf und Wohnung.
+- **Station (Mars, Mond, Phobos, Deimos):** Bewohner gehen durch die belüfteten Gänge und Module zu ihrem echten Arbeitsmodul oder nach Hause (`routeAcrossLocalScene`, ohne Anzug nur in Luft). Schlafende sind in ihrem Quartier. Wer frei hat, geht auf dem Gang bei seiner Wohnung auf und ab. Bisher lief jede Person einen per Zufall gewählten Gang ab.
+- **Grenze:** Die gezeichnete Position ist Darstellung. Begegnungen, Gespräche und Wirtschaft hängen weiter an den Orten der Simulation, nicht am Punkt auf dem Weg.

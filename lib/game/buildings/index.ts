@@ -106,6 +106,15 @@ export const BUILDINGS: Record<string, BuildingDef> = {
     overlay: 'SchoolOverlay',
   },
 
+  // NOXIA-NPC-RELIGION-0002: offener Ort der Omnizedenz (Thomas, 28.10.2026). Kein Personal,
+  // keine Produktion; Omnizedent/innen laden dort zu Resonanzrunden ein. Auf der Erde
+  // dienen reale Orte (Hubertushalle, ArtLounge); gebaut wird er vor allem auf Mars und Stationen.
+  resonance_place: {
+    id: 'resonance_place', name: 'Resonanzplatz', category: 'service',
+    description: 'Offener Ort für Begegnung, Gespräch, Lesen und Stille · kein Personal nötig',
+    cost: 1500, buildTimeTicks: 2,
+  },
+
   bank: {
     id: 'bank', name: 'Bank', category: 'service',
     description: 'Einlagen (+0.5%/Tick) · Kredite · Kreditlimit wächst mit Sicherheiten',

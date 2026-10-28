@@ -10,6 +10,7 @@ import { buildPlanetaryLocalScene } from '@/lib/game/spatial/planetaryLocalScene
 import { buildSurfaceDecor } from '@/lib/game/spatial/surfaceDecor'
 import { PEBBLE_ZOOM, SurfaceTerrainLayer, TERRAIN_PALETTES } from '@/app/components/SurfaceTerrainLayer'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
+import { commuteSeconds, distanceToNearestVertex, pathLength, pointAlong, visibleTarget } from '@/lib/game/population/visibleMovement'
 import {
   advanceAlongLocalSceneRoute,
   isInsidePressurizedSpace,
@@ -67,6 +68,10 @@ export default function PlanetaryWalkableSurface({
   locationSlug,body,title,corridors=[],mobileObjects=[],onOpenWorldObject,onOpenMobileObject,onClose,
 }:Props){
   const residents=useColonyStateStore(state=>state.residents)
+  const refreshColony=useColonyStateStore(state=>state.refresh)
+  // Bewohner frisch halten, damit Wechsel (Wohnung → Arbeit) als Weg sichtbar werden.
+  // Nur nachladen, wenn niemand sonst (Dashboard, alle 30 s) es gerade getan hat.
+  useEffect(()=>{const timer=setInterval(()=>{const state=useColonyStateStore.getState();if(state.locationSlug!==locationSlug)return;if(state.updatedAt&&Date.now()-state.updatedAt<45000)return;void refreshColony(locationSlug,{background:true})},30000);return()=>clearInterval(timer)},[locationSlug,refreshColony])
   const[spatial,setSpatial]=useState<SpatialPayload|null>(null)
   const[error,setError]=useState<string|null>(null)
   const[player,setPlayer]=useState<Point>({xM:0,yM:0})
@@ -92,32 +97,96 @@ export default function PlanetaryWalkableSurface({
   useEffect(()=>{let live=true;(async()=>{try{const token=await getToken();if(!token)throw new Error('Nicht angemeldet');const response=await fetch('/api/game/build/spatial?location='+encodeURIComponent(locationSlug),{headers:{Authorization:'Bearer '+token},cache:'no-store'});const payload=await response.json();if(!response.ok)throw new Error(payload?.error??'Surface-Daten nicht verfügbar');if(live)setSpatial(payload)}catch(err){if(live)setError(err instanceof Error?err.message:String(err))}})();return()=>{live=false}},[locationSlug])
   useEffect(()=>{let frame=0,last=0;const tick=(now:number)=>{if(now-last>=160){setMotionTime(now/1000);last=now}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[])
 
+  // Wegenetz ohne bewegte Objekte: Gebäude und Gänge, für die Wege der Bewohner.
+  const routingScene=useMemo(()=>spatial?buildPlanetaryLocalScene({
+    body,
+    frameId:String(spatial.frame?.terrain_dataset_id??(body+'-local-frame')),
+    radiusM:300,
+    entities:[...(spatial.entities??[]),...(spatial.builds??[])],
+    corridors,
+    mobileObjects:[],
+  }):null,[spatial,body,corridors])
+  // Sichtbares Gehen (Thomas, 28.10.2026): Bewohner gehen durch die belüfteten Gänge
+  // zu ihrem echten Arbeitsmodul oder nach Hause; wer frei hat, geht auf dem Gang
+  // bei seiner Wohnung auf und ab; Schlafende sind in ihrem Quartier.
+  // Nur Darstellung zwischen den Orten der Simulation (NOXIA-VISUAL-0001).
+  // Wegzustand je Person: ein beständiger Merkzettel, der nur die Darstellung fortschreibt.
+  const[walks]=useState(()=>new Map<string,{key:string;pos:Point;path:Array<{x:number;y:number}>|null;length:number;start:number;seconds:number;shift:number}>())
   const residentObjects=useMemo<MobileSurfaceObject[]>(()=>{
     if(!residents.length)return[]
-    return residents.slice(0,18).map((resident,index)=>{
+    const buildingById=new Map((routingScene?.buildings??[]).map(item=>[item.id,item]))
+    const corridorLine=(corridor:PreparedCorridor)=>corridor.points.map(point=>({x:point.xM,y:point.yM}))
+    const nearestCorridor=(at:{x:number;y:number}|null,h:number)=>{
+      const usable=corridors.filter(item=>item.points.length>=2)
+      if(!usable.length)return null
+      if(!at)return usable[h%usable.length]
+      return usable.map(item=>({item,d:Math.min(...item.points.map(p=>Math.hypot(p.xM-at.x,p.yM-at.y)))})).sort((a,b)=>a.d-b.d)[0].item
+    }
+    const seen=new Set<string>()
+    const out:MobileSurfaceObject[]=[]
+    const visible=residents.filter(resident=>visibleTarget(resident.activityState,resident.lastAction,resident.assignments).kind!=='asleep').slice(0,18)
+    visible.forEach((resident,index)=>{
       const h=hash(resident.id)
-      const corridor=corridors.length?corridors[h%corridors.length]:null
-      const points=corridor?.points??[]
-      if(points.length<2)return{id:'resident:'+resident.id,label:residentLabel(resident),xM:-70+(h%140),yM:-55+((h>>>8)%110),role:'person:npc'}
-      const segments=points.slice(1).map((to,i)=>{const from=points[i];return{from,to,length:Math.hypot(to.xM-from.xM,to.yM-from.yM)}}).filter(item=>item.length>.01)
-      const total=segments.reduce((sum,item)=>sum+item.length,0)||1
+      seen.add(resident.id)
+      const target=visibleTarget(resident.activityState,resident.lastAction,resident.assignments)
+      const building=target.tileEntityId?buildingById.get(target.tileEntityId):undefined
       const state=resident.activityState.toLowerCase()
-      const speed=/work|travel|move|commut|deliver|patrol/.test(state)?1.2:/idle|rest|sleep/.test(state)?.18:.65
-      const phase=(h%10000)/10000
-      const travelled=((phase*total)+(motionTime*speed))%total
-      let walked=0
-      let point=points[0]
-      for(const segment of segments){
-        if(travelled<=walked+segment.length){
-          const t=(travelled-walked)/segment.length
-          point={xM:segment.from.xM+(segment.to.xM-segment.from.xM)*t,yM:segment.from.yM+(segment.to.yM-segment.from.yM)*t}
-          break
-        }
-        walked+=segment.length
+      const strollSpeed=/work|travel|move|commut|deliver|patrol/.test(state)?1.2:/idle|rest|sleep/.test(state)?.18:.65
+      // Ziel: im Modul (etwas versetzt, damit nicht alle auf einem Punkt stehen) oder ein Gang bei der Wohnung.
+      let key:string,goal:{x:number;y:number}|null=null,stroll:Array<{x:number;y:number}>|null=null
+      if((target.kind==='work'||target.kind==='home')&&building){
+        key=target.kind+':'+building.id
+        goal={x:building.center.xM+((h%5)-2)*1.4,y:building.center.yM+(((h>>>4)%5)-2)*1.4}
+      }else{
+        const corridor=nearestCorridor(building?{x:building.center.xM,y:building.center.yM}:null,h)
+        key='stroll:'+(corridor?.id??'none')
+        stroll=corridor?corridorLine(corridor):null
       }
-      return{id:'resident:'+resident.id,label:residentLabel(resident),xM:point.xM+((index%3)-1)*1.8,yM:point.yM+((index%2)?1.6:-1.6),role:'person:npc'}
+      let walk=walks.get(resident.id)
+      const fallback={x:-70+(h%140),y:-55+((h>>>8)%110)}
+      if(!walk){
+        // Erster Auftritt: gleich am Ort, ohne Weg.
+        const at=goal??(stroll?pointAlong(stroll,(h%1000)/1000*pathLength(stroll)):fallback)
+        walk={key,pos:{xM:at.x,yM:at.y},path:null,length:0,start:motionTime,seconds:1,shift:stroll?distanceToNearestVertex(stroll,at)-motionTime*strollSpeed:0}
+        walks.set(resident.id,walk)
+      }
+      if(walk.key!==key){
+        // Neuer Ort: Weg durch die Gänge vom aktuellen Standort dorthin.
+        const from={xM:walk.pos.xM,yM:walk.pos.yM}
+        const entry=goal??(stroll?pointAlong(stroll,distanceToNearestVertex(stroll,{x:from.xM,y:from.yM})):null)
+        walk.key=key
+        if(entry&&routingScene){
+          const route=routeAcrossLocalScene(routingScene,from,{xM:entry.x,yM:entry.y},{rules:{pressurized:true,outfit:'none'}})
+          const path=route.points.map(point=>({x:point.xM,y:point.yM}))
+          walk.path=path.length>1?path:null
+          walk.length=pathLength(path)
+          walk.start=motionTime
+          walk.seconds=commuteSeconds(walk.length,1.6,4,120)
+        }
+        if(stroll){
+          const resume=entry??{x:from.xM,y:from.yM}
+          walk.shift=distanceToNearestVertex(stroll,resume)-(motionTime+(walk.path?walk.seconds:0))*strollSpeed
+        }
+      }
+      let at:{x:number;y:number}
+      if(walk.path&&motionTime-walk.start<walk.seconds){
+        at=pointAlong(walk.path,walk.length*(motionTime-walk.start)/walk.seconds)
+      }else{
+        walk.path=null
+        if(goal)at=goal
+        else if(stroll){
+          const total=pathLength(stroll)||1
+          const run=((walk.shift+motionTime*strollSpeed)%(total*2)+total*2)%(total*2)
+          at=pointAlong(stroll,run<=total?run:total*2-run)
+          at={x:at.x+((index%3)-1)*1.2,y:at.y+((index%2)?1.1:-1.1)}
+        }else at=fallback
+      }
+      walk.pos={xM:at.x,yM:at.y}
+      out.push({id:'resident:'+resident.id,label:residentLabel(resident),xM:at.x,yM:at.y,role:'person:npc'})
     })
-  },[corridors,residents,motionTime])
+    for(const id of [...walks.keys()])if(!seen.has(id))walks.delete(id)
+    return out
+  },[corridors,residents,motionTime,routingScene,walks])
 
   const scene=useMemo(()=>spatial?buildPlanetaryLocalScene({
     body,

@@ -18,6 +18,7 @@ export default defineConfig({
       'lib/game/population/personSceneLabel.test.ts',
       'lib/game/population/spiritualRoles.test.ts',
       'lib/game/population/worldviewVoices.test.ts',
+      'lib/game/population/visibleMovement.test.ts',
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/game/spatial/localSceneRuntime.test.ts',

@@ -1,4 +1,5 @@
 import { resolvedPresenceCandidates } from './presence'
+import { isAsleepAction } from './circadian'
 import type { Person, PersonAssignment } from './types'
 
 type SupabaseLike=any
@@ -49,11 +50,15 @@ function preferredRegionFeatureAssignment(person:Person,assignments:readonly Per
       && Boolean(assignment.regionFeatureId)
     )
   if(!active.length)return null
+  // A home in a real, unbought house is a region feature too (NOXIA-NPC-RELIGION-0002):
+  // resting there anchors at the house. A sleeping person keeps no surface row, as before.
   const preferredTypes = person.activityState==='socialising'
     ? ['temporary','work']
     : person.activityState==='working'||person.activityState==='inspecting'
       ? ['work','temporary']
-      : ['temporary']
+      : person.activityState==='resting'&&!isAsleepAction(person.lastAction)
+        ? ['home','temporary']
+        : ['temporary']
   for(const type of preferredTypes){
     const found=active.filter(assignment=>assignment.assignmentType===type).sort((a,b)=>a.id.localeCompare(b.id))[0]
     if(found)return found

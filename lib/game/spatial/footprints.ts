@@ -39,6 +39,7 @@ export function getBuildingFootprint(buildableId: string): BuildingFootprintPoli
   const spaceport = SPACEPORT_FOOTPRINTS[id]
   if (spaceport) return spaceport
 
+  if (id.includes('resonance')) return { widthM: 20, depthM: 16, clearanceM: 3 }
   if (id.includes('road')) return { widthM: 8, depthM: 24, clearanceM: 0 }
   if (id.includes('solar')) return { widthM: 60, depthM: 40, clearanceM: 4 }
   if (id.includes('factory') || id.includes('smelt') || id.includes('schmelz')) return { widthM: 42, depthM: 30, clearanceM: 5 }

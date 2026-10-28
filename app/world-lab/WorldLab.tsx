@@ -62,6 +62,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [noxia, setNoxia] = useState<NoxiaBuilding[]>([])
   const noxiaRef = useRef<NoxiaBuilding[]>([])
   const [surfacePeople, setSurfacePeople] = useState<Array<{ id: string; lat: number; lon: number }>>([])
+  // Tätigkeit, Schlaf und Wohnung je Person (für sichtbare Wege, 28.10.2026)
+  const [surfaceStates, setSurfaceStates] = useState<Array<{ id: string; activityState: string; asleep: boolean; home: { lat: number; lon: number } | null }>>([])
   // Entwicklerdinge (Messwerte, Nachladen, alte Szene) nur mit ?dev=1 – einmal gesetzt, bleibt es (W-2).
   const [dev] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -233,20 +235,32 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   // Autoritative Personenpositionen der gemeinsamen Surface-Presence-Schicht.
   // Das deckt auch reale OSM-Orte ab, z. B. eine Arbeitszuweisung an eine Kirche,
   // ohne dafür ein künstliches NOXIA-Gebäude zu duplizieren.
+  // Alle 30 s neu: Bei 60-facher Spielzeit wechselt jede Minute die Spielstunde,
+  // und Leute gehen von der Wohnung zur Arbeit. Die Karte zeichnet den Weg dazwischen.
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    const load = async () => {
       try {
         const { token } = await getSessionInfo()
         if (!token) return
         const response = await fetch('/api/world-lab/people', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
         if (!response.ok) return
         const json = await response.json()
-        if (!cancelled) setSurfacePeople(Array.isArray(json?.people) ? json.people : [])
+        if (cancelled) return
+        setSurfacePeople(Array.isArray(json?.people) ? json.people : [])
+        setSurfaceStates(Array.isArray(json?.states) ? json.states : [])
       } catch { /* World-Lab bleibt auch ohne Präsenzabruf nutzbar. */ }
-    })()
-    return () => { cancelled = true }
-  }, [residents])
+    }
+    void load()
+    const timer = setInterval(() => { void load() }, 30000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
+  // Bewohnerliste (Tätigkeit, Zuweisungen) ebenfalls nachladen, wenn die Karte sie selbst holt.
+  useEffect(() => {
+    if (givenResidents) return
+    const timer = setInterval(() => { void refreshColony('earth', { background: true }) }, 60000)
+    return () => clearInterval(timer)
+  }, [givenResidents, refreshColony])
 
   // Personen auf die Karte: autoritative Surface-Präsenz hat Vorrang.
   // Fehlt sie, bleibt die bisherige Fallback-Regel über NOXIA-Zuhause/Arbeit;
@@ -255,6 +269,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     if (!engineReady) return
     const byId = new Map(noxia.map(building => [building.id, building]))
     const surfaceByPerson = new Map(surfacePeople.map(person => [person.id, person]))
+    const stateByPerson = new Map(surfaceStates.map(person => [person.id, person]))
     const depthRank = (resident: ColonyResident) =>
       resident.personDepth?.level === 'focal' ? 3
       : resident.personDepth?.level === 'developed' ? 2
@@ -265,13 +280,23 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .slice(0, 18)
     const people: WorldPerson[] = visibleResidents.map(resident => {
       const surface = surfaceByPerson.get(resident.id)
+      const live = stateByPerson.get(resident.id)
       const place = resident.assignments.map(item => item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
       // Tätigkeit wie in der bisherigen Erdszene; wer in einem betretbaren Gebäude arbeitet, ist drinnen.
-      const state = String(resident.activityState ?? '').toLowerCase()
+      // Die Präsenzabfrage ist frischer als die Bewohnerliste und hat daher Vorrang.
+      const state = String(live?.activityState || resident.activityState || '').toLowerCase()
       const atWork = /work|produc|serv|operat/.test(state)
       const activity: WorldPerson['activity'] = /travel|move|commut|deliver|patrol/.test(state) ? 'move' : atWork ? 'work' : /idle|rest|sleep/.test(state) ? 'idle' : 'other'
       const workplace = resident.assignments.map(item => item.type === 'work' && item.tileEntityId ? byId.get(item.tileEntityId) : undefined).find(Boolean)
       const inside = Boolean(atWork && workplace && getBuildingEntryDefinition(workplace.typeId))
+      // Ohne autoritativen Ort: Schlafende bleiben in der Wohnung (nicht sichtbar),
+      // wer frei hat, geht in der Nähe der Wohnung spazieren statt irgendwo in der Stadt.
+      if (!surface && live?.home && (live.asleep || /rest|sleep/.test(state))) {
+        return { id: resident.id, label: personSceneLabel(resident), activity: 'idle' as const, inside: true, anchor: live.home, anchorRadiusM: 5 }
+      }
+      if (!surface && live) {
+        return { id: resident.id, label: personSceneLabel(resident), activity, inside: false, anchor: null, strollAround: live.home }
+      }
       return {
         id: resident.id,
         label: personSceneLabel(resident),
@@ -281,7 +306,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       }
     })
     engineReady.setPeople(people)
-  }, [engineReady, residents, noxia, surfacePeople])
+  }, [engineReady, residents, noxia, surfacePeople, surfaceStates])
 
   // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
   useEffect(() => { engineReady?.setInputEnabled(!trip && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind, trip])

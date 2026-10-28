@@ -48,11 +48,48 @@ export function sundernResonanceRoundWindows(tick:number):PlaceActivityWindow[]{
   ].filter((value):value is PlaceActivityWindow=>Boolean(value))
 }
 
+// Frankfurt, CAMALEO-ArtLounge: Tag 5 der Woche, 19 Uhr, zwei Stunden.
+const FRANKFURT_RESONANCE_PHASE = 115
+
+export function frankfurtResonanceRoundWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,FRANKFURT_RESONANCE_PHASE,RESONANCE_DURATION,'resonance_round','Offene Resonanzrunde in der ArtLounge'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+
+// Tharsis Hub: Tag 6 der Woche, 19 Uhr, zwei Stunden – sobald dort ein Resonanzplatz steht.
+const THARSIS_RESONANCE_PHASE = 139
+
+export function tharsisResonanceRoundWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,THARSIS_RESONANCE_PHASE,RESONANCE_DURATION,'resonance_round','Offene Resonanzrunde am Resonanzplatz'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+
+/**
+ * Where a host's activity takes place.
+ * - `work_region_feature`: the real imported place of the host's work (church, hall, lounge).
+ * - `built`: a built building of one of these types at the host's location
+ *   (e.g. a resonance place on Mars). Without such a building the windows are skipped.
+ */
+export type HostPlace =
+  | { kind:'work_region_feature' }
+  | { kind:'built'; buildingTypes:readonly string[] }
+
+export interface RealPlaceHost { personKey:string; windows:(tick:number)=>PlaceActivityWindow[]; place:HostPlace }
+
 /** Hosts whose real-place schedule the population tick carries. */
-export const REAL_PLACE_HOSTS: ReadonlyArray<{ personKey:string; windows:(tick:number)=>PlaceActivityWindow[] }> = [
-  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows },
-  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows },
+export const REAL_PLACE_HOSTS: ReadonlyArray<RealPlaceHost> = [
+  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-frankfurt-omnizedent-001', windows:frankfurtResonanceRoundWindows, place:{kind:'work_region_feature'} },
+  { personKey:'mars-tharsis-omnizedent-001', windows:tharsisResonanceRoundWindows, place:{kind:'built',buildingTypes:['resonance_place','omnizedenz_resonance_place']} },
 ]
+
+/** A concrete place: an imported real place or a built tile entity. */
+type Place = { regionFeatureId:string; tileEntityId:null } | { regionFeatureId:null; tileEntityId:string }
+const placeRef=(place:Place)=>place.regionFeatureId?`region_feature:${place.regionFeatureId}`:`tile_entity:${place.tileEntityId}`
+const placeSubjectType=(place:Place)=>place.regionFeatureId?'region_feature':'tile_entity'
 
 async function closeExpiredRegionVisits(supabase:SupabaseLike,tick:number){
   const {data,error}=await supabase
@@ -78,10 +115,11 @@ async function ensureEvent(
   tick:number,
   hostPersonId:string,
   locationId:string,
-  regionFeatureId:string,
+  place:Place,
   window:PlaceActivityWindow,
 ){
-  const subjectRef=`region_feature:${regionFeatureId}:${window.kind}:${window.startTick}`
+  // Region-feature refs keep their original shape so existing events stay idempotent.
+  const subjectRef=`${placeRef(place)}:${window.kind}:${window.startTick}`
   const {data:existing,error:lookupError}=await supabase
     .from('population_events')
     .select('id')
@@ -96,10 +134,11 @@ async function ensureEvent(
     event_type:'place_activity_started',
     actor_person_id:hostPersonId,
     location_id:locationId,
-    subject_type:'region_feature',
+    subject_type:placeSubjectType(place),
     subject_ref:subjectRef,
     payload:{
-      regionFeatureId,
+      regionFeatureId:place.regionFeatureId,
+      tileEntityId:place.tileEntityId,
       activityKind:window.kind,
       label:window.label,
       startsTick:window.startTick,
@@ -116,14 +155,21 @@ async function ensureVisitor(
   input:{
     personId:string
     locationId:string
-    regionFeatureId:string
+    place:Place
     hostPersonId:string
     window:PlaceActivityWindow
     tick:number
   },
 ){
-  const {personId,locationId,regionFeatureId,hostPersonId,window,tick}=input
+  const {personId,locationId,place,hostPersonId,window,tick}=input
   const roleCode=`visit:real_place:${window.kind}`
+  const decisionFactors={
+    destinationRegionFeatureId:place.regionFeatureId,
+    destinationTileEntityId:place.tileEntityId,
+    hostPersonId,
+    activityKind:window.kind,
+    attendanceDoesNotImplyBelief:true,
+  }
 
   const {data:person,error:personError}=await supabase
     .from('people')
@@ -136,7 +182,7 @@ async function ensureVisitor(
 
   const {data:existing,error:existingError}=await supabase
     .from('person_assignments')
-    .select('id,region_feature_id,role_code,starts_tick,ends_tick')
+    .select('id,region_feature_id,tile_entity_id,role_code,starts_tick,ends_tick')
     .eq('person_id',personId)
     .eq('assignment_type','temporary')
     .eq('is_active',true)
@@ -145,16 +191,14 @@ async function ensureVisitor(
   if(existingError)throw existingError
 
   const current=existing?.[0]
-  if(current && current.region_feature_id===regionFeatureId && current.role_code===roleCode){
+  const samePlace=current
+    && (current.region_feature_id??null)===place.regionFeatureId
+    && (current.tile_entity_id??null)===place.tileEntityId
+  if(current && samePlace && current.role_code===roleCode){
     const {error}=await supabase.from('people').update({
       activity_state:'socialising',
       last_action:`visit:${window.kind}`,
-      last_decision_factors:{
-        destinationRegionFeatureId:regionFeatureId,
-        hostPersonId,
-        activityKind:window.kind,
-        attendanceDoesNotImplyBelief:true,
-      },
+      last_decision_factors:decisionFactors,
       last_tick:tick,
       updated_at:new Date().toISOString(),
     }).eq('id',personId)
@@ -174,8 +218,8 @@ async function ensureVisitor(
     person_id:personId,
     assignment_type:'temporary',
     location_id:locationId,
-    tile_entity_id:null,
-    region_feature_id:regionFeatureId,
+    tile_entity_id:place.tileEntityId,
+    region_feature_id:place.regionFeatureId,
     employer_actor_id:null,
     role_code:roleCode,
     starts_tick:tick,
@@ -187,12 +231,7 @@ async function ensureVisitor(
   const {error:updatePersonError}=await supabase.from('people').update({
     activity_state:'socialising',
     last_action:`visit:${window.kind}`,
-    last_decision_factors:{
-      destinationRegionFeatureId:regionFeatureId,
-      hostPersonId,
-      activityKind:window.kind,
-      attendanceDoesNotImplyBelief:true,
-    },
+    last_decision_factors:decisionFactors,
     last_tick:tick,
     updated_at:new Date().toISOString(),
   }).eq('id',personId)
@@ -204,8 +243,8 @@ async function ensureVisitor(
     actor_person_id:personId,
     related_person_id:hostPersonId,
     location_id:locationId,
-    subject_type:'region_feature',
-    subject_ref:regionFeatureId,
+    subject_type:placeSubjectType(place),
+    subject_ref:place.regionFeatureId??place.tileEntityId,
     payload:{
       assignmentId:assignment.id,
       activityKind:window.kind,
@@ -225,7 +264,7 @@ export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
   const result:RealPlaceTickResult={closed:0,windows:0,events:0,visitors:0,skipped:true}
   result.closed=await closeExpiredRegionVisits(supabase,tick)
   for(const host of REAL_PLACE_HOSTS){
-    const part=await runHostPlaceTick(supabase,tick,host.personKey,host.windows(tick))
+    const part=await runHostPlaceTick(supabase,tick,host,host.windows(tick))
     result.windows+=part.windows
     result.events+=part.events
     result.visitors+=part.visitors
@@ -237,11 +276,38 @@ export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
 /** Kept for callers of the first pilot; closes expired visits and runs St. Johannes only. */
 export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:number){
   const closed=await closeExpiredRegionVisits(supabase,tick)
-  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0].personKey,stJohannesActivityWindows(tick))
+  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0],stJohannesActivityWindows(tick))
   return {...part,closed}
 }
 
-async function runHostPlaceTick(supabase:SupabaseLike,tick:number,personKey:string,windows:PlaceActivityWindow[]){
+async function resolveHostPlace(supabase:SupabaseLike,host:{id:string;current_location_id:string},spec:HostPlace):Promise<Place|null>{
+  if(spec.kind==='work_region_feature'){
+    const {data:work,error:workError}=await supabase
+      .from('person_assignments')
+      .select('region_feature_id')
+      .eq('person_id',host.id)
+      .eq('assignment_type','work')
+      .eq('is_active',true)
+      .not('region_feature_id','is',null)
+      .limit(1)
+    if(workError)throw workError
+    const id=work?.[0]?.region_feature_id
+    return id?{regionFeatureId:String(id),tileEntityId:null}:null
+  }
+  const {data:built,error:builtError}=await supabase
+    .from('tile_entities')
+    .select('id')
+    .eq('location_id',host.current_location_id)
+    .eq('status','active')
+    .in('entity_id',[...spec.buildingTypes])
+    .order('created_at',{ascending:true})
+    .limit(1)
+  if(builtError)throw builtError
+  const id=built?.[0]?.id
+  return id?{regionFeatureId:null,tileEntityId:String(id)}:null
+}
+
+async function runHostPlaceTick(supabase:SupabaseLike,tick:number,spec:RealPlaceHost,windows:PlaceActivityWindow[]){
   const result:RealPlaceTickResult={closed:0,windows:0,events:0,visitors:0,skipped:false}
   if(!windows.length)return result
   result.windows=windows.length
@@ -249,7 +315,7 @@ async function runHostPlaceTick(supabase:SupabaseLike,tick:number,personKey:stri
   const {data:host,error:hostError}=await supabase
     .from('people')
     .select('id,current_location_id,activity_state,last_action')
-    .eq('person_key',personKey)
+    .eq('person_key',spec.personKey)
     .maybeSingle()
   if(hostError)throw hostError
   if(!host){result.skipped=true;return result}
@@ -258,17 +324,8 @@ async function runHostPlaceTick(supabase:SupabaseLike,tick:number,personKey:stri
     return result
   }
 
-  const {data:work,error:workError}=await supabase
-    .from('person_assignments')
-    .select('region_feature_id')
-    .eq('person_id',host.id)
-    .eq('assignment_type','work')
-    .eq('is_active',true)
-    .not('region_feature_id','is',null)
-    .limit(1)
-  if(workError)throw workError
-  const regionFeatureId=work?.[0]?.region_feature_id
-  if(!regionFeatureId){result.skipped=true;return result}
+  const place=await resolveHostPlace(supabase,host,spec.place)
+  if(!place){result.skipped=true;return result}
 
   // Pilot attendance comes only from an already-established local relationship.
   // It is social provenance, not inferred religious identity.
@@ -284,14 +341,17 @@ async function runHostPlaceTick(supabase:SupabaseLike,tick:number,personKey:stri
     .sort()
 
   for(const window of windows){
-    if(await ensureEvent(supabase,tick,host.id,host.current_location_id,regionFeatureId,window))result.events+=1
+    if(await ensureEvent(supabase,tick,host.id,host.current_location_id,place,window))result.events+=1
+    // A host whose workplace is elsewhere (e.g. a technician hosting a round at a
+    // built resonance place) goes there for the window, like any visitor.
+    if(spec.place.kind==='built') await ensureVisitor(supabase,{personId:host.id,locationId:host.current_location_id,place,hostPersonId:host.id,window,tick})
     // Keep the first pilot deliberately small. Future participation should grow
     // from actual relationships/place affinity, not random religious assignment.
     const visitorId=candidateIds[0]
     if(visitorId && await ensureVisitor(supabase,{
       personId:visitorId,
       locationId:host.current_location_id,
-      regionFeatureId,
+      place,
       hostPersonId:host.id,
       window,
       tick,

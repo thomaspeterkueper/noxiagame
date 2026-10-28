@@ -359,6 +359,15 @@ Umgesetzt:
 
 Die übrigen Ortsbefunde aus G-6 stammen aus der alten Erdszene vom 12.10.2026 („keine Straßen hier“, Herceg Novi). Die neue Weltkarte gibt Straße, Ort und Gebäude mit. Ob sie noch vorkommen, zeigt die tägliche Auswertung.
 
+### W-9 (Philosophie/NPC, 28.10.2026): Figuren gehen sichtbar zwischen ihren Orten – erledigt (28.10.2026)
+
+Thomas (28.10.2026): „auch wichtig, dass die NPCs auch normal durch die Stadt oder Station laufen“. Auf seinen Wunsch im Philosophie/NPC-Chat gebaut (Details: `docs/architecture/NOXIA-NPC-RELIGION-0002-philosophie-npcs-davaru-omnizedenten.md`, Abschnitt „Sichtbares Gehen“).
+
+- `WorldLab.tsx`: `/api/world-lab/people` alle 30 s, Bewohnerliste jede Minute nachladen; Schlafende in der Wohnung (`inside`), Freie mit `strollAround` (Wohnung).
+- `worldEngine.ts`: Wechselt der Anker, geht die Figur über `planRoute` hin (`startCommute`, endet von selbst); Spaziergang auf den nächsten Straßen um die Wohnung (`pickRoute(seed, base)`), Einstieg dort, wo die Figur gerade ist; `releasePerson` geht zurück statt zu springen.
+- `/api/world-lab/people`: zusätzlich `states` (Tätigkeit, Schlaf, Wohnung – Spielgebäude oder realer Grundriss).
+- Gemeinsame Regeln und Tempo: `lib/game/population/visibleMovement.ts`.
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

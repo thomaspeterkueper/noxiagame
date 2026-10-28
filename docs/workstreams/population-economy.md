@@ -362,3 +362,13 @@ Thomas, 28.10.2026: „ich glaube wir brauchen einen Nachtclub.“ In den Karten
 4. **Personal:** `run_venue_staffing` auch für `nightclub` (Rolle `service`; Tür und DJ ergeben sich aus den Plätzen).
 5. **Bewohner gehen aus:** `npc_service_catalog` für `nightclub`, nur nachts und mit Geselligkeit als Anlass (R-5). Sonst bleibt der Club leer, solange Käufe nur aus Hunger und Durst entstehen.
 
+
+## Philosophie/NPC (28.10.2026): Omnizedent/innen, Wohnen im realen Haus, Resonanzplatz baubar
+
+Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut. Details: `docs/architecture/NOXIA-NPC-RELIGION-0002-philosophie-npcs-davaru-omnizedenten.md`.
+
+- **Neue Personen:** Johanna Lind (Sundern), Samira Haddad (Frankfurt), Theodor Grün (Tharsis). Alle nach dem Muster des Pfarrer-Piloten: Startbestand als ausgewiesene Emission, Bedürfnisse, gestelltes Wohnen; Omnizedent/innen ohne Lohnsatz, Theodor als Techniker mit Lohn aus dem öffentlichen Dienst.
+- **Wohnen in realen, nicht gekauften Häusern:** Wohnzuweisung an den OSM-Grundriss (`region_feature_id`, ohne `tile_entity_id`), Mietverhältnis gestellt, Vermieter unbekannt. `buy_earth_building` übernimmt solche Bewohner beim Kauf (Vermieter dann der Käufer). Wer dort ruht und nicht schläft, wird am Haus verortet (`surfacePresence.ts`).
+- **Ortsaktivität:** `REAL_PLACE_HOSTS` in `realPlaceActivity.ts` trägt alle Gastgeber; ein Ort kann ein realer Ort oder ein gebautes Gebäude sein.
+- **Baukatalog:** `resonance_place` (1500 Cr, 2 Ticks) über den normalen Spielerbau.
+- **Station:** Bewohner gehen in `PlanetaryWalkableSurface.tsx` durch die belüfteten Gänge zu Arbeit und Wohnung statt auf einem Zufallsgang.

@@ -8,6 +8,7 @@
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
+import { COMMUTE_THRESHOLD_M, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute } from '@/lib/game/population/visibleMovement'
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
@@ -92,6 +93,8 @@ export interface WorldPerson {
   activity?: 'move' | 'work' | 'idle' | 'other'
   /** Arbeitet gerade in einem betretbaren Gebäude: drinnen, auf der Karte nicht zu sehen. */
   inside?: boolean
+  /** Ohne Anker: Spaziergang auf Straßen in der Nähe dieses Punkts (Wohnung) statt irgendwo. */
+  strollAround?: GeoPoint | null
 }
 
 export interface WorldEngine {
@@ -1079,8 +1082,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     spec: WorldPerson; figure: PixiGraphics; label: InstanceType<typeof PIXI.Text>
     x: number; y: number; seed: number
     route: Array<{ x: number; y: number }> | null; routeLength: number
-    /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer. */
-    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number } | null
+    /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer.
+     *  `commute`: eigener Weg zum neuen Ort aus der Simulation; endet am Ziel von selbst. */
+    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number; commute?: boolean } | null
     /** Zurückgelegter Weg auf der eigenen Straße (m) und Zeit des letzten Schritts */
     runM: number; lastAt: number
   }
@@ -1098,20 +1102,41 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     g.scale.set(1.3)
     return g
   }
-  /** Eine Straße für eine Person: aus den geladenen Kacheln, fest nach ihrer Kennung gewählt. */
-  function pickRoute(seed: number) {
-    const near: Array<Array<{ x: number; y: number }>> = []
+  /** Eine Straße für eine Person: aus den geladenen Kacheln um `base`, unter den nächsten fest nach ihrer Kennung gewählt. */
+  function pickRoute(seed: number, base: { x: number; y: number } = player) {
+    const near: Array<{ pts: Array<{ x: number; y: number }>; d: number }> = []
     for (const entry of loaded.values()) {
-      if (Math.hypot(entry.ox + tileSizeM / 2 - player.x, entry.oy + tileSizeM / 2 - player.y) > tileSizeM * 1.6) continue
+      if (Math.hypot(entry.ox + tileSizeM / 2 - base.x, entry.oy + tileSizeM / 2 - base.y) > tileSizeM * 1.6) continue
       for (const road of entry.data.roads) {
         if (road.c === 'main' || road.p.length < 4) continue
         const pts: Array<{ x: number; y: number }> = []
         for (let i = 0; i < road.p.length; i += 2) pts.push({ x: entry.ox + road.p[i], y: entry.oy + road.p[i + 1] })
-        near.push(pts)
+        const d = Math.min(...pts.map(p => Math.hypot(p.x - base.x, p.y - base.y)))
+        near.push({ pts, d })
       }
     }
     if (!near.length) return null
-    return near[seed % near.length]
+    // Nur die Straßen in der Nähe: so bleibt der Spaziergang im eigenen Viertel.
+    near.sort((a, b) => a.d - b.d)
+    const choice = near.slice(0, Math.min(6, near.length))
+    return choice[seed % choice.length].pts
+  }
+  /** Wo eine Person an ihrem Anker steht: vor dem Haus auf der Kameraseite, ohne Wiegen. */
+  function standPoint(spec: WorldPerson, seed: number) {
+    if (!spec.anchor) return null
+    const home = toWorld(spec.anchor)
+    const out = (spec.anchorRadiusM ?? 6) + 3
+    const spread = ((seed % 5) - 2) * 2.2
+    return { x: home.x + out * 0.71 + spread * 0.71, y: home.y + out * 0.71 - spread * 0.71 }
+  }
+  /** Eigener Weg zum neuen Ort entlang der Straßen (sichtbares Pendeln, NOXIA-VISUAL-0001). */
+  function startCommute(walker: Walker, to: { x: number; y: number }) {
+    const from = { x: walker.x, y: walker.y }
+    if (Math.hypot(to.x - from.x, to.y - from.y) <= COMMUTE_THRESHOLD_M) return
+    const path = [from, ...planRoute(to, from)]
+    if (Math.hypot(path[path.length - 1].x - to.x, path[path.length - 1].y - to.y) > 0.5) path.push(to)
+    const length = pathLength(path)
+    walker.sent = { path, length, start: performance.now(), seconds: commuteSeconds(length), commute: true }
   }
   function along(route: Array<{ x: number; y: number }>, distance: number) {
     for (let i = 1; i < route.length; i++) {
@@ -1135,7 +1160,17 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy(); walker.label.destroy(); walkers.delete(id) }
     for (const spec of list) {
       const known = walkers.get(spec.id)
-      if (known) { known.spec = spec; known.label.text = spec.label; continue }
+      if (known) {
+        const before = standPoint(known.spec, known.seed)
+        known.spec = spec; known.label.text = spec.label
+        const after = standPoint(spec, known.seed)
+        // Neuer Ort aus der Simulation (z. B. Wohnung → Arbeit): hingehen statt springen.
+        // Ein Weg aus einem Gespräch (Mitgehen, Hinschicken) hat Vorrang.
+        if (after && (!known.sent || known.sent.commute) && (shouldCommute(before, after) || (!before && Math.hypot(after.x - known.x, after.y - known.y) > COMMUTE_THRESHOLD_M))) startCommute(known, after)
+        // Kein Ort mehr (frei): neuer Spaziergang in der Nähe.
+        if (!after && before) known.route = null
+        continue
+      }
       const seed = hash(spec.id)
       const figure = makeFigure(spec.tint ?? PERSON_COLORS[seed % PERSON_COLORS.length])
       ;(figure as unknown as { pick: WorldPick }).pick = { type: 'person', id: spec.id }
@@ -1156,6 +1191,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         const t = Math.min(1, (now - walker.sent.start) / 1000 / walker.sent.seconds)
         const at = along(walker.sent.path, walker.sent.length * t)
         x = at.x; y = at.y
+        // Angekommen: ab jetzt steht die Figur wieder an ihrem Ort.
+        if (t >= 1 && walker.sent.commute) walker.sent = null
       } else if (walker.spec.anchor) {
         // Vor dem Haus auf der Kameraseite (Süd-Ost), nicht darin – dort sieht man sie.
         const home = toWorld(walker.spec.anchor)
@@ -1166,11 +1203,17 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         y = home.y + out * 0.71 - spread * 0.71 + Math.sin(sway * 0.8) * 1.2
       } else {
         // Neue Straße, wenn noch keine da ist oder die Figur weit weg zurückblieb.
-        if (!walker.route || Math.hypot(walker.x - player.x, walker.y - player.y) > 260) {
-          const route = pickRoute(walker.seed)
+        // Spaziergang um die eigene Wohnung; ohne Wohnung wie bisher in Spielernähe.
+        const base = walker.spec.strollAround ? toWorld(walker.spec.strollAround) : null
+        if (!walker.route || (!base && Math.hypot(walker.x - player.x, walker.y - player.y) > 260)) {
+          const route = pickRoute(walker.seed, base ?? player)
           if (route) {
             walker.route = route
             walker.routeLength = route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - route[i].x, p.y - route[i].y), 0)
+            // Dort weitergehen, wo die Figur gerade ist, statt ans Straßenende zu springen.
+            walker.runM = distanceToNearestVertex(route, { x: walker.x, y: walker.y })
+            const entry = along(route, walker.runM)
+            if (walker.lastAt && Math.hypot(entry.x - walker.x, entry.y - walker.y) > COMMUTE_THRESHOLD_M) startCommute(walker, entry)
           }
         }
         if (walker.route && walker.routeLength > 1) {
@@ -1732,7 +1775,14 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const straight = Math.hypot(path[path.length - 1].x - from.x, path[path.length - 1].y - from.y) || 1
       walker.sent = { path, length, start: performance.now(), seconds: Math.max(1, seconds) * Math.min(3, Math.max(1, length / straight)) }
     },
-    releasePerson(id) { const walker = walkers.get(id); if (walker) walker.sent = null },
+    releasePerson(id) {
+      const walker = walkers.get(id)
+      if (!walker) return
+      walker.sent = null
+      // Nach dem Gespräch zurück an den eigenen Ort gehen, nicht dorthin springen.
+      const back = standPoint(walker.spec, walker.seed)
+      if (back) startCommute(walker, back)
+    },
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
     setPlayerName(name) { playerName.text = name.slice(0, 40) },
     setSites(list) { sites = list; drawSites() },
