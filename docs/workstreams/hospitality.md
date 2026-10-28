@@ -160,11 +160,15 @@ Ausnahmsweise direkt gebaut, auf Wunsch von Thomas (27.10.2026). Er wollte, dass
 
 ## Offene Aufgaben
 
-2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird.
+2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird. Stand 28.10.2026: Die Tabelle wird stündlich geschrieben, aber nur für 34 Personen in 18 Häusern. Das Personal von Metropol (2) und Balkan Grill (3) fehlt darin, deshalb noch nicht umstellbar.
 
 3. Ortswissen-Abruf einmal live prüfen (`/api/game/hospitality/place`); die Regeln sind mit echten Daten aus Sundern getestet, der Abruf selbst lief noch nicht.
 
 4. Gäste-Abruf einmal live prüfen (`/api/game/hospitality/guests`): Erscheint nach einem echten Kauf eines Bewohners eine Person am Tresen?
+   - **Befund 28.10.2026 aus den Live-Daten:** Gekauft wird. In den letzten 24 Stunden waren es Metropol 2, Startcafé 1, Café Peru 5, Balkan Grill 0.
+   - Die Käufe kommen aber gebündelt alle sechs Ticks (01, 07, 13, 19 Uhr UTC), je Lauf mit einem Zeitstempel. Ein Besuch dauert etwa 37 Minuten. Damit kamen alle Gäste eines Laufs zugleich, danach war das Lokal über fünf Stunden leer.
+   - **Gebaut:** Jeder Besuch beginnt jetzt fest je Person und Kauf irgendwo im Sechs-Stunden-Abschnitt (`spreadVisitAge` in `venues.ts`, im Gäste-Abruf). Es gibt keinen Gast mehr als vorher, nur über den Abschnitt verteilt.
+   - Weiter offen bleibt, dass der Lauf um 01 Uhr UTC mitten in der Nacht liegt (R-5, Ausgehen nach Tageszeit).
 
 5. Öffnungszeiten, Treppe und Mitbekommenes einmal live prüfen; bisher nur Regeltests.
 
@@ -178,9 +182,9 @@ Ausnahmsweise direkt gebaut, auf Wunsch von Thomas (27.10.2026). Er wollte, dass
 
 10. ✅ Migration `20261014090000_hotel_rooms.sql` live eingespielt (14.10.2026). Production-Smoke-Test in zurückgerollter Transaktion bestanden: Hotel erhält 6 Zimmer, Zimmerbuchung funktioniert, Doppelbuchung wird abgewiesen, Vollbelegung wird bei 6/6 erzwungen. **Noch offen:** ein persistentes Hotel regulär über die Spieloberfläche bauen und dort die Buchung visuell/end-to-end prüfen.
 
-11. Gebäudetafel in der neuen Weltkarte: beim Klick auf ein Lokal Name, Art, offen/geschlossen mit Uhrzeit und „Betreten“ – sobald W-2 dort eine rechte Spalte liefert.
+11. ✅ Gebäudetafel in der neuen Weltkarte (28.10.2026): Bei Lokalen steht unter Größe und Nutzung „● Geöffnet – jetzt 13 Uhr Koloniezeit, von 11 bis 23 Uhr“ bzw. „○ Geschlossen – hier arbeitet gerade niemand“. Es gelten dieselben Regeln wie drinnen (`app/earth/VenueStatusLine.tsx`, `lib/game/hospitality/venueStatus.ts`). Name, Art und „Betreten“ hatte die Erdkarte schon (W-4).
 
-12. Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen, ~~Grundriss nach Gebäudegröße~~ (gebaut), ~~Lokalart aus OSM-Tags~~ (`venueKindForRealPlace`, gebaut), Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill).
+12. ✅ Nach R-13/W-4: Lokalart aus der Gebäudenutzung lesen (`entity_id`), ~~Grundriss nach Gebäudegröße~~ (gebaut), ~~Lokalart aus OSM-Tags~~ (`venueKindForRealPlace`, gebaut), Bar- und Restaurantraum für die realen Lokale in Sundern (Metropol, Balkan Grill) – laufen, im Browser geprüft.
 
 13. ✅ NOXIA-INTERIOR-0001 (26.10.2026, Branch `feat/walkable-interior-engine`): allgemeinen Teil aus `CafeWalkableInterior` als `WalkableInterior` herauslösen (Bewegung, Sitzen, Personen, Tafel, Gespräch, Bedienplatz, Angebotskacheln); das Lokal bleibt dabei unverändert spielbar. Danach können andere Gebäude mit eigener Einrichtung und eigenem Wissen dasselbe Bauteil nutzen.
 

@@ -18,6 +18,8 @@ import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import { landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
+import VenueStatusLine from '@/app/earth/VenueStatusLine'
+import { VENUE_TYPE_IDS } from '@/lib/game/hospitality/venueStatus'
 import { buildingSizeLine, buildingUseLine, conversionLine, readyAtLabel, venueOfferLine } from '@/lib/worldlab/buildingUse'
 import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
@@ -528,6 +530,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         <dt>Größe</dt><dd>{buildingSizeLine(offer?.areaM2 ?? building.areaM2 ?? 0, offer?.levels ?? building.levels ?? 1)}</dd>
         {!own?.own && <><dt>Nutzung</dt><dd>{realUse.text}</dd></>}
       </dl>}
+      {/* Gastronomie, Aufgabe 11: bei Lokalen offen/geschlossen mit Uhrzeit */}
+      {own && !own.conversion && VENUE_TYPE_IDS.has(own.typeId) && <VenueStatusLine entityId={own.id} typeId={own.typeId}/>}
       {own && entry
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>

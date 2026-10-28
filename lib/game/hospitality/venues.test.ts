@@ -1,4 +1,5 @@
 import { validateInteriorTemplate } from '../buildings/interiors/topology'
+import { CONSUMPTION_INTERVAL_S, VISIT_TOTAL_S, spreadVisitAge } from './venues'
 import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeStandard'
 import { getInteriorTemplateForBuildingType } from '../buildings/interiors/registry'
 import { getBuildingEntryDefinition } from '../buildings/entry'
@@ -396,6 +397,19 @@ for (const kind of kinds) {
 // ── Lokalart aus den Kartendaten ────────────────────────────────────────────
 check(venueKindForRealPlace({ amenity: 'bar', name: 'Metropol' }) === 'bar' && venueKindForRealPlace({ amenity: 'restaurant' }) === 'restaurant' && venueKindForRealPlace({ amenity: 'pub' }) === 'bar' && venueKindForRealPlace({ tourism: 'guest_house' }) === 'hotel', 'real venues from the map open the matching room')
 check(venueKindForRealPlace({ building: 'apartments' }) === null && venueKindForRealPlace(null) === null, 'a dwelling is no venue until converted')
+
+// Besuche über den Kaufabschnitt verteilt (Lokal nicht 5 Stunden leer)
+{
+  const at = '2026-10-28T01:01:22.152Z'
+  const ids = Array.from({ length: 40 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`)
+  const starts = ids.map(id => CONSUMPTION_INTERVAL_S - (spreadVisitAge(id, at, CONSUMPTION_INTERVAL_S) ?? 0))
+  check(starts.every(s => s >= 0 && s <= CONSUMPTION_INTERVAL_S - VISIT_TOTAL_S), 'every visit starts and ends inside the purchase interval')
+  check(new Set(starts.map(s => Math.floor(s / 3600))).size >= 4, 'visits of one run spread over several hours')
+  check(spreadVisitAge(ids[0], at, 0) === null || spreadVisitAge(ids[0], at, 0) === 0, 'nobody is visible before their visit starts')
+  check(spreadVisitAge(ids[3], at, 5000) === spreadVisitAge(ids[3], at, 5000), 'the same purchase always gives the same visit')
+  const hourOf = (t: number) => ids.filter(id => { const a = spreadVisitAge(id, at, t); return a !== null && a <= VISIT_TOTAL_S }).length
+  check([1, 2, 3, 4, 5].map(h => hourOf(h * 3600)).filter(n => n > 0).length >= 4, 'at most hours of the interval someone is there')
+}
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
