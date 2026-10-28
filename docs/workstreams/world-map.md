@@ -202,7 +202,7 @@ McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wo
 
 ## Einstiegsquiz (Thomas, 27.10.2026)
 
-Geprüft, was mit den Antworten des Einstiegsquiz geschieht: Sie setzen nur die Schwierigkeitsstufe der Akademie (`profiles.knowledge_level`). Ergebnis anzeigen, Stufe nachführen und Fachgebiete nutzen: Request **R-17** in `population-economy.md`.
+Geprüft, was mit den Antworten des Einstiegsquiz geschieht: Sie setzen nur die Schwierigkeitsstufe der Akademie (`profiles.knowledge_level`). Ergebnis anzeigen, Stufe nachführen und Fachgebiete nutzen: Request **R-17** in `population-economy.md`. ✅ Umgesetzt 28.10.2026: Ergebnissatz vor den Startkarten, Stufe passt sich an, Ergebnis je Fachgebiet gespeichert.
 
 ## Staatliche Basis „Selmecke“ (Thomas, 27.10.2026: „sieht furchtbar aus“)
 

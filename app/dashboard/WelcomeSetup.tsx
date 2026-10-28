@@ -2,7 +2,8 @@
 
 // app/dashboard/WelcomeSetup.tsx
 // Erstellt:     07.06.2026
-// Aktualisiert: 09.10.2026 — Texte an den schifflosen Start und den Mondweg angeglichen
+// Aktualisiert: 28.10.2026 — Ergebnis des Einstiegsquiz vor den Startkarten zeigen (R-17)
+// Vorher:       09.10.2026 — Texte an den schifflosen Start und den Mondweg angeglichen
 //               (kein Frachter im Dock, erstes Ziel ist der Mond statt Mars).
 // Vorher:       22.09.2026 — Playability: Earth-Starttext und erster Journey-CTA\n//               an den tatsächlichen Earth/Selmecke-Einstieg angeglichen.\n// Vorher:       16.09.2026 — Bugfix: Name wurde erneut leer abgefragt, obwohl
 //               er bereits bei der Registrierung vergeben wurde; jetzt über
@@ -64,6 +65,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
   const [qIdx, setQIdx]               = useState(0)
   const [quizAnswers, setQuizAnswers] = useState<number[]>([])
   const [quizSubmitting, setQuizSubmitting] = useState(false)
+  const [quizResult, setQuizResult] = useState<string | null>(null)
 
   const mono: React.CSSProperties = { fontFamily: "'Courier Prime', 'Courier New', monospace" }
   const canSave = name.trim().length >= 2 && avatar !== null
@@ -123,11 +125,13 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
     setQuizSubmitting(true)
     try {
       const token = await getToken()
-      await fetch('/api/game/onboarding-quiz', {
+      const response = await fetch('/api/game/onboarding-quiz', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ attemptId, answers: finalAnswers }),
       })
+      const data = await response.json().catch(() => null)
+      if (response.ok && typeof data?.message === 'string') setQuizResult(data.message)
     } catch {
       // Diagnostisch, nicht blockierend — bei Fehler trotzdem weiter.
     }
@@ -286,6 +290,11 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
 
         {step === 'cards' && (
           <div style={{ background: C.panel, border: `1px solid ${C.line}`, padding: '1.8rem', textAlign: 'center' }}>
+            {quizResult && cardIdx === 0 && (
+              <div style={{ ...mono, fontSize: 12, color: C.gold, lineHeight: 1.6, maxWidth: '400px', margin: '0 auto 1.2rem', padding: '0.6rem 0.8rem', border: `1px solid ${C.line}` }}>
+                {quizResult}
+              </div>
+            )}
             <div style={{ ...mono, fontSize: 10, letterSpacing: '0.2em', color: C.dim, textTransform: 'uppercase', marginBottom: '1.6rem' }}>
               Einweisung {cardIdx + 1} / {CARDS.length}
             </div>

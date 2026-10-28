@@ -186,6 +186,15 @@ Entscheidung Thomas, 25.10.2026: Über einer Figur steht in der Spielansicht nur
 - `GET /api/game/population` und `/api/game/hospitality/guests` liefern dann `knownAgeYears`; die Oberfläche hängt es an (`personSceneLabel` nimmt das Feld schon an).
 - Dazu das Spieljahr: Alter = Spieljahr − Geburtsjahr. Das Spieljahr (2086 in der Kopfzeile) hat im Code keine gemeinsame Quelle; bitte eine Funktion dafür.
 
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, Migration `20261028160000`, live:
+
+- **Gespeichert wird das Geburtsjahr, nicht das Alter**, damit das Wissen mitaltert: `player_person_identity_knowledge.known_birth_year` mit `age_source_kind` und `age_learned_tick`.
+- **Gelernt wird es im Gespräch:** Die Figur kennt jetzt ihr Alter (Prompt). Nennt sie ihr **wirkliches** Alter (±1 Jahr, `statedOwnAge` in `lib/game/cognition/playerFacts.ts`), weiß es der Spieler. Ein erfundenes Alter wird nicht gelernt.
+- **Nur bei Personen, deren Namen der Spieler kennt oder vermutet.** Der Wissenssatz verlangt einen Namen.
+- **Spieljahr:** `lib/game/gameCalendar.ts` (`gameYearForTick`, `ageAtTick`). Start 2086 wie in der Kopfzeile, ein Jahr = 8 760 Ticks.
+- `GET /api/game/population` und `/api/game/hospitality/guests` liefern `knownAgeYears`; `ColonyResident` hat das Feld.
+- **[OFFEN, Thomas]:** Die Kopfzeile zeigt 2086, der Kanon zu Zereya und Soraya sagt „NOXIA um 2100+“. Welches Jahr gilt? Es ist eine Konstante (`GAME_START_YEAR`).
+
 ### R-12 (Erdkarte, 25.10.2026): Bestehende Gebäude der Erdkarte kaufen
 
 **Stand 25.10.2026, mittags: auf Wunsch von Thomas im Teilprojekt Erdkarte gebaut** (er brauchte es sofort). Bitte prüfen und übernehmen – vor allem Preisformel, Bewohner realer Häuser und die Buchung.
@@ -233,6 +242,20 @@ Gespräch im Startcafé, 25.10.2026: Der Spieler sagt „Nenn mich Thomas“, Mi
 - Gefälligkeiten: `recipientPersonId` der Bestellroute (Aufgabe 9) schreibt den Eintrag; die Gesprächsroute liest ihn. Hängt mit R-8 (Wissensspuren) zusammen – dies wäre der erste Satz solcher Spuren.
 - Bis dahin: Die Gesprächsroute sollte der Figur sagen, dass sie sich nur an die letzten Wortwechsel erinnert, damit sie kein „das merke ich mir“ verspricht – das übernimmt Gastronomie.
 
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, Migration `20261028160000`, Gesprächsroute 1.4.0:
+
+- **Name:** `npc_player_knowledge` speichert je Figur und Spieler den Namen, unter dem sie ihn kennt, mit Quelle und Tick.
+  - Gelernt aus der Spieleräußerung mit festen Mustern (`playerNameFromUtterance`): „nenn mich …“, „ich heiße …“, „mein Name ist …“.
+  - „ich bin …“ zählt nur mit großem Anfangsbuchstaben – „ich bin neu“ ist kein Name.
+- **Gefälligkeiten:** `npc_player_favors` mit den Arten `gift_credits`, `treated` und `helped`.
+  - Geschenkte Credits im Gespräch schreiben schon einen Eintrag.
+  - `treated` folgt, sobald die Bestellroute `recipientPersonId` auswertet (Aufgabe 9).
+- **Was die Figur im Prompt bekommt:**
+  - „Er heißt Thomas“;
+  - die letzten fünf Gefälligkeiten mit Datum;
+  - Namen und Gefälligkeiten behält sie, Gesprächsinhalt nur kurz.
+  - Die bisherige Zeile „versprich nicht, dir den Namen zu merken“ ist entsprechend angepasst.
+
 ### R-13 (Gastronomie, 25.10.2026): Bestehende Gebäude kaufen und zum Lokal umbauen
 
 Entscheidung (Thomas, 25.10.2026): Auf der Erde soll ein Café nicht als eigenes Gebäude gebaut werden. Man kauft ein bestehendes Gebäude des realen Ortes und baut es zum Café, zur Bar, zum Restaurant oder Hotel um – sofern es nicht schon eines ist. Das selbst gebaute Startcafé soll weg, sobald das geht.
@@ -272,6 +295,17 @@ Die staatliche Bank der Erde steht seit `20261027090000_earth_bank_sparkasse.sql
 - **Lohn:** zahlt der öffentliche Akteur der Erde, wie bei Metropol und Balkan Grill.
 - **Gilt ebenso für:** Akademie, Verwaltung, Raumhafen und Warenhaus, soweit sie leer sind. Ohne Personal kann dort niemand Auskunft geben.
 
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, Migration `20261028150000`, live:
+
+- **Einstellen:** `run_venue_staffing` stellt jetzt in allen Häusern mit Personalplätzen ein, deren Art in `noxia_staffed_kinds()` steht. Das sind die Lokale, der Nachtclub, die Bank und das Reisebüro.
+- **Rolle je Platz** aus `building_staff_roles`:
+  - Bank: Schalter (`bank_clerk`, 60 Cr), Beratung (`bank_advisor`, 75 Cr), Schalter, Büro;
+  - Reisebüro: zweimal Beratung (`travel_agent`, 60 Cr).
+- **Lohn** zahlt der öffentliche Akteur der Erde.
+- **Übergangsreserve** 5 250 Cr (14 Tageslöhne für die sechs Plätze), ausgewiesen als `bootstrap:employer:<actor>:public_services`.
+- **Probe:** Je Tick wird eine Stelle besetzt, die ersten beiden in der Bank sind Schalter und Beratung.
+- **Offen:** Akademie, Verwaltung, Raumhafen und Warenhaus haben noch keine Personalplätze (`staff_capacity` leer). Akademie, Verwaltung und Warenhaus haben je eine Person, der Raumhafen keine. Sobald sie Plätze und Rollen bekommen, stellt derselbe Lauf ein.
+
 ### R-15 (Gastronomie, 27.10.2026): Lernschwellen serverseitig durchsetzen
 
 Thomas, 27.10.2026: „so wie es in der Bank schon existiert auch bei anderen Gebäuden Zugang zu Lernmodulen öffnen, damit man bestimmte Dinge überhaupt erst nutzen kann“.
@@ -291,6 +325,13 @@ Für die Raumhafen-Schwellen (`UNL:NOX:NAV:ORBITAL`, `UNL:NOX:NAV:CURVATURE`) is
 
 **Hinweis:** Für Sicherheitenwert, Arbitrage, Bodenwert und Bahnkrümmung liefert SSF noch kein Modul. Die Tafel sagt dann „Lernmodul folgt“. Eine Sperre ohne Modul würde den Weg ganz verschließen. Deshalb erst sperren, wenn SSF das Modul hat (KB-REQUEST-0003 bei SSF).
 
+**Stand (Bevölkerung und Ökonomie, 28.10.2026): noch nichts gesperrt.**
+
+- Von den vier Schwellen hat nur „Was ist Zinseszins?“ (`ECO-L0-000002`) ein SSF-Modul. Sicherheitenwert, Arbitrage und Bodenwert haben keins; eine Sperre würde den Weg ganz verschließen, wie im Request vermerkt.
+- Für die Zinseszins-Schwelle gibt es noch nichts Sinnvolles zu sperren. Die Zinseszins-Vorschau der Bank erklärt das Prinzip; sie hinter dem Modul zu verstecken, das sie erklärt, wäre verkehrt herum.
+- **[OFFEN, Thomas]** Vorschlag: Festgeld (gesperrte Einlage mit höherem Zins) als neues Produkt, das erst nach dem Zinseszins-Modul geöffnet wird.
+- Die übrigen drei Schwellen werden gesperrt, sobald SSF die Module liefert (KB-REQUEST-0003).
+
 ### R-16 (Gastronomie, 27.10.2026): Gekaufte Häuser als Sicherheit
 
 Die neue Beratungsmappe in der Bank (`bankAdvice` in `lib/game/bank/bankInterior.ts`) rechnet mit `collateralTotal` aus `calcCollateral`. Als Sicherheit zählen dort nur Fördergebäude (Mine, Solar, Eisbohrer, Wasserrecycler) und Schiffe.
@@ -298,6 +339,13 @@ Die neue Beratungsmappe in der Bank (`bankAdvice` in `lib/game/bank/bankInterior
 Auf der Erde hat ein Spieler aber vor allem gekaufte Häuser und Lokale mit Mieteinnahmen (R-12, R-13). Sie zählen bisher nicht.
 
 **Bitte:** Ertragswert gekaufter Häuser (Miete) und Lokale (Umsatz) als Sicherheit aufnehmen. Danach den Satz „als Sicherheit zählen hier Gebäude mit Förderertrag und Schiffe“ in `bankAdvice` anpassen.
+
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, `app/api/game/bank/route.ts` 0.7.0. Als Sicherheit zählen jetzt auch:
+
+- **Vermietete Häuser:** Ertragswert = 10 × die Summe der laufenden Mieten je Abrechnung (wie im Kaufpreis, R-12).
+- **Lokale:** Ertragswert = 2 × der Nettoumsatz der letzten 30 Tage aus Käufen der Bewohner und Bestellungen der Spieler.
+- Der Satz in `bankAdvice` ist angepasst.
+- Ohne Mieter und ohne Umsatz zählt ein Haus nicht. Die Bank beleiht, was es einbringt, nicht den Kaufpreis.
 
 ### R-17 (Erdkarte, 28.10.2026): Einstiegsquiz – Ergebnis zeigen und weiter nutzen
 
@@ -312,6 +360,16 @@ Thomas, 27.10.2026: „Was passiert aktuell mit den Antworten der Fragen, die di
 3. **Stärken je Fachgebiet nutzen.** Jede Frage hat ein Fachgebiet (`domain`). Vorschlag: Ergebnis je Fachgebiet im Versuch speichern (nicht die einzelnen Antworten) und als Anregung verwenden – Akademie-Aufgaben aus schwächeren Gebieten, Hinweise auf passende Stellen (R-10, Aufgabe 12). Bleibt diagnostisch: keine Freischaltungen, kein Alter (wie bisher im Code festgehalten).
 
 **Zuständigkeit:** Es gibt kein eigenes Teilprojekt für Akademie und Einstieg. Wissen und Lernschwellen liegen schon hier (R-15). Wenn ein Teilprojekt „Bildung“ entsteht, zieht der Request dorthin um.
+
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, Migration `20261028170000`, live:
+
+1. **Ergebnis zeigen:** Die Quiz-Antwort liefert `message`, zum Beispiel „7 von 7 richtig – du beginnst in der Akademie auf Stufe 6. Die Stufe passt sich später an deine Ergebnisse an.“ `WelcomeSetup.tsx` zeigt den Satz über der ersten Startkarte.
+2. **Stufe anpassen:**
+   - Jede Akademie-Aufgabe meldet ihr Ergebnis an `POST /api/game/school/result` (gespeichert in `academy_task_results`).
+   - Gezählt werden die letzten fünf Ergebnisse auf der aktuellen Stufe: 4 oder mehr richtig → eine Stufe höher, höchstens 1 richtig → eine tiefer (`lib/knowledge/academyLevel.ts`, mit Tests).
+   - Die Akademie zeigt kurz „Stufe 4: Die Aufgaben werden anspruchsvoller.“
+   - Hinweis: Ob eine Aufgabe richtig ist, prüft heute der Browser. Für eine reine Kalibrierung reicht das; für Belohnungen nicht.
+3. **Fachgebiete:** Richtig/gesamt je Fachgebiet steht in `onboarding_quiz_attempts.domain_scores`. Die Antwort nennt `weakestDomain`. Noch nicht genutzt für Aufgaben aus schwächeren Gebieten oder für passende Stellen.
 
 ### R-18 (Gastronomie, 28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber
 
@@ -331,6 +389,26 @@ Thomas, 28.10.2026: „Der Betreiber eines Lokals oder auch Ladens etc. sollte d
 5. **Später, Bedienung:** Die Einstellungstafel für den Eigentümer (Preise, Toilette frei / nur Gäste / Gebühr) baut Gastronomie im Innenraum, sobald gespeichert werden kann.
 
 **Anregung (Thomas):** Die Toilettenfrage war vermutlich ein Test, wie das Spiel reagiert. Sie zeigt aber ein echtes Bedürfnis. Wenn Bedürfnisse der Figuren weiter ausgebaut werden (R-9), wäre „Toilette“ ein Grund, ein Lokal zu betreten, ohne etwas zu kaufen. Für den Betreiber ist das eine Entscheidung zwischen Gastfreundschaft und Einnahme.
+
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, Migration `20261028150000`, live:
+
+1. **Speichern je Haus:**
+   - `venue_price_overrides`: Preis 1–999 Cr oder „nicht im Angebot“ je Haus und Posten.
+   - `venue_services`: Toilette mit `available`, `price_credits` 0–99 und `guests_only`.
+   - Ohne Eintrag gilt die Karte der Lokalart bzw. „Toilette frei für jeden“.
+   - `venue_menu(tile)` liefert die Hauskarte, `venue_service_rules(tile)` die Hausregeln.
+2. **Ändern dürfen** nur der Spieler, dem das Haus gehört, oder sein Unternehmen (`venue_owned_by`). Das gilt für jedes Haus mit Karte.
+   - `POST /api/game/hospitality/order { action: 'set_price', tileEntityId, itemCode, priceCredits | null, active }`;
+   - `{ action: 'set_service', tileEntityId, service: 'toilet', available, priceCredits, guestsOnly }`.
+   - `priceCredits: null` setzt auf die Karte zurück.
+3. **Liefern:** `services` und `canEditHouse` stehen in `/api/game/hospitality/guests` und im GET der Bestellroute. Die Karte dort ist die Hauskarte, je Posten mit `basePriceCredits` und `housePrice`.
+4. **Bezahlen:**
+   - `itemCode: 'toilet'` über `order_hospitality_item`.
+   - Kostenlos: keine Buchung, die Antwort trägt `free: true`.
+   - Mit Gebühr: Buchung wie ein Posten.
+   - „Nur für Gäste“: Der Spieler muss dort in den letzten vier Stunden etwas gekauft haben (`NOXIA_SERVICE_GUESTS_ONLY`).
+5. **Bewohner zahlen die Hauspreise:** Ihr Kaufpreis folgt dem Verhältnis der Hauskarte zur Karte der Lokalart (`venue_price_factor`). Teurere Häuser werden seltener gewählt.
+- Für Gastronomie bleibt die Einstellungstafel im Innenraum.
 
 ### R-19 (Gastronomie, 28.10.2026): Nachtclub als Lokalart – Karte, Umbau, Personal
 
@@ -365,6 +443,22 @@ Thomas, 28.10.2026: „ich glaube wir brauchen einen Nachtclub.“ In den Karten
 4. **Personal:** `run_venue_staffing` auch für `nightclub` (Rolle `service`; Tür und DJ ergeben sich aus den Plätzen).
 5. **Bewohner gehen aus:** `npc_service_catalog` für `nightclub`, nur nachts und mit Geselligkeit als Anlass (R-5). Sonst bleibt der Club leer, solange Käufe nur aus Hunger und Durst entstehen.
 
+**Erledigt (Bevölkerung und Ökonomie, 28.10.2026)**, Migration `20261028150000`, live, Probe in zurückgerollter Transaktion bestanden:
+
+1. **`building_definitions` `nightclub`:** „Nachtclub“, Stufe 2, `life`, 3 000 Cr, 3 Ticks.
+   - `allowed_locations` ist leer wie bei der Bar, damit ein Nachtclub auch in einer Mars-Kolonie gebaut werden kann.
+   - Auf der Erde nur durch Umbau (`isConversionOnlyOnEarth`).
+2. **Umbau und Kauf:** `start_earth_venue_conversion` nimmt `nightclub` an; `convert_earth_building` (halber Preis, sofort) nicht. `real_venue_kind`: `amenity=nightclub` → `nightclub`, nicht mehr Bar.
+3. **Karte wie vorgeschlagen:** Eintritt 8, Getränk 4, Longdrink 7, Shot 3, Wasser 2.
+   - Der Server nimmt im Nachtclub andere Posten als den Eintritt nur an, wenn derselbe Spieler dort in den letzten acht Stunden Eintritt bezahlt hat.
+   - Sonst kommt `NOXIA_ENTRY_REQUIRED`, „Erst Eintritt bezahlen.“
+4. **Personal:** `run_venue_staffing` auch für den Nachtclub.
+5. **Bewohner gehen aus:** `run_npc_nightlife`, aufgerufen aus `run_npc_consumption`.
+   - Nur 22–5 Uhr Koloniezeit; bei sechsstündigem Takt also einmal je Nacht um 0 Uhr.
+   - Etwa jede dritte Person mit Geselligkeit unter 0,55.
+   - Nur in einen Club mit Personal, für 12 Cr (Eintritt und Getränk, Hauspreis).
+   - Geselligkeit +0,30, höchstens einmal je 24 Ticks.
+   - Probe: Metropol testweise als Club, fünf Bewohner gingen hin.
 
 ## Philosophie/NPC (28.10.2026): Omnizedent/innen, Wohnen im realen Haus, Resonanzplatz baubar
 

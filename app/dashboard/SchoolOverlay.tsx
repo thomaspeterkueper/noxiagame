@@ -1,7 +1,8 @@
 'use client'
 
 // app/dashboard/SchoolOverlay.tsx
-// Aktualisiert: 24.08.2026 — BUGFIX React error #31 (von Thomas lokalisiert):
+// Aktualisiert: 28.10.2026 — Ergebnis jeder Aufgabe an den Server, Stufe passt sich an (R-17)
+// Vorher:       24.08.2026 — BUGFIX React error #31 (von Thomas lokalisiert):
 //               m.unlocks![0] wurde direkt gerendert, aber SSF liefert
 //               unlocks-Einträge z.T. als { key, condition } statt String.
 //               unlockLabel() aus lib/ssfKnowledge.ts normalisiert jetzt
@@ -9,7 +10,7 @@
 //               Normalisierung an der Quelle in fetchSsfKnowledgeModules).
 //               DEBUG_RAW/TaskErrorBoundary bleiben vorerst als Sicherheits-
 //               netz aktiv, GlobalErrorBoundary in DashboardClient ebenso.
-// Version:      1.5.0
+// Version:      1.6.0
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
@@ -461,6 +462,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [result, setResult] = useState<'correct' | 'wrong' | null>(null)
   const [total, setTotal] = useState<number | null>(null)
   const [knowledgeLevel, setKnowledgeLevel] = useState<number | null>(null)
+  const [levelNote, setLevelNote] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bg = ACADEMY_BG[locationSlug]
 
@@ -614,6 +616,22 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     if (task.kind === 'calc') ok = Number(answer.trim()) === task.answer
     else { setSelected(opt ?? null); ok = opt === task.correct }
     setResult(ok ? 'correct' : 'wrong')
+    // Stufe anpassen (R-17): Der Server zählt die letzten fünf Ergebnisse auf dieser Stufe.
+    void (async () => {
+      try {
+        const token = await jwt()
+        const res = await fetch('/api/game/school/result', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ correct: ok, topic: task.topic }),
+        })
+        const data = await res.json().catch(() => null) as { level?: number; previousLevel?: number; changed?: boolean } | null
+        if (res.ok && data?.changed && typeof data.level === 'number') {
+          setKnowledgeLevel(data.level)
+          setLevelNote(data.level > (data.previousLevel ?? 0) ? `Stufe ${data.level}: Die Aufgaben werden anspruchsvoller.` : `Stufe ${data.level}: Die Aufgaben werden etwas leichter.`)
+        } else setLevelNote(null)
+      } catch {}
+    })()
     if (ok) {
       try {
         const token = await jwt()
@@ -737,6 +755,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
                   )}
                   {result === 'correct' && <div style={{ background: C.greenLight, border: '1px solid #a0dcb8', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.green, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Richtig! +{task.points} Punkte</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
                   {result === 'wrong' && <div style={{ background: C.redLight, border: '1px solid #f0a0a0', borderRadius: 8, padding: '0.85rem 1.1rem' }}><div style={{ color: C.red, fontWeight: 700, marginBottom: 6, fontFamily: MONO }}>Nicht ganz.</div><div style={{ lineHeight: 1.65 }}>{task.explanation}</div></div>}
+                  {result !== null && levelNote && <div style={{ marginTop: 8, fontSize: '0.7rem', color: C.accent, textAlign: 'center' as const, fontFamily: MONO }}>{levelNote}</div>}
                   {result !== null && <button onClick={() => generateTask()} style={{ width: '100%', marginTop: 12, padding: '0.68rem', background: '#fff', border: `1.5px solid ${C.accent}`, color: C.accent, borderRadius: 8, fontFamily: MONO, fontWeight: 700, cursor: 'pointer' }}>Nächste Aufgabe →</button>}
                   <div style={{ fontSize: '0.65rem', color: C.textFaint, textAlign: 'center' as const, marginTop: 10, fontFamily: MONO }}>{task.points} Punkte</div>
                 </>

@@ -1,4 +1,6 @@
 // app/api/game/onboarding-quiz/route.ts
+// Aktualisiert: 28.10.2026 — Ergebnis je Fachgebiet (domain_scores) speichern und zurückgeben, Ergebnissatz (R-17)
+// Version:      1.1.0
 // Onboarding-Kalibrierungsquiz: 6-7 von Claude generierte, fachlich
 // unterschiedliche Allgemeinwissensfragen direkt nach der Registrierung.
 // Rein diagnostisch, nicht spielbezogen -- anders als app/api/game/school/
@@ -17,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { domainScores, quizResultLine, weakestDomain } from '@/lib/knowledge/academyLevel'
 
 const QUESTION_COUNT = 7
 
@@ -170,14 +173,20 @@ export async function POST(req: NextRequest) {
   let score = 0
   questions.forEach((q, i) => { if (answers[i] === q.correct) score += 1 })
   const level = levelFromScore(score, questions.length)
+  const domains = domainScores(questions, answers)
 
   await supabase.from('onboarding_quiz_attempts').update({
     completed_at: new Date().toISOString(),
     score,
     derived_level: level,
+    domain_scores: domains,
   }).eq('id', attemptId)
 
   await supabase.from('profiles').update({ knowledge_level: level }).eq('id', user.id)
 
-  return NextResponse.json({ score, total: questions.length, level })
+  return NextResponse.json({
+    score, total: questions.length, level, domains,
+    weakestDomain: weakestDomain(domains),
+    message: quizResultLine(score, questions.length, level),
+  })
 }

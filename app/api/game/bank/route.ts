@@ -1,6 +1,6 @@
 // app/api/game/bank/route.ts
-// Aktualisiert: 10.09.2026 — atomare Game-Core-Bankcommands
-// Version:      0.6.0
+// Aktualisiert: 28.10.2026 — Gekaufte Häuser (Miete) und Lokale (Umsatz) zählen als Sicherheit (R-16)
+// Version:      0.7.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -17,6 +17,10 @@ const COLLATERAL_RATIO    = 0.70
 const SHIP_RESIDUAL_RATIO = 0.60
 const MAX_CREDIT_LIMIT    = 50_000
 const CREDIT_MODULE_ID    = 'ECO-L0-000001'
+/** Ertragswert eines vermieteten Hauses: zehn Mieten je Abrechnung (wie im Kaufpreis, R-12). */
+const RENT_COLLATERAL_FACTOR = 10
+/** Ertragswert eines Lokals: zwei Monatsumsätze netto der letzten 30 Tage. */
+const VENUE_COLLATERAL_MONTHS = 2
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -96,6 +100,28 @@ async function calcCollateral(userId: string): Promise<{
         locationName: (e as any).locations?.name ?? '',
         ertragswert: prod.amount * sellPrice * 20,
       })
+    }
+
+    // R-16: Gekaufte Häuser mit Mietern und Lokale mit Umsatz (Erde). Ertragswert statt
+    // Kaufpreis – die Bank beleiht, was das Haus einbringt.
+    const otherIds = (entities ?? []).filter((e: any) => !PRODUCTION[e.entity_id]).map((e: any) => e.id)
+    if (otherIds.length > 0) {
+      const since = new Date(Date.now() - 30 * 24 * 3600_000).toISOString()
+      const [{ data: tenancies }, { data: npcSales }, { data: playerSales }] = await Promise.all([
+        serviceClient.from('person_tenancies').select('tile_entity_id, rent_per_billing').in('tile_entity_id', otherIds).eq('status', 'active'),
+        serviceClient.from('person_consumption_events').select('tile_entity_id, seller_net_credits').in('tile_entity_id', otherIds).gte('created_at', since),
+        serviceClient.from('player_hospitality_orders').select('tile_entity_id, seller_net_credits').in('tile_entity_id', otherIds).gte('created_at', since),
+      ])
+      const rent = new Map<string, number>()
+      for (const t of tenancies ?? []) rent.set(t.tile_entity_id, (rent.get(t.tile_entity_id) ?? 0) + Number(t.rent_per_billing ?? 0))
+      const revenue = new Map<string, number>()
+      for (const row of [...(npcSales ?? []), ...(playerSales ?? [])]) revenue.set(row.tile_entity_id, (revenue.get(row.tile_entity_id) ?? 0) + Number(row.seller_net_credits ?? 0))
+      for (const e of entities ?? []) {
+        if (PRODUCTION[e.entity_id]) continue
+        const value = Math.round((rent.get(e.id) ?? 0) * RENT_COLLATERAL_FACTOR + (revenue.get(e.id) ?? 0) * VENUE_COLLATERAL_MONTHS)
+        if (value <= 0) continue
+        buildings.push({ id: e.id, name: e.entity_id, locationName: (e as any).locations?.name ?? '', ertragswert: value })
+      }
     }
 
     const { data: ships } = await serviceClient

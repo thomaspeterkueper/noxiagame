@@ -71,11 +71,11 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - R-9 an Bevölkerung und Ökonomie: Lehren aus SunDog – sichtbare Bedürfnisbalken, Wirkung von Alkohol, Ware beim Wirt, Bilder als gemeinsamer Bestand.
 - R-10 an Bevölkerung und Ökonomie: echte Angebote als Daten (Stelle auf einem Handelsschiff, Aufträge), damit das Personal sie nennen kann; Einführung auch in anderen Gebäuden.
 
-- **R-14** (27.10.2026): Personal für die Bank an der Hauptstraße 140 und die anderen leeren öffentlichen Gebäude – `population-economy.md`.
-- **R-15** (27.10.2026): Lernschwellen serverseitig durchsetzen (Sicherheiten, Zinseszins, Arbitrage, Bodenwert) – `population-economy.md`.
-- **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`.
-- **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`.
-- **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`.
+- **R-14** (27.10.2026): Personal für die Bank an der Hauptstraße 140 und die anderen leeren öffentlichen Gebäude – `population-economy.md`. ✅ Bank und Reisebüro (28.10.2026). Andere öffentliche Gebäude brauchen erst Personalplätze.
+- **R-15** (27.10.2026): Lernschwellen serverseitig durchsetzen (Sicherheiten, Zinseszins, Arbitrage, Bodenwert) – `population-economy.md`. Offen: Module fehlen bei SSF; für Zinseszins Vorschlag Festgeld (28.10.2026).
+- **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
+- **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
+- **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
 - **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.
 - **W-7** (27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen (Bank sah nach dem Laden aus wie ein normales Haus) – `world-map.md`.
 
@@ -109,11 +109,11 @@ Entscheidung Thomas, 13.10.2026: Sprach- und Kulturvielfalt ist wichtig – in C
 - Die Gesprächsroute gibt der Figur ihre Sprachen und Kenntnisse als Fakten mit; die Figur spricht in ihrer Sprache bzw. der besten gemeinsamen.
 - Oberfläche: Rede in der Sprache der Figur oder übersetzt mit Kennzeichnung – Vorschlag bitte von hier.
 - Karten im Lokal mehrsprachig bzw. in der Ortssprache; Küche je Ort (später).
-- R-11 an Bevölkerung und Ökonomie: Alter als Wissen des Spielers, Spieljahr als Funktion.
+- R-11 an Bevölkerung und Ökonomie: Alter als Wissen des Spielers, Spieljahr als Funktion. ✅ 28.10.2026: `knownAgeYears` in Bevölkerungs- und Gäste-Abruf, `lib/game/gameCalendar.ts`.
 - W-3 an Weltkarte: Lesbarkeit der neuen Karte (Figur, Straßen, Anklickbares, Schilder), doppelte Leisten.
 - W-2 an Weltkarte: Layout der neuen Karte – eine Spalte rechts, nur was gerade gebraucht wird, Entwicklerdinge versteckt.
 - W-1 an Weltkarte: Straßennamen und Hausnummern in der Spielansicht, Zielwahl nach Adresse.
-- R-12 an Bevölkerung und Ökonomie: Name des Spielers und Gefälligkeiten als Wissen der Figur (heute nur drei Wortwechsel Gedächtnis).
+- R-12 an Bevölkerung und Ökonomie: Name des Spielers und Gefälligkeiten als Wissen der Figur (heute nur drei Wortwechsel Gedächtnis). ✅ 28.10.2026: `npc_player_knowledge`, `npc_player_favors`, Gesprächsroute 1.4.0.
 - R-13 an Bevölkerung und Ökonomie, W-4 an Weltkarte: Lokale durch Kauf und Umbau bestehender Gebäude statt Neubau; Startcafé übertragen (Entscheidung Thomas, 25.10.2026).
 
 ### G-4 (Bevölkerung und Ökonomie, 25.10.2026): Lokale in gekauften Häusern – was jetzt am Gebäude steht (zu R-13)

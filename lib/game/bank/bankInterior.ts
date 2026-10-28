@@ -140,7 +140,7 @@ export function bankAdvice(s: BankCustomerStatus): string[] {
   if (s.loan > 0 && s.deposit > 0 && s.loanRate > s.depositRate) {
     lines.push(`Tilgen aus dem Guthaben spart etwa ${perTick((s.loanRate - s.depositRate) * Math.min(s.deposit, s.loan))}, weil der Kreditzins höher ist`)
   }
-  if (s.collateralTotal <= 0) lines.push('Keine Sicherheiten: als Sicherheit zählen hier Gebäude mit Förderertrag und Schiffe – Kreditrahmen 0')
+  if (s.collateralTotal <= 0) lines.push('Keine Sicherheiten: als Sicherheit zählen hier Gebäude mit Förderertrag, vermietete Häuser, Lokale mit Umsatz und Schiffe – Kreditrahmen 0')
   else lines.push(`Sicherheiten ${cr(s.collateralTotal)} → Kreditrahmen ${cr(s.creditLimit)}, davon frei ${cr(s.availableLoan)}`)
   if (s.overLimit > 0) lines.push(`Der Kredit liegt ${cr(s.overLimit)} über dem Rahmen: tilgen oder Sicherheiten erhöhen`)
   if (!s.hasModule) lines.push('Für einen Kredit fehlt der Nachweis „Was ist Kredit?“; das Modul gibt es hier in der Bank')
