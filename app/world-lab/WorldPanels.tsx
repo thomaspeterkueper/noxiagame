@@ -21,6 +21,7 @@ import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
+import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
 import { VENUE_TYPE_IDS } from '@/lib/game/hospitality/venueStatus'
 import { buildingSizeLine, buildingUseLine, conversionLine, readyAtLabel, venueOfferLine } from '@/lib/worldlab/buildingUse'
@@ -251,9 +252,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const info = building?.source ? placeInfo[building.source] : undefined
   const infoTags: Record<string, string> = info ? Object.fromEntries(Object.entries({ religion: info.religion, denomination: info.denomination, building: info.building }).filter(([, value]) => Boolean(value))) as Record<string, string> : {}
   // Reale Gebäude mit begehbarem Raum: Gotteshaus, Gemeindezentrum, CAMALEO-ArtLounge.
-  const buildingRoom = building && !building.noxiaId ? buildingRoomKind(building.use, building.source, { ...infoTags, ...(building.poi?.tags ?? {}) }) : null
+  // Omnizedenz-Begegnungsstätte (gekauft und umgebaut oder gebaut): offen für alle,
+  // mit den Personen, die laut Simulation drinnen sind (28.10.2026).
+  const resonance = own && isResonanceBuilding(own.typeId) ? meetingPlaces(noxia).find(place => place.noxiaId === own.id) ?? null : null
+  const buildingRoom = building && !building.noxiaId ? buildingRoomKind(building.use, building.source, { ...infoTags, ...(building.poi?.tags ?? {}) }) : resonance ? 'resonance_place' as const : null
   function buildingAsLandmark(): WorldLandmark | null {
     if (!building || !buildingRoom) return null
+    if (resonance) return { at: building.at, name: resonance.name, kind: 'resonance_place', tags: { ...(resonance.round ? { opening_hours: 'Offene Resonanzrunde ' + resonance.round } : {}), description: 'Offen für alle – Gespräch, Lesen, Stille. Niemand muss etwas glauben.' } }
     const kind = buildingRoom === 'community_hall' ? 'community_centre' : buildingRoom === 'artlounge' ? 'artlounge' : 'place_of_worship'
     const religion = buildingRoom === 'mosque' ? 'muslim' : buildingRoom === 'synagogue' ? 'jewish' : buildingRoom === 'hindu_temple' ? 'hindu' : buildingRoom === 'buddhist_temple' ? 'buddhist' : buildingRoom === 'worship' ? 'christian' : undefined
     const name = building.source === ARTLOUNGE_OSM_ID ? 'CAMALEO-ArtLounge' : building.osmName ?? info?.name ?? building.poi?.name ?? building.title
@@ -450,7 +455,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       if ((event.target as HTMLElement | null)?.closest?.('input,textarea,select')) return
       if (event.key === 'Escape' && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') close()
       if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && landmark && room && landmarkNear) setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })
-      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && panel.kind === 'building' && entry && own && buildingDistance !== null && buildingDistance <= ENTER_RANGE_M) enter()
+      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && panel.kind === 'building' && entry && own && !resonance && buildingDistance !== null && buildingDistance <= ENTER_RANGE_M) enter()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -572,17 +577,19 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       </dl>}
       {/* Gastronomie, Aufgabe 11: bei Lokalen offen/geschlossen mit Uhrzeit */}
       {own && !own.conversion && VENUE_TYPE_IDS.has(own.typeId) && <VenueStatusLine entityId={own.id} typeId={own.typeId}/>}
-      {!own && buildingRoom && (() => {
+      {(!own || resonance) && buildingRoom && (() => {
         const inside = buildingAsLandmark()
-        const here = inside ? peopleAtPlace(presence, { osm: building.source, at: building.at, radiusM: 45 }) : []
+        const placeSource = building.source ?? own?.source
+        const here = inside ? peopleAtPlace(presence, { osm: placeSource, at: building.at, radiusM: 45 }) : []
         return inside && <>
           {here.length > 0 && <p className="muted">Gerade drinnen: {here.map(person => person.name).join(', ')}{here[0]?.doing ? ` · ${here[0].doing}` : ''}</p>}
           {buildingDistance !== null && buildingDistance <= ENTER_RANGE_M + 6
-            ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room: buildingRoom, landmark: inside, source: building.source })}>Betreten</button></div>
+            ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room: buildingRoom, landmark: inside, source: placeSource })}>Betreten</button></div>
             : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, ENTER_RANGE_M + 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+          {resonance && <p className="muted">{resonance.round ? `Offene Resonanzrunde ${resonance.round}${resonance.host ? ' mit ' + resonance.host : ''}.` : 'Offener Resonanzplatz.'} Alle sind willkommen.</p>}
         </>
       })()}
-      {own && entry
+      {own && entry && !resonance
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
           : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)

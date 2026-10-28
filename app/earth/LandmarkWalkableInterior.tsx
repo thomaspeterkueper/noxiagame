@@ -505,6 +505,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .room.hindu_temple{background:#e9dcc2}
       .room.buddhist_temple{background:#d9cbb0}
       .room.community_hall{background:#cdbf9f}
+      .room.resonance_place{background:#d3cdb8}
       .zone{position:absolute}
       .zone.tiles{background:repeating-conic-gradient(#d8d0c0 0 25%,#cbc2b1 0 50%) 0 0/32px 32px;box-shadow:inset 0 2px 0 #0002}
       .zone.carpet{background:#8d3a36;background-image:radial-gradient(#a24a44 1.2px,transparent 1.3px);background-size:9px 9px;border:3px solid #6e2a28;border-radius:4px;box-shadow:inset 0 0 0 6px #7a3230}

@@ -9,6 +9,7 @@ const LANDMARK_LABEL: Record<string, string> = {
   townhall: 'Rathaus', theatre: 'Theater', arts_centre: 'Kulturzentrum', hospital: 'Krankenhaus', station: 'Bahnhof',
   tower: 'Turm', lighthouse: 'Leuchtturm', observatory: 'Sternwarte',
   community_centre: 'Gemeindezentrum', artlounge: 'Kultur · ArtLounge',
+  resonance_place: 'Omnizedenz-Begegnungsstätte',
 }
 
 // Läden und Lokale (feature_type 'poi')

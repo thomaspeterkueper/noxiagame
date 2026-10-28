@@ -16,6 +16,8 @@ export default function LandmarkGlyph({ kind, tags, size = 54 }: { kind: string;
     case 'viewpoint': case 'attraction': d = 'M-7 5 L-2 -3 L1 1 L3 -1 L7 5 Z M3 -5 A1.4 1.4 0 1 0 3.01 -5'; break
     case 'hospital': d = 'M-5 -5 H5 V5 H-5 Z M0 -3 V3 M-3 0 H3'; break
     case 'station': d = 'M-4 -5 H4 Q5 -5 5 -4 V2 Q5 3 4 3 H-4 Q-5 3 -5 2 V-4 Q-5 -5 -4 -5 Z M-5 -1 H5 M-3 6 L-2 3 M3 6 L2 3'; break
+    // Omnizedenz-Begegnungsstätte: Kreis und Wellen – Beziehung, Resonanz (28.10.2026)
+    case 'resonance_place': d = 'M-1.6 0 A1.6 1.6 0 1 0 1.6 0 A1.6 1.6 0 1 0 -1.6 0 M-4.4 -1.6 A4.7 4.7 0 0 1 4.4 -1.6 M4.4 1.6 A4.7 4.7 0 0 1 -4.4 1.6 M-7 -3 A7.6 7.6 0 0 1 7 -3 M7 3 A7.6 7.6 0 0 1 -7 3'; break
     default: d = 'M0 -6 L1.8 -1.8 L6 -1.8 L2.6 1 L4 5.5 L0 2.8 L-4 5.5 L-2.6 1 L-6 -1.8 L-1.8 -1.8 Z'
   }
   return <svg viewBox="-14 -14 28 28" width={size} height={size} aria-hidden="true"><circle r="12" fill="#f4ecd2" stroke="#17313c" strokeWidth="1.2"/><path {...ink} d={d}/></svg>

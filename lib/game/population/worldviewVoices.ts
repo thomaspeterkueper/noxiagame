@@ -6,6 +6,8 @@
 // conviction of this person, not world fact. Facts, grounding and memory
 // rules of the conversation route apply unchanged.
 
+import { meetingPlaceLine, OMNIZEDENZ_MEETING_PLACES } from '@/lib/worldlab/meetingPlaces'
+
 export type WorldviewVoice = 'clergy' | 'davaru' | 'omnizedent' | 'resonance_host'
 
 const ROLE_PATTERNS: Array<{ voice: WorldviewVoice; pattern: RegExp }> = [
@@ -51,8 +53,17 @@ const VOICE_LINES: Record<WorldviewVoice, string[]> = {
   ],
 }
 
+/**
+ * Wo man die Omnizedenz kennenlernen kann (Thomas, 28.10.2026: Begegnungsstätten
+ * leicht findbar). Nur diese Orte nennen, keine erfinden.
+ */
+export const MEETING_PLACE_LINE = 'Fragt jemand, wo man die Omnizedenz kennenlernen oder mitreden kann, nennst du nur diese Begegnungsstätten: '
+  + OMNIZEDENZ_MEETING_PLACES.map(meetingPlaceLine).join('; ')
+  + '; im Tharsis Hub auf dem Mars samstags 19–21 Uhr, sobald dort ein Resonanzplatz steht. Alle sind willkommen, niemand muss etwas glauben; auf der Karte stehen sie unter „Ziel“.'
+
 /** Prompt lines for the conversation route; empty for persons without a worldview role. */
 export function worldviewConversationLines(voice: WorldviewVoice | null): string[] {
   if (!voice) return []
-  return [...VOICE_LINES[voice], ...SHARED_LINES]
+  const places = voice === 'omnizedent' || voice === 'resonance_host' ? [MEETING_PLACE_LINE] : []
+  return [...VOICE_LINES[voice], ...places, ...SHARED_LINES]
 }
