@@ -18,7 +18,8 @@ export interface ViewOptions {
   osmPlaces: boolean
 }
 
-export const DEFAULT_VIEW: ViewOptions = { streetNames: true, osmPlaces: true }
+// Vorgabe aus (Thomas, 28.10.2026: „aus zu Beginn ist besser“) – die Karte startet aufgeräumt.
+export const DEFAULT_VIEW: ViewOptions = { streetNames: false, osmPlaces: false }
 const KEY = 'noxia-world-view-v1'
 
 /** Hat ein Ort aus OSM eine Funktion im Spiel (begehbarer Raum)? */
@@ -32,12 +33,12 @@ export function showPlace(view: ViewOptions, place: { kind: string; tags?: Recor
   return !place.poi && placeHasFunction(place.kind, place.tags)
 }
 
-/** Gespeicherte Wahl dieses Browsers (fehlt oder unlesbar: alles an). */
+/** Gespeicherte Wahl dieses Browsers (fehlt oder unlesbar: Vorgabe, alles aus). */
 export function loadView(): ViewOptions {
   try {
     const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null
     const parsed = raw ? JSON.parse(raw) as Partial<ViewOptions> : {}
-    return { streetNames: parsed.streetNames !== false, osmPlaces: parsed.osmPlaces !== false }
+    return { streetNames: parsed.streetNames ?? DEFAULT_VIEW.streetNames, osmPlaces: parsed.osmPlaces ?? DEFAULT_VIEW.osmPlaces }
   } catch { return { ...DEFAULT_VIEW } }
 }
 export function saveView(view: ViewOptions) {
