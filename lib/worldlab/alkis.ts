@@ -184,16 +184,26 @@ export function parseUsePieces(gml: string): ParcelUsePiece[] {
   return out
 }
 
-/** Nutzungen je Flurstück zusammenfassen, größte zuerst. */
+/**
+ * Kennzeichen eines Flurstücks vergleichbar machen. Die Länder schreiben es in
+ * Flurstück und Nutzungsabschnitt nicht immer gleich (Hessen, 28.10.2026: keine
+ * einzige Nutzung zugeordnet) – Füllzeichen und Trenner zählen nicht.
+ */
+export function parcelKey(kennzeichen: string) {
+  return kennzeichen.replace(/[^0-9A-Za-z]/g, '').replace(/^0+/, '').toUpperCase()
+}
+
+/** Nutzungen je Flurstück zusammenfassen, größte zuerst (Schlüssel: parcelKey). */
 export function usesByParcel(pieces: readonly ParcelUsePiece[]) {
   const map = new Map<string, Map<string, { art: string; bez: string | null; m2: number }>>()
   for (const piece of pieces) {
-    const uses = map.get(piece.parcel) ?? new Map()
+    const id = parcelKey(piece.parcel)
+    const uses = map.get(id) ?? new Map()
     const key = piece.art + '|' + (piece.bez ?? '')
     const entry = uses.get(key) ?? { art: piece.art, bez: piece.bez, m2: 0 }
     entry.m2 += piece.m2
     uses.set(key, entry)
-    map.set(piece.parcel, uses)
+    map.set(id, uses)
   }
   return new Map([...map].map(([parcel, uses]) => [parcel, [...uses.values()].sort((a, b) => b.m2 - a.m2)]))
 }

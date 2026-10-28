@@ -9,10 +9,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { cadastreServicesAt, cadastreSource, parcelCell, parcelLabel, parcelRequestUrl, parcelUsage, parseParcels, parseUsePieces, usesByParcel, type CadastreService, type Parcel, type ParcelUsePiece } from '@/lib/worldlab/alkis'
+import { cadastreServicesAt, cadastreSource, parcelCell, parcelKey, parcelLabel, parcelRequestUrl, parcelUsage, parseParcels, parseUsePieces, usesByParcel, type CadastreService, type Parcel, type ParcelUsePiece } from '@/lib/worldlab/alkis'
 
 /** Zellen dieser Fassung haben Nutzungsart und -bezeichnung je Flurstück (NOXIA-MAT-0001); ältere werden einmal neu geholt. */
-const CELL_VERSION = 'v2-nutzung'
+// v3: Kennzeichen beim Zuordnen vereinheitlicht (Hessen hatte keine Nutzung, 28.10.2026) – Zellen werden einmal neu geholt.
+const CELL_VERSION = 'v3-nutzung'
 
 export const maxDuration = 60
 const PAGE = 1000, MAX_PAGES = 4, TIMEOUT_MS = 20_000
@@ -53,7 +54,7 @@ async function fetchFrom(service: CadastreService, cell: ReturnType<typeof parce
       }
       const uses = usesByParcel(pieces)
       for (const parcel of parcels) {
-        const list = uses.get(parcel.props.flstkennz ?? parcel.id)
+        const list = uses.get(parcelKey(parcel.props.flstkennz ?? parcel.id))
         if (!list?.length) continue
         parcel.props.nutzart = list[0].art
         if (list[0].bez) parcel.props.nutzbez = list[0].bez
@@ -107,7 +108,7 @@ export async function GET(req: NextRequest) {
       try {
         const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: 'application/gml+xml, application/xml, text/xml' } })
         const text = await response.text()
-        out.push({ service: service.key, status: response.status, exception: text.match(/<(?:\w+:)?ExceptionText>([^<]{0,300})/)?.[1] ?? null, returned: text.match(/numberReturned="(\d+)"/)?.[1] ?? null, pieces: parseUsePieces(text).length, sample: text.slice(0, 1200) })
+        out.push({ service: service.key, status: response.status, exception: text.match(/<(?:\w+:)?ExceptionText>([^<]{0,300})/)?.[1] ?? null, returned: text.match(/numberReturned="(\d+)"/)?.[1] ?? null, pieces: parseUsePieces(text).slice(0, 3), parcels: parseParcels(await (await fetch(parcelRequestUrl(cell, 0, 3, service), { signal: AbortSignal.timeout(TIMEOUT_MS) })).text(), service.zone).map(parcel => parcel.props.flstkennz ?? parcel.id) })
       } catch (error) { out.push({ service: service.key, error: error instanceof Error ? error.message : String(error) }) }
     }
     return NextResponse.json({ cell, usage: out })

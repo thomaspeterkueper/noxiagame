@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { landUse, landUseKind } from './landUse'
-import { parseUsePieces, usesByParcel } from './alkis'
+import { parcelKey, parseUsePieces, usesByParcel } from './alkis'
 import { toUtm32 } from './utm'
 
 describe('land use (NOXIA-MAT-0001)', () => {
@@ -28,8 +28,15 @@ describe('land use (NOXIA-MAT-0001)', () => {
     const piece = (id: string, art: string, bez: string, size: number) => `<NutzungFlurstueck gml:id="${id}"><flstkennz>051028</flstkennz><nutzart>${art}</nutzart><bez>${bez}</bez><geometrie><exterior><LinearRing><posList>${square(e, n, size)}</posList></LinearRing></exterior></geometrie></NutzungFlurstueck>`
     const pieces = parseUsePieces(piece('a', 'Wald', 'Nadelholz', 100) + piece('b', 'Landwirtschaft', 'Grünland', 50) + piece('c', 'Wald', 'Nadelholz', 10))
     expect(pieces).toHaveLength(3)
-    const uses = usesByParcel(pieces).get('051028')!
+    const uses = usesByParcel(pieces).get(parcelKey('051028'))!
     expect(uses[0]).toMatchObject({ art: 'Wald', bez: 'Nadelholz', m2: 10_100 })
     expect(uses[1]).toMatchObject({ art: 'Landwirtschaft', m2: 2_500 })
+  })
+})
+
+describe('Kennzeichen vereinheitlichen', () => {
+  it('Füllzeichen und führende Nullen zählen nicht', () => {
+    expect(parcelKey('060460011000100007__')).toBe(parcelKey('60460011000100007'))
+    expect(parcelKey('06046001100010/0007')).toBe(parcelKey('060460011000100007'))
   })
 })
