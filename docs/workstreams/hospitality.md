@@ -158,6 +158,25 @@ Ausnahmsweise direkt gebaut, auf Wunsch von Thomas (27.10.2026). Er wollte, dass
   - Das Personal kennt die Hausregel. Fragt jemand danach, steht sie vorn in seinen Fakten (`lib/game/hospitality/venueServices.ts`).
   - Preise und Dienstleistungen je Haus durch den Betreiber: R-18.
 
+### G-7 (Recherche-Chat „Tools & freie Dienste“, 28.10.2026): Spike – Modell-Router mit Fallback für Gespräche
+
+Hintergrund: Recherche vom 28.10.2026 zu freien Diensten für intelligente NPCs (Bericht `noxia-tools-recherche.md` im Chat, Kurzfassung hier). Thomas hat den Spike am 28.10.2026 freigegeben.
+
+**Befund im Code:** `app/api/game/npc-conversation/route.ts` spricht genau einen Anbieter an (DeepSeek, `api.deepseek.com`, 12 s Timeout). Fällt er aus oder drosselt, antwortet die Route mit 502 – es gibt keinen zweiten Weg. Außerdem: DeepSeek verarbeitet Daten außerhalb der EU; für Spieler in der EU ist das datenschutzrechtlich zu prüfen.
+
+**Was gebraucht wird (Spike, klein halten):**
+
+1. Eine schmale Anbieter-Schicht (`lib/game/cognition/llmRouter.ts` o. ä.), OpenAI-kompatibel, mit Reihenfolge aus Umgebungsvariablen, z. B. `NPC_LLM_CHAIN=local,groq,deepseek`. Jeder Anbieter: Basis-URL, Schlüssel, Modell, eigenes Timeout.
+2. Fallback: Bei Timeout, 429 oder 5xx der nächste Anbieter. `logConversationTurn` vermerkt zusätzlich, welcher Anbieter geantwortet hat und wie viele davor scheiterten.
+3. Erster zusätzlicher Anbieter: **lokales Modell** über Ollama auf dem eigenen Ubuntu-Server (Vorschlag Gemma 4 E4B oder Qwen3-Kleinmodell); zweiter: **Groq** (Free-Tier, z. B. gpt-oss-120b, 30 Anfragen/Min., 1.000/Tag). DeepSeek bleibt zunächst als letzter Weg.
+4. **Vorberechnete Begrüßung:** Die Route hat schon `opening` (Figur spricht zuerst). Wenn sich der Spieler einer Figur nähert, die Begrüßung schon anstoßen, damit sie beim Ansprechen fertig ist. Ziel: unter ca. 800 ms gefühlte Antwortzeit.
+5. Ein Café-NPC reicht für den Spike (Vorschlag: Startcafé). Vergleich im Protokoll: `provider_ms` je Anbieter über ein paar Dutzend echte Wortwechsel, plus Stichproben zur Einhaltung der Grounding-Regeln (Mars-Vokabular, erfundene Wege).
+6. Budget-Deckel: höchstens N Aufrufe je Figur und Spieler und Tag, Wert als Umgebungsvariable.
+
+**Nicht Teil des Spikes:** Stimmen (Piper/Kokoro), Gedächtnis über pgvector, Concordia-Prüfstand. Die gehören später in eigene Requests.
+
+**Regeln bleiben:** Gespräch erzeugt keine Fakten; Aktionen (`[[ACTION:…]]`) prüft weiter allein der Server; das Prompt bleibt gleich, nur der Anbieter wechselt.
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird. Stand 28.10.2026: Die Tabelle wird stündlich geschrieben, aber nur für 34 Personen in 18 Häusern. Das Personal von Metropol (2) und Balkan Grill (3) fehlt darin, deshalb noch nicht umstellbar.
