@@ -1,4 +1,6 @@
 // app/api/game/hospitality/guests/route.ts
+// Aktualisiert: 28.10.2026 — Hausregeln (services, canEditHouse) aus venue_service_rules/venue_owned_by (R-18); knownAgeYears (R-11)
+// Version:      1.2.0
 // GET ?tileEntityId=… → der Zustand eines Lokals, wie er sich aus dem
 // wirklichen Geschehen ergibt: wer im letzten Kaufabschnitt (sechs Stunden) gekauft
 // hat – jeder Besuch fest verteilt über den Abschnitt (spreadVisitAge) –, wie spät
@@ -7,6 +9,7 @@
 // wird nichts erfunden und nichts geschrieben. Namen folgen dem, was der
 // Spieler über die Person weiß.
 
+import { ageAtTick } from '@/lib/game/gameCalendar'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
@@ -49,9 +52,10 @@ export async function GET(req: NextRequest) {
   const venue = await venueState(supabase, tileEntityId, profileId)
   if (personIds.length === 0) return NextResponse.json({ ok: true, guests: [], ...venue }, { headers: { 'Cache-Control': 'private, no-store' } })
 
-  const [{ data: people }, { data: identities }] = await Promise.all([
+  const [{ data: people }, { data: identities }, { data: tickNow }] = await Promise.all([
     supabase.from('people').select('id,display_name,observable_description,activity_state,last_action,birth_year,person_appearance(person_id,gender_presentation,body_frame,skin_tone_code,hair_style_code,hair_color_code,facial_hair_code,visible_age_band,clothing_profile)').in('id', personIds),
-    supabase.from('player_person_identity_knowledge').select('person_id,identity_state,inferred_name,known_name').eq('profile_id', profileId).in('person_id', personIds),
+    supabase.from('player_person_identity_knowledge').select('person_id,identity_state,inferred_name,known_name,known_birth_year').eq('profile_id', profileId).in('person_id', personIds),
+    supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
   ])
   const identityByPerson = new Map((identities ?? []).map((row: any) => [row.person_id, row]))
   const guests = (people ?? []).map((person: any) => {
@@ -66,6 +70,7 @@ export async function GET(req: NextRequest) {
         id: person.id,
         displayName: perceivedPersonLabel({ state: identityState, observableDescription, inferredName: identity?.inferred_name ?? null, knownName: identity?.known_name ?? null }),
         identityState, observableDescription, appearance,
+        knownAgeYears: identity?.known_birth_year ? ageAtTick(identity.known_birth_year, tickNow?.tick_number ?? null) : null,
         birthYear: person.birth_year, activityState: person.activity_state, lastAction: person.last_action,
         assignments: [], needs: [], skills: [],
       },
@@ -143,5 +148,10 @@ async function venueState(supabase: any, tileEntityId: string, profileId: string
     const at = paid?.[0]?.created_at ? Date.parse(paid[0].created_at) : null
     entryPaidForS = at ? Math.max(0, Math.round((at + ENTRY_VALID_S * 1000 - Date.now()) / 1000)) : null
   }
-  return { hour, upper, heard, rooms, areaM2, conversion, displayName, entryPaidForS }
+  // Hausregeln (R-18): Toilette frei / nur Gäste / Gebühr; ändern darf nur der Eigentümer.
+  const [{ data: services }, { data: owner }] = await Promise.all([
+    supabase.rpc('venue_service_rules', { p_tile_entity_id: tileEntityId }),
+    supabase.rpc('venue_owned_by', { p_profile_id: profileId, p_tile_entity_id: tileEntityId }),
+  ])
+  return { hour, upper, heard, rooms, areaM2, conversion, displayName, entryPaidForS, services: services ?? null, canEditHouse: owner === true }
 }

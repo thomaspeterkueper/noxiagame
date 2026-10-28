@@ -1,4 +1,6 @@
 // app/api/game/population/route.ts
+// Aktualisiert: 28.10.2026 — knownAgeYears: Alter, wenn der Spieler das Geburtsjahr kennt (R-11)
+// Version:      1.1.0
 // NOXIA-LIVING — readable person view for location/building without exposing private knowledge.
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -7,6 +9,7 @@ import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/populat
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { assessPersonDepth } from '@/lib/game/population/personDepth'
+import { ageAtTick } from '@/lib/game/gameCalendar'
 
 export async function GET(req: NextRequest) {
   const tileEntityId = req.nextUrl.searchParams.get('tileEntityId')
@@ -102,7 +105,7 @@ export async function GET(req: NextRequest) {
     profileId
       ? supabase
         .from('player_person_identity_knowledge')
-        .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind')
+        .select('person_id, identity_state, inferred_name, known_name, confidence, source_kind, known_birth_year')
         .eq('profile_id', profileId)
         .in('person_id', personIds)
       : Promise.resolve({ data: [] as any[] }),
@@ -168,6 +171,8 @@ export async function GET(req: NextRequest) {
       inferredName: identity?.inferred_name ?? null,
       knownName: identity?.known_name ?? null,
     })
+    // Alter nur, wenn der Spieler es erfahren hat (R-11); Spieljahr aus dem letzten Tick der Person.
+    const knownAgeYears = identity?.known_birth_year ? ageAtTick(identity.known_birth_year, person.last_tick) : null
     const depthEvidence = depthCounts.get(person.id)
     const depth = includeDepth && depthEvidence ? assessPersonDepth({
       active: person.simulation_tier === 'active',
@@ -187,6 +192,7 @@ export async function GET(req: NextRequest) {
       ...(includeLifeState ? { lifeStage: (lifeByPerson.get(person.id) as any)?.life_stage ?? 'adult' } : {}),
       displayName,
       identityState,
+      knownAgeYears,
       observableDescription,
       appearance,
       interiorPresence: interiorPresenceByPerson.get(person.id) ? {

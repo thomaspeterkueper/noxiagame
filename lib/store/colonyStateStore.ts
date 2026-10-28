@@ -1,8 +1,8 @@
 'use client'
 
 // lib/store/colonyStateStore.ts
-// Aktualisiert: 27.10.2026 — Ortsdaten führen celestial_body_id (Himmelskörper) für Oberflächenorte ohne festen Code-Eintrag
-// Version:      1.1.0
+// Aktualisiert: 28.10.2026 — knownAgeYears am Bewohner (R-11); 27.10.2026: Ortsdaten führen celestial_body_id (Himmelskörper) für Oberflächenorte ohne festen Code-Eintrag
+// Version:      1.2.0
 
 import { create } from 'zustand'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -45,6 +45,8 @@ export type ColonyResident = {
   displayName: string
   lifeStage?: 'child' | 'adult'
   identityState?: 'unknown' | 'inferred' | 'known'
+  /** Alter in Jahren, nur wenn der Spieler es erfahren hat (R-11). */
+  knownAgeYears?: number | null
   observableDescription?: string
   appearance?: {
     genderPresentation: 'feminine' | 'masculine' | 'androgynous'

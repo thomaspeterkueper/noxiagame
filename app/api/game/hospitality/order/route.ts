@@ -1,8 +1,14 @@
 // app/api/game/hospitality/order/route.ts
+// Aktualisiert: 28.10.2026 — Hauspreise (venue_menu), Toilette als Posten, Eintritt im Nachtclub, Hausregeln ändern (R-18, R-19)
+// Version:      1.1.0
 // Karte und Bestellung in einem Lokal (NOXIA-FIN-0001).
 // GET  ?tileEntityId=…  → Karte mit `affordable` je Posten: Was der Gast nicht
 //                         bezahlen kann, ist gar nicht erst bestellbar.
 // POST { tileEntityId, itemCode, requestId } → besteuerter Transfer Gast → Betreiber.
+//      itemCode 'toilet' → Toilette nach Hausregel (frei, nur für Gäste oder mit Gebühr).
+// POST { action: 'set_price', tileEntityId, itemCode, priceCredits | null, active }
+//      { action: 'set_service', tileEntityId, service: 'toilet', available, priceCredits, guestsOnly }
+//      → Hausregeln ändern; nur der Eigentümer des Hauses (R-18).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -19,12 +25,24 @@ const ERRORS: Record<string, { status: number; error: string }> = {
   NOXIA_ROOM_NONE_HERE: { status: 404, error: 'Dieses Haus hat keine Gästezimmer.' },
   NOXIA_ROOM_NONE_FREE: { status: 409, error: 'Kein Zimmer frei.' },
   NOXIA_ROOM_ALREADY_BOOKED: { status: 409, error: 'Du hast hier schon ein Zimmer.' },
+  NOXIA_ENTRY_REQUIRED: { status: 403, error: 'Erst Eintritt bezahlen.' },
+  NOXIA_SERVICE_UNAVAILABLE: { status: 409, error: 'Die Toilette ist hier nicht benutzbar.' },
+  NOXIA_SERVICE_GUESTS_ONLY: { status: 403, error: 'Die Toilette ist nur für Gäste.' },
+  NOXIA_SERVICE_UNKNOWN: { status: 400, error: 'Diese Dienstleistung gibt es nicht.' },
+  NOXIA_VENUE_NOT_OWNED: { status: 403, error: 'Das Haus gehört dir nicht.' },
+  NOXIA_PRICE_INVALID: { status: 400, error: 'Ungültiger Preis.' },
 }
 
+function mapError(error: any) {
+  const code = Object.keys(ERRORS).find((key) => String(error?.message ?? '').includes(key))
+  return code ? NextResponse.json({ error: ERRORS[code].error, code }, { status: ERRORS[code].status }) : null
+}
+
+/** Karte des Hauses: Karte der Lokalart mit Hauspreisen, abbestellte Posten fehlen (venue_menu). */
 async function menuFor(supabase: any, tileEntityId: string) {
   const { data: tile } = await supabase.from('tile_entities').select('id,entity_id,status,entity_type').eq('id', tileEntityId).maybeSingle()
   if (!tile || tile.status !== 'active' || tile.entity_type !== 'building') return null
-  const { data: items } = await supabase.from('hospitality_menu').select('item_code,label,price_credits').eq('entity_id', tile.entity_id).eq('active', true).order('price_credits')
+  const { data: items } = await supabase.rpc('venue_menu', { p_tile_entity_id: tileEntityId })
   return items ?? []
 }
 
@@ -37,15 +55,22 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const items = await menuFor(supabase, tileEntityId)
   if (!items) return NextResponse.json({ error: 'Lokal nicht gefunden.' }, { status: 404 })
-  const { data: profile } = await supabase.from('profiles').select('credits').eq('id', profileId).maybeSingle()
+  const [{ data: profile }, { data: services }, { data: owner }] = await Promise.all([
+    supabase.from('profiles').select('credits').eq('id', profileId).maybeSingle(),
+    supabase.rpc('venue_service_rules', { p_tile_entity_id: tileEntityId }),
+    supabase.rpc('venue_owned_by', { p_profile_id: profileId, p_tile_entity_id: tileEntityId }),
+  ])
   const credits = Number(profile?.credits ?? 0)
   return NextResponse.json({
     ok: true,
     credits,
     items: items.map((item: any) => ({
       itemCode: item.item_code, label: item.label, priceCredits: item.price_credits,
+      basePriceCredits: item.base_price_credits, housePrice: Boolean(item.house_price),
       affordable: credits >= Number(item.price_credits),
     })),
+    services: services ?? null,
+    canEditHouse: owner === true,
   })
 }
 
@@ -54,6 +79,7 @@ export async function POST(req: NextRequest) {
   if (!profileId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
+  if (body?.action === 'set_price' || body?.action === 'set_service') return setHouseRule(profileId, body)
   const tileEntityId = String(body?.tileEntityId ?? '')
   const itemCode = String(body?.itemCode ?? '').slice(0, 64)
   const requestId = String(body?.requestId ?? '')
@@ -67,11 +93,7 @@ export async function POST(req: NextRequest) {
     p_profile_id: profileId, p_tile_entity_id: tileEntityId, p_item_code: itemCode,
     p_request_id: requestId, p_tick: Number(tickRow?.tick_number ?? 0),
   })
-  if (error) {
-    const code = Object.keys(ERRORS).find((key) => String(error.message ?? '').includes(key))
-    if (code) return NextResponse.json({ error: ERRORS[code].error, code }, { status: ERRORS[code].status })
-    return NextResponse.json({ error: 'Bestellung konnte nicht gebucht werden.' }, { status: 500 })
-  }
+  if (error) return mapError(error) ?? NextResponse.json({ error: 'Bestellung konnte nicht gebucht werden.' }, { status: 500 })
   return NextResponse.json({
     ok: true,
     duplicate: Boolean(data?.duplicate),
@@ -80,5 +102,26 @@ export async function POST(req: NextRequest) {
     priceCredits: data?.price_credits,
     taxCredits: data?.tax_credits,
     credits: data?.credits,
+    free: Boolean(data?.free),
   })
+}
+
+/** Hausregeln ändern: Preis eines Postens oder die Toilette (nur Eigentümer, geprüft in der Datenbank). */
+async function setHouseRule(profileId: string, body: any) {
+  const tileEntityId = String(body?.tileEntityId ?? '')
+  if (!UUID_RE.test(tileEntityId)) return NextResponse.json({ error: 'tileEntityId fehlt.' }, { status: 400 })
+  const supabase = createServiceClient()
+  const price = body?.priceCredits === null || body?.priceCredits === undefined ? null : Math.round(Number(body.priceCredits))
+  if (price !== null && !Number.isFinite(price)) return NextResponse.json({ error: 'Ungültiger Preis.' }, { status: 400 })
+  const { data, error } = body.action === 'set_price'
+    ? await supabase.rpc('set_venue_price', {
+        p_profile_id: profileId, p_tile_entity_id: tileEntityId, p_item_code: String(body?.itemCode ?? '').slice(0, 64),
+        p_price_credits: price, p_active: body?.active !== false,
+      })
+    : await supabase.rpc('set_venue_service', {
+        p_profile_id: profileId, p_tile_entity_id: tileEntityId, p_service_code: String(body?.service ?? 'toilet'),
+        p_available: body?.available !== false, p_price_credits: price ?? 0, p_guests_only: body?.guestsOnly === true,
+      })
+  if (error) return mapError(error) ?? NextResponse.json({ error: 'Hausregel konnte nicht gespeichert werden.' }, { status: 500 })
+  return NextResponse.json({ ok: true, ...(data ?? {}) })
 }

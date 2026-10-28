@@ -1,6 +1,6 @@
 // app/api/game/npc-conversation/route.ts
-// Aktualisiert: 28.10.2026 — Abbruch beim dritten Grenztest, unabhängig vom Wortlaut; zuvor: Protokoll mit Anliegen und realer Meldung
-// Version:      1.4.0
+// Aktualisiert: 28.10.2026 — Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter, Spieler lernt das Alter (R-11); zuvor: Abbruch beim dritten Grenztest, Protokoll mit Anliegen und realer Meldung
+// Version:      1.5.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -18,6 +18,8 @@ import {
   REPEAT_WINDOW_MS,
 } from '@/lib/game/cognition/conversationRepeat'
 import { classifyConversationTopic } from '@/lib/game/cognition/conversationTopic'
+import { playerNameFromUtterance, statedOwnAge } from '@/lib/game/cognition/playerFacts'
+import { ageAtTick } from '@/lib/game/gameCalendar'
 import { worldviewConversationLines, worldviewVoiceFromPublicRole } from '@/lib/game/population/worldviewVoices'
 
 const MAX_PLAYER_CHARS = 80
@@ -193,6 +195,10 @@ export async function POST(request: NextRequest) {
   let canonicalNpc: any = null
   let socialContextLines: string[] = []
   let livedMemoryLines: string[] = []
+  let knownPlayerName: string | null = null
+  let favorLines: string[] = []
+  let npcAge: number | null = null
+  let currentTick: number | null = null
   if (npcId) {
     const [{ data: memoryData }, { data: personData }, { data: identityData }, { data: relationData }, { data: livedMemoryData }] = await Promise.all([
       serviceClient
@@ -203,7 +209,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       serviceClient
         .from('people')
-        .select('id, display_name, public_role, bio_short')
+        .select('id, display_name, public_role, bio_short, birth_year')
         .eq('id', npcId)
         .maybeSingle(),
       serviceClient
@@ -234,6 +240,24 @@ export async function POST(request: NextRequest) {
       : identityData?.identity_state === 'inferred'
         ? 'inferred'
         : 'unknown'
+
+    // Was die Figur vom Spieler weiß (R-12): Name und Gefälligkeiten, als Felder.
+    const [{ data: knowledgeRow }, { data: favorRows }, { data: tickNow }] = await Promise.all([
+      serviceClient.from('npc_player_knowledge').select('known_player_name, name_learned_at').eq('npc_person_id', npcId).eq('player_profile_id', user.id).maybeSingle(),
+      serviceClient.from('npc_player_favors').select('kind, amount, detail, created_at').eq('npc_person_id', npcId).eq('player_profile_id', user.id).order('created_at', { ascending: false }).limit(5),
+      serviceClient.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    currentTick = tickNow?.tick_number != null ? Number(tickNow.tick_number) : null
+    knownPlayerName = knowledgeRow?.known_player_name ? clean(knowledgeRow.known_player_name, 32) : null
+    npcAge = ageAtTick(canonicalNpc?.birth_year ?? null, currentTick)
+    favorLines = (favorRows ?? []).map((row: any) => {
+      const when = new Date(row.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' })
+      return row.kind === 'gift_credits'
+        ? `Am ${when} hat dir der Spieler ${Number(row.amount ?? 0)} Credits geschenkt.`
+        : row.kind === 'treated'
+          ? `Am ${when} hat dich der Spieler eingeladen${row.detail ? ` (${clean(row.detail, 40)})` : ''}.`
+          : `Am ${when} hat dir der Spieler geholfen${row.detail ? ` (${clean(row.detail, 40)})` : ''}.`
+    })
 
     const otherIds = [...new Set([
       ...(relationData ?? []).map((row: any) => row.other_person_id),
@@ -368,7 +392,10 @@ export async function POST(request: NextRequest) {
     introStance || introLeads.length ? 'Wenn jemand neu wirkt, nach Arbeit, Geld, Zielen oder dem Anfang fragt, gib einen oder zwei dieser Hinweise in deinem Ton – nicht alle auf einmal, und frag nach, was die Person reizt. Dein Ton färbt nur die Art; die Tatsachen bleiben dieselben. Erfinde kein konkretes Angebot: keine bestimmte Stelle, kein bestimmtes Schiff, keinen Auftrag, keinen Preis und keine Person, die etwas anbietet, wenn es nicht in deinen Fakten oder im Mitbekommenen steht.' : '',
     'Über Speisen und Getränke weißt du nur, was in den Fakten steht: Name und Preis. Erfinde keine Eigenschaften dazu – nicht warm oder kalt, frisch, hausgemacht, Sorte, Zutaten oder Zubereitung. Kuchen und Snacks sind nie warm und werden nicht „kalt“. Dränge nicht zur Eile beim Essen.',
     opening ? 'Dein Gegenüber ist gerade zu dir getreten und hat noch nichts gesagt. Sprich es von dir aus an: eine kurze Begrüßung in deinem Ton und eine offene Frage oder ein Angebot, das zu deinem Platz passt – höchstens zwei Sätze. Tu nicht so, als hätte es schon etwas gesagt oder bestellt.' : '',
-    'Dein Gedächtnis für diesen Spieler ist kurz: Du behältst nur die letzten paar Wortwechsel. Versprich nicht, dir seinen Namen oder etwas anderes dauerhaft zu merken; sag eher, dass er sich beim nächsten Mal ruhig noch einmal vorstellen soll.',
+    npcAge !== null ? `Du bist ${npcAge} Jahre alt. Nenne dein Alter, wenn man dich danach fragt; sonst erwähne es nicht.` : '',
+    knownPlayerName ? `Du kennst den Spieler: Er heißt ${knownPlayerName}. Sprich ihn mit diesem Namen an, wenn es passt.` : 'Den Namen des Spielers kennst du noch nicht. Nennt er ihn, merkst du ihn dir.',
+    favorLines.length ? `Was der Spieler für dich getan hat:\n- ${favorLines.join('\n- ')}` : '',
+    'Vom Gespräch selbst behältst du nur die letzten paar Wortwechsel. Den Namen des Spielers und was er für dich getan hat, behältst du; anderes nicht – versprich nicht, dir sonst etwas dauerhaft zu merken.',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',
@@ -559,6 +586,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // R-12: Nennt der Spieler seinen Namen, merkt sich die Figur ihn.
+      const statedName = playerNameFromUtterance(player)
+      if (statedName && statedName !== knownPlayerName) {
+        const { error: nameError } = await serviceClient.from('npc_player_knowledge').upsert({
+          npc_person_id: npcId,
+          player_profile_id: user.id,
+          known_player_name: statedName,
+          name_source_kind: 'player_statement',
+          name_learned_tick: currentTick,
+          name_learned_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        }, { onConflict: 'npc_person_id,player_profile_id' })
+        if (nameError) console.error('npc player name write failed', { code: nameError.code })
+      }
+      // R-12: Geschenkte Credits sind eine Gefälligkeit, an die sich die Figur erinnert.
+      if (creditTransfer) {
+        const { error: favorError } = await serviceClient.from('npc_player_favors').insert({
+          npc_person_id: npcId, player_profile_id: user.id, kind: 'gift_credits', amount: creditTransfer.amount, tick: currentTick,
+        })
+        if (favorError) console.error('npc player favor write failed', { code: favorError.code })
+      }
       if (canonicalNpc?.display_name && identityState !== 'known') {
         const normalizedReply = reply.toLocaleLowerCase('de-DE')
         const normalizedName = String(canonicalNpc.display_name).toLocaleLowerCase('de-DE')
@@ -593,6 +641,19 @@ export async function POST(request: NextRequest) {
 
           if (!identityError) identityLearned = true
         }
+      }
+
+      // R-11: Nennt die Figur ihr wirkliches Alter, weiß der Spieler es – als Geburtsjahr,
+      // damit das Wissen mitaltert. Nur zu einer Person, die er schon erkennt (Name).
+      const statedAge = statedOwnAge(reply, npcAge)
+      if (statedAge !== null && canonicalNpc?.birth_year && (identityState !== 'unknown' || identityLearned)) {
+        const { error: ageError } = await serviceClient.from('player_person_identity_knowledge').update({
+          known_birth_year: Number(canonicalNpc.birth_year),
+          age_source_kind: 'self_statement',
+          age_learned_tick: currentTick,
+          updated_at: now.toISOString(),
+        }).eq('profile_id', user.id).eq('person_id', npcId)
+        if (ageError) console.error('player age knowledge write failed', { code: ageError.code })
       }
     }
 
