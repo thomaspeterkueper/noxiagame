@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { buildHistoricalArchitecture } from './historicalBuildings'
 
 /** Lightweight desktop WebGL prototype; no persistent game state. */
 export default function HistoricalThreeScene({ year }) {
@@ -49,27 +50,7 @@ export default function HistoricalThreeScene({ year }) {
     shaft.rotation.y=Math.PI/4;shaft.position.set(0,8.5,-22);shaft.castShadow=true;world.add(shaft)
     const tip=new THREE.Mesh(new THREE.ConeGeometry(0.85,2.2,4),stone)
     tip.rotation.y=Math.PI/4;tip.position.set(0,16,-22);world.add(tip)
-    // The architectural masses vary by era, but are deliberately not claims of precise historic positions.
-    for (const side of [-1,1]) {
-      for (let i=0;i<8;i++) {
-        const z=17-i*10
-        const width=year===550?8:year===1200?7:6
-        const height=year===550?10:year===1200?7:5
-        const x=side*(16+(i%2)*2)
-        block(x,height/2,z,width,height,8,i%3===0?darker:stone)
-        if(year===550) {
-          for(let c=0;c<3;c++) {
-            const column = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,7,10),stone)
-            column.position.set(x-width/2+1.8+c*2.2,4,z+4.3);column.castShadow=true;world.add(column)
-          }
-        } else if(year===1700) {
-          const roof=new THREE.Mesh(new THREE.ConeGeometry(5.8,2.5,4),darker)
-          roof.position.set(x,height+1,z);roof.rotation.y=Math.PI/4;world.add(roof)
-        } else {
-          block(x,height+1,z,width+0.8,2,8.8,darker)
-        }
-      }
-    }
+    const disposeArchitecture = buildHistoricalArchitecture(world, year)
     const keys=new Set()
     const onDown=(e)=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName))return;
       const k=e.key.toLowerCase();if(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown'].includes(k)){e.preventDefault();keys.add(k)}}
@@ -105,6 +86,7 @@ export default function HistoricalThreeScene({ year }) {
     return ()=>{
       disposed=true;cancelAnimationFrame(frame);resize.disconnect()
       window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',onBlur)
+      disposeArchitecture()
       world.traverse(object=>{if(object.isMesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];materials.forEach(m=>m.dispose())}})
       renderer.dispose();renderer.domElement.remove()
     }
