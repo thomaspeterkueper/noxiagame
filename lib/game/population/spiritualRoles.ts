@@ -54,7 +54,7 @@ export interface SpiritualRoleDefinition {
 }
 
 export const SPIRITUAL_ROLE_DEFINITIONS: readonly SpiritualRoleDefinition[] = [
-  { code: 'priest', label: 'Priester/in', traditions: ['christian','other_religious'], functions: ['service','ritual','teaching','care','conversation','community'], clergyLike: true },
+  { code: 'priest', label: 'Priester/in', traditions: ['christian','hindu','other_religious'], functions: ['service','ritual','teaching','care','conversation','community'], clergyLike: true },
   { code: 'pastor', label: 'Pfarrer/in / Pastor/in', traditions: ['christian'], functions: ['service','teaching','care','conversation','community'], clergyLike: true },
   { code: 'imam', label: 'Imam', traditions: ['islamic'], functions: ['service','teaching','care','conversation','community'], clergyLike: true },
   { code: 'rabbi', label: 'Rabbiner/in', traditions: ['jewish'], functions: ['service','teaching','care','conversation','community'], clergyLike: true },

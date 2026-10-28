@@ -96,8 +96,8 @@ Ein gewöhnlicher Kirchenbesuch benötigt keine vollständige Simulation einer R
 
 1. ✅ erster geistlicher NPC an realer Kirche produktiv: Elias Hartmann · St. Johannes Sundern;
 2. reale Kirchen/Moscheen/Tempel/Synagogen weiter über die gemeinsame Fallback-Familie anbinden;
-3. als nächsten Vergleichspilot eine nichtchristliche geistliche Rolle in derselben Architektur anlegen;
-4. erst danach Kalender-/Veranstaltungslogik ergänzen;
+3. ✅ Vertreter weiterer Religionen in derselben Architektur angelegt (28.10.2026, siehe unten);
+4. ✅ Spielwoche (Montag = Tag 0) und Termine je Gotteshaus (28.10.2026);
 5. Resonanzplätze der Omnizedenz als eigene Weltorte definieren, sobald reale/fiktive Standortentscheidungen vorliegen.
 
 
@@ -168,3 +168,27 @@ allgemeine Simulationsmechanik.
 ## Fortsetzung
 
 Philosophische Wege (Weg des DaVaRu, Omnizedenz), die Rolle Omnizedent/in und die Gesprächshaltungen: siehe `NOXIA-NPC-RELIGION-0002-philosophie-npcs-davaru-omnizedenten.md`.
+
+
+## Vertreter der Religionen (Thomas, 28.10.2026)
+
+Thomas: „katholisch, evangelisch, muslimisch, jüdisch, hinduistisch, buddhistisch – müssen nicht alle in Sundern sein, aber wichtig, dass sie vertreten sind und man mit ihnen sprechen kann.“
+
+| Religion | Person | Rolle | Ort (real, OSM) | Wohnung (reales Haus) | Termine |
+|---|---|---|---|---|---|
+| katholisch | Elias Hartmann | `priest` | St. Johannes, Sundern | öffentlicher Wohnblock Selmecke | täglich 18 Uhr offene Zeit, Sonntag 10 Uhr Gottesdienst |
+| evangelisch | Katrin Vogelsang | `pastor` | Lukaskirche, Sundern | Bäumkesweg 1 | Dienstag 18 Uhr offene Zeit, Sonntag 10 Uhr Gottesdienst |
+| Islam (sunnitisch) | Yusuf Demir | `imam` | Hamidiye-Moschee, Frankfurt-Sachsenhausen | Weckmarkt 3 | Freitag 13 Uhr Freitagsgebet |
+| Judentum | David Rosenthal | `rabbi` | Baumweg-Synagoge, Frankfurt | Lange Straße 22 | Freitag 18 Uhr Schabbatbeginn, Samstag 10 Uhr Schabbat-Gottesdienst |
+| Hinduismus | Mahesh Pandya | `priest` (Pujari) | Dwarkadhish-Tempel, Dvārakā | Wohnhaus in der Nähe | täglich 7 und 19 Uhr Aarti |
+| Buddhismus (Fo Guang Shan) | Miao Ling | `monastic` | Fo-Guang-Shan-Tempel, Frankfurt | im Tempel | Sonntag 10 Uhr Andacht und Dharma-Vortrag |
+
+Migrationen: `20261028150000_religious_representatives.sql`, Korrektur `20261028151500_rabbi_home_correction.sql` (die erste Wohnung des Rabbiners war das katholische Kolpinghaus).
+
+- **Gleiches Muster wie die Omnizedent/innen:** normale aktive Personen, Arbeitsort am realen Gotteshaus, Wohnung als Zuweisung an ein reales Wohnhaus ohne Eigentumswechsel. Gemeindeträger als Institution ohne Lohnsatz, weil Einnahmen religiöser Institutionen noch nicht modelliert sind.
+- **Erfunden, nicht stellvertretend:** Die Figuren sind erfunden und sprechen nicht für die realen Gemeinden. Bios bleiben allgemein.
+- **Gespräch:** Alle werden über ihre öffentliche Rolle als `clergy` erkannt (`worldviewVoices.ts`). Neu: Sie erklären ihre Religion aus der Innensicht, genau, ohne Klischees, und sagen offen, was sie nicht sicher wissen. Die Tradition steht in der Bio, die das Gespräch mitbekommt.
+- **Rollen:** `priest` gilt jetzt auch für den Hinduismus.
+- **Spielwoche:** Tag = floor(tick / 24) mod 7, Tag 0 = Montag (`WEEKDAY`, `weekPhase` in `realPlaceActivity.ts`). Weiterhin keine zweite Uhr. Dabei korrigiert: Der Gottesdienst an St. Johannes lag auf Phase 108 = Freitag 12 Uhr; jetzt Sonntag 10 Uhr.
+- **Ortszeit:** Termine zählen in Spielstunden ohne Zeitzone; in Dvārakā liegt die Aarti damit nicht genau auf indischer Ortszeit. Offen, bis es Ortszeiten im Tagesablauf gibt.
+- **Besucher:** wie beim Pilot nur aus bestehenden Beziehungen (Zuneigung ab 0,5); Teilnahme heißt nicht Zugehörigkeit.

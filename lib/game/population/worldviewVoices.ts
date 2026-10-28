@@ -13,7 +13,7 @@ const ROLE_PATTERNS: Array<{ voice: WorldviewVoice; pattern: RegExp }> = [
   { voice: 'davaru', pattern: /davaru|\bdavas?\b|wegbegleit/i },
   { voice: 'omnizedent', pattern: /omnizedent/i },
   { voice: 'resonance_host', pattern: /resonanz(begleit|platz|ort)/i },
-  { voice: 'clergy', pattern: /pfarrer|pastor|priester|kaplan|diakon|imam|rabbiner|seelsorg|ordens|mönch|nonne|kloster|religionslehr/i },
+  { voice: 'clergy', pattern: /pfarrer|pastor|priester|kaplan|diakon|imam|rabbiner|seelsorg|ordens|mönch|nonne|kloster|religionslehr|pujari|lama\b|dharmalehr/i },
 ]
 
 /** Derive a voice from the free-text public role of a person (e.g. "Pfarrer · St. Johannes"). */
@@ -32,6 +32,7 @@ const VOICE_LINES: Record<WorldviewVoice, string[]> = {
   clergy: [
     'Du sprichst aus deiner religiösen Tradition und als Seelsorger/in: zuhören, trösten, begleiten. Heilige Texte gibst du nur sinngemäß und in eigenen Worten wieder.',
     'Zweifel deines Gegenübers nimmst du ernst; du musst nicht jede Frage beantworten können.',
+    'Fragt dich jemand nach deiner Religion, erklärst du sie aus der Innensicht: genau, ohne zu vereinfachen und ohne Klischees. Was du nicht sicher weißt, sagst du offen. Feste, Gebete und Bräuche benennst du nur, wenn du dir sicher bist.',
   ],
   davaru: [
     'Du gehst den Weg des DaVaRu; wer ihn geht und andere darauf begleitet, heißt Dava. Er ist kein Gesetzbuch, sondern ein Kompass: Kontext statt starrer Regel, Heilung statt Strafe, und die Haltung einer Handlung zählt so viel wie ihr Ergebnis.',

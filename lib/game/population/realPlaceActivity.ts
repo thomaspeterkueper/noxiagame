@@ -6,7 +6,9 @@
 
 type SupabaseLike = any
 
-export type PlaceActivityKind = 'open_community' | 'service' | 'resonance_round'
+export type PlaceActivityKind =
+  | 'open_community' | 'service' | 'resonance_round'
+  | 'friday_prayer' | 'shabbat' | 'aarti' | 'dharma_service'
 
 export interface PlaceActivityWindow {
   kind: PlaceActivityKind
@@ -17,9 +19,20 @@ export interface PlaceActivityWindow {
 
 const DAY_TICKS = 24
 const WEEK_TICKS = 168
+
+/**
+ * Spielwoche (NOXIA-NPC-RELIGION-0001, 28.10.2026): Tag = floor(tick / 24) mod 7,
+ * Tag 0 ist Montag; Stunde = tick mod 24. Es gibt weiterhin nur die eine Uhr,
+ * die Zählung legt nur fest, welcher Tag „Freitag“ oder „Sonntag“ heißt.
+ */
+export const WEEKDAY = { monday:0, tuesday:1, wednesday:2, thursday:3, friday:4, saturday:5, sunday:6 } as const
+export function weekPhase(day:number, hour:number){ return day*DAY_TICKS+hour }
+export function weekdayOfTick(tick:number){ return Math.floor(tick/DAY_TICKS)%7 }
+
 const OPEN_PHASE = 18
 const OPEN_DURATION = 2
-const SERVICE_PHASE = 108
+// Sonntag, 10 Uhr (bis 28.10.2026: Phase 108 = Freitag 12 Uhr, unbeabsichtigt).
+const SERVICE_PHASE = weekPhase(WEEKDAY.sunday, 10)
 const SERVICE_DURATION = 2
 
 function windowAt(tick:number, period:number, phase:number, duration:number, kind:PlaceActivityKind, label:string):PlaceActivityWindow|null{
@@ -78,12 +91,52 @@ export type HostPlace =
 
 export interface RealPlaceHost { personKey:string; windows:(tick:number)=>PlaceActivityWindow[]; place:HostPlace }
 
+// ── Vertreter weiterer Religionen (Thomas, 28.10.2026) ────────────────
+/** Lukaskirche Sundern (evangelisch): Gottesdienst Sonntag 10 Uhr, offene Gesprächszeit Dienstag 18 Uhr. */
+export function lukasActivityWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,weekPhase(WEEKDAY.tuesday,18),2,'open_community','Offene Gesprächszeit im Gemeindezentrum'),
+    windowAt(tick,WEEK_TICKS,SERVICE_PHASE,SERVICE_DURATION,'service','Gottesdienst'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+/** Hamidiye-Moschee Frankfurt: Freitagsgebet Freitag 13 Uhr. */
+export function hamidiyeActivityWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,weekPhase(WEEKDAY.friday,13),2,'friday_prayer','Freitagsgebet'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+/** Baumweg-Synagoge Frankfurt: Schabbat-Beginn Freitag 18 Uhr, Schabbat-Gottesdienst Samstag 10 Uhr. */
+export function baumwegActivityWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,weekPhase(WEEKDAY.friday,18),2,'shabbat','Gottesdienst zum Schabbatbeginn'),
+    windowAt(tick,WEEK_TICKS,weekPhase(WEEKDAY.saturday,10),2,'shabbat','Schabbat-Gottesdienst'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+/** Dwarkadhish-Tempel Dvārakā: Aarti täglich 7 und 19 Uhr. */
+export function dwarkadhishActivityWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,DAY_TICKS,7,1,'aarti','Morgen-Aarti'),
+    windowAt(tick,DAY_TICKS,19,1,'aarti','Abend-Aarti'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+/** Fo-Guang-Shan-Tempel Frankfurt: Andacht mit Dharma-Vortrag Sonntag 10 Uhr. */
+export function foGuangShanActivityWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,weekPhase(WEEKDAY.sunday,10),2,'dharma_service','Andacht und Dharma-Vortrag'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+
 /** Hosts whose real-place schedule the population tick carries. */
 export const REAL_PLACE_HOSTS: ReadonlyArray<RealPlaceHost> = [
   { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows, place:{kind:'work_region_feature'} },
   { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows, place:{kind:'work_region_feature'} },
   { personKey:'earth-frankfurt-omnizedent-001', windows:frankfurtResonanceRoundWindows, place:{kind:'work_region_feature'} },
   { personKey:'mars-tharsis-omnizedent-001', windows:tharsisResonanceRoundWindows, place:{kind:'built',buildingTypes:['resonance_place','omnizedenz_resonance_place']} },
+  { personKey:'earth-sundern-lukaskirche-pastor-001', windows:lukasActivityWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-frankfurt-hamidiye-imam-001', windows:hamidiyeActivityWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-frankfurt-baumweg-rabbi-001', windows:baumwegActivityWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-dwarka-dwarkadhish-pujari-001', windows:dwarkadhishActivityWindows, place:{kind:'work_region_feature'} },
+  { personKey:'earth-frankfurt-foguangshan-monastic-001', windows:foGuangShanActivityWindows, place:{kind:'work_region_feature'} },
 ]
 
 /** A concrete place: an imported real place or a built tile entity. */

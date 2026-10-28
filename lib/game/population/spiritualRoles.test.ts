@@ -5,6 +5,10 @@ describe('spiritual roles', () => {
   it('keeps tradition-specific roles explicit', () => {
     expect(spiritualRoleFitsTradition('imam','islamic')).toBe(true)
     expect(spiritualRoleFitsTradition('imam','christian')).toBe(false)
+    expect(spiritualRoleFitsTradition('priest','hindu')).toBe(true)
+    expect(spiritualRoleFitsTradition('monastic','buddhist')).toBe(true)
+    expect(spiritualRoleFitsTradition('rabbi','jewish')).toBe(true)
+    expect(spiritualRoleFitsTradition('pastor','christian')).toBe(true)
   })
 
   it('keeps philosophical ways apart from religions and clergy', () => {

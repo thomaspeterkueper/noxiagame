@@ -1,4 +1,4 @@
-import { REAL_PLACE_HOSTS, frankfurtResonanceRoundWindows, stJohannesActivityWindows, sundernResonanceRoundWindows, tharsisResonanceRoundWindows } from './realPlaceActivity'
+import { REAL_PLACE_HOSTS, WEEKDAY, baumwegActivityWindows, dwarkadhishActivityWindows, foGuangShanActivityWindows, frankfurtResonanceRoundWindows, hamidiyeActivityWindows, lukasActivityWindows, stJohannesActivityWindows, sundernResonanceRoundWindows, tharsisResonanceRoundWindows, weekPhase, weekdayOfTick } from './realPlaceActivity'
 
 let failures=0
 const check=(ok:boolean,label:string)=>{if(!ok){failures++;console.error('FAIL: '+label)}}
@@ -6,21 +6,30 @@ const check=(ok:boolean,label:string)=>{if(!ok){failures++;console.error('FAIL: 
 check(stJohannesActivityWindows(18).some(window=>window.kind==='open_community'),'daily open-community window starts at its phase')
 check(stJohannesActivityWindows(19).some(window=>window.kind==='open_community'),'daily open-community window remains active for its duration')
 check(!stJohannesActivityWindows(20).some(window=>window.kind==='open_community'),'daily open-community window closes after its duration')
-check(stJohannesActivityWindows(108).some(window=>window.kind==='service'),'weekly service window starts from the shared tick')
-check(stJohannesActivityWindows(109).some(window=>window.kind==='service'),'weekly service window spans two ticks')
-check(!stJohannesActivityWindows(110).some(window=>window.kind==='service'),'weekly service window closes deterministically')
+check(stJohannesActivityWindows(154).some(window=>window.kind==='service'),'weekly service window starts from the shared tick (Sunday 10:00)')
+check(stJohannesActivityWindows(155).some(window=>window.kind==='service'),'weekly service window spans two ticks')
+check(!stJohannesActivityWindows(156).some(window=>window.kind==='service'),'weekly service window closes deterministically')
+check(!stJohannesActivityWindows(108).some(window=>window.kind==='service'),'no service on Friday noon any more')
 check(stJohannesActivityWindows(18+24).some(window=>window.kind==='open_community'),'daily window repeats without a second clock')
 check(sundernResonanceRoundWindows(67).some(window=>window.kind==='resonance_round'),'weekly resonance round starts at its phase')
 check(sundernResonanceRoundWindows(68).length===1 && sundernResonanceRoundWindows(69).length===0,'resonance round lasts two ticks')
 check(sundernResonanceRoundWindows(67+168).length===1,'resonance round repeats weekly on the shared tick')
-check(!stJohannesActivityWindows(67).some(window=>window.kind==='service') && sundernResonanceRoundWindows(108).length===0,'church service and resonance round do not overlap')
+check(!stJohannesActivityWindows(67).some(window=>window.kind==='service') && sundernResonanceRoundWindows(154).length===0,'church service and resonance round do not overlap')
 check(frankfurtResonanceRoundWindows(115).length===1 && frankfurtResonanceRoundWindows(117).length===0,'Frankfurt resonance round: day 5, 19:00, two hours')
 check(frankfurtResonanceRoundWindows(67).length===0,'Frankfurt and Sundern rounds are on different days')
 check(tharsisResonanceRoundWindows(139).length===1 && tharsisResonanceRoundWindows(141).length===0,'Tharsis resonance round: day 6, 19:00, two hours')
 check(REAL_PLACE_HOSTS.find(host=>host.personKey==='mars-tharsis-omnizedent-001')?.place.kind==='built','Tharsis round needs a built resonance place')
-check(REAL_PLACE_HOSTS.filter(host=>host.place.kind==='work_region_feature').length===3,'earth hosts keep their real work places')
+check(REAL_PLACE_HOSTS.filter(host=>host.place.kind==='work_region_feature').length===8,'earth hosts keep their real work places')
+check(weekdayOfTick(weekPhase(WEEKDAY.sunday,10))===WEEKDAY.sunday && weekdayOfTick(24*7)===WEEKDAY.monday,'week starts on Monday')
+check(hamidiyeActivityWindows(weekPhase(WEEKDAY.friday,13)).some(window=>window.kind==='friday_prayer'),'Friday prayer on Friday 13:00')
+check(hamidiyeActivityWindows(weekPhase(WEEKDAY.thursday,13)).length===0,'no Friday prayer on Thursday')
+check(baumwegActivityWindows(weekPhase(WEEKDAY.friday,18)).length===1 && baumwegActivityWindows(weekPhase(WEEKDAY.saturday,10)).length===1,'Shabbat: Friday evening and Saturday morning')
+check(dwarkadhishActivityWindows(7).length===1 && dwarkadhishActivityWindows(19+24*3).length===1 && dwarkadhishActivityWindows(8).length===0,'Aarti daily at 7 and 19')
+check(foGuangShanActivityWindows(weekPhase(WEEKDAY.sunday,11)).length===1,'Dharma service on Sunday morning')
+check(lukasActivityWindows(weekPhase(WEEKDAY.sunday,10)).some(window=>window.kind==='service') && lukasActivityWindows(weekPhase(WEEKDAY.tuesday,18)).some(window=>window.kind==='open_community'),'Lukaskirche: Sunday service, Tuesday open hour')
+check(REAL_PLACE_HOSTS.length===9,'nine hosts: six religions, three Omnizedenz')
 check(new Set(REAL_PLACE_HOSTS.map(host=>host.personKey)).size===REAL_PLACE_HOSTS.length,'each host is scheduled once')
-check(stJohannesActivityWindows(108+168).some(window=>window.kind==='service'),'weekly window repeats without a second clock')
+check(stJohannesActivityWindows(154+168).some(window=>window.kind==='service'),'weekly window repeats without a second clock')
 
 if(failures)throw new Error(String(failures)+' real-place schedule test(s) failed')
 console.log('Real-place activity schedule: tests passed')

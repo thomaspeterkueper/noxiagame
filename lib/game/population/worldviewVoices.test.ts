@@ -4,6 +4,11 @@ import { worldviewConversationLines, worldviewVoiceFromPublicRole } from './worl
 describe('worldview voices', () => {
   it('maps public roles to voices', () => {
     expect(worldviewVoiceFromPublicRole('Pfarrer · St. Johannes')).toBe('clergy')
+    expect(worldviewVoiceFromPublicRole('Pfarrerin · Lukaskirche')).toBe('clergy')
+    expect(worldviewVoiceFromPublicRole('Imam · Hamidiye-Moschee')).toBe('clergy')
+    expect(worldviewVoiceFromPublicRole('Rabbiner · Baumweg-Synagoge')).toBe('clergy')
+    expect(worldviewVoiceFromPublicRole('Pujari · Dwarkadhish-Tempel')).toBe('clergy')
+    expect(worldviewVoiceFromPublicRole('Ordensfrau · Fo-Guang-Shan-Tempel')).toBe('clergy')
     expect(worldviewVoiceFromPublicRole('Omnizedentin')).toBe('omnizedent')
     expect(worldviewVoiceFromPublicRole('Omnizedent/in · Resonanzplatz Sundern')).toBe('omnizedent')
     // Live pilots (migration 20261028124500)
