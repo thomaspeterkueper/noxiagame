@@ -1,6 +1,6 @@
 // app/api/game/npc-conversation/route.ts
-// Aktualisiert: 28.10.2026 — Protokoll mit Anliegen (conversationTopic) und mitgegebener realer Meldung
-// Version:      1.3.0
+// Aktualisiert: 28.10.2026 — Abbruch beim dritten Grenztest, unabhängig vom Wortlaut; zuvor: Protokoll mit Anliegen und realer Meldung
+// Version:      1.4.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -9,6 +9,8 @@ import { createHash } from 'node:crypto'
 import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
 import {
   assessRepeat,
+  boundaryBreakoff,
+  boundaryBreakoffLine,
   breakoffLine,
   dismissLine,
   inBreakoffCooldown,
@@ -274,22 +276,30 @@ export async function POST(request: NextRequest) {
   const nowMs = Date.now()
   const { data: recentLogData } = await serviceClient
     .from('npc_conversation_log')
-    .select('player_text, outcome, opening, created_at')
+    .select('player_text, outcome, opening, created_at, topic')
     .eq('player_profile_id', user.id)
     .eq('npc_key', npcKey)
     .gte('created_at', new Date(nowMs - REPEAT_WINDOW_MS).toISOString())
     .order('created_at', { ascending: false })
     .limit(30)
-  const recentLog = (recentLogData ?? []) as Array<{ player_text: string; outcome: string; opening: boolean; created_at: string }>
+  const recentLog = (recentLogData ?? []) as Array<{ player_text: string; outcome: string; opening: boolean; created_at: string; topic: string | null }>
   const lastBreakoffIndex = recentLog.findIndex(row => row.outcome === 'breakoff')
   const lastBreakoffAt = lastBreakoffIndex >= 0 ? recentLog[lastBreakoffIndex].created_at : null
   const priorBreakoffs = recentLog.filter(row => row.outcome === 'breakoff').length
-  const loggedTurns = (lastBreakoffIndex >= 0 ? recentLog.slice(0, lastBreakoffIndex) : recentLog)
+  const loggedRows = (lastBreakoffIndex >= 0 ? recentLog.slice(0, lastBreakoffIndex) : recentLog)
     .filter(row => !row.opening && row.outcome !== 'dismissed')
-    .map(row => row.player_text)
+  const loggedTurns = loggedRows.map(row => row.player_text)
   const historyTurns = history.filter((entry: any) => entry.role === 'user').map((entry: any) => entry.content as string)
-  const previousTurns = loggedTurns.length >= historyTurns.length ? loggedTurns : historyTurns
+  const useLogged = loggedTurns.length >= historyTurns.length
+  const previousTurns = useLogged ? loggedTurns : historyTurns
   const repeat = opening ? { level: 'none' as const, similarCount: 0, normalized: '' } : assessRepeat(player, previousTurns)
+  // Grenztests (Beleidigung, sexuelles Anliegen) zählen nach Anliegen, nicht
+  // nach Wortlaut – wer die Worte wechselt, testet trotzdem dieselbe Grenze.
+  const topic = classifyConversationTopic(player, { opening })
+  const previousBoundaryTests = useLogged
+    ? loggedRows.filter(row => (row.topic ?? classifyConversationTopic(row.player_text)) === 'provocation').length
+    : historyTurns.filter((text: string) => classifyConversationTopic(text) === 'provocation').length
+  const boundaryEnds = boundaryBreakoff(topic === 'provocation', previousBoundaryTests)
   const baseLog = {
     player_profile_id: user.id,
     npc_person_id: npcId,
@@ -302,7 +312,7 @@ export async function POST(request: NextRequest) {
     player_text: player,
     player_norm: repeat.normalized,
     similar_count: repeat.similarCount,
-    topic: classifyConversationTopic(player, { opening }),
+    topic,
     headline: headline || null,
     headline_source: source || null,
   }
@@ -319,6 +329,7 @@ export async function POST(request: NextRequest) {
     })
   }
   if (inBreakoffCooldown(lastBreakoffAt, nowMs)) return endConversation(dismissLine(`${npcKey}:${nowMs}`), 'dismissed')
+  if (boundaryEnds) return endConversation(boundaryBreakoffLine(`${npcKey}:${nowMs}`), 'breakoff')
   if (repeat.level === 'breakoff') return endConversation(breakoffLine(`${npcKey}:${nowMs}`, priorBreakoffs), 'breakoff')
 
   const system = [

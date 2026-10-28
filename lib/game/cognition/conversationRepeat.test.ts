@@ -7,7 +7,10 @@ import {
   normalizeUtterance,
   utteranceSimilarity,
   BREAKOFF_COOLDOWN_MS,
+  boundaryBreakoff,
+  boundaryBreakoffLine,
 } from './conversationRepeat'
+import { classifyConversationTopic } from './conversationTopic'
 
 assert.equal(normalizeUtterance('Wo gibt’s hier Arbeit?!'), 'wo gibt s hier arbeit')
 assert.equal(normalizeUtterance('Grüße'), 'gruesse')
@@ -49,5 +52,25 @@ assert.equal(assessRepeat('Noch einen Kaffee bitte', orders).level, 'none')
 // Verschiedene Themen nacheinander.
 const varied = ['Wo ist die Akademie?', 'Was kostet ein Ticket zum Mond?', 'Wer war zuletzt hier?']
 assert.equal(assessRepeat('Kennst du die Verwaltung?', varied).level, 'none')
+
+// Grenztests in wechselnden Worten (Testprotokoll Yuto Sato, 27.10.2026):
+// Der dritte Grenztest beendet das Gespräch, auch wenn der Wortlaut wechselt.
+const yuto = [
+  'Hallo mochtest du hier kinder machen?',
+  'Ich mochte offentlich hier mit dir kinder machen',
+  'Ich habe technische frage: wie kann man hier kinder machen?',
+]
+const boundaryAt = yuto.map((text, index) => boundaryBreakoff(
+  classifyConversationTopic(text) === 'provocation',
+  yuto.slice(0, index).filter(prev => classifyConversationTopic(prev) === 'provocation').length,
+))
+assert.deepEqual(boundaryAt, [false, false, true])
+// Kein Grenztest jetzt → kein Abbruch, auch nach früheren Grenztests.
+assert.equal(boundaryBreakoff(false, 5), false)
+// Einmal „Bist du dumm?“ beendet nichts.
+assert.equal(boundaryBreakoff(classifyConversationTopic('Bist du dumm?') === 'provocation', 0), false)
+// Tanzen ist ein Beziehungswunsch, kein Grenztest.
+assert.equal(classifyConversationTopic('Ich möchte Tanz sehen'), 'relationship')
+assert.ok(boundaryBreakoffLine('npc:1').length > 0)
 
 console.log('conversationRepeat: ok')
