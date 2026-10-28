@@ -16,6 +16,7 @@ import {
   REPEAT_WINDOW_MS,
 } from '@/lib/game/cognition/conversationRepeat'
 import { classifyConversationTopic } from '@/lib/game/cognition/conversationTopic'
+import { worldviewConversationLines, worldviewVoiceFromPublicRole } from '@/lib/game/population/worldviewVoices'
 
 const MAX_PLAYER_CHARS = 80
 const MAX_HISTORY_MESSAGES = 10
@@ -349,6 +350,8 @@ export async function POST(request: NextRequest) {
     placeKnowledge.length ? 'Nutze das Ortswissen, wenn nach der Gegend, nach Sehenswertem, nach Einrichtungen oder nach dem Weg gefragt wird: Nenne dann zwei, drei passende Dinge daraus, statt zu passen. Was im Ortswissen steht, gilt als belegt. Zur realen Gegend darfst du außerdem allgemein Bekanntes sagen (Landschaft, Region, größere Nachbarorte), aber erfinde keine weiteren Einrichtungen, Öffnungszeiten oder Wegbeschreibungen.' : '',
     hearsay.length ? `Was du in letzter Zeit mitbekommen hast:\n- ${hearsay.join('\n- ')}` : '',
     hearsay.length ? 'Erzähle davon, wenn nach Neuigkeiten, Gerüchten, Arbeit oder dem Geschehen am Ort gefragt wird – nicht von dir aus alles auf einmal. Was mit „Gehört“ beginnt, gibst du als Gehörtes weiter („man erzählt sich“, „ich habe gehört“), nicht als Tatsache. Schmücke nichts aus und nenne keine Namen, die dort nicht stehen.' : '',
+    // Religion/Philosophie (NOXIA-NPC-RELIGION-0002): nur Haltung, kein Wissen.
+    ...worldviewConversationLines(worldviewVoiceFromPublicRole(npcRole)),
     introStance ? `Wie du Neue in die Welt einführst: ${introStance}` : '',
     introLeads.length ? `Wege in die Welt, die du kennst und auf deine Art weitergibst:\n- ${introLeads.join('\n- ')}` : '',
     introStance || introLeads.length ? 'Wenn jemand neu wirkt, nach Arbeit, Geld, Zielen oder dem Anfang fragt, gib einen oder zwei dieser Hinweise in deinem Ton – nicht alle auf einmal, und frag nach, was die Person reizt. Dein Ton färbt nur die Art; die Tatsachen bleiben dieselben. Erfinde kein konkretes Angebot: keine bestimmte Stelle, kein bestimmtes Schiff, keinen Auftrag, keinen Preis und keine Person, die etwas anbietet, wenn es nicht in deinen Fakten oder im Mitbekommenen steht.' : '',

@@ -164,3 +164,7 @@ Die Erweiterung ist nicht kirchenspezifisch:
 
 Damit bleibt Religion Domäneninhalt; Ortsbesuch, Co-Location und Begegnung bleiben
 allgemeine Simulationsmechanik.
+
+## Fortsetzung
+
+Philosophische Wege (Weg des DaVaRu, Omnizedenz), die Rolle Omnizedent/in und die Gesprächshaltungen: siehe `NOXIA-NPC-RELIGION-0002-philosophie-npcs-davaru-omnizedenten.md`.
