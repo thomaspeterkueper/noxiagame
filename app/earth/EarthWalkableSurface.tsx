@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/EarthWalkableSurface.tsx
-// Aktualisiert: 26.10.2026 — Betriebe aus realen Gewerbe-Orten: Marker mit erfundenem Namen und Funktion, betretbar (Laden/Werkstatt) mit Personal; realer Name nur im Tooltip; 12.10.2026 — reale Gebäude als eigene, einmal je Szene aufgebaute Ebene mit Walmdächern und Fensterreihen; 2,5D-Gebäude: reale Häuser mit Höhe, belichteten Wänden, Dachform und Schatten; NOXIA-Gebäude mit ihrem Gebäudebild; Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
-// Version:      1.10.0
+// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd); 26.10.2026: Betriebe aus realen Gewerbe-Orten: Marker mit erfundenem Namen und Funktion, betretbar (Laden/Werkstatt) mit Personal; realer Name nur im Tooltip; 12.10.2026 — reale Gebäude als eigene, einmal je Szene aufgebaute Ebene mit Walmdächern und Fensterreihen; 2,5D-Gebäude: reale Häuser mit Höhe, belichteten Wänden, Dachform und Schatten; NOXIA-Gebäude mit ihrem Gebäudebild; Bewohner stehen an Arbeits- bzw. Wohngebäude statt beliebig auf der Straße; Bibliothek und Gotteshaus öffnen einen begehbaren Innenraum; NOXIA-Gebäude bis 6 km als Ziel wählbar (mit Entfernung), „Gehe dahin“ läuft etappenweise über den Szenenrand hinaus; Landmarks mit Symbol in der Szene, anwählbar und aus der Nähe betretbar (Ortstafel); Maßstab: Szene 2,4-fach vergrößert und auf die Spielfigur zentriert, Figuren behalten ihre Größe; Gebäude mit realem Umriss statt Hüllrechteck, von hinten nach vorn gezeichnet; Szene wandert mit: nähert sich die Spielfigur dem Rand, wird der Ausschnitt um ihren Standort neu aufgebaut; die Szene öffnet am tatsächlichen Standort der Spielfigur
+// Version:      1.11.0
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
@@ -25,6 +25,7 @@ import { extrudeFootprint } from '@/lib/game/spatial/buildingMassing'
 import EarthBuildingMassingLayer, { HEIGHT_PX_PER_M } from './EarthBuildingMassingLayer'
 import type { LocalSurfaceBuilding } from '@/lib/game/spatial/localSurfaceScene'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
+import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { WALKABLE_VIEW, WalkableActor, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, WalkableTrain, projectSurfacePoint as iso, surfaceBuildingTop as buildingPolygon, surfacePathD as pathD, surfacePolygonD as polygonD, surfacePointsAttr as pointsAttr, surfaceCameraTransform as cameraTransform } from '@/app/components/WalkableSurfaceRenderer'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import { PersonPortrait } from '@/lib/grid/PersonPortrait'
@@ -127,6 +128,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const[conversationByNpc,setConversationByNpc]=useState<Record<string,ChatEntry[]>>({})
   const[npcWorldActionById,setNpcWorldActionById]=useState<Record<string,NpcWorldAction>>({})
   const[sending,setSending]=useState(false)
+  const conversationEnd=useConversationEnd()
   const[playerName,setPlayerName]=useState('Du')
   const[motionTime,setMotionTime]=useState(0)
   const[awarenessItems,setAwarenessItems]=useState<WorldAwarenessItem[]>([])
@@ -607,7 +609,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   const selectedActionActive=Boolean(activeActionForSelected&&motionTime-activeActionForSelected.startedAt>=0&&motionTime-activeActionForSelected.startedAt<activeActionForSelected.durationSeconds)
 
   async function talk(){
-    if(!selected||!message.trim()||sending||!canTalkToSelected)return
+    if(!selected||!message.trim()||sending||!canTalkToSelected||conversationEnd.isEnded(selected.id))return
     const playerMessage=message.trim().slice(0,80)
     if(!playerMessage)return
     const history=conversationByNpc[selected.id]??[]
@@ -617,6 +619,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       const response=await fetch('/api/game/npc-conversation',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({player:playerMessage,npcId:selected.id,npcName:selected.displayName,npcRole:role(selected),headline:`Lokales Gespräch in ${data?.region?.name??'der aktuellen Earth-Region'}`,source:'NOXIA Earth local scene',locationName:data?.region?.name??'Erde',localFacts:perceivedLocalFactsForNpc(selected.id),nearbyPlaces:perceivedNearbyPlacesForNpc(selected.id).map(({key,targetRef,name,kind,distanceM})=>({key,targetRef,name,kind,distanceM})),history})})
       const json=await response.json().catch(()=>({}))
       const npcReply=response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.'
+      conversationEnd.noteReply(selected.id,json)
       if(response.ok){
         setConversationByNpc(current=>({
           ...current,
@@ -813,7 +816,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
         <span>{ambientConversation.conversation.item.kind==='colony'?'NOXIA-Weltgeschehen':`Reale Meldung · ${ambientConversation.source?.name??ambientConversation.conversation.item.sourceId}`} · ca. {Math.round(ambientConversation.playerDistance)} m entfernt</span>
       </div>}
 
-      {selected&&<aside><div className="head"><PersonPortrait id={selected.id} role={selected.assignments?.find((item:any)=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={52} title={personSceneLabel(selected)}/><div><small>NPC · LOKAL</small><b>{personSceneLabel(selected)}</b><span>{selected.identityState!=='known'&&selected.observableDescription&&selected.observableDescription!==personSceneLabel(selected)?selected.observableDescription+' · ':''}{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selectedActionActive?'geht voraus':selected.activityState}</b><span>Letzte Aktion</span><b>{selectedActionActive?(activeActionForSelected?.type==='visit_place'?`geht zu ${activeActionForSelected.targetName}`:(activeActionForSelected?.playerFollows?'führt dich den Weg entlang':'geht den Weg entlang')):selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}{canTalkToSelected?<><div className="chat"><input value={message} maxLength={80} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></>:<div className="chat"><span style={{flex:1,alignSelf:'center',fontSize:11,color:'#9fb0bb'}}>{selectedNpcDistance===null?'Nicht mehr in Sichtweite.':`Zu weit weg zum Ansprechen – ${Math.round(selectedNpcDistance)} m.`}</span>{selectedNpcDistance!==null&&<button onClick={()=>{setAutoWalkTargetId('');setApproachNpcId(selected.id)}}>{approachNpcId===selected.id?'GEHE …':'GEHE HIN'}</button>}</div>}</aside>}
+      {selected&&<aside><div className="head"><PersonPortrait id={selected.id} role={selected.assignments?.find((item:any)=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={52} title={personSceneLabel(selected)}/><div><small>NPC · LOKAL</small><b>{personSceneLabel(selected)}</b><span>{selected.identityState!=='known'&&selected.observableDescription&&selected.observableDescription!==personSceneLabel(selected)?selected.observableDescription+' · ':''}{role(selected)}</span></div><button onClick={()=>setSelected(null)}>×</button></div><div className="facts"><span>Aktivität</span><b>{selectedActionActive?'geht voraus':selected.activityState}</b><span>Letzte Aktion</span><b>{selectedActionActive?(activeActionForSelected?.type==='visit_place'?`geht zu ${activeActionForSelected.targetName}`:(activeActionForSelected?.playerFollows?'führt dich den Weg entlang':'geht den Weg entlang')):selected.lastAction??'–'}</b></div>{(conversationByNpc[selected.id]??[]).map((entry,index)=><p key={`${entry.role}-${index}`}><b>{entry.role==='user'?'Du':selected.displayName}:</b> „{entry.content}“</p>)}{canTalkToSelected?<><div className="chat"><input value={message} maxLength={80} disabled={conversationEnd.isEnded(selected.id)} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={conversationEnd.isEnded(selected.id)?CONVERSATION_ENDED_PLACEHOLDER:'Kurze Antwort …'}/><button disabled={sending||conversationEnd.isEnded(selected.id)||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/80</div></>:<div className="chat"><span style={{flex:1,alignSelf:'center',fontSize:11,color:'#9fb0bb'}}>{selectedNpcDistance===null?'Nicht mehr in Sichtweite.':`Zu weit weg zum Ansprechen – ${Math.round(selectedNpcDistance)} m.`}</span>{selectedNpcDistance!==null&&<button onClick={()=>{setAutoWalkTargetId('');setApproachNpcId(selected.id)}}>{approachNpcId===selected.id?'GEHE …':'GEHE HIN'}</button>}</div>}</aside>}
     </div>
     <EarthBuildingAccessLayer request={entryRequest} companion={interiorCompanion} onClose={()=>setEntryRequest(null)}/>
     <style jsx>{`

@@ -1,6 +1,8 @@
 'use client'
 
 // app/world-lab/WorldPanels.tsx
+// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
+// Version:      1.1.0
 // Tafeln der Weltkarte: Person, Gebäude, Innenraum.
 //
 // Grundsatz (Thomas, 25.10.2026 – in der alten Szene lagen Tafeln übereinander):
@@ -30,6 +32,7 @@ import LandPanel from './LandPanel'
 import TicketCounter from '@/app/components/TicketCounter'
 import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
+import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 
 export type Panel =
   | { kind: 'none' }
@@ -134,6 +137,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [conversations, setConversations] = useState<Record<string, Line[]>>({})
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const conversationEnd = useConversationEnd()
   const [walking, setWalking] = useState(false)
   /** Wer gerade wohin unterwegs ist (aus einem Gespräch): Person → NOXIA-Gebäude. */
   const [visits, setVisits] = useState<Record<string, string>>({})
@@ -465,7 +469,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   }
 
   async function talk() {
-    if (!person || !engine || !message.trim() || sending) return
+    if (!person || !engine || !message.trim() || sending || conversationEnd.isEnded(person.id)) return
     const playerMessage = message.trim().slice(0, 80)
     const history = conversations[person.id] ?? []
     // Was die Person von ihrem Platz aus sehen kann (45 m): NOXIA-Gebäude,
@@ -504,6 +508,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       const reply = response.ok && json.reply ? String(json.reply) : 'Die Person kann gerade nicht antworten.'
       setConversations(current => ({ ...current, [person.id]: [...(current[person.id] ?? []), { role: 'user' as const, content: playerMessage }, { role: 'assistant' as const, content: reply }].slice(-10) }))
       if (response.ok) setMessage('')
+      if (conversationEnd.noteReply(person.id, json)) return
       const action = json?.worldAction
       if (action?.type === 'visit_place') {
         const building = noxia.find(item => item.id === action.targetRef)
@@ -555,7 +560,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <dl><dt>Tut gerade</dt><dd>{leading[person.id] ? 'geht voraus' : visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
-        ? <div className="row"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Ansprechen …" autoFocus/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+        ? <div className="row"><input value={message} maxLength={80} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         : <div className="row"><span>{personDistance === null ? 'Nicht in Sichtweite.' : `${Math.round(personDistance)} m entfernt – zu weit zum Ansprechen.`}</span>{personDistance !== null && <button onClick={() => walkTo(() => engine?.personAt(person.id) ?? null, TALK_RANGE_M - 2)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
     </>}
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}

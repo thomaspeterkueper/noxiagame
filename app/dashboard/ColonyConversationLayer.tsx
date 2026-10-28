@@ -1,6 +1,11 @@
 'use client'
 
+// app/dashboard/ColonyConversationLayer.tsx
+// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
+// Version:      1.1.0
+
 import { useEffect, useMemo, useState } from 'react'
+import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { virtualDayProgress } from '@/lib/game/npcDailyRoutine'
 import { simulateNpcSpatialState } from '@/lib/game/npcSpatialSimulation'
@@ -31,6 +36,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
   const[message,setMessage]=useState('')
   const[history,setHistory]=useState<ChatEntry[]>([])
   const[sending,setSending]=useState(false)
+  const conversationEnd=useConversationEnd()
   const[chatError,setChatError]=useState('')
 
   useEffect(()=>{
@@ -111,7 +117,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
   },[scene?.mode,scene?.first.id,scene?.second?.id,scene?.conversation.item.id])
 
   async function sendMessage(){
-    if(!scene||!scene.playerNearby||sending)return
+    if(!scene||!scene.playerNearby||sending||conversationEnd.isEnded(scene.first.id))return
     const player=message.trim().slice(0,MAX_PLAYER_CHARS)
     if(!player)return
     setSending(true)
@@ -136,6 +142,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
       if(!response.ok||!data.reply)throw new Error(data.error||'conversation_failed')
       setHistory(current=>[...current,{role:'user' as const,content:player},{role:'assistant' as const,content:String(data.reply)}].slice(-10))
       setMessage('')
+      conversationEnd.noteReply(scene.first.id,data)
     }catch(error){
       const code=error instanceof Error?error.message:''
       setChatError(code==='conversation_provider_unavailable'?'DeepSeek ist noch nicht konfiguriert.':code==='unauthorized'?'Sitzung abgelaufen.':'Gespräch derzeit nicht erreichbar.')
@@ -157,8 +164,8 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
       {scene.playerNearby&&!joining&&<button onClick={()=>setJoining(true)} style={{width:'100%',margin:'7px 0',padding:'8px 10px',border:'1px solid #3976a5',borderRadius:6,background:'#0a3150',color:'#fff',fontWeight:800,cursor:'pointer'}}>ANSPRECHEN</button>}
       {scene.playerNearby&&joining&&<div style={{marginTop:8}}>
         <div style={{display:'flex',gap:6}}>
-          <input value={message} maxLength={MAX_PLAYER_CHARS} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void sendMessage()}} placeholder="Kurze Antwort …" disabled={sending} autoFocus={scene.mode==='direct'} style={{flex:1,minWidth:0,padding:'8px 9px',border:'1px solid #45657c',borderRadius:6,background:'#06111a',color:'#eef5f8'}}/>
-          <button onClick={()=>void sendMessage()} disabled={sending||!message.trim()} style={{border:'1px solid #3976a5',borderRadius:6,background:'#0a3150',color:'#fff',padding:'0 10px',cursor:sending?'wait':'pointer'}}>{sending?'…':'Senden'}</button>
+          <input value={message} maxLength={MAX_PLAYER_CHARS} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void sendMessage()}} placeholder={conversationEnd.isEnded(scene.first.id)?CONVERSATION_ENDED_PLACEHOLDER:'Kurze Antwort …'} disabled={sending||conversationEnd.isEnded(scene.first.id)} autoFocus={scene.mode==='direct'} style={{flex:1,minWidth:0,padding:'8px 9px',border:'1px solid #45657c',borderRadius:6,background:'#06111a',color:'#eef5f8'}}/>
+          <button onClick={()=>void sendMessage()} disabled={sending||conversationEnd.isEnded(scene.first.id)||!message.trim()} style={{border:'1px solid #3976a5',borderRadius:6,background:'#0a3150',color:'#fff',padding:'0 10px',cursor:sending?'wait':'pointer'}}>{sending?'…':'Senden'}</button>
         </div>
         <div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/{MAX_PLAYER_CHARS}</div>
         {chatError&&<div style={{marginTop:5,color:'#e29a86',fontSize:10}}>{chatError}</div>}
