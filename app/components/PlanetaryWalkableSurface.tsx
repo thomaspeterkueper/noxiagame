@@ -1,9 +1,10 @@
 'use client'
-// Aktualisiert: 27.10.2026 — Klick auf freie Fläche zeigt Bauhinweis mit Weg in die Bauplanung; WASD läuft bis an die Wand statt ganz stehenzubleiben
-// Version:      1.1.0
+// Aktualisiert: 28.10.2026 — Laufweg für die Verhaltensaufzeichnung; 27.10.2026: Klick auf freie Fläche zeigt Bauhinweis mit Weg in die Bauplanung; WASD läuft bis an die Wand statt ganz stehenzubleiben
+// Version:      1.2.0
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
+import { reportPlayerPosition } from '@/lib/telemetry/playerActivity'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { buildPlanetaryLocalScene } from '@/lib/game/spatial/planetaryLocalScene'
 import { buildSurfaceDecor } from '@/lib/game/spatial/surfaceDecor'
@@ -69,6 +70,7 @@ export default function PlanetaryWalkableSurface({
   const[spatial,setSpatial]=useState<SpatialPayload|null>(null)
   const[error,setError]=useState<string|null>(null)
   const[player,setPlayer]=useState<Point>({xM:0,yM:0})
+  useEffect(()=>{reportPlayerPosition(locationSlug,player.xM,player.yM)},[player,locationSlug])
   const[selectedId,setSelectedId]=useState('')
   const[autoWalkId,setAutoWalkId]=useState('')
   const[hoveredBuildingId,setHoveredBuildingId]=useState<string|null>(null)

@@ -1,6 +1,8 @@
 'use client'
 
 // app/interiors/WalkableInterior.tsx
+// Aktualisiert: 28.10.2026 — Laufweg der Spielfigur für die Verhaltensaufzeichnung der Testphase
+// Version:      1.1.0
 // Ein Bedienmodell für alle Gebäude (NOXIA-INTERIOR-0001): Bewegung, Hinsetzen,
 // Wege um die Möbel, Personen wählen, Porträt und Gespräch, Bedienplatz mit
 // Begrüßung, Besucher, die kommen und gehen, rechte Tafel mit dem Nötigen.
@@ -10,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
+import { reportPlayerPosition } from '@/lib/telemetry/playerActivity'
 import { NpcFigure, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import { PersonPortrait } from '@/lib/grid/PersonPortrait'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
@@ -159,6 +162,8 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const[satAt,setSatAt]=useState(0)
   const walk=useRef<ReturnType<typeof setInterval>|null>(null)
   const posRef=useRef<Point>(layout.start)
+  // Laufweg für die Auswertung (Einheit: 10 px), gedrosselt in reportPlayerPosition.
+  useEffect(()=>{reportPlayerPosition('interior:'+entityId,pos.x/10,pos.y/10)},[pos,entityId])
   const greeted=useRef(false)
   const[gates,setGates]=useState<GateView[]>([])
   const[learning,setLearning]=useState<string|null>(null)
