@@ -1,12 +1,11 @@
 // lib/game/gameCalendar.ts
 // Erstellt:     28.10.2026
 // Aktualisiert: 28.10.2026 — Gemeinsame Quelle für das Spieljahr und das Alter von Personen (Request R-11)
-// Version:      1.0.0
+// Version:      1.0.1
 //
 // Rein, ohne DB. Ein Tick ist eine Stunde Koloniezeit (circadian.ts). Das Spiel
 // beginnt im Jahr, das die Kopfzeile zeigt (DashboardCockpit: „NOXIA 2086“).
-// [OFFEN, Thomas] Kanon nennt für NOXIA „um 2100+“ (docs/characters/adar-berger-line.md);
-// die Oberfläche zeigt 2086. Bis das entschieden ist, gilt hier 2086.
+// Entschieden (Thomas, 28.10.2026): Spielbeginn 2086.
 
 export const GAME_START_YEAR = 2086
 export const TICKS_PER_DAY = 24

@@ -35,12 +35,14 @@ Drei gemeinsame Kinder, in den Planungsdokumenten über ihre Geburt strukturiert
 
 1. **Keine Namen erfinden.** Weder für die drei Kinder mit Peter Berger noch für Sorayas Nachkommen. NOXIA füllt die offene Tür nicht.
 2. Bewohner der Simulation dürfen nicht als Nachkommen der Linie ausgegeben werden. Entsteht im Spiel eine Figur, die dafür in Frage käme, entscheidet Thomas, ob sie kanonisch wird.
-3. Zeitachse: NOXIA spielt um 2100+. **Beide leben noch** (Thomas, 27.10.2026): Soraya ist um die 75, Zereya um die 99. **Sie leben auf dem Mars in Mishkan Avi** (Name: Thomas, 27.10.2026), einer neuen, sehr kleinen Siedlung direkt am Valles Marineris nahe dem Monolithen. Entwurf: `docs/worldbuilding/mishkan-avi.md`. Im Spiel noch nicht angelegt. Sehr klein heißt: Außenposten (Stufe 0), Hafenkantine mit Automat, ein eigener Dialekt des Marsianischen mit vermutlich stärkerer Mishkenaz-Schicht als anderswo.
+3. Zeitachse: **NOXIA beginnt 2086** (Thomas, 28.10.2026; `lib/game/gameCalendar.ts`, ein Spieljahr = 8 760 Ticks). **Beide leben noch** (Thomas, 27.10.2026): Soraya ist 61, Zereya 85. Soraya ist gerade erst auf dem Mars angekommen, Zereya kommt in diesem Jahr nach; der Monolith unter dem Valles Marineris wird erst 2087 entdeckt – im Spiel also etwa ein Jahr nach Spielbeginn. **Sie leben auf dem Mars in Mishkan Avi** (Name: Thomas, 27.10.2026), einer neuen, sehr kleinen Siedlung direkt am Valles Marineris nahe dem Monolithen. Entwurf: `docs/worldbuilding/mishkan-avi.md`. Der Ort ist angelegt (27.10.2026), die beiden noch nicht. Sehr klein heißt: Außenposten (Stufe 0), Hafenkantine mit Automat, ein eigener Dialekt des Marsianischen mit vermutlich stärkerer Mishkenaz-Schicht als anderswo.
 4. Wissen: Figuren der Simulation kennen Zereya und Soraya höchstens als Namen der Gründungszeit (Hörensagen, *-nga*), nicht ihre Biografie, solange sie ihnen nicht begegnet sind.
 
 ## Offen
 
-Entschieden am 27.10.2026: Soraya kam 2085–2086 zum Mars, Zereya 2086; beide leben um 2100+ in einer neuen, sehr kleinen Siedlung direkt am Valles Marineris.
+Entschieden am 27.10.2026: Soraya kam 2085–2086 zum Mars, Zereya 2086; beide leben in einer neuen, sehr kleinen Siedlung direkt am Valles Marineris. Spielbeginn 2086 (28.10.2026).
+
+- [OFFEN] Die Entdeckung des Monolithen (2087) liegt im Spiel in der Zukunft. Soll sie als Ereignis im Spiel geschehen, etwa nach einem Spieljahr – und ist Mishkan Avi bis dahin ein Ort, an dem noch niemand weiß, warum Soraya hier ist?
 
 - Siedlung: Mishkan Avi, Rand der Melas Chasma, etwa 12 Bewohner (Annahmen, von Thomas am 27.10.2026 bestätigt) – siehe `docs/worldbuilding/mishkan-avi.md`.
 - [OFFEN] Hat Soraya auf dem Mond Spuren hinterlassen – Mishkenaz-Wörter im Mond-Dialekt, Menschen, die sie dort kannten?

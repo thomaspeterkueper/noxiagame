@@ -193,7 +193,7 @@ Entscheidung Thomas, 25.10.2026: Über einer Figur steht in der Spielansicht nur
 - **Nur bei Personen, deren Namen der Spieler kennt oder vermutet.** Der Wissenssatz verlangt einen Namen.
 - **Spieljahr:** `lib/game/gameCalendar.ts` (`gameYearForTick`, `ageAtTick`). Start 2086 wie in der Kopfzeile, ein Jahr = 8 760 Ticks.
 - `GET /api/game/population` und `/api/game/hospitality/guests` liefern `knownAgeYears`; `ColonyResident` hat das Feld.
-- **[OFFEN, Thomas]:** Die Kopfzeile zeigt 2086, der Kanon zu Zereya und Soraya sagt „NOXIA um 2100+“. Welches Jahr gilt? Es ist eine Konstante (`GAME_START_YEAR`).
+- **Entschieden (Thomas, 28.10.2026): Spielbeginn 2086.** `adar-berger-line.md` und `mishkan-avi.md` angepasst (Soraya 61, Zereya 85; der Monolith wird erst 2087 entdeckt).
 
 ### R-12 (Erdkarte, 25.10.2026): Bestehende Gebäude der Erdkarte kaufen
 

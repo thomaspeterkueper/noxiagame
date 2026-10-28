@@ -7,7 +7,7 @@ Notation: **[W]** von Thomas festgelegt, **[S]** Annahme für NOXIA, **[R]** rea
 ## Wesen
 
 - [W] Neue, sehr kleine Siedlung direkt am Valles Marineris, nahe dem Monolithen der Axis Kammer (entdeckt 2087).
-- [W] Hier leben um 2100+ Zereya (um die 99) und ihre Tochter Soraya Adar (um die 75). Soraya kam 2085–2086 zum Mars, Zereya 2086.
+- [W] Hier leben Zereya (85) und ihre Tochter Soraya Adar (61). Soraya kam 2085–2086 zum Mars, Zereya 2086 – also gerade zum Spielbeginn 2086 (Thomas, 28.10.2026). Die Siedlung ist entsprechend neu. Der Monolith wird erst 2087 entdeckt.
 - [S] Kein Handelsplatz und keine Werft. Ein stiller Ort, den man nicht zufällig findet: Wer hierher kommt, will hierher.
 
 ## Lage
