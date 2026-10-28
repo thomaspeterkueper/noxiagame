@@ -40,7 +40,7 @@ export type Panel =
   | { kind: 'plot'; source: string }
   | { kind: 'parcel'; id: string; at: GeoPoint }
   /** Boden ohne geladenes Flurstück: Flurstück nachladen oder freies Land abstecken (28.10.2026) */
-  | { kind: 'land'; at: GeoPoint }
+  | { kind: 'land'; at: GeoPoint; /** Teilstück aus diesem Flurstück */ parentId?: string }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark; source?: string }
   /** Reise buchen fern von Sundern (Heim- und Weiterreise, 27.10.2026) */
@@ -80,7 +80,7 @@ type Line = { role: 'user' | 'assistant'; content: string }
  */
 type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
@@ -660,7 +660,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <div className="head"><div><small>WEITERREISE</small><b>Reise buchen</b><span>Bahnhof und Flughafen in der Nähe</span></div><button onClick={close} aria-label="Schließen">×</button></div>
       <TravelAgency from={panel.at} onBooked={trip => { setPanel({ kind: 'none' }); onTripBooked?.(trip) }}/>
     </>}
-    {panel.kind === 'land' && <LandPanel key={panel.at.lat + ',' + panel.at.lon} engine={engine} at={panel.at} close={close} open={next => setPanel(next)} onParcelsChanged={onParcelsChanged} onWorldChanged={onWorldChanged}/>}
+    {panel.kind === 'land' && <LandPanel key={panel.at.lat + ',' + panel.at.lon + (panel.parentId ?? '')} engine={engine} at={panel.at} parentId={panel.parentId} close={close} open={next => setPanel(next)} onParcelsChanged={onParcelsChanged} onWorldChanged={onWorldChanged}/>}
     {panel.kind === 'parcel' && <>
       <div className="head"><div><small>FLURSTÜCK</small><b>{parcel?.label ?? 'Flurstück'}</b>{parcel && <span>{parcel.areaM2.toLocaleString('de-DE')} m²{parcel.usage ? ' · ' + parcel.usage : ''}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       {parcel === undefined && <p>Wird geladen …</p>}
@@ -675,7 +675,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           {parcel.land && parcel.land.potential.length > 0 && <><dt>Ertrag</dt><dd>{parcel.land.potential.join(' · ')} <small>(geschätzt)</small></dd></>}
         </dl>
         {parcel.forSale && <div className="row"><span>{buyError || (parcel.listed ? `Angebot von ${parcel.seller} – das Geld geht an ihn (abzüglich Steuer), Häuser und Bewohner gehen mit.` : `Das Geld geht an ${parcel.seller ?? 'die Gemeinde'}.`)}</span><button disabled={buying} onClick={() => void buyParcel()}>{buying ? '…' : 'Kaufen'}</button></div>}
-        {!parcel.forSale && !parcel.own && <div className="row"><span>Nicht verkäuflich: {parcel.reason}</span></div>}
+        {!parcel.forSale && !parcel.own && !parcel.partsOnly && <div className="row"><span>Nicht verkäuflich: {parcel.reason}</span></div>}
+        {/* Teilstück abstecken (Sundern, 28.10.2026): große Flurstücke der Gemeinde stückweise */}
+        {!parcel.owned && ((parcel.forSale && !parcel.listed) || parcel.partsOnly) && parcel.areaM2 >= 600 && <div className="row"><span>{parcel.partsOnly ? parcel.reason : 'Zu groß oder zu teuer?'} Ein Stück hier abstecken, auch länglich.</span><button disabled={buying} onClick={() => setPanel({ kind: 'land', at: panel.at, parentId: parcel.id })}>Teilstück</button></div>}
         {parcel.own && <>
           <p>Hier bauen (an der angeklickten Stelle):</p>
           {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}

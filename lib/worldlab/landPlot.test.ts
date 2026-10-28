@@ -43,3 +43,17 @@ describe('Straßen-Flurstück ohne Nutzungsart', () => {
     expect(looksLikeStreetParcel([{ x: 0, y: 4 }, { x: 25, y: 4 }, { x: 25, y: 40 }, { x: 0, y: 40 }], [road])).toBe(false)
   })
 })
+
+describe('Teilstücke', () => {
+  it('liegt ganz im Flurstück oder nicht', async () => {
+    const { polygonInside, smallestContaining } = await import('./landPlot')
+    const field = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 60 }, { x: 0, y: 60 }]
+    expect(polygonInside([{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 50 }, { x: 10, y: 50 }], field)).toBe(true)
+    expect(polygonInside([{ x: 90, y: 10 }, { x: 110, y: 10 }, { x: 110, y: 50 }, { x: 90, y: 50 }], field)).toBe(false)
+    // L-förmiges Flurstück: Ecken drin, aber die Kante geht durch die Lücke
+    const ell = [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 20 }, { x: 20, y: 20 }, { x: 20, y: 60 }, { x: 0, y: 60 }]
+    expect(polygonInside([{ x: 10, y: 10 }, { x: 50, y: 10 }, { x: 50, y: 15 }, { x: 10, y: 50 }], ell)).toBe(false)
+    const items = [{ id: 'flur', a: 6000 }, { id: 'teil', a: 800 }, { id: 'fern', a: 10 }]
+    expect(smallestContaining(items, item => item.id !== 'fern', item => item.a)?.id).toBe('teil')
+  })
+})

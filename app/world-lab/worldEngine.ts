@@ -1506,12 +1506,16 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   function parcelAtWorld(p: { x: number; y: number }): string | null {
     const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
     const entry = loaded.get(tileKey({ x: tx, y: ty }))
+    // Das kleinste Flurstück am Punkt: ein abgestecktes Teilstück geht dem Flurstück vor, in dem es liegt.
+    let best: string | null = null, bestArea = Infinity
     for (const parcel of entry?.data.parcels ?? []) {
       const ring: Array<{ x: number; y: number }> = []
       for (let i = 0; i + 1 < parcel.p.length; i += 2) ring.push({ x: entry!.ox + parcel.p[i], y: entry!.oy + parcel.p[i + 1] })
-      if (insidePolygon(p, ring)) return parcel.i
+      if (!insidePolygon(p, ring)) continue
+      const area = Math.abs(ring.reduce((sum, a, i) => { const b = ring[(i + 1) % ring.length]; return sum + a.x * b.y - b.x * a.y }, 0)) / 2
+      if (area < bestArea) { best = parcel.i; bestArea = area }
     }
-    return null
+    return best
   }
   function drawPlots() {
     for (const child of plotLayer.removeChildren()) child.destroy({ children: true })
@@ -1845,7 +1849,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
           if (d < 50 && (!best || d < best.d)) best = { d, angle: Math.atan2(dy, dx) * 180 / Math.PI }
         }
       }
-      return best ? Math.round(((best.angle % 90) + 90) % 90) : null
+      // Halbkreis: längliche Stücke liegen mit der Breite an der Straße
+      return best ? Math.round(((best.angle % 180) + 180) % 180) : null
     },
     setLandPreview(ring, ok) {
       landPreview.clear()
