@@ -375,3 +375,41 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut. Details: `docs/architectur
 - **Ortsaktivität:** `REAL_PLACE_HOSTS` in `realPlaceActivity.ts` trägt alle Gastgeber; ein Ort kann ein realer Ort oder ein gebautes Gebäude sein.
 - **Baukatalog:** `resonance_place` (1500 Cr, 2 Ticks) über den normalen Spielerbau.
 - **Station:** Bewohner gehen in `PlanetaryWalkableSurface.tsx` durch die belüfteten Gänge zu Arbeit und Wohnung statt auf einem Zufallsgang.
+
+### R-20 (Gastronomie, 28.10.2026): Spieler arbeiten im Lokal – Stellen, Schicht, Lohn und Trinkgeld
+
+Thomas, 28.10.2026: „Man sollte auch im Club arbeiten können.“ Entschieden:
+- echte Tätigkeit, eine Schicht ist eine Spielstunde;
+- Stundenlohn vom Betreiber plus Trinkgeld der Gäste;
+- Stellen: Türsteher, Barkeeper, DJ, Putzkraft im Club; in den anderen Lokalen Bedienung, Empfang und Putzkraft.
+
+Das ist ein Teil von Aufgabe 12 hier („Angebote für Spieler als Daten“).
+
+**Was schon da ist (Gastronomie):**
+- Regeln in `lib/game/hospitality/playerShift.ts`, mit Tests:
+  - Stellen je Lokal und Arbeitsplatz je Stelle;
+  - Aufgaben aus echten Gästen (ausgeben, einlassen, begrüßen, Tisch abwischen) und aus festen Pflichten (Gläser spülen, Kontrollgang, Musik wählen, Boden wischen, Toilette putzen);
+  - Lohn anteilig.
+- Im Innenraum zeigt die Tafel „Arbeiten“ die freien Stellen. In der Schicht trägt die Figur die Stelle als Plakette, die Aufgaben sind im Raum markiert, „Hingehen“ führt hin und „Erledigen“ hakt sie ab. Der DJ wählt die Musik, und die Tanzfläche wechselt die Farbe.
+- Kollegen und Gäste wissen, dass der Spieler hier arbeitet. Im Club öffnet die Schicht den Einlass.
+- **Ohne Server läuft alles als Probeschicht ohne Lohn.** Sobald `/api/game/hospitality/shift` antwortet, schaltet der Innenraum von selbst auf echte Schichten um.
+
+**Bitte – Schnittstelle, wie der Innenraum sie schon aufruft:**
+
+| Aufruf | Antwort |
+|---|---|
+| `GET /api/game/hospitality/shift?tileEntityId=…` | `{ open: ShiftRole[], wages: { [role]: CrJeStunde }, active: { shiftId, role, startedAt, wagePerHour } \| null, note? }` |
+| `POST { tileEntityId, action: 'start', role }` | `{ shiftId, startedAt, wagePerHour }` oder `4xx { error }` |
+| `POST { tileEntityId, action: 'task', shiftId, taskKey, kind, guest }` | `{ tip?, credits? }` |
+| `POST { tileEntityId, action: 'end', shiftId }` | `{ wage, tips, credits }` |
+
+`open` sind die freien Stellen. Rollen: `door`, `bar`, `dj`, `service`, `reception`, `cleaning`.
+
+1. **Freie Stellen:** `staff_capacity` abzüglich Personal und laufender Spielerschichten. Die Rolle muss zum Lokal passen (`shiftRolesFor`). Je Spieler eine Schicht zur Zeit, nur während der Öffnungszeit.
+2. **Lohn:** anteilig bis zu einer Stunde (`shiftWage`), vom Arbeitgeber wie bei `pay_npc_wage`: Konto des Betreibers, sonst des Eigentümers, sonst des Ortes. Ein zahlungsunfähiger Arbeitgeber bietet keine Stelle an (LIVING-0010).
+   - Vorschlag in `PROPOSED_WAGE_PER_HOUR`: Tür 9, Tresen 8, DJ 10, Bedienung 7, Empfang 7, Putzen 6 Cr je Stunde.
+   - Neue Lohnschlüssel `security`, `dj` und `cleaning` in `role_wage_rates`.
+3. **Trinkgeld:** Für Aufgaben mit `guest: true` gibt ein echter Gast etwas aus seinem eigenen Konto, nur wenn er es hat. Der Server prüft, dass `taskKey` zu einem Besuch dieses Lokals passt (`serve:<person>:<ms>`).
+4. **Missbrauch:** Aufgaben je Minute begrenzen. Eine Schicht endet spätestens nach einer Stunde, auch ohne `end`.
+5. **Später:** Wer öfter dort arbeitet, könnte fest angestellt werden (`person_assignments` für Spieler) – das wäre eine eigene Entscheidung.
+

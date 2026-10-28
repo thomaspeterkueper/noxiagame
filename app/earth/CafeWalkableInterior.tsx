@@ -17,6 +17,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
 import { spokenOrderItems, spokenOrderTitle } from '@/lib/game/hospitality/spokenOrder'
+import { MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_S, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
 import { VENUE_WC_DOOR, toiletAccess, venueServiceRules, type VenueServiceRules } from '@/lib/game/hospitality/venueServices'
 import {
   isAtServicePoint,
@@ -205,47 +206,142 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const readyText=conversion?.readyAt?new Date(conversion.readyAt).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'}):null
   const canteenHint=arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''
 
-  const fitting:InteriorFitting={
-    kind:layout.kind,layout,noun:layout.noun,locative:layout.locative,sectionLabel:'LOKAL',
-    headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(kind,hours):undefined,
-    service,
-    closedText:figures=>{
-      if(underConversion)return{headline:'IM UMBAU',detail:'Dieses Haus wird gerade zum '+layout.noun+' umgebaut'+(readyText?'; fertig etwa '+readyText+'.':'.')+' Bis dahin ist hier Baustelle.'}
-      if(emptyHouse)return{headline:'LEER',detail:'Dieses Haus gehört jemandem, hat aber noch keine Nutzung. Ein Umbau zum Lokal wird auf der Karte am Gebäude beauftragt.'}
-      const reason=venueClosedReason(layout,figures,playerHour,hours)
-      if(!reason)return null
-      return reason==='hours'
-        ?{headline:'GESCHLOSSEN',detail:'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(kind,hours)+' '+clockLabel(hours)+'; jetzt ist es '+playerHour+' Uhr.'+canteenHint}
-        :{headline:'GESCHLOSSEN',detail:'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}
-    },
-    furnitureLabel:(kind,svc)=>kind==='counter'?(svc==='self-service'?'AUTOMAT':'TRESEN'):kind==='kitchen'?'KÜCHE':kind==='desk'?'EMPFANG':kind==='stairs'?(hasUpperFloor(upper)?(upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'):layout.kind==='hotel'?'ZIMMER ↑':null):null,
-    decor:DECOR[layout.kind],
-    counterDressing:<><i className="machine"/><i className="vitrine"><HospitalityItemIcon code="cake" size={14}/><HospitalityItemIcon code="snack" size={14}/></i></>,
-    visits,
-    facts:(self,ctx)=>venueConversationFacts({
-      layout,buildingName:houseName,self,figures:ctx.figures,servingPlayer:self.id===ctx.waiterId&&ctx.atTable,playerPos:ctx.pos,playerSeat:ctx.seat,joinedPlayer:ctx.joined===self.id,arrivalPoint,
-      menu:menu?.items.length&&ctx.service!=='closed'?menu.items:[],
-      playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),
-      giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
-      ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
-      hour:playerHour,hours,upper,rooms,
-      toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
-      entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid}:null,
-    }),
-    placeKnowledge,
-    // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
-    hearsay:self=>self.roomRole==='staff'?heard:[],
-    // Jedes Haus führt Neue auf seine Art ein – nur wer hier arbeitet.
-    introduction:self=>self.roomRole==='staff'?venueIntroduction(kind,upper?.guestRooms??0):undefined,
-    things,
-    idleText:menuState==='ready'&&menu?.items.length?undefined:undefined,
-    greetsAtService:true,
-    goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.servicePoint.locative==='am Empfang'?'Zum Empfang gehen':'Zum Tresen gehen',
-    tableService:true,
-    loaded:true,
-    gate:layout.entry?{open:entryPaid,blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,
-    sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:'Zur Toilette',useLabel:'WC BENUTZEN',use:ctx=>ctx.setStatus(toiletAccess(serviceRules.toilet,{hasOrdered:orders.length>0}).text)},
-    renderOffer:ctx=>{
+  // ── Arbeiten im Lokal (Thomas, 28.10.2026) ──────────────────────────────
+  // Stellen und Lohn kommen vom Server (/api/game/hospitality/shift, R-20). Gibt es
+  // den Weg noch nicht, läuft die Schicht als Probeschicht ohne Lohn.
+  type Shift={role:ShiftRole;startedAtMs:number;shiftId:string|null;wagePerHour:number}
+  type Jobs={server:boolean;open:ShiftRole[];wages:Partial<Record<ShiftRole,number>>;note?:string}
+  const[jobs,setJobs]=useState<Jobs|null>(null)
+  const[shift,setShift]=useState<Shift|null>(null)
+  const[shiftDone,setShiftDone]=useState<string[]>([])
+  const[shiftStats,setShiftStats]=useState({tasks:0,guests:0,tips:0})
+  const[music,setMusic]=useState<MusicStyle>('House')
+  const[shiftBusy,setShiftBusy]=useState(false)
+  // Personalplätze, die bei Schichtbeginn schon besetzt waren – der eigene Arbeitsplatz ist ein freier.
+  const[stationTaken,setStationTaken]=useState<string[]>([])
+  const seatOf=useRef(new Map<string,{x:number;y:number}>())
+  const roles=shiftRolesFor(kind)
+
+  async function shiftApi(body:Record<string,unknown>|null){
+    const{token}=await getSessionInfo()
+    const response=await fetch('/api/game/hospitality/shift'+(body?'':'?tileEntityId='+encodeURIComponent(entityId)),body?{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({tileEntityId:entityId,...body})}:{headers:{Authorization:'Bearer '+token},cache:'no-store'})
+    const data=await response.json().catch(()=>({}))
+    return{ok:response.ok,status:response.status,data}
+  }
+  // Offene Stellen und eine laufende Schicht (nach dem Neuladen) holen.
+  useEffect(()=>{
+    let live=true
+    ;(async()=>{
+      try{
+        const r=await shiftApi(null)
+        if(!live)return
+        if(r.ok&&Array.isArray(r.data.open)){
+          setJobs({server:true,open:r.data.open.filter((role:string)=>roles.includes(role as ShiftRole)),wages:r.data.wages??{},note:r.data.note})
+          if(r.data.active?.role)setShift({role:r.data.active.role,startedAtMs:Date.parse(r.data.active.startedAt),shiftId:String(r.data.active.shiftId),wagePerHour:Number(r.data.active.wagePerHour??0)})
+          return
+        }
+      }catch{/* kein Arbeitsmarkt für Spieler – Probeschicht */}
+      if(live)setJobs({server:false,open:roles,wages:{}})
+    })()
+    return()=>{live=false}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[entityId,kind])
+  // Wo Gäste gesessen haben – damit die Putzkraft weiß, welcher Tisch abzuwischen ist.
+  useEffect(()=>{
+    const ctx=ctxRef.current
+    if(!ctx)return
+    ctx.moments.forEach((moment,id)=>{if(moment.phase==='seated')seatOf.current.set(id,{x:moment.spot.x,y:moment.spot.y})})
+  },[nowMs])
+
+  const shiftVisits=visits.map(visit=>({personId:visit.resident.id,startMs:visit.fetchedAt-visit.ageSeconds*1000,seat:seatOf.current.get(visit.resident.id)??null,label:visit.label}))
+  const tasks:ShiftTask[]=shift?shiftTasks({role:shift.role,layout,taken:new Set(stationTaken),startedAtMs:shift.startedAtMs,nowMs,visits:shiftVisits,done:new Set(shiftDone)}):[]
+  const shiftLeftS=shift?Math.max(0,Math.round(SHIFT_S-(nowMs-shift.startedAtMs)/1000)):0
+
+  const taskCount=(n:number)=>n===1?'1 Aufgabe':n+' Aufgaben'
+  async function startShift(role:ShiftRole){
+    const ctx=ctxRef.current
+    if(!ctx||shiftBusy)return
+    setShiftBusy(true)
+    try{
+      let next:Shift={role,startedAtMs:Date.now(),shiftId:null,wagePerHour:jobs?.wages[role]??PROPOSED_WAGE_PER_HOUR[role]}
+      if(jobs?.server){
+        const r=await shiftApi({action:'start',role})
+        if(!r.ok){ctx.setStatus(String(r.data.error??'Die Stelle ist gerade nicht frei.'));return}
+        next={role,startedAtMs:Date.parse(r.data.startedAt??new Date().toISOString()),shiftId:String(r.data.shiftId),wagePerHour:Number(r.data.wagePerHour??next.wagePerHour)}
+      }
+      setShift(next);setShiftDone([]);setShiftStats({tasks:0,guests:0,tips:0})
+      const station=roleStation(layout,role,new Set(ctx.figures.filter(f=>f.roomRole==='staff').map(f=>f.spot.id)))
+      setStationTaken([...new Set(ctx.figures.filter(f=>f.roomRole==='staff').map(f=>f.spot.id))])
+      ctx.setStatus('Schicht als '+ROLE_LABEL[role]+' beginnt – dein Platz: '+station.label+'.')
+      // Erst nach dem Umschalten gehen – vorher gilt noch die Einlasssperre des Clubs.
+      setTimeout(()=>ctxRef.current?.walkTo(station),80)
+    }finally{setShiftBusy(false)}
+  }
+  async function completeTask(task:ShiftTask,extra?:{music?:MusicStyle}){
+    const ctx=ctxRef.current
+    if(!ctx||!shift)return
+    setShiftDone(current=>[...current,task.key].slice(-200))
+    if(extra?.music)setMusic(extra.music)
+    let tip=0
+    if(shift.shiftId){
+      try{const r=await shiftApi({action:'task',shiftId:shift.shiftId,taskKey:task.key,kind:task.kind,guest:task.guest});tip=Number(r.data.tip??0);if(typeof r.data.credits==='number')useGameStore.setState({credits:r.data.credits})}catch{/* zählt beim Abschluss */}
+    }
+    setShiftStats(current=>({tasks:current.tasks+1,guests:current.guests+(task.guest?1:0),tips:current.tips+tip}))
+    ctx.setStatus('Erledigt: '+task.label+(extra?.music?' – '+extra.music:'')+(tip>0?' · '+tip+' Cr Trinkgeld':'')+'.')
+  }
+  async function endShift(){
+    const ctx=ctxRef.current
+    if(!ctx||!shift||shiftBusy)return
+    setShiftBusy(true)
+    try{
+      const worked=shiftWage(shift.wagePerHour,shift.startedAtMs,Date.now())
+      if(shift.shiftId){
+        const r=await shiftApi({action:'end',shiftId:shift.shiftId})
+        if(r.ok){
+          if(typeof r.data.credits==='number')useGameStore.setState({credits:r.data.credits})
+          ctx.setStatus('Schicht beendet: '+taskCount(shiftStats.tasks)+', Lohn '+Number(r.data.wage??worked)+' Cr, Trinkgeld '+Number(r.data.tips??shiftStats.tips)+' Cr.')
+        }else ctx.setStatus(String(r.data.error??'Die Schicht konnte nicht abgerechnet werden; sie wird später abgerechnet.'))
+      }else ctx.setStatus('Probeschicht beendet: '+taskCount(shiftStats.tasks)+' erledigt. Lohn ('+worked+' Cr) gibt es, sobald Spieler hier angestellt werden können.')
+      setShift(null)
+    }finally{setShiftBusy(false)}
+  }
+  // Nach einer Spielstunde ist die Schicht vorbei.
+  useEffect(()=>{if(shift&&shiftLeftS<=0)void endShift()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[shift?.startedAtMs,shiftLeftS<=0])
+
+  const renderJobs=(ctx:InteriorContext)=>{
+    if(!jobs||roles.length===0||ctx.service==='closed'||underConversion||emptyHouse)return null
+    const open=roles.filter(role=>jobs.open.includes(role))
+    return <div className="menu jobs">
+      <small>ARBEITEN</small>
+      {open.length===0?<p className="hint">Gerade ist hier keine Stelle frei.</p>:<>
+        <p className="hint">{jobs.server?'Eine Schicht dauert eine Spielstunde. Lohn vom Betreiber, dazu Trinkgeld.':'Probeschicht: eine Spielstunde, noch ohne Lohn – bezahlt wird, sobald Spieler hier angestellt werden können.'}</p>
+        {open.map(role=><button key={role} className="tile-row" disabled={shiftBusy} onClick={()=>void startShift(role)} title={ROLE_DUTY[role]}>
+          <span>{ROLE_LABEL[role]}</span><b>{jobs.wages[role]??PROPOSED_WAGE_PER_HOUR[role]} Cr/Std{jobs.server?'':' (Vorschlag)'}</b><small>{ROLE_DUTY[role]}</small>
+        </button>)}
+      </>}
+    </div>
+  }
+  const renderShift=(ctx:InteriorContext)=>{
+    if(!shift)return null
+    const minutes=Math.ceil(shiftLeftS/60)
+    const near=(task:ShiftTask)=>Math.hypot(ctx.pos.x-task.at.x,ctx.pos.y-task.at.y)<46
+    return <div className="menu shift">
+      <small>SCHICHT · {ROLE_LABEL[shift.role].toUpperCase()}{shift.shiftId?'':' · PROBE'}</small>
+      <p>Noch {minutes} Min. · {shiftStats.tasks} erledigt{shiftStats.guests?' · '+shiftStats.guests+' Gäste':''}{shiftStats.tips?' · '+shiftStats.tips+' Cr Trinkgeld':''}{shift.role==='dj'?' · läuft: '+music:''}</p>
+      {tasks.length===0&&<p className="hint">Gerade ist nichts zu tun. {ROLE_DUTY[shift.role]}.</p>}
+      {tasks.slice(0,4).map(task=><div key={task.key} className="task">
+        <span>{task.label}</span>
+        {task.kind==='music'
+          ?(near(task)?<div className="for">{MUSIC_STYLES.map(style=><button key={style} className={style===music?'on':''} onClick={()=>void completeTask(task,{music:style})}>{style}</button>)}</div>:<button onClick={()=>ctx.walkTo(task.at)}>Hingehen</button>)
+          :near(task)?<button onClick={()=>void completeTask(task)}>Erledigen</button>:<button onClick={()=>ctx.walkTo(task.at)}>Hingehen</button>}
+      </div>)}
+      <button className="open-school" disabled={shiftBusy} onClick={()=>void endShift()}>Schicht beenden</button>
+    </div>
+  }
+
+  const customerOffer=(ctx:InteriorContext)=>{
       const hasMenu=Boolean(menu?.items.length)&&ctx.service!=='closed'
       // Nachtclub ohne Eintritt: nur die Kasse an der Tür.
       if(layout.entry&&!entryPaid&&ctx.service!=='closed'){
@@ -297,7 +393,53 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           </div>})()}
         </>}
       </div>
+    }
+
+  const fitting:InteriorFitting={
+    kind:layout.kind,layout,noun:layout.noun,locative:layout.locative,sectionLabel:'LOKAL',
+    headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(kind,hours):undefined,
+    service,
+    closedText:figures=>{
+      if(underConversion)return{headline:'IM UMBAU',detail:'Dieses Haus wird gerade zum '+layout.noun+' umgebaut'+(readyText?'; fertig etwa '+readyText+'.':'.')+' Bis dahin ist hier Baustelle.'}
+      if(emptyHouse)return{headline:'LEER',detail:'Dieses Haus gehört jemandem, hat aber noch keine Nutzung. Ein Umbau zum Lokal wird auf der Karte am Gebäude beauftragt.'}
+      const reason=venueClosedReason(layout,figures,playerHour,hours)
+      if(!reason)return null
+      return reason==='hours'
+        ?{headline:'GESCHLOSSEN',detail:'Dieses Lokal hat gerade geschlossen. Geöffnet ist '+venueHoursText(kind,hours)+' '+clockLabel(hours)+'; jetzt ist es '+playerHour+' Uhr.'+canteenHint}
+        :{headline:'GESCHLOSSEN',detail:'Dieses Lokal ist geschlossen: Hier arbeitet gerade niemand. Ohne Personal gibt es weder Ausschank noch Gäste.'}
     },
+    furnitureLabel:(kind,svc)=>kind==='counter'?(svc==='self-service'?'AUTOMAT':'TRESEN'):kind==='kitchen'?'KÜCHE':kind==='desk'?'EMPFANG':kind==='stairs'?(hasUpperFloor(upper)?(upper.guestRooms>0?'ZIMMER ↑':'PRIVAT ↑'):layout.kind==='hotel'?'ZIMMER ↑':null):null,
+    decor:DECOR[layout.kind],
+    counterDressing:<><i className="machine"/><i className="vitrine"><HospitalityItemIcon code="cake" size={14}/><HospitalityItemIcon code="snack" size={14}/></i></>,
+    visits,
+    facts:(self,ctx)=>venueConversationFacts({
+      layout,buildingName:houseName,self,figures:ctx.figures,servingPlayer:self.id===ctx.waiterId&&ctx.atTable,playerPos:ctx.pos,playerSeat:ctx.seat,joinedPlayer:ctx.joined===self.id,arrivalPoint,
+      menu:menu?.items.length&&ctx.service!=='closed'?menu.items:[],
+      playerOrders:orders.filter(entry=>entry.forId!==self.id).map(entry=>entry.label),
+      giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
+      ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
+      hour:playerHour,hours,upper,rooms,
+      toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
+      entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
+      playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):null,
+    }),
+    placeKnowledge,
+    // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
+    hearsay:self=>self.roomRole==='staff'?heard:[],
+    // Jedes Haus führt Neue auf seine Art ein – nur wer hier arbeitet.
+    introduction:self=>self.roomRole==='staff'?venueIntroduction(kind,upper?.guestRooms??0):undefined,
+    things,
+    idleText:menuState==='ready'&&menu?.items.length?undefined:undefined,
+    greetsAtService:true,
+    goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.servicePoint.locative==='am Empfang'?'Zum Empfang gehen':'Zum Tresen gehen',
+    tableService:true,
+    loaded:true,
+    markers:shift?tasks.slice(0,4).map(task=>({key:task.key,x:task.at.x,y:task.at.y,label:task.label})):[],
+    playerTag:shift?ROLE_LABEL[shift.role]:null,
+    floorMood:layout.danceFloor&&(shift?.role==='dj'||music!=='House')?music.toLowerCase():null,
+    gate:layout.entry?{open:entryPaid||Boolean(shift),blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,
+    sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:'Zur Toilette',useLabel:'WC BENUTZEN',use:ctx=>ctx.setStatus(toiletAccess(serviceRules.toilet,{hasOrdered:orders.length>0}).text)},
+    renderOffer:ctx=>shift?renderShift(ctx):<>{customerOffer(ctx)}{renderJobs(ctx)}</>,
   }
 
   return <WalkableInterior entityId={entityId} buildingName={houseName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
