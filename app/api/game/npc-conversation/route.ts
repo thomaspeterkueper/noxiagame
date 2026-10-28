@@ -1,6 +1,6 @@
 // app/api/game/npc-conversation/route.ts
-// Aktualisiert: 28.10.2026 — Abbruch beim dritten Grenztest, unabhängig vom Wortlaut; zuvor: Protokoll mit Anliegen und realer Meldung
-// Version:      1.4.0
+// Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; Abbruch beim dritten Grenztest, unabhängig vom Wortlaut
+// Version:      1.5.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -14,6 +14,7 @@ import {
   breakoffLine,
   dismissLine,
   inBreakoffCooldown,
+  BREAKOFF_COOLDOWN_MS,
   REPEAT_HINT_INSTRUCTION,
   REPEAT_WINDOW_MS,
 } from '@/lib/game/cognition/conversationRepeat'
@@ -326,6 +327,11 @@ export async function POST(request: NextRequest) {
       worldAction: null,
       creditTransfer: null,
       conversationEnded: true,
+      // Wie lange die Figur noch abweist: nach einem Abbruch die volle
+      // Abkühlzeit, bei einer Abweisung der Rest davon.
+      retryAfterMs: outcome === 'breakoff' || !lastBreakoffAt
+        ? BREAKOFF_COOLDOWN_MS
+        : Math.max(0, Date.parse(lastBreakoffAt) + BREAKOFF_COOLDOWN_MS - nowMs),
     })
   }
   if (inBreakoffCooldown(lastBreakoffAt, nowMs)) return endConversation(dismissLine(`${npcKey}:${nowMs}`), 'dismissed')

@@ -1,8 +1,9 @@
 'use client'
-// Aktualisiert: 28.10.2026 — Laufweg für die Verhaltensaufzeichnung; 27.10.2026: Klick auf freie Fläche zeigt Bauhinweis mit Weg in die Bauplanung; WASD läuft bis an die Wand statt ganz stehenzubleiben
-// Version:      1.2.0
+// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd); Laufweg für die Verhaltensaufzeichnung; 27.10.2026: Klick auf freie Fläche zeigt Bauhinweis mit Weg in die Bauplanung; WASD läuft bis an die Wand statt ganz stehenzubleiben
+// Version:      1.3.0
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { getToken } from '@/lib/supabase/auth'
 import { reportPlayerPosition } from '@/lib/telemetry/playerActivity'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
@@ -92,6 +93,7 @@ export default function PlanetaryWalkableSurface({
   const[objectPanelOpen,setObjectPanelOpen]=useState(false)
   const[message,setMessage]=useState('')
   const[sending,setSending]=useState(false)
+  const conversationEnd=useConversationEnd()
   const[conversationByNpc,setConversationByNpc]=useState<Record<string,Array<{role:'user'|'assistant';content:string}>>>({})
 
   useEffect(()=>{let live=true;(async()=>{try{const token=await getToken();if(!token)throw new Error('Nicht angemeldet');const response=await fetch('/api/game/build/spatial?location='+encodeURIComponent(locationSlug),{headers:{Authorization:'Bearer '+token},cache:'no-store'});const payload=await response.json();if(!response.ok)throw new Error(payload?.error??'Surface-Daten nicht verfügbar');if(live)setSpatial(payload)}catch(err){if(live)setError(err instanceof Error?err.message:String(err))}})();return()=>{live=false}},[locationSlug])
@@ -240,7 +242,7 @@ export default function PlanetaryWalkableSurface({
   },[canInteract,selected,selectedResident,selectedEntity,selectedMobile,onOpenWorldObject,onOpenMobileObject])
 
   async function talk(){
-    if(!selectedResident||!message.trim()||sending)return
+    if(!selectedResident||!message.trim()||sending||conversationEnd.isEnded(selectedResident.id))return
     const playerMessage=message.trim().slice(0,80)
     const history=conversationByNpc[selectedResident.id]??[]
     setSending(true)
@@ -262,6 +264,7 @@ export default function PlanetaryWalkableSurface({
       const reply=response.ok&&json.reply?String(json.reply):'Die Person kann gerade nicht antworten.'
       setConversationByNpc(current=>({...current,[selectedResident.id]:[...(current[selectedResident.id]??[]),{role:'user' as const,content:playerMessage},{role:'assistant' as const,content:reply}].slice(-10)}))
       if(response.ok)setMessage('')
+      conversationEnd.noteReply(selectedResident.id,json)
     }catch{
       setConversationByNpc(current=>({...current,[selectedResident.id]:[...(current[selectedResident.id]??[]),{role:'assistant' as const,content:'Gespräch derzeit nicht erreichbar.'}].slice(-10)}))
     }finally{setSending(false)}
@@ -457,7 +460,7 @@ export default function PlanetaryWalkableSurface({
         <div className="person-head"><div><small>PERSON · LOKALE SZENE</small><b>{residentLabel(selectedResident)}</b><span>{residentRole(selectedResident)}</span></div><button onClick={()=>setPersonPanelOpen(false)}>×</button></div>
         <div className="person-facts"><span>Aktivität</span><b>{selectedResident.activityState}</b><span>Letzte Aktion</span><b>{selectedResident.lastAction??'–'}</b></div>
         {(conversationByNpc[selectedResident.id]??[]).map((entry,index)=><p key={entry.role+'-'+index}><b>{entry.role==='user'?'Du':residentLabel(selectedResident)}:</b> „{entry.content}“</p>)}
-        <div className="person-chat"><input value={message} maxLength={80} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void talk()}} placeholder="Kurze Antwort …"/><button disabled={sending||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
+        <div className="person-chat"><input value={message} maxLength={80} disabled={conversationEnd.isEnded(selectedResident?.id)} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void talk()}} placeholder={conversationEnd.isEnded(selectedResident?.id)?CONVERSATION_ENDED_PLACEHOLDER:'Kurze Antwort …'}/><button disabled={sending||conversationEnd.isEnded(selectedResident?.id)||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
       </aside>}
     </div>
     <style jsx>{`

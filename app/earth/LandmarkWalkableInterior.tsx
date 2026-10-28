@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 28.10.2026 — Laufweg der Spielfigur für die Verhaltensaufzeichnung; 26.10.2026: ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.6.0
+// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd); Laufweg der Spielfigur für die Verhaltensaufzeichnung; 26.10.2026: ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.7.0
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -24,6 +24,7 @@ import {
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
 import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
@@ -108,6 +109,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const conversationEnd = useConversationEnd()
   const [tip, setTip] = useState<LibraryBook | null>(null)
   const tipSeed = useRef(0)
   const waypoints = useMemo(() => landmarkWaypoints(layout), [layout])
@@ -273,6 +275,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const talkName = partner ? partner.person.name : staffName
   const talkRole = partner ? partner.person.role : staff?.role ?? ''
   const talkFigureId = partner ? partner.person.id : `landmark-staff:${name}`
+  const talkEnded = conversationEnd.isEnded(talkFigureId)
 
   function startTalk() {
     if (!staff) return
@@ -324,6 +327,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   }
 
   async function talk() {
+    if (talkEnded) return
     if (partner) { await talkWithPerson(partner.person); return }
     if (!staff || !message.trim() || sending) return
     const text = message.trim().slice(0, 80)
@@ -359,6 +363,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, ich bin gerade beschäftigt – frag mich gleich noch einmal.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
+      if (conversationEnd.noteReply(`landmark-staff:${name}`, data)) return
       // Versprochen ist versprochen: „ich bringe …“ löst den Gang aus, ein genannter Titel wird erkannt.
       if (isLibrary && /\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
         const named = LIBRARY_BOOKS.find(entry => reply.toLowerCase().includes(entry.title.toLowerCase()))
@@ -394,7 +399,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, gerade nicht – gleich wieder.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
-      if (data.conversationEnded) setTalking(false)
+      conversationEnd.noteReply(person.id, data)
     } finally { setSending(false) }
   }
 
@@ -447,7 +452,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </button>}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
-          <div className="chat"><input value={message} maxLength={80} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder="Kurze Frage …"/><button disabled={sending || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <div className="chat"><input value={message} maxLength={80} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
