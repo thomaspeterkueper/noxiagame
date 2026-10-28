@@ -1,6 +1,6 @@
 # NOXIA-NPC-RELIGION-0002 – Philosophie, Ethik und Religion als Figuren
 
-Status: proposed · 2026-10-28
+Status: accepted (Rollen und Stimmen), Figuren in Vorbereitung · 2026-10-28
 Baut auf: NOXIA-NPC-RELIGION-0001 (Rollen und Orte), NOXIA-TEMPLE-0001 (DaVaRu-Tempel), NOXIA-ETHICS-0001 (Resonanzethik), NOXIA-OMNI-0001 (Spielraum)
 Code: `lib/game/population/spiritualRoles.ts`, `lib/game/population/worldviewVoices.ts`, `app/api/game/npc-conversation/route.ts`
 
@@ -52,19 +52,30 @@ Alle sind normale persistente Personen nach RELIGION-0001: Wohnung, Arbeit, Bed�
 
 **Resonanzplatz-Gastgeber (`resonance_host`).** Lädt zum Verweilen, Zuhören, Lesen, Schweigen ein. Lehrt keine Doktrin und verweist für Philosophiefragen auf Gespräche mit Omnizedent/innen.
 
-## Figuren und Orte – Vorschlag zur Freigabe
+## Figuren und Orte
 
-Nichts davon ist in der Live-Datenbank angelegt. Anlage erst nach Freigabe, nach dem Verfahren aus `docs/characters/davaru-aristeas-activation.md` (idempotent, eigene IDs, keine erfundene Anwesenheit).
+Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `docs/characters/davaru-aristeas-activation.md` (idempotent, eigene IDs, keine erfundene Anwesenheit). Je Ort wird zuerst geprüft, ob ein realer Ort materialisiert ist; erst dann bekommt eine Figur Wohnung und Arbeitsort.
 
-| Figur (Arbeitsname) | Rolle | Ort | Begründung |
+**Standorte für Resonanzplätze und Omnizedent/innen (entschieden, Thomas 28.10.2026):**
+
+| Ort | Stand in NOXIA | Hinweis |
+|---|---|---|
+| Sundern | Erdregion vorhanden, St. Johannes mit Elias Hartmann produktiv | Begegnung Pfarrer – Omnizedent/in im selben Ort möglich |
+| Frankfurt am Main | prüfen | Großstadt mit vielen Traditionen; naheliegend für den Vergleichspiloten (Moschee/Synagoge) |
+| Erongo (Namibia) | Erdregion `earth-namibia-erongo` vorhanden | Resonanzplatz außerhalb Europas |
+| Dvārakā | als Reiseziel gewünscht, Region noch nicht materialisiert | Ursprungsort von Mishkenaz im Kanon; Bezug zu Omnizedenz und Davaru |
+| mindestens eine Marskolonie oder Station | Tharsis-Hub vorhanden | Philosophie im Experiment: Knappheit, Abhängigkeit, Spielraum |
+
+**Weg des DaVaRu:** bleibt beim Tempel in Schmitten/Großer Feldberg.
+
+| Figur | Rolle | Ort | Stand |
 |---|---|---|---|
 | Elias Hartmann | `priest` | St. Johannes, Sundern | besteht |
 | DaVaRu (Daniel van Runen) | Gastgeber | Tempel des DaVaRu, Schmitten | besteht als Person, Tempel noch nicht platziert |
 | Aristeas Lux | Gast | Tempel des DaVaRu | besteht als Person |
-| *Wegbegleiterin, Schmitten* | `davaru_companion` | wohnt in Schmitten, Tempel als Arbeitsort | macht den Tempel im Alltag erlebbar, solange die Kanonfiguren Background-Tier sind |
-| *Omnizedentin, Seelenberg* | `omnizedent` | Resonanzplatz Seelenberg | Seelenberg ist schon Pilotort und liegt neben Schmitten: eine Taunus-Achse Davaru – Omnizedenz |
-| *Omnizedent, Tharsis* | `omnizedent` | Resonanzplatz in der Mars-Kolonie | Philosophie im Experiment: Knappheit, Abhängigkeit, Spielraum |
-| *Vergleichspilot* | `imam` oder `rabbi` | reale Moschee/Synagoge, z. B. Frankfurt | Schritt 3 aus RELIGION-0001 |
+| Wegbegleiter/in | `davaru_companion` | Schmitten | geplant, Bezeichnung offen |
+| Omnizedent/innen | `omnizedent` | je ein Resonanzplatz an den fünf Standorten oben | geplant |
+| Vergleichspilot | `imam` oder `rabbi` | z. B. Frankfurt | Schritt 3 aus RELIGION-0001 |
 
 Namen der neuen Figuren werden erst bei der Anlage festgelegt.
 
@@ -76,9 +87,12 @@ Namen der neuen Figuren werden erst bei der Anlage festgelegt.
 4. **Begegnungen untereinander**: Pfarrer, Wegbegleiterin und Omnizedentin können sich über normale Encounter kennenlernen und streiten. Keine vorgefertigten Freundschaften.
 5. **Ethische Fälle**: Bei Konflikten aus NOXIA-ETHICS-0001 (Wasser, Zugang) können diese Figuren Perspektiven beisteuern, als eine Stimme unter mehreren, nie als Schiedsrichter.
 
-## Offene Fragen an Thomas
+## Entscheidungen Thomas (28.10.2026)
 
-- **Begriff:** „Omnizedent/in“ steht bisher nur adjektivisch in den Gestaltungstexten („omnizedent gestalten“). Soll die Personenbezeichnung in den Omnizedenz-Kanon (omnizedenz.org) aufgenommen werden?
-- **DaVaRu-Kanon:** Im Davaru-Text ist Daniel der verstorbene Bruder von Peter Masterson; in NOXIA ist Daniel van Runen (DaVaRu) lebender Gastgeber. Ist das eine bewusste Abweichung der Spielwelt?
-- **Standorte:** Resonanzplatz Seelenberg und Tharsis bestätigen? Weitere Orte, z. B. Sundern oder Frankfurt?
-- **Bezeichnung der Davaru-Rolle:** „Wegbegleitung des DaVaRu“ ist ein Arbeitsbegriff. Gibt es im Kodex einen eigenen Namen?
+- **Begriff „Omnizedent/in“:** vorläufig nur in NOXIA, im Spiel und in den Romanen. Nicht in den Omnizedenz-Kanon (omnizedenz.org) übernehmen; ob sich der Begriff etabliert, zeigt sich später.
+- **DaVaRu:** bleibt der lebende Gastgeber Daniel van Runen. Der verstorbene Bruder (Peters Bruder im Roman) ist nur Namensgeber und muss im Spiel nicht auftauchen. Keine Kanonabweichung, die aufgelöst werden müsste.
+- **Standorte:** Sundern, Frankfurt, Erongo, Dvārakā und mindestens eine Marskolonie oder Station (siehe oben).
+
+## Offen
+
+- **Bezeichnung der Davaru-Rolle:** „Wegbegleitung des DaVaRu“ bleibt Arbeitsbegriff, bis ein eigener Name gefunden ist. Der Code-Schlüssel `davaru_companion` kann bleiben; nur das Label ändert sich dann.

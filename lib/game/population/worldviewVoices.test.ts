@@ -5,7 +5,7 @@ describe('worldview voices', () => {
   it('maps public roles to voices', () => {
     expect(worldviewVoiceFromPublicRole('Pfarrer · St. Johannes')).toBe('clergy')
     expect(worldviewVoiceFromPublicRole('Omnizedentin')).toBe('omnizedent')
-    expect(worldviewVoiceFromPublicRole('Omnizedent/in · Resonanzplatz Seelenberg')).toBe('omnizedent')
+    expect(worldviewVoiceFromPublicRole('Omnizedent/in · Resonanzplatz Sundern')).toBe('omnizedent')
     expect(worldviewVoiceFromPublicRole('Resonanzbegleitung')).toBe('resonance_host')
     expect(worldviewVoiceFromPublicRole('Gastgeber im Tempel des DaVaRu')).toBe('davaru')
     expect(worldviewVoiceFromPublicRole('Wegbegleiterin')).toBe('davaru')
