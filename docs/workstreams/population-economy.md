@@ -507,9 +507,42 @@ Das ist ein Teil von Aufgabe 12 hier („Angebote für Spieler als Daten“).
 4. **Missbrauch:** Aufgaben je Minute begrenzen. Eine Schicht endet spätestens nach einer Stunde, auch ohne `end`.
 5. **Später:** Wer öfter dort arbeitet, könnte fest angestellt werden (`person_assignments` für Spieler) – das wäre eine eigene Entscheidung.
 
+**Nachtrag Zeit (Thomas, 28.10.2026: „kein Spieler wartet 4 echte Stunden als Türsteher“), entschieden: „Einsatz, als Schicht gebucht“.**
+- Man spielt einen kurzen, dichten Einsatz: `EINSATZ_S` = 5 echte Minuten.
+- Gebucht wird eine ganze Schicht von `SHIFT_GAME_HOURS` Spielstunden (4, Putzen 3). Das folgt NOXIA-TIME-0001: Echtzeit-Begegnung als Ereignis fester Dauer.
+- Die echten Käufe dieser Stunden werden in den Einsatz verdichtet (`compressPurchases`). Der Gäste-Abruf liefert dafür jetzt `recent` (Käufe der letzten sechs Stunden).
+- Für die Schnittstelle oben heißt das:
+  - `start` antwortet zusätzlich mit `gameHours`, die laufende Schicht in `GET … active` ebenso.
+  - Lohn = Stundenlohn × `gameHours`, anteilig nach gespielter Einsatzzeit (`shiftWage`); wer den Einsatz zu Ende spielt, bekommt die ganze Schicht.
+  - Eine Schicht endet spätestens nach `EINSATZ_S` plus Spielraum, nicht nach einer Stunde.
+  - Je Spieler höchstens eine Schicht je Lokal und Spieltag, damit niemand Schichten im Minutentakt stapelt. Vorschlag; bei 60× entspräche das einer Schicht je 24 echten Minuten.
+
 ### R-18 (Erdkarte, 28.10.2026): Staatliche Basis ist umgezogen – Wege und Anwesenheit der Bewohner
 
 Die staatliche Basis der Erde steht seit 28.10.2026 nicht mehr in der Selmecke (51,338 / 7,980), sondern am Segelfluggelände Sundern-Seidfeld (51,302 / 7,979), rund 4 km weiter südlich (Migration `20261028190000_state_base_seidfeld.sql`, alte Lage in `state_base_relocation_20261028`). Die `tile_entities`-ids sind gleich geblieben; Wohnzuweisungen und Stellen ziehen also mit.
 
 **Bitte prüfen:** Wo Lage oder Wege der Bewohner nicht aus `tile_entities` gelesen, sondern gespeichert oder fest eingetragen sind (Anwesenheit, Arbeitswege, Pendeln vom Wohnblock), auf die neue Lage umstellen. Die Hafenkantine der Erde hat jetzt erstmals eine Lage (am Raumhafen).
+
+### R-21 (Gastronomie, 28.10.2026): Arbeitsvermittlung – Agentur für Arbeit, Stellenliste, Betriebe, Schiffe, feste Anstellung
+
+Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung geben.“ Entschieden:
+- als begehbare **Agentur für Arbeit am realen Ort** in Sundern, Freiheitsmühle 1 (Agentur für Arbeit Sundern laut arbeitsamt.info);
+- Angebot: Schichten in Lokalen, Betriebe und Läden, Mitflug auf Handelsschiffen, feste Anstellung.
+
+**Was schon da ist (Gastronomie):**
+- Gebäudeart `job_agency` mit Eingang „Agentur für Arbeit betreten“ (`lib/game/buildings/entry.ts`, `EarthBuildingAccessLayer`).
+- Innenraum `app/earth/JobAgencyWalkableInterior.tsx`, Grundriss und Wissen in `lib/game/jobs/jobAgency.ts`, mit Tests:
+  - Stellenwand, Vermittlung am Schalter, Wartebank, Beratungstisch;
+  - die Vermittlerin kennt genau die Stellen an der Wand und sagt, was es noch nicht gibt.
+- Die Wand zeigt heute die Schichten der Lokale im Ort, aus den Gebäuden der Weltkarte und den Stellen je Lokalart: Stelle, Haus, Spielstunden, Lohn, Entfernung. Solange R-20 fehlt, steht „Probe“ dabei.
+- Betriebe und Läden, Mitflug und feste Anstellung stehen als „folgt“ an der Wand. Erfunden wird nichts.
+
+**Bitte:**
+1. **Gebäude anlegen:** `building_definitions` Zeile `job_agency`, „Agentur für Arbeit“, staatlich, und ein `tile_entities`-Eintrag am realen Haus Freiheitsmühle 1 (Muster: Bank Hauptstraße 140, `20261027090000_earth_bank_sparkasse.sql`).
+   - Die Kartendaten führen dort nur Nr. 7 (`osm:way:1474125073`). Kandidaten ohne Hausnummer daneben: `osm:way:191140747` (48 × 48 m) und `osm:way:332679119` (30 × 25 m). Welches Haus Nr. 1 ist, bitte prüfen; die Erdkarte (W-…) kann helfen.
+   - Dazu `staff_capacity` 3: Vermittlung, Beratung, Büro. Personal wie bei der Bank (R-14), Lohnschlüssel z. B. `job_advisor`.
+2. **Stellenliste:** `GET /api/game/jobs?location=earth` → `{ venues: { [tileEntityId]: { open: ShiftRole[], wages: { [role]: CrJeStunde } } } }`. Der Innenraum ruft das schon auf und zeigt dann nur freie, bezahlte Stellen ohne „Probe“. Später kommen weitere Arten dazu (`business`, `ship`, `permanent`).
+3. **Betriebe und Läden:** Stellen für Spieler in Bank, Warenhaus, Reisebüro, Werkstätten. Die Schicht-Mechanik ist allgemein; Gastronomie baut je Gebäudeart die Aufgaben im Innenraum, sobald die Stellen als Daten kommen. Vorschlag zuerst: Bank (Schalter: Ein- und Auszahlungen echter Kunden), Warenhaus (Ware einräumen, Aufträge packen).
+4. **Mitflug auf Handelsschiffen:** Stelle an Bord als Weg zum Herumkommen (Thomas’ Einstiegsidee, R-10). Mit Handel und Schiffe abzustimmen: wer anheuert, Lohn, Ziel, Dauer als Ereignis fester Dauer wie die Schicht.
+5. **Feste Anstellung:** Wer an einem Ort öfter arbeitet, kann fest angestellt werden – regelmäßige Schichten, fester Lohn, `person_assignments` bzw. eine eigene Tabelle für Spieler. Kündigen und Fehlschichten wären zu klären.
 

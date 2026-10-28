@@ -64,6 +64,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Kollegen und Gäste wissen, dass man hier arbeitet. Der Club-Einlass ist offen.
   - Bis R-20 als Probeschicht ohne Lohn. Im Browser geprüft, Tests in `playerShift.test.ts`.
 
+- **28.10.2026 – Zeit der Schicht und Arbeitsvermittlung** (Thomas: „kein Spieler wartet 4 echte Stunden als Türsteher“; „es sollte auch eine Arbeitsvermittlung geben“):
+  - **Einsatz statt Echtzeit-Schicht:** Ein Einsatz dauert 5 echte Minuten und zählt als ganze Schicht von 4 Spielstunden (Putzen 3), nach NOXIA-TIME-0001.
+    - Die echten Käufe dieser Stunden werden in den Einsatz verdichtet. Pflichten kommen alle 35–90 Sekunden.
+    - Lohn: Stundenlohn × Spielstunden, anteilig bei frühem Gehen.
+  - **Agentur für Arbeit:** begehbar, mit Stellenwand (Schichten in den Lokalen des Ortes, nach Nähe sortiert), Vermittlung und Beratungstisch. Betriebe, Schiffe und feste Anstellung stehen als „folgt“ an der Wand.
+  - Im Browser geprüft. Tests in `playerShift.test.ts` und `jobAgency.test.ts`.
+  - Gebäude, Stellenliste und weitere Stellenarten: R-21.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -82,6 +90,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-21** (28.10.2026): Arbeitsvermittlung – Gebäude Freiheitsmühle 1, Stellenliste, Betriebe, Schiffe, feste Anstellung – `population-economy.md`.
 - **R-20** (28.10.2026): Spieler arbeiten im Lokal – Stellen, Schicht, Lohn und Trinkgeld über `/api/game/hospitality/shift` – `population-economy.md`.
 - **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.
 - **W-7** (27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen (Bank sah nach dem Laden aus wie ein normales Haus) – `world-map.md`.
