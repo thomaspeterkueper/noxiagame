@@ -1055,7 +1055,8 @@ export interface ConversationFactsInput {
   /** Tanzt der Spieler gerade auf der Tanzfläche (Nachtclub)? */
   playerDancing?: boolean
   /** Einlass (Nachtclub): Preis des Eintritts (null = nicht auf der Karte) und ob der Spieler bezahlt hat. */
-  entry?: { price: number | null; paid: boolean } | null
+  entry?: { price: number | null; paid: boolean } | null  /** Arbeitet der Spieler hier gerade eine Schicht? Dann der Satz dazu (workingFact, playerShift.ts). */
+  playerWorkingFact?: string | null
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -1113,6 +1114,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
       facts.push(fit(`Dein Gegenüber sitzt ${seat.label}` + (input.servingPlayer ? '; du bist an den Tisch gekommen und nimmst die Bestellung auf – nur, was der Gast selbst nennt, nichts dazu' : together ? (input.joinedPlayer ? '; du hast dich eben dazugesetzt, ihr sitzt zusammen' : '; ihr sitzt zusammen') : '')))
     } else if (input.playerDancing && onDanceFloor(layout, input.playerPos)) facts.push('Dein Gegenüber tanzt gerade auf der Tanzfläche')
     else facts.push(`Dein Gegenüber steht gerade ${describePlayerPosition(layout, input.playerPos)}`)
+    if (input.playerWorkingFact) facts.push(input.playerWorkingFact)
     facts.push(othersFact(layout, self, input.figures))
   }
   // Mit Obergeschoss tritt die Treppe an die Stelle des Personalbereichs – die

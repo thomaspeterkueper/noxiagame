@@ -58,6 +58,12 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Spielbar wird er mit R-19: Gebäudeart, Umbau, Karte und Personal.
   - **Eintritt Pflicht** (Thomas: „nein, man braucht Eintritt“). Ohne bezahlten Eintritt hält eine rote Kordel einen an der Tür. Bezahlt wird beim Türsteher, „Eintritt bezahlen – 8 Cr“. Der Eintritt gilt die ganze Nacht, auch nach dem Hinausgehen. Der Türsteher kennt Preis und Stand. Im Browser geprüft. Die Prüfung auf dem Server bei Bestellungen steht in R-19.
 
+- **28.10.2026 – Arbeiten im Lokal** (Thomas: „man sollte auch im Club arbeiten können“; entschieden: echte Tätigkeit, Stundenlohn und Trinkgeld; Stellen Türsteher, Barkeeper, DJ, Putzkraft, in allen Lokalen):
+  - Unter „Arbeiten“ stehen die freien Stellen mit Lohn.
+  - In der Schicht (eine Spielstunde) trägt die Figur die Stelle als Plakette. Aufgaben sind im Raum markiert: „Hingehen“, „Erledigen“, DJ-Musikwahl mit Farbwechsel der Tanzfläche.
+  - Kollegen und Gäste wissen, dass man hier arbeitet. Der Club-Einlass ist offen.
+  - Bis R-20 als Probeschicht ohne Lohn. Im Browser geprüft, Tests in `playerShift.test.ts`.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -76,6 +82,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-20** (28.10.2026): Spieler arbeiten im Lokal – Stellen, Schicht, Lohn und Trinkgeld über `/api/game/hospitality/shift` – `population-economy.md`.
 - **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.
 - **W-7** (27.10.2026): Öffentliche NOXIA-Gebäude im realen Haus erkennbar machen (Bank sah nach dem Laden aus wie ein normales Haus) – `world-map.md`.
 
