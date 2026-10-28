@@ -62,7 +62,7 @@ Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `
 |---|---|---|
 | Sundern | Erdregion vorhanden, St. Johannes mit Elias Hartmann produktiv | Begegnung Pfarrer – Omnizedent/in im selben Ort möglich |
 | Frankfurt am Main | prüfen | Großstadt mit vielen Traditionen; naheliegend für den Vergleichspiloten (Moschee/Synagoge) |
-| Erongo (Namibia) | Erdregion `earth-namibia-erongo` vorhanden | Resonanzplatz außerhalb Europas |
+| Erongo (Namibia) | **zurückgestellt** (Thomas, 28.10.2026) | Region hat noch keine Gebäude und keinen Wohnraum |
 | Dvārakā | als Reiseziel gewünscht, Region noch nicht materialisiert | Ursprungsort von Mishkenaz im Kanon; Bezug zu Omnizedenz und Davaru |
 | mindestens eine Marskolonie oder Station | Tharsis-Hub vorhanden | Philosophie im Experiment: Knappheit, Abhängigkeit, Spielraum |
 
@@ -77,7 +77,7 @@ Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `
 | Johanna Lind | `omnizedent` | Sundern; Resonanzrunde in der realen Hubertushalle; wohnt im öffentlichen Wohnblock | **produktiv** (`earth-sundern-omnizedent-001`) |
 | Theodor Grün | Techniker, Omnizedent aus Überzeugung | Tharsis Hub; arbeitet an der Wasseraufbereitung, wohnt im öffentlichen Habitat | **produktiv** (`mars-tharsis-omnizedent-001`), Runde startet, sobald ein Resonanzplatz gebaut ist |
 | Samira Haddad | `omnizedent` | Frankfurt-Sachsenhausen; Resonanzrunde in der CAMALEO-ArtLounge (Mörfelder Landstraße 103), wohnt Ziegelhüttenweg 15 | **produktiv** (`earth-frankfurt-omnizedent-001`) |
-| weitere Omnizedent/innen | `omnizedent` | Erongo, Dvārakā | wartet auf Gebäudedaten (siehe unten) |
+| weitere Omnizedent/innen | `omnizedent` | Dvārakā | wartet auf Gebäudedaten |
 | Vergleichspilot | `imam` oder `rabbi` | z. B. Frankfurt | Schritt 3 aus RELIGION-0001 |
 
 Namen weiterer Figuren werden erst bei der Anlage festgelegt.
@@ -103,7 +103,7 @@ Angelegt mit Migration `20261028124500_omnizedent_pilots_sundern_tharsis.sql`, n
 
 - **Begriff „Omnizedent/in“:** vorläufig nur in NOXIA, im Spiel und in den Romanen. Nicht in den Omnizedenz-Kanon (omnizedenz.org) übernehmen; ob sich der Begriff etabliert, zeigt sich später.
 - **DaVaRu:** bleibt der lebende Gastgeber Daniel van Runen. Der verstorbene Bruder (Peters Bruder im Roman) ist nur Namensgeber und muss im Spiel nicht auftauchen. Keine Kanonabweichung, die aufgelöst werden müsste.
-- **Standorte:** Sundern, Frankfurt, Erongo, Dvārakā und mindestens eine Marskolonie oder Station (siehe oben).
+- **Standorte:** Sundern, Frankfurt, Erongo, Dvārakā und mindestens eine Marskolonie oder Station (siehe oben). Erongo am Nachmittag vorerst zurückgestellt.
 
 ## Offen
 
@@ -116,7 +116,7 @@ Thomas: „alles gleich wichtig, auch wichtig, dass die NPCs auch normal durch d
 - **Umbenennung:** Teodor Varga heißt Theodor Grün (Migration `20261028133500_rename_tharsis_omnizedent.sql`, Person und Wirtschaftsakteur).
 - **Frankfurt:** Samira Haddad, Omnizedentin (Migration `20261028141500_omnizedent_frankfurt_artlounge.sql`). Arbeitsort ist das reale Haus der CAMALEO-ArtLounge, Wohnung ein reales Mehrfamilienhaus in der Nähe – beides als Zuweisung an den OSM-Grundriss, ohne Eigentumswechsel. So wohnen auch Bewohner nicht gekaufter echter Häuser; kauft ein Spieler das Haus, bleibt sie dort mit ihm als Vermieter. Resonanzrunde an Tag 5 der Woche, 19 Uhr. Arbeitgeber „Resonanzkreis Frankfurt“, kein Lohnsatz.
 - **Mars:** `resonance_place` ist baubar (1500 Cr, 2 Ticks, `20261028143000_resonance_place_buildable.sql`), über den normalen Spielerbau. `realPlaceActivity` kennt dafür gebaute Gebäude als Ort; Theodor Grün geht an Tag 6 um 19 Uhr hin und lädt ein.
-- **Erongo:** Die Region `earth-namibia-erongo` hat bisher nur Straßen, Bahn, Gewerbeflächen und Wasser, keine einzelnen Gebäude und keinen Wohnraum. Gebäude kommen über den Ortsdetail-Import ins Spiel, wenn jemand den Ort auf der Weltkarte besucht. Danach wird eine Figur wie in Frankfurt angelegt (realer Ort für die Runde, reales Wohnhaus).
+- **Erongo (zurückgestellt):** Die Region `earth-namibia-erongo` hat bisher nur Straßen, Bahn, Gewerbeflächen und Wasser, keine einzelnen Gebäude und keinen Wohnraum. Gebäude kommen über den Ortsdetail-Import ins Spiel, wenn jemand den Ort auf der Weltkarte besucht. Danach wird eine Figur wie in Frankfurt angelegt (realer Ort für die Runde, reales Wohnhaus).
 - **Wohnung im realen Haus als Ort:** Wer ruht und nicht schläft, wird jetzt auch an einer Wohnung im realen Haus verortet (`surfacePresence.ts`), nicht nur an Spielgebäuden.
 
 ### Sichtbares Gehen
