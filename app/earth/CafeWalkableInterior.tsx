@@ -32,6 +32,7 @@ import {
   venueSizeForArea,
   venueLayoutForSize,
   ROOM_ITEM_CODE,
+  ENTRY_ITEM_CODE,
   canBookRoom,
   roomsFree,
   type VenueFigure,
@@ -88,6 +89,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[serviceRules,setServiceRules]=useState<VenueServiceRules>(()=>venueServiceRules(null))
   // Im Gespräch Genanntes, das schon gebucht wurde: „Satz|Posten“.
   const[spokenDone,setSpokenDone]=useState<string[]>([])
+  // Nachtclub: bis wann der Eintritt gilt (aus dem Gäste-Abruf), Millisekunden; null = nicht bezahlt.
+  const[entryPaidUntil,setEntryPaidUntil]=useState<number|null>(null)
 
   const effectiveType=conversion?.type??buildingTypeId
   const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(effectiveType),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[effectiveType,upper,areaM2])
@@ -132,6 +135,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setConversion(data.conversion&&typeof data.conversion==='object'&&data.conversion.type?{type:String(data.conversion.type),readyAt:data.conversion.readyAt?String(data.conversion.readyAt):null}:null)
           setDisplayName(typeof data.displayName==='string'&&data.displayName.trim()?data.displayName.trim():null)
           setServiceRules(venueServiceRules(data.services))
+          setEntryPaidUntil(typeof data.entryPaidForS==='number'&&data.entryPaidForS>0?Date.now()+data.entryPaidForS*1000:null)
           setRooms(data.rooms&&typeof data.rooms==='object'?{capacity:Number(data.rooms.capacity??0),occupied:Number(data.rooms.occupied??0),mineForS:data.rooms.mineForS==null?null:Number(data.rooms.mineForS)}:null)
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
         }
@@ -183,7 +187,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         }else if(!data.duplicate){if(said)setSpokenDone(current=>[...current,said.key].slice(-20));setOrders(current=>[...current,{key:pending.requestId,itemCode:item.itemCode,label:item.label,forId:recipient?.id??null,at:Date.now(),tableService:fromTable}].slice(-8))}
         useGameStore.setState({credits})
         const shown=said?.title??item.label
-        ctx.setStatus((item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?shown+' für '+personSceneLabel(recipient)+' bestellt':fromTable?shown+' bestellt, wird gleich gebracht':shown+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
+        ctx.setStatus((item.itemCode===ENTRY_ITEM_CODE?'Eintritt bezahlt, gilt die ganze Nacht – der Türsteher lässt dich durch':item.itemCode===ROOM_ITEM_CODE?'Zimmer für eine Nacht gebucht':recipient?shown+' für '+personSceneLabel(recipient)+' bestellt':fromTable?shown+' bestellt, wird gleich gebracht':shown+' bestellt')+' – '+item.priceCredits+' Credits bezahlt. Du hast noch '+credits+' Credits.')
       }else{
         ctx.setStatus(String(data.error??'Die Bestellung konnte nicht gebucht werden. Es wurde nichts abgebucht.'))
         if(data.code==='NOXIA_CREDITS_INSUFFICIENT')setMenu(current=>current?{...current,items:current.items.map(entry=>entry.itemCode===item.itemCode?{...entry,affordable:false}:entry)}:current)
@@ -193,7 +197,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     }finally{setOrdering(null)}
   }
 
-  const things:PlacedThing[]=orders.map(entry=>({key:entry.key,icon:<HospitalityItemIcon code={entry.itemCode} size={18} title={entry.label}/>,title:entry.label,forId:entry.forId,at:entry.at,broughtToTable:entry.tableService}))
+  // Einlass (Nachtclub): Eintritt steht auf der Karte; bezahlt ist er für diese Nacht.
+  const entryItem=menu?.items.find(item=>item.itemCode===ENTRY_ITEM_CODE)??null
+  const entryPaid=(entryPaidUntil!==null&&entryPaidUntil>nowMs)||orders.some(entry=>entry.itemCode===ENTRY_ITEM_CODE)
+  const things:PlacedThing[]=orders.filter(entry=>entry.itemCode!==ENTRY_ITEM_CODE).map(entry=>({key:entry.key,icon:<HospitalityItemIcon code={entry.itemCode} size={18} title={entry.label}/>,title:entry.label,forId:entry.forId,at:entry.at,broughtToTable:entry.tableService}))
   const service=(figures:readonly VenueFigure[])=>underConversion||emptyHouse?'closed':venueService(layout,figures,playerHour,hours)
   const readyText=conversion?.readyAt?new Date(conversion.readyAt).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'}):null
   const canteenHint=arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''
@@ -223,6 +230,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
+      entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid}:null,
     }),
     placeKnowledge,
     // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
@@ -235,14 +243,29 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.servicePoint.locative==='am Empfang'?'Zum Empfang gehen':'Zum Tresen gehen',
     tableService:true,
     loaded:true,
+    gate:layout.entry?{open:entryPaid,blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,
     sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:'Zur Toilette',useLabel:'WC BENUTZEN',use:ctx=>ctx.setStatus(toiletAccess(serviceRules.toilet,{hasOrdered:orders.length>0}).text)},
     renderOffer:ctx=>{
       const hasMenu=Boolean(menu?.items.length)&&ctx.service!=='closed'
+      // Nachtclub ohne Eintritt: nur die Kasse an der Tür.
+      if(layout.entry&&!entryPaid&&ctx.service!=='closed'){
+        const atDoor=Math.hypot(ctx.pos.x-layout.entry.payAt.x,ctx.pos.y-layout.entry.payAt.y)<56
+        if(!atDoor)return <p className="hint">Der Türsteher lässt nur mit Eintritt herein.</p>
+        return <div className="menu">
+          <small>EINTRITT</small>
+          {menuState==='loading'&&<p>Die Preise werden geholt …</p>}
+          {menuState!=='loading'&&!entryItem&&<p>Ohne Eintritt kommt niemand rein – und kassieren kann hier noch niemand.</p>}
+          {entryItem&&menu&&<>
+            <p>Du hast {menu.credits} Credits. Der Eintritt gilt die ganze Nacht.</p>
+            <button className="open-school" disabled={!entryItem.affordable||ordering!==null} onClick={()=>{setTreat(false);void order(entryItem)}}>Eintritt bezahlen – {entryItem.priceCredits} Cr{entryItem.affordable?'':' (zu teuer)'}</button>
+          </>}
+        </div>
+      }
       if(!ctx.nearService)return <p className="hint">{ctx.seat&&ctx.tablePhase!=='none'&&ctx.tablePhase!=='gone'?'Jemand vom Personal kommt gleich an deinen Tisch.':ctx.seat&&ctx.service==='staffed'&&layout.kind!=='hotel'?'Bleib sitzen – gleich kommt jemand an den Tisch.':'Zum Bestellen musst du '+(ctx.service==='self-service'?'am Automaten':layout.servicePoint.locative)+' stehen.'}</p>
       // Im Gespräch mit dem Personal Genanntes: ein Knopf je Posten, erst der bucht.
       const talkingToStaff=Boolean(ctx.selected&&ctx.shown.some(entry=>entry.resident.id===ctx.selected!.id&&entry.figure.roomRole==='staff'))
       const spokenText=ctx.lastPlayerText
-      const spoken=hasMenu&&menu&&talkingToStaff?spokenOrderItems(spokenText,menu.items).filter(o=>!spokenDone.includes(spokenText+'|'+o.itemCode)):[]
+      const spoken=hasMenu&&menu&&talkingToStaff?spokenOrderItems(spokenText,menu.items.filter(item=>item.itemCode!==ENTRY_ITEM_CODE)).filter(o=>!spokenDone.includes(spokenText+'|'+o.itemCode)):[]
       return <div className="menu">
         {spoken.length>0&&menu&&<div className="spoken">
           <small>IM GESPRÄCH GENANNT</small>
@@ -258,7 +281,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
             <button className={treat?'':'on'} onClick={()=>setTreat(false)}>Für mich</button>
             <button className={treat?'on':''} onClick={()=>setTreat(true)}>Für {personSceneLabel(ctx.selected)}</button>
           </div>}
-          <div className="tiles">{menu.items.filter(item=>item.itemCode!==ROOM_ITEM_CODE).map(item=><button key={item.itemCode} className="tile" disabled={!item.affordable||ordering!==null} onClick={()=>void order(item)} title={item.affordable?item.label:'Dafür reichen deine Credits nicht.'}>
+          <div className="tiles">{menu.items.filter(item=>item.itemCode!==ROOM_ITEM_CODE&&item.itemCode!==ENTRY_ITEM_CODE).map(item=><button key={item.itemCode} className="tile" disabled={!item.affordable||ordering!==null} onClick={()=>void order(item)} title={item.affordable?item.label:'Dafür reichen deine Credits nicht.'}>
             <HospitalityItemIcon code={item.itemCode} size={44} title={item.label}/>
             <span>{item.label}</span><b>{item.priceCredits} Cr</b>
             {!item.affordable&&<small>zu teuer</small>}

@@ -13,7 +13,7 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { venueHearsay } from '@/lib/game/hospitality/hearsay'
-import { CONSUMPTION_INTERVAL_S, ROOM_ITEM_CODE, ROOM_NIGHT_S, VISIT_TOTAL_S, spreadVisitAge, type VenueRooms } from '@/lib/game/hospitality/venues'
+import { CONSUMPTION_INTERVAL_S, ENTRY_ITEM_CODE, ENTRY_VALID_S, ROOM_ITEM_CODE, ROOM_NIGHT_S, VISIT_TOTAL_S, spreadVisitAge, type VenueRooms } from '@/lib/game/hospitality/venues'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab0-9a-f]{12}$/i
 const WINDOW_S = CONSUMPTION_INTERVAL_S
@@ -135,5 +135,13 @@ async function venueState(supabase: any, tileEntityId: string, profileId: string
     const mineAt = byGuest.get(profileId)
     rooms = { capacity: upper.guestRooms, occupied: Math.min(upper.guestRooms, byGuest.size), mineForS: mineAt ? Math.max(0, Math.round((mineAt + ROOM_NIGHT_S * 1000 - Date.now()) / 1000)) : null }
   }
-  return { hour, upper, heard, rooms, areaM2, conversion, displayName }
+  // Nachtclub: Hat der Spieler heute Nacht schon Eintritt bezahlt? Dann bleibt er gültig.
+  let entryPaidForS: number | null = null
+  if (tile.entity_id === 'nightclub') {
+    const since = new Date(Date.now() - ENTRY_VALID_S * 1000).toISOString()
+    const { data: paid } = await supabase.from('player_hospitality_orders').select('created_at').eq('tile_entity_id', tileEntityId).eq('profile_id', profileId).eq('item_code', ENTRY_ITEM_CODE).gte('created_at', since).order('created_at', { ascending: false }).limit(1)
+    const at = paid?.[0]?.created_at ? Date.parse(paid[0].created_at) : null
+    entryPaidForS = at ? Math.max(0, Math.round((at + ENTRY_VALID_S * 1000 - Date.now()) / 1000)) : null
+  }
+  return { hour, upper, heard, rooms, areaM2, conversion, displayName, entryPaidForS }
 }
