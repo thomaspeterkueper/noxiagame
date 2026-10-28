@@ -6,7 +6,7 @@
 
 type SupabaseLike = any
 
-export type PlaceActivityKind = 'open_community' | 'service'
+export type PlaceActivityKind = 'open_community' | 'service' | 'resonance_round'
 
 export interface PlaceActivityWindow {
   kind: PlaceActivityKind
@@ -36,6 +36,23 @@ export function stJohannesActivityWindows(tick:number):PlaceActivityWindow[]{
     windowAt(tick,WEEK_TICKS,SERVICE_PHASE,SERVICE_DURATION,'service','Gottesdienst / Andacht'),
   ].filter((value):value is PlaceActivityWindow=>Boolean(value))
 }
+
+// NOXIA-NPC-RELIGION-0002: weekly open resonance round of the Omnizedenz,
+// day 3 of the week, 19:00, two hours. Same tick, same mechanics as the church.
+const RESONANCE_PHASE = 67
+const RESONANCE_DURATION = 2
+
+export function sundernResonanceRoundWindows(tick:number):PlaceActivityWindow[]{
+  return [
+    windowAt(tick,WEEK_TICKS,RESONANCE_PHASE,RESONANCE_DURATION,'resonance_round','Offene Resonanzrunde'),
+  ].filter((value):value is PlaceActivityWindow=>Boolean(value))
+}
+
+/** Hosts whose real-place schedule the population tick carries. */
+export const REAL_PLACE_HOSTS: ReadonlyArray<{ personKey:string; windows:(tick:number)=>PlaceActivityWindow[] }> = [
+  { personKey:'earth-sundern-st-johannes-priest-001', windows:stJohannesActivityWindows },
+  { personKey:'earth-sundern-omnizedent-001', windows:sundernResonanceRoundWindows },
+]
 
 async function closeExpiredRegionVisits(supabase:SupabaseLike,tick:number){
   const {data,error}=await supabase
@@ -201,17 +218,38 @@ async function ensureVisitor(
   return true
 }
 
-export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:number){
-  const result={closed:0,windows:0,events:0,visitors:0,skipped:false}
+type RealPlaceTickResult={closed:number,windows:number,events:number,visitors:number,skipped:boolean}
+
+/** Runs every scheduled real-place host. A missing or unavailable host only skips its own windows. */
+export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
+  const result:RealPlaceTickResult={closed:0,windows:0,events:0,visitors:0,skipped:true}
   result.closed=await closeExpiredRegionVisits(supabase,tick)
-  const windows=stJohannesActivityWindows(tick)
+  for(const host of REAL_PLACE_HOSTS){
+    const part=await runHostPlaceTick(supabase,tick,host.personKey,host.windows(tick))
+    result.windows+=part.windows
+    result.events+=part.events
+    result.visitors+=part.visitors
+    if(!part.skipped)result.skipped=false
+  }
+  return result
+}
+
+/** Kept for callers of the first pilot; closes expired visits and runs St. Johannes only. */
+export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:number){
+  const closed=await closeExpiredRegionVisits(supabase,tick)
+  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0].personKey,stJohannesActivityWindows(tick))
+  return {...part,closed}
+}
+
+async function runHostPlaceTick(supabase:SupabaseLike,tick:number,personKey:string,windows:PlaceActivityWindow[]){
+  const result:RealPlaceTickResult={closed:0,windows:0,events:0,visitors:0,skipped:false}
   if(!windows.length)return result
   result.windows=windows.length
 
   const {data:host,error:hostError}=await supabase
     .from('people')
     .select('id,current_location_id,activity_state,last_action')
-    .eq('person_key','earth-sundern-st-johannes-priest-001')
+    .eq('person_key',personKey)
     .maybeSingle()
   if(hostError)throw hostError
   if(!host){result.skipped=true;return result}

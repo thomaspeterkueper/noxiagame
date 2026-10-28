@@ -74,15 +74,26 @@ Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `
 | DaVaRu (Daniel van Runen) | Gastgeber | Tempel des DaVaRu, Schmitten | besteht als Person, Tempel noch nicht platziert |
 | Aristeas Lux | Gast | Tempel des DaVaRu | besteht als Person |
 | Wegbegleiter/in | `davaru_companion` | Schmitten | geplant, Bezeichnung offen |
-| Omnizedent/innen | `omnizedent` | je ein Resonanzplatz an den fünf Standorten oben | geplant |
+| Johanna Lind | `omnizedent` | Sundern; Resonanzrunde in der realen Hubertushalle; wohnt im öffentlichen Wohnblock | **produktiv** (`earth-sundern-omnizedent-001`) |
+| Teodor Varga | Techniker, Omnizedent aus Überzeugung | Tharsis Hub; arbeitet an der Wasseraufbereitung, wohnt im öffentlichen Habitat | **produktiv** (`mars-tharsis-omnizedent-001`), Resonanzplatz fehlt noch |
+| weitere Omnizedent/innen | `omnizedent` | Frankfurt, Erongo, Dvārakā | geplant |
 | Vergleichspilot | `imam` oder `rabbi` | z. B. Frankfurt | Schritt 3 aus RELIGION-0001 |
 
-Namen der neuen Figuren werden erst bei der Anlage festgelegt.
+Namen weiterer Figuren werden erst bei der Anlage festgelegt.
+
+### Pilot Sundern und Tharsis (28.10.2026)
+
+Angelegt mit Migration `20261028124500_omnizedent_pilots_sundern_tharsis.sql`, nach demselben Muster wie Elias Hartmann. Beide sind normale aktive Personen: Wirtschaftsakteur, Startbestand, sechs Bedürfnisse, Lebensstand, Aussehen, Wohnung über ein gestelltes Mietverhältnis im öffentlichen Bestand. Per SELECT geprüft: je genau eine Person, keine Dubletten.
+
+- **Johanna Lind, Sundern.** Arbeitsort ist die real importierte Hubertushalle (OSM-Gemeindezentrum), kein dupliziertes Gebäude. Arbeitgeber ist der „Resonanzkreis Sundern“, ein kleiner Gemeinschaftsakteur. Wie beim Pfarrer gibt es keinen Lohnsatz und damit kein künstliches Einkommen. Wöchentlich trägt sie die **Offene Resonanzrunde** (Tag 3 der Woche, 19 Uhr, zwei Stunden). Das läuft über dieselbe Ortsaktivität wie St. Johannes, die dafür auf eine Gastgeberliste (`REAL_PLACE_HOSTS`) verallgemeinert wurde, ohne zweite Uhr. Gottesdienst und Resonanzrunde überschneiden sich nicht.
+- **Lose Bekanntschaft Johanna – Elias.** Bewusst unter der Besuchsschwelle (Zuneigung 0,48 statt 0,5): Keiner geht automatisch zum Termin des anderen. Ob daraus mehr wird, entscheiden echte Begegnungen.
+- **Teodor Varga, Tharsis Hub.** Er arbeitet als Techniker an der bisher unbesetzten Wasseraufbereitung (Lohn aus dem öffentlichen Dienst nach `role_wage_rates`). Omnizedent ist er aus Überzeugung, nicht von Beruf. Das passt zu einer Kolonie von 30 Menschen. Einen Resonanzplatz gibt es auf dem Mars noch nicht; der braucht ein echtes, baubares Gebäude: `internal-tasks/open/REQ-NOXIA-20261028-resonance-place-buildable.md`.
+- **Gesprächshaltung.** Beide öffentlichen Rollen werden von `worldviewVoices` als `omnizedent` erkannt (Test vorhanden).
 
 ## Spielmechanik (spätere Etappen)
 
 1. **Gespräch** – jetzt umgesetzt über die Stimmen.
-2. **Termine** wie bei St. Johannes: offene Gesprächsrunde am Resonanzplatz, Abend am Tempel, Gottesdienst. Ableitung aus dem Simulationstick, keine zweite Uhr.
+2. **Termine** wie bei St. Johannes – für Sundern umgesetzt (Resonanzrunde). Offen: Abend am Tempel, Resonanzrunde auf Tharsis (braucht `tile_entity` als Ort).
 3. **Lesen und Lernen**: Bibliothek des Tempels und der Raum „Lesen & Denken“ am Resonanzplatz als Lernorte im Sinne von NOXIA-SCHOOL-0001 (immer kostenlos).
 4. **Begegnungen untereinander**: Pfarrer, Wegbegleiterin und Omnizedentin können sich über normale Encounter kennenlernen und streiten. Keine vorgefertigten Freundschaften.
 5. **Ethische Fälle**: Bei Konflikten aus NOXIA-ETHICS-0001 (Wasser, Zugang) können diese Figuren Perspektiven beisteuern, als eine Stimme unter mehreren, nie als Schiedsrichter.

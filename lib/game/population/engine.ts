@@ -18,7 +18,7 @@ import { encounterEventType, encounterOutcome, ENCOUNTER_EVENT_TYPES, type Encou
 import { encounterQualities, decayAffect, affectProfileFromTraits } from '../cognition/personAffect'
 import { fadeRelationships, pairCompatibility } from './relationshipDynamics'
 import { nextEncounterRecency } from './relationshipRecency'
-import { runStJohannesSocialPlaceTick } from './realPlaceActivity'
+import { runRealPlaceSocialTick } from './realPlaceActivity'
 import { affectForDecision, applyEventAffect, loadAffectSnapshot, needsWithPlaceAversion, type AffectSnapshot } from './affectRuntime'
 import type { Person, PersonActivityState, PersonAssignment, PersonRelationship, PopulationAction, PopulationEvent } from './types'
 
@@ -450,7 +450,7 @@ export async function runPopulationTick(supabase: SupabaseLike, tick: number) {
     processed += 1
   }
 
-  const realPlaceActivity = await runStJohannesSocialPlaceTick(supabase, tick)
+  const realPlaceActivity = await runRealPlaceSocialTick(supabase, tick)
 
   // Scheduled place activity can create a temporary real-place assignment and
   // change activity after the ordinary decision pass. Reload only the compact
