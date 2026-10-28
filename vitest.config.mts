@@ -24,6 +24,7 @@ export default defineConfig({
       'lib/game/spatial/localSceneRuntime.test.ts',
       'lib/worldlab/simplify.test.ts',
       'lib/worldlab/reanchor.test.ts',
+      'lib/worldlab/landPlot.test.ts',
       'lib/worldlab/worldPlaceQueue.test.ts',
       'lib/worldlab/tileFormat.test.ts',
       'lib/worldlab/viewTiles.test.ts',

@@ -11,6 +11,7 @@ import { municipalityLabel } from './municipality.server'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
 import { loadTile } from './tileSource.server'
+import { looksLikeStreetParcel, toLocal, type P } from './landPlot'
 
 export type ParcelRow = { id: string; ring: GeoPoint[]; label: string | null; usage: string | null; area_m2: number | null; centre_lat: number; centre_lon: number }
 
@@ -44,12 +45,34 @@ export async function parcelAt(supabase: Supabase, p: GeoPoint): Promise<ParcelR
 /** Flurstücke, die ein Rechteck (Mitte, Maße, Drehung) berühren, mit Eigentümer. */
 export async function parcelsAround(supabase: Supabase, p: GeoPoint, radiusM: number) {
   const dLat = radiusM / 111320, dLon = radiusM / (111320 * Math.cos(p.lat * Math.PI / 180))
-  const { data } = await supabase.from('earth_parcels').select('id,ring,usage').is('retired_at', null)
+  const { data } = await supabase.from('earth_parcels').select('id,ring,usage,source').is('retired_at', null)
     .lte('min_lat', p.lat + dLat).gte('max_lat', p.lat - dLat).lte('min_lon', p.lon + dLon).gte('max_lon', p.lon - dLon).limit(200)
-  const rows = (data ?? []) as Array<{ id: string; ring: GeoPoint[]; usage: string | null }>
+  const rows = (data ?? []) as Array<{ id: string; ring: GeoPoint[]; usage: string | null; source: string | null }>
   const { data: owners } = rows.length ? await supabase.from('earth_parcel_owners').select('parcel_id,profile_id').in('parcel_id', rows.map(row => row.id)) : { data: [] }
   const owner = new Map((owners ?? []).map(row => [String(row.parcel_id), String(row.profile_id)]))
   return rows.map(row => ({ ...row, owner: owner.get(row.id) ?? null }))
+}
+
+/** Ohne Nutzungsart (Hessen): Straße aus den Kartendaten erkennen (`looksLikeStreetParcel`). */
+async function streetWithoutUsage(supabase: Supabase, ring: readonly GeoPoint[]): Promise<string | null> {
+  const lats = ring.map(p => p.lat), lons = ring.map(p => p.lon)
+  const a = tileAt(geoToMerc({ lat: Math.max(...lats), lon: Math.min(...lons) })), b = tileAt(geoToMerc({ lat: Math.min(...lats), lon: Math.max(...lons) }))
+  if ((b.x - a.x + 1) * (b.y - a.y + 1) > 9) return null
+  const origin0 = ring[0]
+  const local = ring.map(p => toLocal(origin0, p))
+  const roads: P[][] = []
+  for (let x = a.x; x <= b.x; x++) for (let y = a.y; y <= b.y; y++) {
+    const tile = { x, y }
+    const data = await loadTile(supabase, tile)
+    const origin = tileOrigin(tile), k = TILE_SIZE_MERC / data.size
+    for (const road of data.roads) {
+      if (road.c === 'path') continue
+      const line: P[] = []
+      for (let i = 0; i + 1 < road.p.length; i += 2) line.push(toLocal(origin0, mercToGeo({ x: origin.x + road.p[i] * k, y: origin.y - road.p[i + 1] * k })))
+      roads.push(line)
+    }
+  }
+  return looksLikeStreetParcel(local, roads) ? 'Verkehrsfläche' : null
 }
 
 /** OSM-Kennungen der Häuser, deren Mitte im Flurstück liegt. */
@@ -94,7 +117,9 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   if (!row) return null
   const parcel = row as ParcelRow & { source: string | null }
   const areaM2 = Math.round(parcel.area_m2 ?? ringAreaM2(parcel.ring))
-  const source = parcel.source === 'noxia' ? 'im Spiel neu vermessen (aus amtlichen Flurstücken)' : cadastreAttribution(parcel.source)
+  const source = parcel.source === 'noxia' ? 'im Spiel neu vermessen (aus amtlichen Flurstücken)'
+    : parcel.source === 'noxia_land' ? 'im Spiel abgesteckt (hier gibt es kein offenes Kataster)'
+      : cadastreAttribution(parcel.source)
   const props = (row as { props?: Record<string, unknown> }).props ?? {}
   const land = landUse(parcel.usage, typeof props.nutzbez === 'string' ? props.nutzbez : null, areaM2)
   const base = { id: parcel.id, label: parcel.label ?? 'Flurstück', areaM2, usage: parcel.usage, source, land, buildings: [] as ParcelOffer['buildings'], residents: 0, rentPerInterval: 0 }
@@ -115,7 +140,7 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
     if (listing) return { ...base, owned: true, own, listed: true, neighbours, forSale: !own, price: Number(listing.price), seller: own ? 'du' : ownerName, reason: own ? 'von dir angeboten' : undefined }
     return { ...base, owned: true, own, neighbours, seller: own ? 'du' : ownerName, forSale: false, reason: own ? 'gehört dir' : `gehört ${ownerName}` }
   }
-  const blocked = parcelNotForSale(parcel.usage)
+  const blocked = parcelNotForSale(parcel.usage) ?? (parcel.usage ? null : await streetWithoutUsage(supabase, parcel.ring))
   if (blocked) return { ...base, owned: false, own: false, forSale: false, reason: blocked }
 
   const sources = await buildingsOn(supabase, parcel.ring)

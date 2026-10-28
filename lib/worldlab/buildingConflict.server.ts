@@ -38,12 +38,19 @@ function footprintPoints(at: GeoPoint, w: number, d: number, rotationDeg: number
 export async function realBuildingConflict(supabase: Supabase, at: GeoPoint, widthM: number, depthM: number, rotationDeg: number, profileId: string): Promise<BuildingConflict> {
   // 1. Kataster: jede Ecke auf einem eigenen Flurstück
   const parcels = await parcelsAround(supabase, at, Math.hypot(widthM, depthM) / 2 + 10)
-  const withCadastre = parcels.length > 0
+  // Amtliches Kataster: alles außer abgestecktem Land (das gibt es nur, wo kein Kataster ist, 28.10.2026)
+  const withCadastre = parcels.some(row => row.source !== 'noxia_land')
   if (withCadastre) {
     for (const point of footprintPoints(at, widthM, depthM, rotationDeg)) {
       const parcel = parcels.find(row => Array.isArray(row.ring) && insideRing(point, row.ring))
       if (!parcel) return { kind: 'parcel', name: 'kein Flurstück' }
       if (parcel.owner !== profileId) return { kind: 'parcel', name: parcel.owner ? 'einem anderen Spieler' : 'der Gemeinde' }
+    }
+  } else {
+    // Ohne Kataster: keine Ecke auf fremdem abgestecktem Land
+    for (const point of footprintPoints(at, widthM, depthM, rotationDeg)) {
+      const parcel = parcels.find(row => Array.isArray(row.ring) && insideRing(point, row.ring))
+      if (parcel && parcel.owner !== profileId) return { kind: 'parcel', name: 'einem anderen Spieler' }
     }
   }
 

@@ -25,6 +25,7 @@ import type { BlockKind } from '@/lib/worldlab/simplify'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
+import LandPanel from './LandPanel'
 import TicketCounter from '@/app/components/TicketCounter'
 import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
@@ -37,6 +38,8 @@ export type Panel =
   | { kind: 'site'; id: string }
   | { kind: 'plot'; source: string }
   | { kind: 'parcel'; id: string; at: GeoPoint }
+  /** Boden ohne geladenes Flurstück: Flurstück nachladen oder freies Land abstecken (28.10.2026) */
+  | { kind: 'land'; at: GeoPoint }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
   | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark }
   /** Reise buchen fern von Sundern (Heim- und Weiterreise, 27.10.2026) */
@@ -55,7 +58,7 @@ function role(resident: ColonyResident) { return resident.assignments.find(item 
 /** Tafel zu einem Klick auf der Karte (Boden schließt die Tafel). */
 export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'person') return { kind: 'person', id: pick.id }
-  if (pick.type === 'ground') return { kind: 'none' }
+  if (pick.type === 'ground') return { kind: 'land', at: pick.at }
   if (pick.type === 'landmark') return { kind: 'landmark', landmark: pick.landmark }
   if (pick.type === 'site') return { kind: 'site', id: pick.id }
   if (pick.type === 'plot') return { kind: 'plot', source: pick.source }
@@ -615,6 +618,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <div className="head"><div><small>WEITERREISE</small><b>Reise buchen</b><span>Bahnhof und Flughafen in der Nähe</span></div><button onClick={close} aria-label="Schließen">×</button></div>
       <TravelAgency from={panel.at} onBooked={trip => { setPanel({ kind: 'none' }); onTripBooked?.(trip) }}/>
     </>}
+    {panel.kind === 'land' && <LandPanel key={panel.at.lat + ',' + panel.at.lon} engine={engine} at={panel.at} close={close} open={next => setPanel(next)} onParcelsChanged={onParcelsChanged} onWorldChanged={onWorldChanged}/>}
     {panel.kind === 'parcel' && <>
       <div className="head"><div><small>FLURSTÜCK</small><b>{parcel?.label ?? 'Flurstück'}</b>{parcel && <span>{parcel.areaM2.toLocaleString('de-DE')} m²{parcel.usage ? ' · ' + parcel.usage : ''}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       {parcel === undefined && <p>Wird geladen …</p>}
@@ -661,6 +665,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     </>}
     <style jsx>{`
       .world-panel .portrait{margin:2px 0 8px}
+      .world-panel button.on{outline:2px solid #d9bb6a}
       .world-panel{position:relative;box-sizing:border-box;width:100%;min-height:0;overflow:auto;padding:12px 14px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;color:#eef2ed;font:12px system-ui;z-index:5}
       .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
       .head small{display:block;font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}

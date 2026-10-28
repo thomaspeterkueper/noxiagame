@@ -141,6 +141,12 @@ export interface WorldEngine {
   landmarks: () => Array<{ landmark: WorldLandmark; distanceM: number }>
   /** NOXIA-Gebäude neu holen (nach Kauf oder Bau). */
   reloadNoxia: () => Promise<void>
+  /** Flurstück an einem Punkt (nur geladene Kacheln). */
+  parcelIdAt: (at: GeoPoint) => string | null
+  /** Richtung der nächsten Straße bis 50 m (Grad wie tile_entities.rotation_deg), sonst null. */
+  roadAngleAt: (at: GeoPoint) => number | null
+  /** Umriss eines Grundstücks zeigen, das abgesteckt wird (null: ausblenden). */
+  setLandPreview: (ring: GeoPoint[] | null, ok: boolean) => void
   destroy: () => void
 }
 
@@ -318,7 +324,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Weg zum Ziel und Baustellen liegen auf dem Boden, über den Straßen.
   const routeLine = new PIXI.Graphics()
   const siteLayer = new PIXI.Container()
-  overlay.addChild(siteLayer, routeLine)
+  // Grundstück, das gerade abgesteckt wird (Landkauf ohne Kataster, 28.10.2026)
+  const landPreview = new PIXI.Graphics()
+  overlay.addChild(siteLayer, routeLine, landPreview)
   // Vorfeld der Anlagen; früh angelegt, weil drawFacilities schon beim ersten Aufbau läuft.
   const apronLayer = new PIXI.Container()
   let apronKey = ''
@@ -1822,6 +1830,30 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       return best
     },
     reloadTiles: reload,
+    parcelIdAt(at) { return parcelAtWorld(toWorld(at)) },
+    roadAngleAt(at) {
+      const p = toWorld(at)
+      let best: { d: number; angle: number } | null = null
+      for (const entry of loaded.values()) for (const road of entry.data.roads) {
+        if (road.c === 'path') continue
+        for (let i = 0; i + 3 < road.p.length; i += 2) {
+          const a = { x: entry.ox + road.p[i], y: entry.oy + road.p[i + 1] }, b = { x: entry.ox + road.p[i + 2], y: entry.oy + road.p[i + 3] }
+          const dx = b.x - a.x, dy = b.y - a.y, len = dx * dx + dy * dy
+          if (!len) continue
+          const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len))
+          const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+          if (d < 50 && (!best || d < best.d)) best = { d, angle: Math.atan2(dy, dx) * 180 / Math.PI }
+        }
+      }
+      return best ? Math.round(((best.angle % 90) + 90) % 90) : null
+    },
+    setLandPreview(ring, ok) {
+      landPreview.clear()
+      if (!ring || ring.length < 3) return
+      const pts: number[] = []
+      for (const point of ring) { const w = toWorld(point), q = iso(w.x, w.y); pts.push(q.x, q.y) }
+      landPreview.poly(pts).fill({ color: ok ? 0xf2c94c : 0xd9534f, alpha: 0.18 }).stroke({ width: 0.8, color: ok ? 0xd9a62a : 0xb03a36, alpha: 0.95 })
+    },
     reloadNoxia,
     destroy() {
       disposed = true

@@ -99,6 +99,19 @@ export async function GET(req: NextRequest) {
   const cell = parcelCell({ lat, lon })
   const services = cadastreServicesAt({ lat, lon })
   if (!services.length) return NextResponse.json({ error: 'kein offenes Kataster an diesem Ort' })
+  // &usage=1: nur die Nutzungsschicht prüfen (Hessen lieferte am 28.10.2026 keine Nutzungsart)
+  if (req.nextUrl.searchParams.get('usage') === '1') {
+    const out: Array<Record<string, unknown>> = []
+    for (const service of services) {
+      const url = parcelRequestUrl({ ...cell, north: cell.south + (cell.north - cell.south) / 4, east: cell.west + (cell.east - cell.west) / 4 }, 0, 20, service, 'ave:NutzungFlurstueck')
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: 'application/gml+xml, application/xml, text/xml' } })
+        const text = await response.text()
+        out.push({ service: service.key, status: response.status, exception: text.match(/<(?:\w+:)?ExceptionText>([^<]{0,300})/)?.[1] ?? null, returned: text.match(/numberReturned="(\d+)"/)?.[1] ?? null, pieces: parseUsePieces(text).length, sample: text.slice(0, 1200) })
+      } catch (error) { out.push({ service: service.key, error: error instanceof Error ? error.message : String(error) }) }
+    }
+    return NextResponse.json({ cell, usage: out })
+  }
   try {
     const { parcels, sample, errors } = await fetchCell(cell)
     return NextResponse.json({ cell, services: services.map(service => service.key), errors, url: parcelRequestUrl(cell, 0, 1000, services[0]), count: parcels.length, first: parcels[0] ? { id: parcels[0].id, label: parcelLabel(parcels[0].props), usage: parcelUsage(parcels[0].props), points: parcels[0].ring.length, keys: Object.keys(parcels[0].props) } : null, sample: parcels.length ? undefined : sample })
