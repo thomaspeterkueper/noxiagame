@@ -4,7 +4,7 @@ import { DEFAULT_VIEW, showPlace } from './viewOptions'
 describe('Beschriftung nach Funktion', () => {
   const off = DEFAULT_VIEW
   const on = { streetNames: true, osmPlaces: true }
-  it('Vorgabe ist aus', () => expect(DEFAULT_VIEW).toEqual({ streetNames: false, osmPlaces: false }))
+  it('Vorgabe: Straßennamen an, OSM-Orte aus', () => expect(DEFAULT_VIEW).toEqual({ streetNames: true, osmPlaces: false }))
   it('alles an: jeder Ort', () => {
     expect(showPlace(on, { kind: 'monument' })).toBe(true)
     expect(showPlace(on, { kind: 'cafe', poi: true })).toBe(true)

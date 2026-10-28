@@ -169,7 +169,7 @@ Befund: Ein Klick auf freien Boden tat nichts, wenn dort kein Flurstück geladen
 ### Beschriftung schaltbar (Kritik, 28.10.2026)
 
 „Man sollte in der Ansicht manche Dinge an- und ausschalten können – Straßennamen, bekannte Gebäude aus OpenStreetMap –, so dass am Ende nur die Gebäude, die wirklich eine Funktion haben, Bezeichnungen tragen; genauso in der Gehe-zu-Liste.“
-- Knopf „◐“ oben rechts („Du bist hier“) öffnet zwei Schalter: **Straßennamen** und **Läden, Lokale und Wahrzeichen aus OpenStreetMap**. Die Wahl bleibt im Browser (`noxia-world-view-v1`). Vorgabe: beides aus (Thomas, 28.10.2026: „aus zu Beginn ist besser“).
+- Knopf „◐“ oben rechts („Du bist hier“) öffnet zwei Schalter: **Straßennamen** und **Läden, Lokale und Wahrzeichen aus OpenStreetMap**. Die Wahl bleibt im Browser (`noxia-world-view-v1`). Vorgabe: Straßennamen an, OSM-Orte aus (Thomas, 28.10.2026: „aus zu Beginn ist besser“, „lassen wir die Straßennamen zu Anfang“).
 - Funktion haben: NOXIA-Gebäude (Namensschild und Symbol, immer sichtbar) und Orte aus OSM mit begehbarem Raum im Spiel (Kirche/Gotteshaus, Bibliothek, ArtLounge, Gemeindezentrum, Begegnungsstätte – `landmarkRoomKind`). Regel in `lib/worldlab/viewOptions.ts` (`showPlace`, mit Tests).
 - Mit „OSM aus“ verschwinden Schild und Name aller anderen OSM-Orte von der Karte und aus der Zielliste („Läden und Lokale“, „Orte“ ohne Raum). Klick auf das Haus selbst zeigt weiter seine heutige Nutzung.
 - In der Zeichenmaschine: eigene Ebenen für Straßennamen und OSM-Namen, `setView` schaltet ohne Neuladen.
