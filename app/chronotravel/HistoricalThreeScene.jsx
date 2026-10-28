@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { buildHistoricalArchitecture } from './historicalBuildings'
+import { createHistoricalStreetLife } from './historicalStreetLife'
 
 /** Lightweight desktop WebGL prototype; no persistent game state. */
 export default function HistoricalThreeScene({ year }) {
@@ -51,6 +52,7 @@ export default function HistoricalThreeScene({ year }) {
     const tip=new THREE.Mesh(new THREE.ConeGeometry(0.85,2.2,4),stone)
     tip.rotation.y=Math.PI/4;tip.position.set(0,16,-22);world.add(tip)
     const disposeArchitecture = buildHistoricalArchitecture(world, year)
+    const streetLife = createHistoricalStreetLife(world, year)
     const keys=new Set()
     const onDown=(e)=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName))return;
       const k=e.key.toLowerCase();if(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown'].includes(k)){e.preventDefault();keys.add(k)}}
@@ -78,14 +80,20 @@ export default function HistoricalThreeScene({ year }) {
       if(keys.has('s')||keys.has('arrowdown'))move.sub(forward)
       if(keys.has('d'))move.add(right)
       if(keys.has('a'))move.sub(right)
-      if(move.lengthSq()>0){move.normalize().multiplyScalar(dt*6);camera.position.add(move)
-        camera.position.x=THREE.MathUtils.clamp(camera.position.x,-11,11)
-        camera.position.z=THREE.MathUtils.clamp(camera.position.z,-46,36)}
+      if(move.lengthSq()>0){
+        move.normalize().multiplyScalar(dt*6)
+        const nextX=camera.position.x+move.x
+        const nextZ=camera.position.z+move.z
+        if(streetLife.isWalkable(nextX,camera.position.z))camera.position.x=nextX
+        if(streetLife.isWalkable(camera.position.x,nextZ))camera.position.z=nextZ
+      }
+      streetLife.update(dt)
       renderer.render(world,camera)
     };animate()
     return ()=>{
       disposed=true;cancelAnimationFrame(frame);resize.disconnect()
       window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',onBlur)
+      streetLife.dispose()
       disposeArchitecture()
       world.traverse(object=>{if(object.isMesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];materials.forEach(m=>m.dispose())}})
       renderer.dispose();renderer.domElement.remove()
