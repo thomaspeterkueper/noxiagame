@@ -50,6 +50,11 @@ const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
     label: 'Bar betreten',
     hint: 'Innenraum, Begegnungen und Aufenthalt öffnen',
   },
+  nightclub: {
+    kind: 'hospitality',
+    label: 'Nachtclub betreten',
+    hint: 'Tanzfläche, Tresen und Begegnungen – nachts geöffnet',
+  },
   restaurant: {
     kind: 'hospitality',
     label: 'Restaurant betreten',

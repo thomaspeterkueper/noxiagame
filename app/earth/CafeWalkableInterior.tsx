@@ -55,6 +55,7 @@ const DECOR:Record<string,{plants:Array<[number,number]>;rug:{x:number;y:number;
   bar:{plants:[[130,112],[470,420]],rug:{x:170,y:110,w:250,h:220}},
   restaurant:{plants:[[130,112],[570,112]],rug:null},
   hotel:{plants:[[130,112],[700,400],[330,112]],rug:{x:150,y:280,w:300,h:110}},
+  nightclub:{plants:[],rug:null},
 }
 
 type MenuItem = { itemCode:string; label:string; priceCredits:number; affordable:boolean }
@@ -221,7 +222,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
-      toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,
+      toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
     }),
     placeKnowledge,
     // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.

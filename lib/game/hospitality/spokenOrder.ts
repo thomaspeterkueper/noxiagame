@@ -12,6 +12,8 @@ export interface SpokenOrder { itemCode: string; label: string; /** Das Wort, wi
 const WORDS: Readonly<Record<string, readonly string[]>> = {
   drink: ['getränk', 'getraenk', 'trinken', 'wasser', 'sprudel', 'kaffee', 'espresso', 'cappuccino', 'latte', 'tee', 'kakao', 'cola', 'limo', 'limonade', 'saft', 'schorle', 'bier', 'pils', 'wein', 'milch'],
   longdrink: ['longdrink', 'cocktail', 'gin', 'whisky', 'wodka', 'rum'],
+  shot: ['shot', 'kurzer', 'kurzen', 'schnaps', 'tequila'],
+  entry: ['eintritt', 'ticket', 'reinkommen'],
   snack: ['snack', 'nüsse', 'chips', 'brezel', 'kleinigkeit'],
   cake: ['kuchen', 'torte', 'gebäck', 'croissant', 'keks', 'waffel'],
   meal: ['mahlzeit', 'essen', 'gericht', 'suppe', 'eintopf', 'brot', 'sandwich', 'frühstück', 'mittagessen', 'abendessen'],

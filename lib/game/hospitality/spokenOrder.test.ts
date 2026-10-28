@@ -27,7 +27,7 @@ check(!toiletAccess({ available: true, priceCredits: 0, guestsOnly: true }, { ha
 check(toiletFact(DEFAULT_VENUE_SERVICES.toilet, true).includes('frei für jeden') && toiletFact(DEFAULT_VENUE_SERVICES.toilet, false).includes('WC'), 'staff know the rule, guests see the door')
 check(mentionsToilet('Ich suche eine Toilett') && mentionsToilet('Kann ich hier pinkeln?') && mentionsToilet('wo ist das WC') && !mentionsToilet('Einen Kaffee bitte'), 'toilet questions are recognized')
 
-for (const kind of ['cafe', 'bar', 'restaurant', 'hotel'] as VenueKind[]) for (const size of ['small', 'standard', 'large'] as const) {
+for (const kind of ['cafe', 'bar', 'restaurant', 'hotel', 'nightclub'] as VenueKind[]) for (const size of ['small', 'standard', 'large'] as const) {
   const L = withUpperFloor(venueLayoutForSize(VENUE_LAYOUTS[kind], size))
   check(!isVenueBlocked(L, VENUE_WC_DOOR) && venuePath(L, L.start, VENUE_WC_DOOR).length >= 2, `${kind}/${size}: WC door free and reachable`)
   const staff = placeVenueFigures(L, [{ id: 's', worksHere: true }])[0]

@@ -332,3 +332,33 @@ Thomas, 28.10.2026: „Der Betreiber eines Lokals oder auch Ladens etc. sollte d
 
 **Anregung (Thomas):** Die Toilettenfrage war vermutlich ein Test, wie das Spiel reagiert. Sie zeigt aber ein echtes Bedürfnis. Wenn Bedürfnisse der Figuren weiter ausgebaut werden (R-9), wäre „Toilette“ ein Grund, ein Lokal zu betreten, ohne etwas zu kaufen. Für den Betreiber ist das eine Entscheidung zwischen Gastfreundschaft und Einnahme.
 
+### R-19 (Gastronomie, 28.10.2026): Nachtclub als Lokalart – Karte, Umbau, Personal
+
+Thomas, 28.10.2026: „ich glaube wir brauchen einen Nachtclub.“ In den Kartendaten von Sundern gibt es keinen realen Nachtclub. Er entsteht also wie Bar und Restaurant durch Kauf und Umbau eines Hauses (R-13).
+
+**Was schon da ist (Gastronomie):**
+- Lokalart `nightclub` in `lib/game/hospitality/venues.ts`. Der Raum hat:
+  - eine begehbare Tanzfläche vor dem DJ-Pult, auf der man tanzen kann;
+  - einen Tresen an der rechten Wand, zwei Stehtische und eine Lounge;
+  - einen Türsteher beim Eingang und die WC-Tür.
+- Personalplätze in dieser Reihenfolge: Tresen, Tür, DJ, zweiter Tresen.
+- Öffnungszeit 22 bis 5 Uhr Koloniezeit.
+- Eigene Einführung („Hier lernt man Leute kennen …“), Eingang „Nachtclub betreten“ und Symbol ♫ in der Weltkarte.
+- OSM `amenity=nightclub` wird jetzt als Nachtclub erkannt, vorher als Bar.
+- Bestellen im Gespräch kennt „Eintritt“ und „Shot“; die Symbole dafür (`entry`, `shot`) sind da.
+- In `lib/worldlab/venueConversion.ts` steht ein Vorschlag: Umbau 3 000 Cr, 3 Ticks, mindestens 120 m², Personal 2/3/4.
+
+**Bitte:**
+1. **`building_definitions`:** Zeile `nightclub`, Name „Nachtclub“, Kategorie wie `bar`, `allowed_locations` mit `earth`. Erst dann bietet die Gebäudetafel den Umbau an.
+2. **Umbau und Kauf:** `start_earth_venue_conversion` und der Kauf realer Lokale nehmen den Typ `nightclub` an (heute `p_type not in ('cafe','bar','restaurant','hotel')` → `NOXIA_TYPE_INVALID`). Dazu `real_venue_kind` in SQL: `amenity = 'nightclub'` → `nightclub`, wie jetzt `venueKindForRealPlace`.
+3. **Karte (`hospitality_menu`, entity_id `nightclub`), Vorschlag:**
+   - Eintritt (`entry`) 8 Cr
+   - Getränk (`drink`) 4 Cr
+   - Longdrink (`longdrink`) 7 Cr
+   - Shot (`shot`) 3 Cr
+   - Wasser (`water`) 2 Cr
+
+   Der Eintritt ist ein Posten wie die anderen. Ob man ohne Eintritt hineindarf, ist offen. Vorschlag: Der Türsteher weist hin, sperrt aber nicht, bis es Hausregeln gibt (R-18).
+4. **Personal:** `run_venue_staffing` auch für `nightclub` (Rolle `service`; Tür und DJ ergeben sich aus den Plätzen).
+5. **Bewohner gehen aus:** `npc_service_catalog` für `nightclub`, nur nachts und mit Geselligkeit als Anlass (R-5). Sonst bleibt der Club leer, solange Käufe nur aus Hunger und Durst entstehen.
+

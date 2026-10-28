@@ -1,5 +1,5 @@
 import { validateInteriorTemplate } from '../buildings/interiors/topology'
-import { CONSUMPTION_INTERVAL_S, VISIT_TOTAL_S, spreadVisitAge } from './venues'
+import { CONSUMPTION_INTERVAL_S, VISIT_TOTAL_S, spreadVisitAge, onDanceFloor } from './venues'
 import { CAFE_STANDARD_INTERIOR } from '../buildings/interiors/templates/cafeStandard'
 import { getInteriorTemplateForBuildingType } from '../buildings/interiors/registry'
 import { getBuildingEntryDefinition } from '../buildings/entry'
@@ -413,3 +413,24 @@ check(venueKindForRealPlace({ building: 'apartments' }) === null && venueKindFor
 
 if (failures > 0) throw new Error(`hospitality venues: ${failures} checks failed`)
 console.log('hospitality venue checks passed')
+
+// Nachtclub (28.10.2026)
+{
+  let f3 = 0
+  const c = (ok: boolean, label: string) => { if (!ok) { f3++; console.error('FAIL', label) } }
+  const L = VENUE_LAYOUTS.nightclub
+  c(venueKindForBuildingType('nightclub') === 'nightclub' && venueKindForRealPlace({ amenity: 'nightclub' }) === 'nightclub', 'nightclub kind from building type and OSM')
+  c(Boolean(L.danceFloor) && L.spots.filter(s => s.id.startsWith('dance-')).every(s => onDanceFloor(L, s) && !isVenueBlocked(L, s)), 'dance spots lie free on the dance floor')
+  c(!isVenueBlocked(L, L.start) && !isVenueBlocked(L, L.servicePoint) && venuePath(L, L.start, { x: L.danceFloor!.x + 40, y: L.danceFloor!.y + 40 }).length >= 2, 'the dance floor is reachable, not blocked')
+  c(L.spots.filter(s => s.kind === 'seat').every(s => venuePath(L, L.start, s).length >= 2), 'lounge seats reachable')
+  c(venueOpenAt('nightclub', 23) && venueOpenAt('nightclub', 3) && !venueOpenAt('nightclub', 12), 'club opens at night')
+  const two = placeVenueFigures(L, [{ id: 'a', worksHere: true }, { id: 'b', worksHere: true }, { id: 'c', worksHere: true }])
+  c(two.map(f => f.spot.id).join() === 'staff-counter,staff-door,staff-dj' && two.every(f => f.visibleToPlayer), 'bar, door, then DJ – all in sight')
+  const dancer = placeVenueFigures(L, [{ id: 'g', worksHere: false }])[0]
+  const floorPos = { x: L.danceFloor!.x + 60, y: L.danceFloor!.y + 60 }
+  const facts = venueConversationFacts({ layout: L, buildingName: 'Club', self: two[0], figures: [...two, dancer], playerPos: floorPos, arrivalPoint: false, playerDancing: true, hour: 23 })
+  c(facts.some(f => f === 'Dein Gegenüber tanzt gerade auf der Tanzfläche') && facts.some(f => f.includes('Musik ist laut')), 'staff see the player dance and know the music is loud')
+  if (f3 > 0) throw new Error(`nightclub: ${f3} checks failed`)
+  console.log('nightclub checks passed')
+}
+if (VENUE_LAYOUTS.nightclub.roomFact.length > 140) throw new Error('nightclub room fact too long')

@@ -90,7 +90,7 @@ export function buildingSizeLine(areaM2: number, levels: number): string {
 
 // ---- Lokale: Umbau und Kauf (W-5, zu R-13) ----
 
-const VENUE_LABEL: Record<string, string> = { cafe: 'Café', bar: 'Bar', restaurant: 'Restaurant', hotel: 'Hotel' }
+const VENUE_LABEL: Record<string, string> = { cafe: 'Café', bar: 'Bar', restaurant: 'Restaurant', hotel: 'Hotel', nightclub: 'Nachtclub' }
 
 /** „Café“, „Bar“ … für eine Lokalart aus R-13 (`venue`, `conversion_plan.type`). */
 export function venueKindLabel(kind: string | null | undefined): string | null {
