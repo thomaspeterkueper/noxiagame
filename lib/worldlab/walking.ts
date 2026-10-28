@@ -7,6 +7,20 @@ export type P = { x: number; y: number }
 /** Grundriss als Vieleck (Ecken in Bodenmetern). */
 export type Footprint = P[]
 
+/**
+ * Häuser werden minimal kleiner gezeichnet als in den Kartendaten (Thomas,
+ * 28.10.2026: „immer noch Bewegungsschwierigkeiten – vielleicht die Bauwerke
+ * minimal kleiner darstellen“). Hindernis ist genau das gezeichnete Haus, ohne
+ * zusätzlichen Rand: Zwischen zwei 10-m-Häusern wird der Durchgang so 1 m breiter.
+ * Kauf, Bauprüfung und Flächen rechnen weiter mit dem echten Grundriss.
+ */
+export const HOUSE_DRAW_SCALE = 0.9
+
+/** Vieleck um einen Mittelpunkt verkleinern. */
+export function scaleRing(ring: readonly P[], centre: P, scale: number): P[] {
+  return ring.map(p => ({ x: centre.x + (p.x - centre.x) * scale, y: centre.y + (p.y - centre.y) * scale }))
+}
+
 /** Liegt `p` im Vieleck? (Strahlverfahren) */
 export function insidePolygon(p: P, ring: readonly P[]): boolean {
   let inside = false
@@ -24,17 +38,31 @@ export function boxFootprint(cx: number, cy: number, hw: number, hd: number, ang
   return [[-w, -d], [w, -d], [w, d], [-w, d]].map(([lx, ly]) => ({ x: cx + lx * cos - ly * sin, y: cy + lx * sin + ly * cos }))
 }
 
+/** Schräg gestellte Ausweichrichtungen (Grad), kleine Abweichung zuerst. */
+const SLIDE_ANGLES = [20, -20, 40, -40, 60, -60, 80, -80]
+
 /**
  * Ein Schritt von `from` nach `to` unter Hindernissen: Ist das Ziel frei, wird
- * es erreicht; sonst wird entlang einer Achse geglitten; sonst bleibt man stehen.
+ * es erreicht; sonst wird entlang einer Achse geglitten; sonst in einer leicht
+ * gedrehten Richtung (Häuser stehen schräg, in der Schrägansicht läuft man
+ * diagonal – vorher blieb man an jeder schrägen Wand stehen); sonst bleibt man stehen.
  * Wer schon in einem Haus steht (Start, Sprung), darf hinaus.
  */
 export function stepWithObstacles(from: P, to: P, blocked: (p: P) => boolean): P {
   if (!blocked(to) || blocked(from)) return to
+  const dx = to.x - from.x, dy = to.y - from.y
+  // Achsen nur, wenn sie überhaupt bewegen (sonst „gleitet“ man auf der Stelle)
   const alongX = { x: to.x, y: from.y }
-  if (!blocked(alongX)) return alongX
+  if (Math.abs(dx) > 1e-6 && !blocked(alongX)) return alongX
   const alongY = { x: from.x, y: to.y }
-  if (!blocked(alongY)) return alongY
+  if (Math.abs(dy) > 1e-6 && !blocked(alongY)) return alongY
+  for (const degrees of SLIDE_ANGLES) {
+    const a = degrees * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a)
+    // etwas kürzer, je stärker die Abweichung (an der Wand entlang statt hinein)
+    const k = Math.cos(a)
+    const next = { x: from.x + (dx * cos - dy * sin) * k, y: from.y + (dx * sin + dy * cos) * k }
+    if (!blocked(next)) return next
+  }
   return from
 }
 

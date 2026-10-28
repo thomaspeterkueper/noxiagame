@@ -14,7 +14,7 @@ import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, N
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
-import { boxFootprint, insidePolygon, RoadGraph, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
+import { boxFootprint, HOUSE_DRAW_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
@@ -499,12 +499,16 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const style = BLOCK_STYLES[block.k]
     const g = new PIXI.Graphics()
     let cos = Math.cos(block.a), sin = Math.sin(block.a)
-    const hw = block.w / 2, hd = block.d / 2
+    // Gezeichnet minimal kleiner als in den Kartendaten (mehr Platz zum Gehen, HOUSE_DRAW_SCALE)
+    const hw = block.w / 2 * HOUSE_DRAW_SCALE, hd = block.d / 2 * HOUSE_DRAW_SCALE
     const cx = ox + block.x, cy = oy + block.y
+    const realRing = block.f && block.f.length >= 8 ? Array.from({ length: block.f.length / 2 }, (_, i) => ({ x: ox + block.f![i * 2], y: oy + block.f![i * 2 + 1] })) : null
+    if (realRing && realRing.length > 3 && realRing[0].x === realRing[realRing.length - 1].x && realRing[0].y === realRing[realRing.length - 1].y) realRing.pop()
+    const shownRing = realRing ? scaleRing(realRing, { x: cx, y: cy }, HOUSE_DRAW_SCALE) : null
     // Steht hier ein NOXIA-Gebäude, übernimmt es den echten Grundriss: gleiche
     // Lage, Größe und Drehung wie die Nachbarn, aber sein eigenes Dach.
     // Gekaufte reale Gebäude gehören über ihre OSM-Kennung, die übrigen NOXIA-Gebäude über ihre Lage.
-    const owner = (block.i ? noxia.find(building => building.source === block.i) : undefined) ?? noxiaOn(cx, cy, hw, hd, cos, sin)
+    const owner = (block.i ? noxia.find(building => building.source === block.i) : undefined) ?? noxiaOn(cx, cy, block.w / 2, block.d / 2, cos, sin)
     // Gekaufte reale Gebäude behalten ihr Aussehen, auch nach einem Umbau.
     // Gebäude des Ortes im realen Haus (Bank, Metropol, W-7): realer Grundriss
     // und reale Höhe, aber NOXIA-Dach, damit man sie als öffentlich erkennt.
@@ -514,11 +518,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
           : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }
     const eave = (look?.levels ?? block.l) * style.storeyM
     let c: Array<{ x: number; y: number }>
-    if (block.f && block.f.length >= 8) {
-      const ring: Array<{ x: number; y: number }> = []
-      for (let i = 0; i < block.f.length; i += 2) ring.push({ x: ox + block.f[i], y: oy + block.f[i + 1] })
-      if (ring.length > 3 && ring[0].x === ring[ring.length - 1].x && ring[0].y === ring[ring.length - 1].y) ring.pop()
-      c = drawPrism(g, block.k, ring, eave, { x: -sin, y: cos }, look?.roof)
+    if (shownRing) {
+      c = drawPrism(g, block.k, shownRing, eave, { x: -sin, y: cos }, look?.roof)
     } else {
       c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM, look?.roof)
     }
@@ -539,9 +540,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     g.eventMode = 'static'
     ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id, source: block.i, areaM2: Math.round(block.f && block.f.length >= 8 ? polygonArea(Array.from({ length: block.f.length / 2 }, (_, i) => ({ x: block.f![i * 2], y: block.f![i * 2 + 1] }))) : block.w * block.d), levels: block.l, use: block.u }
     ;(g as unknown as { box: Box }).box = { cx, cy, hw, hd, cos, sin }
-    // Hindernis für die Spielfigur (Grundriss, ein halber Meter Abstand)
+    // Hindernis für die Spielfigur: genau das gezeichnete Haus (ohne zusätzlichen Rand)
     if (footprints) {
-      const ring = block.f && block.f.length >= 8 ? Array.from({ length: block.f.length / 2 }, (_, i) => ({ x: ox + block.f![i * 2], y: oy + block.f![i * 2 + 1] })) : boxFootprint(cx, cy, hw, hd, block.a, 0.5)
+      const ring = shownRing ?? boxFootprint(cx, cy, hw, hd, block.a, 0)
       footprints.push({ ring, minX: Math.min(...ring.map(p => p.x)), maxX: Math.max(...ring.map(p => p.x)), minY: Math.min(...ring.map(p => p.y)), maxY: Math.max(...ring.map(p => p.y)) })
     }
     return g

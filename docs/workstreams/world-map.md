@@ -174,6 +174,12 @@ Befund: Ein Klick auf freien Boden tat nichts, wenn dort kein Flurstück geladen
 - Mit „OSM aus“ verschwinden Schild und Name aller anderen OSM-Orte von der Karte und aus der Zielliste („Läden und Lokale“, „Orte“ ohne Raum). Klick auf das Haus selbst zeigt weiter seine heutige Nutzung.
 - In der Zeichenmaschine: eigene Ebenen für Straßennamen und OSM-Namen, `setView` schaltet ohne Neuladen.
 
+### Mehr Platz zum Gehen (Thomas, 28.10.2026: „immer noch Bewegungsschwierigkeiten – vielleicht die Bauwerke minimal kleiner darstellen“)
+
+- **Häuser 10 % kleiner gezeichnet** um ihre Mitte (`HOUSE_DRAW_SCALE` in `lib/worldlab/walking.ts`). Hindernis ist genau das gezeichnete Haus; der frühere zusätzliche Rand von 0,5 m um Rechteck-Häuser entfällt. Zwischen zwei 10-m-Häusern wird der Durchgang damit gut 1 m breiter, bei Rechteck-Häusern (umschließendes Rechteck um z. B. L-Formen) knapp 2 m. Kauf, Bauprüfung, Flächenangaben und NOXIA-Zuordnung rechnen weiter mit dem echten Grundriss.
+- **Rutschen an schrägen Wänden:** Bisher glitt die Figur nur in Nord-Süd- oder Ost-West-Richtung an einer Wand entlang; da die Häuser schräg stehen und man in der Schrägansicht diagonal läuft, blieb sie oft stehen. Jetzt versucht `stepWithObstacles` zusätzlich gedrehte Richtungen (±20° bis ±80°, kleine Abweichung zuerst). Fehler behoben: Ein Achsenschritt ohne Bewegung galt als „frei“, die Figur stand still.
+- Nicht im Browser geprüft (Anmeldung nötig).
+
 ### Bereinigung 25.10.2026 (Thomas: „meine selbst gebauten Gebäude passen nicht mehr“)
 
 McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wohnblöcke, Habitat, Schule, Fabrik, Warenhaus, Bank, Raumhafen-Kern, 3 Solarfelder), ohne Erstattung. Die fünf Bewohner (4 aus dem Wohnblock, 1 aus dem Habitat) wohnen jetzt im staatlichen Wohnblock Selmecke (`203e82d7…`, 8 von 12 Plätzen), Mietverhältnis als Bereinigung (`origin = backfill`), Präsenz mitverschoben. Café („Thomas“) und die staatlichen Bauten in Selmecke bleiben.
