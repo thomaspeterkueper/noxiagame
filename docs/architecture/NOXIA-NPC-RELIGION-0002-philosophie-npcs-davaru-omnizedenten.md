@@ -23,7 +23,7 @@ Alle sind normale persistente Personen nach RELIGION-0001: Wohnung, Arbeit, Bed�
 1. **Davaru als eigene Tradition.** `davaru` ist neu in `SpiritualTradition`. Der Weg des DaVaRu ist nach dem Davaru-Kodex (OTA-FND-0019/0020) eine ethische Praxis, keine Religion. Er wird deshalb nicht unter `other_religious` geführt.
 2. **Religion und Philosophie werden getrennt markiert.** `TRADITION_KIND` ordnet jede Tradition `religious` oder `philosophical` zu. Omnizedenz und Davaru sind `philosophical`.
 3. **Omnizedent/in als Rolle.** `omnizedent` (Label „Omnizedent/in“) ist eine Person, die die Omnizedenz vertritt und darüber spricht. Kein Amt, keine Weihe, kein Klerus. Die bisherige `resonance_facilitator`-Rolle bleibt für die Gastgeberfunktion am Ort: Sie hütet den Raum, sie lehrt nicht.
-4. **Wegbegleitung des DaVaRu als Rolle.** `davaru_companion` ist eine Person, die den Weg geht und andere durch seine Fragen begleitet. Damit hängt der Tempel nicht allein an den beiden Kanonfiguren.
+4. **Dava als Rolle.** `davaru_companion` ist eine Person, die den Weg geht und andere durch seine Fragen begleitet. Damit hängt der Tempel nicht allein an den beiden Kanonfiguren.
 5. **Gesprächshaltung statt Sonderlogik.** `worldviewVoices.ts` leitet aus der öffentlichen Rolle einer Person eine Stimme ab (`clergy`, `davaru`, `omnizedent`, `resonance_host`). Die Gesprächsroute hängt die passenden Zeilen an den Systemtext. Es ist dieselbe Route wie für alle Figuren, mit denselben Grounding- und Erinnerungsregeln.
 
 ## Gemeinsame Regeln für alle Stimmen
@@ -73,7 +73,7 @@ Nichts davon ist in der Live-Datenbank angelegt. Anlage nach dem Verfahren aus `
 | Elias Hartmann | `priest` | St. Johannes, Sundern | besteht |
 | DaVaRu (Daniel van Runen) | Gastgeber | Tempel des DaVaRu, Schmitten | besteht als Person, Tempel noch nicht platziert |
 | Aristeas Lux | Gast | Tempel des DaVaRu | besteht als Person |
-| Wegbegleiter/in | `davaru_companion` | Schmitten | geplant, Bezeichnung offen |
+| Dava | `davaru_companion` | Schmitten | geplant |
 | Johanna Lind | `omnizedent` | Sundern; Resonanzrunde in der realen Hubertushalle; wohnt im öffentlichen Wohnblock | **produktiv** (`earth-sundern-omnizedent-001`) |
 | Theodor Grün | Techniker, Omnizedent aus Überzeugung | Tharsis Hub; arbeitet an der Wasseraufbereitung, wohnt im öffentlichen Habitat | **produktiv** (`mars-tharsis-omnizedent-001`), Runde startet, sobald ein Resonanzplatz gebaut ist |
 | Samira Haddad | `omnizedent` | Frankfurt-Sachsenhausen; Resonanzrunde in der CAMALEO-ArtLounge (Mörfelder Landstraße 103), wohnt Ziegelhüttenweg 15 | **produktiv** (`earth-frankfurt-omnizedent-001`) |
@@ -96,7 +96,7 @@ Angelegt mit Migration `20261028124500_omnizedent_pilots_sundern_tharsis.sql`, n
 1. **Gespräch** – jetzt umgesetzt über die Stimmen.
 2. **Termine** wie bei St. Johannes – für Sundern umgesetzt (Resonanzrunde). Offen: Abend am Tempel, Resonanzrunde auf Tharsis (braucht `tile_entity` als Ort).
 3. **Lesen und Lernen**: Bibliothek des Tempels und der Raum „Lesen & Denken“ am Resonanzplatz als Lernorte im Sinne von NOXIA-SCHOOL-0001 (immer kostenlos).
-4. **Begegnungen untereinander**: Pfarrer, Wegbegleiterin und Omnizedentin können sich über normale Encounter kennenlernen und streiten. Keine vorgefertigten Freundschaften.
+4. **Begegnungen untereinander**: Pfarrer, Dava und Omnizedentin können sich über normale Encounter kennenlernen und streiten. Keine vorgefertigten Freundschaften.
 5. **Ethische Fälle**: Bei Konflikten aus NOXIA-ETHICS-0001 (Wasser, Zugang) können diese Figuren Perspektiven beisteuern, als eine Stimme unter mehreren, nie als Schiedsrichter.
 
 ## Entscheidungen Thomas (28.10.2026)
@@ -107,7 +107,7 @@ Angelegt mit Migration `20261028124500_omnizedent_pilots_sundern_tharsis.sql`, n
 
 ## Offen
 
-- **Bezeichnung der Davaru-Rolle:** „Wegbegleitung des DaVaRu“ bleibt Arbeitsbegriff, bis ein eigener Name gefunden ist. Der Code-Schlüssel `davaru_companion` kann bleiben; nur das Label ändert sich dann.
+- ~~Bezeichnung der Davaru-Rolle~~ – entschieden (Thomas, 28.10.2026): **Dava**, Mehrzahl **Davas**, für alle Geschlechter gleich. Code-Schlüssel bleibt `davaru_companion`.
 
 ### Stand 28.10.2026, Nachmittag
 

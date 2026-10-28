@@ -12,6 +12,9 @@ describe('worldview voices', () => {
     expect(worldviewVoiceFromPublicRole('Resonanzbegleitung')).toBe('resonance_host')
     expect(worldviewVoiceFromPublicRole('Gastgeber im Tempel des DaVaRu')).toBe('davaru')
     expect(worldviewVoiceFromPublicRole('Wegbegleiterin')).toBe('davaru')
+    expect(worldviewVoiceFromPublicRole('Dava · Tempel des DaVaRu')).toBe('davaru')
+    expect(worldviewVoiceFromPublicRole('Dava')).toBe('davaru')
+    expect(worldviewVoiceFromPublicRole('Davidstern-Händler')).toBeNull()
   })
 
   it('leaves ordinary roles without a worldview voice', () => {

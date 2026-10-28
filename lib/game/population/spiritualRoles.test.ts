@@ -12,7 +12,7 @@ describe('spiritual roles', () => {
     expect(traditionKind('davaru')).toBe('philosophical')
     expect(traditionKind('christian')).toBe('religious')
     expect(spiritualRoleDefinition('omnizedent')).toMatchObject({ label: 'Omnizedent/in', clergyLike: false, traditions: ['omnizedenz'] })
-    expect(spiritualRoleDefinition('davaru_companion')).toMatchObject({ clergyLike: false, traditions: ['davaru'] })
+    expect(spiritualRoleDefinition('davaru_companion')).toMatchObject({ label: 'Dava', clergyLike: false, traditions: ['davaru'] })
     expect(spiritualRoleFitsTradition('omnizedent', 'davaru')).toBe(false)
   })
 

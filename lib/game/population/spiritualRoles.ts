@@ -69,7 +69,8 @@ export const SPIRITUAL_ROLE_DEFINITIONS: readonly SpiritualRoleDefinition[] = [
   // A person who holds and explains Omnizedenz, no ordination, no office.
   { code: 'omnizedent', label: 'Omnizedent/in', traditions: ['omnizedenz'], functions: ['conversation','teaching','reflection'], clergyLike: false },
   // Practitioner of the Way of DaVaRu who accompanies others through its questions.
-  { code: 'davaru_companion', label: 'Wegbegleitung des DaVaRu', traditions: ['davaru'], functions: ['conversation','care','reflection'], clergyLike: false },
+  // Thomas (28.10.2026): „Dava“, Mehrzahl „Davas“, für alle Geschlechter gleich.
+  { code: 'davaru_companion', label: 'Dava', traditions: ['davaru'], functions: ['conversation','care','reflection'], clergyLike: false },
 ] as const
 
 export function spiritualRoleDefinition(code: SpiritualRoleCode) {

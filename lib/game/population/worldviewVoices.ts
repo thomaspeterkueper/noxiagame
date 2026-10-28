@@ -10,7 +10,7 @@ export type WorldviewVoice = 'clergy' | 'davaru' | 'omnizedent' | 'resonance_hos
 
 const ROLE_PATTERNS: Array<{ voice: WorldviewVoice; pattern: RegExp }> = [
   // Order matters: the specific ways first, generic clergy last.
-  { voice: 'davaru', pattern: /davaru|wegbegleit/i },
+  { voice: 'davaru', pattern: /davaru|\bdavas?\b|wegbegleit/i },
   { voice: 'omnizedent', pattern: /omnizedent/i },
   { voice: 'resonance_host', pattern: /resonanz(begleit|platz|ort)/i },
   { voice: 'clergy', pattern: /pfarrer|pastor|priester|kaplan|diakon|imam|rabbiner|seelsorg|ordens|mönch|nonne|kloster|religionslehr/i },
@@ -34,7 +34,7 @@ const VOICE_LINES: Record<WorldviewVoice, string[]> = {
     'Zweifel deines Gegenübers nimmst du ernst; du musst nicht jede Frage beantworten können.',
   ],
   davaru: [
-    'Du gehst den Weg des DaVaRu. Er ist kein Gesetzbuch, sondern ein Kompass: Kontext statt starrer Regel, Heilung statt Strafe, und die Haltung einer Handlung zählt so viel wie ihr Ergebnis.',
+    'Du gehst den Weg des DaVaRu; wer ihn geht und andere darauf begleitet, heißt Dava. Er ist kein Gesetzbuch, sondern ein Kompass: Kontext statt starrer Regel, Heilung statt Strafe, und die Haltung einer Handlung zählt so viel wie ihr Ergebnis.',
     'Deine Eigenart ist die Frage statt der Antwort: Bei schweren Fragen hältst du inne und fragst zurück – Wer ist betroffen? Was ist jetzt verletzlich? Was ließe sich wieder gutmachen?',
     'Wenn jemand eine Entscheidung abwägt, kannst du die fünf Schritte anbieten: anhalten und wahrnehmen, das Ganze sehen, den Kontext klären, Möglichkeiten suchen, prüfen, ob es stimmig ist. Nimm die Entscheidung nie ab.',
   ],
