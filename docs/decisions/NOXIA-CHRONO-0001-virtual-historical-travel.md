@@ -41,3 +41,7 @@ Route `/chronotravel` rendert nun mit der bereits installierten Bibliothek `thre
 ## Modulare Architektur v1 (28.10.2026)
 
 `app/chronotravel/historicalBuildings.js` generiert Tribünen, Arkaden, Säulen, Loge, einfache Mauersegmente und Häuser aus Three.js-Geometrie. Jahresauswahl: 550 (Tribünen/Loge), 1200 (reduzierte Tribünen und gemischte Bebauung), 1700 (Häuser mit Dachformen am offenen Platz). Alle Abmessungen, Bauformen und Positionen sind **illustrativ, nicht quellengeprüft**. Die Funktion gibt ein Cleanup zurück und erzeugt weder Datenbankobjekte noch echte historische NPCs. Nächste Aufgaben: originale Quellen je Bauwerk, sichere Kollisionsnavigation, Performance-/Render-Test im Browser und ggf. Instancing.
+
+## Wegsystem und Szenenbevölkerung (28.10.2026)
+
+`app/chronotravel/historicalStreetLife.js` stellt einen einfachen zentralen Weg, visuelle Eingangshinweise (1200/1700), sechs deterministisch animierte lokale Figuren und eine begehbare Korridorfläche mit Hindernis am Obelisken bereit. Die Eingänge sind **noch keine betretbaren Innenräume**; Figuren sind **keine echten Core-NPCs**, sie besitzen weder Dialog noch Gedächtnis noch persistierte Identität. Die Kollisionsprüfung ist ein eng begrenzter Prototyp, kein vollständiger Physik-/Navmesh-Algorithmus. Vor Merge: WebGL-Browser-Smoke-Test, Prüfung der Szene bei Szenenwechsel, Performance und Build. Keine wissenschaftliche Authentizitätsfreigabe.
