@@ -654,6 +654,24 @@ export function isAtServicePoint(layout: VenueLayout, pos: VenuePoint): boolean 
 export const VISIT_TIMES = { orderS: 90, walkS: 18, stayS: 35 * 60, leaveS: 22 } as const
 export type VisitPhase = 'ordering' | 'to-seat' | 'seated' | 'leaving' | 'gone'
 
+/** Käufe der Bewohner kommen gebündelt alle sechs Ticks (lib/game/npcEconomy.ts, runNpcConsumptionTick). */
+export const CONSUMPTION_INTERVAL_S = 6 * 60 * 60
+export const VISIT_TOTAL_S = VISIT_TIMES.orderS + VISIT_TIMES.walkS + VISIT_TIMES.stayS + VISIT_TIMES.leaveS
+
+/**
+ * Ein Kauf steht für den ganzen Abschnitt bis zum nächsten Lauf. Damit nicht
+ * alle Gäste eines Laufs zugleich kommen und das Lokal danach fünf Stunden leer
+ * ist, beginnt jeder Besuch fest je Person und Kauf irgendwo in diesem Abschnitt.
+ * Kein zusätzlicher Gast, kein zusätzlicher Kauf – nur die Zeit im Abschnitt.
+ * Ergebnis: Sekunden seit Beginn des Besuchs, oder null, wenn er noch nicht begonnen hat.
+ */
+export function spreadVisitAge(personId: string, purchasedAt: string, ageSeconds: number): number | null {
+  const span = Math.max(1, CONSUMPTION_INTERVAL_S - VISIT_TOTAL_S)
+  const offset = stableHash(personId + '|' + purchasedAt) % span
+  const age = ageSeconds - offset
+  return age < 0 ? null : age
+}
+
 export function visitPhase(ageSeconds: number): { phase: VisitPhase; progress: number } {
   const t = Math.max(0, ageSeconds)
   const { orderS, walkS, stayS, leaveS } = VISIT_TIMES

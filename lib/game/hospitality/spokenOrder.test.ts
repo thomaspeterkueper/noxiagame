@@ -38,3 +38,20 @@ for (const kind of ['cafe', 'bar', 'restaurant', 'hotel'] as VenueKind[]) for (c
 
 if (failures > 0) throw new Error(`spoken order / services: ${failures} checks failed`)
 console.log('spoken order and venue service checks passed')
+
+// Gebäudetafel: offen oder zu
+import { venueStatusLine } from './venueStatus'
+import { venueHoursFor as hoursFor } from './venues'
+{
+  let f2 = 0
+  const c = (ok: boolean, label: string) => { if (!ok) { f2++; console.error('FAIL', label) } }
+  const bar = hoursFor('bar')
+  c(venueStatusLine({ kind: 'bar', hours: bar, hour: null, staffCount: 0 }).text.includes('niemand') && venueStatusLine({ kind: 'bar', hours: bar, hour: null, staffCount: 0 }).open === false, 'bar without staff is closed')
+  c(venueStatusLine({ kind: 'cafe', hours: hoursFor('cafe'), hour: 3, staffCount: 0 }).open === true, 'café without staff runs as vending café')
+  const open = venueStatusLine({ kind: 'restaurant', hours: hoursFor('restaurant'), hour: 13, staffCount: 2 })
+  const shut = venueStatusLine({ kind: 'restaurant', hours: hoursFor('restaurant'), hour: 4, staffCount: 2 })
+  c(open.open === true && open.text.startsWith('Geöffnet – jetzt 13 Uhr Koloniezeit') && shut.open === false && shut.text.includes('geöffnet von'), 'hours decide when staff is there')
+  c(venueStatusLine({ kind: 'cafe', hours: hoursFor('cafe', true), hour: 7, staffCount: 1 }).text.includes('deiner Ortszeit'), 'start café runs on the player clock')
+  if (f2 > 0) throw new Error(`venue status: ${f2} checks failed`)
+  console.log('venue status checks passed')
+}

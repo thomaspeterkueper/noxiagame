@@ -1,6 +1,7 @@
 // app/api/game/hospitality/guests/route.ts
 // GET ?tileEntityId=… → der Zustand eines Lokals, wie er sich aus dem
-// wirklichen Geschehen ergibt: wer in der letzten Stunde gekauft hat, wie spät
+// wirklichen Geschehen ergibt: wer im letzten Kaufabschnitt (sechs Stunden) gekauft
+// hat – jeder Besuch fest verteilt über den Abschnitt (spreadVisitAge) –, wie spät
 // es ist, ob es ein Obergeschoss gibt und was das Personal mitbekommen hat.
 // Quelle sind die echten Käufe der Bewohner (person_consumption_events); es
 // wird nichts erfunden und nichts geschrieben. Namen folgen dem, was der
@@ -12,10 +13,10 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { venueHearsay } from '@/lib/game/hospitality/hearsay'
-import { ROOM_ITEM_CODE, ROOM_NIGHT_S, type VenueRooms } from '@/lib/game/hospitality/venues'
+import { CONSUMPTION_INTERVAL_S, ROOM_ITEM_CODE, ROOM_NIGHT_S, VISIT_TOTAL_S, spreadVisitAge, type VenueRooms } from '@/lib/game/hospitality/venues'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab0-9a-f]{12}$/i
-const WINDOW_S = 60 * 60
+const WINDOW_S = CONSUMPTION_INTERVAL_S
 const SERVICE_LABEL: Record<string, string> = { cafe_meal: 'Mahlzeit', food_hall_meal: 'Mahlzeit' }
 
 export async function GET(req: NextRequest) {
@@ -34,8 +35,16 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(40)
   // Je Person zählt der jüngste Kauf.
-  const latest = new Map<string, { serviceCode: string; at: string }>()
-  for (const event of events ?? []) if (!latest.has(event.person_id)) latest.set(event.person_id, { serviceCode: String(event.service_code), at: String(event.created_at) })
+  const latest = new Map<string, { serviceCode: string; at: string; ageSeconds: number }>()
+  // Sichtbar ist nur, wessen Besuch gerade läuft: begonnen und noch nicht vorbei.
+  const nowMs = Date.now()
+  for (const event of events ?? []) {
+    if (latest.has(event.person_id)) continue
+    const at = String(event.created_at)
+    const age = spreadVisitAge(String(event.person_id), at, Math.max(0, Math.round((nowMs - Date.parse(at)) / 1000)))
+    if (age === null || age > VISIT_TOTAL_S) continue
+    latest.set(event.person_id, { serviceCode: String(event.service_code), at, ageSeconds: age })
+  }
   const personIds = [...latest.keys()]
   const venue = await venueState(supabase, tileEntityId, profileId)
   if (personIds.length === 0) return NextResponse.json({ ok: true, guests: [], ...venue }, { headers: { 'Cache-Control': 'private, no-store' } })
@@ -45,7 +54,6 @@ export async function GET(req: NextRequest) {
     supabase.from('player_person_identity_knowledge').select('person_id,identity_state,inferred_name,known_name').eq('profile_id', profileId).in('person_id', personIds),
   ])
   const identityByPerson = new Map((identities ?? []).map((row: any) => [row.person_id, row]))
-  const now = Date.now()
   const guests = (people ?? []).map((person: any) => {
     const identity = identityByPerson.get(person.id) as any
     const identityState = perceivedIdentityState(identity)
@@ -61,7 +69,7 @@ export async function GET(req: NextRequest) {
         birthYear: person.birth_year, activityState: person.activity_state, lastAction: person.last_action,
         assignments: [], needs: [], skills: [],
       },
-      ageSeconds: Math.max(0, Math.round((now - Date.parse(visit.at)) / 1000)),
+      ageSeconds: visit.ageSeconds,
       label: SERVICE_LABEL[visit.serviceCode] ?? 'Bestellung',
     }
   })
