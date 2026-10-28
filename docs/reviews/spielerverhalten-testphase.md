@@ -33,6 +33,8 @@ Tabelle `player_activity_log` (Migration `20261028110000_player_activity_log.sql
 
 **Vor einem öffentlichen Start [OFFEN]:** Hinweis an die Spieler, Möglichkeit, die Aufzeichnung abzulehnen, Regel zur Aufbewahrung.
 
+**Hinweis 28.10.2026:** Bis etwa 15:30 Uhr Berliner Zeit fehlten der Server-Rolle die Rechte an den neuen Tabellen (Fehler 42501). Die Aufzeichnung, das Gesprächsprotokoll seit dem 27.10. abends, das Wissen der Figuren und die Akademie-Ergebnisse wurden bis dahin nicht gespeichert. Behoben mit `20261028180000_grant_service_role_new_tables.sql`.
+
 ## Auswerten
 
 ```sql
