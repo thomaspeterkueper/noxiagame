@@ -166,6 +166,14 @@ Befund: Ein Klick auf freien Boden tat nichts, wenn dort kein Flurstück geladen
 - **Formen:** quadratisch 20, 30, 40, 60 m oder länglich 15 × 40, 20 × 40, 20 × 60, 30 × 60, 40 × 80 m; „drehen“ legt die lange Seite an die Straße oder quer dazu. Ausrichtung an der nächsten Straße bis 50 m.
 - Offen: Zwei Spieler, die gleichzeitig überlappendes Land abstecken, können beide kaufen (kein Sperren in der Datenbank). Fremde Spieler sehen neues Land wie neue Flurstücke erst, wenn ihre Kachel nicht mehr aus dem CDN kommt (bis zu einer Stunde).
 
+### Beschriftung schaltbar (Kritik, 28.10.2026)
+
+„Man sollte in der Ansicht manche Dinge an- und ausschalten können – Straßennamen, bekannte Gebäude aus OpenStreetMap –, so dass am Ende nur die Gebäude, die wirklich eine Funktion haben, Bezeichnungen tragen; genauso in der Gehe-zu-Liste.“
+- Knopf „◐“ oben rechts („Du bist hier“) öffnet zwei Schalter: **Straßennamen** und **Läden, Lokale und Wahrzeichen aus OpenStreetMap**. Die Wahl bleibt im Browser (`noxia-world-view-v1`), Vorgabe: beides an.
+- Funktion haben: NOXIA-Gebäude (Namensschild und Symbol, immer sichtbar) und Orte aus OSM mit begehbarem Raum im Spiel (Kirche/Gotteshaus, Bibliothek, ArtLounge, Gemeindezentrum, Begegnungsstätte – `landmarkRoomKind`). Regel in `lib/worldlab/viewOptions.ts` (`showPlace`, mit Tests).
+- Mit „OSM aus“ verschwinden Schild und Name aller anderen OSM-Orte von der Karte und aus der Zielliste („Läden und Lokale“, „Orte“ ohne Raum). Klick auf das Haus selbst zeigt weiter seine heutige Nutzung.
+- In der Zeichenmaschine: eigene Ebenen für Straßennamen und OSM-Namen, `setView` schaltet ohne Neuladen.
+
 ### Bereinigung 25.10.2026 (Thomas: „meine selbst gebauten Gebäude passen nicht mehr“)
 
 McKnights elf Bauten in Sundern aus der Zeit vor der echten Karte entfernt (2 Wohnblöcke, Habitat, Schule, Fabrik, Warenhaus, Bank, Raumhafen-Kern, 3 Solarfelder), ohne Erstattung. Die fünf Bewohner (4 aus dem Wohnblock, 1 aus dem Habitat) wohnen jetzt im staatlichen Wohnblock Selmecke (`203e82d7…`, 8 von 12 Plätzen), Mietverhältnis als Bereinigung (`origin = backfill`), Präsenz mitverschoben. Café („Thomas“) und die staatlichen Bauten in Selmecke bleiben.

@@ -8,6 +8,7 @@
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
+import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { COMMUTE_THRESHOLD_M, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute } from '@/lib/game/population/visibleMovement'
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
@@ -57,6 +58,8 @@ export interface WorldEngineOptions {
   onError: (message: string) => void
   /** Anfangszoom (beim Neuverankern der bisherige). */
   zoom?: number
+  /** Was beschriftet wird (Straßennamen, Orte aus OSM) – `lib/worldlab/viewOptions.ts` */
+  view?: ViewOptions
   /**
    * Die Figur steht zu weit vom Zeichenanker (Aufgabe 6, `lib/worldlab/reanchor.ts`).
    * Die Ansicht startet die Welt dann an `at` neu. Wird einmal je Engine gemeldet.
@@ -152,6 +155,8 @@ export interface WorldEngine {
   roadAngleAt: (at: GeoPoint) => number | null
   /** Umriss eines Grundstücks zeigen, das abgesteckt wird (null: ausblenden). */
   setLandPreview: (ring: GeoPoint[] | null, ok: boolean) => void
+  /** Beschriftung an/aus: Straßennamen, Orte aus OSM ohne Funktion */
+  setView: (view: ViewOptions) => void
   destroy: () => void
 }
 
@@ -272,6 +277,19 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const overlay = new PIXI.Container({ isRenderGroup: true })
   const poiLabels = new PIXI.Container()
   labels.addChild(poiLabels)
+  // Schaltbare Beschriftung (28.10.2026): Straßennamen und Orte aus OSM ohne Funktion im Spiel
+  let view: ViewOptions = { ...(options.view ?? DEFAULT_VIEW) }
+  const streetNameLayer = new PIXI.Container()
+  const osmLabelLayer = new PIXI.Container()
+  labels.addChild(streetNameLayer, osmLabelLayer)
+  /** Schilder von Orten ohne Funktion (stehen zwischen den Häusern, nicht in einer eigenen Ebene) */
+  const osmBadges = new Set<Container>()
+  function applyView() {
+    streetNameLayer.visible = view.streetNames
+    osmLabelLayer.visible = view.osmPlaces
+    for (const badge of osmBadges) badge.visible = view.osmPlaces
+  }
+  applyView()
   // Flurstücke: Grenzen unter den Straßen, Eigentum darüber
   const parcelLayer = new PIXI.Container()
   lines.addChild(parcelLayer)
@@ -686,7 +704,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const at = iso(ox + label.x, oy + label.y)
       text.position.set(at.x, at.y)
       text.rotation = label.angle
-      labels.addChild(text)
+      streetNameLayer.addChild(text)
       entry.labels.push(text)
     }
     // Wahrzeichen: Schild mit Namen (klickbar), steht am Ort des Wahrzeichens.
@@ -707,6 +725,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       badge.eventMode = 'static'
       badge.hitArea = new PIXI.Rectangle(-4, -12, 8, 13)
       ;(badge as unknown as { pick: WorldPick }).pick = { type: 'landmark', landmark: landmarkOf(place, ox, oy) }
+      // Ohne Funktion im Spiel: mit „Orte aus OSM“ ausblendbar
+      const functional = !place.p && placeHasFunction(place.k, place.t)
+      if (!functional) {
+        osmBadges.add(badge)
+        badge.visible = view.osmPlaces
+        badge.on('destroyed', () => osmBadges.delete(badge))
+      }
       addObject(badge)
       entry.trees.push(badge)
       const name = new PIXI.Text({ text: place.n, style: { fontFamily: 'system-ui, sans-serif', fontSize: place.p ? 22 : 26, fontWeight: '700', fill: place.p ? 0x1f4f54 : 0x5a3a1c, stroke: { color: 0xf8f4e8, width: 6, join: 'round' } } })
@@ -714,7 +739,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       name.scale.set(0.12)
       name.position.set(at.x, at.y - (place.p ? 8 : 11))
       // Läden erst bei näherem Hinsehen beschriften, sonst drängen sich die Namen.
-      ;(place.p ? poiLabels : labels).addChild(name)
+      ;(place.p ? poiLabels : functional ? labels : osmLabelLayer).addChild(name)
       entry.labels.push(name)
     }
     // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
@@ -1772,7 +1797,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     labels.visible = zoom >= LABEL_MIN_ZOOM
     for (const mark of marks.children) mark.scale.set(2.2 / zoom)
     for (const beacon of beacons.children) beacon.scale.set(2.6 / zoom)
-    poiLabels.visible = zoom >= 2.4
+    poiLabels.visible = zoom >= 2.4 && view.osmPlaces
     parcelLayer.visible = zoom >= 2.2
     const centre = iso(camera.x, camera.y)
     world.scale.set(zoom)
@@ -1874,6 +1899,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     reloadTiles: reload,
     parcelIdAt(at) { return parcelAtWorld(toWorld(at)) },
+    setView(next) { view = { ...next }; applyView() },
     roadAngleAt(at) {
       const p = toWorld(at)
       let best: { d: number; angle: number } | null = null

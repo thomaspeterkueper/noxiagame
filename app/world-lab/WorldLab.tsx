@@ -19,6 +19,7 @@ import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPanels'
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
+import { DEFAULT_VIEW, loadView, saveView, showPlace, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { MEETING_WALK_LIMIT_M, meetingPlaces, nearestMeetingPlace, type MeetingPlace } from '@/lib/worldlab/meetingPlaces'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
@@ -79,6 +80,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   })
   const [devOpen, setDevOpen] = useState(!embedded)
   // Bedienhinweise nur beim ersten Öffnen, danach hinter „?“
+  // Was die Karte beschriftet (28.10.2026): Straßennamen, Orte aus OSM – gilt auch für die Zielliste
+  const [view, setViewState] = useState<ViewOptions>(DEFAULT_VIEW)
+  const [viewOpen, setViewOpen] = useState(false)
+  const viewRef = useRef<ViewOptions>(DEFAULT_VIEW)
+  useEffect(() => { const stored = loadView(); viewRef.current = stored; setViewState(stored) }, [])
+  function changeView(next: ViewOptions) { viewRef.current = next; setViewState(next); saveView(next); engine.current?.setView(next) }
   const [helpOpen, setHelpOpen] = useState(() => { try { return typeof window !== 'undefined' && window.localStorage.getItem('noxia-world-help-v1') !== 'seen' } catch { return false } })
   function closeHelp() { setHelpOpen(false); try { window.localStorage.setItem('noxia-world-help-v1', 'seen') } catch { /* ohne Speicher */ } }
   /** Kurzer Satz für Spieler (Einzelheiten gehen in die Konsole). */
@@ -220,6 +227,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         onHud: next => { if (!disposed) { setHud(next); setTick(value => value + 1) } },
         onError: message => { if (!disposed) { setError(message); console.error('[world-lab]', message); setPlayerNote('Ein Teil der Karte konnte gerade nicht geladen werden.') } },
         zoom: restartAt?.zoom,
+        view: viewRef.current,
         onFarFromAnchor: (at, zoom) => { if (!disposed) setRestartAt({ at, zoom }) },
       })
       if (disposed) { started.destroy(); return }
@@ -565,10 +573,10 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       if (distanceM <= 6000) list.push({ id: 'n:' + building.id, label: building.name + (building.own ? '' : ' · ' + (building.ownerLabel ?? 'NOXIA')), distanceM, group: building.own ? 'Deine Gebäude' : 'NOXIA-Gebäude', panel: { kind: 'building', at: { lat: building.lat, lon: building.lon }, title: building.name, noxiaId: building.id } })
     }
     for (const site of sites) list.push({ id: 's:' + site.id, label: site.name + ' · im Bau', distanceM: metresBetween(here, site.at), group: 'Baustellen', panel: { kind: 'site', id: site.id } })
-    for (const item of engineReady?.landmarks() ?? []) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: item.landmark.poi ? 'Läden und Lokale' : 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
+    for (const item of engineReady?.landmarks() ?? []) if (showPlace(view, item.landmark)) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: item.landmark.poi ? 'Läden und Lokale' : 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
     return list.sort((a, b) => Number(b.group === MEETING_GROUP) - Number(a.group === MEETING_GROUP) || a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting])
+  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting, view])
   const groups = [...new Set(targets.map(target => target.group))]
   const home = noxia.find(building => building.own) ?? null
   const nearestMeeting = here ? nearestMeetingPlace(meeting, here) : null
@@ -672,9 +680,15 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       <div className="where">
         <div className="where-head"><small>DU BIST HIER</small><span className="tools">
           {onPlanning && <button onClick={onPlanning} title="Zur Planungskarte">▦</button>}
+          <button onClick={() => setViewOpen(value => !value)} title="Beschriftung" aria-label="Beschriftung" className={viewOpen ? 'on' : undefined}>◐</button>
           <button onClick={() => setHelpOpen(true)} title="Bedienung" aria-label="Bedienung">?</button>
           {dev && <button onClick={() => setDevOpen(value => !value)} title="Entwicklung" aria-label="Entwicklung">⚙</button>}
         </span></div>
+        {viewOpen && <div className="view-options" role="group" aria-label="Beschriftung">
+          <label><input type="checkbox" checked={view.streetNames} onChange={event => changeView({ ...view, streetNames: event.target.checked })}/> Straßennamen</label>
+          <label><input type="checkbox" checked={view.osmPlaces} onChange={event => changeView({ ...view, osmPlaces: event.target.checked })}/> Läden, Lokale und Wahrzeichen aus OpenStreetMap</label>
+          <small>Aus: Nur Gebäude mit einer Funktion im Spiel tragen Namen – NOXIA-Gebäude und Orte, die man betreten kann. Gilt auch für die Zielliste.</small>
+        </div>}
         <b>{placeName || 'Erde'}</b>
         {street && <span className="street">{street}</span>}
         {playerNote && <span className="player-note">{playerNote}</span>}
@@ -707,6 +721,10 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .where-head{display:flex;justify-content:space-between;align-items:center}
       .tools{display:flex;gap:4px}
       .tools button{width:20px;height:20px;border:1px solid #40595a;background:#17383a;color:#d9bb6a;border-radius:4px;font-size:11px;line-height:1;cursor:pointer;padding:0}
+      .tools button.on{background:#2c5a5c}
+      .view-options{display:grid;gap:4px;margin:6px 0 8px;padding:7px 8px;border:1px solid #40595a;border-radius:6px;background:#0f2428}
+      .view-options label{display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer}
+      .view-options small{color:#9fb3ad;font-size:10.5px;line-height:1.35}
       .home{justify-self:start;margin-top:6px;border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer}
       .home.meeting{border-color:#5f9c8c;background:#1f4f54;color:#e8f4ee}
       .player-note{font-size:10.5px;color:#f0d9a0}
