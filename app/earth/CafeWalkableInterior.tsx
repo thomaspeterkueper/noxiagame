@@ -17,7 +17,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
 import { spokenOrderItems, spokenOrderTitle } from '@/lib/game/hospitality/spokenOrder'
-import { MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_S, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
+import { EINSATZ_S, MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_GAME_HOURS, compressPurchases, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftPurchase, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
 import { VENUE_WC_DOOR, toiletAccess, venueServiceRules, type VenueServiceRules } from '@/lib/game/hospitality/venueServices'
 import {
   isAtServicePoint,
@@ -136,6 +136,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setConversion(data.conversion&&typeof data.conversion==='object'&&data.conversion.type?{type:String(data.conversion.type),readyAt:data.conversion.readyAt?String(data.conversion.readyAt):null}:null)
           setDisplayName(typeof data.displayName==='string'&&data.displayName.trim()?data.displayName.trim():null)
           setServiceRules(venueServiceRules(data.services))
+          setRecentPurchases(Array.isArray(data.recent)?data.recent.map((p:any)=>({personId:String(p.personId),atMs:Date.parse(String(p.at)),label:p.label?String(p.label):undefined})).filter((p:ShiftPurchase)=>Number.isFinite(p.atMs)):[])
           setEntryPaidUntil(typeof data.entryPaidForS==='number'&&data.entryPaidForS>0?Date.now()+data.entryPaidForS*1000:null)
           setRooms(data.rooms&&typeof data.rooms==='object'?{capacity:Number(data.rooms.capacity??0),occupied:Number(data.rooms.occupied??0),mineForS:data.rooms.mineForS==null?null:Number(data.rooms.mineForS)}:null)
           setVisits(data.guests.map((guest:any)=>({resident:guest.resident as ColonyResident,ageSeconds:Number(guest.ageSeconds??0),fetchedAt,label:String(guest.label??'Bestellung')})))
@@ -209,7 +210,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // ── Arbeiten im Lokal (Thomas, 28.10.2026) ──────────────────────────────
   // Stellen und Lohn kommen vom Server (/api/game/hospitality/shift, R-20). Gibt es
   // den Weg noch nicht, läuft die Schicht als Probeschicht ohne Lohn.
-  type Shift={role:ShiftRole;startedAtMs:number;shiftId:string|null;wagePerHour:number}
+  type Shift={role:ShiftRole;startedAtMs:number;shiftId:string|null;wagePerHour:number;gameHours:number}
   type Jobs={server:boolean;open:ShiftRole[];wages:Partial<Record<ShiftRole,number>>;note?:string}
   const[jobs,setJobs]=useState<Jobs|null>(null)
   const[shift,setShift]=useState<Shift|null>(null)
@@ -217,6 +218,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[shiftStats,setShiftStats]=useState({tasks:0,guests:0,tips:0})
   const[music,setMusic]=useState<MusicStyle>('House')
   const[shiftBusy,setShiftBusy]=useState(false)
+  // Echte Käufe der letzten Stunden (Gäste-Abruf) – Stoff für die Gästeaufgaben einer Schicht.
+  const[recentPurchases,setRecentPurchases]=useState<ShiftPurchase[]>([])
   // Personalplätze, die bei Schichtbeginn schon besetzt waren – der eigene Arbeitsplatz ist ein freier.
   const[stationTaken,setStationTaken]=useState<string[]>([])
   const seatOf=useRef(new Map<string,{x:number;y:number}>())
@@ -237,7 +240,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         if(!live)return
         if(r.ok&&Array.isArray(r.data.open)){
           setJobs({server:true,open:r.data.open.filter((role:string)=>roles.includes(role as ShiftRole)),wages:r.data.wages??{},note:r.data.note})
-          if(r.data.active?.role)setShift({role:r.data.active.role,startedAtMs:Date.parse(r.data.active.startedAt),shiftId:String(r.data.active.shiftId),wagePerHour:Number(r.data.active.wagePerHour??0)})
+          if(r.data.active?.role)setShift({role:r.data.active.role,startedAtMs:Date.parse(r.data.active.startedAt),shiftId:String(r.data.active.shiftId),wagePerHour:Number(r.data.active.wagePerHour??0),gameHours:Number(r.data.active.gameHours??SHIFT_GAME_HOURS[r.data.active.role as ShiftRole]??4)})
           return
         }
       }catch{/* kein Arbeitsmarkt für Spieler – Probeschicht */}
@@ -253,9 +256,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     ctx.moments.forEach((moment,id)=>{if(moment.phase==='seated')seatOf.current.set(id,{x:moment.spot.x,y:moment.spot.y})})
   },[nowMs])
 
-  const shiftVisits=visits.map(visit=>({personId:visit.resident.id,startMs:visit.fetchedAt-visit.ageSeconds*1000,seat:seatOf.current.get(visit.resident.id)??null,label:visit.label}))
+  // Die echten Käufe der Schichtstunden, verdichtet auf den Einsatz (NOXIA-TIME-0001: Echtzeit-Ereignis fester Dauer).
+  const shiftVisits=shift?compressPurchases(recentPurchases,shift.startedAtMs,shift.gameHours):[]
   const tasks:ShiftTask[]=shift?shiftTasks({role:shift.role,layout,taken:new Set(stationTaken),startedAtMs:shift.startedAtMs,nowMs,visits:shiftVisits,done:new Set(shiftDone)}):[]
-  const shiftLeftS=shift?Math.max(0,Math.round(SHIFT_S-(nowMs-shift.startedAtMs)/1000)):0
+  const shiftLeftS=shift?Math.max(0,Math.round(EINSATZ_S-(nowMs-shift.startedAtMs)/1000)):0
 
   const taskCount=(n:number)=>n===1?'1 Aufgabe':n+' Aufgaben'
   async function startShift(role:ShiftRole){
@@ -263,11 +267,11 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     if(!ctx||shiftBusy)return
     setShiftBusy(true)
     try{
-      let next:Shift={role,startedAtMs:Date.now(),shiftId:null,wagePerHour:jobs?.wages[role]??PROPOSED_WAGE_PER_HOUR[role]}
+      let next:Shift={role,startedAtMs:Date.now(),shiftId:null,wagePerHour:jobs?.wages[role]??PROPOSED_WAGE_PER_HOUR[role],gameHours:SHIFT_GAME_HOURS[role]}
       if(jobs?.server){
         const r=await shiftApi({action:'start',role})
         if(!r.ok){ctx.setStatus(String(r.data.error??'Die Stelle ist gerade nicht frei.'));return}
-        next={role,startedAtMs:Date.parse(r.data.startedAt??new Date().toISOString()),shiftId:String(r.data.shiftId),wagePerHour:Number(r.data.wagePerHour??next.wagePerHour)}
+        next={role,startedAtMs:Date.parse(r.data.startedAt??new Date().toISOString()),shiftId:String(r.data.shiftId),wagePerHour:Number(r.data.wagePerHour??next.wagePerHour),gameHours:Number(r.data.gameHours??next.gameHours)}
       }
       setShift(next);setShiftDone([]);setShiftStats({tasks:0,guests:0,tips:0})
       const station=roleStation(layout,role,new Set(ctx.figures.filter(f=>f.roomRole==='staff').map(f=>f.spot.id)))
@@ -294,7 +298,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     if(!ctx||!shift||shiftBusy)return
     setShiftBusy(true)
     try{
-      const worked=shiftWage(shift.wagePerHour,shift.startedAtMs,Date.now())
+      const worked=shiftWage(shift.wagePerHour,shift.gameHours,shift.startedAtMs,Date.now())
       if(shift.shiftId){
         const r=await shiftApi({action:'end',shiftId:shift.shiftId})
         if(r.ok){
@@ -316,20 +320,20 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     return <div className="menu jobs">
       <small>ARBEITEN</small>
       {open.length===0?<p className="hint">Gerade ist hier keine Stelle frei.</p>:<>
-        <p className="hint">{jobs.server?'Eine Schicht dauert eine Spielstunde. Lohn vom Betreiber, dazu Trinkgeld.':'Probeschicht: eine Spielstunde, noch ohne Lohn – bezahlt wird, sobald Spieler hier angestellt werden können.'}</p>
+        <p className="hint">{'Ein Einsatz dauert '+Math.round(EINSATZ_S/60)+' Minuten und zählt als ganze Schicht. '+(jobs.server?'Lohn vom Betreiber, dazu Trinkgeld.':'Noch Probeschicht ohne Lohn – bezahlt wird, sobald Spieler hier angestellt werden können.')}</p>
         {open.map(role=><button key={role} className="tile-row" disabled={shiftBusy} onClick={()=>void startShift(role)} title={ROLE_DUTY[role]}>
-          <span>{ROLE_LABEL[role]}</span><b>{jobs.wages[role]??PROPOSED_WAGE_PER_HOUR[role]} Cr/Std{jobs.server?'':' (Vorschlag)'}</b><small>{ROLE_DUTY[role]}</small>
+          <span>{ROLE_LABEL[role]} · {SHIFT_GAME_HOURS[role]} Std</span><b>{(jobs.wages[role]??PROPOSED_WAGE_PER_HOUR[role])*SHIFT_GAME_HOURS[role]} Cr{jobs.server?'':' (Vorschlag)'}</b><small>{ROLE_DUTY[role]}</small>
         </button>)}
       </>}
     </div>
   }
   const renderShift=(ctx:InteriorContext)=>{
     if(!shift)return null
-    const minutes=Math.ceil(shiftLeftS/60)
+    const clock=Math.floor(shiftLeftS/60)+':'+String(shiftLeftS%60).padStart(2,'0')
     const near=(task:ShiftTask)=>Math.hypot(ctx.pos.x-task.at.x,ctx.pos.y-task.at.y)<46
     return <div className="menu shift">
       <small>SCHICHT · {ROLE_LABEL[shift.role].toUpperCase()}{shift.shiftId?'':' · PROBE'}</small>
-      <p>Noch {minutes} Min. · {shiftStats.tasks} erledigt{shiftStats.guests?' · '+shiftStats.guests+' Gäste':''}{shiftStats.tips?' · '+shiftStats.tips+' Cr Trinkgeld':''}{shift.role==='dj'?' · läuft: '+music:''}</p>
+      <p>Noch {clock} · zählt als {shift.gameHours} Spielstunden · {shiftStats.tasks} erledigt{shiftStats.guests?' · '+shiftStats.guests+' Gäste':''}{shiftStats.tips?' · '+shiftStats.tips+' Cr Trinkgeld':''}{shift.role==='dj'?' · läuft: '+music:''}</p>
       {tasks.length===0&&<p className="hint">Gerade ist nichts zu tun. {ROLE_DUTY[shift.role]}.</p>}
       {tasks.slice(0,4).map(task=><div key={task.key} className="task">
         <span>{task.label}</span>

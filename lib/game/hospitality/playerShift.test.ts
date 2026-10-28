@@ -1,4 +1,4 @@
-import { MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_LABEL, SHIFT_S, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type ShiftRole } from './playerShift'
+import { EINSATZ_S, MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_LABEL, SHIFT_GAME_HOURS, compressPurchases, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type ShiftRole } from './playerShift'
 import { VENUE_LAYOUTS, isVenueBlocked, venuePath, type VenueKind } from './venues'
 
 let failures = 0
@@ -19,24 +19,32 @@ const club = VENUE_LAYOUTS.nightclub
 check(roleStation(club, 'door').label === 'an der Tür' && roleStation(club, 'dj').label === 'am DJ-Pult', 'club stations: door and DJ booth')
 
 const t0 = Date.parse('2026-10-28T22:00:00Z')
-const visit = { personId: 'p1', startMs: t0 + 5 * 60_000, seat: { x: 300, y: 380 }, label: 'Longdrink' }
-const at = (min: number) => t0 + min * 60_000
-const bar = shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: at(5.5), visits: [visit], done: new Set() })
-check(bar.some(t => t.kind === 'serve' && t.guest && t.label.includes('Longdrink')), 'a real guest ordering gives the barkeeper a task')
-check(!shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: at(9), visits: [visit], done: new Set() }).some(t => t.kind === 'serve'), 'the order task passes when the guest has walked on')
-check(shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: at(17), visits: [], done: new Set() }).filter(t => t.kind === 'rinse').length === 1, 'duties do not pile up: only the latest open one')
-check(shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: at(3), visits: [], done: new Set() }).length === 0, 'nothing to do in the first minutes without guests')
-check(shiftTasks({ role: 'door', layout: club, startedAtMs: t0, nowMs: at(6), visits: [visit], done: new Set() }).some(t => t.kind === 'admit'), 'doorman admits arriving guests')
-const dj = shiftTasks({ role: 'dj', layout: club, startedAtMs: t0, nowMs: at(7), visits: [], done: new Set() })
-check(dj.length === 1 && dj[0].kind === 'music', 'DJ chooses music every few minutes')
-const wipeAt = at(5 + 38)
-check(shiftTasks({ role: 'cleaning', layout: club, startedAtMs: t0, nowMs: wipeAt, visits: [visit], done: new Set() }).some(t => t.kind === 'wipe' && t.at.x === 300), 'cleaner wipes the table a guest left')
-check(shiftTasks({ role: 'cleaning', layout: club, startedAtMs: t0, nowMs: at(16), visits: [], done: new Set() }).some(t => t.kind === 'toilet'), 'cleaner cleans the toilet')
+const sec = (n: number) => t0 + n * 1000
+// Echte Käufe der letzten vier Stunden werden in den Einsatz verdichtet.
+const purchases = [
+  { personId: 'p1', atMs: t0 - 3.5 * 3600_000, label: 'Longdrink' },
+  { personId: 'p2', atMs: t0 - 1 * 3600_000, label: 'Getränk' },
+  { personId: 'old', atMs: t0 - 6 * 3600_000 },
+  { personId: 'future', atMs: t0 + 60_000 },
+]
+const visits = compressPurchases(purchases, t0, 4)
+check(visits.length === 2 && visits.every(v => v.startMs > t0 && v.startMs < t0 + EINSATZ_S * 1000) && visits[0].personId === 'p1' && visits[0].startMs < visits[1].startMs, 'only the real purchases of the shift hours, in order, inside the Einsatz')
+const firstAt = (visits[0].startMs - t0) / 1000
+const bar = shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: sec(firstAt + 5), visits, done: new Set() })
+check(bar.some(t => t.kind === 'serve' && t.guest && t.label.includes('Longdrink')), 'a real guest gives the barkeeper a task')
+check(!shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: sec(firstAt + 40), visits: [visits[0]], done: new Set() }).some(t => t.kind === 'serve'), 'the order task passes after half a minute')
+check(shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: sec(130), visits: [], done: new Set() }).filter(t => t.kind === 'rinse').length === 1, 'duties do not pile up: only the latest open one')
+check(shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: sec(10), visits: [], done: new Set() }).length === 0, 'nothing to do in the first seconds without guests')
+check(shiftTasks({ role: 'door', layout: club, startedAtMs: t0, nowMs: sec(firstAt + 3), visits, done: new Set() }).some(t => t.kind === 'admit'), 'doorman admits arriving guests')
+const dj = shiftTasks({ role: 'dj', layout: club, startedAtMs: t0, nowMs: sec(40), visits: [], done: new Set() })
+check(dj.length === 1 && dj[0].kind === 'music', 'DJ chooses music every half minute or so')
+check(shiftTasks({ role: 'cleaning', layout: club, startedAtMs: t0, nowMs: sec(firstAt + 60), visits, done: new Set() }).some(t => t.kind === 'wipe'), 'cleaner wipes the table a guest left')
+check(shiftTasks({ role: 'cleaning', layout: club, startedAtMs: t0, nowMs: sec(95), visits: [], done: new Set() }).some(t => t.kind === 'toilet'), 'cleaner cleans the toilet')
 const done = new Set(bar.map(t => t.key))
-check(shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: at(5.5), visits: [visit], done }).length === 0, 'done tasks disappear')
-check(!shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: at(5.5), visits: [{ ...visit, startMs: t0 - 10 * 60_000 }], done: new Set() }).some(t => t.kind === 'serve'), 'guests from before the shift are not yours')
-
-check(shiftWage(8, t0, t0 + SHIFT_S * 1000) === 8 && shiftWage(8, t0, t0 + SHIFT_S * 500) === 4 && shiftWage(8, t0, t0 + SHIFT_S * 3000) === 8, 'wage pro rata, at most one shift')
+check(shiftTasks({ role: 'bar', layout: club, startedAtMs: t0, nowMs: sec(firstAt + 5), visits, done }).length === 0, 'done tasks disappear')
+// Ein Einsatz von fünf Minuten zählt als ganze Schicht
+check(EINSATZ_S <= 6 * 60 && SHIFT_GAME_HOURS.door === 4, 'a short Einsatz stands for a whole shift')
+check(shiftWage(8, 4, t0, t0 + EINSATZ_S * 1000) === 32 && shiftWage(8, 4, t0, t0 + EINSATZ_S * 500) === 16 && shiftWage(8, 4, t0, t0 + EINSATZ_S * 3000) === 32, 'wage for the whole shift, pro rata when leaving early')
 check((Object.keys(PROPOSED_WAGE_PER_HOUR) as ShiftRole[]).every(r => PROPOSED_WAGE_PER_HOUR[r] > 0 && ROLE_LABEL[r]), 'every role has a wage proposal and a name')
 check(workingFact('bar', true).includes('Barkeeper') && workingFact('door', false).includes('Türsteher') && MUSIC_STYLES.length >= 3, 'facts and music styles')
 

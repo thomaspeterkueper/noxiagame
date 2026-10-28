@@ -49,7 +49,10 @@ export async function GET(req: NextRequest) {
     latest.set(event.person_id, { serviceCode: String(event.service_code), at, ageSeconds: age })
   }
   const personIds = [...latest.keys()]
-  const venue = await venueState(supabase, tileEntityId, profileId)
+  // Alle echten Käufe der letzten sechs Stunden – für den Einsatz einer Schicht
+  // (playerShift.compressPurchases): wer was gekauft hat, ohne Namen.
+  const recent = (events ?? []).map(event => ({ personId: String(event.person_id), at: String(event.created_at), label: SERVICE_LABEL[String(event.service_code)] ?? 'Bestellung' }))
+  const venue = { ...(await venueState(supabase, tileEntityId, profileId)), recent }
   if (personIds.length === 0) return NextResponse.json({ ok: true, guests: [], ...venue }, { headers: { 'Cache-Control': 'private, no-store' } })
 
   const [{ data: people }, { data: identities }, { data: tickNow }] = await Promise.all([

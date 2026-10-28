@@ -3,6 +3,7 @@ export type BuildingEntryKind =
   | 'warehouse'
   | 'spaceport'
   | 'administration'
+  | 'job_agency'
   | 'bank'
   | 'shipyard'
   | 'research'
@@ -80,6 +81,11 @@ const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
     kind: 'administration',
     label: 'Verwaltung betreten',
     hint: 'Versorgung, Bevölkerung, Aufträge und Koloniefinanzen öffnen',
+  },
+  job_agency: {
+    kind: 'job_agency',
+    label: 'Agentur für Arbeit betreten',
+    hint: 'Freie Stellen im Ort und Vermittlung',
   },
   bank: {
     kind: 'bank',

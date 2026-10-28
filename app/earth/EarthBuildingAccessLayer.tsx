@@ -20,6 +20,7 @@ import AcademyWalkableInterior from './AcademyWalkableInterior'
 import AdminWalkableInterior from './AdminWalkableInterior'
 import SpaceportWalkableInterior from './SpaceportWalkableInterior'
 import BankWalkableInterior from './BankWalkableInterior'
+import JobAgencyWalkableInterior from './JobAgencyWalkableInterior'
 import WarehouseWalkableInterior from './WarehouseWalkableInterior'
 import BuildingOverlayShell from '@/app/dashboard/BuildingOverlayShell'
 import PortCanteenInterior from '@/app/dashboard/PortCanteenInterior'
@@ -173,6 +174,11 @@ export default function EarthBuildingAccessLayer({
   const location = data?.location
   const resources = location?.location_resources ?? []
   const locationName = location?.name ?? 'Erde'
+
+  if (request.kind === 'job_agency') {
+    // Die Arbeitsvermittlung ist begehbar (NOXIA-INTERIOR-0001); Stellen hängen an der Wand.
+    return <JobAgencyWalkableInterior entityId={request.entityId} buildingName={request.buildingName} companion={companion} onClose={onClose} />
+  }
 
   if (request.kind === 'administration') {
     // Die Verwaltung ist begehbar (NOXIA-INTERIOR-0001); die Rathaus-Tafel öffnet darüber.

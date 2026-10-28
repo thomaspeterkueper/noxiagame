@@ -45,3 +45,12 @@ Bei 60× müsste der Server jede Minute eine Spielstunde rechnen. Ein Tick dauer
 4. **Stundengenau nur dort, wo ein Spieler zuschaut** (Simulationsstufe `active`).
 
 Reihenfolge: zuerst die Personen, dann die Wirtschaft. Bis dahin bleibt die Live-Welt bei einem Tick pro Stunde.
+
+## Ergänzung – Arbeit von Spielern (28.10.2026)
+
+Thomas: „Kein Spieler wartet 4 echte Stunden als Türsteher vor dem Nachtclub.“ Entschieden ist „Einsatz, als Schicht gebucht“:
+- Man spielt einen kurzen, dichten Einsatz von 5 echten Minuten. Gebucht wird eine Schicht fester Dauer, meist 4 Spielstunden.
+- Das ist dieselbe Regel wie für Begegnungen oben: Echtzeit-Ereignis, als feste Dauer gebucht.
+- Was in diesen Spielstunden wirklich geschah – Käufe echter Gäste –, wird in den Einsatz verdichtet. Es kommt nichts hinzu.
+- Regeln: `lib/game/hospitality/playerShift.ts`. Lohn und Buchung: R-20 in `docs/workstreams/population-economy.md`.
+
