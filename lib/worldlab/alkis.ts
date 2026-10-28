@@ -28,13 +28,15 @@ export interface CadastreService {
   boxes: ReadonlyArray<{ south: number; north: number; west: number; east: number }>
   /** Quellenvermerk laut Lizenz */
   attribution: string
+  /** Dienst bietet ave:NutzungFlurstueck (Nutzungsart und Bezeichnung je Flurstück, z. B. Wald/Nadelholz, Landwirtschaft/Grünland) */
+  usageLayer?: boolean
 }
 
 export const CADASTRE_SERVICES: readonly CadastreService[] = [
   { key: 'nw', land: 'Nordrhein-Westfalen', url: 'https://www.wfs.nrw.de/geobasis/wfs_nw_alkis_vereinfacht', zone: 32,
-    boxes: [{ south: 50.3, north: 52.55, west: 5.85, east: 9.47 }], attribution: 'ALKIS NRW, dl-de/zero-2-0' },
+    boxes: [{ south: 50.3, north: 52.55, west: 5.85, east: 9.47 }], attribution: 'ALKIS NRW, dl-de/zero-2-0', usageLayer: true },
   { key: 'he', land: 'Hessen', url: 'https://www.gds.hessen.de/wfs2/aaa-suite/cgi-bin/alkis/vereinf/wfs', zone: 32,
-    boxes: [{ south: 49.39, north: 50.6, west: 7.77, east: 10.24 }, { south: 50.6, north: 51.66, west: 8.1, east: 10.24 }], attribution: '© HVBG, Geobasisdaten Hessen' },
+    boxes: [{ south: 49.39, north: 50.6, west: 7.77, east: 10.24 }, { south: 50.6, north: 51.66, west: 8.1, east: 10.24 }], attribution: '© HVBG, Geobasisdaten Hessen', usageLayer: true },
   { key: 'rp', land: 'Rheinland-Pfalz', url: 'https://geo5.service24.rlp.de/wfs/alkis_rp.fcgi', zone: 32,
     boxes: [{ south: 48.96, north: 50.95, west: 6.11, east: 8.51 }], attribution: '© GeoBasis-DE / LVermGeoRP, dl-de/by-2-0' },
   { key: 'hh', land: 'Hamburg', url: 'https://geodienste.hamburg.de/WFS_HH_ALKIS_vereinfacht', zone: 32,
@@ -42,11 +44,11 @@ export const CADASTRE_SERVICES: readonly CadastreService[] = [
   { key: 'st', land: 'Sachsen-Anhalt', url: 'https://www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_ALKIS_WFS_OpenData/guest', zone: 32,
     boxes: [{ south: 50.93, north: 53.05, west: 10.56, east: 13.19 }], attribution: '© GeoBasis-DE / LVermGeo ST, dl-de/by-2-0' },
   { key: 'sn', land: 'Sachsen', url: 'https://geodienste.sachsen.de/aaa/public_alkis/vereinf/wfs', zone: 32,
-    boxes: [{ south: 50.17, north: 51.69, west: 11.87, east: 15.04 }], attribution: 'GeoSN, dl-de/by-2-0' },
+    boxes: [{ south: 50.17, north: 51.69, west: 11.87, east: 15.04 }], attribution: 'GeoSN, dl-de/by-2-0', usageLayer: true },
   { key: 'bb', land: 'Brandenburg', url: 'https://isk.geobasis-bb.de/ows/alkis_vereinf_wfs', zone: 32,
-    boxes: [{ south: 51.36, north: 53.56, west: 11.26, east: 14.77 }], attribution: '© GeoBasis-DE/LGB, dl-de/by-2-0' },
+    boxes: [{ south: 51.36, north: 53.56, west: 11.26, east: 14.77 }], attribution: '© GeoBasis-DE/LGB, dl-de/by-2-0', usageLayer: true },
   { key: 'mv', land: 'Mecklenburg-Vorpommern', url: 'https://www.geodaten-mv.de/dienste/alkis_wfs_einfach', zone: 33,
-    boxes: [{ south: 53.11, north: 54.69, west: 10.59, east: 14.42 }], attribution: '© GeoBasis-DE/M-V' },
+    boxes: [{ south: 53.11, north: 54.69, west: 10.59, east: 14.42 }], attribution: '© GeoBasis-DE/M-V', usageLayer: true },
 ]
 
 /** Dienste, deren Land den Punkt (grob) enthält – an Grenzen mehrere. */
@@ -69,14 +71,14 @@ export function parcelCell(p: GeoPoint) {
 }
 
 /** GetFeature-Adresse für einen Ausschnitt (Rand in WGS84, Abfrage in der UTM-Zone des Dienstes). */
-export function parcelRequestUrl(box: { south: number; north: number; west: number; east: number }, startIndex = 0, count = 1000, service: CadastreService = CADASTRE_SERVICES[0]) {
+export function parcelRequestUrl(box: { south: number; north: number; west: number; east: number }, startIndex = 0, count = 1000, service: CadastreService = CADASTRE_SERVICES[0], typeName = 'ave:Flurstueck') {
   const zone = service.zone
   const corners = [toUtm(box.south, box.west, zone), toUtm(box.south, box.east, zone), toUtm(box.north, box.west, zone), toUtm(box.north, box.east, zone)]
   const e1 = Math.floor(Math.min(...corners.map(c => c.e))), e2 = Math.ceil(Math.max(...corners.map(c => c.e)))
   const n1 = Math.floor(Math.min(...corners.map(c => c.n))), n2 = Math.ceil(Math.max(...corners.map(c => c.n)))
   const srs = `urn:ogc:def:crs:EPSG::258${zone}`
   const params = new URLSearchParams({
-    SERVICE: 'WFS', VERSION: '2.0.0', REQUEST: 'GetFeature', TYPENAMES: 'ave:Flurstueck',
+    SERVICE: 'WFS', VERSION: '2.0.0', REQUEST: 'GetFeature', TYPENAMES: typeName,
     SRSNAME: srs, BBOX: `${e1},${n1},${e2},${n2},${srs}`,
     COUNT: String(count), STARTINDEX: String(startIndex),
   })
@@ -163,4 +165,35 @@ export function landRate(usage: string | null) {
   if (/wald|gehölz|heide|moor|unland/i.test(usage)) return 0.4
   if (/sport|freizeit|erholung/i.test(usage)) return 1.5
   return 2
+}
+
+/** Nutzungsabschnitt eines Flurstücks (ave:NutzungFlurstueck): Art, Bezeichnung, Fläche (m²). */
+export interface ParcelUsePiece { parcel: string; art: string; bez: string | null; m2: number }
+
+/** Nutzungsabschnitte aus einer GetFeature-Antwort (Fläche in m² aus der UTM-Geometrie). */
+export function parseUsePieces(gml: string): ParcelUsePiece[] {
+  const out: ParcelUsePiece[] = []
+  for (const match of gml.matchAll(/<((?:\w+:)?NutzungFlurstueck)\b[^>]*>([\s\S]*?)<\/\1>/g)) {
+    const body = match[2]
+    const field = (name: string) => { const v = body.match(new RegExp(`<(?:\\w+:)?${name}>([^<]*)<`))?.[1]; return v ? decode(v) : null }
+    const parcel = field('flstkennz'), art = field('nutzart')
+    if (!parcel || !art) continue
+    const m2 = ringsOf(body).reduce((sum, ring) => sum + ringArea(ring), 0)
+    out.push({ parcel, art, bez: field('bez'), m2: Math.round(m2) })
+  }
+  return out
+}
+
+/** Nutzungen je Flurstück zusammenfassen, größte zuerst. */
+export function usesByParcel(pieces: readonly ParcelUsePiece[]) {
+  const map = new Map<string, Map<string, { art: string; bez: string | null; m2: number }>>()
+  for (const piece of pieces) {
+    const uses = map.get(piece.parcel) ?? new Map()
+    const key = piece.art + '|' + (piece.bez ?? '')
+    const entry = uses.get(key) ?? { art: piece.art, bez: piece.bez, m2: 0 }
+    entry.m2 += piece.m2
+    uses.set(key, entry)
+    map.set(piece.parcel, uses)
+  }
+  return new Map([...map].map(([parcel, uses]) => [parcel, [...uses.values()].sort((a, b) => b.m2 - a.m2)]))
 }

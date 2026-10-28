@@ -6,6 +6,7 @@
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileOrigin, TILE_SIZE_MERC, type GeoPoint } from './mercator'
 import { cadastreAttribution, landRate, parcelNotForSale } from './alkis'
 import { mergeRings } from './parcelGeometry'
+import { landUse, type LandUse } from './landUse'
 import { municipalityLabel } from './municipality.server'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
@@ -73,6 +74,8 @@ export interface ParcelOffer {
   id: string; label: string; areaM2: number; usage: string | null
   /** Quellenvermerk (Kataster des Landes oder „im Spiel vermessen“) */
   source: string
+  /** Nutzung und was das Flurstück hergibt (NOXIA-MAT-0001) */
+  land: LandUse
   owned: boolean; own: boolean
   /** von einem Spieler zum Verkauf angeboten */
   listed?: boolean
@@ -92,7 +95,9 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   const parcel = row as ParcelRow & { source: string | null }
   const areaM2 = Math.round(parcel.area_m2 ?? ringAreaM2(parcel.ring))
   const source = parcel.source === 'noxia' ? 'im Spiel neu vermessen (aus amtlichen Flurstücken)' : cadastreAttribution(parcel.source)
-  const base = { id: parcel.id, label: parcel.label ?? 'Flurstück', areaM2, usage: parcel.usage, source, buildings: [] as ParcelOffer['buildings'], residents: 0, rentPerInterval: 0 }
+  const props = (row as { props?: Record<string, unknown> }).props ?? {}
+  const land = landUse(parcel.usage, typeof props.nutzbez === 'string' ? props.nutzbez : null, areaM2)
+  const base = { id: parcel.id, label: parcel.label ?? 'Flurstück', areaM2, usage: parcel.usage, source, land, buildings: [] as ParcelOffer['buildings'], residents: 0, rentPerInterval: 0 }
   const { data: owner } = await supabase.from('earth_parcel_owners').select('profile_id,profiles(username)').eq('parcel_id', id).maybeSingle()
   if (owner) {
     const own = owner.profile_id === profileId
@@ -104,7 +109,7 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
       if (entity) base.buildings.push({ source: ref, name: String(entity.display_name ?? 'Gebäude'), residents: 0 })
     }
     const neighbours = own ? await ownNeighbours(supabase, parcel, profileId!) : undefined
-    const district = String((row as { props?: Record<string, unknown> }).props?.gemeinde ?? '') || null
+    const district = String(props.gemeinde ?? '') || null
     const { data: rate } = await supabase.rpc('earth_property_tax_rate', { p_district: district ?? '*' })
     Object.assign(base, { taxRate: Number(rate ?? 0.05), district })
     if (listing) return { ...base, owned: true, own, listed: true, neighbours, forSale: !own, price: Number(listing.price), seller: own ? 'du' : ownerName, reason: own ? 'von dir angeboten' : undefined }

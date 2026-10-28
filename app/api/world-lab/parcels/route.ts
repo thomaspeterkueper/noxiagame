@@ -9,7 +9,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { cadastreServicesAt, cadastreSource, parcelCell, parcelLabel, parcelRequestUrl, parcelUsage, parseParcels, type CadastreService, type Parcel } from '@/lib/worldlab/alkis'
+import { cadastreServicesAt, cadastreSource, parcelCell, parcelLabel, parcelRequestUrl, parcelUsage, parseParcels, parseUsePieces, usesByParcel, type CadastreService, type Parcel, type ParcelUsePiece } from '@/lib/worldlab/alkis'
+
+/** Zellen dieser Fassung haben Nutzungsart und -bezeichnung je Flurstück (NOXIA-MAT-0001); ältere werden einmal neu geholt. */
+const CELL_VERSION = 'v2-nutzung'
 
 export const maxDuration = 60
 const PAGE = 1000, MAX_PAGES = 4, TIMEOUT_MS = 20_000
@@ -34,6 +37,29 @@ async function fetchFrom(service: CadastreService, cell: ReturnType<typeof parce
       const returned = Math.max(Number(text.match(/numberReturned="(\d+)"/)?.[1] ?? 0), found.length)
       if (returned < PAGE) break
     } finally { clearTimeout(timer) }
+  }
+  // Nutzung je Flurstück (Wald/Nadelholz, Landwirtschaft/Grünland …), wo der Dienst sie anbietet.
+  // Fehlt sie, bleiben die Flurstücke trotzdem (Nutzung dann aus tntxt oder unbekannt).
+  if (service.usageLayer && parcels.length) {
+    try {
+      const pieces: ParcelUsePiece[] = []
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const response = await fetch(parcelRequestUrl(cell, page * PAGE, PAGE, service, 'ave:NutzungFlurstueck'), { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: 'application/gml+xml, application/xml, text/xml' } })
+        const text = await response.text()
+        if (!response.ok || /ExceptionReport/.test(text)) break
+        const found = parseUsePieces(text)
+        pieces.push(...found)
+        if (Math.max(Number(text.match(/numberReturned="(\d+)"/)?.[1] ?? 0), found.length) < PAGE) break
+      }
+      const uses = usesByParcel(pieces)
+      for (const parcel of parcels) {
+        const list = uses.get(parcel.props.flstkennz ?? parcel.id)
+        if (!list?.length) continue
+        parcel.props.nutzart = list[0].art
+        if (list[0].bez) parcel.props.nutzbez = list[0].bez
+        parcel.props.nutzung = list.slice(0, 5).map(use => `${use.art}${use.bez ? '/' + use.bez : ''}:${Math.round(use.m2)}`).join('|')
+      }
+    } catch (error) { console.error('[world-lab parcels] Nutzung', service.key, error instanceof Error ? error.message : error) }
   }
   return { parcels, sample }
 }
@@ -61,7 +87,7 @@ function rowsFor(parcels: Found[]) {
       centre_lat: lats.reduce((a, b) => a + b, 0) / lats.length, centre_lon: lons.reduce((a, b) => a + b, 0) / lons.length,
       min_lat: Math.min(...lats), max_lat: Math.max(...lats), min_lon: Math.min(...lons), max_lon: Math.max(...lons),
       area_m2: Number.isFinite(area) && area > 0 ? Math.round(area) : null,
-      label: parcelLabel(parcel.props), usage: parcelUsage(parcel.props), props: parcel.props, fetched_at: new Date().toISOString(),
+      label: parcelLabel(parcel.props), usage: parcel.props.nutzart || parcelUsage(parcel.props), props: parcel.props, fetched_at: new Date().toISOString(),
     }]
   })
 }
@@ -89,9 +115,9 @@ export async function POST(req: NextRequest) {
   if (!cadastreServicesAt(point).length) return NextResponse.json({ ok: true, outside: true, parcels: 0 })
   const cell = parcelCell(point)
   const supabase = createServiceClient()
-  const { data: known } = await supabase.from('earth_parcel_cells').select('cell,parcels,error,fetched_at').eq('cell', cell.key).maybeSingle()
-  // Erfolgreich geholte Zellen bleiben; gescheiterte frühestens nach einer Stunde erneut.
-  if (known && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) return NextResponse.json({ ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined })
+  const { data: known } = await supabase.from('earth_parcel_cells').select('cell,parcels,error,fetched_at,source').eq('cell', cell.key).maybeSingle()
+  // Erfolgreich geholte Zellen bleiben; gescheiterte frühestens nach einer Stunde erneut; ältere Fassung einmal neu.
+  if (known && known.source === CELL_VERSION && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) return NextResponse.json({ ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined })
   try {
     const { parcels, errors } = await fetchCell(cell)
     // Alle Länder ausgefallen: nichts speichern, später neu versuchen
@@ -102,12 +128,12 @@ export async function POST(req: NextRequest) {
       if (error) throw error
     }
     // Ein Land ausgefallen: Gefundenes bleibt, die Zelle gilt als fehlerhaft und wird nach einer Stunde neu geholt.
-    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, parcels: rows.length, error: errors.length ? errors.join(' | ').slice(0, 500) : null, fetched_at: new Date().toISOString() })
+    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: rows.length, error: errors.length ? errors.join(' | ').slice(0, 500) : null, fetched_at: new Date().toISOString() })
     return NextResponse.json({ ok: true, cached: false, parcels: rows.length, partial: errors.length > 0 || undefined })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('[world-lab parcels]', cell.key, message)
-    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, parcels: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
+    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
     return NextResponse.json({ ok: false, error: 'Kataster gerade nicht erreichbar.' })
   }
 }
