@@ -25,6 +25,7 @@ import {
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
 import { LIBRARY_BOOKS, LIBRARY_SHELVES, RESONANCE_READING_IDS, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { READING_TEXTS } from '@/lib/game/landmarks/readingTexts'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 
@@ -124,6 +125,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [candles, setCandles] = useState(3)
   const [seated, setSeated] = useState(false)
   const [bookId, setBookId] = useState('')
+  const [readingPart, setReadingPart] = useState<number | null>(null)
   const [talking, setTalking] = useState(false)
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
@@ -190,6 +192,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const isResonanceReading = kind === 'resonance_place'
   const resonanceBooks = LIBRARY_BOOKS.filter(entry => (RESONANCE_READING_IDS as readonly string[]).includes(entry.id))
   const book = LIBRARY_BOOKS.find(entry => entry.id === bookId && (!isResonanceReading || resonanceBooks.some(item => item.id === entry.id))) ?? null
+  const readingText = isResonanceReading && book ? READING_TEXTS[book.id] : undefined
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
   const placed = useMemo(() => {
@@ -558,8 +561,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         </>}
         {!talkingNow && resonanceShelfOpen && !book && <div className="book">
           <b>Philosophie · Lesen & denken</b>
-          <p>Wähle ein Werk aus dem Regal. Bis die vollständigen Manuskripte angebunden sind, sind bibliografische Einführungstexte verfügbar.</p>
-          <div className="books"><section>{resonanceBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}</section></div>
+          <p>Alle philosophischen Werke sind frei lesbar. Volltexte sind dort verfügbar, wo eine überprüfte Manuskriptfassung hinterlegt ist.</p>
+          <div className="books"><section>{resonanceBooks.map(entry => <button key={entry.id} onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button>)}</section></div>
         </div>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
@@ -569,8 +572,16 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
-          {isResonanceReading && <p className="muted">Einführungstext · vollständiger Text noch nicht hinterlegt</p>}
-          <button className="act" onClick={() => setBookId('')}>← Zurück</button>
+          {isResonanceReading && (readingText ? <>
+            <p className="muted">Freie Lesefassung · {readingText.version} · ohne Credits oder Kauf</p>
+            {readingPart === null ? <div className="books"><section>{readingText.sections.map((part, index) => <button key={index} onClick={() => setReadingPart(index)}>{part.heading}</button>)}</section></div> : <>
+              <div className="row"><button className="act quiet" onClick={() => setReadingPart(null)}>← Inhaltsverzeichnis</button><span>{readingPart + 1} / {readingText.sections.length}</span></div>
+              <article style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.65,maxHeight:'55vh',overflowY:'auto',padding:'12px 0'}}>{readingText.sections[readingPart]?.text}</article>
+              <div className="row"><button className="act quiet" disabled={readingPart === 0} onClick={() => setReadingPart(n => Math.max(0, (n ?? 0)-1))}>← Vorheriger Teil</button><button className="act" disabled={readingPart + 1 >= readingText.sections.length} onClick={() => setReadingPart(n => Math.min(readingText.sections.length-1,(n ?? 0)+1))}>Nächster Teil →</button></div>
+            </>}
+            <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>
+          </> : <p className="muted">Einführungstext · vollständige Manuskriptfassung noch nicht zugeordnet</p>)}
+          <button className="act" onClick={() => { setBookId(''); setReadingPart(null) }}>← Zurück zum Regal</button>
         </div>}
         {status && <div className="status">{status}</div>}
         {!talkingNow && held && !book && <div className="book held-card">
