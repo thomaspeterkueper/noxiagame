@@ -520,8 +520,8 @@ export async function POST(request: NextRequest) {
         {
           player,
           npc: reply,
-          action: creditTransfer ? 'transfer_credits' : worldAction?.type ?? null,
-          amount: creditTransfer?.amount ?? null,
+          action: worldAction?.type ?? null,
+          amount: null,
           at: now.toISOString(),
           location: locationName || null,
         },
@@ -600,13 +600,7 @@ export async function POST(request: NextRequest) {
         }, { onConflict: 'npc_person_id,player_profile_id' })
         if (nameError) console.error('npc player name write failed', { code: nameError.code })
       }
-      // R-12: Geschenkte Credits sind eine Gefälligkeit, an die sich die Figur erinnert.
-      if (creditTransfer) {
-        const { error: favorError } = await serviceClient.from('npc_player_favors').insert({
-          npc_person_id: npcId, player_profile_id: user.id, kind: 'gift_credits', amount: creditTransfer.amount, tick: currentTick,
-        })
-        if (favorError) console.error('npc player favor write failed', { code: favorError.code })
-      }
+
       if (canonicalNpc?.display_name && identityState !== 'known') {
         const normalizedReply = reply.toLocaleLowerCase('de-DE')
         const normalizedName = String(canonicalNpc.display_name).toLocaleLowerCase('de-DE')
