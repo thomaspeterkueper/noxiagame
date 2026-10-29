@@ -89,6 +89,7 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - Stellen in staatlichen Kolonie-Häusern: Kantine, Werkstatt, Lebenserhaltung, Roverhof, Funk, Lager, Verwaltung, je eine.
     - Jede Fracht wird einmal geprüft; der Grund, wenn niemand kommt, steht in `colony_arrivals` (Sicht `colony_arrivals_summary`). Migration `20261029130000_colony_immigration_with_freight.sql`, live.
     - **Offen, Entscheidung Thomas:** Die öffentlichen Kassen der Kolonien sind leer (Mond 8 Cr, Phobos 36 Cr, Mars 144 Cr). Damit kommt dort niemand (`no_money`), bis die Kolonien Einnahmen oder einen Haushalt haben (NOXIA-FIN-0001: Fiskaltransfer oder ausgewiesene Emission).
+    - **Vorschlag dazu (29.10.2026):** `docs/decisions/NOXIA-FIN-0002-haushalt-der-kolonien.md`. Er sieht Förderabgabe, Miete und Konsumsteuer vor, private Stellen an Förderanlagen und eine befristete Anlaufhilfe. Fünf Entscheidungsfragen an Thomas.
 24. ✅ **Vorhandenes auffindbar (29.10.2026, Spielerwünsche „vorhanden“, entschieden von Thomas).**
     - Fragt ein Spieler nach Toilette, eigenem Lokal, Büchern, Akademie, Tanz, Raumhafen oder Arbeit, bekommt die Figur die Wege als belegtes Wissen, mit den echten Häusern am Ort (`lib/game/cognition/gameGuide.ts`, Gesprächsroute 1.8.0).
     - Was fehlt, sagt sie ehrlich: Einen Nachtclub gibt es auf der Erde noch nicht.
