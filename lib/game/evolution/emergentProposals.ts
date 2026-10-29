@@ -3,7 +3,7 @@
  * This module never alters world state or generates/executes software.
  */
 export type OpportunityKind = 'event' | 'building' | 'service' | 'technology' | 'game_mechanic'
-export type SignalChannel = 'conversation' | 'behavior' | 'dream' | 'world_observation'
+export type SignalChannel = 'conversation' | 'behavior' | 'dream' | 'insight' | 'real_world_discussion' | 'world_observation'
 export interface EvolutionSignal {
   id: string
   npcId: string
@@ -13,6 +13,8 @@ export interface EvolutionSignal {
   kind: OpportunityKind
   relevance: number
   provenanceRefs: readonly string[]
+  /** Required for conversations about real-world news to prevent timeline leakage. */
+  worldProjection?: { availableFromYear: number; worldYear: number; licensed: boolean; accessible: boolean }
 }
 export interface EvolutionProposal {
   id: string
@@ -39,6 +41,7 @@ export function discoverEvolutionProposals(input: {
   const groups = new Map<string, EvolutionSignal[]>()
   for (const s of input.signals) {
     if (!s.id || !s.npcId || !s.opportunityKey || !s.provenanceRefs.length || !Number.isFinite(s.tick)) continue
+    if (s.channel === 'real_world_discussion' && (!s.worldProjection || !s.worldProjection.licensed || !s.worldProjection.accessible || s.worldProjection.availableFromYear > s.worldProjection.worldYear)) continue
     const key = s.kind + ':' + s.opportunityKey
     groups.set(key, [...(groups.get(key) ?? []), s])
   }
