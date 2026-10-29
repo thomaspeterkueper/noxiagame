@@ -301,6 +301,15 @@ export default function EarthRegionPreview(){
       return minX<=right+padding&&maxX>=left-padding&&minY<=bottom+padding&&maxY>=top-padding
     })
   },[projected,projection,zoom,offset.x,offset.y])
+  const buildingRenderDiagnostics=useMemo(()=>{
+    const loaded=(data?.features??[]).filter(f=>f.featureType==='building').length
+    const visible=visibleProjected.filter(f=>f.featureType==='building').length
+    return {loaded,visible,culled:Math.max(0,loaded-visible),sourceStatus:data?.ok?'ready':'unavailable'}
+  },[data,visibleProjected])
+  useEffect(()=>{
+    if(process.env.NODE_ENV==='production')return
+    console.info('[earth-buildings]',{region:data?.region?.id??'unknown',...buildingRenderDiagnostics,zoom})
+  },[data?.region?.id,buildingRenderDiagnostics,zoom])
   const candidates=useMemo(()=>projection?(candidateData?.candidates??[]).map((c,i)=>({...c,index:i,x:projection.x(c.lon),y:projection.y(c.lat)})):[],[candidateData,projection])
   const shortlist=useMemo(()=>projection?(candidateData?.shortlist??[]).map(c=>({...c,x:projection.x(c.lon),y:projection.y(c.lat)})):[],[candidateData,projection])
   const corridorOverlay=useMemo(()=>{
