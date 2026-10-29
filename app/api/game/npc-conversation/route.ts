@@ -8,7 +8,6 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { looksLikeWish } from '@/lib/game/wishes/rules'
 import { submitWish } from '@/lib/game/wishes/service.server'
 import { createClient } from '@supabase/supabase-js'
-import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
 import { createHash } from 'node:crypto'
 import { detectFeatureWish } from '@/lib/game/cognition/featureWish'
 import { gameGuideLines, type GuidePlace } from '@/lib/game/cognition/gameGuide'
@@ -56,31 +55,6 @@ const serviceClient = createClient(
 
 function clean(value: unknown, max = MAX_PLAYER_CHARS) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
-}
-
-function extractCreditAmount(text: string) {
-  const numeric = text.match(/\b(\d{1,4})\s*(?:cr|credit|credits)\b/i)
-  if (numeric) {
-    const amount = Number.parseInt(numeric[1], 10)
-    if (amount >= 1 && amount <= 1000) return amount
-  }
-  if (/\b(?:ein|eine|einen|einem|nen|1)\s*(?:cr|credit|credits)\b/i.test(text)) return 1
-  return null
-}
-
-function creditConsentFromConversation(player: string, history: Array<{ role: string; content: string }>) {
-  const explicitOffer = /\b(?:geb|gebe|gib|schenk|schenke|nimm|kriegst|bekommst|kannst.*haben|hier)\b/i.test(player)
-  const shortConsent = /^(?:ja|jep|jo|okay|ok|klar|gern|gerne|natürlich|sicher|mach(?:en wir)?)(?:[.! ]*)$/i.test(player.trim())
-  const currentAmount = extractCreditAmount(player)
-  const previousAssistant = [...history].reverse().find(entry => entry.role === 'assistant')?.content ?? ''
-  const previousRequest = /\bcredit(?:s)?\b/i.test(previousAssistant)
-    && /\b(?:hast du|hättest du|kannst du|gibst du|leihst du|einen|ein|nen)\b/i.test(previousAssistant)
-  const previousAmount = previousRequest ? extractCreditAmount(previousAssistant) : null
-  const amount = currentAmount ?? (shortConsent && previousRequest ? previousAmount : null)
-  return {
-    allowed: Boolean(amount && (explicitOffer || (shortConsent && previousRequest))),
-    amount,
-  }
 }
 
 function deterministicUuid(seed: string) {
