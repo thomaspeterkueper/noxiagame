@@ -559,7 +559,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </button>}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
-          <div className="chat"><input value={message} maxLength={160} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <div className="chat"><textarea value={message} rows={3} maxLength={160} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
         {!talkingNow && resonanceShelfOpen && !book && <div className="book">
           <b>Philosophie · Lesen & denken</b>
@@ -581,7 +581,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
               <article style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.65,maxHeight:'55vh',overflowY:'auto',padding:'12px 0'}}>{readingText.sections[readingPart]?.text}</article>
               <div className="row"><button className="act quiet" disabled={readingPart === 0} onClick={() => setReadingPart(n => Math.max(0, (n ?? 0)-1))}>← Vorheriger Teil</button><button className="act" disabled={readingPart + 1 >= readingText.sections.length} onClick={() => setReadingPart(n => Math.min(readingText.sections.length-1,(n ?? 0)+1))}>Nächster Teil →</button></div>
             </>}
-            <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>
+            {readingText.source && <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>}
           </> : <p className="muted">Einführungstext · vollständige Manuskriptfassung noch nicht zugeordnet</p>)}
           <button className="act" onClick={() => { setBookId(''); setReadingPart(null) }}>← Zurück zum Regal</button>
         </div>}
