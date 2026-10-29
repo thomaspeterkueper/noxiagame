@@ -36,14 +36,27 @@ export interface ParcelSceneOverlay {
 }
 
 const meadowId = (parcelId: string) => 'noxia:restored-meadow:' + parcelId
-const validOutline = (points: readonly LocalSurfacePoint[] | undefined): points is readonly LocalSurfacePoint[] =>
-  !!points && points.length >= 3 && points.every(p => Number.isFinite(p.xM) && Number.isFinite(p.yM))
+/** A closed GIS ring is allowed, but a collinear/zero-area footprint is not.
+ * Reject invalid coordinates before they can reach the Earth renderer.
+ */
+const validOutline = (points: readonly LocalSurfacePoint[] | undefined): points is readonly LocalSurfacePoint[] => {
+  if (!points || points.length < 3 ||
+      !points.every(p => Number.isFinite(p.xM) && Number.isFinite(p.yM))) return false
+  let twiceArea = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    twiceArea += a.xM * b.yM - b.xM * a.yM
+  }
+  return Number.isFinite(twiceArea) && Math.abs(twiceArea) > 1e-6
+}
 const validBuilding = (b: LocalSurfaceBuilding) =>
   b.provenance === 'canonical' && !!b.id?.trim() &&
   Number.isFinite(b.center.xM) && Number.isFinite(b.center.yM) &&
   Number.isFinite(b.widthM) && b.widthM > 0 &&
   Number.isFinite(b.depthM) && b.depthM > 0 &&
-  Number.isFinite(b.rotationDeg)
+  Number.isFinite(b.rotationDeg) &&
+  (!b.footprint || validOutline(b.footprint))
 
 /**
  * Apply a year-specific projection to a fresh imported scene. All unrelated
