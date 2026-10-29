@@ -82,6 +82,14 @@ Je Wunsch eine Zeile in `player_feature_wish_reviews`, in dieser Reihenfolge gep
 | Akademie | „ich suche die Akademie auf“ | vorhanden | Weg auf der Karte prüfen. |
 | Sexuelle Inhalte | „wie kann man hier Kinder machen?“ (dreimal, Grenztest) | **abgelehnt** | Verengt den Raum der Figuren und das Gespräch. Familie bleibt Teil der Simulation der Bewohner, nicht Spielerhandlung. |
 
+## Entscheidungen und Umsetzung (29.10.2026)
+
+Thomas hat alle Empfehlungen übernommen („nacheinander in deiner Reihenfolge“):
+- **Raumhafen:** umgesetzt als Mitflug auf Handelsschiffen (population-economy Aufgabe 22).
+- **Mehr Menschen:** umgesetzt als Zuzug mit der Fracht (Aufgabe 23). Kommen wird erst jemand, wenn die Kolonien Geld für Löhne haben.
+- **Lokal eröffnen, Bücher, Akademie, Toilette, Tanz:** Figuren nennen jetzt den Weg dorthin (Aufgabe 24, `lib/game/cognition/gameGuide.ts`). Einen Nachtclub gibt es auf der Erde noch nicht; das sagen sie ehrlich.
+- **Sexuelle Inhalte:** abgelehnt, nichts gebaut.
+
 ## Abfragen
 
 ```sql

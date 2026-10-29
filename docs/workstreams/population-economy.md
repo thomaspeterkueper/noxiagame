@@ -76,6 +76,23 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - Gebündelt in der Sicht `player_feature_wishes`, geprüft in `player_feature_wish_reviews`: Spielidee, Ethik, Spielraum (Eigen-, Fremd-, Folge-, Gemeinraum – hilft es beim Werden oder schränkt es ein).
     - Die tägliche Auswertung empfiehlt, Thomas entscheidet; erst dann wird ein Request geschrieben.
     - Prüfweg und erste acht Prüfungen: `docs/reviews/spielerwuensche.md` (Migration `20261029110000_player_feature_wishes.sql`, live).
+22. ✅ **Mitflug auf Handelsschiffen (29.10.2026, Spielerwunsch „Raumhafen“, entschieden von Thomas; R-21 Punkt 4).**
+    - Wer kein eigenes Schiff hat, heuert an der Flugleitung im Raumhafen bei Epona Fracht für ein Ziel an, das von dort bedient wird. Er kommt auf die Heuerliste.
+    - Läuft die nächste Fracht dorthin aus, geht er an Bord (im Tick oder beim Anheuern). Die Reise läuft über `profiles.transit_*` wie der Linienflug.
+    - Bei der Ankunft zahlt der Frachtführer die Heuer aus seinem Konto: Lohnschlüssel `logistics` je Reisestunde, mindestens 10 Cr. Das ist ein Transfer.
+    - Gebaut: `crew_signons`, `noxia_crew_sign_on`/`_cancel`/`_board_due`/`_routes`, Ankunft in `noxia_complete_passenger_transit` (Migration `20261029120000_crew_signon_trade_ships.sql`, live); `app/api/game/crew`; Panel an der Flugleitung (`SpaceportWalkableInterior` 1.1.0); Personal und Agentur kennen die Frachtrouten (`lib/game/jobs/crewSignon.ts`).
+    - **Grenze:** Frachten laufen selten aus. Bisher gab es 12, die letzte vor etwa 5 Tagen, nur Erde → Mond und Erde → Mars. Wer anheuert, wartet, bis die Handelsfirma wieder liefert.
+    - Mit eigenem Schiff kann man nicht anheuern.
+23. ✅ **Zuzug in die Kolonien mit der Fracht (29.10.2026, Spielerwunsch „mehr Menschen“, entschieden von Thomas).**
+    - Kommt eine Fracht von der Erde an, kann eine Person mitkommen. Voraussetzung: Am Ort sind eine Wohnung und eine bezahlte Stelle in einem Haus des Staates oder einer Figur frei, und der Arbeitgeber kann sieben Tage Lohn decken.
+    - Spielerhäuser stellen nicht von selbst ein.
+    - Stellen in staatlichen Kolonie-Häusern: Kantine, Werkstatt, Lebenserhaltung, Roverhof, Funk, Lager, Verwaltung, je eine.
+    - Jede Fracht wird einmal geprüft; der Grund, wenn niemand kommt, steht in `colony_arrivals` (Sicht `colony_arrivals_summary`). Migration `20261029130000_colony_immigration_with_freight.sql`, live.
+    - **Offen, Entscheidung Thomas:** Die öffentlichen Kassen der Kolonien sind leer (Mond 8 Cr, Phobos 36 Cr, Mars 144 Cr). Damit kommt dort niemand (`no_money`), bis die Kolonien Einnahmen oder einen Haushalt haben (NOXIA-FIN-0001: Fiskaltransfer oder ausgewiesene Emission).
+24. ✅ **Vorhandenes auffindbar (29.10.2026, Spielerwünsche „vorhanden“, entschieden von Thomas).**
+    - Fragt ein Spieler nach Toilette, eigenem Lokal, Büchern, Akademie, Tanz, Raumhafen oder Arbeit, bekommt die Figur die Wege als belegtes Wissen, mit den echten Häusern am Ort (`lib/game/cognition/gameGuide.ts`, Gesprächsroute 1.8.0).
+    - Was fehlt, sagt sie ehrlich: Einen Nachtclub gibt es auf der Erde noch nicht.
+    - Sexuelle Inhalte bleiben abgelehnt; der Abbruch beim dritten Grenztest bleibt.
 
 ## Requests aus anderen Teilprojekten
 
@@ -584,7 +601,7 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
    - Dazu `staff_capacity` 3: Vermittlung, Beratung, Büro. Personal wie bei der Bank (R-14), Lohnschlüssel z. B. `job_advisor`.
 2. **Stellenliste:** `GET /api/game/jobs?location=earth` → `{ venues: { [tileEntityId]: { open: ShiftRole[], wages: { [role]: CrJeStunde } } } }`. Der Innenraum ruft das schon auf und zeigt dann nur freie, bezahlte Stellen ohne „Probe“. Später kommen weitere Arten dazu (`business`, `ship`, `permanent`).
 3. **Betriebe und Läden:** Stellen für Spieler in Bank, Warenhaus, Reisebüro, Werkstätten. Die Schicht-Mechanik ist allgemein; Gastronomie baut je Gebäudeart die Aufgaben im Innenraum, sobald die Stellen als Daten kommen. Vorschlag zuerst: Bank (Schalter: Ein- und Auszahlungen echter Kunden), Warenhaus (Ware einräumen, Aufträge packen).
-4. **Mitflug auf Handelsschiffen:** Stelle an Bord als Weg zum Herumkommen (Thomas’ Einstiegsidee, R-10). Mit Handel und Schiffe abzustimmen: wer anheuert, Lohn, Ziel, Dauer als Ereignis fester Dauer wie die Schicht.
+4. **Mitflug auf Handelsschiffen:** Stelle an Bord als Weg zum Herumkommen (Thomas’ Einstiegsidee, R-10). ✅ **Erledigt 29.10.2026** (Aufgabe 22): Anheuern an der Flugleitung, Heuer bei Ankunft. Mit Handel und Schiffe abzustimmen: wer anheuert, Lohn, Ziel, Dauer als Ereignis fester Dauer wie die Schicht.
 5. **Feste Anstellung:** Wer an einem Ort öfter arbeitet, kann fest angestellt werden – regelmäßige Schichten, fester Lohn, `person_assignments` bzw. eine eigene Tabelle für Spieler. Kündigen und Fehlschichten wären zu klären.
 
 ### R-19 (Erdkarte, 29.10.2026): Selbstbau der Bewohner mit Weltlage

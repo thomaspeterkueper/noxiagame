@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { ssfUnlockCandidatesResolvedBeforePersistence } from './ssfUnlockResolutionGuard.mjs';
 
 const read = (path) => readFileSync(path, 'utf8');
 const failures = [];
@@ -96,7 +97,7 @@ check(
 
 check(
   'SSF candidates are resolved by NOXIA before persistence',
-  hasAll(knowledgeRoute, ['resolveGrantableUnlocks(candidateIds, existingIds)', ".from('player_unlocks')", 'const toInsert = resolved.grantable.map']),
+  ssfUnlockCandidatesResolvedBeforePersistence(knowledgeRoute),
   'upstream candidates can be persisted without NOXIA prerequisite resolution',
 );
 
