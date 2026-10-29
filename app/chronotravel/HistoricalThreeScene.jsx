@@ -86,9 +86,12 @@ export default function HistoricalThreeScene({ year, onShopChange }) {
     shop.visible=false
     let inside=false
     const shopEntry={x:0,z:8}
+    const entranceMarker = new THREE.Mesh(new THREE.TorusGeometry(.75,.13,8,24),new THREE.MeshBasicMaterial({color:0xf3d18b}))
+    entranceMarker.position.set(0,2.5,8);world.add(entranceMarker)
     const switchShop=()=>{
       inside=!inside
       shop.visible=inside
+      entranceMarker.visible=!inside
       if(inside){camera.position.set(0,1.75,3.6);yaw=0}
       else{camera.position.set(0,1.75,11);yaw=0}
       onShopChange?.(inside)
@@ -139,6 +142,8 @@ export default function HistoricalThreeScene({ year, onShopChange }) {
       disposed=true;cancelAnimationFrame(frame);resize.disconnect()
       window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',onBlur)
       onShopChange?.(false)
+      world.remove(entranceMarker)
+      entranceMarker.geometry.dispose();entranceMarker.material.dispose()
       world.remove(shop)
       shop.traverse(obj=>{if(obj.isMesh){obj.geometry.dispose();obj.material.dispose()}})
       streetLife.dispose()
