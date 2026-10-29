@@ -414,7 +414,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     if (talkEnded) return
     if (partner) { await talkWithPerson(partner.person); return }
     if (!staff || !message.trim() || sending) return
-    const text = message.trim().slice(0, 80)
+    const text = message.trim().slice(0, 160)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -470,7 +470,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
 
   async function talkWithPerson(person: RoomPerson) {
     if (!message.trim() || sending) return
-    const text = message.trim().slice(0, 80)
+    const text = message.trim().slice(0, 160)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -559,7 +559,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </button>}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
-          <div className="chat"><input value={message} maxLength={80} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <div className="chat"><input value={message} maxLength={160} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
         {!talkingNow && resonanceShelfOpen && !book && <div className="book">
           <b>Philosophie · Lesen & denken</b>
