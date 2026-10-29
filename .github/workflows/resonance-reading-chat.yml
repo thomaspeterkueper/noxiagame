@@ -6,6 +6,7 @@ on:
       - 'app/earth/LandmarkWalkableInterior.tsx'
       - 'app/api/game/npc-conversation/route.ts'
       - 'lib/game/landmarks/**'
+      - 'lib/game/cognition/personHabit.test.ts'
       - 'scripts/resonance-reading-guard.test.mjs'
       - '.github/workflows/resonance-reading-chat.yml'
   workflow_dispatch:
