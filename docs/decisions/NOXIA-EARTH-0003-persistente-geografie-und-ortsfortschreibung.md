@@ -68,3 +68,18 @@ Rekonstruktionen erhalten eine eigene Identität aus `place_id`, Zeitintervall u
 Nach Erstellung wird eine freigegebene Chronimap lokal als versionierter historischer Snapshot gespeichert und bei wiederholter Anfrage wiederverwendet. Nur fehlende Zeitabschnitte, neue Fragestellungen oder explizit genehmigte Verbesserungen lösen erneute externe Recherche aus. Chronimaps sind **Lesesichten bzw. gekennzeichnete historische Simulationen**, keine Rückwirkung auf den aktuellen NOXIA-Spielzustand.
 
 Automatisches Recherchieren aus NPC-/Spieleranfragen benötigt einen kontrollierten Workflow (Auftragswarteschlange, Quellen- und Lizenzkontrolle, Ressourcenbudget, Freigabe der Veröffentlichung). Ein Wunsch allein ändert keine kanonische Geschichte und startet keinen unkontrollierten Crawl.
+
+## Chronimaps als experimentelle historische Forschungsumgebung
+
+Chronimaps kann auf nachweisbar dokumentierten historischen Ausgangsbedingungen mehrere alternative Simulationsläufe ausführen. Der Zweck ist, **Hypothesen über historische Lücken** zu erzeugen und zu prüfen, nicht unbekannte Ereignisse als Tatsachen zu deklarieren.
+
+- Historische Constraints: belegte Bauwerke, Datierungen, Verkehrswege, Demografie- und Wirtschaftsbandbreiten sowie Quellenunsicherheiten.
+- Akteursmodell: NPCs mit zeittypischen, nicht stereotypisierten Interessen, Fähigkeiten, Informationsgrenzen und sozialen Beziehungen. Entscheidungen dürfen von heutigen Spielerannahmen abweichen.
+- Explorative Runs: mehrere Seeds und Parameterbereiche, Sensitivitätsanalysen, konkurrierende Hypothesen und explizite Gegenbeispiele statt einer einzigen zwangsläufigen Chronik.
+- Vergleich mit externer Evidenz: dokumentierte historische Beobachtungen als Holdout zurückhalten und prüfen, ob Simulationsergebnisse diese vorhersagen oder nachträglich nur daran angepasst wurden.
+- Provenienz: jede Hypothese referenziert Ausgangsdaten, Modellversion, Parameter, Zufallsseed, beobachtetes Muster und Unsicherheit.
+- Falsifizierbarkeit: Hypothesen erhalten prüfbare Vorhersagen, etwa erwartbare Gebäudestrukturen, Materialspuren, Handelswege oder schriftliche Überlieferungen; Verifikation bleibt Archäologie und Geschichtswissenschaft vorbehalten.
+- Ergebnisstatus strikt unterscheiden: `belegt`, `rekonstruiert`, `simuliert`, `Hypothese`, `widerlegt`. Auch häufig wiederholte Simulationsergebnisse werden nicht automatisch zu `belegt`.
+- Spieler/NPC können Forschungsfragen vorschlagen. Automatisierte Veröffentlichung in den historischen Kanon ist ausgeschlossen; redaktionelle/ wissenschaftliche Prüfung erforderlich.
+
+Möglicher Pilot: Konstantinopel/Istanbul in einem eng begrenzten Zeitfenster und Stadtviertel; nicht sofort die ganze Stadtgeschichte modellieren. Keine historische Interpretation ohne Quellenprüfung.
