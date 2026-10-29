@@ -126,6 +126,8 @@ export default function EarthBuildingAccessLayer({
   const [hubOpen, setHubOpen] = useState(false)
   const [learnRequest, setLearnRequest] = useState<{ gateId: string; at: number } | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  // Von der Agentur direkt in ein Lokal vermittelt (referral.ts): dorthin weiter.
+  const [handoff, setHandoff] = useState<BuildingEntryRequest | null>(null)
 
   useEffect(() => {
     if (!request) return
@@ -135,6 +137,7 @@ export default function EarthBuildingAccessLayer({
     setHubOpen(false)
     setLearnRequest(null)
     setMessage(null)
+    setHandoff(null)
     let cancelled = false
     setLoading(true)
     ;(async () => {
@@ -175,9 +178,15 @@ export default function EarthBuildingAccessLayer({
   const resources = location?.location_resources ?? []
   const locationName = location?.name ?? 'Erde'
 
+  if (handoff) {
+    return <CafeWalkableInterior key={handoff.entityId} entityId={handoff.entityId} buildingTypeId={handoff.buildingTypeId} buildingName={handoff.buildingName} companion={companion} onClose={onClose} referralStart />
+  }
+
   if (request.kind === 'job_agency') {
     // Die Arbeitsvermittlung ist begehbar (NOXIA-INTERIOR-0001); Stellen hängen an der Wand.
-    return <JobAgencyWalkableInterior entityId={request.entityId} buildingName={request.buildingName} companion={companion} onClose={onClose} />
+    // „Gleich hingehen“ öffnet das vermittelte Lokal; die Schicht beginnt dort.
+    return <JobAgencyWalkableInterior entityId={request.entityId} buildingName={request.buildingName} companion={companion} onClose={onClose}
+      onGoTo={ref => setHandoff({ entityId: ref.buildingId, buildingTypeId: ref.buildingTypeId, buildingName: ref.buildingName, kind: 'hospitality' })} />
   }
 
   if (request.kind === 'administration') {

@@ -65,6 +65,9 @@ export interface AgencyBuilding { id: string; typeId: string; name: string; lat:
 export interface JobOffer {
   category: 'venue'
   buildingId: string
+  /** Gebäudetyp (bar, nightclub …) und Name auf der Karte – zum Hingehen. */
+  typeId: string
+  buildingName: string
   /** „Metropol“, „Hauptstraße 72“ – ohne Art. */
   placeName: string
   /** „Bar“, „Nachtclub“ … */
@@ -97,7 +100,7 @@ export function venueJobOffers(buildings: readonly AgencyBuilding[], server?: Re
     const roles = known ? shiftRolesFor(kind).filter(r => known.open.includes(r)) : shiftRolesFor(kind)
     for (const role of roles) {
       const hours = SHIFT_GAME_HOURS[role]
-      offers.push({ category: 'venue', buildingId: b.id, placeName, placeKind, role, roleLabel: ROLE_LABEL[role], gameHours: hours, wage: (known?.wages?.[role] ?? PROPOSED_WAGE_PER_HOUR[role]) * hours, paid: Boolean(known), lat: b.lat, lon: b.lon })
+      offers.push({ category: 'venue', buildingId: b.id, typeId: b.typeId, buildingName: b.name, placeName, placeKind, role, roleLabel: ROLE_LABEL[role], gameHours: hours, wage: (known?.wages?.[role] ?? PROPOSED_WAGE_PER_HOUR[role]) * hours, paid: Boolean(known), lat: b.lat, lon: b.lon })
     }
   }
   return offers.sort((a, b) => b.wage - a.wage || a.placeName.localeCompare(b.placeName))
@@ -109,7 +112,10 @@ export function distanceM(a: { lat: number; lon: number }, b: { lat: number; lon
   return Math.hypot((a.lat - b.lat) * 111_195, (a.lon - b.lon) * 111_195 * k)
 }
 
-/** Was die Vermittlerin weiß: die Stellen an der Wand, nichts darüber hinaus. */
+/**
+ * Was die Vermittlerin weiß: die Stellen an der Wand, nichts darüber hinaus.
+ * Knapp gehalten – mit den Roboterfakten zusammen bleibt alles unter MAX_FACTS.
+ */
 export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[] {
   if (!offers) return ['Die Stellenliste wird gerade geholt; verweise auf die Stellenwand']
   const facts: string[] = []
@@ -117,19 +123,17 @@ export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[]
   else {
     const byPlace = new Map<string, string[]>()
     for (const o of offers) byPlace.set(o.placeName, [...(byPlace.get(o.placeName) ?? []), o.roleLabel])
-    facts.push(`Freie Schichten in Lokalen: ${offers.length}, in ${byPlace.size === 1 ? 'einem Haus' : byPlace.size + ' Häusern'}`)
-    for (const [place, roles] of [...byPlace].slice(0, 4)) facts.push(`${place}: ${[...new Set(roles)].join(', ')}`)
-    facts.push('Eine Schicht ist ein kurzer Einsatz von wenigen Minuten und zählt als mehrere Spielstunden; dazu Trinkgeld der Gäste')
-    if (!offers.some(o => o.paid)) facts.push('Die Schichten laufen noch als Probeschicht ohne Lohn; bezahlt wird, sobald Spieler angestellt werden können')
+    facts.push(`Freie Schichten in Lokalen (${offers.length}, in ${byPlace.size === 1 ? 'einem Haus' : byPlace.size + ' Häusern'}): ` + [...byPlace].slice(0, 4).map(([place, roles]) => `${place}: ${[...new Set(roles)].join(', ')}`).join('; '))
+    facts.push('Eine Schicht ist ein Einsatz von wenigen Minuten, zählt als mehrere Spielstunden; dazu Trinkgeld' + (offers.some(o => o.paid) ? '' : '; noch Probeschicht ohne Lohn'))
+    facts.push('Du vermittelst direkt; vermittelt ist erst, was dein Gegenüber unter dem Gespräch bestätigt – nie vorher „erledigt“ sagen')
   }
-  facts.push('Stellen in Betrieben und Läden, Mitflug auf Handelsschiffen und feste Anstellungen hat die Vermittlung noch nicht im Angebot')
-  facts.push('Angenommen wird eine Schicht im Lokal selbst, unter „Arbeiten“; du schickst Leute hin, du stellst nicht selbst ein')
+  facts.push('Betriebe und Läden, Mitflug auf Handelsschiffen und feste Anstellungen hat die Vermittlung noch nicht im Angebot')
   return facts.map(f => f.length > 140 ? f.slice(0, 139) + '…' : f)
 }
 
 export const JOB_AGENCY_INTRODUCTION = {
   style: 'job-agency',
-  stance: 'Du bist Vermittlerin: freundlich, praktisch, ohne Umschweife. Du fragst, was jemand kann und wann er Zeit hat, und schickst ihn zu einer passenden Schicht. Du versprichst nur, was an der Stellenwand steht.',
+  stance: 'Du bist Vermittlerin: freundlich, praktisch, ohne Umschweife. Du fragst, was jemand kann und wann er Zeit hat, und vermittelst ihn gleich in eine passende Schicht. Du versprichst nur, was an der Stellenwand steht.',
   leads: [
     'Wer schnell Geld braucht, nimmt eine Schicht in einem Lokal; das geht ohne Vorwissen',
     'Wer etwas lernt, kommt an bessere Stellen; die Akademie ist kostenlos',
@@ -170,8 +174,7 @@ export function agencyRobot(entityId: string) {
 
 /** Was der Roboter über sich und seine Aufgabe weiß – vor der Stellenliste. */
 export const AGENCY_ROBOT_FACTS: readonly string[] = [
-  `Du bist ${AGENCY_ROBOT_NAME}, der Vermittlungsroboter der Agentur – eine Maschine, kein Mensch; das sagst du offen, wenn man fragt`,
-  'Du fragst zuerst, was dein Gegenüber gern tut und kann, und schlägst dann eine passende Schicht von der Stellenwand vor',
+  `Du bist ${AGENCY_ROBOT_NAME}, Vermittlungsroboter – eine Maschine, kein Mensch, das sagst du offen; frag erst, was dein Gegenüber gern tut`,
   'Nennt jemand eine Arbeit, die es hier noch nicht gibt, frag nach, was daran reizt; der Wunsch wird festgehalten und für NOXIA ausgewertet',
   'Spricht dein Gegenüber über sein echtes Leben außerhalb des Spiels, hilf ernsthaft: frag nach Stärken, Interessen und was Freude macht',
   'Echte Hilfe: Berufsberatung der Bundesagentur für Arbeit, kostenlos, 0800 4 555500; Online-Test Check-U, anonym, auch für Berufserfahrene',
@@ -180,7 +183,7 @@ export const AGENCY_ROBOT_FACTS: readonly string[] = [
 
 export const AGENCY_ROBOT_INTRODUCTION = {
   style: 'job-agency-robot',
-  stance: 'Du bist ein freundlicher Vermittlungsroboter: geduldig, neugierig, ehrlich. Du hörst zu, stellst eine Frage nach der anderen und machst Mut, ohne mehr zu versprechen, als es gibt. Im Spiel schickst du Leute zu passenden Schichten; im echten Leben zeigst du Wege zu echter Beratung.',
+  stance: 'Du bist ein freundlicher Vermittlungsroboter: geduldig, neugierig, ehrlich. Du hörst zu, stellst eine Frage nach der anderen und machst Mut, ohne mehr zu versprechen, als es gibt. Im Spiel vermittelst du Leute direkt in passende Schichten; im echten Leben zeigst du Wege zu echter Beratung.',
   leads: [
     'Wer noch nicht weiß, was er will, probiert eine Schicht aus – fünf Minuten, ohne Vorwissen',
     'Wer etwas lernen will, geht in die Akademie; Lernen ist kostenlos',

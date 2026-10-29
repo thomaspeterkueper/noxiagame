@@ -79,6 +79,15 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - VERA berät in der Spielwelt, nimmt Wünsche nach neuen Arbeiten auf und hilft bei Fragen zum echten Leben, mit Verweis auf die echte Berufsberatung und Check-U. Sie sagt offen, dass sie eine Maschine und Spielfigur ist.
   - Im Browser geprüft, Tests in `jobAgency.test.ts`. Auswertung der Wünsche: R-22.
 
+- **29.10.2026 – Direkt vermitteln:**
+  - Thomas: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
+  - An der Vermittlung hat jede Stelle „Vermitteln lassen“.
+  - Im Gespräch mit VERA oder dem Personal erscheint ein Knopf für eine genannte Stelle, z. B. „Als DJ vermitteln: Hauptstraße 50“. Wie beim Bestellen gilt: Vermittelt ist erst, was der Spieler bestätigt.
+  - Der Schein gilt zwei Stunden. Das Personal im Lokal weiß davon, und die Stelle steht dort oben.
+  - „Gleich hingehen und anfangen“ öffnet das Lokal, und die Schicht beginnt sofort.
+  - Im Browser geprüft; Tests in `jobAgency.test.ts`.
+  - Offen: W-12 (Figur auf der Karte beim Lokal absetzen) und R-22 Punkt 4 (Schein serverseitig).
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -97,6 +106,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **W-12** (29.10.2026): nach „Gleich hingehen“ die Spielerfigur beim Lokal absetzen – `world-map.md`.
 - **R-22** (29.10.2026): Wünsche aus der Arbeitsvermittlung in der täglichen Gesprächsauswertung; echte Lebensfragen sorgsam – `population-economy.md`.
 - **R-21** (28.10.2026): Arbeitsvermittlung – Gebäude Freiheitsmühle 1, Stellenliste, Betriebe, Schiffe, feste Anstellung – `population-economy.md`.
 - **R-20** (28.10.2026): Spieler arbeiten im Lokal – Stellen, Schicht, Lohn und Trinkgeld über `/api/game/hospitality/shift` – `population-economy.md`.

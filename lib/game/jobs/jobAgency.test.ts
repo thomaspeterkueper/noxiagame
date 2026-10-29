@@ -1,6 +1,7 @@
 import { validateInteriorTemplate } from '../buildings/interiors/topology'
 import { canSeeRoom, isVenueBlocked, placeVenueFigures, venuePath } from '../hospitality/venues'
 import { AGENCY_ROBOT_FACTS, AGENCY_ROBOT_INTRODUCTION, JOB_AGENCY_LAYOUT as L, agencyRobot, agencyRobotId, distanceM, jobAgencyKnowledge, venueJobOffers } from './jobAgency'
+import { agencyReferralFacts, referralFor, referralFromOffer, referralValid, REFERRAL_VALID_MS, spokenJobChoices, venueReferralFacts } from './referral'
 import { MAX_FACTS, MAX_FACT_CHARS, baseInteriorFacts, withExtraFacts } from '../interiors/baseFacts'
 
 let failures = 0
@@ -39,6 +40,22 @@ check(AGENCY_ROBOT_FACTS.every(f => f.length <= 140) && AGENCY_ROBOT_FACTS.some(
 check(AGENCY_ROBOT_INTRODUCTION.stance.length <= 320 && AGENCY_ROBOT_INTRODUCTION.leads.every(l => l.length <= 180), 'robot introduction within the route limits')
 const robotFacts = withExtraFacts(baseInteriorFacts({ layout: L, buildingName: 'Agentur für Arbeit · Freiheitsmühle 7', self: alone[0], figures: alone, playerPos: L.servicePoint }), [...AGENCY_ROBOT_FACTS, ...jobAgencyKnowledge(probe)])
 check(robotFacts.length <= MAX_FACTS && robotFacts.every(f => f.length <= MAX_FACT_CHARS) && AGENCY_ROBOT_FACTS.every(f => robotFacts.includes(f)) && robotFacts.some(f => f.startsWith('Freie Schichten')), 'all robot facts and the job summary fit')
+
+// Direkt vermitteln
+const clubDj = probe.find(o => o.buildingId === 'c' && o.role === 'dj')!
+const ref = referralFromOffer(clubDj, 'VERA', 1_000)
+check(ref.buildingTypeId === 'nightclub' && ref.buildingName === 'Nachtclub · Hauptstraße 50' && ref.role === 'dj', 'the referral carries what it takes to open the venue')
+check(referralValid(ref, 1_000 + REFERRAL_VALID_MS - 1) && !referralValid(ref, 1_000 + REFERRAL_VALID_MS) && !referralValid(null, 0), 'a referral holds two real hours')
+check(referralFor(ref, 'c', 2_000) === ref && referralFor(ref, 'm', 2_000) === null, 'only the referred house knows it')
+check(agencyReferralFacts(ref, 2_000)[0].includes('DJ') && agencyReferralFacts(ref, 1_000 + REFERRAL_VALID_MS).length === 0, 'the agency knows the open referral')
+check(venueReferralFacts(ref, true, false)[0].includes('vermittelt') && venueReferralFacts(ref, false, false).length === 0 && venueReferralFacts(ref, true, true).length === 0, 'venue staff know, guests do not, and not while working')
+const said = (t: string) => spokenJobChoices(t, probe).map(o => o.buildingId + ':' + o.role).join()
+check(said('Ich würde gern als Barkeeper im Metropol arbeiten') === 'm:bar', 'role and house named')
+check(said('Kann ich als DJ auflegen?') === 'c:dj', 'role only: the first fitting job')
+check(said('Bitte nicht putzen, lieber an die Tür') === 'c:door', 'negated work does not count')
+check(said('Hallo, wie geht es dir?') === '', 'no role, no button')
+const refFacts = withExtraFacts(baseInteriorFacts({ layout: L, buildingName: 'Freiheitsmühle 7', self: alone[0], figures: alone, playerPos: L.servicePoint }), [...agencyReferralFacts(ref, 2_000), ...AGENCY_ROBOT_FACTS, ...jobAgencyKnowledge(probe)])
+check(refFacts.length <= MAX_FACTS && refFacts.some(f => f.startsWith('Dein Gegenüber ist schon vermittelt')) && refFacts.some(f => f.startsWith('Du vermittelst direkt')), 'with a referral the robot still knows how referring works')
 
 if (failures > 0) throw new Error(`job agency: ${failures} checks failed`)
 console.log('job agency checks passed')

@@ -436,3 +436,19 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
 - Bevölkerung, Bedürfnisse, Geld.
+
+### W-12 (Gastronomie, 29.10.2026): Nach einer Vermittlung beim Lokal herauskommen
+
+Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
+
+**Was schon da ist (Gastronomie):**
+- In der Agentur für Arbeit stellt die Vermittlung (oder VERA im Gespräch) einen Vermittlungsschein aus (`lib/game/jobs/referral.ts`).
+- „Gleich hingehen und anfangen“ öffnet das Lokal direkt aus der Agentur heraus (`EarthBuildingAccessLayer`, Zustand `handoff`), und die Schicht beginnt sofort.
+- Der Weg (meist einige hundert Meter) wird damit übersprungen – passend zu „Einsatz, als Schicht gebucht“.
+
+**Bitte:**
+1. Beim Verlassen eines so geöffneten Lokals steht die Spielerfigur auf der Karte noch an der Agentur. Sie sollte vor dem Lokal stehen.
+   - Vorschlag: `EarthBuildingAccessLayer` bekommt `onRelocate?(entityId)`. Ich rufe es beim Hingehen auf; die Karte setzt die Figur an den Eingang dieses Gebäudes.
+   - Sagt mir, welchen Namen und welche Form ihr wollt; die Gastronomie-Seite baue ich dann ein.
+2. Vorschlag, nicht dringend: Ein gültiger Schein liegt im Browser unter `localStorage['noxia.jobReferral']` (`buildingId`, gültig zwei Stunden). Die Karte könnte das Ziel markieren, solange er gilt.
+

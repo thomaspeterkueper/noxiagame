@@ -613,4 +613,9 @@ Thomas, 29.10.2026: „Es sollte Personal oder wenigstens Roboter geben, damit w
    - Am einfachsten über eine Sicht `npc_conversation_job_wishes`, Filter `npc_key like 'robot:job-agency:%'`.
 2. **Echtes Leben – sorgsam:** Gespräche über das echte Leben (Ausbildung, Beruf, Orientierung) sind persönlich. In der Auswertung bitte nur zusammengefasst und ohne Zuordnung zu Spielern; keine Zitate mit persönlichen Angaben. Der offene Punkt „Hinweis an die Spieler, dass Gespräche gespeichert werden“ (Testphasen-Review) wird damit dringlicher; am Schalter der Agentur wäre ein kurzer Hinweis sinnvoll.
 3. **Personal (zu R-21):** VERA überbrückt. Echte Vermittler bleiben gewünscht – Lohnschlüssel `job_advisor`, `building_staff_roles` für `job_agency`.
+4. **Vermittlungsschein serverseitig (zu R-20/R-21, 29.10.2026):**
+   - Die Agentur vermittelt jetzt direkt. Der Schein liegt bis auf Weiteres nur im Browser (`lib/game/jobs/referral.ts`, zwei echte Stunden gültig, je Spieler einer).
+   - Wenn der Schichtweg kommt, bitte:
+     - `POST /api/game/hospitality/shift` mit `referral: { agencyEntityId, issuedAt }` annehmen;
+     - optional eine Tabelle `job_referrals` (player, building, role, issued_at, used_at), damit die Auswertung sieht, welche Vermittlungen angetreten werden.
 

@@ -17,6 +17,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
 import { spokenOrderItems, spokenOrderTitle } from '@/lib/game/hospitality/spokenOrder'
+import { loadReferral, referralFor, saveReferral, venueReferralFacts, type JobReferral } from '@/lib/game/jobs/referral'
 import { EINSATZ_S, MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_GAME_HOURS, compressPurchases, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftPurchase, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
 import { VENUE_WC_DOOR, toiletAccess, venueServiceRules, type VenueServiceRules } from '@/lib/game/hospitality/venueServices'
 import {
@@ -49,6 +50,8 @@ type Props = {
   buildingName: string
   companion?: ColonyResident | null
   onClose: () => void
+  /** Von der Agentur direkt hergeschickt: die vermittelte Schicht beginnt gleich. */
+  referralStart?: boolean
 }
 
 // Dekor je Lokalart – nur Bild, keine Kollision, keine Plätze.
@@ -65,7 +68,7 @@ type Menu = { credits:number; items:MenuItem[] }
 // Eine Bestellung dieses Besuchs. forId: wem sie ausgegeben wurde (null = für sich selbst).
 type PlacedOrder = { key:string; itemCode:string; label:string; forId:string|null; at:number; tableService:boolean }
 
-export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose}:Props){
+export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose,referralStart=false}:Props){
   const[hour,setHour]=useState<number|null>(null)
   const[upper,setUpper]=useState<VenueUpperFloor|null>(null)
   const[heard,setHeard]=useState<string[]>([])
@@ -224,6 +227,9 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[stationTaken,setStationTaken]=useState<string[]>([])
   const seatOf=useRef(new Map<string,{x:number;y:number}>())
   const roles=shiftRolesFor(kind)
+  // Vermittlungsschein der Agentur für dieses Haus (referral.ts).
+  const[referral,setReferral]=useState<JobReferral|null>(()=>referralFor(loadReferral(),entityId,Date.now()))
+  const autoStarted=useRef(false)
 
   async function shiftApi(body:Record<string,unknown>|null){
     const{token}=await getSessionInfo()
@@ -274,9 +280,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         next={role,startedAtMs:Date.parse(r.data.startedAt??new Date().toISOString()),shiftId:String(r.data.shiftId),wagePerHour:Number(r.data.wagePerHour??next.wagePerHour),gameHours:Number(r.data.gameHours??next.gameHours)}
       }
       setShift(next);setShiftDone([]);setShiftStats({tasks:0,guests:0,tips:0})
+      if(referral?.role===role){saveReferral(null);setReferral(null)}
       const station=roleStation(layout,role,new Set(ctx.figures.filter(f=>f.roomRole==='staff').map(f=>f.spot.id)))
       setStationTaken([...new Set(ctx.figures.filter(f=>f.roomRole==='staff').map(f=>f.spot.id))])
-      ctx.setStatus('Schicht als '+ROLE_LABEL[role]+' beginnt – dein Platz: '+station.label+'.')
+      ctx.setStatus((referral?.role===role?'Von der Agentur vermittelt – ':'')+'Schicht als '+ROLE_LABEL[role]+' beginnt – dein Platz: '+station.label+'.')
       // Erst nach dem Umschalten gehen – vorher gilt noch die Einlasssperre des Clubs.
       setTimeout(()=>ctxRef.current?.walkTo(station),80)
     }finally{setShiftBusy(false)}
@@ -314,15 +321,26 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[shift?.startedAtMs,shiftLeftS<=0])
 
+  // Direkt von der Agentur gekommen: Schicht antreten, sobald Stellen und Raum da sind.
+  useEffect(()=>{
+    if(!referralStart||autoStarted.current||!referral||!jobs||shift||!ctxRef.current)return
+    autoStarted.current=true
+    if(ctxRef.current.service==='closed'||underConversion||emptyHouse){ctxRef.current.setStatus('Vermittelt als '+referral.roleLabel+' – aber das Haus hat gerade geschlossen.');return}
+    if(!jobs.open.includes(referral.role)){ctxRef.current.setStatus('Die vermittelte Stelle als '+referral.roleLabel+' ist inzwischen vergeben.');return}
+    void startShift(referral.role)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[referralStart,referral,jobs,shift,nowMs])
+
   const renderJobs=(ctx:InteriorContext)=>{
     if(!jobs||roles.length===0||ctx.service==='closed'||underConversion||emptyHouse)return null
-    const open=roles.filter(role=>jobs.open.includes(role))
+    const open=roles.filter(role=>jobs.open.includes(role)).sort((a,b)=>Number(b===referral?.role)-Number(a===referral?.role))
     return <div className="menu jobs">
       <small>ARBEITEN</small>
+      {referral&&<p className="hint">{open.includes(referral.role)?'Von der Agentur vermittelt: '+referral.roleLabel+' – man erwartet dich.':'Vermittelt als '+referral.roleLabel+', aber die Stelle ist inzwischen vergeben.'}</p>}
       {open.length===0?<p className="hint">Gerade ist hier keine Stelle frei.</p>:<>
         <p className="hint">{'Ein Einsatz dauert '+Math.round(EINSATZ_S/60)+' Minuten und zählt als ganze Schicht. '+(jobs.server?'Lohn vom Betreiber, dazu Trinkgeld.':'Noch Probeschicht ohne Lohn – bezahlt wird, sobald Spieler hier angestellt werden können.')}</p>
         {open.map(role=><button key={role} className="tile-row" disabled={shiftBusy} onClick={()=>void startShift(role)} title={ROLE_DUTY[role]}>
-          <span>{ROLE_LABEL[role]} · {SHIFT_GAME_HOURS[role]} Std</span><b>{(jobs.wages[role]??PROPOSED_WAGE_PER_HOUR[role])*SHIFT_GAME_HOURS[role]} Cr{jobs.server?'':' (Vorschlag)'}</b><small>{ROLE_DUTY[role]}</small>
+          <span>{role===referral?.role?'Vermittelt: ':''}{ROLE_LABEL[role]} · {SHIFT_GAME_HOURS[role]} Std</span><b>{(jobs.wages[role]??PROPOSED_WAGE_PER_HOUR[role])*SHIFT_GAME_HOURS[role]} Cr{jobs.server?'':' (Vorschlag)'}</b><small>{ROLE_DUTY[role]}</small>
         </button>)}
       </>}
     </div>
@@ -425,7 +443,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       hour:playerHour,hours,upper,rooms,
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
       entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
-      playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):null,
+      playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):venueReferralFacts(referral,self.roomRole==='staff',false)[0]??null,
     }),
     placeKnowledge,
     // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.
