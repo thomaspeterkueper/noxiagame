@@ -495,7 +495,7 @@ export async function POST(request: NextRequest) {
     }
     const playerLower = player.toLocaleLowerCase('de-DE')
     const followConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
-    const worldAction = requestedVisitPlace
+    const worldAction = followConsent && requestedVisitPlace
       ? {
           type: 'visit_place' as const,
           targetRef: requestedVisitPlace.targetRef,
@@ -503,7 +503,7 @@ export async function POST(request: NextRequest) {
           durationSeconds: Math.max(4, Math.min(35, Math.round(requestedVisitPlace.distanceM / 1.4))),
           playerFollows: followConsent,
         }
-      : requestedLeadWalk
+      : followConsent && requestedLeadWalk
         ? {
             type: 'lead_walk' as const,
             durationSeconds: 30,
