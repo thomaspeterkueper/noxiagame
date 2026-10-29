@@ -1,0 +1,45 @@
+name: Living Cities parcel scene overlay
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/parcelLifecycle.ts'
+      - 'lib/game/evolution/parcelLifecycle.test.ts'
+      - 'lib/game/evolution/parcelSceneOverlay.ts'
+      - 'lib/game/evolution/parcelSceneOverlay.test.ts'
+      - '.github/workflows/parcel-scene-overlay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/evolution/parcelLifecycle.ts'
+      - 'lib/game/evolution/parcelLifecycle.test.ts'
+      - 'lib/game/evolution/parcelSceneOverlay.ts'
+      - 'lib/game/evolution/parcelSceneOverlay.test.ts'
+      - '.github/workflows/parcel-scene-overlay.yml'
+
+jobs:
+  parcel-scene-overlay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile parcel chronology and scene overlay
+        run: >-
+          pnpm exec tsc
+          lib/game/evolution/parcelLifecycle.test.ts
+          lib/game/evolution/parcelSceneOverlay.test.ts
+          --target ES2022 --module commonjs --moduleResolution node
+          --esModuleInterop --skipLibCheck --rootDir lib
+          --outDir .parcel-scene-test
+      - name: Verify chronology and visual overlay invariants
+        run: >-
+          node .parcel-scene-test/game/evolution/parcelLifecycle.test.js
+          && node .parcel-scene-test/game/evolution/parcelSceneOverlay.test.js
