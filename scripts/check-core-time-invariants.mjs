@@ -238,16 +238,7 @@ if (
   sqlCount(/\$test\$\s*;/gi) === 1 &&
   sqlCount(/\brollback\s*;/gi) === 1 &&
   deleteSqlBody.trim().endsWith('rollback;') &&
-  deleteSqlBody.includes("where te.source_ref ~ '^osm:(way|relation):[0-9]+
-  console.error('NOXIA Core time/tick/event/replay invariant check failed:');
-  for (const failure of failures) console.error(`- ${failure}`);
-  console.error('\nIf this is an intentional architecture change, update docs/core/TIME_TICK_EVENT_REPLAY_MAP.md and this executable guard together.');
-  process.exit(1);
-}
-
-console.log(`NOXIA Core time/tick/event/replay invariant check passed (${passes.length} checks).`);
-for (const label of passes) console.log(`- ${label}`);
-") &&
+  deleteSqlBody.includes("where te.source_ref ~ '^osm:(way|relation):[0-9]+$'") &&
   deleteSqlBody.includes("and te.entity_id = 'acquired_building'") &&
   deleteSqlBody.includes('and not exists (') &&
   deleteSqlBody.includes('for update of te;')
