@@ -23,6 +23,7 @@ create table if not exists public.place_activity_slots (
 );
 
 alter table public.place_activity_slots enable row level security;
+grant select, insert, update, delete on public.place_activity_slots to service_role;
 -- Nur der Server (Service-Rolle) liest und schreibt; keine öffentlichen Policies.
 
 create index if not exists place_activity_slots_person_idx on public.place_activity_slots (person_key) where active;

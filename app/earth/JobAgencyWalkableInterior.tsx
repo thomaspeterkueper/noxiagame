@@ -9,6 +9,7 @@
 // Direkt vermitteln (29.10.2026): an der Vermittlung oder im Gespräch eine Stelle
 // wählen – Vermittlungsschein (referral.ts); „Gleich hingehen“ öffnet das Lokal,
 // dort beginnt die Schicht sofort.
+// Aktualisiert: 29.10.2026 — Stellenwand verweist für Mitflug auf die Flugleitung im Raumhafen
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
@@ -119,7 +120,7 @@ export default function JobAgencyWalkableInterior({ entityId, buildingName, comp
         {offers && shown.length > limit && <p className="hint">… und {shown.length - limit} weitere{canRefer ? '' : ' – die ganze Liste an der Vermittlung'}.</p>}
         {offers && shown.length > 0 && <p className="hint">{canRefer ? 'Wähl eine Stelle, die Agentur vermittelt dich direkt. Ein Einsatz dauert wenige Minuten und zählt als ganze Schicht.' : 'Vermittelt wird an der Vermittlung. Ein Einsatz dauert wenige Minuten und zählt als ganze Schicht.'}</p>}
         <small>BALD</small>
-        <p className="hint">{JOB_CATEGORY_LABEL.business} · {JOB_CATEGORY_LABEL.ship} · {JOB_CATEGORY_LABEL.permanent} – folgt.</p>
+        <p className="hint">{JOB_CATEGORY_LABEL.ship}: Anheuern an der Flugleitung im Raumhafen. {JOB_CATEGORY_LABEL.business} · {JOB_CATEGORY_LABEL.permanent} – folgt.</p>
       </div>
     },
   }

@@ -6,6 +6,7 @@
 // Handelsschiffen, feste Anstellung. Heute gibt es Daten nur für die Lokale
 // (Schichten, playerShift.ts); die übrigen Arten stehen als „folgt“ an der Wand
 // und werden nicht erfunden (R-21). Grundriss und Wissen – reine Regeln.
+// Aktualisiert: 29.10.2026 — Mitflug gibt es jetzt: Anheuern an der Flugleitung im Raumhafen (crewSignon.ts)
 
 import { CIVIC_STANDARD_INTERIOR } from '../buildings/interiors/templates/civicStandard'
 import { VENUE_HEIGHT, VENUE_WIDTH, staffSpot, standingSpot, tableWithChairs, venueKindForBuildingType, type VenueLayout, type VenueSpot } from '../hospitality/venues'
@@ -127,7 +128,8 @@ export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[]
     facts.push('Eine Schicht ist ein Einsatz von wenigen Minuten, zählt als mehrere Spielstunden; dazu Trinkgeld' + (offers.some(o => o.paid) ? '' : '; noch Probeschicht ohne Lohn'))
     facts.push('Du vermittelst direkt; vermittelt ist erst, was dein Gegenüber unter dem Gespräch bestätigt – nie vorher „erledigt“ sagen')
   }
-  facts.push('Betriebe und Läden, Mitflug auf Handelsschiffen und feste Anstellungen hat die Vermittlung noch nicht im Angebot')
+  facts.push('Mitflug auf Handelsschiffen: Wer kein eigenes Schiff hat, heuert an der Flugleitung im Raumhafen bei Epona Fracht an; Heuer bei Ankunft')
+  facts.push('Betriebe und Läden und feste Anstellungen hat die Vermittlung noch nicht im Angebot')
   return facts.map(f => f.length > 140 ? f.slice(0, 139) + '…' : f)
 }
 
@@ -137,7 +139,7 @@ export const JOB_AGENCY_INTRODUCTION = {
   leads: [
     'Wer schnell Geld braucht, nimmt eine Schicht in einem Lokal; das geht ohne Vorwissen',
     'Wer etwas lernt, kommt an bessere Stellen; die Akademie ist kostenlos',
-    'Wer herumkommen will, fragt später nach Mitflug auf Handelsschiffen',
+    'Wer herumkommen will und kein Schiff hat, heuert im Raumhafen als Crew auf einem Frachter an',
   ],
 }
 
