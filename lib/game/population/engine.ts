@@ -4,6 +4,7 @@
 
 import { decidePopulationAction as decideFromState, type PopulationDecisionContext } from './decision'
 import { actionIntentForDecision } from './actionIntent'
+import { clockOffset } from '../gameClock'
 import { executePopulationActionIntent } from './personActionExecutor'
 import { classifyHabitExecution } from './habitExecutionEvidence'
 import { derivePopulationEncounters, isFreshEncounter, type PopulationEncounter } from './encounters'
@@ -131,7 +132,7 @@ async function decideBackgroundPerson(
     supabase.from('person_relationships').select('*').eq('person_id', person.id),
     supabase.from('person_knowledge').select('*').eq('person_id', person.id),
   ])
-  const circadian = circadianState(tick, circadianProfile(person.id, person.traits ?? null))
+  const circadian = circadianState(tick, circadianProfile(person.id, person.traits ?? null), clockOffset(tick))
   const knowledge = (knowledgeRows ?? []).map((r: any) => ({ id: r.id, personId: person.id, subjectType: r.subject_type, subjectRef: r.subject_ref, knowledgeType: r.knowledge_type, confidence: Number(r.confidence), learnedTick: Number(r.learned_tick), sourceEventId: r.source_event_id ?? null, details: r.details ?? {} }))
   const context: PopulationDecisionContext = {
     person: personFromRow(person),

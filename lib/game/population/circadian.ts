@@ -59,7 +59,7 @@ export function circadianProfile(personId: string, traits?: Record<string, unkno
   return { sleepStartHour: mod(21 + Math.round(chronotype * 4) + nightShift, DAY_TICKS), sleepHours: need }
 }
 
-/** `hourOffset` is reserved for per-location local time; settlements currently share colony time. */
+/** `hourOffset`: Verschiebung zur deutschen Zeit (`clockOffset` aus lib/game/gameClock.ts, 29.10.2026); Forschungsläufe rechnen ohne. */
 export function circadianState(tick: number, profile: CircadianProfile, hourOffset = 0): CircadianState {
   const localHour = mod(Math.trunc(tick) + hourOffset, DAY_TICKS)
   const sinceSleepStart = mod(localHour - profile.sleepStartHour, DAY_TICKS)

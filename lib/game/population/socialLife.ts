@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { RECENT_ENCOUNTER_TICK_RETENTION } from './relationshipRecency'
+import { clockTick } from '../gameClock'
 import { regulatedFamilyDesire, type RegulationState } from '../cognition/personInteroception'
 import { childDevelopmentState } from '../cognition/childDevelopment'
 
@@ -317,7 +318,7 @@ export async function runSocialLifeTick(supabase: SB, tick: number) {
     const cognitiveRows = agedRows
       .filter(row => row.life_stage === 'child')
       .map(row => {
-        const development = childDevelopmentState(Number(row.age_ticks), SOCIAL_YEAR_TICKS, tick)
+        const development = childDevelopmentState(Number(row.age_ticks), SOCIAL_YEAR_TICKS, clockTick(tick))
         return {
           person_id: row.person_id,
           mode: development.sleeping ? 'sleep' : development.computeTier === 0 ? 'reactive' : 'routine',

@@ -9,6 +9,7 @@
 // wird nichts erfunden und nichts geschrieben. Namen folgen dem, was der
 // Spieler über die Person weiß.
 
+import { clockHour } from '@/lib/game/gameClock'
 import { ageAtTick } from '@/lib/game/gameCalendar'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -98,7 +99,8 @@ async function venueState(supabase: any, tileEntityId: string, profileId: string
     supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle(),
   ])
   const tick = Number(tickRow?.tick_number)
-  const hour = Number.isFinite(tick) ? ((Math.trunc(tick) % 24) + 24) % 24 : null
+  // Uhrzeit in Deutschland (Spieluhr seit 29.10.2026, lib/game/gameClock.ts)
+  const hour = Number.isFinite(tick) ? clockHour(tick) : null
   const upper = { homes: Math.max(0, Number(tile?.residential_capacity ?? 0)), guestRooms: Math.max(0, Number(tile?.transient_capacity ?? 0)) }
   // Grundfläche des Hauses – bestimmt, wie viele Tische hineinpassen.
   const areaM2 = tile?.footprint_width_m && tile?.footprint_depth_m ? Number(tile.footprint_width_m) * Number(tile.footprint_depth_m) : null

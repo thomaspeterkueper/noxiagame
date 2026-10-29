@@ -13,6 +13,8 @@ export interface WorshipItem {
   host: { id: string; name: string; role: string }
   running: { kind: ActivityKind; label: string; group: string; startedAt: string; endsAt: string; attendees: number } | null
   next: { kind: ActivityKind; label: string; group: string; when: string; startsAt: string } | null
+  /** Wandernde Termine (deutsche Zeit): Stunde, Titel, Besucher beim letzten Mal. */
+  slots?: Array<{ hour: number; label: string; lastAttendance: number | null }>
 }
 
 const metres = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>

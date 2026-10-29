@@ -2,13 +2,14 @@
 // Gottesdienste und Gebete (Thomas, 28.10.2026): wo, wann, läuft gerade?
 //
 // Quelle sind die Gastgeber der Ortsaktivität (REAL_PLACE_HOSTS) und die eine
-// Spieluhr (tick_log). Ein Tick ist eine Stunde; `startedAt`/`endsAt` sind die
+// Spieluhr (tick_log, Uhrzeit = deutsche Zeit seit 29.10.2026). Ein Tick ist eine Stunde; `startedAt`/`endsAt` sind die
 // echten Zeitpunkte von Beginn und Ende, damit der Innenraum den Ablauf zeigt.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { REAL_PLACE_HOSTS, resolveHostPlace } from '@/lib/game/population/realPlaceActivity'
+import { REAL_PLACE_HOSTS, hostWindowsAt, loadSlotRows, resolveHostPlace, slotFromRow } from '@/lib/game/population/realPlaceActivity'
+import { clockTick } from '@/lib/game/gameClock'
 import { ACTIVITY_GROUP_LABEL, scheduleAt, scheduledWindowsFor, windowStartLabel, type ScheduledRow } from '@/lib/game/population/worship'
 import { TICK_INTERVAL_SECONDS } from '@/lib/game/tick'
 import type { WorshipItem } from '@/lib/worldlab/worshipTypes'
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
   const tickStartMs = last?.created_at ? Math.floor(Date.parse(String(last.created_at)) / tickMs) * tickMs : Date.now()
   const atTick = (t: number) => new Date(tickStartMs + (t - tick) * tickMs).toISOString()
 
+  const slotRows = await loadSlotRows(supabase)
   const { data: scheduled } = await supabase.from('population_events').select('payload').eq('event_type', 'place_activity_scheduled').gte('tick', tick - 24 * 14)
   const locationIds = [...new Set((hosts ?? []).map(row => String(row.current_location_id)))]
   const { data: locations } = locationIds.length ? await supabase.from('locations').select('id,slug').in('id', locationIds) : { data: [] }
@@ -63,7 +65,8 @@ export async function GET(req: NextRequest) {
       at = tile?.latitude_deg != null && tile?.longitude_deg != null ? { lat: Number(tile.latitude_deg), lon: Number(tile.longitude_deg) } : null
     }
     const extra = scheduledWindowsFor((scheduled ?? []) as ScheduledRow[], spec.personKey)
-    const { running, next } = scheduleAt(spec.windows, tick, extra)
+    const slots = slotRows.filter(row => row.person_key === spec.personKey)
+    const { running, next } = scheduleAt(t => hostWindowsAt(spec, t, slots.map(slotFromRow)), tick, extra)
     let attendees = 0
     if (running) {
       const query = supabase.from('person_assignments').select('id', { count: 'exact', head: true })
@@ -79,7 +82,8 @@ export async function GET(req: NextRequest) {
       tradition: spec.tradition,
       host: { id: String(host.id), name: String(host.display_name ?? ''), role: String(host.public_role ?? '') },
       running: running ? { kind: running.kind, label: running.label, group: ACTIVITY_GROUP_LABEL[running.kind], startedAt: atTick(running.startTick), endsAt: atTick(running.endTick), attendees } : null,
-      next: next ? { kind: next.kind, label: next.label, group: ACTIVITY_GROUP_LABEL[next.kind], when: windowStartLabel(next.startTick), startsAt: atTick(next.startTick) } : null,
+      slots: slots.map(row => ({ hour: Number(row.hour), label: String(row.label), lastAttendance: row.last_attendance == null ? null : Number(row.last_attendance) })).sort((a, b) => a.hour - b.hour),
+      next: next ? { kind: next.kind, label: next.label, group: ACTIVITY_GROUP_LABEL[next.kind], when: windowStartLabel(clockTick(next.startTick)), startsAt: atTick(next.startTick) } : null,
     })
   }
   return NextResponse.json({ tick, items }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } })

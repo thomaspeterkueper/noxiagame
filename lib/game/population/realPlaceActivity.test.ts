@@ -1,4 +1,4 @@
-import { REAL_PLACE_HOSTS, WEEKDAY, baumwegActivityWindows, dwarkadhishActivityWindows, foGuangShanActivityWindows, frankfurtResonanceRoundWindows, hamidiyeActivityWindows, lukasActivityWindows, stJohannesActivityWindows, sundernResonanceRoundWindows, tharsisResonanceRoundWindows, weekPhase, weekdayOfTick } from './realPlaceActivity'
+import { REAL_PLACE_HOSTS, hostWindowsAt, WEEKDAY, baumwegActivityWindows, dwarkadhishActivityWindows, foGuangShanActivityWindows, frankfurtResonanceRoundWindows, hamidiyeActivityWindows, lukasActivityWindows, stJohannesActivityWindows, sundernResonanceRoundWindows, tharsisResonanceRoundWindows, weekPhase, weekdayOfTick } from './realPlaceActivity'
 
 let failures=0
 const check=(ok:boolean,label:string)=>{if(!ok){failures++;console.error('FAIL: '+label)}}
@@ -30,6 +30,15 @@ check(lukasActivityWindows(weekPhase(WEEKDAY.sunday,10)).some(window=>window.kin
 check(REAL_PLACE_HOSTS.length===9,'nine hosts: six religions, three Omnizedenz')
 check(new Set(REAL_PLACE_HOSTS.map(host=>host.personKey)).size===REAL_PLACE_HOSTS.length,'each host is scheduled once')
 check(stJohannesActivityWindows(154+168).some(window=>window.kind==='service'),'weekly window repeats without a second clock')
+
+// Seit 29.10.2026 gilt deutsche Zeit: Tick 2598 = Mi 20 Uhr; So 10 Uhr deutsche Zeit = Tick 2598 + 4 Tage − 10 h.
+const sunday10=2598+24*4-10
+check(hostWindowsAt(REAL_PLACE_HOSTS[0],sunday10).some(window=>window.kind==='service'&&window.startTick===sunday10),'Sunday service at 10:00 German time')
+check(!hostWindowsAt(REAL_PLACE_HOSTS[0],sunday10+11).some(window=>window.kind==='service'),'no service at the old game hour')
+const probe=[{id:'s',kind:'service' as const,label:'Probe-Gottesdienst',hour:11,duration:2,earliest:7,latestEnd:22}]
+const thursday11=2598+15
+check(hostWindowsAt(REAL_PLACE_HOSTS[0],thursday11,probe).some(window=>window.label==='Probe-Gottesdienst'&&window.startTick===thursday11),'probe service at 11:00 German time')
+check(!hostWindowsAt(REAL_PLACE_HOSTS[0],sunday10+1,probe).some(window=>window.label==='Probe-Gottesdienst'),'probe service yields to the Sunday service')
 
 if(failures)throw new Error(String(failures)+' real-place schedule test(s) failed')
 console.log('Real-place activity schedule: tests passed')

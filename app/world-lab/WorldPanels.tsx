@@ -759,5 +759,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 /** Termin eines Gotteshauses: läuft gerade (mit Zahl der Besucher) oder nächster Beginn. */
 function ScheduleLine({ item }: { item: WorshipItem }) {
   if (item.running) return <p className="muted"><b>Jetzt: {item.running.label}</b> mit {item.host.name}{item.running.attendees ? ` · ${item.running.attendees} ${item.running.attendees === 1 ? 'Besucher(in)' : 'Besucher'}` : ''}. Alle sind willkommen – mitfeiern, zuhören oder hinten sitzen.</p>
-  return item.next ? <p className="muted">Nächster Termin: {item.next.label} · {item.next.when} ({item.host.name})</p> : null
+  return <>
+    {item.next && <p className="muted">Nächster Termin: {item.next.label} · {item.next.when} ({item.host.name})</p>}
+    {item.slots && item.slots.length > 0 && <p className="muted">{item.slots[0].label} täglich {item.slots.map(slot => slot.hour + ' Uhr').join(' und ')} – die Zeiten passen sich an: Kommt niemand, rückt der Termin eine Stunde weiter.</p>}
+  </>
 }

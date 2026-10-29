@@ -4,7 +4,8 @@
 // No second clock: windows are derived only from the authoritative simulation tick.
 // Attendance never implies belief or religious identity.
 
-import { pickCongregation, scheduledWindowsFor, type ScheduledRow, type Tradition } from './worship'
+import { lastSlotStart, nextSlotHour, pickCongregation, scheduledWindowsFor, slotWindowAt, type ActivitySlot, type ScheduledRow, type Tradition } from './worship'
+import { clockTick, tickOfClock } from '../gameClock'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseLike = any
@@ -24,9 +25,10 @@ const DAY_TICKS = 24
 const WEEK_TICKS = 168
 
 /**
- * Spielwoche (NOXIA-NPC-RELIGION-0001, 28.10.2026): Tag = floor(tick / 24) mod 7,
- * Tag 0 ist Montag; Stunde = tick mod 24. Es gibt weiterhin nur die eine Uhr,
- * die Zählung legt nur fest, welcher Tag „Freitag“ oder „Sonntag“ heißt.
+ * Spielwoche (NOXIA-NPC-RELIGION-0001, 28.10.2026): Tag = floor(t / 24) mod 7,
+ * Tag 0 ist Montag; Stunde = t mod 24. Seit 29.10.2026 ist t der Uhr-Tick
+ * (clockTick, lib/game/gameClock.ts): Uhrzeit und Wochentag in Deutschland.
+ * Die Wochenpläne unten bekommen den Uhr-Tick; hostWindowsAt rechnet zurück.
  */
 export const WEEKDAY = { monday:0, tuesday:1, wednesday:2, thursday:3, friday:4, saturday:5, sunday:6 } as const
 export function weekPhase(day:number, hour:number){ return day*DAY_TICKS+hour }
@@ -142,6 +144,75 @@ export const REAL_PLACE_HOSTS: ReadonlyArray<RealPlaceHost> = [
   { personKey:'earth-dwarka-dwarkadhish-pujari-001', windows:dwarkadhishActivityWindows, place:{kind:'work'}, tradition:'hindu' },
   { personKey:'earth-frankfurt-foguangshan-monastic-001', windows:foGuangShanActivityWindows, place:{kind:'work'}, tradition:'buddhist' },
 ]
+
+// ── Uhrzeit und Termine (29.10.2026) ───────────────────────────────────
+// Die Wochenpläne oben rechnen in Uhr-Ticks (Stunde und Wochentag in Deutschland,
+// lib/game/gameClock.ts). Hier werden sie für einen Simulations-Tick ausgewertet und
+// zurück in Ticks gerechnet – zusammen mit wandernden Terminen und Sonderterminen.
+
+/** Zeile aus place_activity_slots. */
+export type SlotRow = { id:string; person_key:string; kind:string; label:string; hour:number; duration:number; earliest_hour:number; latest_end_hour:number; since_tick:number; evaluated_start:number|null; empty_streak:number; last_attendance:number|null; history:unknown; active:boolean }
+export function slotFromRow(row:SlotRow):ActivitySlot{
+  return { id:String(row.id), kind:row.kind as ActivitySlot['kind'], label:String(row.label), hour:Number(row.hour), duration:Math.max(1,Number(row.duration??2)), earliest:Number(row.earliest_hour??7), latestEnd:Number(row.latest_end_hour??22) }
+}
+
+/**
+ * Alle Termine eines Gastgebers zu einem Tick, in Ticks: Wochenplan (deutsche Zeit),
+ * wandernde Termine und Sondertermine. Ein wandernder Termin weicht dem Wochenplan.
+ */
+export function hostWindowsAt(spec:Pick<RealPlaceHost,'windows'>,tick:number,slots:readonly ActivitySlot[]=[],scheduled:readonly PlaceActivityWindow[]=[]):PlaceActivityWindow[]{
+  const clock=clockTick(tick), shift=tick-clock
+  const back=(window:PlaceActivityWindow)=>({...window,startTick:window.startTick+shift,endTick:window.endTick+shift})
+  const fixed=spec.windows(clock).map(back)
+  const wandering=fixed.length?[]:slots.flatMap(slot=>{ const window=slotWindowAt(slot,clock); return window?[back(window)]:[] })
+  return [...fixed,...wandering,...scheduled.filter(window=>tick>=window.startTick&&tick<window.endTick)]
+}
+
+/** Wandernde Termine laden; fehlt die Tabelle noch, gibt es keine. */
+export async function loadSlotRows(supabase:SupabaseLike):Promise<SlotRow[]>{
+  const {data,error}=await supabase.from('place_activity_slots').select('*').eq('active',true)
+  if(error){ if(String(error.code)==='42P01'||/does not exist|schema cache/i.test(String(error.message)))return []; throw error }
+  return (data??[]) as SlotRow[]
+}
+
+/**
+ * Nach einem Termin: Kam niemand (außer dem Gastgeber), rückt der Termin eine Stunde
+ * weiter (nextSlotHour). Ausgewertet wird jeder Termin einmal, nur Termine seit der
+ * letzten Verlegung (`since_tick`).
+ */
+async function adaptSlots(supabase:SupabaseLike,tick:number,hostId:string,rows:SlotRow[],spec:Pick<RealPlaceHost,'windows'>){
+  const clock=clockTick(tick)
+  for(const row of rows){
+    const slot=slotFromRow(row)
+    // Letzter abgeschlossener Termin: Beginn so, dass das Ende spätestens jetzt ist.
+    const startClock=lastSlotStart(slot,clock-slot.duration)
+    const start=tickOfClock(startClock)
+    if(start<Number(row.since_tick)||Number(row.evaluated_start)===start)continue
+    // Fiel der Termin wegen des Wochenplans aus (z. B. Sonntagsgottesdienst), zählt er nicht.
+    if(spec.windows(startClock).length){
+      const {error:skipError}=await supabase.from('place_activity_slots').update({evaluated_start:start,updated_at:new Date().toISOString()}).eq('id',row.id)
+      if(skipError)throw skipError
+      row.evaluated_start=start
+      continue
+    }
+    const {data:visits,error}=await supabase.from('population_events').select('actor_person_id')
+      .eq('event_type','npc_real_place_visit_started').eq('related_person_id',hostId)
+      .eq('payload->>windowStartTick',String(start)).neq('actor_person_id',hostId)
+    if(error)throw error
+    const attendance=new Set(((visits??[]) as Array<{actor_person_id:string}>).map(visit=>visit.actor_person_id)).size
+    const others=rows.filter(other=>other.id!==row.id).map(other=>Number(other.hour))
+    const hour=attendance===0?nextSlotHour(slot,others):slot.hour
+    const history=[...(Array.isArray(row.history)?row.history as unknown[]:[]),{startTick:start,hour:slot.hour,attendance}].slice(-30)
+    const {error:updateError}=await supabase.from('place_activity_slots').update({
+      hour, evaluated_start:start, last_attendance:attendance,
+      empty_streak:attendance===0?Number(row.empty_streak??0)+1:0,
+      since_tick:hour===slot.hour?row.since_tick:tick,
+      history, updated_at:new Date().toISOString(),
+    }).eq('id',row.id)
+    if(updateError)throw updateError
+    row.hour=hour; row.evaluated_start=start
+  }
+}
 
 /** A concrete place: an imported real place or a built tile entity. */
 type Place = { regionFeatureId:string; tileEntityId:null } | { regionFeatureId:null; tileEntityId:string }
@@ -395,11 +466,17 @@ export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
     .lte('tick',tick)
     .gte('tick',tick-24*14)
   if(scheduledError)throw scheduledError
+  const slotRows=await loadSlotRows(supabase)
   const residents=new Map<string,Promise<Resident[]>>()
   const residentsAt=(locationId:string)=>{ if(!residents.has(locationId))residents.set(locationId,residentsOf(supabase,locationId)); return residents.get(locationId)! }
   for(const host of REAL_PLACE_HOSTS){
-    const extra=scheduledWindowsFor((scheduled??[]) as ScheduledRow[],host.personKey).filter(window=>tick>=window.startTick&&tick<window.endTick)
-    const part=await runHostPlaceTick(supabase,tick,host,[...host.windows(tick),...extra],residentsAt)
+    const extra=scheduledWindowsFor((scheduled??[]) as ScheduledRow[],host.personKey)
+    const rows=slotRows.filter(row=>row.person_key===host.personKey)
+    if(rows.length){
+      const {data:hostRow}=await supabase.from('people').select('id').eq('person_key',host.personKey).maybeSingle()
+      if(hostRow?.id)await adaptSlots(supabase,tick,String(hostRow.id),rows,host)
+    }
+    const part=await runHostPlaceTick(supabase,tick,host,hostWindowsAt(host,tick,rows.map(slotFromRow),extra),residentsAt)
     result.windows+=part.windows
     result.events+=part.events
     result.visitors+=part.visitors
@@ -411,7 +488,7 @@ export async function runRealPlaceSocialTick(supabase:SupabaseLike,tick:number){
 /** Kept for callers of the first pilot; closes expired visits and runs St. Johannes only. */
 export async function runStJohannesSocialPlaceTick(supabase:SupabaseLike,tick:number){
   const closed=await closeExpiredRegionVisits(supabase,tick)
-  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0],stJohannesActivityWindows(tick),(locationId)=>residentsOf(supabase,locationId))
+  const part=await runHostPlaceTick(supabase,tick,REAL_PLACE_HOSTS[0],hostWindowsAt(REAL_PLACE_HOSTS[0],tick),(locationId)=>residentsOf(supabase,locationId))
   return {...part,closed}
 }
 

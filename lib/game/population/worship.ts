@@ -82,18 +82,56 @@ export function scheduleAt(windows: (tick: number) => ActivityWindow[], tick: nu
   return { running, next }
 }
 
+// ── Wandernde Termine (Thomas, 29.10.2026) ──────────────────────────────
+// Probe-Gottesdienste zweimal täglich (zuerst 11 und 17 Uhr deutscher Zeit). Kommt
+// zu einem Termin niemand, rückt er beim nächsten Mal eine Stunde weiter, bis er
+// eine Zeit findet, zu der Menschen kommen. Gut besuchte Zeiten bleiben. Nie nach
+// 22 Uhr (`latestEnd`), nie vor 7 Uhr (`earliest`).
+
+/** Ein täglicher Termin in Uhrzeit (deutsche Zeit, siehe lib/game/gameClock.ts). */
+export interface ActivitySlot { id: string; kind: ActivityKind; label: string; hour: number; duration: number; earliest: number; latestEnd: number }
+
+const mod = (value: number, base: number) => ((value % base) + base) % base
+
+/** Laufender Termin eines Slots zu einem Uhr-Tick (clockTick), sonst null. Start/Ende in Uhr-Ticks. */
+export function slotWindowAt(slot: ActivitySlot, clock: number): ActivityWindow | null {
+  const start = lastSlotStart(slot, clock)
+  return clock >= start && clock < start + slot.duration ? { kind: slot.kind, label: slot.label, startTick: start, endTick: start + slot.duration } : null
+}
+
+/** Letzter Beginn des Slots zu oder vor einem Uhr-Tick. */
+export function lastSlotStart(slot: { hour: number }, clock: number) {
+  return clock - mod(clock - slot.hour, 24)
+}
+
+/**
+ * Nächste Stunde für einen leer gebliebenen Termin: eine Stunde später, innerhalb
+ * von `earliest` … `latestEnd`, mit mindestens einer freien Stunde Abstand zu den
+ * anderen Terminen derselben Person (`otherHours`).
+ */
+export function nextSlotHour(slot: Pick<ActivitySlot, 'hour' | 'duration' | 'earliest' | 'latestEnd'>, otherHours: readonly number[]): number {
+  const fits = (h: number) => h >= slot.earliest && h + slot.duration <= slot.latestEnd
+    && otherHours.every(o => Math.abs(o - h) >= slot.duration + 1)
+  let h = slot.hour
+  for (let step = 0; step < 24; step++) {
+    h = h + 1 + slot.duration > slot.latestEnd + 1 ? slot.earliest : h + 1
+    if (fits(h)) return h
+  }
+  return slot.hour
+}
+
 /**
  * Sondertermine (z. B. ein Probe-Gottesdienst) stehen als population_events
  * `place_activity_scheduled` mit Personenschlüssel, Art, Titel, Beginn und Ende.
  */
-export type ScheduledRow = { payload: { personKey?: unknown; kind?: unknown; label?: unknown; startsTick?: unknown; endsTick?: unknown } | null }
+export type ScheduledRow = { payload: { personKey?: unknown; kind?: unknown; label?: unknown; startsTick?: unknown; endsTick?: unknown; cancelled?: unknown } | null }
 const KINDS: readonly ActivityKind[] = ['open_community', 'service', 'resonance_round', 'friday_prayer', 'shabbat', 'aarti', 'dharma_service']
 export function scheduledWindowsFor(rows: readonly ScheduledRow[], personKey: string): ActivityWindow[] {
   return rows.flatMap(row => {
     const p = row.payload ?? {}
     const kind = String(p.kind ?? '') as ActivityKind
     const start = Number(p.startsTick), end = Number(p.endsTick)
-    if (p.personKey !== personKey || !KINDS.includes(kind) || !Number.isFinite(start) || !(end > start)) return []
+    if (p.cancelled === true || p.personKey !== personKey || !KINDS.includes(kind) || !Number.isFinite(start) || !(end > start)) return []
     return [{ kind, label: String(p.label ?? 'Sondertermin').slice(0, 80), startTick: start, endTick: end }]
   })
 }

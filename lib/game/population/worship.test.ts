@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONGREGATION_CAP, liturgyFor, phaseAt, pickCongregation, scheduleAt, scheduledWindowsFor, windowStartLabel } from './worship'
+import { CONGREGATION_CAP, lastSlotStart, liturgyFor, nextSlotHour, slotWindowAt, phaseAt, pickCongregation, scheduleAt, scheduledWindowsFor, windowStartLabel } from './worship'
 import { stJohannesActivityWindows } from './realPlaceActivity'
 
 const neighbours = Array.from({ length: 80 }, (_, i) => ({ id: `n${i}`, distanceM: (i * 13) % 1200 }))
@@ -59,5 +59,29 @@ describe('liturgy', () => {
       expect(phases[0].from).toBe(0)
       for (let i = 1; i < phases.length; i++) expect(phases[i].from).toBe(phases[i - 1].to)
     }
+  })
+})
+
+describe('wandering slots', () => {
+  const slot = { id: 's', kind: 'service' as const, label: 'Probe-Gottesdienst', hour: 11, duration: 2, earliest: 7, latestEnd: 22 }
+  it('runs daily at its hour (clock ticks)', () => {
+    expect(slotWindowAt(slot, 24 * 3 + 11)).toMatchObject({ startTick: 24 * 3 + 11, endTick: 24 * 3 + 13 })
+    expect(slotWindowAt(slot, 24 * 3 + 12)?.startTick).toBe(24 * 3 + 11)
+    expect(slotWindowAt(slot, 24 * 3 + 13)).toBeNull()
+    expect(slotWindowAt(slot, 24 * 3 + 10)).toBeNull()
+    expect(lastSlotStart(slot, 24 * 3 + 10)).toBe(24 * 2 + 11)
+  })
+  it('moves an empty slot one hour later, keeps distance and never past 22:00', () => {
+    expect(nextSlotHour(slot, [17])).toBe(12)
+    expect(nextSlotHour({ ...slot, hour: 13 }, [17])).toBe(14)
+    expect(nextSlotHour({ ...slot, hour: 14 }, [17])).toBe(20)
+    expect(nextSlotHour({ ...slot, hour: 20 }, [11])).toBe(7)
+    expect(nextSlotHour({ ...slot, hour: 19 }, [11])).toBe(20)
+  })
+})
+
+describe('cancelled special dates', () => {
+  it('are ignored', () => {
+    expect(scheduledWindowsFor([{ payload: { personKey: 'p', kind: 'service', startsTick: 1, endsTick: 3, cancelled: true } }], 'p')).toEqual([])
   })
 })

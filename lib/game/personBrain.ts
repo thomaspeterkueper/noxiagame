@@ -5,13 +5,14 @@
 
 import { creativityFromTraits, selectCognitiveState, type CognitiveState } from './personCognition'
 import { circadianProfile, circadianState } from './population/circadian'
+import { clockOffset } from './gameClock'
 
 /** A named lead stays up for a colony pressure at or above this severity. */
 const NIGHT_DUTY_PRESSURE = 0.7
 
 /** NOXIA-LIVING-0007: named persons sleep through their night unless the colony needs them. */
 export function namedPersonSleeps(input: { personId: string; traits?: Record<string, unknown> | null; tick: number; pressures: ColonyPressure[]; sustenance?: number }): boolean {
-  if (!circadianState(input.tick, circadianProfile(input.personId, input.traits)).inSleepWindow) return false
+  if (!circadianState(input.tick, circadianProfile(input.personId, input.traits), clockOffset(input.tick)).inSleepWindow) return false
   if (typeof input.sustenance === 'number' && input.sustenance < 0.25) return false
   return !input.pressures.some((p) => Number(p.severity) >= NIGHT_DUTY_PRESSURE)
 }
