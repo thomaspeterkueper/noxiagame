@@ -1,7 +1,8 @@
 // app/api/game/npc-conversation/route.ts
+// Aktualisiert: 29.10.2026 — Wege zu Vorhandenem (gameGuide: Toilette, Lokal, Bücher, Akademie, Tanz, Raumhafen, Arbeit)
 // Aktualisiert: 29.10.2026 — Hinweise auf fehlende Funktionen im Protokoll (wish_kind, wish_object)
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
-// Version:      1.7.0
+// Version:      1.8.0
 
 import { NextRequest, NextResponse, after } from 'next/server'
 import { looksLikeWish } from '@/lib/game/wishes/rules'
@@ -10,6 +11,7 @@ import { createClient } from '@supabase/supabase-js'
 import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
 import { createHash } from 'node:crypto'
 import { detectFeatureWish } from '@/lib/game/cognition/featureWish'
+import { gameGuideLines, type GuidePlace } from '@/lib/game/cognition/gameGuide'
 import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
 import {
   assessRepeat,
@@ -379,6 +381,18 @@ export async function POST(request: NextRequest) {
   if (repeat.level === 'breakoff') return endConversation(breakoffLine(`${npcKey}:${nowMs}`, priorBreakoffs), 'breakoff')
 
   const sermon = sermonRequest && worldviewVoiceFromPublicRole(npcRole) ? sermonRequest : null
+  // Wege zu Vorhandenem (Spielerwünsche „vorhanden“, Thomas 29.10.2026): nur wenn die Frage dazu passt.
+  let guideLines: string[] = []
+  if (!opening && !sermon && gameGuideLines(player, [], null).length) {
+    const { data: me } = await serviceClient.from('profiles').select('current_location').eq('id', user.id).maybeSingle()
+    const slug = (me?.current_location as string | null) ?? null
+    const { data: loc } = slug ? await serviceClient.from('locations').select('id').eq('slug', slug).maybeSingle() : { data: null }
+    const { data: houses } = loc?.id
+      ? await serviceClient.from('tile_entities').select('entity_id, display_name').eq('location_id', loc.id).eq('status', 'active').limit(400)
+      : { data: [] }
+    const places: GuidePlace[] = ((houses ?? []) as Array<{ entity_id: string; display_name: string | null }>).map(h => ({ kind: h.entity_id, name: h.display_name }))
+    guideLines = gameGuideLines(player, places, slug)
+  }
   const system = [
     repeat.level === 'hint' && !sermon ? REPEAT_HINT_INSTRUCTION : '',
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
@@ -406,6 +420,7 @@ export async function POST(request: NextRequest) {
     localFacts.length ? `Verifizierte lokale Fakten:\n- ${localFacts.join('\n- ')}` : 'Es liegen keine verifizierten lokalen Infrastruktur-Fakten vor.',
     placeKnowledge.length ? `Ortswissen – was du als Ansässige(r) über die Gegend weißt, auch ohne es gerade zu sehen:\n- ${placeKnowledge.join('\n- ')}` : '',
     placeKnowledge.length ? 'Nutze das Ortswissen, wenn nach der Gegend, nach Sehenswertem, nach Einrichtungen oder nach dem Weg gefragt wird: Nenne dann zwei, drei passende Dinge daraus, statt zu passen. Was im Ortswissen steht, gilt als belegt. Zur realen Gegend darfst du außerdem allgemein Bekanntes sagen (Landschaft, Region, größere Nachbarorte), aber erfinde keine weiteren Einrichtungen, Öffnungszeiten oder Wegbeschreibungen.' : '',
+    guideLines.length ? `Was es dazu im Ort gibt (belegt, nenne es, wenn es zur Frage passt; erfinde nichts dazu):\n- ${guideLines.join('\n- ')}` : '',
     hearsay.length ? `Was du in letzter Zeit mitbekommen hast:\n- ${hearsay.join('\n- ')}` : '',
     hearsay.length ? 'Erzähle davon, wenn nach Neuigkeiten, Gerüchten, Arbeit oder dem Geschehen am Ort gefragt wird – nicht von dir aus alles auf einmal. Was mit „Gehört“ beginnt, gibst du als Gehörtes weiter („man erzählt sich“, „ich habe gehört“), nicht als Tatsache. Schmücke nichts aus und nenne keine Namen, die dort nicht stehen.' : '',
     // Religion/Philosophie (NOXIA-NPC-RELIGION-0002): nur Haltung, kein Wissen.
