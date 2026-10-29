@@ -73,7 +73,7 @@ assert(timeline.render(2050).overlay.scene.buildings.some(b => b.id === 'osm:nei
   'unrelated neighboring buildings survive all years')
 
 // Changing the caller's source after timeline creation must not alter replay.
-(snapshot.receipts as CoreParcelReceipt[]).length = 0
+;(snapshot.receipts as CoreParcelReceipt[]).length = 0
 scene.buildings[0].center.yM = 800
 assert(hasBuilding(2050, 'core:house-new'), 'timeline owns a snapshot of receipts')
 assert(timeline.render(2026).overlay.scene.buildings.find(b => b.id === 'osm:old')?.center.yM === 0,
