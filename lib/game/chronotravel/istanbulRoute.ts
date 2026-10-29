@@ -10,7 +10,7 @@ export const ISTANBUL_RESEARCH_SOURCES = [
 
 export const ISTANBUL_STOPS = [
   { id:'hippodrome', name:'Hippodrom / Atmeydanı', placeId:'earth-istanbul-hippodrome', eras:[550,1200,1700], status:'prototype', sceneIds:['hippodrome-550','hippodrome-1200','hippodrome-1700'] },
-  { id:'hagia-sophia', name:'Hagia Sophia', placeId:'earth-istanbul-hagia-sophia', eras:[550,1200,1700], status:'research', sceneIds:[] },
+  { id:'hagia-sophia', name:'Hagia Sophia', placeId:'earth-istanbul-hagia-sophia', eras:[550,1200,1700], status:'prototype', sceneIds:['hagia-sophia-550','hagia-sophia-1200','hagia-sophia-1700'] },
   { id:'basilica-cistern', name:'Basilika-Zisterne', placeId:'earth-istanbul-basilica-cistern', eras:[550,1200,1700], status:'research', sceneIds:[] },
   { id:'topkapi', name:'Topkapı-Palast', placeId:'earth-istanbul-topkapi', eras:[1700], status:'research', sceneIds:[] },
   { id:'suleymaniye', name:'Süleymaniye', placeId:'earth-istanbul-suleymaniye', eras:[1700], status:'research', sceneIds:[] },
