@@ -80,6 +80,9 @@ create trigger noxia_tile_entity_deletion
   after delete on public.tile_entities
   for each row execute function public.noxia_record_tile_entity_deletion();
 
+-- Trigger functions are internal; no direct execution is exposed to API roles.
+revoke all on function public.noxia_record_tile_entity_deletion() from public, anon, authenticated;
+
 comment on function public.noxia_record_tile_entity_deletion() is
   'Audit-only DELETE mirror to simulation_events; no demolition authorization or parcel binding.';
 
