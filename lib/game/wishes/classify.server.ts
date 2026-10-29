@@ -11,7 +11,7 @@ const SYSTEM = [
   'Du ordnest Wünsche und Gebete ein, die Spieler oder Figuren in einem Aufbauspiel (NOXIA: Erde 2086, Mond, Mars) äußern.',
   'Die Welt kann Wünsche erfüllen, wenn sie für das Spiel und die Welt sinnvoll sind. Du entscheidest nicht, du ordnest nur ein.',
   'Antworte nur mit einem JSON-Objekt mit genau diesen Feldern:',
-  '{"realLife":bool,"distress":bool,"harmful":bool,"realPerson":bool,"selfish":bool,"category":string,"summary":string,"clusterKey":string,"sense":number,"resource":string|null}',
+  '{"realLife":bool,"distress":bool,"harmful":bool,"realPerson":bool,"selfish":bool,"category":string,"summary":string,"clusterKey":string,"sense":number,"resource":string|null,"eventTitle":string|null}',
   'realLife: true, wenn es um das echte Leben des Schreibenden geht (Krankheit, Familie, Schule, Arbeit, Beziehung, Kummer) und nicht um das Spiel.',
   'distress: true bei Hinweisen auf eine Notlage: Gedanken an Selbstverletzung oder Suizid, Gewalt, Missbrauch, akute Gefahr.',
   'harmful: true, wenn der Wunsch gegen Recht oder Moral verstößt, anderen schaden soll, Hass, Gewalt, Drogen, Sexuelles oder Diskriminierung enthält.',
@@ -22,6 +22,7 @@ const SYSTEM = [
   'clusterKey: 1 bis 3 kleingeschriebene Wörter mit Bindestrich, die gleichartige Wünsche verbinden, z. B. "baeckerei-sundern", "wasser-mars", "fest-sundern".',
   'sense: 0 bis 1 – wie sinnvoll wäre die Erfüllung für das Spiel und die Welt (Gemeinschaft, Versorgung, schöner Ort) und für viele Menschen? Eigennütziges oder Belangloses niedrig.',
   'resource: bei versorgung eine von water, food, energy, metal, components, sonst null.',
+  'eventTitle: bei gemeinschaft ein kurzer Titel für das Treffen, wie er an einer Pinnwand stünde, höchstens 40 Zeichen, ohne das Wort Wunsch (z. B. "Treffen für alle", "Erntedankfest", "Abend der Stille"), sonst null.',
 ].join('\n')
 
 function bool(value: unknown) { return value === true }
@@ -64,6 +65,7 @@ export async function assessWish(text: string, context: { place?: string | null;
       clusterKey: String(raw.clusterKey ?? '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || rules.clusterKey,
       sense: Number.isFinite(sense) ? Math.max(0, Math.min(1, sense)) : rules.sense,
       resource,
+      eventTitle: typeof raw.eventTitle === 'string' && raw.eventTitle.trim() ? raw.eventTitle.replace(/\s+/g, ' ').trim().slice(0, 40) : null,
       byRules: false,
     }
   } catch {

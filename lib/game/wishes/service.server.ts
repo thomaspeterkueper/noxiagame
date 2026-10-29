@@ -153,7 +153,8 @@ async function gathering(supabase: Supabase, wish: WishRow, a: WishAssessment, t
     if ((hour === 11 || hour === 17 || hour === 15 || hour === 19) && !busy(t) && !busy(t + 1)) start = t
   }
   if (start === null) return { ok: false, reason: 'in den nächsten zwei Tagen kein freier Termin' }
-  const label = `Zusammenkunft: ${a.summary}`.slice(0, 80)
+  // Titel wie an einer Pinnwand – ohne Hinweis auf einen Wunsch (die Welt erklärt nichts).
+  const label = (a.eventTitle && !/wunsch/i.test(a.eventTitle) ? a.eventTitle : 'Offenes Treffen').slice(0, 60)
   const { data: event, error } = await supabase.from('population_events').insert({
     tick, event_type: 'place_activity_scheduled', actor_person_id: host.personId, location_id: host.locationId,
     subject_type: 'wish', subject_ref: wish.id,

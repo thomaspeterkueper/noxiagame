@@ -19,7 +19,7 @@ Stand: 29.10.2026. Thomas: „Was passiert, wenn sich Spieler oder NPCs etwas w�
    - **Zusammenkunft** am Ort des Wunsches: Sondertermin mit der Gastgeberin oder dem Gastgeber, nächster freier Termin um 11, 15, 17 oder 19 Uhr (deutsche Zeit; nicht über Wochenplan, Probe-Gottesdiensten oder anderen Sonderterminen), mindestens zwei Stunden voraus. Steht schon eine an, zählt der Wunsch dazu. Die Gemeinde kommt wie zu jedem Termin.
    - **Lieferung** an einen Ort, nur bei echtem Mangel (Vorrat reicht keine Woche): eine Woche Verbrauch, 50–500 Einheiten; Ereignis `supply_arrived`.
    - **Neuer Ort, neue Funktion, für eine Figur:** wenn sinnvoll und getragen → „in Arbeit“ für die Entwicklung (die tägliche Auswertung kann daraus Aufgaben machen).
-5. **Admin-Bereich** `/admin/wuensche` (nur Konten in `admin_profiles`: Aristeas, Thomas, McKnight): Zahlen je Stand, Bündel mit Zahl der Menschen, einzelne Wünsche mit Wortlaut (außer privat), Begründung und Erfüllung; Aktionen: ablehnen (mit Grund), anpassen (Kurzfassung, Art, Bündel, Notiz) und neu entscheiden, erfüllen.
+5. **Admin-Bereich** `/admin/wuensche` – vorläufig hinter Benutzer und Passwort (HTTP Basic, Benutzer „Superadmin“, nur der SHA-256-Wert steht im Code `proxy.ts`, Wechsel über `ADMIN_BASIC_AUTH_SHA256`); die Daten zusätzlich nur für Konten in `admin_profiles` (Aristeas, Thomas, McKnight): Zahlen je Stand, Bündel mit Zahl der Menschen, einzelne Wünsche mit Wortlaut (außer privat), Begründung und Erfüllung; Aktionen: ablehnen (mit Grund), anpassen (Kurzfassung, Art, Bündel, Notiz) und neu entscheiden, erfüllen.
 
 ## Technik
 

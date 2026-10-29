@@ -54,6 +54,8 @@ export interface WishAssessment {
   sense: number
   /** Versorgung: welche Ressource. */
   resource?: 'water' | 'food' | 'energy' | 'metal' | 'components' | null
+  /** Gemeinschaft: Titel des Treffens für die Pinnwand (ohne „Wunsch“ – die Welt erklärt nichts). */
+  eventTitle?: string | null
   /** Einordnung durch Regeln statt Sprachmodell. */
   byRules?: boolean
 }
