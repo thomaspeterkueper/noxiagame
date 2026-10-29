@@ -29,7 +29,7 @@ import { playerNameFromUtterance, statedOwnAge } from '@/lib/game/cognition/play
 import { ageAtTick } from '@/lib/game/gameCalendar'
 import { worldviewConversationLines, worldviewVoiceFromPublicRole } from '@/lib/game/population/worldviewVoices'
 
-const MAX_PLAYER_CHARS = 80
+const MAX_PLAYER_CHARS = 160
 const MAX_HISTORY_MESSAGES = 10
 const MAX_HISTORY_ENTRY_CHARS = 180
 const MAX_HISTORY_TOTAL_CHARS = 1200
