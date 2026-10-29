@@ -6,6 +6,7 @@ on:
       - 'supabase/migrations/20261029133000_tile_entity_delete_audit.sql'
       - 'supabase/tests/20261029133000_tile_entity_delete_audit.test.sql'
       - 'supabase/tests/20261029133000_tile_entity_delete_audit_atomicity.test.sql'
+      - 'supabase/tests/20261029133000_tile_entity_delete_audit_temporal_boundary.test.sql'
       - 'supabase/tests/fixtures/tile_entity_delete_audit_fixture.sql'
       - '.github/workflows/tile-entity-delete-audit.yml'
 
@@ -71,6 +72,18 @@ jobs:
             (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
           test "$actual" = "1|1|0" || {
             echo "Unexpected state after rejected audit rollback: $actual"
+            exit 1
+          }
+      - name: Verify temporal boundary and matching deletion event timestamp
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit_temporal_boundary.test.sql
+          actual="$(psql -v ON_ERROR_STOP=1 -Atc "select
+            (select count(*) from public.tile_entities),
+            (select count(*) from public.entity_states where valid_to is null),
+            (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
+          test "$actual" = "1|1|0" || {
+            echo "Unexpected state after temporal boundary rollback: $actual"
             exit 1
           }
       - name: Verify missing fixture fails closed
