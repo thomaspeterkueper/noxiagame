@@ -51,3 +51,20 @@ Zunächst vorhandene Tabellen `celestial_regions` und `region_features` auf Wied
 6. Skalierungs- und Lizenztests für weitere Orte dokumentieren.
 
 Kein Anspruch, dass diese Architektur mit diesem Dokument bereits implementiert ist.
+
+## Chronimaps: historische Quellen nur bei konkretem Bedarf
+
+Chronimaps sind eine **separate zeitbezogene Rekonstruktionsschicht** über der regulären Erde. Der einmalige Import der gegenwärtigen Geografie löst **keine** pauschale Recherche oder einen Massenimport historischer Kartensammlungen aus.
+
+Eine historische Recherche wird nur durch einen konkreten Anlass eröffnet:
+- Spieler oder NPC fragt innerhalb des Spiels nach Ort und historischer Zeit bzw. bucht eine historische Reise.
+- Ein freigegebener Entwicklungsauftrag benötigt ein bestimmtes historisches Szenario.
+- Ein vorhandener historischer Schauplatz benötigt für die nächste tatsächliche Spielhandlung eine überprüfbare Ergänzung.
+
+Beispiel: Konstantinopel / Istanbul. Zuerst Ort, gewünschtes Jahr bzw. Zeitfenster, Zweck und benötigte räumliche Auflösung bestimmen. Erst dann passende historische Stadtpläne, Karten, Reiseberichte, Grabungsbefunde und andere Quellen suchen, lizenzrechtlich prüfen und abgleichen. Kein voreiliger Import aller Epochen Istanbuls.
+
+Rekonstruktionen erhalten eine eigene Identität aus `place_id`, Zeitintervall und `reconstruction_version`. Quellen, Datierung, Unsicherheit und wissenschaftliche Alternativen sind pro Objekt nachvollziehbar; spekulative Ergänzungen werden sichtbar gekennzeichnet. Moderne Geometrie darf nicht ungeprüft als historische Geometrie verwendet werden.
+
+Nach Erstellung wird eine freigegebene Chronimap lokal als versionierter historischer Snapshot gespeichert und bei wiederholter Anfrage wiederverwendet. Nur fehlende Zeitabschnitte, neue Fragestellungen oder explizit genehmigte Verbesserungen lösen erneute externe Recherche aus. Chronimaps sind **Lesesichten bzw. gekennzeichnete historische Simulationen**, keine Rückwirkung auf den aktuellen NOXIA-Spielzustand.
+
+Automatisches Recherchieren aus NPC-/Spieleranfragen benötigt einen kontrollierten Workflow (Auftragswarteschlange, Quellen- und Lizenzkontrolle, Ressourcenbudget, Freigabe der Veröffentlichung). Ein Wunsch allein ändert keine kanonische Geschichte und startet keinen unkontrollierten Crawl.
