@@ -5,7 +5,7 @@ import { buildHistoricalArchitecture } from './historicalBuildings'
 import { createHistoricalStreetLife } from './historicalStreetLife'
 
 /** Lightweight desktop WebGL prototype; no persistent game state. */
-export default function HistoricalThreeScene({ year }) {
+export default function HistoricalThreeScene({ year, onShopChange }) {
   const mountRef = useRef(null)
   useEffect(() => {
     const host = mountRef.current
@@ -53,9 +53,49 @@ export default function HistoricalThreeScene({ year }) {
     tip.rotation.y=Math.PI/4;tip.position.set(0,16,-22);world.add(tip)
     const disposeArchitecture = buildHistoricalArchitecture(world, year)
     const streetLife = createHistoricalStreetLife(world, year)
+    // A small interior prototype, separate from the persistently simulated world.
+    const shop = new THREE.Group()
+    world.add(shop)
+    const plaster = new THREE.MeshStandardMaterial({color:0xbfb098, side:THREE.DoubleSide})
+    const wood = new THREE.MeshStandardMaterial({color:0x694d36})
+    const goodsMat = new THREE.MeshStandardMaterial({color:0xb77d50})
+    function shopBox(x,y,z,w,h,d,mat=wood) {
+      const obj=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat)
+      obj.position.set(x,y,z);obj.castShadow=true;shop.add(obj)
+    }
+    shopBox(0,-.12,0,12,.2,11,plaster)
+    shopBox(0,3,-5.5,12,6,.2,plaster)
+    shopBox(-6,3,0,.2,6,11,plaster)
+    shopBox(6,3,0,.2,6,11,plaster)
+    shopBox(0,6,0,12,.2,11,wood)
+    shopBox(-3,1,-3.5,4,2,1.2,wood)
+    shopBox(3,1,-3.5,4,2,1.2,wood)
+    shopBox(0,.7,-1.3,3,1.4,1,wood)
+    for(let i=0;i<8;i++){
+      const jar = new THREE.Mesh(new THREE.CylinderGeometry(.23,.38,.8,12),goodsMat)
+      jar.position.set(i<4?-4.5+i*.85:1.5+(i-4)*.85,2.5,-3.5)
+      shop.add(jar)
+    }
+    const merchant=new THREE.Group()
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,1.4,12),new THREE.MeshStandardMaterial({color:0x52676a}))
+    body.position.y=1.05;merchant.add(body)
+    const face=new THREE.Mesh(new THREE.SphereGeometry(.3,12,10),new THREE.MeshStandardMaterial({color:0xbc9273}))
+    face.position.y=2.06;merchant.add(face)
+    merchant.position.set(0,0,-3)
+    shop.add(merchant)
+    shop.visible=false
+    let inside=false
+    const shopEntry={x:0,z:8}
+    const switchShop=()=>{
+      inside=!inside
+      shop.visible=inside
+      if(inside){camera.position.set(0,1.75,3.6);yaw=0}
+      else{camera.position.set(0,1.75,11);yaw=0}
+      onShopChange?.(inside)
+    }
     const keys=new Set()
     const onDown=(e)=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName))return;
-      const k=e.key.toLowerCase();if(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown'].includes(k)){e.preventDefault();keys.add(k)}}
+      const k=e.key.toLowerCase();if(k==='e' && !e.repeat){e.preventDefault();if(inside || Math.hypot(camera.position.x-shopEntry.x,camera.position.z-shopEntry.z)<4)switchShop();return}if(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown'].includes(k)){e.preventDefault();keys.add(k)}}
     const onUp=e=>keys.delete(e.key.toLowerCase())
     const onBlur=()=>keys.clear()
     window.addEventListener('keydown',onDown);window.addEventListener('keyup',onUp);window.addEventListener('blur',onBlur)
@@ -84,20 +124,28 @@ export default function HistoricalThreeScene({ year }) {
         move.normalize().multiplyScalar(dt*6)
         const nextX=camera.position.x+move.x
         const nextZ=camera.position.z+move.z
-        if(streetLife.isWalkable(nextX,camera.position.z))camera.position.x=nextX
-        if(streetLife.isWalkable(camera.position.x,nextZ))camera.position.z=nextZ
+        if(inside){
+          if(Math.abs(nextX)<5.5)camera.position.x=nextX
+          if(nextZ>-4.6 && nextZ<4.7)camera.position.z=nextZ
+        } else {
+          if(streetLife.isWalkable(nextX,camera.position.z))camera.position.x=nextX
+          if(streetLife.isWalkable(camera.position.x,nextZ))camera.position.z=nextZ
+        }
       }
-      streetLife.update(dt)
+      if(!inside)streetLife.update(dt)
       renderer.render(world,camera)
     };animate()
     return ()=>{
       disposed=true;cancelAnimationFrame(frame);resize.disconnect()
       window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',onBlur)
+      onShopChange?.(false)
+      world.remove(shop)
+      shop.traverse(obj=>{if(obj.isMesh){obj.geometry.dispose();obj.material.dispose()}})
       streetLife.dispose()
       disposeArchitecture()
       world.traverse(object=>{if(object.isMesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];materials.forEach(m=>m.dispose())}})
       renderer.dispose();renderer.domElement.remove()
     }
-  },[year])
+  },[year, onShopChange])
   return <div ref={mountRef} style={{height:'100%',width:'100%',background:'#8b8065'}} aria-label="Dreidimensionale historische Demonstrationsszene"/>
 }
