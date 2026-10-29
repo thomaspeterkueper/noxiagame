@@ -45,6 +45,32 @@ export function createParcelSceneTimeline(snapshot: ParcelSceneTimelineSnapshot)
     throw new Error('Invalid Earth parcel timeline baseline')
   }
   const source = structuredClone(snapshot)
+  // Reject inconsistent bindings before any replay can hide an imported
+  // feature. This is a referential check, NOT proof of land ownership or
+  // geometry provenance; the server must supply authorized bindings.
+  const baseline = new Map(source.baseline.map(parcel => [parcel.parcelId, parcel]))
+  const sceneBuildings = new Map(source.scene.buildings.map(building => [building.id, building]))
+  const usedCanonicalIds = new Set<string>()
+  for (const binding of source.bindings) {
+    const original = baseline.get(binding.parcelId)
+    if (!original) throw new Error('Parcel binding has no baseline parcel')
+    if (binding.importedBuildingId) {
+      const imported = sceneBuildings.get(binding.importedBuildingId)
+      if (original.surface !== 'occupied' ||
+          original.buildingId !== binding.baselineBuildingId ||
+          !imported || imported.provenance === 'canonical') {
+        throw new Error('Imported building binding does not match the captured baseline')
+      }
+    } else if (binding.baselineBuildingId) {
+      throw new Error('Baseline building ID without imported feature binding')
+    }
+    for (const building of binding.canonicalBuildings ?? []) {
+      if (usedCanonicalIds.has(building.id)) {
+        throw new Error('Canonical building geometry assigned to multiple parcels')
+      }
+      usedCanonicalIds.add(building.id)
+    }
+  }
   return {
     render(year: number): ParcelSceneTimelineFrame {
       const projection = projectParcelLifecycle({
