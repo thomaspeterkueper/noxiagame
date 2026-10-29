@@ -86,8 +86,25 @@ export function cityAtYear(input: {
   const appliedEventIds: string[] = []
   const rejectedEventIds: string[] = []
   const seen = new Set<string>()
-  const ordered = input.events.filter(e => e.settlementId === input.settlementId && e.year <= input.year)
-    .sort((a, b) => a.year - b.year || a.sequence - b.sequence || a.id.localeCompare(b.id))
+  // Runtime input may contain malformed JSON/DB rows. Validate before sorting:
+  // an invalid sequence or ID must never influence replay order or crash it.
+  const ordered = input.events.filter((e, index) => {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) {
+      rejectedEventIds.push(`invalid-event:${index}`)
+      return false
+    }
+    if (e.settlementId !== input.settlementId) {
+      if (typeof e.settlementId !== 'string') rejectedEventIds.push(`invalid-event:${index}`)
+      return false
+    }
+    // Future events are invisible, including malformed future receipts.
+    if (Number.isInteger(e.year) && e.year > input.year) return false
+    if (!validateEvent(e, input.settlementId)) {
+      rejectedEventIds.push(typeof e.id === 'string' && e.id.trim() ? e.id : `invalid-event:${index}`)
+      return false
+    }
+    return true
+  }).sort((a, b) => a.year - b.year || a.sequence - b.sequence || a.id.localeCompare(b.id))
   for (const event of ordered) {
     if (seen.has(event.id) || !validateEvent(event, input.settlementId)) {
       rejectedEventIds.push(event.id)

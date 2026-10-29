@@ -39,4 +39,23 @@ const safe = snapshot(2150, malformed)
 assert(safe.assets.length === 1 && safe.assets[0].name === 'Altes Haus', 'malformed events leave city unchanged')
 assert(safe.appliedEventIds.length === 0 && safe.rejectedEventIds.length === malformed.length,
   'all malformed events rejected without false applied IDs')
+// Untrusted JSON can contain null records and invalid sorting keys.
+const malformedEnvelope: CityHistoryEvent[] = [
+  null as unknown as CityHistoryEvent,
+  { ...events[1], id: 'invalid-sequence', sequence: 'not-a-number' as unknown as number },
+  { ...events[1], id: 'invalid-year', year: Number.NaN },
+  { ...events[1], id: null as unknown as string },
+  { ...events[1], settlementId: null as unknown as string },
+]
+const safeEnvelope = snapshot(2150, malformedEnvelope)
+assert(safeEnvelope.assets.length === 1 && safeEnvelope.assets[0].id === 'old-house',
+  'malformed event envelopes cannot change the city')
+assert(safeEnvelope.appliedEventIds.length === 0 &&
+  safeEnvelope.rejectedEventIds.length === malformedEnvelope.length,
+  'all malformed envelopes rejected without crashes or false applied IDs')
+assert(safeEnvelope.rejectedEventIds.includes('invalid-sequence') &&
+  safeEnvelope.rejectedEventIds.includes('invalid-year'),
+  'invalid sort keys explicitly rejected')
+assert(snapshot(2026, [{ ...events[1], id: 'future-malformed', sequence: null as unknown as number }])
+  .rejectedEventIds.length === 0, 'future event contents remain invisible')
 console.log('Living Future Cities chronicle: tests passed')
