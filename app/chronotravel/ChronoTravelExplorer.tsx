@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import type { HistoricalScene } from '@/lib/game/chronotravel/domain'
 import styles from './chronotravel.module.css'
 import HistoricalThreeScene from './HistoricalThreeScene'
+import HagiaSophiaScene from './HagiaSophiaScene'
 import { SHOP_CONTENT, merchantReply } from './merchantContent'
 
 const epochs: Record<number, { heading: string; description: string; landmarks: string[]; sky: string }> = {
@@ -33,6 +34,7 @@ export default function ChronoTravelExplorer({ scenes }: { scenes: HistoricalSce
   const [dialogue, setDialogue] = useState('')
   const handleShopChange = useCallback((inside: boolean) => { setInsideShop(inside); setDialogue('') }, [])
   const scene = scenes[index]
+  const isHagia = scene.placeId === 'earth-istanbul-hagia-sophia'
   const info = epochs[scene.yearCE]
 
   if (!scene || !info) return <main>Keine historische Szene verfügbar.</main>
@@ -43,24 +45,24 @@ export default function ChronoTravelExplorer({ scenes }: { scenes: HistoricalSce
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
           <p className={styles.eyebrow}>Historische Zeitreise</p>
-          <h1>Ein Ort. Drei Epochen.</h1>
-          <p>Erkunde eine dreidimensionale, vereinfachte WebGL-Prototypszene des einstigen Hippodroms. Desktop-Version.</p>
-          <label htmlFor="epoch">Reisezeit wählen</label>
+          <h1>Zwei Orte. Drei Epochen.</h1>
+          <p>Erkunde schematische 3D-Prototypen des Hippodroms und der Hagia Sophia. Desktop-Version.</p>
+          <label htmlFor="epoch">Historischen Ort und Reisezeit wählen</label>
           <select id="epoch" value={index} onChange={e => changeEpoch(Number(e.target.value))}>
-            {scenes.map((s, i) => <option key={s.id} value={i}>{s.yearCE} n. Chr.</option>)}
+            {scenes.map((s, i) => <option key={s.id} value={i}>{s.label}</option>)}
           </select>
-          <h2>{info.heading}</h2>
-          <p>{info.description}</p>
+          <h2>{isHagia ? scene.label : info.heading}</h2>
+          <p>{isHagia ? 'Hagia Sophia als vereinfachte Baukörperstudie. Kirche 550 und 1200, osmanische Moschee 1700. Keine historische 3D-Vermessung oder validierte Innenraumrekonstruktion.' : info.description}</p>
           <h3>Orientierungspunkte</h3>
-          <ul>{info.landmarks.map(l => <li key={l}>{l}</li>)}</ul>
+          <ul>{(isHagia ? ['Hauptkuppel (schematisch)','Halbkuppeln (schematisch)',...(scene.yearCE === 1700 ? ['Minarette (schematisch)'] : [])] : info.landmarks).map(l => <li key={l}>{l}</li>)}</ul>
           <label className={styles.check}><input type="checkbox" checked={showEvidence} onChange={e => setShowEvidence(e.target.checked)} /> Forschungsstand anzeigen</label>
           {showEvidence && <div className={styles.evidence}><strong>Rekonstruktionsstatus: spekulativ</strong><p>Für diesen Zeitschnitt sind noch historische Primär- und Fachquellen zu kuratieren. Positionen und Bauten sind nicht als Tatsachen zu interpretieren.</p></div>}
           <button onClick={() => changeEpoch(index === 0 ? 1 : 0)}>Andere Epoche laden</button>
         </aside>
         <section className={styles.stageArea} aria-label="Interaktive historische Szenenskizze">
-          <div className={styles.stage}><HistoricalThreeScene year={scene.yearCE} onShopChange={handleShopChange} /></div>
+          <div className={styles.stage}>{isHagia ? <HagiaSophiaScene year={scene.yearCE}/> : <HistoricalThreeScene year={scene.yearCE} onShopChange={handleShopChange}/>}</div>
           <section style={{marginTop:12,padding:16,background:'#1b2735',borderRadius:12}} aria-live="polite">
-            {insideShop ? <>
+            {isHagia ? <p style={{margin:0}}>Hagia Sophia: schematische Außenansicht. WASD bewegen, Pfeile drehen. Für diesen Ort gibt es noch keinen begehbaren Innenraum oder Händler.</p> : insideShop ? <>
               <strong>{SHOP_CONTENT[scene.yearCE]?.merchant} · Demonstrationsdialog</strong>
               <p style={{margin:'9px 0',lineHeight:1.6}}>{dialogue || merchantReply(scene.yearCE, 'greeting')}</p>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
