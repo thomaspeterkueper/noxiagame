@@ -71,6 +71,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - **Agentur für Arbeit:** begehbar, mit Stellenwand (Schichten in den Lokalen des Ortes, nach Nähe sortiert), Vermittlung und Beratungstisch. Betriebe, Schiffe und feste Anstellung stehen als „folgt“ an der Wand.
   - Im Browser geprüft. Tests in `playerShift.test.ts` und `jobAgency.test.ts`.
   - Gebäude, Stellenliste und weitere Stellenarten: R-21.
+  - **29.10.2026:** Agentur live angelegt im realen Haus Freiheitsmühle 7 (Thomas: „nimm das Gebäude, das besser passt“; bei Nr. 1 gibt es nur schmale Winkelbauten). Kartensymbol ⚒. Personal folgt mit R-21.
 
 ## Gestellte Requests
 

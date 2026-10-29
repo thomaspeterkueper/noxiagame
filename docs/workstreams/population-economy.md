@@ -562,7 +562,8 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
 - Betriebe und Läden, Mitflug und feste Anstellung stehen als „folgt“ an der Wand. Erfunden wird nichts.
 
 **Bitte:**
-1. **Gebäude anlegen:** `building_definitions` Zeile `job_agency`, „Agentur für Arbeit“, staatlich, und ein `tile_entities`-Eintrag am realen Haus Freiheitsmühle 1 (Muster: Bank Hauptstraße 140, `20261027090000_earth_bank_sparkasse.sql`).
+1. ✅ **Gebäude angelegt (Gastronomie, 29.10.2026, live):** Gebäudeart `job_agency` (nicht baubar, wie das Reisebüro) und staatliche Agentur im realen Haus **Freiheitsmühle 7** (`osm:way:1474125073`, 51,3 × 30 m, `20261029020000_earth_job_agency.sql`). Thomas: „Nimm das Gebäude, das besser passt, wir müssen nicht perfekt sein.“ Bei Nr. 1 gibt es in den Kartendaten nur schmale Winkelbauten. **Für euch bleibt das Personal:** `job_agency` in `noxia_staffed_kinds`, `building_staff_roles` (1 Vermittlung, 2 Beratung, 3 Büro), Lohnschlüssel `job_advisor` und Übergangsreserve wie bei Bank und Reisebüro.
+   Ursprünglich: `building_definitions` Zeile `job_agency`, „Agentur für Arbeit“, staatlich, und ein `tile_entities`-Eintrag am realen Haus Freiheitsmühle 1 (Muster: Bank Hauptstraße 140, `20261027090000_earth_bank_sparkasse.sql`).
    - Die Kartendaten führen dort nur Nr. 7 (`osm:way:1474125073`). Kandidaten ohne Hausnummer daneben: `osm:way:191140747` (48 × 48 m) und `osm:way:332679119` (30 × 25 m). Welches Haus Nr. 1 ist, bitte prüfen; die Erdkarte (W-…) kann helfen.
    - Dazu `staff_capacity` 3: Vermittlung, Beratung, Büro. Personal wie bei der Bank (R-14), Lohnschlüssel z. B. `job_advisor`.
 2. **Stellenliste:** `GET /api/game/jobs?location=earth` → `{ venues: { [tileEntityId]: { open: ShiftRole[], wages: { [role]: CrJeStunde } } } }`. Der Innenraum ruft das schon auf und zeigt dann nur freie, bezahlte Stellen ohne „Probe“. Später kommen weitere Arten dazu (`business`, `ship`, `permanent`).
