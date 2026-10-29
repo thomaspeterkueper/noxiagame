@@ -1,5 +1,6 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
+// Aktualisiert: 29.10.2026 — Mitflug: wer angeheuert hat, geht an Bord, wenn eine Fracht ausläuft (noxia_crew_board_due)
 // Aktualisiert: 28.10.2026 — Bankzinsen einmal am Tag in der Datenbank (run_bank_daily), Bank zahlt aus eigenem Konto
 // Zuvor:        12.10.2026 — Fracht geht an die Spedition (role 'carrier'); Frachtdauer aus der
 //               Entfernung; davor am selben Tag: Handelsfirma (lib/game/npcTrade.ts, Tabelle npc_shipments): kaufen,
@@ -9,7 +10,7 @@
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.9.0
+// Version:      3.10.0
 
 import {
   CONSUMPTION_PER_100,
@@ -629,6 +630,19 @@ async function runHandel(supabase: SB, actorId: string, tick: number, kasse: num
   return 1
 }
 
+// ── Mitflug auf Handelsschiffen ─────────────────────────────────────────────
+// Wer am Raumhafen angeheuert hat (crew_signons, Migration 20261029120000), geht an
+// Bord, sobald eine Fracht von dort zu seinem Ziel ausläuft.
+
+export async function runCrewBoardingTick(supabase: SB, tickNumber: number) {
+  const { data, error } = await supabase.rpc('noxia_crew_board_due', { p_tick: tickNumber })
+  if (error) {
+    console.error('runCrewBoardingTick failed', { tick: tickNumber, code: error.code })
+    return { boarded: 0 }
+  }
+  return { boarded: Number(data ?? 0) }
+}
+
 // ── Bank-Zinsen ───────────────────────────────────────────────────────────────
 // Einmal am Tag (alle 24 Ticks) in der Datenbank: run_bank_daily zahlt Einlagezinsen
 // aus dem Konto der Solar Central Bank, lässt Kreditzinsen auflaufen und zahlt fälliges
@@ -734,10 +748,12 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const prices = await runPriceTick(supabase, tickNumber, locationSnapshot ?? [])
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
+  // Mitflug (29.10.2026): nach dem Handel, damit frisch auslaufende Frachten Crew mitnehmen
+  const crew = await runCrewBoardingTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
   const wishes = await runWishTick(supabase, tickNumber)
-  return { tickNumber, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, crew, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
