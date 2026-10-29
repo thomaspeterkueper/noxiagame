@@ -1,0 +1,21 @@
+import { evaluateCivicDecision, type CivicDecision } from './civicPreflight'
+import { screenEngineeringCandidate, type EngineeringCandidate } from './engineeringHandoff'
+const check=(value:boolean,message:string)=>{if(!value)throw Error(message)}
+const d:CivicDecision={id:'vote:1',proposalId:'proposal:1',action:'conversion',assetId:'old-factory',
+ competentAuthority:true,quorumMet:true,approved:true,protectedAsset:false,protectionPermit:false,
+ propertyOwnerConsents:true,legalTransferAuthority:false,budgetAvailable:true,resourcesAvailable:true,
+ provenanceRefs:['vote:record']}
+check(evaluateCivicDecision(d).allowed,'valid proposal passes preflight')
+check(!evaluateCivicDecision({...d,propertyOwnerConsents:false}).allowed,'vote alone cannot override owner')
+check(!evaluateCivicDecision({...d,protectedAsset:true}).allowed,'protected building needs permit')
+check(!evaluateCivicDecision({...d,quorumMet:false}).allowed,'quorum is required')
+check(evaluateCivicDecision(d).execution==='core_command_required','preflight never mutates world')
+const idea:EngineeringCandidate={id:'idea:1',sourceProposalId:'proposal:1',worldYear:2150,domain:'vehicle',
+ problem:'Transport in low-density settlements',hypothesis:'Modular electric platform',
+ sourceRefs:['dialogue:12','book:7'],availableCapabilities:['electric propulsion'],
+ limitations:['battery availability'],origin:'community'}
+check(screenEngineeringCandidate(idea).status==='needs_review','documented idea reaches review')
+check(screenEngineeringCandidate(idea).grantsTechnology===false,'not an automatic invention unlock')
+check(screenEngineeringCandidate({...idea,sourceRefs:[]}).status==='rejected','unsourced idea rejected')
+check(screenEngineeringCandidate({...idea,limitations:[]}).status==='rejected','limits required')
+console.log('Civic and engineering gate tests passed')
