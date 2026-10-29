@@ -564,7 +564,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {!talkingNow && resonanceShelfOpen && !book && <div className="book">
           <b>Philosophie · Lesen & denken</b>
           <p>Alle philosophischen Werke sind frei lesbar. Volltexte sind dort verfügbar, wo eine überprüfte Manuskriptfassung hinterlegt ist.</p>
-          <div className="books"><section>{resonanceBooks.map(entry => <button key={entry.id} onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button>)}</section></div>
+          <div className="books"><section>{resonanceBooks.map((entry, index) => <div key={entry.id}>{index === 0 && <p><strong>Philosophie und Bewusstsein</strong></p>}{index === resonanceBooks.length - THEOLOGICAL_ESSAYS.length && <p><strong>Theologie und Bibelauslegung</strong></p>}<button onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button></div>)}</section></div>
         </div>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
