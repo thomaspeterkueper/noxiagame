@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'experiments/seelenberg/**'
+      - 'app/earth/EarthRegionPreview.tsx'
       - '.github/workflows/seelenberg-integration-v2.yml'
   push:
     branches: ['feat/seelenberg-integration-v2']
@@ -23,3 +24,7 @@ jobs:
         run: corepack enable
       - name: Upstream food chain regression
         run: pnpm test:food-chain
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck Earth integration
+        run: pnpm exec tsc --noEmit
