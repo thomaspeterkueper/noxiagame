@@ -518,7 +518,9 @@ export async function POST(request: NextRequest) {
       npcCredits: number
     } = null
     const creditConsent = creditConsentFromConversation(player, history)
-    if (requestedCreditAcceptance && npcId && creditConsent.allowed && creditConsent.amount) {
+    // A model-generated marker or chat heuristic is never authorization to move currency.
+    // Credit gifts require a separate authenticated, explicitly confirmed transaction flow.
+    if (false && requestedCreditAcceptance && npcId && creditConsent.allowed && creditConsent.amount) {
       try {
         const transfer = await transferPlayerToNpcCredits({
           profileId: user.id,
