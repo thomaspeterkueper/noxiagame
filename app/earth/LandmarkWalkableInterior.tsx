@@ -748,7 +748,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .act{border:1px solid #6e7d55;border-radius:5px;background:#273d24;color:#edf3dd;padding:7px 9px;font:800 9px monospace;cursor:pointer}
       .act.quiet{border-color:#476476;background:#102b3c;color:#dce9ee}
       .chat{display:flex;gap:6px}
-      .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}
+      .chat textarea{flex:1;min-width:0;min-height:72px;resize:vertical;font:inherit;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}
       .chat button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}
       .tipcard{display:grid;gap:2px;text-align:left;border:1px solid #c9a24a;border-radius:6px;background:#efe6d2;color:#2b2118;padding:8px 10px;cursor:pointer}
       .tipcard span{font:800 8px monospace;letter-spacing:.1em;color:#7a5a36}
