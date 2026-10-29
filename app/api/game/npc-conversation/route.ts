@@ -468,7 +468,6 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
     const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
-    const requestedCreditAcceptance = rawReply.includes(CREDIT_ACTION_MARKER)
     const visitMatches = [...rawReply.matchAll(VISIT_PLACE_ACTION_RE)]
     const requestedVisitKey = visitMatches[0]?.[1] ?? null
     const requestedVisitPlace = requestedVisitKey
@@ -517,30 +516,7 @@ export async function POST(request: NextRequest) {
       playerCredits: number
       npcCredits: number
     } = null
-    const creditConsent = creditConsentFromConversation(player, history)
-    // A model-generated marker or chat heuristic is never authorization to move currency.
-    // Credit gifts require a separate authenticated, explicitly confirmed transaction flow.
-    if (false && requestedCreditAcceptance && npcId && creditConsent.allowed && creditConsent.amount) {
-      try {
-        const transfer = await transferPlayerToNpcCredits({
-          profileId: user.id,
-          personId: npcId,
-          amount: creditConsent.amount,
-          note: `Geschenk im Gespräch mit ${npcName}`,
-        })
-        creditTransfer = {
-          amount: transfer.amount,
-          playerCredits: transfer.player_credits,
-          npcCredits: transfer.npc_credits,
-        }
-      } catch (transferError) {
-        console.error('npc conversation credit transfer failed', {
-          npcId,
-          userId: user.id,
-          error: transferError instanceof Error ? transferError.message : String(transferError),
-        })
-      }
-    }
+    // Currency movement requires a separate authenticated, explicitly confirmed action.
 
     let identityLearned = false
     if (npcId) {
