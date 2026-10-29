@@ -26,4 +26,17 @@ assert(snapshot(2150, [{ ...events[1], committed: false as true }]).assets.lengt
 let differentSettlement = false
 try { compareCityYears(early, { ...late, settlementId: 'other' }) } catch { differentSettlement = true }
 assert(differentSettlement, 'different settlements cannot be compared')
+// Runtime input can come from JSON/DB rows, not only type-checked TypeScript.
+// Malformed or unknown actions must fail closed without crashing or being counted as applied.
+const malformed: CityHistoryEvent[] = [
+  { ...events[1], id: 'unknown-action', change: { action: 'demolish', assetId: 'old-house' } as unknown as CityHistoryEvent['change'] },
+  { ...events[1], id: 'missing-asset', change: { action: 'establish' } as CityHistoryEvent['change'] },
+  { ...events[1], id: 'null-change', change: null as unknown as CityHistoryEvent['change'] },
+  { ...events[1], id: 'invalid-rename', change: { action: 'rename', assetId: 'old-house', name: null } as unknown as CityHistoryEvent['change'] },
+  { ...events[1], id: 'invalid-provenance', provenanceRefs: [null as unknown as string] },
+]
+const safe = snapshot(2150, malformed)
+assert(safe.assets.length === 1 && safe.assets[0].name === 'Altes Haus', 'malformed events leave city unchanged')
+assert(safe.appliedEventIds.length === 0 && safe.rejectedEventIds.length === malformed.length,
+  'all malformed events rejected without false applied IDs')
 console.log('Living Future Cities chronicle: tests passed')

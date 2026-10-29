@@ -46,8 +46,33 @@ function validateEvent(e: CityHistoryEvent, settlementId: string): boolean {
   return e.settlementId === settlementId &&
     e.committed === true &&
     Number.isInteger(e.year) && Number.isInteger(e.sequence) &&
-    e.id.length > 0 && e.provenanceRefs.length > 0 &&
-    e.provenanceRefs.every(ref => ref.trim().length > 0)
+    typeof e.id === 'string' && e.id.trim().length > 0 &&
+    Array.isArray(e.provenanceRefs) && e.provenanceRefs.length > 0 &&
+    e.provenanceRefs.every(ref => typeof ref === 'string' && ref.trim().length > 0)
+}
+
+/** Runtime guard: persisted events can be malformed despite static TypeScript types. */
+function validChange(change: unknown): change is CityChange {
+  if (!change || typeof change !== 'object') return false
+  const value = change as Record<string, unknown>
+  if (value.action === 'retire') {
+    return typeof value.assetId === 'string' && value.assetId.trim().length > 0
+  }
+  if (value.action === 'rename') {
+    return typeof value.assetId === 'string' && value.assetId.trim().length > 0 &&
+      typeof value.name === 'string' && value.name.trim().length > 0
+  }
+  if (value.action === 'establish') {
+    if (!value.asset || typeof value.asset !== 'object') return false
+    const asset = value.asset as Record<string, unknown>
+    return typeof asset.id === 'string' && asset.id.trim().length > 0 &&
+      typeof asset.name === 'string' && asset.name.trim().length > 0 &&
+      typeof asset.districtId === 'string' && asset.districtId.trim().length > 0 &&
+      Number.isInteger(asset.introducedYear) &&
+      (asset.kind === 'building' || asset.kind === 'infrastructure' ||
+        asset.kind === 'institution' || asset.kind === 'service')
+  }
+  return false
 }
 /** Reconstruct a city at a chosen year without leaking later changes. */
 export function cityAtYear(input: {
@@ -69,6 +94,10 @@ export function cityAtYear(input: {
       continue
     }
     seen.add(event.id)
+    if (!validChange(event.change)) {
+      rejectedEventIds.push(event.id)
+      continue
+    }
     const change = event.change
     if (change.action === 'establish') {
       if (assets.has(change.asset.id) || change.asset.introducedYear !== event.year) {
