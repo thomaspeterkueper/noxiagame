@@ -1,6 +1,10 @@
 'use client'
+// app/academy/learn/SsfModuleRenderer.tsx
+// Aktualisiert: 29.10.2026 — Prüfung bewertet der Server; Abschluss, Freischaltung und
+//                              Prämie in Credits nur nach bestandener Prüfung
+// Version:      2.0.0
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { SsfKnowledgeModuleDetail, SsfModuleAssessment } from '@/lib/ssfKnowledge'
 import GravityWellInteractive from './GravityWellInteractive'
@@ -17,7 +21,7 @@ export default function SsfModuleRenderer({
   onComplete,
 }: {
   moduleId: string
-  onComplete?: (result: { points: number; unlocks: string[]; blocked?: { id: string; missingUnlocks: string[] }[] }) => void
+  onComplete?: (result: { points: number; credits: number; unlocks: string[]; blocked?: { id: string; missingUnlocks: string[] }[] }) => void
 }) {
   const [module, setModule] = useState<SsfKnowledgeModuleDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,6 +30,9 @@ export default function SsfModuleRenderer({
   const [checked, setChecked] = useState(false)
   const [completing, setCompleting] = useState(false)
   const [done, setDone] = useState(false)
+  const [review, setReview] = useState<{ right: boolean; explanation: string; correctOption: number | null }[]>([])
+  const [examNote, setExamNote] = useState<string | null>(null)
+  const [passed, setPassed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -49,38 +56,48 @@ export default function SsfModuleRenderer({
     return () => { cancelled = true }
   }, [moduleId])
 
-  const passed = useMemo(() => {
-    if (!module) return false
-    if (module.assessment.length === 0) return module.sections.length > 0
-    const correct = module.assessment.filter((q, i) => answers[i] === q.correctOption).length
-    return correct >= Math.ceil(module.assessment.length * 0.7)
-  }, [module, answers])
-
-  async function complete() {
+  // Prüfung abgeben: Der Server bewertet, schließt bei Bestehen ab und zahlt die Prämie.
+  async function submitExam() {
     if (!module || completing || done) return
-    setCompleting(true); setError(null)
+    setCompleting(true); setError(null); setExamNote(null)
     try {
       const { data: { session } } = await createClient().auth.getSession()
       if (!session) throw new Error('no_session')
-      const res = await fetch(`/api/game/knowledge?action=complete_module&module_id=${encodeURIComponent(module.id)}`, {
+      const res = await fetch(`/api/game/knowledge?action=complete_module&module_id=${encodeURIComponent(module.id)}&answers=${answers.join(',')}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const data = await res.json()
-      if (!res.ok || !data.ok) throw new Error(data.error ?? 'complete_failed')
-      setDone(true)
+      if (Array.isArray(data.review)) setReview(data.review)
+      if (data.error === 'exam_failed') {
+        setChecked(true); setPassed(false); setExamNote(data.message ?? 'Noch nicht bestanden.')
+        return
+      }
+      if (!res.ok || !data.ok) {
+        setExamNote(data.message ?? 'Die Prüfung konnte nicht gespeichert werden.')
+        return
+      }
+      setChecked(true); setPassed(true); setDone(true)
+      const credits = Number(data.credits_awarded ?? 0)
+      setExamNote(`Bestanden: ${data.exam?.correct ?? '?'} von ${data.exam?.total ?? '?'} richtig${credits > 0 ? ` · Prämie +${credits} Cr` : data.already_completed ? ' · Prämie bereits erhalten' : ''}`)
       onComplete?.({
         points: Number(data.points_awarded ?? 0),
+        credits,
         unlocks: Array.isArray(data.unlocks_granted) ? data.unlocks_granted : [],
         blocked: Array.isArray(data.unlocks_blocked) ? data.unlocks_blocked : [],
       })
     } catch {
-      setError('Der Modulabschluss konnte nicht gespeichert werden.')
+      setError('Die Prüfung konnte nicht gespeichert werden.')
     } finally {
       setCompleting(false)
     }
   }
 
-  if (loading) return <div style={{ padding: '1.25rem', color: C.muted }}>Lernmodul wird geladen …</div>
+  function retry() {
+    if (!module) return
+    setChecked(false); setReview([]); setExamNote(null)
+    setAnswers(Array(module.assessment.length).fill(-1))
+  }
+
   if (error && !module) return <div style={{ padding: '1.25rem', color: C.red }}>{error}</div>
   if (!module) return null
 
@@ -122,8 +139,9 @@ export default function SsfModuleRenderer({
               <div style={{ padding: '0.65rem 0.85rem' }}>
                 {q.options.map((option, oi) => {
                   const selected = answers[qi] === oi
-                  const correct = checked && oi === q.correctOption
-                  const wrong = checked && selected && oi !== q.correctOption
+                  const r = review[qi]
+                  const correct = checked && r != null && (r.correctOption === oi || (r.correctOption == null && selected && r.right))
+                  const wrong = checked && selected && r != null && !r.right
                   return (
                     <button key={oi} disabled={checked} onClick={() => setAnswers(prev => { const next = [...prev]; next[qi] = oi; return next })}
                       style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 5, padding: '0.55rem 0.7rem', borderRadius: 6, border: `1px solid ${correct ? C.green : wrong ? C.red : selected ? C.accent : C.border}`, background: correct ? '#e8f7ef' : wrong ? '#faeaea' : selected ? '#eef4fb' : '#fff', cursor: checked ? 'default' : 'pointer' }}>
@@ -131,22 +149,25 @@ export default function SsfModuleRenderer({
                     </button>
                   )
                 })}
-                {checked && <div style={{ color: C.muted, fontSize: '0.8rem', marginTop: 6 }}>{q.explanation}</div>}
+                {checked && review[qi] && <div style={{ color: review[qi].right ? C.green : C.muted, fontSize: '0.8rem', marginTop: 6 }}>{review[qi].right ? '✓ ' : '✗ '}{review[qi].explanation}</div>}
               </div>
             </div>
           ))}
-          {!checked && <button disabled={answers.some(a => a < 0)} onClick={() => setChecked(true)} style={{ padding: '0.65rem 1rem', border: 0, borderRadius: 7, background: answers.some(a => a < 0) ? '#d8d3ca' : C.accent, color: '#fff', cursor: answers.some(a => a < 0) ? 'not-allowed' : 'pointer', fontWeight: 700 }}>Auswerten</button>}
-          {checked && !passed && <div style={{ color: C.red, fontWeight: 700 }}>Noch nicht bestanden. Lies die Erklärungen und versuche es erneut.</div>}
-          {checked && !passed && <button onClick={() => { setChecked(false); setAnswers(Array(module.assessment.length).fill(-1)) }} style={{ marginTop: 8, padding: '0.55rem 0.85rem', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }}>Erneut versuchen</button>}
+          {!checked && (
+            <button disabled={completing || answers.some(a => a < 0)} onClick={submitExam} style={{ padding: '0.65rem 1rem', border: 0, borderRadius: 7, background: answers.some(a => a < 0) ? '#d8d3ca' : C.accent, color: '#fff', cursor: completing || answers.some(a => a < 0) ? 'not-allowed' : 'pointer', fontWeight: 700 }}>
+              {completing ? 'Wird bewertet …' : 'Prüfung abgeben →'}
+            </button>
+          )}
+          {!checked && <div style={{ marginTop: 6, color: C.faint, fontSize: '0.75rem' }}>Abschluss, Freischaltung und Prämie in Credits gibt es nur für eine bestandene Prüfung (70 %).</div>}
+          {examNote && <div style={{ marginTop: 8, color: passed ? C.green : C.red, fontWeight: 700 }}>{examNote}</div>}
+          {checked && !passed && <button onClick={retry} style={{ marginTop: 8, padding: '0.55rem 0.85rem', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }}>Erneut versuchen</button>}
+          {done && module.unlocks.some(isGameRequirementUnlock) && <div style={{ marginTop: 8, color: C.gold, fontSize: '0.8rem', fontWeight: 700 }}>Freischaltung: {module.unlocks.filter(isGameRequirementUnlock).map(unlockDisplayLabel).join(' · ')}</div>}
         </div>
       )}
 
-      {(module.assessment.length === 0 ? module.sections.length > 0 : checked && passed) && (
-        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: `1px solid ${C.border}` }}>
-          <button onClick={complete} disabled={completing || done} style={{ padding: '0.75rem 1.1rem', border: 0, borderRadius: 8, background: done ? C.green : C.gold, color: '#fff', fontWeight: 700, cursor: completing || done ? 'default' : 'pointer' }}>
-            {done ? '✓ Abgeschlossen' : completing ? 'Speichere …' : 'Modul abschließen →'}
-          </button>
-          {module.unlocks.some(isGameRequirementUnlock) && <div style={{ marginTop: 8, color: C.gold, fontSize: '0.8rem', fontWeight: 700 }}>Freischaltung: {module.unlocks.filter(isGameRequirementUnlock).map(unlockDisplayLabel).join(' · ')}</div>}
+      {module.assessment.length === 0 && module.sections.length > 0 && (
+        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: `1px solid ${C.border}`, color: C.muted, fontSize: '0.82rem' }}>
+          Für dieses Modul gibt es noch keine Prüfung. Abschluss, Freischaltung und Prämie folgen, sobald die SSF eine liefert.
         </div>
       )}
       {error && module && <div style={{ marginTop: 10, color: C.red }}>{error}</div>}

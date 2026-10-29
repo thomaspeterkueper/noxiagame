@@ -49,6 +49,17 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - **Altguthaben neu berechnet:** eingezahlt plus 0,1 %/Tag seit Einzahlung, 1 066 und 553 Cr; die Korrektur steht im Bankbuch.
     - **Nebenbefund:** `academy_completions` verlangte Kennungen aus `academy_modules` (alte Namen). Abschlüsse der SSF-Module scheiterten still; niemand konnte den Kreditnachweis `ECO-L0-000001` erbringen. Der Fremdschlüssel ist entfernt.
     - **Sätze:** in `noxia_bank_rates()` und `app/api/game/bank/route.ts`, anpassbar.
+19. ✅ **Prämie für bestandene Prüfungen (29.10.2026, entschieden von Thomas: „Nur anschauen des Lernmoduls bringt kein Geld, man muss auch die Prüfung bestehen – sowohl für Prämie als auch für Freischaltung“).**
+    - **Befund:** Ob 70 % der Fragen richtig waren, prüfte nur der Browser. Der Server schrieb Abschluss und Freischaltungen ohne Nachweis; die Lösungen lagen offen im Browser.
+    - **Neu:** Der Browser schickt die Antworten (`complete_module&answers=…`). Der Server holt die Prüfung bei der SSF und bewertet. Nur bei Bestehen gibt es Abschluss, Freischaltung, Wissenspunkte und Prämie.
+    - **Prämie:** L0 30 Cr, L1 60 Cr, L2 120 Cr, einmal je Spieler und Modul (`lib/knowledge/academyExam.ts`).
+    - **Geld (NOXIA-FIN-0001):** ausgewiesene Emission, Emittent SSF-Bildungsprämie, Obergrenze einmal je Spieler und Modul, Beleg `academy_exam_premiums.ref` (Migration `20261029090000_academy_exam_premium.sql`, live).
+    - **Lösungen:** `/api/ssf/modules/[id]` liefert die Prüfung ohne Lösungen und Erklärungen. Nach einem Versuch sagt der Server je Frage richtig oder falsch und erklärt; die richtige Option erst nach dem Bestehen.
+    - **Raten bremsen:** Nach drei Fehlversuchen in 30 Minuten wartet man, bis der älteste aus dem Fenster fällt.
+    - **Auswertung:** `academy_exam_attempts` hält jeden Versuch, Sicht `academy_exam_stats` je Modul (Versuche, bestanden, Spieler, Durchschnitt, gezahlte Prämien).
+    - **Frühere Abschlüsse** bleiben gültig. Wer die Prüfung nachholt, bekommt die Prämie.
+    - **Offen:** Module ohne Prüfung bei der SSF lassen sich nicht mehr abschließen und schalten nichts frei. Request an die SSF: jedes Modul mit Freischaltung braucht eine Prüfung.
+    - **Offen:** Das Kursangebot (Reiter „Kurse“) vergibt Wissenspunkte weiter ohne serverseitige Prüfung, aber keine Credits.
 
 ## Requests aus anderen Teilprojekten
 

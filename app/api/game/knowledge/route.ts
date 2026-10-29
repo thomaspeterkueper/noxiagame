@@ -3,9 +3,13 @@
 // Aktualisiert: 31.08.2026 — SSF-Unlock-Sync idempotent + NOXIA-Prerequisites
 // Aktualisiert: 28.10.2026 — Freischaltungen auch aus NOXIAs Lernverzeichnis,
 //                              wenn die SSF für ein Modul keine meldet (Kredit)
-// Version:      2.7.0
+// Aktualisiert: 29.10.2026 — Abschluss nur mit bestandener Prüfung (Server bewertet die
+//                              Antworten gegen die SSF), Prämie in Credits einmal je Modul
+// Version:      2.8.0
 
 import { unlocksForModule } from '@/lib/knowledge/learningCatalog'
+import { fetchSsfKnowledgeModule } from '@/lib/ssfKnowledge'
+import { examPremiumForModule, examRetryBlocked, parseExamAnswers, scoreExam, type ExamScore } from '@/lib/knowledge/academyExam'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { resolveGrantableUnlocks, getMissingUnlockPrerequisites, UNLOCK_REGISTRY } from '@/lib/knowledge/unlockRegistry'
@@ -159,12 +163,64 @@ export async function GET(req: NextRequest) {
 
     const alreadyCompleted = Boolean(existing)
 
+    // Prüfung (29.10.2026): Ohne bestandene Prüfung kein Abschluss, keine Freischaltung,
+    // keine Prämie. Frühere Abschlüsse bleiben gültig; für sie werden die Freischaltungen
+    // weiter abgeglichen, und wer die Prüfung nachholt, bekommt die Prämie.
+    const answers = parseExamAnswers(searchParams.get('answers'))
+    let exam: ExamScore | null = null
+    let review: { right: boolean; explanation: string; correctOption: number | null }[] = []
+    if (answers) {
+      const { data: failed } = await supabase
+        .from('academy_exam_attempts')
+        .select('created_at')
+        .eq('profile_id', user.id)
+        .eq('module_id', moduleId)
+        .eq('passed', false)
+        .gte('created_at', new Date(Date.now() - 60 * 60_000).toISOString())
+      const retry = examRetryBlocked((failed ?? []).map((r: any) => Date.parse(r.created_at)), Date.now())
+      if (retry.blocked) {
+        return NextResponse.json({ ok: false, error: 'exam_retry_wait', retry_in_min: retry.retryInMin,
+          message: `Drei Fehlversuche – lies das Modul noch einmal. Neuer Versuch in ${retry.retryInMin} Min.` }, { status: 429 })
+      }
+      const mod = await fetchSsfKnowledgeModule(moduleId)
+      if (!mod) return NextResponse.json({ ok: false, error: 'exam_unavailable', message: 'Die Prüfung ist gerade nicht erreichbar. Bitte später noch einmal.' }, { status: 503 })
+      if (mod.assessment.length === 0) {
+        return NextResponse.json({ ok: false, error: 'no_exam', message: 'Für dieses Modul gibt es noch keine Prüfung. Abschluss und Prämie folgen, sobald die SSF eine liefert.' }, { status: 409 })
+      }
+      exam = scoreExam(mod.assessment.map(q => q.correctOption), answers)
+      // Rückmeldung je Frage. Die richtige Option zeigt der Server erst nach dem Bestehen.
+      const passedNow = exam.passed
+      review = mod.assessment.map((q, i) => ({
+        right: answers[i] === q.correctOption,
+        explanation: q.explanation,
+        correctOption: passedNow ? q.correctOption : null,
+      }))
+      await supabase.from('academy_exam_attempts').insert({
+        profile_id: user.id, module_id: moduleId, correct: exam.correct, total: exam.total, passed: exam.passed,
+      })
+      if (!exam.passed) {
+        return NextResponse.json({ ok: false, error: 'exam_failed', exam, review,
+          message: `${exam.correct} von ${exam.total} richtig – nötig sind ${exam.needed}. Kein Abschluss, keine Prämie.` }, { status: 200 })
+      }
+    } else if (!alreadyCompleted) {
+      return NextResponse.json({ ok: false, error: 'exam_required', message: 'Erst die Prüfung bestehen – dann gibt es Abschluss, Freischaltung und Prämie.' }, { status: 400 })
+    }
+
     if (!alreadyCompleted) {
       await supabase.from('academy_completions').insert({
         profile_id:   user.id,
         module_id:    moduleId,
         completed_at: new Date().toISOString(),
       })
+    }
+
+    let creditsAwarded = 0
+    if (exam?.passed) {
+      const { data: paid, error: payErr } = await supabase.rpc('pay_academy_exam_premium', {
+        p_profile_id: user.id, p_module_id: moduleId, p_amount: examPremiumForModule(moduleId),
+      })
+      if (payErr) console.error('[knowledge] exam premium failed:', payErr)
+      creditsAwarded = Number(paid ?? 0)
     }
 
     const blockedUnlocks: { id: string; missingUnlocks: string[] }[] = []
@@ -254,6 +310,9 @@ export async function GET(req: NextRequest) {
       already_completed: alreadyCompleted,
       module_id:        moduleId,
       points_awarded:   pointsAwarded,
+      credits_awarded:  creditsAwarded,
+      exam,
+      review,
       knowledge_points: newTotal ?? 0,
       unlocks_granted:  (grantedUnlocks ?? []).map((u: any) => u.unlock_id),
       unlocks_blocked:  blockedUnlocks,

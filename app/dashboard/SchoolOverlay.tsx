@@ -1,6 +1,8 @@
 'use client'
 
 // app/dashboard/SchoolOverlay.tsx
+// Aktualisiert: 29.10.2026 — Modulabschluss zeigt die Prämie in Credits; der alte
+//                              Abschluss ohne Prüfung (completeModule) fällt weg
 // Aktualisiert: 28.10.2026 — Ergebnis jeder Aufgabe an den Server, Stufe passt sich an (R-17)
 // Vorher:       24.08.2026 — BUGFIX React error #31 (von Thomas lokalisiert):
 //               m.unlocks![0] wurde direkt gerendert, aber SSF liefert
@@ -10,7 +12,7 @@
 //               Normalisierung an der Quelle in fetchSsfKnowledgeModules).
 //               DEBUG_RAW/TaskErrorBoundary bleiben vorerst als Sicherheits-
 //               netz aktiv, GlobalErrorBoundary in DashboardClient ebenso.
-// Version:      1.6.0
+// Version:      1.7.0
 
 import React, { useEffect, useRef, useState } from 'react'
 import KursRenderer from './KursRenderer'
@@ -449,7 +451,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
   const [activeModuleId, setActiveModuleId] = useState<string | null>(initialModuleId)
   const [moduleResult, setModuleResult] = useState<string | null>(null)
   const [completedModules, setCompleted] = useState<string[]>([])
-  const [moduleLoading, setModuleLoading] = useState(false)
+  const [moduleLoading] = useState(false)
   const [activeKursId, setActiveKursId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId]  = useState<string>('')
 
@@ -598,25 +600,6 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
     setLoading(false)
   }
 
-  async function completeModule(moduleId: string) {
-    setModuleLoading(true)
-    try {
-      const token = await jwt()
-      const data = await (await fetch(
-        `/api/game/knowledge?action=complete_module&module_id=${encodeURIComponent(moduleId)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )).json() as Record<string, unknown>
-      if (data.ok && !data.already_completed) {
-        setCompleted(prev => [...prev, moduleId])
-        if (data.knowledge_points != null) {
-          setTotal(data.knowledge_points as number)
-          onKnowledgeEarned((data.points_awarded as number) ?? 50, data.knowledge_points as number)
-        }
-      }
-    } catch {}
-    setModuleLoading(false)
-  }
-
   async function check(opt?: number) {
     if (!task || result) return
     let ok = false
@@ -710,7 +693,7 @@ export default function SchoolOverlay({ locationSlug, colonyContext, onClose, on
                   <SsfModuleRenderer key={activeModuleId} moduleId={activeModuleId} onComplete={result => {
                     const freed = result.unlocks.length ? ` · Freigeschaltet: ${result.unlocks.map(unlockDisplayLabel).join(', ')}` : ''
                     const blocked = (result.blocked ?? []).length ? ` · Noch gesperrt: ${(result.blocked ?? []).map(b => `${unlockDisplayLabel(b.id)} (zuerst ${b.missingUnlocks.map(unlockDisplayLabel).join(', ')})`).join(', ')}` : ''
-                    setModuleResult(`✓ Abgeschlossen${result.points > 0 ? ` · +${result.points} Wissen` : ''}${freed}${blocked}`)
+                    setModuleResult(`✓ Bestanden${result.credits > 0 ? ` · +${result.credits} Cr` : ''}${result.points > 0 ? ` · +${result.points} Wissen` : ''}${freed}${blocked}`)
                     if (result.points > 0) onKnowledgeEarned(result.points, (total ?? 0) + result.points)
                     loadKnowledge(); loadCompletedModules()
                   }} />
