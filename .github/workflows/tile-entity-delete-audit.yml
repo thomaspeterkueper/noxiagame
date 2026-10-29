@@ -1,0 +1,123 @@
+name: Tile entity DELETE audit (disposable PostgreSQL)
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261029133000_tile_entity_delete_audit.sql'
+      - 'supabase/tests/20261029133000_tile_entity_delete_audit.test.sql'
+      - 'supabase/tests/20261029133000_tile_entity_delete_audit_atomicity.test.sql'
+      - 'supabase/tests/20261029133000_tile_entity_delete_audit_temporal_boundary.test.sql'
+      - 'supabase/tests/20261029133000_tile_entity_delete_audit_missing_state.test.sql'
+      - 'supabase/tests/20261029133000_tile_entity_delete_audit_bulk_mixed.test.sql'
+      - 'supabase/tests/fixtures/tile_entity_delete_audit_fixture.sql'
+      - '.github/workflows/tile-entity-delete-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  delete-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: noxia_delete_audit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d noxia_delete_audit_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: noxia_delete_audit_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+      - name: Apply disposable contract fixture and draft migration
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/tile_entity_delete_audit_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029133000_tile_entity_delete_audit.sql
+      - name: Exercise actual DELETE trigger and verify transaction rollback
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit.test.sql
+          actual="$(psql -v ON_ERROR_STOP=1 -Atc "select
+            (select count(*) from public.tile_entities),
+            (select count(*) from public.entity_states where valid_to is null),
+            (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
+          test "$actual" = "1|1|0" || {
+            echo "Unexpected state after rollback: $actual"
+            exit 1
+          }
+      - name: Verify audit failure atomically rolls back building deletion
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit_atomicity.test.sql
+          actual="$(psql -v ON_ERROR_STOP=1 -Atc "select
+            (select count(*) from public.tile_entities),
+            (select count(*) from public.entity_states where valid_to is null),
+            (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
+          test "$actual" = "1|1|0" || {
+            echo "Unexpected state after rejected audit rollback: $actual"
+            exit 1
+          }
+      - name: Verify temporal boundary and matching deletion event timestamp
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit_temporal_boundary.test.sql
+          actual="$(psql -v ON_ERROR_STOP=1 -Atc "select
+            (select count(*) from public.tile_entities),
+            (select count(*) from public.entity_states where valid_to is null),
+            (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
+          test "$actual" = "1|1|0" || {
+            echo "Unexpected state after temporal boundary rollback: $actual"
+            exit 1
+          }
+      - name: Verify deletion without current temporal state is audited, not invented
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit_missing_state.test.sql
+          actual="$(psql -v ON_ERROR_STOP=1 -Atc "select
+            (select count(*) from public.tile_entities),
+            (select count(*) from public.entity_states where valid_to is null),
+            (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
+          test "$actual" = "1|1|0" || {
+            echo "Unexpected state after missing-state scenario rollback: $actual"
+            exit 1
+          }
+      - name: Verify mixed bulk DELETE never fabricates civic authority
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit_bulk_mixed.test.sql
+          actual="$(psql -v ON_ERROR_STOP=1 -Atc "select
+            (select count(*) from public.tile_entities),
+            (select count(*) from public.entity_states where valid_to is null),
+            (select count(*) from public.simulation_events where event_type = 'entity.deleted')")"
+          test "$actual" = "1|1|0" || {
+            echo "Unexpected state after mixed DELETE rollback: $actual"
+            exit 1
+          }
+      - name: Verify missing fixture fails closed
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -c "delete from public.tile_entities where id = '00000000-0000-4000-8000-000000000001'"
+          if psql -v ON_ERROR_STOP=1 -f supabase/tests/20261029133000_tile_entity_delete_audit.test.sql > "$RUNNER_TEMP/missing-fixture.log" 2>&1; then
+            echo "Regression passed without its required fixture"
+            exit 1
+          fi
+          grep -Fq 'NOXIA_TEST_FIXTURE_MISSING' "$RUNNER_TEMP/missing-fixture.log"
