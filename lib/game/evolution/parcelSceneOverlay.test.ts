@@ -71,6 +71,32 @@ assert(scene.buildings.length === 2 && scene.polygons.length === 0, 'source scen
 assert(at(2050, [{ ...binding, canonicalBuildings: [] }]).gaps[0]?.reason === 'missing_canonical_building', 'unknown construction geometry is not invented')
 assert(at(2032, [{ ...binding, parcelOutline: undefined }]).gaps[0]?.reason === 'missing_parcel_outline', 'unknown meadow footprint is not invented')
 assert(at(2050, [{ ...binding, canonicalBuildings: [{ ...newHome, provenance: 'observed' }] }]).gaps[0]?.reason === 'missing_canonical_building', 'imported geometry cannot masquerade as new canonical building')
+
+assert(at(2032, [{ ...binding, parcelOutline: [
+  { xM: 0, yM: 0 }, { xM: 5, yM: 5 }, { xM: 10, yM: 10 },
+] }]).gaps[0]?.reason === 'missing_parcel_outline',
+  'collinear parcel vertices cannot produce a meadow')
+assert(at(2032, [{ ...binding, parcelOutline: [
+  { xM: 0, yM: 0 }, { xM: 0, yM: 0 }, { xM: 0, yM: 0 },
+] }]).restoredMeadows.length === 0,
+  'zero-area parcel does not produce a synthetic meadow')
+assert(at(2032, [{ ...binding, parcelOutline: [
+  { xM: 0, yM: 0 }, { xM: 5, yM: 0 }, { xM: Number.NaN, yM: 5 },
+] }]).gaps[0]?.reason === 'missing_parcel_outline',
+  'non-finite parcel geometry rejected')
+assert(at(2050, [{ ...binding, canonicalBuildings: [{ ...newHome, footprint: [
+  { xM: 0, yM: 0 }, { xM: 1, yM: 1 }, { xM: 2, yM: 2 },
+] }] }]).gaps[0]?.reason === 'missing_canonical_building',
+  'degenerate canonical building footprint rejected')
+assert(at(2050, [{ ...binding, canonicalBuildings: [{ ...newHome, footprint: [
+  { xM: 0, yM: 0 }, { xM: 1, yM: 0 }, { xM: 0, yM: Number.POSITIVE_INFINITY },
+] }] }]).shownCanonicalBuildings.length === 0,
+  'non-finite canonical building footprint never reaches scene')
+assert(at(2050, [{ ...binding, canonicalBuildings: [{ ...newHome, footprint: [
+  { xM: 0, yM: 0 }, { xM: 1, yM: 0 }, { xM: 0, yM: 1 }, { xM: 0, yM: 0 },
+] }] }]).shownCanonicalBuildings.includes(newHome.id),
+  'valid closed GIS footprint remains accepted')
+
 assert(at(2050, [{ parcelId: 'missing' }]).gaps[0]?.reason === 'unknown_parcel', 'unknown parcel does not affect scene')
 assert(at(2026, [binding], [{ ...receipts[0], committed: false as true }]).scene.buildings.length === 2, 'uncommitted proposal has no effect')
 let mismatched = false
