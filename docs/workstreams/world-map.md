@@ -273,7 +273,20 @@ Das Startcafé im realen Haus Hauptstraße 72 trägt das NOXIA-Dach wie die öff
 - **Mishkan Avi:** Kantine am Landeplatz.
 - Geprüft mit einer Testseite der Mond-Szene: alle 27 Gebäude erscheinen, keine Fehler.
 
-**Nicht gemacht:** Die Stationen Prometheus (5 Module) und Q1 (12) haben keine begehbare Ansicht; ihre Module bleiben im Kachelraster, bis die Stationen begehbar werden (eigener Entwurf, offen). Ob der alte Landeplatz und das alte Lager auf Phobos neben den neuen bleiben sollen, entscheidet Thomas. Neue Wohnhabitate aus dem Selbstbau der Bewohner kommen weiter ohne Lage: Request R-19 an Bevölkerung und Ökonomie.
+**Klarstellung 30.10.2026:** Auf Phobos gibt es nur einen Landeplatz; doppelt sind nur die zwei Lager (je 32 × 26 m, 50 m auseinander, ohne Überschneidung). Beide bleiben. Neue Wohnhabitate aus dem Selbstbau der Bewohner kommen weiter ohne Lage: Request R-19 an Bevölkerung und Ökonomie.
+
+## Begehbare Stationen: Prometheus und Q1 (Thomas, 30.10.2026: „erst 1, dann 2“)
+
+**Befund:** Prometheus (Kepler Station) hatte 13 Bauten, Q1 fünf Module ohne Lage in Metern. Die 12 Räume in Q1 (Café, Archivbibliothek, Beobachtungsgalerie, Lernraum, Maker-Raum, Garten, Hafen, Kantine …) und die Hafenkantine auf Prometheus sind Kinder dieser Module (`parent_id`) und bleiben Innenräume ohne eigene Lage.
+
+**Erledigt (Migration `20261030010000_station_layouts.sql`, live; Lageplan in `lib/game/spatial/stationLayouts.ts`):**
+- **Prometheus:** Zentralmodul (Kommandozentrale) in der Mitte, Ringgang um vier Innenmodule (zwei Habitate, Habitatmodul, Wasserrecycler), vier Speichen zu Observatorium (Nord), Lager (Süd), Andockbucht (Ost, 44 × 30 m) und Solarausleger nach Westen. Drei Solarfelder und zwei Scanner hängen an Außenpfaden, die man nur im Anzug begeht.
+- **Q1:** Umsteigeknoten in der Mitte, Hauptgang Ost–West mit Hafenviertel im Osten und Altbogen im Westen, Archiv- und Kulturviertel nordwestlich, Alltagsmodul im Norden, verbunden durch Druckgänge.
+- Abstand der Module mindestens 8 m, jedes Modul liegt an einem Druckgang (Test `stationLayouts.test.ts`). Alte Werte in `station_placement_20261030`.
+- **Ansicht:** `app/dashboard/DashboardStationSurface.tsx` nutzt dieselbe lokale Szene wie Mond und Mars (`PlanetaryWalkableSurface`, Körper `station`); statt Gelände ein dunkles Deck (Palette `station`, keine Krater und Felsen). Freigeschaltet über `hasDedicatedSurfaceView` (Prometheus, Q1). Ein Klick auf ein Modul öffnet seinen Innenraum.
+- Geprüft mit einer Testseite beider Szenen: alle Module, Gänge und die Figur erscheinen, keine Fehler.
+
+**Offen:** Die Module haben noch keine eigenen Bilder (graue Platten wie Bauten ohne Bildvorlage); Prometheus ist in der Karte als „Kepler Station" benannt (Slug `prometheus`). Außerhalb der Gänge gilt im Anzug „frei begehbar" – auf einer Station wäre das der Weltraum; eine eigene Regel „Leere nicht begehbar" folgt, wenn Stationen Außenhüllen bekommen. Die Bewohner dort laufen ab sofort über die Gänge, sobald sie Arbeit oder Wohnung in einem Modul haben (gleiche Logik wie Mond und Mars, dort nicht eigens geprüft).
 
 ## Requests aus anderen Teilprojekten
 
