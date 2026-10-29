@@ -30,13 +30,17 @@ export const LIBRARY_SHELVES: ReadonlyArray<{ id: LibraryBook['shelf']; label: s
 export const RESONANCE_READING_IDS = [
   'sachbuecher:gott-ist-eine-wolke',
   'sachbuecher:physik-der-seele',
+  'sachbuecher:vom-kleinen-und-grossen',
+  'sachbuecher:die-verkoerperte-seele',
   'sachbuecher:fluide-hermeneutik',
   'sachbuecher:die-physik-des-ich',
   'sachbuecher:biochemie-der-verbundenheit',
 ] as const
 
 export const LIBRARY_BOOKS: readonly LibraryBook[] = [
-  { id: 'sachbuecher:physik-der-seele', shelf: 'sachbuecher', author: LIBRARY_AUTHOR, title: 'Die Physik der Seele', genre: 'Philosophie / Bewusstsein und Naturwissenschaft', teaser: 'Gedanken zum Verhältnis von Seele, Bewusstsein und physikalischer Wirklichkeit. Eine philosophische Erkundung, keine naturwissenschaftlich bestätigte Theorie.' },
+  { id: 'sachbuecher:vom-kleinen-und-grossen', shelf: 'sachbuecher', author: LIBRARY_AUTHOR, title: 'Vom Kleinen und Großen', genre: 'Philosophie / Einführung in das omnizedente Denken', teaser: 'Wie lebt das Ganze in seinen Teilen? Ein philosophischer Text über Entfaltung, Resonanz und die Beziehung des Kleinen zum Großen. Die eigenständige Lesefassung muss noch anhand des Originalmanuskripts abgeglichen werden.' },
+  { id: 'sachbuecher:die-verkoerperte-seele', shelf: 'sachbuecher', author: LIBRARY_AUTHOR, title: 'Die verkörperte Seele', genre: 'Philosophie / Fragmentierung, Resonanz und Rückkehr', teaser: 'Eine ausdrücklich spekulative Betrachtung der Seele als verkörpertes Resonanzmuster. Keine empirisch bestätigte Seelenphysik und keine medizinische Handlungsanweisung.' },
+  { id: 'sachbuecher:physik-der-seele', shelf: 'sachbuecher', author: LIBRARY_AUTHOR, title: 'Physik der Seele', genre: 'Philosophisches Manuskriptprojekt / Bewusstsein und Identität', teaser: 'Projektübersicht zur Kosmologie der Seele und ihrer Weiterentwicklung zur Physik des Ich: Teilchenphysik als Metapher für Einsamkeit, Identität und Transformation. Originalmanuskript hier noch nicht zugeordnet.' },
   { id: "romane:bon-air", shelf: "romane", author: LIBRARY_AUTHOR, title: "Bon Air", genre: "Climate Fiction / Science-Thriller", teaser: "Die Erde zu retten war einfach. Sie zu überleben wird unmöglich. Fünf Forschungsgruppen entwickeln geniale Lösungen gegen die Klimakrise – doch ihre Erfolge werden zur Katastrophe." },
   { id: "romane:baumeister-kragoss", shelf: "romane", author: LIBRARY_AUTHOR, title: "Das Echo von K'Ragoss", genre: "Science Fiction / Psychologisches Epos", teaser: "Lain Thorn bewacht seit 1.851 Tagen die Ruinen auf K'Ragoss. Als ein Kristall erwacht, muss er entscheiden: 35.000 Menschen retten oder das Universum vor einer Technologie schützen, die ihre Schöpfer verschlang." },
   { id: "romane:code-des-kollektivs", shelf: "romane", author: LIBRARY_AUTHOR, title: "Der Code des Kollektivs", genre: "Visionäre Science-Spirituality-Fiction", teaser: "Eine App. Milliarden Menschen. Was geschieht, wenn wir spüren, was andere fühlen? Eine monumentale 4-Band-Serie über die bewusste Evolution der Menschheit und die Grenzen des Individuums." },
