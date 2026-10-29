@@ -24,7 +24,10 @@ import {
   type LandmarkRoomKind,
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
-import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { LIBRARY_BOOKS, LIBRARY_SHELVES, RESONANCE_READING_IDS, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { READING_TEXTS } from '@/lib/game/landmarks/readingTexts'
+import { THEOLOGICAL_ESSAYS } from '@/lib/game/landmarks/theologicalEssays'
+import { IDENTITY_BOOK } from '@/lib/game/landmarks/identityBook'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 
@@ -124,6 +127,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [candles, setCandles] = useState(3)
   const [seated, setSeated] = useState(false)
   const [bookId, setBookId] = useState('')
+  const [readingPart, setReadingPart] = useState<number | null>(null)
   const [talking, setTalking] = useState(false)
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
@@ -187,7 +191,10 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { staffPosRef.current = staffPos }, [staffPos])
   useEffect(() => { readerPosRef.current = readerPos }, [readerPos])
   useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
-  const book = LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
+  const isResonanceReading = kind === 'resonance_place'
+  const resonanceBooks = [...LIBRARY_BOOKS.filter(entry => (RESONANCE_READING_IDS as readonly string[]).includes(entry.id)), IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS]
+  const book = [...LIBRARY_BOOKS, IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS].find(entry => entry.id === bookId && (!isResonanceReading || resonanceBooks.some(item => item.id === entry.id))) ?? null
+  const readingText = isResonanceReading && book ? READING_TEXTS[book.id] : undefined
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
   const placed = useMemo(() => {
@@ -319,6 +326,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const nearStaff = Boolean(staff && Math.hypot(pos.x - staffPos.x, pos.y - staffPos.y) <= STAFF_REACH)
   const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
+  const resonanceShelfOpen = isResonanceReading && shown?.action === 'books'
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
   const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
@@ -406,7 +414,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     if (talkEnded) return
     if (partner) { await talkWithPerson(partner.person); return }
     if (!staff || !message.trim() || sending) return
-    const text = message.trim().slice(0, 80)
+    const text = message.trim().slice(0, 160)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -462,7 +470,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
 
   async function talkWithPerson(person: RoomPerson) {
     if (!message.trim() || sending) return
-    const text = message.trim().slice(0, 80)
+    const text = message.trim().slice(0, 160)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -551,17 +559,31 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </button>}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
-          <div className="chat"><input value={message} maxLength={80} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <div className="chat"><textarea value={message} rows={3} maxLength={160} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
+        {!talkingNow && resonanceShelfOpen && !book && <div className="book">
+          <b>Philosophie · Lesen & denken</b>
+          <p>Alle philosophischen Werke sind frei lesbar. Volltexte sind dort verfügbar, wo eine überprüfte Manuskriptfassung hinterlegt ist.</p>
+          <div className="books"><section>{resonanceBooks.map((entry, index) => <div key={entry.id}>{index === 0 && <p><strong>Philosophie und Bewusstsein</strong></p>}{index === resonanceBooks.length - THEOLOGICAL_ESSAYS.length && <p><strong>Theologie und Bibelauslegung</strong></p>}<button onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button></div>)}</section></div>
+        </div>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
         </section></div></>}
-        {!talkingNow && book && (shelf || !shown) && <div className="book">
+        {!talkingNow && book && (shelf || !shown || resonanceShelfOpen) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
-          <button className="act" onClick={() => setBookId('')}>← Zurück</button>
+          {isResonanceReading && (readingText ? <>
+            <p className="muted">Freie Lesefassung · {readingText.version} · ohne Credits oder Kauf</p>
+            {readingPart === null ? <div className="books"><section>{readingText.sections.map((part, index) => <button key={index} onClick={() => setReadingPart(index)}>{part.heading}</button>)}</section></div> : <>
+              <div className="row"><button className="act quiet" onClick={() => setReadingPart(null)}>← Inhaltsverzeichnis</button><span>{readingPart + 1} / {readingText.sections.length}</span></div>
+              <article style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.65,maxHeight:'55vh',overflowY:'auto',padding:'12px 0'}}>{readingText.sections[readingPart]?.text}</article>
+              <div className="row"><button className="act quiet" disabled={readingPart === 0} onClick={() => setReadingPart(n => Math.max(0, (n ?? 0)-1))}>← Vorheriger Teil</button><button className="act" disabled={readingPart + 1 >= readingText.sections.length} onClick={() => setReadingPart(n => Math.min(readingText.sections.length-1,(n ?? 0)+1))}>Nächster Teil →</button></div>
+            </>}
+            {readingText.source && <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>}
+          </> : <p className="muted">Einführungstext · vollständige Manuskriptfassung noch nicht zugeordnet</p>)}
+          <button className="act" onClick={() => { setBookId(''); setReadingPart(null) }}>← Zurück zum Regal</button>
         </div>}
         {status && <div className="status">{status}</div>}
         {!talkingNow && held && !book && <div className="book held-card">
@@ -726,7 +748,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .act{border:1px solid #6e7d55;border-radius:5px;background:#273d24;color:#edf3dd;padding:7px 9px;font:800 9px monospace;cursor:pointer}
       .act.quiet{border-color:#476476;background:#102b3c;color:#dce9ee}
       .chat{display:flex;gap:6px}
-      .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}
+      .chat textarea{flex:1;min-width:0;min-height:72px;resize:vertical;font:inherit;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}
       .chat button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}
       .tipcard{display:grid;gap:2px;text-align:left;border:1px solid #c9a24a;border-radius:6px;background:#efe6d2;color:#2b2118;padding:8px 10px;cursor:pointer}
       .tipcard span{font:800 8px monospace;letter-spacing:.1em;color:#7a5a36}
