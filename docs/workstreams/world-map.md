@@ -262,6 +262,19 @@ Gewählt mit einer Suche auf Acker, Wiese und Flugfeld: mindestens 10 m Abstand 
 
 Das Startcafé im realen Haus Hauptstraße 72 trägt das NOXIA-Dach wie die öffentlichen Gebäude (W-7). Gekaufte und umgebaute Häuser behalten ihr reales Aussehen. Weil beide in der Datenbank sonst gleich aussehen (Spielergebäude mit `source_ref`), gibt es dafür das Merkmal `tile_entities.noxia_roof` (Migration `20261027160000_tile_entities_noxia_roof.sql`); `/api/world-lab/buildings` liefert es als `noxiaRoof`.
 
+## Gebäude außerhalb der Erde in der Welt (Thomas, 29.10.2026: „hole sie in die Welt, aber sinnvoll verteilt“)
+
+**Befund 28.10.2026:** 35 Gebäude auf Mars, Mond, Phobos und in Mishkan Avi stammten noch aus dem alten Kachelraster und hatten keine Lage in Metern. Die begehbaren Ansichten zeigen nur Bauten mit `x_m`/`y_m` (`planetaryLocalScene`), sie waren also unsichtbar.
+
+**Erledigt (Migration `20261029020000_offworld_buildings_into_world.sql`, live):** alle 35 stehen jetzt in der Welt, Drehung wie die Nachbarn, Abstand zu Bauten 6–14 m (Phobos 14 m wie `PHOBOS_BASE_ALPHA_MIN_CLEARANCE_M`), zu Korridoren 4–8 m. Alte Werte in `offworld_placement_20261029`.
+- **Mars, Tharsis Hub:** sieben Wohnhabitate der Bewohner als neues Wohnviertel nordöstlich der Schule (zwei Reihen, y 200 und 240); Solarfeld eines Spielers am Ende der Solarreihe (10 / 150); Hafenkantine neben dem Landeplatz.
+- **Mond, Shackleton:** 16 Eisbohrer als Eisfeld in vier Reihen südlich der Basis, zum Kraterinneren hin (dort liegt das Wassereis im Dauerschatten); Mine zwischen Fahrzeughof und Landeplatz; Kantine am Lager.
+- **Phobos, Stickney:** Verwaltung und Schule (die von Thomas) am Wohnkern, zweites Lager beim Logistikcluster, kleiner zweiter Landeplatz (30 × 30 m) neben dem Anlegefeld, Kantine dazwischen, die zwei Scanner von McKnight am Kraterrand.
+- **Mishkan Avi:** Kantine am Landeplatz.
+- Geprüft mit einer Testseite der Mond-Szene: alle 27 Gebäude erscheinen, keine Fehler.
+
+**Nicht gemacht:** Die Stationen Prometheus (5 Module) und Q1 (12) haben keine begehbare Ansicht; ihre Module bleiben im Kachelraster, bis die Stationen begehbar werden (eigener Entwurf, offen). Ob der alte Landeplatz und das alte Lager auf Phobos neben den neuen bleiben sollen, entscheidet Thomas. Neue Wohnhabitate aus dem Selbstbau der Bewohner kommen weiter ohne Lage: Request R-19 an Bevölkerung und Ökonomie.
+
 ## Requests aus anderen Teilprojekten
 
 ### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht – in der Weltkarte erledigt (25.10.2026)

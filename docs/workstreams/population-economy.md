@@ -571,3 +571,9 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
 4. **Mitflug auf Handelsschiffen:** Stelle an Bord als Weg zum Herumkommen (Thomas’ Einstiegsidee, R-10). Mit Handel und Schiffe abzustimmen: wer anheuert, Lohn, Ziel, Dauer als Ereignis fester Dauer wie die Schicht.
 5. **Feste Anstellung:** Wer an einem Ort öfter arbeitet, kann fest angestellt werden – regelmäßige Schichten, fester Lohn, `person_assignments` bzw. eine eigene Tabelle für Spieler. Kündigen und Fehlschichten wären zu klären.
 
+### R-19 (Erdkarte, 29.10.2026): Selbstbau der Bewohner mit Weltlage
+
+`run_npc_self_build` legt Wohnhabitate als `legacy_tile` ohne `x_m`/`y_m` an (zuletzt sieben auf dem Mars am 22. und 25.10.2026). Die begehbaren Ansichten zeigen nur Bauten mit Weltlage; diese Häuser waren unsichtbar. Sie stehen seit 29.10.2026 in einem Wohnviertel nordöstlich der Schule im Tharsis Hub (Migration `20261029020000_offworld_buildings_into_world.sql`).
+
+**Bitte:** Neue Bauten aus dem Selbstbau mit `placement_mode = 'world'`, `x_m`, `y_m`, `rotation_deg`, `footprint_width_m`, `footprint_depth_m` anlegen – frei von bestehenden Bauten und Korridoren, möglichst im Wohnviertel des Ortes (auf dem Mars ab 70 / 200 nach Osten weiter). Die Prüfung von Lage und Abstand gibt es serverseitig schon in `POST /api/game/build/spatial`; derselbe Weg ist für Bewohner am einfachsten.
+
