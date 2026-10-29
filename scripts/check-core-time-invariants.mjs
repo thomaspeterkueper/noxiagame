@@ -196,6 +196,37 @@ if (suspiciousTimestampCommandLookup) {
   pass('timestamps are not used as retry identity');
 }
 
+// 15. A tile entity DELETE is a historical fact, not a civic demolition permit.
+// The SQL integration test must fail without a real disposable fixture, rather
+// than report a misleading green result when no temporal row was exercised.
+const deleteAudit = read('supabase/migrations/20261029133000_tile_entity_delete_audit.sql');
+const deleteAuditTest = read('supabase/tests/20261029133000_tile_entity_delete_audit.test.sql');
+const deleteFunction = functionBlock(deleteAudit, 'noxia_record_tile_entity_deletion');
+if (!deleteFunction) {
+  fail('tile entity DELETE audit remains event-linked', 'missing deletion audit function');
+} else {
+  requireTokens('tile entity DELETE audit remains event-linked', deleteFunction, [
+    "set valid_to = greatest(v_at, valid_from + interval '1 microsecond')",
+    'subject_id = old.id',
+    'and valid_to is null',
+    'insert into public.simulation_events',
+    "'entity.deleted', 'tile_entity', old.id, null, old.location_id",
+    "'type', 'entity_state', 'from', v_previous, 'to', null",
+    "'deletion_kind', 'unspecified'",
+  ]);
+}
+requireTokens('tile entity DELETE trigger is server-only', deleteAudit, [
+  'after delete on public.tile_entities',
+  'for each row execute function public.noxia_record_tile_entity_deletion()',
+  'revoke all on function public.noxia_record_tile_entity_deletion() from public, anon, authenticated',
+]);
+requireTokens('tile entity DELETE regression cannot silently skip', deleteAuditTest, [
+  'NOXIA_TEST_FIXTURE_MISSING',
+  "v_closed_at is distinct from v_event.occurred_at",
+  "v_event.effects->0->'to' is distinct from 'null'::jsonb",
+  'rollback;',
+]);
+
 if (failures.length > 0) {
   console.error('NOXIA Core time/tick/event/replay invariant check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
