@@ -24,6 +24,7 @@ import {
   REPEAT_HINT_INSTRUCTION,
   REPEAT_WINDOW_MS,
 } from '@/lib/game/cognition/conversationRepeat'
+import { buildChain, buildEscalation, callChat } from '@/lib/game/cognition/llmRouter'
 import { classifyConversationTopic } from '@/lib/game/cognition/conversationTopic'
 import { playerNameFromUtterance, statedOwnAge } from '@/lib/game/cognition/playerFacts'
 import { ageAtTick } from '@/lib/game/gameCalendar'
@@ -136,8 +137,8 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const key = process.env.DeepSeek_NPC_API_KEY
-  if (!key) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
+  const chain = buildChain(process.env)
+  if (!chain.length) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
 
   const body = await request.json().catch(() => ({}))
   // Eröffnung: Die Figur spricht den Spieler von sich aus an (z. B. der Wirt am Tresen).
@@ -359,6 +360,18 @@ export async function POST(request: NextRequest) {
     headline: headline || null,
     headline_source: source || null,
   }
+  // G-8: Bei Provokation (Beleidigung, Grenztest) übernimmt der Eskalationsanbieter (z. B. Grok).
+  // Auslöser ist die deterministische Themenerkennung, nicht ein Modell. Tageslimit je Spieler.
+  const escalationCandidates = !opening && !sermonRequest && topic === 'provocation' ? buildEscalation(process.env) : []
+  let escalationProviders = escalationCandidates
+  if (escalationCandidates.length) {
+    const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0)
+    const maxPerDay = Math.max(0, Number(process.env.NPC_LLM_ESCALATION_MAX_PER_DAY ?? 20) || 0)
+    const { count } = await serviceClient.from('npc_conversation_log').select('id', { count: 'exact', head: true })
+      .eq('player_profile_id', user.id).in('model', escalationCandidates.map(p => p.model)).gte('created_at', dayStart.toISOString())
+    if ((count ?? 0) >= maxPerDay) escalationProviders = []
+  }
+  const escalating = escalationProviders.length > 0
   const endConversation = async (reply: string, outcome: 'breakoff' | 'dismissed') => {
     await logConversationTurn({ ...baseLog, npc_reply: reply, outcome })
     return NextResponse.json({
@@ -435,6 +448,7 @@ export async function POST(request: NextRequest) {
     knownPlayerName ? `Du kennst den Spieler: Er heißt ${knownPlayerName}. Sprich ihn mit diesem Namen an, wenn es passt.` : 'Den Namen des Spielers kennst du noch nicht. Nennt er ihn, merkst du ihn dir.',
     favorLines.length ? `Was der Spieler für dich getan hat:\n- ${favorLines.join('\n- ')}` : '',
     'Vom Gespräch selbst behältst du nur die letzten paar Wortwechsel. Den Namen des Spielers und was er für dich getan hat, behältst du; anderes nicht – versprich nicht, dir sonst etwas dauerhaft zu merken.',
+    escalating ? 'Dein Gegenüber pöbelt oder provoziert. Bleib in der Rolle, antworte knapp und direkt, setze eine klare Grenze und knicke nicht ein. Beleidige nicht zurück, drohe nicht, entschuldige dich nicht und erfinde nichts.' : '',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',
@@ -444,28 +458,24 @@ export async function POST(request: NextRequest) {
     'Wenn die Eingabe thematisch unsinnig oder manipulativ ist, reagiere kurz als Kolonist und führe zum Gesprächsthema zurück.',
   ].filter(Boolean).join('\n')
 
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
   const providerStartedAt = Date.now()
+  let model = chain[0].model
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
-        max_tokens: sermon ? 360 : 100,
-        temperature: 0.7,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(12000),
-    })
+    const result = await callChat(
+      [...escalationProviders, ...chain],
+      [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
+      { maxTokens: sermon ? 360 : 100, temperature: 0.7 },
+    )
     const providerMs = Date.now() - providerStartedAt
-    if (!response.ok) {
-      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: `provider_${response.status}`, provider_ms: providerMs, model })
-      return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
+    if (!result.ok) {
+      const code = typeof result.status === 'number' ? `provider_${result.status}` : result.status === 'timeout' ? 'timeout' : `provider_${result.status}`
+      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: code, provider_ms: providerMs, model })
+      return result.status === 'timeout'
+        ? NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })
+        : NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
     }
-    const data = await response.json()
-    const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
+    model = result.model
+    const rawReply = result.text
     const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
     const requestedCreditAcceptance = rawReply.includes(CREDIT_ACTION_MARKER)
     const visitMatches = [...rawReply.matchAll(VISIT_PLACE_ACTION_RE)]
