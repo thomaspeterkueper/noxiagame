@@ -61,6 +61,9 @@ begin
        and e.subject_id in (v_building, v_other)
        and (
          e.actor_id is not null
+         or e.canonical_event_id is not null
+         or e.canonical_entity_id is not null
+         or e.effects->0->'from' ?| array['profile_id','owner_id','occupant_id']
          or e.metadata->>'source' is distinct from 'tile_entities_delete_trigger'
          or e.metadata->>'deletion_kind' is distinct from 'unspecified'
          or e.metadata ? 'parcel_id'
