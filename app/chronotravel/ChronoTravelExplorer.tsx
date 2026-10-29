@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { HistoricalScene } from '@/lib/game/chronotravel/domain'
 import styles from './chronotravel.module.css'
 import HistoricalThreeScene from './HistoricalThreeScene'
@@ -31,6 +31,7 @@ export default function ChronoTravelExplorer({ scenes }: { scenes: HistoricalSce
   const [showEvidence, setShowEvidence] = useState(true)
   const [insideShop, setInsideShop] = useState(false)
   const [dialogue, setDialogue] = useState('')
+  const handleShopChange = useCallback((inside: boolean) => { setInsideShop(inside); setDialogue('') }, [])
   const scene = scenes[index]
   const info = epochs[scene.yearCE]
 
@@ -57,11 +58,11 @@ export default function ChronoTravelExplorer({ scenes }: { scenes: HistoricalSce
           <button onClick={() => changeEpoch(index === 0 ? 1 : 0)}>Andere Epoche laden</button>
         </aside>
         <section className={styles.stageArea} aria-label="Interaktive historische Szenenskizze">
-          <div className={styles.stage}><HistoricalThreeScene year={scene.yearCE} onShopChange={(inside: boolean) => { setInsideShop(inside); setDialogue(inside ? merchantReply(scene.yearCE, 'greeting') : '') }} /></div>
+          <div className={styles.stage}><HistoricalThreeScene year={scene.yearCE} onShopChange={handleShopChange} /></div>
           <section style={{marginTop:12,padding:16,background:'#1b2735',borderRadius:12}} aria-live="polite">
             {insideShop ? <>
               <strong>{SHOP_CONTENT[scene.yearCE]?.merchant} · Demonstrationsdialog</strong>
-              <p style={{margin:'9px 0',lineHeight:1.6}}>{dialogue}</p>
+              <p style={{margin:'9px 0',lineHeight:1.6}}>{dialogue || merchantReply(scene.yearCE, 'greeting')}</p>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 <button style={{padding:'9px 12px',background:'#31445a',color:'white',borderRadius:7}} onClick={()=>setDialogue(merchantReply(scene.yearCE,'goods'))}>Waren ansehen</button>
                 <button style={{padding:'9px 12px',background:'#31445a',color:'white',borderRadius:7}} onClick={()=>setDialogue(merchantReply(scene.yearCE,'city'))}>Über die Stadt sprechen</button>
