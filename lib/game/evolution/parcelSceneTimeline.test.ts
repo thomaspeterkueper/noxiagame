@@ -72,6 +72,23 @@ assert(JSON.stringify(timeline.render(2032)) === JSON.stringify(timeline.render(
 assert(timeline.render(2050).overlay.scene.buildings.some(b => b.id === 'osm:neighbor'),
   'unrelated neighboring buildings survive all years')
 
+// A bad geometry binding must never hide an unrelated imported feature.
+const rejectsBindings = (bindings: ParcelSceneTimelineSnapshot['bindings'], label: string,
+  extra: Partial<ParcelSceneTimelineSnapshot> = {}) => {
+  let rejected = false
+  try { createParcelSceneTimeline({ ...snapshot, ...extra, bindings }) } catch { rejected = true }
+  assert(rejected, label)
+}
+const bound = snapshot.bindings[0]
+rejectsBindings([{ ...bound, parcelId: 'not-in-baseline' }], 'unknown parcel binding rejected')
+rejectsBindings([{ ...bound, baselineBuildingId: 'core:wrong' }], 'wrong Core baseline building rejected')
+rejectsBindings([{ ...bound, importedBuildingId: 'osm:missing' }], 'missing imported feature rejected')
+rejectsBindings([{ ...bound, importedBuildingId: undefined }], 'unpaired baseline ID rejected')
+rejectsBindings([{ ...bound, importedBuildingId: newHouse.id }], 'unloaded canonical feature cannot impersonate import')
+rejectsBindings([bound, { parcelId: 'parcel-2', canonicalBuildings: [newHouse] }],
+  'same canonical building cannot be assigned to two parcels',
+  { baseline: [...snapshot.baseline, { parcelId: 'parcel-2', surface: 'cleared' }] })
+
 // Changing the caller's source after timeline creation must not alter replay.
 ;(snapshot.receipts as CoreParcelReceipt[]).length = 0
 scene.buildings[0].center.yM = 800
