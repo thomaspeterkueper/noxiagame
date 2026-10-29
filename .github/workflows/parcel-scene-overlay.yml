@@ -7,6 +7,8 @@ on:
       - 'lib/game/evolution/parcelLifecycle.test.ts'
       - 'lib/game/evolution/parcelSceneOverlay.ts'
       - 'lib/game/evolution/parcelSceneOverlay.test.ts'
+      - 'lib/game/evolution/parcelSceneTimeline.ts'
+      - 'lib/game/evolution/parcelSceneTimeline.test.ts'
       - '.github/workflows/parcel-scene-overlay.yml'
   push:
     branches: [main]
@@ -15,6 +17,8 @@ on:
       - 'lib/game/evolution/parcelLifecycle.test.ts'
       - 'lib/game/evolution/parcelSceneOverlay.ts'
       - 'lib/game/evolution/parcelSceneOverlay.test.ts'
+      - 'lib/game/evolution/parcelSceneTimeline.ts'
+      - 'lib/game/evolution/parcelSceneTimeline.test.ts'
       - '.github/workflows/parcel-scene-overlay.yml'
 
 jobs:
@@ -36,6 +40,7 @@ jobs:
           pnpm exec tsc
           lib/game/evolution/parcelLifecycle.test.ts
           lib/game/evolution/parcelSceneOverlay.test.ts
+          lib/game/evolution/parcelSceneTimeline.test.ts
           --target ES2022 --module commonjs --moduleResolution node
           --esModuleInterop --skipLibCheck --rootDir lib
           --outDir .parcel-scene-test
@@ -43,3 +48,4 @@ jobs:
         run: >-
           node .parcel-scene-test/game/evolution/parcelLifecycle.test.js
           && node .parcel-scene-test/game/evolution/parcelSceneOverlay.test.js
+          && node .parcel-scene-test/game/evolution/parcelSceneTimeline.test.js
