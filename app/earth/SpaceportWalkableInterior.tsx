@@ -7,7 +7,7 @@
 // sind die bestehenden Hafenfunktionen – Navigation, Fracht, Wartung, Kantine –
 // die als Tafeln darüber öffnen.
 // Aktualisiert: 29.10.2026 — Mitflug auf Handelsschiffen: Anheuern an der Flugleitung, Personal kennt die Frachtrouten
-// Version:      1.1.0
+// Version:      1.1.1
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
@@ -41,7 +41,10 @@ export default function SpaceportWalkableInterior({ entityId, buildingName, fact
       if (data) { setCrew(data as CrewState); setCrewNote(null) }
     } catch { setCrewNote('Die Heuerliste ist gerade nicht erreichbar.') }
   }, [])
-  useEffect(() => { void loadCrew() }, [loadCrew])
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadCrew() }, 0)
+    return () => clearTimeout(timer)
+  }, [loadCrew])
   async function crewAction(body: Record<string, string>) {
     setCrewBusy(true)
     await loadCrew({ method: 'POST', body: JSON.stringify(body) })
