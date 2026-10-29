@@ -45,3 +45,7 @@ Route `/chronotravel` rendert nun mit der bereits installierten Bibliothek `thre
 ## Wegsystem und Szenenbevölkerung (28.10.2026)
 
 `app/chronotravel/historicalStreetLife.js` stellt einen einfachen zentralen Weg, visuelle Eingangshinweise (1200/1700), sechs deterministisch animierte lokale Figuren und eine begehbare Korridorfläche mit Hindernis am Obelisken bereit. Die Eingänge sind **noch keine betretbaren Innenräume**; Figuren sind **keine echten Core-NPCs**, sie besitzen weder Dialog noch Gedächtnis noch persistierte Identität. Die Kollisionsprüfung ist ein eng begrenzter Prototyp, kein vollständiger Physik-/Navmesh-Algorithmus. Vor Merge: WebGL-Browser-Smoke-Test, Prüfung der Szene bei Szenenwechsel, Performance und Build. Keine wissenschaftliche Authentizitätsfreigabe.
+
+## Erster Händlerladen (29.10.2026)
+
+Die WebGL-Szene besitzt einen markierten Einstieg bei (X=0,Z=8) und einen schematischen, per E betretbaren Modell-Innenraum (separat eingeblendete Szene). Im Laden stehen Regale, exemplarische Waren sowie eine nichtpersistente Händlerfigur. Die UI zeigt drei Dialogaktionen (`merchantContent.js`), mit epochenspezifischen, **fiktionalen** Texten. Keine Warenbuchung, keine Wallet, keine historische Quellenvalidierung, keine echte NPC-Kognition und keine persistenten Innenraumobjekte. Der Einstieg ist bewusst ein Prototyp-Portal; seine Architektur ist noch nicht mit einem physischen Geschäftseingang des Außenmodells synchronisiert. Vor Merge WebGL, Ein-/Austritt, Szenenwechsel und Build testen.
