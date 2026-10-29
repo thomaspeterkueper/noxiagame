@@ -92,7 +92,10 @@ export async function projectSurfacePresence(supabase:SupabaseLike,tick:number,p
   if(regionError)throw regionError
   const regionSlugById=new Map((regions??[]).map((row:any)=>[row.id,row.slug]))
 
-  const tileIds=[...new Set(candidates.map(c=>c.tileEntityId))]
+  // Kandidaten mit Zuweisung an einen realen Ort (region_feature) haben keine Kachel-ID.
+  // Ohne Filter ging „null“ in die Abfrage und brach die ganze Projektion ab
+  // (Laufzeitfehler „invalid input syntax for type uuid: "null"“, 25.–29.10.2026).
+  const tileIds=[...new Set(candidates.map(c=>c.tileEntityId).filter((id):id is string=>Boolean(id)))]
   const {data:tiles,error:tileError}=tileIds.length
     ? await supabase.from('tile_entities').select('id, location_id, x_m, y_m, latitude_deg, longitude_deg, altitude_m, spatial_region_id').in('id',tileIds)
     : {data:[],error:null}

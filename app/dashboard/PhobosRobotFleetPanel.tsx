@@ -58,7 +58,7 @@ export default function PhobosRobotFleetPanel({ selectedRobotId = null, onSelect
     const token = await getToken(); if (!token) return
     const response = await fetch('/api/game/phobos/pilot-extraction', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
     const payload = await response.json()
-    if (!response.ok) throw new Error(payload?.error ?? 'Robotikflotte nicht verfügbar.')
+    if (!response.ok || payload?.onSite === false) throw new Error(payload?.error ?? 'Robotikflotte nicht verfügbar.')
     setRobots(Array.isArray(payload.robots) ? payload.robots : [])
     setReadiness(Array.isArray(payload.fleetReadiness) ? payload.fleetReadiness : [])
     setJobs(Array.isArray(payload.jobs) ? payload.jobs : [])

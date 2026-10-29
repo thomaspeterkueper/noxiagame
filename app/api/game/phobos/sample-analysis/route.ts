@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
   const user = await userFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
-  if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ error: 'Probenanalyse ist nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
+  if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ ok: false, onSite: false, error: 'Probenanalyse ist nur vor Ort auf Phobos verfügbar.', discoveries: [], samples: [], jobs: [], robots: [] })
   try {
     return NextResponse.json({ ok: true, samples: await listAnalyses(supabase, user.id) })
   } catch (error) {

@@ -40,12 +40,19 @@ function regionFeatures(supabase: Supabase, regionId: string): Promise<SourceFea
   if (cached && Date.now() - cached.at < REGION_TTL_MS) return cached.features
   const features = (async () => {
     const out: SourceFeature[] = []
-    // Der Datenbankzugang liefert höchstens 1000 Zeilen je Abruf.
-    for (let from = 0; from < 20_000; from += 1000) {
-      const { data, error } = await supabase.from('region_features').select('id,feature_type,geometry,properties').eq('region_id', regionId).order('id').range(from, from + 999)
+    // Der Datenbankzugang liefert höchstens 1000 Zeilen je Abruf. Weiterblättern über
+    // die letzte ID (Index region_id, id), nicht über den Versatz: Mit Versatz las jede
+    // Seite die ganze Tabelle neu und lief bei großen Regionen in die Zeitgrenze von
+    // 8 s (Fehler 57014, 28.10.2026, Auswertung des Spielerverhaltens).
+    let after = ''
+    for (let page = 0; page < 40; page++) {
+      let query = supabase.from('region_features').select('id,feature_type,geometry,properties').eq('region_id', regionId).order('id').limit(1000)
+      if (after) query = query.gt('id', after)
+      const { data, error } = await query
       if (error) throw error
       if (!data?.length) break
       for (const row of data) out.push({ id: String(row.id), featureType: String(row.feature_type), geometry: row.geometry, properties: row.properties } as SourceFeature)
+      after = String(data[data.length - 1].id)
       if (data.length < 1000) break
     }
     return out

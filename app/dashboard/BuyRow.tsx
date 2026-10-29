@@ -2,10 +2,11 @@
 
 // app/dashboard/BuyRow.tsx
 // Erstellt:     15.06.2026
-// Aktualisiert: 27.10.2026 — gesperrter Kaufknopf sagt warum (Laderaum voll)
+// Aktualisiert: 29.10.2026 — „Menge erhöhen“ sagt, wo die Grenze liegt; vor der Wahl gilt Bestand oder Laderaum
+// Vorher:       27.10.2026 — gesperrter Kaufknopf sagt warum (Laderaum voll)
 // Vorher:       09.10.2026 — Direkthandel zum Marktpreis statt Auktions-Vorbereitung:
 //               Bestätigung zeigt Menge × Preis; abgerechnet wird, was der Server bucht.
-// Version:      2.0.1
+// Version:      2.0.2
 //
 // Handelszeile (Kauf/Verkauf einer Ressource) der Handelszentrale.
 // Aus DashboardClient.tsx herausgelöst (Refactor Schritt 2). Bezieht
@@ -34,8 +35,12 @@ export default function BuyRow({ p, last, cargoFree, owned, onBuy, onSell }: {
   const [busy, setBusy] = useState(false)
 
   const stepBtn: React.CSSProperties = { width: '26px', height: '26px', borderRadius: '7px', border: `1px solid ${T.line}`, background: T.bg, color: T.blue, cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }
-  // Obergrenze: Verkauf = eigener Bestand, sonst freier Frachtraum.
-  const cap = prep === 'sell' ? Math.max(1, owned) : Math.max(1, cargoFree)
+  // Obergrenze: Verkauf = eigener Bestand, Kauf = freier Frachtraum. Vor der Wahl gilt das
+  // Größere – sonst ließ sich bei vollem Laderaum die Verkaufsmenge nicht erhöhen
+  // (17 Wutklicks auf „Menge erhöhen“, Spielerauswertung 28.10.2026).
+  const cap = prep === 'sell' ? Math.max(1, owned) : prep === 'buy' ? Math.max(1, cargoFree) : Math.max(1, cargoFree, owned)
+  const atCap = amount >= cap
+  const capHint = prep === 'sell' ? `Höchstens ${cap} t – so viel hast du an Bord` : prep === 'buy' ? `Höchstens ${cap} t – so viel Laderaum ist frei` : `Höchstens ${cap} t (freier Laderaum ${cargoFree} t, an Bord ${owned} t)`
   function setFromInput(raw: string) {
     const n = parseInt(raw.replace(/\D/g, ''), 10)
     if (Number.isNaN(n)) { setAmount(1); return }
@@ -75,7 +80,7 @@ export default function BuyRow({ p, last, cargoFree, owned, onBuy, onSell }: {
             onFocus={e => e.target.select()}
             style={{ width: '44px', height: '26px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600, border: `1px solid ${T.line}`, borderRadius: '7px', color: T.ink, background: '#fff' }}
           />
-          <button aria-label="Menge erhöhen" style={stepBtn} onClick={() => setAmount((a: number) => Math.min(cap, a + 1))}>+</button>
+          <button aria-label="Menge erhöhen" title={atCap ? capHint : undefined} disabled={atCap} style={{ ...stepBtn, opacity: atCap ? 0.4 : 1, cursor: atCap ? 'not-allowed' : 'pointer' }} onClick={() => setAmount((a: number) => Math.min(cap, a + 1))}>+</button>
           <button disabled={!canBuy} title={canBuy ? undefined : 'Laderaum voll – erst etwas verkaufen'} style={{ background: T.blue, color: '#fff', border: 'none', padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.4 }} onClick={() => openPrep('buy')}>Kaufen</button>
           <button disabled={!canSell} style={{ background: 'transparent', color: T.blue, border: `1px solid ${T.line}`, padding: '0.4rem 0.8rem', fontSize: '0.74rem', fontWeight: 600, borderRadius: '7px', cursor: canSell ? 'pointer' : 'not-allowed', opacity: canSell ? 1 : 0.4 }} onClick={() => openPrep('sell')}>Verk.</button>
         </div>

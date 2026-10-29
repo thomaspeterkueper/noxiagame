@@ -76,3 +76,12 @@ export function shouldReportPosition(
   if (next.t - last.t < 5000) return false
   return Math.hypot(next.x - last.x, next.y - last.y) >= 3
 }
+
+/**
+ * Erde: Standort als Bodenmeter für die Laufwege (29.10.2026). x = Länge × 111 320 m × cos(Breite),
+ * y = Breite × 110 574 m – örtlich maßstabstreu; zurück: Breite = y / 110 574,
+ * Länge = x / (111 320 · cos(Breite)). Szene „earth“, damit Erdoberfläche und Weltkarte zusammen zählen.
+ */
+export function earthPathPoint(geo: { lat: number; lon: number }): { x: number; y: number } {
+  return { x: geo.lon * 111_320 * Math.cos(geo.lat * Math.PI / 180), y: geo.lat * 110_574 }
+}

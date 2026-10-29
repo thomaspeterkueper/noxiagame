@@ -24,8 +24,8 @@ Tabelle `player_activity_log` (Migration `20261028110000_player_activity_log.sql
 **Laufwege** melden bisher:
 - Mond, Mars, Phobos, Deimos (`PlanetaryWalkableSurface`);
 - Innenräume (`WalkableInterior`, `LandmarkWalkableInterior`);
-- Koloniesicht (Kachelraster).
-- **Offen:** die begehbare Erdoberfläche (`EarthWalkableSurface`).
+- Koloniesicht (Kachelraster);
+- Erde: Weltkarte und Erdoberfläche (seit 29.10.2026, Szene `earth`, Bodenmeter: x = Länge × 111 320 × cos(Breite), y = Breite × 110 574).
 
 **Nicht aufgezeichnet:** Tastendrücke, Inhalte von Eingabefeldern (Gespräche stehen im Gesprächsprotokoll), Antworten des Servers. Bereiche mit `data-noxia-private` werden übersprungen. Nur angemeldete Spieler.
 
@@ -69,3 +69,17 @@ Die tägliche Auswertung („NOXIA Gesprächsauswertung“, 7:34 Uhr) liest dies
 - **Fehler mit derselben Aktion bei mehreren Spielern** sind Kandidaten für sofortige Fixes, etwa Kaufen bei vollem Laderaum.
 - **Wege, die an derselben Stelle enden**, deuten auf eine Wand oder eine Blockade hin.
 - **Sitzungen, die nach wenigen Minuten enden**, gehören zusammen mit ihrer letzten Ansicht gelesen: Wo geben Neue auf?
+
+## Erste Auswertung (29.10.2026)
+
+Datenlage: eine Sitzung (McKnight, 28.10.2026, 17:01–17:26 Uhr, 282 Ereignisse), danach nicht gespielt. Dazu die Laufzeitfehler des Servers (Vercel, 24 Stunden). Befunde und was daraus wurde:
+
+| Befund | Ursache | Behoben |
+|---|---|---|
+| 86 Fehler beim Laden der Kartenkacheln (17 × Serverfehler, 69 × abgebrochen) | Objekte einer Region wurden mit Versatz seitenweise gelesen; jede Seite las den ganzen Primärschlüssel (75 000 Zeilen, 0,44 s je Seite) und lief bei vielen Kacheln gleichzeitig in die Zeitgrenze von 8 s (Fehler 57014). Die abgebrochenen sind meist Ansichtswechsel. | Index `region_features (region_id, id)` und Weiterblättern über die letzte ID: 6 ms je Seite (`tileSource.server.ts`, Migration `20261029040000_region_features_region_id_id.sql`). |
+| 17 Wutklicks auf „Menge erhöhen“ (Handel, Phobos) | Vor der Wahl Kauf/Verkauf galt als Obergrenze der freie Laderaum; bei vollem Laderaum blieb die Menge stumm bei 1. | Vor der Wahl gilt Bestand oder Laderaum, je nachdem, was größer ist; an der Grenze ist der Knopf gesperrt und sagt warum (`BuyRow.tsx`). |
+| 20 × Status 409 von Förderung, Erkundung, Bohrung, Probenanalyse | Die Phobos-Ansicht fragt den Stand ab, auch wenn man von der Erde aus plant; die Abfrage antwortete „nur vor Ort“ als Fehler. | Abfragen aus der Ferne antworten jetzt mit leerer Liste und Hinweis (`onSite: false`), Handlungen bleiben gesperrt. |
+| (Serverprotokoll) 20 Ticks ohne Standorte der Menschen | Wer arbeitete, aber nur eine Wohnung im realen Haus hatte, brachte eine leere Kachel-ID in die Abfrage („invalid input syntax for type uuid: "null"“); die ganze Standortberechnung brach ab. | Leere IDs werden herausgefiltert (`surfacePresence.ts`, Test vorhanden). |
+| Kaum Laufwege | Die Erde meldete keine Positionen. | Weltkarte und Erdoberfläche melden jetzt mit (siehe oben). |
+
+Offen: Die Baubarkeitsprüfung auf der Erde scheiterte 4-mal (Status 400), eine Lokal-Schicht 2-mal (404) – zu wenige Fälle, um die Ursache sicher zu sagen; mit mehr Sitzungen wieder ansehen.

@@ -61,5 +61,18 @@ function mockSupabase(seed:Record<string,any[]>,writes:any[]){
   check(Math.abs(writes[0]?.latitude_deg-51.3287)<0.000001,'observed feature coordinate anchors person')
 }
 
+{
+  // 29.10.2026: Wer arbeitet, aber nur eine Wohnung im realen Haus hat (region_feature),
+  // darf keine „null“-Kachel in die Abfrage bringen.
+  const writes:any[]=[]
+  const asked:any[][]=[]
+  const base:any=mockSupabase({tile_entities:[],region_features:[],celestial_regions:[],person_surface_presence:[],person_travel_state:[]},writes)
+  const supabase:any={from:(name:string)=>{const b=base.from(name);const inner=b.in;b.in=(key:string,values:any[])=>{if(name==='tile_entities')asked.push(values);return inner(key,values)};return b}}
+  const people=[{id:'mo',display_name:'Mo',birth_year:null,current_location_id:'earth',simulation_tier:'active',activity_state:'working',last_action:'work',last_decision_factors:{},last_tick:12}]
+  const assignments=[{id:'h',person_id:'mo',assignment_type:'home',location_id:'earth',tile_entity_id:null,region_feature_id:'house',is_active:true}]
+  await projectSurfacePresence(supabase,12,people,assignments)
+  check(asked.every(values=>values.every(value=>value)),'no null tile id is sent to the database')
+}
+
 if(failures)throw new Error(String(failures)+' surface presence test(s) failed')
 console.log('Authoritative person surface presence: tests passed')

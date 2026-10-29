@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   apiActionParam,
   cleanLabel,
+  earthPathPoint,
   isActivityKind,
   isRageClick,
   normalizeApiPath,
@@ -37,3 +38,11 @@ assert.equal(shouldReportPosition({ t: t - 6000, x: 0, y: 0, scope: 'moon' }, { 
 assert.equal(shouldReportPosition({ t: t - 100, x: 0, y: 0, scope: 'moon' }, { t, x: 0, y: 0, scope: 'cafe' }), true)
 
 console.log('activityRules: ok')
+
+// Erde: Bodenmeter, örtlich maßstabstreu (Sundern, 29.10.2026)
+{
+  const a = earthPathPoint({ lat: 51.33, lon: 8.0 }), b = earthPathPoint({ lat: 51.33, lon: 8.001 })
+  assert.ok(Math.abs((b.x - a.x) - 69.6) < 0.5, 'ein tausendstel Grad Länge sind in Sundern rund 70 m')
+  const c = earthPathPoint({ lat: 51.331, lon: 8.0 })
+  assert.ok(Math.abs((c.y - a.y) - 110.6) < 0.5, 'ein tausendstel Grad Breite sind rund 111 m')
+}

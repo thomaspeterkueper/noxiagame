@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
   const user = await userFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
-  if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ error: 'Bohrmissionen sind nur vor Ort auf Phobos verfügbar.' }, { status: 409 })
+  if (!await requirePhobosPresence(supabase, user.id)) return NextResponse.json({ ok: false, onSite: false, error: 'Bohrmissionen sind nur vor Ort auf Phobos verfügbar.', discoveries: [], samples: [], jobs: [], robots: [] })
   try {
     const { location } = await phobosContext(supabase)
     await resolveDuePhobosJobs(supabase, user.id, location.id)
