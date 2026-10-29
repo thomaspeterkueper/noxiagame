@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict'
+import { detectFeatureWish } from './featureWish'
+
+const t = (s: string, r?: string) => detectFeatureWish(s, r)
+
+assert.deepEqual(t('Ich suche eine Toilett'), { kind: 'seeking', object: 'toilett', npcDenied: false })
+assert.equal(t('Kann ich hier pinkeln?')?.kind, 'how_to')
+assert.equal(t('Kann ich hier pinkeln?')?.object, 'pinkeln')
+assert.deepEqual(t('ich möchte ein Cafee eröffnen'), { kind: 'wish', object: 'cafee eröffnen', npcDenied: false })
+assert.equal(t('ich möchte zum raumhafen und den weltraum entdecken')?.kind, 'wish')
+assert.equal(t('Ich kann hier nicht bauen', 'Das geht hier leider nicht.')?.npcDenied, true)
+assert.equal(t('Ich kann hier nicht bauen')?.object, 'bauen')
+assert.equal(t('warum kann ich keine Aktien kaufen')?.kind, 'blocked')
+assert.equal(t('gibt es hier keine Börse?')?.object, 'börse')
+assert.equal(t('das Bezahlen geht nicht')?.kind, 'blocked')
+assert.equal(t('wo kann ich hier schlafen?')?.object, 'schlafen')
+assert.equal(t('hi, gibt es etwas neues in der stadt?'), null)
+assert.equal(t('Moin was gibt es neues?'), null)
+assert.equal(t('danke für den tipp. hast du etwas getraumt?'), null)
+assert.equal(t('Hallo'), null)
+assert.equal(t('Ich mochte Tanz sehen')?.object, 'tanz sehen')
+assert.equal(t('Hier ist zu wenig leute. Wir mussen mehr machen')?.kind, 'missing')
+assert.equal(t('Hallo mochtest du hier kinder machen?'), null)
+assert.equal(t('wie kann man hier kinder machen?')?.object, 'kinder machen')
+console.log('featureWish ok')

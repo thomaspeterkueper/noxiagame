@@ -58,8 +58,24 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - **Raten bremsen:** Nach drei Fehlversuchen in 30 Minuten wartet man, bis der älteste aus dem Fenster fällt.
     - **Auswertung:** `academy_exam_attempts` hält jeden Versuch, Sicht `academy_exam_stats` je Modul (Versuche, bestanden, Spieler, Durchschnitt, gezahlte Prämien).
     - **Frühere Abschlüsse** bleiben gültig. Wer die Prüfung nachholt, bekommt die Prämie.
-    - **Offen:** Module ohne Prüfung bei der SSF lassen sich nicht mehr abschließen und schalten nichts frei. Request an die SSF: jedes Modul mit Freischaltung braucht eine Prüfung.
+    - **Offen:** Module ohne Prüfung bei der SSF lassen sich nicht mehr abschließen und schalten nichts frei.
+      - **Request an die SSF gestellt (29.10.2026):** `solarsciencefoundation/external-tasks/open/EXT-NOXIA-SSF-20261029-exams-for-all-modules.md`. Befund: Lernpfade liefern nie `assessment[]`; die Kurztests kommen als Rohtext-Aufgabe. Elf der achtzehn Module, die NOXIA verlangt, haben gar keinen Kurztest.
+      - **Zwischenlösung:** NOXIA liest die Rohtext-Kurztests selbst (`lib/ssfKnowledge.ts` 0.9.0, `assessmentFromQuizSections`). Kredit, Festgeld, Wasser und Rohstoffe sind damit prüfbar.
     - **Offen:** Das Kursangebot (Reiter „Kurse“) vergibt Wissenspunkte weiter ohne serverseitige Prüfung, aber keine Credits.
+20. ✅ **Personal für die Akademie (29.10.2026, Wunsch Thomas: „braucht auch die Akademie Personal, mit dem man reden kann“) und die Agentur für Arbeit (R-21 Punkt 1).**
+    - **Befund:** Die Akademie der Erde hatte eine Lehrkraft und keine Personalplätze; die Einstellung kannte die Art `school` nicht.
+    - **Neu:** `school` und `job_agency` gehören zu `noxia_staffed_kinds()`. Je drei Plätze: Akademie Lehrkraft, Sekretariat, Lehrbereich; Agentur Vermittlung, Beratung, Büro. Lohnschlüssel `job_advisor` 65 Cr/Tag.
+    - **Übergangsreserve:** 14 Tageslöhne für den öffentlichen Akteur der Erde, ausgewiesen (Migration `20261029100000_academy_and_job_agency_staff.sql`, live).
+    - **Besetzt:**
+      - Akademie: Amara Ndlovu (Lehrkraft), Anna Busch (Sekretariat), Felix Petrović (Lehrkraft);
+      - Agentur: Emilia Klein, Felix Schulte (Vermittlung, Beratung), Jakob Lange (Büro).
+    - **Wissen:** Das Personal der Akademie kennt Prüfung, Prämie und Wartezeit (`academyInterior.ts` 1.1.0).
+    - **Offen:** Akademien auf Mars und Phobos – dort fehlen Lage für Bewerber und Arbeitgeber am Haus; in der Kolonieansicht öffnet die Schule direkt den Lernraum ohne Innenraum.
+21. ✅ **Spielerwünsche aus Gesprächen (29.10.2026, Wunsch Thomas; ausnahmsweise im Gesprächsteil, sonst Gastronomie G-6).**
+    - Jeder Gesprächszug wird auf Hinweise geprüft („ich kann nicht …“, „gibt es kein …“, „ich suche …“) und im Protokoll markiert (`lib/game/cognition/featureWish.ts`, Route 1.7.0).
+    - Gebündelt in der Sicht `player_feature_wishes`, geprüft in `player_feature_wish_reviews`: Spielidee, Ethik, Spielraum (Eigen-, Fremd-, Folge-, Gemeinraum – hilft es beim Werden oder schränkt es ein).
+    - Die tägliche Auswertung empfiehlt, Thomas entscheidet; erst dann wird ein Request geschrieben.
+    - Prüfweg und erste acht Prüfungen: `docs/reviews/spielerwuensche.md` (Migration `20261029110000_player_feature_wishes.sql`, live).
 
 ## Requests aus anderen Teilprojekten
 
@@ -562,7 +578,7 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
 - Betriebe und Läden, Mitflug und feste Anstellung stehen als „folgt“ an der Wand. Erfunden wird nichts.
 
 **Bitte:**
-1. ✅ **Gebäude angelegt (Gastronomie, 29.10.2026, live):** Gebäudeart `job_agency` (nicht baubar, wie das Reisebüro) und staatliche Agentur im realen Haus **Freiheitsmühle 7** (`osm:way:1474125073`, 51,3 × 30 m, `20261029020000_earth_job_agency.sql`). Thomas: „Nimm das Gebäude, das besser passt, wir müssen nicht perfekt sein.“ Bei Nr. 1 gibt es in den Kartendaten nur schmale Winkelbauten. **Für euch bleibt das Personal:** `job_agency` in `noxia_staffed_kinds`, `building_staff_roles` (1 Vermittlung, 2 Beratung, 3 Büro), Lohnschlüssel `job_advisor` und Übergangsreserve wie bei Bank und Reisebüro.
+1. ✅ **Gebäude angelegt (Gastronomie, 29.10.2026, live):** Gebäudeart `job_agency` (nicht baubar, wie das Reisebüro) und staatliche Agentur im realen Haus **Freiheitsmühle 7** (`osm:way:1474125073`, 51,3 × 30 m, `20261029020000_earth_job_agency.sql`). Thomas: „Nimm das Gebäude, das besser passt, wir müssen nicht perfekt sein.“ Bei Nr. 1 gibt es in den Kartendaten nur schmale Winkelbauten. **Für euch bleibt das Personal:** `job_agency` in `noxia_staffed_kinds`, `building_staff_roles` (1 Vermittlung, 2 Beratung, 3 Büro), Lohnschlüssel `job_advisor` und Übergangsreserve wie bei Bank und Reisebüro. ✅ **Erledigt 29.10.2026** (Aufgabe 20): drei Personen eingestellt.
    Ursprünglich: `building_definitions` Zeile `job_agency`, „Agentur für Arbeit“, staatlich, und ein `tile_entities`-Eintrag am realen Haus Freiheitsmühle 1 (Muster: Bank Hauptstraße 140, `20261027090000_earth_bank_sparkasse.sql`).
    - Die Kartendaten führen dort nur Nr. 7 (`osm:way:1474125073`). Kandidaten ohne Hausnummer daneben: `osm:way:191140747` (48 × 48 m) und `osm:way:332679119` (30 × 25 m). Welches Haus Nr. 1 ist, bitte prüfen; die Erdkarte (W-…) kann helfen.
    - Dazu `staff_capacity` 3: Vermittlung, Beratung, Büro. Personal wie bei der Bank (R-14), Lohnschlüssel z. B. `job_advisor`.

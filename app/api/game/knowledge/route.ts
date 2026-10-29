@@ -192,7 +192,7 @@ export async function GET(req: NextRequest) {
       const passedNow = exam.passed
       review = mod.assessment.map((q, i) => ({
         right: answers[i] === q.correctOption,
-        explanation: q.explanation,
+        explanation: q.explanation || (answers[i] === q.correctOption ? 'Richtig.' : 'Noch nicht – lies den Abschnitt dazu noch einmal.'),
         correctOption: passedNow ? q.correctOption : null,
       }))
       await supabase.from('academy_exam_attempts').insert({

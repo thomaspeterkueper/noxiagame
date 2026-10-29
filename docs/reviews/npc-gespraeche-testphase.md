@@ -2,6 +2,8 @@
 
 Stand: 28.10.2026. Wunsch Thomas (27.10.2026): Gespräche der Spieler mit Figuren speichern und auswerten; wer immer wieder Ähnliches fragt, bekommt einen Abbruchsatz. Täglich auswerten – wer spricht, ob es vor allem Figuren untereinander sind, worüber zu realen Themen gesprochen wird und ob Gespräche das Handeln der Figuren beeinflussen.
 
+Seit 29.10.2026 markiert jeder Gesprächszug auch Hinweise auf fehlende Funktionen. Wie daraus geprüfte Wünsche werden: `docs/reviews/spielerwuensche.md`.
+
 ## Was gespeichert wird
 
 Tabelle `npc_conversation_log` (Migration `20261027200000_npc_conversation_log.sql`). Sie ist append-only und hat eine Zeile je Wortmeldung:

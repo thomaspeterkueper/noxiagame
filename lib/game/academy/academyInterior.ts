@@ -2,6 +2,8 @@
 // Grundriss und Wissen der Akademie für den allgemeinen Innenraum
 // (NOXIA-INTERIOR-0001): Lernraum mit Doppelpulten, Rednerpult und Tafel,
 // Sekretariat als Bedienplatz, Lehrbereich dahinter. Reine Regeln.
+// Aktualisiert: 29.10.2026 — Personal weiß von Prüfung und Prämie; drei Stellen (Lehrkraft, Sekretariat, Lehrbereich)
+// Version:      1.1.0
 
 import { ACADEMY_STANDARD_INTERIOR } from '../buildings/interiors/templates/academyStandard'
 import { VENUE_HEIGHT, VENUE_WIDTH, staffSpot, standingSpot, tables, type VenueLayout } from '../hospitality/venues'
@@ -50,7 +52,11 @@ export function academyKnowledge(modules: readonly SsfKnowledgeModule[]): string
     `Die Akademie bietet ${modules.length} Lernmodule, z. B. ${sample}`,
     domains.length ? `Fachgebiete: ${domains.join(', ')}` : '',
     'Angemeldet wird am Sekretariat; gelernt und geprüft wird im Lernraum; mehr Wissen öffnet im Spiel mehr Möglichkeiten',
-    'Preise oder Prüfungsergebnisse kennst du nur, wenn sie in deinen Fakten stehen – erfinde keine',
+    'Ein Modul gilt erst als abgeschlossen, wenn man seine Prüfung besteht (mindestens 70 % richtig); nur Lesen schaltet nichts frei',
+    'Wer die Prüfung besteht, bekommt die Freischaltung und einmal je Modul eine Prämie: 30 Credits für Grundstufe L0, 60 für L1, 120 für L2',
+    'Nach drei Fehlversuchen in einer halben Stunde muss man kurz warten; nach jedem Versuch erklärt der Lernraum die Fragen',
+    'Manche Module haben noch keine Prüfung; die lassen sich noch nicht abschließen – die Solar Science Foundation liefert sie nach',
+    'Prüfungsergebnisse einzelner Leute kennst du nur, wenn sie in deinen Fakten stehen – erfinde keine',
   ]
   return facts.filter(Boolean)
 }

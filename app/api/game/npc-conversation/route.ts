@@ -1,11 +1,13 @@
 // app/api/game/npc-conversation/route.ts
+// Aktualisiert: 29.10.2026 — Hinweise auf fehlende Funktionen im Protokoll (wish_kind, wish_object)
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
-// Version:      1.6.0
+// Version:      1.7.0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
 import { createHash } from 'node:crypto'
+import { detectFeatureWish } from '@/lib/game/cognition/featureWish'
 import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
 import {
   assessRepeat,
@@ -111,6 +113,9 @@ async function ensureLandmarkStaffPerson(personKey: string, displayName: string,
 
 /** Eine Zeile im Gesprächsprotokoll; ein Fehler hier darf das Gespräch nicht stören. */
 async function logConversationTurn(row: Record<string, unknown>) {
+  // Hinweis auf eine fehlende Funktion (29.10.2026, docs/reviews/spielerwuensche.md).
+  const wish = row.opening ? null : detectFeatureWish(String(row.player_text ?? ''), typeof row.npc_reply === 'string' ? row.npc_reply : null)
+  if (wish) Object.assign(row, { wish_kind: wish.kind, wish_object: wish.object, wish_npc_denied: wish.npcDenied })
   const { error } = await serviceClient.from('npc_conversation_log').insert(row)
   if (error) console.error('npc conversation log failed', { code: error.code })
 }
