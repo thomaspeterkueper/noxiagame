@@ -224,6 +224,20 @@ Hintergrund: Recherche vom 28.10.2026 zu freien Diensten für intelligente NPCs 
 
 **Regeln bleiben:** Gespräch erzeugt keine Fakten; Aktionen (`[[ACTION:…]]`) prüft weiter allein der Server; das Prompt bleibt gleich, nur der Anbieter wechselt.
 
+### G-8 (Chat 29.10.2026): Grok übernimmt, wenn Spieler ausfallend werden
+
+Anlass: Thomas hat den Eindruck, dass Grok direkter antwortet und zu den Gesprächen passt, die Vassili geführt hat. Wenn Spieler ausfallend reagieren, soll Grok die Figur sprechen. Aufbauend auf G-7 (Router) und `EXT-ECO-NOXIA-20261028-001` (Prüfsuite).
+
+1. **Auslöser, deterministisch zuerst:** Wortliste und einfache Muster für Beleidigungen und Anpöbeln (Deutsch), geprüft auf der Spielereingabe vor dem Modellaufruf. Kein Modell entscheidet über den Wechsel. Zählt mehrere Eingaben in Folge als „ausfallend“, bleibt die Figur in diesem Gespräch bei Grok (Zustand je Gespräch, nicht je Spieler).
+2. **Anbieter:** xAI (`https://api.x.ai/v1`, OpenAI-kompatibel) als zusätzlicher Eintrag im Router, nur über `NPC_LLM_ESCALATION=xai` erreichbar, nicht in `NPC_LLM_CHAIN`. Modell zunächst `grok-4.3` (1,25 $/2,50 $ je Mio. Token); als Vergleich `x-ai/grok-4-fast:free` über OpenRouter. Fällt xAI aus oder ist kein Schlüssel gesetzt, antwortet die normale Kette.
+3. **Sprachregeln unverändert:** Dasselbe Prompt und dieselben Grounding-Regeln. Direkter heißt: knapp, klare Grenze, kein Einknicken – nicht: selbst beleidigen, drohen oder Fakten erfinden. Der Server prüft Aktionen (`[[ACTION:…]]`) wie bisher allein; ein Streit ändert Preise, Öffnung oder Zugang nur über Spielregeln, nicht über das Gespräch.
+4. **Budget:** Aufrufe an xAI zählen im Budget-Deckel aus G-7 mit eigenem Wert (`NPC_LLM_ESCALATION_MAX_PER_DAY`). Danach kurze Standardantwort ohne Modell.
+5. **Datenschutz:** An xAI geht nur Spielkontext (Figur, Ort, die letzten Äußerungen), keine Konto- oder Spielerdaten. Vor dem Einschalten Auftragsverarbeitung und Datenfreigabe-Optionen im xAI-Konto prüfen.
+6. **Messung:** 10–15 Eskalationsfälle in die Prüfsuite aufnehmen und gegen Grok, DeepSeek und Groq laufen lassen: Regeltreue, Länge, Ton (kein Hochschaukeln, keine erfundenen Fakten). Danach entscheidet die Tabelle, ob Grok bleibt.
+7. `logConversationTurn` vermerkt `escalation: true` und den Auslöser.
+
+**Zu klären (Thomas):** xAI-Konto und Schlüssel anlegen; Inhaltsrahmen für Beleidigungen festlegen (z. B. bis wohin die Figur zurückgibt, ab wann sie das Gespräch beendet).
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird. Stand 28.10.2026: Die Tabelle wird stündlich geschrieben, aber nur für 34 Personen in 18 Häusern. Das Personal von Metropol (2) und Balkan Grill (3) fehlt darin, deshalb noch nicht umstellbar.
