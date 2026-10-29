@@ -73,6 +73,12 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Gebäude, Stellenliste und weitere Stellenarten: R-21.
   - **29.10.2026:** Agentur live angelegt im realen Haus Freiheitsmühle 7 (Thomas: „nimm das Gebäude, das besser passt“; bei Nr. 1 gibt es nur schmale Winkelbauten). Kartensymbol ⚒. Personal folgt mit R-21.
 
+- **29.10.2026 – VERA, Vermittlungsroboter der Agentur:**
+  - Thomas: „Personal oder wenigstens Roboter, damit wir Arbeitssuchende beraten und aus dem Gespräch neue Ideen für NOXIA entwickeln können … vielleicht hilft das auch Personen, die im echten Leben noch orientierungslos sind“.
+  - Der Motor kann jetzt Figuren ohne Personeneintrag (`extraResidents`, Kennung `robot:…`), mit eigener Roboterfigur und eigenem Bild.
+  - VERA berät in der Spielwelt, nimmt Wünsche nach neuen Arbeiten auf und hilft bei Fragen zum echten Leben, mit Verweis auf die echte Berufsberatung und Check-U. Sie sagt offen, dass sie eine Maschine und Spielfigur ist.
+  - Im Browser geprüft, Tests in `jobAgency.test.ts`. Auswertung der Wünsche: R-22.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -91,6 +97,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-22** (29.10.2026): Wünsche aus der Arbeitsvermittlung in der täglichen Gesprächsauswertung; echte Lebensfragen sorgsam – `population-economy.md`.
 - **R-21** (28.10.2026): Arbeitsvermittlung – Gebäude Freiheitsmühle 1, Stellenliste, Betriebe, Schiffe, feste Anstellung – `population-economy.md`.
 - **R-20** (28.10.2026): Spieler arbeiten im Lokal – Stellen, Schicht, Lohn und Trinkgeld über `/api/game/hospitality/shift` – `population-economy.md`.
 - **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.

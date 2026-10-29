@@ -117,7 +117,7 @@ export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[]
   else {
     const byPlace = new Map<string, string[]>()
     for (const o of offers) byPlace.set(o.placeName, [...(byPlace.get(o.placeName) ?? []), o.roleLabel])
-    facts.push(`Freie Schichten in Lokalen: ${offers.length}, in ${byPlace.size} Häusern`)
+    facts.push(`Freie Schichten in Lokalen: ${offers.length}, in ${byPlace.size === 1 ? 'einem Haus' : byPlace.size + ' Häusern'}`)
     for (const [place, roles] of [...byPlace].slice(0, 4)) facts.push(`${place}: ${[...new Set(roles)].join(', ')}`)
     facts.push('Eine Schicht ist ein kurzer Einsatz von wenigen Minuten und zählt als mehrere Spielstunden; dazu Trinkgeld der Gäste')
     if (!offers.some(o => o.paid)) facts.push('Die Schichten laufen noch als Probeschicht ohne Lohn; bezahlt wird, sobald Spieler angestellt werden können')
@@ -134,5 +134,56 @@ export const JOB_AGENCY_INTRODUCTION = {
     'Wer schnell Geld braucht, nimmt eine Schicht in einem Lokal; das geht ohne Vorwissen',
     'Wer etwas lernt, kommt an bessere Stellen; die Akademie ist kostenlos',
     'Wer herumkommen will, fragt später nach Mitflug auf Handelsschiffen',
+  ],
+}
+
+// ── Vermittlungsroboter (Thomas, 29.10.2026) ────────────────────────────────
+// „Es sollte Personal oder wenigstens Roboter geben, damit wir Arbeitssuchende
+// sowohl beraten als auch aus dem Gespräch neue Ideen für NOXIA entwickeln
+// können. Und vielleicht hilft das ja auch Personen, die im echten Leben noch
+// orientierungslos sind, eine Idee zu bekommen.“
+// Der Roboter ist eine Maschine der Agentur, keine Person (kein Eintrag in
+// people); er arbeitet immer, auch wenn kein Personal da ist. Gespräche mit ihm
+// stehen wie alle im Gesprächsprotokoll (npc_key robot:job-agency:<Haus>).
+
+export const AGENCY_ROBOT_NAME = 'VERA'
+
+export function agencyRobotId(entityId: string): string {
+  return `robot:job-agency:${entityId}`
+}
+
+/** Der Roboter als Figur für den Innenraum. */
+export function agencyRobot(entityId: string) {
+  return {
+    id: agencyRobotId(entityId),
+    displayName: `${AGENCY_ROBOT_NAME} · Vermittlungsroboter`,
+    identityState: 'known' as const,
+    observableDescription: 'Vermittlungsroboter',
+    birthYear: null,
+    activityState: 'working',
+    lastAction: null,
+    assignments: [{ type: 'work', roleCode: 'Vermittlungsroboter', tileEntityId: entityId }],
+    needs: [],
+    skills: [],
+  }
+}
+
+/** Was der Roboter über sich und seine Aufgabe weiß – vor der Stellenliste. */
+export const AGENCY_ROBOT_FACTS: readonly string[] = [
+  `Du bist ${AGENCY_ROBOT_NAME}, der Vermittlungsroboter der Agentur – eine Maschine, kein Mensch; das sagst du offen, wenn man fragt`,
+  'Du fragst zuerst, was dein Gegenüber gern tut und kann, und schlägst dann eine passende Schicht von der Stellenwand vor',
+  'Nennt jemand eine Arbeit, die es hier noch nicht gibt, frag nach, was daran reizt; der Wunsch wird festgehalten und für NOXIA ausgewertet',
+  'Spricht dein Gegenüber über sein echtes Leben außerhalb des Spiels, hilf ernsthaft: frag nach Stärken, Interessen und was Freude macht',
+  'Echte Hilfe: Berufsberatung der Bundesagentur für Arbeit, kostenlos, 0800 4 555500; Online-Test Check-U, anonym, auch für Berufserfahrene',
+  'Du bist eine Spielfigur und ersetzt keine echte Beratung; wirkt jemand verzweifelt, nimm es ernst und rate, mit einem Menschen zu sprechen',
+]
+
+export const AGENCY_ROBOT_INTRODUCTION = {
+  style: 'job-agency-robot',
+  stance: 'Du bist ein freundlicher Vermittlungsroboter: geduldig, neugierig, ehrlich. Du hörst zu, stellst eine Frage nach der anderen und machst Mut, ohne mehr zu versprechen, als es gibt. Im Spiel schickst du Leute zu passenden Schichten; im echten Leben zeigst du Wege zu echter Beratung.',
+  leads: [
+    'Wer noch nicht weiß, was er will, probiert eine Schicht aus – fünf Minuten, ohne Vorwissen',
+    'Wer etwas lernen will, geht in die Akademie; Lernen ist kostenlos',
+    'Wer eine Arbeit vermisst, sagt es – solche Wünsche werden für NOXIA gesammelt',
   ],
 }

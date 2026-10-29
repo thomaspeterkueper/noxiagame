@@ -15,6 +15,7 @@ import { getSessionInfo } from '@/lib/supabase/auth'
 import { reportPlayerPosition } from '@/lib/telemetry/playerActivity'
 import { NpcFigure, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import { PersonPortrait } from '@/lib/grid/PersonPortrait'
+import { RobotFigure, RobotPortrait, isRobotId } from '@/lib/grid/RobotVisual'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import { learningGatesFor, type LearningNeed } from '@/lib/game/interiors/learningGates'
 import SsfModuleRenderer from '@/app/academy/learn/SsfModuleRenderer'
@@ -140,6 +141,8 @@ export interface InteriorFitting {
   playerTag?:string|null
   /** Stimmung der Tanzfläche (Musikstil des DJ), als CSS-Klasse. */
   floorMood?:string|null
+  /** Zusätzliche Figuren ohne Personeneintrag, z. B. ein Roboter (Kennung „robot:…“). */
+  extraResidents?:ColonyResident[]
 }
 
 export type Props = {
@@ -273,9 +276,11 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const visits=fitting.visits
   const worksHere=(r:ColonyResident)=>r.assignments.some(a=>a.type==='work'&&a.tileEntityId===entityId)
   const everyone=useMemo(()=>{
-    const known=new Set(residents.map(r=>r.id))
-    return[...residents,...visits.filter(visit=>!known.has(visit.resident.id)).map(visit=>visit.resident)]
-  },[residents,visits])
+    const extra=fitting.extraResidents??[]
+    const known=new Set([...residents,...extra].map(r=>r.id))
+    return[...residents,...extra.filter(r=>!residents.some(x=>x.id===r.id)),...visits.filter(visit=>!known.has(visit.resident.id)).map(visit=>visit.resident)]
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[residents,visits,(fitting.extraResidents??[]).map(r=>r.id).join()])
   const{figures,moments,joined}=useMemo(()=>{
     const ageOf=new Map(visits.map(visit=>[visit.resident.id,visit.ageSeconds+(nowMs-visit.fetchedAt)/1000]))
     const placed=placeVenueFigures(layout,everyone.map(r=>({id:r.id,worksHere:worksHere(r),isCompanion:Boolean(companion&&r.id===companion.id),presenceRoomId:r.interiorPresence?.roomId??null,displayPriority:r.personDepth?.level==='focal'?3:r.personDepth?.level==='developed'?2:r.personDepth?.level==='situated'?1:0})))
@@ -406,7 +411,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {shown.map(({figure,resident,moment})=>{
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className={'npc'+(figure.spot.id.startsWith('dance-')&&!closed?' dancing':'')} style={{left:figure.spot.x-12,top:figure.spot.y-34}}>
-            <NpcFigure id={resident.id} name={personSceneLabel(resident)} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setHistory([])}}/>
+            {isRobotId(resident.id)?<RobotFigure name={resident.displayName} selected={selected?.id===resident.id} showLabel={selected?.id===resident.id||near} onClick={()=>{setSelected(resident);setHistory([])}}/>:<NpcFigure id={resident.id} name={personSceneLabel(resident)} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setHistory([])}}/>}
           </div>
         })}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
@@ -427,7 +432,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
       </div>
       <aside>
         <small>{fitting.noun.toUpperCase()} · {fitting.sectionLabel}</small>
-        {selected?<div className="portrait"><PersonPortrait id={selected.id} role={selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={64} title={personSceneLabel(selected)}/><div><h3>{personSceneLabel(selected)}</h3>{selected.identityState==='known'&&<small>{selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState}</small>}</div></div>:<h3>{layout.template.rooms.find(r=>r.id===layout.playerRoomId)?.name??'Raum'}</h3>}
+        {selected?<div className="portrait">{isRobotId(selected.id)?<RobotPortrait size={64} title={selected.displayName}/>:<PersonPortrait id={selected.id} role={selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={64} title={personSceneLabel(selected)}/>}<div><h3>{personSceneLabel(selected)}</h3>{selected.identityState==='known'&&<small>{selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState}</small>}</div></div>:<h3>{layout.template.rooms.find(r=>r.id===layout.playerRoomId)?.name??'Raum'}</h3>}
         {selected&&selected.identityState!=='known'&&selected.observableDescription&&selected.observableDescription!==personSceneLabel(selected)&&<p className="desc">{selected.observableDescription}</p>}
         {!selected&&closedInfo&&<p>{closedInfo.detail}</p>}
         {!selected&&!closed&&!nearService&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{fitting.idleText?' '+fitting.idleText:''}</p>}

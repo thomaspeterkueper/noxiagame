@@ -9,10 +9,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
-import { JOB_AGENCY_INTRODUCTION, JOB_AGENCY_LAYOUT, JOB_CATEGORY_LABEL, distanceM, jobAgencyKnowledge, venueJobOffers, type AgencyBuilding, type JobOffer } from '@/lib/game/jobs/jobAgency'
+import { AGENCY_ROBOT_FACTS, AGENCY_ROBOT_INTRODUCTION, JOB_AGENCY_INTRODUCTION, JOB_AGENCY_LAYOUT, agencyRobot, JOB_CATEGORY_LABEL, distanceM, jobAgencyKnowledge, venueJobOffers, type AgencyBuilding, type JobOffer } from '@/lib/game/jobs/jobAgency'
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
+import { isRobotId } from '@/lib/grid/RobotVisual'
 
 type Props = { entityId: string; buildingName: string; companion?: ColonyResident | null; onClose: () => void }
 
@@ -47,6 +48,8 @@ export default function JobAgencyWalkableInterior({ entityId, buildingName, comp
 
   const knowledge = useMemo(() => jobAgencyKnowledge(offers), [offers])
   const layout = JOB_AGENCY_LAYOUT
+  // Der Vermittlungsroboter arbeitet immer – auch ohne Personal (Thomas, 29.10.2026).
+  const robot = useMemo(() => agencyRobot(entityId) as unknown as ColonyResident, [entityId])
   // In der Nähe zuerst, dann nach Lohn.
   const shown = useMemo(() => !offers ? [] : here ? [...offers].sort((a, b) => distanceM(here, a) - distanceM(here, b) || b.wage - a.wage) : offers, [offers, here])
 
@@ -58,12 +61,13 @@ export default function JobAgencyWalkableInterior({ entityId, buildingName, comp
     decor: { plants: [[400, 112], [700, 420]], rug: { x: 150, y: 125, w: 300, h: 120 } },
     visits: [],
     facts: (self, ctx) => withExtraFacts(
-      baseInteriorFacts({ layout, buildingName, self, figures: ctx.figures, playerPos: ctx.pos, playerSeat: ctx.seat, staffRoleText: 'Du arbeitest hier in der Arbeitsvermittlung' }),
-      self.roomRole === 'staff' ? knowledge : ['Du wartest hier selbst; die Stellen hängen an der Wand'],
+      baseInteriorFacts({ layout, buildingName: buildingName.split(' · ').pop() ?? buildingName, self, figures: ctx.figures, playerPos: ctx.pos, playerSeat: ctx.seat, staffRoleText: 'Du arbeitest hier in der Arbeitsvermittlung' }),
+      isRobotId(self.id) ? [...AGENCY_ROBOT_FACTS, ...knowledge] : self.roomRole === 'staff' ? knowledge : ['Du wartest hier selbst; die Stellen hängen an der Wand'],
     ),
     placeKnowledge: [],
     hearsay: () => [],
-    introduction: self => self.roomRole === 'staff' ? JOB_AGENCY_INTRODUCTION : undefined,
+    introduction: self => isRobotId(self.id) ? AGENCY_ROBOT_INTRODUCTION : self.roomRole === 'staff' ? JOB_AGENCY_INTRODUCTION : undefined,
+    extraResidents: [robot],
     things: [],
     idleText: 'An der Stellenwand hängen die freien Schichten im Ort; an der Vermittlung berät man dich.',
     greetsAtService: true,

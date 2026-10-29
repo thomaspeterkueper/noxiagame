@@ -1,6 +1,7 @@
 import { validateInteriorTemplate } from '../buildings/interiors/topology'
 import { canSeeRoom, isVenueBlocked, placeVenueFigures, venuePath } from '../hospitality/venues'
-import { JOB_AGENCY_LAYOUT as L, distanceM, jobAgencyKnowledge, venueJobOffers } from './jobAgency'
+import { AGENCY_ROBOT_FACTS, AGENCY_ROBOT_INTRODUCTION, JOB_AGENCY_LAYOUT as L, agencyRobot, agencyRobotId, distanceM, jobAgencyKnowledge, venueJobOffers } from './jobAgency'
+import { MAX_FACTS, MAX_FACT_CHARS, baseInteriorFacts, withExtraFacts } from '../interiors/baseFacts'
 
 let failures = 0
 function check(ok: boolean, label: string) { if (!ok) { failures++; console.error('FAIL', label) } }
@@ -27,6 +28,17 @@ check(distanceM({ lat: 51.33, lon: 8 }, { lat: 51.331, lon: 8 }) > 100 && distan
 const k = jobAgencyKnowledge(probe)
 check(k[0].startsWith('Freie Schichten in Lokalen') && k.some(f => f.includes('Probeschicht')) && k.some(f => f.includes('noch nicht im Angebot')) && k.every(f => f.length <= 140), 'the advisor knows the board and says what is not there yet')
 check(jobAgencyKnowledge(null)[0].includes('geholt') && jobAgencyKnowledge([])[0].includes('keine freien'), 'without data nothing is invented')
+
+// Vermittlungsroboter
+const rid = agencyRobotId('agency-1')
+check(rid.startsWith('robot:') && agencyRobot('agency-1').assignments[0].tileEntityId === 'agency-1', 'the robot works in this agency')
+const alone = placeVenueFigures(L, [{ id: rid, worksHere: true }])
+const withStaff = placeVenueFigures(L, [{ id: '00000000-0000-4000-8000-000000000001', worksHere: true }, { id: rid, worksHere: true }])
+check(alone[0].spot.id === 'staff-counter' && withStaff.find(f => f.id === rid)?.spot.id === 'staff-advice', 'robot at the counter when alone, at the advice table when there is staff')
+check(AGENCY_ROBOT_FACTS.every(f => f.length <= 140) && AGENCY_ROBOT_FACTS.some(f => f.includes('0800 4 555500') && f.includes('Check-U')) && AGENCY_ROBOT_FACTS.some(f => f.includes('Maschine, kein Mensch')), 'robot facts: honest about being a machine, real help for real life')
+check(AGENCY_ROBOT_INTRODUCTION.stance.length <= 320 && AGENCY_ROBOT_INTRODUCTION.leads.every(l => l.length <= 180), 'robot introduction within the route limits')
+const robotFacts = withExtraFacts(baseInteriorFacts({ layout: L, buildingName: 'Agentur für Arbeit · Freiheitsmühle 7', self: alone[0], figures: alone, playerPos: L.servicePoint }), [...AGENCY_ROBOT_FACTS, ...jobAgencyKnowledge(probe)])
+check(robotFacts.length <= MAX_FACTS && robotFacts.every(f => f.length <= MAX_FACT_CHARS) && AGENCY_ROBOT_FACTS.every(f => robotFacts.includes(f)) && robotFacts.some(f => f.startsWith('Freie Schichten')), 'all robot facts and the job summary fit')
 
 if (failures > 0) throw new Error(`job agency: ${failures} checks failed`)
 console.log('job agency checks passed')

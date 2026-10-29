@@ -593,3 +593,24 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
 
 **Bitte:** Neue Bauten aus dem Selbstbau mit `placement_mode = 'world'`, `x_m`, `y_m`, `rotation_deg`, `footprint_width_m`, `footprint_depth_m` anlegen – frei von bestehenden Bauten und Korridoren, möglichst im Wohnviertel des Ortes (auf dem Mars ab 70 / 200 nach Osten weiter). Die Prüfung von Lage und Abstand gibt es serverseitig schon in `POST /api/game/build/spatial`; derselbe Weg ist für Bewohner am einfachsten.
 
+### R-22 (Gastronomie, 29.10.2026): Wünsche aus der Arbeitsvermittlung auswerten
+
+Thomas, 29.10.2026: „Es sollte Personal oder wenigstens Roboter geben, damit wir Arbeitssuchende sowohl beraten als auch aus dem Gespräch neue Ideen für NOXIA entwickeln können. Und vielleicht hilft das ja auch Personen, die im echten Leben noch orientierungslos sind, eine Idee zu bekommen.“
+
+**Was schon da ist (Gastronomie):**
+- In der Agentur für Arbeit (Freiheitsmühle 7) arbeitet immer **VERA, ein Vermittlungsroboter** (`lib/game/jobs/jobAgency.ts`, `lib/grid/RobotVisual.tsx`).
+  - Ohne Personal steht sie an der Vermittlung, mit Personal am Beratungstisch.
+  - Sie ist eine Maschine, kein Eintrag in `people`, und sagt das offen.
+- VERA fragt zuerst, was jemand gern tut, und schlägt dann eine Schicht von der Stellenwand vor.
+- Nennt jemand eine Arbeit, die es noch nicht gibt, fragt sie nach, was daran reizt, und sagt, dass der Wunsch festgehalten und ausgewertet wird.
+- Spricht jemand über sein echtes Leben, hilft sie ernsthaft: Sie fragt nach Stärken und Interessen und nennt die echte Berufsberatung der Bundesagentur für Arbeit (kostenlos, 0800 4 555500) und den Test Check-U. Sie sagt, dass sie eine Spielfigur ist, und rät bei Verzweiflung, mit einem Menschen zu sprechen.
+- Gespräche mit VERA stehen im Gesprächsprotokoll unter `npc_key` `robot:job-agency:<Haus>`. Ein persönliches Gedächtnis hat sie nicht (keine Person).
+
+**Bitte:**
+1. **Tägliche Auswertung:** In „NOXIA Gesprächsauswertung“ einen eigenen Abschnitt „Wünsche aus der Arbeitsvermittlung“ anlegen.
+   - Welche Arbeiten sich Spieler wünschen, die es noch nicht gibt; was sie daran reizt; wie oft.
+   - Daraus Vorschläge für neue Stellen oder Gebäude, wie heute die Befunde in G-6.
+   - Am einfachsten über eine Sicht `npc_conversation_job_wishes`, Filter `npc_key like 'robot:job-agency:%'`.
+2. **Echtes Leben – sorgsam:** Gespräche über das echte Leben (Ausbildung, Beruf, Orientierung) sind persönlich. In der Auswertung bitte nur zusammengefasst und ohne Zuordnung zu Spielern; keine Zitate mit persönlichen Angaben. Der offene Punkt „Hinweis an die Spieler, dass Gespräche gespeichert werden“ (Testphasen-Review) wird damit dringlicher; am Schalter der Agentur wäre ein kurzer Hinweis sinnvoll.
+3. **Personal (zu R-21):** VERA überbrückt. Echte Vermittler bleiben gewünscht – Lohnschlüssel `job_advisor`, `building_staff_roles` für `job_agency`.
+
