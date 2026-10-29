@@ -21,7 +21,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // Im Code steht nur der SHA-256-Wert von „Benutzer:Passwort“, nicht das Passwort.
 // Wechseln: ADMIN_BASIC_AUTH_SHA256 in Vercel setzen (überschreibt diesen Wert).
 // Die Daten selbst (/api/admin/…) prüfen zusätzlich das Spielerkonto (admin_profiles).
-const ADMIN_BASIC_SHA256 = '49201e6acdc6408f17a0f32dd3142800de8990e262323ab258da40630feb079b'
+const ADMIN_BASIC_SHA256 = '160c6c39d70c34ad16ac2dfb55b5e50c0146eec38b09030c73c88130eb059296'
 
 async function sha256Hex(text: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
