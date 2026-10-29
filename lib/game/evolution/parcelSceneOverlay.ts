@@ -16,6 +16,8 @@ export interface ParcelSceneBinding {
   parcelId: string
   /** Imported feature ID, not the canonical Core building ID. */
   importedBuildingId?: string
+  /** Canonical Core ID of the imported building at the baseline year. */
+  baselineBuildingId?: string
   /** True parcel footprint in local scene metres; never infer it from a house. */
   parcelOutline?: readonly LocalSurfacePoint[]
   /** Already-authorized geometry, keyed by canonical Core building ID. */
@@ -62,7 +64,7 @@ export function overlayParcelProjection(input: {
   const importedIds = new Set<string>()
   for (const binding of input.bindings) {
     if (!binding.parcelId.trim() || boundParcels.has(binding.parcelId) ||
-        (binding.importedBuildingId && importedIds.has(binding.importedBuildingId))) {
+        (binding.importedBuildingId && (!binding.baselineBuildingId?.trim() || importedIds.has(binding.importedBuildingId)))) {
       throw new Error('Duplicate or invalid parcel scene binding')
     }
     boundParcels.add(binding.parcelId)
@@ -82,7 +84,7 @@ export function overlayParcelProjection(input: {
       continue
     }
     const currentIsImported = state.surface === 'occupied' &&
-      state.buildingId === binding.importedBuildingId
+      state.buildingId === binding.baselineBuildingId
     // A real imported feature can use an OSM ID distinct from the Core ID.
     // A binding to that feature must therefore carry its canonical baseline ID.
     // When the parcel has changed, the old feature is hidden on every replay.
