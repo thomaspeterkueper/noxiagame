@@ -49,6 +49,19 @@ type Props = {
   people?: RoomPerson[]
   /** Laufender Gottesdienst, Gebet oder Runde (aus /api/world-lab/worship). */
   occasion?: RoomOccasion
+  /** OSM-Kennung oder Spielgebäude des Ortes (für Wünsche und Gebete). */
+  placeRef?: string
+}
+
+/** Wie das Anliegen hier heißt (29.10.2026: Wünsche und Gebete, die die Welt erhört). */
+const PLEA: Partial<Record<LandmarkRoomKind, { title: string; hint: string; button: string }>> = {
+  worship: { title: 'Fürbitte', hint: 'Am Eingang liegt ein Buch für Fürbitten. Was möchtest du hineinschreiben?', button: 'Ins Buch schreiben' },
+  mosque: { title: 'Bittgebet (Dua)', hint: 'Ein persönliches Bittgebet, in eigenen Worten.', button: 'Bitten' },
+  synagogue: { title: 'Gebet', hint: 'Ein Gebet oder ein Anliegen, in eigenen Worten.', button: 'Beten' },
+  hindu_temple: { title: 'Gebet', hint: 'Ein Gebet oder ein Anliegen vor dem Schrein.', button: 'Beten' },
+  buddhist_temple: { title: 'Wunsch für alle Wesen', hint: 'Ein guter Wunsch – für dich, für andere, für die Welt.', button: 'Widmen' },
+  resonance_place: { title: 'Anliegen an die Runde', hint: 'Was soll werden? Ein Wunsch, eine Frage, eine Hoffnung.', button: 'An die Pinnwand' },
+  community_hall: { title: 'Anliegen', hint: 'Was fehlt im Ort, was wäre schön?', button: 'An die Pinnwand' },
 }
 /** Ein laufender Termin am Ort: Art, Titel, echte Zeiten und wer ihn trägt. */
 export type RoomOccasion = { kind: ActivityKind; label: string; group: string; startedAt: string; endsAt: string; attendees: number; tradition: Tradition; host: { id: string; name: string; role: string } }
@@ -101,7 +114,7 @@ export default function LandmarkWalkableInterior(props: Props) {
   return <LandmarkRoom key={floor.level} {...props} level={floor.level} byStairs={floor.byStairs} onLevel={level => setFloor({ level, byStairs: true })}/>
 }
 
-function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], occasion, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
+function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], occasion, placeRef, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
   const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
@@ -123,6 +136,27 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const minute = occasion ? Math.floor((nowMs - Date.parse(occasion.startedAt)) / 60000) : -1
   const phase = occasion ? phaseAt(phases, minute) : null
   const [sermon, setSermon] = useState<{ text: string; by: string } | null>(null)
+  const plea = PLEA[kind] ?? null
+  const [pleaText, setPleaText] = useState('')
+  const [pleaNote, setPleaNote] = useState<{ text: string; help?: string } | null>(null)
+  const [pleaBusy, setPleaBusy] = useState(false)
+  async function sendPlea() {
+    const text = pleaText.trim()
+    if (!plea || text.length < 3 || pleaBusy) return
+    setPleaBusy(true)
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/wishes', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, channel: kind === 'resonance_place' ? 'resonanz' : 'fuerbitte', placeRef: placeRef ?? null, placeName: name, tradition: kind, location: 'earth' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      // Die Welt erklärt nichts: kein „wird erfüllt“, nur dass es angekommen ist.
+      setPleaNote(response.ok ? { text: data.message ?? 'Aufgeschrieben. Es bleibt hier.', help: data.help } : { text: data.error ?? 'Gerade nicht möglich.' })
+      if (response.ok) setPleaText('')
+    } finally { setPleaBusy(false) }
+  }
   const [hearing, setHearing] = useState(false)
   const [tip, setTip] = useState<LibraryBook | null>(null)
   const tipSeed = useRef(0)
@@ -486,6 +520,14 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {talkingNow && (staff || partner)
           ? <div className="portrait"><NpcPortrait id={talkFigureId} name={talkName} role={talkRole}/></div>
           : <h3>{shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>}
+        {!talkingNow && plea && <div className="plea">
+          <small>{plea.title.toUpperCase()}</small>
+          <span>{plea.hint}</span>
+          <textarea value={pleaText} maxLength={280} rows={3} data-noxia-private onChange={event => setPleaText(event.target.value)} placeholder="In eigenen Worten …"/>
+          <div className="row"><button className="act" disabled={pleaBusy || pleaText.trim().length < 3} onClick={() => void sendPlea()}>{pleaBusy ? '…' : plea.button}</button></div>
+          {pleaNote && <p>{pleaNote.text}</p>}
+          {pleaNote?.help && <p className="help">{pleaNote.help}</p>}
+        </div>}
         {!talkingNow && occasion && phase && <div className="occasion">
           <small>JETZT · {occasion.group.toUpperCase()}</small>
           <b>{occasion.label}</b>
@@ -643,6 +685,12 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .npc{position:absolute;z-index:2}
       .npc .carry{position:absolute;left:18px;top:14px;width:9px;height:12px;background:#b24a3d;border:1px solid #3b1a14;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .player .held{position:absolute;left:16px;top:10px;width:8px;height:11px;background:#2f5d6b;border:1px solid #1a3038;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
+      .plea{display:grid;gap:5px;padding:9px 10px;border:1px solid #6b8793;border-radius:7px;background:#0f2230;color:#dfe9ee}
+      .plea small{font:800 8px monospace;letter-spacing:.12em;color:#9fd3c0}
+      .plea span{font-size:10px;color:#a9bfc6}
+      .plea textarea{resize:vertical;min-height:52px;font:inherit;font-size:11px;padding:6px;border-radius:5px;border:1px solid #40595a;background:#0b1a24;color:#eef2ed}
+      .plea p{margin:0;font-size:11px}
+      .plea .help{padding:6px 8px;border-left:3px solid #e9c46a;background:#1d160b;color:#fff3d6}
       .occasion{display:grid;gap:5px;padding:9px 10px;border:1px solid #c9a447;border-radius:7px;background:#2a2010;color:#f6ead0}
       .occasion small{font:800 8px monospace;letter-spacing:.12em;color:#e9c46a}
       .occasion b{font-size:13px}

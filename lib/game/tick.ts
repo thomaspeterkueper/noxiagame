@@ -36,6 +36,7 @@ import { runSocialLifeTick } from './population/socialLife'
 import { runInteroceptionTick } from './population/interoceptionRuntime'
 import { runHousingShadowTick } from './population/housingShadowRuntime'
 import { projectSurfacePresence } from './population/surfacePresence'
+import { runWishTick } from './wishes/service.server'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick, runVenueStaffingTick } from './npcEconomy'
 
 /** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
@@ -734,7 +735,9 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
-  return { tickNumber, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
+  const wishes = await runWishTick(supabase, tickNumber)
+  return { tickNumber, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {

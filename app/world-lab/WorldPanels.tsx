@@ -557,7 +557,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   if (panel.kind === 'landmarkInside') {
     const service = worshipAt(worship, { source: panel.source, at: panel.landmark.at })
     const occasion = service?.running ? { ...service.running, tradition: service.tradition, host: service.host } : undefined
-    return <LandmarkWalkableInterior occasion={occasion} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
+    return <LandmarkWalkableInterior occasion={occasion} placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
       people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
   }
   if (panel.kind === 'none') return null

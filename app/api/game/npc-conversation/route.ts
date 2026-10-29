@@ -3,7 +3,9 @@
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
 // Version:      1.7.0
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { looksLikeWish } from '@/lib/game/wishes/rules'
+import { submitWish } from '@/lib/game/wishes/service.server'
 import { createClient } from '@supabase/supabase-js'
 import { transferPlayerToNpcCredits } from '@/lib/game/npcEconomy'
 import { createHash } from 'node:crypto'
@@ -466,6 +468,14 @@ export async function POST(request: NextRequest) {
     if (!reply) {
       await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'empty_reply', provider_ms: providerMs, model })
       return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
+    }
+    // Ein Wunsch im Gespräch („ich wünsche mir …“, „hoffentlich …“) geht in die Wünsche
+    // der Welt (29.10.2026) – nach der Antwort, damit das Gespräch nicht wartet.
+    if (!opening && !sermon && looksLikeWish(player)) {
+      after(async () => {
+        try { await submitWish(serviceClient, { source: 'player', profileId: user.id, channel: 'gespraech', text: player, placeName: locationName || null, locationSlug: null }) }
+        catch (error) { console.error('wish from conversation failed', error instanceof Error ? error.message : error) }
+      })
     }
     const playerLower = player.toLocaleLowerCase('de-DE')
     const followConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
