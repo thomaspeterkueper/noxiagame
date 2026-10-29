@@ -5,7 +5,8 @@
 // - versorgung: eine Lieferung an einen Ort, wenn dort wirklich Mangel ist
 // Alles andere Sinnvolle und Getragene geht als „in Arbeit“ an die Entwicklung.
 
-import { REAL_PLACE_HOSTS, hostWindowsAt, resolveHostPlace, type RealPlaceHost } from '@/lib/game/population/realPlaceActivity'
+import { REAL_PLACE_HOSTS, hostWindowsAt, loadSlotRows, resolveHostPlace, slotFromRow, type RealPlaceHost } from '@/lib/game/population/realPlaceActivity'
+import { scheduledWindowsFor, type ScheduledRow } from '@/lib/game/population/worship'
 import { clockHour, clockTick } from '@/lib/game/gameClock'
 import { assessWish } from './classify.server'
 import { decideWish, HELP_LINE, SUPPORT_NEEDED, SUPPORT_WINDOW_TICKS, type WishAssessment, type WishChannel, type WishStatus } from './rules'
@@ -131,7 +132,7 @@ async function hostForPlace(supabase: Supabase, placeRef: string): Promise<{ spe
 }
 
 /**
- * Zusammenkunft: ein Sondertermin am Ort, zur nächsten guten Zeit (11 oder 17 Uhr
+ * Zusammenkunft: ein Sondertermin am Ort, zur nächsten freien guten Zeit (11, 15, 17 oder 19 Uhr
  * deutscher Zeit, mindestens zwei Stunden voraus, nicht über einem anderen Termin).
  * Steht schon eine Zusammenkunft in den nächsten zwei Tagen an, zählt der Wunsch dazu.
  */
@@ -142,10 +143,14 @@ async function gathering(supabase: Supabase, wish: WishRow, a: WishAssessment, t
   const { data: planned } = await supabase.from('population_events').select('id,payload').eq('event_type', 'place_activity_scheduled').gte('tick', tick - 48)
   const existing = ((planned ?? []) as Array<{ id: string; payload: Record<string, unknown> }>).find(row => row.payload?.personKey === host.spec.personKey && row.payload?.wish === true && Number(row.payload?.endsTick) > tick && row.payload?.cancelled !== true)
   if (existing) return { ok: true, fulfilment: { kind: 'gathering', joined: existing.id, startsTick: existing.payload.startsTick, place: wish.place_name } }
+  // Frei heißt: kein Wochentermin, kein wandernder Termin (Probe-Gottesdienst), kein Sondertermin.
+  const slots = (await loadSlotRows(supabase)).filter(row => row.person_key === host.spec.personKey).map(slotFromRow)
+  const extra = scheduledWindowsFor((planned ?? []) as ScheduledRow[], host.spec.personKey)
+  const busy = (t: number) => hostWindowsAt(host.spec, t, slots, extra).length > 0
   let start: number | null = null
   for (let t = tick + 2; t <= tick + 48 && start === null; t++) {
     const hour = clockHour(t)
-    if ((hour === 11 || hour === 17) && !hostWindowsAt(host.spec, t).length && !hostWindowsAt(host.spec, t + 1).length) start = t
+    if ((hour === 11 || hour === 17 || hour === 15 || hour === 19) && !busy(t) && !busy(t + 1)) start = t
   }
   if (start === null) return { ok: false, reason: 'in den nächsten zwei Tagen kein freier Termin' }
   const label = `Zusammenkunft: ${a.summary}`.slice(0, 80)
