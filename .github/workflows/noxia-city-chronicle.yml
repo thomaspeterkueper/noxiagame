@@ -1,0 +1,38 @@
+name: NOXIA city chronicle regression
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/cityChronicle.ts'
+      - 'lib/game/evolution/cityChronicle.test.ts'
+      - '.github/workflows/noxia-city-chronicle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/evolution/cityChronicle.ts'
+      - 'lib/game/evolution/cityChronicle.test.ts'
+      - '.github/workflows/noxia-city-chronicle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-city-chronicle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chronicle-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile and execute chronicle regression
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/cityChronicle.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .city-chronicle-test
+          node .city-chronicle-test/cityChronicle.test.js
