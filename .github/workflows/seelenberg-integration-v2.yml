@@ -1,0 +1,25 @@
+name: Seelenberg integration v2
+on:
+  pull_request:
+    paths:
+      - 'experiments/seelenberg/**'
+      - '.github/workflows/seelenberg-integration-v2.yml'
+  push:
+    branches: ['feat/seelenberg-integration-v2']
+  workflow_dispatch:
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: All Seelenberg geometry and food adapter tests
+        run: node --test experiments/seelenberg/*.test.mjs
+      - name: Prepare package manager
+        run: corepack enable
+      - name: Upstream food chain regression
+        run: pnpm test:food-chain
