@@ -24,7 +24,7 @@ import {
   type LandmarkRoomKind,
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
-import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { LIBRARY_BOOKS, LIBRARY_SHELVES, RESONANCE_READING_IDS, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 
@@ -187,7 +187,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { staffPosRef.current = staffPos }, [staffPos])
   useEffect(() => { readerPosRef.current = readerPos }, [readerPos])
   useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
-  const book = LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
+  const isResonanceReading = kind === 'resonance_place'
+  const resonanceBooks = LIBRARY_BOOKS.filter(entry => (RESONANCE_READING_IDS as readonly string[]).includes(entry.id))
+  const book = LIBRARY_BOOKS.find(entry => entry.id === bookId && (!isResonanceReading || resonanceBooks.some(item => item.id === entry.id))) ?? null
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
   const placed = useMemo(() => {
@@ -319,6 +321,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const nearStaff = Boolean(staff && Math.hypot(pos.x - staffPos.x, pos.y - staffPos.y) <= STAFF_REACH)
   const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
+  const resonanceShelfOpen = isResonanceReading && shown?.action === 'books'
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
   const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
@@ -553,14 +556,20 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><input value={message} maxLength={80} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
+        {!talkingNow && resonanceShelfOpen && !book && <div className="book">
+          <b>Philosophie · Lesen & denken</b>
+          <p>Wähle ein Werk aus dem Regal. Bis die vollständigen Manuskripte angebunden sind, sind bibliografische Einführungstexte verfügbar.</p>
+          <div className="books"><section>{resonanceBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}</section></div>
+        </div>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
         </section></div></>}
-        {!talkingNow && book && (shelf || !shown) && <div className="book">
+        {!talkingNow && book && (shelf || !shown || resonanceShelfOpen) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
+          {isResonanceReading && <p className="muted">Einführungstext · vollständiger Text noch nicht hinterlegt</p>}
           <button className="act" onClick={() => setBookId('')}>← Zurück</button>
         </div>}
         {status && <div className="status">{status}</div>}
