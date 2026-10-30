@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const now = new Date()
   const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const [conversations, wishSignals, deniedWishSignals, conversationMemories, socialEvents, insightCandidates, reviews] = await Promise.all([
+  const [conversations, wishSignals, deniedWishSignals, conversationMemories, socialEvents, insightCandidates, reviews, wishKindRows] = await Promise.all([
     db.from('npc_conversation_log').select('id', { head: true, count: 'exact' }).gte('created_at', since),
     db.from('npc_conversation_log').select('id', { head: true, count: 'exact' })
       .gte('created_at', since).not('wish_kind', 'is', null),
@@ -26,8 +26,11 @@ export async function GET(req: NextRequest) {
     db.from('person_insight_candidates').select('id', { head: true, count: 'exact' }),
     db.from('npc_conversation_reviews').select('day,player_turns,players,npcs,npc_encounters')
       .order('day', { ascending: false }).limit(1),
+    // Bounded structured metadata only: no free-text wishes, dialogue or player IDs.
+    db.from('npc_conversation_log').select('wish_kind,wish_npc_denied')
+      .gte('created_at', since).not('wish_kind', 'is', null).limit(201),
   ])
   return NextResponse.json(buildNpcInsightOverview({
-    asOf: now.toISOString(), since, conversations, wishSignals, deniedWishSignals, conversationMemories, socialEvents, insightCandidates, reviews,
+    asOf: now.toISOString(), since, conversations, wishSignals, deniedWishSignals, conversationMemories, socialEvents, insightCandidates, reviews, wishKindRows,
   }), { headers: { 'Cache-Control': 'private, no-store' } })
 }
