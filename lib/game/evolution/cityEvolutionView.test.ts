@@ -64,6 +64,16 @@ for (const importedBaseline of [
  try { project({importedBaseline}) } catch { threw=true }
  check(threw, 'invalid or duplicate imported asset must fail closed before replay')
 }
+// A baseline is a snapshot, not a queue of future construction instructions.
+// Otherwise a future-dated imported building could appear without a Core event.
+let rejectedFutureImport=false
+try { project({importedBaseline:[{...validAsset,id:'phantom',introducedYear:2080}]}) }
+catch { rejectedFutureImport=true }
+check(rejectedFutureImport, 'future-dated import cannot materialize without committed Core event')
+const historicalImport=project({importedBaseline:[{...validAsset,introducedYear:2020}]})
+check(historicalImport.before.assets[0]?.id==='old' && historicalImport.after.assets[0]?.id==='old',
+ 'already-existing historical baseline asset remains visible')
+
 const emptyBaseline = project({importedBaseline:[]})
 check(emptyBaseline.before.assets.length===0 && emptyBaseline.after.assets.length===0,
  'empty initial import is valid and remains empty without confirmed events')
