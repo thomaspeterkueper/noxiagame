@@ -64,6 +64,7 @@ export default defineConfig({
       'lib/game/landmarks/interiors.test.ts',
       'lib/game/spatial/buildingMassing.test.ts',
       'lib/game/cognition/conversationRecall.test.ts',
+      'lib/game/cognition/conversationActions.test.ts',
       'lib/game/business/establishments.test.ts',
       'lib/game/chronicle.test.ts',
       'lib/game/merchantQualification.test.ts',

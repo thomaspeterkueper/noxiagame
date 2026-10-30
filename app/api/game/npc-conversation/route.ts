@@ -23,6 +23,7 @@ import {
   REPEAT_HINT_INSTRUCTION,
   REPEAT_WINDOW_MS,
 } from '@/lib/game/cognition/conversationRepeat'
+import { parseActionMarkers, playerConsentsToFollow, stripActionMarkers } from '@/lib/game/cognition/conversationActions'
 import { classifyConversationTopic } from '@/lib/game/cognition/conversationTopic'
 import { playerNameFromUtterance, statedOwnAge } from '@/lib/game/cognition/playerFacts'
 import { ageAtTick } from '@/lib/game/gameCalendar'
@@ -33,9 +34,6 @@ const MAX_HISTORY_MESSAGES = 10
 const MAX_HISTORY_ENTRY_CHARS = 180
 const MAX_HISTORY_TOTAL_CHARS = 1200
 const MAX_REPLY_CHARS = 280
-const ACTION_MARKER = '[[ACTION:LEAD_WALK]]'
-const CREDIT_ACTION_MARKER = '[[ACTION:ACCEPT_CREDITS]]'
-const VISIT_PLACE_ACTION_RE = /\[\[ACTION:VISIT_PLACE:(p\d{1,2})\]\]/g
 const MIN_PERSISTED_EXCHANGES = 6
 const MAX_PERSISTED_EXCHANGES = 18
 type PersistedExchange = {
@@ -441,17 +439,12 @@ export async function POST(request: NextRequest) {
     }
     const data = await response.json()
     const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
-    const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
-    const visitMatches = [...rawReply.matchAll(VISIT_PLACE_ACTION_RE)]
-    const requestedVisitKey = visitMatches[0]?.[1] ?? null
+    const { leadWalk: requestedLeadWalk, visitPlaceKey: requestedVisitKey } = parseActionMarkers(rawReply)
     const requestedVisitPlace = requestedVisitKey
       ? nearbyPlaces.find((place: any) => place.key === requestedVisitKey) ?? null
       : null
     const reply = clean(
-      rawReply
-        .replaceAll(ACTION_MARKER, '')
-        .replaceAll(CREDIT_ACTION_MARKER, '')
-        .replace(VISIT_PLACE_ACTION_RE, ''),
+      stripActionMarkers(rawReply),
       sermon ? 1100 : MAX_REPLY_CHARS,
     )
     if (!reply) {
@@ -466,8 +459,7 @@ export async function POST(request: NextRequest) {
         catch (error) { console.error('wish from conversation failed', error instanceof Error ? error.message : error) }
       })
     }
-    const playerLower = player.toLocaleLowerCase('de-DE')
-    const followConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
+    const followConsent = playerConsentsToFollow(player)
     const worldAction = followConsent && requestedVisitPlace
       ? {
           type: 'visit_place' as const,
