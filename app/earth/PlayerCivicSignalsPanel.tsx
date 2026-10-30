@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { readPlayerCivicSignalsPayload, type PlayerCivicSignalView } from '@/lib/game/civic/playerCivicSignalView'
+import { preparePlayerCivicDraft, formatPlayerCivicDraft, type PlayerCivicDraft } from '@/lib/game/civic/playerCivicDraft'
 
 type Phase = 'idle' | 'loading' | 'ready' | 'signed_out' | 'error'
 const kindLabel: Record<PlayerCivicSignalView['kind'], string> = {
@@ -15,9 +16,13 @@ export default function PlayerCivicSignalsPanel() {
   const [expanded, setExpanded] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [signals, setSignals] = useState<PlayerCivicSignalView[]>([])
+  const [draft, setDraft] = useState<PlayerCivicDraft | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
   const currentRequest = useRef<AbortController | null>(null)
 
   const load = useCallback(async (signal: AbortSignal) => {
+    setDraft(null)
+    setCopyStatus('idle')
     setPhase('loading')
     try {
       const token = await getToken()
@@ -64,6 +69,16 @@ export default function PlayerCivicSignalsPanel() {
     }
   }, [expanded, load])
 
+  const copyDraft = async () => {
+    if (!draft) return
+    try {
+      await navigator.clipboard.writeText(formatPlayerCivicDraft(draft))
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('error')
+    }
+  }
+
   const refresh = () => {
     currentRequest.current?.abort()
     const controller = new AbortController()
@@ -88,6 +103,8 @@ export default function PlayerCivicSignalsPanel() {
         if (expanded) {
           currentRequest.current?.abort()
           setSignals([])
+          setDraft(null)
+          setCopyStatus('idle')
           setPhase('idle')
         }
         setExpanded(!expanded)
@@ -115,9 +132,43 @@ export default function PlayerCivicSignalsPanel() {
                     {item.unverifiedPlaceLabel && ` · Ortsangabe (ungeprüft): ${item.unverifiedPlaceLabel}`}
                   </div>
                   <small>Beleg: {item.sourceRef}{item.npcDenied ? ' · NPC hat widersprochen' : ''}</small>
+                  <div><button type="button" onClick={() => {
+                    setDraft(preparePlayerCivicDraft(item))
+                    setCopyStatus('idle')
+                  }} style={{ marginTop: 5, cursor: 'pointer' }}>
+                    Privaten Vorschlagsentwurf vorbereiten
+                  </button></div>
                 </li>
               ))}
             </ul>
+          )}
+          {phase === 'ready' && draft && (
+            <div style={{ marginTop: 14, padding: 12, border: '1px solid #a9b5b4', borderRadius: 8 }}>
+              <h3 style={{ marginTop: 0 }}>Privater Vorschlagsentwurf – nicht eingereicht</h3>
+              <p style={{ fontSize: 12 }}>
+                Du entscheidest, ob du den Text weiterverwendest. Hier wird nichts gespeichert,
+                veröffentlicht oder zur Abstimmung gestellt. Ein offizieller Einreichungsweg
+                folgt separat mit Prüfung und Moderation.
+              </p>
+              <label style={{ display: 'block', marginBottom: 8 }}>
+                Titel
+                <input value={draft.title} maxLength={120}
+                  onChange={e => { setDraft({ ...draft, title: e.target.value }); setCopyStatus('idle') }}
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box' }} />
+              </label>
+              <label style={{ display: 'block', marginBottom: 8 }}>
+                Beschreibung
+                <textarea value={draft.description} rows={5} maxLength={5000}
+                  onChange={e => { setDraft({ ...draft, description: e.target.value }); setCopyStatus('idle') }}
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box' }} />
+              </label>
+              <p style={{ fontSize: 12 }}>Beleg: {draft.sourceRef}
+                {draft.unverifiedPlaceLabel && ` · Ortsangabe (ungeprüft): ${draft.unverifiedPlaceLabel}`}
+              </p>
+              <button type="button" onClick={() => { void copyDraft() }}>Entwurf bewusst kopieren</button>
+              {copyStatus === 'copied' && <span role="status"> Text kopiert – nicht eingereicht.</span>}
+              {copyStatus === 'error' && <span role="status"> Kopieren nicht möglich; Text kann manuell markiert werden.</span>}
+            </div>
           )}
           <p style={{ fontSize: 11, color: '#617075' }}>
             Gesprächshinweise lösen keine Veränderungen der Spielwelt aus.
