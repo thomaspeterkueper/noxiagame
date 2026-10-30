@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
     .in('outcome', ['reply', 'repeat_hint'])
     .not('wish_kind', 'is', null)
     .order('created_at', { ascending: false })
+    // Deterministic top-100 selection when many receipts share a timestamp.
+    .order('id', { ascending: false })
     .limit(100)
   if (error) {
     console.error('civic-signals read failed', { code: error.code })
