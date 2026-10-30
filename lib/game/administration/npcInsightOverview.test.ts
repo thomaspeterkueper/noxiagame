@@ -1,4 +1,4 @@
-import { buildNpcInsightOverview, type NpcInsightOverviewInput } from './npcInsightOverview'
+import { buildNpcInsightOverview, npcInsightWindow, withinNpcInsightWindow, type NpcInsightOverviewInput } from './npcInsightOverview'
 
 const base = (): NpcInsightOverviewInput => ({
   asOf: '2026-10-30T07:30:00.000Z', since: '2026-10-23T07:30:00.000Z',
@@ -102,6 +102,27 @@ function check(ok: boolean, label: string) {
   check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'missing provenance ID invalidates breakdown')
   input.wishKindRows = { data: base().wishKindRows.data!.map(row => ({ ...row as object, id: String((row as {id:number}).id) })) }
   check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'recorded', 'canonical decimal bigint IDs are accepted')
+}
+{
+  const window = npcInsightWindow(new Date('2026-10-30T11:00:00.000Z'))
+  check(window.asOf === '2026-10-30T11:00:00.000Z' && window.since === '2026-10-23T11:00:00.000Z',
+    'observation window is exactly seven days and has an upper bound')
+  const calls: string[] = []
+  class Query {
+    gte(column: string, value: string) { calls.push('gte:' + column + ':' + value); return this }
+    lte(column: string, value: string) { calls.push('lte:' + column + ':' + value); return this }
+  }
+  const query = new Query()
+  check(withinNpcInsightWindow(query, 'created_at', window) === query, 'query builder remains chainable')
+  check(calls.join('|') === 'gte:created_at:' + window.since + '|lte:created_at:' + window.asOf,
+    'conversation queries exclude future-dated records')
+  calls.length = 0
+  withinNpcInsightWindow(query, 'occurred_at', window)
+  check(calls.join('|') === 'gte:occurred_at:' + window.since + '|lte:occurred_at:' + window.asOf,
+    'population event queries exclude future-dated records')
+  let rejected = false
+  try { npcInsightWindow(new Date(Number.NaN)) } catch { rejected = true }
+  check(rejected, 'invalid observation timestamp is rejected')
 }
 if (failed) throw new Error(`NPC insight overview: ${failed} checks failed`)
 console.log('NPC insight overview checks passed')
