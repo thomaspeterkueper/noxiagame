@@ -1,0 +1,36 @@
+name: NOXIA city receipt adapter regression
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/committedEventAdapter.ts'
+      - 'lib/game/evolution/committedEventAdapter.test.ts'
+      - '.github/workflows/noxia-city-receipt-adapter.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/evolution/committedEventAdapter.ts'
+      - 'lib/game/evolution/committedEventAdapter.test.ts'
+      - '.github/workflows/noxia-city-receipt-adapter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-city-receipts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  receipt-adapter-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile and test city receipt adapter
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/committedEventAdapter.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .city-receipt-test
+          node .city-receipt-test/committedEventAdapter.test.js
