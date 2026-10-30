@@ -1,6 +1,6 @@
 import { projectPlayerConversationSignals } from './playerConversationSignals'
 const assert = (ok: boolean, message: string) => { if (!ok) throw Error(message) }
-const row = (id: number, overrides: Record<string, unknown> = {}) => ({
+const row = (id: number | string, overrides: Record<string, unknown> = {}) => ({
   id, created_at: '2026-10-30T18:00:00Z', wish_kind: 'missing',
   wish_object: 'ein Treffpunkt', wish_npc_denied: false,
   location_name: 'Seelenberg', opening: false, outcome: 'reply',
@@ -26,4 +26,12 @@ assert(projectPlayerConversationSignals([row(1, { wish_npc_denied: 'true', locat
 assert(projectPlayerConversationSignals(Array.from({ length: 30 }, (_, i) => row(i + 1)), 100).length === 20,
   'bounded output')
 assert(projectPlayerConversationSignals([null, false, 'x', {}]).length === 0, 'malformed rows safe')
+const equalTime = projectPlayerConversationSignals([
+  row('9'), row('10'), row('9223372036854775807'), row('9007199254740993'), row('11'),
+])
+assert(equalTime.map(s => s.id).join(',') === '9223372036854775807,9007199254740993,11,10,9',
+  'same-timestamp bigint receipts ordered numerically without precision loss')
+assert(projectPlayerConversationSignals([
+  row('9223372036854775807', { created_at: '2026-10-29T18:00:00Z' }), row('9'),
+])[0].id === '9', 'newer timestamp takes precedence over larger id')
 console.log('Player conversation civic signals: tests passed')
