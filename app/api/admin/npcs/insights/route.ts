@@ -26,8 +26,8 @@ export async function GET(req: NextRequest) {
     db.from('person_insight_candidates').select('id', { head: true, count: 'exact' }),
     db.from('npc_conversation_reviews').select('day,player_turns,players,npcs,npc_encounters')
       .order('day', { ascending: false }).limit(1),
-    // Bounded structured metadata only: no free-text wishes, dialogue or player IDs.
-    db.from('npc_conversation_log').select('wish_kind,wish_npc_denied')
+    // Bounded structured metadata; IDs only for server-side deduplication.\n    // No free-text wishes, dialogue or player IDs leave the database.
+    db.from('npc_conversation_log').select('id,wish_kind,wish_npc_denied')
       .gte('created_at', since).not('wish_kind', 'is', null).limit(201),
   ])
   return NextResponse.json(buildNpcInsightOverview({
