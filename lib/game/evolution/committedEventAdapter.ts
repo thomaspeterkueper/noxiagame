@@ -45,7 +45,14 @@ function validReceipt(value: unknown): value is CommittedWorldReceipt {
     Number.isInteger(r.worldYear) && Number.isInteger(r.sequence) &&
     (r.domain === 'buildings' || r.domain === 'infrastructure' ||
      r.domain === 'institutions' || r.domain === 'services') &&
-    validChange(r.change, r.worldYear as number)
+    validChange(r.change, r.worldYear as number) &&
+    // An establishing event must originate in the Core domain that owns its asset kind.
+    // Retire/rename lack an asset kind in this receipt contract; the verified reader
+    // must enforce ownership for those actions against persisted domain state.
+    (r.change.action !== 'establish' || r.domain === ({
+      building: 'buildings', infrastructure: 'infrastructure',
+      institution: 'institutions', service: 'services',
+    } as const)[r.change.asset.kind])
 }
 
 /** Read-only adapter. Never turns a proposed or failed command into history.
