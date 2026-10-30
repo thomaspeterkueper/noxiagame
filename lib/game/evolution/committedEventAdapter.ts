@@ -18,17 +18,60 @@ export interface ChronicleAdaptation {
   events: CityHistoryEvent[]
   rejected: { eventId: string; reason: string }[]
 }
-/** Read-only adapter. Never turns a proposed or failed command into history. */
+
+const nonempty = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0
+
+/** Validate runtime JSON before constructing a typed historical event. */
+function validChange(value: unknown, year: number): value is CityChange {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const change = value as Record<string, unknown>
+  if (change.action === 'retire') return nonempty(change.assetId)
+  if (change.action === 'rename') return nonempty(change.assetId) && nonempty(change.name)
+  if (change.action !== 'establish' || !change.asset ||
+      typeof change.asset !== 'object' || Array.isArray(change.asset)) return false
+  const asset = change.asset as Record<string, unknown>
+  return nonempty(asset.id) && nonempty(asset.name) && nonempty(asset.districtId) &&
+    Number.isInteger(asset.introducedYear) && asset.introducedYear === year &&
+    (asset.kind === 'building' || asset.kind === 'infrastructure' ||
+     asset.kind === 'institution' || asset.kind === 'service')
+}
+
+function validReceipt(value: unknown): value is CommittedWorldReceipt {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const r = value as Record<string, unknown>
+  return nonempty(r.eventId) && nonempty(r.settlementId) &&
+    nonempty(r.domainEventRef) && nonempty(r.actorRef) &&
+    Number.isInteger(r.worldYear) && Number.isInteger(r.sequence) &&
+    (r.domain === 'buildings' || r.domain === 'infrastructure' ||
+     r.domain === 'institutions' || r.domain === 'services') &&
+    validChange(r.change, r.worldYear as number)
+}
+
+/** Read-only adapter. Never turns a proposed or failed command into history.
+ * Runtime guards protect against malformed persisted JSON, but do NOT authenticate
+ * the origin of receipts. Only a server-side verified eventstore reader may call this.
+ */
 export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldReceipt[]): ChronicleAdaptation {
   const events: CityHistoryEvent[] = []
   const rejected: ChronicleAdaptation['rejected'] = []
   const seen = new Set<string>()
-  for (const r of receipts) {
-    if (!r.committed) { rejected.push({ eventId: r.eventId, reason: 'not_committed' }); continue }
-    if (!r.eventId || !r.settlementId || !r.domainEventRef || !r.actorRef ||
-        !Number.isInteger(r.worldYear) || !Number.isInteger(r.sequence)) {
-      rejected.push({ eventId: r.eventId, reason: 'invalid_receipt' }); continue
+  for (const candidate of receipts) {
+    // The public TypeScript type does not protect against JSON/DB values at runtime.
+    const eventId = candidate && typeof candidate === 'object' &&
+      nonempty((candidate as CommittedWorldReceipt).eventId)
+      ? (candidate as CommittedWorldReceipt).eventId : ''
+    if (!candidate || typeof candidate !== 'object' ||
+        (candidate as CommittedWorldReceipt).committed !== true) {
+      rejected.push({ eventId, reason: candidate && typeof candidate === 'object' &&
+        (candidate as CommittedWorldReceipt).committed === false ? 'not_committed' : 'invalid_receipt' })
+      continue
     }
+    if (!validReceipt(candidate)) {
+      rejected.push({ eventId, reason: 'invalid_receipt' })
+      continue
+    }
+    const r = candidate
     const identity = r.settlementId + ':' + r.eventId
     if (seen.has(identity)) { rejected.push({ eventId: r.eventId, reason: 'duplicate' }); continue }
     seen.add(identity)
