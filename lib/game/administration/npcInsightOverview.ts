@@ -88,15 +88,24 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
       wishSignals7d.count !== null && deniedWishSignals7d.count !== null &&
       wishSignals7d.count <= 200 && rows.length === wishSignals7d.count) {
     const categories = WISH_KINDS.map(kind => ({ kind, count: 0, denied: 0 }))
+    // IDs are used only server-side to prevent duplicate evidence from being
+    // mistaken for distinct conversations. They never appear in the response.
+    const seenIds = new Set<string>()
     let valid = true
     for (const row of rows) {
       if (!row || typeof row !== 'object') { valid = false; break }
       const record = row as Record<string, unknown>
+      // PostgREST bigint IDs can be safe JS integers or decimal strings.
+      const id = typeof record.id === 'number' && Number.isSafeInteger(record.id) && record.id > 0
+        ? String(record.id)
+        : typeof record.id === 'string' && /^[1-9][0-9]*$/.test(record.id) ? record.id : null
       const category = categories.find(item => item.kind === record.wish_kind)
-      if (!category || (record.wish_npc_denied !== null && typeof record.wish_npc_denied !== 'boolean')) {
+      if (!id || seenIds.has(id) || !category ||
+          (record.wish_npc_denied !== null && typeof record.wish_npc_denied !== 'boolean')) {
         valid = false
         break
       }
+      seenIds.add(id)
       category.count++
       if (record.wish_npc_denied === true) category.denied++
     }
