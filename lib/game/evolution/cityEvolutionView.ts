@@ -7,6 +7,27 @@ export interface CityEvolutionView {
  changes: CityDiff
  rejectedReceipts: { eventId: string; reason: string }[]
 }
+/** Reject malformed or ambiguous initial imports before any historical replay.
+ * A duplicate ID must not silently overwrite another imported asset.
+ * This validates shape only; provenance must be verified by the importing Core.
+ */
+function validBaseline(assets: readonly CityAsset[]): boolean {
+ const ids = new Set<string>()
+ for (const candidate of assets as readonly unknown[]) {
+   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false
+   const asset = candidate as Record<string, unknown>
+   if (typeof asset.id !== 'string' || !asset.id.trim() ||
+       typeof asset.name !== 'string' || !asset.name.trim() ||
+       typeof asset.districtId !== 'string' || !asset.districtId.trim() ||
+       !Number.isInteger(asset.introducedYear) ||
+       (asset.kind !== 'building' && asset.kind !== 'infrastructure' &&
+        asset.kind !== 'institution' && asset.kind !== 'service')) return false
+   if (ids.has(asset.id)) return false
+   ids.add(asset.id)
+ }
+ return true
+}
+
 /**
  * Composes a read-only city evolution view from verified upstream domain receipts.
  * Caller must fetch/authenticate those receipts from authoritative Core persistence.
@@ -24,7 +45,8 @@ export function cityEvolutionView(input:{
      typeof input.settlementId !== 'string' || !input.settlementId.trim() ||
      !Number.isInteger(input.fromYear) || !Number.isInteger(input.toYear) ||
      input.fromYear > input.toYear ||
-     !Array.isArray(input.importedBaseline) || !Array.isArray(input.authoritativeReceipts)) {
+     !Array.isArray(input.importedBaseline) || !Array.isArray(input.authoritativeReceipts) ||
+     !validBaseline(input.importedBaseline)) {
    throw Error('Invalid city evolution input')
  }
  const rejectedMalformed: CityEvolutionView['rejectedReceipts'] = []
