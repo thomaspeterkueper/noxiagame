@@ -61,6 +61,8 @@ export function projectPlayerConversationSignals(rows: readonly unknown[], reque
     } else if (!old) byId.set(signal.id, signal)
   }
   return [...byId.values()]
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id))
+    // Compare bigint receipt IDs as decimal strings (no Number conversion or locale-dependent ordering).
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) ||
+      b.id.length - a.id.length || (b.id > a.id ? 1 : b.id < a.id ? -1 : 0))
     .slice(0, limit)
 }
