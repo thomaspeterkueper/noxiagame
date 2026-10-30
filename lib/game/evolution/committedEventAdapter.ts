@@ -56,6 +56,20 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
   const events: CityHistoryEvent[] = []
   const rejected: ChronicleAdaptation['rejected'] = []
   const seen = new Set<string>()
+  // One persisted domain event may authorize at most one city-history change.
+  // Reject *all* conflicting IDs for the same source, regardless of input order.
+  // Count only valid committed receipts: malformed rows must not poison good events.
+  const sourceEventIds = new Map<string, Set<string>>()
+  for (const candidate of receipts as readonly unknown[]) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) ||
+        (candidate as CommittedWorldReceipt).committed !== true ||
+        !validReceipt(candidate)) continue
+    const r = candidate
+    const sourceKey = JSON.stringify([r.settlementId, r.domain, r.domainEventRef])
+    const ids = sourceEventIds.get(sourceKey) ?? new Set<string>()
+    ids.add(r.eventId)
+    sourceEventIds.set(sourceKey, ids)
+  }
   for (const candidate of receipts) {
     // The public TypeScript type does not protect against JSON/DB values at runtime.
     const eventId = candidate && typeof candidate === 'object' &&
@@ -72,6 +86,11 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
       continue
     }
     const r = candidate
+    const sourceKey = JSON.stringify([r.settlementId, r.domain, r.domainEventRef])
+    if ((sourceEventIds.get(sourceKey)?.size ?? 0) > 1) {
+      rejected.push({ eventId: r.eventId, reason: 'ambiguous_domain_ref' })
+      continue
+    }
     const identity = r.settlementId + ':' + r.eventId
     if (seen.has(identity)) { rejected.push({ eventId: r.eventId, reason: 'duplicate' }); continue }
     seen.add(identity)
