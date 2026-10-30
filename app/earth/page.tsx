@@ -6,6 +6,7 @@ import EarthSurfaceLogisticsConsole from './EarthSurfaceLogisticsConsole'
 import EarthSurfaceMissionDraftPanel from './EarthSurfaceMissionDraftPanel'
 import EarthVehicleStagingPanel from './EarthVehicleStagingPanel'
 import SpaceportAreaComparison from './SpaceportAreaComparison'
+import PlayerCivicSignalsPanel from './PlayerCivicSignalsPanel'
 
 export const metadata = {
   title: 'NOXIA Earth · Sauerland',
@@ -14,6 +15,7 @@ export const metadata = {
 export default function EarthPage() {
   return <>
     <EarthRegionPreview />
+    <PlayerCivicSignalsPanel />
     <EarthInfrastructurePlanner />
     <EarthLandmarkMap />
     <EarthLandmarkExplorer />
