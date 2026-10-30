@@ -53,4 +53,32 @@ crossOpportunity.opportunityKey = 'another-building'
 assert(discoverEvolutionProposals({ signals: [s('collision', 'lan', 1), crossOpportunity, s('other', 'hana', 1)] }).length === 0,
   'one evidence ID cannot support conflicting opportunities')
 
+
+/** Malformed JSON from external NPC/event sources must not crash or manufacture evidence. */
+const invalid = [
+  null, undefined, 'not-an-event', { ...s('invalid-kind', 'lan', 1), kind: 'teleport' },
+  { ...s('invalid-channel', 'lan', 1), channel: 'admin-command' },
+  { ...s('invalid-tick', 'lan', 1), tick: Number.NaN },
+  { ...s('invalid-score', 'lan', 1), relevance: Number.POSITIVE_INFINITY },
+  { ...s('negative-score', 'lan', 1), relevance: -0.5 },
+  { ...s('oversized-score', 'lan', 1), relevance: 2 },
+  { ...s('blank-ref', 'lan', 1), provenanceRefs: ['  '] },
+  { ...s('bad-ref', 'lan', 1), provenanceRefs: [null] },
+  { ...s('blank-id', 'lan', 1), id: ' ' },
+  { ...s('bad-projection', 'lan', 1, 'real_world_discussion'),
+    worldProjection: { availableFromYear: '2149', worldYear: 2150, licensed: true, accessible: true } },
+] as unknown as EvolutionSignal[]
+assert(discoverEvolutionProposals({ signals: [...invalid, s('valid-a', 'lan', .9), s('valid-b', 'hana', .9)] }).length === 1,
+  'invalid runtime JSON is ignored without poisoning valid independent evidence')
+const validCollision = s('good-id', 'lan', .9)
+const invalidCollision = { ...validCollision, relevance: Number.NaN } as EvolutionSignal
+assert(discoverEvolutionProposals({ signals: [invalidCollision, validCollision, s('good-other', 'hana', .9)] }).length === 1,
+  'malformed receipt cannot veto a valid receipt with the same evidence ID')
+assert(JSON.stringify(discoverEvolutionProposals({ signals: [invalidCollision, validCollision, s('good-other', 'hana', .9)] })) ===
+  JSON.stringify(discoverEvolutionProposals({ signals: [s('good-other', 'hana', .9), validCollision, invalidCollision] })),
+  'invalid receipt handling is order-independent')
+assert(discoverEvolutionProposals({ signals: [s('default-a', 'lan', .8), s('default-b', 'hana', .8)],
+  minIndependentNpcs: Number.NaN, minScore: Number.NaN, maxProposals: Number.NaN }).length === 1,
+  'invalid optional thresholds use safe defaults')
+
 console.log('Emergent evolution screening: tests passed')
