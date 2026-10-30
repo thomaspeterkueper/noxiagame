@@ -11,8 +11,10 @@ type InsightOverview = {
  asOf: string; since: string;
  metrics: { conversations7d: InsightMetric; wishSignals7d: InsightMetric; deniedWishSignals7d: InsightMetric; memoryPairsTotal: InsightMetric; socialEvents7d: InsightMetric; insightCandidatesTotal: InsightMetric };
  latestReview: { day: string; playerTurns: number; players: number; npcs: number; npcEncounters: number } | null;
- reviewQuality: 'recorded' | 'none' | 'unavailable'; note: string;
+ reviewQuality: 'recorded' | 'none' | 'unavailable';
+ wishKindBreakdown: {quality: 'recorded' | 'unavailable'; categories: {kind:string;count:number;denied:number}[]}; note: string;
 }
+const WISH_KIND_LABELS: Record<string,string> = {wish:'Wünsche',seeking:'Suche',how_to:'Anleitungen',missing:'Fehlendes'}
 const INSIGHT_METRICS: Array<[keyof InsightOverview['metrics'], string]> = [
  ['conversations7d', 'Gesprächseinträge · 7 Tage'],
  ['wishSignals7d', 'Wunsch-/Suchmarkierungen · 7 Tage'],
@@ -66,6 +68,11 @@ export default function NpcObservatory() {
     <span>{label}</span>
     {overview.metrics[key].quality==='unavailable'&&<small style={{display:'block'}}>Quelle nicht verfügbar</small>}
    </div>)}</div>
+   <h3>Strukturierte Gesprächssignale</h3>
+   {overview.wishKindBreakdown?.quality === 'recorded'
+    ? <p>{overview.wishKindBreakdown.categories.map(c => (WISH_KIND_LABELS[c.kind] ?? c.kind)+': '+c.count+' (davon abgelehnt: '+c.denied+')').join(' · ')}</p>
+    : <p>Aufschlüsselung nicht verfügbar oder unvollständig; keine Schätzung.</p>}
+   <p>Nur aggregierte Gesprächsmarkierungen. Keine Gesprächsinhalte, keine verifizierten NPC-Erkenntnisse.</p>
    {overview.latestReview?<p>Letzte Gesprächsauswertung: {overview.latestReview.day} · {overview.latestReview.playerTurns} Spielerbeiträge · {overview.latestReview.npcEncounters} NPC-Begegnungen</p>
     :<p>{overview.reviewQuality==='none'?'Noch keine Gesprächsauswertung gespeichert.':'Gesprächsauswertung derzeit nicht verfügbar.'}</p>}
    <p style={{opacity:.8}}>{overview.note}</p>
