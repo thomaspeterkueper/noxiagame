@@ -2,7 +2,7 @@
 export type LiteraryCheckpoint = {
   id: string
   work: string
-  sceneId: string
+  sceneId?: string
   sourceDocument: string
   narrativeOrder: number
   actorIds: string[]
@@ -22,7 +22,7 @@ export function auditJourney(
   const findings: ContinuityFinding[] = []
   for (const point of checkpoints) {
     if (!point.sourceDocument.trim()) findings.push({checkpointId:point.id,type:'missing_source',detail:'Textbeleg fehlt'})
-    if (!knownSceneIds.includes(point.sceneId)) findings.push({checkpointId:point.id,type:'missing_scene',detail:'Szenenreferenz nicht im Katalog'})
+    if (point.sceneId && !knownSceneIds.includes(point.sceneId)) findings.push({checkpointId:point.id,type:'missing_scene',detail:'Szenenreferenz nicht im Katalog'})
   }
   const ordered=[...checkpoints].sort((a,b)=>a.narrativeOrder-b.narrativeOrder)
   for(let i=1;i<ordered.length;i++) {
@@ -36,11 +36,10 @@ export const MIRIAM_ISTANBUL_CHECKPOINTS: LiteraryCheckpoint[] = [
   {
     id:'miriam-ch2-hagia-sophia',
     work:'Die Miriam-Chroniken',
-    sceneId:'hagia-sophia-1700',
     sourceDocument:'Drive:1i6IuedvPGFoK3iL-U2Q3EerHjBGZ20IV',
     narrativeOrder:2,
     actorIds:['miriam-rachael','mehmet-oezkan'],
     setting:'fictional',
-    notes:'Narrativer Ort: Hagia Sophia; Szene-ID dient nur als geometrischer Platzhalter, NICHT als behauptetes Handlungsjahr 1700. Zeitliche Verortung des Romans noch offen.',
+    notes:'Narrativer Ort: Hagia Sophia; die Handlungszeit und passende 3D-Szene sind erst anhand des Romantexts zu klären.',
   },
 ]
