@@ -14,8 +14,12 @@ export async function GET(req: NextRequest) {
 
   const now = new Date()
   const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const [conversations, conversationMemories, socialEvents, insightCandidates, reviews] = await Promise.all([
+  const [conversations, wishSignals, deniedWishSignals, conversationMemories, socialEvents, insightCandidates, reviews] = await Promise.all([
     db.from('npc_conversation_log').select('id', { head: true, count: 'exact' }).gte('created_at', since),
+    db.from('npc_conversation_log').select('id', { head: true, count: 'exact' })
+      .gte('created_at', since).not('wish_kind', 'is', null),
+    db.from('npc_conversation_log').select('id', { head: true, count: 'exact' })
+      .gte('created_at', since).not('wish_kind', 'is', null).eq('wish_npc_denied', true),
     db.from('npc_player_conversation_memory').select('id', { head: true, count: 'exact' }),
     db.from('population_events').select('id', { head: true, count: 'exact' })
       .gte('occurred_at', since).in('event_type', ['social_interaction', 'npc_social_interaction', 'person_conflict', 'person_assistance']),
@@ -24,6 +28,6 @@ export async function GET(req: NextRequest) {
       .order('day', { ascending: false }).limit(1),
   ])
   return NextResponse.json(buildNpcInsightOverview({
-    asOf: now.toISOString(), since, conversations, conversationMemories, socialEvents, insightCandidates, reviews,
+    asOf: now.toISOString(), since, conversations, wishSignals, deniedWishSignals, conversationMemories, socialEvents, insightCandidates, reviews,
   }), { headers: { 'Cache-Control': 'private, no-store' } })
 }
