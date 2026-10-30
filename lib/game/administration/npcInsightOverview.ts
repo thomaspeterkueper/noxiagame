@@ -1,6 +1,30 @@
 // Read-only, privacy-minimised projection for the NPC observatory (#545).
 // Counts describe stored evidence; they never certify an NPC idea or trigger Core actions.
 
+export type NpcInsightWindow = { asOf: string; since: string }
+
+// An observation window is closed at a single captured instant: future-dated
+// records must not leak into the historical evidence summary.
+export function npcInsightWindow(now: Date): NpcInsightWindow {
+  const timestamp = now.getTime()
+  if (!Number.isFinite(timestamp)) throw new Error('Invalid NPC observation timestamp')
+  return {
+    asOf: new Date(timestamp).toISOString(),
+    since: new Date(timestamp - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  }
+}
+
+export interface WindowFilter<T> {
+  gte(column: string, value: string): T
+  lte(column: string, value: string): T
+}
+
+export function withinNpcInsightWindow<T extends WindowFilter<T>>(
+  query: T, column: 'created_at' | 'occurred_at', window: NpcInsightWindow,
+): T {
+  return query.gte(column, window.since).lte(column, window.asOf)
+}
+
 export type CountResult = { count: number | null; error?: unknown }
 export type ReviewResult = { data: unknown[] | null; error?: unknown }
 export type WishKindResult = { data: unknown[] | null; error?: unknown }
