@@ -60,6 +60,16 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
   // Reject *all* conflicting IDs for the same source, regardless of input order.
   // Count only valid committed receipts: malformed rows must not poison good events.
   const sourceEventIds = new Map<string, Set<string>>()
+  // The same settlement/event ID must not carry two different committed payloads.
+  // Compare only semantic fields so JSON object key order cannot change identity.
+  const eventSignatures = new Map<string, Set<string>>()
+  const receiptSignature = (r: CommittedWorldReceipt): string => {
+    const c = r.change
+    const change = c.action === 'establish'
+      ? [c.action, c.asset.id, c.asset.kind, c.asset.name, c.asset.districtId, c.asset.introducedYear]
+      : c.action === 'retire' ? [c.action, c.assetId] : [c.action, c.assetId, c.name]
+    return JSON.stringify([r.worldYear, r.sequence, r.domain, r.domainEventRef, r.actorRef, change])
+  }
   for (const candidate of receipts as readonly unknown[]) {
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) ||
         (candidate as CommittedWorldReceipt).committed !== true ||
@@ -69,6 +79,10 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
     const ids = sourceEventIds.get(sourceKey) ?? new Set<string>()
     ids.add(r.eventId)
     sourceEventIds.set(sourceKey, ids)
+    const identity = JSON.stringify([r.settlementId, r.eventId])
+    const signatures = eventSignatures.get(identity) ?? new Set<string>()
+    signatures.add(receiptSignature(r))
+    eventSignatures.set(identity, signatures)
   }
   for (const candidate of receipts) {
     // The public TypeScript type does not protect against JSON/DB values at runtime.
@@ -91,7 +105,11 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
       rejected.push({ eventId: r.eventId, reason: 'ambiguous_domain_ref' })
       continue
     }
-    const identity = r.settlementId + ':' + r.eventId
+    const identity = JSON.stringify([r.settlementId, r.eventId])
+    if ((eventSignatures.get(identity)?.size ?? 0) > 1) {
+      rejected.push({ eventId: r.eventId, reason: 'ambiguous_event_id' })
+      continue
+    }
     if (seen.has(identity)) { rejected.push({ eventId: r.eventId, reason: 'duplicate' }); continue }
     seen.add(identity)
     // This is a projection, not a proof that the upstream authority is genuine.

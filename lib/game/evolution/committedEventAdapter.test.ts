@@ -72,4 +72,47 @@ assert(malformedCollision.events.length === 1 &&
   malformedCollision.rejected[0].reason === 'invalid_receipt',
   'malformed receipt cannot poison valid source event')
 
+// One event ID cannot describe two different committed changes. Reject both,
+// irrespective of input order; otherwise historical replay becomes order-dependent.
+const conflictingEventId = [
+  { ...receipt('shared-id', 2050, true, { action:'rename', assetId:'hall', name:'A' }),
+    domainEventRef:'core:shared' },
+  { ...receipt('shared-id', 2050, true, { action:'rename', assetId:'hall', name:'B' }),
+    domainEventRef:'core:shared' },
+]
+for (const input of [conflictingEventId, [...conflictingEventId].reverse()]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 0, 'conflicting same-ID receipts must not enter history')
+  assert(result.rejected.length === 2 &&
+    result.rejected.every(r => r.reason === 'ambiguous_event_id'),
+    'same-ID conflict must reject both receipts in any order')
+}
+// Distinct provenance with the same event ID is also ambiguous.
+const differentProvenance = adaptCommittedWorldEvents([
+  conflictingEventId[0],
+  { ...conflictingEventId[0], domainEventRef:'core:another' },
+])
+assert(differentProvenance.events.length === 0 &&
+  differentProvenance.rejected.every(r => r.reason === 'ambiguous_event_id'),
+  'same event ID must not reference two distinct source events')
+// Identical duplicates retain their existing first-accepted/duplicate-rejected behavior.
+const identical = adaptCommittedWorldEvents([conflictingEventId[0], { ...conflictingEventId[0] }])
+assert(identical.events.length === 1 && identical.rejected.length === 1 &&
+  identical.rejected[0].reason === 'duplicate', 'identical replay is a duplicate, not a conflict')
+// Event IDs are scoped by settlement, including names containing delimiters.
+const delimiterSafe = adaptCommittedWorldEvents([
+  { ...conflictingEventId[0], settlementId:'a:b', eventId:'c' },
+  { ...conflictingEventId[1], settlementId:'a', eventId:'b:c' },
+])
+assert(delimiterSafe.events.length === 2 && delimiterSafe.rejected.length === 0,
+  'settlement/event IDs must not collide through colon concatenation')
+// A malformed receipt cannot veto an otherwise valid event with the same ID.
+const invalidSameId = adaptCommittedWorldEvents([
+  conflictingEventId[0],
+  { ...conflictingEventId[1], worldYear: Number.NaN },
+])
+assert(invalidSameId.events.length === 1 && invalidSameId.rejected.length === 1 &&
+  invalidSameId.rejected[0].reason === 'invalid_receipt',
+  'invalid same-ID candidate cannot poison valid history')
+
 console.log('Committed city event adapter: tests passed')
