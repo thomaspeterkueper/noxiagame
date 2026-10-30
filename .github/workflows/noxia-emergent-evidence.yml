@@ -1,0 +1,30 @@
+name: NOXIA emergent evidence regression
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/emergentProposals.ts'
+      - 'lib/game/evolution/emergentProposals.test.ts'
+      - '.github/workflows/noxia-emergent-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-emergent-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile and run deterministic evidence tests
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/emergentProposals.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .emergent-evidence-test
+          node .emergent-evidence-test/emergentProposals.test.js
