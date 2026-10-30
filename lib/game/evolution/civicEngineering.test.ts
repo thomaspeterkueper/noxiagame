@@ -18,4 +18,27 @@ check(screenEngineeringCandidate(idea).status==='needs_review','documented idea 
 check(screenEngineeringCandidate(idea).grantsTechnology===false,'not an automatic invention unlock')
 check(screenEngineeringCandidate({...idea,sourceRefs:[]}).status==='rejected','unsourced idea rejected')
 check(screenEngineeringCandidate({...idea,limitations:[]}).status==='rejected','limits required')
+
+// Malformed NPC/experimental input is never a technology handoff payload.
+check(screenEngineeringCandidate(idea).payload === idea, 'valid candidate retained for manual review')
+const reject = (candidate: unknown, message: string) => {
+ const result = screenEngineeringCandidate(candidate)
+ check(result.status === 'rejected' && result.payload === null && !result.grantsTechnology, message)
+}
+reject(null, 'null input safely rejected')
+reject('arbitrary text', 'non-object input safely rejected')
+reject({...idea, sourceRefs: 'dialogue:12'}, 'string cannot masquerade as reference array')
+reject({...idea, sourceRefs: ['dialogue:12', ' ']}, 'blank provenance rejected')
+reject({...idea, availableCapabilities: [null]}, 'invalid capability rejected')
+reject({...idea, limitations: [4]}, 'invalid limitation rejected')
+reject({...idea, problem: null}, 'missing problem safely rejected')
+reject({...idea, hypothesis: '  '}, 'blank hypothesis rejected')
+reject({...idea, worldYear: Number.NaN}, 'NaN year rejected')
+reject({...idea, worldYear: Number.POSITIVE_INFINITY}, 'infinite year rejected')
+reject({...idea, worldYear: 2150.5}, 'fractional year rejected')
+reject({...idea, domain: 'world_override'}, 'invalid engineering domain rejected')
+reject({...idea, origin: 'system_command'}, 'invalid source origin rejected')
+reject({...idea, id: ' '}, 'blank idea id rejected')
+reject({...idea, sourceProposalId: ' '}, 'blank source proposal rejected')
+
 console.log('Civic and engineering gate tests passed')
