@@ -45,4 +45,34 @@ const reusedElsewhere = { ...replay[0], proposalKey: 'other-proposal' }
 assert(deliberate({ contributions: [replay[0], reusedElsewhere] }).length === 0,
   'one receipt ID cannot support competing proposals')
 
+
+// JSON event inputs are not guaranteed to satisfy the TypeScript interface.
+const malformed = [
+  null, undefined, 'not-a-receipt',
+  { ...make('bad-source','x','support','book'), source: 'system_command' },
+  { ...make('bad-stance','x','support','book'), stance: 'execute' },
+  { ...make('bad-tick','x','support','book'), tick: Number.NaN },
+  { ...make('infinite-tick','x','support','book'), tick: Number.POSITIVE_INFINITY },
+  { ...make('negative-tick','x','support','book'), tick: -1 },
+  { ...make('bad-ref','x','support','book'), sourceRefs: [null] },
+  { ...make('blank-ref','x','support','book'), sourceRefs: ['   '] },
+  { ...make('bad-actor','x','support','book'), actorId: ' ' },
+  { ...make('bad-evidence','x','support','book'), independentEvidence: 'yes' },
+  { ...make('bad-consent','x','support','book'), willingToCollaborate: 'yes' },
+] as unknown as CivicContribution[]
+const clean = deliberate({ contributions: replay })
+const withMalformed = deliberate({ contributions: [...malformed, ...replay] })
+assert(JSON.stringify(clean) === JSON.stringify(withMalformed),
+  'malformed external events cannot create participants, consent, or provenance')
+assert(JSON.stringify(withMalformed) === JSON.stringify(deliberate({ contributions: [...replay, ...malformed].reverse() })),
+  'malformed event filtering is order-independent')
+const invalidSameId = { ...replay[0], independentEvidence: 'true' } as unknown as CivicContribution
+assert(JSON.stringify(deliberate({ contributions: [invalidSameId, ...replay] })) === JSON.stringify(clean),
+  'invalid event cannot poison valid event with the same immutable receipt ID')
+assert(deliberate({ contributions: replay, minCollaborators: Number.NaN })[0].status === 'collaboration_candidate' &&
+  deliberate({ contributions: replay, minCollaborators: Number.POSITIVE_INFINITY })[0].status === 'collaboration_candidate',
+  'non-finite collaborator thresholds fall back to the default instead of silently blocking proposals')
+assert(deliberate({ contributions: replay, minCollaborators: 4 })[0].status === 'discussion',
+  'valid stricter threshold is preserved')
+
 console.log('Social deliberation projection: tests passed')
