@@ -17,4 +17,30 @@ assert(at(2050).assets[0].name==='Bürgerzentrum','approved change appears at co
 assert(at(2070).assets.length===2,'later building appears')
 assert(compareCityYears(at(2026),at(2070)).added.length===1,'city diff shows new building')
 assert(adaptCommittedWorldEvents([...receipts, receipts[1]]).rejected.some(r=>r.reason==='duplicate'),'duplicate event rejected')
+
+const malformed = [
+  null,
+  undefined,
+  { ...receipts[1], eventId: ' ' },
+  { ...receipts[1], eventId: 'bad-domain', domain: 'unknown' },
+  { ...receipts[1], eventId: 'bad-year', worldYear: Number.NaN },
+  { ...receipts[1], eventId: 'bad-sequence', sequence: 'one' },
+  { ...receipts[1], eventId: 'bad-provenance', domainEventRef: ' ' },
+  { ...receipts[1], eventId: 'bad-actor', actorRef: null },
+  { ...receipts[1], eventId: 'null-change', change: null },
+  { ...receipts[1], eventId: 'unknown-action', change: { action: 'demolish', assetId: 'hall' } },
+  { ...receipts[1], eventId: 'bad-rename', change: { action: 'rename', assetId: 'hall', name: null } },
+  { ...receipts[2], eventId: 'wrong-introduced-year',
+    change: { action: 'establish', asset: { id:'lab2', kind:'institution', name:'Ungültig', districtId:'center', introducedYear: 2000 } } },
+  { ...receipts[1], eventId: 'nonboolean-committed', committed: 'true' },
+] as unknown as CommittedWorldReceipt[]
+const checked = adaptCommittedWorldEvents(malformed)
+assert(checked.events.length === 0, 'malformed receipts cannot become history')
+assert(checked.rejected.length === malformed.length, 'every malformed receipt must be reported')
+assert(checked.rejected.every(r => r.reason === 'invalid_receipt'), 'invalid receipt reason')
+const combined = adaptCommittedWorldEvents([...malformed, ...receipts])
+assert(combined.events.length === 2, 'malformed receipts cannot poison valid replay')
+assert(cityAtYear({settlementId:'seelenberg',year:2070,baseline,events:combined.events}).assets.length === 2,
+  'valid historical state remains reproducible')
+
 console.log('Committed city event adapter: tests passed')
