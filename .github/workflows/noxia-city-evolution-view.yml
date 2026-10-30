@@ -1,0 +1,36 @@
+name: NOXIA city evolution view regression
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/cityEvolutionView.ts'
+      - 'lib/game/evolution/cityEvolutionView.test.ts'
+      - '.github/workflows/noxia-city-evolution-view.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/evolution/cityEvolutionView.ts'
+      - 'lib/game/evolution/cityEvolutionView.test.ts'
+      - '.github/workflows/noxia-city-evolution-view.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-city-evolution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  city-evolution-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile and test city evolution projection
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/cityEvolutionView.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .city-evolution-test
+          node .city-evolution-test/cityEvolutionView.test.js
