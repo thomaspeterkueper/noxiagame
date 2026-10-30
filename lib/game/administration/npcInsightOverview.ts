@@ -62,13 +62,25 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
     }
   }
 
+  // A subset cannot exceed its parent; never display contradictory counts as evidence.
+  const conversations7d = metric(input.conversations)
+  const wishSignals7d = metric(input.wishSignals)
+  let deniedWishSignals7d = metric(input.deniedWishSignals)
+  if (wishSignals7d.count !== null && conversations7d.count !== null && wishSignals7d.count > conversations7d.count) {
+    wishSignals7d.count = null
+    wishSignals7d.quality = 'unavailable'
+  }
+  if (deniedWishSignals7d.count !== null && (wishSignals7d.count === null || deniedWishSignals7d.count > wishSignals7d.count)) {
+    deniedWishSignals7d = { count: null, quality: 'unavailable' }
+  }
+
   return {
     asOf: input.asOf,
     since: input.since,
     metrics: {
-      conversations7d: metric(input.conversations),
-      wishSignals7d: metric(input.wishSignals),
-      deniedWishSignals7d: metric(input.deniedWishSignals),
+      conversations7d,
+      wishSignals7d,
+      deniedWishSignals7d,
       memoryPairsTotal: metric(input.conversationMemories),
       socialEvents7d: metric(input.socialEvents),
       insightCandidatesTotal: metric(input.insightCandidates),
