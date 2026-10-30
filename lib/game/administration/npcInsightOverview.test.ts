@@ -8,6 +8,12 @@ const base = (): NpcInsightOverviewInput => ({
   conversationMemories: { count: 20, error: null },
   socialEvents: { count: 179, error: null },
   insightCandidates: { count: 0, error: null },
+  wishKindRows: { data: [
+    ...Array.from({ length: 5 }, (_, i) => ({ wish_kind: 'wish', wish_npc_denied: i === 0 })),
+    ...Array.from({ length: 2 }, (_, i) => ({ wish_kind: 'seeking', wish_npc_denied: i === 0 })),
+    ...Array.from({ length: 2 }, () => ({ wish_kind: 'how_to', wish_npc_denied: false })),
+    ...Array.from({ length: 2 }, (_, i) => ({ wish_kind: 'missing', wish_npc_denied: i === 0 })),
+  ], error: null },
   reviews: { data: [{ day: '2026-10-29', player_turns: 6, players: 2, npcs: 3, npc_encounters: 5,
     summary: 'private player text', findings: { secret: 'private player text' } }], error: null },
 })
@@ -18,6 +24,9 @@ function check(ok: boolean, label: string) {
 
 {
   const snapshot = buildNpcInsightOverview(base())
+  check(snapshot.wishKindBreakdown.quality === 'recorded' && snapshot.wishKindBreakdown.categories.find(x => x.kind === 'wish')?.count === 5, 'safe category breakdown derived from complete evidence')
+  check(snapshot.wishKindBreakdown.categories.reduce((sum, x) => sum + x.denied, 0) === 3, 'denials reconcile with aggregate')
+  check(!JSON.stringify(snapshot).includes('wish_object'), 'private free text never reaches overview')
   check(snapshot.metrics.insightCandidatesTotal.count === 0 && snapshot.metrics.insightCandidatesTotal.quality === 'recorded', 'zero is measured, not unavailable')
   check(snapshot.metrics.wishSignals7d.count === 11 && snapshot.metrics.deniedWishSignals7d.count === 3, 'conversation wish signals and denials are separate aggregate counts')
   check(snapshot.sources.wishSignals7d === 'npc_conversation_log.wish_kind', 'wish signal provenance is explicit')
@@ -61,6 +70,24 @@ function check(ok: boolean, label: string) {
   input.deniedWishSignals = { count: 3 }
   snapshot = buildNpcInsightOverview(input)
   check(snapshot.metrics.deniedWishSignals7d.quality === 'unavailable', 'dependent metric unavailable when parent query fails')
+}
+
+{
+  const input = base()
+  input.wishKindRows = { data: [{ wish_kind: 'wish', wish_npc_denied: false }] }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'partial page is never presented as complete')
+  input.wishKindRows = { data: [...base().wishKindRows.data!, { wish_kind: 'wish', wish_npc_denied: false }] }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'extra row is rejected')
+  input.wishKindRows = { data: base().wishKindRows.data!.map((row, i) => i === 0 ? { wish_kind: 'unknown', wish_npc_denied: false } : row) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'unknown kind is not silently misclassified')
+  input.wishKindRows = { data: base().wishKindRows.data!.map((row, i) => i === 0 ? { wish_kind: 'wish', wish_npc_denied: false } : row) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'denied category totals must reconcile')
+  input.wishKindRows = { data: null, error: { detail: 'private data' } }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'query failure never becomes zero')
+  input.wishSignals = { count: 201 }
+  input.conversations = { count: 250 }
+  input.wishKindRows = { data: Array.from({ length: 201 }, () => ({ wish_kind: 'wish', wish_npc_denied: false })) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'bounded query never claims exhaustive coverage beyond 200')
 }
 if (failed) throw new Error(`NPC insight overview: ${failed} checks failed`)
 console.log('NPC insight overview checks passed')
