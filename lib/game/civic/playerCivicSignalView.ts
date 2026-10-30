@@ -12,9 +12,14 @@ const kinds = new Set(['blocked', 'missing', 'wish', 'seeking', 'how_to'])
 const validText = (v: unknown, max: number, min = 1): v is string =>
   typeof v === 'string' && v.length >= min && v.length <= max &&
   v.trim() === v && !/[\u0000-\u001f\u007f]/.test(v)
-const validDate = (v: unknown): v is string =>
-  typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(v) &&
-  Number.isFinite(Date.parse(v)) && new Date(v).toISOString() === v
+const validDate = (v: unknown): v is string => {
+  if (typeof v !== 'string') return false
+  // Accept legacy millisecond receipts and canonical six-digit PostgreSQL receipts.
+  // JS Date truncates the final three digits; compare the millisecond prefix.
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d{3})(?:\d{3})?Z$/.exec(v)
+  return !!match && Number.isFinite(Date.parse(v)) &&
+    new Date(v).toISOString() === `${match[1]}.${match[2]}Z`
+}
 
 export function readPlayerCivicSignalsPayload(input: unknown): PlayerCivicSignalResult {
   const invalid: PlayerCivicSignalResult = { ok: false, signals: [] }
