@@ -41,7 +41,7 @@ function validSignal(value: unknown): value is EvolutionSignal {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const s = value as Partial<EvolutionSignal>
   if (!nonempty(s.id) || !nonempty(s.npcId) || !nonempty(s.opportunityKey) ||
-      !Number.isSafeInteger(s.tick) || (s.tick as number) < 0 ||
+      typeof s.tick !== 'number' || !Number.isSafeInteger(s.tick) || s.tick < 0 ||
       typeof s.relevance !== 'number' || !Number.isFinite(s.relevance) ||
       s.relevance < 0 || s.relevance > 1 ||
       !opportunityKinds.includes(s.kind as OpportunityKind) ||
@@ -61,7 +61,7 @@ export function discoverEvolutionProposals(input: {
   minScore?: number
   maxProposals?: number
 }): EvolutionProposal[] {
-  const minNpcs = Number.isSafeInteger(input.minIndependentNpcs)
+  const minNpcs = typeof input.minIndependentNpcs === 'number' && Number.isSafeInteger(input.minIndependentNpcs)
     ? Math.max(2, input.minIndependentNpcs as number) : 2
   const minScore = typeof input.minScore === 'number' && Number.isFinite(input.minScore)
     ? bounded(input.minScore) : 0.6
@@ -122,6 +122,6 @@ export function discoverEvolutionProposals(input: {
     })
   }
   return proposals.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
-    .slice(0, Number.isSafeInteger(input.maxProposals)
+    .slice(0, typeof input.maxProposals === 'number' && Number.isSafeInteger(input.maxProposals)
       ? Math.max(0, Math.min(100, input.maxProposals as number)) : 20)
 }
