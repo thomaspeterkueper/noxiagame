@@ -9,12 +9,14 @@ type Detail = {person:Person;health?:{wellbeing:number;condition_code:string|nul
 type InsightMetric = { count: number | null; quality: 'recorded' | 'unavailable' }
 type InsightOverview = {
  asOf: string; since: string;
- metrics: { conversations7d: InsightMetric; memoryPairsTotal: InsightMetric; socialEvents7d: InsightMetric; insightCandidatesTotal: InsightMetric };
+ metrics: { conversations7d: InsightMetric; wishSignals7d: InsightMetric; deniedWishSignals7d: InsightMetric; memoryPairsTotal: InsightMetric; socialEvents7d: InsightMetric; insightCandidatesTotal: InsightMetric };
  latestReview: { day: string; playerTurns: number; players: number; npcs: number; npcEncounters: number } | null;
  reviewQuality: 'recorded' | 'none' | 'unavailable'; note: string;
 }
 const INSIGHT_METRICS: Array<[keyof InsightOverview['metrics'], string]> = [
  ['conversations7d', 'Gesprächseinträge · 7 Tage'],
+ ['wishSignals7d', 'Wunsch-/Suchmarkierungen · 7 Tage'],
+ ['deniedWishSignals7d', 'Davon durch NPC abgelehnt · 7 Tage'],
  ['socialEvents7d', 'Soziale Ereignisse · 7 Tage'],
  ['memoryPairsTotal', 'Gespeicherte NPC-Spieler-Erinnerungen · gesamt'],
  ['insightCandidatesTotal', 'Erkenntniskandidaten · gesamt'],
