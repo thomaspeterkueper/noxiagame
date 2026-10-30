@@ -3,6 +3,8 @@
 
 export type CountResult = { count: number | null; error?: unknown }
 export type ReviewResult = { data: unknown[] | null; error?: unknown }
+export type WishKindResult = { data: unknown[] | null; error?: unknown }
+const WISH_KINDS = ['wish', 'seeking', 'how_to', 'missing'] as const
 export type EvidenceQuality = 'recorded' | 'unavailable'
 export type CountMetric = { count: number | null; quality: EvidenceQuality }
 
@@ -16,6 +18,7 @@ export interface NpcInsightOverviewInput {
   socialEvents: CountResult
   insightCandidates: CountResult
   reviews: ReviewResult
+  wishKindRows: WishKindResult
 }
 
 function metric(result: CountResult): CountMetric {
@@ -74,6 +77,35 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
     deniedWishSignals7d = { count: null, quality: 'unavailable' }
   }
 
+  // Read only bounded, whitelisted structured tags. Never forward conversation text,
+  // wish_object, player identifiers or row-level records to the admin browser.
+  const wishKindBreakdown: {
+    quality: EvidenceQuality
+    categories: { kind: string; count: number; denied: number }[]
+  } = { quality: 'unavailable', categories: [] }
+  const rows = input.wishKindRows.data
+  if (!input.wishKindRows.error && Array.isArray(rows) &&
+      wishSignals7d.count !== null && deniedWishSignals7d.count !== null &&
+      wishSignals7d.count <= 200 && rows.length === wishSignals7d.count) {
+    const categories = WISH_KINDS.map(kind => ({ kind, count: 0, denied: 0 }))
+    let valid = true
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') { valid = false; break }
+      const record = row as Record<string, unknown>
+      const category = categories.find(item => item.kind === record.wish_kind)
+      if (!category || (record.wish_npc_denied !== null && typeof record.wish_npc_denied !== 'boolean')) {
+        valid = false
+        break
+      }
+      category.count++
+      if (record.wish_npc_denied === true) category.denied++
+    }
+    if (valid && categories.reduce((sum, item) => sum + item.denied, 0) === deniedWishSignals7d.count) {
+      wishKindBreakdown.quality = 'recorded'
+      wishKindBreakdown.categories = categories
+    }
+  }
+
   return {
     asOf: input.asOf,
     since: input.since,
@@ -87,9 +119,11 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
     },
     latestReview,
     reviewQuality,
+    wishKindBreakdown,
     sources: {
       conversations7d: 'npc_conversation_log',
       wishSignals7d: 'npc_conversation_log.wish_kind',
+      wishKindBreakdown: 'npc_conversation_log.wish_kind + wish_npc_denied',
       deniedWishSignals7d: 'npc_conversation_log.wish_npc_denied',
       memoryPairsTotal: 'npc_player_conversation_memory',
       socialEvents7d: 'population_events',
