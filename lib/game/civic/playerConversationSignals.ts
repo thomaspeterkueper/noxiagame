@@ -29,6 +29,26 @@ function rowId(value: unknown): string | null {
   return typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) ? value : null
 }
 
+/**
+ * PostgreSQL timestamptz receipts require an explicit timezone and a real
+ * calendar date. Date.parse alone silently normalizes dates like February 30
+ * and accepts timezone-less strings, corrupting provenance ordering.
+ */
+function receiptTime(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (year === 0 || month < 1 || month > 12 || day < 1 || day > days[month - 1] ||
+      Number(match[4]) > 23 || Number(match[5]) > 59 || Number(match[6]) > 59) return null
+  const epoch = Date.parse(value)
+  return Number.isFinite(epoch) ? new Date(epoch).toISOString() : null
+}
+
 export function projectPlayerConversationSignals(rows: readonly unknown[], requestedLimit = 20): PlayerConversationSignal[] {
   const limit = Number.isSafeInteger(requestedLimit) ? Math.max(1, Math.min(20, requestedLimit)) : 20
   const valid: PlayerConversationSignal[] = []
@@ -37,13 +57,14 @@ export function projectPlayerConversationSignals(rows: readonly unknown[], reque
     const r = row as Record<string, unknown>
     const id = rowId(r.id)
     const subject = text(r.wish_object, 120)
+    const occurredAt = receiptTime(r.created_at)
     if (!id || !KINDS.includes(String(r.wish_kind)) || subject.length < 3 ||
         r.opening !== false || !['reply', 'repeat_hint'].includes(String(r.outcome)) ||
-        typeof r.created_at !== 'string' || !Number.isFinite(Date.parse(r.created_at))) continue
+        !occurredAt) continue
     valid.push({
       id, kind: r.wish_kind as ConversationWishKind, subject,
       npcDenied: r.wish_npc_denied === true,
-      occurredAt: new Date(r.created_at).toISOString(),
+      occurredAt,
       unverifiedPlaceLabel: text(r.location_name, 80) || null,
       sourceRef: `npc_conversation_log:${id}`,
       status: 'unreviewed', canTriggerWorldChange: false,
