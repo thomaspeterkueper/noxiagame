@@ -48,5 +48,19 @@ function check(ok: boolean, label: string) {
   input.reviews = { data: [{ day: '2026-10-29', player_turns: -1, players: 1, npcs: 1, npc_encounters: 1 }], error: null }
   check(buildNpcInsightOverview(input).reviewQuality === 'unavailable', 'invalid review counters rejected')
 }
+{
+  const input = base()
+  input.wishSignals = { count: 90 }
+  let snapshot = buildNpcInsightOverview(input)
+  check(snapshot.metrics.wishSignals7d.quality === 'unavailable' && snapshot.metrics.deniedWishSignals7d.quality === 'unavailable', 'wish subset larger than conversations invalidates dependent counts')
+  input.wishSignals = { count: 11 }
+  input.deniedWishSignals = { count: 12 }
+  snapshot = buildNpcInsightOverview(input)
+  check(snapshot.metrics.wishSignals7d.count === 11 && snapshot.metrics.deniedWishSignals7d.quality === 'unavailable', 'denied wishes cannot exceed wish signals')
+  input.wishSignals = { count: null, error: 'unavailable' }
+  input.deniedWishSignals = { count: 3 }
+  snapshot = buildNpcInsightOverview(input)
+  check(snapshot.metrics.deniedWishSignals7d.quality === 'unavailable', 'dependent metric unavailable when parent query fails')
+}
 if (failed) throw new Error(`NPC insight overview: ${failed} checks failed`)
 console.log('NPC insight overview checks passed')
