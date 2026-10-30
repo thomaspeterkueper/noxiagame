@@ -31,3 +31,8 @@ test('all published manuscripts are registered, including Kinder Gottes', () => 
   assert.match(interior, /THEOLOGICAL_ESSAYS/)
   assert.match(interior, /readingText\.sections/)
 })
+
+test('NPC cannot move player without explicit UI confirmation', () => {
+  assert.match(interior, /playerFollows && window\.confirm/)
+  assert.equal((interior.match(/window\.confirm\(/g) || []).length, 2)
+})
