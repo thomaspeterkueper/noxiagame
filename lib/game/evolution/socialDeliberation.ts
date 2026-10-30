@@ -38,9 +38,30 @@ export function deliberate(input: {
   contributions: readonly CivicContribution[]
   minCollaborators?: number
 }): DeliberationSnapshot[] {
-  const groups = new Map<string, CivicContribution[]>()
+  // A contribution ID identifies one immutable receipt across all proposals.
+  // Identical replays count once; conflicting uses of an ID count zero,
+  // irrespective of input order. Neither is a new participant or vote.
+  const unique = new Map<string, { contribution: CivicContribution; fingerprint: string }>()
+  const conflictingIds = new Set<string>()
   for (const c of input.contributions) {
-    if (!c.id || !c.actorId || !c.proposalKey || !c.sourceRefs.length || !Number.isFinite(c.tick)) continue
+    if (!c.id || conflictingIds.has(c.id)) continue
+    const fingerprint = JSON.stringify([
+      c.actorId, c.proposalKey, c.source,
+      Array.isArray(c.sourceRefs) ? [...c.sourceRefs].sort() : null,
+      c.stance, c.tick, c.independentEvidence, c.willingToCollaborate,
+    ])
+    const prior = unique.get(c.id)
+    if (prior && prior.fingerprint !== fingerprint) {
+      unique.delete(c.id)
+      conflictingIds.add(c.id)
+    } else if (!prior) {
+      unique.set(c.id, { contribution: c, fingerprint })
+    }
+  }
+  const groups = new Map<string, CivicContribution[]>()
+  for (const { contribution: c } of unique.values()) {
+    if (!c.actorId || !c.proposalKey || !Array.isArray(c.sourceRefs) ||
+        !c.sourceRefs.length || !Number.isFinite(c.tick)) continue
     groups.set(c.proposalKey, [...(groups.get(c.proposalKey) ?? []), c])
   }
   const required = Math.max(2, Math.floor(input.minCollaborators ?? 3))
