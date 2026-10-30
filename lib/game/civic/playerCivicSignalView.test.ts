@@ -2,7 +2,7 @@ import { readPlayerCivicSignalsPayload as read } from './playerCivicSignalView'
 const check = (ok: boolean, message: string) => { if (!ok) throw Error(message) }
 const row = (id: string, patch: Record<string, unknown> = {}) => ({
   id, kind: 'missing', subject: 'ein Treffpunkt', npcDenied: false,
-  occurredAt: '2026-10-30T18:00:00.000Z', unverifiedPlaceLabel: 'Seelenberg',
+  occurredAt: '2026-10-30T18:00:00.000000Z', unverifiedPlaceLabel: 'Seelenberg',
   sourceRef: `npc_conversation_log:${id}`, status: 'unreviewed',
   canTriggerWorldChange: false, player_text: 'geheimer Gesprächsinhalt', ...patch,
 })
@@ -27,6 +27,12 @@ check(read(envelope([row('1', { unverifiedPlaceLabel: 'Seelenberg\nverified' })]
   'control characters in location rejected')
 check(read(envelope([row('1', { occurredAt: 'not-a-date' })])).signals.length === 0,
   'invalid dates rejected')
+check(read(envelope([row('1', { occurredAt: '2026-02-30T18:00:00.000001Z' })])).signals.length === 0,
+  'impossible microsecond calendar dates rejected')
+check(read(envelope([row('1', { occurredAt: '2026-10-30T18:00:00.123456Z' })])).signals.length === 1,
+  'six-digit microsecond receipts accepted')
+check(read(envelope([row('1', { occurredAt: '2026-10-30T18:00:00.123Z' })])).signals.length === 1,
+  'legacy millisecond receipts remain compatible')
 check(read(envelope([row('1', { npcDenied: 'false' })])).signals.length === 0,
   'truthy strings not treated as booleans')
 check(read(envelope([row('1'), row('1')])).signals.length === 1,
