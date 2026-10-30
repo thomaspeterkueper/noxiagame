@@ -13,7 +13,7 @@ const base = (): NpcInsightOverviewInput => ({
     ...Array.from({ length: 2 }, (_, i) => ({ wish_kind: 'seeking', wish_npc_denied: i === 0 })),
     ...Array.from({ length: 2 }, () => ({ wish_kind: 'how_to', wish_npc_denied: false })),
     ...Array.from({ length: 2 }, (_, i) => ({ wish_kind: 'missing', wish_npc_denied: i === 0 })),
-  ], error: null },
+  ].map((row, i) => ({ id: i + 1, ...row })), error: null },
   reviews: { data: [{ day: '2026-10-29', player_turns: 6, players: 2, npcs: 3, npc_encounters: 5,
     summary: 'private player text', findings: { secret: 'private player text' } }], error: null },
 })
@@ -26,7 +26,7 @@ function check(ok: boolean, label: string) {
   const snapshot = buildNpcInsightOverview(base())
   check(snapshot.wishKindBreakdown.quality === 'recorded' && snapshot.wishKindBreakdown.categories.find(x => x.kind === 'wish')?.count === 5, 'safe category breakdown derived from complete evidence')
   check(snapshot.wishKindBreakdown.categories.reduce((sum, x) => sum + x.denied, 0) === 3, 'denials reconcile with aggregate')
-  check(!JSON.stringify(snapshot).includes('wish_object'), 'private free text never reaches overview')
+  check(!JSON.stringify(snapshot).includes('wish_object') && !JSON.stringify(snapshot).includes('"id":'), 'row IDs and private free text never reach overview')
   check(snapshot.metrics.insightCandidatesTotal.count === 0 && snapshot.metrics.insightCandidatesTotal.quality === 'recorded', 'zero is measured, not unavailable')
   check(snapshot.metrics.wishSignals7d.count === 11 && snapshot.metrics.deniedWishSignals7d.count === 3, 'conversation wish signals and denials are separate aggregate counts')
   check(snapshot.sources.wishSignals7d === 'npc_conversation_log.wish_kind', 'wish signal provenance is explicit')
@@ -88,6 +88,20 @@ function check(ok: boolean, label: string) {
   input.conversations = { count: 250 }
   input.wishKindRows = { data: Array.from({ length: 201 }, () => ({ wish_kind: 'wish', wish_npc_denied: false })) }
   check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'bounded query never claims exhaustive coverage beyond 200')
+}
+{
+  const input = base()
+  input.wishKindRows = { data: base().wishKindRows.data!.map((row, i) =>
+    i === 1 ? { ...row as object, id: 1 } : row) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'duplicate conversation IDs are not counted twice')
+  input.wishKindRows = { data: base().wishKindRows.data!.map((row, i) =>
+    i === 1 ? { ...row as object, id: '1' } : row) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'numeric and string IDs are deduplicated')
+  input.wishKindRows = { data: base().wishKindRows.data!.map((row, i) =>
+    i === 1 ? { ...row as object, id: null } : row) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'unavailable', 'missing provenance ID invalidates breakdown')
+  input.wishKindRows = { data: base().wishKindRows.data!.map(row => ({ ...row as object, id: String((row as {id:number}).id) })) }
+  check(buildNpcInsightOverview(input).wishKindBreakdown.quality === 'recorded', 'canonical decimal bigint IDs are accepted')
 }
 if (failed) throw new Error(`NPC insight overview: ${failed} checks failed`)
 console.log('NPC insight overview checks passed')
