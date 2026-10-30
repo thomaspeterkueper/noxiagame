@@ -43,4 +43,33 @@ assert(combined.events.length === 2, 'malformed receipts cannot poison valid rep
 assert(cityAtYear({settlementId:'seelenberg',year:2070,baseline,events:combined.events}).assets.length === 2,
   'valid historical state remains reproducible')
 
+// One source event cannot be relabeled with another eventId to replay twice.
+// Both conflicting records are rejected so replay is independent of input order.
+const conflictingSources = [
+  { ...receipt('source-a',2050,true,{action:'rename',assetId:'hall',name:'A'}), domainEventRef:'core:one-source' },
+  { ...receipt('source-b',2050,true,{action:'rename',assetId:'hall',name:'B'}), domainEventRef:'core:one-source' },
+]
+for (const input of [conflictingSources, [...conflictingSources].reverse()]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 0, 'conflicting source IDs must not produce history')
+  assert(result.rejected.length === 2 &&
+    result.rejected.every(r => r.reason === 'ambiguous_domain_ref'),
+    'all ambiguous source receipts must be reported regardless of order')
+}
+// Repeated source references in a different settlement are distinct Core domains.
+const separateSettlements = adaptCommittedWorldEvents([
+  conflictingSources[0],
+  {...conflictingSources[1], settlementId:'brombach'},
+])
+assert(separateSettlements.events.length === 2 && separateSettlements.rejected.length === 0,
+  'same source reference in another settlement must not collide')
+// Invalid receipts must not veto a genuine receipt with the same source reference.
+const malformedCollision = adaptCommittedWorldEvents([
+  conflictingSources[0], {...conflictingSources[1], actorRef:null} as unknown as CommittedWorldReceipt,
+])
+assert(malformedCollision.events.length === 1 &&
+  malformedCollision.rejected.length === 1 &&
+  malformedCollision.rejected[0].reason === 'invalid_receipt',
+  'malformed receipt cannot poison valid source event')
+
 console.log('Committed city event adapter: tests passed')
