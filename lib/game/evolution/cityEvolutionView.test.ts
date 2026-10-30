@@ -46,6 +46,28 @@ for (const overrides of [
  try { project(overrides) } catch { threw=true }
  check(threw, 'invalid city view input must be rejected')
 }
+// Imported map baseline is the starting snapshot, never a source of arbitrary state.
+const validAsset = {id:'old',kind:'building',name:'Altes Haus',districtId:'core',introducedYear:2026}
+for (const importedBaseline of [
+ [null],
+ [undefined],
+ ['old'],
+ [{...validAsset,id:' '}],
+ [{...validAsset,kind:'unknown'}],
+ [{...validAsset,introducedYear:NaN}],
+ [{...validAsset,introducedYear:'2026'}],
+ [{...validAsset,name:null}],
+ [{...validAsset,districtId:''}],
+ [validAsset,{...validAsset,name:'Konflikt'}],
+]) {
+ let threw=false
+ try { project({importedBaseline}) } catch { threw=true }
+ check(threw, 'invalid or duplicate imported asset must fail closed before replay')
+}
+const emptyBaseline = project({importedBaseline:[]})
+check(emptyBaseline.before.assets.length===0 && emptyBaseline.after.assets.length===0,
+ 'empty initial import is valid and remains empty without confirmed events')
+
 let rejectedNullInput=false
 try { cityEvolutionView(null as unknown as Parameters<typeof cityEvolutionView>[0]) }
 catch { rejectedNullInput=true }
