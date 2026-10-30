@@ -46,7 +46,10 @@ function receiptTime(value: unknown): string | null {
   if (year === 0 || month < 1 || month > 12 || day < 1 || day > days[month - 1] ||
       Number(match[4]) > 23 || Number(match[5]) > 59 || Number(match[6]) > 59) return null
   const epoch = Date.parse(value)
-  return Number.isFinite(epoch) ? new Date(epoch).toISOString() : null
+  if (!Number.isFinite(epoch)) return null
+  // JS Date only retains milliseconds. Keep the PostgreSQL microsecond receipt
+  // precision so two events in the same millisecond remain chronologically ordered.
+  return `${new Date(epoch).toISOString().slice(0, 19)}.${(match[7] ?? '').padEnd(6, '0')}Z`
 }
 
 export function projectPlayerConversationSignals(rows: readonly unknown[], requestedLimit = 20): PlayerConversationSignal[] {
