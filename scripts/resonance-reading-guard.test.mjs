@@ -24,7 +24,7 @@ test('NPC movement needs consent beyond model action marker', () => {
   assert.match(conversation, /followConsent && requestedLeadWalk/)
 })
 test('all published manuscripts are registered, including Kinder Gottes', () => {
-  for (const slug of ['kinder-gottes','gott-ist-eine-wolke','philosophie-der-omnizedenz','die-verkoerperte-seele','die-physik-des-ich','agurs-worte','der-erhellte-blick']) {
+  for (const slug of ['kinder-gottes','gott-ist-eine-wolke','philosophie-der-omnizedenz','die-verkoerperte-seele','die-physik-des-ich','agurs-worte','der-erhellte-blick','gottesdienst','isaak','was-ist-durch-dich-geschehen','ueber-die-sanftmut']) {
     assert.ok(registry.includes("readings/" + slug), slug)
   }
   assert.match(catalogue, /sachbuecher:kinder-gottes/)
