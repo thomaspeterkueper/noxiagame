@@ -31,6 +31,27 @@ export interface DeliberationSnapshot {
   execution: 'review_required'
   canonical: false
 }
+const sources: readonly DeliberationSource[] = ['conversation', 'book', 'dream', 'insight', 'observation']
+const stances: readonly Stance[] = ['support', 'oppose', 'question', 'alternative']
+const nonempty = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0
+
+/** External event JSON is untrusted, including boolean flags and actor IDs.
+ * Reject malformed receipts before collision checks so they cannot veto valid ones.
+ * Provenance references are labels, not proof of authenticity.
+ */
+function validContribution(value: unknown): value is CivicContribution {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const c = value as Partial<CivicContribution>
+  return nonempty(c.id) && nonempty(c.actorId) && nonempty(c.proposalKey) &&
+    sources.includes(c.source as DeliberationSource) &&
+    stances.includes(c.stance as Stance) &&
+    Array.isArray(c.sourceRefs) && c.sourceRefs.length > 0 &&
+    c.sourceRefs.every(nonempty) &&
+    typeof c.tick === 'number' && Number.isSafeInteger(c.tick) && c.tick >= 0 &&
+    typeof c.independentEvidence === 'boolean' &&
+    typeof c.willingToCollaborate === 'boolean'
+}
 /** Count persons, not messages. The latest contribution determines their present stance.
  * No single actor or any number of duplicates can authorize collective action.
  */
@@ -43,8 +64,10 @@ export function deliberate(input: {
   // irrespective of input order. Neither is a new participant or vote.
   const unique = new Map<string, { contribution: CivicContribution; fingerprint: string }>()
   const conflictingIds = new Set<string>()
-  for (const c of input.contributions) {
-    if (!c.id || conflictingIds.has(c.id)) continue
+  for (const candidate of input.contributions as readonly unknown[]) {
+    if (!validContribution(candidate)) continue
+    const c = candidate
+    if (conflictingIds.has(c.id)) continue
     const fingerprint = JSON.stringify([
       c.actorId, c.proposalKey, c.source,
       Array.isArray(c.sourceRefs) ? [...c.sourceRefs].sort() : null,
@@ -64,7 +87,8 @@ export function deliberate(input: {
         !c.sourceRefs.length || !Number.isFinite(c.tick)) continue
     groups.set(c.proposalKey, [...(groups.get(c.proposalKey) ?? []), c])
   }
-  const required = Math.max(2, Math.floor(input.minCollaborators ?? 3))
+  const required = typeof input.minCollaborators === 'number' && Number.isSafeInteger(input.minCollaborators) && input.minCollaborators >= 2
+    ? input.minCollaborators : 3
   return [...groups.entries()].map(([proposalKey, contributions]) => {
     const latest = new Map<string, CivicContribution>()
     for (const c of contributions) {
