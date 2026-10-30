@@ -57,3 +57,28 @@ console.log('player shift checks passed')
   if (!(free.y !== roleStation(club2, 'bar').y && all.label)) throw new Error('player shift: barkeeper takes the free counter place')
   console.log('player shift station checks passed')
 }
+
+// Bezahlung nach Leistung (Thomas, 30.10.2026) – dieselben Zahlen wie noxia_close_player_shift
+{
+  const { offeredDuties, requiredTasks, shiftPay, employerShiftFacts, shiftEndText, standingFrom, EMPTY_SHIFT_LIMIT } = require('./playerShift') as typeof import('./playerShift')
+  let bad = 0
+  const ok = (cond: boolean, label: string) => { if (!cond) { bad++; console.error('FAIL', label) } }
+  ok(offeredDuties('bar', 300) === 7 && offeredDuties('cleaning', 300) === 10 && offeredDuties('dj', 300) === 8 && offeredDuties('door', 30) === 0, 'duties offered in the rhythm of the job')
+  ok(requiredTasks('bar', 300) === 6 && requiredTasks('door', 20) === 1, 'three quarters for full pay, at least one task')
+  const half = shiftPay({ role: 'bar', wagePerHour: 8, gameHours: 4, playedS: 300, tasksDone: 3 })
+  ok(half.full === 32 && half.required === 6 && half.wage === 16 && half.deduction === 16, 'half the tasks, half the wage (as in the database test)')
+  ok(shiftPay({ role: 'bar', wagePerHour: 8, gameHours: 4, playedS: 300, tasksDone: 6 }).wage === 32 && shiftPay({ role: 'bar', wagePerHour: 8, gameHours: 4, playedS: 300, tasksDone: 9 }).wage === 32, 'full pay from three quarters, never more')
+  ok(shiftPay({ role: 'dj', wagePerHour: 10, gameHours: 4, playedS: 300, tasksDone: 0 }).wage === 0, 'nothing for doing nothing')
+  const warned = standingFrom({ emptyStreak: 2, blockedUntil: null, nextShiftAt: null })
+  const blocked = standingFrom({ emptyStreak: 3, blockedUntil: '2026-11-06T09:00:00Z', nextShiftAt: null })
+  const f1 = employerShiftFacts({ employer: 'die Gemeinde', standing: warned, working: false, paid: true })
+  ok(f1.some(f => f.includes('Nichtstun')) && f1.some(f => f.includes('zwei Schichten') && f.includes('noch eine solche,')) && f1.every(f => f.length <= 140), 'staff explain the rule and warn after empty shifts')
+  const f2 = employerShiftFacts({ employer: 'die Gemeinde', standing: blocked, working: false, paid: true })
+  ok(f2.length === 1 && f2[0].includes('nicht mehr ein') && f2[0].length <= 140, 'staff explain why there is no further shift')
+  const t0 = shiftEndText({ employer: 'die Gemeinde', tasks: 0, required: 6, wage: 0, full: 32, deduction: 32, standing: standingFrom({ emptyStreak: 1 }) })
+  ok(t0.startsWith('Die Gemeinde: „Für Nichtstun gibt es kein Geld.“') && t0.includes(`${EMPTY_SHIFT_LIMIT - 1 === 2 ? 'zwei Schichten' : ''}`), 'the employer says it at the end of an empty shift')
+  ok(shiftEndText({ employer: 'die Gemeinde', tasks: 3, required: 6, wage: 16, full: 32, deduction: 16, standing: null }).includes('Abzug 16 Cr'), 'deduction named')
+  ok(shiftEndText({ employer: 'die Gemeinde', tasks: 6, required: 6, wage: 32, full: 32, deduction: 0, standing: null }).includes('Lohn 32 Cr'), 'full pay named')
+  if (bad > 0) throw new Error(`player shift pay: ${bad} checks failed`)
+  console.log('player shift pay checks passed')
+}

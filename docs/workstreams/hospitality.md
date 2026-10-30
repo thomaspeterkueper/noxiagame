@@ -88,6 +88,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Im Browser geprüft; Tests in `jobAgency.test.ts`.
   - Offen: W-12 (Figur auf der Karte beim Lokal absetzen) und R-22 Punkt 4 (Schein serverseitig).
 
+- **30.10.2026 – Bezahlte Schichten nach Leistung:**
+  - Thomas: „Geld gibt es nur, wenn auch die Aufgaben erfüllt wurden, sonst Abzüge … keine Folgeanstellung am selben Ort, wenn bei drei Schichten immer noch keine Aufgaben erledigt wurden … für Nichtstun gibt es kein Geld.“
+  - Der Schichtweg (R-20) ist gebaut und live. Regeln in `playerShift.ts` (`shiftPay`, `employerShiftFacts`, `shiftEndText`), gerechnet in der Datenbank.
+  - Lohn: ab drei Vierteln der Aufgaben voll, darunter anteilig, ohne Aufgabe nichts.
+  - Drei Leerschichten in Folge bedeuten eine Woche keine Schicht in diesem Haus.
+  - Das Personal erklärt Lohn und Sperre im Namen des Betreibers. In der Schicht zeigt die Tafel, was bisher verdient ist und wie viele Aufgaben zum vollen Lohn fehlen.
+  - In der Datenbank durchgerechnet, im Browser geprüft. Offen bei Population: Trinkgeld, Lohnsätze aus `role_wage_rates`.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

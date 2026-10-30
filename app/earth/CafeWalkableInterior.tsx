@@ -18,7 +18,7 @@ import { useGameStore } from '@/lib/store/gameStore'
 import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
 import { spokenOrderItems, spokenOrderTitle } from '@/lib/game/hospitality/spokenOrder'
 import { loadReferral, referralFor, saveReferral, venueReferralFacts, type JobReferral } from '@/lib/game/jobs/referral'
-import { EINSATZ_S, MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_GAME_HOURS, compressPurchases, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftPurchase, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
+import { EINSATZ_S, employerShiftFacts, shiftEndText, shiftPay, standingFrom, type ShiftStanding, MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_GAME_HOURS, compressPurchases, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftPurchase, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
 import { VENUE_WC_DOOR, toiletAccess, venueServiceRules, type VenueServiceRules } from '@/lib/game/hospitality/venueServices'
 import {
   isAtServicePoint,
@@ -214,7 +214,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // Stellen und Lohn kommen vom Server (/api/game/hospitality/shift, R-20). Gibt es
   // den Weg noch nicht, läuft die Schicht als Probeschicht ohne Lohn.
   type Shift={role:ShiftRole;startedAtMs:number;shiftId:string|null;wagePerHour:number;gameHours:number}
-  type Jobs={server:boolean;open:ShiftRole[];wages:Partial<Record<ShiftRole,number>>;note?:string}
+  type Jobs={server:boolean;open:ShiftRole[];wages:Partial<Record<ShiftRole,number>>;note?:string;employer:string;ownVenue:boolean;standing:ShiftStanding|null}
   const[jobs,setJobs]=useState<Jobs|null>(null)
   const[shift,setShift]=useState<Shift|null>(null)
   const[shiftDone,setShiftDone]=useState<string[]>([])
@@ -245,12 +245,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         const r=await shiftApi(null)
         if(!live)return
         if(r.ok&&Array.isArray(r.data.open)){
-          setJobs({server:true,open:r.data.open.filter((role:string)=>roles.includes(role as ShiftRole)),wages:r.data.wages??{},note:r.data.note})
-          if(r.data.active?.role)setShift({role:r.data.active.role,startedAtMs:Date.parse(r.data.active.startedAt),shiftId:String(r.data.active.shiftId),wagePerHour:Number(r.data.active.wagePerHour??0),gameHours:Number(r.data.active.gameHours??SHIFT_GAME_HOURS[r.data.active.role as ShiftRole]??4)})
+          setJobs({server:true,open:r.data.open.filter((role:string)=>roles.includes(role as ShiftRole)),wages:r.data.wages??{},note:r.data.note,employer:String(r.data.employer?.name??'der Betreiber'),ownVenue:Boolean(r.data.employer?.ownVenue),standing:standingFrom(r.data.standing)})
+          if(r.data.active?.role&&String(r.data.active.tileEntityId??entityId)===entityId){if(Array.isArray(r.data.active.doneKeys))setShiftDone(r.data.active.doneKeys.map(String));setShiftStats({tasks:Number(r.data.active.tasks??0),guests:0,tips:0})}
+          if(r.data.active?.role&&String(r.data.active.tileEntityId??entityId)===entityId)setShift({role:r.data.active.role,startedAtMs:Date.parse(r.data.active.startedAt),shiftId:String(r.data.active.shiftId),wagePerHour:Number(r.data.active.wagePerHour??0),gameHours:Number(r.data.active.gameHours??SHIFT_GAME_HOURS[r.data.active.role as ShiftRole]??4)})
           return
         }
       }catch{/* kein Arbeitsmarkt für Spieler – Probeschicht */}
-      if(live)setJobs({server:false,open:roles,wages:{}})
+      if(live)setJobs({server:false,open:roles,wages:{},employer:'der Betreiber',ownVenue:false,standing:null})
     })()
     return()=>{live=false}
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,6 +269,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const shiftLeftS=shift?Math.max(0,Math.round(EINSATZ_S-(nowMs-shift.startedAtMs)/1000)):0
 
   const taskCount=(n:number)=>n===1?'1 Aufgabe':n+' Aufgaben'
+  const blockedText=(employer:string,until:string)=>employer.charAt(0).toLocaleUpperCase('de-DE')+employer.slice(1)+' stellt dich hier bis '+new Date(until).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'numeric'})+' nicht mehr ein: drei Schichten ohne eine erledigte Aufgabe.'
   async function startShift(role:ShiftRole){
     const ctx=ctxRef.current
     if(!ctx||shiftBusy)return
@@ -275,7 +277,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     try{
       let next:Shift={role,startedAtMs:Date.now(),shiftId:null,wagePerHour:jobs?.wages[role]??PROPOSED_WAGE_PER_HOUR[role],gameHours:SHIFT_GAME_HOURS[role]}
       if(jobs?.server){
-        const r=await shiftApi({action:'start',role})
+        const r=await shiftApi({action:'start',role,referral:referral?.role===role?{by:referral.by,issuedAt:new Date(referral.issuedAtMs).toISOString()}:null})
         if(!r.ok){ctx.setStatus(String(r.data.error??'Die Stelle ist gerade nicht frei.'));return}
         next={role,startedAtMs:Date.parse(r.data.startedAt??new Date().toISOString()),shiftId:String(r.data.shiftId),wagePerHour:Number(r.data.wagePerHour??next.wagePerHour),gameHours:Number(r.data.gameHours??next.gameHours)}
       }
@@ -291,13 +293,20 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   async function completeTask(task:ShiftTask,extra?:{music?:MusicStyle}){
     const ctx=ctxRef.current
     if(!ctx||!shift)return
+    let tip=0
+    let counted:number|null=null
+    if(shift.shiftId){
+      // Gezählt wird, was der Server annimmt – Lohn gibt es nur für Erledigtes.
+      try{
+        const r=await shiftApi({action:'task',shiftId:shift.shiftId,taskKey:task.key,kind:task.kind,guest:task.guest})
+        if(!r.ok){ctx.setStatus(String(r.data.error??'Das zählt gerade nicht.'));return}
+        tip=Number(r.data.tip??0);counted=typeof r.data.tasks==='number'?r.data.tasks:null
+        if(typeof r.data.credits==='number')useGameStore.setState({credits:r.data.credits})
+      }catch{ctx.setStatus('Keine Verbindung – versuch es gleich noch einmal.');return}
+    }
     setShiftDone(current=>[...current,task.key].slice(-200))
     if(extra?.music)setMusic(extra.music)
-    let tip=0
-    if(shift.shiftId){
-      try{const r=await shiftApi({action:'task',shiftId:shift.shiftId,taskKey:task.key,kind:task.kind,guest:task.guest});tip=Number(r.data.tip??0);if(typeof r.data.credits==='number')useGameStore.setState({credits:r.data.credits})}catch{/* zählt beim Abschluss */}
-    }
-    setShiftStats(current=>({tasks:current.tasks+1,guests:current.guests+(task.guest?1:0),tips:current.tips+tip}))
+    setShiftStats(current=>({tasks:counted??current.tasks+1,guests:current.guests+(task.guest?1:0),tips:current.tips+tip}))
     ctx.setStatus('Erledigt: '+task.label+(extra?.music?' – '+extra.music:'')+(tip>0?' · '+tip+' Cr Trinkgeld':'')+'.')
   }
   async function endShift(){
@@ -310,7 +319,9 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
         const r=await shiftApi({action:'end',shiftId:shift.shiftId})
         if(r.ok){
           if(typeof r.data.credits==='number')useGameStore.setState({credits:r.data.credits})
-          ctx.setStatus('Schicht beendet: '+taskCount(shiftStats.tasks)+', Lohn '+Number(r.data.wage??worked)+' Cr, Trinkgeld '+Number(r.data.tips??shiftStats.tips)+' Cr.')
+          const standing=standingFrom(r.data.standing)
+          ctx.setStatus(shiftEndText({employer:jobs?.employer??'der Betreiber',tasks:Number(r.data.tasks??shiftStats.tasks),required:Number(r.data.required??1),wage:Number(r.data.wage??0),full:Number(r.data.full??worked),deduction:Number(r.data.deduction??0),ownVenue:Boolean(r.data.ownVenue),shortPaid:Number(r.data.shortPaid??0),standing}))
+          setJobs(current=>current?{...current,standing}:current)
         }else ctx.setStatus(String(r.data.error??'Die Schicht konnte nicht abgerechnet werden; sie wird später abgerechnet.'))
       }else ctx.setStatus('Probeschicht beendet: '+taskCount(shiftStats.tasks)+' erledigt. Lohn ('+worked+' Cr) gibt es, sobald Spieler hier angestellt werden können.')
       setShift(null)
@@ -333,12 +344,16 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 
   const renderJobs=(ctx:InteriorContext)=>{
     if(!jobs||roles.length===0||ctx.service==='closed'||underConversion||emptyHouse)return null
+    const standing=jobs.standing
     const open=roles.filter(role=>jobs.open.includes(role)).sort((a,b)=>Number(b===referral?.role)-Number(a===referral?.role))
     return <div className="menu jobs">
       <small>ARBEITEN</small>
       {referral&&<p className="hint">{open.includes(referral.role)?'Von der Agentur vermittelt: '+referral.roleLabel+' – man erwartet dich.':'Vermittelt als '+referral.roleLabel+', aber die Stelle ist inzwischen vergeben.'}</p>}
-      {open.length===0?<p className="hint">Gerade ist hier keine Stelle frei.</p>:<>
-        <p className="hint">{'Ein Einsatz dauert '+Math.round(EINSATZ_S/60)+' Minuten und zählt als ganze Schicht. '+(jobs.server?'Lohn vom Betreiber, dazu Trinkgeld.':'Noch Probeschicht ohne Lohn – bezahlt wird, sobald Spieler hier angestellt werden können.')}</p>
+      {standing?.blockedUntil?<p className="hint warn">{blockedText(jobs.employer,standing.blockedUntil)}</p>
+      :standing?.nextShiftAt&&Date.parse(standing.nextShiftAt)>Date.now()?<p className="hint">Hier hattest du eben eine Schicht. Die nächste gibt es ab {new Date(standing.nextShiftAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr – oder in einem anderen Lokal.</p>
+      :open.length===0?<p className="hint">Gerade ist hier keine Stelle frei.</p>:<>
+        <p className="hint">{'Ein Einsatz dauert '+Math.round(EINSATZ_S/60)+' Minuten und zählt als ganze Schicht. '+(!jobs.server?'Noch Probeschicht ohne Lohn.':jobs.ownVenue?'Im eigenen Haus ohne Lohn.':'Lohn zahlt '+jobs.employer+' nur für Erledigtes: ab drei Vierteln der Aufgaben voll, darunter weniger, ohne Aufgabe nichts.')}</p>
+        {standing&&standing.emptyStreak>0&&<p className="hint warn">{(standing.emptyStreak===1?'Deine letzte Schicht':'Deine letzten zwei Schichten')+' hier: nichts erledigt. Nach drei solchen stellt man dich hier eine Woche nicht mehr ein.'}</p>}
         {open.map(role=><button key={role} className="tile-row" disabled={shiftBusy} onClick={()=>void startShift(role)} title={ROLE_DUTY[role]}>
           <span>{role===referral?.role?'Vermittelt: ':''}{ROLE_LABEL[role]} · {SHIFT_GAME_HOURS[role]} Std</span><b>{(jobs.wages[role]??PROPOSED_WAGE_PER_HOUR[role])*SHIFT_GAME_HOURS[role]} Cr{jobs.server?'':' (Vorschlag)'}</b><small>{ROLE_DUTY[role]}</small>
         </button>)}
@@ -351,6 +366,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     const near=(task:ShiftTask)=>Math.hypot(ctx.pos.x-task.at.x,ctx.pos.y-task.at.y)<46
     return <div className="menu shift">
       <small>SCHICHT · {ROLE_LABEL[shift.role].toUpperCase()}{shift.shiftId?'':' · PROBE'}</small>
+      {shift.shiftId&&!jobs?.ownVenue&&(()=>{const pay=shiftPay({role:shift.role,wagePerHour:shift.wagePerHour,gameHours:shift.gameHours,playedS:(nowMs-shift.startedAtMs)/1000,tasksDone:shiftStats.tasks});const atEnd=shiftPay({role:shift.role,wagePerHour:shift.wagePerHour,gameHours:shift.gameHours,playedS:EINSATZ_S,tasksDone:shiftStats.tasks});return <p className={'hint'+(shiftStats.tasks===0?' warn':'')}>{shiftStats.tasks===0?'Noch nichts erledigt – für Nichtstun gibt es kein Geld.':'Bisher verdient: '+pay.wage+' Cr.'} Für den vollen Lohn ({atEnd.full} Cr) braucht es bis zum Ende {atEnd.required} Aufgaben.</p>})()}
       <p>Noch {clock} · zählt als {shift.gameHours} Spielstunden · {shiftStats.tasks} erledigt{shiftStats.guests?' · '+shiftStats.guests+' Gäste':''}{shiftStats.tips?' · '+shiftStats.tips+' Cr Trinkgeld':''}{shift.role==='dj'?' · läuft: '+music:''}</p>
       {tasks.length===0&&<p className="hint">Gerade ist nichts zu tun. {ROLE_DUTY[shift.role]}.</p>}
       {tasks.slice(0,4).map(task=><div key={task.key} className="task">
@@ -444,6 +460,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
       entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
       playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):venueReferralFacts(referral,self.roomRole==='staff',false)[0]??null,
+      // Lohn und Ruf im Haus erklärt das Personal im Namen des Betreibers (Thomas, 30.10.2026).
+      employmentFacts:self.roomRole==='staff'&&jobs?.server&&!jobs.ownVenue?employerShiftFacts({employer:jobs.employer,standing:jobs.standing,working:Boolean(shift),paid:true}):[],
     }),
     placeKnowledge,
     // Mitbekommenes hat nur, wer hier arbeitet und den ganzen Tag zuhört.

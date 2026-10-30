@@ -565,6 +565,32 @@ Das ist ein Teil von Aufgabe 12 hier („Angebote für Spieler als Daten“).
 4. **Missbrauch:** Aufgaben je Minute begrenzen. Eine Schicht endet spätestens nach einer Stunde, auch ohne `end`.
 5. **Später:** Wer öfter dort arbeitet, könnte fest angestellt werden (`person_assignments` für Spieler) – das wäre eine eigene Entscheidung.
 
+**✅ Bezahlung freigeschaltet (Gastronomie, 30.10.2026, live):** Thomas: „Ich glaube, wir können die Bezahlung bei Arbeiten freischalten, aber Geld gibt es nur, wenn auch die Aufgaben erfüllt wurden, sonst Abzüge; eventuell auch keine Folgeanstellung am selben Ort, wenn bei drei Schichten immer noch keine Aufgaben erledigt wurden. Das sollte der Besitzer auch erklären. Für Nichtstun gibt es kein Geld.“
+
+Gebaut hat das die Gastronomie, weil der Schichtweg fehlte. Bitte prüft es und übernehmt es, wenn ihr wollt.
+- **Migration** `20261030090000_player_shifts_paid.sql`:
+  - Tabelle `player_shifts`;
+  - Funktionen `noxia_player_shift_state`, `noxia_start_player_shift`, `noxia_player_shift_task`, `noxia_end_player_shift`, `noxia_close_player_shift`, `noxia_venue_employer`.
+- **Wege:** `/api/game/hospitality/shift` (wie oben in der Tabelle) und `/api/game/jobs` (R-21 Punkt 2).
+- **Lohn:**
+  - Wer drei Viertel der erschienenen Pflichten erledigt, bekommt den vollen Lohn; Gästeaufgaben zählen mit.
+  - Darunter gibt es anteilig weniger, das ist der Abzug. Ohne erledigte Aufgabe gibt es 0 Cr.
+  - Der Server zählt nur Pflichten, deren Takt schon erschienen ist. Jede Aufgabe zählt einmal, höchstens eine je 2 Sekunden.
+- **Sperre:**
+  - Drei Schichten in Folge ohne erledigte Aufgabe im selben Haus bedeuten dort sieben Tage keine Schicht.
+  - Je Haus gibt es eine Schicht je 24 echte Minuten.
+  - Das Personal erklärt beides im Namen des Betreibers. Der Betreiber sagt es auch am Ende der Schicht („Für Nichtstun gibt es kein Geld“).
+- **Wer zahlt:** wie bei `pay_npc_wage` – Betreiber, sonst Eigentümer, sonst Gemeinde (`npc_ledger`, Art `wage`, `ref` `player_shift:<id>`).
+  - Gutgeschrieben wird auf `profiles.credits`.
+  - Kann der Arbeitgeber nicht voll zahlen, bekommt der Spieler, was da ist, und es steht als `shortPaid` in der Antwort. Ohne Deckung für eine volle Schicht bietet das Haus die Stelle nicht an.
+  - Im eigenen Haus gibt es keinen Lohn.
+- **Lohnsätze** stehen noch fest in `noxia_shift_wage_rate`: Tür 9, Tresen 8, DJ 10, Bedienung und Empfang 7, Putzen 6 Cr je Spielstunde.
+- **Offen für euch:**
+  - Trinkgeld (Punkt 3) – `tip` ist bisher immer 0;
+  - Lohnsätze aus `role_wage_rates`;
+  - Steuer auf Lohn, falls gewünscht;
+  - feste Anstellung (R-21 Punkt 5).
+
 **Nachtrag Zeit (Thomas, 28.10.2026: „kein Spieler wartet 4 echte Stunden als Türsteher“), entschieden: „Einsatz, als Schicht gebucht“.**
 - Man spielt einen kurzen, dichten Einsatz: `EINSATZ_S` = 5 echte Minuten.
 - Gebucht wird eine ganze Schicht von `SHIFT_GAME_HOURS` Spielstunden (4, Putzen 3). Das folgt NOXIA-TIME-0001: Echtzeit-Begegnung als Ereignis fester Dauer.
@@ -633,7 +659,7 @@ Thomas, 29.10.2026: „Es sollte Personal oder wenigstens Roboter geben, damit w
 3. **Personal (zu R-21):** VERA überbrückt. Echte Vermittler bleiben gewünscht – Lohnschlüssel `job_advisor`, `building_staff_roles` für `job_agency`.
 4. **Vermittlungsschein serverseitig (zu R-20/R-21, 29.10.2026):**
    - Die Agentur vermittelt jetzt direkt. Der Schein liegt bis auf Weiteres nur im Browser (`lib/game/jobs/referral.ts`, zwei echte Stunden gültig, je Spieler einer).
-   - Wenn der Schichtweg kommt, bitte:
-     - `POST /api/game/hospitality/shift` mit `referral: { agencyEntityId, issuedAt }` annehmen;
+   - Der Schichtweg nimmt seit 30.10.2026 `referral: { by, issuedAt }` an und legt ihn in `player_shifts.referral` ab. Offen bleibt:
+     - den Schein selbst serverseitig ausstellen und prüfen;
      - optional eine Tabelle `job_referrals` (player, building, role, issued_at, used_at), damit die Auswertung sieht, welche Vermittlungen angetreten werden.
 

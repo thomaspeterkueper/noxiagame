@@ -125,7 +125,7 @@ export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[]
     const byPlace = new Map<string, string[]>()
     for (const o of offers) byPlace.set(o.placeName, [...(byPlace.get(o.placeName) ?? []), o.roleLabel])
     facts.push(`Freie Schichten in Lokalen (${offers.length}, in ${byPlace.size === 1 ? 'einem Haus' : byPlace.size + ' Häusern'}): ` + [...byPlace].slice(0, 4).map(([place, roles]) => `${place}: ${[...new Set(roles)].join(', ')}`).join('; '))
-    facts.push('Eine Schicht ist ein Einsatz von wenigen Minuten, zählt als mehrere Spielstunden; dazu Trinkgeld' + (offers.some(o => o.paid) ? '' : '; noch Probeschicht ohne Lohn'))
+    facts.push('Eine Schicht: wenige Minuten, zählt als mehrere Spielstunden' + (offers.some(o => o.paid) ? '; Lohn nur für erledigte Aufgaben, für Nichtstun nichts' : '; noch Probeschicht ohne Lohn'))
     facts.push('Du vermittelst direkt; vermittelt ist erst, was dein Gegenüber unter dem Gespräch bestätigt – nie vorher „erledigt“ sagen')
   }
   facts.push('Mitflug auf Handelsschiffen: Wer kein eigenes Schiff hat, heuert an der Flugleitung im Raumhafen bei Epona Fracht an; Heuer bei Ankunft')
