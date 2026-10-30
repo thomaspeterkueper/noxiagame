@@ -6,6 +6,8 @@ on:
       - 'lib/game/civic/playerConversationSignals.test.ts'
       - 'lib/game/civic/playerCivicSignalView.ts'
       - 'lib/game/civic/playerCivicSignalView.test.ts'
+      - 'lib/game/civic/playerCivicDraft.ts'
+      - 'lib/game/civic/playerCivicDraft.test.ts'
       - 'app/api/game/civic-signals/route.ts'
       - 'app/earth/PlayerCivicSignalsPanel.tsx'
       - 'app/earth/page.tsx'
@@ -27,6 +29,7 @@ jobs:
           node-version: '24'
       - name: Compile and test private conversation projection and UI data boundary
         run: |
-          npx --yes --package typescript@5.8.3 -- tsc lib/game/civic/playerConversationSignals.test.ts lib/game/civic/playerCivicSignalView.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .civic-signals-test
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/civic/playerConversationSignals.test.ts lib/game/civic/playerCivicSignalView.test.ts lib/game/civic/playerCivicDraft.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .civic-signals-test
           node .civic-signals-test/playerConversationSignals.test.js
           node .civic-signals-test/playerCivicSignalView.test.js
+          node .civic-signals-test/playerCivicDraft.test.js
