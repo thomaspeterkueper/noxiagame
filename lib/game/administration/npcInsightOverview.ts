@@ -84,6 +84,6 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
       insightCandidatesTotal: 'person_insight_candidates',
       latestReview: 'npc_conversation_reviews',
     },
-    note: 'Wunsch-/Suchmarkierungen stammen aus protokollierten Gesprächen und sind weder eigenständige NPC-Ideen noch verifizierte Erkenntnisse. NPC-Ablehnungen sind keine Autorisierung. Ideen bleiben bis zur Prüfung unverbindlich.',
+    note: 'Wunsch-/Suchmarkierungen stammen aus protokollierten Gesprächen und sind keine verifizierten Erkenntnisse oder eigenständigen NPC-Ideen. NPC-Ablehnungen sind keine Autorisierung. Ideen bleiben bis zur Prüfung unverbindlich.',
   }
 }
