@@ -29,6 +29,31 @@ export interface EvolutionProposal {
   canonical: false
 }
 const bounded = (n: number) => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+const opportunityKinds: readonly OpportunityKind[] = ['event', 'building', 'service', 'technology', 'game_mechanic']
+const signalChannels: readonly SignalChannel[] = ['conversation', 'behavior', 'dream', 'insight', 'real_world_discussion', 'world_observation']
+const nonempty = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
+
+/** TypeScript does not validate JSON loaded from NPC memory, event logs or APIs.
+ * Invalid receipts are ignored *before* ID collision detection so malformed data
+ * cannot veto an otherwise valid, persisted receipt.
+ */
+function validSignal(value: unknown): value is EvolutionSignal {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const s = value as Partial<EvolutionSignal>
+  if (!nonempty(s.id) || !nonempty(s.npcId) || !nonempty(s.opportunityKey) ||
+      !Number.isSafeInteger(s.tick) || (s.tick as number) < 0 ||
+      typeof s.relevance !== 'number' || !Number.isFinite(s.relevance) ||
+      s.relevance < 0 || s.relevance > 1 ||
+      !opportunityKinds.includes(s.kind as OpportunityKind) ||
+      !signalChannels.includes(s.channel as SignalChannel) ||
+      !Array.isArray(s.provenanceRefs) || !s.provenanceRefs.length ||
+      !s.provenanceRefs.every(nonempty)) return false
+  const p = s.worldProjection
+  if (p !== undefined && (!p || typeof p !== 'object' || Array.isArray(p) ||
+      !Number.isSafeInteger(p.availableFromYear) || !Number.isSafeInteger(p.worldYear) ||
+      typeof p.licensed !== 'boolean' || typeof p.accessible !== 'boolean')) return false
+  return true
+}
 /** Screening only. A separate domain-specific command must validate actual actions. */
 export function discoverEvolutionProposals(input: {
   signals: readonly EvolutionSignal[]
@@ -36,15 +61,19 @@ export function discoverEvolutionProposals(input: {
   minScore?: number
   maxProposals?: number
 }): EvolutionProposal[] {
-  const minNpcs = Math.max(2, Math.floor(input.minIndependentNpcs ?? 2))
-  const minScore = bounded(input.minScore ?? 0.6)
+  const minNpcs = Number.isSafeInteger(input.minIndependentNpcs)
+    ? Math.max(2, input.minIndependentNpcs as number) : 2
+  const minScore = typeof input.minScore === 'number' && Number.isFinite(input.minScore)
+    ? bounded(input.minScore) : 0.6
   // Signal IDs are evidence identities, not NPC votes. Replayed identical
   // receipts count once; conflicting receipts with the same ID count zero.
   // Reject both sides of a collision regardless of arrival order.
   const unique = new Map<string, { signal: EvolutionSignal; fingerprint: string }>()
   const conflictingIds = new Set<string>()
-  for (const s of input.signals) {
-    if (!s.id || conflictingIds.has(s.id)) continue
+  for (const candidate of input.signals as readonly unknown[]) {
+    if (!validSignal(candidate)) continue
+    const s = candidate
+    if (conflictingIds.has(s.id)) continue
     const fingerprint = JSON.stringify([
       s.npcId, s.tick, s.channel, s.opportunityKey, s.kind, s.relevance,
       Array.isArray(s.provenanceRefs) ? [...s.provenanceRefs].sort() : null,
@@ -93,5 +122,6 @@ export function discoverEvolutionProposals(input: {
     })
   }
   return proposals.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
-    .slice(0, Math.max(0, Math.min(100, Math.floor(input.maxProposals ?? 20))))
+    .slice(0, Number.isSafeInteger(input.maxProposals)
+      ? Math.max(0, Math.min(100, input.maxProposals as number)) : 20)
 }
