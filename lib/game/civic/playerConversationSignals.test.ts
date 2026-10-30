@@ -48,9 +48,18 @@ assert(projectPlayerConversationSignals(invalidReceiptTimes.map((created_at, i) 
 assert(projectPlayerConversationSignals([row(1, { created_at: '2024-02-29T18:00:00Z' })]).length === 1,
   'valid leap day preserved')
 assert(projectPlayerConversationSignals([row(1, { created_at: '2026-10-30T18:00:00.123456+02:00' })])[0]
-  .occurredAt === '2026-10-30T16:00:00.123Z', 'offset and microseconds normalized')
+  .occurredAt === '2026-10-30T16:00:00.123456Z', 'offset and microseconds preserved')
 assert(projectPlayerConversationSignals([
   row(1, { created_at: '2026-02-30T18:00:00Z' }), row(1),
 ]).length === 1, 'malformed receipt cannot displace valid receipt with same ID')
+assert(projectPlayerConversationSignals([
+  row('10', { created_at: '2026-10-30T18:00:00.123455Z' }),
+  row('9', { created_at: '2026-10-30T18:00:00.123456Z' }),
+]).map(s => s.id).join(',') === '9,10',
+  'microsecond chronology takes precedence over bigint ID tie-breaker')
+assert(projectPlayerConversationSignals([
+  row(1, { created_at: '2026-10-30T18:00:00.000001+02:00' }),
+])[0].occurredAt === '2026-10-30T16:00:00.000001Z',
+  'sub-millisecond offset receipt retains exact microseconds')
 
 console.log('Player conversation civic signals: tests passed')
