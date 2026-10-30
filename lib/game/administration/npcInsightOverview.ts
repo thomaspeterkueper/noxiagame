@@ -10,6 +10,8 @@ export interface NpcInsightOverviewInput {
   asOf: string
   since: string
   conversations: CountResult
+  wishSignals: CountResult
+  deniedWishSignals: CountResult
   conversationMemories: CountResult
   socialEvents: CountResult
   insightCandidates: CountResult
@@ -65,6 +67,8 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
     since: input.since,
     metrics: {
       conversations7d: metric(input.conversations),
+      wishSignals7d: metric(input.wishSignals),
+      deniedWishSignals7d: metric(input.deniedWishSignals),
       memoryPairsTotal: metric(input.conversationMemories),
       socialEvents7d: metric(input.socialEvents),
       insightCandidatesTotal: metric(input.insightCandidates),
@@ -73,11 +77,13 @@ export function buildNpcInsightOverview(input: NpcInsightOverviewInput) {
     reviewQuality,
     sources: {
       conversations7d: 'npc_conversation_log',
+      wishSignals7d: 'npc_conversation_log.wish_kind',
+      deniedWishSignals7d: 'npc_conversation_log.wish_npc_denied',
       memoryPairsTotal: 'npc_player_conversation_memory',
       socialEvents7d: 'population_events',
       insightCandidatesTotal: 'person_insight_candidates',
       latestReview: 'npc_conversation_reviews',
     },
-    note: 'Gespeicherte Ereignisse sind keine verifizierten neuen Erkenntnisse. Ideen bleiben bis zur Prüfung unverbindlich.',
+    note: 'Wunsch-/Suchmarkierungen stammen aus protokollierten Gesprächen und sind weder eigenständige NPC-Ideen noch verifizierte Erkenntnisse. NPC-Ablehnungen sind keine Autorisierung. Ideen bleiben bis zur Prüfung unverbindlich.',
   }
 }
