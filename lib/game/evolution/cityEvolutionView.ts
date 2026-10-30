@@ -9,9 +9,11 @@ export interface CityEvolutionView {
 }
 /** Reject malformed or ambiguous initial imports before any historical replay.
  * A duplicate ID must not silently overwrite another imported asset.
- * This validates shape only; provenance must be verified by the importing Core.
+ * Baseline objects must already exist at the first displayed year: future objects
+ * require their own committed Core event, never a scheduled map-import entry.
+ * This validates shape/time only; provenance must be verified by the importing Core.
  */
-function validBaseline(assets: readonly CityAsset[]): boolean {
+function validBaseline(assets: readonly CityAsset[], fromYear: number): boolean {
  const ids = new Set<string>()
  for (const candidate of assets as readonly unknown[]) {
    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false
@@ -20,6 +22,7 @@ function validBaseline(assets: readonly CityAsset[]): boolean {
        typeof asset.name !== 'string' || !asset.name.trim() ||
        typeof asset.districtId !== 'string' || !asset.districtId.trim() ||
        !Number.isInteger(asset.introducedYear) ||
+       (asset.introducedYear as number) > fromYear ||
        (asset.kind !== 'building' && asset.kind !== 'infrastructure' &&
         asset.kind !== 'institution' && asset.kind !== 'service')) return false
    if (ids.has(asset.id)) return false
@@ -46,7 +49,7 @@ export function cityEvolutionView(input:{
      !Number.isInteger(input.fromYear) || !Number.isInteger(input.toYear) ||
      input.fromYear > input.toYear ||
      !Array.isArray(input.importedBaseline) || !Array.isArray(input.authoritativeReceipts) ||
-     !validBaseline(input.importedBaseline)) {
+     !validBaseline(input.importedBaseline, input.fromYear)) {
    throw Error('Invalid city evolution input')
  }
  const rejectedMalformed: CityEvolutionView['rejectedReceipts'] = []
