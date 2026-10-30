@@ -34,4 +34,23 @@ assert(equalTime.map(s => s.id).join(',') === '9223372036854775807,9007199254740
 assert(projectPlayerConversationSignals([
   row('9223372036854775807', { created_at: '2026-10-29T18:00:00Z' }), row('9'),
 ])[0].id === '9', 'newer timestamp takes precedence over larger id')
+
+const invalidReceiptTimes = [
+  '2026-02-30T18:00:00Z', '2025-02-29T18:00:00Z',
+  '2026-10-30T18:00:00', '2026-10-30 18:00:00Z',
+  '2026-13-01T18:00:00Z', '2026-10-30T24:00:00Z',
+  '2026-10-30T18:60:00Z', '2026-10-30T18:00:60Z',
+  '2026-10-30T18:00:00+99:00',
+]
+assert(projectPlayerConversationSignals(invalidReceiptTimes.map((created_at, i) =>
+  row(i + 1, { created_at }))).length === 0,
+  'invalid calendar dates, timezone-less receipts and invalid clock values excluded')
+assert(projectPlayerConversationSignals([row(1, { created_at: '2024-02-29T18:00:00Z' })]).length === 1,
+  'valid leap day preserved')
+assert(projectPlayerConversationSignals([row(1, { created_at: '2026-10-30T18:00:00.123456+02:00' })])[0]
+  .occurredAt === '2026-10-30T16:00:00.123Z', 'offset and microseconds normalized')
+assert(projectPlayerConversationSignals([
+  row(1, { created_at: '2026-02-30T18:00:00Z' }), row(1),
+]).length === 1, 'malformed receipt cannot displace valid receipt with same ID')
+
 console.log('Player conversation civic signals: tests passed')
