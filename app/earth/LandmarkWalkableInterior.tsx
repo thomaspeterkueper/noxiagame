@@ -457,13 +457,13 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         if (target && staff) {
           setStaffTask({ kind: 'visit', label: target.label })
           staffGo(target, () => setTimeout(() => staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }), 6000))
-          if (data.worldAction.playerFollows) walkTo({ x: target.x - 24, y: target.y })
+          if (data.worldAction.playerFollows && window.confirm(`Möchtest du ${target.label} jetzt folgen?`)) walkTo({ x: target.x - 24, y: target.y })
         }
       } else if (data.worldAction?.type === 'lead_walk' && staff) {
         const shelf = waypoints.find(point => point.id === 'shelf:romane') ?? waypoints[0]
         setStaffTask({ kind: 'visit', label: shelf.label })
         staffGo(shelf, () => setTimeout(() => staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }), 6000))
-        walkTo({ x: shelf.x - 24, y: shelf.y })
+        if (data.worldAction.playerFollows && window.confirm(`Möchtest du zum ${shelf.label} folgen?`)) walkTo({ x: shelf.x - 24, y: shelf.y })
       }
     } finally { setSending(false) }
   }
