@@ -31,4 +31,26 @@ assert(discoverEvolutionProposals({ signals: [dream, news] }).length === 1, 'leg
 news.worldProjection.licensed = false
 assert(discoverEvolutionProposals({ signals: [dream, news] }).length === 0, 'unlicensed source excluded')
 
+
+const replay = [s('same', 'lan', .9), s('same', 'lan', .9), s('other', 'hana', .9)]
+const replayProposals = discoverEvolutionProposals({ signals: replay })
+assert(replayProposals.length === 1 && replayProposals[0].signalIds.length === 2,
+  'identical receipt replays do not create extra votes or evidence IDs')
+assert(JSON.stringify(replayProposals) === JSON.stringify(discoverEvolutionProposals({ signals: replay.slice().reverse() })),
+  'replay order cannot change proposal result')
+
+const conflictingId = [s('collision', 'lan', 1), s('collision', 'hana', 1), s('other', 'hana', 1)]
+assert(discoverEvolutionProposals({ signals: conflictingId }).length === 0,
+  'one evidence ID reused by two NPCs cannot manufacture independent consensus')
+assert(discoverEvolutionProposals({ signals: conflictingId.slice().reverse() }).length === 0,
+  'conflicting evidence IDs are rejected regardless of arrival order')
+const conflictingWithSurvivors = [...conflictingId, s('third', 'tira', .9)]
+const survivors = discoverEvolutionProposals({ signals: conflictingWithSurvivors })
+assert(survivors.length === 1 && survivors[0].independentNpcs === 2 &&
+  !survivors[0].signalIds.includes('collision'), 'only independently identified evidence survives collisions')
+const crossOpportunity = s('collision', 'lan', 1)
+crossOpportunity.opportunityKey = 'another-building'
+assert(discoverEvolutionProposals({ signals: [s('collision', 'lan', 1), crossOpportunity, s('other', 'hana', 1)] }).length === 0,
+  'one evidence ID cannot support conflicting opportunities')
+
 console.log('Emergent evolution screening: tests passed')
