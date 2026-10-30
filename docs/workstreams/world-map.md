@@ -288,6 +288,26 @@ Das Startcafé im realen Haus Hauptstraße 72 trägt das NOXIA-Dach wie die öff
 
 **Offen:** Die Module haben noch keine eigenen Bilder (graue Platten wie Bauten ohne Bildvorlage); Prometheus ist in der Karte als „Kepler Station" benannt (Slug `prometheus`). Außerhalb der Gänge gilt im Anzug „frei begehbar" – auf einer Station wäre das der Weltraum; eine eigene Regel „Leere nicht begehbar" folgt, wenn Stationen Außenhüllen bekommen. Die Bewohner dort laufen ab sofort über die Gänge, sobald sie Arbeit oder Wohnung in einem Modul haben (gleiche Logik wie Mond und Mars, dort nicht eigens geprüft).
 
+## Gebäudechronik und Eventstore-Reader (Issue #541, Thomas 30.10.2026: „Ja, mach das“)
+
+**Ziel:** Nach einer bestätigten Core-Aktion (Abriss, Verkauf, Umnutzung) sieht der Spieler eine dauerhafte, nachvollziehbare Änderung auf der Erdkarte. Der Reader vertraut nur persistierten Belegen, nie Angaben des Clients.
+
+**Gebaut (nur lesend, keine Migration, keine Änderung an Produktivdaten):**
+- `lib/worldlab/buildingChronicle.ts` (rein): macht aus `simulation_events` (`entity.created` / `entity.updated` / `entity.deleted` für `tile_entity`) und den Grabsteinen in `earth_cleared_buildings` eine zeitlich geordnete Chronik mit den Arten gebaut, geändert, Eigentümerwechsel, abgerissen. Jeder Eintrag nennt Quelle und Beleg-ID, `own` (gehört dem Betrachter?) und `authorized` (Beleg mit geprüfter Berechtigung). Eine allgemeine Löschung (`deletion_kind=unspecified`, PR #555) ist ausdrücklich **nicht** autorisiert. Lücken werden benannt: `deleted_without_receipt` (Gebäude weg, kein Beleg) und `tombstone_unlinked` (Grabstein ohne Gebäude-ID). `buildingStateAt` spielt den Zustand eines Gebäudes zu einem Zeitpunkt nach (steht / abgerissen / unbekannt).
+- `lib/worldlab/buildingChronicle.server.ts` lädt die Belege (höchstens 500), `app/api/world-lab/building-history/route.ts` liefert sie. Anmeldung nötig, Parameter `entityId` oder `sourceRef`, keine Nutzlast.
+- `lib/worldlab/buildingChronicle.test.ts`: 8 Tests, unter anderem „`committed` in den Ereignisdaten zählt nicht“ und „gelöscht ohne Beleg wird als Lücke gemeldet, nicht als Abriss geraten“.
+
+**Befund im Livesystem (30.10.2026):** 3122 Ereignisse, davon 152 `entity.created` für Gebäude, 38 auf der Erde; kein `entity.updated`, kein `entity.deleted`. `earth_cleared_buildings` ist leer. Es gab also noch keinen echten Abriss; der Reader ist damit bisher nur mit Testdaten geprüft.
+
+**Request an den Core (Blocker aus dem Integrationsaudit vom 29.10.2026, nicht von diesem Teilprojekt zu bauen):**
+1. `demolish_earth_building()` und die Umbaufunktion (`20261025120000_earth_building_residents_and_conversion.sql`) schreiben in derselben Transaktion ein Ereignis (`entity.demolished` bzw. `entity.converted`) mit Gebäude-ID, `source_ref`, Akteur, Art und Eigentumsprüfung; wiederholbar (idempotent über eine Quell-Ereignis-ID).
+2. `earth_cleared_buildings` bekommt die Gebäude-ID und die Ereignis-ID des Abrisses, damit Grabstein und Ereignis sicher zusammengehören.
+3. Eine feste Zuordnung Parzelle ↔ Ereignis (`earth_parcels.id` ist Text, `simulation_events.subject_id` UUID).
+4. Verkäufe: Der Eigentümerwechsel muss als Ereignis erscheinen. Heute überschreibt der Verkauf `profile_id` im Grabstein (`20261025190000_earth_property_sale_tax.sql`), die frühere Geschichte geht verloren.
+Migration nur gesondert, mit Vorabprüfung und Rücknahme (Vorgabe aus dem Issue). PR #555 (Löschen im Eventstore) ist dafür die Grundlage, aber kein Abrissbeleg.
+
+**Nächste Schritte in diesem Teilprojekt:** Anzeige in der Karte (Verlauf eines Gebäudes im Infofenster, danach Zeitregler); danach der Seelenberg-Test (NPC-Vorschlag ohne Wirkung, bestätigter Umbau ändert die Karte, OSM-Refresh überschreibt nichts). Beides sinnvoll erst, wenn der Core die Ereignisse schreibt.
+
 ## Requests aus anderen Teilprojekten
 
 ### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht – in der Weltkarte erledigt (25.10.2026)
