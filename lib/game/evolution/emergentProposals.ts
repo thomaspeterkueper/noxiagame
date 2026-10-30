@@ -38,9 +38,34 @@ export function discoverEvolutionProposals(input: {
 }): EvolutionProposal[] {
   const minNpcs = Math.max(2, Math.floor(input.minIndependentNpcs ?? 2))
   const minScore = bounded(input.minScore ?? 0.6)
-  const groups = new Map<string, EvolutionSignal[]>()
+  // Signal IDs are evidence identities, not NPC votes. Replayed identical
+  // receipts count once; conflicting receipts with the same ID count zero.
+  // Reject both sides of a collision regardless of arrival order.
+  const unique = new Map<string, { signal: EvolutionSignal; fingerprint: string }>()
+  const conflictingIds = new Set<string>()
   for (const s of input.signals) {
-    if (!s.id || !s.npcId || !s.opportunityKey || !s.provenanceRefs.length || !Number.isFinite(s.tick)) continue
+    if (!s.id || conflictingIds.has(s.id)) continue
+    const fingerprint = JSON.stringify([
+      s.npcId, s.tick, s.channel, s.opportunityKey, s.kind, s.relevance,
+      Array.isArray(s.provenanceRefs) ? [...s.provenanceRefs].sort() : null,
+      s.worldProjection ? [
+        s.worldProjection.availableFromYear, s.worldProjection.worldYear,
+        s.worldProjection.licensed, s.worldProjection.accessible,
+      ] : null,
+    ])
+    const previous = unique.get(s.id)
+    if (previous && previous.fingerprint !== fingerprint) {
+      unique.delete(s.id)
+      conflictingIds.add(s.id)
+    } else if (!previous) {
+      unique.set(s.id, { signal: s, fingerprint })
+    }
+  }
+
+  const groups = new Map<string, EvolutionSignal[]>()
+  for (const { signal: s } of unique.values()) {
+    if (!s.npcId || !s.opportunityKey || !Array.isArray(s.provenanceRefs) ||
+        !s.provenanceRefs.length || !Number.isFinite(s.tick)) continue
     if (s.channel === 'real_world_discussion' && (!s.worldProjection || !s.worldProjection.licensed || !s.worldProjection.accessible || s.worldProjection.availableFromYear > s.worldProjection.worldYear)) continue
     const key = s.kind + ':' + s.opportunityKey
     groups.set(key, [...(groups.get(key) ?? []), s])
