@@ -1,0 +1,27 @@
+name: NOXIA player civic signals regression
+on:
+  pull_request:
+    paths:
+      - 'lib/game/civic/playerConversationSignals.ts'
+      - 'lib/game/civic/playerConversationSignals.test.ts'
+      - 'app/api/game/civic-signals/route.ts'
+      - '.github/workflows/noxia-player-civic-signals.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: noxia-player-civic-signals-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile and test private conversation projection
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/civic/playerConversationSignals.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .civic-signals-test
+          node .civic-signals-test/playerConversationSignals.test.js
