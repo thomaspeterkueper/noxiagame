@@ -7,7 +7,7 @@ const receipt = (eventId:string,year:number,committed:boolean,change:CommittedWo
 const receipts = [
  receipt('proposal',2040,false,{ action:'retire',assetId:'hall' }),
  receipt('approved',2050,true,{ action:'rename',assetId:'hall',name:'Bürgerzentrum' }),
- receipt('build',2070,true,{ action:'establish',asset:{id:'lab',kind:'institution',name:'Forschungshaus',districtId:'center',introducedYear:2070} }),
+ { ...receipt('build',2070,true,{ action:'establish',asset:{id:'lab',kind:'institution',name:'Forschungshaus',districtId:'center',introducedYear:2070} }), domain:'institutions' as const },
 ]
 const adapted = adaptCommittedWorldEvents(receipts)
 assert(adapted.events.length===2 && adapted.rejected[0].reason==='not_committed','uncommitted proposal excluded')
@@ -16,6 +16,25 @@ assert(at(2040).assets[0].name==='Alte Halle','uncommitted proposal has no effec
 assert(at(2050).assets[0].name==='Bürgerzentrum','approved change appears at correct year')
 assert(at(2070).assets.length===2,'later building appears')
 assert(compareCityYears(at(2026),at(2070)).added.length===1,'city diff shows new building')
+// Asset creation must be owned by its corresponding authoritative Core domain.
+// A receipt marked committed is insufficient if it claims a foreign asset kind.
+const crossDomain = adaptCommittedWorldEvents([
+  { ...receipts[2], eventId:'cross-domain', domain:'buildings', domainEventRef:'core:cross-domain' },
+])
+assert(crossDomain.events.length === 0 && crossDomain.rejected.length === 1 &&
+  crossDomain.rejected[0].reason === 'invalid_receipt',
+  'cross-domain establishment cannot enter city history')
+const ownedKinds: Array<[CommittedWorldReceipt['domain'], 'building' | 'infrastructure' | 'institution' | 'service']> = [
+  ['buildings','building'], ['infrastructure','infrastructure'],
+  ['institutions','institution'], ['services','service'],
+]
+const validDomains = adaptCommittedWorldEvents(ownedKinds.map(([domain,kind],i) => ({
+  ...receipt('owned-'+i,2080,true,{action:'establish',asset:{
+    id:'asset-'+i,kind,name:'Authorized '+kind,districtId:'center',introducedYear:2080,
+  }}),domain,
+})))
+assert(validDomains.events.length === 4 && validDomains.rejected.length === 0,
+  'all four matching Core domains retain valid establishment receipts')
 assert(adaptCommittedWorldEvents([...receipts, receipts[1]]).rejected.some(r=>r.reason==='duplicate'),'duplicate event rejected')
 
 const malformed = [
