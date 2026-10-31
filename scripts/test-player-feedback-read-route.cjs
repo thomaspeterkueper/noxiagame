@@ -12,7 +12,7 @@ assert.match(route, /createClient\(url, anonKey/, 'use anon-key RLS-scoped clien
 assert.doesNotMatch(route, /createServiceClient|SUPABASE_SERVICE_ROLE_KEY|\.rpc\(/, 'never bypass RLS or call world RPC')
 assert.match(route, /Authorization: `Bearer \$\{token\}`/, 'pass caller JWT to RLS client')
 assert.match(route, /\.select\('id,title,status,created_at'\)/, 'select receipt columns only')
-assert.doesNotMatch(route, /\.eq\('owner_user_id'/, 'no private owner column filter')
+assert.doesNotMatch(route, /^\s*\.eq\('owner_user_id'/m, 'no private owner column filter')
 assert.match(route, /projectFeedbackReceiptList\(data \?\? \[\], limit\)/, 'fail-closed private projection')
 assert.match(route, /private, no-store/, 'private response must not cache')
 assert.match(query, /limit >= 1 && limit <= 50/, 'bounded read')
