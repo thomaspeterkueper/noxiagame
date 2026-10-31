@@ -13,6 +13,9 @@ Read-only inspection of the public Supabase schema found **no** table whose name
 - GET `/api/game/feedback` lists only the authenticated owner's submissions and statuses. Never expose private NPC transcripts or another player's submissions.
 - No feedback endpoint can emit Core events, alter parcels, grant ownership, approve civic initiatives, or execute engineering tasks.
 
+## Review status contract (implemented as pure logic, not yet persisted)
+The status lifecycle in `lib/game/evolution/feedbackReviewStatus.ts` is `submitted_for_review` → `under_review` → `needs_information` / `accepted_for_planning` / `declined` / `closed`. `needs_information` can return to `under_review`; `accepted_for_planning` can close. `declined` and `closed` are terminal. Status transitions are **not** permission checks: only an authenticated, audited moderation service may write status changes. Even `accepted_for_planning` is neither a civic approval nor permission to change the world. Unknown status values fail closed.
+
 ## Required persistence and security review
 Proposed relation `player_feedback_submissions`: `id uuid`, `owner_user_id uuid`, `category`, `title`, `description`, `location_hint`, `requested_visibility`, `publication_consent`, `source_kind`, `private_source_ref`, `status`, `created_at`, `updated_at`, `idempotency_key`. Enforce field lengths/check constraints, uniqueness `(owner_user_id,idempotency_key)`, indexes for owner + created_at. Decide whether owner should be auth.uid or mapped profile **before** migration.
 
