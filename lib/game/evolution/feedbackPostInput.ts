@@ -1,4 +1,5 @@
-import { prepareFeedbackSubmission, type FeedbackSubmissionPreparation } from './feedbackSubmissionGate'
+import { type FeedbackSubmissionPreparation } from './feedbackSubmissionGate'
+import { parseFeedbackPostRequest } from './feedbackPostRequest'
 
 /** Parse untrusted POST input. Conversation sources remain disabled until server-side
  * npc_conversation_log ownership can be verified; client ownerVerified is never trusted.
@@ -18,7 +19,7 @@ export function parseDirectFeedbackPost(input: unknown, key: unknown):
   const source = body.source as Record<string, unknown>
   if (source.kind === 'conversation')
     return { ok: false, error: 'conversation_source_unavailable' }
-  const prepared = prepareFeedbackSubmission(body.feedback, body.source)
+  const prepared = parseFeedbackPostRequest({ feedback: body.feedback, source: body.source, idempotencyKey: key })
   if (!prepared.ok || prepared.source.kind !== 'direct')
     return { ok: false, error: 'invalid_request' }
   return { ok: true, feedback: prepared.feedback, key }
