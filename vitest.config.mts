@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'lib/ai/chatProvider.test.ts',
       'lib/game/population/personSceneLabel.test.ts',
       'lib/game/population/spiritualRoles.test.ts',
       'lib/game/population/worldviewVoices.test.ts',
