@@ -16,6 +16,14 @@ export function prepareFeedbackSubmission(feedback: unknown, source: unknown): F
   if (!checked.valid || !checked.normalized) {
     return { ok: false, errors: checked.errors, canTriggerWorldChange: false }
   }
+  // Never publish private conversation receipt identifiers, even if a caller
+  // bypasses the local conversation-to-feedback bridge. This guard is not
+  // moderation or a substitute for server-side ownership verification.
+  if (checked.normalized.visibility === 'public' &&
+      [checked.normalized.title, checked.normalized.description, checked.normalized.locationRef]
+        .some(text => typeof text === 'string' && /npc_conversation_log\\s*:\\s*\\d+/i.test(text))) {
+    return { ok: false, errors: ['private_conversation_receipt_in_public_feedback'], canTriggerWorldChange: false }
+  }
   if (!source || typeof source !== 'object' || Array.isArray(source)) {
     return { ok: false, errors: ['invalid_source'], canTriggerWorldChange: false }
   }
