@@ -9,6 +9,8 @@ on:
       - 'lib/game/evolution/feedbackReceiptList.test.ts'
       - 'lib/game/evolution/feedbackIdempotency.ts'
       - 'lib/game/evolution/feedbackIdempotency.test.ts'
+      - 'lib/game/evolution/feedbackPostRequest.ts'
+      - 'lib/game/evolution/feedbackPostRequest.test.ts'
       - 'lib/game/evolution/feedbackReceiptQuery.ts'
       - 'lib/game/evolution/feedbackReceiptQuery.test.ts'
       - 'lib/game/evolution/feedbackReceiptResponse.ts'
@@ -56,6 +58,7 @@ jobs:
           node .player-feedback-test/feedbackReceipt.test.js
           node .player-feedback-test/feedbackReceiptList.test.js
           node .player-feedback-test/feedbackIdempotency.test.js
+          node .player-feedback-test/feedbackPostRequest.test.js
           node .player-feedback-test/feedbackReceiptQuery.test.js
           node .player-feedback-test/feedbackReceiptResponse.test.js
       - name: Check read-only feedback receipt endpoint boundary (static only)
