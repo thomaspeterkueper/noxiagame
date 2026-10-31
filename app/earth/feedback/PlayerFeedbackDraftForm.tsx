@@ -11,6 +11,7 @@ const categoryLabels: Record<FeedbackCategory, string> = {
 
 /** Deliberately local-only until authenticated, moderated and rate-limited intake exists. */
 export default function PlayerFeedbackDraftForm() {
+  const [destination, setDestination] = useState<'development' | 'world_initiative'>('development')
   const [category, setCategory] = useState<FeedbackCategory>('idea')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -18,7 +19,7 @@ export default function PlayerFeedbackDraftForm() {
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
   const [consentToPublish, setConsentToPublish] = useState(false)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
-  const result = prepareLocalFeedbackCopy({ category, title, description, locationRef, visibility, consentToPublish })
+  const result = prepareLocalFeedbackCopy({ category, destination, title, description, locationRef, visibility, consentToPublish })
 
   async function copyDraft() {
     if (!result.ok) return
@@ -35,6 +36,10 @@ export default function PlayerFeedbackDraftForm() {
     <p>Dies ist ein <strong>lokaler Entwurf</strong>. Es gibt hier noch keine Einreichung, Speicherung,
       Veröffentlichung, Abstimmung oder Veränderung der Spielwelt. Kopiere den Text nur bewusst.</p>
     <form onSubmit={event => event.preventDefault()}>
+      <fieldset style={{ marginBottom: 12 }}><legend>Art des Anliegens</legend>
+        <label><input type="radio" name="destination" checked={destination === 'development'} onChange={() => { setDestination('development'); setCopyStatus('idle') }} /> Feedback zur Software</label>{' '}
+        <label><input type="radio" name="destination" checked={destination === 'world_initiative'} onChange={() => { setDestination('world_initiative'); setCopyStatus('idle') }} /> Initiative in der Spielwelt</label>
+      </fieldset>
       <label style={{ display: 'block', marginBottom: 12 }}>Kategorie<br />
         <select value={category} onChange={event => { setCategory(event.target.value as FeedbackCategory); setCopyStatus('idle') }}>
           {FEEDBACK_CATEGORIES.map(value => <option key={value} value={value}>{categoryLabels[value]}</option>)}
