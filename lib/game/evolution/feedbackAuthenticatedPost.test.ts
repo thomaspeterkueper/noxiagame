@@ -61,7 +61,7 @@ async function main() {
   const malformed = await parse(conversation({ kind: 'conversation', sourceRef: 'npc_conversation_log:0' }), key, ownerA, reader())
   assert('error' in malformed && malformed.error === 'invalid_source_ref', 'malformed source rejected')
   const invalid = await parse({ feedback: { ...feedback, title: 'x' }, source: { kind: 'conversation', sourceRef: 'npc_conversation_log:42' } }, key, ownerA, reader())
-  assert(!invalid.ok && invalid.error === 'invalid_request', 'invalid feedback rejected after ownership')
+  assert('error' in invalid && invalid.error === 'invalid_request', 'invalid feedback rejected after ownership')
   const publicLeak = await parse({
     feedback: { ...feedback, visibility: 'public', consentToPublish: true, description: 'Private receipt npc_conversation_log:42 must not be published.' },
     source: { kind: 'conversation', sourceRef: 'npc_conversation_log:42' },
