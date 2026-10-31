@@ -60,13 +60,22 @@ async function main() {
   }
   const malformed = await parse(conversation({ kind: 'conversation', sourceRef: 'npc_conversation_log:0' }), key, ownerA, reader())
   assert('error' in malformed && malformed.error === 'invalid_source_ref', 'malformed source rejected')
+  const beforeInvalid = queries
   const invalid = await parse({ feedback: { ...feedback, title: 'x' }, source: { kind: 'conversation', sourceRef: 'npc_conversation_log:42' } }, key, ownerA, reader())
-  assert('error' in invalid && invalid.error === 'invalid_request', 'invalid feedback rejected after ownership')
+  assert('error' in invalid && invalid.error === 'invalid_request', 'invalid feedback rejected')
+  assert(queries === beforeInvalid, 'invalid feedback must not trigger a service-role ownership lookup')
+  const unexpected = await parse({
+    feedback: { ...feedback, claimedVotes: 999 },
+    source: { kind: 'conversation', sourceRef: 'npc_conversation_log:42' },
+  }, key, ownerA, reader())
+  assert('error' in unexpected && unexpected.error === 'invalid_request', 'client authority metadata rejected')
+  assert(queries === beforeInvalid, 'unexpected feedback metadata must not trigger a lookup')
   const publicLeak = await parse({
     feedback: { ...feedback, visibility: 'public', consentToPublish: true, description: 'Private receipt npc_conversation_log:42 must not be published.' },
     source: { kind: 'conversation', sourceRef: 'npc_conversation_log:42' },
   }, key, ownerA, reader())
   assert(!publicLeak.ok, 'public private receipt leakage rejected')
+  assert(queries === beforeInvalid, 'public receipt leakage must not trigger an ownership lookup')
   const extra = await parse({ ...conversation({ kind: 'conversation', sourceRef: 'npc_conversation_log:42' }), owner_user_id: ownerB }, key, ownerA, reader())
   assert('error' in extra && extra.error === 'invalid_request', 'body owner spoof rejected')
   console.log('Authenticated NPC feedback gate tests passed (mocked lookup, no SQL/HTTP)')
