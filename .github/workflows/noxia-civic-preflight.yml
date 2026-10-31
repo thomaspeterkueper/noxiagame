@@ -1,0 +1,33 @@
+name: NOXIA civic preflight regression
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/civicPreflight.ts'
+      - 'lib/game/evolution/civicPreflight.test.ts'
+      - 'lib/game/evolution/civicEngineering.test.ts'
+      - 'lib/game/evolution/engineeringHandoff.ts'
+      - '.github/workflows/noxia-civic-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-civic-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  civic-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile and run isolated civic and engineering checks
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/civicPreflight.test.ts lib/game/evolution/civicEngineering.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .civic-preflight-test
+          node .civic-preflight-test/civicPreflight.test.js
+          node .civic-preflight-test/civicEngineering.test.js
