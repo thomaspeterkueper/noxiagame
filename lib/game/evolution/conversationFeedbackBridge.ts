@@ -41,6 +41,7 @@ export function prepareConversationFeedbackDraft(localDraft: unknown, choices: u
   }
   const result = validateFeedback({
     category: selection.category,
+    destination: selection.destination ?? 'world_initiative',
     title: draft.title,
     description: draft.description,
     ...(typeof place === 'string' ? { locationRef: place } : {}),
