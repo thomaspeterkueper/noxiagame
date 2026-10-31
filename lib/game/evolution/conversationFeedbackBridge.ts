@@ -25,7 +25,8 @@ export function prepareConversationFeedbackDraft(localDraft: unknown, choices: u
   const draft = localDraft as Record<string, unknown>
   const selection = choices as Record<string, unknown>
   if (draft.status !== 'local_draft' || draft.canTriggerWorldChange !== false ||
-      typeof draft.sourceRef !== 'string' || !/^npc_conversation_log:[1-9]\d{0,18}$/.test(draft.sourceRef)) {
+      typeof draft.sourceRef !== 'string' || !/^npc_conversation_log:[1-9]\d{0,18}$/.test(draft.sourceRef) ||
+      BigInt(draft.sourceRef.slice('npc_conversation_log:'.length)) > 9223372036854775807n) {
     return invalid('invalid_private_provenance')
   }
   const place = draft.unverifiedPlaceLabel
@@ -36,7 +37,7 @@ export function prepareConversationFeedbackDraft(localDraft: unknown, choices: u
   // Prevent accidental disclosure of a private receipt through ANY public text field.
   // This is a UX/privacy guard, not a substitute for moderation or server-side checks.
   if (selection.visibility === 'public' &&
-      [draft.title, draft.description, place].some(v => typeof v === 'string' && /npc_conversation_log:[1-9]\d{0,18}/.test(v))) {
+      [draft.title, draft.description, place].some(v => typeof v === 'string' && /npc_conversation_log\s*:\s*\d+/i.test(v))) {
     return invalid('private_receipt_in_public_text')
   }
   const result = validateFeedback({
