@@ -5,12 +5,14 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router   = useRouter()
+  const searchParams = useSearchParams()
+  const confirmationFailed = searchParams.get('error') === 'confirmation_failed'
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -35,7 +37,9 @@ export default function LoginPage() {
     })
 
     if (error || !data.session || !data.user) {
-      if (error?.code && error.code !== 'invalid_credentials') {
+      if (error?.code === 'email_not_confirmed' || error?.message?.toLowerCase().includes('email not confirmed')) {
+        setError('Dein Konto ist noch nicht bestätigt. Bitte öffne die Bestätigungs-E-Mail in deinem Maileingang (gegebenenfalls im Spam-Ordner).')
+      } else if (error?.code && error.code !== 'invalid_credentials') {
         console.error('[auth/login] signInWithPassword failed', {
           code: error.code,
           status: error.status,
@@ -43,7 +47,7 @@ export default function LoginPage() {
         })
         setError('Anmeldung derzeit nicht möglich. Bitte versuche es erneut.')
       } else {
-        setError('Email oder Passwort falsch.')
+        setError('E-Mail oder Passwort nicht korrekt. Falls du dich gerade registriert hast, bestätige bitte zuerst deine E-Mail.')
       }
       setLoginFailed(true)
       setLoading(false)
@@ -120,6 +124,11 @@ export default function LoginPage() {
           </button>
         </div>
 
+        {confirmationFailed && !error && (
+          <div role="alert" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', padding: '0.7rem', fontSize: '0.8rem', color: '#9a3412', marginBottom: '1rem' }}>
+            Der Bestätigungslink ist ungültig oder abgelaufen. Bitte fordere über die Registrierung eine neue Bestätigungs-E-Mail an.
+          </div>
+        )}
         {error && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#c0392b', marginBottom: '1rem' }}>
             {error}
