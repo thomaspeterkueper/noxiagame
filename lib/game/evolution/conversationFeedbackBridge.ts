@@ -33,10 +33,10 @@ export function prepareConversationFeedbackDraft(localDraft: unknown, choices: u
       place.trim() !== place || /[\u0000-\u001f\u007f]/.test(place))) {
     return invalid('invalid_unverified_place')
   }
-  // Prevent an accidental disclosure of the private receipt in a public post.
+  // Prevent accidental disclosure of a private receipt through ANY public text field.
   // This is a UX/privacy guard, not a substitute for moderation or server-side checks.
   if (selection.visibility === 'public' &&
-      [draft.title, draft.description].some(v => typeof v === 'string' && /npc_conversation_log:[1-9]\d{0,18}/.test(v))) {
+      [draft.title, draft.description, place].some(v => typeof v === 'string' && /npc_conversation_log:[1-9]\d{0,18}/.test(v))) {
     return invalid('private_receipt_in_public_text')
   }
   const result = validateFeedback({
