@@ -20,6 +20,7 @@ export function prepareLocalFeedbackCopy(input: unknown): LocalFeedbackCopy {
     text: [
       'NOXIA – privater Feedback-Entwurf (NICHT eingereicht)',
       `Kategorie: ${value.category}`,
+      `Ziel: ${value.destination === 'world_initiative' ? 'Initiative in der Spielwelt' : 'Feedback zur Software'}`,
       `Gewünschte Sichtbarkeit (NICHT veröffentlicht): ${value.visibility}`,
       `Titel: ${value.title}`,
       `Beschreibung:\n${value.description}`,
