@@ -16,4 +16,23 @@ for (const id of ['1', '42', '1234567890123456789']) {
 for (const id of ['0', '02', '4a', '4\\\\d', '12345678901234567890']) {
   assert(!prepare(draft, { kind: 'conversation', sourceRef: 'npc_conversation_log:' + id, ownerVerified: true }).ok, 'malformed source rejected: ' + id)
 }
+
+const publicDraft = { ...draft, visibility: 'public', consentToPublish: true }
+assert(prepare(publicDraft, { kind: 'direct' }).ok, 'consented public draft without receipts accepted')
+for (const field of ['title', 'description', 'locationRef'] as const) {
+  const withReceipt = { ...publicDraft, [field]: field === 'title'
+    ? 'NPC log npc_conversation_log:42'
+    : field === 'description'
+      ? 'Private NPC conversation receipt npc_conversation_log:42 must not be public.'
+      : 'npc_conversation_log:42' }
+  const result = prepare(withReceipt, { kind: 'direct' })
+  assert(!result.ok && result.errors.includes('private_conversation_receipt_in_public_feedback'),
+    'private NPC receipt blocked from public ' + field)
+}
+assert(!prepare({ ...publicDraft, description: 'A private receipt NPC_CONVERSATION_LOG : 42 must not be disclosed.' },
+  { kind: 'conversation', sourceRef: 'npc_conversation_log:42', ownerVerified: true }).ok,
+  'alternate case and spaces do not bypass receipt protection')
+assert(prepare({ ...draft, description: 'A private receipt npc_conversation_log:42 may remain in a private draft.' },
+  { kind: 'direct' }).ok, 'private drafts retain own private references')
+
 console.log('Feedback submission gate tests passed')
