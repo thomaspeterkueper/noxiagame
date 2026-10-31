@@ -253,3 +253,34 @@ describe('world lab: finer lines win (Thomas, 27.10.2026: Bahnhof, Kreisel, Brü
     expect(out.roads[0].b).toBe(1)
   })
 })
+
+describe('world lab: Gotteshäuser ohne Umriss', () => {
+  const landmark = (props: Record<string, unknown>): SourceFeature => ({ id: 'l1', featureType: 'landmark', geometry: { kind: 'point', coordinates: at(80, 90) }, properties: { name: 'Lukaskirche', amenity: 'place_of_worship', building: 'church', noxia_source_id: 'osm:way:264006197', ...props } })
+  const road: SourceFeature = { id: 'r1', featureType: 'road', geometry: { kind: 'line', coordinates: [at(0, 100), at(190, 130)] }, properties: { visual_class: 'residential', highway: 'residential' } }
+
+  it('setzt eine Kirche als Haus an den Punkt, wenn die Daten keinen Umriss haben', () => {
+    const built = buildTile([landmark({}), road], tile, TILE_Z)
+    const church = built.blocks.find(block => block.i === 'osm:way:264006197')
+    expect(church?.k).toBe('church')
+    expect(church?.nm).toBe('Lukaskirche')
+    expect(church!.w).toBeGreaterThan(church!.d)
+    // längs der Straße (steigt nach Osten leicht an)
+    expect(Math.abs(church!.a)).toBeGreaterThan(0.05)
+    expect(Math.abs(church!.a)).toBeLessThan(0.4)
+  })
+
+  it('setzt die Rochuskapelle als Achteck', () => {
+    const built = buildTile([landmark({ name: 'Rochuskapelle', building: 'chapel', noxia_source_id: 'osm:way:246890728' })], tile, TILE_Z)
+    const chapel = built.blocks.find(block => block.i === 'osm:way:246890728')
+    expect(chapel?.f).toHaveLength(16)
+    expect(chapel!.w).toBeLessThan(12)
+  })
+
+  it('setzt kein Ersatzhaus, wenn die Daten den Umriss haben – auch wenn der Punkt zuerst kommt', () => {
+    const outline: SourceFeature = { id: 'b1', featureType: 'building', geometry: polygon([[70, 80], [90, 80], [90, 100], [70, 100]]), properties: { building: 'church', amenity: 'place_of_worship', name: 'Lukaskirche', noxia_source_id: 'osm:way:264006197' } }
+    const built = buildTile([landmark({}), outline], tile, TILE_Z)
+    const churches = built.blocks.filter(block => block.i === 'osm:way:264006197')
+    expect(churches).toHaveLength(1)
+    expect(churches[0].w).toBeCloseTo(20, 0)
+  })
+})
