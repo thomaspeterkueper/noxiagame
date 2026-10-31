@@ -24,7 +24,12 @@ async function main() {
   assert.ok(anonKey && serviceKey && anonKey !== serviceKey, 'Distinct local keys required')
   // Import after the safety gate: even module initialization must not touch remote services.
   const { createClient } = require('@supabase/supabase-js')
-  const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+  const { createLocalOnlyFetch } = require('./feedback-local-only-fetch.cjs')
+  const localOnlyFetch = createLocalOnlyFetch(url.origin)
+  const options = {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: localOnlyFetch },
+  }
   const service = createClient(rawUrl, serviceKey, options)
   const anon = createClient(rawUrl, anonKey, options)
   const ids = []
@@ -66,7 +71,7 @@ async function main() {
       if (error || !data?.session?.access_token) throw Error('Local fixture login failed: ' + (error?.code ?? 'unknown'))
       return createClient(rawUrl, anonKey, {
         ...options,
-        global: { headers: { Authorization: 'Bearer ' + data.session.access_token } },
+        global: { fetch: localOnlyFetch, headers: { Authorization: 'Bearer ' + data.session.access_token } },
       })
     }
     const [clientA, clientB] = await Promise.all([login(a), login(b)])
