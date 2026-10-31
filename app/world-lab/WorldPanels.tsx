@@ -11,11 +11,11 @@
 // die zu einem Ort geht) ist keine Tafel, sondern ein Vermerk, der im Innenraum
 // genutzt wird.
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
-import type { ColonyResident } from '@/lib/store/colonyStateStore'
+import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
@@ -484,7 +484,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 
   async function talk() {
     if (!person || !engine || !message.trim() || sending || conversationEnd.isEnded(person.id)) return
-    const playerMessage = message.trim().slice(0, 80)
+    const playerMessage = message.trim().slice(0, 400)
     const history = conversations[person.id] ?? []
     // Was die Person von ihrem Platz aus sehen kann (45 m): NOXIA-Gebäude,
     // Wahrzeichen, Baustellen, Wasser, Wald – wie in der bisherigen Erdszene.
@@ -529,6 +529,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         }),
       })
       const json = await response.json().catch(() => ({}))
+      if (response.ok && json?.identityLearned) void refreshResidents()
       const reply = response.ok && json.reply ? String(json.reply) : 'Die Person kann gerade nicht antworten.'
       setConversations(current => ({ ...current, [person.id]: [...(current[person.id] ?? []), { role: 'user' as const, content: playerMessage }, { role: 'assistant' as const, content: reply }].slice(-10) }))
       if (response.ok) setMessage('')
@@ -586,7 +587,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <dl><dt>Tut gerade</dt><dd>{leading[person.id] ? 'geht voraus' : visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
-        ? <div className="row"><input value={message} maxLength={80} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+        ? <div className="row"><input value={message} maxLength={400} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         : <div className="row"><span>{personDistance === null ? 'Nicht in Sichtweite.' : `${Math.round(personDistance)} m entfernt – zu weit zum Ansprechen.`}</span>{personDistance !== null && <button onClick={() => walkTo(() => engine?.personAt(person.id) ?? null, TALK_RANGE_M - 2)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
     </>}
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
@@ -775,7 +776,34 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 }
 
 /** Termin eines Gotteshauses: läuft gerade (mit Zahl der Besucher) oder nächster Beginn. */
+/** Der Spieler hat den Namen einer Person erfahren (Gespräch, Aushang): als bekannt merken und Figuren neu laden. */
+async function rememberPerson(personId: string, sourceKind: string) {
+  try {
+    const { token } = await getSessionInfo()
+    if (!token) return
+    const response = await fetch('/api/game/population/identity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ personId, state: 'known', sourceKind }),
+    })
+    if (response.ok) await refreshResidents()
+  } catch { /* beim nächsten Laden wieder */ }
+}
+
+async function refreshResidents() {
+  const { locationSlug, refresh } = useColonyStateStore.getState()
+  if (locationSlug) await refresh(locationSlug, { background: true })
+}
+
 function ScheduleLine({ item }: { item: WorshipItem }) {
+  // Der Name der Leitung steht hier lesbar: Wer ihn gelesen hat, kennt sie (31.10.2026).
+  const hostKnown = useColonyStateStore(state => state.residents.find(resident => resident.id === item.host.id)?.identityState)
+  const learned = useRef(false)
+  useEffect(() => {
+    if (learned.current || !hostKnown || hostKnown === 'known') return
+    learned.current = true
+    void rememberPerson(item.host.id, 'worship_host')
+  }, [hostKnown, item.host.id])
   if (item.running) return <p className="muted"><b>Jetzt: {item.running.label}</b> mit {item.host.name}{item.running.attendees ? ` · ${item.running.attendees} ${item.running.attendees === 1 ? 'Besucher(in)' : 'Besucher'}` : ''}. Alle sind willkommen – mitfeiern, zuhören oder hinten sitzen.</p>
   return <>
     {item.next && <p className="muted">Nächster Termin: {item.next.label} · {item.next.when} ({item.host.name})</p>}

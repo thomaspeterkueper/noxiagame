@@ -337,7 +337,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     if(!target||(!opening&&!message.trim())||sending)return
     const self=served.find(f=>f.id===target.id)
     if(!self)return
-    const text=opening?'':message.trim().slice(0,80)
+    const text=opening?'':message.trim().slice(0,400)
     const history=opening?[]:historyState
     setSending(true)
     try{
@@ -438,7 +438,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {!selected&&!closed&&!nearService&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{fitting.idleText?' '+fitting.idleText:''}</p>}
         {selected&&<>
           <div className="history">{historyState.map((entry,index)=><p key={index}><b>{entry.role==='user'?'Du':personSceneLabel(selected)}:</b> „{entry.content}“</p>)}</div>
-          <div className="chat"><input value={message} maxLength={80} disabled={endedBy===selected.id} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={endedBy===selected.id?'Gespräch beendet':'Kurze Antwort …'}/><button disabled={sending||!message.trim()||endedBy===selected.id} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
+          <div className="chat"><input value={message} maxLength={400} disabled={endedBy===selected.id} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={endedBy===selected.id?'Gespräch beendet':'Kurze Antwort …'}/><button disabled={sending||!message.trim()||endedBy===selected.id} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
         </>}
         {!closed&&<div className="moves">
           {!gateOpen&&layout.entry?<button onClick={()=>walkTo(layout.entry!.payAt)}>Zum Türsteher</button>:!nearService&&<button onClick={()=>walkTo(layout.servicePoint)}>{fitting.goToServiceLabel(service)}</button>}
