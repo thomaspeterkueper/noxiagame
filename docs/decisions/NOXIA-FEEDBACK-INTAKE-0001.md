@@ -6,7 +6,7 @@ Status: proposed; **not deployed**. A versioned, **unapplied** schema migration 
 Read-only inspection of the public Supabase schema found **no** table whose name contains `feedback` or `proposal`. Therefore the draft UI must never claim successful submission without a validated server receipt; the migration remains unapplied. No production schema change is authorized by this document.
 
 ## Submission contract
-- POST `/api/game/feedback` requires a valid server-verified Supabase user, body validated with `validateFeedback`, bounded request size, and server-enforced rate limiting.
+- POST `/api/game/feedback` requires a valid server-verified Supabase user, body validated with `validateFeedback`, bounded request size, and server-enforced rate limiting. The feedback object has an explicit field allowlist: unknown client metadata (including claimed votes, ownership, approvals or Core actions) is rejected rather than silently accepted. This is defense in depth; the server still never grants civic or world authority.
 - For direct feedback, source kind `direct`. For conversation feedback, the server must resolve `npc_conversation_log:<id>` using the authenticated player's mapped profile, verify ownership, and only then call `prepareFeedbackSubmission(..., {kind:'conversation', sourceRef, ownerVerified:true})`. Never trust client-supplied `ownerVerified`.
 - Require an idempotency key bound to owner and payload. Generate UUID, owner ID, creation time, and initial `submitted_for_review` status server-side. Reject duplicate/conflicting keys deterministically.
 - Store private provenance separately from any publishable text. Client location hints are **unverified**. Public visibility requires explicit consent and human moderation; consent is not publication.

@@ -2,6 +2,12 @@
 export const FEEDBACK_CATEGORIES = ['idea', 'problem', 'building', 'profession', 'technology', 'gameplay', 'other'] as const
 export type FeedbackCategory = typeof FEEDBACK_CATEGORIES[number]
 export type FeedbackDestination = 'development' | 'world_initiative'
+// Reject unknown client metadata instead of silently discarding claimed votes,
+// approvals, ownership or Core commands. This is an input contract, not authority.
+const FEEDBACK_FIELDS = new Set([
+  'category', 'destination', 'title', 'description', 'locationRef',
+  'visibility', 'consentToPublish',
+])
 export interface FeedbackDraft {
   category: FeedbackCategory
   destination?: FeedbackDestination
@@ -26,6 +32,8 @@ export function validateFeedback(input: unknown): FeedbackValidation {
   }
   const value = input as Record<string, unknown>
   const errors: string[] = []
+  if (Object.keys(value).some(key => !FEEDBACK_FIELDS.has(key)))
+    errors.push('unexpected_feedback_fields')
   const category = value.category
   const destination = value.destination ?? 'development'
   const title = typeof value.title === 'string' ? value.title.trim() : ''

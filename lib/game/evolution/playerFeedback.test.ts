@@ -21,9 +21,19 @@ assert(!validateFeedback({ ...draft, title: 'Bad\nverified' }).valid, 'title con
 assert(!validateFeedback({ ...draft, locationRef: 'Seelenberg\nverified' }).valid, 'location control characters rejected')
 assert(!validateFeedback({ ...draft, description: 'A sufficiently long description\u0000with control' }).valid, 'description binary control rejected')
 assert(validateFeedback({ ...draft, description: 'A sufficiently long\nmultiline description' }).valid, 'legitimate multiline description accepted')
-const normalized = validateFeedback({ ...draft, locationRef: '  Seelenberg  ', hiddenWorldWrite: true }).normalized
+const normalized = validateFeedback({ ...draft, locationRef: '  Seelenberg  ' }).normalized
 assert(normalized?.locationRef === 'Seelenberg', 'location hint trimmed')
-assert(!('hiddenWorldWrite' in (normalized ?? {})), 'unrecognized fields stripped')
+for (const extra of [
+  { hiddenWorldWrite: true }, { owner_user_id: 'other-player' },
+  { status: 'accepted_for_planning' }, { canTriggerWorldChange: true },
+  { votes: 999 }, { sourceRef: 'npc_conversation_log:42' },
+]) {
+  const result = validateFeedback({ ...draft, ...extra })
+  assert(!result.valid && result.errors.includes('unexpected_feedback_fields'),
+    'unknown or authority-claiming feedback metadata must be rejected')
+}
+const protoKey = JSON.parse('{"__proto__":{"status":"approved"}}')
+assert(!validateFeedback({ ...draft, ...protoKey }).valid, 'JSON prototype-like key rejected')
 assert(FEEDBACK_INTAKE_POLICY.createsWorldEvent === false && FEEDBACK_INTAKE_POLICY.executesCode === false, 'feedback never authorizes action')
 console.log('Player feedback intake validation: tests passed')
 
