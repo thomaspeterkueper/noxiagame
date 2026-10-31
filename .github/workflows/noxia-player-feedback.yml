@@ -41,6 +41,8 @@ on:
       - 'scripts/test-player-feedback-migration.cjs'
       - 'scripts/test-player-feedback-rls-local.cjs'
       - 'scripts/test-player-feedback-rls-safety.cjs'
+      - 'scripts/feedback-local-only-fetch.cjs'
+      - 'scripts/test-feedback-local-only-fetch.cjs'
       - '.github/workflows/noxia-player-feedback.yml'
   workflow_dispatch:
 permissions:
@@ -86,5 +88,7 @@ jobs:
         run: node --check scripts/test-player-feedback-rls-local.cjs
       - name: Run negative-only local RLS safety gates (no database connection)
         run: node scripts/test-player-feedback-rls-safety.cjs
+      - name: Verify local-only HTTP transport and redirect refusal (no network)
+        run: node scripts/test-feedback-local-only-fetch.cjs
       - name: Check staged feedback migration security contract (static only)
         run: node scripts/test-player-feedback-migration.cjs
