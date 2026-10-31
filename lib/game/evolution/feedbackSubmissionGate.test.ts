@@ -26,7 +26,7 @@ for (const field of ['title', 'description', 'locationRef'] as const) {
       ? 'Private NPC conversation receipt npc_conversation_log:42 must not be public.'
       : 'npc_conversation_log:42' }
   const result = prepare(withReceipt, { kind: 'direct' })
-  assert(!result.ok && result.errors.includes('private_conversation_receipt_in_public_feedback'),
+  assert(!result.ok && 'errors' in result && result.errors.includes('private_conversation_receipt_in_public_feedback'),
     'private NPC receipt blocked from public ' + field)
 }
 assert(!prepare({ ...publicDraft, description: 'A private receipt NPC_CONVERSATION_LOG : 42 must not be disclosed.' },
