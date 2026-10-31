@@ -39,6 +39,7 @@ on:
       - 'supabase/migrations/20261031080000_player_feedback_submissions.sql'
       - 'supabase/tests/player_feedback_submissions.test.sql'
       - 'scripts/test-player-feedback-migration.cjs'
+      - 'scripts/test-player-feedback-rls-local.cjs'
       - '.github/workflows/noxia-player-feedback.yml'
   workflow_dispatch:
 permissions:
@@ -80,5 +81,7 @@ jobs:
         run: node scripts/test-player-feedback-submit-panel.cjs
       - name: Check authenticated direct feedback POST boundary (static only)
         run: node scripts/test-player-feedback-post-route.cjs
+      - name: Syntax-check opt-in local RLS harness (no database connection)
+        run: node --check scripts/test-player-feedback-rls-local.cjs
       - name: Check staged feedback migration security contract (static only)
         run: node scripts/test-player-feedback-migration.cjs
