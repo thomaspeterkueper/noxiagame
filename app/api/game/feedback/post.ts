@@ -1,12 +1,13 @@
 /** Authenticated direct feedback intake; review-only, no world/Core writes.
  * Requires the separately reviewed SQL migration including its atomic rate trigger.
- * Conversation sources are deliberately rejected until server ownership checks exist.
+ * Conversation provenance is checked server-side against the authenticated owner.
  */
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { parseDirectFeedbackPost } from '@/lib/game/evolution/feedbackPostInput'
+import { parseAuthenticatedFeedbackPost } from '@/lib/game/evolution/feedbackAuthenticatedPost'
+import type { ConversationLogReader } from '@/lib/game/evolution/conversationSourceOwnership.server'
 import { classifyFeedbackRetry } from '@/lib/game/evolution/feedbackIdempotency'
 import { projectFeedbackReceipt } from '@/lib/game/evolution/feedbackReceipt'
 
@@ -54,14 +55,20 @@ export async function POST(req: NextRequest) {
   if (raw === null) return reply({ error: 'payload_too_large_or_invalid' }, 413)
   let body: unknown
   try { body = JSON.parse(raw) } catch { return reply({ error: 'invalid_json' }, 400) }
-  const parsed = parseDirectFeedbackPost(body, req.headers.get('idempotency-key'))
+  const db = createServiceClient()
+  const parsed = await parseAuthenticatedFeedbackPost(
+    body, req.headers.get('idempotency-key'), ownerId, db as unknown as ConversationLogReader,
+  )
   if (!parsed.ok) return reply({ error: parsed.error }, parsed.error === 'conversation_source_unavailable' ? 422 : 400)
 
-  // Hash the normalized content, not untrusted JSON key order or client identity.
+  // Bind the idempotency fingerprint to the verified private source; retain
+  // the original direct-feedback fingerprint format for stable retries.
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify({ feedback: parsed.feedback, source: 'direct' }))
+    .update(JSON.stringify({
+      feedback: parsed.feedback,
+      source: parsed.sourceKind === 'direct' ? 'direct' : { kind: 'conversation', ref: parsed.privateSourceRef },
+    }))
     .digest('hex')
-  const db = createServiceClient()
   const findExisting = () => db.from('player_feedback_submissions')
     .select('id,owner_user_id,idempotency_key,payload_fingerprint,title,status,created_at')
     .eq('owner_user_id', ownerId)
@@ -88,8 +95,8 @@ export async function POST(req: NextRequest) {
       location_hint: parsed.feedback.locationRef ?? null,
       requested_visibility: parsed.feedback.visibility,
       publication_consent: parsed.feedback.consentToPublish === true,
-      source_kind: 'direct',
-      private_source_ref: null,
+      source_kind: parsed.sourceKind,
+      private_source_ref: parsed.privateSourceRef,
       status: 'submitted_for_review',
       idempotency_key: parsed.key,
       payload_fingerprint: fingerprint,
