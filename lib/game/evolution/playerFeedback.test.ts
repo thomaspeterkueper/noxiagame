@@ -26,3 +26,6 @@ assert(normalized?.locationRef === 'Seelenberg', 'location hint trimmed')
 assert(!('hiddenWorldWrite' in (normalized ?? {})), 'unrecognized fields stripped')
 assert(FEEDBACK_INTAKE_POLICY.createsWorldEvent === false && FEEDBACK_INTAKE_POLICY.executesCode === false, 'feedback never authorizes action')
 console.log('Player feedback intake validation: tests passed')
+
+assert(validateFeedback({ ...draft, destination: 'world_initiative' }).normalized?.destination === 'world_initiative', 'world initiative preserved')
+assert(!validateFeedback({ ...draft, destination: 'admin_approved' }).valid, 'invalid destination rejected')
