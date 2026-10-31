@@ -115,8 +115,8 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 /** Baubarer Typ aus /api/game/build/spatial (available). */
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean; requiredUnlock?: string | null } }
 
-/** Gebäudearten, zu denen eine Person den Spieler auch über größere Entfernung führt. */
-const FAR_GUIDE_KINDS = new Set(['job_agency'])
+/** Die wichtigsten Gebäude, die alle Einwohner kennen: Eine Person führt den Spieler auch über größere Entfernung dorthin (31.10.2026). */
+const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
 
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
@@ -501,7 +501,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       .filter(item => FAR_GUIDE_KINDS.has(item.typeId) && !places.some(place => place.targetRef === item.id))
       .map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'bekannt' }))
       .filter(place => place.distanceM > 45 && place.distanceM <= 3000)
-      .sort((a, b) => a.distanceM - b.distanceM).slice(0, 2)
+      .sort((a, b) => a.distanceM - b.distanceM)
+      // Von jeder Art das nächste – so bleibt die Liste kurz.
+      .filter((place, index, all) => all.findIndex(other => other.kind === place.kind) === index)
+      .slice(0, 6)
     const nearbyPlaces = [...places.map(place => ({ ...place, far: false })), ...farPlaces.map(place => ({ ...place, far: true }))]
       .map((place, index) => ({ key: 'p' + index, targetRef: place.targetRef, name: place.name, kind: place.kind, distanceM: Math.round(place.distanceM), far: place.far }))
     const localFacts = [

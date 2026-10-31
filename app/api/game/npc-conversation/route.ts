@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
   // Nahe Ziele (bis 45 m) und wenige bekannte weiter entfernte Ziele (far, bis 3 km), zu denen die
   // Figur den Spieler führen kann – z. B. die Agentur für Arbeit (31.10.2026).
   const nearbyPlaces = Array.isArray(body.nearbyPlaces)
-    ? body.nearbyPlaces.slice(0, 12).map((value: any, index: number) => {
+    ? body.nearbyPlaces.slice(0, 16).map((value: any, index: number) => {
         const far = value?.far === true
         return {
           key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
@@ -390,7 +390,7 @@ export async function POST(request: NextRequest) {
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
     'Du kannst ausdrücklich erlaubte Aktionsmarker verwenden. Wenn du dich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge am Ende [[ACTION:LEAD_WALK]] an.',
     nearbyPlaces.some((place: any) => !place.far) ? `Verifizierte nahe Ziele, die du aktuell wahrnehmen kannst:\n- ${nearbyPlaces.filter((place: any) => !place.far).map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.max(1,Math.round(place.distanceM))} m`).join('\n- ')}` : '',
-    nearbyPlaces.some((place: any) => place.far) ? `Weiter entfernte Ziele, die du kennst und zu denen du den Spieler führen kannst:\n- ${nearbyPlaces.filter((place: any) => place.far).map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.round(place.distanceM / 10) * 10} m`).join('\n- ')}\nBietest du an, den Spieler zu so einem Ziel zu bringen, und er stimmt zu, führe ihn mit [[ACTION:VISIT_PLACE:pN]] hin. Sage dann kurz, dass es ein Stück zu gehen ist; versprich keine Dauer.` : '',
+    nearbyPlaces.some((place: any) => place.far) ? `Weiter entfernte Ziele – die wichtigsten Gebäude im Ort, die alle Einwohner kennen – zu denen du den Spieler führen kannst:\n- ${nearbyPlaces.filter((place: any) => place.far).map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.round(place.distanceM / 10) * 10} m`).join('\n- ')}\nBietest du an, den Spieler zu so einem Ziel zu bringen, und er stimmt zu, führe ihn mit [[ACTION:VISIT_PLACE:pN]] hin. Sage dann kurz, dass es ein Stück zu gehen ist; versprich keine Dauer.` : '',
     nearbyPlaces.length ? 'Wenn der Spieler eine konkrete gemeinsame Aktivität an einem dieser nahen Ziele vorschlägt und du zustimmst, kannst du genau dieses Ziel mit [[ACTION:VISIT_PLACE:pN]] auswählen. Verwende nur einen oben aufgeführten pN-Schlüssel und nur wenn das Ziel inhaltlich zum Vorschlag passt.' : '',
     'Wenn der Spieler dir ausdrücklich Credits anbietet oder eine unmittelbar vorherige konkrete Credit-Bitte von dir klar bestätigt, darfst du die Annahme mit [[ACTION:ACCEPT_CREDITS]] markieren. Der Marker bedeutet nur „annehmen“; Betrag und Berechtigung werden ausschließlich serverseitig aus dem Gespräch geprüft. Fordere mit diesem Marker niemals selbst eine Abbuchung an.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
