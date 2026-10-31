@@ -6,6 +6,7 @@ import { validateFeedback } from '@/lib/game/evolution/playerFeedback'
 import { readPlayerFeedbackSubmissionResponse } from '@/lib/game/evolution/feedbackSubmitResponse'
 import { FEEDBACK_CATEGORIES, type FeedbackCategory } from '@/lib/game/evolution/playerFeedback'
 import { prepareLocalFeedbackCopy } from '@/lib/game/evolution/playerFeedbackLocalCopy'
+import { selectFeedbackAttempt } from '@/lib/game/evolution/feedbackSubmissionAttempt'
 
 const categoryLabels: Record<FeedbackCategory, string> = {
   idea: 'Idee', problem: 'Problem', building: 'Gebäude / Nutzung',
@@ -34,8 +35,10 @@ export default function PlayerFeedbackDraftForm() {
     const checked = validateFeedback({ category, destination, title, description, locationRef, visibility, consentToPublish })
     if (!checked.valid || !checked.normalized) { setSubmitPhase('invalid'); return }
     const body = JSON.stringify({ feedback: checked.normalized, source: { kind: 'direct' } })
-    const key = lastAttempt.current?.body === body ? lastAttempt.current.key : crypto.randomUUID()
-    lastAttempt.current = { body, key } // Reuse key on network retry; never regenerate for the same payload.
+    const attempt = selectFeedbackAttempt(lastAttempt.current, body, crypto.randomUUID())
+    if (!attempt) { setSubmitPhase('invalid'); return }
+    lastAttempt.current = attempt // Same normalized payload retains its key across network retries.
+    const key = attempt.key
     active.current?.abort()
     const controller = new AbortController()
     active.current = controller
