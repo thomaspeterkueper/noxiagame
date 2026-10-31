@@ -29,7 +29,7 @@ export type NoxiaBuilding = { id: string; typeId: string; name: string; lat: num
 /** Bahnstrecke: beginnt am Bahnhof, wenn einer an ihrem Ende liegt. */
 export type WorldRailLine = { points: GeoPoint[]; lengthM: number; station: { name: string; at: GeoPoint } | null }
 /** Freie Fläche nach Abriss eines gekauften Gebäudes. */
-export type WorldPlot = { source: string; own: boolean; name: string; lat: number; lon: number; w: number; d: number; rotation: number }
+export type WorldPlot = { source: string; own: boolean; name: string; lat: number; lon: number; w: number; d: number; rotation: number; /** Zeitpunkt des Abrisses (Zeitregler) */ clearedAt?: string }
 export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number
   /** Gezeigter Weg zum Ziel: Länge und ob er dem Straßennetz folgt. */
   route: { lengthM: number; viaRoads: boolean } | null }
@@ -135,6 +135,8 @@ export interface WorldEngine {
   trainAt: (stationName: string) => TrainState | null
   /** Freie Flächen nach Abriss: der OSM-Grundriss wird dort nicht mehr gezeichnet. */
   setPlots: (plots: WorldPlot[]) => void
+  /** Zeitregler: zeigt den Stand der Abrisse zu diesem Zeitpunkt (null = jetzt). */
+  setAsOf: (iso: string | null) => void
   /** Flurstücke mit Eigentümer: eigene golden umrandet, fremde blau. */
   setParcelOwners: (owners: Array<{ id: string; own: boolean }>) => void
   /** Baustellen zeigen (ersetzt die vorigen). */
@@ -1462,7 +1464,17 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
 
   // ── Freie Flächen (nach Abriss) ─────────────────────────────────────
   let plots: WorldPlot[] = []
+  let allPlots: WorldPlot[] = []
+  let asOf: string | null = null
   let cleared = new Set<string>()
+  /** Sichtbar sind nur Abrisse bis zum gewählten Zeitpunkt (Zeitregler, Issue #541). */
+  const applyPlots = () => {
+    const before = [...cleared].sort().join('|')
+    plots = asOf ? allPlots.filter(plot => !plot.clearedAt || plot.clearedAt <= asOf!) : allPlots
+    cleared = new Set(plots.map(plot => plot.source))
+    drawPlots()
+    if ([...cleared].sort().join('|') !== before) reload()
+  }
   const plotLayer = new PIXI.Container()
   overlay.addChildAt(plotLayer, 0)
   overlay.addChildAt(ownedLayer, 0)
@@ -1877,12 +1889,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       parcelOwners = new Map(list.map(item => [item.id, item.own]))
       for (const entry of loaded.values()) drawOwned(entry)
     },
-    setPlots(list) {
-      const before = [...cleared].sort().join('|')
-      plots = list; cleared = new Set(list.map(plot => plot.source))
-      drawPlots()
-      if ([...cleared].sort().join('|') !== before) reload()
-    },
+    setPlots(list) { allPlots = list; applyPlots() },
+    setAsOf(iso) { asOf = iso; applyPlots() },
     setRouteTarget(at) { routeTarget = at; routeAt = 0; if (!at) { routeLine.clear(); routeInfo = null } },
     surroundings(at, radiusM) { return surroundingsOf(toWorld(at), radiusM) },
     landmarks() {

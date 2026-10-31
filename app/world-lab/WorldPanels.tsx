@@ -31,6 +31,7 @@ import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
 import LandPanel from './LandPanel'
+import BuildingHistory from './BuildingHistory'
 import TicketCounter from '@/app/components/TicketCounter'
 import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
@@ -577,6 +578,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
     {building && <>
       <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}{building.poi && <span>Hier: {building.poi.name} · {landmarkLabel(building.poi.kind, building.poi.tags)}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      <BuildingHistory entityId={building.noxiaId} sourceRef={building.source}/>
       {realUse && <dl>
         <dt>Größe</dt><dd>{buildingSizeLine(offer?.areaM2 ?? building.areaM2 ?? 0, offer?.levels ?? building.levels ?? 1)}</dd>
         {!own?.own && <><dt>Nutzung</dt><dd>{realUse.text}</dd></>}
@@ -716,6 +718,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     </>}
     {panel.kind === 'plot' && <>
       <div className="head"><div><small>FREIE FLÄCHE</small><b>{plot?.name ?? 'Freie Fläche'}</b>{plot && <span>{Math.round(plot.w)} × {Math.round(plot.d)} m · {plot.own ? 'dein Grundstück' : 'gehört einem anderen Spieler'}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      <BuildingHistory sourceRef={panel.source}/>
       {plot?.own && (buildables === null ? <p>Bautypen werden geladen …</p>
         : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}{item.requirements?.knowledgeOk === false && <> <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
           : <p>Kein Bautyp passt auf diese Fläche.</p>)}
