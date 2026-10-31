@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'lib/game/evolution/playerFeedback.ts'
+      - 'lib/game/evolution/feedbackSubmissionGate.ts'
+      - 'lib/game/evolution/feedbackSubmissionGate.test.ts'
       - 'lib/game/evolution/playerFeedback.test.ts'
       - 'lib/game/evolution/conversationFeedbackBridge.ts'
       - 'lib/game/evolution/conversationFeedbackBridge.test.ts'
@@ -27,7 +29,8 @@ jobs:
           node-version: '22'
       - name: Validate feedback contract, conversation bridge and local export
         run: |
-          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/playerFeedback.test.ts lib/game/evolution/conversationFeedbackBridge.test.ts lib/game/evolution/playerFeedbackLocalCopy.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .player-feedback-test
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/playerFeedback.test.ts lib/game/evolution/conversationFeedbackBridge.test.ts lib/game/evolution/playerFeedbackLocalCopy.test.ts lib/game/evolution/feedbackSubmissionGate.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .player-feedback-test
           node .player-feedback-test/playerFeedback.test.js
           node .player-feedback-test/conversationFeedbackBridge.test.js
           node .player-feedback-test/playerFeedbackLocalCopy.test.js
+          node .player-feedback-test/feedbackSubmissionGate.test.js
