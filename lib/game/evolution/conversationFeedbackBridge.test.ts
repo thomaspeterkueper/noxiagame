@@ -32,6 +32,21 @@ assert(!prepare({ ...draft, description: `Private source: ${draft.sourceRef}` },
   'public feedback must not accidentally expose private source reference')
 assert(prepare({ ...draft, description: `Private source: ${draft.sourceRef}` },
   { category: 'idea', visibility: 'private' }).ok, 'private drafts may retain their own reference')
+assert(!prepare({ ...draft, description: 'Private source: NPC_CONVERSATION_LOG : 42 is internal.' },
+  { category: 'idea', visibility: 'public', consentToPublish: true }).ok,
+  'case and whitespace cannot disclose private conversation receipts');
+assert(!prepare({ ...draft, unverifiedPlaceLabel: 'NPC_CONVERSATION_LOG : 42' },
+  { category: 'idea', visibility: 'public', consentToPublish: true }).ok,
+  'public place hints cannot disclose spaced private conversation receipts');
+assert(prepare({ ...draft, description: 'Private source: NPC_CONVERSATION_LOG : 42 is internal.' },
+  { category: 'idea', visibility: 'private' }).ok,
+  'private feedback may retain private conversation references');
+assert(!prepare({ ...draft, sourceRef: 'npc_conversation_log:9223372036854775808' },
+  { category: 'idea', visibility: 'private' }).ok,
+  'PostgreSQL bigint overflow rejected before submission');
+assert(prepare({ ...draft, sourceRef: 'npc_conversation_log:9223372036854775807' },
+  { category: 'idea', visibility: 'private' }).ok,
+  'valid PostgreSQL bigint upper boundary accepted');
 assert(!prepare({ ...draft, unverifiedPlaceLabel: draft.sourceRef },
   { category: 'idea', visibility: 'public', consentToPublish: true }).ok,
   'private receipt must not leak through public place hint')
