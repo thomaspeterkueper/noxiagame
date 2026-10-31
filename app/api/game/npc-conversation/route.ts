@@ -390,6 +390,7 @@ export async function POST(request: NextRequest) {
     headline ? `Belegte reale Meldung: ${headline}` : '',
     source ? `Quelle der Meldung: ${source}` : '',
     locationName ? `Aktueller Ort: ${locationName}` : '',
+    sermon ? '' : 'Räumliche Lage: Der Spieler spricht dich nur an, wenn er bei dir steht. Er ist also gerade direkt bei dir, in Sprechweite, am selben Ort wie du, und du siehst ihn vor dir. Frage nie, wo er gerade steht oder wo er ist, und bitte ihn nicht, es dir zu sagen. Wenn du ihm etwas zeigst oder ihn irgendwohin bringst, geht ihr von diesem Platz aus gemeinsam los. Beschreibe sein Aussehen nicht, du kennst es nicht genauer.',
     priorEncounterLines.length ? `Erinnerung an frühere Begegnungen mit genau diesem Spieler:\n- ${priorEncounterLines.join('\n- ')}` : '',
     priorEncounterLines.length ? 'Epistemische Regel für Gesprächserinnerungen: Diese Zeilen sind deine eigenen begrenzten kommunikativen Spuren, keine vollständige Weltwahrheit. Eine erinnerte Aussage des Spielers belegt zunächst nur, dass der Spieler sie gesagt hat. Formuliere ältere Details bei Bedarf als Erinnerung („ich meine“, „wenn ich mich richtig erinnere“). Widersprechen aktuelle verifizierte lokale Fakten einer Erinnerung, behandle die aktuellen Fakten als neue Beobachtung, korrigiere dich natürlich und erfinde keine Erklärung für den Widerspruch.' : '',
     localFacts.length ? `Verifizierte lokale Fakten:\n- ${localFacts.join('\n- ')}` : 'Es liegen keine verifizierten lokalen Infrastruktur-Fakten vor.',
