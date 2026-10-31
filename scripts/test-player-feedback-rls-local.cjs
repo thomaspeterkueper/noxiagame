@@ -61,7 +61,8 @@ async function main() {
     const a = await createUser('a')
     const b = await createUser('b')
     const login = async user => {
-      const { data, error } = await anon.auth.signInWithPassword({ email: user.email, password })
+      const loginClient = createClient(rawUrl, anonKey, options)
+      const { data, error } = await loginClient.auth.signInWithPassword({ email: user.email, password })
       if (error || !data?.session?.access_token) throw Error('Local fixture login failed: ' + (error?.code ?? 'unknown'))
       return createClient(rawUrl, anonKey, {
         ...options,
@@ -90,6 +91,12 @@ async function main() {
         label + ' private description')
       await expectDenied(client.from('player_feedback_submissions').select('owner_user_id'),
         label + ' private owner id')
+      await expectDenied(client.from('player_feedback_submissions').select('private_source_ref'),
+        label + ' private provenance')
+      const { data: foreign, error: foreignError } = await client.from('player_feedback_submissions')
+        .select('id').eq('id', foreignId)
+      assert.ifError(foreignError)
+      assert.equal(foreign?.length, 0, label + ' foreign-id lookup must be empty')
       await expectDenied(client.from('player_feedback_submissions')
         .update({ status: 'accepted_for_planning' }).eq('id', ownId),
         label + ' unauthorized moderation')
@@ -105,11 +112,11 @@ async function main() {
     if (ids.length) {
       const { error } = await service.from('player_feedback_submissions')
         .delete().in('owner_user_id', ids)
-      if (error) console.error('Local fixture row cleanup failed:', error.code)
+      if (error) { console.error('Local fixture row cleanup failed:', error.code); process.exitCode = 1 }
     }
     for (const id of ids) {
       const { error } = await service.auth.admin.deleteUser(id)
-      if (error) console.error('Local fixture user cleanup failed:', error.code)
+      if (error) { console.error('Local fixture user cleanup failed:', error.code); process.exitCode = 1 }
     }
   }
 }
