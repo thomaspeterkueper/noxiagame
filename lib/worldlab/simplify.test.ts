@@ -274,6 +274,12 @@ describe('world lab: Gotteshäuser ohne Umriss', () => {
     const chapel = built.blocks.find(block => block.i === 'osm:way:246890728')
     expect(chapel?.f).toHaveLength(16)
     expect(chapel!.w).toBeLessThan(12)
+    // Dachreiter auf dem Hauptbau, dazu Chor und Vorhalle als Anbauten (nicht einzeln anklickbar)
+    expect(chapel?.t).toBe(1)
+    const annexes = built.blocks.filter(block => block.o === 1)
+    expect(annexes).toHaveLength(2)
+    expect(annexes.map(block => block.k).sort()).toEqual(['church', 'shed'])
+    expect(annexes.every(block => !block.i)).toBe(true)
   })
 
   it('setzt kein Ersatzhaus, wenn die Daten den Umriss haben – auch wenn der Punkt zuerst kommt', () => {

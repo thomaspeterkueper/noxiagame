@@ -13,11 +13,18 @@ export interface WorshipMassing {
   octagon: boolean
   /** Geschosse (Höhe der Traufe). */
   levels: number
+  /** Eingezogener, rechteckiger Chor am hinteren Ende (Länge entlang der Achse, Breite quer). */
+  choir?: { w: number; d: number }
+  /** Vorhalle am vorderen Ende. */
+  porch?: { w: number; d: number }
+  /** Dachreiter auf dem First. */
+  turret?: boolean
 }
 
 /** Besondere Bauten nach OSM-Kennung. Rochuskapelle von 1925: achteckiger, längsoblonger Zentralbau (Deutsche Digitale Bibliothek). */
 export const WORSHIP_MASSING_BY_SOURCE: Record<string, WorshipMassing> = {
-  'osm:way:246890728': { w: 11, d: 9, octagon: true, levels: 2 },
+  // Achteckiger, längsoblonger Zentralbau mit eingezogenem rechteckigem Chor, offener Westvorhalle und verschiefertem Dachreiter.
+  'osm:way:246890728': { w: 11, d: 9, octagon: true, levels: 2, choir: { w: 5, d: 5.5 }, porch: { w: 3.5, d: 6 }, turret: true },
 }
 
 /** Größe nach Art des Gotteshauses, wenn nichts Besonderes bekannt ist. */

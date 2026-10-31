@@ -8,7 +8,7 @@
 
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from './mercator'
 import { buildingUseCode } from './buildingUse'
-import { nearestRoadAngle, octagonRing, worshipMassing } from './worshipShapes'
+import { nearestRoadAngle, octagonRing, worshipMassing, type WorshipMassing } from './worshipShapes'
 
 export interface SourceFeature {
   id: string
@@ -45,6 +45,10 @@ export interface TileBlock {
   nm?: string
   /** Kennung der Quelle, z. B. „osm:way:123“ – für Kauf und Eigentum. */
   i?: string
+  /** 1: Anbau (Chor, Vorhalle) – gehört zum Gebäude davor, nicht einzeln anklickbar. */
+  o?: 1
+  /** 1: Dachreiter auf dem First. */
+  t?: 1
   /** Heutige Nutzung aus OSM als kurze Kennung, z. B. „a:bar“, „s:bakery“, „b:apartments“ (`lib/worldlab/buildingUse.ts`). */
   u?: string
 }
@@ -364,7 +368,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
   for (const feature of features) {
     if (feature.featureType === 'building') { const id = (feature.properties as Record<string, unknown> | null)?.noxia_source_id; if (typeof id === 'string') buildingKeys.add(id) }
   }
-  const synthesized: Array<{ block: TileBlock; octagon: boolean }> = []
+  const synthesized: Array<{ block: TileBlock; massing: WorshipMassing }> = []
   // Dieselbe Linie aus mehreren Importen (Region grob auf ~13 m, Ortsdetail, genaue
   // Hauptstraßen und Gleise): die mit den meisten Punkten zählt.
   const finest = new Map<string, SourceFeature>()
@@ -400,7 +404,8 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
         const use = buildingUseCode(properties)
         if (use) block.u = use
         out.blocks.push(block)
-        synthesized.push({ block, octagon: massing.octagon })
+        if (massing.turret) block.t = 1
+        synthesized.push({ block, massing })
       }
       continue
     }
@@ -520,9 +525,17 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])
   if (out.rw && out.rw.length !== out.rivers.length) delete out.rw
   // Ersatzhäuser für Gotteshäuser stehen längs der nächsten Straße; das Achteck bekommt seinen Grundriss.
-  for (const { block, octagon } of synthesized) {
+  for (const { block, massing } of synthesized) {
     block.a = Math.round(nearestRoadAngle(block.x, block.y, out.roads) * 1000) / 1000
-    if (octagon) block.f = octagonRing(block.x, block.y, block.w, block.d, block.a)
+    if (massing.octagon) block.f = octagonRing(block.x, block.y, block.w, block.d, block.a)
+    // Anbauten liegen an den Enden der Längsachse: Chor hinten (+), Vorhalle vorn (−).
+    const cos = Math.cos(block.a), sin = Math.sin(block.a)
+    const annex = (part: { w: number; d: number }, side: 1 | -1, kind: BlockKind, levels: number) => {
+      const along = side * (block.w / 2 + part.w / 2 - 0.4)
+      out.blocks.push({ x: round1(block.x + along * cos), y: round1(block.y + along * sin), w: part.w, d: part.d, a: block.a, k: kind, l: levels, o: 1 })
+    }
+    if (massing.choir) annex(massing.choir, 1, 'church', 2)
+    if (massing.porch) annex(massing.porch, -1, 'shed', 1)
   }
   return out
 }

@@ -535,11 +535,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const towerEave = eave + style.roofM + Math.max(8, side * 1.6)
       drawMass(g, block.k, tx, ty, side / 2 + 0.3, side / 2 + 0.3, cos, sin, towerEave, side * 1.8)
     }
+    if (block.t) {
+      // Dachreiter auf dem First: schlanker Aufsatz mit spitzem Dach.
+      drawMass(g, block.k, cx, cy, 0.9, 0.9, cos, sin, eave + style.roofM + 1.5, 3.2)
+    }
     // Tiefe: der vorderste Fußpunkt entscheidet, was vor wem steht.
     g.zIndex = Math.max(...c.map(p => p.x + p.y))
     // Für Klicks: was dieses Gebäude ist. Ein Wahrzeichen in oder dicht an ihm
     // wird beim Klick gesucht (es kann in der Nachbarkachel liegen).
-    g.eventMode = 'static'
+    g.eventMode = block.o ? 'none' : 'static'
     ;(g as unknown as { pick: WorldPick }).pick = { type: 'building', at: toGeo({ x: cx, y: cy }), address: block.h, name: block.nm, kind: block.k, noxiaId: owner?.id, source: block.i, areaM2: Math.round(block.f && block.f.length >= 8 ? polygonArea(Array.from({ length: block.f.length / 2 }, (_, i) => ({ x: block.f![i * 2], y: block.f![i * 2 + 1] }))) : block.w * block.d), levels: block.l, use: block.u }
     ;(g as unknown as { box: Box }).box = { cx, cy, hw, hd, cos, sin }
     // Hindernis für die Spielfigur: genau das gezeichnete Haus (ohne zusätzlichen Rand)
