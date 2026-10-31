@@ -1,6 +1,7 @@
-/** Authenticated, read-only owner receipts. No service-role data reads, no world writes.
+/** Authenticated owner receipts (GET); direct submissions (POST) are isolated in post.ts. No world writes.
  * The staged feedback table must exist before this endpoint can serve receipts.
  */
+export { POST } from './post'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
