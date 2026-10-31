@@ -5,14 +5,13 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router   = useRouter()
-  const searchParams = useSearchParams()
-  const confirmationFailed = searchParams.get('error') === 'confirmation_failed'
+  const [confirmationFailed, setConfirmationFailed] = useState(false)
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -21,7 +20,7 @@ export default function LoginPage() {
   const [loginFailed, setLoginFailed] = useState(false)
 
   // Fade-in nach Mount
-  useEffect(() => { setTimeout(() => setVisible(true), 50) }, [])
+  useEffect(() => { setTimeout(() => setVisible(true), 50); setConfirmationFailed(new URLSearchParams(window.location.search).get('error') === 'confirmation_failed') }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
