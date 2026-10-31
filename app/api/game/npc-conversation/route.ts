@@ -378,7 +378,7 @@ export async function POST(request: NextRequest) {
     identityState === 'known'
       ? `Der Spieler kennt deinen Namen bereits als ${npcName}.`
       : `Der Spieler kennt deinen Namen noch nicht sicher. Verwende deinen echten Namen nicht beiläufig als bereits bekannt. Wenn du dich natürlich vorstellst oder nach deinem Namen gefragt wirst, sage klar „Ich bin ${npcName}“ oder „Mein Name ist ${npcName}“.`,
-    'Antworte natürlich auf Deutsch, knapp und dialogisch, normalerweise 1-2 kurze Sätze.',
+    'Antworte natürlich auf Deutsch, grundsätzlich kurz und dialogisch: meist 1–2 kurze, vollständige Sätze. Wiederhole die Frage nicht unnötig und verzichte auf lange Vorreden. Nur wenn der Spieler ausdrücklich um eine ausführliche Erklärung bittet oder eine komplexe Frage sonst unverständlich bliebe, antworte etwas ausführlicher. Beende jeden Satz vollständig; das technische Ausgabelimit ist kein Längenziel.',
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
