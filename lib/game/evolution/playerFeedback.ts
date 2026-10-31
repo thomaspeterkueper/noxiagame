@@ -1,8 +1,10 @@
 /** Explicit player feedback is not a simulation observation or authorized command. */
 export const FEEDBACK_CATEGORIES = ['idea', 'problem', 'building', 'profession', 'technology', 'gameplay', 'other'] as const
 export type FeedbackCategory = typeof FEEDBACK_CATEGORIES[number]
+export type FeedbackDestination = 'development' | 'world_initiative'
 export interface FeedbackDraft {
   category: FeedbackCategory
+  destination?: FeedbackDestination
   title: string
   description: string
   /** Client-supplied, unverified place hint; never an ownership or settlement reference. */
@@ -25,12 +27,14 @@ export function validateFeedback(input: unknown): FeedbackValidation {
   const value = input as Record<string, unknown>
   const errors: string[] = []
   const category = value.category
+  const destination = value.destination ?? 'development'
   const title = typeof value.title === 'string' ? value.title.trim() : ''
   const description = typeof value.description === 'string' ? value.description.trim() : ''
   const visibility = value.visibility
   const location = value.locationRef
   const consent = value.consentToPublish
 
+  if (destination !== 'development' && destination !== 'world_initiative') errors.push('invalid_destination')
   if (typeof category !== 'string' || !FEEDBACK_CATEGORIES.some(item => item === category)) errors.push('invalid_category')
   if (title.length < 5 || title.length > 120 || /[\u0000-\u001f\u007f]/.test(title)) errors.push('invalid_title')
   if (description.length < 20 || description.length > 5000 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(description)) errors.push('invalid_description')
@@ -44,6 +48,7 @@ export function validateFeedback(input: unknown): FeedbackValidation {
     valid: true, errors: [],
     normalized: {
       category: category as FeedbackCategory,
+      destination: destination as FeedbackDestination,
       title,
       description,
       ...(typeof location === 'string' && location.trim() ? { locationRef: location.trim() } : {}),
