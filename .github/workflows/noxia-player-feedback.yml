@@ -19,6 +19,9 @@ on:
       - 'lib/game/evolution/playerFeedbackLocalCopy.ts'
       - 'lib/game/evolution/playerFeedbackLocalCopy.test.ts'
       - 'app/earth/feedback/**'
+      - 'supabase/migrations/20261031080000_player_feedback_submissions.sql'
+      - 'supabase/tests/player_feedback_submissions.test.sql'
+      - 'scripts/test-player-feedback-migration.cjs'
       - '.github/workflows/noxia-player-feedback.yml'
   workflow_dispatch:
 permissions:
@@ -46,3 +49,5 @@ jobs:
           node .player-feedback-test/feedbackReceipt.test.js
           node .player-feedback-test/feedbackReceiptList.test.js
           node .player-feedback-test/feedbackIdempotency.test.js
+      - name: Check staged feedback migration security contract (static only)
+        run: node scripts/test-player-feedback-migration.cjs
