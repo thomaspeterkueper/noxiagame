@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'lib/worldlab/placeStories.test.ts',
       'lib/ai/chatProvider.test.ts',
       'lib/game/population/personSceneLabel.test.ts',
       'lib/game/population/spiritualRoles.test.ts',
