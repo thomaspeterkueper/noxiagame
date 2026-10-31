@@ -71,3 +71,41 @@ comment on column public.player_feedback_submissions.private_source_ref is
   'Server-verified NPC conversation provenance; never returned by public/player receipt APIs.';
 comment on column public.player_feedback_submissions.requested_visibility is
   'User preference only. Publication requires a separate moderation and consent process.';
+
+-- Atomic per-owner abuse guard: at most five NEW submissions in any rolling hour.
+-- Transaction advisory lock serializes concurrent inserts for the same owner.
+-- Existing idempotency keys bypass the cap so a concurrent retry can resolve
+-- through the unique constraint and return its original receipt.
+create function public.enforce_player_feedback_insert_rate()
+returns trigger
+language plpgsql security definer
+set search_path = ''
+as $feedback_rate$
+begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(new.owner_user_id::text, 0)
+  );
+  if exists (
+    select 1 from public.player_feedback_submissions
+    where owner_user_id = new.owner_user_id
+      and idempotency_key = new.idempotency_key
+  ) then
+    return new;
+  end if;
+  if (
+    select count(*) from public.player_feedback_submissions
+    where owner_user_id = new.owner_user_id
+      and created_at > pg_catalog.now() - interval '1 hour'
+  ) >= 5 then
+    raise exception 'feedback_rate_limit_exceeded' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$feedback_rate$;
+
+revoke all on function public.enforce_player_feedback_insert_rate()
+  from public, anon, authenticated;
+
+create trigger player_feedback_insert_rate_guard
+before insert on public.player_feedback_submissions
+for each row execute function public.enforce_player_feedback_insert_rate();
