@@ -13,6 +13,9 @@ on:
       - 'lib/game/evolution/feedbackPostRequest.test.ts'
       - 'lib/game/evolution/feedbackPostInput.ts'
       - 'lib/game/evolution/feedbackPostInput.test.ts'
+      - 'lib/game/evolution/feedbackSubmitResponse.ts'
+      - 'lib/game/evolution/feedbackSubmitResponse.test.ts'
+      - 'scripts/test-player-feedback-submit-panel.cjs'
       - 'scripts/test-player-feedback-post-route.cjs'
       - 'lib/game/evolution/feedbackPostRequest.ts'
       - 'lib/game/evolution/feedbackPostRequest.test.ts'
@@ -54,7 +57,7 @@ jobs:
           node-version: '22'
       - name: Validate feedback contract, conversation bridge and local export
         run: |
-          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/playerFeedback.test.ts lib/game/evolution/conversationFeedbackBridge.test.ts lib/game/evolution/playerFeedbackLocalCopy.test.ts lib/game/evolution/feedbackSubmissionGate.test.ts lib/game/evolution/feedbackReviewStatus.test.ts lib/game/evolution/feedbackReceipt.test.ts lib/game/evolution/feedbackReceiptList.test.ts lib/game/evolution/feedbackIdempotency.test.ts lib/game/evolution/feedbackReceiptQuery.test.ts lib/game/evolution/feedbackReceiptResponse.test.ts lib/game/evolution/feedbackPostRequest.test.ts lib/game/evolution/feedbackPostInput.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .player-feedback-test
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/playerFeedback.test.ts lib/game/evolution/conversationFeedbackBridge.test.ts lib/game/evolution/playerFeedbackLocalCopy.test.ts lib/game/evolution/feedbackSubmissionGate.test.ts lib/game/evolution/feedbackReviewStatus.test.ts lib/game/evolution/feedbackReceipt.test.ts lib/game/evolution/feedbackReceiptList.test.ts lib/game/evolution/feedbackIdempotency.test.ts lib/game/evolution/feedbackReceiptQuery.test.ts lib/game/evolution/feedbackReceiptResponse.test.ts lib/game/evolution/feedbackPostRequest.test.ts lib/game/evolution/feedbackPostInput.test.ts lib/game/evolution/feedbackSubmitResponse.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .player-feedback-test
           node .player-feedback-test/playerFeedback.test.js
           node .player-feedback-test/conversationFeedbackBridge.test.js
           node .player-feedback-test/playerFeedbackLocalCopy.test.js
@@ -67,10 +70,13 @@ jobs:
           node .player-feedback-test/feedbackReceiptQuery.test.js
           node .player-feedback-test/feedbackReceiptResponse.test.js
           node .player-feedback-test/feedbackPostInput.test.js
+          node .player-feedback-test/feedbackSubmitResponse.test.js
       - name: Check read-only feedback receipt endpoint boundary (static only)
         run: node scripts/test-player-feedback-read-route.cjs
       - name: Check private feedback receipts panel wiring (static only)
         run: node scripts/test-player-feedback-receipts-panel.cjs
+      - name: Check direct feedback submit panel (static only)
+        run: node scripts/test-player-feedback-submit-panel.cjs
       - name: Check authenticated direct feedback POST boundary (static only)
         run: node scripts/test-player-feedback-post-route.cjs
       - name: Check staged feedback migration security contract (static only)
