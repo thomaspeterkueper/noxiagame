@@ -306,7 +306,12 @@ Das Startcafé im realen Haus Hauptstraße 72 trägt das NOXIA-Dach wie die öff
 4. Verkäufe: Der Eigentümerwechsel muss als Ereignis erscheinen. Heute überschreibt der Verkauf `profile_id` im Grabstein (`20261025190000_earth_property_sale_tax.sql`), die frühere Geschichte geht verloren.
 Migration nur gesondert, mit Vorabprüfung und Rücknahme (Vorgabe aus dem Issue). PR #555 (Löschen im Eventstore) ist dafür die Grundlage, aber kein Abrissbeleg.
 
-**Nächste Schritte in diesem Teilprojekt:** Anzeige in der Karte (Verlauf eines Gebäudes im Infofenster, danach Zeitregler); danach der Seelenberg-Test (NPC-Vorschlag ohne Wirkung, bestätigter Umbau ändert die Karte, OSM-Refresh überschreibt nichts). Beides sinnvoll erst, wenn der Core die Ereignisse schreibt.
+**Anzeige in der Karte (31.10.2026, Thomas: „den Verlauf des Gebäudes und Zeitregler“):**
+- **Verlauf:** Im Infofenster jedes Gebäudes und jeder freien Fläche gibt es einen aufklappbaren Abschnitt „Verlauf“ (`app/world-lab/BuildingHistory.tsx`). Er lädt erst beim Aufklappen aus `/api/world-lab/building-history` und zeigt Datum und Ereignis („Gebaut“, „Eigentümer gewechselt“, „Abgerissen“, eigene mit „von dir“). Lücken stehen offen da („Ein Abriss ist verzeichnet, lässt sich aber noch nicht sicher einem Gebäude zuordnen“). Texte in `lib/worldlab/buildingChronicleText.ts`.
+- **Zeitregler:** `app/world-lab/TimeSlider.tsx` unten in der Karte; die Engine hat dafür `setAsOf` (Abrisse nach dem gewählten Zeitpunkt erscheinen als stehende Gebäude, spätere Abrisse als freie Fläche). `/api/world-lab/buildings` liefert dafür `clearedAt` je freier Fläche. Der Regler erscheint **nur, wenn es einen datierten Abriss gibt**; heute ist `earth_cleared_buildings` leer, er bleibt also bis zum ersten Abriss unsichtbar.
+- **Grenzen:** Zurückgespielt werden nur Abrisse mit Datum, keine Neubauten, Verkäufe oder Umbauten (dazu fehlen die Ereignisse vom Core, siehe Request oben). Geprüft mit einer Testseite der beiden Bausteine (Aufklappen, Zeilen, Lückentext, Regler); die Engine-Umstellung `setAsOf` ist nur per Typprüfung abgesichert, nicht in der laufenden Karte gesehen.
+
+**Noch offen:** Seelenberg-Test (NPC-Vorschlag ohne Wirkung, bestätigter Umbau ändert die Karte, OSM-Refresh überschreibt nichts), sobald der Core die Ereignisse schreibt.
 
 ## Requests aus anderen Teilprojekten
 

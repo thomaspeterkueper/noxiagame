@@ -34,6 +34,7 @@ export default defineConfig({
       'lib/worldlab/worldPlaceQueue.test.ts',
       'lib/game/spatial/stationLayouts.test.ts',
       'lib/worldlab/buildingChronicle.test.ts',
+      'lib/worldlab/buildingChronicleText.test.ts',
       'lib/worldlab/tileFormat.test.ts',
       'lib/worldlab/viewTiles.test.ts',
       'lib/worldlab/frameStats.test.ts',
