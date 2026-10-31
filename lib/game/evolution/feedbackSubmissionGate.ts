@@ -21,7 +21,7 @@ export function prepareFeedbackSubmission(feedback: unknown, source: unknown): F
   // moderation or a substitute for server-side ownership verification.
   if (checked.normalized.visibility === 'public' &&
       [checked.normalized.title, checked.normalized.description, checked.normalized.locationRef]
-        .some(text => typeof text === 'string' && /npc_conversation_log\\s*:\\s*\\d+/i.test(text))) {
+        .some(text => typeof text === 'string' && /npc_conversation_log\s*:\s*\d+/i.test(text))) {
     return { ok: false, errors: ['private_conversation_receipt_in_public_feedback'], canTriggerWorldChange: false }
   }
   if (!source || typeof source !== 'object' || Array.isArray(source)) {
