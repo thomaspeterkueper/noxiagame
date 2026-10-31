@@ -1,5 +1,5 @@
 // lib/game/wishes/classify.server.ts
-// Einordnung eines Wunsches durch das Sprachmodell (Grok, sonst DeepSeek – wie die Gespräche).
+// Einordnung eines Wunsches durch das Sprachmodell (DeepSeek, sonst Grok – wie die Gespräche).
 // Ohne Schlüssel oder bei Fehler: Regeln aus rules.ts. Vorsichtig zusammengeführt:
 // Was eine der beiden Seiten als privat, Notlage oder schädlich erkennt, gilt.
 

@@ -1,11 +1,11 @@
 // lib/ai/chatProvider.server.ts
 // Sprachmodell für Gespräche, Predigten und Wünsche (31.10.2026).
 //
-// Zuerst Grok (xAI), dann DeepSeek. Beide sprechen dieselbe Chat-Schnittstelle.
+// Zuerst DeepSeek, dann Grok (xAI). Beide sprechen dieselbe Chat-Schnittstelle.
 // Lehnt ein Anbieter ab, weil das Guthaben fehlt (402), der Schlüssel nicht passt
 // (401/403), das Modell unbekannt ist (404), zu viele Anfragen kommen (429) oder der
 // Dienst gestört ist (5xx), versucht es der nächste. Welche Reihenfolge gilt, lässt
-// sich mit CHAT_PROVIDERS="deepseek,xai" ändern, ohne Code anzufassen.
+// sich mit CHAT_PROVIDERS="xai,deepseek" ändern, ohne Code anzufassen.
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -31,7 +31,7 @@ function providers(): Provider[] {
       model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
     },
   }
-  const order = (process.env.CHAT_PROVIDERS || 'xai,deepseek')
+  const order = (process.env.CHAT_PROVIDERS || 'deepseek,xai')
     .split(',').map(id => id.trim()).filter((id): id is Provider['id'] => id in all)
   return order.map(id => all[id]).filter(provider => !!provider.key)
 }

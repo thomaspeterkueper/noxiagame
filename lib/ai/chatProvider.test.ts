@@ -11,20 +11,20 @@ function reply(status: number, content = 'Hallo') {
 describe('chatComplete', () => {
   it('fällt bei fehlendem Guthaben auf den nächsten Anbieter zurück', async () => {
     process.env.XAI_API_KEY = 'x'; process.env.DeepSeek_NPC_API_KEY = 'd'; delete process.env.CHAT_PROVIDERS
-    const fetchMock = vi.fn().mockResolvedValueOnce(reply(402)).mockResolvedValueOnce(reply(200, 'von DeepSeek'))
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(402)).mockResolvedValueOnce(reply(200, 'von Grok'))
     vi.stubGlobal('fetch', fetchMock)
     const result = await chatComplete({ messages: [{ role: 'user', content: 'hi' }], maxTokens: 10, temperature: 0, timeoutMs: 5000 })
-    expect(String(fetchMock.mock.calls[0][0])).toContain('api.x.ai')
-    expect(result).toMatchObject({ ok: true, content: 'von DeepSeek', provider: 'deepseek' })
+    expect(String(fetchMock.mock.calls[0][0])).toContain('api.deepseek.com')
+    expect(result).toMatchObject({ ok: true, content: 'von Grok', provider: 'xai' })
   })
 
-  it('nutzt Grok zuerst und hört bei Erfolg auf', async () => {
+  it('nutzt DeepSeek zuerst und hört bei Erfolg auf', async () => {
     process.env.XAI_API_KEY = 'x'; process.env.DeepSeek_NPC_API_KEY = 'd'
-    const fetchMock = vi.fn().mockResolvedValue(reply(200, 'von Grok'))
+    const fetchMock = vi.fn().mockResolvedValue(reply(200, 'von DeepSeek'))
     vi.stubGlobal('fetch', fetchMock)
     const result = await chatComplete({ messages: [{ role: 'user', content: 'hi' }], maxTokens: 10, temperature: 0, timeoutMs: 5000 })
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(result).toMatchObject({ ok: true, provider: 'xai' })
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
   })
 
   it('wechselt nicht bei einer fehlerhaften Anfrage', () => {
