@@ -48,7 +48,7 @@ async function main() {
     { kind: 'conversation', sourceRef: 'npc_conversation_log:42', extra: 'x' },
   ]) {
     const result = await parse(conversation(source), key, ownerA, reader())
-    assert(!result.ok && result.error === 'invalid_request', 'client ownership claim/extra field rejected')
+    assert('error' in result && result.error === 'invalid_request', 'client ownership claim/extra field rejected')
   }
   assert(queries === count, 'spoofed sources never queried')
   for (const [id, owner, error] of [
@@ -56,10 +56,10 @@ async function main() {
     ['43', ownerA, null],
   ] as const) {
     const result = await parse(conversation({ kind: 'conversation', sourceRef: 'npc_conversation_log:42' }), key, ownerA, reader(id, owner, error))
-    assert(!result.ok && result.error === 'conversation_source_unavailable', 'foreign/missing/error source fail closed')
+    assert('error' in result && result.error === 'conversation_source_unavailable', 'foreign/missing/error source fail closed')
   }
   const malformed = await parse(conversation({ kind: 'conversation', sourceRef: 'npc_conversation_log:0' }), key, ownerA, reader())
-  assert(!malformed.ok && malformed.error === 'invalid_source_ref', 'malformed source rejected')
+  assert('error' in malformed && malformed.error === 'invalid_source_ref', 'malformed source rejected')
   const invalid = await parse({ feedback: { ...feedback, title: 'x' }, source: { kind: 'conversation', sourceRef: 'npc_conversation_log:42' } }, key, ownerA, reader())
   assert(!invalid.ok && invalid.error === 'invalid_request', 'invalid feedback rejected after ownership')
   const publicLeak = await parse({
@@ -68,7 +68,7 @@ async function main() {
   }, key, ownerA, reader())
   assert(!publicLeak.ok, 'public private receipt leakage rejected')
   const extra = await parse({ ...conversation({ kind: 'conversation', sourceRef: 'npc_conversation_log:42' }), owner_user_id: ownerB }, key, ownerA, reader())
-  assert(!extra.ok && extra.error === 'invalid_request', 'body owner spoof rejected')
+  assert('error' in extra && extra.error === 'invalid_request', 'body owner spoof rejected')
   console.log('Authenticated NPC feedback gate tests passed (mocked lookup, no SQL/HTTP)')
 }
 main().catch(error => { throw error })

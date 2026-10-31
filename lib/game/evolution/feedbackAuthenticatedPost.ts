@@ -16,11 +16,14 @@ export async function parseAuthenticatedFeedbackPost(
 ): Promise<AuthenticatedFeedbackPost> {
   const direct = parseDirectFeedbackPost(input, key)
   if (direct.ok) return { ...direct, sourceKind: 'direct', privateSourceRef: null }
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return direct
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    return { ok: false, error: 'error' in direct ? direct.error : 'invalid_request' }
   const body = input as Record<string, unknown>
-  if (!body.source || typeof body.source !== 'object' || Array.isArray(body.source)) return direct
+  if (!body.source || typeof body.source !== 'object' || Array.isArray(body.source))
+    return { ok: false, error: 'error' in direct ? direct.error : 'invalid_request' }
   const source = body.source as Record<string, unknown>
-  if (source.kind !== 'conversation') return direct
+  if (source.kind !== 'conversation')
+    return { ok: false, error: 'error' in direct ? direct.error : 'invalid_request' }
   if (typeof key !== 'string' || !/^[a-zA-Z0-9_-]{16,128}$/.test(key))
     return { ok: false, error: 'invalid_idempotency_key' }
   // Browser may submit a source reference, never an ownership assertion.
@@ -30,7 +33,7 @@ export async function parseAuthenticatedFeedbackPost(
     return { ok: false, error: 'invalid_request' }
 
   const ownership = await verifyConversationSourceOwnership(source.sourceRef, verifiedOwnerId, reader)
-  if (!ownership.ok) return ownership
+  if (!ownership.ok) return { ok: false, error: 'error' in ownership ? ownership.error : 'conversation_source_unavailable' }
   const prepared = prepareFeedbackSubmission(body.feedback, {
     kind: 'conversation', sourceRef: ownership.privateSourceRef, ownerVerified: true,
   })
