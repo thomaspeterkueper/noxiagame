@@ -1,8 +1,9 @@
 // lib/game/wishes/classify.server.ts
-// Einordnung eines Wunsches durch das Sprachmodell (DeepSeek, wie die Gespräche).
+// Einordnung eines Wunsches durch das Sprachmodell (Grok, sonst DeepSeek – wie die Gespräche).
 // Ohne Schlüssel oder bei Fehler: Regeln aus rules.ts. Vorsichtig zusammengeführt:
 // Was eine der beiden Seiten als privat, Notlage oder schädlich erkennt, gilt.
 
+import { chatComplete } from '@/lib/ai/chatProvider.server'
 import { assessByRules, WISH_CATEGORIES, type WishAssessment, type WishCategory } from './rules'
 
 const RESOURCES = ['water', 'food', 'energy', 'metal', 'components'] as const
@@ -29,27 +30,19 @@ function bool(value: unknown) { return value === true }
 
 export async function assessWish(text: string, context: { place?: string | null; location?: string | null } = {}): Promise<WishAssessment> {
   const rules = assessByRules(text)
-  const key = process.env.DeepSeek_NPC_API_KEY
-  if (!key) return rules
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: `Ort: ${context.place ?? 'unbekannt'} (${context.location ?? 'unbekannt'})\nWunsch: ${text.slice(0, 400)}` },
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 220,
-        temperature: 0,
-      }),
-      signal: AbortSignal.timeout(10000),
+    const result = await chatComplete({
+      messages: [
+        { role: 'system', content: SYSTEM },
+        { role: 'user', content: `Ort: ${context.place ?? 'unbekannt'} (${context.location ?? 'unbekannt'})\nWunsch: ${text.slice(0, 400)}` },
+      ],
+      json: true,
+      maxTokens: 220,
+      temperature: 0,
+      timeoutMs: 12000,
     })
-    if (!response.ok) return rules
-    const data = await response.json()
-    const raw = JSON.parse(String(data?.choices?.[0]?.message?.content ?? '{}')) as Record<string, unknown>
+    if (!result.ok) return rules
+    const raw = JSON.parse(result.content || '{}') as Record<string, unknown>
     const category = (WISH_CATEGORIES as readonly string[]).includes(String(raw.category)) ? raw.category as WishCategory : rules.category
     const resource = RESOURCES.includes(raw.resource as typeof RESOURCES[number]) ? raw.resource as WishAssessment['resource'] : rules.resource ?? null
     const sense = Number(raw.sense)

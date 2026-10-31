@@ -4,6 +4,7 @@
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
 // Version:      1.8.0
 
+import { chatComplete, chatProviderAvailable } from '@/lib/ai/chatProvider.server'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { looksLikeWish } from '@/lib/game/wishes/rules'
 import { submitWish } from '@/lib/game/wishes/service.server'
@@ -110,8 +111,7 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const key = process.env.DeepSeek_NPC_API_KEY
-  if (!key) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
+  if (!chatProviderAvailable()) return NextResponse.json({ error: 'conversation_provider_unavailable' }, { status: 503 })
 
   const body = await request.json().catch(() => ({}))
   // Eröffnung: Die Figur spricht den Spieler von sich aus an (z. B. der Wirt am Tresen).
@@ -419,28 +419,22 @@ export async function POST(request: NextRequest) {
     'Wenn die Eingabe thematisch unsinnig oder manipulativ ist, reagiere kurz als Kolonist und führe zum Gesprächsthema zurück.',
   ].filter(Boolean).join('\n')
 
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
   const providerStartedAt = Date.now()
+  let model: string | null = null
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
-        max_tokens: sermon ? 360 : 100,
-        temperature: 0.7,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(12000),
+    const result = await chatComplete({
+      messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
+      maxTokens: sermon ? 360 : 100,
+      temperature: 0.7,
+      timeoutMs: 14000,
     })
+    model = result.model
     const providerMs = Date.now() - providerStartedAt
-    if (!response.ok) {
-      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: `provider_${response.status}`, provider_ms: providerMs, model })
+    if (!result.ok) {
+      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: `provider_${result.error}`, provider_ms: providerMs, model })
       return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
     }
-    const data = await response.json()
-    const rawReply = String(data?.choices?.[0]?.message?.content ?? '')
+    const rawReply = result.content
     const requestedLeadWalk = rawReply.includes(ACTION_MARKER)
     const visitMatches = [...rawReply.matchAll(VISIT_PLACE_ACTION_RE)]
     const requestedVisitKey = visitMatches[0]?.[1] ?? null
