@@ -13,6 +13,8 @@ on:
       - 'lib/game/evolution/feedbackPostRequest.test.ts'
       - 'lib/game/evolution/feedbackPostInput.ts'
       - 'lib/game/evolution/feedbackPostInput.test.ts'
+      - 'lib/game/evolution/feedbackSubmissionAttempt.ts'
+      - 'lib/game/evolution/feedbackSubmissionAttempt.test.ts'
       - 'lib/game/evolution/feedbackSubmitResponse.ts'
       - 'lib/game/evolution/feedbackSubmitResponse.test.ts'
       - 'scripts/test-player-feedback-submit-panel.cjs'
@@ -70,6 +72,7 @@ jobs:
           node .player-feedback-test/feedbackReceiptQuery.test.js
           node .player-feedback-test/feedbackReceiptResponse.test.js
           node .player-feedback-test/feedbackPostInput.test.js
+          node .player-feedback-test/feedbackSubmissionAttempt.test.js
           node .player-feedback-test/feedbackSubmitResponse.test.js
       - name: Check read-only feedback receipt endpoint boundary (static only)
         run: node scripts/test-player-feedback-read-route.cjs
