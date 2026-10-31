@@ -28,6 +28,9 @@ assert(!prepare({ ...draft, description: `Private source: ${draft.sourceRef}` },
   'public feedback must not accidentally expose private source reference')
 assert(prepare({ ...draft, description: `Private source: ${draft.sourceRef}` },
   { category: 'idea', visibility: 'private' }).ok, 'private drafts may retain their own reference')
+assert(!prepare({ ...draft, unverifiedPlaceLabel: draft.sourceRef },
+  { category: 'idea', visibility: 'public', consentToPublish: true }).ok,
+  'private receipt must not leak through public place hint')
 for (const altered of [
   null, {}, { ...draft, status: 'approved' }, { ...draft, canTriggerWorldChange: true },
   { ...draft, sourceRef: 'vote:42' }, { ...draft, sourceRef: 'npc_conversation_log:0' },
