@@ -11,10 +11,23 @@
 import { isAsleepAction } from './circadian'
 
 /** Zeitgerafftes Gehtempo der Figuren (m/s). Halb so schnell wie die Spielfigur (16 m/s). */
-export const NPC_WALK_M_PER_S = 8
+// 31.10.2026 (Thomas: „über die Karte rennen“): 8 → 4 m/s, zügiges Gehen im Zeitraffer.
+export const NPC_WALK_M_PER_S = 4
+
+/** Weiter als das wird nicht sichtbar gegangen (Bus, Auto): unterwegs unsichtbar. */
+export const VISIBLE_WALK_MAX_M = 500
+
+/** Höchstens so viele stehen sichtbar vor einem Haus; die anderen sind drinnen. */
+export const ANCHOR_VISIBLE_MAX = 3
+
+/** Seitlicher Versatz (m) des Platzes `slot` von `slots` vor einem Haus – nebeneinander, 3,2 m Abstand. */
+export function anchorSpread(slot: number, slots: number): number {
+  const count = Math.max(1, slots)
+  return (Math.min(slot, count - 1) - (count - 1) / 2) * 3.2
+}
 
 /** Dauer eines sichtbaren Wegs: aus der Weglänge, mit Unter- und Obergrenze. */
-export function commuteSeconds(lengthM: number, metersPerSecond = NPC_WALK_M_PER_S, minS = 4, maxS = 90): number {
+export function commuteSeconds(lengthM: number, metersPerSecond = NPC_WALK_M_PER_S, minS = 4, maxS = 150): number {
   if (!Number.isFinite(lengthM) || lengthM <= 0) return minS
   return Math.min(maxS, Math.max(minS, lengthM / Math.max(0.1, metersPerSecond)))
 }

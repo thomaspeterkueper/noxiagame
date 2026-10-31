@@ -9,7 +9,7 @@ import type { Application, Container, Graphics as PixiGraphics, Texture } from '
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
-import { COMMUTE_THRESHOLD_M, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute } from '@/lib/game/population/visibleMovement'
+import { ANCHOR_VISIBLE_MAX, COMMUTE_THRESHOLD_M, anchorSpread, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute, VISIBLE_WALK_MAX_M } from '@/lib/game/population/visibleMovement'
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
@@ -1127,7 +1127,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     route: Array<{ x: number; y: number }> | null; routeLength: number
     /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer.
      *  `commute`: eigener Weg zum neuen Ort aus der Simulation; endet am Ziel von selbst. */
-    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number; commute?: boolean } | null
+    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number; commute?: boolean; /** Weg ohne Straßen oder zu weit: unterwegs unsichtbar (Bus, Auto), statt quer durch Häuser zu rennen. */ hidden?: boolean } | null
+    /** Platz vor dem Anker (0, 1, 2 …) und ob die Person drinnen ist, weil vor dem Haus schon genug stehen. */
+    slot: number; slots: number; crowdInside: boolean
     /** Zurückgelegter Weg auf der eigenen Straße (m) und Zeit des letzten Schritts */
     runM: number; lastAt: number
   }
@@ -1165,21 +1167,27 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return choice[seed % choice.length].pts
   }
   /** Wo eine Person an ihrem Anker steht: vor dem Haus auf der Kameraseite, ohne Wiegen. */
-  function standPoint(spec: WorldPerson, seed: number) {
+  function standPoint(spec: WorldPerson, seed: number, slot = seed % 5, slots = 5) {
     if (!spec.anchor) return null
     const home = toWorld(spec.anchor)
     const out = (spec.anchorRadiusM ?? 6) + 3
-    const spread = ((seed % 5) - 2) * 2.2
+    const spread = anchorSpread(slot, slots)
     return { x: home.x + out * 0.71 + spread * 0.71, y: home.y + out * 0.71 - spread * 0.71 }
   }
   /** Eigener Weg zum neuen Ort entlang der Straßen (sichtbares Pendeln, NOXIA-VISUAL-0001). */
   function startCommute(walker: Walker, to: { x: number; y: number }) {
     const from = { x: walker.x, y: walker.y }
-    if (Math.hypot(to.x - from.x, to.y - from.y) <= COMMUTE_THRESHOLD_M) return
-    const path = [from, ...planRoute(to, from)]
+    const direct = Math.hypot(to.x - from.x, to.y - from.y)
+    if (direct <= COMMUTE_THRESHOLD_M) return
+    const planned = planRoute(to, from)
+    const path = [from, ...planned]
     if (Math.hypot(path[path.length - 1].x - to.x, path[path.length - 1].y - to.y) > 0.5) path.push(to)
     const length = pathLength(path)
-    walker.sent = { path, length, start: performance.now(), seconds: commuteSeconds(length), commute: true }
+    // Kein Straßenweg gefunden (nur der direkte Strich) oder zu weit zum Gehen: nicht quer durch
+    // Häuser laufen, sondern unterwegs unsichtbar sein (Thomas, 31.10.2026: „über die Karte rennen,
+    // ohne Rücksicht auf Straßen und Gebäude“).
+    const offRoad = planned.length <= 1 && direct > 30
+    walker.sent = { path, length, start: performance.now(), seconds: commuteSeconds(length), commute: true, hidden: offRoad || length > VISIBLE_WALK_MAX_M }
   }
   function along(route: Array<{ x: number; y: number }>, distance: number) {
     for (let i = 1; i < route.length; i++) {
@@ -1204,9 +1212,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     for (const spec of list) {
       const known = walkers.get(spec.id)
       if (known) {
-        const before = standPoint(known.spec, known.seed)
+        const before = standPoint(known.spec, known.seed, known.slot, known.slots)
         known.spec = spec; known.label.text = spec.label
-        const after = standPoint(spec, known.seed)
+        const after = standPoint(spec, known.seed, known.slot, known.slots)
         // Neuer Ort aus der Simulation (z. B. Wohnung → Arbeit): hingehen statt springen.
         // Ein Weg aus einem Gespräch (Mitgehen, Hinschicken) hat Vorrang.
         if (after && (!known.sent || known.sent.commute) && (shouldCommute(before, after) || (!before && Math.hypot(after.x - known.x, after.y - known.y) > COMMUTE_THRESHOLD_M))) startCommute(known, after)
@@ -1222,9 +1230,22 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       label.scale.set(0.12)
       labels.addChild(label)
       const start = spec.anchor ? toWorld(spec.anchor) : { x: player.x + (seed % 40) - 20, y: player.y + ((seed >> 8) % 40) - 20 }
-      const walker: Walker = { spec, figure, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null, runM: seed % 997, lastAt: 0 }
+      const walker: Walker = { spec, figure, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null, runM: seed % 997, lastAt: 0, slot: 0, slots: 1, crowdInside: false }
       walkers.set(spec.id, walker)
       placeDepth(figure, start.x + start.y)
+    }
+    // Vor einem Haus stehen höchstens ANCHOR_VISIBLE_MAX nebeneinander; die anderen sind drinnen
+    // (Personal, Gäste) – statt eines Knäuels mit übereinanderliegenden Namen.
+    const byAnchor = new Map<string, Walker[]>()
+    for (const walker of walkers.values()) {
+      if (!walker.spec.anchor || walker.spec.inside) continue
+      const key = walker.spec.anchor.lat.toFixed(5) + ',' + walker.spec.anchor.lon.toFixed(5)
+      byAnchor.set(key, [...(byAnchor.get(key) ?? []), walker])
+    }
+    for (const group of byAnchor.values()) {
+      group.sort((a, b) => a.seed - b.seed)
+      const shown = Math.min(group.length, ANCHOR_VISIBLE_MAX)
+      group.forEach((walker, index) => { walker.slot = index; walker.slots = shown; walker.crowdInside = index >= ANCHOR_VISIBLE_MAX })
     }
   }
   function moveWalkers(now: number) {
@@ -1240,7 +1261,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         // Vor dem Haus auf der Kameraseite (Süd-Ost), nicht darin – dort sieht man sie.
         const home = toWorld(walker.spec.anchor)
         const out = (walker.spec.anchorRadiusM ?? 6) + 3
-        const spread = ((walker.seed % 5) - 2) * 2.2
+        const spread = anchorSpread(walker.slot, walker.slots)
         const sway = now / 1000 * 0.35 + walker.seed % 7
         x = home.x + out * 0.71 + spread * 0.71 + Math.cos(sway) * 1.2
         y = home.y + out * 0.71 - spread * 0.71 + Math.sin(sway * 0.8) * 1.2
@@ -1279,7 +1300,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       walker.figure.position.set(foot.x, foot.y)
       placeDepth(walker.figure, x + y)
       walker.label.position.set(foot.x, foot.y - 12)
-      const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent)
+      const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent) && !(walker.crowdInside && !walker.sent) && !walker.sent?.hidden
       walker.figure.visible = near
       walker.label.visible = near && zoom >= 2.2
     }
@@ -1876,7 +1897,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (!walker) return
       walker.sent = null
       // Nach dem Gespräch zurück an den eigenen Ort gehen, nicht dorthin springen.
-      const back = standPoint(walker.spec, walker.seed)
+      const back = standPoint(walker.spec, walker.seed, walker.slot, walker.slots)
       if (back) startCommute(walker, back)
     },
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
