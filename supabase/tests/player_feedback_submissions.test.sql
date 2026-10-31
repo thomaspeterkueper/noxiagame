@@ -70,5 +70,30 @@ begin
     raise exception 'NOXIA_FEEDBACK_SOURCE_CHECK_MISSING';
   end if;
 
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = t
+      and tgname = 'player_feedback_insert_rate_guard'
+      and tgenabled = 'O'
+      and not tgisinternal
+  ) then
+    raise exception 'NOXIA_FEEDBACK_ATOMIC_RATE_TRIGGER_MISSING';
+  end if;
+
+  if not exists (
+    select 1 from pg_proc
+    where oid = 'public.enforce_player_feedback_insert_rate()'::regprocedure
+      and prosecdef
+      and 'search_path=' = any(proconfig)
+  ) then
+    raise exception 'NOXIA_FEEDBACK_RATE_FUNCTION_NOT_HARDENED';
+  end if;
+
+  if has_function_privilege(
+    'authenticated', 'public.enforce_player_feedback_insert_rate()'::regprocedure, 'EXECUTE'
+  ) then
+    raise exception 'NOXIA_FEEDBACK_RATE_FUNCTION_PUBLICLY_EXECUTABLE';
+  end if;
+
   raise notice 'NOXIA_FEEDBACK_RLS_METADATA_OK';
 end $feedback_test$;
