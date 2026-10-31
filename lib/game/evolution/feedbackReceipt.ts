@@ -8,6 +8,6 @@ export function projectFeedbackReceipt(input: unknown) {
   if (typeof row.title !== 'string' || row.title.length < 5 || row.title.length > 120) return null
   const status = getPlayerFeedbackStatusView(row.status)
   if (!status) return null
-  if (typeof row.created_at !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T/.test(row.created_at) || !Number.isFinite(Date.parse(row.created_at))) return null
+  if (typeof row.created_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(row.created_at) || !Number.isFinite(Date.parse(row.created_at))) return null
   return { id: row.id, title: row.title, createdAt: row.created_at, ...status }
 }
