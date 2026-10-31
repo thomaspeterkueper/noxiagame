@@ -32,14 +32,17 @@ export async function parseAuthenticatedFeedbackPost(
       !Object.hasOwn(source, 'kind') || !Object.hasOwn(source, 'sourceRef'))
     return { ok: false, error: 'invalid_request' }
 
+  // Validate the full feedback contract (including public receipt privacy) before
+  // spending a service-role read on a potentially invalid or abusive request.
+  // This temporary 'direct' source is a validation-only sentinel; it does not
+  // authorize the conversation. Ownership is checked before any success result.
+  const validated = prepareFeedbackSubmission(body.feedback, { kind: 'direct' })
+  if (!validated.ok) return { ok: false, error: 'invalid_request' }
+
   const ownership = await verifyConversationSourceOwnership(source.sourceRef, verifiedOwnerId, reader)
   if (!ownership.ok) return { ok: false, error: 'error' in ownership ? ownership.error : 'conversation_source_unavailable' }
-  const prepared = prepareFeedbackSubmission(body.feedback, {
-    kind: 'conversation', sourceRef: ownership.privateSourceRef, ownerVerified: true,
-  })
-  if (!prepared.ok) return { ok: false, error: 'invalid_request' }
   return {
-    ok: true, feedback: prepared.feedback, key, sourceKind: 'conversation',
+    ok: true, feedback: validated.feedback, key, sourceKind: 'conversation',
     privateSourceRef: ownership.privateSourceRef,
   }
 }
