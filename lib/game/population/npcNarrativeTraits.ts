@@ -30,6 +30,15 @@ function signFor(month:number,day:number):WesternSign{
   return WESTERN_SIGNS[0]
 }
 function hash(s:string):number {let h=2166136261;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),16777619)}return h>>>0}
+// Editorial biases are deliberately small; per-person variation and subsequent experience dominate.
+const SIGN_STYLE:Partial<Record<WesternSign,Partial<Record<'curiosity'|'empathy'|'autonomy'|'sociability'|'routine_stability'|'risk_tolerance',number>>>>={
+  aries:{autonomy:0.06,risk_tolerance:0.06},taurus:{routine_stability:0.07},
+  gemini:{curiosity:0.07,sociability:0.04},cancer:{empathy:0.07},
+  leo:{sociability:0.06},virgo:{routine_stability:0.06},
+  libra:{empathy:0.05,sociability:0.05},scorpio:{autonomy:0.05},
+  sagittarius:{curiosity:0.07,risk_tolerance:0.04},capricorn:{routine_stability:0.07},
+  aquarius:{autonomy:0.06,curiosity:0.05},pisces:{empathy:0.07},
+}
 const TRAITS=['curiosity','empathy','autonomy','sociability','routine_stability','risk_tolerance'] as const
 export function narrativeTraitBaseline(input:NarrativeBirthSeed):NarrativeTraitBaseline {
   if(!input.personId.trim() || !input.worldSeed.trim())throw Error('stable person and world seed required')
@@ -42,7 +51,8 @@ export function narrativeTraitBaseline(input:NarrativeBirthSeed):NarrativeTraitB
   const traits={} as NarrativeTraitBaseline['traits']
   for(const key of TRAITS){
     const n=hash([input.worldSeed,input.personId,archetype,chineseAnimal,key].join('|'))/4294967295
-    traits[key]=Math.round((0.25+n*0.5)*1000)/1000
+    const bias=archetype==='unassigned'?0:(SIGN_STYLE[archetype]?.[key]??0)
+    traits[key]=Math.round(Math.max(0.2,Math.min(0.8,0.25+n*0.5+bias))*1000)/1000
   }
   return {archetype,chineseAnimal,traits,method:'fictional_astrology_v1',source:'author_design'}
 }
