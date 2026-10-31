@@ -25,7 +25,7 @@ export function prepareFeedbackSubmission(feedback: unknown, source: unknown): F
   }
   if (value.kind === 'conversation' && value.ownerVerified === true &&
       typeof value.sourceRef === 'string' &&
-      /^npc_conversation_log:[1-9]\\d{0,18}$/.test(value.sourceRef) &&
+      /^npc_conversation_log:[1-9]\d{0,18}$/.test(value.sourceRef) &&
       Object.keys(value).length === 3) {
     return { ok: true, feedback: checked.normalized, source: { kind: 'conversation', sourceRef: value.sourceRef, ownerVerified: true }, status: 'submitted_for_review', canTriggerWorldChange: false }
   }
