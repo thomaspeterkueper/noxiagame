@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 function safeNext(value: string | null) {
-  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/dashboard'
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/auth/login'
 }
 
 export async function GET(request: NextRequest) {
@@ -27,7 +27,13 @@ export async function GET(request: NextRequest) {
   }
 
   if (!error) {
-    return NextResponse.redirect(new URL(next, request.url))
+    // Email confirmation establishes a Supabase session; onboarding requires
+    // a fresh explicit login before entering the game.
+    await supabase.auth.signOut()
+    const target = next.startsWith('/auth/login') ? next : '/auth/login'
+    const loginUrl = new URL(target, request.url)
+    loginUrl.searchParams.set('confirmed', '1')
+    return NextResponse.redirect(loginUrl)
   }
 
   const errorUrl = new URL('/auth/login', request.url)
