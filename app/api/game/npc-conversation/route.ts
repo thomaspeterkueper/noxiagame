@@ -29,11 +29,11 @@ import { playerNameFromUtterance, statedOwnAge } from '@/lib/game/cognition/play
 import { ageAtTick } from '@/lib/game/gameCalendar'
 import { worldviewConversationLines, worldviewVoiceFromPublicRole } from '@/lib/game/population/worldviewVoices'
 
-const MAX_PLAYER_CHARS = 160
+const MAX_PLAYER_CHARS = 500
 const MAX_HISTORY_MESSAGES = 10
-const MAX_HISTORY_ENTRY_CHARS = 180
-const MAX_HISTORY_TOTAL_CHARS = 1200
-const MAX_REPLY_CHARS = 280
+const MAX_HISTORY_ENTRY_CHARS = 900
+const MAX_HISTORY_TOTAL_CHARS = 4500
+const MAX_REPLY_CHARS = 900
 const ACTION_MARKER = '[[ACTION:LEAD_WALK]]'
 const CREDIT_ACTION_MARKER = '[[ACTION:ACCEPT_CREDITS]]'
 const VISIT_PLACE_ACTION_RE = /\[\[ACTION:VISIT_PLACE:(p\d{1,2})\]\]/g
@@ -424,7 +424,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await chatComplete({
       messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
-      maxTokens: sermon ? 360 : 100,
+      maxTokens: sermon ? 480 : 380,
       temperature: 0.7,
       timeoutMs: 14000,
     })
