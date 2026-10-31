@@ -158,14 +158,20 @@ export async function POST(request: NextRequest) {
   const introLeads = Array.isArray(body.introduction?.leads)
     ? body.introduction.leads.slice(0, 5).map((value: unknown) => clean(value, 180)).filter(Boolean)
     : []
+  // Nahe Ziele (bis 45 m) und wenige bekannte weiter entfernte Ziele (far, bis 3 km), zu denen die
+  // Figur den Spieler führen kann – z. B. die Agentur für Arbeit (31.10.2026).
   const nearbyPlaces = Array.isArray(body.nearbyPlaces)
-    ? body.nearbyPlaces.slice(0, 10).map((value: any, index: number) => ({
-        key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
-        targetRef: clean(value?.targetRef, 96),
-        name: clean(value?.name, 80),
-        kind: clean(value?.kind, 48),
-        distanceM: Math.max(0, Math.min(100, Number(value?.distanceM ?? 0))),
-      })).filter((place: any) => place.targetRef && place.name && Number.isFinite(place.distanceM) && place.distanceM <= 45)
+    ? body.nearbyPlaces.slice(0, 12).map((value: any, index: number) => {
+        const far = value?.far === true
+        return {
+          key: /^p\d{1,2}$/.test(String(value?.key ?? '')) ? String(value.key) : `p${index}`,
+          targetRef: clean(value?.targetRef, 96),
+          name: clean(value?.name, 80),
+          kind: clean(value?.kind, 48),
+          far,
+          distanceM: Math.max(0, Math.min(far ? 3000 : 100, Number(value?.distanceM ?? 0))),
+        }
+      }).filter((place: any) => place.targetRef && place.name && Number.isFinite(place.distanceM) && place.distanceM <= (place.far ? 3000 : 45))
     : []
   if (!player) return NextResponse.json({ error: 'empty_message' }, { status: 400 })
 
@@ -383,7 +389,8 @@ export async function POST(request: NextRequest) {
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
     'Du kannst ausdrücklich erlaubte Aktionsmarker verwenden. Wenn du dich entscheidest, jetzt vorauszugehen oder gemeinsam loszugehen, füge am Ende [[ACTION:LEAD_WALK]] an.',
-    nearbyPlaces.length ? `Verifizierte nahe Ziele, die du aktuell wahrnehmen kannst:\n- ${nearbyPlaces.map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.max(1,Math.round(place.distanceM))} m`).join('\n- ')}` : '',
+    nearbyPlaces.some((place: any) => !place.far) ? `Verifizierte nahe Ziele, die du aktuell wahrnehmen kannst:\n- ${nearbyPlaces.filter((place: any) => !place.far).map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.max(1,Math.round(place.distanceM))} m`).join('\n- ')}` : '',
+    nearbyPlaces.some((place: any) => place.far) ? `Weiter entfernte Ziele, die du kennst und zu denen du den Spieler führen kannst:\n- ${nearbyPlaces.filter((place: any) => place.far).map((place:any)=>`${place.key}: ${place.name} · ${place.kind} · ca. ${Math.round(place.distanceM / 10) * 10} m`).join('\n- ')}\nBietest du an, den Spieler zu so einem Ziel zu bringen, und er stimmt zu, führe ihn mit [[ACTION:VISIT_PLACE:pN]] hin. Sage dann kurz, dass es ein Stück zu gehen ist; versprich keine Dauer.` : '',
     nearbyPlaces.length ? 'Wenn der Spieler eine konkrete gemeinsame Aktivität an einem dieser nahen Ziele vorschlägt und du zustimmst, kannst du genau dieses Ziel mit [[ACTION:VISIT_PLACE:pN]] auswählen. Verwende nur einen oben aufgeführten pN-Schlüssel und nur wenn das Ziel inhaltlich zum Vorschlag passt.' : '',
     'Wenn der Spieler dir ausdrücklich Credits anbietet oder eine unmittelbar vorherige konkrete Credit-Bitte von dir klar bestätigt, darfst du die Annahme mit [[ACTION:ACCEPT_CREDITS]] markieren. Der Marker bedeutet nur „annehmen“; Betrag und Berechtigung werden ausschließlich serverseitig aus dem Gespräch geprüft. Fordere mit diesem Marker niemals selbst eine Abbuchung an.',
     'Erfinde keine neuen Fakten über reale Nachrichten. Trenne belegte Meldung und persönliche Meinung.',
@@ -473,7 +480,7 @@ export async function POST(request: NextRequest) {
           type: 'visit_place' as const,
           targetRef: requestedVisitPlace.targetRef,
           targetName: requestedVisitPlace.name,
-          durationSeconds: Math.max(4, Math.min(35, Math.round(requestedVisitPlace.distanceM / 1.4))),
+          durationSeconds: Math.max(4, Math.min(120, Math.round(requestedVisitPlace.distanceM / 1.4))),
           playerFollows: followConsent,
         }
       : followConsent && requestedLeadWalk

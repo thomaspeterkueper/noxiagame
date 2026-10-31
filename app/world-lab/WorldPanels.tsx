@@ -115,6 +115,9 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 /** Baubarer Typ aus /api/game/build/spatial (available). */
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean; requiredUnlock?: string | null } }
 
+/** Gebäudearten, zu denen eine Person den Spieler auch über größere Entfernung führt. */
+const FAR_GUIDE_KINDS = new Set(['job_agency'])
+
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
   presence?: PresenceRow[]
@@ -492,8 +495,15 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const places = [
       ...noxia.map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'aktiv' })),
       ...around.landmarks.map(item => ({ targetRef: landmarkRef(item.landmark), name: item.landmark.name, kind: landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, status: 'sichtbar' })),
-    ].filter(place => place.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 10)
-    const nearbyPlaces = places.map((place, index) => ({ key: 'p' + index, targetRef: place.targetRef, name: place.name, kind: place.kind, distanceM: Math.round(place.distanceM) }))
+    ].filter(place => place.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 8)
+    // Wenige bekannte, weiter entfernte Ziele (Agentur für Arbeit …), zu denen die Person führen kann.
+    const farPlaces = noxia
+      .filter(item => FAR_GUIDE_KINDS.has(item.typeId) && !places.some(place => place.targetRef === item.id))
+      .map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'bekannt' }))
+      .filter(place => place.distanceM > 45 && place.distanceM <= 3000)
+      .sort((a, b) => a.distanceM - b.distanceM).slice(0, 2)
+    const nearbyPlaces = [...places.map(place => ({ ...place, far: false })), ...farPlaces.map(place => ({ ...place, far: true }))]
+      .map((place, index) => ({ key: 'p' + index, targetRef: place.targetRef, name: place.name, kind: place.kind, distanceM: Math.round(place.distanceM), far: place.far }))
     const localFacts = [
       `Ort: ${placeName}`,
       ...(street ? [`Ihr steht an der ${street}.`] : []),
@@ -526,7 +536,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         const landmark = around.landmarks.find(item => landmarkRef(item.landmark) === action.targetRef)?.landmark
         const target = building ? { lat: building.lat, lon: building.lon } : landmark?.at
         if (target) {
-          const seconds = Math.max(4, Math.min(35, Number(action.durationSeconds ?? 8)))
+          const seconds = Math.max(4, Math.min(120, Number(action.durationSeconds ?? 8)))
           engine.sendPerson(person.id, target, seconds)
           setVisits(current => ({ ...current, [person.id]: String(action.targetRef) }))
           if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
