@@ -8,6 +8,10 @@ const draft = {
 }
 const privateResult = prepare(draft, { category: 'building', visibility: 'private' })
 assert(privateResult.ok, 'explicit private choice accepted')
+assert(privateResult.ok && privateResult.feedback.destination === 'world_initiative', 'conversation drafts target world initiative review by default')
+const softwareResult = prepare(draft, { category: 'gameplay', destination: 'development', visibility: 'private' })
+assert(softwareResult.ok && softwareResult.feedback.destination === 'development', 'explicit software routing remains possible')
+assert(!prepare(draft, { category: 'building', destination: 'approved', visibility: 'private' }).ok, 'forged destination rejected')
 if (!privateResult.ok) throw Error('missing valid private result')
 assert(privateResult.feedback.category === 'building' && privateResult.feedback.locationRef === 'Seelenberg',
   'feedback contract retains category and unverified place hint')
