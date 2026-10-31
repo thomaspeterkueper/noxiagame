@@ -16,6 +16,9 @@ Read-only inspection of the public Supabase schema found **no** table whose name
 ## Read-only receipt endpoint (staged, not deployed)
 A GET-only endpoint now exists at `app/api/game/feedback/route.ts`. It requires a verified Bearer JWT and uses a fresh Supabase client with the **anon key plus caller JWT**, never the service-role client, to select only `id,title,status,created_at`. Owner isolation is enforced by the staged table's `auth.uid()` RLS policy; the caller does not receive SELECT privilege on `owner_user_id`, so the query must not filter on that private column. Results are limited to 1–50, projected through the private-field-stripping receipt contract and returned with `Cache-Control: private, no-store`. Invalid limits return 400, unauthenticated calls 401, missing schema or database errors 503; the route does not insert or mutate world state. The CI guard for this route is **static** and cannot prove runtime JWT isolation. Before release: execute the migration in an isolated environment, test two distinct authenticated accounts, verify the full Next.js build, and then separately authorize deployment. There is **no POST endpoint yet**, and the draft form still cannot submit feedback.
 
+## Private player receipt panel (staged, not deployed)
+The `/earth/feedback` page now mounts a read-only **Meine Vorschläge** panel alongside the existing local-only draft form. On explicit user action, it retrieves the current session bearer token, calls `GET /api/game/feedback?limit=20` without caching, and validates the owner-only/review-only response envelope before displaying a bounded list of receipt titles, dates and review statuses. It never forwards private provenance or exposes an API write action. It handles signed-out, empty and unavailable states separately and cancels in-flight reads when collapsed. The panel does **not** imply that submissions exist: the migration remains unapplied and there is still no POST endpoint. The panel wiring check is static; browser and two-user RLS integration tests are required before release.
+
 ## Review status contract (implemented as pure logic, not yet persisted)
 The status lifecycle in `lib/game/evolution/feedbackReviewStatus.ts` is `submitted_for_review` → `under_review` → `needs_information` / `accepted_for_planning` / `declined` / `closed`. `needs_information` can return to `under_review`; `accepted_for_planning` can close. `declined` and `closed` are terminal. Status transitions are **not** permission checks: only an authenticated, audited moderation service may write status changes. Even `accepted_for_planning` is neither a civic approval nor permission to change the world. Unknown status values fail closed.
 
@@ -36,7 +39,7 @@ RLS is enabled in the staged migration. Authenticated clients get **SELECT on re
 ## Delivery order
 1. **Staged for review:** Auth UUID ownership model and versioned migration in repository (no production apply). Review with a database/security owner and run isolated SQL + two-user RLS tests before authorization.
 2. **Read-only GET staged** with caller JWT + RLS and private receipts. Still implement POST with bounded input, rate limiting, idempotency and server-side conversation ownership verification against the approved schema.
-3. Add persistent status list in /earth/feedback and integrate #578's conversation drafts.
+3. **Read-only status panel staged** in `/earth/feedback`; it becomes useful only after approved schema deployment and a separately reviewed POST. Integrate #578's conversation drafts after server-side source ownership verification.
 4. Review and merge/deploy separately, only with explicit authorization.
 
 ## Existing NPC wish processing is not an explicit feedback inbox
