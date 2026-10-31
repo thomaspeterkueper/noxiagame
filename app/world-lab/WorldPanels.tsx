@@ -32,6 +32,7 @@ import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, W
 import LandmarkGlyph from './LandmarkGlyph'
 import LandPanel from './LandPanel'
 import BuildingHistory from './BuildingHistory'
+import PlaceStory from './PlaceStory'
 import TicketCounter from '@/app/components/TicketCounter'
 import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
@@ -578,6 +579,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
     {building && <>
       <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}{building.poi && <span>Hier: {building.poi.name} · {landmarkLabel(building.poi.kind, building.poi.tags)}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      <PlaceStory source={building.source}/>
       <BuildingHistory entityId={building.noxiaId} sourceRef={building.source}/>
       {realUse && <dl>
         <dt>Größe</dt><dd>{buildingSizeLine(offer?.areaM2 ?? building.areaM2 ?? 0, offer?.levels ?? building.levels ?? 1)}</dd>
