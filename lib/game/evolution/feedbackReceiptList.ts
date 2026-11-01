@@ -6,7 +6,7 @@ import { projectFeedbackReceipt } from './feedbackReceipt'
  * Called only after projectFeedbackReceipt validated the timestamp.
  */
 function receiptInstantMicros(timestamp: string): bigint {
-  const fraction = /\\.(\\d{1,6})(?:Z|[+-]\\d{2}:\\d{2})$/.exec(timestamp)?.[1] ?? ''
+  const fraction = /\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/.exec(timestamp)?.[1] ?? ''
   return BigInt(Date.parse(timestamp)) * 1000n + BigInt(fraction.padEnd(6, '0').slice(3) || '0')
 }
 
@@ -20,5 +20,9 @@ export function projectFeedbackReceiptList(rows: unknown, limit = 50) {
     if (!receipt) return null // Fail closed rather than silently hiding corrupt records.
     result.push(receipt)
   }
-  return result.sort((a, b) => (receiptInstantMicros(a.createdAt) > receiptInstantMicros(b.createdAt) ? -1 : receiptInstantMicros(a.createdAt) < receiptInstantMicros(b.createdAt) ? 1 : a.id.localeCompare(b.id))).slice(0, limit)
+  return result.sort((a, b) => {
+    const aInstant = receiptInstantMicros(a.createdAt)
+    const bInstant = receiptInstantMicros(b.createdAt)
+    return aInstant === bInstant ? a.id.localeCompare(b.id) : aInstant > bInstant ? -1 : 1
+  }).slice(0, limit)
 }
