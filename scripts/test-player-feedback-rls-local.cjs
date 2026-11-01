@@ -89,7 +89,18 @@ async function main() {
       conversationIds.push(String(data.id))
       assert.equal(data.player_profile_id, owner.id, 'Conversation owner must be auth user UUID')
     }
+    // Invoke the same server-side provenance verifier used by feedback POST.
+    // The TS module is loaded only when the local Node runtime supports TS.
+    const { verifyConversationSourceOwnership } = require('../lib/game/evolution/conversationSourceOwnership.server.ts')
     for (let i = 0; i < 2; i++) {
+      const checkedOwn = await verifyConversationSourceOwnership(
+        'npc_conversation_log:' + conversationIds[i], ids[i], service)
+      assert.equal(checkedOwn.ok, true, 'Owner verifier must accept own conversation')
+      const checkedForeign = await verifyConversationSourceOwnership(
+        'npc_conversation_log:' + conversationIds[1-i], ids[i], service)
+      assert.deepEqual(checkedForeign,
+        { ok: false, error: 'conversation_source_unavailable' },
+        'Owner verifier must reject foreign conversation without disclosing existence')
       const own = await service.from('npc_conversation_log')
         .select('id,player_profile_id').eq('id', conversationIds[i]).eq('player_profile_id', ids[i]).maybeSingle()
       assert.ifError(own.error)
