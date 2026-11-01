@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
 import { detectFeatureWish } from '@/lib/game/cognition/featureWish'
 import { gameGuideLines, type GuidePlace } from '@/lib/game/cognition/gameGuide'
+import { hasNpcMovementConsent } from '@/lib/game/cognition/npcMovementConsent'
 import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
 import {
   assessRepeat,
@@ -298,13 +299,20 @@ export async function POST(request: NextRequest) {
   const nowMs = Date.now()
   const { data: recentLogData } = await serviceClient
     .from('npc_conversation_log')
-    .select('player_text, outcome, opening, created_at, topic')
+    .select('player_text, npc_reply, outcome, opening, created_at, topic')
     .eq('player_profile_id', user.id)
     .eq('npc_key', npcKey)
     .gte('created_at', new Date(nowMs - REPEAT_WINDOW_MS).toISOString())
     .order('created_at', { ascending: false })
     .limit(30)
-  const recentLog = (recentLogData ?? []) as Array<{ player_text: string; outcome: string; opening: boolean; created_at: string; topic: string | null }>
+  const recentLog = (recentLogData ?? []) as Array<{ player_text: string; npc_reply: string | null; outcome: string; opening: boolean; created_at: string; topic: string | null }>
+  // Only a recent, server-logged NPC turn can constitute an outstanding offer.
+  // The client-provided conversation history is not authoritative consent context.
+  const lastLoggedTurn = recentLog[0]
+  const previousNpcReply = lastLoggedTurn && ['reply', 'repeat_hint'].includes(lastLoggedTurn.outcome)
+    && Date.parse(lastLoggedTurn.created_at) >= nowMs - 5 * 60_000
+    ? lastLoggedTurn.npc_reply
+    : null
   const lastBreakoffIndex = recentLog.findIndex(row => row.outcome === 'breakoff')
   const lastBreakoffAt = lastBreakoffIndex >= 0 ? recentLog[lastBreakoffIndex].created_at : null
   const priorBreakoffs = recentLog.filter(row => row.outcome === 'breakoff').length
@@ -468,26 +476,28 @@ export async function POST(request: NextRequest) {
         catch (error) { console.error('wish from conversation failed', error instanceof Error ? error.message : error) }
       })
     }
-    const playerLower = player.toLocaleLowerCase('de-DE')
-    // Ein NPC-Aktionsmarker ist keine Spielerzustimmung. Bewegung nur bei expliziter
-    // positiver Spieleräußerung und ohne gleichzeitige Ablehnung.
-    const spokenConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
-    const refusal = /\b(nein|nee|nicht|kein|keine|später|spaeter|stopp|stop|lieber|doch nicht|vergiss)\b/i.test(playerLower)
-    const followConsent = spokenConsent && !refusal
-    const worldAction = followConsent && requestedVisitPlace
+    // Model markers cannot grant consent. Bind short affirmations to the last
+    // server-logged offer (max 5 minutes), and visits to the named destination.
+    const visitConsent = Boolean(requestedVisitPlace && hasNpcMovementConsent({
+      playerText: player, previousNpcReply, action: 'visit_place', targetName: requestedVisitPlace.name,
+    }))
+    const walkConsent = requestedLeadWalk && hasNpcMovementConsent({
+      playerText: player, previousNpcReply, action: 'lead_walk',
+    })
+    const worldAction = visitConsent && requestedVisitPlace
       ? {
           type: 'visit_place' as const,
           targetRef: requestedVisitPlace.targetRef,
           targetName: requestedVisitPlace.name,
           durationSeconds: Math.max(4, Math.min(120, Math.round(requestedVisitPlace.distanceM / 1.4))),
-          playerFollows: followConsent,
+          playerFollows: true,
         }
-      : followConsent && requestedLeadWalk
+      : walkConsent && requestedLeadWalk
         ? {
             type: 'lead_walk' as const,
             durationSeconds: 30,
             maxDistanceMeters: 45,
-            playerFollows: followConsent,
+            playerFollows: true,
           }
         : null
 
