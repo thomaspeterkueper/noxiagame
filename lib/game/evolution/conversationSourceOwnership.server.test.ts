@@ -37,10 +37,10 @@ async function main() {
   const upperDb = await verify(source, ownerA, reader({ id: 42, player_profile_id: ownerA.toUpperCase() }))
   assert(upperDb.ok, 'lowercase verified owner matches uppercase DB UUID')
   const foreignCase = await verify(source, ownerA.toUpperCase(), reader({ id: 42, player_profile_id: ownerB }))
-  assert(!foreignCase.ok && foreignCase.error === 'conversation_source_unavailable',
+  assert('error' in foreignCase && foreignCase.error === 'conversation_source_unavailable',
     'canonical UUID comparison never admits a different owner')
   const invalidDbOwner = await verify(source, ownerA, reader({ id: 42, player_profile_id: 42 }))
-  assert(!invalidDbOwner.ok && invalidDbOwner.error === 'conversation_source_unavailable',
+  assert('error' in invalidDbOwner && invalidDbOwner.error === 'conversation_source_unavailable',
     'non-string database owner fails closed')
   for (const [row, err] of [
     [{ id: 42, player_profile_id: ownerB }, null],
