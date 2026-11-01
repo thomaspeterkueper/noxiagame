@@ -21,6 +21,8 @@ assert.equal(isMarsSurfaceSite({ slug: 'mishkan-avi', celestial_body_id: MARS, l
 assert.equal(isMarsSurfaceSite({ slug: 'orbit-x', celestial_body_id: MARS, location_type: 'station' }), false)
 assert.equal(isMarsSurfaceSite({ slug: 'mond-x', celestial_body_id: MOON, location_type: 'colony' }), false)
 assert.equal(hasDedicatedSurfaceView('phobos'), true)
+assert.equal(hasDedicatedSurfaceView('prometheus'), true)
+assert.equal(hasDedicatedSurfaceView('q1'), true)
 assert.equal(hasDedicatedSurfaceView('mishkan-avi', { slug: 'mishkan-avi', celestial_body_id: MARS, location_type: 'colony' }), true)
 assert.equal(hasDedicatedSurfaceView('mishkan-avi'), false)
 
