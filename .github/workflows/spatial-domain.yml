@@ -37,3 +37,6 @@ jobs:
       - run: corepack enable && corepack prepare pnpm@10.28.0 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:spatial
+      # Shared walkable-scene interactions use Vitest and are not part of test:spatial.
+      - name: Verify local scene entry and collision regression
+        run: pnpm exec vitest run lib/game/spatial/localSceneRuntime.test.ts
