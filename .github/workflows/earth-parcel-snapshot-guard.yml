@@ -1,0 +1,35 @@
+name: Earth parcel snapshot guard
+
+on:
+  pull_request:
+    paths:
+      - 'app/api/world-lab/parcels/route.ts'
+      - 'lib/worldlab/parcelImportPolicy.ts'
+      - 'lib/worldlab/parcelImportPolicy.test.ts'
+      - '.github/workflows/earth-parcel-snapshot-guard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app/api/world-lab/parcels/route.ts'
+      - 'lib/worldlab/parcelImportPolicy.ts'
+      - 'lib/worldlab/parcelImportPolicy.test.ts'
+      - '.github/workflows/earth-parcel-snapshot-guard.yml'
+
+jobs:
+  insert-only-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: corepack enable && corepack prepare pnpm@10.28.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run lib/worldlab/parcelImportPolicy.test.ts
