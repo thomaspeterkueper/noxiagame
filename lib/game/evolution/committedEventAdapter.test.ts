@@ -134,4 +134,25 @@ assert(invalidSameId.events.length === 1 && invalidSameId.rejected.length === 1 
   invalidSameId.rejected[0].reason === 'invalid_receipt',
   'invalid same-ID candidate cannot poison valid history')
 
+// Adaptation must detach projected history from mutable input receipts.
+// Otherwise a later caller mutation could retroactively change the city view.
+const mutableRename = receipt('mutable-rename', 2050, true,
+  { action: 'rename', assetId: 'hall', name: 'Original' })
+const projectedRename = adaptCommittedWorldEvents([mutableRename])
+if (mutableRename.change.action === 'rename') mutableRename.change.name = 'Manipuliert'
+assert(projectedRename.events[0]?.change.action === 'rename' &&
+  projectedRename.events[0].change.name === 'Original',
+  'later input mutation cannot rename historical projection')
+const mutableEstablish: CommittedWorldReceipt = {
+  ...receipt('mutable-build', 2080, true, { action: 'establish', asset: {
+    id: 'new-lab', kind: 'institution', name: 'Original',
+    districtId: 'center', introducedYear: 2080,
+  } }), domain: 'institutions',
+}
+const projectedEstablish = adaptCommittedWorldEvents([mutableEstablish])
+if (mutableEstablish.change.action === 'establish') mutableEstablish.change.asset.name = 'Manipuliert'
+assert(projectedEstablish.events[0]?.change.action === 'establish' &&
+  projectedEstablish.events[0].change.asset.name === 'Original',
+  'later nested asset mutation cannot rewrite established historical asset')
+
 console.log('Committed city event adapter: tests passed')
