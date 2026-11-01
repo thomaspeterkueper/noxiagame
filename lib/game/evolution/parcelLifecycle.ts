@@ -77,22 +77,54 @@ export function projectParcelLifecycle(input: {
   const transitions: ParcelTransition[] = []
   const rejected: ParcelProjection['rejected'] = []
   const seen = new Set<string>()
-  const receipts = input.receipts
-    .filter(r => r.settlementId === settlementId && (!Number.isFinite(r.worldYear) || r.worldYear <= year))
-    .sort((a, b) => a.worldYear - b.worldYear || a.sequence - b.sequence || a.id.localeCompare(b.id))
-  for (const receipt of receipts) {
-    if (seen.has(receipt.id)) {
-      rejected.push({ eventId: receipt.id, reason: 'duplicate_event' })
+  // A persisted Core reader can still return malformed historical JSON.
+  // Filter and sort defensively BEFORE dereferencing fields; invalid rows must
+  // be reported, not crash the entire Seelenberg/Brombach city projection.
+  const record = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown> : {}
+  const order = (value: unknown) => {
+    const r = record(value)
+    return {
+      year: typeof r.worldYear === 'number' && Number.isFinite(r.worldYear) ? r.worldYear : Number.MAX_SAFE_INTEGER,
+      sequence: typeof r.sequence === 'number' && Number.isInteger(r.sequence) ? r.sequence : Number.MAX_SAFE_INTEGER,
+      id: typeof r.id === 'string' ? r.id : '',
+    }
+  }
+  const receipts = (input.receipts as readonly unknown[])
+    .filter(candidate => {
+      const r = record(candidate)
+      // Foreign, well-identified settlements are intentionally out of scope.
+      if (typeof r.settlementId === 'string' && r.settlementId.trim() &&
+          r.settlementId !== settlementId) return false
+      return typeof r.worldYear !== 'number' || !Number.isFinite(r.worldYear) ||
+        r.worldYear <= year
+    })
+    .sort((a, b) => {
+      const left = order(a), right = order(b)
+      return left.year - right.year || left.sequence - right.sequence || left.id.localeCompare(right.id)
+    })
+  for (const candidate of receipts) {
+    const r = record(candidate)
+    const eventId = typeof r.id === 'string' ? r.id : ''
+    if (typeof r.id !== 'string' || !r.id.trim() ||
+        typeof r.parcelId !== 'string' || !r.parcelId.trim() ||
+        typeof r.sourceEventRef !== 'string' || !r.sourceEventRef.trim() ||
+        r.settlementId !== settlementId || r.committed !== true ||
+        !Number.isInteger(r.worldYear) || !Number.isInteger(r.sequence) ||
+        (r.sequence as number) < 0 || (r.worldYear as number) < baselineYear ||
+        !r.change || typeof r.change !== 'object' || Array.isArray(r.change) ||
+        !['demolish', 'restore_meadow', 'construct'].includes((r.change as Record<string, unknown>).action as string)) {
+      rejected.push({ eventId, reason: 'invalid_receipt' })
       continue
     }
-    seen.add(receipt.id)
-    if (!receipt.id?.trim() || !receipt.parcelId?.trim() || !receipt.sourceEventRef?.trim() ||
-        receipt.committed !== true || !Number.isInteger(receipt.worldYear) ||
-        !Number.isInteger(receipt.sequence) || receipt.sequence < 0 || receipt.worldYear < baselineYear ||
-        !receipt.change || !['demolish', 'restore_meadow', 'construct'].includes(receipt.change.action)) {
-      rejected.push({ eventId: receipt.id, reason: 'invalid_receipt' })
+    // Malformed duplicates must not suppress an otherwise valid committed row.
+    if (seen.has(eventId)) {
+      rejected.push({ eventId, reason: 'duplicate_event' })
       continue
     }
+    seen.add(eventId)
+    const receipt = r as unknown as CoreParcelReceipt
     const parcel = parcels.get(receipt.parcelId)
     if (!parcel) {
       rejected.push({ eventId: receipt.id, reason: 'unknown_parcel' })
