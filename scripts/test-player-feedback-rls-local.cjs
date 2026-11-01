@@ -19,6 +19,8 @@ async function main() {
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(url.hostname),
     'Refusing non-local Supabase endpoint')
   assert.ok(!url.username && !url.password, 'URL credentials not allowed')
+  assert.equal(url.pathname + url.search + url.hash, '/',
+    'Only a bare local Supabase origin is permitted (no path, query or fragment)')
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   assert.ok(anonKey && serviceKey && anonKey !== serviceKey, 'Distinct local keys required')
@@ -62,6 +64,9 @@ async function main() {
   const expectDenied = async (promise, label) => {
     const { error } = await promise
     assert.ok(error, label + ' must be denied')
+    // A generic transport, schema or missing-table error is NOT evidence of
+    // correct RLS/grant isolation. PostgreSQL must report insufficient privilege.
+    assert.equal(error.code, '42501', label + ' must fail with SQLSTATE 42501')
   }
   try {
     const a = await createUser('a')
@@ -155,13 +160,65 @@ async function main() {
         .select('id').eq('id', foreignId)
       assert.ifError(foreignError)
       assert.equal(foreign?.length, 0, label + ' foreign-id lookup must be empty')
+      // RLS must deny *all* direct player writes, including writes to the
+      // player's own rows. Ownership grants receipt reads, never mutation.
+      await expectDenied(client.from('player_feedback_submissions')
+        .insert(receiptRow(label === 'A' ? a.id : b.id)),
+        label + ' self-owned client insert')
       await expectDenied(client.from('player_feedback_submissions')
         .update({ status: 'accepted_for_planning' }).eq('id', ownId),
         label + ' unauthorized moderation')
       await expectDenied(client.from('player_feedback_submissions')
+        .delete().eq('id', ownId),
+        label + ' self-owned client delete')
+      // Foreign-row writes must fail with insufficient privilege, not merely
+      // silently match zero rows under RLS. Receipt ownership is read-only.
+      await expectDenied(client.from('player_feedback_submissions')
+        .update({ status: 'accepted_for_planning' }).eq('id', foreignId),
+        label + ' foreign client update')
+      await expectDenied(client.from('player_feedback_submissions')
+        .delete().eq('id', foreignId),
+        label + ' foreign client delete')
+      await expectDenied(client.from('player_feedback_submissions')
         .insert(receiptRow(label === 'A' ? b.id : a.id)),
         label + ' owner-spoofed insert')
     }
+    // Anonymous callers have neither receipt-read privileges nor direct
+    // mutation rights. Check each SQL verb, not just SELECT: a future grant
+    // regression must fail with a PostgreSQL permission error (42501).
+    await expectDenied(anon.from('player_feedback_submissions').select('id'),
+      'anonymous receipt read')
+    await expectDenied(anon.from('player_feedback_submissions')
+      .insert(receiptRow(a.id)), 'anonymous client insert')
+    await expectDenied(anon.from('player_feedback_submissions')
+      .update({ status: 'accepted_for_planning' }).eq('id', idA),
+      'anonymous client update')
+    await expectDenied(anon.from('player_feedback_submissions')
+      .delete().eq('id', idB), 'anonymous client delete')
+
+    // A denied write must also leave the original receipts intact. This
+    // catches silent zero-row RLS operations or unexpected side effects.
+    const { data: retained, error: retainedError } = await service
+      .from('player_feedback_submissions')
+      .select('id,owner_user_id,status').in('id', [idA, idB])
+    assert.ifError(retainedError)
+    assert.equal(retained?.length, 2, 'Both receipts must survive denied writes')
+    for (const [receiptId, ownerId] of [[idA, a.id], [idB, b.id]]) {
+      const row = retained.find(entry => entry.id === receiptId)
+      assert.equal(row?.owner_user_id, ownerId, 'Receipt owner must remain unchanged')
+      assert.equal(row?.status, 'submitted_for_review',
+        'Denied client moderation must not change receipt status')
+    }
+
+    // A rejected INSERT must not create a third row under either identity.
+    // Existing-row checks alone cannot detect an unauthorized extra insertion.
+    const { data: allBeforeBurst, error: beforeBurstError } = await service
+      .from('player_feedback_submissions')
+      .select('id,owner_user_id').in('owner_user_id', [a.id, b.id])
+    assert.ifError(beforeBurstError)
+    assert.equal(allBeforeBurst?.length, 2,
+      'Denied client inserts must not create additional feedback rows')
+
     // Five concurrent NEW submissions for A after its first fixture row: the
     // database advisory lock must allow exactly four and reject the fifth.
     // This tests the trigger against actual parallel HTTP inserts, not a mock.
@@ -193,8 +250,6 @@ async function main() {
     const otherOwner = await service.from('player_feedback_submissions').insert(receiptRow(b.id))
     assert.ifError(otherOwner.error) // A's rate limit must not throttle B.
 
-    await expectDenied(anon.from('player_feedback_submissions').select('id'),
-      'anonymous receipt read')
     console.log('LOCAL feedback two-user RLS and concurrent rate-limit checks passed; no world/Core writes')
   } finally {
     // Always clean up, even on assertion failure. Local disposable DB ONLY.
