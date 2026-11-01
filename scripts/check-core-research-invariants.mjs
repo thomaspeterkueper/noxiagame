@@ -140,6 +140,17 @@ check(
   'knowledge points and unlock persistence are no longer represented separately',
 );
 
+check(
+  'new physics permissions remain scoped to experimental research',
+  hasAll(registry, [
+    "'UNL:NOX:research:gold-transmutation-design'",
+    "'ACT:NOX:RESEARCH:GOLD-TRANSMUTATION-DESIGN'",
+    "'UNL:NOX:research:optomechanics-experiment-design'",
+    "'ACT:NOX:RESEARCH:OPTOMECHANICS-EXPERIMENT-DESIGN'",
+  ]),
+  'physics learning must not directly grant production buildings or commercialized technologies',
+);
+
 if (failures.length) {
   console.error('NOXIA Core research/knowledge/unlock invariant check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
