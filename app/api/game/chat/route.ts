@@ -21,6 +21,8 @@ async function getUserFromRequest(req: NextRequest) {
 }
 import { publishDirectMessage } from '@/lib/ably/server'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function GET(req: NextRequest) {
   const user = await getUserFromRequest(req)
   if (!user) return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 })
@@ -32,6 +34,8 @@ export async function GET(req: NextRequest) {
   // ── Nachrichtenhistorie ───────────────────────────────────────────────────
   if (action === 'history') {
     if (!otherUserId) return NextResponse.json({ error: 'userId fehlt' }, { status: 400 })
+    // Nur eine echte ID: Sonst ließ sich über den Filter fremde Chats lesen (Sicherheitsprüfung 29.10.2026).
+    if (!UUID_RE.test(otherUserId)) return NextResponse.json({ error: 'userId ungültig' }, { status: 400 })
 
     const { data: messages, error } = await supabase
       .from('chat_messages')
@@ -71,7 +75,7 @@ export async function POST(req: NextRequest) {
     const receiverId = body.receiverId as string
     const content    = (body.content as string ?? '').trim()
 
-    if (!receiverId) return NextResponse.json({ error: 'receiverId fehlt' }, { status: 400 })
+    if (!receiverId || !UUID_RE.test(receiverId)) return NextResponse.json({ error: 'receiverId fehlt oder ungültig' }, { status: 400 })
     if (!content || content.length > 500)
       return NextResponse.json({ error: 'Nachricht zu lang oder leer' }, { status: 400 })
     if (receiverId === user.id)

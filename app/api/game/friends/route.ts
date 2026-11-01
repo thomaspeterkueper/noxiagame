@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -85,6 +87,8 @@ export async function POST(req: NextRequest) {
   // ── Freundschaftsanfrage senden ───────────────────────────────────────────
   if (action === 'add') {
     const addresseeId = body.addresseeId as string
+    // Nur eine echte ID (Filter-Injection, Sicherheitsprüfung 29.10.2026)
+    if (!UUID_RE.test(String(addresseeId ?? ''))) return NextResponse.json({ error: 'addresseeId ungültig' }, { status: 400 })
     if (!addresseeId) return NextResponse.json({ error: 'addresseeId fehlt' }, { status: 400 })
     if (addresseeId === user.id) return NextResponse.json({ error: 'Kann nicht sich selbst hinzufügen' }, { status: 400 })
 
@@ -119,6 +123,7 @@ export async function POST(req: NextRequest) {
   // ── Freundschaft entfernen ────────────────────────────────────────────────
   if (action === 'remove') {
     const otherId = body.otherId as string
+    if (!UUID_RE.test(String(otherId ?? ''))) return NextResponse.json({ error: 'otherId ungültig' }, { status: 400 })
     await supabase
       .from('friendships')
       .delete()
