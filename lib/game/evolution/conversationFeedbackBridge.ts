@@ -26,7 +26,7 @@ export function prepareConversationFeedbackDraft(localDraft: unknown, choices: u
   const selection = choices as Record<string, unknown>
   if (draft.status !== 'local_draft' || draft.canTriggerWorldChange !== false ||
       typeof draft.sourceRef !== 'string' || !/^npc_conversation_log:[1-9]\d{0,18}$/.test(draft.sourceRef) ||
-      BigInt(draft.sourceRef.slice('npc_conversation_log:'.length)) > 9223372036854775807n) {
+      BigInt(draft.sourceRef.slice('npc_conversation_log:'.length)) > BigInt('9223372036854775807')) {
     return invalid('invalid_private_provenance')
   }
   const place = draft.unverifiedPlaceLabel
