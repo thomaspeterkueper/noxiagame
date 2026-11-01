@@ -45,7 +45,10 @@ export async function verifyConversationSourceOwnership(
       .eq('id', match[1])
       .eq('player_profile_id', verifiedOwnerId)
       .maybeSingle()
-    if (error || !data || data.player_profile_id !== verifiedOwnerId) return unavailable()
+    // PostgreSQL UUID comparison is case-insensitive, even if the verified JWT
+    // and database adapter render the same owner UUID in different case.
+    if (error || !data || typeof data.player_profile_id !== 'string' ||
+        data.player_profile_id.toLowerCase() !== verifiedOwnerId.toLowerCase()) return unavailable()
     // Supabase may decode bigint as a JS number. Fail closed if it is unsafe.
     const rowId = typeof data.id === 'string' ? data.id :
       typeof data.id === 'number' && Number.isSafeInteger(data.id) ? String(data.id) : null
