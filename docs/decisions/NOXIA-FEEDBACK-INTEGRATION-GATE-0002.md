@@ -18,3 +18,13 @@ Two-user local Supabase acceptance matrix (A and B):
 - Every accepted row stays submitted_for_review; no civic vote, approval or Core event.
 
 Run tests only on a disposable local database with real conversation fixtures and two confirmed users; clean up on success and failure. The existing local RLS harness covers direct feedback only and must be extended. Then run combined TypeScript/Next.js build, browser interaction and privacy review. Keep branches separate until conflict resolution and human migration review. No automatic merge, deploy, production DB migration or world write.
+
+## Schema verification (2026-11-01, read-only)
+
+Verified against connected NOXIA Supabase project using information_schema and pg_constraint, without reading conversation content or modifying data:
+- public.npc_conversation_log.id is bigint PK.
+- public.npc_conversation_log.player_profile_id is NOT NULL uuid, FK REFERENCES auth.users(id) ON DELETE CASCADE.
+- public.profiles.id is uuid, FK REFERENCES auth.users(id) ON DELETE CASCADE.
+- Conversation hint columns wish_kind, wish_object, wish_npc_denied, opening and outcome exist.
+
+Therefore the direct verifiedBearerUserId-to-player_profile_id comparison matches the deployed schema. The **schema identity blocker is resolved**, but local two-user ownership/HTTP/RLS tests and combined UI build are still outstanding. This read-only schema inspection is NOT a production migration or integration-test success.
