@@ -6,7 +6,7 @@ const view=cityEvolutionView({
   {eventId:'idea',settlementId:'seelenberg',worldYear:2040,sequence:1,domain:'buildings',
    domainEventRef:'proposal:1',actorRef:'npc:1',committed:false,
    change:{action:'retire',assetId:'old'}},
-  {eventId:'built',settlementId:'seelenberg',worldYear:2080,sequence:1,domain:'buildings',
+  {eventId:'built',settlementId:'seelenberg',worldYear:2080,sequence:1,domain:'institutions',
    domainEventRef:'core:build:1',actorRef:'npc:2',committed:true,
    change:{action:'establish',asset:{id:'future',kind:'institution',name:'Gemeinschaftslabor',districtId:'core',introducedYear:2080}}}
  ]
@@ -77,6 +77,18 @@ check(historicalImport.before.assets[0]?.id==='old' && historicalImport.after.as
 const emptyBaseline = project({importedBaseline:[]})
 check(emptyBaseline.before.assets.length===0 && emptyBaseline.after.assets.length===0,
  'empty initial import is valid and remains empty without confirmed events')
+
+// A committed flag alone cannot establish an institution through the buildings
+// domain. Such a forged/misrouted receipt must not materialize a new asset.
+const crossDomainView = project({authoritativeReceipts:[{
+ eventId:'misrouted-institution',settlementId:'seelenberg',worldYear:2080,sequence:1,
+ domain:'buildings',domainEventRef:'core:misrouted',actorRef:'npc:2',committed:true,
+ change:{action:'establish',asset:{id:'phantom',kind:'institution',name:'Phantom',
+  districtId:'core',introducedYear:2080}}
+}]})
+check(crossDomainView.after.assets.length===1 &&
+ crossDomainView.rejectedReceipts.some(r=>r.eventId==='misrouted-institution' && r.reason==='invalid_receipt'),
+ 'cross-domain receipt must be rejected without changing city history')
 
 let rejectedNullInput=false
 try { cityEvolutionView(null as unknown as Parameters<typeof cityEvolutionView>[0]) }
