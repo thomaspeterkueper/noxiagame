@@ -19,6 +19,8 @@ async function main() {
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(url.hostname),
     'Refusing non-local Supabase endpoint')
   assert.ok(!url.username && !url.password, 'URL credentials not allowed')
+  assert.equal(url.pathname + url.search + url.hash, '/',
+    'Only a bare local Supabase origin is permitted (no path, query or fragment)')
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   assert.ok(anonKey && serviceKey && anonKey !== serviceKey, 'Distinct local keys required')
