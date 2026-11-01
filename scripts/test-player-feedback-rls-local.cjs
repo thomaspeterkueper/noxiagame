@@ -169,6 +169,14 @@ async function main() {
       await expectDenied(client.from('player_feedback_submissions')
         .delete().eq('id', ownId),
         label + ' self-owned client delete')
+      // Foreign-row writes must fail with insufficient privilege, not merely
+      // silently match zero rows under RLS. Receipt ownership is read-only.
+      await expectDenied(client.from('player_feedback_submissions')
+        .update({ status: 'accepted_for_planning' }).eq('id', foreignId),
+        label + ' foreign client update')
+      await expectDenied(client.from('player_feedback_submissions')
+        .delete().eq('id', foreignId),
+        label + ' foreign client delete')
       await expectDenied(client.from('player_feedback_submissions')
         .insert(receiptRow(label === 'A' ? b.id : a.id)),
         label + ' owner-spoofed insert')
