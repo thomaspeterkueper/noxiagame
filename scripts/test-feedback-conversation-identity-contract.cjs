@@ -16,6 +16,9 @@ assert.match(owner, /\.eq\('player_profile_id', verifiedOwnerId\)/, 'ownership l
 assert.match(post, /verifiedBearerUserId\(req\)/, 'feedback must authenticate')
 assert.match(post, /parseAuthenticatedFeedbackPost\(/, 'feedback must verify source ownership')
 assert.match(post, /sourceKind === 'direct'/, 'direct and conversation sources remain distinct')
+assert.match(post, /private_source_ref: parsed.privateSourceRef/, 'verified private provenance must be persisted')
+assert.match(post, /status: 'submitted_for_review'/, 'conversation feedback stays review-only')
+assert.doesNotMatch(post, /(?:emitCoreEvent|applyWorldMutation|castVote)\s*\(/, 'intake must not execute civic or world commands')
 if (fs.existsSync(path.join(root, civicPath))) {
   const civic = read(civicPath)
   assert.match(civic, /verifiedBearerUserId\(req\)/, 'civic reader must authenticate')
