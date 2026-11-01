@@ -35,7 +35,7 @@ export async function verifyConversationSourceOwnership(
   const match = SOURCE.exec(sourceRef)
   if (!match) return { ok: false, error: 'invalid_source_ref' }
   // PostgreSQL bigint (identity) range; avoid unsafe numeric coercion.
-  if (BigInt(match[1]) > 9223372036854775807n)
+  if (BigInt(match[1]) > BigInt('9223372036854775807'))
     return { ok: false, error: 'invalid_source_ref' }
   if (typeof verifiedOwnerId !== 'string' || !UUID.test(verifiedOwnerId)) return unavailable()
   try {
