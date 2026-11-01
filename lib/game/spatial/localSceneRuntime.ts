@@ -319,7 +319,15 @@ export function targetAccessDistance(scene: LocalSurfaceScene, player: LocalSurf
   let best = centerDistance
   for (const building of scene.buildings) {
     if (!insideFootprint(target, building)) continue
-    best = Math.min(best, distanceToBuildingFootprint(player, building))
+    // Observed outlines can be diagonal or concave. Their bounding rectangle
+    // may contain walkable pavement far from the actual wall; using that box
+    // would grant entry prematurely. Keep the rectangle fallback for buildings
+    // without a surveyed polygon (e.g. canonical NOXIA buildings).
+    const outline = building.footprint
+    const edgeDistance = outline && outline.length >= 3
+      ? pointInPolygon(player, outline) ? 0 : distanceToPolygonEdge(player, outline)
+      : distanceToBuildingFootprint(player, building)
+    best = Math.min(best, edgeDistance)
   }
   return best
 }
