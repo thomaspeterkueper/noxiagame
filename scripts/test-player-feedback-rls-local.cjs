@@ -170,6 +170,20 @@ async function main() {
         .insert(receiptRow(label === 'A' ? b.id : a.id)),
         label + ' owner-spoofed insert')
     }
+    // A denied write must also leave the original receipts intact. This
+    // catches silent zero-row RLS operations or unexpected side effects.
+    const { data: retained, error: retainedError } = await service
+      .from('player_feedback_submissions')
+      .select('id,owner_user_id,status').in('id', [idA, idB])
+    assert.ifError(retainedError)
+    assert.equal(retained?.length, 2, 'Both receipts must survive denied writes')
+    for (const [receiptId, ownerId] of [[idA, a.id], [idB, b.id]]) {
+      const row = retained.find(entry => entry.id === receiptId)
+      assert.equal(row?.owner_user_id, ownerId, 'Receipt owner must remain unchanged')
+      assert.equal(row?.status, 'submitted_for_review',
+        'Denied client moderation must not change receipt status')
+    }
+
     // Five concurrent NEW submissions for A after its first fixture row: the
     // database advisory lock must allow exactly four and reject the fifth.
     // This tests the trigger against actual parallel HTTP inserts, not a mock.
