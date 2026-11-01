@@ -32,6 +32,12 @@ const equalTime = projectPlayerConversationSignals([
 assert(equalTime.map(s => s.id).join(',') === '9223372036854775807,9007199254740993,11,10,9',
   'same-timestamp bigint receipts ordered numerically without precision loss')
 assert(projectPlayerConversationSignals([
+  row('9223372036854775808'), row('9999999999999999999'), row('10000000000000000000'),
+]).length === 0, 'out-of-range PostgreSQL bigint IDs cannot become actionable source references')
+assert(projectPlayerConversationSignals([row('9223372036854775807')])[0].sourceRef ===
+  'npc_conversation_log:9223372036854775807', 'signed bigint boundary remains valid')
+
+assert(projectPlayerConversationSignals([
   row('9223372036854775807', { created_at: '2026-10-29T18:00:00Z' }), row('9'),
 ])[0].id === '9', 'newer timestamp takes precedence over larger id')
 
