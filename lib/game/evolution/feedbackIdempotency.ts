@@ -10,6 +10,11 @@ export function classifyFeedbackRetry(existing: unknown, ownerId: unknown, key: 
   if (existing === null) return 'new'
   if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return 'invalid'
   const record = existing as Record<string, unknown>
-  if (record.owner_user_id !== ownerId || record.idempotency_key !== key) return 'conflict'
+  // PostgreSQL uuid equality is case-insensitive; a database round trip may
+  // return lowercase even when the verified auth UUID was supplied uppercase.
+  // Keep the same owner binding without making retries spuriously conflict.
+  if (typeof record.owner_user_id !== 'string' || !AUTH_UUID.test(record.owner_user_id) ||
+      record.owner_user_id.toLowerCase() !== ownerId.toLowerCase() ||
+      record.idempotency_key !== key) return 'conflict'
   return record.payload_fingerprint === fingerprint ? 'replay' : 'conflict'
 }
