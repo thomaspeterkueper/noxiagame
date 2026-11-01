@@ -173,6 +173,19 @@ async function main() {
         .insert(receiptRow(label === 'A' ? b.id : a.id)),
         label + ' owner-spoofed insert')
     }
+    // Anonymous callers have neither receipt-read privileges nor direct
+    // mutation rights. Check each SQL verb, not just SELECT: a future grant
+    // regression must fail with a PostgreSQL permission error (42501).
+    await expectDenied(anon.from('player_feedback_submissions').select('id'),
+      'anonymous receipt read')
+    await expectDenied(anon.from('player_feedback_submissions')
+      .insert(receiptRow(a.id)), 'anonymous client insert')
+    await expectDenied(anon.from('player_feedback_submissions')
+      .update({ status: 'accepted_for_planning' }).eq('id', idA),
+      'anonymous client update')
+    await expectDenied(anon.from('player_feedback_submissions')
+      .delete().eq('id', idB), 'anonymous client delete')
+
     // A denied write must also leave the original receipts intact. This
     // catches silent zero-row RLS operations or unexpected side effects.
     const { data: retained, error: retainedError } = await service
@@ -227,8 +240,6 @@ async function main() {
     const otherOwner = await service.from('player_feedback_submissions').insert(receiptRow(b.id))
     assert.ifError(otherOwner.error) // A's rate limit must not throttle B.
 
-    await expectDenied(anon.from('player_feedback_submissions').select('id'),
-      'anonymous receipt read')
     console.log('LOCAL feedback two-user RLS and concurrent rate-limit checks passed; no world/Core writes')
   } finally {
     // Always clean up, even on assertion failure. Local disposable DB ONLY.
