@@ -41,76 +41,7 @@ create table public.player_feedback_submissions (
       or
       (source_kind = 'conversation' and
         private_source_ref is not null and
-        private_source_ref ~ '^npc_conversation_log:[1-9][0-9]{0,18}
-    ),
-  constraint player_feedback_owner_idempotency_unique
-    unique (owner_user_id, idempotency_key)
-);
-
-create index player_feedback_owner_created_idx
-  on public.player_feedback_submissions (owner_user_id, created_at desc, id desc);
-
-alter table public.player_feedback_submissions enable row level security;
-
--- The table is NOT a public inbox. Service role writes are guarded by the API.
--- No authenticated INSERT, UPDATE or DELETE: in particular clients cannot
--- spoof owner, mark a proposal accepted, or alter private provenance.
-revoke all on table public.player_feedback_submissions from public, anon, authenticated;
-grant select (id, title, status, created_at)
-  on table public.player_feedback_submissions to authenticated;
-grant select, insert, update, delete
-  on table public.player_feedback_submissions to service_role;
-
-create policy player_feedback_owner_receipts_select
-  on public.player_feedback_submissions
-  for select to authenticated
-  using (owner_user_id = (select auth.uid()));
-
-comment on table public.player_feedback_submissions is
-  'Private, review-only NOXIA player feedback. No automatic civic authority or Core/world mutations.';
-comment on column public.player_feedback_submissions.private_source_ref is
-  'Server-verified NPC conversation provenance; never returned by public/player receipt APIs.';
-comment on column public.player_feedback_submissions.requested_visibility is
-  'User preference only. Publication requires a separate moderation and consent process.';
-
--- Atomic per-owner abuse guard: at most five NEW submissions in any rolling hour.
--- Transaction advisory lock serializes concurrent inserts for the same owner.
--- Existing idempotency keys bypass the cap so a concurrent retry can resolve
--- through the unique constraint and return its original receipt.
-create function public.enforce_player_feedback_insert_rate()
-returns trigger
-language plpgsql security definer
-set search_path = ''
-as $feedback_rate$
-begin
-  perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended(new.owner_user_id::text, 0)
-  );
-  if exists (
-    select 1 from public.player_feedback_submissions
-    where owner_user_id = new.owner_user_id
-      and idempotency_key = new.idempotency_key
-  ) then
-    return new;
-  end if;
-  if (
-    select count(*) from public.player_feedback_submissions
-    where owner_user_id = new.owner_user_id
-      and created_at > pg_catalog.now() - interval '1 hour'
-  ) >= 5 then
-    raise exception 'feedback_rate_limit_exceeded' using errcode = 'P0001';
-  end if;
-  return new;
-end;
-$feedback_rate$;
-
-revoke all on function public.enforce_player_feedback_insert_rate()
-  from public, anon, authenticated;
-
-create trigger player_feedback_insert_rate_guard
-before insert on public.player_feedback_submissions
-for each row execute function public.enforce_player_feedback_insert_rate();
-)
+        private_source_ref ~ '^npc_conversation_log:[1-9][0-9]{0,18}$')
     ),
   constraint player_feedback_owner_idempotency_unique
     unique (owner_user_id, idempotency_key)
