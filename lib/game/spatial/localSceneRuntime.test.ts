@@ -124,6 +124,21 @@ describe('shared local scene runtime', () => {
     expect(targetAccessDistance(scene, player, centre)).toBeCloseTo(6, 5)
   })
 
+  it('uses the surveyed outline rather than its bounding rectangle for diagonal buildings', () => {
+    const centre = { xM: 0, yM: 0 }
+    // This point is walkable inside the 60 m bounding square, but more
+    // than 12 m from the actual diagonal hall wall.
+    const yard = { xM: 20, yM: -20 }
+    expect(isLocalScenePointWalkable(diagonal, yard)).toBe(true)
+    expect(targetAccessDistance(diagonal, yard, centre)).toBeGreaterThan(12)
+
+    // At the opposite end of the hall the player is far from its centre,
+    // but only about 2.12 m from the actual surveyed wall.
+    const besideWall = { xM: 26, yM: 30 }
+    expect(targetAccessDistance(diagonal, besideWall, centre)).toBeCloseTo(3 / Math.SQRT2, 5)
+    expect(targetAccessDistance(diagonal, centre, centre)).toBe(0)
+  })
+
   it('keeps centre distance for targets outside any building (control case)', () => {
     expect(targetAccessDistance(scene, { xM: -20, yM: 4 }, { xM: -30, yM: 4 })).toBeCloseTo(10, 5)
   })
