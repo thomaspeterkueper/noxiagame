@@ -155,9 +155,17 @@ async function main() {
         .select('id').eq('id', foreignId)
       assert.ifError(foreignError)
       assert.equal(foreign?.length, 0, label + ' foreign-id lookup must be empty')
+      // RLS must deny *all* direct player writes, including writes to the
+      // player's own rows. Ownership grants receipt reads, never mutation.
+      await expectDenied(client.from('player_feedback_submissions')
+        .insert(receiptRow(label === 'A' ? a.id : b.id)),
+        label + ' self-owned client insert')
       await expectDenied(client.from('player_feedback_submissions')
         .update({ status: 'accepted_for_planning' }).eq('id', ownId),
         label + ' unauthorized moderation')
+      await expectDenied(client.from('player_feedback_submissions')
+        .delete().eq('id', ownId),
+        label + ' self-owned client delete')
       await expectDenied(client.from('player_feedback_submissions')
         .insert(receiptRow(label === 'A' ? b.id : a.id)),
         label + ' owner-spoofed insert')
