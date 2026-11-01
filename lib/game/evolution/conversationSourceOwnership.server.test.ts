@@ -27,6 +27,21 @@ async function main() {
   assert(JSON.stringify(own).indexOf('PRIVATE') === -1, 'no private transcript returned')
   assert(calls.join('|') === 'from:npc_conversation_log|select:id,player_profile_id|id:42|player_profile_id:' + ownerA + '|maybeSingle',
     'service-role lookup is constrained to both source ID and authenticated owner')
+  // PostgreSQL compares UUIDs case-insensitively. The verified JWT and
+  // database adapter may use different spellings of the same owner UUID.
+  const upperAuth = await verify(source, ownerA.toUpperCase(), reader({ id: '42', player_profile_id: ownerA }))
+  assert(upperAuth.ok, 'uppercase verified owner matches lowercase DB UUID')
+  assert(calls.slice(-5).join('|') ===
+    'from:npc_conversation_log|select:id,player_profile_id|id:42|player_profile_id:' + ownerA.toUpperCase() + '|maybeSingle',
+    'query remains scoped to the actual authenticated UUID')
+  const upperDb = await verify(source, ownerA, reader({ id: 42, player_profile_id: ownerA.toUpperCase() }))
+  assert(upperDb.ok, 'lowercase verified owner matches uppercase DB UUID')
+  const foreignCase = await verify(source, ownerA.toUpperCase(), reader({ id: 42, player_profile_id: ownerB }))
+  assert(!foreignCase.ok && foreignCase.error === 'conversation_source_unavailable',
+    'canonical UUID comparison never admits a different owner')
+  const invalidDbOwner = await verify(source, ownerA, reader({ id: 42, player_profile_id: 42 }))
+  assert(!invalidDbOwner.ok && invalidDbOwner.error === 'conversation_source_unavailable',
+    'non-string database owner fails closed')
   for (const [row, err] of [
     [{ id: 42, player_profile_id: ownerB }, null],
     [null, null],
