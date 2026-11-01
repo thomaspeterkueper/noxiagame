@@ -2,6 +2,10 @@ name: NOXIA player feedback contract
 on:
   pull_request:
     paths:
+      - 'lib/game/civic/**'
+      - 'app/api/game/civic-signals/**'
+      - 'app/earth/PlayerCivicSignalsPanel.tsx'
+      - 'app/earth/page.tsx'
       - 'lib/game/evolution/playerFeedback.ts'
       - 'lib/game/evolution/feedbackReceipt.ts'
       - 'lib/game/evolution/feedbackReceipt.test.ts'
@@ -83,6 +87,12 @@ jobs:
           node .player-feedback-test/feedbackPostInput.test.js
           node .player-feedback-test/feedbackSubmissionAttempt.test.js
           node .player-feedback-test/feedbackSubmitResponse.test.js
+      - name: Verify civic signals projection, view and local draft contracts
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/civic/playerConversationSignals.test.ts lib/game/civic/playerCivicSignalView.test.ts lib/game/civic/playerCivicDraft.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .civic-integration-test
+          node .civic-integration-test/playerConversationSignals.test.js
+          node .civic-integration-test/playerCivicSignalView.test.js
+          node .civic-integration-test/playerCivicDraft.test.js
       - name: Check read-only feedback receipt endpoint boundary (static only)
         run: node scripts/test-player-feedback-read-route.cjs
       - name: Check private feedback receipts panel wiring (static only)
