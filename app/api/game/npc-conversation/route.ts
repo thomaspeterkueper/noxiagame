@@ -469,12 +469,11 @@ export async function POST(request: NextRequest) {
       })
     }
     const playerLower = player.toLocaleLowerCase('de-DE')
-    // Zustimmung: Stichwort des Spielers – oder die Figur sagt selbst zu (Aktionsmarker), und der
-    // Spieler lehnt nicht ab. Antwortet er auf ihr Angebot nur mit „hier direkt bei dir“, geht sie
-    // sonst allein los und er muss von Hand hinterher (31.10.2026).
+    // Ein NPC-Aktionsmarker ist keine Spielerzustimmung. Bewegung nur bei expliziter
+    // positiver Spieleräußerung und ohne gleichzeitige Ablehnung.
     const spokenConsent = /\b(ja|gern|gerne|okay|ok|los|folge|folgen|bleibe|bleiben|komm|komme|gehen wir|machen wir)\b/i.test(playerLower)
     const refusal = /\b(nein|nee|nicht|kein|keine|später|spaeter|stopp|stop|lieber|doch nicht|vergiss)\b/i.test(playerLower)
-    const followConsent = spokenConsent || ((requestedLeadWalk || Boolean(requestedVisitPlace)) && !refusal)
+    const followConsent = spokenConsent && !refusal
     const worldAction = followConsent && requestedVisitPlace
       ? {
           type: 'visit_place' as const,
