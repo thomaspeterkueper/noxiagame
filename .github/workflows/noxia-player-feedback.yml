@@ -1,0 +1,103 @@
+name: NOXIA player feedback contract
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/playerFeedback.ts'
+      - 'lib/game/evolution/feedbackReceipt.ts'
+      - 'lib/game/evolution/feedbackReceipt.test.ts'
+      - 'lib/game/evolution/feedbackReceiptList.ts'
+      - 'lib/game/evolution/feedbackReceiptList.test.ts'
+      - 'lib/game/evolution/feedbackIdempotency.ts'
+      - 'lib/game/evolution/feedbackIdempotency.test.ts'
+      - 'lib/game/evolution/feedbackPostRequest.ts'
+      - 'lib/game/evolution/feedbackPostRequest.test.ts'
+      - 'lib/game/evolution/feedbackPostInput.ts'
+      - 'lib/game/evolution/feedbackPostInput.test.ts'
+      - 'lib/game/evolution/feedbackSubmissionAttempt.ts'
+      - 'lib/game/evolution/feedbackSubmissionAttempt.test.ts'
+      - 'lib/game/evolution/feedbackSubmitResponse.ts'
+      - 'lib/game/evolution/feedbackSubmitResponse.test.ts'
+      - 'scripts/test-player-feedback-submit-panel.cjs'
+      - 'scripts/test-player-feedback-post-route.cjs'
+      - 'lib/game/evolution/feedbackReceiptQuery.ts'
+      - 'lib/game/evolution/feedbackReceiptQuery.test.ts'
+      - 'lib/game/evolution/feedbackReceiptResponse.ts'
+      - 'lib/game/evolution/feedbackReceiptResponse.test.ts'
+      - 'scripts/test-player-feedback-receipts-panel.cjs'
+      - 'app/api/game/feedback/**'
+      - 'scripts/test-player-feedback-read-route.cjs'
+      - 'lib/game/evolution/feedbackSubmissionGate.ts'
+      - 'lib/game/evolution/feedbackSubmissionGate.test.ts'
+      - 'lib/game/evolution/feedbackReviewStatus.ts'
+      - 'lib/game/evolution/feedbackReviewStatus.test.ts'
+      - 'lib/game/evolution/playerFeedback.test.ts'
+      - 'lib/game/evolution/conversationFeedbackBridge.ts'
+      - 'lib/game/evolution/conversationFeedbackBridge.test.ts'
+      - 'lib/game/evolution/conversationSourceOwnership.server.ts'
+      - 'lib/game/evolution/conversationSourceOwnership.server.test.ts'
+      - 'lib/game/evolution/feedbackAuthenticatedPost.ts'
+      - 'lib/game/evolution/feedbackAuthenticatedPost.test.ts'
+      - 'lib/game/evolution/playerFeedbackLocalCopy.ts'
+      - 'lib/game/evolution/playerFeedbackLocalCopy.test.ts'
+      - 'app/earth/feedback/**'
+      - 'supabase/migrations/20261031080000_player_feedback_submissions.sql'
+      - 'supabase/tests/player_feedback_submissions.test.sql'
+      - 'scripts/test-player-feedback-migration.cjs'
+      - 'scripts/test-feedback-conversation-identity-contract.cjs'
+      - 'scripts/test-player-feedback-rls-local.cjs'
+      - 'scripts/test-player-feedback-rls-safety.cjs'
+      - 'scripts/feedback-local-only-fetch.cjs'
+      - 'scripts/test-feedback-local-only-fetch.cjs'
+      - '.github/workflows/noxia-player-feedback.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: noxia-player-feedback-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate feedback contract, conversation bridge and local export
+        run: |
+          npx --yes --package typescript@5.8.3 -- tsc lib/game/evolution/playerFeedback.test.ts lib/game/evolution/conversationFeedbackBridge.test.ts lib/game/evolution/conversationSourceOwnership.server.test.ts lib/game/evolution/feedbackAuthenticatedPost.test.ts lib/game/evolution/playerFeedbackLocalCopy.test.ts lib/game/evolution/feedbackSubmissionGate.test.ts lib/game/evolution/feedbackReviewStatus.test.ts lib/game/evolution/feedbackReceipt.test.ts lib/game/evolution/feedbackReceiptList.test.ts lib/game/evolution/feedbackIdempotency.test.ts lib/game/evolution/feedbackReceiptQuery.test.ts lib/game/evolution/feedbackReceiptResponse.test.ts lib/game/evolution/feedbackPostRequest.test.ts lib/game/evolution/feedbackPostInput.test.ts lib/game/evolution/feedbackSubmitResponse.test.ts lib/game/evolution/feedbackSubmissionAttempt.test.ts --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --outDir .player-feedback-test
+          node .player-feedback-test/playerFeedback.test.js
+          node .player-feedback-test/conversationFeedbackBridge.test.js
+          node .player-feedback-test/conversationSourceOwnership.server.test.js
+          node .player-feedback-test/feedbackAuthenticatedPost.test.js
+          node .player-feedback-test/playerFeedbackLocalCopy.test.js
+          node .player-feedback-test/feedbackSubmissionGate.test.js
+          node .player-feedback-test/feedbackReviewStatus.test.js
+          node .player-feedback-test/feedbackReceipt.test.js
+          node .player-feedback-test/feedbackReceiptList.test.js
+          node .player-feedback-test/feedbackIdempotency.test.js
+          node .player-feedback-test/feedbackPostRequest.test.js
+          node .player-feedback-test/feedbackReceiptQuery.test.js
+          node .player-feedback-test/feedbackReceiptResponse.test.js
+          node .player-feedback-test/feedbackPostInput.test.js
+          node .player-feedback-test/feedbackSubmissionAttempt.test.js
+          node .player-feedback-test/feedbackSubmitResponse.test.js
+      - name: Check read-only feedback receipt endpoint boundary (static only)
+        run: node scripts/test-player-feedback-read-route.cjs
+      - name: Check private feedback receipts panel wiring (static only)
+        run: node scripts/test-player-feedback-receipts-panel.cjs
+      - name: Check direct feedback submit panel (static only)
+        run: node scripts/test-player-feedback-submit-panel.cjs
+      - name: Check authenticated direct feedback POST boundary (static only)
+        run: node scripts/test-player-feedback-post-route.cjs
+      - name: Syntax-check opt-in local RLS harness (no database connection)
+        run: node --check scripts/test-player-feedback-rls-local.cjs
+      - name: Run negative-only local RLS safety gates (no database connection)
+        run: node scripts/test-player-feedback-rls-safety.cjs
+      - name: Verify local-only HTTP transport and redirect refusal (no network)
+        run: node scripts/test-feedback-local-only-fetch.cjs
+      - name: Check cross-route conversation identity contract (static only)
+        run: node scripts/test-feedback-conversation-identity-contract.cjs
+      - name: Check staged feedback migration security contract (static only)
+        run: node scripts/test-player-feedback-migration.cjs
