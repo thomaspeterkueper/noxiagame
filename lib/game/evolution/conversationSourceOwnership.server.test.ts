@@ -29,14 +29,15 @@ async function main() {
     'service-role lookup is constrained to both source ID and authenticated owner')
   // PostgreSQL compares UUIDs case-insensitively. The verified JWT and
   // database adapter may use different spellings of the same owner UUID.
-  const upperAuth = await verify(source, ownerA.toUpperCase(), reader({ id: '42', player_profile_id: ownerA }))
+  const caseOwner = 'a1111111-1111-4111-8111-111111111111'
+  const upperAuth = await verify(source, caseOwner.toUpperCase(), reader({ id: '42', player_profile_id: caseOwner }))
   assert(upperAuth.ok, 'uppercase verified owner matches lowercase DB UUID')
   assert(calls.slice(-5).join('|') ===
-    'from:npc_conversation_log|select:id,player_profile_id|id:42|player_profile_id:' + ownerA.toUpperCase() + '|maybeSingle',
+    'from:npc_conversation_log|select:id,player_profile_id|id:42|player_profile_id:' + caseOwner.toUpperCase() + '|maybeSingle',
     'query remains scoped to the actual authenticated UUID')
-  const upperDb = await verify(source, ownerA, reader({ id: 42, player_profile_id: ownerA.toUpperCase() }))
+  const upperDb = await verify(source, caseOwner, reader({ id: 42, player_profile_id: caseOwner.toUpperCase() }))
   assert(upperDb.ok, 'lowercase verified owner matches uppercase DB UUID')
-  const foreignCase = await verify(source, ownerA.toUpperCase(), reader({ id: 42, player_profile_id: ownerB }))
+  const foreignCase = await verify(source, caseOwner.toUpperCase(), reader({ id: 42, player_profile_id: ownerB }))
   assert('error' in foreignCase && foreignCase.error === 'conversation_source_unavailable',
     'canonical UUID comparison never admits a different owner')
   const invalidDbOwner = await verify(source, ownerA, reader({ id: 42, player_profile_id: 42 }))
