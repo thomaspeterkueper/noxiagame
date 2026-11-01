@@ -90,8 +90,24 @@ async function main() {
       assert.equal(data.player_profile_id, owner.id, 'Conversation owner must be auth user UUID')
     }
     // Invoke the same server-side provenance verifier used by feedback POST.
-    // The TS module is loaded only when the local Node runtime supports TS.
-    const { verifyConversationSourceOwnership } = require('../lib/game/evolution/conversationSourceOwnership.server.ts')
+    // Compile the exact TypeScript production verifier with the project's TypeScript
+    // dependency; do not rely on version-specific Node native TS loading.
+    const fs = require('node:fs')
+    const Module = require('node:module')
+    const path = require('node:path')
+    const ts = require('typescript')
+    const verifierPath = path.resolve(__dirname, '../lib/game/evolution/conversationSourceOwnership.server.ts')
+    const compiled = ts.transpileModule(fs.readFileSync(verifierPath, 'utf8'), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+      fileName: verifierPath,
+      reportDiagnostics: true,
+    })
+    assert.equal(compiled.diagnostics?.length ?? 0, 0, 'Verifier TS transpilation must succeed')
+    const verifierModule = new Module(verifierPath, module)
+    verifierModule.filename = verifierPath
+    verifierModule.paths = module.paths
+    verifierModule._compile(compiled.outputText, verifierPath)
+    const { verifyConversationSourceOwnership } = verifierModule.exports
     for (let i = 0; i < 2; i++) {
       const checkedOwn = await verifyConversationSourceOwnership(
         'npc_conversation_log:' + conversationIds[i], ids[i], service)
