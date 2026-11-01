@@ -7,7 +7,7 @@ import { projectFeedbackReceipt } from './feedbackReceipt'
  */
 function receiptInstantMicros(timestamp: string): bigint {
   const fraction = /\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/.exec(timestamp)?.[1] ?? ''
-  return BigInt(Date.parse(timestamp)) * 1000n + BigInt(fraction.padEnd(6, '0').slice(3) || '0')
+  return BigInt(Date.parse(timestamp)) * BigInt(1000) + BigInt(fraction.padEnd(6, '0').slice(3) || '0')
 }
 
 /** Presentation-only projection of already owner-scoped rows; never performs authorization. */
