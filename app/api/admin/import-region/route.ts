@@ -543,6 +543,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'slug, label, lat, lon und radius > 0 erforderlich' }, { status: 400 })
   }
 
+  // Persisted Earth regions belong to NOXIA after initial import.
+  // Administrative OSM re-import must not erase simulated city history.
+  if (body === 'earth') {
+    const { data: existing, error: lookupError } = await supabase
+      .from('celestial_regions').select('id').eq('slug', slug).maybeSingle()
+    if (lookupError) return NextResponse.json({ error: 'Regionsstatus nicht lesbar' }, { status: 503 })
+    if (existing) {
+      const { data: feature, error: featureError } = await supabase
+        .from('region_features').select('id').eq('region_id', existing.id).limit(1)
+      if (featureError) return NextResponse.json({ error: 'Regionsbestand nicht lesbar' }, { status: 503 })
+      if (feature?.length) return NextResponse.json({
+        error: 'Region ist NOXIA-eigener persistierter Weltzustand; Reimport blockiert',
+        regionId: existing.id,
+      }, { status: 409 })
+    }
+  }
+
   const bounds = boundsFor(lat, lon, radiusKm)
 
   try {

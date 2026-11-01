@@ -435,37 +435,18 @@ export async function materializeEarthPlace(input: {
       .filter(row => !row.enrichment && row.feature_type !== 'arrival_node')
       .map(row => String(row.id))
 
-    // Create once, persist, enrich incrementally. Existing geography is
-    // authoritative until a geography refresh succeeds. A snapshot written by
-    // an older import profile is refreshed; if that fails it simply stays.
-    if (existingFeatureIds.length > 0 && Number(existing.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION) {
-      input = { ...input, refreshGeography: true }
-    }
-    if (existingFeatureIds.length > 0 && !input.refreshGeography) {
-      const versionPatch: Record<string, unknown> = {}
-      if (Number(existing.geography_import_version ?? 0) < EARTH_GEOGRAPHY_IMPORT_VERSION) {
-        versionPatch.geography_import_version = EARTH_GEOGRAPHY_IMPORT_VERSION
-      }
-      if (Number(existing.normalization_version ?? 0) < EARTH_NORMALIZATION_VERSION) {
-        versionPatch.normalization_version = EARTH_NORMALIZATION_VERSION
-      }
-      if (Number(existing.enrichment_version ?? 0) < EARTH_ENRICHMENT_VERSION) {
-        versionPatch.enrichment_version = EARTH_ENRICHMENT_VERSION
-      }
-      if (String(existing.source ?? '') === 'noxia:materialization-failed') {
-        versionPatch.source = 'overpass:retained-snapshot'
-      }
-      if (Object.keys(versionPatch).length > 0) {
-        const { error } = await supabase.from('celestial_regions').update(versionPatch).eq('id', existing.id)
-        if (error) throw error
-      }
+    // NOXIA-owned geography: after the first successful persisted import,
+    // OSM is provenance only. Never replace geography merely because an
+    // import profile changed or a refresh was requested. Future changes
+    // must be authored as Core world-state events/overlays instead.
+    if (existingFeatureIds.length > 0) {
       return {
         ok: true,
         status: 'ready' as const,
         slug: input.slug,
         regionId: existing.id,
         total: existingFeatureIds.length,
-        source: versionPatch.source ?? existing.source,
+        source: existing.source,
         persistedSnapshot: true,
       }
     }
