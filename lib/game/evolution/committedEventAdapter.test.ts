@@ -155,4 +155,49 @@ assert(projectedEstablish.events[0]?.change.action === 'establish' &&
   projectedEstablish.events[0].change.asset.name === 'Original',
   'later nested asset mutation cannot rewrite established historical asset')
 
+
+ // Runtime Core JSON may contain private or future fields not present in the
+ // public CityChange contract. Do not copy those into the city history feed.
+const extraFields = [
+  { ...receipt('extra-rename', 2050, true, { action: 'rename', assetId: 'hall', name: 'Public' }),
+    change: { action: 'rename', assetId: 'hall', name: 'Public', privateMemo: 'secret' } },
+  { ...receipt('extra-establish', 2080, true, { action: 'establish', asset: {
+    id: 'public-lab', kind: 'institution', name: 'Labor',
+    districtId: 'center', introducedYear: 2080,
+  } }), domain: 'institutions',
+    change: { action: 'establish', asset: {
+      id: 'public-lab', kind: 'institution', name: 'Labor',
+      districtId: 'center', introducedYear: 2080,
+      privateOwnerId: 'not-for-public-history', nested: { token: 'secret' },
+    } } },
+] as unknown as CommittedWorldReceipt[]
+const publicOnly = adaptCommittedWorldEvents(extraFields)
+assert(publicOnly.events.length === 2 && publicOnly.rejected.length === 0,
+  'valid receipts with extra JSON fields remain projectable')
+assert(Object.keys(publicOnly.events[0].change).sort().join(',') === 'action,assetId,name',
+  'private rename fields cannot leak into public history')
+const publicAsset = publicOnly.events[1].change
+assert(publicAsset.action === 'establish' &&
+  Object.keys(publicAsset.asset).sort().join(',') ===
+    'districtId,id,introducedYear,kind,name',
+  'private or nested asset fields cannot leak into public history')
+// The signature already ignores extra fields. Canonical output must agree:
+// duplicate JSON envelopes with different private metadata cannot change
+// the accepted public projection or its duplicate classification.
+const extraTwin = {
+  ...extraFields[1], change: { action: 'establish', asset: {
+    id: 'public-lab', kind: 'institution', name: 'Labor',
+    districtId: 'center', introducedYear: 2080, privateOwnerId: 'different',
+  } },
+} as unknown as CommittedWorldReceipt
+for (const input of [[extraFields[1], extraTwin], [extraTwin, extraFields[1]]]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 1 && result.rejected[0]?.reason === 'duplicate',
+    'private metadata differences must not create ambiguous public history')
+  const projected = result.events[0].change
+  assert(projected.action === 'establish' &&
+    Object.keys(projected.asset).sort().join(',') === 'districtId,id,introducedYear,kind,name',
+    'public history shape must not depend on duplicate input order')
+}
+
 console.log('Committed city event adapter: tests passed')
