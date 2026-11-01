@@ -49,9 +49,9 @@ export function isMarsSurfaceSite(location: LocationBodyInput | null | undefined
   return resolveLocationBody(location) === 'mars'
 }
 
-/** Orte mit eigener Oberflächenansicht – fest (Mond, Mars, Phobos, Deimos) oder über den Körper. */
+/** Orte mit eigener Oberflächenansicht – fest (Mond, Mars, Phobos, Deimos, begehbare Stationen) oder über den Körper. */
 export function hasDedicatedSurfaceView(slug: string, location?: LocationBodyInput | null): boolean {
-  if (['moon', 'mars', 'phobos', 'deimos'].includes(slug)) return true
+  if (['moon', 'mars', 'phobos', 'deimos', 'prometheus', 'q1'].includes(slug)) return true
   return isMarsSurfaceSite(location ?? null)
 }
 

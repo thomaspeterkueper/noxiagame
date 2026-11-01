@@ -11,11 +11,11 @@
 // die zu einem Ort geht) ist keine Tafel, sondern ein Vermerk, der im Innenraum
 // genutzt wird.
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
-import type { ColonyResident } from '@/lib/store/colonyStateStore'
+import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
@@ -31,6 +31,8 @@ import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
 import LandPanel from './LandPanel'
+import BuildingHistory from './BuildingHistory'
+import PlaceStory from './PlaceStory'
 import TicketCounter from '@/app/components/TicketCounter'
 import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
@@ -112,6 +114,9 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 
 /** Baubarer Typ aus /api/game/build/spatial (available). */
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean; requiredUnlock?: string | null } }
+
+/** Die wichtigsten Gebäude, die alle Einwohner kennen: Eine Person führt den Spieler auch über größere Entfernung dorthin (31.10.2026). */
+const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
 
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
@@ -479,7 +484,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 
   async function talk() {
     if (!person || !engine || !message.trim() || sending || conversationEnd.isEnded(person.id)) return
-    const playerMessage = message.trim().slice(0, 80)
+    const playerMessage = message.trim().slice(0, 400)
     const history = conversations[person.id] ?? []
     // Was die Person von ihrem Platz aus sehen kann (45 m): NOXIA-Gebäude,
     // Wahrzeichen, Baustellen, Wasser, Wald – wie in der bisherigen Erdszene.
@@ -490,8 +495,18 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const places = [
       ...noxia.map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'aktiv' })),
       ...around.landmarks.map(item => ({ targetRef: landmarkRef(item.landmark), name: item.landmark.name, kind: landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, status: 'sichtbar' })),
-    ].filter(place => place.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 10)
-    const nearbyPlaces = places.map((place, index) => ({ key: 'p' + index, targetRef: place.targetRef, name: place.name, kind: place.kind, distanceM: Math.round(place.distanceM) }))
+    ].filter(place => place.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 8)
+    // Wenige bekannte, weiter entfernte Ziele (Agentur für Arbeit …), zu denen die Person führen kann.
+    const farPlaces = noxia
+      .filter(item => FAR_GUIDE_KINDS.has(item.typeId) && !places.some(place => place.targetRef === item.id))
+      .map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'bekannt' }))
+      .filter(place => place.distanceM > 45 && place.distanceM <= 3000)
+      .sort((a, b) => a.distanceM - b.distanceM)
+      // Von jeder Art das nächste – so bleibt die Liste kurz.
+      .filter((place, index, all) => all.findIndex(other => other.kind === place.kind) === index)
+      .slice(0, 6)
+    const nearbyPlaces = [...places.map(place => ({ ...place, far: false })), ...farPlaces.map(place => ({ ...place, far: true }))]
+      .map((place, index) => ({ key: 'p' + index, targetRef: place.targetRef, name: place.name, kind: place.kind, distanceM: Math.round(place.distanceM), far: place.far }))
     const localFacts = [
       `Ort: ${placeName}`,
       ...(street ? [`Ihr steht an der ${street}.`] : []),
@@ -514,6 +529,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         }),
       })
       const json = await response.json().catch(() => ({}))
+      if (response.ok && json?.identityLearned) void refreshResidents()
       const reply = response.ok && json.reply ? String(json.reply) : 'Die Person kann gerade nicht antworten.'
       setConversations(current => ({ ...current, [person.id]: [...(current[person.id] ?? []), { role: 'user' as const, content: playerMessage }, { role: 'assistant' as const, content: reply }].slice(-10) }))
       if (response.ok) setMessage('')
@@ -524,7 +540,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         const landmark = around.landmarks.find(item => landmarkRef(item.landmark) === action.targetRef)?.landmark
         const target = building ? { lat: building.lat, lon: building.lon } : landmark?.at
         if (target) {
-          const seconds = Math.max(4, Math.min(35, Number(action.durationSeconds ?? 8)))
+          const seconds = Math.max(4, Math.min(120, Number(action.durationSeconds ?? 8)))
           engine.sendPerson(person.id, target, seconds)
           setVisits(current => ({ ...current, [person.id]: String(action.targetRef) }))
           if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
@@ -557,7 +573,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   if (panel.kind === 'landmarkInside') {
     const service = worshipAt(worship, { source: panel.source, at: panel.landmark.at })
     const occasion = service?.running ? { ...service.running, tradition: service.tradition, host: service.host } : undefined
-    return <LandmarkWalkableInterior occasion={occasion} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
+    return <LandmarkWalkableInterior occasion={occasion} placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
       people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
   }
   if (panel.kind === 'none') return null
@@ -571,12 +587,14 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <dl><dt>Tut gerade</dt><dd>{leading[person.id] ? 'geht voraus' : visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
-        ? <div className="row"><input value={message} maxLength={80} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+        ? <div className="row"><input value={message} maxLength={400} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         : <div className="row"><span>{personDistance === null ? 'Nicht in Sichtweite.' : `${Math.round(personDistance)} m entfernt – zu weit zum Ansprechen.`}</span>{personDistance !== null && <button onClick={() => walkTo(() => engine?.personAt(person.id) ?? null, TALK_RANGE_M - 2)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
     </>}
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
     {building && <>
       <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}{building.poi && <span>Hier: {building.poi.name} · {landmarkLabel(building.poi.kind, building.poi.tags)}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      <PlaceStory source={building.source}/>
+      <BuildingHistory entityId={building.noxiaId} sourceRef={building.source}/>
       {realUse && <dl>
         <dt>Größe</dt><dd>{buildingSizeLine(offer?.areaM2 ?? building.areaM2 ?? 0, offer?.levels ?? building.levels ?? 1)}</dd>
         {!own?.own && <><dt>Nutzung</dt><dd>{realUse.text}</dd></>}
@@ -716,6 +734,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     </>}
     {panel.kind === 'plot' && <>
       <div className="head"><div><small>FREIE FLÄCHE</small><b>{plot?.name ?? 'Freie Fläche'}</b>{plot && <span>{Math.round(plot.w)} × {Math.round(plot.d)} m · {plot.own ? 'dein Grundstück' : 'gehört einem anderen Spieler'}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+      <BuildingHistory sourceRef={panel.source}/>
       {plot?.own && (buildables === null ? <p>Bautypen werden geladen …</p>
         : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}{item.requirements?.knowledgeOk === false && <> <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
           : <p>Kein Bautyp passt auf diese Fläche.</p>)}
@@ -757,7 +776,34 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 }
 
 /** Termin eines Gotteshauses: läuft gerade (mit Zahl der Besucher) oder nächster Beginn. */
+/** Der Spieler hat den Namen einer Person erfahren (Gespräch, Aushang): als bekannt merken und Figuren neu laden. */
+async function rememberPerson(personId: string, sourceKind: string) {
+  try {
+    const { token } = await getSessionInfo()
+    if (!token) return
+    const response = await fetch('/api/game/population/identity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ personId, state: 'known', sourceKind }),
+    })
+    if (response.ok) await refreshResidents()
+  } catch { /* beim nächsten Laden wieder */ }
+}
+
+async function refreshResidents() {
+  const { locationSlug, refresh } = useColonyStateStore.getState()
+  if (locationSlug) await refresh(locationSlug, { background: true })
+}
+
 function ScheduleLine({ item }: { item: WorshipItem }) {
+  // Der Name der Leitung steht hier lesbar: Wer ihn gelesen hat, kennt sie (31.10.2026).
+  const hostKnown = useColonyStateStore(state => state.residents.find(resident => resident.id === item.host.id)?.identityState)
+  const learned = useRef(false)
+  useEffect(() => {
+    if (learned.current || !hostKnown || hostKnown === 'known') return
+    learned.current = true
+    void rememberPerson(item.host.id, 'worship_host')
+  }, [hostKnown, item.host.id])
   if (item.running) return <p className="muted"><b>Jetzt: {item.running.label}</b> mit {item.host.name}{item.running.attendees ? ` · ${item.running.attendees} ${item.running.attendees === 1 ? 'Besucher(in)' : 'Besucher'}` : ''}. Alle sind willkommen – mitfeiern, zuhören oder hinten sitzen.</p>
   return <>
     {item.next && <p className="muted">Nächster Termin: {item.next.label} · {item.next.when} ({item.host.name})</p>}

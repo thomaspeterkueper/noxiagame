@@ -216,3 +216,95 @@ export function workingFact(role: ShiftRole, staff: boolean): string {
     ? `Dein Gegenüber arbeitet diese Schicht mit dir, als ${ROLE_LABEL[role]}`
     : `Dein Gegenüber arbeitet hier, als ${ROLE_LABEL[role]}`
 }
+
+// ── Bezahlung nach Leistung (Thomas, 30.10.2026) ────────────────────────────
+// „Geld gibt es nur, wenn auch die Aufgaben erfüllt wurden, sonst Abzüge;
+// eventuell auch keine Folgeanstellung am selben Ort, wenn bei drei Schichten
+// immer noch keine Aufgaben erledigt wurden. Das sollte der Besitzer auch
+// erklären. Für Nichtstun gibt es kein Geld.“
+// Gerechnet wird in der Datenbank (noxia_close_player_shift); hier dieselben
+// Regeln für Anzeige, Tests und das Wissen des Personals.
+
+/** Ab diesem Anteil erledigter Pflichten gibt es den vollen Lohn. */
+export const FULL_PAY_SHARE = 0.75
+/** So viele Schichten ohne erledigte Aufgabe in Folge – dann keine Schicht mehr im Haus. */
+export const EMPTY_SHIFT_LIMIT = 3
+export const BLOCK_DAYS = 7
+
+/** Pflichten, die bis `playedS` erschienen sind (Takt der Stelle). */
+export function offeredDuties(role: ShiftRole, playedS: number): number {
+  const s = Math.max(0, Math.min(EINSATZ_S, playedS))
+  return (PERIODS[role] ?? []).reduce((sum, duty) => sum + Math.floor(s / duty.everyS), 0)
+}
+
+/** Wie viele Aufgaben für den vollen Lohn nötig sind (Gästeaufgaben zählen mit). */
+export function requiredTasks(role: ShiftRole, playedS: number): number {
+  return Math.max(1, Math.ceil(FULL_PAY_SHARE * offeredDuties(role, playedS)))
+}
+
+export interface ShiftPay { full: number; required: number; wage: number; deduction: number }
+
+/** Lohn nach Leistung: voll ab drei Vierteln, darunter anteilig, ohne Aufgabe nichts. */
+export function shiftPay(input: { role: ShiftRole; wagePerHour: number; gameHours: number; playedS: number; tasksDone: number }): ShiftPay {
+  const played = Math.max(0, Math.min(EINSATZ_S, input.playedS))
+  const full = Math.round(input.wagePerHour * input.gameHours * played / EINSATZ_S)
+  const required = requiredTasks(input.role, played)
+  const wage = input.tasksDone <= 0 ? 0 : Math.round(full * Math.min(1, input.tasksDone / required))
+  return { full, required, wage, deduction: Math.max(0, full - wage) }
+}
+
+export interface ShiftStanding {
+  emptyStreak: number
+  blockedUntil: string | null
+  nextShiftAt: string | null
+  last?: { role: ShiftRole; tasks: number; required: number | null; wage: number | null; full: number | null; deduction: number | null } | null
+}
+
+export function standingFrom(raw: any): ShiftStanding {
+  return {
+    emptyStreak: Number(raw?.emptyStreak ?? 0) || 0,
+    blockedUntil: raw?.blockedUntil ? String(raw.blockedUntil) : null,
+    nextShiftAt: raw?.nextShiftAt ? String(raw.nextShiftAt) : null,
+    last: raw?.last && typeof raw.last === 'object' ? { role: raw.last.role, tasks: Number(raw.last.tasks ?? 0), required: raw.last.required ?? null, wage: raw.last.wage ?? null, full: raw.last.full ?? null, deduction: raw.last.deduction ?? null } : null,
+  }
+}
+
+const dayText = (iso: string) => new Date(iso).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'numeric' })
+const shifts = (n: number) => n === 1 ? 'eine Schicht' : n === 2 ? 'zwei Schichten' : n === 3 ? 'drei Schichten' : `${n} Schichten`
+
+/**
+ * Was das Personal über Lohn und den Ruf des Gegenübers im Haus weiß – im Namen
+ * des Betreibers. Gäste wissen davon nichts.
+ */
+export function employerShiftFacts(input: { employer: string; standing: ShiftStanding | null; working: boolean; paid: boolean }): string[] {
+  const { employer, standing } = input
+  const facts: string[] = []
+  if (standing?.blockedUntil) {
+    facts.push(`${employer} stellt dein Gegenüber bis ${dayText(standing.blockedUntil)} hier nicht mehr ein: drei Schichten ohne eine erledigte Aufgabe; erklär es ruhig`)
+    return facts
+  }
+  if (input.paid) facts.push(`Lohn zahlt ${employer} nur für Erledigtes: ab drei Vierteln der Aufgaben voll, darunter weniger; für Nichtstun gibt es nichts`)
+  if (standing && standing.emptyStreak > 0) {
+    const left = EMPTY_SHIFT_LIMIT - standing.emptyStreak
+    facts.push(`Dein Gegenüber hat hier zuletzt ${shifts(standing.emptyStreak)} nichts erledigt; noch ${left === 1 ? 'eine solche' : shifts(left).replace(' Schichten', ' solche')}, dann stellt ${employer} es eine Woche nicht ein`)
+  } else if (standing?.last && standing.last.deduction && standing.last.deduction > 0 && !input.working) {
+    facts.push(`Letzte Schicht deines Gegenübers hier: ${standing.last.tasks} von ${standing.last.required ?? '?'} Aufgaben erledigt, ${standing.last.wage ?? 0} von ${standing.last.full ?? 0} Cr Lohn`)
+  }
+  return facts.map(f => f.length > 140 ? f.slice(0, 139) + '…' : f)
+}
+
+/** Was der Betreiber am Ende der Schicht sagt – und was gebucht wurde. */
+export function shiftEndText(input: { employer: string; tasks: number; required: number; wage: number; full: number; deduction: number; ownVenue?: boolean; shortPaid?: number; standing: ShiftStanding | null }): string {
+  const who = input.employer.charAt(0).toLocaleUpperCase('de-DE') + input.employer.slice(1)
+  const done = input.tasks === 1 ? '1 Aufgabe' : `${input.tasks} Aufgaben`
+  if (input.ownVenue) return `Schicht im eigenen Haus beendet: ${done} erledigt. Lohn zahlst du dir hier nicht.`
+  if (input.tasks <= 0) {
+    const s = input.standing
+    const tail = s?.blockedUntil ? ` Drei Schichten ohne Arbeit – bis ${dayText(s.blockedUntil)} stellt man dich hier nicht mehr ein.`
+      : s && s.emptyStreak > 0 ? ` Noch ${shifts(EMPTY_SHIFT_LIMIT - s.emptyStreak)} so, dann stellt man dich hier eine Woche nicht mehr ein.` : ''
+    return `${who}: „Für Nichtstun gibt es kein Geld.“ Kein Lohn – keine Aufgabe erledigt.${tail}`
+  }
+  const short = input.shortPaid && input.shortPaid > 0 ? ` ${who} konnte ${input.shortPaid} Cr nicht zahlen.` : ''
+  if (input.deduction > 0) return `${who}: „${done} von ${input.required} – dafür gibt es ${input.wage} von ${input.full} Cr.“ Abzug ${input.deduction} Cr für Liegengebliebenes.${short}`
+  return `${who}: „Gute Schicht.“ ${done} erledigt, Lohn ${input.wage} Cr.${short}`
+}

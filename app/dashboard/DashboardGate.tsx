@@ -22,6 +22,7 @@ import DashboardMoonSurface from './DashboardMoonSurface'
 import DashboardMarsSurface from './DashboardMarsSurface'
 import DashboardPhobosSurface from './DashboardPhobosSurface'
 import DashboardDeimosSurface from './DashboardDeimosSurface'
+import DashboardStationSurface from './DashboardStationSurface'
 import DashboardProfileBridge from './DashboardProfileBridge'
 import EarthInteractionManager from './EarthInteractionManager'
 import EarthRegionSwitcherOverlay from './EarthRegionSwitcherOverlay'
@@ -90,6 +91,7 @@ export default function DashboardGate({ locations, prices, orders }: { locations
     <DashboardMarsSurface />
     <DashboardPhobosSurface locations={locations} prices={prices} orders={orders} />
     <DashboardDeimosSurface locations={locations} prices={prices} orders={orders} />
+    <DashboardStationSurface locations={locations} prices={prices} orders={orders} />
     <DashboardProfileBridge />
     <DashboardHudManager />
     <DashboardLocationDockManager />

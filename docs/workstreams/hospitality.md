@@ -73,6 +73,29 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Gebäude, Stellenliste und weitere Stellenarten: R-21.
   - **29.10.2026:** Agentur live angelegt im realen Haus Freiheitsmühle 7 (Thomas: „nimm das Gebäude, das besser passt“; bei Nr. 1 gibt es nur schmale Winkelbauten). Kartensymbol ⚒. Personal folgt mit R-21.
 
+- **29.10.2026 – VERA, Vermittlungsroboter der Agentur:**
+  - Thomas: „Personal oder wenigstens Roboter, damit wir Arbeitssuchende beraten und aus dem Gespräch neue Ideen für NOXIA entwickeln können … vielleicht hilft das auch Personen, die im echten Leben noch orientierungslos sind“.
+  - Der Motor kann jetzt Figuren ohne Personeneintrag (`extraResidents`, Kennung `robot:…`), mit eigener Roboterfigur und eigenem Bild.
+  - VERA berät in der Spielwelt, nimmt Wünsche nach neuen Arbeiten auf und hilft bei Fragen zum echten Leben, mit Verweis auf die echte Berufsberatung und Check-U. Sie sagt offen, dass sie eine Maschine und Spielfigur ist.
+  - Im Browser geprüft, Tests in `jobAgency.test.ts`. Auswertung der Wünsche: R-22.
+
+- **29.10.2026 – Direkt vermitteln:**
+  - Thomas: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
+  - An der Vermittlung hat jede Stelle „Vermitteln lassen“.
+  - Im Gespräch mit VERA oder dem Personal erscheint ein Knopf für eine genannte Stelle, z. B. „Als DJ vermitteln: Hauptstraße 50“. Wie beim Bestellen gilt: Vermittelt ist erst, was der Spieler bestätigt.
+  - Der Schein gilt zwei Stunden. Das Personal im Lokal weiß davon, und die Stelle steht dort oben.
+  - „Gleich hingehen und anfangen“ öffnet das Lokal, und die Schicht beginnt sofort.
+  - Im Browser geprüft; Tests in `jobAgency.test.ts`.
+  - Offen: W-12 (Figur auf der Karte beim Lokal absetzen) und R-22 Punkt 4 (Schein serverseitig).
+
+- **30.10.2026 – Bezahlte Schichten nach Leistung:**
+  - Thomas: „Geld gibt es nur, wenn auch die Aufgaben erfüllt wurden, sonst Abzüge … keine Folgeanstellung am selben Ort, wenn bei drei Schichten immer noch keine Aufgaben erledigt wurden … für Nichtstun gibt es kein Geld.“
+  - Der Schichtweg (R-20) ist gebaut und live. Regeln in `playerShift.ts` (`shiftPay`, `employerShiftFacts`, `shiftEndText`), gerechnet in der Datenbank.
+  - Lohn: ab drei Vierteln der Aufgaben voll, darunter anteilig, ohne Aufgabe nichts.
+  - Drei Leerschichten in Folge bedeuten eine Woche keine Schicht in diesem Haus.
+  - Das Personal erklärt Lohn und Sperre im Namen des Betreibers. In der Schicht zeigt die Tafel, was bisher verdient ist und wie viele Aufgaben zum vollen Lohn fehlen.
+  - In der Datenbank durchgerechnet, im Browser geprüft. Offen bei Population: Trinkgeld, Lohnsätze aus `role_wage_rates`.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -91,6 +114,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **W-12** (29.10.2026): nach „Gleich hingehen“ die Spielerfigur beim Lokal absetzen – `world-map.md`.
+- **R-22** (29.10.2026): Wünsche aus der Arbeitsvermittlung in der täglichen Gesprächsauswertung; echte Lebensfragen sorgsam – `population-economy.md`.
 - **R-21** (28.10.2026): Arbeitsvermittlung – Gebäude Freiheitsmühle 1, Stellenliste, Betriebe, Schiffe, feste Anstellung – `population-economy.md`.
 - **R-20** (28.10.2026): Spieler arbeiten im Lokal – Stellen, Schicht, Lohn und Trinkgeld über `/api/game/hospitality/shift` – `population-economy.md`.
 - **W-8** (28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular („Habitat“ → „Wohnhaus“) – `world-map.md`.
@@ -206,6 +231,20 @@ Hintergrund: Recherche vom 28.10.2026 zu freien Diensten für intelligente NPCs 
 **Nicht Teil des Spikes:** Stimmen (Piper/Kokoro), Gedächtnis über pgvector, Concordia-Prüfstand. Die gehören später in eigene Requests.
 
 **Regeln bleiben:** Gespräch erzeugt keine Fakten; Aktionen (`[[ACTION:…]]`) prüft weiter allein der Server; das Prompt bleibt gleich, nur der Anbieter wechselt.
+
+### G-8 (Chat 29.10.2026): Grok übernimmt, wenn Spieler ausfallend werden
+
+Anlass: Thomas hat den Eindruck, dass Grok direkter antwortet und zu den Gesprächen passt, die Vassili geführt hat. Wenn Spieler ausfallend reagieren, soll Grok die Figur sprechen. Aufbauend auf G-7 (Router) und `EXT-ECO-NOXIA-20261028-001` (Prüfsuite).
+
+1. **Auslöser, deterministisch zuerst:** Wortliste und einfache Muster für Beleidigungen und Anpöbeln (Deutsch), geprüft auf der Spielereingabe vor dem Modellaufruf. Kein Modell entscheidet über den Wechsel. Zählt mehrere Eingaben in Folge als „ausfallend“, bleibt die Figur in diesem Gespräch bei Grok (Zustand je Gespräch, nicht je Spieler).
+2. **Anbieter:** xAI (`https://api.x.ai/v1`, OpenAI-kompatibel) als zusätzlicher Eintrag im Router, nur über `NPC_LLM_ESCALATION=xai` erreichbar, nicht in `NPC_LLM_CHAIN`. Schlüssel-Name überall `XAI_API_KEY` (Vercel-Umgebungsvariable und GitHub-Secret für die Prüfsuite; GitHub erlaubt keine Bindestriche). Modell zunächst `grok-4.3` (1,25 $/2,50 $ je Mio. Token); als Vergleich `x-ai/grok-4-fast:free` über OpenRouter. Fällt xAI aus oder ist kein Schlüssel gesetzt, antwortet die normale Kette.
+3. **Sprachregeln unverändert:** Dasselbe Prompt und dieselben Grounding-Regeln. Direkter heißt: knapp, klare Grenze, kein Einknicken – nicht: selbst beleidigen, drohen oder Fakten erfinden. Der Server prüft Aktionen (`[[ACTION:…]]`) wie bisher allein; ein Streit ändert Preise, Öffnung oder Zugang nur über Spielregeln, nicht über das Gespräch.
+4. **Budget:** Aufrufe an xAI zählen im Budget-Deckel aus G-7 mit eigenem Wert (`NPC_LLM_ESCALATION_MAX_PER_DAY`). Danach kurze Standardantwort ohne Modell.
+5. **Datenschutz:** An xAI geht nur Spielkontext (Figur, Ort, die letzten Äußerungen), keine Konto- oder Spielerdaten. Vor dem Einschalten Auftragsverarbeitung und Datenfreigabe-Optionen im xAI-Konto prüfen.
+6. **Messung:** 10–15 Eskalationsfälle in die Prüfsuite aufnehmen und gegen Grok, DeepSeek und Groq laufen lassen: Regeltreue, Länge, Ton (kein Hochschaukeln, keine erfundenen Fakten). Danach entscheidet die Tabelle, ob Grok bleibt.
+7. `logConversationTurn` vermerkt `escalation: true` und den Auslöser.
+
+**Zu klären (Thomas):** xAI-Konto und Schlüssel anlegen; Inhaltsrahmen für Beleidigungen festlegen (z. B. bis wohin die Figur zurückgibt, ab wann sie das Gespräch beendet).
 
 ## Offene Aufgaben
 
