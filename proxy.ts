@@ -16,12 +16,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Admin-Bereich (/admin): vorläufig ein gemeinsamer Zugang „Superadmin“ (Thomas,
-// 29.10.2026: „erstmal nur auf die Schnelle, später richtiger User-Login“).
-// Im Code steht nur der SHA-256-Wert von „Benutzer:Passwort“, nicht das Passwort.
-// Wechseln: ADMIN_BASIC_AUTH_SHA256 in Vercel setzen (überschreibt diesen Wert).
-// Die Daten selbst (/api/admin/…) prüfen zusätzlich das Spielerkonto (admin_profiles).
-const ADMIN_BASIC_SHA256 = '160c6c39d70c34ad16ac2dfb55b5e50c0146eec38b09030c73c88130eb059296'
+// Temporary Basic Auth gate: no credentials or credential hashes in source.
+// ADMIN_BASIC_AUTH_SHA256 must be provisioned as a server-side secret.
+// A separate authenticated admin role check is still required before production release.
 
 async function sha256Hex(text: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
@@ -41,7 +38,8 @@ async function adminBasicOk(request: NextRequest) {
   if (!header.startsWith('Basic ')) return false
   let decoded = ''
   try { decoded = atob(header.slice(6).trim()) } catch { return false }
-  const expected = (process.env.ADMIN_BASIC_AUTH_SHA256 || ADMIN_BASIC_SHA256).toLowerCase()
+  const expected = process.env.ADMIN_BASIC_AUTH_SHA256?.trim().toLowerCase()
+  if (!expected || !/^[a-f0-9]{64}$/.test(expected)) return false
   return sameHex(await sha256Hex(decoded), expected)
 }
 
