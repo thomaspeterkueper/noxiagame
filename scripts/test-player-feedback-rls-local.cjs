@@ -33,6 +33,7 @@ async function main() {
   const service = createClient(rawUrl, serviceKey, options)
   const anon = createClient(rawUrl, anonKey, options)
   const ids = []
+  const conversationIds = []
   const marker = randomUUID().slice(0, 8)
   const password = randomBytes(24).toString('hex')
   const createUser = async suffix => {
@@ -75,6 +76,29 @@ async function main() {
       })
     }
     const [clientA, clientB] = await Promise.all([login(a), login(b)])
+    // Real conversation rows, tied to auth.users by the deployed schema FK.
+    // Only fixture text is inserted; no production transcript is read.
+    for (const owner of [a, b]) {
+      const { data, error } = await service.from('npc_conversation_log').insert({
+        player_profile_id: owner.id,
+        npc_key: 'feedback-local-test',
+        player_text: 'Disposable local conversation ownership test',
+        outcome: 'reply',
+      }).select('id,player_profile_id').single()
+      if (error || !data?.id) throw Error('Local conversation fixture failed: ' + (error?.code ?? 'unknown'))
+      conversationIds.push(String(data.id))
+      assert.equal(data.player_profile_id, owner.id, 'Conversation owner must be auth user UUID')
+    }
+    for (let i = 0; i < 2; i++) {
+      const own = await service.from('npc_conversation_log')
+        .select('id,player_profile_id').eq('id', conversationIds[i]).eq('player_profile_id', ids[i]).maybeSingle()
+      assert.ifError(own.error)
+      assert.equal(String(own.data?.id), conversationIds[i], 'Own conversation must be discoverable')
+      const foreign = await service.from('npc_conversation_log')
+        .select('id,player_profile_id').eq('id', conversationIds[1-i]).eq('player_profile_id', ids[i]).maybeSingle()
+      assert.ifError(foreign.error)
+      assert.equal(foreign.data, null, 'Foreign conversation must not pass owner-scoped lookup')
+    }
     const fixtureA = receiptRow(a.id)
     const fixtureB = receiptRow(b.id)
     const { data: inserted, error: insertError } = await service.from('player_feedback_submissions')
@@ -147,6 +171,10 @@ async function main() {
     console.log('LOCAL feedback two-user RLS and concurrent rate-limit checks passed; no world/Core writes')
   } finally {
     // Always clean up, even on assertion failure. Local disposable DB ONLY.
+    if (conversationIds.length) {
+      const { error } = await service.from('npc_conversation_log').delete().in('id', conversationIds)
+      if (error) { console.error('Local conversation cleanup failed:', error.code); process.exitCode = 1 }
+    }
     if (ids.length) {
       const { error } = await service.from('player_feedback_submissions')
         .delete().in('owner_user_id', ids)
