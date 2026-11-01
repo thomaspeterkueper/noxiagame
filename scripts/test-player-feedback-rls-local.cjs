@@ -62,6 +62,9 @@ async function main() {
   const expectDenied = async (promise, label) => {
     const { error } = await promise
     assert.ok(error, label + ' must be denied')
+    // A generic transport, schema or missing-table error is NOT evidence of
+    // correct RLS/grant isolation. PostgreSQL must report insufficient privilege.
+    assert.equal(error.code, '42501', label + ' must fail with SQLSTATE 42501')
   }
   try {
     const a = await createUser('a')
@@ -183,6 +186,15 @@ async function main() {
       assert.equal(row?.status, 'submitted_for_review',
         'Denied client moderation must not change receipt status')
     }
+
+    // A rejected INSERT must not create a third row under either identity.
+    // Existing-row checks alone cannot detect an unauthorized extra insertion.
+    const { data: allBeforeBurst, error: beforeBurstError } = await service
+      .from('player_feedback_submissions')
+      .select('id,owner_user_id').in('owner_user_id', [a.id, b.id])
+    assert.ifError(beforeBurstError)
+    assert.equal(allBeforeBurst?.length, 2,
+      'Denied client inserts must not create additional feedback rows')
 
     // Five concurrent NEW submissions for A after its first fixture row: the
     // database advisory lock must allow exactly four and reject the fifth.
