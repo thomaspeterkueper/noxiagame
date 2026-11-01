@@ -6,13 +6,13 @@ const interior = read('app/earth/LandmarkWalkableInterior.tsx')
 const conversation = read('app/api/game/npc-conversation/route.ts')
 const catalogue = read('lib/game/landmarks/theologicalEssays.ts')
 const registry = read('lib/game/landmarks/readingTexts.ts')
-test('interior UI allows 160 characters, with no premature truncation', () => {
-  assert.match(interior, /maxLength=\{160\}/)
-  assert.equal((interior.match(/message\.trim\(\)\.slice\(0, 160\)/g) || []).length, 2)
+test('interior UI allows 500 characters, with no premature truncation', () => {
+  assert.match(interior, /maxLength=\{500\}/)
+  assert.equal((interior.match(/message\.trim\(\)\.slice\(0, 500\)/g) || []).length, 2)
   assert.doesNotMatch(interior, /message\.trim\(\)\.slice\(0, 80\)/)
 })
 test('server accepts same message length', () => {
-  assert.match(conversation, /const MAX_PLAYER_CHARS = 160/)
+  assert.match(conversation, /const MAX_PLAYER_CHARS = 500/)
 })
 test('model output cannot execute NPC credit transfers', () => {
   assert.doesNotMatch(conversation, /transferPlayerToNpcCredits\s*\(/)
