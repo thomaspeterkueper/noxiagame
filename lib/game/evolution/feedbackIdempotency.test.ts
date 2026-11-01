@@ -24,4 +24,13 @@ for (const invalidOwner of [
 }
 assert(check(null, '123E4567-E89B-42D3-A456-426614174000', key, hash) === 'new',
   'case-insensitive UUID syntax remains supported')
+// PostgreSQL UUID equality ignores letter case. A verified owner must replay
+// their own row even when the stored UUID uses another case.
+assert(check(record, owner.toUpperCase(), key, hash) === 'replay', 'uppercase verified UUID replays lowercase DB UUID')
+assert(check({ ...record, owner_user_id: owner.toUpperCase() }, owner, key, hash) === 'replay',
+  'lowercase verified UUID replays uppercase DB UUID')
+assert(check(record, '123e4567-e89b-42d3-a456-426614174001'.toUpperCase(), key, hash) === 'conflict',
+  'different uppercase owner remains a conflict')
+assert(check({ ...record, owner_user_id: 'not-a-uuid' }, owner, key, hash) === 'conflict',
+  'malformed stored owner cannot replay')
 console.log('Feedback idempotency contract tests passed')
