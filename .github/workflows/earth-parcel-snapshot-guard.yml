@@ -6,6 +6,7 @@ on:
       - 'app/api/world-lab/parcels/route.ts'
       - 'lib/worldlab/parcelImportPolicy.ts'
       - 'lib/worldlab/parcelImportPolicy.test.ts'
+      - 'vitest.config.mts'
       - '.github/workflows/earth-parcel-snapshot-guard.yml'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - 'app/api/world-lab/parcels/route.ts'
       - 'lib/worldlab/parcelImportPolicy.ts'
       - 'lib/worldlab/parcelImportPolicy.test.ts'
+      - 'vitest.config.mts'
       - '.github/workflows/earth-parcel-snapshot-guard.yml'
 
 jobs:
