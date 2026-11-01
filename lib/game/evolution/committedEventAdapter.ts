@@ -122,9 +122,18 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
     // This is a projection, not a proof that the upstream authority is genuine.
     // Do not retain references to mutable deserialized Core receipts. A caller
     // changing its input after adaptation must not rewrite projected history.
+    // Project only canonical CityChange/CityAsset fields. Persisted JSON may
+    // carry additional private or future fields that must not leak into public
+    // history or make replay depend on whichever duplicate was encountered first.
     const change: CityChange = r.change.action === 'establish'
-      ? { action: 'establish', asset: { ...r.change.asset } }
-      : { ...r.change }
+      ? { action: 'establish', asset: {
+        id: r.change.asset.id, kind: r.change.asset.kind,
+        name: r.change.asset.name, districtId: r.change.asset.districtId,
+        introducedYear: r.change.asset.introducedYear,
+      } }
+      : r.change.action === 'retire'
+        ? { action: 'retire', assetId: r.change.assetId }
+        : { action: 'rename', assetId: r.change.assetId, name: r.change.name }
     events.push({
       id: r.eventId, settlementId: r.settlementId, year: r.worldYear, sequence: r.sequence,
       provenanceRefs: [r.domainEventRef, r.actorRef], committed: true, change,
