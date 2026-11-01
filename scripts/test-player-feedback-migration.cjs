@@ -22,6 +22,20 @@ for (const [name, pattern] of Object.entries({
   assert.match(migration, pattern, `missing migration safety invariant: ${name}`)
 }
 
+// Fail closed on accidental duplicate SQL blocks or truncated migrations.
+for (const [name, pattern] of Object.entries({
+  table: /create\s+table\s+public\.player_feedback_submissions\s*\(/gi,
+  index: /create\s+index\s+player_feedback_owner_created_idx/gi,
+  function: /create\s+function\s+public\.enforce_player_feedback_insert_rate\s*\(/gi,
+  trigger: /create\s+trigger\s+player_feedback_insert_rate_guard/gi,
+})) {
+  assert.equal([...migration.matchAll(pattern)].length, 1, `expected exactly one ${name} definition`)
+}
+assert.match(migration, /private_source_ref\s*~\s*'\^npc_conversation_log:\[1-9\]\[0-9\]\{0,18\}\$'/i,
+  'conversation source regex must be terminated and anchored')
+assert.match(migration.trimEnd(), /for\s+each\s+row\s+execute\s+function\s+public\.enforce_player_feedback_insert_rate\(\);$/i,
+  'migration must end with a complete rate-limit trigger')
+
 assert.doesNotMatch(migration, /^\s*grant\s+(?:all|insert|update|delete)(?:\s|,)[^;]*to\s+(?:authenticated|anon)\s*;/gim,
   'client must not receive mutation grants')
 assert.match(sqlTest, /NOXIA_FEEDBACK_PRIVATE_COLUMN_EXPOSED/, 'SQL test must check private columns')
