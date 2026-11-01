@@ -36,7 +36,7 @@ export interface ParcelTransition {
   sourceEventRef: string
 }
 export type ParcelRejectionReason =
-  | 'duplicate_event' | 'invalid_receipt' | 'unknown_parcel'
+  | 'duplicate_event' | 'duplicate_source_event' | 'invalid_receipt' | 'unknown_parcel'
   | 'invalid_transition' | 'building_identity_reused'
 export interface ParcelProjection {
   settlementId: string
@@ -77,6 +77,9 @@ export function projectParcelLifecycle(input: {
   const transitions: ParcelTransition[] = []
   const rejected: ParcelProjection['rejected'] = []
   const seen = new Set<string>()
+  // One persisted Core event may affect several parcels, but must not advance
+  // the same parcel twice (e.g. demolition and meadow from one approval).
+  const appliedSourceEvents = new Map<string, Set<string>>()
   // A persisted Core reader can still return malformed historical JSON.
   // Filter and sort defensively BEFORE dereferencing fields; invalid rows must
   // be reported, not crash the entire Seelenberg/Brombach city projection.
@@ -118,16 +121,20 @@ export function projectParcelLifecycle(input: {
       rejected.push({ eventId, reason: 'invalid_receipt' })
       continue
     }
-    // Malformed duplicates must not suppress an otherwise valid committed row.
+    // A rejected event cannot reserve an ID or source reference: a corrupt
+    // historical row must not hide a valid committed receipt with that key.
     if (seen.has(eventId)) {
       rejected.push({ eventId, reason: 'duplicate_event' })
       continue
     }
-    seen.add(eventId)
     const receipt = r as unknown as CoreParcelReceipt
     const parcel = parcels.get(receipt.parcelId)
     if (!parcel) {
       rejected.push({ eventId: receipt.id, reason: 'unknown_parcel' })
+      continue
+    }
+    if (appliedSourceEvents.get(receipt.parcelId)?.has(receipt.sourceEventRef)) {
+      rejected.push({ eventId: receipt.id, reason: 'duplicate_source_event' })
       continue
     }
     const change = receipt.change
@@ -156,6 +163,10 @@ export function projectParcelLifecycle(input: {
       rejected.push({ eventId: receipt.id, reason: 'invalid_transition' })
       continue
     }
+    seen.add(eventId)
+    const refs = appliedSourceEvents.get(receipt.parcelId) ?? new Set<string>()
+    refs.add(receipt.sourceEventRef)
+    appliedSourceEvents.set(receipt.parcelId, refs)
     parcels.set(receipt.parcelId, next)
     transitions.push({ eventId: receipt.id, parcelId: receipt.parcelId, year: receipt.worldYear,
       from: parcel.surface, to: next.surface, sourceEventRef: receipt.sourceEventRef })
