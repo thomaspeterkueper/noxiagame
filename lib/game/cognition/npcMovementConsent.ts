@@ -16,7 +16,8 @@ export function hasNpcMovementConsent(input: {
   if (!player || /\b(nein|nee|nicht|kein|keine|später|spaeter|stopp|stop|vergiss|ohne mich|allein|alleine)\b/i.test(player)) return false
 
   const directRequest = /\b(zeig(?:e|en)?|führ(?:e|en)?|bring(?:e|en)?|begleit(?:e|en)?|komm mit|gehen wir|lass uns|ich folge dir|ich komme mit)\b/i.test(player)
-  const affirmation = /^(ja|ja bitte|ja gern|ja gerne|klar|klar gerne|gern|gerne|ok|okay|los|machen wir|gehen wir|ich folge dir|ich komme mit)[.!? ]*$/i.test(player)
+  const affirmativeText = player.replace(/[,.!?]+/g, ' ').replace(/\s+/g, ' ').trim()
+  const affirmation = /^(ja|ja bitte|ja gern|ja gerne|ja klar|ja ich komme mit|ja ich folge dir|klar|klar gerne|gern|gerne|ok|okay|los|machen wir|gehen wir|ich folge dir|ich komme mit)$/i.test(affirmativeText)
   const offered = /\b(soll ich|kann ich|ich kann|ich könnte|wir können|wir könnten|möchtest du|willst du|lass uns|ich zeige|ich führe|ich bringe|ich begleite|komm mit|gehen wir)\b/i.test(previous)
     && /\b(weg|gehen|laufen|zeigen|zeige|führen|führe|bringen|bringe|begleiten|begleite|mitnehmen|mitkommen|spaziergang|tour|mitgehen)\b/i.test(previous)
   if (!directRequest && !(affirmation && offered)) return false
