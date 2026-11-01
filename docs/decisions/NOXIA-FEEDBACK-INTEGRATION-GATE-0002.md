@@ -28,3 +28,9 @@ Verified against connected NOXIA Supabase project using information_schema and p
 - Conversation hint columns wish_kind, wish_object, wish_npc_denied, opening and outcome exist.
 
 Therefore the direct verifiedBearerUserId-to-player_profile_id comparison matches the deployed schema. The **schema identity blocker is resolved**, but local two-user ownership/HTTP/RLS tests and combined UI build are still outstanding. This read-only schema inspection is NOT a production migration or integration-test success.
+
+## Deployment observation (2026-11-01, read-only)
+
+Production schema: npc_conversation_log has an identity bigint id and RLS enabled. The feedback table player_feedback_submissions is not present in the connected NOXIA production database. This is expected for an unapplied staged migration and means production HTTP feedback POST cannot be acceptance-tested yet. The local disposable database must include both the conversation schema and reviewed feedback migration. Never apply the migration merely to satisfy a test.
+
+The last committed local harness invokes the production provenance verifier after creating two conversation fixtures. Existing GitHub static CI passing does not execute that harness or validate production data access. Do not mark integration complete until the local harness and combined build actually run.
