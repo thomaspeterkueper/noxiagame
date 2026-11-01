@@ -6,6 +6,7 @@ import {
   localSceneInteractions,
   resolveLocalSceneStep,
   routeAcrossLocalScene,
+  targetAccessDistance,
 } from './localSceneRuntime'
 
 describe('shared local scene runtime', () => {
@@ -113,5 +114,17 @@ describe('shared local scene runtime', () => {
     // from walkable ground the wall still stops the step
     const outside = { xM: 10, yM: -10 }
     expect(resolveLocalSceneStep(diagonal, outside, { xM: 2, yM: -2 })).not.toEqual({ xM: 2, yM: -2 })
+  })
+
+  it('measures landmark access to the building edge when the POI centre lies inside a footprint (church entry)', () => {
+    const player = { xM: 8, yM: 12 }
+    const centre = { xM: 20, yM: 12 }
+    expect(Math.hypot(centre.xM - player.xM, centre.yM - player.yM)).toBe(12)
+    expect(targetAccessDistance(scene, { xM: 4, yM: 12 }, centre)).toBeCloseTo(10, 5)
+    expect(targetAccessDistance(scene, player, centre)).toBeCloseTo(6, 5)
+  })
+
+  it('keeps centre distance for targets outside any building (control case)', () => {
+    expect(targetAccessDistance(scene, { xM: -20, yM: 4 }, { xM: -30, yM: 4 })).toBeCloseTo(10, 5)
   })
 })

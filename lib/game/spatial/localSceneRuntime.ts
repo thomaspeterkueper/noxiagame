@@ -308,6 +308,22 @@ export function distanceToBuildingFootprint(point: LocalSurfacePoint, building: 
   return Math.hypot(dx, dy)
 }
 
+/**
+ * Abstand, ab dem ein Spieler ein Ziel (POI/Landmark) nutzen kann. Liegt der
+ * Zielpunkt innerhalb eines begehungssperrenden Gebäudegrundrisses (z. B. eine
+ * Kirche), ist der Mittelpunkt nie erreichbar – dann zählt der Abstand zur
+ * Gebäudegrenze statt zum Mittelpunkt.
+ */
+export function targetAccessDistance(scene: LocalSurfaceScene, player: LocalSurfacePoint, target: LocalSurfacePoint) {
+  const centerDistance = Math.hypot(target.xM - player.xM, target.yM - player.yM)
+  let best = centerDistance
+  for (const building of scene.buildings) {
+    if (!insideFootprint(target, building)) continue
+    best = Math.min(best, distanceToBuildingFootprint(player, building))
+  }
+  return best
+}
+
 export function pointBlockedByBuilding(
   point: LocalSurfacePoint,
   building: LocalSurfaceBuilding,

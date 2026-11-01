@@ -9,7 +9,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import { EARTH_LOCAL_ENRICHMENT_PROFILE, buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
-import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, resolveLocalSceneStep, routeAcrossLocalScene } from '@/lib/game/spatial/localSceneRuntime'
+import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, resolveLocalSceneStep, routeAcrossLocalScene, targetAccessDistance } from '@/lib/game/spatial/localSceneRuntime'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
@@ -353,8 +353,9 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     rotationDeg:Number(selectedBuildingTarget.entity.rotation_deg??0),
     provenance:'canonical',
   }):null
-  const targetInteractionDistance=selectedBuildingDistance??targetDistance
-  const autoWalkStopDistance=selectedBuildingTarget?6:2
+  const landmarkAccessDistance=selectedLandmark?(scene?targetAccessDistance(scene,player,selectedLandmark):targetDistance):null
+  const targetInteractionDistance=selectedBuildingDistance??landmarkAccessDistance??targetDistance
+  const autoWalkStopDistance=selectedBuildingTarget||(selectedLandmark&&landmarkAccessDistance!==null&&landmarkAccessDistance<(targetDistance??0))?6:2
   const canEnterSelectedBuilding=Boolean(selectedBuildingTarget&&selectedBuildingEntry&&selectedBuildingDistance!==null&&selectedBuildingDistance<=8)
 
   function enterSelectedBuilding(){
@@ -772,7 +773,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
           <option value="">{spatialStatus==='loading'?'— Ziele werden geladen —':spatialStatus==='failed'?'— Gebäude nicht geladen —':'— kein Ziel —'}</option>
           {navigationTargets.map(target=>{const away=Math.hypot(target.xM-player.xM,target.yM-player.yM);return <option key={target.id} value={target.id}>{target.name}{away>SCENE_RADIUS_M?` · ${(away/1000).toFixed(1).replace('.',',')} km`:''}</option>})}
         </select></label>
-        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(targetDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(targetDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${selectedLandmark.business?selectedLandmark.business.function:landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(targetDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
+        {navigationTarget&&<div className="earth-target"><b>{navigationTarget.name}</b><span>{Math.round(targetInteractionDistance??targetDistance??0)} m entfernt{(targetDistance??0)<=SCENE_RADIUS_M?<> · Weg {Math.round(navigationRoute?.distanceM??targetDistance??0)} m {navigationRoute?.usesNetwork?'über Wegenetz':''}</>:' · außerhalb des Ausschnitts'}</span>{targetInteractionDistance!==null&&targetInteractionDistance>autoWalkStopDistance&&<button onClick={()=>setAutoWalkTargetId(navigationTarget.id)}>{autoWalkTargetId===navigationTarget.id?'GEHE …':'GEHE DAHIN'}</button>}{selectedBuildingEntry&&<button disabled={!canEnterSelectedBuilding} onClick={enterSelectedBuilding} title={canEnterSelectedBuilding?selectedBuildingEntry.hint:'Gehe bis auf etwa 8 m an das Gebäude heran'}>{canEnterSelectedBuilding?'BETRETEN':'NÄHER HERANGEHEN'}</button>}{selectedLandmark&&<button disabled={(landmarkAccessDistance??Infinity)>12} onClick={()=>setOpenLandmarkId(selectedLandmark.id)} title={(landmarkAccessDistance??Infinity)>12?'Gehe bis auf etwa 12 m heran':`${selectedLandmark.business?selectedLandmark.business.function:landmarkLabel(selectedLandmark.kind,selectedLandmark.tags)} betreten`}>{(landmarkAccessDistance??Infinity)>12?'NÄHER HERANGEHEN':'BETRETEN'}</button>}</div>}
       </div>
       {openLandmark?.business&&<LandmarkWalkableInterior kind={openLandmark.business.room} name={openLandmark.name} typeLabel={openLandmark.business.function} staffRole={openLandmark.business.staffRole} realName={openLandmark.business.realName} services={openLandmark.business.services} knowledge={establishmentKnowledge(openLandmark.business,data.region?.name??'diesem Ort')} onClose={()=>setOpenLandmarkId('')} facts={[
         ['Adresse',[openLandmark.tags['addr:street'],openLandmark.tags['addr:housenumber']].filter(Boolean).join(' ')],
