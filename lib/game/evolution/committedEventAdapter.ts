@@ -120,9 +120,14 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
     if (seen.has(identity)) { rejected.push({ eventId: r.eventId, reason: 'duplicate' }); continue }
     seen.add(identity)
     // This is a projection, not a proof that the upstream authority is genuine.
+    // Do not retain references to mutable deserialized Core receipts. A caller
+    // changing its input after adaptation must not rewrite projected history.
+    const change: CityChange = r.change.action === 'establish'
+      ? { action: 'establish', asset: { ...r.change.asset } }
+      : { ...r.change }
     events.push({
       id: r.eventId, settlementId: r.settlementId, year: r.worldYear, sequence: r.sequence,
-      provenanceRefs: [r.domainEventRef, r.actorRef], committed: true, change: r.change,
+      provenanceRefs: [r.domainEventRef, r.actorRef], committed: true, change,
     })
   }
   events.sort((a, b) => a.settlementId.localeCompare(b.settlementId) || a.year - b.year ||
