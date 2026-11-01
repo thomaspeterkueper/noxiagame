@@ -16,6 +16,7 @@ for (const [name, pattern] of Object.entries({
   ownerKeyUnique: /constraint\s+player_feedback_owner_idempotency_unique\s+unique\s*\(owner_user_id,\s*idempotency_key\)/i,
   consent: /constraint\s+player_feedback_public_requires_consent/i,
   provenance: /constraint\s+player_feedback_source_ref_consistency/i,
+  conversationSourceNonNull: /\(source_kind\s*=\s*'conversation'\s+and\s+private_source_ref\s+is\s+not\s+null\s+and\s+private_source_ref\s*~/i,
   noWorldActions: /no\s+automatic\s+civic\s+authority\s+or\s+Core\/world\s+mutations/i,
 })) {
   assert.match(migration, pattern, `missing migration safety invariant: ${name}`)
@@ -25,4 +26,5 @@ assert.doesNotMatch(migration, /^\s*grant\s+(?:all|insert|update|delete)(?:\s|,)
   'client must not receive mutation grants')
 assert.match(sqlTest, /NOXIA_FEEDBACK_PRIVATE_COLUMN_EXPOSED/, 'SQL test must check private columns')
 assert.match(sqlTest, /NOXIA_FEEDBACK_CLIENT_WRITE_OR_ANON_READ_GRANT/, 'SQL test must check client grants')
+assert.match(sqlTest, /NOXIA_FEEDBACK_CONVERSATION_SOURCE_NONNULL_MISSING/, 'SQL test must check null conversation provenance')
 console.log('Feedback migration static contract passed (SQL/RLS execution not performed)')

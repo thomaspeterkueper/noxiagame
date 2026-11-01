@@ -70,6 +70,17 @@ begin
     raise exception 'NOXIA_FEEDBACK_SOURCE_CHECK_MISSING';
   end if;
 
+  -- PostgreSQL CHECK constraints accept UNKNOWN: a conversation source with
+  -- NULL private_source_ref must be explicitly forbidden, not just regex-tested.
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = t and conname = 'player_feedback_source_ref_consistency'
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%private_source_ref IS NOT NULL%'
+  ) then
+    raise exception 'NOXIA_FEEDBACK_CONVERSATION_SOURCE_NONNULL_MISSING';
+  end if;
+
   if not exists (
     select 1 from pg_trigger
     where tgrelid = t
