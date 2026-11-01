@@ -22,4 +22,11 @@ assert(project([sameInstantOffset, laterMicro])?.map(item => item.id).join(',') 
 const farEarlier = make('123e4567-e89b-42d3-a456-426614174007', '9999-12-31T23:59:59.999998Z')
 const farLater = make('123e4567-e89b-42d3-a456-426614174008', '9999-12-31T23:59:59.999999Z')
 assert(project([farEarlier, farLater], 1)?.[0]?.id === farLater.id, 'far-future microseconds avoid unsafe Number precision')
+// Duplicate UUID spellings must not produce two receipts or evade the display limit.
+assert(project([a, a]) === null, 'duplicate receipt identity rejected')
+assert(project([a, { ...a, id: a.id.toUpperCase() }], 1) === null, 'case-insensitive UUID duplicates rejected before limiting')
+const mixedCaseA = make('ABCDEF12-E89B-42D3-A456-426614174009', '2026-10-31T06:00:00Z')
+const mixedCaseB = make('abcdef12-e89b-42d3-a456-42661417400a', '2026-10-31T06:00:00Z')
+assert(project([mixedCaseB, mixedCaseA])?.map(item => item.id).join(',') ===
+  [mixedCaseA.id, mixedCaseB.id].join(','), 'equal instants use stable canonical ASCII UUID order')
 console.log('Feedback receipt list tests passed')

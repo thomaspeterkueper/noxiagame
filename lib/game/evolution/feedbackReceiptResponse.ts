@@ -23,8 +23,9 @@ export function readPlayerFeedbackReceiptsPayload(input: unknown): PlayerFeedbac
     const receipt = projectFeedbackReceipt({
       id: row.id, title: row.title, status: row.status, created_at: row.createdAt,
     })
-    if (!receipt || row.label !== receipt.label || seen.has(receipt.id)) return invalid
-    seen.add(receipt.id)
+    const canonicalId = receipt?.id.toLowerCase()
+    if (!receipt || row.label !== receipt.label || !canonicalId || seen.has(canonicalId)) return invalid
+    seen.add(canonicalId)
     receipts.push(receipt) // Re-project: never forward unknown or private fields.
   }
   return { ok: true, receipts }
