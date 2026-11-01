@@ -273,7 +273,45 @@ Das Startcafé im realen Haus Hauptstraße 72 trägt das NOXIA-Dach wie die öff
 - **Mishkan Avi:** Kantine am Landeplatz.
 - Geprüft mit einer Testseite der Mond-Szene: alle 27 Gebäude erscheinen, keine Fehler.
 
-**Nicht gemacht:** Die Stationen Prometheus (5 Module) und Q1 (12) haben keine begehbare Ansicht; ihre Module bleiben im Kachelraster, bis die Stationen begehbar werden (eigener Entwurf, offen). Ob der alte Landeplatz und das alte Lager auf Phobos neben den neuen bleiben sollen, entscheidet Thomas. Neue Wohnhabitate aus dem Selbstbau der Bewohner kommen weiter ohne Lage: Request R-19 an Bevölkerung und Ökonomie.
+**Klarstellung 30.10.2026:** Auf Phobos gibt es nur einen Landeplatz; doppelt sind nur die zwei Lager (je 32 × 26 m, 50 m auseinander, ohne Überschneidung). Beide bleiben. Neue Wohnhabitate aus dem Selbstbau der Bewohner kommen weiter ohne Lage: Request R-19 an Bevölkerung und Ökonomie.
+
+## Begehbare Stationen: Prometheus und Q1 (Thomas, 30.10.2026: „erst 1, dann 2“)
+
+**Befund:** Prometheus (Kepler Station) hatte 13 Bauten, Q1 fünf Module ohne Lage in Metern. Die 12 Räume in Q1 (Café, Archivbibliothek, Beobachtungsgalerie, Lernraum, Maker-Raum, Garten, Hafen, Kantine …) und die Hafenkantine auf Prometheus sind Kinder dieser Module (`parent_id`) und bleiben Innenräume ohne eigene Lage.
+
+**Erledigt (Migration `20261030010000_station_layouts.sql`, live; Lageplan in `lib/game/spatial/stationLayouts.ts`):**
+- **Prometheus:** Zentralmodul (Kommandozentrale) in der Mitte, Ringgang um vier Innenmodule (zwei Habitate, Habitatmodul, Wasserrecycler), vier Speichen zu Observatorium (Nord), Lager (Süd), Andockbucht (Ost, 44 × 30 m) und Solarausleger nach Westen. Drei Solarfelder und zwei Scanner hängen an Außenpfaden, die man nur im Anzug begeht.
+- **Q1:** Umsteigeknoten in der Mitte, Hauptgang Ost–West mit Hafenviertel im Osten und Altbogen im Westen, Archiv- und Kulturviertel nordwestlich, Alltagsmodul im Norden, verbunden durch Druckgänge.
+- Abstand der Module mindestens 8 m, jedes Modul liegt an einem Druckgang (Test `stationLayouts.test.ts`). Alte Werte in `station_placement_20261030`.
+- **Ansicht:** `app/dashboard/DashboardStationSurface.tsx` nutzt dieselbe lokale Szene wie Mond und Mars (`PlanetaryWalkableSurface`, Körper `station`); statt Gelände ein dunkles Deck (Palette `station`, keine Krater und Felsen). Freigeschaltet über `hasDedicatedSurfaceView` (Prometheus, Q1). Ein Klick auf ein Modul öffnet seinen Innenraum.
+- Geprüft mit einer Testseite beider Szenen: alle Module, Gänge und die Figur erscheinen, keine Fehler.
+
+**Offen:** Die Module haben noch keine eigenen Bilder (graue Platten wie Bauten ohne Bildvorlage); Prometheus ist in der Karte als „Kepler Station" benannt (Slug `prometheus`). Außerhalb der Gänge gilt im Anzug „frei begehbar" – auf einer Station wäre das der Weltraum; eine eigene Regel „Leere nicht begehbar" folgt, wenn Stationen Außenhüllen bekommen. Die Bewohner dort laufen ab sofort über die Gänge, sobald sie Arbeit oder Wohnung in einem Modul haben (gleiche Logik wie Mond und Mars, dort nicht eigens geprüft).
+
+## Gebäudechronik und Eventstore-Reader (Issue #541, Thomas 30.10.2026: „Ja, mach das“)
+
+**Ziel:** Nach einer bestätigten Core-Aktion (Abriss, Verkauf, Umnutzung) sieht der Spieler eine dauerhafte, nachvollziehbare Änderung auf der Erdkarte. Der Reader vertraut nur persistierten Belegen, nie Angaben des Clients.
+
+**Gebaut (nur lesend, keine Migration, keine Änderung an Produktivdaten):**
+- `lib/worldlab/buildingChronicle.ts` (rein): macht aus `simulation_events` (`entity.created` / `entity.updated` / `entity.deleted` für `tile_entity`) und den Grabsteinen in `earth_cleared_buildings` eine zeitlich geordnete Chronik mit den Arten gebaut, geändert, Eigentümerwechsel, abgerissen. Jeder Eintrag nennt Quelle und Beleg-ID, `own` (gehört dem Betrachter?) und `authorized` (Beleg mit geprüfter Berechtigung). Eine allgemeine Löschung (`deletion_kind=unspecified`, PR #555) ist ausdrücklich **nicht** autorisiert. Lücken werden benannt: `deleted_without_receipt` (Gebäude weg, kein Beleg) und `tombstone_unlinked` (Grabstein ohne Gebäude-ID). `buildingStateAt` spielt den Zustand eines Gebäudes zu einem Zeitpunkt nach (steht / abgerissen / unbekannt).
+- `lib/worldlab/buildingChronicle.server.ts` lädt die Belege (höchstens 500), `app/api/world-lab/building-history/route.ts` liefert sie. Anmeldung nötig, Parameter `entityId` oder `sourceRef`, keine Nutzlast.
+- `lib/worldlab/buildingChronicle.test.ts`: 8 Tests, unter anderem „`committed` in den Ereignisdaten zählt nicht“ und „gelöscht ohne Beleg wird als Lücke gemeldet, nicht als Abriss geraten“.
+
+**Befund im Livesystem (30.10.2026):** 3122 Ereignisse, davon 152 `entity.created` für Gebäude, 38 auf der Erde; kein `entity.updated`, kein `entity.deleted`. `earth_cleared_buildings` ist leer. Es gab also noch keinen echten Abriss; der Reader ist damit bisher nur mit Testdaten geprüft.
+
+**Request an den Core (Blocker aus dem Integrationsaudit vom 29.10.2026, nicht von diesem Teilprojekt zu bauen):**
+1. `demolish_earth_building()` und die Umbaufunktion (`20261025120000_earth_building_residents_and_conversion.sql`) schreiben in derselben Transaktion ein Ereignis (`entity.demolished` bzw. `entity.converted`) mit Gebäude-ID, `source_ref`, Akteur, Art und Eigentumsprüfung; wiederholbar (idempotent über eine Quell-Ereignis-ID).
+2. `earth_cleared_buildings` bekommt die Gebäude-ID und die Ereignis-ID des Abrisses, damit Grabstein und Ereignis sicher zusammengehören.
+3. Eine feste Zuordnung Parzelle ↔ Ereignis (`earth_parcels.id` ist Text, `simulation_events.subject_id` UUID).
+4. Verkäufe: Der Eigentümerwechsel muss als Ereignis erscheinen. Heute überschreibt der Verkauf `profile_id` im Grabstein (`20261025190000_earth_property_sale_tax.sql`), die frühere Geschichte geht verloren.
+Migration nur gesondert, mit Vorabprüfung und Rücknahme (Vorgabe aus dem Issue). PR #555 (Löschen im Eventstore) ist dafür die Grundlage, aber kein Abrissbeleg.
+
+**Anzeige in der Karte (31.10.2026, Thomas: „den Verlauf des Gebäudes und Zeitregler“):**
+- **Verlauf:** Im Infofenster jedes Gebäudes und jeder freien Fläche gibt es einen aufklappbaren Abschnitt „Verlauf“ (`app/world-lab/BuildingHistory.tsx`). Er lädt erst beim Aufklappen aus `/api/world-lab/building-history` und zeigt Datum und Ereignis („Gebaut“, „Eigentümer gewechselt“, „Abgerissen“, eigene mit „von dir“). Lücken stehen offen da („Ein Abriss ist verzeichnet, lässt sich aber noch nicht sicher einem Gebäude zuordnen“). Texte in `lib/worldlab/buildingChronicleText.ts`.
+- **Zeitregler:** `app/world-lab/TimeSlider.tsx` unten in der Karte; die Engine hat dafür `setAsOf` (Abrisse nach dem gewählten Zeitpunkt erscheinen als stehende Gebäude, spätere Abrisse als freie Fläche). `/api/world-lab/buildings` liefert dafür `clearedAt` je freier Fläche. Der Regler erscheint **nur, wenn es einen datierten Abriss gibt**; heute ist `earth_cleared_buildings` leer, er bleibt also bis zum ersten Abriss unsichtbar.
+- **Grenzen:** Zurückgespielt werden nur Abrisse mit Datum, keine Neubauten, Verkäufe oder Umbauten (dazu fehlen die Ereignisse vom Core, siehe Request oben). Geprüft mit einer Testseite der beiden Bausteine (Aufklappen, Zeilen, Lückentext, Regler); die Engine-Umstellung `setAsOf` ist nur per Typprüfung abgesichert, nicht in der laufenden Karte gesehen.
+
+**Noch offen:** Seelenberg-Test (NPC-Vorschlag ohne Wirkung, bestätigter Umbau ändert die Karte, OSM-Refresh überschreibt nichts), sobald der Core die Ereignisse schreibt.
 
 ## Requests aus anderen Teilprojekten
 
@@ -436,3 +474,19 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
 - Bevölkerung, Bedürfnisse, Geld.
+
+### W-12 (Gastronomie, 29.10.2026): Nach einer Vermittlung beim Lokal herauskommen
+
+Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
+
+**Was schon da ist (Gastronomie):**
+- In der Agentur für Arbeit stellt die Vermittlung (oder VERA im Gespräch) einen Vermittlungsschein aus (`lib/game/jobs/referral.ts`).
+- „Gleich hingehen und anfangen“ öffnet das Lokal direkt aus der Agentur heraus (`EarthBuildingAccessLayer`, Zustand `handoff`), und die Schicht beginnt sofort.
+- Der Weg (meist einige hundert Meter) wird damit übersprungen – passend zu „Einsatz, als Schicht gebucht“.
+
+**Bitte:**
+1. Beim Verlassen eines so geöffneten Lokals steht die Spielerfigur auf der Karte noch an der Agentur. Sie sollte vor dem Lokal stehen.
+   - Vorschlag: `EarthBuildingAccessLayer` bekommt `onRelocate?(entityId)`. Ich rufe es beim Hingehen auf; die Karte setzt die Figur an den Eingang dieses Gebäudes.
+   - Sagt mir, welchen Namen und welche Form ihr wollt; die Gastronomie-Seite baue ich dann ein.
+2. Vorschlag, nicht dringend: Ein gültiger Schein liegt im Browser unter `localStorage['noxia.jobReferral']` (`buildingId`, gültig zwei Stunden). Die Karte könnte das Ziel markieren, solange er gilt.
+

@@ -6,6 +6,7 @@
 // Handelsschiffen, feste Anstellung. Heute gibt es Daten nur für die Lokale
 // (Schichten, playerShift.ts); die übrigen Arten stehen als „folgt“ an der Wand
 // und werden nicht erfunden (R-21). Grundriss und Wissen – reine Regeln.
+// Aktualisiert: 29.10.2026 — Mitflug gibt es jetzt: Anheuern an der Flugleitung im Raumhafen (crewSignon.ts)
 
 import { CIVIC_STANDARD_INTERIOR } from '../buildings/interiors/templates/civicStandard'
 import { VENUE_HEIGHT, VENUE_WIDTH, staffSpot, standingSpot, tableWithChairs, venueKindForBuildingType, type VenueLayout, type VenueSpot } from '../hospitality/venues'
@@ -65,6 +66,9 @@ export interface AgencyBuilding { id: string; typeId: string; name: string; lat:
 export interface JobOffer {
   category: 'venue'
   buildingId: string
+  /** Gebäudetyp (bar, nightclub …) und Name auf der Karte – zum Hingehen. */
+  typeId: string
+  buildingName: string
   /** „Metropol“, „Hauptstraße 72“ – ohne Art. */
   placeName: string
   /** „Bar“, „Nachtclub“ … */
@@ -97,7 +101,7 @@ export function venueJobOffers(buildings: readonly AgencyBuilding[], server?: Re
     const roles = known ? shiftRolesFor(kind).filter(r => known.open.includes(r)) : shiftRolesFor(kind)
     for (const role of roles) {
       const hours = SHIFT_GAME_HOURS[role]
-      offers.push({ category: 'venue', buildingId: b.id, placeName, placeKind, role, roleLabel: ROLE_LABEL[role], gameHours: hours, wage: (known?.wages?.[role] ?? PROPOSED_WAGE_PER_HOUR[role]) * hours, paid: Boolean(known), lat: b.lat, lon: b.lon })
+      offers.push({ category: 'venue', buildingId: b.id, typeId: b.typeId, buildingName: b.name, placeName, placeKind, role, roleLabel: ROLE_LABEL[role], gameHours: hours, wage: (known?.wages?.[role] ?? PROPOSED_WAGE_PER_HOUR[role]) * hours, paid: Boolean(known), lat: b.lat, lon: b.lon })
     }
   }
   return offers.sort((a, b) => b.wage - a.wage || a.placeName.localeCompare(b.placeName))
@@ -109,7 +113,10 @@ export function distanceM(a: { lat: number; lon: number }, b: { lat: number; lon
   return Math.hypot((a.lat - b.lat) * 111_195, (a.lon - b.lon) * 111_195 * k)
 }
 
-/** Was die Vermittlerin weiß: die Stellen an der Wand, nichts darüber hinaus. */
+/**
+ * Was die Vermittlerin weiß: die Stellen an der Wand, nichts darüber hinaus.
+ * Knapp gehalten – mit den Roboterfakten zusammen bleibt alles unter MAX_FACTS.
+ */
 export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[] {
   if (!offers) return ['Die Stellenliste wird gerade geholt; verweise auf die Stellenwand']
   const facts: string[] = []
@@ -117,22 +124,71 @@ export function jobAgencyKnowledge(offers: readonly JobOffer[] | null): string[]
   else {
     const byPlace = new Map<string, string[]>()
     for (const o of offers) byPlace.set(o.placeName, [...(byPlace.get(o.placeName) ?? []), o.roleLabel])
-    facts.push(`Freie Schichten in Lokalen: ${offers.length}, in ${byPlace.size} Häusern`)
-    for (const [place, roles] of [...byPlace].slice(0, 4)) facts.push(`${place}: ${[...new Set(roles)].join(', ')}`)
-    facts.push('Eine Schicht ist ein kurzer Einsatz von wenigen Minuten und zählt als mehrere Spielstunden; dazu Trinkgeld der Gäste')
-    if (!offers.some(o => o.paid)) facts.push('Die Schichten laufen noch als Probeschicht ohne Lohn; bezahlt wird, sobald Spieler angestellt werden können')
+    facts.push(`Freie Schichten in Lokalen (${offers.length}, in ${byPlace.size === 1 ? 'einem Haus' : byPlace.size + ' Häusern'}): ` + [...byPlace].slice(0, 4).map(([place, roles]) => `${place}: ${[...new Set(roles)].join(', ')}`).join('; '))
+    facts.push('Eine Schicht: wenige Minuten, zählt als mehrere Spielstunden' + (offers.some(o => o.paid) ? '; Lohn nur für erledigte Aufgaben, für Nichtstun nichts' : '; noch Probeschicht ohne Lohn'))
+    facts.push('Du vermittelst direkt; vermittelt ist erst, was dein Gegenüber unter dem Gespräch bestätigt – nie vorher „erledigt“ sagen')
   }
-  facts.push('Stellen in Betrieben und Läden, Mitflug auf Handelsschiffen und feste Anstellungen hat die Vermittlung noch nicht im Angebot')
-  facts.push('Angenommen wird eine Schicht im Lokal selbst, unter „Arbeiten“; du schickst Leute hin, du stellst nicht selbst ein')
+  facts.push('Mitflug auf Handelsschiffen: Wer kein eigenes Schiff hat, heuert an der Flugleitung im Raumhafen bei Epona Fracht an; Heuer bei Ankunft')
+  facts.push('Betriebe und Läden und feste Anstellungen hat die Vermittlung noch nicht im Angebot')
   return facts.map(f => f.length > 140 ? f.slice(0, 139) + '…' : f)
 }
 
 export const JOB_AGENCY_INTRODUCTION = {
   style: 'job-agency',
-  stance: 'Du bist Vermittlerin: freundlich, praktisch, ohne Umschweife. Du fragst, was jemand kann und wann er Zeit hat, und schickst ihn zu einer passenden Schicht. Du versprichst nur, was an der Stellenwand steht.',
+  stance: 'Du bist Vermittlerin: freundlich, praktisch, ohne Umschweife. Du fragst, was jemand kann und wann er Zeit hat, und vermittelst ihn gleich in eine passende Schicht. Du versprichst nur, was an der Stellenwand steht.',
   leads: [
     'Wer schnell Geld braucht, nimmt eine Schicht in einem Lokal; das geht ohne Vorwissen',
     'Wer etwas lernt, kommt an bessere Stellen; die Akademie ist kostenlos',
-    'Wer herumkommen will, fragt später nach Mitflug auf Handelsschiffen',
+    'Wer herumkommen will und kein Schiff hat, heuert im Raumhafen als Crew auf einem Frachter an',
+  ],
+}
+
+// ── Vermittlungsroboter (Thomas, 29.10.2026) ────────────────────────────────
+// „Es sollte Personal oder wenigstens Roboter geben, damit wir Arbeitssuchende
+// sowohl beraten als auch aus dem Gespräch neue Ideen für NOXIA entwickeln
+// können. Und vielleicht hilft das ja auch Personen, die im echten Leben noch
+// orientierungslos sind, eine Idee zu bekommen.“
+// Der Roboter ist eine Maschine der Agentur, keine Person (kein Eintrag in
+// people); er arbeitet immer, auch wenn kein Personal da ist. Gespräche mit ihm
+// stehen wie alle im Gesprächsprotokoll (npc_key robot:job-agency:<Haus>).
+
+export const AGENCY_ROBOT_NAME = 'VERA'
+
+export function agencyRobotId(entityId: string): string {
+  return `robot:job-agency:${entityId}`
+}
+
+/** Der Roboter als Figur für den Innenraum. */
+export function agencyRobot(entityId: string) {
+  return {
+    id: agencyRobotId(entityId),
+    displayName: `${AGENCY_ROBOT_NAME} · Vermittlungsroboter`,
+    identityState: 'known' as const,
+    observableDescription: 'Vermittlungsroboter',
+    birthYear: null,
+    activityState: 'working',
+    lastAction: null,
+    assignments: [{ type: 'work', roleCode: 'Vermittlungsroboter', tileEntityId: entityId }],
+    needs: [],
+    skills: [],
+  }
+}
+
+/** Was der Roboter über sich und seine Aufgabe weiß – vor der Stellenliste. */
+export const AGENCY_ROBOT_FACTS: readonly string[] = [
+  `Du bist ${AGENCY_ROBOT_NAME}, Vermittlungsroboter – eine Maschine, kein Mensch, das sagst du offen; frag erst, was dein Gegenüber gern tut`,
+  'Nennt jemand eine Arbeit, die es hier noch nicht gibt, frag nach, was daran reizt; der Wunsch wird festgehalten und für NOXIA ausgewertet',
+  'Spricht dein Gegenüber über sein echtes Leben außerhalb des Spiels, hilf ernsthaft: frag nach Stärken, Interessen und was Freude macht',
+  'Echte Hilfe: Berufsberatung der Bundesagentur für Arbeit, kostenlos, 0800 4 555500; Online-Test Check-U, anonym, auch für Berufserfahrene',
+  'Du bist eine Spielfigur und ersetzt keine echte Beratung; wirkt jemand verzweifelt, nimm es ernst und rate, mit einem Menschen zu sprechen',
+]
+
+export const AGENCY_ROBOT_INTRODUCTION = {
+  style: 'job-agency-robot',
+  stance: 'Du bist ein freundlicher Vermittlungsroboter: geduldig, neugierig, ehrlich. Du hörst zu, stellst eine Frage nach der anderen und machst Mut, ohne mehr zu versprechen, als es gibt. Im Spiel vermittelst du Leute direkt in passende Schichten; im echten Leben zeigst du Wege zu echter Beratung.',
+  leads: [
+    'Wer noch nicht weiß, was er will, probiert eine Schicht aus – fünf Minuten, ohne Vorwissen',
+    'Wer etwas lernen will, geht in die Akademie; Lernen ist kostenlos',
+    'Wer eine Arbeit vermisst, sagt es – solche Wünsche werden für NOXIA gesammelt',
   ],
 }

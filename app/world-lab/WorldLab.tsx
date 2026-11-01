@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
+import TimeSlider from './TimeSlider'
 import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPanels'
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
@@ -115,6 +116,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [hover, setHover] = useState<{ pick: WorldPick; x: number; y: number } | null>(null)
   const [targetId, setTargetId] = useState('')
   const [plots, setPlots] = useState<WorldPlot[]>([])
+  // Zeitregler: Stand der Abrisse zu einem früheren Zeitpunkt (null = jetzt)
+  const [asOf, setAsOf] = useState<string | null>(null)
   const [parcelOwners, setParcelOwners] = useState<Array<{ id: string; own: boolean }>>([])
   const [buildsVersion, setBuildsVersion] = useState(0)
 
@@ -489,6 +492,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     return () => { live = false; clearInterval(timer) }
   }, [buildsVersion])
   useEffect(() => { engineReady?.setPlots(plots) }, [engineReady, plots])
+  useEffect(() => { engineReady?.setAsOf(asOf) }, [engineReady, asOf, plots])
   useEffect(() => { engineReady?.setParcelOwners(parcelOwners) }, [engineReady, parcelOwners])
 
   // Genaue Hauptstraßen, Kreisel und Gleise: Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
@@ -767,6 +771,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         {destinationNote && <p className="note">{destinationNote}</p>}
         </>}
       </div>
+      <TimeSlider plots={plots} asOf={asOf} onChange={setAsOf}/>
       <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople} worship={worship}/>
     </div>
     <style jsx>{`

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   ])
   // Abgerissene reale Gebäude: die Karte zeichnet dort eine freie Fläche (nur der Eigentümer darf bauen).
   const { data: parcelOwners } = await supabase.from('earth_parcel_owners').select('parcel_id,profile_id').limit(5000)
-  const { data: cleared } = await supabase.from('earth_cleared_buildings').select('source_ref,profile_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,display_name').limit(1000)
+  const { data: cleared } = await supabase.from('earth_cleared_buildings').select('source_ref,profile_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,display_name,cleared_at').limit(1000)
   const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), String(row.name)]))
   return NextResponse.json({
     buildings: (rows ?? []).map((row: any) => ({
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
     plots: (cleared ?? []).map(row => ({
       source: String(row.source_ref), own: row.profile_id === profileId, name: row.display_name ?? 'Freie Fläche',
       lat: Number(row.latitude_deg), lon: Number(row.longitude_deg), w: Number(row.footprint_width_m), d: Number(row.footprint_depth_m), rotation: Number(row.rotation_deg ?? 0),
+      clearedAt: row.cleared_at ? String(row.cleared_at) : undefined,
     })),
   }, { headers: { 'Cache-Control': 'private, max-age=60' } })
 }

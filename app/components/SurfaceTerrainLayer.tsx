@@ -17,6 +17,7 @@ export interface TerrainPalette { ground: string; grainLight: string; grainDark:
 export const TERRAIN_PALETTES: Record<string, TerrainPalette> = {
   phobos: { ground: '#3a332e', grainLight: '#544a42', grainDark: '#26211d', floor: '#2a2420', rim: '#5d524a', rock: '#4a413a', rockLight: '#6e6157', groove: '#221d1a' },
   deimos: { ground: '#4a423b', grainLight: '#62584f', grainDark: '#322c27', floor: '#352f2a', rim: '#6c6158', rock: '#564d45', rockLight: '#7a6e64', groove: '#2c2622' },
+  station: { ground: '#1d2630', grainLight: '#2c3a47', grainDark: '#121920', floor: '#18212a', rim: '#3a4b5b', rock: '#26313c', rockLight: '#3b4a59', groove: '#0f151b' },
   moon: { ground: '#6d6e69', grainLight: '#85867f', grainDark: '#55564f', floor: '#4f504a', rim: '#93948d', rock: '#5f605a', rockLight: '#9d9e97', groove: '#4a4b45' },
 }
 
@@ -41,7 +42,7 @@ function SurfaceTerrainLayerInner({ body, decor, extentM, detailed = false }: { 
   const ground = corners.map(p => `${p.x},${p.y}`).join(' ')
   // Kleine Steine nur nah heran (Level of Detail)
   const pebbleRandom = seededRandom(17)
-  const pebbles = detailed ? Array.from({ length: 900 }, () => ({ xM: (pebbleRandom() * 2 - 1) * extentM, yM: (pebbleRandom() * 2 - 1) * extentM, r: 0.25 + pebbleRandom() * 0.55 })) : []
+  const pebbles = detailed && body !== 'station' ? Array.from({ length: 900 }, () => ({ xM: (pebbleRandom() * 2 - 1) * extentM, yM: (pebbleRandom() * 2 - 1) * extentM, r: 0.25 + pebbleRandom() * 0.55 })) : []
   return <g pointerEvents="none">
     <defs>
       {layers.map(layer => <pattern key={layer.size} id={`regolith-${body}-${layer.size}`} width={layer.size} height={layer.size} patternUnits="userSpaceOnUse">
