@@ -43,6 +43,7 @@ on:
       - 'supabase/migrations/20261031080000_player_feedback_submissions.sql'
       - 'supabase/tests/player_feedback_submissions.test.sql'
       - 'scripts/test-player-feedback-migration.cjs'
+      - 'scripts/test-feedback-conversation-identity-contract.cjs'
       - 'scripts/test-player-feedback-rls-local.cjs'
       - 'scripts/test-player-feedback-rls-safety.cjs'
       - 'scripts/feedback-local-only-fetch.cjs'
@@ -96,5 +97,7 @@ jobs:
         run: node scripts/test-player-feedback-rls-safety.cjs
       - name: Verify local-only HTTP transport and redirect refusal (no network)
         run: node scripts/test-feedback-local-only-fetch.cjs
+      - name: Check cross-route conversation identity contract (static only)
+        run: node scripts/test-feedback-conversation-identity-contract.cjs
       - name: Check staged feedback migration security contract (static only)
         run: node scripts/test-player-feedback-migration.cjs
