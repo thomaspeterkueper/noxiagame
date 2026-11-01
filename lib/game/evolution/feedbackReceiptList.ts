@@ -14,7 +14,7 @@ function receiptInstantMicros(timestamp: string): bigint {
 export function projectFeedbackReceiptList(rows: unknown, limit = 50) {
   if (!Array.isArray(rows) || !Number.isInteger(limit) || limit < 1 || limit > 100) return null
   if (rows.length > 100) return null
-  const result = []
+  const result: NonNullable<ReturnType<typeof projectFeedbackReceipt>>[] = []
   const seenIds = new Set<string>()
   for (const row of rows) {
     const receipt = projectFeedbackReceipt(row)
