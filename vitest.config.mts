@@ -63,6 +63,7 @@ export default defineConfig({
       'lib/worldlab/lineDetails.test.ts',
       'lib/worldlab/landUse.test.ts',
       'lib/worldlab/alkis.test.ts',
+      'lib/worldlab/parcelImportPolicy.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',
       'lib/game/landmarks/interiors.test.ts',
       'lib/game/spatial/buildingMassing.test.ts',

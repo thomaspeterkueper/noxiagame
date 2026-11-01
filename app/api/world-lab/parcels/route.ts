@@ -7,6 +7,7 @@
 // GET  ?lat=…&lon=…&dry=1: nur abrufen und lesen, nichts speichern – zur Prüfung des Dienstes.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { PARCEL_INITIAL_IMPORT_UPSERT } from '@/lib/worldlab/parcelImportPolicy'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { cadastreServicesAt, cadastreSource, parcelCell, parcelKey, parcelLabel, parcelRequestUrl, parcelUsage, parseParcels, parseUsePieces, usesByParcel, type CadastreService, type Parcel, type ParcelUsePiece } from '@/lib/worldlab/alkis'
@@ -137,8 +138,10 @@ export async function POST(req: NextRequest) {
     // Alle Länder ausgefallen: nichts speichern, später neu versuchen
     if (errors.length && !parcels.length) throw new Error(errors.join(' | '))
     const rows = rowsFor(parcels)
+    // Preserve every existing cadastral snapshot and any later NOXIA edits.
+    // Only previously unknown IDs may be inserted by another provider fetch.
     for (let i = 0; i < rows.length; i += 300) {
-      const { error } = await supabase.from('earth_parcels').upsert(rows.slice(i, i + 300), { onConflict: 'id' })
+      const { error } = await supabase.from('earth_parcels').upsert(rows.slice(i, i + 300), PARCEL_INITIAL_IMPORT_UPSERT)
       if (error) throw error
     }
     // Ein Land ausgefallen: Gefundenes bleibt, die Zelle gilt als fehlerhaft und wird nach einer Stunde neu geholt.
