@@ -26,7 +26,11 @@ const text = (value: unknown, max: number) => typeof value === 'string'
 /** The database id is bigint. Avoid lossy number-to-string conversion. */
 function rowId(value: unknown): string | null {
   if (typeof value === 'number') return Number.isSafeInteger(value) && value > 0 ? String(value) : null
-  return typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) ? value : null
+  // A PostgreSQL bigint identity cannot exceed signed int64; do not publish
+  // source references that the provenance verifier can never resolve.
+  if (typeof value !== 'string' || !/^[1-9]\d{0,18}$/.test(value)) return null
+  const max = '9223372036854775807'
+  return value.length < max.length || (value.length === max.length && value <= max) ? value : null
 }
 
 /**
