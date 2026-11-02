@@ -31,6 +31,7 @@ import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { NoxiaBuilding, WorldEngine, WorldLandmark, WorldPick, WorldPlot, WorldSite } from './worldEngine'
 import LandmarkGlyph from './LandmarkGlyph'
 import LandPanel from './LandPanel'
+import { earthBuildingName } from '@/lib/worldlab/earthNames'
 import BuildingHistory from './BuildingHistory'
 import PlaceStory from './PlaceStory'
 import TicketCounter from '@/app/components/TicketCounter'
@@ -494,13 +495,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const street = around.street ?? engine.nearestStreet()
     const metres = (target: GeoPoint) => Math.hypot((target.lat - at.lat) * 111320, (target.lon - at.lon) * 111320 * Math.cos(at.lat * Math.PI / 180))
     const places = [
-      ...noxia.map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'aktiv' })),
+      ...noxia.map(item => ({ targetRef: item.id, name: item.name, kind: earthBuildingName(item.typeId, undefined), distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'aktiv' })),
       ...around.landmarks.map(item => ({ targetRef: landmarkRef(item.landmark), name: item.landmark.name, kind: landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, status: 'sichtbar' })),
     ].filter(place => place.distanceM <= 45).sort((a, b) => a.distanceM - b.distanceM).slice(0, 8)
     // Wenige bekannte, weiter entfernte Ziele (Agentur für Arbeit …), zu denen die Person führen kann.
     const farPlaces = noxia
       .filter(item => FAR_GUIDE_KINDS.has(item.typeId) && !places.some(place => place.targetRef === item.id))
-      .map(item => ({ targetRef: item.id, name: item.name, kind: item.typeId, distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'bekannt' }))
+      .map(item => ({ targetRef: item.id, name: item.name, kind: earthBuildingName(item.typeId, undefined), distanceM: metres({ lat: item.lat, lon: item.lon }), status: 'bekannt' }))
       .filter(place => place.distanceM > 45 && place.distanceM <= 3000)
       .sort((a, b) => a.distanceM - b.distanceM)
       // Von jeder Art das nächste – so bleibt die Liste kurz.
@@ -563,9 +564,22 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     } finally { setSending(false) }
   }
 
+  /**
+   * W-12 (Gastronomie, 29.10.2026): Von der Agentur direkt ins Lokal vermittelt –
+   * die Figur steht danach vor dem Lokal, nicht mehr an der Agentur. Vor dem Haus
+   * heißt: 2 m vor seiner Vorderseite (Südseite in seiner Drehung, wie die Eingänge).
+   */
+  function relocateTo(entityId: string) {
+    const building = noxia.find(item => item.id === entityId)
+    if (!building || !engine) return
+    const a = (Number(building.rotation ?? 0) || 0) * Math.PI / 180
+    const ahead = building.d / 2 * 0.9 + 2
+    const east = -Math.sin(a) * ahead, south = Math.cos(a) * ahead
+    engine.jump({ lat: building.lat - south / 111_320, lon: building.lon + east / (111_320 * Math.cos(building.lat * Math.PI / 180)) })
+  }
   if (panel.kind === 'inside') {
     const companion = panel.companionId ? residents.find(resident => resident.id === panel.companionId) ?? null : null
-    return <EarthBuildingAccessLayer request={panel.request} companion={companion} onClose={() => {
+    return <EarthBuildingAccessLayer request={panel.request} companion={companion} onRelocate={relocateTo} onClose={() => {
       // Wer mitgekommen ist, geht wieder seiner Wege.
       if (panel.companionId) { engine?.releasePerson(panel.companionId); setVisits(current => { const next = { ...current }; delete next[panel.companionId as string]; return next }) }
       close()

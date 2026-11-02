@@ -441,7 +441,10 @@ Umgesetzt:
 2. **Kein Aufblitzen:** NOXIA-Gebäude mit `source` nicht als eigenen Block zeichnen, solange die Kachel ihres Hauses noch lädt.
 3. **Gilt ebenso für** Metropol und Balkan Grill (Gebäude des Ortes in realen Lokalen) und für alle späteren öffentlichen Gebäude an realen Adressen.
 
-### W-8 (Gastronomie, 28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular
+### W-8 (Gastronomie, 28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular – erledigt (02.11.2026)
+
+Umgesetzt: Namenstabelle für die Erde `lib/worldlab/earthNames.ts` (`habitat` → „Wohnhaus“, `residential_block` → „Wohnblock“, mit Tests). `/api/world-lab/buildings` nimmt sie für alle Namen, damit gelten sie in Beschriftung, Gebäudetafel, Zielliste und Hinweis; die Gesprächsfakten (`nearbyPlaces` in `WorldPanels.tsx`) geben als Art ebenfalls den Erdnamen statt der Kennung mit. Mond und Mars unverändert. Weitere Einträge bei Bedarf in die Tabelle.
+
 
 **Befund aus der Gesprächsauswertung (G-6, `docs/reviews/npc-gespraeche-testphase.md`):** Ein Pfarrer im Sauerland ist „auf dem Weg zum Habitat“. Erfunden hat er das nicht: Bei Sundern stehen zwei NOXIA-Gebäude der Art `habitat`. Die Weltkarte gibt der Figur ihren Namen aus `building_definitions` („Habitat“) als Ort in der Nähe mit (`nearbyPlaces`, `localFacts` in `app/world-lab/WorldPanels.tsx`).
 
@@ -481,7 +484,13 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
 - Bevölkerung, Bedürfnisse, Geld.
 
-### W-12 (Gastronomie, 29.10.2026): Nach einer Vermittlung beim Lokal herauskommen
+### W-12 (Gastronomie, 29.10.2026): Nach einer Vermittlung beim Lokal herauskommen – Punkt 1 erledigt (02.11.2026)
+
+Umgesetzt wie vorgeschlagen, beide Seiten (die Gastronomie-Seite ist eine Zeile, daher gleich mit):
+- `EarthBuildingAccessLayer` hat `onRelocate?(entityId: string)`; aufgerufen in `onGoTo`, bevor das Lokal öffnet.
+- Die Weltkarte (`relocateTo` in `WorldPanels.tsx`) setzt die Figur 2 m vor die Vorderseite des Lokals (Südseite in seiner Drehung). Nach dem Verlassen steht sie also vor dem Lokal.
+- Punkt 2 (Ziel markieren, solange `noxia.jobReferral` gilt) noch offen.
+
 
 Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
 
