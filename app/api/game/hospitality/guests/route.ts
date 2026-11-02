@@ -17,6 +17,7 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { venueHearsay } from '@/lib/game/hospitality/hearsay'
+import { FUNERAL_RECEPTION_KIND, receptionAt } from '@/lib/game/hospitality/funeralReception'
 import { CONSUMPTION_INTERVAL_S, ENTRY_ITEM_CODE, ENTRY_VALID_S, ROOM_ITEM_CODE, ROOM_NIGHT_S, VISIT_TOTAL_S, spreadVisitAge, type VenueRooms } from '@/lib/game/hospitality/venues'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab0-9a-f]{12}$/i
@@ -154,9 +155,14 @@ async function venueState(supabase: any, tileEntityId: string, profileId: string
     entryPaidForS = at ? Math.max(0, Math.round((at + ENTRY_VALID_S * 1000 - Date.now()) / 1000)) : null
   }
   // Hausregeln (R-18): Toilette frei / nur Gäste / Gebühr; ändern darf nur der Eigentümer.
-  const [{ data: services }, { data: owner }] = await Promise.all([
+  // Beerdigungskaffee (R-23 Punkt 6): Sondertermin von Population für dieses Lokal.
+  const [{ data: services }, { data: owner }, { data: scheduled }] = await Promise.all([
     supabase.rpc('venue_service_rules', { p_tile_entity_id: tileEntityId }),
     supabase.rpc('venue_owned_by', { p_profile_id: profileId, p_tile_entity_id: tileEntityId }),
+    Number.isFinite(tick)
+      ? supabase.from('population_events').select('payload').eq('event_type', 'place_activity_scheduled').eq('payload->>kind', FUNERAL_RECEPTION_KIND).eq('payload->>tileEntityId', tileEntityId).gte('tick', tick - 24 * 7).limit(20)
+      : Promise.resolve({ data: [] as any[] }),
   ])
-  return { hour, upper, heard, rooms, areaM2, conversion, displayName, entryPaidForS, services: services ?? null, canEditHouse: owner === true }
+  const reception = Number.isFinite(tick) ? receptionAt(scheduled ?? [], tileEntityId, tick, profileId) : null
+  return { hour, upper, heard, rooms, areaM2, conversion, displayName, entryPaidForS, services: services ?? null, canEditHouse: owner === true, reception }
 }

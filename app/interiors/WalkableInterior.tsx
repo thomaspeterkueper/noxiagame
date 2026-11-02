@@ -83,6 +83,8 @@ export interface InteriorContext {
   dancing:boolean
   /** Zu einem Punkt im Raum gehen (Wege um die Möbel). */
   walkTo:(target:Point,onArrive?:()=>void)=>void
+  /** Sagt der gewählten Person einen Satz (z. B. Beileid), als hätte der Spieler ihn getippt. */
+  say:(text:string)=>void
 }
 /** Eine Tür an der Eingangswand neben dem Ausgang (z. B. WC): gehen, benutzen. */
 export interface SideDoor { x:number; y:number; label:string; goLabel:string; useLabel:string; use:(ctx:InteriorContext)=>void }
@@ -327,17 +329,17 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const nearSide=Boolean(fitting.sideDoor&&Math.hypot(pos.x-fitting.sideDoor.x,pos.y-fitting.sideDoor.y)<44)
 
   const lastPlayerText=[...historyState].reverse().find(entry=>entry.role==='user')?.content??null
-  const ctx:InteriorContext={pos,seat,atTable,nearService,closed,service,selected,shown,figures:served,moments,joined,waiterId,tablePhase,nowMs,setStatus,setSelected,gates,openLearning,talkTo:resident=>{setSelected(resident);setHistory([]);void converse(resident,true)},history:historyState,lastPlayerText,dancing:dancing&&onFloor,walkTo}
+  const ctx:InteriorContext={pos,seat,atTable,nearService,closed,service,selected,shown,figures:served,moments,joined,waiterId,tablePhase,nowMs,setStatus,setSelected,gates,openLearning,talkTo:resident=>{setSelected(resident);setHistory([]);void converse(resident,true)},history:historyState,lastPlayerText,dancing:dancing&&onFloor,walkTo,say:text=>{if(selected)void converse(selected,false,text)}}
   const ctxRef=useRef<InteriorContext|null>(null)
   ctxRef.current=ctx
   useEffect(()=>{onContext?.(ctx)})
 
   const talk=()=>converse(selected,false)
-  async function converse(target:ColonyResident|null,opening:boolean){
-    if(!target||(!opening&&!message.trim())||sending)return
+  async function converse(target:ColonyResident|null,opening:boolean,said?:string){
+    if(!target||(!opening&&!(said??message).trim())||sending)return
     const self=served.find(f=>f.id===target.id)
     if(!self)return
-    const text=opening?'':message.trim().slice(0,400)
+    const text=opening?'':(said??message).trim().slice(0,400)
     const history=opening?[]:historyState
     setSending(true)
     try{
