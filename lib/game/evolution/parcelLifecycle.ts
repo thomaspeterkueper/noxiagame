@@ -150,19 +150,17 @@ export function projectParcelLifecycle(input: {
       return left.year - right.year || left.sequence - right.sequence ||
         compareIds(left.id, right.id) || compareIds(payloadKey(a), payloadKey(b))
     })
-  // Two well-formed receipts claiming the same identity AND logical instant
-  // but different domain payloads are ambiguous. Quarantine both rather than
-  // arbitrarily selecting a building from a deterministic sort order.
-  // This is an integrity guard, not proof that any receipt is authorized.
+  // Receipt IDs are unique throughout the projected settlement history,
+  // not just at a single (year, sequence) instant. Reusing an ID with a
+  // different instant or payload is ambiguous: quarantine every valid claimant.
+  // This is an integrity guard, NOT authentication of the Core event store.
   const signatures = new Map<string, string>()
   const conflicts = new Set<string>()
-  const identityAtInstant = (r: Record<string, unknown>) =>
-    JSON.stringify([r.id, r.worldYear, r.sequence])
   for (const candidate of receipts) {
     const r = record(candidate)
     if (!validReceiptShape(r)) continue
-    const key = identityAtInstant(r)
-    const signature = payloadKey(candidate)
+    const key = r.id as string
+    const signature = JSON.stringify([r.worldYear, r.sequence, payloadKey(candidate)])
     const previous = signatures.get(key)
     if (previous !== undefined && previous !== signature) conflicts.add(key)
     else if (previous === undefined) signatures.set(key, signature)
@@ -174,7 +172,7 @@ export function projectParcelLifecycle(input: {
       rejected.push({ eventId, reason: 'invalid_receipt' })
       continue
     }
-    if (conflicts.has(identityAtInstant(r))) {
+    if (conflicts.has(eventId)) {
       rejected.push({ eventId, reason: 'conflicting_event' })
       continue
     }
