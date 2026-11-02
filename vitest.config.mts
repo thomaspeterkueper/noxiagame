@@ -46,6 +46,7 @@ export default defineConfig({
       'lib/worldlab/address.test.ts',
       'lib/worldlab/walking.test.ts',
       'lib/worldlab/landmarks.test.ts',
+      'lib/worldlab/placeSearch.test.ts',
       'lib/worldlab/buildingUse.test.ts',
       'lib/worldlab/facility.test.ts',
       'lib/game/spatial/surfaceDecor.test.ts',

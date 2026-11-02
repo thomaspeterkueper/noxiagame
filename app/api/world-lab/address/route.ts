@@ -1,11 +1,12 @@
 // app/api/world-lab/address/route.ts
 // Erdkarte (Request W-1): Ziel nach Adresse. GET ?q=Hauptstraße 102 (oder
-// „Bogenstraße“ oder „51.3407, 8.0015“) → Lage aus den gespeicherten
+// „Bogenstraße“, einem Ortsnamen wie „Seelenberg“ oder „51.3407, 8.0015“) → Lage aus den gespeicherten
 // Kartendaten. Keine Anfrage an fremde Dienste. Nur lesend.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
+import { findPlace } from '@/lib/worldlab/placeSearch'
 import { parseAddressQuery, streetKey, streetPrefix } from '@/lib/worldlab/address'
 
 type Point = { lat: number; lon: number }
@@ -23,6 +24,12 @@ export async function GET(req: NextRequest) {
   if (query.kind === 'coordinates') return NextResponse.json({ lat: query.lat, lon: query.lon, label: `${query.lat.toFixed(5)}, ${query.lon.toFixed(5)}` })
 
   const supabase = createServiceClient()
+  // Ort (Seelenberg, Vuiteboeuf, Dvārakā …): Regionen der Erde nach ihrem Namen
+  if (!query.number) {
+    const { data: regions } = await supabase.from('celestial_regions').select('slug,label,center_lat,center_lon').eq('body', 'earth').limit(300)
+    const place = findPlace((regions ?? []).filter(r => typeof r.label === 'string'), query.street, near)
+    if (place) return NextResponse.json({ lat: place.lat, lon: place.lon, label: place.label, building: false })
+  }
   if (query.number) {
     // Hausnummer über jsonb-Enthaltensein (der Doppelpunkt im Schlüssel verträgt sich nicht mit ->>), Straße hier vergleichen.
     const { data } = await supabase.from('region_features').select('geometry,properties')
