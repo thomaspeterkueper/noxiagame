@@ -148,8 +148,9 @@ export function projectParcelLifecycle(input: {
       Number.isSafeInteger(r.worldYear) && Number.isSafeInteger(r.sequence) &&
       (r.sequence as number) >= 0 && (r.worldYear as number) >= baselineYear &&
       ['demolish', 'restore_meadow', 'construct'].includes(change.action as string) &&
-      (change.action === 'restore_meadow' ||
-        (typeof change.buildingId === 'string' && !!change.buildingId.trim()))
+      (change.action === 'restore_meadow'
+        ? change.buildingId === undefined
+        : (typeof change.buildingId === 'string' && !!change.buildingId.trim()))
   }
   const receipts = (input.receipts as readonly unknown[])
     .filter(candidate => {
