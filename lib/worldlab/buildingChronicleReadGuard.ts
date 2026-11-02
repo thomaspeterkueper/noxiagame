@@ -107,7 +107,7 @@ function isChronicleInstant(value: unknown): value is string {
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   if (day < 1 || day > days[month - 1]) return false
-  const zone = match[4]
+  const zone = match[5]
   if (zone !== 'Z') {
     const hours = Number(zone.slice(1, 3))
     const minutes = Number(zone.slice(4, 6))
