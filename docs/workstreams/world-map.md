@@ -551,3 +551,9 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 - Der stündliche Lauf (`/api/cron/world-places`) holt je Lauf zwei Zellen; Ringzellen kommen hinten in die Warteschlange und werden nur angelegt, wenn weniger als vier warten. Echte leere Orte und Mittelzellen gehen vor. Ein Ort braucht so etwa 12 Stunden bis zum vollen Ring.
 - Offene Fragen: Beobachten, ob Overpass die Menge verträgt; bei großen Städten (Istanbul, Frankfurt) kann eine Zelle sehr viele Gebäude haben (Zeitbudget je Lauf).
 - Istanbul-Beispiel (Thomas, Galatasaray Ortaokulu): Unsere Darstellung weicht von der Satellitenkarte ab – rote Satteldächer überall, Minarette und Moscheen wie Kirchtürme, Gebäudenutzung teils falsch zugeordnet („Ayasofya Tarihi Müzesi Defter-i Hakani Nezareti Binası · Büro“ an der Schule). Als nächste Schritte vorgesehen: Moschee mit Minarett und Kuppel statt Kirchturm (nach `religion=muslim`), Dachformen nach Region, Zuordnung Ort ↔ Gebäude prüfen.
+
+## Moscheen (02.11.2026)
+
+- Gebäude der Art „Kirche" werden als Moschee gezeichnet, wenn `block.u === 'b:mosque'` oder ein Wahrzeichen im Haus `religion=muslim` trägt: Flachdach, Kuppel mittig, ein bis zwei Minarette an den vorderen Ecken, kein Kirchturm, kein Dachreiter.
+- Christliche Kirchen (z. B. in Istanbul) bleiben unverändert Kirchen (in warmen Breiten flach, ohne Turm).
+- Offen: regionale Dachformen allgemein, Zuordnung Ort↔Gebäude in Istanbul.

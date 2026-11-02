@@ -12,7 +12,7 @@ import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
 import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { ANCHOR_VISIBLE_MAX, COMMUTE_THRESHOLD_M, anchorSpread, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute, VISIBLE_WALK_MAX_M } from '@/lib/game/population/visibleMovement'
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
-import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
+import { iso, ISO_HEIGHT, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
 import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, WALK_CORE_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
@@ -524,7 +524,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const eave = (look?.levels ?? block.l) * style.storeyM
     // Warme Breiten (Gujarat, Sahel, Tropen): Flachdächer statt roter Satteldächer, Tempel und Moscheen ohne Kirchturm (02.11.2026).
     const warm = Math.abs(toGeo({ x: cx, y: cy }).lat) < 36
-    const roofM = warm ? (block.k === 'church' ? 1.2 : 0) : style.roofM
+    // Moschee: Nutzung b:mosque oder Wahrzeichen im Haus mit religion=muslim (Istanbul hat daneben echte Kirchen).
+    const mosque = block.k === 'church' && (block.u === 'b:mosque' || landmarkIn({ cx, cy, hw, hd, cos, sin })?.tags.religion === 'muslim')
+    const roofM = mosque ? 0 : warm ? (block.k === 'church' ? 1.2 : 0) : style.roofM
     let c: Array<{ x: number; y: number }>
     if (shownRing) {
       c = drawPrism(g, block.k, shownRing, eave, { x: -sin, y: cos }, look?.roof)
@@ -532,7 +534,19 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, roofM, look?.roof)
     }
     if (owner) claim(owner)
-    if (block.k === 'church' && block.w >= 12 && !warm) {
+    if (mosque) {
+      // Minarette an den beiden vorderen Ecken, Kuppel mittig auf dem Flachdach.
+      const corners = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([u, v]) => ({ x: cx + u * hw * cos - v * hd * sin, y: cy + u * hw * sin + v * hd * cos }))
+        .sort((p, q) => (q.x + q.y) - (p.x + p.y)).slice(0, hw * 2 > 14 ? 2 : 1)
+      for (const m of corners.sort((p, q) => (p.x + p.y) - (q.x + q.y))) drawMass(g, block.k, m.x, m.y, 1.1, 1.1, cos, sin, eave + 12, 4.5, 0xd9d4c8)
+      const r = Math.min(hw, hd) * 0.62, mid = iso(cx, cy, eave)
+      const rx = r * Math.SQRT2, ry = r * ISO_HEIGHT
+      const dome: number[] = []
+      for (let i = 0; i <= 16; i++) { const t = Math.PI * i / 16; dome.push(mid.x + rx * Math.cos(t), mid.y - ry * Math.sin(t)) }
+      g.poly(dome).fill(0xb9c7c2).stroke({ width: 0.4, color: OUTLINE, alpha: 0.7 })
+      g.poly([mid.x - rx * 0.45, mid.y - ry * 0.75, mid.x - rx * 0.1, mid.y - ry * 0.98, mid.x - rx * 0.1, mid.y - ry * 0.5]).fill({ color: 0xffffff, alpha: 0.25 })
+    }
+    if (block.k === 'church' && block.w >= 12 && !warm && !mosque) {
       // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
       // spitzem Pyramidendach – macht eine Kirche von Weitem erkennbar.
       if (cos + sin < 0) { cos = -cos; sin = -sin }
@@ -541,7 +555,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const towerEave = eave + style.roofM + Math.max(8, side * 1.6)
       drawMass(g, block.k, tx, ty, side / 2 + 0.3, side / 2 + 0.3, cos, sin, towerEave, side * 1.8)
     }
-    if (block.t && !warm) {
+    if (block.t && !warm && !mosque) {
       // Dachreiter auf dem First: schlanker Aufsatz mit spitzem Dach.
       drawMass(g, block.k, cx, cy, 0.9, 0.9, cos, sin, eave + style.roofM + 1.5, 3.2)
     }
