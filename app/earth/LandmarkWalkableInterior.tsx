@@ -30,6 +30,8 @@ import { THEOLOGICAL_ESSAYS } from '@/lib/game/landmarks/theologicalEssays'
 import { IDENTITY_BOOK } from '@/lib/game/landmarks/identityBook'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
+import { isRoundKind, roundKeyOf } from '@/lib/game/rounds/roundTalk'
+import RoundTalk from './RoundTalk'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
@@ -542,6 +544,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <span>mit {occasion.host.name}{placed.length > 1 ? ` · ${placed.length - 1} weitere hier` : ''}</span>
           <ol>{phases.filter(item => item.from < 120).map(item => <li key={item.title} className={item === phase ? 'now' : item.to <= minute ? 'done' : ''}>{item.title}</li>)}</ol>
           <p>{phase.text}</p>
+          {isRoundKind(occasion.kind) && placed.length >= 2 && <RoundTalk roundKey={roundKeyOf(placeRef ?? name, occasion.startedAt)} placeName={name} label={occasion.label} people={placed.slice(0, 8).map(item => ({ id: item.person.id, name: item.person.name }))}/>}
           <div className="row">
             {phases.some(item => item.speak) && (phase.speak
               ? <button className="act" disabled={hearing} onClick={() => void hearSermon()}>{hearing ? 'Hört zu …' : `${speechNoun(occasion.kind)} hören`}</button>
