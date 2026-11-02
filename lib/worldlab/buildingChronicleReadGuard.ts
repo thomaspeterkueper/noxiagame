@@ -31,3 +31,17 @@ export function requireEarthLocationId(earth: { id: string } | null): string {
 export function shouldReadChronicleEvents(sourceRef: string | null | undefined, entityId: string | null): boolean {
   return !sourceRef || Boolean(entityId)
 }
+
+/**
+ * The public reader accepts one building selector at a time. Combining an
+ * unrelated entity UUID with an OSM source reference would otherwise splice
+ * one building's events together with another parcel's demolition tombstone.
+ */
+export function requireUnambiguousChronicleSelector(
+  entityId: string | null | undefined,
+  sourceRef: string | null | undefined,
+): void {
+  if (entityId && sourceRef) {
+    throw new Error('Building chronicle Core read ambiguous: building selectors')
+  }
+}
