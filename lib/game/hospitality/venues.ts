@@ -1059,6 +1059,8 @@ export interface ConversationFactsInput {
   playerWorkingFact?: string | null
   /** Lohn und Ruf des Gegenübers im Haus – nur Personal (playerShift.employerShiftFacts). */
   employmentFacts?: readonly string[]
+  /** Besonderer Anlass im Lokal, z. B. Beerdigungskaffee (funeralReception.ts) – steht früh, damit er nicht abgeschnitten wird. */
+  occasionFacts?: readonly string[]
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -1104,6 +1106,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     (name ? `Ihr befindet euch ${layout.locative} ${name}` : `Ihr befindet euch ${layout.locative}`) + clock,
   ]
   if (seesGuestRoom) facts.push(layout.roomFact)
+  for (const f of input.occasionFacts ?? []) facts.push(fit(f))
 
   if (staff) facts.push(`Du arbeitest hier und ${posture} ${self.spot.label}`)
   else if (self.roomRole === 'companion') facts.push(`Du bist mit deinem Gegenüber hergekommen und ${posture} ${self.spot.label}`)

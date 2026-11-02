@@ -551,3 +551,37 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 - Der stündliche Lauf (`/api/cron/world-places`) holt je Lauf zwei Zellen; Ringzellen kommen hinten in die Warteschlange und werden nur angelegt, wenn weniger als vier warten. Echte leere Orte und Mittelzellen gehen vor. Ein Ort braucht so etwa 12 Stunden bis zum vollen Ring.
 - Offene Fragen: Beobachten, ob Overpass die Menge verträgt; bei großen Städten (Istanbul, Frankfurt) kann eine Zelle sehr viele Gebäude haben (Zeitbudget je Lauf).
 - Istanbul-Beispiel (Thomas, Galatasaray Ortaokulu): Unsere Darstellung weicht von der Satellitenkarte ab – rote Satteldächer überall, Minarette und Moscheen wie Kirchtürme, Gebäudenutzung teils falsch zugeordnet („Ayasofya Tarihi Müzesi Defter-i Hakani Nezareti Binası · Büro“ an der Schule). Als nächste Schritte vorgesehen: Moschee mit Minarett und Kuppel statt Kirchturm (nach `religion=muslim`), Dachformen nach Region, Zuordnung Ort ↔ Gebäude prüfen.
+
+### W-13 (Gastronomie, 02.11.2026): Friedhöfe begehbar, mit Gedenkort
+
+Thomas, 02.11.2026: „Zwischenidee: ein Friedhof.“ Auf Nachfrage entschieden, alle vier Teile:
+- ein begehbarer Ort;
+- Bewohner sterben;
+- Beerdigungen mit anschließendem Beerdigungskaffee;
+- ein Gedenkort, auch für Spieler selbst.
+
+Verteilt als Requests:
+- W-13 an die Erdkarte: Ort und Gedenken;
+- R-23 an Population: Sterben, Gräber, Trauer;
+- P-1 an Philosophie/NPC: die Trauerfeier.
+
+Den Beerdigungskaffee baut die Gastronomie.
+
+**Stand:** Friedhöfe sind heute nur Fläche mit Grabmuster (`AreaKind` `cemetery`, `areaPatterns.ts`). Betreten kann man sie nicht.
+
+**Bitte:**
+1. **Betreten:** Ein Klick auf eine Friedhofsfläche öffnet „Friedhof betreten“ mit dem echten Namen aus OSM (`landuse=cemetery`, `amenity=grave_yard`). Fehlt der Name, steht dort „Friedhof“.
+2. **Außenraum** als begehbare Szene:
+   - Wege, Grabfelder, Bänke, Wasserstelle und Gießkannen, Bäume;
+   - die Trauerhalle oder Kapelle, falls auf der Fläche ein Gebäude steht.
+   - Grabfelder ohne Namen, solange es keine Gräber aus der Simulation gibt (R-23). Erfunden wird nichts.
+3. **Menschen:** Wer laut Simulation dort ist (`placePresence`, wie bei W-10): Grabpflege, Spaziergang, Trauerfeier. Ansprechbar mit ihrer echten ID.
+4. **Gräber aus der Simulation:** Sobald R-23 Gräber liefert, stehen sie mit Namen, Lebensjahren und Grabfeld im Raum.
+   - Angehörige kommen ab und zu ans Grab.
+   - Spieler können eine Kerze anzünden oder Blumen ablegen. Das ist ein kleiner Kauf beim Blumenladen oder der Friedhofsgärtnerei, falls es eine gibt.
+5. **Gedenkort für Spieler:** ein ruhiger Platz, etwa eine Gedenkwand oder ein Baum, an dem ein Spieler für sich eine Kerze anzündet, wahlweise mit einem Namen.
+   - Vorschlag: nur für ihn selbst sichtbar, nicht öffentlich. So muss niemand Fremdes lesen, und es braucht keine Moderation.
+   - Gesprächsfiguren dort: Wer über einen echten Verlust spricht, bekommt ernsthafte, ruhige Antworten.
+   - Bei Verzweiflung nennen sie die Telefonseelsorge (kostenlos, rund um die Uhr: 0800 111 0 111 oder 0800 111 0 222, online telefonseelsorge.de) – wie VERA in der Agentur (R-22).
+6. **Würde:** kein Lärm, keine Musik, kein Rennen auf den Grabfeldern. Kauf und Verkauf von Grabstellen höchstens über die Gemeinde (Friedhofsträger), nicht als Spekulationsware.
+

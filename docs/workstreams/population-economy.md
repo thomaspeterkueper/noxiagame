@@ -663,3 +663,56 @@ Thomas, 29.10.2026: „Es sollte Personal oder wenigstens Roboter geben, damit w
      - den Schein selbst serverseitig ausstellen und prüfen;
      - optional eine Tabelle `job_referrals` (player, building, role, issued_at, used_at), damit die Auswertung sieht, welche Vermittlungen angetreten werden.
 
+### R-23 (Gastronomie, 02.11.2026): Bewohner sterben – Gräber, Trauer, Nachlass, Termine
+
+Thomas, 02.11.2026: „Zwischenidee: ein Friedhof.“ Auf Nachfrage entschieden, alle vier Teile:
+- ein begehbarer Ort;
+- Bewohner sterben;
+- Beerdigungen mit anschließendem Beerdigungskaffee;
+- ein Gedenkort, auch für Spieler selbst.
+
+Verteilt als Requests:
+- W-13 an die Erdkarte: Ort und Gedenken;
+- R-23 an Population: Sterben, Gräber, Trauer;
+- P-1 an Philosophie/NPC: die Trauerfeier.
+
+Den Beerdigungskaffee baut die Gastronomie.
+
+**Stand (02.11.2026):** In der Simulation stirbt niemand. `person_life_state` kennt bisher nur `adult` (65 Personen). `people` hat keine Spalte für den Tod.
+
+**Bitte – Vorschläge, die Entscheidung liegt bei euch:**
+1. **Sterblichkeit:** selten und nachvollziehbar, nach Alter (Geburtsjahr, `ageAtTick`) und später nach Gesundheit; kein Zufallstod junger Menschen ohne Grund.
+   - Lebensstufen `elder` und `deceased` in `person_life_state`;
+   - Ereignis `person_died` in `population_events` (Person, Tick, Ort).
+   - Tote bleiben als Eintrag erhalten. Sie erscheinen nicht mehr im Raum, im Gespräch, auf Stellen oder in Wohnungen.
+2. **Grab:** eine Tabelle, z. B. `person_graves` (Person, Friedhof als OSM-Kennung, Grabfeld, Beisetzung als Tick, Art: Erd- oder Urnengrab).
+   - Gewählt wird der nächste Friedhof am Wohnort, oder nach Religion, wenn es einen eigenen gibt.
+   - Die Erdkarte zeigt die Gräber (W-13).
+3. **Trauer:** Wer eine enge Beziehung hatte (Zuneigung ≥ 0,5), trauert eine Zeit lang (Affekt) und besucht ab und zu das Grab.
+   - Figuren wissen davon nur, was sie wissen können: Angehörige und Freunde sofort, Bekannte vom Hörensagen.
+4. **Nachlass** nach NOXIA-FIN-0001: Guthaben und Besitz als Transfer an Erben aus den Familienbeziehungen, sonst an die Gemeinde. Keine Emission, nichts verschwindet.
+   - Freie Stelle und Wohnung werden wieder vergeben.
+5. **Termine:**
+   - **Trauerfeier** als Sondertermin, `population_events` `place_activity_scheduled`, Art `funeral`, in Kapelle oder Kirche, mit Trauergemeinde aus den Beziehungen (siehe P-1 bei Philosophie/NPC).
+   - Danach der **Beerdigungskaffee** als Sondertermin im nächsten Lokal. Den baut die Gastronomie, Vertrag unten.
+6. **Beerdigungskaffee – Vertrag mit der Gastronomie** (im Lokal schon gebaut, 02.11.2026):
+
+   ```json
+   {
+     "event_type": "place_activity_scheduled",
+     "payload": {
+       "kind": "funeral_reception",
+       "tileEntityId": "<Lokal>",
+       "label": "Beerdigungskaffee",
+       "deceasedPersonId": "<id>", "deceasedName": "<Name>",
+       "hostPersonId": "<Angehörige(r)>",
+       "guestIds": ["<id>", "…"],
+       "startsTick": 1234, "endsTick": 1236
+     }
+   }
+   ```
+
+   - Die Trauergäste kaufen wie sonst im Lokal (`person_consumption_events`). Die Familie zahlt: Transfer Gastgeber → Betreiber, Posten Kaffee und Kuchen. Dann erscheinen sie im Raum.
+   - Das Lokal zeigt „Beerdigungskaffee“. Personal und Trauergäste wissen, für wen er ist. Der Spieler kann der Familie sein Beileid aussprechen.
+   - Ob der Spieler eingeladen ist (z. B. wenn er die Verstorbene kannte), könnt ihr als `playerProfileIds` mitgeben. Ohne Einladung ist er normaler Gast im Lokal.
+

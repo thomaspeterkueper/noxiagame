@@ -96,6 +96,13 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Das Personal erklärt Lohn und Sperre im Namen des Betreibers. In der Schicht zeigt die Tafel, was bisher verdient ist und wie viele Aufgaben zum vollen Lohn fehlen.
   - In der Datenbank durchgerechnet, im Browser geprüft. Offen bei Population: Trinkgeld, Lohnsätze aus `role_wage_rates`.
 
+- **02.11.2026 – Friedhof, davon hier: der Beerdigungskaffee:**
+  - Thomas: „Zwischenidee: ein Friedhof“. Entschieden: begehbarer Ort, Bewohner sterben, Beerdigungen, Gedenkort – verteilt als W-13, R-23 und P-1 (Philosophie/NPC, in `NOXIA-NPC-RELIGION-0001`).
+  - Gebaut: Beerdigungskaffee im Lokal (`lib/game/hospitality/funeralReception.ts`), sobald Population ihn als Sondertermin `funeral_reception` ansetzt (Vertrag in R-23 Punkt 6).
+  - Tafel „Beerdigungskaffee für …“. Personal bedient taktvoll; Gastgeber und Trauergäste wissen, für wen er ist, und erfinden keine Erinnerungen.
+  - Der Spieler kann sein Beileid aussprechen. Neu im Motor: `ctx.say(text)`.
+  - Ohne Termin gibt es nichts. Tests in `funeralReception.test.ts`, im Browser mit Probetermin geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -114,6 +121,9 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **W-13** (02.11.2026): Friedhöfe begehbar, Gedenkort – `world-map.md`.
+- **R-23** (02.11.2026): Bewohner sterben, Gräber, Trauer, Nachlass, Termine – `population-economy.md`.
+- **P-1** (02.11.2026): Trauerfeier je Tradition – `docs/architecture/NOXIA-NPC-RELIGION-0001-spiritual-roles-and-places.md`.
 - **W-12** (29.10.2026): nach „Gleich hingehen“ die Spielerfigur beim Lokal absetzen – `world-map.md`.
 - **R-22** (29.10.2026): Wünsche aus der Arbeitsvermittlung in der täglichen Gesprächsauswertung; echte Lebensfragen sorgsam – `population-economy.md`.
 - **R-21** (28.10.2026): Arbeitsvermittlung – Gebäude Freiheitsmühle 1, Stellenliste, Betriebe, Schiffe, feste Anstellung – `population-economy.md`.

@@ -17,6 +17,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { SOCIAL_INFRASTRUCTURE } from '@/lib/game/settlements/tiers'
 import { spokenOrderItems, spokenOrderTitle } from '@/lib/game/hospitality/spokenOrder'
+import { CONDOLENCE_TEXT, receptionFacts, receptionNotice, receptionRole, type FuneralReception } from '@/lib/game/hospitality/funeralReception'
 import { loadReferral, referralFor, saveReferral, venueReferralFacts, type JobReferral } from '@/lib/game/jobs/referral'
 import { EINSATZ_S, employerShiftFacts, shiftEndText, shiftPay, standingFrom, type ShiftStanding, MUSIC_STYLES, PROPOSED_WAGE_PER_HOUR, ROLE_DUTY, ROLE_LABEL, SHIFT_GAME_HOURS, compressPurchases, roleStation, shiftRolesFor, shiftTasks, shiftWage, workingFact, type MusicStyle, type ShiftPurchase, type ShiftRole, type ShiftTask } from '@/lib/game/hospitality/playerShift'
 import { VENUE_WC_DOOR, toiletAccess, venueServiceRules, type VenueServiceRules } from '@/lib/game/hospitality/venueServices'
@@ -76,6 +77,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[areaM2,setAreaM2]=useState<number|null>(null)
   // Umbau (R-13): Ziel-Lokalart und Fertigstellung; Anzeigename des Hauses (z. B. „Metropol“, „Hauptstraße 72“).
   const[conversion,setConversion]=useState<{type:string;readyAt:string|null}|null>(null)
+  // Beerdigungskaffee (R-23 Punkt 6), wenn Population einen für dieses Lokal angesetzt hat.
+  const[reception,setReception]=useState<FuneralReception|null>(null)
   const[displayName,setDisplayName]=useState<string|null>(null)
   const[placeKnowledge,setPlaceKnowledge]=useState<string[]>([])
   const[visits,setVisits]=useState<Visit[]>([])
@@ -138,6 +141,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
           setAreaM2(typeof data.areaM2==='number'&&data.areaM2>0?data.areaM2:null)
           setConversion(data.conversion&&typeof data.conversion==='object'&&data.conversion.type?{type:String(data.conversion.type),readyAt:data.conversion.readyAt?String(data.conversion.readyAt):null}:null)
           setDisplayName(typeof data.displayName==='string'&&data.displayName.trim()?data.displayName.trim():null)
+          setReception(data.reception&&typeof data.reception==='object'&&data.reception.deceasedName?data.reception as FuneralReception:null)
           setServiceRules(venueServiceRules(data.services))
           setRecentPurchases(Array.isArray(data.recent)?data.recent.map((p:any)=>({personId:String(p.personId),atMs:Date.parse(String(p.at)),label:p.label?String(p.label):undefined})).filter((p:ShiftPurchase)=>Number.isFinite(p.atMs)):[])
           setEntryPaidUntil(typeof data.entryPaidForS==='number'&&data.entryPaidForS>0?Date.now()+data.entryPaidForS*1000:null)
@@ -342,6 +346,19 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[referralStart,referral,jobs,shift,nowMs])
 
+  // Beerdigungskaffee: Hinweis und Beileid an die Familie oder Trauergäste.
+  const renderReception=(ctx:InteriorContext)=>{
+    if(!reception||underConversion||emptyHouse)return null
+    const role=ctx.selected?receptionRole(reception,ctx.selected.id,ctx.shown.some(e=>e.resident.id===ctx.selected!.id&&e.figure.roomRole==='staff')):null
+    const mourning=role==='host'||role==='mourner'
+    const condoled=/beileid/i.test(ctx.lastPlayerText??'')
+    return <div className="menu reception">
+      <small>BEERDIGUNGSKAFFEE</small>
+      <p className="hint">{receptionNotice(reception,reception.playerInvited)}</p>
+      {mourning&&!condoled&&<button className="open-school" onClick={()=>ctx.say(CONDOLENCE_TEXT)}>{reception.playerInvited||role==='host'?'Beileid aussprechen':'Leise Beileid wünschen'}</button>}
+    </div>
+  }
+
   const renderJobs=(ctx:InteriorContext)=>{
     if(!jobs||roles.length===0||ctx.service==='closed'||underConversion||emptyHouse)return null
     const standing=jobs.standing
@@ -457,6 +474,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
+      occasionFacts:receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')}),
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
       entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
       playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):venueReferralFacts(referral,self.roomRole==='staff',false)[0]??null,
@@ -479,7 +497,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     floorMood:layout.danceFloor&&(shift?.role==='dj'||music!=='House')?music.toLowerCase():null,
     gate:layout.entry?{open:entryPaid||Boolean(shift),blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,
     sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:'Zur Toilette',useLabel:'WC BENUTZEN',use:ctx=>ctx.setStatus(toiletAccess(serviceRules.toilet,{hasOrdered:orders.length>0}).text)},
-    renderOffer:ctx=>shift?renderShift(ctx):<>{customerOffer(ctx)}{renderJobs(ctx)}</>,
+    renderOffer:ctx=>shift?renderShift(ctx):<>{renderReception(ctx)}{customerOffer(ctx)}{renderJobs(ctx)}</>,
   }
 
   return <WalkableInterior entityId={entityId} buildingName={houseName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
