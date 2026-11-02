@@ -522,14 +522,17 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         : owner.source ? { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId], levels: undefined }
           : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }
     const eave = (look?.levels ?? block.l) * style.storeyM
+    // Warme Breiten (Gujarat, Sahel, Tropen): Flachdächer statt roter Satteldächer, Tempel und Moscheen ohne Kirchturm (02.11.2026).
+    const warm = Math.abs(toGeo({ x: cx, y: cy }).lat) < 36
+    const roofM = warm ? (block.k === 'church' ? 1.2 : 0) : style.roofM
     let c: Array<{ x: number; y: number }>
     if (shownRing) {
       c = drawPrism(g, block.k, shownRing, eave, { x: -sin, y: cos }, look?.roof)
     } else {
-      c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, style.roofM, look?.roof)
+      c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, roofM, look?.roof)
     }
     if (owner) claim(owner)
-    if (block.k === 'church' && block.w >= 12) {
+    if (block.k === 'church' && block.w >= 12 && !warm) {
       // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
       // spitzem Pyramidendach – macht eine Kirche von Weitem erkennbar.
       if (cos + sin < 0) { cos = -cos; sin = -sin }
@@ -538,7 +541,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const towerEave = eave + style.roofM + Math.max(8, side * 1.6)
       drawMass(g, block.k, tx, ty, side / 2 + 0.3, side / 2 + 0.3, cos, sin, towerEave, side * 1.8)
     }
-    if (block.t) {
+    if (block.t && !warm) {
       // Dachreiter auf dem First: schlanker Aufsatz mit spitzem Dach.
       drawMass(g, block.k, cx, cy, 0.9, 0.9, cos, sin, eave + style.roofM + 1.5, 3.2)
     }
