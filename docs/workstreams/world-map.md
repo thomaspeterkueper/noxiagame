@@ -544,3 +544,10 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 - **Unsere Daten:** Der 500-m-Kern (`earth-place-22p23900-68p96725`) hat 1.117 Gebäude, der Außenring 2,5 km (`earth-place-22p23786-68p96754`) **0 Gebäude** (Notprofil ohne Gebäude). Im Kern liegen wir also gleichauf mit Overture; außerhalb fehlen uns rund 3.600 Häuser.
 - Offen: Lizenz der Overture-Gebäude klären (gemischt aus OSM, Microsoft, Google Open Buildings; Quelle je Gebäude in `sources`), Außenring aus OSM-Ortsdetail in Zellen nachladen statt Overture, falls die Lizenz stört.
 - Technik: Die Overture-Dateien (GeoParquet, ZSTD, 512 Dateien) lassen sich ohne Server im Browser lesen (hyparquet); Dwarka liegt in Datei 288, Zeilengruppe 86.
+
+## Ringzellen um benannte Orte (02.11.2026, Entscheidung Thomas: Ortsdetail aus OSM nachladen)
+
+- Thomas wählt für den Außenring den sauberen Weg: OSM-Ortsdetail in Zellen nachladen (statt Overture, Lizenz offen). `missingRingCells` (`lib/worldlab/worldPlaceQueue.ts`) legt, sobald die Mittelzelle eines Ortes geholt ist, die Zellen rundum an: Ring 1 (8 Zellen), dann Ring 2 (16 Zellen), zusammen 5 × 5 Zellen ≈ 3,3 km.
+- Der stündliche Lauf (`/api/cron/world-places`) holt je Lauf zwei Zellen; Ringzellen kommen hinten in die Warteschlange und werden nur angelegt, wenn weniger als vier warten. Echte leere Orte und Mittelzellen gehen vor. Ein Ort braucht so etwa 12 Stunden bis zum vollen Ring.
+- Offene Fragen: Beobachten, ob Overpass die Menge verträgt; bei großen Städten (Istanbul, Frankfurt) kann eine Zelle sehr viele Gebäude haben (Zeitbudget je Lauf).
+- Istanbul-Beispiel (Thomas, Galatasaray Ortaokulu): Unsere Darstellung weicht von der Satellitenkarte ab – rote Satteldächer überall, Minarette und Moscheen wie Kirchtürme, Gebäudenutzung teils falsch zugeordnet („Ayasofya Tarihi Müzesi Defter-i Hakani Nezareti Binası · Büro“ an der Schule). Als nächste Schritte vorgesehen: Moschee mit Minarett und Kuppel statt Kirchturm (nach `religion=muslim`), Dachformen nach Region, Zuordnung Ort ↔ Gebäude prüfen.
