@@ -2,7 +2,7 @@
 export function requireChronicleOptional<T>(
   result: { data: T | null; error: unknown }, source: string,
 ): T | null {
-  if (!result || result.error !== null) {
+  if (!result || result.error !== null || result.data === undefined) {
     throw new Error(`Building chronicle Core read failed: ${source}`)
   }
   return result.data
