@@ -51,3 +51,16 @@ export function requireUnambiguousChronicleSelector(
     throw new Error('Building chronicle Core read ambiguous: building selectors')
   }
 }
+
+/**
+ * Bound read-only chronicle queries to a finite, deterministic row count.
+ * Invalid runtime payloads must fail before reaching the service client.
+ * This is a page-size guard, NOT a guarantee that the entire history was read.
+ */
+export function resolveChronicleReadLimit(value: unknown): number {
+  if (value === undefined || value === null) return 200
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('Building chronicle Core read invalid: limit')
+  }
+  return Math.min(Math.max(Math.floor(value), 1), 500)
+}
