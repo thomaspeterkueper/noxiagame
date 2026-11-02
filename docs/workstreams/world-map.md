@@ -515,3 +515,8 @@ Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir j
 - Thomas: „Seelenberg kennt unser Suchfeld nicht“. Das Feld verstand nur Straßen, Adressen und Koordinaten.
 - `app/api/world-lab/address/route.ts` sucht ohne Hausnummer zuerst unter den Erd-Regionen (`celestial_regions.label`, `lib/worldlab/placeSearch.ts`): Akzente egal (Dvārakā = dvaraka), Klammerzusatz zählt („Dwarka“), Anfang genügt ab 3 Zeichen, gleichnamige Straßentreffer werden übergangen.
 - Datenbefund: Die Region `earth-place-14p62474-79p62235` („dvaraka, Atmakur ( N ) Main road, Andhra Pradesh“) ist ein falscher Geocoder-Treffer (eine Straße gleichen Namens), nicht Dvārakā in Gujarat (`earth-place-22p23786-68p96754`). Nicht gelöscht – Entscheidung bei Thomas.
+
+## Dvārakā: echtes Dwarka und Thomas' fiktives Dvaraka (02.11.2026)
+
+- Das Dvārakā der Karte ist das echte Dwarka (Gujarat, 22,238 N / 68,968 O). Thomas' Dvaraka ist ein anderes: ein versunkener Ort am Meer, dort werden gerade alte Hafenanlagen ausgegraben; sein Buch „Der letzte Gesang von Dvaraka“ spielt dort, um 1600 v. Chr. Es hat noch keine Region und keine Karte; das ist ein eigener Auftrag (Ort in der Spielwelt vs. nur Buchwelt, Lage, Darstellung als Unterwasser-/Ausgrabungsort).
+- Darstellung: Die Karte zeichnete in Dwarka Kirchtürme und rote Satteldächer, weil jedes Gotteshaus als „church“ gilt und alle Häuser dieselbe europäische Dachform haben. Fix: in warmen Breiten (|Breite| < 36°) Flachdächer, Tempel/Moscheen ohne Kirchturm und ohne Dachreiter (`worldEngine.ts` drawBlock). Echte Tempelformen (Shikhara, Kuppel) und regionale Wandfarben sind offen.
