@@ -199,6 +199,21 @@ export function projectParcelLifecycle(input: {
     if (previous !== undefined && previous !== signature) sourceConflicts.add(key)
     else if (previous === undefined) sourceClaims.set(key, signature)
   }
+  // A single Core source event has one logical instant, even when it affects
+  // several parcels. Reject all in-scope claims if the same source reference
+  // appears with incompatible years or sequences across different parcels.
+  // This does not establish that the source reference is authentic.
+  const sourceInstants = new Map<string, string>()
+  const sourceInstantConflicts = new Set<string>()
+  for (const candidate of receipts) {
+    const r = record(candidate)
+    if (!validReceiptShape(r)) continue
+    const key = r.sourceEventRef as string
+    const instant = JSON.stringify([r.worldYear, r.sequence])
+    const previous = sourceInstants.get(key)
+    if (previous !== undefined && previous !== instant) sourceInstantConflicts.add(key)
+    else if (previous === undefined) sourceInstants.set(key, instant)
+  }
   for (const candidate of receipts) {
     const r = record(candidate)
     const eventId = typeof r.id === 'string' ? r.id : ''
@@ -210,7 +225,8 @@ export function projectParcelLifecycle(input: {
       rejected.push({ eventId, reason: 'conflicting_event' })
       continue
     }
-    if (sourceConflicts.has(sourceKey(r))) {
+    if (sourceConflicts.has(sourceKey(r)) ||
+        sourceInstantConflicts.has(r.sourceEventRef as string)) {
       rejected.push({ eventId, reason: 'conflicting_source_event' })
       continue
     }
