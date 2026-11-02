@@ -47,7 +47,7 @@ export interface ParcelProjection {
   rejected: { eventId: string; reason: ParcelRejectionReason }[]
 }
 
-function validBaseline(value: unknown, settlementId: string): value is ParcelBaseline {
+function validBaseline(value: unknown, settlementId: string, baselineYear: number): value is ParcelBaseline {
   // Even authoritative snapshots may contain malformed historical JSON.
   // Fail closed with a domain error rather than dereferencing null or
   // accepting a falsy non-string building ID on an unoccupied parcel.
@@ -58,6 +58,10 @@ function validBaseline(value: unknown, settlementId: string): value is ParcelBas
   // Never publish another settlement's parcels because of a mis-scoped read.
   // Legacy baselines without this optional field remain supported.
   if (p.settlementId !== undefined && p.settlementId !== settlementId) return false
+  // An explicitly versioned Core baseline must match the requested replay
+  // anchor. Otherwise stale snapshots could be combined with newer events.
+  // Legacy snapshots without baselineYear remain supported.
+  if (p.baselineYear !== undefined && p.baselineYear !== baselineYear) return false
   if (p.surface === 'occupied') {
     return typeof p.buildingId === 'string' && !!p.buildingId.trim()
   }
@@ -90,7 +94,7 @@ export function projectParcelLifecycle(input: {
   const parcels = new Map<string, ParcelState>()
   const usedBuildings = new Set<string>()
   for (const parcel of input.baseline) {
-    if (!validBaseline(parcel, settlementId) || parcels.has(parcel.parcelId) ||
+    if (!validBaseline(parcel, settlementId, baselineYear) || parcels.has(parcel.parcelId) ||
         (parcel.buildingId && usedBuildings.has(parcel.buildingId))) {
       throw new Error('Invalid or duplicated parcel baseline')
     }
