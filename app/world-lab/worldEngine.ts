@@ -14,7 +14,7 @@ import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, N
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
-import { boxFootprint, HOUSE_DRAW_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
+import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
@@ -121,6 +121,8 @@ export interface WorldEngine {
   setInputEnabled: (enabled: boolean) => void
   /** Abstand der Spielfigur in Metern (zu einem Punkt oder zum Rand eines Grundrisses). */
   distanceTo: (at: GeoPoint) => number
+  /** Abstand zum Ort: steht der Punkt in einem Haus (Kirche, Bibliothek), zählt der Abstand zur Hauswand. */
+  distanceToPlace: (at: GeoPoint) => number
   /** Nächste benannte Straße zur Spielfigur (für Gespräche). */
   nearestStreet: () => string | null
   /** Wo die Spielfigur steht. */
@@ -1928,6 +1930,22 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     stopWalking() { autoWalk = null },
     setInputEnabled(enabled) { inputEnabled = enabled; if (!enabled) { keys.clear(); autoWalk = null } },
     distanceTo(at) { const p = toWorld(at); return Math.hypot(p.x - player.x, p.y - player.y) },
+    distanceToPlace(at) {
+      const p = toWorld(at)
+      const direct = Math.hypot(p.x - player.x, p.y - player.y)
+      // Ein Wahrzeichen liegt oft mitten im Haus; man kommt nur bis an die Wand (Häuser sind Hindernisse).
+      const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
+      let best = direct
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
+        if (!entry) continue
+        for (const f of entry.footprints) {
+          if (p.x < f.minX || p.x > f.maxX || p.y < f.minY || p.y > f.maxY || !insidePolygon(p, f.ring)) continue
+          best = Math.min(best, distanceToRing(player, f.ring))
+        }
+      }
+      return best
+    },
     nearestStreet() {
       let best: string | null = null, bestD = 60
       for (const entry of loaded.values()) for (const road of entry.data.roads) {

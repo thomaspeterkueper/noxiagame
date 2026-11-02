@@ -313,6 +313,12 @@ Migration nur gesondert, mit Vorabprüfung und Rücknahme (Vorgabe aus dem Issue
 
 **Noch offen:** Seelenberg-Test (NPC-Vorschlag ohne Wirkung, bestätigter Umbau ändert die Karte, OSM-Refresh überschreibt nichts), sobald der Core die Ereignisse schreibt.
 
+## Fix 02.11.2026: Kirche nicht betretbar (Thomas)
+
+**Befund:** Bei St. Johannes stand die Tafel auf „15 m entfernt · Gehe hin“, ein „Betreten“ erschien nie. Ursache: Der Eintritt galt nur bis 14 m **zur Mitte des Hauses**. Häuser sind Hindernisse, man kommt höchstens bis an die Wand; bei einer großen Kirche liegt die Mitte weiter als 14 m von jeder erreichbaren Stelle. Das Gehen endete an der Wand (festgelaufen), die Entfernung blieb über der Grenze.
+
+**Fix:** Neue Engine-Funktion `distanceToPlace`: Liegt der Punkt in einem Haus, zählt der Abstand zur Hauswand (`distanceToRing` in `lib/worldlab/walking.ts`, getestet). Gilt für die Wahrzeichen-Tafel und für reale Häuser mit Innenraum (Kirche, Bibliothek, Gemeindehaus); eigene NOXIA-Gebäude rechnen wie bisher. Nicht in der laufenden Karte gesehen, nur Typprüfung und Test der Abstandsrechnung.
+
 ## Requests aus anderen Teilprojekten
 
 ### W-1 (Gastronomie, 25.10.2026): Straßennamen in der Spielansicht – in der Weltkarte erledigt (25.10.2026)
