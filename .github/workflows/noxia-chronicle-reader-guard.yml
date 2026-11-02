@@ -1,0 +1,29 @@
+name: NOXIA building chronicle reader guard
+
+on:
+  pull_request:
+    paths:
+      - 'lib/worldlab/buildingChronicle.server.ts'
+      - 'lib/worldlab/buildingChronicleReadGuard.ts'
+      - 'lib/worldlab/buildingChronicleReadGuard.test.mjs'
+      - '.github/workflows/noxia-chronicle-reader-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noxia-chronicle-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chronicle-reader-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run fail-closed reader guard regression
+        run: node --test lib/worldlab/buildingChronicleReadGuard.test.mjs
