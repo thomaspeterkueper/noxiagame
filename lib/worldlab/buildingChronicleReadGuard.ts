@@ -43,9 +43,13 @@ export function requireUnambiguousChronicleSelector(
 ): void {
   // An explicitly supplied blank selector is not the same as omitting it:
   // otherwise an empty entityId silently becomes a settlement-wide scan.
-  if ((entityId !== null && entityId !== undefined && !entityId.trim()) ||
-      (sourceRef !== null && sourceRef !== undefined && !sourceRef.trim())) {
-    throw new Error('Building chronicle Core read invalid: blank building selector')
+  // TypeScript signatures do not validate JSON arriving at runtime. Non-string
+  // selectors must fail before the query is constructed, not throw a TypeError.
+  if ([entityId, sourceRef].some(value =>
+    value !== null && value !== undefined &&
+    (typeof value !== 'string' || !value.trim())
+  )) {
+    throw new Error('Building chronicle Core read invalid: blank or malformed building selector')
   }
   if (entityId && sourceRef) {
     throw new Error('Building chronicle Core read ambiguous: building selectors')
