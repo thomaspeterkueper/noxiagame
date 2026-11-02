@@ -509,3 +509,9 @@ Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir j
 - Thomas: „ja bitte“ – an beiden Orten gibt es keinen Bahnhof in den Kartendaten, also je ein staatliches Reisebüro als Abfahrtsort.
 - Migration `20261102080000_travel_agencies_seelenberg_dvaraka.sql` (live, Probelauf zuvor zurückgerollt): zwei neue `tile_entities` (`travel_agency`, STATE), nur neue Zeilen, nichts Bestehendes geändert. Seelenberg: `osm:way:353655651` (11,5 × 9,5 m); Dvārakā: `osm:way:1343177750` (18,3 × 15,5 m). Rücknahme: beide Zeilen über `source_ref` löschen.
 - Lage x_m/y_m relativ zur Ortsmitte (x Ost, y Nord). Die Häuser sind unbenannte Wohn-/Geschäftshäuser; sobald OSM dort ein Reisebüro führt, kann die Zuordnung getauscht werden.
+
+## Ortssuche im Suchfeld (02.11.2026)
+
+- Thomas: „Seelenberg kennt unser Suchfeld nicht“. Das Feld verstand nur Straßen, Adressen und Koordinaten.
+- `app/api/world-lab/address/route.ts` sucht ohne Hausnummer zuerst unter den Erd-Regionen (`celestial_regions.label`, `lib/worldlab/placeSearch.ts`): Akzente egal (Dvārakā = dvaraka), Klammerzusatz zählt („Dwarka“), Anfang genügt ab 3 Zeichen, gleichnamige Straßentreffer werden übergangen.
+- Datenbefund: Die Region `earth-place-14p62474-79p62235` („dvaraka, Atmakur ( N ) Main road, Andhra Pradesh“) ist ein falscher Geocoder-Treffer (eine Straße gleichen Namens), nicht Dvārakā in Gujarat (`earth-place-22p23786-68p96754`). Nicht gelöscht – Entscheidung bei Thomas.
