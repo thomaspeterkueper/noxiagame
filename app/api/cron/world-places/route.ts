@@ -20,7 +20,7 @@ import { materializeEarthPlace } from '@/lib/world/spatial/earthPlaceMaterialize
 import { EARTH_LOCAL_DETAIL_SOURCE, enrichEarthLocalScene } from '@/lib/world/spatial/earthLocalEnrichment.server'
 import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import { DETAIL_RADIUS_KM } from '@/lib/worldlab/detailCells'
-import { missingCenterCells, pickWorldPlaceTasks, worldPlaceTask, type WorldPlaceTask } from '@/lib/worldlab/worldPlaceQueue'
+import { missingCenterCells, missingRingCells, pickWorldPlaceTasks, worldPlaceTask, type WorldPlaceTask } from '@/lib/worldlab/worldPlaceQueue'
 
 export const maxDuration = 300
 
@@ -46,7 +46,12 @@ export async function GET(req: NextRequest) {
   const rows = (regions ?? []) as Row[]
 
   // Ortsdetail-Zelle an der Mitte benannter Orte anlegen (leer – der Lauf füllt sie).
-  const seeds = missingCenterCells(rows, earthPlaceSlug)
+  // Danach (nur wenn die Mitte geholt ist) die Ringe rundum, wenige je Lauf.
+  // Ringzellen kommen hinten an und nur, wenn kaum etwas wartet – echte Orte und Mittelzellen gehen vor.
+  const waiting = rows.filter(row => row.source === EARTH_LOCAL_DETAIL_SOURCE && !row.source_checked_at).length
+  const centerSeeds = missingCenterCells(rows, earthPlaceSlug)
+  const ringSeeds = waiting < 4 ? missingRingCells(rows, earthPlaceSlug) : []
+  const seeds = [...centerSeeds, ...ringSeeds]
   if (seeds.length) {
     const { error: seedError } = await supabase.from('celestial_regions').upsert(seeds.map(cell => {
       const dLat = DETAIL_RADIUS_KM / 111.195, dLon = dLat / Math.max(0.05, Math.cos(cell.lat * Math.PI / 180))
@@ -58,7 +63,11 @@ export async function GET(req: NextRequest) {
       }
     }), { onConflict: 'slug', ignoreDuplicates: true })
     if (seedError) console.warn('[world-places] seed', seedError.message)
-    else rows.unshift(...seeds.map(cell => ({ id: '', slug: cell.slug, label: null, source: EARTH_LOCAL_DETAIL_SOURCE, center_lat: cell.lat, center_lon: cell.lon, radius_km: DETAIL_RADIUS_KM, source_checked_at: null })))
+    else {
+      const asRow = (cell: { slug: string; lat: number; lon: number }) => ({ id: '', slug: cell.slug, label: null, source: EARTH_LOCAL_DETAIL_SOURCE, center_lat: cell.lat, center_lon: cell.lon, radius_km: DETAIL_RADIUS_KM, source_checked_at: null })
+      rows.unshift(...centerSeeds.map(asRow))
+      rows.push(...ringSeeds.map(asRow))
+    }
   }
 
   const due = Date.now() - RETRY_AFTER_MS

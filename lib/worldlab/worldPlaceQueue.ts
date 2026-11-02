@@ -12,7 +12,7 @@
 //   3. benannte Orte bekommen eine Ortsdetail-Zelle an ihrer Mitte (Gebäude), damit
 //      man dort nicht auf leerem Boden ankommt.
 
-import { detailCell } from './detailCells'
+import { DETAIL_CELL_LAT, detailCell } from './detailCells'
 
 export const COMPACT_PROFILE = 'compact-v2'
 export const LOCAL_DETAIL_SOURCE = 'noxia:local-detail'
@@ -51,6 +51,41 @@ export function missingCenterCells(rows: WorldPlaceRow[], slugOf: (point: { lat:
     if (known.has(slug)) continue
     known.add(slug)
     out.push({ slug, ...cell })
+  }
+  return out
+}
+
+/**
+ * Ringe um die Mitte (Thomas, 02.11.2026, Dwarka: im Außenring fehlten rund 3.600 Häuser, weil dort nur das
+ * Notprofil ohne Gebäude liegt). Sobald die Mitte eines Ortes fertig geholt ist, kommen die Zellen rundum
+ * dran, von innen nach außen: `rings` Zellen weit (2 Ringe = 5 × 5 Zellen ≈ 3,3 km). Höchstens `limit` neue
+ * Zellen je Aufruf, damit die öffentlichen OpenStreetMap-Dienste nicht überlastet werden.
+ */
+export function missingRingCells(rows: WorldPlaceRow[], slugOf: (point: { lat: number; lon: number }) => string, rings = 2, limit = 8) {
+  const bySlug = new Map(rows.map(row => [row.slug, row]))
+  const known = new Set(rows.map(row => row.slug))
+  const out: Array<{ slug: string; lat: number; lon: number }> = []
+  for (let ring = 1; ring <= rings; ring++) {
+    for (const place of rows) {
+      if (place.source === LOCAL_DETAIL_SOURCE || !place.slug.startsWith('earth-place-')) continue
+      const center = detailCell({ lat: Number(place.center_lat), lon: Number(place.center_lon) })
+      const centerRow = bySlug.get(slugOf(center))
+      // erst wenn die Mitte geholt wurde; äußere Ringe erst, wenn der Ring davor da ist
+      if (!centerRow || !centerRow.source_checked_at) continue
+      for (let dr = -ring; dr <= ring; dr++) for (let dc = -ring; dc <= ring; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue
+        const lat = center.lat + dr * DETAIL_CELL_LAT
+        const lonStep = DETAIL_CELL_LAT / Math.max(0.05, Math.cos(lat * Math.PI / 180))
+        const cell = detailCell({ lat, lon: center.lon + dc * lonStep })
+        const slug = slugOf(cell)
+        if (known.has(slug)) continue
+        known.add(slug)
+        out.push({ slug, ...cell })
+        if (out.length >= limit) return out
+      }
+      // ein Ring nach dem anderen: Ring 2 erst, wenn Ring 1 vollständig vorhanden ist
+      if (out.length) return out
+    }
   }
   return out
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isCompactSnapshot, missingCenterCells, pickWorldPlaceTasks, worldPlaceTask, type WorldPlaceRow } from './worldPlaceQueue'
+import { isCompactSnapshot, missingCenterCells, missingRingCells, pickWorldPlaceTasks, worldPlaceTask, type WorldPlaceRow } from './worldPlaceQueue'
 import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import { detailCell } from './detailCells'
 
@@ -38,5 +38,19 @@ describe('worldPlaceQueue', () => {
     const existing = row({ slug: cells[0].slug, source: 'noxia:local-detail', center_lat: cells[0].lat, center_lon: cells[0].lon })
     expect(missingCenterCells([seelenberg, existing], earthPlaceSlug)).toHaveLength(0)
     expect(missingCenterCells([row({ slug: 'earth-sauerland' })], earthPlaceSlug)).toHaveLength(0)
+  })
+  it('legt Ringzellen erst an, wenn die Mitte geholt wurde, von innen nach außen', () => {
+    const dwarka = row({ slug: 'earth-place-22p23786-68p96754', center_lat: 22.23786, center_lon: 68.96754 })
+    expect(missingRingCells([dwarka], earthPlaceSlug)).toHaveLength(0)
+    const centre = detailCell({ lat: 22.23786, lon: 68.96754 })
+    const done = row({ slug: earthPlaceSlug(centre), source: 'noxia:local-detail', center_lat: centre.lat, center_lon: centre.lon, source_checked_at: '2026-11-02T00:00:00Z' })
+    const first = missingRingCells([dwarka, done], earthPlaceSlug, 2, 100)
+    expect(first).toHaveLength(8)              // Ring 1: 3 × 3 ohne Mitte
+    expect(new Set(first.map(c => c.slug)).size).toBe(8)
+    expect(first.every(c => Math.abs(c.lat - centre.lat) < 0.0125)).toBe(true)
+    // Ring 1 vollständig vorhanden → Ring 2 (16 Zellen)
+    const rows1 = [dwarka, done, ...first.map(c => row({ slug: c.slug, source: 'noxia:local-detail', center_lat: c.lat, center_lon: c.lon }))]
+    expect(missingRingCells(rows1, earthPlaceSlug, 2, 100)).toHaveLength(16)
+    expect(missingRingCells(rows1, earthPlaceSlug, 2, 5)).toHaveLength(5)
   })
 })
