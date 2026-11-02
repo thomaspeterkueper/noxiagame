@@ -285,12 +285,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     void tick
     if (!building || !engine) return null
     // Rand statt Mitte: halbe Größe abziehen, sonst ist man bei großen Bauten nie „nah“.
-    const half = own ? Math.max(own.w, own.d) / 2 : 6
-    return Math.max(0, engine.distanceTo(building.at) - half)
+    // Reale Häuser: der Punkt liegt in der Hausmitte, man kommt nur bis an die Wand (Kirche, Bibliothek).
+    if (!own) return engine.distanceToPlace(building.at)
+    return Math.max(0, engine.distanceTo(building.at) - Math.max(own.w, own.d) / 2)
   }, [building, own, engine, tick])
   const landmarkDistance = useMemo(() => {
     void tick
-    return landmark && engine ? engine.distanceTo(landmark.at) : null
+    return landmark && engine ? engine.distanceToPlace(landmark.at) : null
   }, [landmark, engine, tick])
   const landmarkNear = landmarkDistance !== null && landmarkDistance <= LANDMARK_ENTER_M
   const site = panel.kind === 'site' ? sites.find(item => item.id === panel.id) ?? null : null

@@ -137,3 +137,16 @@ export class RoadGraph {
     return null
   }
 }
+
+/** Kürzester Abstand eines Punktes zum Rand eines Grundrisses (0, wenn er darin steht). */
+export function distanceToRing(p: P, ring: readonly P[]): number {
+  if (insidePolygon(p, ring)) return 0
+  let best = Infinity
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length]
+    const dx = b.x - a.x, dy = b.y - a.y
+    const t = dx || dy ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy))) : 0
+    best = Math.min(best, Math.hypot(a.x + dx * t - p.x, a.y + dy * t - p.y))
+  }
+  return best
+}

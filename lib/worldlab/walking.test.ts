@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boxFootprint, insidePolygon, RoadGraph, scaleRing, stepWithObstacles } from './walking'
+import { boxFootprint, distanceToRing, insidePolygon, RoadGraph, scaleRing, stepWithObstacles } from './walking'
 
 describe('obstacles', () => {
   const house = boxFootprint(10, 10, 5, 4, 0, 0.5)
@@ -52,5 +52,20 @@ describe('RoadGraph', () => {
     graph.addLine([{ x: 0, y: 0 }, { x: 50, y: 0.2 }])
     graph.addLine([{ x: 50.1, y: 0 }, { x: 100, y: 0 }])
     expect(graph.route({ x: 0, y: 0 }, { x: 100, y: 0 })).not.toBeNull()
+  })
+})
+
+describe('distanceToRing (Eintritt in Kirchen und Bibliotheken)', () => {
+  const church = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 }, { x: 0, y: 20 }]
+  it('misst bis zur Hauswand, nicht bis zur Mitte', () => {
+    // Mittelpunkt (20, 10): Wer an der Wand steht, ist 20 m von der Mitte entfernt, aber nur 3 m von der Wand.
+    expect(distanceToRing({ x: -3, y: 10 }, church)).toBeCloseTo(3, 5)
+    expect(Math.hypot(-3 - 20, 10 - 10)).toBeGreaterThan(14)
+  })
+  it('rechnet an Ecken mit dem Abstand zur Ecke', () => {
+    expect(distanceToRing({ x: 43, y: 24 }, church)).toBeCloseTo(5, 5)
+  })
+  it('ist 0 im Haus', () => {
+    expect(distanceToRing({ x: 10, y: 10 }, church)).toBe(0)
   })
 })
