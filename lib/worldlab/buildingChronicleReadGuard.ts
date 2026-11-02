@@ -68,3 +68,25 @@ export function resolveChronicleReadLimit(value: unknown): number {
   }
   return Math.min(Math.max(Math.floor(value), 1), 500)
 }
+
+
+/**
+ * Fetch one extra row to detect a truncated history before projection.
+ * A capped response is not an authoritative complete chronicle. Until
+ * cursor-based pagination is integrated, reject it instead of rendering
+ * an incomplete history as if it were complete.
+ */
+export function requireCompleteChroniclePage<T>(
+  result: { data: T[] | null; error: unknown },
+  source: string,
+  limit: number,
+): T[] {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+    throw new Error('Building chronicle Core read invalid: page limit')
+  }
+  const rows = requireChronicleRows(result, source)
+  if (rows.length > limit) {
+    throw new Error(`Building chronicle Core read incomplete: ${source} exceeds page limit`)
+  }
+  return rows
+}
