@@ -107,6 +107,21 @@ export function projectParcelLifecycle(input: {
   // Code-unit ordering is independent of the host ICU locale. Historical
   // replay must not change when server or runtime locale settings change.
   const compareIds = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
+  // Two corrupt receipts may share the same ID, year and sequence but differ
+  // in their domain payload. Never let their input order decide which one is
+  // replayed. This is a deterministic tie-break, NOT proof of Core authority.
+  const payloadKey = (value: unknown) => {
+    const r = record(value)
+    const change = record(r.change)
+    return JSON.stringify([
+      typeof r.settlementId === 'string' ? r.settlementId : '',
+      typeof r.parcelId === 'string' ? r.parcelId : '',
+      typeof r.sourceEventRef === 'string' ? r.sourceEventRef : '',
+      r.committed === true ? '1' : '0',
+      typeof change.action === 'string' ? change.action : '',
+      typeof change.buildingId === 'string' ? change.buildingId : '',
+    ])
+  }
   const receipts = (input.receipts as readonly unknown[])
     .filter(candidate => {
       const r = record(candidate)
@@ -118,7 +133,8 @@ export function projectParcelLifecycle(input: {
     })
     .sort((a, b) => {
       const left = order(a), right = order(b)
-      return left.year - right.year || left.sequence - right.sequence || compareIds(left.id, right.id)
+      return left.year - right.year || left.sequence - right.sequence ||
+        compareIds(left.id, right.id) || compareIds(payloadKey(a), payloadKey(b))
     })
   for (const candidate of receipts) {
     const r = record(candidate)
