@@ -138,6 +138,13 @@ export function projectParcelLifecycle(input: {
       continue
     }
     const change = receipt.change
+    // A historical JSON row can contain a numeric/object buildingId despite
+    // the TypeScript union. Validate before any .trim() or state transition.
+    if ((change.action === 'demolish' || change.action === 'construct') &&
+        (typeof change.buildingId !== 'string' || !change.buildingId.trim())) {
+      rejected.push({ eventId: receipt.id, reason: 'invalid_receipt' })
+      continue
+    }
     let next: ParcelState | null = null
     if (change.action === 'demolish') {
       if (parcel.surface === 'occupied' && parcel.buildingId === change.buildingId) {
@@ -146,10 +153,6 @@ export function projectParcelLifecycle(input: {
     } else if (change.action === 'restore_meadow') {
       if (parcel.surface === 'cleared') next = { parcelId: parcel.parcelId, surface: 'meadow' }
     } else if (change.action === 'construct') {
-      if (!change.buildingId?.trim()) {
-        rejected.push({ eventId: receipt.id, reason: 'invalid_receipt' })
-        continue
-      }
       if (usedBuildings.has(change.buildingId)) {
         rejected.push({ eventId: receipt.id, reason: 'building_identity_reused' })
         continue
