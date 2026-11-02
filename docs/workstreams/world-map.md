@@ -536,3 +536,11 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 - Fix: Die Spielfigur stößt nur noch an den **Kern** der Häuser (`WALK_CORE_SCALE` = 0,72 des gezeichneten Grundrisses, `lib/worldlab/walking.ts`, `worldEngine.ts` blocked()). Dicht gebaute Orte wie Dwarka haben so Gassen zwischen den Häusern; Betreten und Entfernung rechnen weiter mit der Hauswand (`footprints[].ring`).
 - Anforderung Thomas: Für die Chronomaps (begehbare Zeit-Orte, z. B. Dvaraka um 1600 v. Chr., Konstantinopel) soll es **Zeitreise-Reisebüros** geben, also Reisebüros, bei denen man neben Bahn/Flug/Weltraum eine Zeitreise zu einer Chronomap bucht (Panel `travel`, vierter Reiter „Zeit“). Noch nicht gebaut; offen sind Abfahrtsorte, Preis und Dauer, und der Inhalt der Chronomaps (siehe Konzept oben).
 - Kanon: Thomas hat den Text „Das Lied von Dvārakā“ (erweiterte Fassung, Kapitel 1.0 bis 1.4.5: sieben Türme, Hafen mit Fischer Matsya, Bäckergasse, Marktplatz, Handwerkerviertel, Schulhof, Heilgarten; Arabisches Meer) als Grundlage für die Hafenszene gegeben. Er liegt nur im Chat, nicht im Repo.
+
+## Datenabgleich Dwarka: GlobalBuildingAtlas und Overture Maps (02.11.2026)
+
+- **GlobalBuildingAtlas (TUM), ODbL-Teil** (`GBA.ODbLPolygon`, Kachel `e065_n25_e070_n20`): im Umkreis von 2,5 km um Dvārakā nur 24 Gebäude (alle OSM, keine Microsoft-Grundrisse) – bringt nichts. Die Teile mit mehr Gebäuden (Polygone, LoD1, Höhen) stehen unter CC BY-NC 4.0.
+- **Overture Maps** (Release 2026-10-21.0, Thema `buildings/building`): 4.792 Gebäude im Umkreis von 2,5 km, davon 1.210 im 500-m-Kern; Klassen u. a. Haus, Schule, Krankenhaus, Tempel (9), Hotel (6), Bahnhof (4). Keine Höhen in diesem Ausschnitt.
+- **Unsere Daten:** Der 500-m-Kern (`earth-place-22p23900-68p96725`) hat 1.117 Gebäude, der Außenring 2,5 km (`earth-place-22p23786-68p96754`) **0 Gebäude** (Notprofil ohne Gebäude). Im Kern liegen wir also gleichauf mit Overture; außerhalb fehlen uns rund 3.600 Häuser.
+- Offen: Lizenz der Overture-Gebäude klären (gemischt aus OSM, Microsoft, Google Open Buildings; Quelle je Gebäude in `sources`), Außenring aus OSM-Ortsdetail in Zellen nachladen statt Overture, falls die Lizenz stört.
+- Technik: Die Overture-Dateien (GeoParquet, ZSTD, 512 Dateien) lassen sich ohne Server im Browser lesen (hyparquet); Dwarka liegt in Datei 288, Zeilengruppe 86.
