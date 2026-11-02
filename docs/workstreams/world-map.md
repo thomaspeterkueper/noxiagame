@@ -503,3 +503,9 @@ Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir j
 - Fix: `effectivePlaceKind` (Lokal mit `tourism=hotel|guest_house` zählt als Hotel) und `isTravelPlace` (Bahnhof, Hotel, Pension) in `lib/worldlab/landmarks.ts`; Reiseorte sind immer sichtbar und stehen in der „Gehe zu“-Liste (`viewOptions.ts`, `worldEngine.ts`). Keine Kachel muss neu gebaut werden.
 - Am Bahnhof zeigt das Infofenster „Reise buchen“ (öffnet das Reisebüro/Weiterreise-Fenster mit dem Bahnhof als Abfahrtsort).
 - Offen: In den Kartendaten von Seelenberg und Dvārakā gibt es keinen Bahnhof; dort bleibt „✈ Weiterreisen“ (ab 30 km vom Start) bzw. ein eigenes NOXIA-Reisebüro als Abfahrtsort. Hotels haben noch keinen Innenraum.
+
+## Reisebüros in Seelenberg und Dvārakā (02.11.2026)
+
+- Thomas: „ja bitte“ – an beiden Orten gibt es keinen Bahnhof in den Kartendaten, also je ein staatliches Reisebüro als Abfahrtsort.
+- Migration `20261102080000_travel_agencies_seelenberg_dvaraka.sql` (live, Probelauf zuvor zurückgerollt): zwei neue `tile_entities` (`travel_agency`, STATE), nur neue Zeilen, nichts Bestehendes geändert. Seelenberg: `osm:way:353655651` (11,5 × 9,5 m); Dvārakā: `osm:way:1343177750` (18,3 × 15,5 m). Rücknahme: beide Zeilen über `source_ref` löschen.
+- Lage x_m/y_m relativ zur Ortsmitte (x Ost, y Nord). Die Häuser sind unbenannte Wohn-/Geschäftshäuser; sobald OSM dort ein Reisebüro führt, kann die Zuordnung getauscht werden.
