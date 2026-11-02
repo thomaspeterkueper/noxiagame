@@ -37,7 +37,7 @@ export interface ParcelTransition {
 }
 export type ParcelRejectionReason =
   | 'duplicate_event' | 'duplicate_source_event' | 'invalid_receipt' | 'unknown_parcel'
-  | 'invalid_transition' | 'building_identity_reused'
+  | 'invalid_transition' | 'building_identity_reused' | 'conflicting_event'
 export interface ParcelProjection {
   settlementId: string
   year: number
@@ -122,6 +122,20 @@ export function projectParcelLifecycle(input: {
       typeof change.buildingId === 'string' ? change.buildingId : '',
     ])
   }
+  // Only structurally valid, in-scope receipts may participate in a collision
+  // check. Corrupt rows must not suppress a valid Core receipt with the same ID.
+  const validReceiptShape = (r: Record<string, unknown>): boolean => {
+    const change = record(r.change)
+    return typeof r.id === 'string' && !!r.id.trim() &&
+      typeof r.parcelId === 'string' && !!r.parcelId.trim() &&
+      typeof r.sourceEventRef === 'string' && !!r.sourceEventRef.trim() &&
+      r.settlementId === settlementId && r.committed === true &&
+      Number.isInteger(r.worldYear) && Number.isInteger(r.sequence) &&
+      (r.sequence as number) >= 0 && (r.worldYear as number) >= baselineYear &&
+      ['demolish', 'restore_meadow', 'construct'].includes(change.action as string) &&
+      (change.action === 'restore_meadow' ||
+        (typeof change.buildingId === 'string' && !!change.buildingId.trim()))
+  }
   const receipts = (input.receipts as readonly unknown[])
     .filter(candidate => {
       const r = record(candidate)
@@ -136,18 +150,32 @@ export function projectParcelLifecycle(input: {
       return left.year - right.year || left.sequence - right.sequence ||
         compareIds(left.id, right.id) || compareIds(payloadKey(a), payloadKey(b))
     })
+  // Two well-formed receipts claiming the same identity AND logical instant
+  // but different domain payloads are ambiguous. Quarantine both rather than
+  // arbitrarily selecting a building from a deterministic sort order.
+  // This is an integrity guard, not proof that any receipt is authorized.
+  const signatures = new Map<string, string>()
+  const conflicts = new Set<string>()
+  const identityAtInstant = (r: Record<string, unknown>) =>
+    JSON.stringify([r.id, r.worldYear, r.sequence])
+  for (const candidate of receipts) {
+    const r = record(candidate)
+    if (!validReceiptShape(r)) continue
+    const key = identityAtInstant(r)
+    const signature = payloadKey(candidate)
+    const previous = signatures.get(key)
+    if (previous !== undefined && previous !== signature) conflicts.add(key)
+    else if (previous === undefined) signatures.set(key, signature)
+  }
   for (const candidate of receipts) {
     const r = record(candidate)
     const eventId = typeof r.id === 'string' ? r.id : ''
-    if (typeof r.id !== 'string' || !r.id.trim() ||
-        typeof r.parcelId !== 'string' || !r.parcelId.trim() ||
-        typeof r.sourceEventRef !== 'string' || !r.sourceEventRef.trim() ||
-        r.settlementId !== settlementId || r.committed !== true ||
-        !Number.isInteger(r.worldYear) || !Number.isInteger(r.sequence) ||
-        (r.sequence as number) < 0 || (r.worldYear as number) < baselineYear ||
-        !r.change || typeof r.change !== 'object' || Array.isArray(r.change) ||
-        !['demolish', 'restore_meadow', 'construct'].includes((r.change as Record<string, unknown>).action as string)) {
+    if (!validReceiptShape(r)) {
       rejected.push({ eventId, reason: 'invalid_receipt' })
+      continue
+    }
+    if (conflicts.has(identityAtInstant(r))) {
+      rejected.push({ eventId, reason: 'conflicting_event' })
       continue
     }
     // A rejected event cannot reserve an ID or source reference: a corrupt
