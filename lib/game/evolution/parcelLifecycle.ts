@@ -181,19 +181,20 @@ export function projectParcelLifecycle(input: {
     if (previous !== undefined && previous !== signature) conflicts.add(key)
     else if (previous === undefined) signatures.set(key, signature)
   }
-  // A single Core source at one logical instant cannot carry competing
-  // receipts for the same parcel. Quarantine all such claims rather than
-  // accepting whichever happens to sort first. This remains a read-only
-  // consistency check, not proof that a Core event was authorized.
+  // A single Core source must not claim two different events for the same
+  // parcel, even at different years/sequences. Otherwise a recycled source
+  // reference could silently advance the parcel twice. Multi-parcel events
+  // remain valid because the key includes the parcel identity. This is an
+  // integrity check only, not proof of Core authority.
   const sourceClaims = new Map<string, string>()
   const sourceConflicts = new Set<string>()
   const sourceKey = (r: Record<string, unknown>) =>
-    JSON.stringify([r.parcelId, r.sourceEventRef, r.worldYear, r.sequence])
+    JSON.stringify([r.parcelId, r.sourceEventRef])
   for (const candidate of receipts) {
     const r = record(candidate)
     if (!validReceiptShape(r)) continue
     const key = sourceKey(r)
-    const signature = JSON.stringify([r.id, payloadKey(candidate)])
+    const signature = JSON.stringify([r.worldYear, r.sequence, r.id, payloadKey(candidate)])
     const previous = sourceClaims.get(key)
     if (previous !== undefined && previous !== signature) sourceConflicts.add(key)
     else if (previous === undefined) sourceClaims.set(key, signature)
