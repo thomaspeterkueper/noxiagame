@@ -4,11 +4,10 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
-const MAX_LIMIT = 500
 
 export function isEntityId(value: string | null | undefined): value is string {
   return Boolean(value && UUID.test(value))
@@ -21,7 +20,7 @@ export function isEntityId(value: string | null | undefined): value is string {
  */
 export async function loadBuildingChronicle(input: { viewerProfileId: string; entityId?: string | null; sourceRef?: string | null; limit?: number }): Promise<Chronicle> {
   const supabase = createServiceClient()
-  const limit = Math.min(Math.max(Math.floor(input.limit ?? 200), 1), MAX_LIMIT)
+  const limit = resolveChronicleReadLimit(input.limit)
 
   // Never combine a user-selected entity with an unrelated OSM tombstone.
   requireUnambiguousChronicleSelector(input.entityId, input.sourceRef)
