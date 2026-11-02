@@ -16,6 +16,13 @@ export type Footprint = P[]
  */
 export const HOUSE_DRAW_SCALE = 0.9
 
+/**
+ * Hindernis für die Spielfigur: nur der Kern des gezeichneten Hauses (Thomas, 02.11.2026: „in Dwarka
+ * kaum laufen, die Gebäude stehen so dicht, dass man ständig blockiert wird“). Dicht gebaute Orte
+ * lassen so Gassen zwischen den Häusern; Betreten und Entfernung rechnen weiter mit der Hauswand.
+ */
+export const WALK_CORE_SCALE = 0.72
+
 /** Vieleck um einen Mittelpunkt verkleinern. */
 export function scaleRing(ring: readonly P[], centre: P, scale: number): P[] {
   return ring.map(p => ({ x: centre.x + (p.x - centre.x) * scale, y: centre.y + (p.y - centre.y) * scale }))
