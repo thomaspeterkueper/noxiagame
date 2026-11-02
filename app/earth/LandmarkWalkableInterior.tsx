@@ -32,6 +32,8 @@ import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/compon
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 import { isRoundKind, roundKeyOf } from '@/lib/game/rounds/roundTalk'
 import RoundTalk from './RoundTalk'
+import RoundBubbles from './RoundBubbles'
+import { useRoundTalk } from './useRoundTalk'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
@@ -336,6 +338,15 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const talkRole = partner ? partner.person.role : staff?.role ?? ''
   const talkFigureId = partner ? partner.person.id : `landmark-staff:${name}`
   const talkEnded = conversationEnd.isEnded(talkFigureId)
+  // Offene Runde: Beiträge laufen, solange jemand im Raum ist und du nicht gerade mit jemandem sprichst.
+  const roundOn = Boolean(occasion && isRoundKind(occasion.kind) && placed.length >= 2)
+  const round = useRoundTalk({
+    enabled: roundOn && !talkingNow,
+    roundKey: occasion ? roundKeyOf(placeRef ?? name, occasion.startedAt) : '',
+    placeName: name,
+    label: occasion?.label ?? '',
+    people: placed.slice(0, 8).map(item => ({ id: item.person.id, name: item.person.name })),
+  })
 
   function startTalk() {
     if (!staff) return
@@ -515,6 +526,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {placed.map(item => <div key={item.person.id} className="npc" style={{ left: item.at.x - 12, top: item.at.y - 34 }}>
           <NpcFigure id={item.person.id} name={item.person.name} role={item.person.doing ?? item.person.role} moving={false} showLabel={nearPerson?.person.id === item.person.id || partnerId === item.person.id || item.person.host} showRoleLabel selected={talkingNow && partnerId === item.person.id} onClick={() => { if (nearPerson?.person.id === item.person.id) void startTalkWith(item.person) }}/>
         </div>)}
+        {roundOn && !talkingNow && <RoundBubbles lines={round.lines} width={LANDMARK_ROOM.width} figures={placed.map(item => ({ id: item.person.id, x: item.at.x, y: item.at.y }))}/>}
         {layout.kind === 'library' && readerSeats.length > 0 && <div className="npc" style={{ left: readerPos.x - 12, top: readerPos.y - 34 }}>
           <NpcFigure id={`landmark-reader:${name}`} name={readerName} role={readerMoving ? 'unterwegs' : 'liest'} moving={readerMoving} showLabel={Math.hypot(readerPos.x - pos.x, readerPos.y - pos.y) < 70} showRoleLabel onClick={() => setStatus(`${readerName} schaut kurz auf, nickt dir zu und liest weiter.`)}/>
         </div>}
@@ -544,7 +556,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <span>mit {occasion.host.name}{placed.length > 1 ? ` · ${placed.length - 1} weitere hier` : ''}</span>
           <ol>{phases.filter(item => item.from < 120).map(item => <li key={item.title} className={item === phase ? 'now' : item.to <= minute ? 'done' : ''}>{item.title}</li>)}</ol>
           <p>{phase.text}</p>
-          {isRoundKind(occasion.kind) && placed.length >= 2 && <RoundTalk roundKey={roundKeyOf(placeRef ?? name, occasion.startedAt)} placeName={name} label={occasion.label} people={placed.slice(0, 8).map(item => ({ id: item.person.id, name: item.person.name }))}/>}
+          {roundOn && <RoundTalk lines={round.lines} sending={round.sending} note={round.note} say={round.say}/>}
           <div className="row">
             {phases.some(item => item.speak) && (phase.speak
               ? <button className="act" disabled={hearing} onClick={() => void hearSermon()}>{hearing ? 'Hört zu …' : `${speechNoun(occasion.kind)} hören`}</button>
