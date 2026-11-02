@@ -91,6 +91,13 @@ export function requireCompleteChroniclePage<T>(
   return rows
 }
 
+/** Supabase timestamptz receipts must carry a complete, parseable ISO instant. */
+function isChronicleInstant(value: unknown): value is string {
+  return typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    Number.isFinite(Date.parse(value))
+}
+
 /**
  * A malformed persisted receipt must not vanish silently in buildChronicle.
  * The eventstore query already filters event types, but the returned payload
@@ -109,13 +116,41 @@ export function requireChronicleEventRows<T>(
     }
     const receipt = row as Record<string, unknown>
     if (
-      !['id', 'subject_id', 'occurred_at'].every(
+      !['id', 'subject_id'].every(
         key => typeof receipt[key] === 'string' && Boolean((receipt[key] as string).trim()),
       ) ||
+      !isChronicleInstant(receipt.occurred_at) ||
       typeof receipt.event_type !== 'string' ||
       !allowed.has(receipt.event_type)
     ) {
       throw new Error(`Building chronicle Core read invalid: ${source} event receipt`)
+    }
+  }
+  return rows
+}
+
+/**
+ * Tombstones are authoritative demolition evidence. Malformed rows must
+ * fail closed instead of creating phantom or undated demolition entries.
+ */
+export function requireChronicleTombstoneRows<T>(
+  result: { data: T[] | null; error: unknown },
+  source: string,
+  limit: number,
+): T[] {
+  const rows = requireCompleteChroniclePage(result, source, limit)
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error(`Building chronicle Core read invalid: ${source} tombstone`)
+    }
+    const stone = row as Record<string, unknown>
+    if (
+      typeof stone.source_ref !== 'string' || !stone.source_ref.trim() ||
+      !isChronicleInstant(stone.cleared_at) ||
+      !(stone.profile_id === null || (typeof stone.profile_id === 'string' && Boolean(stone.profile_id.trim()))) ||
+      !(stone.display_name === undefined || stone.display_name === null || typeof stone.display_name === 'string')
+    ) {
+      throw new Error(`Building chronicle Core read invalid: ${source} tombstone`)
     }
   }
   return rows
