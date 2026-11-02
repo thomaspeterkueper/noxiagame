@@ -90,3 +90,33 @@ export function requireCompleteChroniclePage<T>(
   }
   return rows
 }
+
+/**
+ * A malformed persisted receipt must not vanish silently in buildChronicle.
+ * The eventstore query already filters event types, but the returned payload
+ * still needs a minimal runtime shape check before historical projection.
+ */
+export function requireChronicleEventRows<T>(
+  result: { data: T[] | null; error: unknown },
+  source: string,
+  limit: number,
+): T[] {
+  const rows = requireCompleteChroniclePage(result, source, limit)
+  const allowed = new Set(['entity.created', 'entity.updated', 'entity.deleted'])
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error(`Building chronicle Core read invalid: ${source} event receipt`)
+    }
+    const receipt = row as Record<string, unknown>
+    if (
+      !['id', 'subject_id', 'occurred_at'].every(
+        key => typeof receipt[key] === 'string' && Boolean((receipt[key] as string).trim()),
+      ) ||
+      typeof receipt.event_type !== 'string' ||
+      !allowed.has(receipt.event_type)
+    ) {
+      throw new Error(`Building chronicle Core read invalid: ${source} event receipt`)
+    }
+  }
+  return rows
+}

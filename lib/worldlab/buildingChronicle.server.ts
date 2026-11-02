@@ -4,7 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -56,7 +56,7 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
       ? eventQuery : Promise.resolve({ data: [], error: null }),
     stoneQuery,
   ])
-  const eventRows = requireCompleteChroniclePage(eventResult, 'simulation_events', limit) as ChronicleEventRow[]
+  const eventRows = requireChronicleEventRows(eventResult, 'simulation_events', limit) as ChronicleEventRow[]
   const stones = requireCompleteChroniclePage(stoneResult, 'earth_cleared_buildings', limit) as ChronicleTombstoneRow[]
   const subjectIds = [...new Set(eventRows.map(row => row.subject_id).filter((id): id is string => Boolean(id)))]
 
