@@ -46,10 +46,20 @@ export interface ParcelProjection {
   rejected: { eventId: string; reason: ParcelRejectionReason }[]
 }
 
-function validBaseline(p: ParcelBaseline): boolean {
-  return !!p.parcelId?.trim() &&
-    (p.surface === 'occupied' || p.surface === 'cleared' || p.surface === 'meadow') &&
-    (p.surface === 'occupied' ? !!p.buildingId?.trim() : !p.buildingId)
+function validBaseline(value: unknown): value is ParcelBaseline {
+  // Even authoritative snapshots may contain malformed historical JSON.
+  // Fail closed with a domain error rather than dereferencing null or
+  // accepting a falsy non-string building ID on an unoccupied parcel.
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const p = value as Record<string, unknown>
+  if (typeof p.parcelId !== 'string' || !p.parcelId.trim()) return false
+  if (p.surface === 'occupied') {
+    return typeof p.buildingId === 'string' && !!p.buildingId.trim()
+  }
+  if (p.surface === 'cleared' || p.surface === 'meadow') {
+    return p.buildingId === undefined
+  }
+  return false
 }
 
 /** A stable parcel is not the building occupying it; both have distinct IDs. */
