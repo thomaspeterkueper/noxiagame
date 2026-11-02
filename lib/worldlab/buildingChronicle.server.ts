@@ -4,7 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -42,10 +42,10 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
     .select('id,event_type,subject_id,actor_id,occurred_at,effects,metadata')
     .eq('subject_type', 'tile_entity').in('event_type', EVENT_TYPES)
     .eq('location_id', earthId)
-    .order('occurred_at', { ascending: false }).limit(limit)
+    .order('occurred_at', { ascending: false }).limit(limit + 1)
   if (entityId) eventQuery = eventQuery.eq('subject_id', entityId)
 
-  let stoneQuery = supabase.from('earth_cleared_buildings').select('source_ref,profile_id,display_name,cleared_at').order('cleared_at', { ascending: false }).limit(limit)
+  let stoneQuery = supabase.from('earth_cleared_buildings').select('source_ref,profile_id,display_name,cleared_at').order('cleared_at', { ascending: false }).limit(limit + 1)
   if (input.sourceRef) stoneQuery = stoneQuery.eq('source_ref', input.sourceRef)
   else if (entityId) stoneQuery = stoneQuery.eq('source_ref', '__none__') // ohne Gebäude-ID ist ein Grabstein nicht zuzuordnen
 
@@ -56,8 +56,8 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
       ? eventQuery : Promise.resolve({ data: [], error: null }),
     stoneQuery,
   ])
-  const eventRows = requireChronicleRows(eventResult, 'simulation_events') as ChronicleEventRow[]
-  const stones = requireChronicleRows(stoneResult, 'earth_cleared_buildings') as ChronicleTombstoneRow[]
+  const eventRows = requireCompleteChroniclePage(eventResult, 'simulation_events', limit) as ChronicleEventRow[]
+  const stones = requireCompleteChroniclePage(stoneResult, 'earth_cleared_buildings', limit) as ChronicleTombstoneRow[]
   const subjectIds = [...new Set(eventRows.map(row => row.subject_id).filter((id): id is string => Boolean(id)))]
 
   const existing = new Set<string>()
