@@ -15,7 +15,7 @@ import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, N
 import { iso, ISO_Y, leftToRight, roofMatrix, wallMatrix, type Affine } from '@/lib/worldlab/facade'
 import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatterns'
 import { streetLabels } from '@/lib/worldlab/streetLabels'
-import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
+import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, WALK_CORE_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
 import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
@@ -374,7 +374,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -555,7 +555,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Hindernis für die Spielfigur: genau das gezeichnete Haus (ohne zusätzlichen Rand)
     if (footprints) {
       const ring = shownRing ?? boxFootprint(cx, cy, hw, hd, block.a, 0)
-      footprints.push({ ring, minX: Math.min(...ring.map(p => p.x)), maxX: Math.max(...ring.map(p => p.x)), minY: Math.min(...ring.map(p => p.y)), maxY: Math.max(...ring.map(p => p.y)) })
+      const core = scaleRing(ring, { x: cx, y: cy }, WALK_CORE_SCALE)
+      footprints.push({ ring, minX: Math.min(...ring.map(p => p.x)), maxX: Math.max(...ring.map(p => p.x)), minY: Math.min(...ring.map(p => p.y)), maxY: Math.max(...ring.map(p => p.y)),
+        core, cMinX: Math.min(...core.map(p => p.x)), cMaxX: Math.max(...core.map(p => p.x)), cMinY: Math.min(...core.map(p => p.y)), cMaxY: Math.max(...core.map(p => p.y)) })
     }
     return g
   }
@@ -1348,8 +1350,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
       if (!entry) continue
       for (const f of entry.footprints) {
-        if (p.x < f.minX || p.x > f.maxX || p.y < f.minY || p.y > f.maxY) continue
-        if (insidePolygon(p, f.ring)) return true
+        if (p.x < f.cMinX || p.x > f.cMaxX || p.y < f.cMinY || p.y > f.cMaxY) continue
+        if (insidePolygon(p, f.core)) return true
       }
     }
     return false
