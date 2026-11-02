@@ -8,6 +8,7 @@
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
+import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
 import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { ANCHOR_VISIBLE_MAX, COMMUTE_THRESHOLD_M, anchorSpread, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute, VISIBLE_WALK_MAX_M } from '@/lib/game/population/visibleMovement'
 import { AREA_COLORS, AREA_OUTLINES, AREA_PATTERNS, BLOCK_STYLES, TRACK_STYLE, NOXIA_DEFAULT_LOOK, NOXIA_LOOKS, publicSymbol, type BlockArt, GROUND_COLOR, OUTLINE, RIVER_STYLE, ROAD_STYLES } from '@/lib/worldlab/blocks'
@@ -570,7 +571,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return undefined
   }
   function landmarkOf(place: TilePlace, ox: number, oy: number): WorldLandmark {
-    return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: place.k, tags: place.t ?? {}, ...(place.p ? { poi: true } : {}) }
+    return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: effectivePlaceKind(place.k, place.t), tags: place.t ?? {}, ...(place.p ? { poi: true } : {}) }
   }
 
   /** Linie (x/y abwechselnd, Meter) um `by` Meter seitlich versetzt (Geländer). */
@@ -735,7 +736,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       badge.hitArea = new PIXI.Rectangle(-4, -12, 8, 13)
       ;(badge as unknown as { pick: WorldPick }).pick = { type: 'landmark', landmark: landmarkOf(place, ox, oy) }
       // Ohne Funktion im Spiel: mit „Orte aus OSM“ ausblendbar
-      const functional = !place.p && placeHasFunction(place.k, place.t)
+      const functional = isTravelPlace(place.k, place.t) || (!place.p && placeHasFunction(place.k, place.t))
       if (!functional) {
         osmBadges.add(badge)
         badge.visible = view.osmPlaces

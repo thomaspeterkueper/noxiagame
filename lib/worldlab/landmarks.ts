@@ -25,6 +25,22 @@ const POI_LABEL: Record<string, string> = {
   school: 'Schule', hotel: 'Hotel', guest_house: 'Pension', craft: 'Handwerk', office: 'Büro', shop: 'Laden',
 }
 
+/**
+ * Tatsächliche Art eines Ortes: Ein Lokal, das zugleich Hotel ist (OSM: amenity=restaurant + tourism=hotel,
+ * z. B. „Hôtel de l'Ours“ in Vuiteboeuf), zählt als Hotel – sonst fehlt das Hotel auf der Karte (02.11.2026).
+ */
+export function effectivePlaceKind(kind: string, tags?: Record<string, string>): string {
+  const stay = tags?.tourism
+  if ((kind === 'restaurant' || kind === 'cafe' || kind === 'bar' || kind === 'pub') && (stay === 'hotel' || stay === 'guest_house')) return stay
+  return kind
+}
+
+/** Bahnhof oder Unterkunft: Orte, an denen man ankommt und abreist – immer sichtbar, auch ohne „Orte aus OSM“. */
+export function isTravelPlace(kind: string, tags?: Record<string, string>): boolean {
+  const k = effectivePlaceKind(kind, tags)
+  return k === 'station' || k === 'hotel' || k === 'guest_house'
+}
+
 export function landmarkLabel(kind: string, tags?: Record<string, string>) {
   if (kind === 'shop') return SHOP_LABEL[tags?.shop ?? ''] ?? 'Laden'
   if (POI_LABEL[kind]) return POI_LABEL[kind]

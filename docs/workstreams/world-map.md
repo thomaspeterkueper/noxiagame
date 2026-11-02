@@ -496,3 +496,10 @@ Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir j
    - Sagt mir, welchen Namen und welche Form ihr wollt; die Gastronomie-Seite baue ich dann ein.
 2. Vorschlag, nicht dringend: Ein gültiger Schein liegt im Browser unter `localStorage['noxia.jobReferral']` (`buildingId`, gültig zwei Stunden). Die Karte könnte das Ziel markieren, solange er gilt.
 
+
+## Fix 02.11.2026: Bahnhof und Hotel in Vuiteboeuf fehlten
+
+- Ursache: Der Bahnhof „Vuiteboeuf“ war in den Kacheln (Kachel 67922/46205, Klasse `station`), wurde aber als „Ort ohne Funktion“ mit den OSM-Orten ausgeblendet; das „Hôtel de l'Ours“ trägt in OSM `amenity=restaurant` und `tourism=hotel` und lief nur als Lokal (ebenfalls ausgeblendet).
+- Fix: `effectivePlaceKind` (Lokal mit `tourism=hotel|guest_house` zählt als Hotel) und `isTravelPlace` (Bahnhof, Hotel, Pension) in `lib/worldlab/landmarks.ts`; Reiseorte sind immer sichtbar und stehen in der „Gehe zu“-Liste (`viewOptions.ts`, `worldEngine.ts`). Keine Kachel muss neu gebaut werden.
+- Am Bahnhof zeigt das Infofenster „Reise buchen“ (öffnet das Reisebüro/Weiterreise-Fenster mit dem Bahnhof als Abfahrtsort).
+- Offen: In den Kartendaten von Seelenberg und Dvārakā gibt es keinen Bahnhof; dort bleibt „✈ Weiterreisen“ (ab 30 km vom Start) bzw. ein eigenes NOXIA-Reisebüro als Abfahrtsort. Hotels haben noch keinen Innenraum.

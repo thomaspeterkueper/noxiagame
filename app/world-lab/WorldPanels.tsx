@@ -690,7 +690,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {landmark.tags.description && <p>{landmark.tags.description}</p>}
       {(() => { const service = worshipAt(worship, { source: landmarkSource, at: landmark.at }); return service && <ScheduleLine item={service}/> })()}
       {landmarkFacts(landmark.tags).length > 0 && <dl>{landmarkFacts(landmark.tags).map(fact => <Fragment key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></Fragment>)}</dl>}
-      {room && landmarkNear
+      {landmark.kind === 'station' && landmarkNear
+        ? <div className="row"><span>Du stehst am Bahnhof – von hier fahren Züge weiter.</span><button onClick={() => setPanel({ kind: 'travel', at: landmark.at })}>Reise buchen</button></div>
+        : room && landmarkNear
         ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })}>Betreten</button></div>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>

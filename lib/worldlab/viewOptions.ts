@@ -10,6 +10,7 @@
 // Denkmäler …) ist nur Beschriftung und lässt sich ausblenden.
 
 import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { isTravelPlace } from './landmarks'
 
 export interface ViewOptions {
   /** Straßennamen entlang der Straßen */
@@ -25,13 +26,13 @@ const KEY = 'noxia-world-view-v1'
 
 /** Hat ein Ort aus OSM eine Funktion im Spiel (begehbarer Raum)? */
 export function placeHasFunction(kind: string, tags?: Record<string, string>): boolean {
-  return landmarkRoomKind(kind, tags) !== null
+  return landmarkRoomKind(kind, tags) !== null || isTravelPlace(kind, tags)
 }
 
 /** Soll ein Ort aus OSM gezeigt werden (Schild, Name, Zielliste)? */
 export function showPlace(view: ViewOptions, place: { kind: string; tags?: Record<string, string>; poi?: boolean }): boolean {
   if (view.osmPlaces) return true
-  return !place.poi && placeHasFunction(place.kind, place.tags)
+  return (!place.poi && placeHasFunction(place.kind, place.tags)) || isTravelPlace(place.kind, place.tags)
 }
 
 /** Gespeicherte Wahl dieses Browsers (fehlt oder unlesbar: Vorgabe). */
