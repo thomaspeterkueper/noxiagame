@@ -166,11 +166,11 @@ export function projectParcelLifecycle(input: {
       // Foreign, well-identified settlements are intentionally out of scope.
       if (typeof r.settlementId === 'string' && r.settlementId.trim() &&
           r.settlementId !== settlementId) return false
-      // Only a valid, safely representable future year may be deferred.
-      // An unsafe or fractional year is malformed, not a future event;
-      // include it so replay reports invalid_receipt instead of hiding it.
-      return !Number.isSafeInteger(r.worldYear) ||
-        (r.worldYear as number) <= year
+      // Defer only structurally valid future receipts. A future-dated row
+      // with an invalid sequence, change, identity or committed marker is
+      // malformed NOW and must be diagnosed, not silently hidden by its year.
+      // This is validation only; it does not authenticate Core provenance.
+      return !validReceiptShape(r) || (r.worldYear as number) <= year
     })
     .sort((a, b) => {
       const left = order(a), right = order(b)
