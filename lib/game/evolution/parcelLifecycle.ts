@@ -70,8 +70,16 @@ export function projectParcelLifecycle(input: {
   baseline: readonly ParcelBaseline[]
   receipts: readonly CoreParcelReceipt[]
 }): ParcelProjection {
+  // A failed/partial Core read must never be mistaken for an empty history.
+  // Validate the read-model envelope before trusting the baseline or receipts.
+  if (!input || typeof input !== 'object' || !Array.isArray(input.baseline) ||
+      !Array.isArray(input.receipts)) {
+    throw new Error('Invalid parcel replay input')
+  }
   const { settlementId, baselineYear, year } = input
-  if (!settlementId.trim() || !Number.isInteger(baselineYear) || !Number.isInteger(year) || year < baselineYear) {
+  if (typeof settlementId !== 'string' || !settlementId.trim() ||
+      !Number.isSafeInteger(baselineYear) || !Number.isSafeInteger(year) ||
+      year < baselineYear) {
     throw new Error('Invalid settlement or projection interval')
   }
   const parcels = new Map<string, ParcelState>()
@@ -130,7 +138,7 @@ export function projectParcelLifecycle(input: {
       typeof r.parcelId === 'string' && !!r.parcelId.trim() &&
       typeof r.sourceEventRef === 'string' && !!r.sourceEventRef.trim() &&
       r.settlementId === settlementId && r.committed === true &&
-      Number.isInteger(r.worldYear) && Number.isInteger(r.sequence) &&
+      Number.isSafeInteger(r.worldYear) && Number.isSafeInteger(r.sequence) &&
       (r.sequence as number) >= 0 && (r.worldYear as number) >= baselineYear &&
       ['demolish', 'restore_meadow', 'construct'].includes(change.action as string) &&
       (change.action === 'restore_meadow' ||
