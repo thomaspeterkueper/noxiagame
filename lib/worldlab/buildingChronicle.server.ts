@@ -4,6 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, shouldReadChronicleEvents } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -24,31 +25,39 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
 
   let entityId = input.entityId ?? null
   if (!entityId && input.sourceRef) {
-    const { data } = await supabase.from('tile_entities').select('id').eq('source_ref', input.sourceRef).maybeSingle()
-    entityId = data?.id ?? null
+    const lookup = await supabase.from('tile_entities').select('id').eq('source_ref', input.sourceRef).maybeSingle()
+    entityId = requireChronicleOptional(lookup, 'tile_entities.source_ref')?.id ?? null
   }
 
-  const { data: earth } = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
+  const earthLookup = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
+  const earthId = requireEarthLocationId(requireChronicleOptional(earthLookup, 'locations.earth'))
 
   let eventQuery = supabase.from('simulation_events')
     .select('id,event_type,subject_id,actor_id,occurred_at,effects,metadata')
     .eq('subject_type', 'tile_entity').in('event_type', EVENT_TYPES)
+    .eq('location_id', earthId)
     .order('occurred_at', { ascending: false }).limit(limit)
   if (entityId) eventQuery = eventQuery.eq('subject_id', entityId)
-  else if (earth?.id) eventQuery = eventQuery.eq('location_id', earth.id)
 
   let stoneQuery = supabase.from('earth_cleared_buildings').select('source_ref,profile_id,display_name,cleared_at').order('cleared_at', { ascending: false }).limit(limit)
   if (input.sourceRef) stoneQuery = stoneQuery.eq('source_ref', input.sourceRef)
   else if (entityId) stoneQuery = stoneQuery.eq('source_ref', '__none__') // ohne Gebäude-ID ist ein Grabstein nicht zuzuordnen
 
-  const [{ data: events }, { data: stones }] = await Promise.all([eventQuery, stoneQuery])
-  const eventRows = (events ?? []) as ChronicleEventRow[]
+  // An unknown source_ref can still have a tombstone, but must never fall
+  // back to a settlement-wide event scan.
+  const [eventResult, stoneResult] = await Promise.all([
+    shouldReadChronicleEvents(input.sourceRef, entityId)
+      ? eventQuery : Promise.resolve({ data: [], error: null }),
+    stoneQuery,
+  ])
+  const eventRows = requireChronicleRows(eventResult, 'simulation_events') as ChronicleEventRow[]
+  const stones = requireChronicleRows(stoneResult, 'earth_cleared_buildings') as ChronicleTombstoneRow[]
   const subjectIds = [...new Set(eventRows.map(row => row.subject_id).filter((id): id is string => Boolean(id)))]
 
   const existing = new Set<string>()
   for (let i = 0; i < subjectIds.length; i += 100) {
-    const { data } = await supabase.from('tile_entities').select('id').in('id', subjectIds.slice(i, i + 100))
-    for (const row of data ?? []) existing.add(String(row.id))
+    const lookup = await supabase.from('tile_entities').select('id').in('id', subjectIds.slice(i, i + 100))
+    for (const row of requireChronicleRows(lookup, 'tile_entities.existing')) existing.add(String(row.id))
   }
-  return buildChronicle({ events: eventRows, tombstones: (stones ?? []) as ChronicleTombstoneRow[], existingEntityIds: existing, viewerProfileId: input.viewerProfileId })
+  return buildChronicle({ events: eventRows, tombstones: stones, existingEntityIds: existing, viewerProfileId: input.viewerProfileId })
 }
