@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
+import { earthBuildingName } from '@/lib/worldlab/earthNames'
 
 export async function GET(req: NextRequest) {
   const profileId = await verifiedBearerUserId(req)
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest) {
   // Abgerissene reale Gebäude: die Karte zeichnet dort eine freie Fläche (nur der Eigentümer darf bauen).
   const { data: parcelOwners } = await supabase.from('earth_parcel_owners').select('parcel_id,profile_id').limit(5000)
   const { data: cleared } = await supabase.from('earth_cleared_buildings').select('source_ref,profile_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,display_name,cleared_at').limit(1000)
-  const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), String(row.name)]))
+  // Namen wie auf der Erde üblich (W-8: „Habitat“ → „Wohnhaus“)
+  const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), earthBuildingName(String(row.key), String(row.name))]))
   return NextResponse.json({
     buildings: (rows ?? []).map((row: any) => ({
       id: row.id, typeId: row.entity_id, name: row.display_name ? (row.entity_id === 'acquired_building' ? row.display_name : `${names.get(String(row.entity_id)) ?? row.entity_id} · ${row.display_name}`) : names.get(String(row.entity_id)) ?? row.entity_id, source: row.source_ref ?? undefined,

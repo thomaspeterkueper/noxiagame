@@ -108,10 +108,13 @@ export default function EarthBuildingAccessLayer({
   request,
   onClose,
   companion,
+  onRelocate,
 }: {
   request: BuildingEntryRequest | null
   onClose: () => void
   companion?: ColonyResident | null
+  /** W-12: Die Agentur öffnet ein anderes Gebäude direkt – die Karte setzt die Figur davor. */
+  onRelocate?: (entityId: string) => void
 }) {
   const {
     credits, cargo, cargoMax, buy, sell, loadFromServer,
@@ -186,7 +189,7 @@ export default function EarthBuildingAccessLayer({
     // Die Arbeitsvermittlung ist begehbar (NOXIA-INTERIOR-0001); Stellen hängen an der Wand.
     // „Gleich hingehen“ öffnet das vermittelte Lokal; die Schicht beginnt dort.
     return <JobAgencyWalkableInterior entityId={request.entityId} buildingName={request.buildingName} companion={companion} onClose={onClose}
-      onGoTo={ref => setHandoff({ entityId: ref.buildingId, buildingTypeId: ref.buildingTypeId, buildingName: ref.buildingName, kind: 'hospitality' })} />
+      onGoTo={ref => { onRelocate?.(ref.buildingId); setHandoff({ entityId: ref.buildingId, buildingTypeId: ref.buildingTypeId, buildingName: ref.buildingName, kind: 'hospitality' }) }} />
   }
 
   if (request.kind === 'administration') {
