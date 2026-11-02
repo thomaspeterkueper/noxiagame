@@ -166,8 +166,11 @@ export function projectParcelLifecycle(input: {
       // Foreign, well-identified settlements are intentionally out of scope.
       if (typeof r.settlementId === 'string' && r.settlementId.trim() &&
           r.settlementId !== settlementId) return false
-      return typeof r.worldYear !== 'number' || !Number.isFinite(r.worldYear) ||
-        r.worldYear <= year
+      // Only a valid, safely representable future year may be deferred.
+      // An unsafe or fractional year is malformed, not a future event;
+      // include it so replay reports invalid_receipt instead of hiding it.
+      return !Number.isSafeInteger(r.worldYear) ||
+        (r.worldYear as number) <= year
     })
     .sort((a, b) => {
       const left = order(a), right = order(b)
