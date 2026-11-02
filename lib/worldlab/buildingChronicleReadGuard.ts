@@ -91,11 +91,29 @@ export function requireCompleteChroniclePage<T>(
   return rows
 }
 
-/** Supabase timestamptz receipts must carry a complete, parseable ISO instant. */
+/**
+ * Date.parse normalizes impossible dates (e.g. February 30) and 24:00 into
+ * another day. A persisted Core receipt must represent the stated instant,
+ * not a silently corrected calendar date.
+ */
 function isChronicleInstant(value: unknown): value is string {
-  return typeof value === 'string' &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
-    Number.isFinite(Date.parse(value))
+  if (typeof value !== 'string') return false
+  const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(Z|[+-]\d{2}:[0-5]\d)$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (year < 1 || month < 1 || month > 12) return false
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (day < 1 || day > days[month - 1]) return false
+  const zone = match[4]
+  if (zone !== 'Z') {
+    const hours = Number(zone.slice(1, 3))
+    const minutes = Number(zone.slice(4, 6))
+    if (hours > 14 || (hours === 14 && minutes !== 0)) return false
+  }
+  return Number.isFinite(Date.parse(value))
 }
 
 /**
