@@ -4,7 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, shouldReadChronicleEvents } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -23,14 +23,21 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
   const supabase = createServiceClient()
   const limit = Math.min(Math.max(Math.floor(input.limit ?? 200), 1), MAX_LIMIT)
 
-  let entityId = input.entityId ?? null
-  if (!entityId && input.sourceRef) {
-    const lookup = await supabase.from('tile_entities').select('id').eq('source_ref', input.sourceRef).maybeSingle()
-    entityId = requireChronicleOptional(lookup, 'tile_entities.source_ref')?.id ?? null
-  }
+  // Never combine a user-selected entity with an unrelated OSM tombstone.
+  requireUnambiguousChronicleSelector(input.entityId, input.sourceRef)
 
+  // Resolve Earth before source_ref: source refs must never resolve to an
+  // entity on another world, even if its UUID is globally unique.
   const earthLookup = await supabase.from('locations').select('id').eq('slug', 'earth').maybeSingle()
   const earthId = requireEarthLocationId(requireChronicleOptional(earthLookup, 'locations.earth'))
+
+  let entityId = input.entityId ?? null
+  if (!entityId && input.sourceRef) {
+    const lookup = await supabase.from('tile_entities').select('id')
+      .eq('source_ref', input.sourceRef).eq('location_id', earthId)
+      .eq('entity_type', 'building').maybeSingle()
+    entityId = requireChronicleOptional(lookup, 'tile_entities.source_ref')?.id ?? null
+  }
 
   let eventQuery = supabase.from('simulation_events')
     .select('id,event_type,subject_id,actor_id,occurred_at,effects,metadata')
@@ -56,7 +63,7 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
 
   const existing = new Set<string>()
   for (let i = 0; i < subjectIds.length; i += 100) {
-    const lookup = await supabase.from('tile_entities').select('id').in('id', subjectIds.slice(i, i + 100))
+    const lookup = await supabase.from('tile_entities').select('id').eq('location_id', earthId).in('id', subjectIds.slice(i, i + 100))
     for (const row of requireChronicleRows(lookup, 'tile_entities.existing')) existing.add(String(row.id))
   }
   return buildChronicle({ events: eventRows, tombstones: stones, existingEntityIds: existing, viewerProfileId: input.viewerProfileId })
