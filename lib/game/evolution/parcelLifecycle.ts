@@ -90,7 +90,13 @@ export function projectParcelLifecycle(input: {
         (parcel.buildingId && usedBuildings.has(parcel.buildingId))) {
       throw new Error('Invalid or duplicated parcel baseline')
     }
-    parcels.set(parcel.parcelId, { ...parcel })
+    // A baseline may contain private/operational fields from the Core store.
+    // Publish only the explicit parcel read-model contract; never spread raw JSON.
+    parcels.set(parcel.parcelId, {
+      parcelId: parcel.parcelId,
+      surface: parcel.surface,
+      ...(parcel.surface === 'occupied' ? { buildingId: parcel.buildingId } : {}),
+    })
     if (parcel.buildingId) usedBuildings.add(parcel.buildingId)
   }
   const transitions: ParcelTransition[] = []
