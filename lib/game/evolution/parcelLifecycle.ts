@@ -104,6 +104,9 @@ export function projectParcelLifecycle(input: {
       id: typeof r.id === 'string' ? r.id : '',
     }
   }
+  // Code-unit ordering is independent of the host ICU locale. Historical
+  // replay must not change when server or runtime locale settings change.
+  const compareIds = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
   const receipts = (input.receipts as readonly unknown[])
     .filter(candidate => {
       const r = record(candidate)
@@ -115,7 +118,7 @@ export function projectParcelLifecycle(input: {
     })
     .sort((a, b) => {
       const left = order(a), right = order(b)
-      return left.year - right.year || left.sequence - right.sequence || left.id.localeCompare(right.id)
+      return left.year - right.year || left.sequence - right.sequence || compareIds(left.id, right.id)
     })
   for (const candidate of receipts) {
     const r = record(candidate)
@@ -185,6 +188,6 @@ export function projectParcelLifecycle(input: {
       from: parcel.surface, to: next.surface, sourceEventRef: receipt.sourceEventRef })
   }
   return { settlementId, year,
-    parcels: [...parcels.values()].sort((a, b) => a.parcelId.localeCompare(b.parcelId)),
+    parcels: [...parcels.values()].sort((a, b) => compareIds(a.parcelId, b.parcelId)),
     transitions, rejected }
 }
