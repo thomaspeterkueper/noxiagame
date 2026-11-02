@@ -23,7 +23,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const noStore = { 'Cache-Control': 'no-store' }
 
 type Row = { id: number; speaker_person_id: string | null; speaker_name: string; text: string; visible_to: string | null; created_at: string }
-const view = (row: Row, userId: string) => ({ id: row.id, name: row.speaker_name, text: row.text, speakerId: row.speaker_person_id, mine: row.visible_to === userId && row.speaker_person_id === null })
+const view = (row: Row, userId: string) => ({ id: row.id, at: row.created_at, name: row.speaker_name, text: row.text, speakerId: row.speaker_person_id, mine: row.visible_to === userId && row.speaker_person_id === null })
 
 function roundKeyFrom(value: unknown): string | null {
   const key = typeof value === 'string' ? value.trim().slice(0, 160) : ''
