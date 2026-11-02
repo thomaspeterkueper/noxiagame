@@ -38,6 +38,7 @@ export interface ParcelTransition {
 export type ParcelRejectionReason =
   | 'duplicate_event' | 'duplicate_source_event' | 'invalid_receipt' | 'unknown_parcel'
   | 'invalid_transition' | 'building_identity_reused' | 'conflicting_event'
+  | 'conflicting_source_event'
 export interface ParcelProjection {
   settlementId: string
   year: number
@@ -173,6 +174,23 @@ export function projectParcelLifecycle(input: {
     if (previous !== undefined && previous !== signature) conflicts.add(key)
     else if (previous === undefined) signatures.set(key, signature)
   }
+  // A single Core source at one logical instant cannot carry competing
+  // receipts for the same parcel. Quarantine all such claims rather than
+  // accepting whichever happens to sort first. This remains a read-only
+  // consistency check, not proof that a Core event was authorized.
+  const sourceClaims = new Map<string, string>()
+  const sourceConflicts = new Set<string>()
+  const sourceKey = (r: Record<string, unknown>) =>
+    JSON.stringify([r.parcelId, r.sourceEventRef, r.worldYear, r.sequence])
+  for (const candidate of receipts) {
+    const r = record(candidate)
+    if (!validReceiptShape(r)) continue
+    const key = sourceKey(r)
+    const signature = JSON.stringify([r.id, payloadKey(candidate)])
+    const previous = sourceClaims.get(key)
+    if (previous !== undefined && previous !== signature) sourceConflicts.add(key)
+    else if (previous === undefined) sourceClaims.set(key, signature)
+  }
   for (const candidate of receipts) {
     const r = record(candidate)
     const eventId = typeof r.id === 'string' ? r.id : ''
@@ -182,6 +200,10 @@ export function projectParcelLifecycle(input: {
     }
     if (conflicts.has(eventId)) {
       rejected.push({ eventId, reason: 'conflicting_event' })
+      continue
+    }
+    if (sourceConflicts.has(sourceKey(r))) {
+      rejected.push({ eventId, reason: 'conflicting_source_event' })
       continue
     }
     // A rejected event cannot reserve an ID or source reference: a corrupt
