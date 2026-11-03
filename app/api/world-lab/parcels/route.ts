@@ -125,7 +125,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!await verifiedBearerUserId(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({})) as { lat?: number; lon?: number }
-  const point = { lat: Number(body.lat), lon: Number(body.lon) }
+  // Reject absent or nonnumeric coordinates rather than silently coercing null to zero.
+  if (typeof body.lat !== 'number' || typeof body.lon !== 'number') return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
+  const point = { lat: body.lat, lon: body.lon }
   if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
   if (!cadastreServicesAt(point).length) return NextResponse.json({ ok: true, outside: true, parcels: 0 })
   const cell = parcelCell(point)
