@@ -12,13 +12,14 @@ import { getToken } from '@/lib/supabase/auth'
 import { useGameStore } from '@/lib/store/gameStore'
 import { flightDurationText, type PassengerOffer } from '@/lib/game/passengerOffers'
 
-type Offers = { from: string | null; hasShip: boolean; inTransit: boolean; credits: number; offers: PassengerOffer[] }
+type Offers = { from: string | null; hasShip: boolean; parkedAt: string | null; inTransit: boolean; credits: number; offers: PassengerOffer[] }
 
 export default function TicketCounter({ compact = false }: { compact?: boolean }) {
   const loadFromServer = useGameStore(state => state.loadFromServer)
   const [data, setData] = useState<Offers | null>(null)
   const [error, setError] = useState('')
   const [booking, setBooking] = useState<string | null>(null)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -33,14 +34,14 @@ export default function TicketCounter({ compact = false }: { compact?: boolean }
       } catch { if (live) setError('Flugplan nicht erreichbar.') }
     })()
     return () => { live = false }
-  }, [])
+  }, [reload])
 
   async function book(offer: PassengerOffer) {
     if (booking) return
     setBooking(offer.slug); setError('')
     try {
       const token = await getToken()
-      const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start', destination: offer.slug }) })
+      const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'passenger', destination: offer.slug }) })
       const json = await response.json().catch(() => ({}))
       if (!response.ok || !json.ok) { setError(String(json.error ?? 'Buchung nicht möglich.')); return }
       // Der Spielstand liest den Flug vom Server und zeigt ihn an.
@@ -48,13 +49,28 @@ export default function TicketCounter({ compact = false }: { compact?: boolean }
     } catch { setError('Buchung derzeit nicht erreichbar.') } finally { setBooking(null) }
   }
 
+  async function boardShip() {
+    if (booking) return
+    setBooking('board'); setError('')
+    try {
+      const token = await getToken()
+      const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'board' }) })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok || !json.ok) { setError(String(json.error ?? 'Das Einsteigen ist nicht möglich.')); return }
+      await loadFromServer()
+      setReload(value => value + 1)
+    } catch { setError('Das Einsteigen ist derzeit nicht erreichbar.') } finally { setBooking(null) }
+  }
+
   const credits = data?.credits ?? 0
   return <div className={'ticket-counter' + (compact ? ' compact' : '')}>
     <div className="tc-head"><small>LINIENFLUG · TICKETSCHALTER</small>{data && <span>Guthaben {credits.toLocaleString('de-DE')} Cr</span>}</div>
     {!data && !error && <p>Flugplan wird geladen …</p>}
     {data?.inTransit && <p>Du bist bereits unterwegs.</p>}
-    {data?.hasShip && <p>Du hast ein eigenes Schiff – Abflug über die Navigation. Der Linienflug ist für Reisende ohne Schiff.</p>}
-    {data && !data.hasShip && !data.inTransit && (data.offers.length
+    {data?.hasShip && !data.inTransit && <p>Du hast ein eigenes Schiff. Mit dem Linienflug steigst du aus: Das Schiff bleibt hier geparkt, bis du zurückkommst und wieder an Bord gehst.</p>}
+    {data?.parkedAt && data.parkedAt === data.from && <div className="tc-board"><p>Dein Schiff liegt hier.</p><button disabled={Boolean(booking)} onClick={() => void boardShip()}>{booking === 'board' ? '…' : 'An Bord gehen'}</button></div>}
+    {data?.parkedAt && data.parkedAt !== data.from && <p>Dein Schiff liegt in {data.parkedAt}. Dort gehst du wieder an Bord.</p>}
+    {data && !data.inTransit && (data.offers.length
       ? <ul>{data.offers.map(offer => <li key={offer.slug}>
           <div><b>{offer.name}</b><span>{flightDurationText(offer.durationSeconds)} Flug</span></div>
           <button disabled={Boolean(booking) || credits < offer.ticketPrice} title={credits < offer.ticketPrice ? 'Nicht genug Credits' : undefined} onClick={() => void book(offer)}>{booking === offer.slug ? '…' : `${offer.ticketPrice.toLocaleString('de-DE')} Cr`}</button>
@@ -75,6 +91,7 @@ export default function TicketCounter({ compact = false }: { compact?: boolean }
       li span{font-size:9px;color:#8ba3ad}
       button{border:1px solid #9b8545;border-radius:6px;background:#2a2413;color:#f3e2b0;padding:5px 10px;cursor:pointer;font-weight:700;white-space:nowrap}
       button:disabled{opacity:.45;cursor:not-allowed}
+      .tc-board{display:flex;justify-content:space-between;align-items:center;gap:10px}
       .compact li{padding:5px 7px}
     `}</style>
   </div>

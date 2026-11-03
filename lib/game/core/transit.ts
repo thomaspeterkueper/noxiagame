@@ -81,17 +81,43 @@ export type PlayerTransitState = {
   arrival: StationArrivalState | null
 }
 
+/**
+ * Das Schiff, auf dem der Spieler gerade ist (profiles.aboard_ship_id, Migration
+ * 20261103190000). Ein geparktes Schiff zählt nicht: ohne Schiff an Bord gilt der Linienflug.
+ */
 async function activeShipForProfile(profileId: string): Promise<ActiveShip | null> {
   const supabase = createServiceClient()
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('aboard_ship_id').eq('id', profileId).maybeSingle()
+  if (profileError) throw new Error(`aboard ship lookup failed: ${profileError.message}`)
+  const shipId = (profile as { aboard_ship_id?: string | null } | null)?.aboard_ship_id
+  if (!shipId) return null
   const { data, error } = await supabase
     .from('ships')
     .select('id, profile_id, location, status, dest_location, arrives_at, transit_started_at, ship_type_id, cargo_max, is_active, created_at')
+    .eq('id', shipId)
     .eq('profile_id', profileId)
-    .order('created_at', { ascending: true })
+    .maybeSingle()
 
   if (error) throw new Error(`active ship lookup failed: ${error.message}`)
-  const rows = (data ?? []) as unknown as ActiveShip[]
-  return rows.find(ship => ship.is_active) ?? rows[0] ?? null
+  return (data as unknown as ActiveShip | null) ?? null
+}
+
+/** Der Spieler geht an Bord seines Schiffs (nur am Ort des Schiffs). */
+export async function boardPlayerShip(profileId: string, shipId?: string): Promise<{ ok: boolean; shipId: string; location: string; alreadyAboard: boolean }> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_board_ship', { p_profile_id: profileId, p_ship_id: shipId ?? null })
+  if (error) throw new Error(error.message)
+  const row = data as { ship_id: string; location: string; already_aboard: boolean }
+  return { ok: true, shipId: row.ship_id, location: row.location, alreadyAboard: Boolean(row.already_aboard) }
+}
+
+/** Wo das eigene Schiff liegt, wenn der Spieler nicht an Bord ist (sonst null). */
+export async function parkedShipLocation(profileId: string): Promise<{ shipId: string; location: string } | null> {
+  const supabase = createServiceClient()
+  const { data: profile } = await supabase.from('profiles').select('aboard_ship_id').eq('id', profileId).maybeSingle()
+  if ((profile as { aboard_ship_id?: string | null } | null)?.aboard_ship_id) return null
+  const { data } = await supabase.from('ships').select('id, location').eq('profile_id', profileId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+  return data ? { shipId: String((data as { id: string }).id), location: String((data as { location: string }).location) } : null
 }
 
 function arrivalCoreNotRolledOut(message: string) {
@@ -121,7 +147,7 @@ async function registerKnownLocationBodies(supabase: ReturnType<typeof createSer
   registerLocationBodies((data ?? []) as any[])
 }
 
-async function startPlayerPassengerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
+export async function startPlayerPassengerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
   const supabase = createServiceClient()
   const profile = await passengerProfile(profileId)
   if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
@@ -166,7 +192,7 @@ async function startPlayerPassengerTransit(profileId: string, destination: strin
  * Dauern wie beim Abflug (startPlayerPassengerTransit). Wer ein eigenes Schiff
  * hat, fliegt über die Navigation – der Schalter sagt das (hasShip).
  */
-export async function getPassengerOffers(profileId: string): Promise<{ from: string | null; hasShip: boolean; inTransit: boolean; credits: number; offers: PassengerOffer[] }> {
+export async function getPassengerOffers(profileId: string): Promise<{ from: string | null; hasShip: boolean; parkedAt: string | null; inTransit: boolean; credits: number; offers: PassengerOffer[] }> {
   const supabase = createServiceClient()
   const [ship, profile, { data: wallet }, { data: locations }, { data: tickRow }] = await Promise.all([
     activeShipForProfile(profileId),
@@ -177,11 +203,13 @@ export async function getPassengerOffers(profileId: string): Promise<{ from: str
   ])
   if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
   registerLocationBodies((locations ?? []) as Parameters<typeof registerLocationBodies>[0])
+  // Der Ort des Spielers: an Bord der des Schiffs (folgt ihm), sonst der eigene.
   const from = ship ? ship.location : profile.current_location
   const inTransit = ship ? ship.status === 'transit' : Boolean(profile.transit_destination)
+  const parked = ship ? null : await parkedShipLocation(profileId)
   const navigationProficiency = navigationProficiencyFromUnlocks(await getPlayerUnlocks(profileId))
   const offers = from ? passengerOffers({ from, destinations: (locations ?? []) as Array<{ slug: string; name: string | null }>, tick: Number(tickRow?.tick_number ?? 0), navigationProficiency }) : []
-  return { from, hasShip: Boolean(ship), inTransit, credits: Number(wallet?.credits ?? 0), offers }
+  return { from, hasShip: Boolean(ship), parkedAt: parked?.location ?? null, inTransit, credits: Number(wallet?.credits ?? 0), offers }
 }
 
 export async function startPlayerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
