@@ -30,6 +30,9 @@ describe('Earth parcel import is an initial snapshot, not world truth', () => {
     expect(source).toContain("status: 503")
     expect(source).toContain('if (cacheWriteError) throw cacheWriteError')
     expect(source.indexOf('if (cacheWriteError) throw cacheWriteError')).toBeLessThan(source.indexOf('return NextResponse.json({ ok: true, cached: false'))
+    expect(source).toContain('if (cacheFailureWriteError) console.error(')
+    expect(source).toContain("error: 'Katasterimport fehlgeschlagen.' }, { status: 503 }")
+    expect(source).toContain('catch (cacheFailureWriteError)')
   })
 
 })
