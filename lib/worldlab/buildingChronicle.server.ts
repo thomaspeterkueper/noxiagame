@@ -4,7 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows, requireChronicleTombstoneRows, readCompleteChroniclePages, readChronicleKeysetPages } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows, requireChronicleTombstoneRows, readCompleteChroniclePages, readChronicleKeysetPages, chronicleKeysetFilter } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -49,7 +49,7 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
             .eq('subject_type', 'tile_entity').in('event_type', EVENT_TYPES)
             .eq('location_id', earthId)
           if (entityId) query = query.eq('subject_id', entityId)
-          if (cursor) query = query.or(`occurred_at.lt.${cursor.timestamp},and(occurred_at.eq.${cursor.timestamp},id.lt.${cursor.id})`)
+          if (cursor) query = query.or(chronicleKeysetFilter('occurred_at', 'id', cursor))
           return await query.order('occurred_at', { ascending: false })
             .order('id', { ascending: false }).limit(pageLimit)
         },
@@ -62,12 +62,7 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
           .select('source_ref,profile_id,display_name,cleared_at')
         if (input.sourceRef) query = query.eq('source_ref', input.sourceRef)
         else if (entityId) query = query.eq('source_ref', '__none__')
-        if (cursor) {
-          // PostgREST quoted value prevents commas and parentheses in OSM refs
-          // from becoming filter syntax. Escape both backslashes and quotes.
-          const safeRef = cursor.id.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-          query = query.or(`cleared_at.lt.${cursor.timestamp},and(cleared_at.eq.${cursor.timestamp},source_ref.lt."${safeRef}")`)
-        }
+        if (cursor) query = query.or(chronicleKeysetFilter('cleared_at', 'source_ref', cursor))
         return await query.order('cleared_at', { ascending: false })
           .order('source_ref', { ascending: false }).limit(pageLimit)
       },
