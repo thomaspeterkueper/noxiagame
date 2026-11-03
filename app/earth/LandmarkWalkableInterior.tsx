@@ -36,6 +36,8 @@ import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } fr
 import { isRoundKind, roundKeyOf } from '@/lib/game/rounds/roundTalk'
 import RoundTalk from './RoundTalk'
 import RoundBubbles from './RoundBubbles'
+import { RoomAudioControls, useLoungeMusic, useSpeech } from './RoomAudio'
+import { nextReadingChunk, readingSource } from '@/lib/game/landmarks/readAloud'
 import { useRoundTalk } from './useRoundTalk'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
@@ -136,6 +138,10 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [active, setActive] = useState<LandmarkSpot | null>(null)
   const [candles, setCandles] = useState(3)
   const [seated, setSeated] = useState(false)
+  const speech = useSpeech()
+  const lounge = useLoungeMusic(kind === 'hospitality')
+  // Vorlesen: der zuletzt gelesene Abschnitt steht als Text da, die Sprachausgabe liest ihn mit.
+  const [reading, setReading] = useState<{ bookId: string; offset: number; text: string; done: boolean } | null>(null)
   const [bookId, setBookId] = useState('')
   const [readingPart, setReadingPart] = useState<number | null>(null)
   const [talking, setTalking] = useState(false)
@@ -424,7 +430,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         body: JSON.stringify({ opening: true, npcId: person.id, npcName: person.name, npcRole: person.role, locationName: name, headline: `Begegnung in ${name}`, source: 'NOXIA place interior', localFacts: personFacts(person), history: [] }),
       })
       const data = await response.json().catch(() => ({}))
-      setHistory([{ role: 'assistant', content: response.ok && data.reply ? String(data.reply) : 'Hallo.' }])
+      const opening = response.ok && data.reply ? String(data.reply) : 'Hallo.'
+      setHistory([{ role: 'assistant', content: opening }])
+      speech.speak(opening, person.id)
     } finally { setSending(false) }
   }
 
@@ -449,8 +457,20 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         }),
       })
       const data = await response.json().catch(() => ({}))
-      setSermon({ text: response.ok && data.reply ? String(data.reply) : `${host.name} spricht leise; du verstehst heute nur Bruchstücke.`, by: host.name })
+      const sermonText = response.ok && data.reply ? String(data.reply) : `${host.name} spricht leise; du verstehst heute nur Bruchstücke.`
+      setSermon({ text: sermonText, by: host.name })
+      speech.speak(sermonText, host.id)
     } finally { setHearing(false) }
+  }
+
+  /** Mira liest vor: freie Lesefassung Abschnitt für Abschnitt, sonst den Klappentext. */
+  function readAloud() {
+    if (!held) return
+    const source = readingSource(held)
+    const offset = reading?.bookId === held.id && !reading.done ? reading.offset : 0
+    const part = nextReadingChunk(source.text, offset)
+    setReading({ bookId: held.id, offset: part.next, text: part.chunk, done: part.done })
+    speech.speak(part.chunk, `landmark-staff:${name}`)
   }
 
   function giveTip() {
@@ -502,6 +522,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, ich bin gerade beschäftigt – frag mich gleich noch einmal.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
+      speech.speak(reply, `landmark-staff:${name}`)
       if (conversationEnd.noteReply(`landmark-staff:${name}`, data)) return
       // Versprochen ist versprochen: „ich bringe …“ löst den Gang aus, ein genannter Titel wird erkannt.
       if (isLibrary && staff && !seated && /\b(hol|hole|holen|bring|bringe)\b/i.test(reply) && /(leseecke|leseplatz|lesen|setz|sitz)/i.test(reply)) {
@@ -544,6 +565,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, gerade nicht – gleich wieder.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
+      speech.speak(reply, person.id)
       conversationEnd.noteReply(person.id, data)
     } finally { setSending(false) }
   }
@@ -552,7 +574,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
 
   return <div className="landmark-interior">
     <NpcVisualStyles/>
-    <header><div><small>INNENRAUM · {typeLabel.toUpperCase()}</small><b>{name}</b><span>WASD bewegen · Person anklicken · ESC verlassen</span></div><button onClick={onClose}>← Verlassen</button></header>
+    <header><div><small>INNENRAUM · {typeLabel.toUpperCase()}</small><b>{name}</b><span>WASD bewegen · Person anklicken · ESC verlassen</span></div><div className="head-tools"><RoomAudioControls speech={speech} music={lounge}/><button onClick={onClose}>← Verlassen</button></div></header>
     <main>
       <div className={'room ' + layout.kind} style={{ width: LANDMARK_ROOM.width, height: LANDMARK_ROOM.height }}>
         {layout.zones.map(zone => <div key={zone.id} className={'zone ' + zone.kind} style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}/>)}
@@ -654,6 +676,10 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <b>{held.title}</b>
           <i>{held.genre}</i>
           {seated ? <p>{held.teaser}</p> : <p>Setz dich an einen Leseplatz, um darin zu lesen.</p>}
+          {seated && staff && isLibrary && <>
+            {reading?.bookId === held.id && <blockquote className="reading">{reading.text}</blockquote>}
+            <button className="act" onClick={readAloud}>{reading?.bookId === held.id && !reading.done ? `Weiterlesen (${staffName})` : reading?.bookId === held.id ? `Noch einmal von vorn (${staffName})` : `${staffName} liest vor`}</button>
+          </>}
           {atCounter ? <button className="act" onClick={() => { setHeld(null); setStatus(`Du gibst „${held.title}“ an der Ausleihe zurück.`) }}>Zurückgeben</button> : <button className="act quiet" onClick={() => setHeld(null)}>Weglegen</button>}
         </div>}
         {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length > 0 && <p>{placed.map(item => item.person.name).join(', ')} {placed.length === 1 ? 'ist' : 'sind'} gerade hier. Geh hin und sprich {placed.length === 1 ? 'sie oder ihn' : 'jemanden'} an.</p>}
@@ -791,6 +817,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .moves button{border:1px solid #476476;border-radius:5px;background:#102b3c;color:#dce9ee;padding:4px 7px;font:700 9px system-ui;cursor:pointer}
       .moves button:hover{background:#173b50}
       .held-card{border-color:#2f5d6b}
+      .head-tools{display:flex;align-items:center;gap:10px}
+      .reading{margin:6px 0;padding:6px 10px;border-left:3px solid #7fb59b;background:#0c1d1a;font-size:12px;line-height:1.55;color:#dcebe3;font-style:italic;max-height:30vh;overflow:auto}
       .player{position:absolute;width:20px;height:28px;pointer-events:none;z-index:3}
       .player i{position:absolute;left:3px;top:8px;width:14px;height:18px;border-radius:7px 7px 3px 3px;background:#d4ad43;border:1.5px solid #594717}
       .player i::before{content:'';position:absolute;left:1.5px;top:-9px;width:8px;height:8px;border-radius:50%;background:#f0c49c;border:1.5px solid #493c18}
