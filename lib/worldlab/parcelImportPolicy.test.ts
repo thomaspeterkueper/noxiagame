@@ -21,4 +21,15 @@ describe('Earth parcel import is an initial snapshot, not world truth', () => {
     // A regression to default upsert semantics would overwrite simulated history.
     expect(source).not.toMatch(/\.from\('earth_parcels'\)\.upsert\(rows\.slice\(i, i \+ 300\), \{ onConflict: 'id' \}\)/)
   })
+  it('fails closed when parcel-cell cache reads or success writes fail', () => {
+    const source = readFileSync(
+      new URL('../../app/api/world-lab/parcels/route.ts', import.meta.url),
+      'utf8',
+    )
+    expect(source).toMatch(/error: cacheReadError[\\s\\S]*?if \\(cacheReadError\\)/)
+    expect(source).toContain("status: 503")
+    expect(source).toMatch(/error: cacheWriteError[\\s\\S]*?if \\(cacheWriteError\\) throw cacheWriteError/)
+    expect(source.indexOf('if (cacheWriteError) throw cacheWriteError')).toBeLessThan(source.indexOf('return NextResponse.json({ ok: true, cached: false'))
+  })
+
 })
