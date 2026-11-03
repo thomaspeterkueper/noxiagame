@@ -7,6 +7,9 @@
 
 export const isRobotId = (id: string | null | undefined) => typeof id === 'string' && id.startsWith('robot:')
 
+/** Roboter als Teil der Bevölkerung (R-26): Kennung `robot:…` oder Merkmal `isRobot` aus der Simulation. */
+export const isRobot = (resident: { id: string; isRobot?: boolean } | null | undefined) => Boolean(resident && (resident.isRobot || isRobotId(resident.id)))
+
 export function RobotFigure({ name, selected = false, showLabel = false, onClick }: { name: string; selected?: boolean; showLabel?: boolean; onClick?: () => void }) {
   return <button className={'robot-figure' + (selected ? ' selected' : '')} onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onClick?.() }} title={name} aria-label={name}>
     <i className="ant" /><i className="head"><b /><b /></i><i className="body" /><i className="base" />

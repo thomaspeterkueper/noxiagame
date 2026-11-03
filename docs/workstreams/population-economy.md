@@ -755,3 +755,69 @@ Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, 
      - Eine Begleitung soll auch selbst bestellen und zahlen können, als echter Kauf.
      - Ortswechsel von Personen über Kontinente hinweg brauchen eine Reise.
 
+### R-25 (Gastronomie, 03.11.2026): Paare und Beziehungen entwickeln sich – auch mit Spielern
+
+Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnten auch Spieler und NPC ein Paar werden, oder später ganz andere Konstellationen. Ich denke, das muss sich dynamisch im Spiel und auf den Stationen, Kolonien und Raumschiffen entwickeln. Roboter fehlen noch.“
+
+**Stand (03.11.2026):** `person_relationships` hat 118 Einträge: 68 `friend`, 30 `acquaintance`, 20 `partner` (zehn Paare). Sie sind gesetzt, nicht gewachsen. Spieler haben kein Alter in `profiles`.
+
+**Bitte – Bewohner untereinander:**
+1. **Beziehungen wachsen und enden:** aus Begegnungen am selben Ort (Arbeit, Lokal, Verein, Gottesdienst, Bordleben) entstehen Bekanntschaft, Freundschaft, Verliebtheit, Partnerschaft, Zusammenziehen, Familie (R-24). Auch Streit, Trennung, Versöhnung, Verwitwung (R-23).
+   - Langsam und begründet: Nähe, Zeit, gemeinsame Interessen, Werte.
+   - Jedes Ereignis steht in `population_events` und im Gedächtnis der Beteiligten.
+2. **Konstellationen offen:** gleich- und gemischtgeschlechtliche Paare, Alleinerziehende, Patchwork, Wahlfamilien, Wohngemeinschaften; später weitere Formen. Nichts ist fest verdrahtet: `relationship_type` plus Eigenschaften statt einer starren Liste.
+3. **Überall:** auf der Erde, auf Stationen, in Kolonien und an Bord.
+   - Wer reist, lernt an Bord und am Zielort Menschen kennen. Fernbeziehungen brauchen Nachrichten und Reisen.
+   - Auf kleinen Stationen und Schiffen wiegen Beziehungen schwerer: wenige Menschen, enger Raum.
+
+**Bitte – Spieler und Bewohner:**
+
+4. **Möglich, mit festen Regeln:**
+   - **Nur Erwachsene.**
+     - Heute weiß das Spiel nicht, wie alt ein Spieler ist, und es gibt den Schulpilot in Sundern.
+     - Ohne eine bestätigte Volljährigkeit gibt es keine Romantik mit Figuren. Schulkonten sind immer ausgeschlossen.
+     - Figuren unter 18 nie (R-24 Punkt 0).
+   - **Die Figur hat ihren eigenen Willen:**
+     - Zuneigung wächst nur über viele echte Begegnungen (`affinity`, `trust`).
+     - Sie kann Nein sagen, Abstand nehmen und eine Beziehung beenden.
+     - Kein Kauf von Zuneigung, keine Geschenke als Schalter.
+   - **Nichts Sexuelles.** Zärtlichkeit höchstens angedeutet. Der bestehende Grenzschutz im Gesprächsweg bleibt.
+   - **Gesund statt bindend:**
+     - Die Figur drängt nicht, macht nicht eifersüchtig auf das echte Leben und verlangt keine Zeit.
+     - Wirkt ein Spieler einsam oder abhängig, ermutigt sie ihn freundlich zu echten Kontakten.
+     - Fragt jemand ernsthaft, sagt sie, dass sie eine Spielfigur ist.
+5. **Daten:** Beziehung Spieler–Person als eigene Zeilen (z. B. `player_person_relationships`), nicht in `person_relationships`.
+   - Die Gastronomie setzt Paare im Lokal an einen Tisch. Die Figur weiß, wer ihr Partner ist, ob Bewohner oder Spieler.
+6. **Ganz andere Konstellationen**, auch mit Robotern (R-26): bitte erst mit Thomas entscheiden, nicht von selbst einführen.
+
+
+### R-26 (Gastronomie, 03.11.2026): Roboter als Teil der Bevölkerung
+
+Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnten auch Spieler und NPC ein Paar werden, oder später ganz andere Konstellationen. Ich denke, das muss sich dynamisch im Spiel und auf den Stationen, Kolonien und Raumschiffen entwickeln. Roboter fehlen noch.“
+
+**Stand:**
+- Roboter gibt es als Maschinen: Inspektionsdrohnen und Robotermodule (`robotModuleManufacturing.ts`), den Kantinenschwarm der Hafenkantine (Gastronomie) und VERA in der Agentur für Arbeit (Gastronomie, ohne Eintrag in `people`).
+- Als Teil der Bevölkerung mit Arbeit, Tagesablauf und Gedächtnis gibt es keine.
+
+**Bitte:**
+1. **Roboter als Wesen der Simulation:** eigener Eintrag mit Art (`being_kind`: `human` | `robot`), Typ, Hersteller oder Herkunft (gefertigt aus Robotermodulen), Betreiber oder Eigentümer, Baujahr.
+   - Typen:
+     - Service: Ausschank, Kantine, Empfang;
+     - Wartung: Station, Schiff, Habitat;
+     - Logistik: Lager, Hafen;
+     - Pflege und Assistenz;
+     - Bordroboter auf Handelsschiffen;
+     - Vermittlung (wie VERA).
+2. **Bedürfnisse anders:** Energie, Wartung, Ersatzteile, Updates statt Hunger, Schlaf und Wohnung. Ausfälle haben Folgen, z. B. eine kaputte Kantine.
+3. **Arbeit und Ökonomie** nach NOXIA-FIN-0001:
+   - Roboter kosten Anschaffung und Wartung, keinen Lohn. Sie gehören jemandem.
+   - Wo sie Arbeit übernehmen, verändert das Stellen für Menschen. Das gehört in den Stellenmarkt (R-21).
+4. **Wo:** vor allem auf Stationen, in Kolonien und an Bord – dort, wo Menschen knapp sind. Auf der Erde eher Service und Logistik.
+5. **Gespräch:**
+   - Roboter sagen offen, dass sie Maschinen sind. Sie haben Gedächtnis, aber keine erfundenen Gefühle oder Lebensläufe.
+   - Ihr Wissen ist ihr Auftrag und ihr Ort.
+   - Beziehungen zwischen Menschen und Robotern: erst mit Thomas entscheiden (R-25 Punkt 6).
+6. **Für die Innenräume:** Liefert Roboter in `/api/game/population` mit `isRobot: true`.
+   - Der Innenraum zeichnet sie seit 03.11.2026 als Roboter mit eigenem Bild (`isRobot` in `lib/grid/RobotVisual.tsx`, Merkmal an `ColonyResident`).
+   - In der Gesprächsbeschreibung (`bio_short`, Rolle) bitte „Roboter“ nennen, damit die Figur sich nicht für einen Menschen hält.
+

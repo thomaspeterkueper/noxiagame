@@ -129,6 +129,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-25** (03.11.2026): Paare und Beziehungen wachsen dynamisch, auch Spieler–Figur mit festen Regeln – `population-economy.md`.
+- **R-26** (03.11.2026): Roboter als Teil der Bevölkerung – `population-economy.md`.
 - **R-24** (03.11.2026): Kinder, Lebensläufe, Kinderschutz, gemeinsame Unternehmungen – `population-economy.md`.
 - **W-14** (03.11.2026): Kindergarten, Schule, Spielplatz betretbar – `world-map.md`.
 - **W-13** (02.11.2026): Friedhöfe begehbar, Gedenkort – `world-map.md`.

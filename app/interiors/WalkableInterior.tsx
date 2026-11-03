@@ -15,7 +15,7 @@ import { getSessionInfo } from '@/lib/supabase/auth'
 import { reportPlayerPosition } from '@/lib/telemetry/playerActivity'
 import { NpcFigure, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import { PersonPortrait } from '@/lib/grid/PersonPortrait'
-import { RobotFigure, RobotPortrait, isRobotId } from '@/lib/grid/RobotVisual'
+import { RobotFigure, RobotPortrait, isRobot } from '@/lib/grid/RobotVisual'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import { learningGatesFor, type LearningNeed } from '@/lib/game/interiors/learningGates'
 import SsfModuleRenderer from '@/app/academy/learn/SsfModuleRenderer'
@@ -438,7 +438,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {shown.map(({figure,resident,moment})=>{
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className={'npc'+(figure.spot.id.startsWith('dance-')&&!closed?' dancing':'')+(figure.roomRole==='companion'?' with-player':'')} style={{left:figure.spot.x-12,top:figure.spot.y-34}}>
-            {isRobotId(resident.id)?<RobotFigure name={resident.displayName} selected={selected?.id===resident.id} showLabel={selected?.id===resident.id||near} onClick={()=>select(resident)}/>:<NpcFigure id={resident.id} name={personSceneLabel(resident)} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>select(resident)}/>}
+            {isRobot(resident)?<RobotFigure name={resident.displayName} selected={selected?.id===resident.id} showLabel={selected?.id===resident.id||near} onClick={()=>select(resident)}/>:<NpcFigure id={resident.id} name={personSceneLabel(resident)} role={resident.activityState} appearance={resident.appearance} moving={moment?.phase==='to-seat'||moment?.phase==='leaving'} showLabel={selected?.id===resident.id||near} showRoleLabel={resident.identityState==='known'} selected={selected?.id===resident.id} onClick={()=>select(resident)}/>}
           </div>
         })}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
@@ -459,7 +459,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
       </div>
       <aside>
         <small>{fitting.noun.toUpperCase()} · {fitting.sectionLabel}</small>
-        {selected?<div className="portrait">{isRobotId(selected.id)?<RobotPortrait size={64} title={selected.displayName}/>:<PersonPortrait id={selected.id} role={selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={64} title={personSceneLabel(selected)}/>}<div><h3>{personSceneLabel(selected)}</h3>{selected.identityState==='known'&&<small>{selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState}</small>}</div></div>:<h3>{layout.template.rooms.find(r=>r.id===layout.playerRoomId)?.name??'Raum'}</h3>}
+        {selected?<div className="portrait">{isRobot(selected)?<RobotPortrait size={64} title={selected.displayName}/>:<PersonPortrait id={selected.id} role={selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={64} title={personSceneLabel(selected)}/>}<div><h3>{personSceneLabel(selected)}</h3>{selected.identityState==='known'&&<small>{selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState}</small>}</div></div>:<h3>{layout.template.rooms.find(r=>r.id===layout.playerRoomId)?.name??'Raum'}</h3>}
         {selected&&selected.identityState!=='known'&&selected.observableDescription&&selected.observableDescription!==personSceneLabel(selected)&&<p className="desc">{selected.observableDescription}</p>}
         {!selected&&closedInfo&&<p>{closedInfo.detail}</p>}
         {!selected&&!closed&&!nearService&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{fitting.idleText?' '+fitting.idleText:''}</p>}
