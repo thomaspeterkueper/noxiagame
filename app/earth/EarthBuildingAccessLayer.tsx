@@ -109,12 +109,15 @@ export default function EarthBuildingAccessLayer({
   onClose,
   companion,
   onRelocate,
+  companionHistory = [],
 }: {
   request: BuildingEntryRequest | null
   onClose: () => void
   companion?: ColonyResident | null
   /** W-12: Die Agentur öffnet ein anderes Gebäude direkt – die Karte setzt die Figur davor. */
   onRelocate?: (entityId: string) => void
+  /** Gespräch mit der Begleitung draußen – geht im Lokal weiter (03.11.2026). */
+  companionHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
 }) {
   const {
     credits, cargo, cargoMax, buy, sell, loadFromServer,
@@ -333,6 +336,7 @@ export default function EarthBuildingAccessLayer({
   if (request.kind === 'hospitality') {
     return (
       <CafeWalkableInterior
+        companionHistory={companionHistory}
         entityId={request.entityId}
         buildingTypeId={request.buildingTypeId}
         buildingName={request.buildingName}

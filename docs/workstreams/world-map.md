@@ -600,3 +600,17 @@ Den Beerdigungskaffee baut die Gastronomie.
    - Bei Verzweiflung nennen sie die Telefonseelsorge (kostenlos, rund um die Uhr: 0800 111 0 111 oder 0800 111 0 222, online telefonseelsorge.de) – wie VERA in der Agentur (R-22).
 6. **Würde:** kein Lärm, keine Musik, kein Rennen auf den Grabfeldern. Kauf und Verkauf von Grabstellen höchstens über die Gemeinde (Friedhofsträger), nicht als Spekulationsware.
 
+### W-14 (Gastronomie, 03.11.2026): Kindergarten, Schule und Spielplatz betretbar
+
+Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, Kindergarten, Spielplatz. Aktuell sind die Charaktere noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen.“
+
+**Stand (03.11.2026):** 65 Personen, alle erwachsen (`person_life_state` nur `adult`, Geburtsjahre 2031–2079). `person_parent_child` ist leer.
+
+**Bitte:**
+1. **Spielplatz** (Fläche `playground` gibt es schon): ein Klick öffnet „Spielplatz betreten“, als Außenraum mit Schaukel, Rutsche, Sandkasten und Bänken für Eltern. Darin ist, wer laut Simulation dort ist (R-24): Kinder mit Eltern, nachmittags.
+2. **Kindergarten und Schulen** (OSM `amenity=kindergarten` und `school`; `buildingUse` kennt beide schon): „Betreten“ wie bei W-10.
+   - Die Innenräume (Gruppenraum, Klassenzimmer, Pausenhof) baut die Gastronomie, sobald es Kinder gibt (R-24).
+   - Gebt mir bitte die Art (`entry.kind`) an, unter der ihr sie öffnet.
+3. **Kinderschutz** (R-24 Punkt 0): Spieler sehen Kinder, können sie aber nicht wegführen. Auf der Karte führt keine Figur unter 18 einen Spieler irgendwohin.
+4. **Erledigt nebenbei:** `WorldPanels.tsx` gibt beim Betreten das Gespräch mit der Begleitung an das Lokal weiter (`companionHistory`, eine Zeile). Drinnen geht es weiter, statt neu anzufangen.
+

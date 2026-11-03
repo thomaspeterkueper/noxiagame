@@ -579,7 +579,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   }
   if (panel.kind === 'inside') {
     const companion = panel.companionId ? residents.find(resident => resident.id === panel.companionId) ?? null : null
-    return <EarthBuildingAccessLayer request={panel.request} companion={companion} onRelocate={relocateTo} onClose={() => {
+    return <EarthBuildingAccessLayer request={panel.request} companion={companion} companionHistory={panel.companionId ? (conversations[panel.companionId] ?? []).filter(line => line.content !== 'Gespräch derzeit nicht erreichbar.') : []} onRelocate={relocateTo} onClose={() => {
       // Wer mitgekommen ist, geht wieder seiner Wege.
       if (panel.companionId) { engine?.releasePerson(panel.companionId); setVisits(current => { const next = { ...current }; delete next[panel.companionId as string]; return next }) }
       close()

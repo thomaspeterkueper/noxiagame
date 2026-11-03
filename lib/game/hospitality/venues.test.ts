@@ -454,3 +454,24 @@ if (VENUE_LAYOUTS.nightclub.roomFact.length > 140) throw new Error('nightclub ro
   if (f4 > 0) throw new Error(`nightclub entry: ${f4} checks failed`)
   console.log('nightclub entry checks passed')
 }
+
+// Gemeinsam unterwegs (03.11.2026): die Begleitung bleibt beim Spieler
+{
+  const { companionPlace, companionFacts, VENUE_LAYOUTS: LAYOUTS, isVenueBlocked: blocked } = require('./venues') as typeof import('./venues')
+  let f5 = 0
+  const c = (ok: boolean, label: string) => { if (!ok) { f5++; console.error('FAIL', label) } }
+  const L = LAYOUTS.cafe
+  const seat = L.spots.find(s => s.kind === 'seat')!
+  const atTable = companionPlace(L, { playerPos: seat, playerSeat: seat, taken: new Set() })
+  c(atTable.kind === 'seat' && atTable.id !== seat.id && atTable.label === seat.label, 'companion sits at the same table')
+  const full = new Set(L.spots.filter(s => s.kind === 'seat' && s.label === seat.label && s.id !== seat.id).map(s => s.id))
+  const near = companionPlace(L, { playerPos: seat, playerSeat: seat, taken: full })
+  c(near.id !== seat.id && !full.has(near.id), 'table full: a seat nearby or beside the player')
+  const standing = companionPlace(L, { playerPos: L.start, playerSeat: null, taken: new Set() })
+  c(standing.label === 'neben dir' && !blocked(L, standing, 8) && Math.hypot(standing.x - L.start.x, standing.y - L.start.y) < 30, 'standing: right beside the player')
+  const own = companionFacts({ role: 'companion', companionLabel: 'Lukas', plan: 'Gut, dann lass uns rüber zur Bar gehen.', sittingTogether: false })
+  c(own.some(f => f.includes('zusammen')) && own.some(f => f.includes('rüber zur Bar')) && own.every(f => f.length <= 140), 'the companion remembers why you came')
+  c(companionFacts({ role: 'staff', companionLabel: 'Lukas Brüggemann', plan: null, sittingTogether: false })[0].includes('begrüße beide'), 'staff greet both')
+  if (f5 > 0) throw new Error(`companion: ${f5} checks failed`)
+  console.log('companion checks passed')
+}

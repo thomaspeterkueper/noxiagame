@@ -716,3 +716,42 @@ Den Beerdigungskaffee baut die Gastronomie.
    - Das Lokal zeigt „Beerdigungskaffee“. Personal und Trauergäste wissen, für wen er ist. Der Spieler kann der Familie sein Beileid aussprechen.
    - Ob der Spieler eingeladen ist (z. B. wenn er die Verstorbene kannte), könnt ihr als `playerProfileIds` mitgeben. Ohne Einladung ist er normaler Gast im Lokal.
 
+### R-24 (Gastronomie, 03.11.2026): Kinder, Lebensläufe und gemeinsame Unternehmungen
+
+Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, Kindergarten, Spielplatz. Aktuell sind die Charaktere noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen.“
+
+**Stand (03.11.2026):** 65 Personen, alle erwachsen (`person_life_state` nur `adult`, Geburtsjahre 2031–2079). `person_parent_child` ist leer.
+
+**Bitte:**
+
+0. **Kinderschutz zuerst – Voraussetzung, bevor die erste minderjährige Figur ansprechbar ist:**
+   - Im Gesprächsweg (`/api/game/npc-conversation`) gelten für Figuren unter 18 feste Regeln, unabhängig vom Spielertext:
+     - keine Romantik, kein Flirt, nichts Sexuelles;
+     - keine Geheimnisse mit Erwachsenen, keine persönlichen Daten erfragen oder weitergeben;
+     - Kinder sprechen kurz und altersgerecht. Bei Grenztests verweisen sie auf ihre Eltern und beenden das Gespräch.
+   - Minderjährige können **nicht mitgenommen werden**: `lead_walk` und `visit_place` sind für sie gesperrt, kein „komm mit“ zu Spielern.
+   - Kleine Kinder sind nur mit einem Elternteil oder in Kita und Schule unterwegs.
+   - Lokale: keine Kinder in Bar und Nachtclub, kein Alkohol unter 18. Die Gastronomie prüft das im Innenraum, sobald Alter oder Lebensstufe an den Figuren hängt.
+1. **Lebensstufen** in `person_life_state`: Säugling, Kleinkind, Kindergartenkind (3–6), Schulkind (6–10), Jugendliche(r) (10–18), Ausbildung oder Studium, Beruf, Ruhestand – und `deceased` (R-23). Jede Stufe hat ihren Tagesablauf:
+   - Kita oder Schule am Vormittag;
+   - nachmittags Spielplatz, Sportverein, Hausaufgaben, mit Eltern einkaufen;
+   - abends zu Hause.
+2. **Geburt und Familie:** Kinder in Familien (`person_parent_child`), aus Paaren mit Kinderwunsch (`family_desire` gibt es schon). Ein Kind hat Name, Geburtsjahr, Aussehen, Eltern und Wohnung der Familie.
+   - Die Eltern wissen, wo ihr Kind gerade ist. Sie sprechen von ihm, wenn es passt.
+3. **Lebenslauf als Daten:** je Person die Stationen mit Jahr, z. B. Kita, Schule, Abschluss, Ausbildung, erste Stelle, Umzug, Heirat, Kinder, Rente.
+   - Daraus erzählt die Figur ihr Leben stimmig und erfindet nicht im Gespräch.
+   - Für die heutigen 65 Erwachsenen bitte einen glaubwürdigen Lebenslauf nachtragen, passend zu Rolle, Alter und Biografie.
+4. **Gemeinsame Unternehmungen der Bewohner untereinander:** Heute kauft jede Person einzeln (`person_consumption_events`). Echt wäre:
+   - Familien gehen zusammen ins Café, Freunde treffen sich an einem Tisch, Eltern mit Kind auf dem Spielplatz.
+   - Vorschlag: eine Gruppen-Kennung am Besuch (`group_id`) und gemeinsamer Ort mit gemeinsamer Zeit. Die Gastronomie setzt Gruppen dann an einen Tisch, und sie reden miteinander.
+   - Wer zahlt: einer für alle oder jeder selbst, als Transfer nach NOXIA-FIN-0001.
+5. **Gemeinsam mit dem Spieler** – Befunde aus dem Gesprächsprotokoll:
+   - 28.10.: Lukas Brüggemann geht mit Thomas „rüber zur Bar“. Im Metropol begrüßt nur der Barkeeper, Lukas schweigt.
+   - 31.10.: Hana Moreau führt zur Agentur, bleibt stehen („Doch, ich geh ja schon“).
+   - Victor Chen ist am 31.10. in St. Johannes und am 02.11. in Istanbul.
+   - **Gastronomie hat heute gebaut:** Die Begleitung bleibt im Lokal beim Spieler (selber Tisch, neben ihm am Tresen). Das Gespräch von draußen geht drinnen weiter, und das Personal begrüßt beide.
+   - **Bitte an euch:**
+     - Wer etwas zusagt („ich komme mit“), soll es in seinem Gedächtnis haben, auch beim nächsten Mal.
+     - Eine Begleitung soll auch selbst bestellen und zahlen können, als echter Kauf.
+     - Ortswechsel von Personen über Kontinente hinweg brauchen eine Reise.
+

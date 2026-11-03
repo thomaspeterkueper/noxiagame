@@ -42,6 +42,7 @@ import {
   type VenueRooms,
   type VenueUpperFloor,
   type VenueKind,
+  companionFacts,
 } from '@/lib/game/hospitality/venues'
 
 type Props = {
@@ -53,6 +54,8 @@ type Props = {
   onClose: () => void
   /** Von der Agentur direkt hergeschickt: die vermittelte Schicht beginnt gleich. */
   referralStart?: boolean
+  /** Gespräch mit der Begleitung von draußen (Weltkarte) – geht drinnen weiter. */
+  companionHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
 }
 
 // Dekor je Lokalart – nur Bild, keine Kollision, keine Plätze.
@@ -69,7 +72,7 @@ type Menu = { credits:number; items:MenuItem[] }
 // Eine Bestellung dieses Besuchs. forId: wem sie ausgegeben wurde (null = für sich selbst).
 type PlacedOrder = { key:string; itemCode:string; label:string; forId:string|null; at:number; tableService:boolean }
 
-export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose,referralStart=false}:Props){
+export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose,referralStart=false,companionHistory=[]}:Props){
   const[hour,setHour]=useState<number|null>(null)
   const[upper,setUpper]=useState<VenueUpperFloor|null>(null)
   const[heard,setHeard]=useState<string[]>([])
@@ -102,7 +105,9 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const effectiveType=conversion?.type??buildingTypeId
   const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(effectiveType),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[effectiveType,upper,areaM2])
   // Der Name des Hauses: aus den Daten, sonst der übergebene Name ohne Art-Präfix („Bar · Metropol“ → „Metropol“).
-  const houseName=displayName??buildingName.split(' · ').pop()??buildingName
+  // Nur die Art („Café“) ist kein Hausname – sonst hieße es „im Café Café“ (Gespräch 01.11.2026).
+  const rawHouseName=displayName??buildingName.split(' · ').pop()??buildingName
+  const houseName=rawHouseName.trim().toLocaleLowerCase('de-DE')===layout.noun.toLocaleLowerCase('de-DE')?'':rawHouseName
   const underConversion=Boolean(conversion)
   const emptyHouse=!conversion&&String(buildingTypeId??'')==='acquired_building'
   const kind=layout.kind as VenueKind
@@ -474,7 +479,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
-      occasionFacts:receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')}),
+      occasionFacts:[...(ctx.companion?companionFacts({role:ctx.companion.id===self.id?'companion':self.roomRole==='staff'?'staff':'guest',companionLabel:ctx.companion.label,plan:ctx.companion.plan,sittingTogether:Boolean(ctx.seat)}):[]),...receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')})],
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
       entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
       playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):venueReferralFacts(referral,self.roomRole==='staff',false)[0]??null,
@@ -500,5 +505,5 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     renderOffer:ctx=>shift?renderShift(ctx):<>{renderReception(ctx)}{customerOffer(ctx)}{renderJobs(ctx)}</>,
   }
 
-  return <WalkableInterior entityId={entityId} buildingName={houseName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
+  return <WalkableInterior entityId={entityId} buildingName={houseName||buildingName} companion={companion} companionHistory={companionHistory} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
 }

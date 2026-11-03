@@ -103,6 +103,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Der Spieler kann sein Beileid aussprechen. Neu im Motor: `ctx.say(text)`.
   - Ohne Termin gibt es nichts. Tests in `funeralReception.test.ts`, im Browser mit Probetermin geprüft.
 
+- **03.11.2026 – Gemeinsam im Lokal (Begleitung bleibt beim Spieler):**
+  - Thomas: „die Charaktere sind noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen“. Befund im Protokoll: Lukas Brüggemann ging am 28.10. mit Thomas in die Bar und schwieg dort.
+  - Jetzt bleibt die Begleitung beim Spieler: selber Tisch oder neben ihm (`companionPlace`).
+  - Das Gespräch von draußen geht weiter (`companionHistory`). Die Begleitung weiß, was ausgemacht war, und das Personal begrüßt beide (`companionFacts`).
+  - Gespräche bleiben beim Wechsel zwischen Personen erhalten.
+  - Nebenbei behoben: „im Café Café“.
+  - Kinder, Lebensläufe, Kita, Schule, Spielplatz: R-24 und W-14.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -121,6 +129,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-24** (03.11.2026): Kinder, Lebensläufe, Kinderschutz, gemeinsame Unternehmungen – `population-economy.md`.
+- **W-14** (03.11.2026): Kindergarten, Schule, Spielplatz betretbar – `world-map.md`.
 - **W-13** (02.11.2026): Friedhöfe begehbar, Gedenkort – `world-map.md`.
 - **R-23** (02.11.2026): Bewohner sterben, Gräber, Trauer, Nachlass, Termine – `population-economy.md`.
 - **P-1** (02.11.2026): Trauerfeier je Tradition – `docs/architecture/NOXIA-NPC-RELIGION-0001-spiritual-roles-and-places.md`.
