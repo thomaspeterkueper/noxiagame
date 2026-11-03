@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { earthBuildingName } from '@/lib/worldlab/earthNames'
+import { buildingLabel, earthBuildingName } from '@/lib/worldlab/earthNames'
 
 export async function GET(req: NextRequest) {
   const profileId = await verifiedBearerUserId(req)
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), earthBuildingName(String(row.key), String(row.name))]))
   return NextResponse.json({
     buildings: (rows ?? []).map((row: any) => ({
-      id: row.id, typeId: row.entity_id, name: row.display_name ? (row.entity_id === 'acquired_building' ? row.display_name : `${names.get(String(row.entity_id)) ?? row.entity_id} · ${row.display_name}`) : names.get(String(row.entity_id)) ?? row.entity_id, source: row.source_ref ?? undefined,
+      id: row.id, typeId: row.entity_id, name: buildingLabel(String(row.entity_id), names.get(String(row.entity_id)), row.display_name), source: row.source_ref ?? undefined,
       // Laufender Umbau zum Lokal (R-13): Ziel und Fertigstellung; das Haus bleibt bis dahin, was es war.
       conversion: row.conversion_plan?.type ? { type: String(row.conversion_plan.type), name: names.get(String(row.conversion_plan.type)) ?? String(row.conversion_plan.type), readyAt: row.conversion_plan.ready_at ? String(row.conversion_plan.ready_at) : null } : undefined,
       lat: Number(row.latitude_deg), lon: Number(row.longitude_deg),

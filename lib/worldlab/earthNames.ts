@@ -14,3 +14,17 @@ export const EARTH_BUILDING_NAMES: Record<string, string> = {
 export function earthBuildingName(typeId: string, generic: string | undefined): string {
   return EARTH_BUILDING_NAMES[typeId] ?? generic ?? typeId
 }
+
+/**
+ * Schildname: Art · eigener Name („Bar · Metropol“). Beginnt der eigene Name schon
+ * mit der Art („Reisebüro · Hauptstraße 47“), nicht doppelt (03.11.2026). Gekaufte
+ * Häuser tragen nur ihren Namen.
+ */
+export function buildingLabel(typeId: string, generic: string | undefined, displayName: string | null | undefined): string {
+  const kind = generic ?? typeId
+  const own = displayName?.trim()
+  if (!own) return kind
+  if (typeId === 'acquired_building') return own
+  if (own.toLocaleLowerCase('de').startsWith(kind.toLocaleLowerCase('de'))) return own
+  return `${kind} · ${own}`
+}
