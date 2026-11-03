@@ -267,8 +267,9 @@ export async function readChronicleKeysetPages<T>(
       const next = rowCursor(row)
       if (!next || typeof next.timestamp !== 'string' || !next.timestamp ||
           typeof next.id !== 'string' || !next.id.trim() || seen.has(next.id) ||
-          (cursor !== null && !(next.timestamp < cursor.timestamp ||
-            (next.timestamp === cursor.timestamp && next.id < cursor.id)))) {
+          !isChronicleInstant(next.timestamp) ||
+          (cursor !== null && !(Date.parse(next.timestamp) < Date.parse(cursor.timestamp) ||
+            (Date.parse(next.timestamp) === Date.parse(cursor.timestamp) && next.id < cursor.id)))) {
         throw new Error('Building chronicle Core read invalid: ' + source + ' cursor order or duplicate')
       }
       seen.add(next.id)
