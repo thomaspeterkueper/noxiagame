@@ -155,7 +155,13 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('[world-lab parcels]', cell.key, message)
-    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
-    return NextResponse.json({ ok: false, error: 'Kataster gerade nicht erreichbar.' })
+    // Best-effort diagnostic only: do not hide the original import failure.
+    try {
+      const { error: cacheFailureWriteError } = await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
+      if (cacheFailureWriteError) console.error('[world-lab parcels] cache failure write', cell.key, cacheFailureWriteError.message)
+    } catch (cacheFailureWriteError) {
+      console.error('[world-lab parcels] cache failure write', cell.key, cacheFailureWriteError)
+    }
+    return NextResponse.json({ ok: false, error: 'Katasterimport fehlgeschlagen.' }, { status: 503 })
   }
 }
