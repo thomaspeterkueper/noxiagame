@@ -11,6 +11,7 @@
 //   - Gezeichnet wird über die Grafikkarte; Bewegung läuft je Bild, nicht je Tastendruck.
 //   - Reale Orte sind stark vereinfacht: Blöcke aus einem Baukasten (lib/worldlab/blocks.ts).
 
+import { bubbleDurationMs, bubbleText } from '@/lib/game/rounds/bubbles'
 import type { PresenceRow } from '@/lib/game/population/placePresence'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
@@ -461,6 +462,28 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     const conversation = awarenessConversationForResident(best.a.resident.id, role, awareness, new Date().toISOString().slice(0, 10))
     return conversation ? { first: best.a.resident, second: best.b.resident, conversation, source: sourceForAwarenessItem(conversation.item), playerDistance: best.playerDistance } : null
   }, [tick, engineReady, awareness, panel.kind, residents])
+
+  // Das mitgehörte Gespräch auch als Sprechblasen über den beiden Figuren: erst sagt die eine,
+  // dann antwortet die andere; danach wird es still, bis ein anderes Gespräch in Hörweite kommt.
+  const overheardKey = overheard ? overheard.first.id + '|' + overheard.second.id + '|' + overheard.conversation.opener : ''
+  const overheardRef = useRef(overheard)
+  useEffect(() => { overheardRef.current = overheard })
+  useEffect(() => {
+    const current = overheardRef.current
+    if (!engineReady || !current) return
+    const { first, second, conversation } = current
+    const lines = [{ id: first.id, text: bubbleText(conversation.opener) }, { id: second.id, text: bubbleText(conversation.followUp) }]
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let at = 600
+    for (const line of lines) {
+      const start = at
+      timers.push(setTimeout(() => engineReady.speak(line.id, line.text), start))
+      at += bubbleDurationMs(line.text)
+      timers.push(setTimeout(() => engineReady.speak(line.id, null), at))
+      at += 400
+    }
+    return () => { timers.forEach(clearTimeout); engineReady.speak(first.id, null); engineReady.speak(second.id, null) }
+  }, [engineReady, overheardKey])
 
   // Bahnstrecken mit Zug: neu holen, wenn die Figur mehr als 3 km weitergegangen ist.
   const railAt = useRef<GeoPoint | null>(null)
