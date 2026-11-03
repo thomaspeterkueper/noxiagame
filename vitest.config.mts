@@ -16,6 +16,9 @@ export default defineConfig({
     environment: 'node',
     include: [
       'lib/game/rounds/bubbles.test.ts',
+      'lib/speech/browserSpeech.test.ts',
+      'lib/game/landmarks/readAloud.test.ts',
+      'lib/game/music/lounge.test.ts',
       'lib/game/rounds/roundTalk.test.ts',
       'lib/worldlab/placeStories.test.ts',
       'lib/ai/chatProvider.test.ts',
