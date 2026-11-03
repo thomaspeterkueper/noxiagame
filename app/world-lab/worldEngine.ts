@@ -158,6 +158,8 @@ export interface WorldEngine {
   reloadNoxia: () => Promise<void>
   /** Flurstück an einem Punkt (nur geladene Kacheln). */
   parcelIdAt: (at: GeoPoint) => string | null
+  /** Ist die Kachel an diesem Punkt fertig gezeichnet? */
+  tileReadyAt: (at: GeoPoint) => boolean
   /** Richtung der nächsten Straße bis 50 m (Grad wie tile_entities.rotation_deg), sonst null. */
   roadAngleAt: (at: GeoPoint) => number | null
   /** Umriss eines Grundstücks zeigen, das abgesteckt wird (null: ausblenden). */
@@ -2003,6 +2005,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     reloadTiles: reload,
     parcelIdAt(at) { return parcelAtWorld(toWorld(at)) },
+    tileReadyAt(at) { const p = toWorld(at); return tileDoneAt(p.x, p.y) },
     setView(next) { view = { ...next }; applyView() },
     roadAngleAt(at) {
       const p = toWorld(at)
