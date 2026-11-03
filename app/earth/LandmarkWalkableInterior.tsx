@@ -291,6 +291,30 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     })
   }, [layout, staff, staffGo, staffName])
 
+  /**
+   * „Ich hole es, und wir setzen uns an die Leseecke“: die Person holt das Buch am richtigen Regal,
+   * du gehst zum Leseplatz, sie setzt sich dazu und liest mit. Nach einer Weile geht sie zurück.
+   */
+  const readTogether = useCallback((book: LibraryBook) => {
+    if (!staff || staffTaskRef.current) return
+    const seat = waypoints.find(point => point.kind === 'Sitzplatz')
+    const shelf = waypoints.find(point => point.id === 'shelf:' + book.shelf) ?? waypoints.find(point => point.kind === 'Regal')
+    if (!seat || !shelf) { bringBook(book); return }
+    setStaffTask({ kind: 'visit', label: 'holt ein Buch' })
+    walkTo({ x: seat.x, y: seat.y }, () => setSeated(true))
+    staffGo(shelf, () => {
+      setStaffTask({ kind: 'bring', book })
+      const beside = { x: seat.x + 34, y: seat.y + 4 }
+      staffGo(isLandmarkRoomBlocked(layout, beside) ? seat : beside, () => {
+        setHeld(book)
+        setStatus(`${staffName} setzt sich zu dir und legt „${book.title}“ auf den Tisch.`)
+        setHistory(current => [...current, { role: 'assistant' as const, content: `So, hier ist „${book.title}“. Schlag auf, wo du magst – ich lese gern mit.` }].slice(-12))
+        setStaffTask({ kind: 'visit', label: 'liest mit dir' })
+        setTimeout(() => { setStaffTask({ kind: 'return' }); staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }) }, 90000)
+      })
+    })
+  }, [layout, staff, staffGo, staffName, waypoints, walkTo, bringBook])
+
   // Bewegung aller Figuren: 25 Schritte je Sekunde.
   useEffect(() => {
     const timer = setInterval(() => {
@@ -480,7 +504,13 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       setMessage('')
       if (conversationEnd.noteReply(`landmark-staff:${name}`, data)) return
       // Versprochen ist versprochen: „ich bringe …“ löst den Gang aus, ein genannter Titel wird erkannt.
-      if (isLibrary && /\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
+      if (isLibrary && staff && !seated && /\b(hol|hole|holen|bring|bringe)\b/i.test(reply) && /(leseecke|leseplatz|lesen|setz|sitz)/i.test(reply)) {
+        // Titel: in der Antwort, sonst im bisherigen Gespräch (zuletzt genannter zuerst).
+        const lower = (value: string) => value.toLowerCase()
+        const mentioned = (value: string) => LIBRARY_BOOKS.find(entry => lower(value).includes(lower(entry.title)))
+        const earlier = [...history, { role: 'user', content: text }].reverse().map(entry => mentioned(entry.content)).find(Boolean)
+        readTogether(mentioned(reply) ?? earlier ?? tip ?? pickTip(tipSeed.current += 3))
+      } else if (isLibrary && /\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
         const named = LIBRARY_BOOKS.find(entry => reply.toLowerCase().includes(entry.title.toLowerCase()))
         bringBook(named ?? tip ?? pickTip(tipSeed.current += 3))
       } else if (data.worldAction?.type === 'visit_place') {
