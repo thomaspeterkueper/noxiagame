@@ -130,7 +130,11 @@ export async function POST(req: NextRequest) {
   if (!cadastreServicesAt(point).length) return NextResponse.json({ ok: true, outside: true, parcels: 0 })
   const cell = parcelCell(point)
   const supabase = createServiceClient()
-  const { data: known } = await supabase.from('earth_parcel_cells').select('cell,parcels,error,fetched_at,source').eq('cell', cell.key).maybeSingle()
+  const { data: known, error: cacheReadError } = await supabase.from('earth_parcel_cells').select('cell,parcels,error,fetched_at,source').eq('cell', cell.key).maybeSingle()
+  if (cacheReadError) {
+    console.error('[world-lab parcels] cache read', cell.key, cacheReadError.message)
+    return NextResponse.json({ ok: false, error: 'Kataster-Zellencache nicht lesbar.' }, { status: 503 })
+  }
   // Erfolgreich geholte Zellen bleiben; gescheiterte frühestens nach einer Stunde erneut; ältere Fassung einmal neu.
   if (known && known.source === CELL_VERSION && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) return NextResponse.json({ ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined })
   try {
@@ -145,7 +149,8 @@ export async function POST(req: NextRequest) {
       if (error) throw error
     }
     // Ein Land ausgefallen: Gefundenes bleibt, die Zelle gilt als fehlerhaft und wird nach einer Stunde neu geholt.
-    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: rows.length, error: errors.length ? errors.join(' | ').slice(0, 500) : null, fetched_at: new Date().toISOString() })
+    const { error: cacheWriteError } = await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: rows.length, error: errors.length ? errors.join(' | ').slice(0, 500) : null, fetched_at: new Date().toISOString() })
+    if (cacheWriteError) throw cacheWriteError
     return NextResponse.json({ ok: true, cached: false, parcels: rows.length, partial: errors.length > 0 || undefined })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
