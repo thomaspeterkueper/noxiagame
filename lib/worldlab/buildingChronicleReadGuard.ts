@@ -234,6 +234,12 @@ export async function readCompleteChroniclePages<T>(
  * Date.parse alone truncates fractional seconds to milliseconds.
  * Refuse sub-microsecond values rather than silently collapsing ordering.
  */
+function isChronicleMicrosecondInstant(value: string): boolean {
+  if (!isChronicleInstant(value)) return false
+  const fraction = /:\d{2}(?:\.(\d+))?(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1] ?? ''
+  return fraction.length <= 6 || !/[1-9]/.test(fraction.slice(6))
+}
+
 export function compareChronicleInstants(left: string, right: string): number {
   const micros = (value: string): bigint => {
     if (!isChronicleInstant(value)) {
@@ -290,6 +296,7 @@ export async function readChronicleKeysetPages<T>(
       if (!next || typeof next.timestamp !== 'string' || !next.timestamp ||
           typeof next.id !== 'string' || !next.id.trim() || seen.has(next.id) ||
           !isChronicleInstant(next.timestamp) ||
+          !isChronicleMicrosecondInstant(next.timestamp) ||
           (cursor !== null && !(compareChronicleInstants(next.timestamp, cursor.timestamp) < 0 ||
             (compareChronicleInstants(next.timestamp, cursor.timestamp) === 0 && next.id < cursor.id)))) {
         throw new Error('Building chronicle Core read invalid: ' + source + ' cursor order or duplicate')
@@ -317,7 +324,7 @@ export function chronicleKeysetFilter(
 ): string {
   if (!['occurred_at', 'cleared_at'].includes(timestampColumn) ||
       !['id', 'source_ref'].includes(idColumn) ||
-      !isChronicleInstant(cursor?.timestamp) || typeof cursor?.id !== 'string' || !cursor.id.trim()) {
+      !isChronicleMicrosecondInstant(cursor?.timestamp) || typeof cursor?.id !== 'string' || !cursor.id.trim()) {
     throw new Error('Building chronicle Core read invalid: cursor')
   }
   const quoted = (value: string) => '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
