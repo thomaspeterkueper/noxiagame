@@ -16,7 +16,7 @@ import { geoToMerc, tileAt, tileOrigin, TILE_SIZE_MERC, type GeoPoint } from './
 import { hasCadastre } from './alkis'
 import { rectsOverlap } from './rects'
 import { loadTile } from './tileSource.server'
-import { parcelsAround } from './parcelOffer.server'
+import { buildingsOn, parcelsAround } from './parcelOffer.server'
 import { parcelNotForSale, landRate } from './alkis'
 import { locationAt, type Supabase } from './buildingOffer.server'
 import { municipalityLabel } from './municipality.server'
@@ -65,6 +65,10 @@ export async function landOffer(supabase: Supabase, request: LandRequest): Promi
     if (blocked) return { ...base, available: false, reason: `${blocked} – davon verkauft die Gemeinde nichts.` }
     const { data: owner } = await supabase.from('earth_parcel_owners').select('profile_id').eq('parcel_id', parent.id).maybeSingle()
     if (owner) return { ...base, available: false, reason: 'Das Flurstück gehört schon jemandem.' }
+    // Steht ein Haus darauf, teilt nur, wem das Flurstück gehört (Thomas, 03.11.2026):
+    // erst das ganze Flurstück kaufen, dann teilen.
+    const houses = await buildingsOn(supabase, parent.ring)
+    if (houses.length) return { ...base, available: false, reason: `Auf dem Flurstück steht ${houses.length === 1 ? 'ein Haus' : houses.length + ' Häuser'} – Teilstücke gibt es nur von unbebauten Flurstücken. Erst das ganze Flurstück kaufen, dann teilen.` }
     if (!polygonInside(local, parent.ring.map(p => toLocal(at, p)))) return { ...base, available: false, reason: 'Das Stück muss ganz im Flurstück liegen – verschieben, drehen oder kleiner wählen.' }
   } else if (hasCadastre(at)) {
     return { ...base, available: false, reason: 'Hier gilt das amtliche Kataster – bitte ein Flurstück anklicken.' }

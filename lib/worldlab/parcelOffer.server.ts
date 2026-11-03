@@ -77,7 +77,7 @@ async function streetWithoutUsage(supabase: Supabase, ring: readonly GeoPoint[])
 }
 
 /** OSM-Kennungen der Häuser, deren Mitte im Flurstück liegt. */
-async function buildingsOn(supabase: Supabase, ring: readonly GeoPoint[]) {
+export async function buildingsOn(supabase: Supabase, ring: readonly GeoPoint[]) {
   const lats = ring.map(p => p.lat), lons = ring.map(p => p.lon)
   const a = tileAt(geoToMerc({ lat: Math.max(...lats), lon: Math.min(...lons) })), b = tileAt(geoToMerc({ lat: Math.min(...lats), lon: Math.max(...lons) }))
   const sources = new Set<string>()
