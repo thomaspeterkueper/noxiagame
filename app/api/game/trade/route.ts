@@ -177,6 +177,8 @@ export async function GET(req: NextRequest) {
       cargoMax: ship?.cargo_max ?? 40,
       cargo,
       hasShip: Boolean(ship),
+      // Eigenes Schiff geparkt (Spieler nicht an Bord): wo es liegt.
+      parkedAt: ship ? null : ((shipRows as any[])?.[0]?.location ?? null),
       // Eigenes Schiff ohne Flugausbildung: ein angeheuerter Pilot fliegt (Honorar je Flug).
       pilotRequired: Boolean(ship) && !(await playerHasPilotTraining(user.id)),
       shipId: ship?.id ?? null,

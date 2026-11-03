@@ -38,4 +38,5 @@ Der Spieler hat einen eigenen Ort, das Schiff auch. Sie sind nur „zusammen“,
 - Mit Rücknahmetests geprüft: Linienflug mit Schiff (Schiff bleibt am Boden, Spieler hat kein Schiff mehr an Bord), Spothandel danach über den Spediteur-Pfad am eigenen Ort, Ankunft setzt den Ort, „An Bord gehen“ am falschen Ort wird abgelehnt (`NOXIA_SHIP_NOT_HERE`), am richtigen Ort klappt es, das Schiff zieht den Spieler wieder mit.
 - Server: `activeShipForProfile` ist jetzt das Schiff an Bord; neue Aktionen `passenger` (Linienflug) und `board` (An Bord gehen) in `/api/game/transit`; Handels- und Schiffsroute lesen das Schiff an Bord.
 - Oberfläche: Ticketschalter zeigt Linienflüge auch mit Schiff, „Dein Schiff liegt hier / in X“ und „An Bord gehen“.
-- Offen: Anzeige „Schiff geparkt“ im Navigationsbereich; Abflug-Schaltfläche der Navigation löst ohne Schiff an Bord einen Linienflug aus; mehrere Schiffe und angeheuerte Piloten (nächster Schritt).
+- Navigation: Ohne Schiff an Bord zeigt sie den Linienflug mit Preis und „dein Schiff liegt in X“; am Schiffsort gibt es dort „An Bord deines Schiffs gehen“.
+- Offen: mehrere Schiffe und angeheuerte Piloten (nächster Schritt).
