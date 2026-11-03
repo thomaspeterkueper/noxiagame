@@ -827,3 +827,26 @@ Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnt
 
 **Bitte:** Die Kennungen gehören zur Bevölkerung, darum hier: eine Funktion mit deutschen Bezeichnungen, z. B. `personStatusLabels(resident)` → `{ role: 'Servicekraft', doing: 'hat gerade nichts zu tun', last: 'hat eine Stelle bekommen' }`, für alle Werte von `roleCode`, `PersonActivityState` und `lastAction` (auch `employment.ts`, `circadian.ts`). Unbekannte Werte lieber weglassen als roh zeigen. Sobald es sie gibt, setzt die Erdkarte sie in Personentafel und Porträt ein (wir bauen das auf unserer Seite).
 
+### R-27 (Gastronomie, 03.11.2026): Echte Lokale – Personal, Käufe, Stellen
+
+Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
+
+**Anlass:** Seit 03.11.2026 gab es zwei verschiedene Lokale.
+- Echte Cafés, Bars, Kneipen und Restaurants der Karte öffneten einen einfachen Gastraum (Philosophie/NPC, `LandmarkWalkableInterior`, Raum `hospitality`), ohne Karte, Bestellen, Arbeiten und Begleitung.
+- NOXIA-Lokale wie Metropol öffneten das Lokal der Gastronomie.
+
+**Gebaut (Gastronomie, live):**
+- `noxia_real_venue` (`20261103180000_real_venues.sql`) und `POST /api/game/hospitality/real-venue`.
+  - Beim ersten Betreten bekommt das reale Lokal ein NOXIA-Lokal: staatlich wie Metropol, mit OSM-Kennung und Lage, `source_tags.real_venue`.
+  - Gibt es dort schon eines (gleiche Kennung oder höchstens 25 m), wird es genommen.
+- `app/earth/RealVenueInterior.tsx` öffnet dann das volle Lokal.
+  - Wer laut Simulation am Ort ist (`peopleAtPlace`), ist drinnen: Wer arbeitet, steht hinter dem Tresen, die anderen sind Gäste.
+  - Klappt das nicht, öffnet weiter der einfache Gastraum.
+
+**Bitte:**
+1. **Personal:** Neu angelegte reale Lokale haben `staff_capacity` null, damit ihr dort nicht ungefragt Leute einstellt.
+   - Entscheidet bitte, ob reale Lokale Stellen bekommen sollen, etwa nach Größe wie Metropol (2) oder Balkan Grill (3), mit dem Lohn aus der Gemeindekasse.
+   - Bis dahin arbeitet dort nur, wen eure Anwesenheit am Ort als arbeitend führt.
+2. **Käufe:** Wer am realen Ort zu Gast ist, kauft bisher nicht im Lokal (`person_consumption_events` hängen am NOXIA-Lokal). Sobald das NOXIA-Lokal existiert, bitte dort buchen. Dann erscheinen die Gäste mit ihrer Bestellung und als Aufgaben in der Schicht.
+3. **Stellenliste** (`/api/game/jobs`): nimmt reale Lokale schon mit (alle aktiven Lokale des Ortes). Ohne Personal sind sie geschlossen, und dort zu arbeiten ergibt erst mit Gästen Sinn.
+

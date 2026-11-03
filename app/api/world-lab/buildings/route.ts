@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
   const [{ data: rows }, { data: definitions }] = await Promise.all([
     supabase.from('tile_entities').select('id,entity_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,profile_id,owner_class,source_ref,display_name,conversion_plan,noxia_roof,profiles(username),actors(display_name)')
       // Straßenstücke aus dem alten Bausystem gehören nicht in die Karte – Straßen kommen aus OpenStreetMap.
-      .eq('location_id', earth.id).eq('entity_type', 'building').eq('status', 'active').neq('entity_id', 'road').not('latitude_deg', 'is', null).limit(1000),
+      .eq('location_id', earth.id).eq('entity_type', 'building').eq('status', 'active').neq('entity_id', 'road').not('latitude_deg', 'is', null)
+      // Echte Lokale, die erst beim Betreten ein NOXIA-Lokal bekommen (Gastronomie, 03.11.2026): das reale Haus bleibt, wie es ist.
+      .or('source_tags->>real_venue.is.null,source_tags->>real_venue.neq.true').limit(1000),
     supabase.from('building_definitions').select('key,name'),
   ])
   // Abgerissene reale Gebäude: die Karte zeichnet dort eine freie Fläche (nur der Eigentümer darf bauen).

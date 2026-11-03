@@ -18,6 +18,7 @@ import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
+import RealVenueInterior from '@/app/earth/RealVenueInterior'
 import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
@@ -269,7 +270,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   function buildingAsLandmark(): WorldLandmark | null {
     if (!building || !buildingRoom) return null
     if (resonance) return { at: building.at, name: resonance.name, kind: 'resonance_place', tags: { ...(resonance.round ? { opening_hours: 'Offene Resonanzrunde ' + resonance.round } : {}), description: 'Offen für alle – Gespräch, Lesen, Stille. Niemand muss etwas glauben.' } }
-    const kind = buildingRoom === 'community_hall' ? 'community_centre' : buildingRoom === 'artlounge' ? 'artlounge' : 'place_of_worship'
+    // Lokal: die Art aus der Nutzung (a:cafe, a:pub …) – sonst würde es als Gotteshaus geführt.
+    const kind = buildingRoom === 'hospitality' ? (building.poi?.kind ?? String(building.use ?? '').split(':')[1] ?? 'cafe') : buildingRoom === 'community_hall' ? 'community_centre' : buildingRoom === 'artlounge' ? 'artlounge' : 'place_of_worship'
     const religion = buildingRoom === 'mosque' ? 'muslim' : buildingRoom === 'synagogue' ? 'jewish' : buildingRoom === 'hindu_temple' ? 'hindu' : buildingRoom === 'buddhist_temple' ? 'buddhist' : buildingRoom === 'worship' ? 'christian' : undefined
     const name = building.source === ARTLOUNGE_OSM_ID ? 'CAMALEO-ArtLounge' : building.osmName ?? info?.name ?? building.poi?.name ?? building.title
     return { at: building.at, name, kind, tags: { ...(religion ? { religion } : {}), ...infoTags, ...(building.poi?.tags ?? {}) } }
@@ -584,6 +586,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       if (panel.companionId) { engine?.releasePerson(panel.companionId); setVisits(current => { const next = { ...current }; delete next[panel.companionId as string]; return next }) }
       close()
     }}/>
+  }
+  if (panel.kind === 'landmarkInside' && panel.room === 'hospitality') {
+    // Echte Lokale öffnen das volle Lokal der Gastronomie (03.11.2026, „Lokale zusammenführen“);
+    // klappt das nicht, bleibt der einfache Gastraum.
+    const people = peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })
+    return <RealVenueInterior source={panel.source} amenity={panel.landmark.kind} name={panel.landmark.name} at={panel.landmark.at} people={people} residents={residents} onClose={close}
+      fallback={<LandmarkWalkableInterior placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close} people={people}/>}/>
   }
   if (panel.kind === 'landmarkInside') {
     const service = worshipAt(worship, { source: panel.source, at: panel.landmark.at })

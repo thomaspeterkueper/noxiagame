@@ -56,6 +56,8 @@ type Props = {
   referralStart?: boolean
   /** Gespräch mit der Begleitung von draußen (Weltkarte) – geht drinnen weiter. */
   companionHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+  /** Wer laut Simulation gerade am realen Ort ist (RealVenueInterior) – zusätzlich zu Personal und Gästen des Hauses. */
+  presentPeople?: ColonyResident[]
 }
 
 // Dekor je Lokalart – nur Bild, keine Kollision, keine Plätze.
@@ -72,7 +74,7 @@ type Menu = { credits:number; items:MenuItem[] }
 // Eine Bestellung dieses Besuchs. forId: wem sie ausgegeben wurde (null = für sich selbst).
 type PlacedOrder = { key:string; itemCode:string; label:string; forId:string|null; at:number; tableService:boolean }
 
-export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose,referralStart=false,companionHistory=[]}:Props){
+export default function CafeWalkableInterior({entityId,buildingTypeId,buildingName,companion=null,onClose,referralStart=false,companionHistory=[],presentPeople=[]}:Props){
   const[hour,setHour]=useState<number|null>(null)
   const[upper,setUpper]=useState<VenueUpperFloor|null>(null)
   const[heard,setHeard]=useState<string[]>([])
@@ -492,6 +494,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     // Jedes Haus führt Neue auf seine Art ein – nur wer hier arbeitet.
     introduction:self=>self.roomRole==='staff'?venueIntroduction(kind,upper?.guestRooms??0):undefined,
     things,
+    extraResidents:presentPeople,
     idleText:menuState==='ready'&&menu?.items.length?undefined:undefined,
     greetsAtService:true,
     goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.servicePoint.locative==='am Empfang'?'Zum Empfang gehen':'Zum Tresen gehen',

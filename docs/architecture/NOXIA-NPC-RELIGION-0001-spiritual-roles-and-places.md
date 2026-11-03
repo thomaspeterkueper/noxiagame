@@ -253,3 +253,28 @@ Den Beerdigungskaffee baut die Gastronomie.
 3. **Gespräch:** Die Trauernden wissen, wen sie verloren haben. Der Gastgeber spricht über die Verstorbene nur, was die Simulation über sie weiß – Name, Lebensjahre, Rolle, Beziehungen.
 4. **Spieler:** Teilnehmen dürfen alle, still und hinten. Wer die Verstorbene kannte, kann nach der Feier kondolieren.
 
+### P-2 (Gastronomie, 03.11.2026): Gastraum für Lokale – bitte nicht doppelt weiterbauen
+
+Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
+
+**Anlass:** Seit 03.11.2026 gab es zwei verschiedene Lokale.
+- Echte Cafés, Bars, Kneipen und Restaurants der Karte öffneten einen einfachen Gastraum (Philosophie/NPC, `LandmarkWalkableInterior`, Raum `hospitality`), ohne Karte, Bestellen, Arbeiten und Begleitung.
+- NOXIA-Lokale wie Metropol öffneten das Lokal der Gastronomie.
+
+**Gebaut (Gastronomie, live):**
+- `noxia_real_venue` (`20261103180000_real_venues.sql`) und `POST /api/game/hospitality/real-venue`.
+  - Beim ersten Betreten bekommt das reale Lokal ein NOXIA-Lokal: staatlich wie Metropol, mit OSM-Kennung und Lage, `source_tags.real_venue`.
+  - Gibt es dort schon eines (gleiche Kennung oder höchstens 25 m), wird es genommen.
+- `app/earth/RealVenueInterior.tsx` öffnet dann das volle Lokal.
+  - Wer laut Simulation am Ort ist (`peopleAtPlace`), ist drinnen: Wer arbeitet, steht hinter dem Tresen, die anderen sind Gäste.
+  - Klappt das nicht, öffnet weiter der einfache Gastraum.
+
+**Bitte:**
+- Cafés, Bars, Kneipen und Restaurants gehören zur Gastronomie (`docs/workstreams/README.md`). Der Raum `hospitality` in `lib/game/landmarks/interiors.ts` bleibt nur als Rückfall.
+- Was ihr dort gebaut habt, ist im Lokal schon da oder wird übernommen:
+  - Gäste wechseln zwischen Tisch, Hocker und Stehplatz;
+  - Lounge-Musik;
+  - Vorlesen.
+- Wünsche bitte als Request an `hospitality.md`.
+- Bibliothek, Gotteshäuser, ArtLounge und Begegnungsstätten bleiben bei euch.
+
