@@ -228,3 +228,56 @@ export async function readCompleteChroniclePages<T>(
     collected.push(...page)
   }
 }
+
+/**
+ * Cursor-based reader for a descending (timestamp, unique row ID) ordering.
+ * A later page must be strictly older than the previous cursor; unlike OFFSET,
+ * deleting an earlier row cannot shift the next page boundary.
+ *
+ * The database callback MUST enforce the same strict tuple comparison and
+ * deterministic ORDER BY. This helper cannot provide transaction snapshots:
+ * updates to sort keys and backdated inserts still require Core snapshot rules.
+ */
+export async function readChronicleKeysetPages<T>(
+  readPage: (cursor: { timestamp: string; id: string } | null, limit: number) =>
+    Promise<{ data: T[] | null; error: unknown }>,
+  validatePage: (result: { data: T[] | null; error: unknown }, source: string, limit: number) => T[],
+  source: string,
+  pageSize: number,
+  rowCursor: (row: T) => { timestamp: string; id: string },
+  maxRows = 10_000,
+  maxPages = 51,
+): Promise<T[]> {
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500 ||
+      !Number.isSafeInteger(maxRows) || maxRows < 1 || maxRows > 10_000 ||
+      !Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 51) {
+    throw new Error('Building chronicle Core read invalid: pagination bounds')
+  }
+  const collected: T[] = []
+  const seen = new Set<string>()
+  let cursor: { timestamp: string; id: string } | null = null
+  for (let pageNumber = 0; pageNumber < maxPages; pageNumber++) {
+    const requested = Math.min(pageSize, maxRows - collected.length + 1)
+    const page = validatePage(await readPage(cursor, requested), source, requested)
+    if (page.length > requested) {
+      throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeded requested page')
+    }
+    if (page.length === 0) return collected
+    for (const row of page) {
+      const next = rowCursor(row)
+      if (!next || typeof next.timestamp !== 'string' || !next.timestamp ||
+          typeof next.id !== 'string' || !next.id.trim() || seen.has(next.id) ||
+          (cursor !== null && !(next.timestamp < cursor.timestamp ||
+            (next.timestamp === cursor.timestamp && next.id < cursor.id)))) {
+        throw new Error('Building chronicle Core read invalid: ' + source + ' cursor order or duplicate')
+      }
+      seen.add(next.id)
+      cursor = next
+    }
+    if (collected.length + page.length > maxRows) {
+      throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeds maximum history')
+    }
+    collected.push(...page)
+  }
+  throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeds page budget')
+}
