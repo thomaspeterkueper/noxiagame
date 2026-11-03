@@ -173,3 +173,52 @@ export function requireChronicleTombstoneRows<T>(
   }
   return rows
 }
+
+/**
+ * Read all Core rows in bounded pages. A short page is not proof of completion:
+ * some PostgREST deployments cap individual responses below the requested size.
+ * Fetch until an empty page, and fail closed if the safety ceiling is exceeded.
+ * Callers must supply a stable, unique SQL ORDER BY (timestamp plus row key).
+ * Offset pagination is not a database snapshot; concurrent writes require a
+ * future snapshot/keyset reader before the result is authoritative for replay.
+ */
+export async function readCompleteChroniclePages<T>(
+  readPage: (from: number, to: number) => Promise<{ data: unknown; error: unknown }>,
+  validatePage: (result: { data: T[] | null; error: unknown }, source: string, limit: number) => T[],
+  source: string,
+  pageSize: number,
+  rowIdentity: (row: T) => string,
+  maxRows = 10_000,
+): Promise<T[]> {
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500 ||
+      !Number.isSafeInteger(maxRows) || maxRows < 1 || maxRows > 10_000) {
+    throw new Error('Building chronicle Core read invalid: pagination bounds')
+  }
+  const collected: T[] = []
+  const seen = new Set<string>()
+  while (true) {
+    // One extra row is requested after the cap to distinguish an exact fit
+    // from a truncated history; no rows beyond maxRows are returned.
+    const requested = Math.min(pageSize, maxRows - collected.length + 1)
+    const page = validatePage(
+      await readPage(collected.length, collected.length + requested - 1) as { data: T[] | null; error: unknown },
+      source,
+      requested,
+    )
+    if (page.length > requested) {
+      throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeded requested page')
+    }
+    for (const row of page) {
+      const key = rowIdentity(row)
+      if (typeof key !== 'string' || !key.trim() || seen.has(key)) {
+        throw new Error('Building chronicle Core read invalid: ' + source + ' duplicate or missing row key')
+      }
+      seen.add(key)
+    }
+    if (collected.length + page.length > maxRows) {
+      throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeds maximum history')
+    }
+    if (page.length === 0) return collected
+    collected.push(...page)
+  }
+}
