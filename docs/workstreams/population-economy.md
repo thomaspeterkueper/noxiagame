@@ -821,3 +821,9 @@ Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnt
    - Der Innenraum zeichnet sie seit 03.11.2026 als Roboter mit eigenem Bild (`isRobot` in `lib/grid/RobotVisual.tsx`, Merkmal an `ColonyResident`).
    - In der Gesprächsbeschreibung (`bio_short`, Rolle) bitte „Roboter“ nennen, damit die Figur sich nicht für einen Menschen hält.
 
+### R-27 (Erdkarte, 03.11.2026): Personentafel auf Deutsch – Rolle, Tätigkeit, letzte Handlung
+
+**Befund (Prüfung im Browser mit Thomas, 03.11.2026, Sundern Mitte):** Die Personentafel der Weltkarte zeigt rohe Kennungen: Rolle „service“ bzw. im Porträt „GENERAL“, „Tut gerade: idle“, „Zuletzt: hired“. Die Karte gibt dort `assignments[].roleCode`, `activityState` und `lastAction` aus `ColonyResident` unverändert aus (`app/world-lab/WorldPanels.tsx`, Personentafel; Porträt `NpcPortrait` in `lib/grid/NpcVisual.tsx`). Dass die Person „Person“ heißt, ist richtig: Man kennt sie nicht, und das Aussehen ist neutral (`personSceneLabel`).
+
+**Bitte:** Die Kennungen gehören zur Bevölkerung, darum hier: eine Funktion mit deutschen Bezeichnungen, z. B. `personStatusLabels(resident)` → `{ role: 'Servicekraft', doing: 'hat gerade nichts zu tun', last: 'hat eine Stelle bekommen' }`, für alle Werte von `roleCode`, `PersonActivityState` und `lastAction` (auch `employment.ts`, `circadian.ts`). Unbekannte Werte lieber weglassen als roh zeigen. Sobald es sie gibt, setzt die Erdkarte sie in Personentafel und Porträt ein (wir bauen das auf unserer Seite).
+
