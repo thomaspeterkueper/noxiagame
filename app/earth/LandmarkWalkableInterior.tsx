@@ -11,6 +11,9 @@ import { NpcFigure, NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
   LANDMARK_LEVELS,
   LANDMARK_ROOM,
+  STANCE_LABEL,
+  hospitalityPlacement,
+  type Stance,
   crowdSpots,
   isLandmarkRoomBlocked,
   landmarkPath,
@@ -39,6 +42,9 @@ import { useRoundTalk } from './useRoundTalk'
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
 // ist ein typischer Grundriss für die Ortsart, nicht der vermessene Innenraum
 // des realen Gebäudes.
+/** Gäste wechseln ihren Platz etwa alle vier Minuten. */
+const STANCE_WINDOW_MS = 4 * 60 * 1000
+
 type Props = {
   kind: LandmarkRoomKind
   name: string
@@ -201,7 +207,19 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const readingText = isResonanceReading && book ? READING_TEXTS[book.id] : undefined
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
-  const placed = useMemo(() => {
+  // Gastraum: Gäste entscheiden selbst, wo sie sind, und wechseln alle paar Minuten.
+  const [stanceBucket, setStanceBucket] = useState(() => Math.floor(Date.now() / STANCE_WINDOW_MS))
+  useEffect(() => {
+    if (kind !== 'hospitality') return
+    const timer = setInterval(() => setStanceBucket(Math.floor(Date.now() / STANCE_WINDOW_MS)), 30000)
+    return () => clearInterval(timer)
+  }, [kind])
+  const placed = useMemo((): Array<{ person: RoomPerson; at: LandmarkPoint; stance?: Stance }> => {
+    if (kind === 'hospitality') {
+      const crowd = people.slice(0, 20)
+      const spots = new Map(hospitalityPlacement(layout, crowd.map(person => ({ id: person.id, host: Boolean(person.host) })), stanceBucket).map(item => [item.id, item]))
+      return crowd.flatMap(person => { const spot = spots.get(person.id); return spot ? [{ person, at: spot.at, stance: spot.stance }] : [] })
+    }
     const hosts = people.filter(person => person.host).slice(0, 1)
     const rest = people.filter(person => !hosts.includes(person)).slice(0, 14)
     // Größere Gemeinde: feste Plätze zuerst, dann freie Plätze daneben.
@@ -212,7 +230,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       ...hosts.map(person => ({ person, at: hostSpot })),
       ...others.map((person, index) => ({ person, at: spots[index] })),
     ]
-  }, [people, layout])
+  }, [people, layout, kind, stanceBucket])
   const [partnerId, setPartnerId] = useState<string | null>(null)
   const partner = partnerId ? placed.find(item => item.person.id === partnerId) ?? null : null
   const nearPerson = useMemo(() => {
@@ -524,7 +542,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           {staffTask?.kind === 'bring' && <i className="carry"/>}
         </div>}
         {placed.map(item => <div key={item.person.id} className="npc" style={{ left: item.at.x - 12, top: item.at.y - 34 }}>
-          <NpcFigure id={item.person.id} name={item.person.name} role={item.person.doing ?? item.person.role} moving={false} showLabel={nearPerson?.person.id === item.person.id || partnerId === item.person.id || item.person.host} showRoleLabel selected={talkingNow && partnerId === item.person.id} onClick={() => { if (nearPerson?.person.id === item.person.id) void startTalkWith(item.person) }}/>
+          <NpcFigure id={item.person.id} name={item.person.name} role={item.person.doing ?? (item.stance ? `${item.person.role} · ${STANCE_LABEL[item.stance]}` : item.person.role)} moving={false} showLabel={nearPerson?.person.id === item.person.id || partnerId === item.person.id || item.person.host} showRoleLabel selected={talkingNow && partnerId === item.person.id} onClick={() => { if (nearPerson?.person.id === item.person.id) void startTalkWith(item.person) }}/>
         </div>)}
         {roundOn && !talkingNow && <RoundBubbles lines={round.lines} width={LANDMARK_ROOM.width} figures={placed.map(item => ({ id: item.person.id, x: item.at.x, y: item.at.y }))}/>}
         {layout.kind === 'library' && readerSeats.length > 0 && <div className="npc" style={{ left: readerPos.x - 12, top: readerPos.y - 34 }}>
@@ -719,7 +737,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .note{position:absolute;top:2px;width:10px;height:7px;border:1px solid #0003}
       .note.n1{left:6px;background:#f7e9a8}.note.n2{left:30px;background:#dfe9f5;top:1px}.note.n3{left:56px;background:#f4cfc9}
       .flame{position:absolute;width:4px;height:7px;border-radius:50% 50% 45% 45%;background:#ffd76a;box-shadow:0 0 6px 2px #ffb84a99}
-      .npc{position:absolute;z-index:2}
+      .npc{position:absolute;z-index:2;transition:left 1.6s ease-in-out,top 1.6s ease-in-out}
       .npc .carry{position:absolute;left:18px;top:14px;width:9px;height:12px;background:#b24a3d;border:1px solid #3b1a14;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .player .held{position:absolute;left:16px;top:10px;width:8px;height:11px;background:#2f5d6b;border:1px solid #1a3038;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .plea{display:grid;gap:5px;padding:9px 10px;border:1px solid #6b8793;border-radius:7px;background:#0f2230;color:#dfe9ee}

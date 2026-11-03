@@ -9,6 +9,8 @@ export type LandmarkRoomKind =
   | 'mosque' | 'synagogue' | 'hindu_temple' | 'buddhist_temple' | 'community_hall'
   // Omnizedenz-Begegnungsstätte (gekauftes, umgebautes Haus oder gebauter Resonanzplatz).
   | 'resonance_place'
+  // Café, Bar, Restaurant, Kneipe: Gastraum mit Tresen, Tischen und Hockern (03.11.2026).
+  | 'hospitality'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
@@ -38,6 +40,8 @@ export type LandmarkRoomLayout = {
   hostAt?: LandmarkPoint
   /** Wo Besucher bei einem Termin sitzen oder stehen (freie Plätze). */
   gatherAt?: LandmarkPoint[]
+  /** Gastraum: Stehplätze am Tresen. */
+  counterAt?: LandmarkPoint[]
 }
 
 export const LANDMARK_ROOM = { width: 760, height: 480, left: 24, right: 736, top: 28, bottom: 456 }
@@ -145,6 +149,83 @@ function shopLayout(): LandmarkRoomLayout {
       { id: 'desk', label: 'KASSE', x: 555, y: 440, action: 'staff', text: 'Die Kasse. Hier steht jemand, der den Betrieb kennt.' },
     ],
   }
+}
+
+/**
+ * Gastraum (Thomas, 03.11.2026: Leute stehen nicht vor dem Lokal, sondern drinnen): Tresen mit
+ * Hockern und Stehplätzen, Tische mit Stühlen, Bedienung hinter dem Tresen.
+ */
+function hospitalityLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'back-shelf', kind: 'shelf', x: 436, y: 34, w: 270, h: 18 },
+    { id: 'counter', kind: 'counter', x: 430, y: 92, w: 280, h: 28 },
+    { id: 'plant-0', kind: 'plant', x: 36, y: 410, w: 26, h: 26 },
+    { id: 'plant-1', kind: 'plant', x: 700, y: 410, w: 26, h: 26 },
+  ]
+  for (let i = 0; i < 5; i++) furniture.push({ id: `stool-${i}`, kind: 'chair', x: 438 + i * 36, y: 134, w: 20, h: 18 })
+  const tables = [[60, 130], [200, 130], [340, 130], [60, 270], [200, 270], [340, 270], [490, 260], [630, 260]]
+  tables.forEach(([x, y], index) => {
+    furniture.push({ id: `table-${index}`, kind: 'table', x, y, w: 64, h: 40 })
+    furniture.push({ id: `chair-${index}-a`, kind: 'chair', x: x + 22, y: y - 24, w: 20, h: 18 })
+    furniture.push({ id: `chair-${index}-b`, kind: 'chair', x: x + 22, y: y + 46, w: 20, h: 18 })
+  })
+  return {
+    kind: 'hospitality', noun: 'Gastraum', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [{ id: 'floor', kind: 'parquet', x: 24, y: 28, w: 712, h: 348 }, { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 }],
+    lamps: [{ x: 570, y: 100, r: 120, warm: true }, { x: 110, y: 170, r: 100, warm: true }, { x: 250, y: 170, r: 100, warm: true }, { x: 110, y: 310, r: 100, warm: true }, { x: 250, y: 310, r: 100, warm: true }, { x: 560, y: 300, r: 110 }],
+    staff: { id: 'service', role: 'Bedienung', x: 600, y: 72, greeting: 'Hallo! Setz dich, wohin du magst – oder komm an die Theke.' },
+    hostAt: { x: 500, y: 72 },
+    counterAt: [{ x: 630, y: 142 }, { x: 664, y: 142 }, { x: 698, y: 142 }, { x: 596, y: 142 }],
+    spots: [
+      { id: 'counter', label: 'THEKE', x: 560, y: 176, action: 'staff', text: 'Die Theke. Hier bestellt man, und hier wird geredet.' },
+      { id: 'tables', label: 'TISCHE', x: 200, y: 214, action: 'sit', text: 'Tische für zwei und für mehr.' },
+    ],
+  }
+}
+
+export type Stance = 'sit' | 'stool' | 'bar' | 'stand' | 'work'
+export const STANCE_LABEL: Record<Stance, string> = { sit: 'sitzt am Tisch', stool: 'sitzt an der Theke', bar: 'steht an der Theke', stand: 'steht im Raum', work: 'arbeitet' }
+
+function stanceHash(text: string) {
+  let h = 2166136261
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return h >>> 0
+}
+
+/**
+ * Wer im Gastraum wo ist. Mitarbeitende stehen hinter der Theke; Gäste entscheiden selbst
+ * (Hash aus Person und Zeitfenster `bucket`, das sich alle paar Minuten ändert): am Tisch sitzen,
+ * am Tresen sitzen, am Tresen stehen oder frei stehen. Ist eine Wahl voll, kommt die nächste.
+ */
+export function hospitalityPlacement(
+  layout: LandmarkRoomLayout,
+  people: ReadonlyArray<{ id: string; host: boolean }>,
+  bucket: number,
+): Array<{ id: string; at: LandmarkPoint; stance: Stance }> {
+  const center = (item: LandmarkFurniture) => ({ x: item.x + item.w / 2, y: item.y + item.h / 2 })
+  const pools: Record<Exclude<Stance, 'work'>, LandmarkPoint[]> = {
+    sit: layout.furniture.filter(item => item.id.startsWith('chair-')).map(center),
+    stool: layout.furniture.filter(item => item.id.startsWith('stool-')).map(center),
+    bar: [...(layout.counterAt ?? [])],
+    stand: [],
+  }
+  const used = [...pools.sit, ...pools.stool, ...pools.bar]
+  pools.stand = crowdSpots(layout, used.length + people.length + 10).filter(p => !used.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 26))
+  const out: Array<{ id: string; at: LandmarkPoint; stance: Stance }> = []
+  const hosts = people.filter(person => person.host)
+  const hostBase = layout.hostAt ?? layout.start
+  hosts.forEach((person, index) => out.push({ id: person.id, at: { x: hostBase.x - (index % 4) * 36 + Math.floor(index / 4) * 0, y: hostBase.y }, stance: 'work' }))
+  const guests = people.filter(person => !person.host).sort((a, b) => stanceHash(a.id + bucket) - stanceHash(b.id + bucket))
+  for (const person of guests) {
+    const roll = stanceHash(person.id + ':' + bucket) % 100
+    const order: Array<Exclude<Stance, 'work'>> = roll < 45 ? ['sit', 'stool', 'bar', 'stand'] : roll < 70 ? ['stool', 'bar', 'sit', 'stand'] : roll < 88 ? ['bar', 'stand', 'stool', 'sit'] : ['stand', 'bar', 'sit', 'stool']
+    const stance = order.find(key => pools[key].length > 0)
+    if (!stance) continue
+    const pool = pools[stance]
+    const [at] = pool.splice(stanceHash(person.id + bucket + stance) % pool.length, 1)
+    out.push({ id: person.id, at, stance })
+  }
+  return out
 }
 
 function workshopLayout(): LandmarkRoomLayout {
@@ -513,12 +594,16 @@ export function worshipRoomKind(religion?: string | null, buildingType?: string 
 }
 
 /** Landmark classes that have a walkable interior; all others show the place card. */
+/** Lokale, die einen Gastraum bekommen (OSM-amenity). */
+const HOSPITALITY_CLASSES = new Set(['cafe', 'bar', 'restaurant', 'pub', 'biergarten', 'fast_food', 'ice_cream'])
+
 export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, string>): LandmarkRoomKind | null {
   if (landmarkClass === 'library') return 'library'
   if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
   if (landmarkClass === 'community_centre') return 'community_hall'
   if (landmarkClass === 'resonance_place') return 'resonance_place'
+  if (HOSPITALITY_CLASSES.has(landmarkClass)) return 'hospitality'
   return null
 }
 
@@ -533,6 +618,7 @@ export function buildingRoomKind(useCode?: string | null, source?: string | null
   const [prefix, value = ''] = String(useCode ?? '').split(':')
   if (prefix === 'a' && value === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (prefix === 'a' && value === 'community_centre') return 'community_hall'
+  if (prefix === 'a' && HOSPITALITY_CLASSES.has(value)) return 'hospitality'
   if (prefix === 'b' && ['church', 'chapel', 'cathedral'].includes(value)) return 'worship'
   if (prefix === 'b' && ['mosque', 'synagogue', 'temple'].includes(value)) return worshipRoomKind(tags?.religion, value)
   return null
@@ -550,6 +636,7 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'buddhist_temple': return buddhistTempleLayout()
     case 'community_hall': return communityHallLayout()
     case 'resonance_place': return resonancePlaceLayout()
+    case 'hospitality': return hospitalityLayout()
     default: return workshopLayout()
   }
 }

@@ -11,6 +11,7 @@
 //   - Gezeichnet wird über die Grafikkarte; Bewegung läuft je Bild, nicht je Tastendruck.
 //   - Reale Orte sind stark vereinfacht: Blöcke aus einem Baukasten (lib/worldlab/blocks.ts).
 
+import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { bubbleDurationMs, bubbleText } from '@/lib/game/rounds/bubbles'
 import type { PresenceRow } from '@/lib/game/population/placePresence'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -314,6 +315,9 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     const byId = new Map(noxia.map(building => [building.id, building]))
     const surfaceByPerson = new Map(surfacePeople.map(person => [person.id, person]))
     const stateByPerson = new Map(surfaceStates.map(person => [person.id, person]))
+    // Wer an einem Haus mit Innenraum ist (Lokal, Kirche, Bibliothek …), steht nicht davor, sondern drinnen.
+    const roomsNearby = engineReady.landmarks().filter(item => landmarkRoomKind(item.landmark.kind, item.landmark.tags)).map(item => item.landmark.at)
+    const inRoom = (row: PresenceRow | undefined) => Boolean(row && (row.sourceKind === 'region_feature_anchor' || row.sourceKind === 'building_anchor') && roomsNearby.some(at => metresBetween(at, row) <= 45))
     const depthRank = (resident: ColonyResident) =>
       resident.personDepth?.level === 'focal' ? 3
       : resident.personDepth?.level === 'developed' ? 2
@@ -344,13 +348,13 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       return {
         id: resident.id,
         label: personSceneLabel(resident),
-        activity, inside,
+        activity, inside: inside || inRoom(surface),
         anchor: surface ? { lat: surface.lat, lon: surface.lon } : place ? { lat: place.lat, lon: place.lon } : null,
         anchorRadiusM: surface ? 3 : place ? Math.max(place.w, place.d) / 2 : undefined,
       }
     })
     engineReady.setPeople(people)
-  }, [engineReady, residents, noxia, surfacePeople, surfaceStates])
+  }, [engineReady, residents, noxia, surfacePeople, surfaceStates, hud?.tiles])
 
   // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
   useEffect(() => { engineReady?.setInputEnabled(!trip && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind, trip])
