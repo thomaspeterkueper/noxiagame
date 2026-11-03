@@ -189,14 +189,20 @@ export async function readCompleteChroniclePages<T>(
   pageSize: number,
   rowIdentity: (row: T) => string,
   maxRows = 10_000,
+  maxPages = 51,
 ): Promise<T[]> {
   if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500 ||
-      !Number.isSafeInteger(maxRows) || maxRows < 1 || maxRows > 10_000) {
+      !Number.isSafeInteger(maxRows) || maxRows < 1 || maxRows > 10_000 ||
+      !Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 51) {
     throw new Error('Building chronicle Core read invalid: pagination bounds')
   }
   const collected: T[] = []
   const seen = new Set<string>()
+  let pages = 0
   while (true) {
+    if (++pages > maxPages) {
+      throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeds page budget')
+    }
     // One extra row is requested after the cap to distinguish an exact fit
     // from a truncated history; no rows beyond maxRows are returned.
     const requested = Math.min(pageSize, maxRows - collected.length + 1)
