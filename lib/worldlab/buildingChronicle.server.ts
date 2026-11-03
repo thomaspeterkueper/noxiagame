@@ -4,7 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows, requireChronicleTombstoneRows } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows, requireChronicleTombstoneRows, readCompleteChroniclePages } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -38,26 +38,35 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
     entityId = requireChronicleOptional(lookup, 'tile_entities.source_ref')?.id ?? null
   }
 
-  let eventQuery = supabase.from('simulation_events')
-    .select('id,event_type,subject_id,actor_id,occurred_at,effects,metadata')
-    .eq('subject_type', 'tile_entity').in('event_type', EVENT_TYPES)
-    .eq('location_id', earthId)
-    .order('occurred_at', { ascending: false }).limit(limit + 1)
-  if (entityId) eventQuery = eventQuery.eq('subject_id', entityId)
-
-  let stoneQuery = supabase.from('earth_cleared_buildings').select('source_ref,profile_id,display_name,cleared_at').order('cleared_at', { ascending: false }).limit(limit + 1)
-  if (input.sourceRef) stoneQuery = stoneQuery.eq('source_ref', input.sourceRef)
-  else if (entityId) stoneQuery = stoneQuery.eq('source_ref', '__none__') // ohne Gebäude-ID ist ein Grabstein nicht zuzuordnen
-
-  // An unknown source_ref can still have a tombstone, but must never fall
-  // back to a settlement-wide event scan.
-  const [eventResult, stoneResult] = await Promise.all([
+  // The input limit is a per-page size. Read through the terminal empty page;
+  // never present the first page as a complete historical record.
+  const [eventRows, stones] = await Promise.all([
     shouldReadChronicleEvents(input.sourceRef, entityId)
-      ? eventQuery : Promise.resolve({ data: [], error: null }),
-    stoneQuery,
+      ? readCompleteChroniclePages<ChronicleEventRow>(
+        async (from, to) => {
+          let query = supabase.from('simulation_events')
+            .select('id,event_type,subject_id,actor_id,occurred_at,effects,metadata')
+            .eq('subject_type', 'tile_entity').in('event_type', EVENT_TYPES)
+            .eq('location_id', earthId)
+          if (entityId) query = query.eq('subject_id', entityId)
+          return await query.order('occurred_at', { ascending: false })
+            .order('id', { ascending: false }).range(from, to)
+        },
+        requireChronicleEventRows, 'simulation_events', limit, row => row.id,
+      )
+      : Promise.resolve([] as ChronicleEventRow[]),
+    readCompleteChroniclePages<ChronicleTombstoneRow>(
+      async (from, to) => {
+        let query = supabase.from('earth_cleared_buildings')
+          .select('source_ref,profile_id,display_name,cleared_at')
+        if (input.sourceRef) query = query.eq('source_ref', input.sourceRef)
+        else if (entityId) query = query.eq('source_ref', '__none__')
+        return await query.order('cleared_at', { ascending: false })
+          .order('source_ref', { ascending: false }).range(from, to)
+      },
+      requireChronicleTombstoneRows, 'earth_cleared_buildings', limit, row => row.source_ref,
+    ),
   ])
-  const eventRows = requireChronicleEventRows(eventResult, 'simulation_events', limit) as ChronicleEventRow[]
-  const stones = requireChronicleTombstoneRows(stoneResult, 'earth_cleared_buildings', limit) as ChronicleTombstoneRow[]
   const subjectIds = [...new Set(eventRows.map(row => row.subject_id).filter((id): id is string => Boolean(id)))]
 
   const existing = new Set<string>()
