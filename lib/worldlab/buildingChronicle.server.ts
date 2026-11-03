@@ -4,7 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildChronicle, type Chronicle, type ChronicleEventRow, type ChronicleTombstoneRow } from './buildingChronicle'
-import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows, requireChronicleTombstoneRows, readCompleteChroniclePages } from './buildingChronicleReadGuard'
+import { requireChronicleOptional, requireChronicleRows, requireEarthLocationId, requireUnambiguousChronicleSelector, shouldReadChronicleEvents, resolveChronicleReadLimit, requireCompleteChroniclePage, requireChronicleEventRows, requireChronicleTombstoneRows, readCompleteChroniclePages, readChronicleKeysetPages } from './buildingChronicleReadGuard'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EVENT_TYPES = ['entity.created', 'entity.updated', 'entity.deleted']
@@ -42,29 +42,36 @@ export async function loadBuildingChronicle(input: { viewerProfileId: string; en
   // never present the first page as a complete historical record.
   const [eventRows, stones] = await Promise.all([
     shouldReadChronicleEvents(input.sourceRef, entityId)
-      ? readCompleteChroniclePages<ChronicleEventRow>(
-        async (from, to) => {
+      ? readChronicleKeysetPages<ChronicleEventRow>(
+        async (cursor, pageLimit) => {
           let query = supabase.from('simulation_events')
             .select('id,event_type,subject_id,actor_id,occurred_at,effects,metadata')
             .eq('subject_type', 'tile_entity').in('event_type', EVENT_TYPES)
             .eq('location_id', earthId)
           if (entityId) query = query.eq('subject_id', entityId)
+          if (cursor) query = query.or(`occurred_at.lt.${cursor.timestamp},and(occurred_at.eq.${cursor.timestamp},id.lt.${cursor.id})`)
           return await query.order('occurred_at', { ascending: false })
-            .order('id', { ascending: false }).range(from, to)
+            .order('id', { ascending: false }).limit(pageLimit)
         },
-        requireChronicleEventRows, 'simulation_events', limit, row => row.id,
+        requireChronicleEventRows, 'simulation_events', limit, row => ({ timestamp: row.occurred_at, id: row.id }),
       )
       : Promise.resolve([] as ChronicleEventRow[]),
-    readCompleteChroniclePages<ChronicleTombstoneRow>(
-      async (from, to) => {
+    readChronicleKeysetPages<ChronicleTombstoneRow>(
+      async (cursor, pageLimit) => {
         let query = supabase.from('earth_cleared_buildings')
           .select('source_ref,profile_id,display_name,cleared_at')
         if (input.sourceRef) query = query.eq('source_ref', input.sourceRef)
         else if (entityId) query = query.eq('source_ref', '__none__')
+        if (cursor) {
+          // PostgREST quoted value prevents commas and parentheses in OSM refs
+          // from becoming filter syntax. Escape both backslashes and quotes.
+          const safeRef = cursor.id.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          query = query.or(`cleared_at.lt.${cursor.timestamp},and(cleared_at.eq.${cursor.timestamp},source_ref.lt."${safeRef}")`)
+        }
         return await query.order('cleared_at', { ascending: false })
-          .order('source_ref', { ascending: false }).range(from, to)
+          .order('source_ref', { ascending: false }).limit(pageLimit)
       },
-      requireChronicleTombstoneRows, 'earth_cleared_buildings', limit, row => row.source_ref,
+      requireChronicleTombstoneRows, 'earth_cleared_buildings', limit, row => ({ timestamp: row.cleared_at, id: row.source_ref }),
     ),
   ])
   const subjectIds = [...new Set(eventRows.map(row => row.subject_id).filter((id): id is string => Boolean(id)))]
