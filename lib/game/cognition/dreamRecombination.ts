@@ -7,14 +7,96 @@ export interface DreamAssociation {
   id: string
   npcId: string
   sourceMemoryIds: string[]
+  sourceIds: readonly string[]
   sourceTraceIds: string[]
   sourcePatternKeys: string[]
-  motifs: string[]
+  motifs: readonly string[]
   associationStrength: number
   novelty: number
   createdAtTick: number
   provenance: 'dream_recombination'
   canonical: false
+}
+
+/** Common provenance-preserving association constructor for internal and cached-source dreams. */
+export function createDreamAssociation(input: {
+  npcId: string
+  atTick: number
+  memoryIds: readonly string[]
+  traceIds?: readonly string[]
+  patternKeys?: readonly string[]
+  sourceIds?: readonly string[]
+  motifs: readonly string[]
+  strength: number
+  novelty: number
+  maxMotifs?: number
+}): DreamAssociation {
+  const sourceIds = input.sourceIds ?? []
+  const key = [...input.memoryIds, ...(input.traceIds ?? []), ...(input.patternKeys ?? []), ...sourceIds].join('|')
+  return {
+    id: 'dream-association:' + input.npcId + ':' + input.atTick + ':' + stableHash01(key).toFixed(5),
+    npcId: input.npcId,
+    createdAtTick: input.atTick,
+    sourceMemoryIds: [...input.memoryIds],
+    sourceTraceIds: [...input.traceIds ?? []],
+    sourcePatternKeys: [...input.patternKeys ?? []],
+    sourceIds: [...sourceIds],
+    motifs: [...new Set(input.motifs)].slice(0, Math.max(0, Math.min(24, input.maxMotifs ?? 12))),
+    associationStrength: unit(input.strength),
+    novelty: unit(input.novelty),
+    provenance: 'dream_recombination',
+    canonical: false,
+  }
+}
+
+/** One deterministic ranking policy for memory, pattern and external source candidates.
+ * A source may use the hashed tie-break; lived memories retain lexical ties.
+ */
+function rankDreamSignals<T>(items: readonly T[], options: {
+  score: (item: T) => number
+  key: (item: T) => string
+  tieSeed?: string
+}): T[] {
+  return [...items].sort((a, b) => options.score(b) - options.score(a) ||
+    (options.tieSeed === undefined ? 0 :
+      stableHash01(options.tieSeed + options.key(a)) -
+      stableHash01(options.tieSeed + options.key(b))) ||
+    options.key(a).localeCompare(options.key(b)))
+}
+
+function rankExternalSources(input: {
+  npcId: string
+  atTick: number
+  motifKeys: readonly string[]
+  sources: readonly { id: string; motifs: readonly string[] }[]
+}): { id: string; score: number }[] {
+  const keys = new Set(input.motifKeys.flatMap(abstractMotifKeys))
+  return rankDreamSignals(input.sources.map(source => ({
+    id: source.id,
+    score: source.motifs.flatMap(abstractMotifKeys).filter(key => keys.has(key)).length,
+  })), { score: source => source.score, key: source => source.id,
+    tieSeed: input.npcId + ':' + input.atTick + ':' })
+}
+
+/** Optional, at most one explicitly marked unrelated impulse from already-approved sources. */
+export function selectDreamSourceMotifs(input: {
+  npcId: string
+  atTick: number
+  motifKeys: readonly string[]
+  sources: readonly { id: string; motifs: readonly string[] }[]
+  limit: number
+  allowForeignImpulse?: boolean
+}): readonly { id: string; kind: 'related' | 'foreign-impulse' }[] {
+  const limit = Math.max(0, Math.min(12, input.limit))
+  if (!limit) return []
+  const ranked = rankExternalSources(input)
+  const selected: { id: string; kind: 'related' | 'foreign-impulse' }[] = ranked.filter(s => s.score > 0).slice(0, limit)
+    .map(s => ({ id: s.id, kind: 'related' as const }))
+  if (input.allowForeignImpulse && selected.length < limit) {
+    const unrelated = ranked.find(s => s.score === 0 && !selected.some(item => item.id === s.id))
+    if (unrelated) selected.push({ id: unrelated.id, kind: 'foreign-impulse' as const })
+  }
+  return selected
 }
 
 export interface DreamRecombinationResult {
@@ -34,26 +116,38 @@ function stableHash01(value: string) {
   return ((h >>> 0) % 100000) / 100000
 }
 
+/** Shared bounded Unicode motif normalization; prose is never retained verbatim. */
+export function abstractMotifKeys(value: string): string[] {
+  const stop = new Set(['about', 'there', 'their', 'would', 'could', 'from', 'with', 'have', 'that', 'this',
+    'eine', 'einer', 'eines', 'einem', 'einen', 'auch', 'aber', 'oder', 'nicht', 'dass',
+    'sind', 'wird', 'werden', 'und', 'der', 'die', 'das', 'dem', 'den', 'des', 'für', 'mit', 'von'])
+  return [...new Set((value.toLowerCase().match(/[\p{L}\p{N}_:-]{4,}/gu) ?? [])
+    .filter(word => word.length <= 48 && !stop.has(word))
+    .map(word => {
+      if (/^reparat(?:ur|uren)$|^reparier(?:en|t|te|ten)$/.test(word)) return 'repar'
+      if (/^repair(?:ed|ing|s)?$/.test(word)) return 'repair'
+      return word
+    }))].slice(0, 32)
+}
+
 function memoryMotifs(memory: NpcMemory): string[] {
+  const keys = [memory.attribute, memory.subjectRef]
   const value = memory.rememberedValue
-  const motifs = [memory.attribute, memory.subjectRef]
-  if (typeof value === 'string' && value.trim()) motifs.push(value.trim())
+  if (typeof value === 'string') keys.push(...abstractMotifKeys(value))
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const object = value as Record<string, unknown>
-    const features = object.features
+    const features = (value as Record<string, unknown>).features
     if (features && typeof features === 'object' && !Array.isArray(features)) {
       for (const [key, feature] of Object.entries(features as Record<string, unknown>)) {
-        if (typeof feature === 'string' || typeof feature === 'number' || typeof feature === 'boolean') {
-          motifs.push(key + ':' + String(feature))
-        }
+        keys.push(key)
+        if (typeof feature === 'string') keys.push(...abstractMotifKeys(feature))
       }
     }
   }
-  return [...new Set(motifs)].slice(0, 8)
+  return [...new Set(keys.flatMap(abstractMotifKeys))].slice(0, 8)
 }
 
 function patternMotifs(pattern: SensoryPattern): string[] {
-  return [pattern.modality, pattern.sourceClass, pattern.sourceRef]
+  return [...new Set([pattern.modality, pattern.sourceClass, pattern.sourceRef].flatMap(abstractMotifKeys))]
 }
 
 function memoryScore(memory: NpcMemory) {
@@ -85,15 +179,15 @@ export function recombineDuringDream(input: {
   const maxPatterns = Math.max(0, Math.min(12, input.maxPatterns ?? 4))
   const maxCandidates = Math.max(0, Math.min(12, input.maxCandidates ?? 4))
 
-  const memories = input.memoryState.memories
-    .filter(memory => memory.state !== 'forgotten')
-    .slice()
-    .sort((a, b) => memoryScore(b) - memoryScore(a) || a.id.localeCompare(b.id))
+  const memories = rankDreamSignals(
+    input.memoryState.memories.filter(memory => memory.state !== 'forgotten'),
+    { score: memoryScore, key: memory => memory.id },
+  )
     .slice(0, maxMemories)
 
-  const patterns = input.patterns
-    .slice()
-    .sort((a, b) => patternScore(b) - patternScore(a) || a.key.localeCompare(b.key))
+  const patterns = rankDreamSignals(input.patterns,
+    { score: patternScore, key: pattern => pattern.key },
+  )
     .slice(0, maxPatterns)
 
   type CandidateSource = {
@@ -128,9 +222,10 @@ export function recombineDuringDream(input: {
 
   const threshold = unit(0.66 - input.creativity.associativeRange * 0.12 - input.creativity.cognitiveFlexibility * 0.08)
 
-  const candidates = sources
-    .filter(source => source.rawScore >= threshold)
-    .sort((a, b) => b.rawScore - a.rawScore || a.key.localeCompare(b.key))
+  const candidates = rankDreamSignals(
+    sources.filter(source => source.rawScore >= threshold),
+    { score: source => source.rawScore, key: source => source.key },
+  )
     .slice(0, maxCandidates)
     .map(source => {
       const sourceMemoryIds = [source.memoryA.id, ...(source.memoryB ? [source.memoryB.id] : [])]
@@ -147,19 +242,17 @@ export function recombineDuringDream(input: {
           + input.creativity.noveltySeeking * 0.20,
       )
 
-      return {
-        id: 'dream-association:' + input.memoryState.npcId + ':' + input.atTick + ':' + stableHash01(source.key).toFixed(5),
+      return createDreamAssociation({
         npcId: input.memoryState.npcId,
-        sourceMemoryIds,
-        sourceTraceIds,
-        sourcePatternKeys,
-        motifs: [...new Set(motifs)].slice(0, 12),
-        associationStrength: source.rawScore,
+        atTick: input.atTick,
+        memoryIds: sourceMemoryIds,
+        traceIds: sourceTraceIds,
+        patternKeys: sourcePatternKeys,
+        motifs,
+        strength: source.rawScore,
         novelty,
-        createdAtTick: input.atTick,
-        provenance: 'dream_recombination' as const,
-        canonical: false as const,
-      }
+        maxMotifs: 12,
+      })
     })
 
   return {

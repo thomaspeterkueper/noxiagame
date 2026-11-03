@@ -1,0 +1,32 @@
+name: NPC dream prototype checks
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/**/dream*'
+      - 'lib/game/cognition/npcDream*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/npc-dream-checks.yml'
+  workflow_dispatch:
+
+jobs:
+  dream-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Dream prototype tests
+        run: pnpm run test:dreams
+      - name: Existing knowledge transmission regression
+        run: pnpm run test:knowledge-transmission
