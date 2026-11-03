@@ -230,6 +230,28 @@ export async function readCompleteChroniclePages<T>(
 }
 
 /**
+ * Compare persisted instants at PostgreSQL's microsecond precision.
+ * Date.parse alone truncates fractional seconds to milliseconds.
+ * Refuse sub-microsecond values rather than silently collapsing ordering.
+ */
+export function compareChronicleInstants(left: string, right: string): number {
+  const micros = (value: string): bigint => {
+    if (!isChronicleInstant(value)) {
+      throw new Error('Building chronicle Core read invalid: cursor timestamp')
+    }
+    const fraction = /:\\d{2}(?:\\.(\\d+))?(?:Z|[+-]\\d{2}:\\d{2})$/.exec(value)?.[1] ?? ''
+    if (fraction.length > 6 && /[1-9]/.test(fraction.slice(6))) {
+      throw new Error('Building chronicle Core read invalid: sub-microsecond cursor')
+    }
+    const base = value.replace(/(T\\d{2}:\\d{2}:\\d{2})\\.\\d+/, '$1')
+    return BigInt(Date.parse(base)) * 1000n + BigInt(fraction.slice(0, 6).padEnd(6, '0'))
+  }
+  const a = micros(left)
+  const b = micros(right)
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
  * Cursor-based reader for a descending (timestamp, unique row ID) ordering.
  * A later page must be strictly older than the previous cursor; unlike OFFSET,
  * deleting an earlier row cannot shift the next page boundary.
@@ -268,8 +290,8 @@ export async function readChronicleKeysetPages<T>(
       if (!next || typeof next.timestamp !== 'string' || !next.timestamp ||
           typeof next.id !== 'string' || !next.id.trim() || seen.has(next.id) ||
           !isChronicleInstant(next.timestamp) ||
-          (cursor !== null && !(Date.parse(next.timestamp) < Date.parse(cursor.timestamp) ||
-            (Date.parse(next.timestamp) === Date.parse(cursor.timestamp) && next.id < cursor.id)))) {
+          (cursor !== null && !(compareChronicleInstants(next.timestamp, cursor.timestamp) < 0 ||
+            (compareChronicleInstants(next.timestamp, cursor.timestamp) === 0 && next.id < cursor.id)))) {
         throw new Error('Building chronicle Core read invalid: ' + source + ' cursor order or duplicate')
       }
       seen.add(next.id)
