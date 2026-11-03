@@ -143,7 +143,7 @@ export default function LandPanel({ engine, at, parentId, close, open, onParcels
         {offer.available
           ? <div className="row"><span>{error || 'Wird dein Grundstück: bauen, teilen, weiterverkaufen.'}</span><button disabled={buying} onClick={() => void buy()}>{buying ? '…' : 'Kaufen'}</button></div>
           : <div className="row"><span>{offer.reason ?? 'Hier kann man kein Land kaufen.'}</span></div>}
-        {!offer.available && <p className="hint">{parentId ? 'Eine andere Stelle im Flurstück anklicken, drehen oder eine andere Größe wählen.' : 'Eine andere Stelle anklicken oder die Größe ändern.'}</p>}
+        {!offer.available && <p className="hint">{parentId ? 'In das Flurstück klicken, um das Stück dorthin zu verschieben, oder drehen bzw. eine andere Größe wählen.' : 'Eine andere Stelle anklicken oder die Größe ändern.'}</p>}
       </>}
       <span className="source">{parentId ? 'Das Stück wird aus dem Flurstück der Gemeinde abgesteckt; der Rest bleibt bei ihr.' : 'Hier gibt es kein offenes Kataster – das Grundstück wird im Spiel abgesteckt.'}</span>
     </>}

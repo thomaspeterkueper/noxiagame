@@ -239,7 +239,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
           }
           return list
         },
-        onPick: pick => { if (!disposed) { engine.current?.stopWalking(); setTargetId(''); setPanel(panelForPick(pick, noxiaRef.current)) } },
+        onPick: pick => { if (!disposed) { engine.current?.stopWalking(); setTargetId(''); setPanel(current => {
+          const next = panelForPick(pick, noxiaRef.current)
+          // Teilstück abstecken: Klick in dasselbe Flurstück verschiebt das Stück dorthin (03.11.2026)
+          if (current.kind === 'land' && current.parentId && next.kind === 'parcel' && next.id === current.parentId) return { kind: 'land', at: next.at, parentId: current.parentId }
+          return next
+        }) } },
         onHover: next => { if (!disposed) setHover(next) },
         noxiaVisual: typeId => getBuildingVisual(typeId, 'earth'),
         onHud: next => { if (!disposed) { setHud(next); setTick(value => value + 1) } },
