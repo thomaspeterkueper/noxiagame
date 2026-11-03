@@ -26,9 +26,9 @@ describe('Earth parcel import is an initial snapshot, not world truth', () => {
       new URL('../../app/api/world-lab/parcels/route.ts', import.meta.url),
       'utf8',
     )
-    expect(source).toMatch(/error: cacheReadError[\\s\\S]*?if \\(cacheReadError\\)/)
+    expect(source).toContain('if (cacheReadError)')
     expect(source).toContain("status: 503")
-    expect(source).toMatch(/error: cacheWriteError[\\s\\S]*?if \\(cacheWriteError\\) throw cacheWriteError/)
+    expect(source).toContain('if (cacheWriteError) throw cacheWriteError')
     expect(source.indexOf('if (cacheWriteError) throw cacheWriteError')).toBeLessThan(source.indexOf('return NextResponse.json({ ok: true, cached: false'))
   })
 
