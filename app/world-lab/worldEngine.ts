@@ -110,6 +110,8 @@ export interface WorldEngine {
   setPeople: (people: WorldPerson[]) => void
   /** Wo eine Person gerade steht. */
   personAt: (id: string) => GeoPoint | null
+  /** Sprechblase über einer Person zeigen (Text) oder entfernen (null). */
+  speak: (id: string, text: string | null) => void
   /** Person geht in `seconds` Sekunden zu `to` und bleibt dort, bis `release` sie freigibt. */
   sendPerson: (id: string, to: GeoPoint, seconds: number) => void
   /** Die Person geht die Straße entlang voraus (Gespräch: lead_walk). */
@@ -1149,6 +1151,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // der geladenen Kacheln auf und ab. Gespräche können sie irgendwohin schicken.
   type Walker = {
     spec: WorldPerson; figure: PixiGraphics; label: InstanceType<typeof PIXI.Text>
+    /** Sprechblase über der Figur (Gespräch in Hörweite), sonst nicht gesetzt. */
+    bubble?: InstanceType<typeof PIXI.Container>
     x: number; y: number; seed: number
     route: Array<{ x: number; y: number }> | null; routeLength: number
     /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer.
@@ -1234,7 +1238,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
   function setPeople(list: WorldPerson[]) {
     const keep = new Set(list.map(person => person.id))
-    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy(); walker.label.destroy(); walkers.delete(id) }
+    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy(); walker.label.destroy(); walker.bubble?.destroy(); walkers.delete(id) }
     for (const spec of list) {
       const known = walkers.get(spec.id)
       if (known) {
@@ -1329,6 +1333,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent) && !(walker.crowdInside && !walker.sent) && !walker.sent?.hidden
       walker.figure.visible = near
       walker.label.visible = near && zoom >= 2.2
+      if (walker.bubble) { walker.bubble.position.set(foot.x, foot.y - 17); walker.bubble.visible = near && zoom >= 1.6 }
     }
   }
 
@@ -1899,6 +1904,25 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     position: () => toGeo(player),
     setPeople,
+    speak(id, text) {
+      const walker = walkers.get(id)
+      if (!walker) return
+      walker.bubble?.destroy(); walker.bubble = undefined
+      if (!text) return
+      const words = new PIXI.Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 24, fill: 0x16241c, wordWrap: true, wordWrapWidth: 420, lineHeight: 30 } })
+      words.anchor.set(0.5, 1)
+      words.position.set(0, -10)
+      const w = words.width + 22, h = words.height + 14
+      const box = new PIXI.Graphics()
+      box.roundRect(-w / 2, -10 - h + 7, w, h, 12).fill({ color: 0xf4f8f5 }).stroke({ color: 0x9db3a6, width: 2 })
+      box.poly([-7, -10 + 7, 7, -10 + 7, 0, -10 + 17]).fill({ color: 0xf4f8f5 })
+      const bubble = new PIXI.Container()
+      bubble.addChild(box, words)
+      bubble.scale.set(0.12)
+      bubble.eventMode = 'none'
+      labels.addChild(bubble)
+      walker.bubble = bubble
+    },
     personAt(id) { const walker = walkers.get(id); return walker && !(walker.spec.inside && !walker.sent) ? toGeo(walker) : null },
     leadPerson(id, distanceM, seconds) {
       const walker = walkers.get(id)
