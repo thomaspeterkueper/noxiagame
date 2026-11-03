@@ -16,7 +16,7 @@ export function createHistoricalSnapshot(input: {
   consent: LegacyConsent | null
   audience: 'owner' | 'player'
 }): HistoricalSnapshot {
-  const allowed = input.sources.filter(source =>
+  if (input.consent?.subjectId !== input.identity.subjectId || input.consent.ownerUserId !== input.identity.ownerUserId)\n    throw new Error('Legacy consent identity mismatch')\n  const allowed = input.sources.filter(source =>
     source.subjectId === input.identity.subjectId &&
     canReadHistoricalSource(source, input.consent, input.audience)
   )
