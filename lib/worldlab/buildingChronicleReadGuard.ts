@@ -239,11 +239,11 @@ export function compareChronicleInstants(left: string, right: string): number {
     if (!isChronicleInstant(value)) {
       throw new Error('Building chronicle Core read invalid: cursor timestamp')
     }
-    const fraction = /:\\d{2}(?:\\.(\\d+))?(?:Z|[+-]\\d{2}:\\d{2})$/.exec(value)?.[1] ?? ''
+    const fraction = /:\d{2}(?:\.(\d+))?(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1] ?? ''
     if (fraction.length > 6 && /[1-9]/.test(fraction.slice(6))) {
       throw new Error('Building chronicle Core read invalid: sub-microsecond cursor')
     }
-    const base = value.replace(/(T\\d{2}:\\d{2}:\\d{2})\\.\\d+/, '$1')
+    const base = value.replace(/(T\d{2}:\d{2}:\d{2})\.\d+/, '$1')
     return BigInt(Date.parse(base)) * 1000n + BigInt(fraction.slice(0, 6).padEnd(6, '0'))
   }
   const a = micros(left)
