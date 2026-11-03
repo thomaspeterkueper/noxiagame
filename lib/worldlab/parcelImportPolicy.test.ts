@@ -26,6 +26,8 @@ describe('Earth parcel import is an initial snapshot, not world truth', () => {
       new URL('../../app/api/world-lab/parcels/route.ts', import.meta.url),
       'utf8',
     )
+    // Cached failures must not be presented as HTTP success to callers.
+    expect(source).toContain('{ status: known.error ? 503 : 200 }')
     expect(source).toContain('if (cacheReadError)')
     expect(source).toContain("status: 503")
     expect(source).toContain('if (cacheWriteError) throw cacheWriteError')
