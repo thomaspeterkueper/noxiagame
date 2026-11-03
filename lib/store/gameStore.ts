@@ -60,6 +60,8 @@ interface GameState {
   /** Eigenes Schiff ohne Flugausbildung: je Flug fällt ein Pilotenhonorar an. */
   pilotRequired: boolean
   shipRange:  number
+  /** Ort des eigenen Schiffs, wenn der Spieler nicht an Bord ist. */
+  parkedAt:   string | null
   loaded:     boolean
 
   inTransit:         boolean
@@ -133,6 +135,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   speedMult:  1.0,
   pilotRequired: false,
   shipRange:  28,
+  parkedAt:   null,
   loaded:     false,
 
   inTransit:         false,
@@ -179,6 +182,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         speedMult:    data.speedMult ?? 1.0,
         pilotRequired: Boolean(data.pilotRequired),
         shipRange:    data.rangeDistance ?? 28,
+        parkedAt:     data.parkedAt ?? null,
         loaded:       true,
         inTransit,
         transitFrom:  inTransit ? transit.from as LocationSlug : null,
