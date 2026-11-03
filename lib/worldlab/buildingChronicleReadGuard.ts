@@ -250,7 +250,7 @@ export function compareChronicleInstants(left: string, right: string): number {
       throw new Error('Building chronicle Core read invalid: sub-microsecond cursor')
     }
     const base = value.replace(/(T\d{2}:\d{2}:\d{2})\.\d+/, '$1')
-    return BigInt(Date.parse(base)) * 1000n + BigInt(fraction.slice(0, 6).padEnd(6, '0'))
+    return BigInt(Date.parse(base)) * BigInt(1000) + BigInt(fraction.slice(0, 6).padEnd(6, '0'))
   }
   const a = micros(left)
   const b = micros(right)
