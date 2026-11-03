@@ -136,7 +136,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Kataster-Zellencache nicht lesbar.' }, { status: 503 })
   }
   // Erfolgreich geholte Zellen bleiben; gescheiterte frühestens nach einer Stunde erneut; ältere Fassung einmal neu.
-  if (known && known.source === CELL_VERSION && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) return NextResponse.json({ ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined })
+  if (known && known.source === CELL_VERSION && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) {
+    // A cached failed import is still a failure, not an HTTP 200 success.
+    return NextResponse.json(
+      { ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined },
+      { status: known.error ? 503 : 200 },
+    )
+  }
   try {
     const { parcels, errors } = await fetchCell(cell)
     // Alle Länder ausgefallen: nichts speichern, später neu versuchen
