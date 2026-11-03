@@ -22,11 +22,20 @@ type Opened = { kind: 'parcel'; id: string; at: GeoPoint }
 
 const credits = (value: number) => Math.round(value).toLocaleString('de-DE') + ' Cr'
 
-/** Wartet, bis das Flurstück am Punkt in den Kacheln steht (nach Neuladen). */
-async function waitForParcel(engine: WorldEngine, at: GeoPoint, tries: number, isStale: () => boolean) {
-  for (let i = 0; i < tries && !isStale(); i++) {
+/**
+ * Wartet, bis das Flurstück am Punkt in den Kacheln steht (nach Neuladen).
+ * Erst wenn die Kachel dort fertig ist und trotzdem kein Flurstück hat, gilt
+ * „keins“ – das Neuladen kann nach frischen Kartendaten eine Minute dauern
+ * (03.11.2026: nach 10 s stand fälschlich „kein Flurstück“ da).
+ */
+async function waitForParcel(engine: WorldEngine, at: GeoPoint, isStale: () => boolean, maxMs = 90_000) {
+  const start = Date.now()
+  let readySince: number | null = null
+  while (!isStale() && Date.now() - start < maxMs) {
     const id = engine.parcelIdAt(at)
     if (id) return id
+    if (engine.tileReadyAt(at)) { readySince ??= Date.now(); if (Date.now() - readySince > 1500) return null }
+    else readySince = null
     await new Promise(resolve => setTimeout(resolve, 400))
   }
   return null
@@ -58,7 +67,7 @@ export default function LandPanel({ engine, at, parentId, close, open, onParcels
   useEffect(() => {
     if (!cadastre || !engine) return
     let stale = false
-    setNote('Flurstücke werden geladen …')
+    setNote('Flurstücke werden geladen … (nach frischen Kartendaten kann das bis zu einer Minute dauern)')
     void (async () => {
       const ready = engine.parcelIdAt(at)
       if (ready) { open({ kind: 'parcel', id: ready, at }); return }
@@ -70,7 +79,7 @@ export default function LandPanel({ engine, at, parentId, close, open, onParcels
         if (stale) return
         if (!json?.ok) { setNote('Das Kataster ist gerade nicht erreichbar – bitte später noch einmal.'); return }
         if (!json.cached && json.parcels > 0) onParcelsChanged?.()
-        const id = await waitForParcel(engine, at, 25, () => stale)
+        const id = await waitForParcel(engine, at, () => stale)
         if (stale) return
         if (id) open({ kind: 'parcel', id, at })
         else setNote('Hier liegt kein Flurstück, das man kaufen kann – meist eine Straße oder ein Gewässer.')
@@ -113,7 +122,7 @@ export default function LandPanel({ engine, at, parentId, close, open, onParcels
       if (!response.ok) { setError(String(json.error ?? 'Kauf nicht möglich.')); if (json.price) setOffer({ ...offer, price: Number(json.price) }); return }
       onParcelsChanged?.()
       onWorldChanged()
-      const id = await waitForParcel(engine, at, 25, () => false)
+      const id = await waitForParcel(engine, at, () => false)
       if (id) open({ kind: 'parcel', id, at })
       else setError('Gekauft. Die Grenze erscheint gleich auf der Karte – dann das Grundstück anklicken, um zu bauen.')
     } catch { setError('Kauf derzeit nicht erreichbar.') } finally { setBuying(false) }
@@ -138,5 +147,24 @@ export default function LandPanel({ engine, at, parentId, close, open, onParcels
       </>}
       <span className="source">{parentId ? 'Das Stück wird aus dem Flurstück der Gemeinde abgesteckt; der Rest bleibt bei ihr.' : 'Hier gibt es kein offenes Kataster – das Grundstück wird im Spiel abgesteckt.'}</span>
     </>}
+    {/* Eigene Stile: die der Tafel (WorldPanels, styled-jsx) gelten nur dort (03.11.2026: Kopf unformatiert) */}
+    <style jsx>{`
+      .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
+      .head small{display:block;font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
+      .head b{display:block;font-size:15px}
+      .head span{display:block;font-size:11px;color:#9fb5b0;margin-top:2px}
+      .head button{border:0;background:none;color:#9fb5b0;font-size:18px;cursor:pointer;line-height:1}
+      .hint{margin:6px 0 0;font-size:11px;color:#c9d6c2;line-height:1.4}
+      .source{display:block;margin-top:8px;font-size:10px;color:#7f9792}
+      dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:4px 0 8px;font-size:11px}
+      dt{color:#9fb5b0}dd{margin:0}
+      p{margin:4px 0;font-size:11.5px;line-height:1.45}
+      .row{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
+      .row span{flex:1;font-size:11px;color:#9fb5b0}
+      .row button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+      .row button:disabled{opacity:.5;cursor:default}
+      .row button.on{outline:2px solid #d9bb6a}
+      .shapes span{flex:0 0 100%}
+    `}</style>
   </>
 }
