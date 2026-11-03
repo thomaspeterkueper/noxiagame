@@ -282,3 +282,20 @@ export async function readChronicleKeysetPages<T>(
   }
   throw new Error('Building chronicle Core read incomplete: ' + source + ' exceeds page budget')
 }
+
+/**
+ * PostgREST OR filters require quoting string values containing reserved
+ * punctuation. The timestamp is validated and the row key is quoted so OSM
+ * source references cannot alter the filter grammar.
+ */
+export function chronicleKeysetFilter(
+  timestampColumn: 'occurred_at' | 'cleared_at',
+  idColumn: 'id' | 'source_ref',
+  cursor: { timestamp: string; id: string },
+): string {
+  if (!isChronicleInstant(cursor.timestamp) || typeof cursor.id !== 'string' || !cursor.id.trim()) {
+    throw new Error('Building chronicle Core read invalid: cursor')
+  }
+  const quoted = (value: string) => '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+  return `${timestampColumn}.lt.${quoted(cursor.timestamp)},and(${timestampColumn}.eq.${quoted(cursor.timestamp)},${idColumn}.lt.${quoted(cursor.id)})`
+}
