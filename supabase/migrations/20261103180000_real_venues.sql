@@ -9,7 +9,7 @@
 --   * stehen nicht als NOXIA-Haus auf der Karte (source_tags.real_venue), das reale Haus
 --     bleibt, wie es ist;
 --   * haben vorerst keine Stellenzahl (staff_capacity null): Bevölkerung stellt dort
---     niemanden von selbst ein (R-27). Wer laut Simulation dort arbeitet, steht hinter dem Tresen.
+--     niemanden von selbst ein (R-28). Wer laut Simulation dort arbeitet, steht hinter dem Tresen.
 
 create or replace function public.noxia_real_venue(
   p_source_ref text, p_amenity text, p_name text, p_lat double precision, p_lon double precision,

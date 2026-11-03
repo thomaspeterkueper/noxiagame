@@ -827,7 +827,7 @@ Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnt
 
 **Bitte:** Die Kennungen gehören zur Bevölkerung, darum hier: eine Funktion mit deutschen Bezeichnungen, z. B. `personStatusLabels(resident)` → `{ role: 'Servicekraft', doing: 'hat gerade nichts zu tun', last: 'hat eine Stelle bekommen' }`, für alle Werte von `roleCode`, `PersonActivityState` und `lastAction` (auch `employment.ts`, `circadian.ts`). Unbekannte Werte lieber weglassen als roh zeigen. Sobald es sie gibt, setzt die Erdkarte sie in Personentafel und Porträt ein (wir bauen das auf unserer Seite).
 
-### R-27 (Gastronomie, 03.11.2026): Echte Lokale – Personal, Käufe, Stellen
+### R-28 (Gastronomie, 03.11.2026): Echte Lokale – Personal, Käufe, Stellen
 
 Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
 

@@ -115,7 +115,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Thomas: „Lokale zusammenführen“.
   - Reale Cafés, Bars, Kneipen und Restaurants der Karte bekommen beim ersten Betreten ein NOXIA-Lokal (`noxia_real_venue`). Sie öffnen `CafeWalkableInterior` über `RealVenueInterior`, mit den Anwesenden der Simulation als Personal und Gästen.
   - In der Datenbank durchgerechnet (vorhandenes Metropol wird gefunden, neues Lokal angelegt und beim zweiten Mal wiedergefunden, Karte vorhanden). Im Browser mit Probeort geprüft.
-  - Requests: W-15, R-27, P-2.
+  - Requests: W-15, R-28, P-2.
 
 ## Gestellte Requests
 
@@ -136,7 +136,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
 - **W-15** (03.11.2026): Echte Lokale öffnen das volle Lokal – Änderungen in `WorldPanels.tsx` und `/api/world-lab/buildings` prüfen – `world-map.md`.
-- **R-27** (03.11.2026): Echte Lokale – Personal, Käufe, Stellen – `population-economy.md`.
+- **R-28** (03.11.2026): Echte Lokale – Personal, Käufe, Stellen – `population-economy.md`.
 - **P-2** (03.11.2026): Gastraum nicht doppelt weiterbauen – `NOXIA-NPC-RELIGION-0001`.
 - **R-25** (03.11.2026): Paare und Beziehungen wachsen dynamisch, auch Spieler–Figur mit festen Regeln – `population-economy.md`.
 - **R-26** (03.11.2026): Roboter als Teil der Bevölkerung – `population-economy.md`.
