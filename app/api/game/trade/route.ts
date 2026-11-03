@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
 
     const { data: profile } = await serviceClient
       .from('profiles')
-      .select('credits, current_location')
+      .select('credits, current_location, aboard_ship_id')
       .eq('id', user.id)
       .single()
 
@@ -151,9 +151,9 @@ export async function GET(req: NextRequest) {
       .from('ships')
       .select('id, location, cargo_max, ship_type_id, is_active')
       .eq('profile_id', user.id)
-    const ship: any = (shipRows as any[])?.find((s: any) => s.is_active)
-      ?? (shipRows as any[])?.[0]
-      ?? null
+    // Nur das Schiff, auf dem der Spieler ist; ein geparktes zählt nicht (Spediteur-Pfad).
+    const aboardId = (profile as { aboard_ship_id?: string | null } | null)?.aboard_ship_id ?? null
+    const ship: any = (shipRows as any[])?.find((s: any) => s.id === aboardId) ?? null
 
     const { data: shipType } = ship?.ship_type_id
       ? await serviceClient.from('ship_types').select('speed_mult, range_distance').eq('id', ship.ship_type_id).maybeSingle()
