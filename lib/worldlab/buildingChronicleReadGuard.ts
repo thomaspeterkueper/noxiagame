@@ -293,7 +293,9 @@ export function chronicleKeysetFilter(
   idColumn: 'id' | 'source_ref',
   cursor: { timestamp: string; id: string },
 ): string {
-  if (!isChronicleInstant(cursor.timestamp) || typeof cursor.id !== 'string' || !cursor.id.trim()) {
+  if (!['occurred_at', 'cleared_at'].includes(timestampColumn) ||
+      !['id', 'source_ref'].includes(idColumn) ||
+      !isChronicleInstant(cursor?.timestamp) || typeof cursor?.id !== 'string' || !cursor.id.trim()) {
     throw new Error('Building chronicle Core read invalid: cursor')
   }
   const quoted = (value: string) => '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
