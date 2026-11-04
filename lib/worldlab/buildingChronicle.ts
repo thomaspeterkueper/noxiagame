@@ -12,7 +12,7 @@
 // lässt sich deshalb nicht sicher einem Ereignis zuordnen (Request an Core in
 // docs/workstreams/world-map.md).
 
-export type ChronicleKind = 'built' | 'changed' | 'owner_changed' | 'demolished'
+export type ChronicleKind = 'built' | 'changed' | 'remodeled' | 'repurposed' | 'owner_changed' | 'demolished'
 export type ChronicleAuthority = 'event' | 'tombstone'
 
 export type ChronicleEventRow = {
@@ -56,6 +56,11 @@ export type Chronicle = {
   gaps: ChronicleGap[]
   summary: { events: number; tombstones: number; gaps: number }
 }
+
+// These categories describe observed persisted field changes, not construction permits.
+// An update remains an update; only an authorized Core receipt can change the world.
+const REMODEL_FIELDS = new Set(['building_levels', 'roof_levels', 'height', 'building:levels', 'building:roof:levels', 'geometry', 'footprint', 'floor_area'])
+const USE_FIELDS = new Set(['building_use', 'usage', 'use_type', 'land_use', 'entity_subtype'])
 
 const EVENT_TYPES = new Set(['entity.created', 'entity.updated', 'entity.deleted'])
 
@@ -113,8 +118,12 @@ export function buildChronicle(input: {
       authorized = deletionKind !== 'unspecified' && Boolean(event.actor_id)
     } else {
       const change = changedFields(event.effects)
-      kind = change.owner ? 'owner_changed' : 'changed'
+      kind = change.owner ? 'owner_changed' : change.fields.some(field => REMODEL_FIELDS.has(field)) ? 'remodeled' : change.fields.some(field => USE_FIELDS.has(field)) ? 'repurposed' : 'changed'
       detail.fields = change.fields
+      // Both categories can apply to the same receipt; keep the secondary
+      // dimension visible without manufacturing a second Core event.
+      detail.remodeled = change.fields.some(field => REMODEL_FIELDS.has(field))
+      detail.repurposed = change.fields.some(field => USE_FIELDS.has(field))
     }
     entries.push({
       id: 'event:' + event.id, kind, at: event.occurred_at, authority: 'event', sourceId: event.id,
