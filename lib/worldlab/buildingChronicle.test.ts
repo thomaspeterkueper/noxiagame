@@ -14,11 +14,22 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
         ev('e2', 'entity.updated', 'b1', '2026-10-02T10:00:00Z', { effects: [{ from: { profile_id: 'p0' }, to: { profile_id: 'p1' } }] }),
       ],
       tombstones: [], existingEntityIds: new Set(), viewerProfileId: 'p1',
+      verifiedReceiptIds: new Set(['e3']),
     })
     expect(chronicle.entries.map(e => e.kind)).toEqual(['built', 'owner_changed', 'demolished'])
     expect(chronicle.entries[2].authorized).toBe(true)
     expect(chronicle.entries[2].own).toBe(true)
     expect(chronicle.gaps).toEqual([])
+  })
+
+  it('Akteur und metadata allein belegen keine Core-Autorisierung', () => {
+    const event = ev('e1', 'entity.updated', 'b1', '2026-10-02T10:00:00Z', {
+      actor_id: 'p1', metadata: { committed: true, authorized: true },
+    })
+    const unverified = buildChronicle({ events: [event], tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: 'p1' })
+    expect(unverified.entries[0].authorized).toBe(false)
+    const verified = buildChronicle({ events: [event], tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: 'p1', verifiedReceiptIds: new Set(['e1']) })
+    expect(verified.entries[0].authorized).toBe(true)
   })
 
   it('allgemeine Löschung ist kein autorisierter Abriss', () => {
