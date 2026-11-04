@@ -12,6 +12,8 @@
 // lässt sich deshalb nicht sicher einem Ereignis zuordnen (Request an Core in
 // docs/workstreams/world-map.md).
 
+import { compareChronicleInstants } from './buildingChronicleReadGuard'
+
 export type ChronicleKind = 'built' | 'changed' | 'remodeled' | 'repurposed' | 'owner_changed' | 'demolished'
 export type ChronicleAuthority = 'event' | 'tombstone'
 
@@ -148,7 +150,7 @@ export function buildChronicle(input: {
     })
   }
 
-  entries.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+  entries.sort((a, b) => compareChronicleInstants(a.at, b.at) || a.id.localeCompare(b.id))
 
   const gaps: ChronicleGap[] = []
   for (const subjectId of builtSubjects) {
@@ -168,7 +170,7 @@ export type BuildingStateAt = 'standing' | 'demolished' | 'unknown'
 export function buildingStateAt(chronicle: Chronicle, key: { subjectId?: string | null; sourceRef?: string | null }, at: string): BuildingStateAt {
   let state: BuildingStateAt = 'unknown'
   for (const entry of chronicle.entries) {
-    if (entry.at > at) break
+    if (compareChronicleInstants(entry.at, at) > 0) break
     const match = (key.subjectId && entry.subjectId === key.subjectId) || (key.sourceRef && entry.sourceRef === key.sourceRef)
     if (!match) continue
     state = entry.kind === 'demolished' ? 'demolished' : 'standing'
