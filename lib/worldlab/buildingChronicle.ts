@@ -168,6 +168,8 @@ export type BuildingStateAt = 'standing' | 'demolished' | 'unknown'
 
 /** Zustand eines Gebäudes zu einem Zeitpunkt (Wiedergabe). Schlüssel: Gebäude-ID oder source_ref. */
 export function buildingStateAt(chronicle: Chronicle, key: { subjectId?: string | null; sourceRef?: string | null }, at: string): BuildingStateAt {
+  // Historical evidence must not combine unrelated building identity namespaces.
+  if (Boolean(key.subjectId) === Boolean(key.sourceRef)) return 'unknown'
   let state: BuildingStateAt = 'unknown'
   for (const entry of chronicle.entries) {
     if (compareChronicleInstants(entry.at, at) > 0) break
