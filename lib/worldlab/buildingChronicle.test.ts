@@ -186,4 +186,18 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     })
     expect(verifiedBuildingStateAt(rebuilt, { subjectId: 'b1' }, '2026-10-05T00:00:00Z')).toBe('standing')
   })
+  it('fail-closed: gleichzeitiger Neubau und Abriss haben ohne Sequenz keine eindeutige Reihenfolge', () => {
+    const events = [
+      ev('a-create', 'entity.created', 'b1', '2026-11-04T12:00:00.123456Z'),
+      ev('z-delete', 'entity.deleted', 'b1', '2026-11-04T13:00:00.123456+01:00', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['a-create', 'z-delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
 })
