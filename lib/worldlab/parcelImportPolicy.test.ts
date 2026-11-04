@@ -58,4 +58,15 @@ describe('Earth parcel import is an initial snapshot, not world truth', () => {
     expect(source).toContain('catch (cacheFailureWriteError)')
   })
 
+  it('reports a failed GET cadastral request with HTTP 503 without exposing upstream details', () => {
+    const source = readFileSync(
+      new URL('../../app/api/world-lab/parcels/route.ts', import.meta.url),
+      'utf8',
+    )
+    const getHandler = source.split('export async function GET(req: NextRequest) {')[1]?.split('export async function POST(req: NextRequest) {')[0]
+    expect(getHandler).toBeDefined()
+    expect(getHandler).toContain("error: 'Katasterabfrage fehlgeschlagen.' }, { status: 503 }")
+    expect(getHandler).not.toContain('error: error instanceof Error ? error.message : String(error) })')
+  })
+
 })
