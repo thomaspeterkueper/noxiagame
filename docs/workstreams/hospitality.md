@@ -122,6 +122,18 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Die Stellenwand der Agentur kennt reale Lokale mit Personal.
   - Im Browser geprüft.
 
+- **04.11.2026 – Hausregeln, bezahlte Toilette, Familien:**
+  - **Hausregeln für Eigentümer:** Im eigenen Lokal steht „Hausregeln: Preise, Angebot, Toilette“. Dort lässt sich je Posten ein eigener Preis setzen oder der Posten von der Karte nehmen. Die Toilette ist frei, nur für Gäste, mit Gebühr oder gar nicht da.
+    - Gespeichert über `set_price` und `set_service` (R-18). Den Eigentümer prüft die Datenbank.
+    - `GET /api/game/hospitality/order` liefert dem Eigentümer `houseMenu`, die ganze Karte der Lokalart.
+  - **Toilette mit Gebühr:** Sie wird wie ein Posten gebucht (`toilet`). Die Gebühr steht am Knopf, und wer eben erst war, zahlt nicht gleich noch einmal.
+  - **Familien (vorbereitend, R-24):**
+    - Kakao und Kinderteller auf der Karte (Café; Restaurant nur Kinderteller).
+    - Keine Kinder in Bar und Nachtclub, kein Alkohol an Kinder (auch nicht ausgegeben).
+    - Kinder wissen im Gespräch, dass sie mit niemandem mitgehen und nichts Persönliches verraten. Kinder kommen nicht als Begleitung mit.
+    - Regeln in `lib/game/hospitality/familyRules.ts`, Tests vorhanden.
+  - In der Datenbank als `service_role` durchgerechnet (Preis 5, Kuchen abbestellt, Toilette 2 Cr gebucht), im Browser geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
