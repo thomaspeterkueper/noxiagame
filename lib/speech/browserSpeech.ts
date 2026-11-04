@@ -22,10 +22,11 @@ function hash(text: string) {
 }
 
 /** Stimme und Tonlage für eine Figur: stabil über die Zeit, verschieden zwischen Figuren. */
-export function voiceChoice(voices: ReadonlyArray<{ lang: string; name: string }>, key: string) {
-  const german = voices.filter(voice => voice.lang.toLowerCase().startsWith('de'))
+export function voiceChoice(voices: ReadonlyArray<{ lang: string; name: string }>, key: string, languageTag = 'de-DE') {
+  const prefix = languageTag.toLowerCase().split('-')[0]
+  const matching = voices.filter(voice => voice.lang.toLowerCase().startsWith(prefix))
   const h = hash(key)
-  return { voiceIndex: german.length ? h % german.length : -1, pitch: 0.9 + (h % 21) / 100, german }
+  return { voiceIndex: matching.length ? h % matching.length : -1, pitch: 0.9 + (h % 21) / 100, matching }
 }
 
 /** Lange Texte in Sätze teilen: Browser brechen sonst mitten im Text ab. */
@@ -40,17 +41,17 @@ export function speechChunks(text: string, max = 220): string[] {
   return out
 }
 
-export function speak(text: string, voiceKey: string, rate = 0.95) {
+export function speak(text: string, voiceKey: string, rate = 0.95, languageTag = 'de-DE') {
   if (!speechSupported() || !text.trim()) return
   const synth = window.speechSynthesis
   synth.cancel()
-  const choice = voiceChoice(synth.getVoices(), voiceKey)
+  const choice = voiceChoice(synth.getVoices(), voiceKey, languageTag)
   for (const chunk of speechChunks(text)) {
     const utterance = new SpeechSynthesisUtterance(chunk)
-    utterance.lang = 'de-DE'
+    utterance.lang = languageTag
     utterance.rate = rate
     utterance.pitch = choice.pitch
-    if (choice.voiceIndex >= 0) utterance.voice = choice.german[choice.voiceIndex] as SpeechSynthesisVoice
+    if (choice.voiceIndex >= 0) utterance.voice = choice.matching[choice.voiceIndex] as SpeechSynthesisVoice
     synth.speak(utterance)
   }
 }
