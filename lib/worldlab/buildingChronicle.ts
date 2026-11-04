@@ -194,6 +194,7 @@ export function verifiedBuildingStateAt(
   let previousInstant: string | null = null
   let seenCreationAtInstant = false
   let seenDemolitionAtInstant = false
+  let conflictedInstant = false
   for (const entry of chronicle.entries) {
     if (compareChronicleInstants(entry.at, at) > 0) break
     if (!((key.subjectId && entry.subjectId === key.subjectId) ||
@@ -203,11 +204,18 @@ export function verifiedBuildingStateAt(
     if (previousInstant === null || compareChronicleInstants(previousInstant, entry.at) !== 0) {
       seenCreationAtInstant = false
       seenDemolitionAtInstant = false
+      conflictedInstant = false
     }
     previousInstant = entry.at
     if (entry.kind === 'built') seenCreationAtInstant = true
     if (entry.kind === 'demolished') seenDemolitionAtInstant = true
-    if (seenCreationAtInstant && seenDemolitionAtInstant) return 'unknown'
+    if (seenCreationAtInstant && seenDemolitionAtInstant) conflictedInstant = true
+    if (conflictedInstant) {
+      // Later timestamps may contain a new, independently verified creation.
+      // No event inside this ambiguous instant may establish a final state.
+      state = 'unknown'
+      continue
+    }
     if (!entry.authorized) {
       state = 'unknown'
       continue
