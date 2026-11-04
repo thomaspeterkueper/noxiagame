@@ -855,3 +855,30 @@ Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
 2. **Käufe:** Wer am realen Ort zu Gast ist, kauft bisher nicht im Lokal (`person_consumption_events` hängen am NOXIA-Lokal). Sobald das NOXIA-Lokal existiert, bitte dort buchen. Dann erscheinen die Gäste mit ihrer Bestellung und als Aufgaben in der Schicht.
 3. **Stellenliste** (`/api/game/jobs`): nimmt reale Lokale schon mit (alle aktiven Lokale des Ortes). Ohne Personal sind sie geschlossen, und dort zu arbeiten ergibt erst mit Gästen Sinn.
 
+### R-29 (Gastronomie, 04.11.2026): Credits untereinander – Bewohner zahlen Spielern; Trinkgeld entfällt
+
+Thomas, 04.11.2026: „Ich denke, wir lassen Trinkgeld weg, aber es sollte Möglichkeiten geben, generell Credits untereinander auszutauschen.“ Entschieden:
+- Spieler an Spieler, Spieler an Bewohner, Bewohner an Spieler;
+- bar von Hand zu Hand und als Überweisung bei der Bank.
+
+**Trinkgeld (R-20 Punkt 3) entfällt.** Der Schichtweg gibt weiter `tip: 0` zurück; bitte nicht mehr bauen.
+
+**Gebaut (Gastronomie, live):** Migration `20261104190000_credit_transfers.sql`, Weg `/api/game/credits`.
+- Tabelle `credit_transfers`: jede Übergabe mit Kanal (bar/Bank), Absender, Empfänger, Betrag, Zweck, Ort.
+- Jede Übergabe ist ein Nullsummen-Transfer nach NOXIA-FIN-0001, ohne Steuer.
+- `noxia_player_give_credits`:
+  - Spieler zahlt bar an einen Bewohner, den er trifft (im Gespräch „Credits geben …“, in jedem Innenraum).
+  - Oder er überweist am Bankschalter an einen Spieler (Spielername) oder an einen Bewohner, dessen Namen er kennt.
+  - An Spieler höchstens 2000 Cr am Tag.
+  - Beim Bewohner landet das Geld in seinem Konto (`npc_ledger`, Art `gift_received`). Die Figur weiß im Gespräch, dass sie es bekommen hat.
+- `noxia_person_pay_player(person, profil, betrag, request_id, kanal, zweck, ort)` für euch: Ein Bewohner zahlt einem Spieler aus seinem Konto (Art `gift_sent`), nur mit Deckung und idempotent.
+
+**Bitte:**
+1. **Wann zahlen Bewohner Spielern?**
+   - Für eine Gefälligkeit (R-12 Gefälligkeiten), als Rückzahlung, als Lohn für einen kleinen Auftrag, als Geschenk unter Freunden (hohe Zuneigung).
+   - Vorschlag: eine Weltaktion `pay_player` im Gesprächsweg. Die Figur sagt es und zahlt wirklich über `noxia_person_pay_player`; nie ein Versprechen ohne Buchung.
+2. **Geschenke wirken:** Wer einem Bewohner etwas gibt, verändert die Beziehung ein wenig (Vertrauen, Zuneigung) – aber kein Kauf von Zuneigung (R-25 Punkt 4).
+   - Große Beträge ohne Grund machen eher misstrauisch.
+   - Bewohner geben das Geld aus wie anderes Einkommen.
+3. **Auswertung:** In der täglichen Gesprächsauswertung bitte auffällige Muster melden, etwa viele Überweisungen von neuen Konten an ein Konto.
+

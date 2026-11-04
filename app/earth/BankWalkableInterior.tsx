@@ -15,6 +15,7 @@ import { ADVICE_STAFF_SPOT_ID, isAtAdviceTable, BANK_ADVISOR_INTRODUCTION, BANK_
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
 import { learningGateFacts, statusesFromViews } from '@/lib/game/interiors/learningGates'
 import { getSessionInfo } from '@/lib/supabase/auth'
+import BankTransfer from './BankTransfer'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 
 type Props = { entityId: string; buildingName: string; locationSlug: string; locationName: string; companion?: ColonyResident | null; onClose: () => void; onOpenDesk: () => void; learnRequest?: { gateId: string; at: number } | null }
@@ -105,6 +106,7 @@ export default function BankWalkableInterior({ entityId, buildingName, locationS
         </dl> : <p>Die Kurstafel wird geholt …</p>}
         <small>SCHALTER</small>
         <button className="open-school" onClick={onOpenDesk}>Schalter öffnen – einzahlen, abheben, Kredit</button>
+        <BankTransfer place={buildingName.split(' · ').pop() ?? buildingName} onStatus={ctx.setStatus} />
       </div>
     },
   }
