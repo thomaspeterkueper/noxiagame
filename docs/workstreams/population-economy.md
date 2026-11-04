@@ -882,3 +882,23 @@ Thomas, 04.11.2026: „Ich denke, wir lassen Trinkgeld weg, aber es sollte Mögl
    - Bewohner geben das Geld aus wie anderes Einkommen.
 3. **Auswertung:** In der täglichen Gesprächsauswertung bitte auffällige Muster melden, etwa viele Überweisungen von neuen Konten an ein Konto.
 
+### R-30 (Gastronomie, 04.11.2026): Spieler unter sich – Raum-Chat und Kommen/Gehen in die tägliche Auswertung
+
+Thomas, 04.11.2026: „Da wir aktuell mit Ably max. 5 gleichzeitig haben können, solltest du die Chats zwischen Spielern auch freischalten. Alles, was gerade passiert, wenn jemand kommt, ist wichtig für uns, um einzuschätzen, wo wir aufpassen müssen.“
+
+**Gebaut (Gastronomie, live)**, Migration `20261104200000_player_room_log.sql`:
+- `player_room_messages`: was Spieler im Raum allen sagen.
+  - Gespeichert werden das Original und die gezeigte Fassung, dazu das Anliegen (`classifyConversationTopic`), Merkmale (`contact`, `messenger`, `provocation`) und wie viele andere Spieler im Raum waren.
+  - In der gezeigten Fassung sind Kontaktdaten entfernt (E-Mail, Telefon, Links, @Namen).
+- `player_room_events`: Kommen (`join`), Gehen (`leave`), Gesten (`gesture`: winkt, prostet zu) und Meldungen (`report`, mit Nachricht).
+- Sicht **`player_room_log`**: alles in einer Zeitlinie. Credits bar und Überweisungen stehen in `credit_transfers` (R-29).
+- Zugestellt wird über Ably (`noxia:room:<Haus>`, Spieler dürfen nur lesen), gesendet nur über `/api/game/room-chat`. Höchstens sechs Nachrichten je Minute und Spieler.
+
+**Bitte:**
+1. **„NOXIA Gesprächsauswertung“** um einen Abschnitt **„Spieler unter sich“** erweitern:
+   - Wer kam wann wohin, mit wem; was wurde gesagt (Anliegen, Häufungen); Gesten und Geld zwischen Spielern.
+   - **Auffälliges zuerst:** Meldungen, Merkmale `provocation`, `contact`, `messenger`.
+   - Ebenso, wenn jemand einem anderen wiederholt folgt, schreibt oder Geld gibt, vor allem neuen Konten.
+2. **Zum Schulpilot:** Gibt es Hinweise, dass ein Minderjähriger angesprochen wird, gehört das ganz nach oben, mit Vorschlag zum Eingreifen (Sperren, Raum schließen).
+3. Datenschutz in der Auswertung wie in R-22: zusammenfassen, keine persönlichen Angaben zitieren.
+

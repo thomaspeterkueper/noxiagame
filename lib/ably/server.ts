@@ -94,3 +94,8 @@ export async function publishWorldUpdated(): Promise<void> {
     ts: Date.now(),
   })
 }
+
+// ── Raum-Chat: Nachricht eines Spielers an alle im Raum (04.11.2026) ─────────
+export async function publishRoomMessage(roomKey: string, data: { id: string; senderId: string; senderName: string; text: string; at: string }): Promise<void> {
+  await publish(ABLY_CHANNELS.room(roomKey), ABLY_EVENTS.room.message, data)
+}

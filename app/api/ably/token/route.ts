@@ -56,6 +56,8 @@ export async function GET(req: NextRequest) {
       'noxia:world':        ['subscribe'],
       [`noxia:builds:${user.id}`]: ['subscribe'],
       [`noxia:dm:${user.id}`]:     ['subscribe'],
+      // Raum-Chat (04.11.2026): lesen ja, senden nur über /api/game/room-chat (gespeichert).
+      'noxia:room:*':       ['subscribe'],
     },
   })
 

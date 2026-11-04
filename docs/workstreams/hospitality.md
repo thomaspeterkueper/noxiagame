@@ -149,6 +149,13 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Bewohner wissen, dass weitere Gäste da sind.
   - Karte, Auto, Raumschiff: W-16. Freier Chat zwischen Spielern: offen, Schutzregeln nötig.
 
+- **04.11.2026 – Raum-Chat zwischen Spielern, alles protokolliert:**
+  - Thomas: „Chats zwischen Spielern auch freischalten; alles, was gerade passiert, wenn jemand kommt, ist wichtig.“
+  - Im Innenraum gibt es „IM RAUM“: Nachrichten an alle im Haus, mit Verlauf der letzten 30 Minuten und „melden“.
+  - Kontaktdaten werden für die anderen entfernt. Ein Hinweis sagt, dass in der Testphase gespeichert und ausgewertet wird.
+  - Protokolliert werden Kommen, Gehen, Gesten und Meldungen (`player_room_log`). Zustellung über Ably, gesendet nur über den Server.
+  - Tests in `roomChat.test.ts`; im Browser mit nachgestellten Mitspielern geprüft. Auswertung: R-30.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -167,6 +174,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-30** (04.11.2026): Spieler unter sich – Raum-Chat und Kommen/Gehen in die tägliche Auswertung – `population-economy.md`.
 - **W-16** (04.11.2026): Andere Spieler auf der Karte, im Auto und an Bord – `world-map.md`.
 - **R-29** (04.11.2026): Credits untereinander – Bewohner zahlen Spielern; Trinkgeld entfällt – `population-economy.md`.
 - **W-15** (03.11.2026): Echte Lokale öffnen das volle Lokal – Änderungen in `WorldPanels.tsx` und `/api/world-lab/buildings` prüfen – `world-map.md`.
