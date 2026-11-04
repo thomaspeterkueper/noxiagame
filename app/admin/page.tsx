@@ -39,6 +39,7 @@ const cards: Array<[keyof Overview['metrics'], string]> = [
 const modules = [
   { href: '/admin/wuensche', title: 'Wünsche & Gebete', description: 'Wünsche prüfen und bearbeiten' },
   { href: '/admin/npcs', title: 'NPC-Observatorium', description: 'Biografie, Bedürfnisse, Stimmung, Erinnerungen und Beziehungen' },
+  { href: '/admin/welt', title: 'Weltsimulation', description: 'Standorte, Bevölkerung, Simulationstakte und Ereignisse' },
 ]
 const time = (s: string | null) => s ? new Date(s).toLocaleString('de-DE') : 'Keine Aktivität erfasst'
 
