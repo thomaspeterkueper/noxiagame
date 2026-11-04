@@ -175,3 +175,29 @@ export function buildingStateAt(chronicle: Chronicle, key: { subjectId?: string 
   }
   return state
 }
+
+/**
+ * Only independently verified Core receipts may drive a world-state overlay.
+ * The regular buildingStateAt() remains a historical evidence viewer, including
+ * unverified tombstones; never use it to authorize a map or parcel mutation.
+ * An unverified receipt after the last verified one makes the result unknown:
+ * silently ignoring it would claim a state we cannot establish.
+ */
+export function verifiedBuildingStateAt(
+  chronicle: Chronicle,
+  key: { subjectId?: string | null; sourceRef?: string | null },
+  at: string,
+): BuildingStateAt {
+  let state: BuildingStateAt = 'unknown'
+  for (const entry of chronicle.entries) {
+    if (entry.at > at) break
+    if (!((key.subjectId && entry.subjectId === key.subjectId) ||
+          (key.sourceRef && entry.sourceRef === key.sourceRef))) continue
+    if (!entry.authorized) {
+      state = 'unknown'
+      continue
+    }
+    state = entry.kind === 'demolished' ? 'demolished' : 'standing'
+  }
+  return state
+}
