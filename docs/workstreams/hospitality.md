@@ -117,6 +117,11 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - In der Datenbank durchgerechnet (vorhandenes Metropol wird gefunden, neues Lokal angelegt und beim zweiten Mal wiedergefunden, Karte vorhanden). Im Browser mit Probeort geprüft.
   - Requests: W-15, R-28, P-2.
 
+- **04.11.2026 – W-15 fertig:**
+  - Wer mit jemandem losgeht – vorausgehen lassen oder gemeinsam zu einem Ort –, nimmt ihn mit ins Lokal, auch ins reale. Das Gespräch geht drinnen weiter, ohne doppelte Figur.
+  - Die Stellenwand der Agentur kennt reale Lokale mit Personal.
+  - Im Browser geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

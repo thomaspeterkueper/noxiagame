@@ -52,7 +52,7 @@ export type Panel =
   /** Boden ohne geladenes Flurstück: Flurstück nachladen oder freies Land abstecken (28.10.2026) */
   | { kind: 'land'; at: GeoPoint; /** Teilstück aus diesem Flurstück */ parentId?: string }
   | { kind: 'inside'; request: BuildingEntryRequest; companionId: string | null }
-  | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark; source?: string }
+  | { kind: 'landmarkInside'; room: LandmarkRoomKind; landmark: WorldLandmark; source?: string; companionId?: string | null }
   /** Reise buchen fern von Sundern (Heim- und Weiterreise, 27.10.2026) */
   | { kind: 'travel'; at: GeoPoint }
 
@@ -157,6 +157,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   const [visitNames, setVisitNames] = useState<Record<string, string>>({})
   /** Wer gerade vorausgeht */
   const [leading, setLeading] = useState<Record<string, boolean>>({})
+  // W-15: Wer zuletzt mit dem Spieler losgegangen ist (vorausgehen, mitnehmen) – kommt mit hinein.
+  const [ledAt, setLedAt] = useState<Record<string, number>>({})
   const [offers, setOffers] = useState<Record<string, Offer | null>>({})
   const [buying, setBuying] = useState(false)
   const [buyError, setBuyError] = useState('')
@@ -467,7 +469,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const onKey = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.closest?.('input,textarea,select')) return
       if (event.key === 'Escape' && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') close()
-      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && landmark && room && landmarkNear) setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })
+      if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && landmark && room && landmarkNear) enterLandmark(room, landmark, landmarkSource)
       if ((event.key === 'f' || event.key === 'F' || event.key === 'Enter') && panel.kind === 'building' && entry && own && !resonance && buildingDistance !== null && buildingDistance <= ENTER_RANGE_M) enter()
     }
     window.addEventListener('keydown', onKey)
@@ -480,9 +482,36 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     engine.walkTo(target, withinM, () => setWalking(false))
   }
 
+  /**
+   * W-15 (03.11.2026): Wer kommt mit hinein? Wer zu diesem Ort unterwegs ist, sonst wer
+   * in den letzten fünf Minuten mit dem Spieler losgegangen ist und jetzt dicht bei ihm steht.
+   */
+  function companionFor(refs: ReadonlyArray<string | null | undefined>): string | null {
+    const wanted = refs.filter(Boolean) as string[]
+    const byVisit = Object.entries(visits).find(([, target]) => wanted.includes(target))?.[0]
+    if (byVisit) return byVisit
+    if (!engine) return null
+    const near = Object.entries(ledAt)
+      .filter(([, at]) => Date.now() - at < 5 * 60_000)
+      .map(([id]) => { const at = engine.personAt(id); return { id, d: at ? engine.distanceTo(at) : Infinity } })
+      .filter(item => item.d <= 25)
+      .sort((a, b) => a.d - b.d)
+    return near[0]?.id ?? null
+  }
+  function enterLandmark(room: LandmarkRoomKind, landmark: WorldLandmark, source?: string) {
+    const companionId = room === 'hospitality' ? companionFor([landmarkRef(landmark), source]) : null
+    setPanel({ kind: 'landmarkInside', room, landmark, source, companionId })
+  }
+  function releaseCompanion(id: string | null | undefined) {
+    if (!id) return
+    engine?.releasePerson(id)
+    setVisits(current => { const next = { ...current }; delete next[id]; return next })
+    setLedAt(current => { const next = { ...current }; delete next[id]; return next })
+  }
+
   function enter() {
     if (!own || !entry) return
-    const companionId = Object.entries(visits).find(([, target]) => target === own.id)?.[0] ?? null
+    const companionId = companionFor([own.id, own.source])
     setPanel({ kind: 'inside', request: { entityId: own.id, buildingTypeId: own.typeId, buildingName: own.name, kind: entry.kind }, companionId })
   }
 
@@ -548,7 +577,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           engine.sendPerson(person.id, target, seconds)
           setVisits(current => ({ ...current, [person.id]: String(action.targetRef) }))
           if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
-          if (action.playerFollows) walkTo(() => engine.personAt(person.id), 3)
+          if (action.playerFollows) { walkTo(() => engine.personAt(person.id), 3); setLedAt(current => ({ ...current, [person.id]: Date.now() })) }
         }
       } else if (action?.type === 'lead_walk') {
         // Die Person geht wirklich voraus (wie in der bisherigen Erdszene); wer folgt, bleibt dicht dahinter.
@@ -557,6 +586,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         const id = person.id
         engine.leadPerson(id, metres, seconds)
         setLeading(current => ({ ...current, [id]: true }))
+        setLedAt(current => ({ ...current, [id]: Date.now() }))
         if (action.playerFollows) walkTo(() => engine.personAt(id), 3)
         // Danach geht sie wieder ihrer Wege.
         setTimeout(() => { engine.releasePerson(id); setLeading(current => { const next = { ...current }; delete next[id]; return next }) }, (seconds + 20) * 1000)
@@ -583,7 +613,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const companion = panel.companionId ? residents.find(resident => resident.id === panel.companionId) ?? null : null
     return <EarthBuildingAccessLayer request={panel.request} companion={companion} companionHistory={panel.companionId ? (conversations[panel.companionId] ?? []).filter(line => line.content !== 'Gespräch derzeit nicht erreichbar.') : []} onRelocate={relocateTo} onClose={() => {
       // Wer mitgekommen ist, geht wieder seiner Wege.
-      if (panel.companionId) { engine?.releasePerson(panel.companionId); setVisits(current => { const next = { ...current }; delete next[panel.companionId as string]; return next }) }
+      releaseCompanion(panel.companionId)
       close()
     }}/>
   }
@@ -591,7 +621,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     // Echte Lokale öffnen das volle Lokal der Gastronomie (03.11.2026, „Lokale zusammenführen“);
     // klappt das nicht, bleibt der einfache Gastraum.
     const people = peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })
-    return <RealVenueInterior source={panel.source} amenity={panel.landmark.kind} name={panel.landmark.name} at={panel.landmark.at} people={people} residents={residents} onClose={close}
+    const companion = panel.companionId ? residents.find(resident => resident.id === panel.companionId) ?? null : null
+    const companionHistory = companion ? (conversations[companion.id] ?? []).filter(line => line.content !== 'Gespräch derzeit nicht erreichbar.') : []
+    return <RealVenueInterior source={panel.source} amenity={panel.landmark.kind} name={panel.landmark.name} at={panel.landmark.at} people={people} residents={residents}
+      companion={companion} companionHistory={companionHistory} onClose={() => { releaseCompanion(panel.companionId); close() }}
       fallback={<LandmarkWalkableInterior placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close} people={people}/>}/>
   }
   if (panel.kind === 'landmarkInside') {
@@ -633,7 +666,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           {(() => { const service = worshipAt(worship, { source: placeSource, at: building.at }); return service && <ScheduleLine item={service}/> })()}
           {here.length > 0 && <p className="muted">Gerade drinnen: {here.map(person => person.name).join(', ')}{here[0]?.doing ? ` · ${here[0].doing}` : ''}</p>}
           {buildingDistance !== null && buildingDistance <= ENTER_RANGE_M + 6
-            ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room: buildingRoom, landmark: inside, source: placeSource })}>Betreten</button></div>
+            ? <div className="row"><span>Du stehst davor.</span><button onClick={() => enterLandmark(buildingRoom, inside, placeSource)}>Betreten</button></div>
             : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, ENTER_RANGE_M + 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
           {resonance && <p className="muted">{resonance.round ? `Offene Resonanzrunde ${resonance.round}${resonance.host ? ' mit ' + resonance.host : ''}.` : 'Offener Resonanzplatz.'} Alle sind willkommen.</p>}
         </>
@@ -716,7 +749,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {landmark.kind === 'station' && landmarkNear
         ? <div className="row"><span>Du stehst am Bahnhof – von hier fahren Züge weiter.</span><button onClick={() => setPanel({ kind: 'travel', at: landmark.at })}>Reise buchen</button></div>
         : room && landmarkNear
-        ? <div className="row"><span>Du stehst davor.</span><button onClick={() => setPanel({ kind: 'landmarkInside', room, landmark, source: landmarkSource })}>Betreten</button></div>
+        ? <div className="row"><span>Du stehst davor.</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>Betreten</button></div>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}

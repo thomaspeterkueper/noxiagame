@@ -616,7 +616,14 @@ Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, 
 3. **Kinderschutz** (R-24 Punkt 0): Spieler sehen Kinder, können sie aber nicht wegführen. Auf der Karte führt keine Figur unter 18 einen Spieler irgendwohin.
 4. **Erledigt nebenbei:** `WorldPanels.tsx` gibt beim Betreten das Gespräch mit der Begleitung an das Lokal weiter (`companionHistory`, eine Zeile). Drinnen geht es weiter, statt neu anzufangen.
 
-### W-15 (Gastronomie, 03.11.2026): Echte Lokale öffnen das volle Lokal – drei kleine Änderungen in euren Dateien
+### W-15 (Gastronomie, 03.11.2026): Echte Lokale öffnen das volle Lokal – drei kleine Änderungen in euren Dateien – offene Punkte erledigt (04.11.2026)
+
+**Nachtrag 04.11.2026 (Thomas: „W-15 sollten wir als nächstes bauen“, von der Gastronomie gebaut, bitte prüfen):**
+- **Begleitung in reale Lokale:** `landmarkInside` hat jetzt `companionId`.
+  - `companionFor` in `WorldPanels.tsx`: Wer zu diesem Ort unterwegs ist (`visits`, auch mit Kennung des Kartenpunkts), sonst wer in den letzten fünf Minuten mit dem Spieler losgegangen ist (`lead_walk`, `visit_place` mit Folgen; `ledAt`) und höchstens 25 m entfernt steht.
+  - Das gilt auch für NOXIA-Lokale (`enter`). Beim Verlassen geht die Begleitung wieder ihrer Wege (`releaseCompanion`).
+  - Alle Eingänge zu Kartenräumen laufen über `enterLandmark`.
+- **Stellenwand:** `/api/game/jobs` liefert zusätzlich `places` (auch reale Lokale), die Agentur nimmt sie mit. Reale Lokale ohne eigenes Personal fehlen dort, denn geschlossen gibt es keine Schicht (R-28).
 
 Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
 

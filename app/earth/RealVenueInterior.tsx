@@ -25,11 +25,13 @@ type Props = {
   /** Bewohner der Weltkarte mit Aussehen – für die Figuren drinnen. */
   residents: readonly ColonyResident[]
   companion?: ColonyResident | null
+  /** Gespräch mit der Begleitung draußen – geht drinnen weiter (W-15). */
+  companionHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
   onClose: () => void
   fallback: ReactNode
 }
 
-export default function RealVenueInterior({ source, amenity, name, at, people, residents, companion = null, onClose, fallback }: Props) {
+export default function RealVenueInterior({ source, amenity, name, at, people, residents, companion = null, companionHistory = [], onClose, fallback }: Props) {
   const [venue, setVenue] = useState<{ id: string; kind: string; name: string | null } | null | 'failed'>(null)
   useEffect(() => {
     let live = true
@@ -62,5 +64,5 @@ export default function RealVenueInterior({ source, amenity, name, at, people, r
   if (venue === 'failed') return <>{fallback}</>
   if (!venue) return <div style={{ position: 'fixed', inset: 0, zIndex: 2300, background: 'rgba(2,7,12,.82)', display: 'grid', placeItems: 'center', color: '#eef4f1', font: '700 13px system-ui' }}>Lokal wird betreten …</div>
   const label = venue.kind === 'bar' ? 'Bar' : venue.kind === 'restaurant' ? 'Restaurant' : 'Café'
-  return <CafeWalkableInterior entityId={venue.id} buildingTypeId={venue.kind} buildingName={`${label} · ${venue.name ?? name}`} companion={companion} onClose={onClose} presentPeople={present} />
+  return <CafeWalkableInterior entityId={venue.id} buildingTypeId={venue.kind} buildingName={`${label} · ${venue.name ?? name}`} companion={companion} companionHistory={companionHistory} onClose={onClose} presentPeople={present.filter(p => p.id !== companion?.id)} />
 }

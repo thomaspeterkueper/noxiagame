@@ -43,6 +43,10 @@ export default function JobAgencyWalkableInterior({ entityId, buildingName, comp
         ])
         if (!live) return
         const buildings: AgencyBuilding[] = Array.isArray(map?.buildings) ? map.buildings.map((b: any) => ({ id: String(b.id), typeId: String(b.typeId), name: String(b.name), lat: Number(b.lat), lon: Number(b.lon) })) : []
+        // W-15: reale Lokale, die nicht als NOXIA-Haus auf der Karte stehen, kennt die Stellenliste.
+        for (const p of Array.isArray(jobs?.places) ? jobs.places : []) {
+          if (!buildings.some(b => b.id === String(p.id))) buildings.push({ id: String(p.id), typeId: String(p.typeId), name: String(p.name), lat: Number(p.lat), lon: Number(p.lon) })
+        }
         const self = buildings.find(b => b.id === entityId)
         if (self) setHere({ lat: self.lat, lon: self.lon })
         const server = jobs && typeof jobs.venues === 'object' ? jobs.venues : null
