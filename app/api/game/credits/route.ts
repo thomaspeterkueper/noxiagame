@@ -57,8 +57,7 @@ export async function POST(req: NextRequest) {
   if (!channel || !Number.isFinite(amount) || !UUID_RE.test(requestId) || (!toPersonId && !toUsername) || (toPersonId && !UUID_RE.test(toPersonId))) {
     return NextResponse.json({ error: 'Angaben unvollständig.' }, { status: 400 })
   }
-  // Bar geht nur an Bewohner, die man trifft; an Spieler wird überwiesen (andere Spieler sind im Raum nicht zu sehen).
-  if (channel === 'cash' && !toPersonId) return NextResponse.json({ error: 'Bar gibst du jemandem, den du triffst – an Spieler wird überwiesen.' }, { status: 400 })
+  // Bar an Spieler: seit 04.11.2026 sieht man andere Spieler im Raum (roomPresence) – die Tagesgrenze gilt wie bei Überweisungen.
   const { data, error } = await createServiceClient().rpc('noxia_player_give_credits', {
     p_profile_id: profileId, p_request_id: requestId, p_channel: channel, p_amount: amount,
     p_to_username: toPersonId ? null : toUsername, p_to_person_id: toPersonId,

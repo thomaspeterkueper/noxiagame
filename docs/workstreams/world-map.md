@@ -660,3 +660,27 @@ Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
 - **Geprüft** als `service_role`: Reise Sundern → Menden gebucht (Probe, zurückgerollt), Schichtstand lesbar.
 - **Für alle Teilprojekte:** Wer in einer Migration `revoke … from public` schreibt, entzieht damit auch `service_role` das Ausführen. Seit dem neuen Standard bleibt das Recht erhalten. Tests nur als `postgres` übersehen diesen Fehler – bitte auch als `service_role` prüfen (`set role service_role`).
 
+### W-16 (Gastronomie, 04.11.2026): Andere Spieler auf der Karte, im Auto und an Bord
+
+Thomas, 04.11.2026: „Andere Spieler sollten gleichzeitig in der gleichen Welt, Bar, Orten usw. sein können, sogar auf einem Raumschiff mitfliegen können oder im Auto.“
+
+**Gebaut (Gastronomie) – in allen Innenräumen des Lokal-Motors** (Lokale, Bank, Agentur, Akademie, Verwaltung, Raumhafen, Warenhaus):
+- `lib/multiplayer/roomPresence.ts` (`useRoomPresence`) über Supabase Realtime Presence, Kanal `noxia:room:<Haus>`.
+- Jeder meldet Name, Stelle im Raum, Sitzen, Schichtrolle und eine kurze Geste. In der Datenbank wird nichts gespeichert.
+- Andere Spieler stehen als blaue Figuren mit Namen im Raum. Anklicken zeigt: Winken, Zuprosten, „Credits geben …“ (bar, mit derselben Tagesgrenze wie Überweisungen).
+- Bewohner sehen, dass weitere Gäste da sind (ohne Namen); auch, wer dort gerade mitarbeitet.
+
+**Bitte (Erdkarte):**
+1. **Karte:** derselbe Weg auf der Weltkarte, Kanal je Kartenzelle (z. B. `noxia:cell:<Zelle>`). Mit der Spielerfigur, Name und Richtung; Nachbarzellen mit abonnieren, damit man sich an Zellgrenzen sieht.
+   - Den Hook könnt ihr übernehmen oder verallgemeinern; `peersFrom` ist getestet.
+2. **Gemeinsam gehen:** Ein Spieler kann einem anderen folgen, so wie einer Begleitung. Wer zusammen ein Haus betritt, ist drinnen im selben Raum; das geschieht schon über die Kennung des Hauses.
+3. **Im Auto:** wer mitfährt (Fahrer und Mitfahrer), sitzt im selben Fahrzeug und kommt zusammen an. Vorschlag: ein Kanal je Fahrzeug und eine Mitfahrt-Einladung des Fahrers.
+4. **Raumschiff:** Mitfliegen auf dem Schiff eines anderen Spielers oder auf einem Linienflug.
+   - Gemeinsame Abfahrt und Ankunft und dieselbe Reisezeit; an Bord sieht man sich.
+   - Das berührt Linienflug und Schiff parken (eure Migration) und das Anheuern bei Population (`noxia_crew_sign_on`). Bitte mit Population abstimmen, wer die Buchung „Mitflug bei Spieler X“ baut.
+5. **Begegnungsstätten, Bibliothek, Gotteshäuser** (`LandmarkWalkableInterior`, Philosophie/NPC): bitte denselben Hook einbauen, Kanal `noxia:room:<OSM-Kennung>`.
+
+**Bewusst noch nicht gebaut: freier Text-Chat zwischen Spielern.** Mit dem Schulpilot in Sundern braucht er Schutzregeln (Filter, Melden, Sperren, keine privaten Nachrichten an Minderjährige). Entscheidung bei Thomas.
+
+**Nicht geprüft:** echte Realtime-Verbindung von zwei Browsern. Die Testumgebung lässt keine Websockets zu Supabase durch. Geprüft sind die Darstellung mit nachgestellter Anwesenheit und die Buchung.
+

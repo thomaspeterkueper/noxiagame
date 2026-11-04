@@ -16,6 +16,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'lib/game/rounds/bubbles.test.ts',
+      'lib/multiplayer/roomPresence.test.ts',
       'lib/speech/browserSpeech.test.ts',
       'lib/game/landmarks/readAloud.test.ts',
       'lib/game/music/lounge.test.ts',
