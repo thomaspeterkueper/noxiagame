@@ -191,10 +191,21 @@ export function verifiedBuildingStateAt(
   at: string,
 ): BuildingStateAt {
   let state: BuildingStateAt = 'unknown'
+  let previousInstant: string | null = null
+  let previousKind: ChronicleKind | null = null
   for (const entry of chronicle.entries) {
     if (compareChronicleInstants(entry.at, at) > 0) break
     if (!((key.subjectId && entry.subjectId === key.subjectId) ||
           (key.sourceRef && entry.sourceRef === key.sourceRef))) continue
+    // No persisted sequence number exists for equal-time receipts. In particular,
+    // creation and demolition at the same instant must not depend on lexical IDs.
+    if (previousInstant !== null && compareChronicleInstants(previousInstant, entry.at) === 0 &&
+        ((previousKind === 'built' && entry.kind === 'demolished') ||
+         (previousKind === 'demolished' && entry.kind === 'built'))) {
+      return 'unknown'
+    }
+    previousInstant = entry.at
+    previousKind = entry.kind
     if (!entry.authorized) {
       state = 'unknown'
       continue
