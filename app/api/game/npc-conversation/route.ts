@@ -28,6 +28,8 @@ import { classifyConversationTopic } from '@/lib/game/cognition/conversationTopi
 import { playerNameFromUtterance, statedOwnAge } from '@/lib/game/cognition/playerFacts'
 import { ageAtTick } from '@/lib/game/gameCalendar'
 import { worldviewConversationLines, worldviewVoiceFromPublicRole } from '@/lib/game/population/worldviewVoices'
+import { languageDevelopmentCapacity, languagePromptConstraint } from '@/lib/game/cognition/languageSystem'
+import { loadPersonLanguageProfile, selectConversationLanguage } from '@/lib/game/cognition/languagePersistence'
 
 const MAX_PLAYER_CHARS = 500
 const MAX_HISTORY_MESSAGES = 10
@@ -197,6 +199,9 @@ export async function POST(request: NextRequest) {
   let favorLines: string[] = []
   let npcAge: number | null = null
   let currentTick: number | null = null
+  let originalLanguageCode: string | null = null
+  let translatedForPlayer = false
+  let languageInstruction = 'Sprachregel: Für diese Figur liegen noch keine expliziten Sprachdaten vor. Antworte für die aktuelle deutsche Oberfläche auf Deutsch, aber behandle Deutsch nicht als kanonisch belegte Muttersprache.'
   if (npcId) {
     const [{ data: memoryData }, { data: personData }, { data: identityData }, { data: relationData }, { data: livedMemoryData }] = await Promise.all([
       serviceClient
@@ -248,6 +253,37 @@ export async function POST(request: NextRequest) {
     currentTick = tickNow?.tick_number != null ? Number(tickNow.tick_number) : null
     knownPlayerName = knowledgeRow?.known_player_name ? clean(knowledgeRow.known_player_name, 32) : null
     npcAge = ageAtTick(canonicalNpc?.birth_year ?? null, currentTick)
+
+    try {
+      const languageProfile = await loadPersonLanguageProfile(serviceClient, npcId)
+      const languageContext = selectConversationLanguage(languageProfile, 'de')
+      originalLanguageCode = languageContext.originalLanguageCode
+      translatedForPlayer = languageContext.translatedForPlayer
+      if (languageProfile && originalLanguageCode) {
+        languageInstruction = [
+          languagePromptConstraint({ profile: languageProfile, preferredLanguageCode: originalLanguageCode }),
+          translatedForPlayer
+            ? `Die Figur spricht im Spiel ursprünglich ${originalLanguageCode}. Gib für die deutsche Oberfläche eine natürliche deutsche Übersetzung aus; die sprachliche Einfachheit, Unsicherheit oder Kompetenz der Originaläußerung muss in der Übersetzung erkennbar bleiben.`
+            : 'Die Originalsprache entspricht der deutschen Oberfläche; keine Übersetzung ist nötig.',
+        ].join(' ')
+      } else if (npcAge !== null && npcAge < 8) {
+        const capacity = languageDevelopmentCapacity(npcAge * 365)
+        const productive = capacity.productiveSpeech
+        const grammar = capacity.grammarLearning
+        languageInstruction = productive < 0.08
+          ? 'Sprachregel: Die Figur ist entwicklungsbedingt noch nicht zu produktiver Sprache fähig. Reagiere mit sehr kurzen Lauten, Gesten oder nonverbalen Hinweisen; erfinde keine flüssige Sprache.'
+          : productive < 0.35
+            ? 'Sprachregel: Die Figur ist ein sehr junges Kind. Verwende nur einzelne Wörter oder sehr kurze Fragmente; keine erwachsene Grammatik oder Ausdrucksweise.'
+            : grammar < 0.45
+              ? 'Sprachregel: Die Figur ist ein junges Kind. Verwende kurze, altersgemäße Sätze und begrenzte Grammatik; keine erwachsene Ausdrucksweise.'
+              : 'Sprachregel: Die Figur spricht altersgemäß, aber noch nicht mit der sprachlichen Komplexität eines Erwachsenen.'
+      }
+    } catch (error) {
+      console.error('npc language profile load failed', {
+        npcId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
     favorLines = (favorRows ?? []).map((row: any) => {
       const when = new Date(row.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' })
       return row.kind === 'gift_credits'
@@ -384,7 +420,8 @@ export async function POST(request: NextRequest) {
     identityState === 'known'
       ? `Der Spieler kennt deinen Namen bereits als ${npcName}.`
       : `Der Spieler kennt deinen Namen noch nicht sicher. Verwende deinen echten Namen nicht beiläufig als bereits bekannt. Wenn du dich natürlich vorstellst oder nach deinem Namen gefragt wirst, sage klar „Ich bin ${npcName}“ oder „Mein Name ist ${npcName}“.`,
-    'Antworte natürlich auf Deutsch, grundsätzlich kurz und dialogisch: meist 1–2 kurze, vollständige Sätze. Wiederhole die Frage nicht unnötig und verzichte auf lange Vorreden. Nur wenn der Spieler ausdrücklich um eine ausführliche Erklärung bittet oder eine komplexe Frage sonst unverständlich bliebe, antworte etwas ausführlicher. Beende jeden Satz vollständig; das technische Ausgabelimit ist kein Längenziel.',
+        languageInstruction,
+    'Formuliere für die Oberfläche grundsätzlich kurz und dialogisch: meist 1–2 kurze, vollständige Sätze, soweit die Sprachkompetenz der Figur vollständige Sätze zulässt. Wiederhole die Frage nicht unnötig und verzichte auf lange Vorreden. Nur wenn der Spieler ausdrücklich um eine ausführliche Erklärung bittet oder eine komplexe Frage sonst unverständlich bliebe, antworte etwas ausführlicher. Das technische Ausgabelimit ist kein Längenziel.',
     'Behandle das Gespräch als fortlaufenden Dialog: Greife den letzten offenen Vorschlag, die letzte Frage oder eine Zusage des Spielers zuerst auf, statt das Thema grundlos neu zu starten.',
     'Kurze Antworten wie „ja“, „ich habe Zeit“, „okay“, „gern“ oder „machen wir“ beziehen sich auf den unmittelbar vorherigen Gesprächsfaden. Führe diesen Faden konkret weiter.',
     'Wenn du selbst gerade eine konkrete gemeinsame Handlung vorgeschlagen hast und der Spieler zustimmt, frage nicht allgemein „Was möchtest du machen?“, sondern schlage den nächsten konkreten Schritt dieser Handlung vor.',
@@ -674,6 +711,8 @@ export async function POST(request: NextRequest) {
       learnedName: identityLearned ? canonicalNpc?.display_name ?? null : null,
       worldAction,
       creditTransfer,
+      originalLanguageCode,
+      translatedForPlayer,
     })
   } catch {
     await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'timeout', provider_ms: Date.now() - providerStartedAt, model })
