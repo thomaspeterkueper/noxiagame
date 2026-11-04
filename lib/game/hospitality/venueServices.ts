@@ -57,12 +57,16 @@ export function mentionsToilet(text: string | null | undefined): boolean {
   return Boolean(text && /\b(toilett\w*|wc|klo\w*|pinkel\w*|bad|waschraum|örtchen|austreten|muss mal)\b/i.test(text))
 }
 
-export type ToiletAccess = { ok: true; text: string } | { ok: false; text: string }
+export type ToiletAccess = { ok: true; text: string; payCredits: number } | { ok: false; text: string }
 
-/** Darf der Spieler jetzt auf die Toilette? Bezahlt wird erst, wenn es Hauspreise gibt (R-18). */
+/**
+ * Darf der Spieler jetzt auf die Toilette? Mit Gebühr wird sie wie ein Posten gebucht
+ * (Artikel `toilet`, order_hospitality_item; 04.11.2026). „Nur für Gäste“ prüft der
+ * Server zusätzlich (Bestellung in den letzten vier Stunden).
+ */
 export function toiletAccess(rule: ToiletRule, input: { hasOrdered: boolean }): ToiletAccess {
   if (!rule.available) return { ok: false, text: 'Hier gibt es keine Toilette für Besucher.' }
   if (rule.guestsOnly && !input.hasOrdered) return { ok: false, text: 'Die Toilette ist nur für Gäste – erst etwas bestellen.' }
-  if (rule.priceCredits > 0) return { ok: false, text: `Die Toilette kostet ${rule.priceCredits} Credits; bezahlen kann man das noch nicht.` }
-  return { ok: true, text: 'Du warst kurz auf der Toilette.' }
+  if (rule.priceCredits > 0) return { ok: true, payCredits: rule.priceCredits, text: `Du warst kurz auf der Toilette – ${rule.priceCredits} Credits bezahlt.` }
+  return { ok: true, payCredits: 0, text: 'Du warst kurz auf der Toilette.' }
 }

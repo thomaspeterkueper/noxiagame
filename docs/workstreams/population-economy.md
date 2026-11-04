@@ -755,6 +755,11 @@ Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, 
      - Eine Begleitung soll auch selbst bestellen und zahlen können, als echter Kauf.
      - Ortswechsel von Personen über Kontinente hinweg brauchen eine Reise.
 
+**Nachtrag R-24 (Gastronomie, 04.11.2026):**
+- Das Lokal ist für Kinder vorbereitet (`familyRules.ts`): Kakao, Kinderteller, keine Kinder in Bar und Nachtclub, kein Alkohol an Kinder.
+- Erkannt wird ein Kind an `lifeStage: 'child'` oder an einem bekannten Alter unter 18. Bitte liefert `lifeStage` mit den Bewohnern in `/api/game/population` und am Gast im Gäste-Abruf.
+- Serverseitig fehlt noch die Prüfung beim Ausgeben: `order_hospitality_item` kennt den Empfänger nicht. Wenn Kinder kommen, bitte `recipientPersonId` mitnehmen und Alkohol an Minderjährige ablehnen.
+
 ### R-25 (Gastronomie, 03.11.2026): Paare und Beziehungen entwickeln sich – auch mit Spielern
 
 Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnten auch Spieler und NPC ein Paar werden, oder später ganz andere Konstellationen. Ich denke, das muss sich dynamisch im Spiel und auf den Stationen, Kolonien und Raumschiffen entwickeln. Roboter fehlen noch.“

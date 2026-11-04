@@ -93,6 +93,19 @@ const ICONS: Record<string, ReactNode> = {
     <path d="M11 11h10l-1.5 12h-7z" fill="#dff1ee" {...s} />
     <path d="M11.6 15h8.8l-1 8h-6.8z" fill="#e5c23c" />
   </>,
+  // Kakao: Tasse mit Sahnehaube
+  cocoa: <>
+    <path d="M8 14h14v8a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z" fill="#8a5a3a" {...s} />
+    <path d="M22 16h2.5a3 3 0 0 1 0 6H22" fill="none" {...s} />
+    <path d="M7.5 14c0-3 3-4 4.5-3 1-2 5-2 6 0 2-1 4.5 0 4.5 3z" fill="#fff8ee" {...s} />
+  </>,
+  // Kinderteller: Teller mit Smiley
+  kids_meal: <>
+    <circle cx="16" cy="17" r="9.5" fill="#f4ead6" {...s} />
+    <circle cx="12.5" cy="15" r="1.4" fill="#d2423a" />
+    <circle cx="19.5" cy="15" r="1.4" fill="#d2423a" />
+    <path d="M11.5 19.5q4.5 4 9 0" fill="none" stroke="#e0a030" strokeWidth="2" strokeLinecap="round" />
+  </>,
   // Dessertglas
   dessert: <>
     <path d="M8 12h16a8 8 0 0 1-16 0z" fill="#dff1ee" {...s} />

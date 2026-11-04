@@ -488,13 +488,15 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
    */
   function companionFor(refs: ReadonlyArray<string | null | undefined>): string | null {
     const wanted = refs.filter(Boolean) as string[]
-    const byVisit = Object.entries(visits).find(([, target]) => wanted.includes(target))?.[0]
+    const byVisit = Object.entries(visits).find(([id, target]) => wanted.includes(target) && residents.find(r => r.id === id)?.lifeStage !== 'child')?.[0]
     if (byVisit) return byVisit
     if (!engine) return null
     const near = Object.entries(ledAt)
       .filter(([, at]) => Date.now() - at < 5 * 60_000)
       .map(([id]) => { const at = engine.personAt(id); return { id, d: at ? engine.distanceTo(at) : Infinity } })
       .filter(item => item.d <= 25)
+      // Kinder nimmt man nicht mit (R-24 Punkt 0).
+      .filter(item => residents.find(r => r.id === item.id)?.lifeStage !== 'child')
       .sort((a, b) => a.d - b.d)
     return near[0]?.id ?? null
   }
