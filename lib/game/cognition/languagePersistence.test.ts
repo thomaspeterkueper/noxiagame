@@ -15,8 +15,12 @@ const profile = languageProfileFromRows('lan', [
 check(profile?.primaryLanguageCode === 'vi', 'native language becomes default original language')
 check(profile?.languages.length === 2, 'multiple languages remain in profile')
 
-const translated = selectConversationLanguage(profile, 'de')
-check(translated.originalLanguageCode === 'vi', 'conversation keeps NPC original language')
+const shared = selectConversationLanguage(profile, 'de')
+check(shared.originalLanguageCode === 'de', 'shared player/NPC language is preferred over translation')
+check(!shared.translatedForPlayer, 'shared language needs no translation')
+
+const translated = selectConversationLanguage(profile, 'fr')
+check(translated.originalLanguageCode === 'vi', 'without shared language the primary language is kept')
 check(translated.translatedForPlayer, 'different player language is marked as translated')
 
 const none = selectConversationLanguage(null, 'de')
