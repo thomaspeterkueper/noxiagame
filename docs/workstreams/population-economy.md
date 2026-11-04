@@ -926,3 +926,39 @@ Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „g
 4. Mehr Vielfalt bei Frisuren und Haarfarben. Kiesel versteht `short`, `long`, `curly`, `braided`, `bun`, `shaved`; Haarfarben `dark`, `brown`, `light`, `red`, `grey`, `white`.
 5. **Roboter** mit `isRobot: true` (R-26); Kiesel zeichnet sie als Roboter.
 
+### R-32 (Gastronomie, 04.11.2026): Streit, Rangelei und Kampf – mit Folgen
+
+Thomas, 04.11.2026, auf die Frage, ob Figuren tanzen, mit Werkzeug arbeiten und kämpfen können: **„alles in genau dieser Steigerung, leider ist die Welt nicht nur nett.“**
+
+**Was die Gastronomie gebaut hat (nur Darstellung):**
+- Kiesel-Posen für Rangelei (Schubsen, Hinfallen) und Kampf (Zuschlagen, Abwehren, Getroffen, Am Boden), dazu ein sichtbares Pflaster für Verletzte (`lib/figures/kiesel.ts`).
+- `lib/game/hospitality/venueIncident.ts` liest einen Vorfall als `population_events` mit `event_type = 'venue_incident'`. Das Lokal zeigt:
+  - die Posen der Beteiligten;
+  - einen Hinweis für den Spieler;
+  - was Beteiligte und Anwesende davon wissen.
+- Ohne Ereignis gibt es keinen Streit; erfunden wird nichts.
+
+**Erwartetes Ereignis (Vorschlag, gern anpassen):**
+```json
+{ "tileEntityId": "<Lokal>", "level": "rangelei | kampf", "startsTick": 100, "endsTick": 101, "aftermathTick": 104,
+  "cause": "Streit um die Rechnung",
+  "participants": [{ "personId": "…", "role": "angreifer | verteidiger | schlichter", "outcome": "steht | am_boden | verletzt" }],
+  "removedIds": ["…"], "cancelled": false }
+```
+
+**Bitte (Population):**
+1. **Wann es Streit gibt** – aus dem, was die Figuren sind und erleben: Alkohol, Eifersucht, Schulden, alte Feindschaften, Gedränge.
+   - Selten und begründet, nie zufällig.
+   - Erst Worte, dann Rangelei, Kampf nur bei echter Eskalation.
+   - Kinder sind nie beteiligt.
+2. **Folgen, die bleiben:**
+   - Verletzung (wie lange, Arzt);
+   - Hausverbot nach Hausregel (der Türsteher begleitet hinaus, `removedIds`);
+   - Polizei bei Kampf;
+   - Erinnerung und Beziehung (Groll, Versöhnung);
+   - Ruf im Ort.
+3. **Spieler:**
+   - Ob und wie ein Spieler hineingezogen werden kann – auch von anderen Spielern –, welche Grenzen gelten und was er danach erlebt (Hausverbot, Strafe, Ruf).
+   - Erst nach eurer Regel bauen wir ein Eingreifen im Lokal: dazwischengehen, Türsteher holen, gehen.
+4. Ereignisse bitte in die tägliche Auswertung (R-30), damit sichtbar ist, wo es kracht.
+

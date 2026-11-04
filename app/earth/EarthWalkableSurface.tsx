@@ -745,7 +745,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
 
         {navigationTarget&&navigationRoute&&<WalkableRoute points={navigationRoute.points} target={{xM:navigationTarget.xM,yM:navigationTarget.yM}}/>}
 
-        {npcPositions.map(({resident,xM,yM})=><g key={resident.id} transform={unzoomedAt({xM,yM})}><WalkableActor point={{xM,yM}} label={personSceneLabel(resident)} appearance={resident.appearance} visualSeed={resident.id} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('');setAutoWalkTargetId('');setNavigationTargetId('')}}/></g>)}
+        {npcPositions.map(({resident,xM,yM})=><g key={resident.id} transform={unzoomedAt({xM,yM})}><WalkableActor point={{xM,yM}} label={personSceneLabel(resident)} appearance={resident.appearance} visualSeed={resident.id} work={role(resident)} selected={selected?.id===resident.id} onClick={()=>{setSelected(resident);setMessage('');setAutoWalkTargetId('');setNavigationTargetId('')}}/></g>)}
 
         {localTrainPoint&&<WalkableTrain point={localTrainPoint} label="Regional"/>}
         {namedPoiTargets.filter(target=>target.isLandmark||target.business).map(target=>{

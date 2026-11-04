@@ -161,6 +161,19 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Generator `lib/figures/kiesel.ts` mit Tests. Alle Innenräume zeichnen Bewohner, Spieler und Mitspieler jetzt als Kiesel, mit Blickrichtung aus der Bewegung, Gehen, Sitzen und Kleidung nach Arbeit (Schürze im Café, Weste an der Bar).
   - Im Browser geprüft. Karte: W-17; Aussehen für alle, Alter und Kleidung: R-31.
 
+- **04.11.2026 – Kiesel überall, Tanzen, Arbeit, Rangelei, Kampf:**
+  - Thomas sah im Spiel noch keine neuen Figuren; auf seinen Wunsch auch Erdkarte, Oberflächen, Kolonie und Landmarken auf Kiesel umgestellt (W-17).
+  - Neue Posen in seiner Steigerung:
+    - Tanzen;
+    - Arbeit mit Werkzeug wie in Siedler: Tablett, Glas polieren, Wischen, Hämmern, Hacken, Schaufeln;
+    - Rangelei: Schubsen, Hinfallen;
+    - Kampf: Zuschlagen, Abwehren, Getroffen, am Boden, mit Pflaster für Verletzte.
+  - Im Lokal:
+    - Gäste und Spieler tanzen auf der Tanzfläche.
+    - Das Personal arbeitet sichtbar, mit Pausen: Putzkraft wischt, Tresen poliert, Bedienung trägt das Tablett, der DJ tanzt.
+    - Rangelei und Kampf kommen nur aus Population-Ereignissen `venue_incident` (`venueIncident.ts`, mit Test): Posen, Hinweis, Wissen der Figuren.
+  - Regeln und Folgen: R-32; Haltung zu Streit: P-3.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -179,6 +192,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-32** (04.11.2026): Streit, Rangelei und Kampf – mit Folgen – `population-economy.md`.
+- **P-3** (04.11.2026): Haltung zu Streit und Gewalt – NPC-Religion.
 - **W-17** (04.11.2026): Kiesel-Figuren auf der Karte – `world-map.md`.
 - **R-31** (04.11.2026): Aussehen für alle – Altersgruppen und Kleidung – `population-economy.md`.
 - **R-30** (04.11.2026): Spieler unter sich – Raum-Chat und Kommen/Gehen in die tägliche Auswertung – `population-economy.md`.

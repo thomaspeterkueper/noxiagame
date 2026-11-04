@@ -278,3 +278,14 @@ Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
 - Wünsche bitte als Request an `hospitality.md`.
 - Bibliothek, Gotteshäuser, ArtLounge und Begegnungsstätten bleiben bei euch.
 
+### P-3 (Gastronomie, 04.11.2026): Haltung zu Streit und Gewalt
+
+Thomas, 04.11.2026: „leider ist die Welt nicht nur nett.“ Population regelt, wann es im Lokal zu Rangelei oder Kampf kommt (R-32); die Gastronomie zeigt es.
+
+**Bitte:** Wie gehen Figuren je nach Haltung und Tradition damit um?
+- Wer schlichtet, wer hält sich heraus, wer vergibt, wer trägt nach?
+- Gibt es Versöhnung, und wie?
+- Was sagen Seelsorger und Gemeinden dazu?
+
+Das fließt in das Wissen der Figuren ein (`incidentFacts`) und später in Gespräche danach.
+

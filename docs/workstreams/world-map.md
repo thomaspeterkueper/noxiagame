@@ -701,3 +701,10 @@ Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „g
 2. Die Richtung kommt aus der Bewegung auf dem Bildschirm (`kieselDirFrom`), die Kleidung aus `kieselLookFor(person, arbeit)`.
 3. Das bisherige `NpcFigure` (`lib/grid/NpcVisual.tsx`) bleibt, bis die Karte umgestellt ist.
 
+**Stand 04.11.2026 (Gastronomie, auf Thomas' Wunsch selbst umgestellt):**
+- Erdkarte und Oberflächen zeichnen Spieler und Bewohner jetzt als Kiesel: `WalkablePlayer` und `WalkableActor` in `app/components/WalkableSurfaceRenderer.tsx`, mit Blickrichtung und Gehen aus der Bewegung, auf Mond, Phobos und Deimos im Druckanzug.
+- Die Kolonie-Karte und die Landmarken (Gotteshaus, Bibliothek, Friedhof) laufen über `NpcFigure`, das jetzt Kiesel zeichnet.
+- Die eigene Figur sieht überall gleich aus (Profil-Kennung).
+- **Offen für die Erdkarte:**
+  - Arbeit auf der Karte sichtbar machen (Posen `haemmern`, `hacken`, `schaufeln`, `tragen` an Arbeitsorten, `pose`-Eigenschaft von `WalkableActor`);
+  - Leistung messen, wenn viele Figuren gleichzeitig laufen; bei Bedarf Bilder zwischenspeichern.

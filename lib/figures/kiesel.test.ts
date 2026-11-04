@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kieselDirFrom, kieselLookFor, kieselSVG } from './kiesel'
+import { KIESEL_POSES, kieselAnimated, kieselDirFrom, kieselLookFor, kieselSVG, type KieselPose } from './kiesel'
 
 describe('kiesel', () => {
   const look = kieselLookFor({ id: 'p1', appearance: { genderPresentation: 'masculine', bodyFrame: 'broad', skinToneCode: 'skin_4', hairStyleCode: 'short', hairColorCode: 'dark', facialHairCode: 'full', visibleAgeBand: 'adult' } }, 'bar')
@@ -25,5 +25,22 @@ describe('kiesel', () => {
     expect(kieselDirFrom(5, 3)).toBe('se'); expect(kieselDirFrom(-5, 3)).toBe('sw')
     expect(kieselDirFrom(2, -6)).toBe('ne'); expect(kieselDirFrom(-2, -6)).toBe('nw')
     expect(kieselDirFrom(0, 0, 'nw')).toBe('nw')
+  })
+  it('draws every pose in every direction and frame without broken numbers', () => {
+    for (const pose of Object.keys(KIESEL_POSES) as KieselPose[]) for (const dir of ['se', 'sw', 'ne', 'nw'] as const) for (let f = 0; f < 4; f++) {
+      const svg = kieselSVG({ ...look, verletzt: true }, dir, pose, f, true)
+      expect(svg.includes('NaN') || svg.includes('undefined')).toBe(false)
+      expect(svg.split('<g').length).toBe(svg.split('</g>').length)
+    }
+  })
+  it('animates dance, work and fight, and carries a tray only while walking', () => {
+    expect(kieselSVG(look, 'se', 'tanzen', 0)).not.toBe(kieselSVG(look, 'se', 'tanzen', 1))
+    expect(kieselSVG(look, 'se', 'haemmern', 0)).not.toBe(kieselSVG(look, 'se', 'haemmern', 2))
+    expect(kieselAnimated('tragen')).toBe(false); expect(kieselAnimated('tragen', true)).toBe(true)
+    expect(kieselAnimated('liegen')).toBe(false); expect(kieselAnimated('zuschlagen')).toBe(true)
+  })
+  it('shows injury only when marked', () => {
+    expect(kieselSVG(look, 'se', 'liegen').includes('#efd9b4')).toBe(false)
+    expect(kieselSVG({ ...look, verletzt: true }, 'se', 'liegen').includes('#efd9b4')).toBe(true)
   })
 })

@@ -12,10 +12,44 @@ export type KieselAge = 'kind' | 'jung' | 'erwachsen' | 'aelter' | 'alt'
 export type KieselBuild = 'schmal' | 'mittel' | 'kraeftig'
 export type KieselHair = 'kurz' | 'lang' | 'locken' | 'zopf' | 'dutt' | 'glatze'
 export type KieselBeard = 'ohne' | 'stoppeln' | 'vollbart' | 'schnurrbart'
-export type KieselFace = 'freundlich' | 'neutral' | 'traurig' | 'erstaunt'
+export type KieselFace = 'freundlich' | 'neutral' | 'traurig' | 'erstaunt' | 'wuetend'
 export type KieselClothes = 'alltag' | 'schuerze' | 'bar' | 'druckanzug' | 'fest' | 'kleid' | 'overall' | 'kittel'
 export type KieselDir = 'sw' | 'se' | 'nw' | 'ne'
-export type KieselPose = 'stehen' | 'gehen' | 'sitzen'
+export type KieselPose =
+  | 'stehen' | 'gehen' | 'sitzen'
+  | 'tanzen'
+  | 'tragen' | 'polieren' | 'wischen' | 'haemmern' | 'hacken' | 'schaufeln'
+  | 'schubsen' | 'hinfallen'
+  | 'zuschlagen' | 'abwehren' | 'getroffen' | 'liegen'
+
+/**
+ * Posen in Thomas' Steigerung (04.11.2026: „alles in genau dieser Steigerung, leider
+ * ist die Welt nicht nur nett“): Tanzen – Arbeit mit Werkzeug wie in Siedler –
+ * Rangelei mit Hinfallen – Kampf mit Folgen (verletzt, am Boden). Die Folgen selbst
+ * (Verletzung, Hausverbot, Polizei, Gedächtnis) regeln Population und NPC (Request);
+ * hier wird nur gezeichnet.
+ */
+export const KIESEL_POSES: Readonly<Record<KieselPose, { label: string; stufe: 'grund' | 'tanz' | 'arbeit' | 'rangelei' | 'kampf'; animated: boolean }>> = {
+  stehen: { label: 'Stehen', stufe: 'grund', animated: false },
+  gehen: { label: 'Gehen', stufe: 'grund', animated: true },
+  sitzen: { label: 'Sitzen', stufe: 'grund', animated: false },
+  tanzen: { label: 'Tanzen', stufe: 'tanz', animated: true },
+  tragen: { label: 'Tablett tragen', stufe: 'arbeit', animated: false },
+  polieren: { label: 'Glas polieren', stufe: 'arbeit', animated: true },
+  wischen: { label: 'Wischen', stufe: 'arbeit', animated: true },
+  haemmern: { label: 'Hämmern', stufe: 'arbeit', animated: true },
+  hacken: { label: 'Hacken', stufe: 'arbeit', animated: true },
+  schaufeln: { label: 'Schaufeln', stufe: 'arbeit', animated: true },
+  schubsen: { label: 'Schubsen', stufe: 'rangelei', animated: true },
+  hinfallen: { label: 'Hinfallen', stufe: 'rangelei', animated: true },
+  zuschlagen: { label: 'Zuschlagen', stufe: 'kampf', animated: true },
+  abwehren: { label: 'Abwehren', stufe: 'kampf', animated: true },
+  getroffen: { label: 'Getroffen', stufe: 'kampf', animated: true },
+  liegen: { label: 'Am Boden', stufe: 'kampf', animated: false },
+}
+
+/** Läuft die Pose in Schritten (Bild 0–3)? Tragen nur, wenn die Figur dabei geht. */
+export const kieselAnimated = (pose: KieselPose, moving = false) => KIESEL_POSES[pose]?.animated || (pose === 'tragen' && moving)
 
 export interface KieselLook {
   age: KieselAge
@@ -31,6 +65,8 @@ export interface KieselLook {
   /** Farbe der Oberbekleidung im Alltag (aus der Person, damit nicht alle gleich aussehen). */
   topColor?: string
   robot?: boolean
+  /** Sichtbar verletzt (Pflaster), nur wenn die Bevölkerung es meldet. */
+  verletzt?: boolean
 }
 
 const AGES: Record<KieselAge, { scale: number; head: number; stoop: number; lines: number }> = {
@@ -64,8 +100,38 @@ function mix(a: string, b: string, t: number): string {
 const shade = (c: string, t: number) => mix(c, '#000000', t)
 const r1 = (v: number) => Math.round(v * 10) / 10
 
-/** Die Figur als SVG-Inhalt (ohne äußeres <svg>), viewBox 0 0 64 96. */
-export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose = 'stehen', frame = 0): string {
+type Rig = { back: number; front: number; lean: number; legs: 'stand' | 'walk' | 'sit' | 'wide'; bob: number; face?: KieselFace; tool?: 'tablett' | 'glas' | 'mopp' | 'hammer' | 'axt' | 'schaufel' }
+
+/** Arm- und Körperhaltung je Pose und Bild. Winkel in Grad: 0 hängt, 90 nach vorn, 180 nach oben. */
+function rig(pose: KieselPose, f: number, moving: boolean): Rig {
+  const i = ((f % 4) + 4) % 4
+  const ph = [0, 1, 0, -1][i]
+  const pick = <T,>(v: readonly T[]) => v[i]
+  switch (pose) {
+    case 'gehen': return { back: ph * 18, front: -ph * 18, lean: 0, legs: 'walk', bob: i % 2 ? -1 : 0 }
+    case 'sitzen': return { back: 8, front: 8, lean: 0, legs: 'sit', bob: 0 }
+    case 'tanzen': return { back: pick([150, 165, 25, 125]), front: pick([25, 165, 150, 125]), lean: pick([-7, 0, 7, 0]), legs: 'walk', bob: pick([0, -2.5, 0, -2.5]), face: 'freundlich' }
+    case 'tragen': return { back: moving ? ph * 16 : 0, front: 78, lean: 0, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, tool: 'tablett' }
+    case 'polieren': return { back: 52, front: pick([62, 74, 62, 50]), lean: 2, legs: 'stand', bob: 0, tool: 'glas' }
+    case 'wischen': return { back: pick([32, 46, 32, 18]), front: pick([38, 54, 38, 22]), lean: 5, legs: 'stand', bob: 0, tool: 'mopp' }
+    case 'haemmern': return { back: 20, front: pick([155, 110, 55, 110]), lean: pick([-3, 0, 6, 0]), legs: 'stand', bob: 0, tool: 'hammer' }
+    case 'hacken': return { back: pick([168, 120, 42, 120]), front: pick([168, 120, 42, 120]), lean: pick([-5, 0, 9, 0]), legs: 'wide', bob: pick([0, 0, 1, 0]), tool: 'axt' }
+    case 'schaufeln': return { back: pick([38, 70, 115, 70]), front: pick([45, 76, 120, 76]), lean: pick([12, 6, -3, 6]), legs: 'wide', bob: 0, tool: 'schaufel' }
+    case 'schubsen': return { back: pick([70, 92, 92, 60]), front: pick([70, 92, 92, 60]), lean: pick([4, 14, 12, 2]), legs: 'wide', bob: 0, face: 'wuetend' }
+    case 'hinfallen': return { back: pick([30, 70, 120, 150]), front: pick([40, 90, 140, 160]), lean: pick([-10, -28, -55, -82]), legs: 'wide', bob: pick([0, 2, 5, 8]), face: 'erstaunt' }
+    case 'zuschlagen': return { back: pick([70, 60, 70, 60]), front: pick([-45, 100, 96, 20]), lean: pick([-7, 11, 9, 0]), legs: 'wide', bob: 0, face: 'wuetend' }
+    case 'abwehren': return { back: pick([118, 124, 118, 112]), front: pick([112, 118, 112, 106]), lean: pick([-4, -6, -4, -3]), legs: 'wide', bob: 0, face: 'neutral' }
+    case 'getroffen': return { back: pick([-30, -40, -20, 10]), front: pick([40, 55, 30, 10]), lean: pick([-14, -18, -10, -4]), legs: 'wide', bob: 0, face: 'erstaunt' }
+    case 'liegen': return { back: 170, front: 150, lean: 0, legs: 'stand', bob: 0, face: 'traurig' }
+    default: return { back: 0, front: 0, lean: 0, legs: 'stand', bob: 0 }
+  }
+}
+
+/**
+ * Die Figur als SVG-Inhalt (ohne äußeres <svg>), viewBox 0 0 64 96.
+ * `moving` nur für Posen, die man im Gehen macht (Tablett tragen).
+ */
+export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose = 'stehen', frame = 0, moving = false): string {
   const age = AGES[a.age] ?? AGES.erwachsen
   const w = BUILD[a.build] ?? 1
   const back = dir === 'nw' || dir === 'ne'
@@ -77,9 +143,12 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
   const ell = (cx: number, cy: number, rx: number, ry: number, fill: string, opacity = 1) =>
     out.push(`<ellipse cx="${r1(cx)}" cy="${r1(cy)}" rx="${r1(rx)}" ry="${r1(ry)}" fill="${fill}"${opacity < 1 ? ` opacity="${opacity}"` : ''}/>`)
 
-  const walking = pose === 'gehen', sitting = pose === 'sitzen'
-  const ph = walking ? [0, 1, 0, -1][frame % 4] : 0
-  const bob = walking && frame % 2 === 1 ? -1 : 0
+  const R = rig(pose, frame, moving)
+  const lying = pose === 'liegen'
+  const face: KieselFace = R.face && a.face !== 'traurig' ? R.face : (lying ? 'traurig' : a.face)
+  const sitting = R.legs === 'sit'
+  const ph = R.legs === 'walk' ? [0, 1, 0, -1][((frame % 4) + 4) % 4] : R.legs === 'wide' ? 1 : 0
+  const bob = R.bob
   const ground = 90
   const legH = (sitting ? 9 : 20) * S, torsoH = 22 * S, headR = 11 * S * H
   const hipY = ground - (sitting ? 10 : 0) - legH + bob
@@ -91,31 +160,52 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
   let hairC = a.hairColor
   if (age.lines >= 1 && hairC.toLowerCase() !== GREY) hairC = mix(hairC, GREY, age.lines === 1 ? .35 : .7)
 
-  ell(32, ground + 1, 14 * S * w, 4 * S, '#000', .16)
+  if (lying) ell(32, ground - 1, 30 * S, 5 * S, '#000', .16)
+  else ell(32, ground + 1, 14 * S * w, 4 * S, '#000', .16)
+  if (lying) out.push(`<g transform="translate(${r1(12 * S)} ${r1(-2)}) rotate(-86 32 ${ground - 2})">`)
   if (sitting) out.push(`<rect x="${r1(cx - 13 * S)}" y="${r1(hipY + legH - 3)}" width="${r1(26 * S)}" height="12" rx="2" fill="#8b6a4a"/>`)
+  // Was am Boden liegt, woran gearbeitet wird
+  if (!lying && (R.tool === 'hammer' || R.tool === 'axt')) { rect(cx + 15 * S, ground - 7, 12 * S, 7, '#8b6a4a'); if (R.tool === 'axt') ell(cx + 21 * S, ground - 7, 6 * S, 2, '#b08a5e') }
+  if (!lying && R.tool === 'schaufel') ell(cx + 22 * S, ground - 2, 9 * S, 4, '#6b5038')
 
   // Beine
   const legW = 6.5 * S * Math.max(.9, w * .92)
   const legCol = a.robot ? ROBOT.dark : c!.bottom, shoe = a.robot ? ROBOT.dark : c!.shoes
   const legs: Array<[number, number]> = [[-1, -ph], [1, ph]]
-  if (c?.dress) {
-    for (const [s, o] of legs) { rect(cx + s * 4 * S - legW / 2 + o * 2, hipY + legH * .45, legW * .8, legH * .55, a.skin); rect(cx + s * 4 * S - legW / 2 + o * 2 - .5, ground - 3 + bob, legW * .9 + 1, 4, shoe) }
-    const top = hipY - 2, bot = hipY + legH * .62
-    out.push(`<path d="M${r1(cx - torsoW * .46)} ${r1(top)} L${r1(cx + torsoW * .46)} ${r1(top)} L${r1(cx + torsoW * .72)} ${r1(bot)} L${r1(cx - torsoW * .72)} ${r1(bot)} Z" fill="${c.bottom}" stroke-linejoin="round"/>`)
+  if (c?.dress && !sitting) {
+    for (const [s, o] of legs) { rect(cx + s * 4 * S - legW / 2 + o * 2, hipY + legH * .45, legW * .8, legH * .55 - bob, a.skin); rect(cx + s * 4 * S - legW / 2 + o * 2 - .5, ground - 3, legW * .9 + 1, 4, shoe) }
   } else if (sitting) {
     for (const [s] of legs) { const lx = cx + s * 4 * S - legW / 2; rect(lx, hipY, legW, legH, legCol); rect(lx - .5, hipY + legH - 3, legW + 3, 4, shoe) }
   } else {
-    for (const [s, o] of legs) { const lx = cx + s * 4.2 * S - legW / 2 + o * 2.2; rect(lx, hipY, legW, legH - 3 + (o < 0 ? -1 : 0), legCol); rect(lx - .5, ground - 4 + bob + (o < 0 ? -1 : 0), legW + 2.5, 4.5, shoe) }
+    for (const [s, o] of legs) { const lx = cx + s * 4.2 * S - legW / 2 + o * 2.2; rect(lx, hipY, legW, ground - hipY - 3 + (o < 0 ? -1 : 0), legCol); rect(lx - .5, ground - 4 + (o < 0 ? -1 : 0), legW + 2.5, 4.5, shoe) }
   }
 
-  // Rumpf und Arme
+  // Oberkörper neigt sich um die Hüfte
+  out.push(`<g transform="rotate(${r1(R.lean)} ${cx} ${r1(hipY)})">`)
+  if (c?.dress && !sitting) {
+    const top = hipY - 2, bot = hipY + legH * .62
+    out.push(`<path d="M${r1(cx - torsoW * .46)} ${r1(top)} L${r1(cx + torsoW * .46)} ${r1(top)} L${r1(cx + torsoW * .72)} ${r1(bot)} L${r1(cx - torsoW * .72)} ${r1(bot)} Z" fill="${c.bottom}"/>`)
+  }
   const armW = 5.2 * S * Math.max(.9, w * .9), armH = 17 * S
-  const swing = walking ? ph * 2.2 : 0
-  const armY = torsoTop + 2.5 * S
+  const armY = torsoTop + 2.5 * S + armW / 2
   const topCol = a.robot ? ROBOT.metal : c!.top
   const armCol = a.robot ? ROBOT.dark : topCol
-  rect(cx - torsoW / 2 - armW + 1.2, armY + (back ? -swing : swing), armW, armH, armCol)
-  if (!a.robot) ell(cx - torsoW / 2 - armW / 2 + 1.2, armY + (back ? -swing : swing) + armH + 1.5, armW * .55, armW * .55, a.skin)
+  const flip = back && pose === 'gehen' ? -1 : 1
+  const L = armH + 1.5
+  // Werkzeug in der Hand, im Bezug des Arms (Hand bei 0,L)
+  const toolLocal = (t: Rig['tool']): string => {
+    if (t === 'hammer') return `<rect x="-1.2" y="${r1(L - 1)}" width="2.4" height="${r1(11 * S)}" rx="1" fill="#8a6440" transform="rotate(-90 0 ${r1(L)})"/><rect x="${r1(8 * S)}" y="${r1(L - 4.5 * S)}" width="${r1(4 * S)}" height="${r1(9 * S)}" rx="1" fill="#5b6066"/>`
+    if (t === 'axt') return `<rect x="-1.3" y="${r1(L - 2)}" width="2.6" height="${r1(20 * S)}" rx="1" fill="#8a6440"/><path d="M1 ${r1(L + 14 * S)} q${r1(8 * S)} ${r1(1 * S)} ${r1(7 * S)} ${r1(7 * S)} q-${r1(4 * S)} -${r1(1 * S)} -${r1(7 * S)} 0z" fill="#9aa3a8"/>`
+    if (t === 'schaufel') return `<rect x="-1.2" y="${r1(L - 2)}" width="2.4" height="${r1(20 * S)}" rx="1" fill="#8a6440"/><path d="M-4 ${r1(L + 17 * S)} h8 l-1 ${r1(8 * S)} q-3 2 -6 0z" fill="#7d868c"/>`
+    return ''
+  }
+  const arm = (px: number, angle: number, t?: Rig['tool']) => {
+    const handFill = a.robot ? ROBOT.metal : a.skin
+    out.push(`<g transform="translate(${r1(px)} ${r1(armY)}) rotate(${r1(-angle)})"><rect x="${r1(-armW / 2)}" y="${r1(-armW / 2)}" width="${r1(armW)}" height="${r1(armH)}" rx="${r1(armW / 2)}" fill="${armCol}"/>${toolLocal(t)}<ellipse cx="0" cy="${r1(L - armW / 2)}" rx="${r1(armW * .55)}" ry="${r1(armW * .55)}" fill="${handFill}"/></g>`)
+  }
+  const handAt = (px: number, angle: number) => { const rad = angle * Math.PI / 180; return { x: px + Math.sin(rad) * (L - armW / 2), y: armY + Math.cos(rad) * (L - armW / 2) } }
+  const backX = cx - torsoW / 2 - armW / 2 + 1.2, frontX = cx + torsoW / 2 + armW / 2 - 1.2
+  arm(backX, R.back * flip)
   rect(cx - torsoW / 2, torsoTop, torsoW, torsoH + (c?.coat ? 6 * S : 0), topCol)
   if (c && !back) {
     if (c.apron) rect(cx - torsoW * .36, torsoTop + torsoH * .42, torsoW * .72, torsoH * .75, c.apron)
@@ -128,8 +218,16 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
   if (c && back && c.suit) rect(cx - torsoW * .42, torsoTop + 3, torsoW * .84, torsoH * .6, '#b9c0c4')
   if (a.robot && !back) rect(cx - torsoW * .3, torsoTop + torsoH * .3, torsoW * .6, torsoH * .3, '#f1d57a')
   out.push(`<rect x="${r1(cx)}" y="${r1(torsoTop)}" width="${r1(torsoW / 2)}" height="${r1(torsoH)}" rx="${r1(torsoW / 4)}" fill="#000" opacity=".08"/>`)
-  rect(cx + torsoW / 2 - 1.2, armY + (back ? swing : -swing), armW, armH, armCol)
-  if (!a.robot) ell(cx + torsoW / 2 + armW / 2 - 1.2, armY + (back ? swing : -swing) + armH + 1.5, armW * .55, armW * .55, a.skin)
+  // Dinge, die waagerecht bleiben (Tablett, Glas, Mopp), in Weltlage an der Hand
+  const hf = handAt(frontX, R.front * flip), hb = handAt(backX, R.back * flip)
+  if (R.tool === 'mopp') { out.push(`<line x1="${r1(hf.x)}" y1="${r1(hf.y - 3)}" x2="${r1(hf.x + 9 * S)}" y2="${r1(ground - 3 - bob)}" stroke="#8a6440" stroke-width="2.2" stroke-linecap="round"/>`); ell(hf.x + 9 * S, ground - 2 - bob, 6 * S, 2.4, '#d9d4c4') }
+  arm(frontX, R.front * flip, R.tool)
+  if (R.tool === 'tablett') {
+    ell(hf.x + 3, hf.y - 2.5, 8 * S, 2.2, '#b9c0c4'); rect(hf.x - 1, hf.y - 9, 3, 6, '#e8d9a8', .9); rect(hf.x + 4, hf.y - 8, 2.6, 5, '#7a3b2a', .9)
+  }
+  if (R.tool === 'glas') {
+    rect(hb.x - 2.8, hb.y - 9, 5.6, 9, '#cfe8ee', .9); rect(hf.x - 3, hf.y - 3, 6, 4, '#f4f1ea')
+  }
 
   // Kopf
   const hx = cx + (back ? -1 : 1.5), hy = headCy, hr = headR
@@ -137,7 +235,7 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
     out.push(`<line x1="${r1(hx)}" y1="${r1(hy - hr)}" x2="${r1(hx)}" y2="${r1(hy - hr - 5)}" stroke="#9fb5b0" stroke-width="2"/>`)
     ell(hx, hy - hr - 6, 2.2, 2.2, ROBOT.glow)
     out.push(`<rect x="${r1(hx - hr * 1.05)}" y="${r1(hy - hr * .85)}" width="${r1(hr * 2.1)}" height="${r1(hr * 1.7)}" rx="5" fill="${ROBOT.metal}"/>`)
-    if (!back) { out.push(`<rect x="${r1(hx - hr * .75 + 1.5)}" y="${r1(hy - hr * .35)}" width="${r1(hr * 1.5)}" height="${r1(hr * .8)}" rx="3" fill="#163a35"/>`); ell(hx - hr * .3 + 2, hy + .5, 1.8, 1.8, ROBOT.glow); ell(hx + hr * .35 + 2, hy + .5, 1.8, 1.8, ROBOT.glow) }
+    if (!back) { out.push(`<rect x="${r1(hx - hr * .75 + 1.5)}" y="${r1(hy - hr * .35)}" width="${r1(hr * 1.5)}" height="${r1(hr * .8)}" rx="3" fill="#163a35"/>`); ell(hx - hr * .3 + 2, hy + .5, 1.8, 1.8, face === 'wuetend' ? '#e2574c' : ROBOT.glow); ell(hx + hr * .35 + 2, hy + .5, 1.8, 1.8, face === 'wuetend' ? '#e2574c' : ROBOT.glow) }
   } else {
     rect(cx - 2.2 * S, torsoTop - 3 * S, 4.4 * S, 4 * S, shade(a.skin, .06))
     if (a.hair === 'lang') out.push(`<rect x="${r1(hx - hr * 1.02)}" y="${r1(hy - hr * .3)}" width="${r1(hr * 2.04)}" height="${r1(hr * 1.7)}" rx="4" fill="${hairC}"/>`)
@@ -146,10 +244,11 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
     if (!back) {
       const ex = hx + 2.4 * H, ey = hy + .5
       for (const x of [ex - 4.2 * H, ex + 2.6 * H]) out.push(`<ellipse cx="${r1(x)}" cy="${r1(ey)}" rx="1.5" ry="1.9" fill="#1d1714"/><circle cx="${r1(x + .5)}" cy="${r1(ey - .6)}" r=".5" fill="#fff"/>`)
-      ell(ex - 5.5 * H, ey + 4, 2, 1.1, '#e07a6a', .35); ell(ex + 4.2 * H, ey + 4, 2, 1.1, '#e07a6a', .35)
+      if (face === 'wuetend') out.push(`<path d="M${r1(ex - 6 * H)} ${r1(ey - 4.2)} l3.2 1.4 M${r1(ex + 4.4 * H)} ${r1(ey - 4.2)} l-3.2 1.4" stroke="#3a2a22" stroke-width="1.1" stroke-linecap="round"/>`)
+      ell(ex - 5.5 * H, ey + 4, 2, 1.1, '#e07a6a', face === 'wuetend' ? .6 : .35); ell(ex + 4.2 * H, ey + 4, 2, 1.1, '#e07a6a', face === 'wuetend' ? .6 : .35)
       const my = ey + 5 * H, mx = ex - .8
-      const mouth = { freundlich: `M${r1(mx - 3)} ${r1(my)} Q${r1(mx)} ${r1(my + 2.6)} ${r1(mx + 3)} ${r1(my)}`, neutral: `M${r1(mx - 2.4)} ${r1(my + .8)} L${r1(mx + 2.4)} ${r1(my + .8)}`, traurig: `M${r1(mx - 2.6)} ${r1(my + 1.8)} Q${r1(mx)} ${r1(my - .6)} ${r1(mx + 2.6)} ${r1(my + 1.8)}`, erstaunt: '' }[a.face] ?? ''
-      out.push(a.face === 'erstaunt' ? `<ellipse cx="${r1(mx)}" cy="${r1(my + .8)}" rx="1.3" ry="1.6" fill="#6b2a24"/>` : `<path d="${mouth}" fill="none" stroke="#6b2a24" stroke-width="1.3" stroke-linecap="round"/>`)
+      const mouth = { freundlich: `M${r1(mx - 3)} ${r1(my)} Q${r1(mx)} ${r1(my + 2.6)} ${r1(mx + 3)} ${r1(my)}`, neutral: `M${r1(mx - 2.4)} ${r1(my + .8)} L${r1(mx + 2.4)} ${r1(my + .8)}`, traurig: `M${r1(mx - 2.6)} ${r1(my + 1.8)} Q${r1(mx)} ${r1(my - .6)} ${r1(mx + 2.6)} ${r1(my + 1.8)}`, wuetend: `M${r1(mx - 2.6)} ${r1(my + 1.4)} L${r1(mx + 2.6)} ${r1(my + .6)}`, erstaunt: '' }[face] ?? ''
+      out.push(face === 'erstaunt' ? `<ellipse cx="${r1(mx)}" cy="${r1(my + .8)}" rx="1.3" ry="1.6" fill="#6b2a24"/>` : `<path d="${mouth}" fill="none" stroke="#6b2a24" stroke-width="1.3" stroke-linecap="round"/>`)
       const wrinkle = shade(a.skin, .35)
       if (age.lines >= 1) out.push(`<path d="M${r1(ex - 6.5 * H)} ${r1(ey - 3.5)} q1.5 -.8 3 0 M${r1(ex + 1.5 * H)} ${r1(ey - 3.5)} q1.5 -.8 3 0" fill="none" stroke="${wrinkle}" stroke-width=".7"/>`)
       if (age.lines >= 2) out.push(`<path d="M${r1(mx - 5)} ${r1(my - 1)} q-.6 1.4 .3 2.6 M${r1(mx + 5)} ${r1(my - 1)} q.6 1.4 -.3 2.6" fill="none" stroke="${wrinkle}" stroke-width=".7"/>`)
@@ -164,8 +263,15 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
       if (a.hair === 'zopf' && !back) ell(hx - hr * 1.05, hy + hr * .15, hr * .26, hr * .42, hairC)
       if (a.hair === 'lang' && !back) out.push(`<rect x="${r1(hx - hr * 1.06)}" y="${r1(hy - hr * .4)}" width="${r1(hr * .38)}" height="${r1(hr * 1.45)}" rx="2" fill="${hairC}"/>`)
     } else if (age.lines >= 1) rect(hx - hr * 1.04, hy - hr * .15, hr * .3, hr * .55, hairC)
+    if (a.verletzt) out.push(`<g transform="rotate(-24 ${r1(hx + hr * .35)} ${r1(hy - hr * .55)})"><rect x="${r1(hx + hr * .35 - 4.5)}" y="${r1(hy - hr * .55 - 1.6)}" width="9" height="3.2" rx="1" fill="#efd9b4"/><rect x="${r1(hx + hr * .35 - 4.5)}" y="${r1(hy - hr * .55 - .3)}" width="9" height=".6" fill="#c8a77a"/></g>`)
     if (c?.suit) out.push(`<ellipse cx="${r1(hx)}" cy="${r1(hy - .5)}" rx="${r1(hr * 1.32)}" ry="${r1(hr * 1.35)}" fill="#bfe4f2" opacity=".32" stroke="#e7e9ea" stroke-width="2"/>`)
   }
+  out.push('</g>')
+  if (lying) out.push('</g>')
+  // Kampf: kurze Zeichen, wo es trifft; am Boden kreisen Sterne
+  if (pose === 'zuschlagen' && frame % 4 === 1) out.push(`<path d="M${r1(cx + 26 * S)} ${r1(torsoTop - 4)} l3 -4 l1 4 l4 -1 l-3 3 l3 3 l-4 -1 l-1 4 l-2 -4 l-4 1 l3 -3 l-3 -3z" fill="#f1d57a" opacity=".9"/>`)
+  if (pose === 'getroffen' && frame % 4 < 2) out.push(`<path d="M${r1(cx - 20 * S)} ${r1(headCy - 6)} l-5 -2 M${r1(cx - 20 * S)} ${r1(headCy)} l-6 0 M${r1(cx - 20 * S)} ${r1(headCy + 6)} l-5 2" stroke="#f1d57a" stroke-width="1.4" stroke-linecap="round"/>`)
+  if (lying && a.verletzt) for (let i = 0; i < 3; i++) out.push(`<circle cx="${r1(52 * S + 8 + Math.cos(i * 2.1 + frame) * 6)}" cy="${r1(ground - 14 + Math.sin(i * 2.1 + frame) * 2)}" r="1.4" fill="#f1d57a"/>`)
   const body = out.join('')
   return mirror ? `<g transform="translate(64 0) scale(-1 1)">${body}</g>` : body
 }
