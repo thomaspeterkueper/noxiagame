@@ -84,10 +84,24 @@ export function selectConversationLanguage(
   if (!profile?.languages.length) {
     return { profile: null, originalLanguageCode: null, translatedForPlayer: false }
   }
-  const primary = profile.primaryLanguageCode ?? profile.languages[0].languageCode
+
+  // If both parties share the interface language, use it before translating.
+  // This follows NOXIA-LIVING-0014 and avoids inventing a "primary" language
+  // for multilingual people whose biography only proves that they speak several.
+  const shared = profile.languages
+    .filter(language => language.languageCode === playerLanguageCode && language.comprehension >= 0.35 && language.production >= 0.25)
+    .sort((a, b) => b.production - a.production)[0]
+
+  const selected = shared
+    ?? (profile.primaryLanguageCode
+      ? profile.languages.find(language => language.languageCode === profile.primaryLanguageCode)
+      : null)
+    ?? profile.languages.slice().sort((a, b) => b.production - a.production || b.comprehension - a.comprehension)[0]
+
+  const code = selected?.languageCode ?? null
   return {
     profile,
-    originalLanguageCode: primary,
-    translatedForPlayer: primary !== playerLanguageCode,
+    originalLanguageCode: code,
+    translatedForPlayer: Boolean(code && code !== playerLanguageCode),
   }
 }
