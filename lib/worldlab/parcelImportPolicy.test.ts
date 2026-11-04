@@ -21,6 +21,16 @@ describe('Earth parcel import is an initial snapshot, not world truth', () => {
     // A regression to default upsert semantics would overwrite simulated history.
     expect(source).not.toMatch(/\.from\('earth_parcels'\)\.upsert\(rows\.slice\(i, i \+ 300\), \{ onConflict: 'id' \}\)/)
   })
+  it('rejects missing and blank GET coordinates before requesting ALKIS', () => {
+    const source = readFileSync(
+      new URL('../../app/api/world-lab/parcels/route.ts', import.meta.url),
+      'utf8',
+    )
+    expect(source).toContain("latParam === null || lonParam === null")
+    expect(source).toContain("!latParam.trim() || !lonParam.trim()")
+    expect(source.indexOf('!latParam.trim()')).toBeLessThan(source.indexOf('const cell = parcelCell({ lat, lon })'))
+  })
+
   it('rejects missing or nonnumeric POST coordinates before opening the import', () => {
     const source = readFileSync(
       new URL('../../app/api/world-lab/parcels/route.ts', import.meta.url),
