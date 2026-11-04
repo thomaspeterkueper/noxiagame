@@ -95,7 +95,9 @@ function rowsFor(parcels: Found[]) {
 }
 
 export async function GET(req: NextRequest) {
-  const lat = Number(req.nextUrl.searchParams.get('lat')), lon = Number(req.nextUrl.searchParams.get('lon'))
+  const latParam = req.nextUrl.searchParams.get('lat'), lonParam = req.nextUrl.searchParams.get('lon')
+  if (latParam === null || lonParam === null || !latParam.trim() || !lonParam.trim()) return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
+  const lat = Number(latParam), lon = Number(lonParam)
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
   if (req.nextUrl.searchParams.get('dry') !== '1') return NextResponse.json({ error: 'nur dry=1' }, { status: 400 })
   const cell = parcelCell({ lat, lon })
