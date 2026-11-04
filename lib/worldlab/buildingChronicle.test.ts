@@ -53,13 +53,24 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(chronicle.gaps).toEqual([])
   })
 
-  it('Grabstein zählt als autorisierter Abriss, bleibt aber ohne Gebäude-ID als „nicht zugeordnet“ markiert', () => {
+  it('Grabstein bleibt ohne Core-Nachweis unautorisiert und ohne Gebäude-ID nicht zugeordnet', () => {
     const chronicle = buildChronicle({
       events: [], existingEntityIds: new Set(), viewerProfileId: 'p2',
       tombstones: [{ source_ref: 'osm:way/1', profile_id: 'p2', display_name: 'Altes Haus', cleared_at: '2026-10-05T08:00:00Z' }],
     })
-    expect(chronicle.entries[0]).toMatchObject({ kind: 'demolished', authority: 'tombstone', authorized: true, own: true, sourceRef: 'osm:way/1' })
+    expect(chronicle.entries[0]).toMatchObject({ kind: 'demolished', authority: 'tombstone', authorized: false, own: true, sourceRef: 'osm:way/1' })
     expect(chronicle.gaps[0].code).toBe('tombstone_unlinked')
+    const verified = buildChronicle({
+      events: [], existingEntityIds: new Set(), viewerProfileId: 'p2',
+      tombstones: [{ source_ref: 'osm:way/1', profile_id: 'p2', cleared_at: '2026-10-05T08:00:00Z' }],
+      verifiedTombstoneRefs: new Set(['osm:way/1']),
+    })
+    expect(verified.entries[0].authorized).toBe(true)
+    expect(buildChronicle({
+      events: [], existingEntityIds: new Set(), viewerProfileId: 'p2',
+      tombstones: [{ source_ref: 'osm:way/1', profile_id: 'p2', cleared_at: '2026-10-05T08:00:00Z' }],
+      verifiedReceiptIds: new Set(['osm:way/1']),
+    }).entries[0].authorized).toBe(false)
   })
 
   it('Wiedergabe: vor dem Abriss steht das Haus, danach nicht (Schlüssel source_ref)', () => {
