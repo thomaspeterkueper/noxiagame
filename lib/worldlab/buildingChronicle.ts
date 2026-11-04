@@ -192,7 +192,7 @@ export function verifiedBuildingStateAt(
 ): BuildingStateAt {
   let state: BuildingStateAt = 'unknown'
   for (const entry of chronicle.entries) {
-    if (entry.at > at) break
+    if (compareChronicleInstants(entry.at, at) > 0) break
     if (!((key.subjectId && entry.subjectId === key.subjectId) ||
           (key.sourceRef && entry.sourceRef === key.sourceRef))) continue
     if (!entry.authorized) {
