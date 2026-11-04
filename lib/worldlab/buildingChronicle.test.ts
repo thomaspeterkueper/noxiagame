@@ -267,4 +267,40 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
   })
 
+
+  it('ein späterer verifizierter Abriss kann einen früheren Zeitkonflikt auflösen', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+        ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('later-delete', 'entity.deleted', 'b1', '2026-11-04T12:00:01Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete', 'later-delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:00Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('demolished')
+  })
+
+  it('unverifizierte Änderung nach späterem Neubau setzt die Kartenprojektion wieder auf unknown', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+        ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('rebuild', 'entity.created', 'b1', '2026-11-04T12:00:01Z'),
+        ev('unverified-remodel', 'entity.updated', 'b1', '2026-11-04T12:00:02Z'),
+      ],
+      tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete', 'rebuild']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:02Z')).toBe('unknown')
+  })
+
 })
