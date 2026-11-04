@@ -175,7 +175,9 @@ export function buildingStateAt(chronicle: Chronicle, key: { subjectId?: string 
     if (compareChronicleInstants(entry.at, at) > 0) break
     const match = (key.subjectId && entry.subjectId === key.subjectId) || (key.sourceRef && entry.sourceRef === key.sourceRef)
     if (!match) continue
-    state = entry.kind === 'demolished' ? 'demolished' : 'standing'
+    if (entry.kind === 'demolished') state = 'demolished'
+    else if (entry.kind === 'built') state = 'standing'
+    else if (state !== 'standing') state = 'unknown'
   }
   return state
 }
