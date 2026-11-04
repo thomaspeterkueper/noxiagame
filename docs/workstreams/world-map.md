@@ -648,3 +648,15 @@ Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
 
 **Offen für euch:** Wer mit einer Begleitung ein reales Lokal betritt, nimmt sie bisher nicht mit hinein. `landmarkInside` kennt keine `companionId` wie `inside`. Wenn ihr sie mitgebt, reiche ich sie samt Gespräch (`companionHistory`) durch.
 
+## Fix 04.11.2026: Reisebüro – „Buchung fehlgeschlagen“ (Gastronomie, auf Bitte von Thomas)
+
+- **Ursache:** Im Datenbank-Protokoll stand „permission denied for function noxia_book_earth_trip“ und „… for table earth_trips“. Die Server-Wege arbeiten als `service_role`, und neue Tabellen und Funktionen bekamen in diesem Projekt keine Rechte dafür.
+- **Ebenso betroffen:**
+  - bezahlte Schichten und echte Lokale der Gastronomie;
+  - Forschungsproben, Ausrüstung, Übungen, Wartung, `colony_treasury`, `person_health` u. a.
+- **Fix:** Migration `20261104140000_service_role_grants.sql`, live.
+  - Rechte für `service_role` auf alle Tabellen, Sequenzen und Funktionen in `public`, dazu als Standard für neue Objekte.
+  - `anon` und `authenticated` bekommen nichts.
+- **Geprüft** als `service_role`: Reise Sundern → Menden gebucht (Probe, zurückgerollt), Schichtstand lesbar.
+- **Für alle Teilprojekte:** Wer in einer Migration `revoke … from public` schreibt, entzieht damit auch `service_role` das Ausführen. Seit dem neuen Standard bleibt das Recht erhalten. Tests nur als `postgres` übersehen diesen Fehler – bitte auch als `service_role` prüfen (`set role service_role`).
+
