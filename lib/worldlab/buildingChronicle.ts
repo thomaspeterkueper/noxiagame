@@ -12,7 +12,7 @@
 // lässt sich deshalb nicht sicher einem Ereignis zuordnen (Request an Core in
 // docs/workstreams/world-map.md).
 
-import { compareChronicleInstants } from './buildingChronicleReadGuard'
+import { compareChronicleInstants } from './buildingChronicleReadGuard.ts'
 
 export type ChronicleKind = 'built' | 'changed' | 'remodeled' | 'repurposed' | 'owner_changed' | 'demolished'
 export type ChronicleAuthority = 'event' | 'tombstone'
