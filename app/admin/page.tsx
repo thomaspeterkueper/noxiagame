@@ -7,6 +7,7 @@ import { getSessionInfo } from '@/lib/supabase/auth'
 type Player = {
   id: string
   username: string
+  credits: number
   created_at: string | null
   last_session_at: string | null
   last_seen_at: string | null
@@ -46,6 +47,12 @@ export default function AdminPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [filter, setFilter] = useState('')
+  const [recipient, setRecipient] = useState<Player | null>(null)
+  const [amount, setAmount] = useState(100)
+  const [reason, setReason] = useState('Testguthaben für Spieltest')
+  const [grantError, setGrantError] = useState('')
+  const [grantSuccess, setGrantSuccess] = useState('')
+  const [grantBusy, setGrantBusy] = useState(false)
   const load = useCallback(async () => {
     setBusy(true)
     try {
@@ -61,6 +68,27 @@ export default function AdminPage() {
     } finally { setBusy(false) }
   }, [])
   useEffect(() => { void load() }, [load])
+  async function grantCredits() {
+    if (!recipient || grantBusy) return
+    setGrantError('')
+    setGrantSuccess('')
+    setGrantBusy(true)
+    try {
+      const { token } = await getSessionInfo()
+      if (!token) throw new Error('Spielanmeldung fehlt')
+      const response = await fetch('/api/admin/credits', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: recipient.id, amount, reason, requestId: crypto.randomUUID() }),
+      })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(String(json.error ?? 'Vergabe fehlgeschlagen'))
+      setGrantSuccess('Test-Credits für ' + recipient.username + ' gebucht und protokolliert.')
+      setRecipient(null)
+      await load()
+    } catch (e) { setGrantError(String(e)) }
+    finally { setGrantBusy(false) }
+  }
   const players = (data?.players ?? []).filter(p => p.username.toLowerCase().includes(filter.toLowerCase()))
   const online = (s: string | null) => Boolean(s && Date.now() - Date.parse(s) >= 0 && Date.now() - Date.parse(s) < 120000)
 
@@ -99,14 +127,31 @@ export default function AdminPage() {
               onChange={e => setFilter(e.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
           </div>
           <div className="overflow-x-auto"><table className="w-full text-left text-sm">
-            <thead><tr className="border-b text-[#63737a]"><th className="py-2">Spieler</th><th>Letzter Heartbeat</th><th>Letzte Spielsitzung</th><th>Sitzungen</th><th>Aktionen</th><th>Status</th></tr></thead>
+            <thead><tr className="border-b text-[#63737a]"><th className="py-2">Spieler</th><th>Letzter Heartbeat</th><th>Letzte Spielsitzung</th><th>Credits</th><th>Sitzungen</th><th>Aktionen</th><th>Status</th><th>Testguthaben</th></tr></thead>
             <tbody>{players.map(p => <tr className="border-b border-[#eee9df]" key={p.id}>
               <td className="py-3 font-medium">{p.username}{p.is_admin ? ' · Admin' : ''}</td>
-              <td>{time(p.last_seen_at)}</td><td>{time(p.last_session_at)}</td><td>{p.sessions}</td><td>{p.actions}</td>
+              <td>{time(p.last_seen_at)}</td><td>{time(p.last_session_at)}</td><td className="tabular-nums">{p.credits}</td><td>{p.sessions}</td><td>{p.actions}</td>
               <td>{online(p.last_seen_at) ? 'Online' : 'Offline / unbekannt'}</td>
+              <td>{!p.is_admin && <button type="button" onClick={() => { setRecipient(p); setGrantError(''); setGrantSuccess('') }} className="rounded border px-2 py-1 text-xs">Credits geben</button>}</td>
             </tr>)}</tbody>
           </table></div>
           {players.length === 0 && <p className="py-3 text-sm text-[#63737a]">Keine passenden Spieler.</p>}
+          {grantSuccess && <p role="status" className="mt-3 text-sm text-[#20613b]">{grantSuccess}</p>}
+          {grantError && <p role="alert" className="mt-3 text-sm text-red-800">{grantError}</p>}
+          {recipient && <form className="mt-4 rounded-lg border bg-[#f6f4ee] p-4" onSubmit={e => { e.preventDefault(); void grantCredits() }}>
+            <h3 className="font-semibold">Test-Credits für {recipient.username}</h3>
+            <p className="mt-1 text-xs text-[#63737a]">Aktueller Stand: {recipient.credits} Credits. Jede Vergabe wird protokolliert; keine Selbstzuweisungen.</p>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="text-sm">Betrag (1–5000)
+                <input type="number" min="1" max="5000" required value={amount} onChange={e=>setAmount(Number(e.target.value))} className="mt-1 block w-32 rounded border p-2"/>
+              </label>
+              <label className="min-w-52 flex-1 text-sm">Grund
+                <input required minLength={5} maxLength={200} value={reason} onChange={e=>setReason(e.target.value)} className="mt-1 block w-full rounded border p-2"/>
+              </label>
+              <button disabled={grantBusy || reason.trim().length < 5 || amount < 1 || amount > 5000} type="submit" className="rounded bg-[#1f4f54] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{grantBusy?'Bucht …':'Verbindlich gutschreiben'}</button>
+              <button type="button" onClick={()=>setRecipient(null)} className="rounded border px-3 py-2 text-sm">Abbrechen</button>
+            </div>
+          </form>}
         </section>
       </>}
       <section>

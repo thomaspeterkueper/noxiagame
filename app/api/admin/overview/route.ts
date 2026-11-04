@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 type Player = {
   id: string
   username: string
+  credits: number
   created_at: string | null
   last_seen_at: string | null
   last_session_at: string | null
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [profilesResult, sessionsResult, adminResult] = await Promise.all([
-    db.from('profiles').select('id,username,created_at,last_seen_at').limit(1000),
+    db.from('profiles').select('id,username,credits,created_at,last_seen_at').limit(1000),
     db.from('player_sessions').select('player_profile_id,last_at,actions').order('last_at', { ascending: false }).limit(5000),
     db.from('admin_profiles').select('profile_id'),
   ])
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
 
   const authById = new Map(authUsers.map(u => [u.id, u]))
   const players: Player[] = (profilesResult.data ?? []).map(p => ({
-    id: p.id, username: p.username || 'Unbenannt',
+    id: p.id, username: p.username || 'Unbenannt', credits: Number(p.credits ?? 0),
     created_at: authById.get(p.id)?.created_at ?? p.created_at ?? null,
     last_seen_at: p.last_seen_at ?? null,
     last_session_at: activity.get(p.id)?.last ?? null,
