@@ -131,6 +131,38 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(chronicle.entries[0].authorized).toBe(false)
   })
 
+  it('sortiert Ereignisse nach absoluten Zeitpunkten statt Zeitzonen-Text', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('created', 'entity.created', 'b1', '2026-11-03T01:00:00+02:00'),
+        ev('removed', 'entity.deleted', 'b1', '2026-11-03T00:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['created', 'removed']),
+    })
+    expect(chronicle.entries.map(entry => entry.sourceId)).toEqual(['created', 'removed'])
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T01:30:00+02:00')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T00:30:00Z')).toBe('demolished')
+  })
+
+  it('bewahrt Mikrosekunden-Reihenfolge beim Umbau vor Abriss', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('removed', 'entity.deleted', 'b1', '2026-11-03T00:00:00.123456Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('created', 'entity.created', 'b1', '2026-11-03T00:00:00.123455Z'),
+      ],
+      tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['created', 'removed']),
+    })
+    expect(chronicle.entries.map(entry => entry.sourceId)).toEqual(['created', 'removed'])
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T00:00:00.123455Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T00:00:00.123456Z')).toBe('demolished')
+  })
+
   it('ein verifizierter Umbau belebt ein abgerissenes Haus nicht wieder', () => {
     const events = [
       ev('build', 'entity.created', 'b1', '2026-10-01T10:00:00Z'),
