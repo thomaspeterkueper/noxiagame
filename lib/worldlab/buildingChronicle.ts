@@ -190,6 +190,10 @@ export function verifiedBuildingStateAt(
   key: { subjectId?: string | null; sourceRef?: string | null },
   at: string,
 ): BuildingStateAt {
+  // A caller must identify exactly one building identity namespace.
+  // Combining a parcel/source reference with an unrelated entity ID could
+  // otherwise project another building's verified state onto this one.
+  if (Boolean(key.subjectId) === Boolean(key.sourceRef)) return 'unknown'
   let state: BuildingStateAt = 'unknown'
   let previousInstant: string | null = null
   let seenCreationAtInstant = false
