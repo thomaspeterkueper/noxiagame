@@ -236,4 +236,35 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:02Z')).toBe('standing')
   })
 
+  it('Konflikte anderer Gebäude beeinflussen eine verifizierte Gebäudehistorie nicht', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('a-create', 'entity.created', 'a', '2026-11-04T12:00:00Z'),
+        ev('b-create', 'entity.created', 'b', '2026-11-04T12:00:00Z'),
+        ev('b-delete', 'entity.deleted', 'b', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set(['a']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['a-create', 'b-create', 'b-delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'a' }, '2026-11-04T12:00:01Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
+  it('eine spätere unverifizierte Neugründung löst einen Zeitkonflikt nicht auf', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+        ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('rebuild', 'entity.created', 'b1', '2026-11-04T12:00:01Z'),
+      ],
+      tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
 })
