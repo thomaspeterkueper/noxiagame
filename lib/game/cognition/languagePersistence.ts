@@ -48,9 +48,10 @@ export function languageProfileFromRows(personId: string, rows: PersistedLanguag
         || a.competence.languageCode.localeCompare(b.competence.languageCode),
     )
   if (!valid.length) return null
+  const native = valid.filter(entry => entry.row.is_native)
   return {
     personId,
-    primaryLanguageCode: valid[0].competence.languageCode,
+    primaryLanguageCode: native.length === 1 ? native[0].competence.languageCode : null,
     languages: valid.map(entry => entry.competence),
   }
 }
