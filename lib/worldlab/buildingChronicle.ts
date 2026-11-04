@@ -95,6 +95,8 @@ export function buildChronicle(input: {
   viewerProfileId: string | null
   /** Core-verified receipt IDs, supplied by a trusted server-side verifier only. */
   verifiedReceiptIds?: ReadonlySet<string>
+  /** Core-verified tombstone source refs, never supplied by an untrusted caller. */
+  verifiedTombstoneRefs?: ReadonlySet<string>
 }): Chronicle {
   const entries: ChronicleEntry[] = []
   const demolishedSubjects = new Set<string>()
@@ -141,7 +143,7 @@ export function buildChronicle(input: {
       id: 'tombstone:' + stone.source_ref, kind: 'demolished', at: stone.cleared_at, authority: 'tombstone', sourceId: stone.source_ref,
       subjectId: null, sourceRef: stone.source_ref,
       own: stone.profile_id && input.viewerProfileId ? stone.profile_id === input.viewerProfileId : null,
-      authorized: true,
+      authorized: input.verifiedTombstoneRefs?.has(stone.source_ref) === true,
       detail: stone.display_name ? { name: stone.display_name } : {},
     })
   }
