@@ -39,13 +39,7 @@ alter table public.location_languages enable row level security;
 
 revoke all on public.person_languages from anon, authenticated;
 revoke all on public.location_languages from anon, authenticated;
-grant select on public.person_languages, public.location_languages to authenticated;
 grant select, insert, update, delete on public.person_languages, public.location_languages to service_role;
 
-drop policy if exists person_languages_authenticated_read on public.person_languages;
-create policy person_languages_authenticated_read
-  on public.person_languages for select to authenticated using (true);
-
-drop policy if exists location_languages_authenticated_read on public.location_languages;
-create policy location_languages_authenticated_read
-  on public.location_languages for select to authenticated using (true);
+-- No browser policies in v0.1. Language data is read by server-side game APIs
+-- using service_role and projected to clients only as needed.
