@@ -200,4 +200,22 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
   })
 
+  it('fail-closed: gleichzeitiger Neubau und Abriss bleiben trotz dazwischenliegendem Umbau widersprüchlich', () => {
+    const events = [
+      ev('a-create', 'entity.created', 'b1', '2026-11-04T12:00:00.123456Z'),
+      ev('m-remodel', 'entity.updated', 'b1', '2026-11-04T12:00:00.123456Z', {
+        effects: [{ from: { building_levels: 1 }, to: { building_levels: 2 } }],
+      }),
+      ev('z-delete', 'entity.deleted', 'b1', '2026-11-04T13:00:00.123456+01:00', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['a-create', 'm-remodel', 'z-delete']),
+    })
+    expect(chronicle.entries.map(entry => entry.sourceId)).toEqual(['a-create', 'm-remodel', 'z-delete'])
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
 })
