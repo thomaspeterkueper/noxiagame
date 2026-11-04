@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
     const { parcels, sample, errors } = await fetchCell(cell)
     return NextResponse.json({ cell, services: services.map(service => service.key), errors, url: parcelRequestUrl(cell, 0, 1000, services[0]), count: parcels.length, first: parcels[0] ? { id: parcels[0].id, label: parcelLabel(parcels[0].props), usage: parcelUsage(parcels[0].props), points: parcels[0].ring.length, keys: Object.keys(parcels[0].props) } : null, sample: parcels.length ? undefined : sample })
   } catch (error) {
-    return NextResponse.json({ cell, error: error instanceof Error ? error.message : String(error) })
+    return NextResponse.json({ cell, error: 'Katasterabfrage fehlgeschlagen.' }, { status: 503 })
   }
 }
 
