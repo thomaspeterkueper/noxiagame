@@ -69,12 +69,13 @@ export async function GET(req: NextRequest) {
   const now = Date.now()
   const recent = (p: Player, minutes: number) => Boolean(p.last_session_at && now - Date.parse(p.last_session_at) >= 0 && now - Date.parse(p.last_session_at) < minutes * 60000)
   const counted = players.filter(p => !p.is_admin)
+  const online = (p: Player) => Boolean(p.last_seen_at && now - Date.parse(p.last_seen_at) >= 0 && now - Date.parse(p.last_seen_at) < 120000)
   const signups = (days: number) => authUsers.filter(u => now - Date.parse(u.created_at) >= 0 && now - Date.parse(u.created_at) < days * 86400000).length
   players.sort((a, b) => (b.last_session_at ?? '').localeCompare(a.last_session_at ?? ''))
 
   return NextResponse.json({
     observed_at: new Date(now).toISOString(),
-    definition: 'Aktiv = letzte aufgezeichnete Spielsitzungsaktualisierung innerhalb von 5 Minuten; keine garantierte Live-Verbindung.',
+    definition: 'Online (2 Min.) = sichtbares Spiel-Dashboard mit aktuellem Heartbeat; Sitzungsaktivität wird separat gezählt. Keine garantierte Socket-Verbindung.',
     complete: complete && (profilesResult.data?.length ?? 0) < 1000 && (sessionsResult.data?.length ?? 0) < 5000,
     metrics: {
       registered_accounts: authUsers.length,
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
       registrations_24h: signups(1),
       registrations_7d: signups(7),
       registrations_30d: signups(30),
+      online_2m: counted.filter(online).length,
       active_5m: counted.filter(p => recent(p, 5)).length,
       active_24h: counted.filter(p => recent(p, 1440)).length,
       active_7d: counted.filter(p => recent(p, 10080)).length,
