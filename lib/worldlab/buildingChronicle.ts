@@ -43,7 +43,7 @@ export type ChronicleEntry = {
   sourceRef: string | null
   /** Gehört der Beleg dem Betrachter? null, wenn unbekannt. */
   own: boolean | null
-  /** Beleg mit geprüfter Berechtigung (Grabstein, Abriss mit Akteur); sonst nur protokolliert. */
+  /** True only when a trusted Core-side verifier explicitly attests this receipt. */
   authorized: boolean
   detail: Record<string, unknown>
 }
@@ -93,6 +93,8 @@ export function buildChronicle(input: {
   /** Gebäude-IDs, die in tile_entities noch existieren. */
   existingEntityIds: ReadonlySet<string>
   viewerProfileId: string | null
+  /** Core-verified receipt IDs, supplied by a trusted server-side verifier only. */
+  verifiedReceiptIds?: ReadonlySet<string>
 }): Chronicle {
   const entries: ChronicleEntry[] = []
   const demolishedSubjects = new Set<string>()
@@ -102,7 +104,8 @@ export function buildChronicle(input: {
     if (!EVENT_TYPES.has(event.event_type) || !event.subject_id) continue
     const metadata = asRecord(event.metadata)
     let kind: ChronicleKind
-    let authorized = true
+    // Actor IDs, metadata and persistence alone do not prove authorization.
+    let authorized = input.verifiedReceiptIds?.has(event.id) === true
     const detail: Record<string, unknown> = {}
     if (event.event_type === 'entity.created') {
       kind = 'built'
@@ -115,7 +118,7 @@ export function buildChronicle(input: {
       const deletionKind = typeof metadata.deletion_kind === 'string' ? metadata.deletion_kind : 'unspecified'
       detail.deletionKind = deletionKind
       // Eine allgemeine Löschung beweist weder Eigentum noch Abrissrecht (PR #555).
-      authorized = deletionKind !== 'unspecified' && Boolean(event.actor_id)
+      authorized = authorized && deletionKind !== 'unspecified' && Boolean(event.actor_id)
     } else {
       const change = changedFields(event.effects)
       kind = change.owner ? 'owner_changed' : change.fields.some(field => REMODEL_FIELDS.has(field)) ? 'remodeled' : change.fields.some(field => USE_FIELDS.has(field)) ? 'repurposed' : 'changed'
