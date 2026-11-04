@@ -902,3 +902,27 @@ Thomas, 04.11.2026: „Da wir aktuell mit Ably max. 5 gleichzeitig haben können
 2. **Zum Schulpilot:** Gibt es Hinweise, dass ein Minderjähriger angesprochen wird, gehört das ganz nach oben, mit Vorschlag zum Eingreifen (Sperren, Raum schließen).
 3. Datenschutz in der Auswertung wie in R-22: zusammenfassen, keine persönlichen Angaben zitieren.
 
+### R-31 (Gastronomie, 04.11.2026): Aussehen für alle – Altersgruppen und Kleidung
+
+Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „gleicher Winkel wie unsere Karte, einfach strukturiert“. Aus drei Entwürfen (Figurenwerkstatt, Artefakt) gewählt: **„Kiesel wirkt am angenehmsten.“**
+
+**Der Stil:** eiförmiger Kopf, runde Körper ohne Umriss, leichte Schatten; eigene Formen, keine Nachbildung bekannter Spielfiguren.
+- Gezeichnet aus Werten: Alter, Statur, Haut, Haare, Bart, Kleidung, Ausdruck, Mensch oder Roboter.
+- Vier Blickrichtungen; Stehen, Gehen (vier Schritte), Sitzen.
+- `lib/figures/kiesel.ts` (`kieselSVG`, `kieselLookFor`, `kieselDirFrom`), getestet; `lib/figures/KieselFigure.tsx`.
+- Seit 04.11.2026 in allen Innenräumen des Lokal-Motors, für Bewohner, Spieler und Mitspieler.
+
+**Befund (04.11.2026):**
+- Von 65 Bewohnern haben 42 einen Eintrag in `person_appearance`. Die übrigen 23 werden aus der Kennung erzeugt und können auf Karte und im Lokal verschieden aussehen.
+- Alle 42 sind `adult`.
+- `clothing_profile` ist bei 41 leer.
+- Die Auswahl ist schmal: 5 Frisuren, 6 Hauttöne.
+
+**Bitte:**
+1. Ein Aussehen für alle Bewohner, auch für neue (Zuzug, Geburt, R-24).
+2. **Altersgruppen** aus dem Geburtsjahr: `child`, `teen`, `young_adult`, `adult`, `older`, neu `elder` ab etwa 75. Mit dem Alter ändert sich das Aussehen; graue Haare und Falten zeichnet Kiesel von selbst.
+3. **Kleidung** als eigene, wechselbare Schicht (NOXIA-LIVING, „Clothing next“): `clothing_profile` mit `work` (cafe, bar, restaurant, science, engineer, space …), `style` und `occasion` (Gottesdienst, Feier, Beerdigung).
+   - Kiesel kennt heute: Alltag, Café-Schürze, Barkeeper, Druckanzug, Festkleidung, Kleid, Overall, Kittel. Wünsche für mehr gern als Request an die Gastronomie.
+4. Mehr Vielfalt bei Frisuren und Haarfarben. Kiesel versteht `short`, `long`, `curly`, `braided`, `bun`, `shaved`; Haarfarben `dark`, `brown`, `light`, `red`, `grey`, `white`.
+5. **Roboter** mit `isRobot: true` (R-26); Kiesel zeichnet sie als Roboter.
+

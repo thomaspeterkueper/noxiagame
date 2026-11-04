@@ -684,3 +684,20 @@ Thomas, 04.11.2026: „Andere Spieler sollten gleichzeitig in der gleichen Welt,
 
 **Nicht geprüft:** echte Realtime-Verbindung von zwei Browsern. Die Testumgebung lässt keine Websockets zu Supabase durch. Geprüft sind die Darstellung mit nachgestellter Anwesenheit und die Buchung.
 
+### W-17 (Gastronomie, 04.11.2026): Kiesel-Figuren auf der Karte
+
+Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „gleicher Winkel wie unsere Karte, einfach strukturiert“. Aus drei Entwürfen (Figurenwerkstatt, Artefakt) gewählt: **„Kiesel wirkt am angenehmsten.“**
+
+**Der Stil:** eiförmiger Kopf, runde Körper ohne Umriss, leichte Schatten; eigene Formen, keine Nachbildung bekannter Spielfiguren.
+- Gezeichnet aus Werten: Alter, Statur, Haut, Haare, Bart, Kleidung, Ausdruck, Mensch oder Roboter.
+- Vier Blickrichtungen; Stehen, Gehen (vier Schritte), Sitzen.
+- `lib/figures/kiesel.ts` (`kieselSVG`, `kieselLookFor`, `kieselDirFrom`), getestet; `lib/figures/KieselFigure.tsx`.
+- Seit 04.11.2026 in allen Innenräumen des Lokal-Motors, für Bewohner, Spieler und Mitspieler.
+
+**Bitte:**
+1. Personen, Spieler und Mitspieler (W-16) auf der Karte als Kiesel zeichnen.
+   - Vorschlag: `kieselSVG(look, dir, 'gehen', frame)` einmal je Aussehen, Richtung und Schritt als Bild (PixiJS-Textur) rechnen und zwischenspeichern.
+   - In der Probebühne der Figurenwerkstatt liefen 50 Figuren so flüssig; 500 bitte auf echten Geräten messen.
+2. Die Richtung kommt aus der Bewegung auf dem Bildschirm (`kieselDirFrom`), die Kleidung aus `kieselLookFor(person, arbeit)`.
+3. Das bisherige `NpcFigure` (`lib/grid/NpcVisual.tsx`) bleibt, bis die Karte umgestellt ist.
+

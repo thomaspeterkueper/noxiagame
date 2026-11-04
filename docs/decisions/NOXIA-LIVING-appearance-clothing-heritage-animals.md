@@ -63,3 +63,11 @@ Animals should use their own persistent entity model with:
 - optional work/service role
 
 This supports pets, livestock, service animals, research animals and later non-Earth fauna through the same living-world principles.
+
+## Style decision (Thomas, 04.11.2026): „Kiesel"
+
+Of three drafts (Bauklotz, Kiesel, Pixel; isometric 2:1 like the world map), Kiesel was chosen: egg-shaped head, rounded bodies without outline, soft shading. It is an original style, not a copy of known toy figures.
+- Figures are generated from parameters (age, build, skin, hair, beard, clothing, expression, human or robot), in four directions, standing, walking and sitting.
+- Implementation: `lib/figures/kiesel.ts`, `lib/figures/KieselFigure.tsx`. Used in all interiors of the venue engine since 04.11.2026.
+- World map: W-17. Appearance data for everyone, age bands and clothing: R-31.
+

@@ -156,6 +156,11 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Protokolliert werden Kommen, Gehen, Gesten und Meldungen (`player_room_log`). Zustellung über Ably, gesendet nur über den Server.
   - Tests in `roomChat.test.ts`; im Browser mit nachgestellten Mitspielern geprüft. Auswertung: R-30.
 
+- **04.11.2026 – Kiesel-Figuren:**
+  - Thomas wählt aus drei Entwürfen (Figurenwerkstatt) den Stil „Kiesel“.
+  - Generator `lib/figures/kiesel.ts` mit Tests. Alle Innenräume zeichnen Bewohner, Spieler und Mitspieler jetzt als Kiesel, mit Blickrichtung aus der Bewegung, Gehen, Sitzen und Kleidung nach Arbeit (Schürze im Café, Weste an der Bar).
+  - Im Browser geprüft. Karte: W-17; Aussehen für alle, Alter und Kleidung: R-31.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -174,6 +179,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **W-17** (04.11.2026): Kiesel-Figuren auf der Karte – `world-map.md`.
+- **R-31** (04.11.2026): Aussehen für alle – Altersgruppen und Kleidung – `population-economy.md`.
 - **R-30** (04.11.2026): Spieler unter sich – Raum-Chat und Kommen/Gehen in die tägliche Auswertung – `population-economy.md`.
 - **W-16** (04.11.2026): Andere Spieler auf der Karte, im Auto und an Bord – `world-map.md`.
 - **R-29** (04.11.2026): Credits untereinander – Bewohner zahlen Spielern; Trinkgeld entfällt – `population-economy.md`.
