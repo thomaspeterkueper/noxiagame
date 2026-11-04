@@ -16,7 +16,7 @@ export function useSpeech() {
     return () => { clearTimeout(timer); stopSpeaking() }
   }, [])
   const setEnabled = useCallback((on: boolean) => { ref.current = on; setEnabledState(on); saveSpeechEnabled(on); if (!on) stopSpeaking() }, [])
-  const speak = useCallback((text: string, voiceKey: string) => { if (ref.current) browserSpeak(text, voiceKey) }, [])
+  const speak = useCallback((text: string, voiceKey: string, languageTag = 'de-DE') => { if (ref.current) browserSpeak(text, voiceKey, 0.95, languageTag) }, [])
   return { enabled, supported, setEnabled, speak, stop: stopSpeaking }
 }
 
