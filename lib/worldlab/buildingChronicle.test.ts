@@ -1,11 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { buildChronicle, buildingStateAt, type ChronicleEventRow } from './buildingChronicle'
+import { buildChronicle, buildingStateAt, verifiedBuildingStateAt, type ChronicleEventRow } from './buildingChronicle'
 
 const ev = (id: string, type: string, subject: string, at: string, extra: Partial<ChronicleEventRow> = {}): ChronicleEventRow => ({
   id, event_type: type, subject_id: subject, actor_id: null, occurred_at: at, effects: [], metadata: {}, ...extra,
 })
 
 describe('Gebäudechronik (Eventstore-Reader)', () => {
+
+  it('verwendet für Karten-Overlays ausschließlich Core-verifizierte Belege', () => {
+    const base = {
+      events: [
+        ev('build', 'entity.created', 'b1', '2026-10-01T10:00:00Z'),
+        ev('remodel', 'entity.updated', 'b1', '2026-10-02T10:00:00Z', {
+          effects: [{ from: { building_levels: 1 }, to: { building_levels: 2 } }],
+        }),
+        ev('remove', 'entity.deleted', 'b1', '2026-10-03T10:00:00Z', {
+          actor_id: 'p1', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set<string>(), viewerProfileId: 'p1',
+    }
+    const unverified = buildChronicle(base)
+    expect(buildingStateAt(unverified, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('demolished')
+    expect(verifiedBuildingStateAt(unverified, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('unknown')
+    const partial = buildChronicle({ ...base, verifiedReceiptIds: new Set(['build', 'remodel']) })
+    expect(verifiedBuildingStateAt(partial, { subjectId: 'b1' }, '2026-10-01T11:00:00Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(partial, { subjectId: 'b1' }, '2026-10-02T11:00:00Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(partial, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('unknown')
+    const verified = buildChronicle({ ...base, verifiedReceiptIds: new Set(['build', 'remodel', 'remove']) })
+    expect(verifiedBuildingStateAt(verified, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('demolished')
+  })
+
+  it('unverifizierte Grabsteine dürfen den Kartenstatus nicht festlegen', () => {
+    const base = { events: [], existingEntityIds: new Set<string>(), viewerProfileId: null,
+      tombstones: [{ source_ref: 'osm:way/2', profile_id: null, cleared_at: '2026-10-05T08:00:00Z' }] }
+    expect(verifiedBuildingStateAt(buildChronicle(base), { sourceRef: 'osm:way/2' }, '2026-10-06T00:00:00Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(buildChronicle({ ...base, verifiedTombstoneRefs: new Set(['osm:way/2']) }),
+      { sourceRef: 'osm:way/2' }, '2026-10-06T00:00:00Z')).toBe('demolished')
+  })
+
   it('ordnet Bau, Änderung, Eigentümerwechsel und Abriss nach Zeit', () => {
     const chronicle = buildChronicle({
       events: [
