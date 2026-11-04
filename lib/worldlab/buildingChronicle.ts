@@ -192,20 +192,22 @@ export function verifiedBuildingStateAt(
 ): BuildingStateAt {
   let state: BuildingStateAt = 'unknown'
   let previousInstant: string | null = null
-  let previousKind: ChronicleKind | null = null
+  let seenCreationAtInstant = false
+  let seenDemolitionAtInstant = false
   for (const entry of chronicle.entries) {
     if (compareChronicleInstants(entry.at, at) > 0) break
     if (!((key.subjectId && entry.subjectId === key.subjectId) ||
           (key.sourceRef && entry.sourceRef === key.sourceRef))) continue
-    // No persisted sequence number exists for equal-time receipts. In particular,
-    // creation and demolition at the same instant must not depend on lexical IDs.
-    if (previousInstant !== null && compareChronicleInstants(previousInstant, entry.at) === 0 &&
-        ((previousKind === 'built' && entry.kind === 'demolished') ||
-         (previousKind === 'demolished' && entry.kind === 'built'))) {
-      return 'unknown'
+    // Inspect the entire equal-time group, including intervening updates.
+    // A lexical event-ID order is not a committed Core execution sequence.
+    if (previousInstant === null || compareChronicleInstants(previousInstant, entry.at) !== 0) {
+      seenCreationAtInstant = false
+      seenDemolitionAtInstant = false
     }
     previousInstant = entry.at
-    previousKind = entry.kind
+    if (entry.kind === 'built') seenCreationAtInstant = true
+    if (entry.kind === 'demolished') seenDemolitionAtInstant = true
+    if (seenCreationAtInstant && seenDemolitionAtInstant) return 'unknown'
     if (!entry.authorized) {
       state = 'unknown'
       continue
