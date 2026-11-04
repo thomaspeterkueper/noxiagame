@@ -7,6 +7,8 @@ on:
       - 'app/api/game/npc-conversation/route.ts'
       - 'lib/game/landmarks/**'
       - 'lib/game/cognition/personHabit.test.ts'
+      - 'lib/game/cognition/npcMovementConsent.ts'
+      - 'lib/game/cognition/npcMovementConsent.test.mjs'
       - 'scripts/resonance-reading-guard.test.mjs'
       - '.github/workflows/resonance-reading-chat.yml'
   workflow_dispatch:
@@ -24,7 +26,7 @@ jobs:
         with:
           node-version: '24'
       - name: Targeted regression checks
-        run: node --test scripts/resonance-reading-guard.test.mjs
+        run: node --test scripts/resonance-reading-guard.test.mjs lib/game/cognition/npcMovementConsent.test.mjs
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 20
