@@ -197,7 +197,15 @@ export function verifiedBuildingStateAt(
       state = 'unknown'
       continue
     }
-    state = entry.kind === 'demolished' ? 'demolished' : 'standing'
+    if (entry.kind === 'demolished') {
+      state = 'demolished'
+    } else if (entry.kind === 'built') {
+      state = 'standing'
+    } else if (state !== 'standing') {
+      // A remodel, change of use or ownership transfer is not proof that a
+      // demolished building was rebuilt. Require a verified creation receipt.
+      state = 'unknown'
+    }
   }
   return state
 }
