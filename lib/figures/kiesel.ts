@@ -21,6 +21,8 @@ export type KieselPose =
   | 'tragen' | 'polieren' | 'wischen' | 'haemmern' | 'hacken' | 'schaufeln'
   | 'schubsen' | 'hinfallen'
   | 'zuschlagen' | 'abwehren' | 'getroffen' | 'liegen'
+  | 'winken' | 'jubeln' | 'klatschen' | 'verbeugen' | 'prost'
+  | 'paartanz' | 'anstossen' | 'handschlag' | 'umarmen' | 'troesten'
 
 /**
  * Posen in Thomas' Steigerung (04.11.2026: „alles in genau dieser Steigerung, leider
@@ -29,7 +31,7 @@ export type KieselPose =
  * (Verletzung, Hausverbot, Polizei, Gedächtnis) regeln Population und NPC (Request);
  * hier wird nur gezeichnet.
  */
-export const KIESEL_POSES: Readonly<Record<KieselPose, { label: string; stufe: 'grund' | 'tanz' | 'arbeit' | 'rangelei' | 'kampf'; animated: boolean }>> = {
+export const KIESEL_POSES: Readonly<Record<KieselPose, { label: string; stufe: 'grund' | 'tanz' | 'arbeit' | 'rangelei' | 'kampf' | 'geste' | 'gemeinsam'; animated: boolean }>> = {
   stehen: { label: 'Stehen', stufe: 'grund', animated: false },
   gehen: { label: 'Gehen', stufe: 'grund', animated: true },
   sitzen: { label: 'Sitzen', stufe: 'grund', animated: false },
@@ -46,6 +48,16 @@ export const KIESEL_POSES: Readonly<Record<KieselPose, { label: string; stufe: '
   abwehren: { label: 'Abwehren', stufe: 'kampf', animated: true },
   getroffen: { label: 'Getroffen', stufe: 'kampf', animated: true },
   liegen: { label: 'Am Boden', stufe: 'kampf', animated: false },
+  winken: { label: 'Winken', stufe: 'geste', animated: true },
+  jubeln: { label: 'Jubeln', stufe: 'geste', animated: true },
+  klatschen: { label: 'Klatschen', stufe: 'geste', animated: true },
+  verbeugen: { label: 'Verbeugen', stufe: 'geste', animated: true },
+  prost: { label: 'Prost', stufe: 'geste', animated: true },
+  paartanz: { label: 'Paartanz', stufe: 'gemeinsam', animated: true },
+  anstossen: { label: 'Anstoßen', stufe: 'gemeinsam', animated: true },
+  handschlag: { label: 'Hand geben', stufe: 'gemeinsam', animated: true },
+  umarmen: { label: 'Umarmen', stufe: 'gemeinsam', animated: true },
+  troesten: { label: 'Trösten', stufe: 'gemeinsam', animated: true },
 }
 
 /** Läuft die Pose in Schritten (Bild 0–3)? Tragen nur, wenn die Figur dabei geht. */
@@ -100,7 +112,7 @@ function mix(a: string, b: string, t: number): string {
 const shade = (c: string, t: number) => mix(c, '#000000', t)
 const r1 = (v: number) => Math.round(v * 10) / 10
 
-type Rig = { back: number; front: number; lean: number; legs: 'stand' | 'walk' | 'sit' | 'wide'; bob: number; face?: KieselFace; tool?: 'tablett' | 'glas' | 'mopp' | 'hammer' | 'axt' | 'schaufel' }
+type Rig = { back: number; front: number; lean: number; legs: 'stand' | 'walk' | 'sit' | 'wide'; bob: number; face?: KieselFace; tool?: 'tablett' | 'glas' | 'mopp' | 'hammer' | 'axt' | 'schaufel' | 'becher' }
 
 /** Arm- und Körperhaltung je Pose und Bild. Winkel in Grad: 0 hängt, 90 nach vorn, 180 nach oben. */
 function rig(pose: KieselPose, f: number, moving: boolean): Rig {
@@ -122,6 +134,16 @@ function rig(pose: KieselPose, f: number, moving: boolean): Rig {
     case 'zuschlagen': return { back: pick([70, 60, 70, 60]), front: pick([-45, 100, 96, 20]), lean: pick([-7, 11, 9, 0]), legs: 'wide', bob: 0, face: 'wuetend' }
     case 'abwehren': return { back: pick([118, 124, 118, 112]), front: pick([112, 118, 112, 106]), lean: pick([-4, -6, -4, -3]), legs: 'wide', bob: 0, face: 'neutral' }
     case 'getroffen': return { back: pick([-30, -40, -20, 10]), front: pick([40, 55, 30, 10]), lean: pick([-14, -18, -10, -4]), legs: 'wide', bob: 0, face: 'erstaunt' }
+    case 'winken': return { back: 0, front: pick([150, 168, 150, 132]), lean: 0, legs: 'stand', bob: 0, face: 'freundlich' }
+    case 'jubeln': return { back: pick([160, 176, 160, 176]), front: pick([160, 176, 160, 176]), lean: 0, legs: 'stand', bob: pick([0, -2.5, 0, -2.5]), face: 'freundlich' }
+    case 'klatschen': return { back: pick([62, 78, 62, 78]), front: pick([78, 62, 78, 62]), lean: 0, legs: 'stand', bob: 0, face: 'freundlich' }
+    case 'verbeugen': return { back: 8, front: 8, lean: pick([0, 16, 28, 16]), legs: 'stand', bob: 0, face: 'freundlich' }
+    case 'prost': return { back: 0, front: pick([125, 140, 125, 140]), lean: 0, legs: 'stand', bob: 0, face: 'freundlich', tool: 'becher' }
+    case 'paartanz': return { back: pick([30, 40, 30, 20]), front: 82, lean: pick([-4, 0, 4, 0]), legs: 'walk', bob: pick([0, -1.5, 0, -1.5]), face: 'freundlich' }
+    case 'anstossen': return { back: 0, front: pick([98, 110, 98, 110]), lean: 3, legs: 'stand', bob: 0, face: 'freundlich', tool: 'becher' }
+    case 'handschlag': return { back: 0, front: pick([74, 66, 74, 66]), lean: 3, legs: 'stand', bob: 0, face: 'freundlich' }
+    case 'umarmen': return { back: 86, front: 86, lean: pick([7, 9, 7, 9]), legs: 'stand', bob: 0, face: 'freundlich' }
+    case 'troesten': return { back: 0, front: pick([96, 100, 96, 100]), lean: 6, legs: 'stand', bob: 0, face: 'neutral' }
     case 'liegen': return { back: 170, front: 150, lean: 0, legs: 'stand', bob: 0, face: 'traurig' }
     default: return { back: 0, front: 0, lean: 0, legs: 'stand', bob: 0 }
   }
@@ -225,6 +247,7 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
   if (R.tool === 'tablett') {
     ell(hf.x + 3, hf.y - 2.5, 8 * S, 2.2, '#b9c0c4'); rect(hf.x - 1, hf.y - 9, 3, 6, '#e8d9a8', .9); rect(hf.x + 4, hf.y - 8, 2.6, 5, '#7a3b2a', .9)
   }
+  if (R.tool === 'becher') { rect(hf.x - 2.6, hf.y - 9, 5.2, 8, '#e8c35a', .92); rect(hf.x - 2.6, hf.y - 10, 5.2, 2.2, '#fbf6e6') }
   if (R.tool === 'glas') {
     rect(hb.x - 2.8, hb.y - 9, 5.6, 9, '#cfe8ee', .9); rect(hf.x - 3, hf.y - 3, 6, 4, '#f4f1ea')
   }

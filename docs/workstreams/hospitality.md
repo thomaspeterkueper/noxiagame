@@ -174,6 +174,22 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Rangelei und Kampf kommen nur aus Population-Ereignissen `venue_incident` (`venueIncident.ts`, mit Test): Posen, Hinweis, Wissen der Figuren.
   - Regeln und Folgen: R-32; Haltung zu Streit: P-3.
 
+- **04.11.2026 – Gesten und gemeinsame Bewegungen (nach Second Life):**
+  - Thomas: „wir können uns da auch Sachen von Second Life abschauen“ – „alles nacheinander“. Übernommen ist die Spielmechanik, nicht Namen oder Bilder.
+  - **Gesten:** Winken, Jubeln, Klatschen, Verbeugen, Prost, Tanzen.
+    - Per Knopf oder im Chat („/winken“, „/prost“).
+    - Mitspieler sehen sie über die Anwesenheit.
+    - Eine Figur in der Nähe weiß, dass man ihr zugewinkt hat.
+  - **Gemeinsam:** Zusammen tanzen, Anstoßen, Hand geben, Umarmen, Trösten.
+    - Mit Spielern: Einladung, die andere Seite sagt „Gern“ oder „Lieber nicht“; wer annimmt, geht hin, beide machen die Bewegung und schauen sich an.
+    - Mit Bewohnern: Die Figur entscheidet nach dem, was sie weiß (`npcJointDecision`):
+      - Umarmen nur mit der Begleitung oder nach dem Beileid;
+      - Anstoßen nur, wenn beide etwas trinken;
+      - Tanzen nicht mit Kindern und nicht mit Personal bei der Arbeit;
+      - Trösten nur Trauernde.
+    - Danach weiß die Figur es im Gespräch.
+  - `lib/multiplayer/gestures.ts` mit Tests; im Browser geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

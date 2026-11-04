@@ -535,6 +535,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     loaded:true,
     markers:shift?tasks.slice(0,4).map(task=>({key:task.key,x:task.at.x,y:task.at.y,label:task.label})):[],
     playerTag:shift?ROLE_LABEL[shift.role]:null,
+    jointContext:reception?(personId:string)=>({mourning:['host','mourner'].includes(receptionRole(reception,personId,false))}):undefined,
     poseFor:incident?(personId:string)=>incidentPose(incident.at,personId,incident.tick):undefined,
     floorMood:layout.danceFloor&&(shift?.role==='dj'||music!=='House')?music.toLowerCase():null,
     gate:layout.entry?{open:entryPaid||Boolean(shift),blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,

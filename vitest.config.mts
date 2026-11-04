@@ -17,7 +17,7 @@ export default defineConfig({
     include: [
       'lib/game/rounds/bubbles.test.ts',
       'lib/multiplayer/roomPresence.test.ts',
-      'lib/multiplayer/roomChat.test.ts',
+      'lib/multiplayer/roomChat.test.ts', 'lib/multiplayer/gestures.test.ts',
       'lib/figures/kiesel.test.ts',
       'lib/speech/browserSpeech.test.ts',
       'lib/game/landmarks/readAloud.test.ts',
