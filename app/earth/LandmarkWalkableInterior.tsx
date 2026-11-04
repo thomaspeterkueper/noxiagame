@@ -39,6 +39,7 @@ import RoundBubbles from './RoundBubbles'
 import { RoomAudioControls, useLoungeMusic, useSpeech } from './RoomAudio'
 import { nextReadingChunk, readingSource } from '@/lib/game/landmarks/readAloud'
 import { useRoundTalk } from './useRoundTalk'
+import { translatedLanguageLabel } from '@/lib/game/cognition/languageDisplay'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
@@ -148,6 +149,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [languageLabel, setLanguageLabel] = useState<string | null>(null)
   const conversationEnd = useConversationEnd()
   // Ablauf des laufenden Termins nach echter Uhr (Beginn und Ende kommen vom Server).
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -399,6 +401,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   function startTalk() {
     if (!staff) return
     if (partnerId) { setPartnerId(null); setHistory([]) }
+    setLanguageLabel(null)
     setTalking(true)
     setActive(null)
     if (!history.length || partnerId) setHistory([{ role: 'assistant', content: staff.greeting }])
@@ -421,6 +424,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     setTalking(true)
     setActive(null)
     setHistory([])
+    setLanguageLabel(null)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -431,6 +435,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       })
       const data = await response.json().catch(() => ({}))
       const opening = response.ok && data.reply ? String(data.reply) : 'Hallo.'
+      setLanguageLabel(translatedLanguageLabel(data.originalLanguageCode, Boolean(data.translatedForPlayer)))
       setHistory([{ role: 'assistant', content: opening }])
       speech.speak(opening, person.id)
     } finally { setSending(false) }
@@ -458,6 +463,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       })
       const data = await response.json().catch(() => ({}))
       const sermonText = response.ok && data.reply ? String(data.reply) : `${host.name} spricht leise; du verstehst heute nur Bruchstücke.`
+      setLanguageLabel(translatedLanguageLabel(data.originalLanguageCode, Boolean(data.translatedForPlayer)))
       setSermon({ text: sermonText, by: host.name })
       speech.speak(sermonText, host.id)
     } finally { setHearing(false) }
@@ -520,6 +526,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       })
       const data = await response.json().catch(() => ({}))
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, ich bin gerade beschäftigt – frag mich gleich noch einmal.'
+      setLanguageLabel(translatedLanguageLabel(data.originalLanguageCode, Boolean(data.translatedForPlayer)))
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
       speech.speak(reply, `landmark-staff:${name}`)
@@ -563,6 +570,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       })
       const data = await response.json().catch(() => ({}))
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, gerade nicht – gleich wieder.'
+      setLanguageLabel(translatedLanguageLabel(data.originalLanguageCode, Boolean(data.translatedForPlayer)))
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
       speech.speak(reply, person.id)
@@ -638,6 +646,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         </div>}
         {talkingNow && (staff || partner) && <>
           <p className="muted">{talkRole}{isLibrary && !partner ? ' · an der Ausleihe' : ` · ${name}`}</p>
+          {languageLabel && <p className="muted">Sprache: {languageLabel}</p>}
           <div className="history">{history.map((entry, index) => <p key={index}><b>{entry.role === 'user' ? 'Du' : talkName}:</b> „{entry.content}“</p>)}{sending && !history.length && <p className="muted">…</p>}</div>
           {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false) }}>
             <span>{tip.author}</span><b>{tip.title}</b><i>{tip.genre}</i><small>Klappentext lesen →</small>
