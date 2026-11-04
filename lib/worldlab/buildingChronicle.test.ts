@@ -218,4 +218,22 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
   })
 
+  it('gleichzeitiger Konflikt bleibt unbekannt, spätere verifizierte Neugründung kann ihn auflösen', () => {
+    const events = [
+      ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+      ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+      ev('update', 'entity.updated', 'b1', '2026-11-04T12:00:01Z'),
+      ev('rebuild', 'entity.created', 'b1', '2026-11-04T12:00:02Z'),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete', 'update', 'rebuild']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:00Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:02Z')).toBe('standing')
+  })
+
 })
