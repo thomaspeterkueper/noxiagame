@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import DashboardGate from './DashboardGate'
+import PlayerPresenceHeartbeat from './PlayerPresenceHeartbeat'
 import DashboardPrimaryColony from './DashboardPrimaryColony'
 import { unstable_cache } from 'next/cache'
 
@@ -24,6 +25,7 @@ export default async function Dashboard() {
   return (
     <div className="noxia-dashboard-shell">
       <DashboardGate locations={locations} prices={prices} orders={orders} />
+      <PlayerPresenceHeartbeat />
       <DashboardPrimaryColony />
       <style>{`
         :root {

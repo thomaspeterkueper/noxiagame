@@ -9,6 +9,7 @@ type Player = {
   username: string
   created_at: string | null
   last_session_at: string | null
+  last_seen_at: string | null
   sessions: number
   actions: number
   is_admin: boolean
@@ -20,7 +21,7 @@ type Overview = {
   metrics: {
     registered_accounts: number; player_profiles: number
     registrations_24h: number; registrations_7d: number; registrations_30d: number
-    active_5m: number; active_24h: number; active_7d: number
+    online_2m: number; active_5m: number; active_24h: number; active_7d: number
     admins: number; session_records: number
   }
   players: Player[]
@@ -28,7 +29,8 @@ type Overview = {
 const cards: Array<[keyof Overview['metrics'], string]> = [
   ['registered_accounts', 'Registrierte Konten'],
   ['player_profiles', 'Spielerprofile'],
-  ['active_5m', 'Kürzlich aktiv (5 Min.)'],
+  ['online_2m', 'Jetzt online (2 Min.)'],
+  ['active_5m', 'Spielsitzung (5 Min.)'],
   ['active_24h', 'Aktiv in 24 Stunden'],
   ['active_7d', 'Aktiv in 7 Tagen'],
   ['registrations_7d', 'Neue Konten (7 Tage)'],
@@ -59,7 +61,7 @@ export default function AdminPage() {
   }, [])
   useEffect(() => { void load() }, [load])
   const players = (data?.players ?? []).filter(p => p.username.toLowerCase().includes(filter.toLowerCase()))
-  const recentlyActive = (s: string | null) => Boolean(s && Date.now() - Date.parse(s) >= 0 && Date.now() - Date.parse(s) < 300000)
+  const online = (s: string | null) => Boolean(s && Date.now() - Date.parse(s) >= 0 && Date.now() - Date.parse(s) < 120000)
 
   return <main className="min-h-screen bg-[#f6f4ee] px-4 py-10 text-[#1d2a30]">
     <div className="mx-auto max-w-5xl">
@@ -91,16 +93,16 @@ export default function AdminPage() {
         <section className="mb-8 rounded-xl border border-[#ded9ca] bg-white p-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div><h2 className="text-xl font-bold">Spielerübersicht</h2>
-              <p className="text-xs text-[#63737a]">Sitzungsaktualisierungen sind ein Näherungswert für Online-Aktivität, kein Live-Verbindungsnachweis.</p></div>
+              <p className="text-xs text-[#63737a]">Online: Heartbeat eines sichtbaren Spiel-Dashboards (max. zwei Minuten alt). Sitzungsaktivität ist separat ausgewiesen.</p></div>
             <input aria-label="Spieler suchen" placeholder="Spielername suchen" value={filter}
               onChange={e => setFilter(e.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
           </div>
           <div className="overflow-x-auto"><table className="w-full text-left text-sm">
-            <thead><tr className="border-b text-[#63737a]"><th className="py-2">Spieler</th><th>Letzte Spielsitzung</th><th>Sitzungen</th><th>Aktionen</th><th>Status</th></tr></thead>
+            <thead><tr className="border-b text-[#63737a]"><th className="py-2">Spieler</th><th>Letzter Heartbeat</th><th>Letzte Spielsitzung</th><th>Sitzungen</th><th>Aktionen</th><th>Status</th></tr></thead>
             <tbody>{players.map(p => <tr className="border-b border-[#eee9df]" key={p.id}>
               <td className="py-3 font-medium">{p.username}{p.is_admin ? ' · Admin' : ''}</td>
-              <td>{time(p.last_session_at)}</td><td>{p.sessions}</td><td>{p.actions}</td>
-              <td>{recentlyActive(p.last_session_at) ? 'Kürzlich aktiv' : 'Nicht kürzlich aktiv'}</td>
+              <td>{time(p.last_seen_at)}</td><td>{time(p.last_session_at)}</td><td>{p.sessions}</td><td>{p.actions}</td>
+              <td>{online(p.last_seen_at) ? 'Online' : 'Offline / unbekannt'}</td>
             </tr>)}</tbody>
           </table></div>
           {players.length === 0 && <p className="py-3 text-sm text-[#63737a]">Keine passenden Spieler.</p>}
