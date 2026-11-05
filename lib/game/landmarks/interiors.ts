@@ -766,7 +766,11 @@ export type LandmarkWaypoint = { id: string; label: string; x: number; y: number
 export function landmarkWaypoints(layout: LandmarkRoomLayout): LandmarkWaypoint[] {
   const out: LandmarkWaypoint[] = layout.spots.map(spot => ({ id: `spot:${spot.id}`, label: spot.label.charAt(0) + spot.label.slice(1).toLowerCase(), x: spot.x, y: spot.y, kind: spot.action === 'sit' ? 'Sitzplatz' : spot.action === 'staff' ? 'Tresen' : 'Bereich' }))
   const shelves = layout.furniture.filter(item => item.kind === 'shelf' || item.kind === 'shelf-low')
-  if (shelves.length) {
+  if (shelves.length && layout.kind === 'resonance_place') {
+    // Begegnungsstätte: keine Romane (die gibt es in der Bibliothek), nur Philosophie und Theologie (05.11.2026)
+    const first = shelves.find(item => item.kind === 'shelf') ?? shelves[0]
+    out.push({ id: 'shelf:lesen', label: 'Regal (Philosophie & Theologie)', x: first.x + Math.min(60, first.w / 2), y: first.y + first.h + 18, kind: 'Regal' })
+  } else if (shelves.length) {
     const first = shelves.find(item => item.kind === 'shelf') ?? shelves[0]
     out.push({ id: 'shelf:romane', label: 'Regale (Romane)', x: first.x + Math.min(60, first.w / 2), y: first.y + first.h + 18, kind: 'Regal' })
     const low = shelves.find(item => item.kind === 'shelf-low')
