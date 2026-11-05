@@ -38,3 +38,18 @@ test('build completion RPC is not re-granted to browser roles in this migration'
     );
   }
 });
+
+test('build completion wrapper remains server-only and uses the privileged service client', () => {
+  const commands = readFileSync(
+    new URL('../lib/game/core/commands.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(commands, /^import ['"]server-only['"]/m);
+  assert.match(commands, /import\s*\{\s*createServiceClient\s*\}\s*from\s*['"]@\/lib\/supabase\/service['"]/);
+  const completion = commands.match(
+    /export async function completeBuildCommand\([^]*?(?=\nexport (?:async )?function |$)/,
+  )?.[0];
+  assert.ok(completion, 'expected completeBuildCommand wrapper');
+  assert.match(completion, /const supabase = createServiceClient\(\)/);
+  assert.match(completion, /supabase\.rpc\(['"]noxia_complete_build['"]/);
+});
