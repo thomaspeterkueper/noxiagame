@@ -34,7 +34,7 @@ export interface TilePlace { x: number; y: number; n: string; k: string; t?: Rec
 const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia', 'shop', 'cuisine', 'amenity', 'craft', 'office', 'tourism']
 
 export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string; /** 1: Kreisverkehr */ r?: 1; /** 1: Brücke */ b?: 1 }
-export interface TileArea { k: AreaKind; p: number[] }
+export interface TileArea { k: AreaKind; p: number[]; /** Name aus OSM (nur Friedhöfe, W-13: „Friedhof betreten“) */ n?: string }
 export interface TileBlock {
   x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
   /** Echter Grundriss (Meter in der Kachel, x/y abwechselnd) – nur bei Hallen und Fabriken, deren Form kein Rechteck ist. */
@@ -511,7 +511,8 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
           }
         }
       }
-      if (clipped.length >= 4) out.areas.push({ k: kindHere as AreaKind, p: flat(clipped) })
+      const areaName = kindHere === 'cemetery' && typeof properties.name === 'string' ? properties.name.slice(0, 80) : undefined
+      if (clipped.length >= 4) out.areas.push({ k: kindHere as AreaKind, p: flat(clipped), ...(areaName ? { n: areaName } : {}) })
     }
   }
   // Feste Reihenfolge: Felder unten, dann Gärten und bebaute Fläche, Wald, Sportanlage,

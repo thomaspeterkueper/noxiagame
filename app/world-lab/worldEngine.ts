@@ -1669,6 +1669,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     ownedLayer.addChild(g)
     entry.owned = g
   }
+  /** Name des Friedhofs an einem Weltpunkt (nur geladene Kacheln), sonst null. */
+  function cemeteryAtWorld(p: { x: number; y: number }): string | null {
+    const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
+    const entry = loaded.get(tileKey({ x: tx, y: ty }))
+    for (const area of entry?.data.areas ?? []) {
+      if (area.k !== 'cemetery') continue
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: entry!.ox + area.p[i], y: entry!.oy + area.p[i + 1] })
+      if (insidePolygon(p, ring)) return area.n ?? 'Friedhof'
+    }
+    return null
+  }
   /** Flurstück an einem Weltpunkt (nur geladene Kacheln). */
   function parcelAtWorld(p: { x: number; y: number }): string | null {
     const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
@@ -1859,6 +1871,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const centre = iso(camera.x, camera.y)
     const u = (event.offsetX - app.screen.width / 2) / zoom + centre.x, v = (event.offsetY - app.screen.height / 2) / zoom + centre.y
     const groundX = (u + v / ISO_Y) / 2, groundY = (v / ISO_Y - u) / 2
+    // W-13: Friedhofsfläche – öffnet „Friedhof betreten“ mit dem Namen aus OSM
+    const cemetery = cemeteryAtWorld({ x: groundX, y: groundY })
+    if (cemetery) { options.onPick({ type: 'landmark', landmark: { at: toGeo({ x: groundX, y: groundY }), name: cemetery, kind: 'cemetery', tags: {} } }); return }
     const parcel = parcelAtWorld({ x: groundX, y: groundY })
     options.onPick(parcel ? { type: 'parcel', id: parcel, at: toGeo({ x: groundX, y: groundY }) } : { type: 'ground', at: toGeo({ x: groundX, y: groundY }) })
   }

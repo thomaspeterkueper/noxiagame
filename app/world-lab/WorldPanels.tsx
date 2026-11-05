@@ -632,8 +632,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   if (panel.kind === 'landmarkInside') {
     const service = worshipAt(worship, { source: panel.source, at: panel.landmark.at })
     const occasion = service?.running ? { ...service.running, tradition: service.tradition, host: service.host } : undefined
-    return <LandmarkWalkableInterior occasion={occasion} placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
-      people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
+    // Friedhof ohne OSM-Kennung (Fläche): die Stelle als Ortskennung, Anwesende im weiteren Umkreis
+    const cemetery = panel.room === 'cemetery'
+    return <LandmarkWalkableInterior occasion={occasion} placeRef={panel.source ?? (cemetery ? landmarkRef(panel.landmark) : undefined)} kind={panel.room} name={panel.landmark.name} typeLabel={landmarkLabel(panel.landmark.kind, panel.landmark.tags)} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
+      people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: cemetery ? 120 : 45 })}/>
   }
   if (panel.kind === 'none') return null
 
@@ -751,7 +753,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {landmark.kind === 'station' && landmarkNear
         ? <div className="row"><span>Du stehst am Bahnhof – von hier fahren Züge weiter.</span><button onClick={() => setPanel({ kind: 'travel', at: landmark.at })}>Reise buchen</button></div>
         : room && landmarkNear
-        ? <div className="row"><span>Du stehst davor.</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>Betreten</button></div>
+        ? <div className="row"><span>{room === 'cemetery' ? 'Du stehst am Friedhof.' : 'Du stehst davor.'}</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>{room === 'cemetery' ? 'Friedhof betreten' : 'Betreten'}</button></div>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}

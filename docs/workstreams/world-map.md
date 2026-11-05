@@ -569,7 +569,16 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 - Christliche Kirchen (z. B. in Istanbul) bleiben unverändert Kirchen (in warmen Breiten flach, ohne Turm).
 - Offen: regionale Dachformen allgemein, Zuordnung Ort↔Gebäude in Istanbul.
 
-### W-13 (Gastronomie, 02.11.2026): Friedhöfe begehbar, mit Gedenkort
+### W-13 (Gastronomie, 02.11.2026): Friedhöfe begehbar, mit Gedenkort – Punkte 1, 2, 3, 5, 6 erledigt (05.11.2026)
+
+Umgesetzt (Thomas, 05.11.2026: „W-13“):
+- **Betreten:** Klick auf eine Friedhofsfläche öffnet die Tafel „Friedhof“ mit dem Namen aus OSM (`TileArea.n`, nur Friedhöfe; Kachelformat `2026-11-05.1`, die Kacheln werden neu erzeugt), sonst „Friedhof“; davor stehend „Friedhof betreten“ (`cemeteryAtWorld` in `worldEngine.ts`).
+- **Außenraum** `cemetery` in `lib/game/landmarks/interiors.ts`: Kieswege als Kreuz, vier Grabfelder mit Steinen ohne Namen, drei Bänke, Wasserstelle mit Gießkannen, Bäume, Gedenkort; alle Ziele erreichbar (geprüft mit `landmarkPath`). Trauerhalle/Kapelle noch nicht – die Fläche sagt nicht, ob dort ein Gebäude steht.
+- **Menschen:** wer laut Simulation dort ist (`peopleAtPlace`, Umkreis 120 m statt 45 m, weil Friedhöfe groß sind); ansprechbar. Die Gesprächsfakten sagen: leise, ruhig, ernsthaft, keine erfundenen Verstorbenen; bei Verzweiflung die Telefonseelsorge (0800 111 0 111, 0800 111 0 222, telefonseelsorge.de).
+- **Gedenkort für Spieler** (Vorschlag übernommen: nur für ihn selbst sichtbar): Kerze anzünden, wahlweise mit Namen; Tabelle `player_memorials` (nur über den Server, höchstens 12 je Tag), `GET/POST /api/game/memorial`. Die eigenen Kerzen brennen an der Gedenkwand jedes Friedhofs.
+- **Würde:** keine Musik, kein Rennen (Umschalt-Taste wirkt dort nicht).
+- **Offen:** Punkt 4 (Gräber mit Namen, Angehörige am Grab, Kerze/Blumen am Grab) wartet auf R-23 (`person_graves` gibt es noch nicht); Trauerhalle, sobald ein Gebäude auf der Fläche erkannt wird.
+
 
 Thomas, 02.11.2026: „Zwischenidee: ein Friedhof.“ Auf Nachfrage entschieden, alle vier Teile:
 - ein begehbarer Ort;

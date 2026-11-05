@@ -42,6 +42,7 @@ export function isTravelPlace(kind: string, tags?: Record<string, string>): bool
 }
 
 export function landmarkLabel(kind: string, tags?: Record<string, string>) {
+  if (kind === 'cemetery') return 'Friedhof'
   if (kind === 'shop') return SHOP_LABEL[tags?.shop ?? ''] ?? 'Laden'
   if (POI_LABEL[kind]) return POI_LABEL[kind]
   if (kind === 'place_of_worship') {

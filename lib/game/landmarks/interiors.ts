@@ -11,18 +11,21 @@ export type LandmarkRoomKind =
   | 'resonance_place'
   // Café, Bar, Restaurant, Kneipe: Gastraum mit Tresen, Tischen und Hockern (03.11.2026).
   | 'hospitality'
+  // Friedhof als Außenraum mit Gedenkort (W-13, 05.11.2026).
+  | 'cemetery'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
+  | 'grave' | 'tap' | 'tree' | 'memorial'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
-export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number }
+export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs' | 'memorial'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number }
 /** Bodenzone – rein optisch, blockiert nicht. */
 export type LandmarkZone = { id: string; kind: LandmarkZoneKind; x: number; y: number; w: number; h: number }
 /** Deckenlampe: heller Lichtkegel auf dem Boden. */
 export type LandmarkLamp = { x: number; y: number; r: number; warm?: boolean }
 /** Angestellte Person im Raum – steht an einem festen Platz und ist ansprechbar. */
 export type LandmarkStaff = { id: string; role: string; x: number; y: number; greeting: string }
-export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet'
+export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet' | 'grass' | 'gravel'
 export type LandmarkRoomLayout = {
   kind: LandmarkRoomKind
   noun: string
@@ -472,6 +475,53 @@ function resonancePlaceLayout(): LandmarkRoomLayout {
   }
 }
 
+/**
+ * Friedhof (W-13, 05.11.2026): Außenraum mit Wegekreuz, Grabfeldern, Bänken,
+ * Wasserstelle mit Gießkannen, Bäumen und einem Gedenkort. Die Grabsteine tragen
+ * keine Namen, solange die Simulation keine Gräber liefert (R-23) – erfunden wird nichts.
+ */
+function cemeteryLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = []
+  // Vier Grabfelder um das Wegekreuz, je drei Reihen
+  const fields = [{ x: 60, y: 60 }, { x: 440, y: 60 }, { x: 60, y: 262 }, { x: 440, y: 262 }]
+  fields.forEach((field, f) => {
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 7; col++) {
+      if (f === 1 && row === 0 && col >= 5) continue // Platz für den Gedenkort
+      furniture.push({ id: `grave-${f}-${row}-${col}`, kind: 'grave', x: field.x + col * 34, y: field.y + row * 44, w: 22, h: 26 })
+    }
+  })
+  furniture.push(
+    { id: 'memorial', kind: 'memorial', x: 620, y: 40, w: 90, h: 18 },
+    { id: 'tap', kind: 'tap', x: 330, y: 392, w: 26, h: 26 },
+    { id: 'bench-0', kind: 'bench', x: 300, y: 70, w: 18, h: 56 },
+    { id: 'bench-1', kind: 'bench', x: 442, y: 200, w: 56, h: 16 },
+    { id: 'bench-2', kind: 'bench', x: 160, y: 200, w: 56, h: 16 },
+    { id: 'tree-0', kind: 'tree', x: 30, y: 200, w: 34, h: 34 },
+    { id: 'tree-1', kind: 'tree', x: 700, y: 200, w: 34, h: 34 },
+    { id: 'tree-2', kind: 'tree', x: 380, y: 34, w: 30, h: 30 },
+    { id: 'tree-3', kind: 'tree', x: 700, y: 400, w: 30, h: 30 },
+  )
+  return {
+    kind: 'cemetery', noun: 'Friedhof', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'grass', kind: 'grass', x: 24, y: 28, w: 712, h: 428 },
+      { id: 'path-ns', kind: 'gravel', x: 352, y: 28, w: 56, h: 428 },
+      { id: 'path-ew', kind: 'gravel', x: 24, y: 218, w: 712, h: 36 },
+    ],
+    lamps: [],
+    staff: null,
+    hostAt: { x: 380, y: 236 },
+    gatherAt: [{ x: 340, y: 236 }, { x: 420, y: 236 }, { x: 300, y: 236 }, { x: 460, y: 236 }, { x: 380, y: 280 }, { x: 380, y: 196 }],
+    spots: [
+      { id: 'cross', label: 'WEGEKREUZ', x: 380, y: 236, text: 'Kieswege zwischen den Grabfeldern. Hier geht man langsam und spricht leise.' },
+      { id: 'fields', label: 'GRABFELDER', x: 326, y: 166, text: 'Grabreihen mit Steinen und Bepflanzung. Namen stehen hier erst, wenn in der Simulation jemand beigesetzt wird.' },
+      { id: 'memorial', label: 'GEDENKORT', x: 665, y: 90, action: 'memorial', text: 'Eine stille Wand mit einer Kerzenbank. Hier kannst du für dich eine Kerze anzünden, wenn du magst mit einem Namen. Nur du siehst, was du hier hinterlässt.' },
+      { id: 'tap', label: 'WASSERSTELLE', x: 343, y: 440, text: 'Ein Wasserhahn mit Gießkannen für die Grabpflege.' },
+      { id: 'bench', label: 'BANK', x: 470, y: 190, action: 'sit', text: 'Eine Bank unter dem Baum. Hier darf man einfach sitzen.' },
+    ],
+  }
+}
+
 /** Mehrgeschossige Häuser: Anzahl Geschosse je Raumart (alle anderen haben eines). */
 export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3 }
 
@@ -603,6 +653,7 @@ export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, st
   if (landmarkClass === 'artlounge') return 'artlounge'
   if (landmarkClass === 'community_centre') return 'community_hall'
   if (landmarkClass === 'resonance_place') return 'resonance_place'
+  if (landmarkClass === 'cemetery' || landmarkClass === 'grave_yard') return 'cemetery'
   if (HOSPITALITY_CLASSES.has(landmarkClass)) return 'hospitality'
   return null
 }
@@ -636,6 +687,7 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'buddhist_temple': return buddhistTempleLayout()
     case 'community_hall': return communityHallLayout()
     case 'resonance_place': return resonancePlaceLayout()
+    case 'cemetery': return cemeteryLayout()
     case 'hospitality': return hospitalityLayout()
     default: return workshopLayout()
   }

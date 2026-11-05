@@ -137,6 +137,42 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { reportPlayerPosition('landmark:' + kind, pos.x / 10, pos.y / 10) }, [pos, kind])
   const [active, setActive] = useState<LandmarkSpot | null>(null)
   const [candles, setCandles] = useState(3)
+  // W-13: Gedenkort auf dem Friedhof – eigene Kerzen, nur für den Spieler sichtbar
+  const isCemetery = kind === 'cemetery'
+  const [memorials, setMemorials] = useState<Array<{ id: string; placeRef: string; name: string | null; at: string }>>([])
+  const [memorialName, setMemorialName] = useState('')
+  const [memorialNote, setMemorialNote] = useState('')
+  const [memorialBusy, setMemorialBusy] = useState(false)
+  useEffect(() => {
+    if (!isCemetery) return
+    let live = true
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/game/memorial', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+        const json = await response.json().catch(() => null)
+        if (live && response.ok && Array.isArray(json?.candles)) setMemorials(json.candles)
+      } catch { /* ohne Kerzen */ }
+    })()
+    return () => { live = false }
+  }, [isCemetery])
+  // Der Gedenkort ist persönlich: an jedem Friedhof brennen die eigenen Kerzen
+  const memorialsHere = memorials
+  async function lightMemorial() {
+    if (memorialBusy) return
+    setMemorialBusy(true); setMemorialNote('')
+    try {
+      const { token } = await getSessionInfo()
+      if (!token) { setMemorialNote('Zum Anzünden bitte anmelden.'); return }
+      const response = await fetch('/api/game/memorial', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ placeRef: placeRef ?? name, placeName: name, name: memorialName }) })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setMemorialNote(String(json.error ?? 'Die Kerze ließ sich nicht anzünden.')); return }
+      setMemorials(current => [json.candle, ...current])
+      setMemorialNote(memorialName.trim() ? `Die Kerze für ${memorialName.trim()} brennt.` : 'Die Kerze brennt.')
+      setMemorialName('')
+    } catch { setMemorialNote('Die Kerze ließ sich gerade nicht anzünden.') } finally { setMemorialBusy(false) }
+  }
   const [seated, setSeated] = useState(false)
   const speech = useSpeech()
   const lounge = useLoungeMusic(kind === 'hospitality')
@@ -258,7 +294,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       setPlayerMoving(false)
       setSeated(false)
       setPos(current => {
-        const step = event.shiftKey ? SPEED * 1.6 : SPEED
+        // Auf dem Friedhof rennt man nicht (W-13: Würde)
+        const step = event.shiftKey && kind !== 'cemetery' ? SPEED * 1.6 : SPEED
         const next = { x: current.x + (key === 'd' ? step : key === 'a' ? -step : 0), y: current.y + (key === 's' ? step : key === 'w' ? -step : 0) }
         if (!isLandmarkRoomBlocked(layout, next)) return next
         const slideX = { x: next.x, y: current.y }
@@ -416,6 +453,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       person.doing ? `Gerade ist hier: ${person.doing}.` : '',
       occasion && phase ? `Ablauf gerade: ${phase.title}. ${person.host ? 'Du leitest den Termin.' : 'Du nimmst teil; das sagt nichts darüber, was du glaubst.'}` : '',
       `Der Spieler steht bei dir im Raum.`,
+      // W-13: Friedhof – ruhig und ernst; bei Verzweiflung auf die Telefonseelsorge hinweisen
+      kind === 'cemetery' ? 'Du bist auf einem Friedhof. Sprich leise, ruhig und ernsthaft. Wenn jemand über einen echten Verlust spricht, hör zu und nimm es ernst; erfinde keine Verstorbenen.' : '',
+      kind === 'cemetery' ? 'Wirkt jemand verzweifelt oder spricht davon, nicht mehr leben zu wollen, nenne freundlich die Telefonseelsorge: kostenlos, rund um die Uhr, 0800 111 0 111 oder 0800 111 0 222, online telefonseelsorge.de.' : '',
     ].filter(Boolean)
   }
 
@@ -592,6 +632,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           {item.kind === 'pinboard' && <><i className="note n1"/><i className="note n2"/><i className="note n3"/></>}
           {furnitureLabel(item) && <span className="label">{furnitureLabel(item)}</span>}
         </div>)}
+        {layout.kind === 'cemetery' && memorialsHere.slice(0, 12).map((item, index) => <i key={item.id} className="flame" style={{ left: 628 + (index % 6) * 13, top: 44 + Math.floor(index / 6) * 8 }}/>)}
         {layout.kind === 'worship' && Array.from({ length: Math.min(9, candles) }, (_, index) => <i key={index} className="flame" style={{ left: 654 + (index % 5) * 8, top: 88 + Math.floor(index / 5) * 9 }}/>)}
         {staff && <div className="npc" style={{ left: staffPos.x - 12, top: staffPos.y - 34 }}>
           <NpcFigure id={`landmark-staff:${name}`} name={staffName} role={staffTask?.kind === 'bring' ? 'bringt ein Buch' : staffTask?.kind === 'reshelve' ? 'sortiert ein' : staff.role} moving={staffMoving} showLabel={nearStaff || talkingNow || Boolean(staffTask)} showRoleLabel selected={talkingNow} onClick={() => { if (nearStaff) startTalk() }}/>
@@ -694,6 +735,14 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {!talkingNow && !shown && !shelf && realName && <p className="muted">Heute steht hier laut OpenStreetMap „{realName}“. Im Spiel (2086) ist der Betrieb eine erfundene Nachfolgerin.</p>}
         {!talkingNow && shown && <p>{shown.text}</p>}
         {!talkingNow && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
+        {!talkingNow && shown?.action === 'memorial' && <div className="plea">
+          <small>GEDENKEN · NUR FÜR DICH</small>
+          <span>Wenn du magst, mit einem Namen. Niemand sonst sieht, was du hier hinterlässt.</span>
+          <input value={memorialName} maxLength={80} data-noxia-private onChange={event => setMemorialName(event.target.value)} placeholder="Name (freiwillig)"/>
+          <div className="row"><button className="act" disabled={memorialBusy} onClick={() => void lightMemorial()}>{memorialBusy ? '…' : 'Kerze anzünden'}</button></div>
+          {memorialNote && <p>{memorialNote}</p>}
+          {memorialsHere.length > 0 && <p className="muted">Deine Kerzen: {memorialsHere.slice(0, 8).map(item => item.name ?? 'ohne Namen').join(', ')}{memorialsHere.length > 8 ? ' …' : ''}</p>}
+        </div>}
         {!talkingNow && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
         {!talkingNow && shown?.action === 'stairs' && shown.toLevel !== undefined && <button className="act" onClick={() => onLevel(shown.toLevel as number)}>{shown.toLevel === 0 ? 'Ins Erdgeschoss' : shown.toLevel > level ? `Ins ${shown.toLevel}. Obergeschoss` : `Ins ${shown.toLevel}. Obergeschoss hinunter`}</button>}
         {!talkingNow && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
@@ -730,6 +779,15 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .zone.concrete{background:#9a9b96;background-image:linear-gradient(#90918c 1px,transparent 1px),linear-gradient(90deg,#90918c 1px,transparent 1px);background-size:120px 120px}
       .floor-tag{position:absolute;left:50%;top:6px;transform:translateX(-50%);font:800 8px monospace;letter-spacing:.14em;color:#f3ead6;background:#17313ccc;padding:3px 8px;border-radius:3px;z-index:3;pointer-events:none}
       .f.stairs{background:repeating-linear-gradient(180deg,#c9b48f 0 8px,#a8916a 8px 10px);border:2px solid #6b5230;box-shadow:3px 4px 0 #0003}
+      .zone.grass{background:#8faa6e;background-image:radial-gradient(#9ab878 1px,transparent 1.2px);background-size:7px 7px}
+      .zone.gravel{background:#cfc6b2;background-image:radial-gradient(#b7ad97 1px,transparent 1.3px);background-size:5px 5px;box-shadow:inset 0 0 0 2px #b9af9a}
+      .f.grave{background:#8f8f8a;border:2px solid #5e5e59;border-radius:9px 9px 2px 2px;box-shadow:0 7px 0 -2px #6f8a52,2px 3px 0 #0003}
+      .f.tap{background:#6c7a84;border:2px solid #3d474e;border-radius:50%;box-shadow:inset 0 0 0 5px #8fa3ae}
+      .f.tap::after{content:'';position:absolute;right:-12px;bottom:-2px;width:10px;height:12px;background:#4f8a5a;border-radius:2px 2px 4px 4px}
+      .f.tree{background:radial-gradient(circle at 40% 35%,#6f9a52,#3f6a33);border-radius:50%;border:2px solid #2f5228;box-shadow:3px 4px 0 #0003}
+      .f.memorial{background:#cfc8b8;border:2px solid #8c8471;border-radius:2px;box-shadow:inset 0 -6px 0 #b4ab97,2px 3px 0 #0003}
+      .room.cemetery{background:#7e9a62}
+      .plea input{border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:6px 8px;font:inherit}
       .zone.parquet{background:repeating-linear-gradient(90deg,#b98a57 0 38px,#a97a4a 38px 40px);box-shadow:inset 0 2px 0 #0002}
       .f.piano{background:#15151a;border:2px solid #000;border-radius:10px 46px 10px 10px;box-shadow:inset 0 -14px 0 #2a2a33,3px 4px 0 #0004}
       .f.piano::after{content:'';position:absolute;left:6px;right:46px;bottom:3px;height:9px;background:repeating-linear-gradient(90deg,#f4f0e6 0 5px,#222 5px 6px)}
