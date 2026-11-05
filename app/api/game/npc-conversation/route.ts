@@ -9,7 +9,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { looksLikeWish } from '@/lib/game/wishes/rules'
 import { submitWish } from '@/lib/game/wishes/service.server'
 import { createClient } from '@supabase/supabase-js'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { detectFeatureWish } from '@/lib/game/cognition/featureWish'
 import { gameGuideLines, type GuidePlace } from '@/lib/game/cognition/gameGuide'
 import { pruneExchanges, recallLines } from '@/lib/game/cognition/conversationRecall'
@@ -93,12 +93,39 @@ async function ensureLandmarkStaffPerson(personKey: string, displayName: string,
 }
 
 /** Eine Zeile im Gesprächsprotokoll; ein Fehler hier darf das Gespräch nicht stören. */
-async function logConversationTurn(row: Record<string, unknown>) {
-  // Hinweis auf eine fehlende Funktion (29.10.2026, docs/reviews/spielerwuensche.md).
+type CausalStage = {
+  stage: 'classified' | 'model_response' | 'memory_write' | 'name_knowledge_write' |
+    'identity_knowledge_write' | 'age_knowledge_write' | 'testimony_write' |
+    'wish_scheduled' | 'action_proposed' | 'conversation_logged' | 'error'
+  status: 'observed' | 'proposed' | 'succeeded' | 'failed' | 'not_confirmed'
+  detail: Record<string, string | number | boolean | null>
+}
+
+/** Persist dialogue and independently observed actions. Never claim the client executed a proposed action. */
+async function logConversationTurn(row: Record<string, unknown>, stages: CausalStage[] = []) {
   const wish = row.opening ? null : detectFeatureWish(String(row.player_text ?? ''), typeof row.npc_reply === 'string' ? row.npc_reply : null)
   if (wish) Object.assign(row, { wish_kind: wish.kind, wish_object: wish.object, wish_npc_denied: wish.npcDenied })
-  const { error } = await serviceClient.from('npc_conversation_log').insert(row)
-  if (error) console.error('npc conversation log failed', { code: error.code })
+  const { data, error } = await serviceClient.from('npc_conversation_log').insert(row).select('id').single()
+  if (error) {
+    console.error('npc conversation log failed', { code: error.code })
+    return null
+  }
+  const trace: CausalStage[] = [
+    { stage: 'classified', status: 'observed', detail: { topic: String(row.topic ?? ''), detectedWish: Boolean(wish) } },
+    ...stages,
+    { stage: 'conversation_logged', status: 'succeeded', detail: { outcome: String(row.outcome ?? ''), hasReply: Boolean(row.npc_reply) } },
+  ]
+  const { error: traceError } = await serviceClient.from('npc_conversation_causal_traces').insert(trace.map(event => ({
+    correlation_id: row.correlation_id,
+    conversation_log_id: data.id,
+    player_profile_id: row.player_profile_id,
+    npc_person_id: row.npc_person_id,
+    stage: event.stage,
+    status: event.status,
+    detail: event.detail,
+  })))
+  if (traceError) console.error('npc causal trace write failed', { code: traceError.code })
+  return data.id as number
 }
 
 async function getUserFromRequest(request: NextRequest) {
@@ -358,7 +385,13 @@ export async function POST(request: NextRequest) {
     ? loggedRows.filter(row => (row.topic ?? classifyConversationTopic(row.player_text)) === 'provocation').length
     : historyTurns.filter((text: string) => classifyConversationTopic(text) === 'provocation').length
   const boundaryEnds = boundaryBreakoff(topic === 'provocation', previousBoundaryTests)
+  const correlationId = randomUUID()
+  const causalStages: CausalStage[] = []
+  const recordStage = (stage: CausalStage['stage'], status: CausalStage['status'], detail: CausalStage['detail']) => {
+    causalStages.push({stage,status,detail})
+  }
   const baseLog = {
+    correlation_id: correlationId,
     player_profile_id: user.id,
     npc_person_id: npcId,
     npc_key: npcKey,
@@ -376,7 +409,9 @@ export async function POST(request: NextRequest) {
     headline_source: source || null,
   }
   const endConversation = async (reply: string, outcome: 'breakoff' | 'dismissed') => {
-    await logConversationTurn({ ...baseLog, npc_reply: reply, outcome })
+    await logConversationTurn({ ...baseLog, npc_reply: reply, outcome }, [
+      {stage:'model_response',status:'observed',detail:{decision:outcome, reason:outcome==='breakoff'?'boundary_or_repeat':'cooldown'}},
+    ])
     return NextResponse.json({
       reply,
       maxPlayerChars: MAX_PLAYER_CHARS,
@@ -477,7 +512,7 @@ export async function POST(request: NextRequest) {
     model = result.model
     const providerMs = Date.now() - providerStartedAt
     if (!result.ok) {
-      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: `provider_${result.error}`, provider_ms: providerMs, model })
+      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: `provider_${result.error}`, provider_ms: providerMs, model }, [{stage:'error',status:'failed',detail:{source:'provider',code:String(result.error)}}])
       return NextResponse.json({ error: 'conversation_provider_error' }, { status: 502 })
     }
     const rawReply = result.content
@@ -495,12 +530,13 @@ export async function POST(request: NextRequest) {
       sermon ? 1100 : MAX_REPLY_CHARS,
     )
     if (!reply) {
-      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'empty_reply', provider_ms: providerMs, model })
+      await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'empty_reply', provider_ms: providerMs, model }, [{stage:'error',status:'failed',detail:{source:'provider',code:'empty_reply'}}])
       return NextResponse.json({ error: 'empty_reply' }, { status: 502 })
     }
     // Ein Wunsch im Gespräch („ich wünsche mir …“, „hoffentlich …“) geht in die Wünsche
     // der Welt (29.10.2026) – nach der Antwort, damit das Gespräch nicht wartet.
     if (!opening && !sermon && looksLikeWish(player)) {
+      recordStage('wish_scheduled','not_confirmed',{kind:'wish',note:'background_submission_not_confirmed'})
       after(async () => {
         try { await submitWish(serviceClient, { source: 'player', profileId: user.id, channel: 'gespraech', text: player, placeName: locationName || null, locationSlug: null }) }
         catch (error) { console.error('wish from conversation failed', error instanceof Error ? error.message : error) }
@@ -530,7 +566,10 @@ export async function POST(request: NextRequest) {
           }
         : null
 
-    let creditTransfer: null | {
+    recordStage('model_response','observed',{model:model ?? 'unknown',providerMs,replyLength:reply.length})
+    if (worldAction) recordStage('action_proposed','proposed',{type:worldAction.type,dispatchedToClient:true,executed:false})
+    else if (requestedLeadWalk || requestedVisitKey) recordStage('action_proposed','not_confirmed',{type:requestedVisitKey?'visit_place':'lead_walk',rejected:true})
+        let creditTransfer: null | {
       amount: number
       playerCredits: number
       npcCredits: number
@@ -588,6 +627,12 @@ export async function POST(request: NextRequest) {
           updated_at: now.toISOString(),
         }, { onConflict: 'npc_person_id,player_profile_id' })
 
+      recordStage('memory_write', memoryError ? 'failed' : 'succeeded', {
+        store:'npc_player_conversation_memory',
+        encounterCount,
+        exchangeCount:recentExchanges.length,
+        code:memoryError?.code ?? null,
+      })
       if (memoryError) {
         console.error('npc conversation memory write failed', {
           npcId,
@@ -625,6 +670,7 @@ export async function POST(request: NextRequest) {
               observed_tick: tick,
               trace_kind: 'hearsay',
             }, { onConflict: 'id', ignoreDuplicates: true })
+          recordStage('testimony_write',testimonyError?'failed':'succeeded',{store:'person_epistemic_traces',source:'player_reported',code:testimonyError?.code??null})
           if (testimonyError) console.error('npc player testimony trace write failed', {
             npcId, code: testimonyError.code,
           })
@@ -643,6 +689,7 @@ export async function POST(request: NextRequest) {
           name_learned_at: now.toISOString(),
           updated_at: now.toISOString(),
         }, { onConflict: 'npc_person_id,player_profile_id' })
+        recordStage('name_knowledge_write',nameError?'failed':'succeeded',{store:'npc_player_knowledge',source:'player_statement',code:nameError?.code??null})
         if (nameError) console.error('npc player name write failed', { code: nameError.code })
       }
 
@@ -678,6 +725,7 @@ export async function POST(request: NextRequest) {
               updated_at: now.toISOString(),
             }, { onConflict: 'profile_id,person_id' })
 
+          recordStage('identity_knowledge_write',identityError?'failed':'succeeded',{store:'player_person_identity_knowledge',source:'npc_self_introduction',code:identityError?.code??null})
           if (!identityError) identityLearned = true
         }
       }
@@ -692,6 +740,7 @@ export async function POST(request: NextRequest) {
           age_learned_tick: currentTick,
           updated_at: now.toISOString(),
         }).eq('profile_id', user.id).eq('person_id', npcId)
+        recordStage('age_knowledge_write',ageError?'failed':'succeeded',{store:'player_person_identity_knowledge',source:'npc_age_statement',code:ageError?.code??null})
         if (ageError) console.error('player age knowledge write failed', { code: ageError.code })
       }
     }
@@ -703,7 +752,7 @@ export async function POST(request: NextRequest) {
       world_action: creditTransfer ? 'transfer_credits' : worldAction?.type ?? null,
       provider_ms: providerMs,
       model,
-    })
+    }, causalStages)
     return NextResponse.json({
       reply,
       maxPlayerChars: MAX_PLAYER_CHARS,
@@ -715,7 +764,7 @@ export async function POST(request: NextRequest) {
       translatedForPlayer,
     })
   } catch {
-    await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'timeout', provider_ms: Date.now() - providerStartedAt, model })
+    await logConversationTurn({ ...baseLog, outcome: 'error', error_code: 'timeout', provider_ms: Date.now() - providerStartedAt, model }, [{stage:'error',status:'failed',detail:{source:'provider',code:'timeout'}}])
     return NextResponse.json({ error: 'conversation_provider_timeout' }, { status: 504 })
   }
 }
