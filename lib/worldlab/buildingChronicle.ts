@@ -80,7 +80,9 @@ function changedFields(effects: unknown): { owner: boolean; fields: string[] } {
   for (const raw of asArray(effects)) {
     const effect = asRecord(raw)
     const from = asRecord(effect.from), to = asRecord(effect.to)
-    for (const key of Object.keys(to)) {
+    // Removed fields are changes too: a missing `to` key must not hide
+    // an ownership, use or geometry change from the historical evidence.
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
       if (JSON.stringify(from[key] ?? null) === JSON.stringify(to[key] ?? null)) continue
       fields.add(key)
       if (key === 'profile_id' || key === 'owner_id' || key === 'owner_class') owner = true
