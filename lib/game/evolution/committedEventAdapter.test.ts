@@ -258,4 +258,21 @@ assert(sharedRefAcrossDomains.events.length === 2 &&
   sharedRefAcrossDomains.rejected.length === 0,
   'source reference identity must include owning Core domain')
 
+
+// A rejected proposal may reuse the eventual committed event ID. The rejected
+// row must not enter the signature index or suppress the authoritative result.
+const proposalReusesEventId = receipt('decision-event', 2092, false,
+  { action: 'rename', assetId: 'hall', name: 'Unapproved' })
+const approvedReusesEventId = receipt('decision-event', 2092, true,
+  { action: 'rename', assetId: 'hall', name: 'Approved' })
+for (const input of [[proposalReusesEventId, approvedReusesEventId],
+  [approvedReusesEventId, proposalReusesEventId]]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 1 && result.events[0].change.action === 'rename' &&
+    result.events[0].change.name === 'Approved',
+    'uncommitted same-ID proposal must not poison committed event identity')
+  assert(result.rejected.length === 1 && result.rejected[0].reason === 'not_committed',
+    'same-ID proposal must remain explicitly rejected')
+}
+
 console.log('Committed city event adapter: tests passed')
