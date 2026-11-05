@@ -378,7 +378,11 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const nearStaff = Boolean(staff && Math.hypot(pos.x - staffPos.x, pos.y - staffPos.y) <= STAFF_REACH)
   const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
-  const resonanceShelfOpen = isResonanceReading && shown?.action === 'books'
+  // Begegnungsstätte: Die Regale zeigen die Schriften zu Philosophie und Theologie, keine Romane
+  // (05.11.2026: „im Omnizedenz-Gebäude sieht man keine Bücher und Dokumente mehr“ – die
+  // Regale waren nur in der Bibliothek stöberbar, die Bücher nur am Bereich „Lesen & Denken“).
+  const resonanceShelf = isResonanceReading ? shelfAt(layout, pos) : null
+  const resonanceShelfOpen = isResonanceReading && (shown?.action === 'books' || Boolean(resonanceShelf))
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
   const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
@@ -602,6 +606,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         </div>}
         <div className={'player' + (seated ? ' seated' : '') + (playerMoving ? ' moving' : '')} style={{ left: pos.x - 10, top: pos.y - 24 }}><i/><span>Du</span>{held && <b className="held" title={held.title}/>}</div>
         {shelf && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>STÖBERN</button>}
+        {resonanceShelf && talkingNow && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>LESEN</button>}
         {!shelf && near && near.action !== 'staff' && <button className="context" style={{ left: near.x - 40, top: near.y + 12 }} onClick={() => { setActive(near); setTalking(false) }}>{near.label}</button>}
         {staff && nearStaff && !talkingNow && <button className="context" style={{ left: staff.x - 40, top: staff.y + 14 }} onClick={startTalk}>ANSPRECHEN</button>}
         {nearPerson && !(talkingNow && partnerId === nearPerson.person.id) && <button className="context" style={{ left: nearPerson.at.x - 40, top: nearPerson.at.y + 14 }} onClick={() => void startTalkWith(nearPerson.person)}>ANSPRECHEN</button>}
