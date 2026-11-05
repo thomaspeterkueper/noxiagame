@@ -83,7 +83,8 @@ function changedFields(effects: unknown): { owner: boolean; fields: string[] } {
     // Removed fields are changes too: a missing `to` key must not hide
     // an ownership, use or geometry change from the historical evidence.
     for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
-      if (JSON.stringify(from[key] ?? null) === JSON.stringify(to[key] ?? null)) continue
+      if (Object.hasOwn(from, key) === Object.hasOwn(to, key) &&
+          JSON.stringify(from[key]) === JSON.stringify(to[key])) continue
       fields.add(key)
       if (key === 'profile_id' || key === 'owner_id' || key === 'owner_class') owner = true
     }
