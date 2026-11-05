@@ -190,6 +190,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Danach weiß die Figur es im Gespräch.
   - `lib/multiplayer/gestures.ts` mit Tests; im Browser geprüft.
 
+- **05.11.2026 – Eigene Figur gestalten (Second Life, Teil 3):**
+  - Tabelle `player_appearance` (Thomas bestätigt).
+  - `/api/game/appearance`: nur erlaubte Werte, keine Kinder- oder Roboterfigur.
+  - Editor „Deine Figur gestalten …“ im Lokal: Alter, Statur, Haut, Frisur, Haarfarbe, Bart, Ausdruck, Kleidung, Oberteil; Vorschau in vier Richtungen.
+  - Die Figur gilt im Lokal, auf Erdkarte und Oberflächen (dort im Druckanzug) und in der Kolonie. Mitspieler sehen sie über die Anwesenheit.
+  - Bei einer Schicht kommt die Arbeitskleidung darüber.
+  - Im Browser geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

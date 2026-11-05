@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
+import { cleanPlayerLook, defaultPlayerLook } from './playerLook'
 import { kieselAnimated, kieselDirFrom, kieselSVG, type KieselDir, type KieselLook, type KieselPose } from './kiesel'
 
 let reduced: boolean | null = null
@@ -66,4 +67,48 @@ export function useMyFigureId(fallback = 'player'): string {
     return () => { live = false }
   }, [])
   return id
+}
+
+// ── Eigenes Aussehen (player_appearance), einmal geladen, überall gleich ──
+let myLook: KieselLook | null = null
+let loading: Promise<void> | null = null
+const listeners = new Set<(l: KieselLook) => void>()
+function setMine(l: KieselLook) { myLook = l; listeners.forEach(f => f(l)) }
+
+/** Die eigene Figur – Vorgabe aus der Kennung, bis das gespeicherte Aussehen da ist. */
+export function useMyLook(): { look: KieselLook; save: (next: KieselLook) => Promise<{ ok: boolean; error?: string }> } {
+  const id = useMyFigureId()
+  const [look, setLook] = useState<KieselLook>(myLook ?? defaultPlayerLook(id))
+  useEffect(() => {
+    const f = (l: KieselLook) => setLook(l)
+    listeners.add(f)
+    if (myLook) setLook(myLook)
+    else {
+      setLook(defaultPlayerLook(id))
+      loading ??= (async () => {
+        try {
+          const { token, userId } = await getSessionInfo()
+          if (!token || !userId) { loading = null; return }
+          const r = await fetch('/api/game/appearance', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+          const d = await r.json().catch(() => ({}))
+          if (r.ok && d.look) setMine(cleanPlayerLook(d.look, userId))
+        } catch { loading = null }
+      })()
+    }
+    return () => { listeners.delete(f) }
+  }, [id])
+  return {
+    look,
+    async save(next) {
+      try {
+        const { token, userId } = await getSessionInfo()
+        if (!token || !userId) return { ok: false, error: 'Nicht angemeldet.' }
+        const r = await fetch('/api/game/appearance', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ look: next }) })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) return { ok: false, error: String(d.error ?? 'Nicht gespeichert.') }
+        setMine(cleanPlayerLook(d.look, userId))
+        return { ok: true }
+      } catch { return { ok: false, error: 'Keine Verbindung.' } }
+    },
+  }
 }

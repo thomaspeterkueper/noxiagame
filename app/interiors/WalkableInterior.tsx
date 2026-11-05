@@ -22,7 +22,9 @@ import SsfModuleRenderer from '@/app/academy/learn/SsfModuleRenderer'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useGameStore } from '@/lib/store/gameStore'
 import { useRoomPresence, type PeerState } from '@/lib/multiplayer/roomPresence'
-import { KieselFigure } from '@/lib/figures/KieselFigure'
+import { KieselFigure, useMyLook } from '@/lib/figures/KieselFigure'
+import FigureEditor from '@/lib/figures/FigureEditor'
+import { cleanPlayerLook, lookAtWork } from '@/lib/figures/playerLook'
 import { kieselDirFrom, kieselLookFor, type KieselDir, type KieselPose } from '@/lib/figures/kiesel'
 import { useRoomChat } from '@/lib/multiplayer/useRoomChat'
 import { GESTURES, JOINTS, acceptedBy, besidePartner, faceTowards, gestureState, invitesFor, jointState, npcJointDecision, parseGestureCommand, poseNow, type GestureName, type InviteState, type JointName, type NpcJointContext, type PoseState } from '@/lib/multiplayer/gestures'
@@ -413,7 +415,9 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     return{dir:prev.dir,moving:Date.now()-prev.movedAt<500}
   }
   const workKey=String(fitting.kind)
-  const presence=useRoomPresence(entityId,me,{x:pos.x,y:pos.y,seated:Boolean(seat),role:fitting.playerTag??null})
+  const myLook=useMyLook().look
+  const[editingFigure,setEditingFigure]=useState(false)
+  const presence=useRoomPresence(entityId,me,{x:pos.x,y:pos.y,seated:Boolean(seat),role:fitting.playerTag??null,look:myLook})
   const peers=presence.peers
   const peer=peerId?peers.find(p=>p.profileId===peerId)??null:null
   function setMyPose(next:PoseState|null){setMyPoseRaw(next);poseFrom.current=next?{...posRef.current}:null;presence.setPose(next)}
@@ -654,7 +658,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
           </div>
         })}
         {peers.map(p=>{const waving=p.emote&&Date.now()-p.emote.at<6000;return <button key={'peer:'+p.profileId} className={'peer'+(p.seated?' sitting':'')+(peerId===p.profileId?' selected':'')} style={{left:p.x-19,top:p.y-50}} onClick={e=>{e.stopPropagation();select(null);setPeerId(p.profileId)}} onPointerDown={e=>e.stopPropagation()} title={p.name+' (Spieler)'}>
-          {(()=>{const m=motion('peer:'+p.profileId,p.x,p.y);const pp=poseNow(p.pose,nowMs);const partner=p.pose?.with?(p.pose.with===me?.profileId?pos:peers.find(o=>o.profileId===p.pose!.with)??null):null;return <KieselFigure look={kieselLookFor({id:p.profileId},p.role?workKey:null)} dir={pp&&partner?faceTowards(p,partner):m.dir} pose={m.moving?'gehen':pp??(p.seated?'sitzen':'stehen')} title={p.name}/>})()}<span>{p.name}{p.role?' · '+p.role:''}</span>{waving&&<em>{p.emote!.text}</em>}
+          {(()=>{const m=motion('peer:'+p.profileId,p.x,p.y);const pp=poseNow(p.pose,nowMs);const partner=p.pose?.with?(p.pose.with===me?.profileId?pos:peers.find(o=>o.profileId===p.pose!.with)??null):null;return <KieselFigure look={p.look?lookAtWork(p.look,p.profileId,p.role?workKey:null):kieselLookFor({id:p.profileId},p.role?workKey:null)} dir={pp&&partner?faceTowards(p,partner):m.dir} pose={m.moving?'gehen':pp??(p.seated?'sitzen':'stehen')} title={p.name}/>})()}<span>{p.name}{p.role?' · '+p.role:''}</span>{waving&&<em>{p.emote!.text}</em>}
         </button>})}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
         {closedInfo&&<div className="closed"><b>{closedInfo.headline}</b><span>{closedInfo.detail}</span></div>}
@@ -667,7 +671,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         })}
         {openSeats.map(spot=><button key={spot.id} className="seat-hit" style={{left:spot.x-11,top:spot.y-11}} title={'Hier hinsetzen – '+spot.label} aria-label={'Hinsetzen '+spot.label} onClick={()=>sitAt(spot)}/>)}
         {(fitting.markers??[]).map(marker=><div key={marker.key} className="task-marker" style={{left:marker.x-9,top:marker.y-30}} title={marker.label}><b>!</b><span>{marker.label}</span></div>)}
-        {(()=>{const m=motion('me',pos.x,pos.y);return <div className={'player kiesel-player'+(seat?' sitting':'')+(dancing&&onFloor?' dancing':'')+(fitting.playerTag?' working':'')} style={{left:pos.x-19,top:pos.y-50}}><KieselFigure look={kieselLookFor({id:me?.profileId??'player'},fitting.playerTag?workKey:null)} dir={(()=>{const w=myPose?.with;if(!poseNow(myPose,nowMs)||!w)return m.dir;const q=w==='me'?null:peers.find(o=>o.profileId===w)??served.find(f=>f.id===w)?.spot;return q?faceTowards(pos,q):m.dir})()} pose={!m.moving&&poseNow(myPose,nowMs)?poseNow(myPose,nowMs)!:seat?'sitzen':dancing&&onFloor?'tanzen':(fitting.playerTag&&!closed?(m.moving?(workPose(fitting.playerTag,'me',true)==='tragen'?'tragen':null):(nearService||/putz|reinig/i.test(fitting.playerTag)?workPose(fitting.playerTag,'me-',false):null)):null)??(m.moving?'gehen':'stehen')} moving={m.moving} title="Du"/><span>{fitting.playerTag?'Du · '+fitting.playerTag:'Du'}</span></div>})()}
+        {(()=>{const m=motion('me',pos.x,pos.y);return <div className={'player kiesel-player'+(seat?' sitting':'')+(dancing&&onFloor?' dancing':'')+(fitting.playerTag?' working':'')} style={{left:pos.x-19,top:pos.y-50}}><KieselFigure look={lookAtWork(myLook,me?.profileId??'player',fitting.playerTag?workKey:null)} dir={(()=>{const w=myPose?.with;if(!poseNow(myPose,nowMs)||!w)return m.dir;const q=w==='me'?null:peers.find(o=>o.profileId===w)??served.find(f=>f.id===w)?.spot;return q?faceTowards(pos,q):m.dir})()} pose={!m.moving&&poseNow(myPose,nowMs)?poseNow(myPose,nowMs)!:seat?'sitzen':dancing&&onFloor?'tanzen':(fitting.playerTag&&!closed?(m.moving?(workPose(fitting.playerTag,'me',true)==='tragen'?'tragen':null):(nearService||/putz|reinig/i.test(fitting.playerTag)?workPose(fitting.playerTag,'me-',false):null)):null)??(m.moving?'gehen':'stehen')} moving={m.moving} title="Du"/><span>{fitting.playerTag?'Du · '+fitting.playerTag:'Du'}</span></div>})()}
         {nearService&&!closed&&<div className="context hint" style={{left:layout.servicePoint.x-34,top:layout.servicePoint.y+14}}>{service==='self-service'?'AM AUTOMATEN':layout.servicePoint.label} · RECHTS</div>}
         {(nearExit||closed)&&<button className="context exit" style={{left:42,top:420}} onClick={onClose}>{fitting.noun.toUpperCase()} VERLASSEN</button>}
         {fitting.sideDoor&&!closed&&nearSide&&<button className="context exit" style={{left:fitting.sideDoor.x-40,top:398}} onClick={()=>fitting.sideDoor!.use(ctx)}>{fitting.sideDoor.useLabel}</button>}
@@ -711,6 +715,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
           {onFloor&&!seat&&<button onClick={()=>{const next=!dancing;setDancing(next);setStatus(next?'Du tanzt.':'Du hörst auf zu tanzen.')}}>{dancing?'Aufhören':'Tanzen'}</button>}
           {seat?<button onClick={()=>setSeat(null)}>Aufstehen</button>:nextSeat&&<button onClick={()=>sitAt(nextSeat)}>Hinsetzen</button>}
         </div>}
+        <button className="give-open block" onClick={()=>setEditingFigure(true)}>Deine Figur gestalten …</button>
         {!closed&&<div className="moves gestures"><small>GESTEN · auch im Chat: /winken, /prost, /hand …</small>{(Object.keys(GESTURES) as GestureName[]).map(g=><button key={g} className={poseNow(myPose,nowMs)===g?'on':''} onClick={()=>poseNow(myPose,nowMs)===g?setMyPose(null):doGesture(g)}>{GESTURES[g].label}</button>)}</div>}
         {!closed&&fitting.renderOffer(ctx)}
         {!closed&&!selected&&gates.length>0&&<div className="menu learn">
@@ -725,6 +730,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {nearestNpc&&<div className="near">Nächste Person: {personSceneLabel(nearestNpc.resident)} · {nearestNpc.figure.spot.label}</div>}
       </aside>
     </main>
+    {editingFigure&&<FigureEditor onClose={text=>{setEditingFigure(false);if(text)setStatus(text)}}/>}
     {learning&&(()=>{const gate=gates.find(g=>g.id===learning);if(!gate?.moduleId)return null;return <div className="learn-overlay" role="dialog" aria-label={'Lernmodul '+gate.moduleTitle}>
       <div className="sheet">
         <div className="bar"><div><small>LERNEN {fitting.locative.toUpperCase()}</small><b>{gate.moduleTitle}</b><span>{gate.label} – {gate.why}.</span></div><button onClick={()=>setLearning(null)}>Zurück in den Raum</button></div>
