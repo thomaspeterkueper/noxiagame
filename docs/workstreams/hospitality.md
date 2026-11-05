@@ -96,6 +96,151 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Das Personal erklärt Lohn und Sperre im Namen des Betreibers. In der Schicht zeigt die Tafel, was bisher verdient ist und wie viele Aufgaben zum vollen Lohn fehlen.
   - In der Datenbank durchgerechnet, im Browser geprüft. Offen bei Population: Trinkgeld, Lohnsätze aus `role_wage_rates`.
 
+- **02.11.2026 – Friedhof, davon hier: der Beerdigungskaffee:**
+  - Thomas: „Zwischenidee: ein Friedhof“. Entschieden: begehbarer Ort, Bewohner sterben, Beerdigungen, Gedenkort – verteilt als W-13, R-23 und P-1 (Philosophie/NPC, in `NOXIA-NPC-RELIGION-0001`).
+  - Gebaut: Beerdigungskaffee im Lokal (`lib/game/hospitality/funeralReception.ts`), sobald Population ihn als Sondertermin `funeral_reception` ansetzt (Vertrag in R-23 Punkt 6).
+  - Tafel „Beerdigungskaffee für …“. Personal bedient taktvoll; Gastgeber und Trauergäste wissen, für wen er ist, und erfinden keine Erinnerungen.
+  - Der Spieler kann sein Beileid aussprechen. Neu im Motor: `ctx.say(text)`.
+  - Ohne Termin gibt es nichts. Tests in `funeralReception.test.ts`, im Browser mit Probetermin geprüft.
+
+- **03.11.2026 – Gemeinsam im Lokal (Begleitung bleibt beim Spieler):**
+  - Thomas: „die Charaktere sind noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen“. Befund im Protokoll: Lukas Brüggemann ging am 28.10. mit Thomas in die Bar und schwieg dort.
+  - Jetzt bleibt die Begleitung beim Spieler: selber Tisch oder neben ihm (`companionPlace`).
+  - Das Gespräch von draußen geht weiter (`companionHistory`). Die Begleitung weiß, was ausgemacht war, und das Personal begrüßt beide (`companionFacts`).
+  - Gespräche bleiben beim Wechsel zwischen Personen erhalten.
+  - Nebenbei behoben: „im Café Café“.
+  - Kinder, Lebensläufe, Kita, Schule, Spielplatz: R-24 und W-14.
+
+- **03.11.2026 – Echte Lokale öffnen das volle Lokal:**
+  - Thomas: „Lokale zusammenführen“.
+  - Reale Cafés, Bars, Kneipen und Restaurants der Karte bekommen beim ersten Betreten ein NOXIA-Lokal (`noxia_real_venue`). Sie öffnen `CafeWalkableInterior` über `RealVenueInterior`, mit den Anwesenden der Simulation als Personal und Gästen.
+  - In der Datenbank durchgerechnet (vorhandenes Metropol wird gefunden, neues Lokal angelegt und beim zweiten Mal wiedergefunden, Karte vorhanden). Im Browser mit Probeort geprüft.
+  - Requests: W-15, R-28, P-2.
+
+- **04.11.2026 – W-15 fertig:**
+  - Wer mit jemandem losgeht – vorausgehen lassen oder gemeinsam zu einem Ort –, nimmt ihn mit ins Lokal, auch ins reale. Das Gespräch geht drinnen weiter, ohne doppelte Figur.
+  - Die Stellenwand der Agentur kennt reale Lokale mit Personal.
+  - Im Browser geprüft.
+
+- **04.11.2026 – Hausregeln, bezahlte Toilette, Familien:**
+  - **Hausregeln für Eigentümer:** Im eigenen Lokal steht „Hausregeln: Preise, Angebot, Toilette“. Dort lässt sich je Posten ein eigener Preis setzen oder der Posten von der Karte nehmen. Die Toilette ist frei, nur für Gäste, mit Gebühr oder gar nicht da.
+    - Gespeichert über `set_price` und `set_service` (R-18). Den Eigentümer prüft die Datenbank.
+    - `GET /api/game/hospitality/order` liefert dem Eigentümer `houseMenu`, die ganze Karte der Lokalart.
+  - **Toilette mit Gebühr:** Sie wird wie ein Posten gebucht (`toilet`). Die Gebühr steht am Knopf, und wer eben erst war, zahlt nicht gleich noch einmal.
+  - **Familien (vorbereitend, R-24):**
+    - Kakao und Kinderteller auf der Karte (Café; Restaurant nur Kinderteller).
+    - Keine Kinder in Bar und Nachtclub, kein Alkohol an Kinder (auch nicht ausgegeben).
+    - Kinder wissen im Gespräch, dass sie mit niemandem mitgehen und nichts Persönliches verraten. Kinder kommen nicht als Begleitung mit.
+    - Regeln in `lib/game/hospitality/familyRules.ts`, Tests vorhanden.
+  - In der Datenbank als `service_role` durchgerechnet (Preis 5, Kuchen abbestellt, Toilette 2 Cr gebucht), im Browser geprüft.
+
+- **04.11.2026 – Credits untereinander:**
+  - Thomas: „Trinkgeld lassen wir weg, aber es sollte Möglichkeiten geben, generell Credits untereinander auszutauschen.“
+  - **Bar:** In jedem Innenraum gibt es im Gespräch „Credits geben …“ – an den Bewohner, mit dem man spricht. Er weiß es im Gespräch und reagiert darauf.
+  - **Überweisung** am Bankschalter: an Spieler (Spielername, höchstens 2000 Cr am Tag) oder an Bewohner, deren Namen man kennt, mit Verwendungszweck. Darunter stehen die Ein- und Ausgänge.
+  - Bewohner an Spieler: Funktion für Population (R-29).
+  - In der Datenbank als `service_role` durchgerechnet, im Browser geprüft.
+  - Trinkgeld entfällt.
+
+- **04.11.2026 – Andere Spieler im selben Raum:**
+  - Thomas: „andere Spieler sollten gleichzeitig in der gleichen Welt, Bar, Orten usw. sein können“.
+  - In allen Innenräumen des Lokal-Motors sieht man andere Spieler als Figuren mit Namen (Supabase Realtime Presence, `roomPresence.ts`).
+  - Winken, Zuprosten, Credits bar geben.
+  - Bewohner wissen, dass weitere Gäste da sind.
+  - Karte, Auto, Raumschiff: W-16. Freier Chat zwischen Spielern: offen, Schutzregeln nötig.
+
+- **04.11.2026 – Raum-Chat zwischen Spielern, alles protokolliert:**
+  - Thomas: „Chats zwischen Spielern auch freischalten; alles, was gerade passiert, wenn jemand kommt, ist wichtig.“
+  - Im Innenraum gibt es „IM RAUM“: Nachrichten an alle im Haus, mit Verlauf der letzten 30 Minuten und „melden“.
+  - Kontaktdaten werden für die anderen entfernt. Ein Hinweis sagt, dass in der Testphase gespeichert und ausgewertet wird.
+  - Protokolliert werden Kommen, Gehen, Gesten und Meldungen (`player_room_log`). Zustellung über Ably, gesendet nur über den Server.
+  - Tests in `roomChat.test.ts`; im Browser mit nachgestellten Mitspielern geprüft. Auswertung: R-30.
+
+- **04.11.2026 – Kiesel-Figuren:**
+  - Thomas wählt aus drei Entwürfen (Figurenwerkstatt) den Stil „Kiesel“.
+  - Generator `lib/figures/kiesel.ts` mit Tests. Alle Innenräume zeichnen Bewohner, Spieler und Mitspieler jetzt als Kiesel, mit Blickrichtung aus der Bewegung, Gehen, Sitzen und Kleidung nach Arbeit (Schürze im Café, Weste an der Bar).
+  - Im Browser geprüft. Karte: W-17; Aussehen für alle, Alter und Kleidung: R-31.
+
+- **04.11.2026 – Kiesel überall, Tanzen, Arbeit, Rangelei, Kampf:**
+  - Thomas sah im Spiel noch keine neuen Figuren; auf seinen Wunsch auch Erdkarte, Oberflächen, Kolonie und Landmarken auf Kiesel umgestellt (W-17).
+  - Neue Posen in seiner Steigerung:
+    - Tanzen;
+    - Arbeit mit Werkzeug wie in Siedler: Tablett, Glas polieren, Wischen, Hämmern, Hacken, Schaufeln;
+    - Rangelei: Schubsen, Hinfallen;
+    - Kampf: Zuschlagen, Abwehren, Getroffen, am Boden, mit Pflaster für Verletzte.
+  - Im Lokal:
+    - Gäste und Spieler tanzen auf der Tanzfläche.
+    - Das Personal arbeitet sichtbar, mit Pausen: Putzkraft wischt, Tresen poliert, Bedienung trägt das Tablett, der DJ tanzt.
+    - Rangelei und Kampf kommen nur aus Population-Ereignissen `venue_incident` (`venueIncident.ts`, mit Test): Posen, Hinweis, Wissen der Figuren.
+  - Regeln und Folgen: R-32; Haltung zu Streit: P-3.
+
+- **04.11.2026 – Gesten und gemeinsame Bewegungen (nach Second Life):**
+  - Thomas: „wir können uns da auch Sachen von Second Life abschauen“ – „alles nacheinander“. Übernommen ist die Spielmechanik, nicht Namen oder Bilder.
+  - **Gesten:** Winken, Jubeln, Klatschen, Verbeugen, Prost, Tanzen.
+    - Per Knopf oder im Chat („/winken“, „/prost“).
+    - Mitspieler sehen sie über die Anwesenheit.
+    - Eine Figur in der Nähe weiß, dass man ihr zugewinkt hat.
+  - **Gemeinsam:** Zusammen tanzen, Anstoßen, Hand geben, Umarmen, Trösten.
+    - Mit Spielern: Einladung, die andere Seite sagt „Gern“ oder „Lieber nicht“; wer annimmt, geht hin, beide machen die Bewegung und schauen sich an.
+    - Mit Bewohnern: Die Figur entscheidet nach dem, was sie weiß (`npcJointDecision`):
+      - Umarmen nur mit der Begleitung oder nach dem Beileid;
+      - Anstoßen nur, wenn beide etwas trinken;
+      - Tanzen nicht mit Kindern und nicht mit Personal bei der Arbeit;
+      - Trösten nur Trauernde.
+    - Danach weiß die Figur es im Gespräch.
+  - `lib/multiplayer/gestures.ts` mit Tests; im Browser geprüft.
+
+- **05.11.2026 – Eigene Figur gestalten (Second Life, Teil 3):**
+  - Tabelle `player_appearance` (Thomas bestätigt).
+  - `/api/game/appearance`: nur erlaubte Werte, keine Kinder- oder Roboterfigur.
+  - Editor „Deine Figur gestalten …“ im Lokal: Alter, Statur, Haut, Frisur, Haarfarbe, Bart, Ausdruck, Kleidung, Oberteil; Vorschau in vier Richtungen.
+  - Die Figur gilt im Lokal, auf Erdkarte und Oberflächen (dort im Druckanzug) und in der Kolonie. Mitspieler sehen sie über die Anwesenheit.
+  - Bei einer Schicht kommt die Arbeitskleidung darüber.
+  - Im Browser geprüft.
+
+- **05.11.2026 – Flüstern, Sagen, Rufen (Second Life, Teil 4):**
+  - Im Raum-Chat wählt man „Sagen“ (hören die in der Nähe, etwa zwei Fünftel des Raums) oder „Rufen“ (der ganze Raum).
+  - Flüstern geht über den eigenen Ably-Kanal nur an den einen Spieler; wer zu weit weg steht, geht erst hin.
+  - Gespeichert wird alles mit Reichweite und Standort (`player_room_messages.range`, `to_profile_id`, `pos_x`, `pos_y`). Der Verlauf zeigt fremdes Geflüster nicht.
+  - Im Browser geprüft.
+
+- **05.11.2026 – Veranstaltungen (Second Life, Teil 5):**
+  - Tabelle `venue_events` (Thomas bestätigt) und `/api/game/hospitality/events`.
+  - Der Eigentümer kündigt DJ-Abend, Konzert, Lesung, Quiz, Feier oder Stammtisch an (echte Uhrzeit, höchstens zehn Termine, zwei Monate im Voraus) und kann absagen.
+  - Im Lokal hängt der Aushang, dazu „Was ist los? · anderswo“.
+  - Die Figuren wissen davon: Das Personal kennt das Programm, Gäste wissen, was gerade läuft, und kennen die nächste Ankündigung.
+  - Tests; im Browser geprüft. Bewohner kommen zu Veranstaltungen: R-33; Karte: W-18.
+
+- **05.11.2026 – Einrichten und Hausrecht (Second Life, Teil 6):**
+  - Tabellen `venue_furnishing` und `venue_bans` (Thomas bestätigt), `/api/game/hospitality/house`.
+  - **Einrichten:** Wem das Lokal gehört, der zieht im Raum die Tische mit ihren Stühlen und Plätzen an eine andere Stelle und schmückt mit Pflanze, Stehlampe, Bild, Girlande, Teppich und Kerzen (höchstens zwölf Stück).
+    - Das geht auch, wenn geschlossen ist.
+    - Tresen, Tanzfläche, Einlass und Ausgang bleiben frei; die Wege passen sich an (`furnishing.ts`, mit Tests).
+    - Die Figuren sehen den Schmuck.
+  - **Hausrecht:** Der Eigentümer gibt einem Mitspieler Hausverbot für 24 Stunden, eine Woche oder auf Dauer, und kann es wieder aufheben.
+    - Wer Hausverbot hat, sieht das Lokal als geschlossen, mit Angabe, bis wann.
+    - Bestellen und Raum-Chat sind für ihn auch auf dem Server gesperrt; nach höchstens 30 Sekunden greift es auch drinnen.
+  - Im Browser geprüft. Damit sind alle sechs Teile der Second-Life-Mechaniken gebaut.
+
+- **05.11.2026 – In den Arm nehmen, Hand in Hand:**
+  - Thomas: „in den Arm nehmen fehlt oder Hand in Hand laufen“.
+  - Zwei weitere gemeinsame Bewegungen, bei denen man zusammen weitergeht: Wer angenommen hat, läuft neben dem anderen mit, mit der Hand auf der richtigen Seite. Lässt einer los („Loslassen“ oder weggehen), ist es für beide vorbei.
+  - Auch per Chat: „/hand in hand“, „/in den Arm“.
+  - Bewohner machen es nur mit ihrer Begleitung, in den Arm nehmen auch Trauernde nach dem Beileid, nie Kinder.
+  - Tests; im Browser geprüft.
+
+- **06.11.2026 – Polizei, Feuerwehr, Arztpraxis, Krankenhaus:**
+  - Thomas: „ja, mache das“. Begehbare Räume auf dem Innenraum-Motor, mit Dienstpersonal in Uniform, Wissen und Angeboten:
+    - Wache: Anzeige, Fundsache, Verlust; sie kennt gemeldete Vorfälle.
+    - Feuerwache: Löschfahrzeug, Mitmachen bei der Freiwilligen Feuerwehr.
+    - Praxis: Sprechzeiten, Termin, Wartezimmer.
+    - Krankenhaus: Information, Besuch, Station.
+  - Tabelle `service_cases`, `/api/game/services`.
+  - Öffnen von der Karte: `police`, `fire_station`, `doctors`/`dentist`, `hospital`/`clinic`.
+  - Einsatz im Lokal: Nach einer Schlägerei kommt die Streife, bei Verletzten der Rettungsdienst.
+  - Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117; keine Diagnosen.
+  - Tests; im Browser geprüft. Requests R-34, W-20, P-4.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -114,6 +259,29 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-34** (06.11.2026): Polizei, Feuerwehr, Gesundheit – Einsätze und Folgen – `population-economy.md`.
+- **W-20** (06.11.2026): Polizei, Feuerwache, Praxis, Krankenhaus begehbar – `world-map.md`.
+- **P-4** (06.11.2026): Seelsorge im Krankenhaus und bei Einsätzen – NPC-Religion.
+- **W-19** (05.11.2026): Grabsteine auf der Weltkarte – `world-map.md`; Nachtrag zu R-23 (Gräber mit Namen vorziehen).
+- **R-33** (05.11.2026): Bewohner gehen zu Veranstaltungen – `population-economy.md`.
+- **W-18** (05.11.2026): „Was ist los?“ auf der Karte – `world-map.md`.
+- **R-32** (04.11.2026): Streit, Rangelei und Kampf – mit Folgen – `population-economy.md`.
+- **P-3** (04.11.2026): Haltung zu Streit und Gewalt – NPC-Religion.
+- **W-17** (04.11.2026): Kiesel-Figuren auf der Karte – `world-map.md`.
+- **R-31** (04.11.2026): Aussehen für alle – Altersgruppen und Kleidung – `population-economy.md`.
+- **R-30** (04.11.2026): Spieler unter sich – Raum-Chat und Kommen/Gehen in die tägliche Auswertung – `population-economy.md`.
+- **W-16** (04.11.2026): Andere Spieler auf der Karte, im Auto und an Bord – `world-map.md`.
+- **R-29** (04.11.2026): Credits untereinander – Bewohner zahlen Spielern; Trinkgeld entfällt – `population-economy.md`.
+- **W-15** (03.11.2026): Echte Lokale öffnen das volle Lokal – Änderungen in `WorldPanels.tsx` und `/api/world-lab/buildings` prüfen – `world-map.md`.
+- **R-28** (03.11.2026): Echte Lokale – Personal, Käufe, Stellen – `population-economy.md`.
+- **P-2** (03.11.2026): Gastraum nicht doppelt weiterbauen – `NOXIA-NPC-RELIGION-0001`.
+- **R-25** (03.11.2026): Paare und Beziehungen wachsen dynamisch, auch Spieler–Figur mit festen Regeln – `population-economy.md`.
+- **R-26** (03.11.2026): Roboter als Teil der Bevölkerung – `population-economy.md`.
+- **R-24** (03.11.2026): Kinder, Lebensläufe, Kinderschutz, gemeinsame Unternehmungen – `population-economy.md`.
+- **W-14** (03.11.2026): Kindergarten, Schule, Spielplatz betretbar – `world-map.md`.
+- **W-13** (02.11.2026): Friedhöfe begehbar, Gedenkort – `world-map.md`.
+- **R-23** (02.11.2026): Bewohner sterben, Gräber, Trauer, Nachlass, Termine – `population-economy.md`.
+- **P-1** (02.11.2026): Trauerfeier je Tradition – `docs/architecture/NOXIA-NPC-RELIGION-0001-spiritual-roles-and-places.md`.
 - **W-12** (29.10.2026): nach „Gleich hingehen“ die Spielerfigur beim Lokal absetzen – `world-map.md`.
 - **R-22** (29.10.2026): Wünsche aus der Arbeitsvermittlung in der täglichen Gesprächsauswertung; echte Lebensfragen sorgsam – `population-economy.md`.
 - **R-21** (28.10.2026): Arbeitsvermittlung – Gebäude Freiheitsmühle 1, Stellenliste, Betriebe, Schiffe, feste Anstellung – `population-economy.md`.

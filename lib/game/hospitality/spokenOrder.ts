@@ -10,6 +10,9 @@ export interface SpokenOrder { itemCode: string; label: string; /** Das Wort, wi
 
 /** Wörter je Kartenposten. Nur Posten, die auf der Karte stehen, werden vorgeschlagen. */
 const WORDS: Readonly<Record<string, readonly string[]>> = {
+  // Vor „drink“, damit „Kakao“ und „Kinderteller“ ihren eigenen Posten treffen (04.11.2026).
+  cocoa: ['kakao', 'kakau', 'schokomilch', 'heiße schokolade'],
+  kids_meal: ['kinderteller', 'kinderessen', 'kindermenü', 'kindermenue', 'kinderportion'],
   drink: ['getränk', 'getraenk', 'trinken', 'wasser', 'sprudel', 'kaffee', 'espresso', 'cappuccino', 'latte', 'tee', 'kakao', 'cola', 'limo', 'limonade', 'saft', 'schorle', 'bier', 'pils', 'wein', 'milch'],
   longdrink: ['longdrink', 'cocktail', 'gin', 'whisky', 'wodka', 'rum'],
   shot: ['shot', 'kurzer', 'kurzen', 'schnaps', 'tequila'],

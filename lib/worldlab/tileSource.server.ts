@@ -8,6 +8,8 @@ import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, T
 import { buildTile, type SimplifiedTile, type SourceFeature } from './simplify'
 import { lineDetailFeatures } from './lineDetails.server'
 import { storedTileValid, TILE_FORMAT } from './tileFormat'
+import { tileTerrainFor } from './terrainSource.server'
+import type { TileTerrainPart } from './terrain'
 
 type Supabase = ReturnType<typeof createServiceClient>
 type Region = { id: string; lat: number; lon: number; radiusKm: number }
@@ -130,14 +132,16 @@ export async function loadBaseTile(supabase: Supabase, tile: TileId, options: { 
   return { tile: built, origin: 'built' }
 }
 
-export async function loadTile(supabase: Supabase, tile: TileId): Promise<SimplifiedTile> {
+export async function loadTile(supabase: Supabase, tile: TileId): Promise<SimplifiedTile & TileTerrainPart> {
   const origin = tileOrigin(tile)
   const centre = mercToGeo({ x: origin.x + TILE_SIZE_MERC / 2, y: origin.y - TILE_SIZE_MERC / 2 })
   // Kopie: die abgelegte Grundkachel bekommt die Flurstücke nicht mit.
-  const out: SimplifiedTile = { ...(await loadBaseTile(supabase, tile)).tile }
+  const out: SimplifiedTile & TileTerrainPart = { ...(await loadBaseTile(supabase, tile)).tile }
   // Flurstücke ändern sich durch Spieler (Kauf, Teilen) und werden immer frisch gelesen.
-  const parcels = await tileParcels(supabase, tile, centre.lat)
+  // Gelände liegt in eigenen Höhenzellen (NOXIA-WORLD-0004) und kommt wie die Flurstücke frisch dazu.
+  const [parcels, terrain] = await Promise.all([tileParcels(supabase, tile, centre.lat), tileTerrainFor(supabase, tile)])
   if (parcels.length) out.parcels = parcels
+  if (terrain) out.terrain = terrain
   return out
 }
 

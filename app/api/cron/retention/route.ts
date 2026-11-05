@@ -6,6 +6,8 @@
 // EXT-ECO-NOXIA-20260712-001 — Retention-Löschjob
 // Läuft täglich um 03:00 UTC.
 //
+// Regel 0: Wortlaut von Spielergesprächen > 14 Tage → löschen (immer aktiv)
+//
 // Regel 1: Inaktive Konten > 6 Monate → löschen
 //   Quelle: auth.users.last_sign_in_at
 //   Kaskade: ON DELETE CASCADE löscht profiles, ships, player_builds etc.
@@ -19,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { CRON_SECRET_HEADER } from '@/lib/game/config'
+import { RAW_TEXT_RETENTION_DAYS } from '@/lib/game/conversationInsights'
 
 const DRY_RUN = process.env.RETENTION_DRY_RUN !== 'false'
 
@@ -29,6 +32,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
   const now = new Date()
+
+  // ── Regel 0: Gesprächswortlaut nach 14 Tagen löschen (NOXIA-PRIVACY-0004) ──
+  // Unabhängig vom Trockenmodus der Kontolöschung: das ist eine Zusage an die Spieler.
+  const { data: conversationPurge, error: purgeErr } = await supabase.rpc('purge_conversation_raw_text', { p_days: RAW_TEXT_RETENTION_DAYS })
+  if (purgeErr) console.error('[retention] conversation purge failed:', purgeErr.message)
+  else console.log('[retention] conversation purge', conversationPurge)
   const sixMonthsAgo = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString()
   const oneMonthAgo  = new Date(now.getTime() - 1 * 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -56,6 +65,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       dry_run: true,
+      conversation_purge: purgeErr ? { error: purgeErr.message } : conversationPurge,
       would_delete_inactive:    toDeleteInactive.length,
       would_delete_unconfirmed: toDeleteUnconfirmed.length,
       inactive_ids:    toDeleteInactive.map(u => u.id).slice(0, 10),
@@ -93,6 +103,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     dry_run: false,
+    conversation_purge: purgeErr ? { error: purgeErr.message } : conversationPurge,
     deleted_inactive:    deletedInactive,
     deleted_unconfirmed: deletedUnconfirmed,
     errors: errors.length > 0 ? errors : undefined,

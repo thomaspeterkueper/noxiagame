@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import DashboardGate from './DashboardGate'
+import PlayerPresenceHeartbeat from './PlayerPresenceHeartbeat'
 import DashboardPrimaryColony from './DashboardPrimaryColony'
 import { unstable_cache } from 'next/cache'
 
@@ -24,6 +25,10 @@ export default async function Dashboard() {
   return (
     <div className="noxia-dashboard-shell">
       <DashboardGate locations={locations} prices={prices} orders={orders} />
+      <PlayerPresenceHeartbeat />
+      <a href="/testbetrieb" aria-label="Hinweis zur Gesprächsauswertung im Testbetrieb" style={{position:'fixed',right:12,bottom:12,zIndex:5000,padding:'7px 12px',borderRadius:7,background:'rgba(8,25,31,.93)',color:'#d8f4ef',border:'1px solid #4e8883',fontSize:11,boxShadow:'0 2px 10px #0007'}}>
+        TESTBETRIEB · Gespräche werden automatisch ausgewertet · Schutzfilter
+      </a>
       <DashboardPrimaryColony />
       <style>{`
         :root {

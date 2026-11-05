@@ -1,6 +1,8 @@
 'use client'
 
 import React from 'react'
+import { KieselFigure } from '@/lib/figures/KieselFigure'
+import { kieselLookFor, type KieselDir, type KieselLook, type KieselPose, type KieselSource } from '@/lib/figures/kiesel'
 
 export type NpcRole='science'|'engineering'|'operations'|'habitat'|'general'
 export type NpcGenderPresentation='feminine'|'masculine'|'androgynous'
@@ -58,6 +60,7 @@ export function NpcVisualStyles(){return <style>{`
 .npcv .leg{position:absolute;top:27px;width:5px;height:9px;background:#263848}.npcv .l{left:5px}.npcv .r{left:14px}
 .npcv.walking .l{animation:npcwalk .5s infinite alternate}.npcv.walking .r{animation:npcwalk .5s infinite alternate-reverse}
 .npcv.selected{filter:drop-shadow(0 0 7px #ffe27b)}
+.npcv.kv>svg{position:absolute;left:-1px;top:-2px;pointer-events:none}.npcv.kv{--accent:#9fc6d8}
 .npcv>span{position:absolute;top:-17px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#07121eea;border:1px solid #52677a;color:#eee0c6;padding:2px 4px;font:7px monospace}.npcv>span small{display:block;color:var(--accent)}
 @keyframes npcwalk{from{transform:rotate(-15deg)}to{transform:rotate(15deg)}}
 `}</style>}
@@ -66,9 +69,15 @@ function classes(v:NpcVisualProfile,moving:boolean,selected:boolean){
   return ['npcv','gp-'+v.genderPresentation,'frame-'+v.bodyFrame,'hair-'+v.hairStyle,'beard-'+v.facialHair,'age-'+v.ageBand,moving?'walking':'',selected?'selected':''].filter(Boolean).join(' ')
 }
 
-export function NpcFigure({id,name,role,appearance,moving=false,selected=false,showLabel=false,showRoleLabel=true,onClick}:{id:string;name:string;role?:string|null;appearance?:NpcAppearance;moving?:boolean;selected?:boolean;showLabel?:boolean;showRoleLabel?:boolean;onClick?:()=>void}){
+/**
+ * Figur auf Kolonie-Karte und in den Landmarken (Gotteshaus, Bibliothek, Friedhof).
+ * Seit 04.11.2026 im Kiesel-Stil (Thomas: „Kiesel wirkt am angenehmsten“); Name,
+ * Größe (24×38) und Aufruf bleiben, damit alle bisherigen Stellen weiterlaufen.
+ */
+export function NpcFigure({id,name,role,appearance,moving=false,selected=false,showLabel=false,showRoleLabel=true,onClick,pose,dir,look:given}:{id:string;name:string;role?:string|null;appearance?:NpcAppearance;moving?:boolean;selected?:boolean;showLabel?:boolean;showRoleLabel?:boolean;onClick?:()=>void;pose?:KieselPose;dir?:KieselDir;look?:KieselLook}){
   const v=npcVisual(id,role,appearance)
-  return <button className={classes(v,moving,selected)} style={{'--skin':v.skin,'--hair':v.hair,'--suit':v.suit,'--accent':v.accent} as React.CSSProperties} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onClick?.()}} title={showRoleLabel?name+' · '+(role??v.role):name}><i className="sh"/><i className="head"/><i className="hair"/><i className="body"/><i className="leg l"/><i className="leg r"/>{showLabel&&<span>{name}{showRoleLabel&&<small>{role??v.role}</small>}</span>}</button>
+  const look=given??kieselLookFor({id,appearance:appearance as KieselSource['appearance']},role??null)
+  return <button className={classes(v,moving,selected)+' kv'} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onClick?.()}} title={showRoleLabel?name+' · '+(role??v.role):name}><KieselFigure look={look} width={26} pose={pose??(moving?'gehen':'stehen')} moving={moving} dir={dir??'se'} title={name}/>{showLabel&&<span>{name}{showRoleLabel&&<small>{role??v.role}</small>}</span>}</button>
 }
 
 export function NpcPortrait({id,name,role,appearance}:{id:string;name:string;role?:string|null;appearance?:NpcAppearance}){

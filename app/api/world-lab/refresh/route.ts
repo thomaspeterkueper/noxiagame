@@ -8,6 +8,14 @@
 //   2. Ortsdetail (Gebäude, Wohnstraßen, Wege) für die feste Zelle um den Ort
 //      holen, falls es dort noch keins gibt.
 // Bestehende Daten bleiben stehen, wenn ein Abruf scheitert.
+//
+// 05.11.2026: Eine veraltete Region, deren Neuaufbau in den letzten sechs
+// Stunden schon versucht wurde, wird nicht bei jedem Laden erneut geholt.
+// Vorher scheiterte das Sauerland (Profil 4) bei jedem Seitenaufruf nach rund
+// 37 s; das Nachholen übernimmt der stündliche Lauf (cron/world-places).
+//
+// 05.11.2026: Außerdem Gelände (Höhenzellen 3 × 3 um den Ort), falls es noch
+// fehlt – einmal je Ort, danach liest die Karte nur noch die eigene Tabelle.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -16,12 +24,17 @@ import { getEarthRegion } from '@/lib/world/spatial/regions'
 import { EARTH_GEOGRAPHY_IMPORT_VERSION, materializeEarthPlace } from '@/lib/world/spatial/earthPlaceMaterializer.server'
 import { EARTH_LOCAL_DETAIL_SOURCE, enrichEarthLocalScene } from '@/lib/world/spatial/earthLocalEnrichment.server'
 import { DETAIL_RADIUS_KM, detailCell, groundDistanceM } from '@/lib/worldlab/detailCells'
+import { geoToMerc, tileAt } from '@/lib/worldlab/mercator'
+import { terrainCellOf, terrainCellsAround } from '@/lib/worldlab/terrain'
+import { clearTerrainCache, fillTerrainCells } from '@/lib/worldlab/terrainSource.server'
 
 export const maxDuration = 120
 
 const noStore = { 'Cache-Control': 'private, no-store, max-age=0' }
 /** Zeitbudget: Vercel bricht nach 120 s ab und schickt dann eine Textseite statt JSON. */
 const BUDGET_MS = 95_000
+/** Frühestens nach dieser Zeit eine veraltete Region erneut aufbauen (mit wartendem Spieler). */
+const RETRY_AFTER_MS = 6 * 60 * 60 * 1000
 const TIMED_OUT = Symbol('timeout')
 function withinBudget<T>(promise: Promise<T>, started: number): Promise<T | typeof TIMED_OUT> {
   const left = Math.max(1000, BUDGET_MS - (Date.now() - started))
@@ -44,15 +57,18 @@ export async function POST(req: NextRequest) {
 
   // 1. Veraltete Regionen mit eigener Geographie, die den Ort umfassen.
   const { data: rows, error } = await supabase.from('celestial_regions')
-    .select('slug,label,center_lat,center_lon,radius_km,geography_import_version,source')
+    .select('slug,label,center_lat,center_lon,radius_km,geography_import_version,source,source_checked_at')
     .eq('body', 'earth').gte('geography_import_version', 1).lt('geography_import_version', EARTH_GEOGRAPHY_IMPORT_VERSION)
   if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: noStore })
+  const recent = Date.now() - RETRY_AFTER_MS
   const outdated = (rows ?? []).filter(row => row.source !== EARTH_LOCAL_DETAIL_SOURCE
+    && !(row.source_checked_at && new Date(String(row.source_checked_at)).getTime() > recent)
     && groundDistanceM(point, { lat: Number(row.center_lat), lon: Number(row.center_lon) }) <= Number(row.radius_km ?? 0) * 1000)
 
   const cell = detailCell(point)
   const started = Date.now()
-  const [regions, detail] = await Promise.all([
+  const terrainCells = terrainCellsAround(terrainCellOf(tileAt(geoToMerc(point))), 1)
+  const [regions, detail, terrain] = await Promise.all([
     Promise.allSettled(outdated.map(row => withinBudget((() => {
       const configured = getEarthRegion(String(row.slug))
       return materializeEarthPlace({
@@ -65,7 +81,10 @@ export async function POST(req: NextRequest) {
     })(), started).then(value => { if (value === TIMED_OUT) throw new Error('Zeitüberschreitung'); return value }))),
     withinBudget(enrichEarthLocalScene({ slug: earthPlaceSlug(cell), lat: cell.lat, lon: cell.lon, radiusKm: DETAIL_RADIUS_KM }), started)
       .then(result => result === TIMED_OUT ? { ok: false as const, error: 'Zeitüberschreitung' } : { ok: true as const, result }, (reason: unknown) => ({ ok: false as const, error: reason instanceof Error ? reason.message : String(reason) })),
+    fillTerrainCells(supabase, terrainCells, { limit: terrainCells.length, deadline: started + 60_000 })
+      .catch((reason: unknown) => ({ wanted: terrainCells.length, present: 0, fetched: 0, failed: terrainCells.length, skipped: 0, errors: [String(reason)] })),
   ])
+  if (terrain.fetched) clearTerrainCache()
 
   return NextResponse.json({
     regions: regions.map((outcome, index) => ({
@@ -73,6 +92,7 @@ export async function POST(req: NextRequest) {
       ok: outcome.status === 'fulfilled' && Boolean((outcome.value as { ok?: boolean }).ok),
       error: outcome.status === 'rejected' ? String((outcome.reason as Error)?.message ?? outcome.reason) : undefined,
     })),
+    terrain: { fetched: terrain.fetched, present: terrain.present, failed: terrain.failed },
     detail: { cell, ...(detail.ok ? { ok: true, cached: Boolean((detail.result as { cached?: boolean }).cached), total: (detail.result as { total?: number }).total ?? 0 } : { ok: false, error: detail.error }) },
   }, { headers: noStore })
 }

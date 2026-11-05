@@ -14,6 +14,7 @@ import { ResourceType, LocationSlug, useGameStore } from '@/lib/store/gameStore'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { pilotFee } from '@/lib/game/pilotQualification'
 import BuildingResidentsCard from './BuildingResidentsCard'
+import { getToken } from '@/lib/supabase/auth'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️' }
@@ -51,7 +52,7 @@ export default function ColonyDetail({
   onTravel: (dest: LocationSlug) => void
   currentTick?: number
 }) {
-  const { location, shipRange, shipId, speedMult, credits, pilotRequired } = useGameStore()
+  const { location, shipRange, shipId, speedMult, credits, pilotRequired, parkedAt } = useGameStore()
   if (!colony) return null
 
   // Dieselbe Rechnung wie der Server (lib/game/core/transit.ts). Navigations-
@@ -154,8 +155,17 @@ export default function ColonyDetail({
                 <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>
                   An Bord: {energyOnBoard}t{!hasEnergy && ` · fehlt ${energyCost - energyOnBoard}t`}
                 </span>
-              </> : <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>🎫 Linienflug: {ticketPrice.toLocaleString('de')} Cr{!hasEnergy && ' · zu wenig Guthaben'}</span>}
+              </> : <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>🎫 Linienflug: {ticketPrice.toLocaleString('de')} Cr{!hasEnergy && ' · zu wenig Guthaben'}{parkedAt && parkedAt !== location && ` · dein Schiff liegt in ${parkedAt}`}{parkedAt && parkedAt === location && ' · dein Schiff liegt hier'}</span>}
             </div>
+            {!hasShip && parkedAt && parkedAt === location && <button
+              style={{ marginTop: '6px', width: '100%', padding: '7px 0', fontSize: '0.78rem', borderRadius: '8px', border: '1px solid #3d7a64', background: '#12261f', color: '#9ee2c6', cursor: 'pointer' }}
+              onClick={async () => {
+                const token = await getToken()
+                const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'board' }) })
+                const json = await response.json().catch(() => ({}))
+                if (!response.ok || !json.ok) { alert(String(json.error ?? 'Das Einsteigen ist nicht möglich.')); return }
+                await useGameStore.getState().loadFromServer()
+              }}>An Bord deines Schiffs gehen</button>}
           </div>
         ) : (
           <div title="Ziel außerhalb der Reichweite deines Schiffs" style={{ width: '100%', padding: '12px 0', fontSize: '0.9rem', borderRadius: '9px', border: '1px solid #3a4759', background: '#0f1722', color: '#7d93b0', textAlign: 'center', fontWeight: 600 }}>

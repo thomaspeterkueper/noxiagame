@@ -50,6 +50,7 @@ export default function TravelAgency({ from, onBooked, homeOnly = false }: { fro
   }
 
   const credits = data?.credits ?? 0
+  // Die Zeilen entstehen in dieser Hilfsfunktion; styled-jsx erfasst sie dort nicht, daher :global unter .agency.
   const row = (offer: EarthTripOffer, label?: string) => <li key={offer.slug}>
     <div><b>{label ?? offer.name}</b><span>{MODE[offer.mode]} · {offer.distanceKm.toLocaleString('de-DE')} km · {flightDurationText(offer.durationSeconds)}{offer.country && !label ? ` · ${offer.country}` : ''}</span></div>
     <button disabled={Boolean(booking) || credits < offer.price} title={credits < offer.price ? 'Nicht genug Credits' : undefined} onClick={() => void book(offer)}>{booking === offer.slug ? '…' : `${offer.price.toLocaleString('de-DE')} Cr`}</button>
@@ -79,12 +80,12 @@ export default function TravelAgency({ from, onBooked, homeOnly = false }: { fro
       p{margin:0;font-size:11px;color:#b7c7cd;line-height:1.45}
       .ag-error{color:#f0a48a}
       ul{list-style:none;margin:0;padding:0;display:grid;gap:4px;max-height:320px;overflow:auto}
-      li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;border:1px solid #2f4a57;border-radius:7px;background:#0a1c27}
-      li div{display:grid;gap:1px;min-width:0}
-      li b{font-size:12px;color:#eef5f7}
-      li span{font-size:9px;color:#8ba3ad}
-      li button{border:1px solid #9b8545;border-radius:6px;background:#2a2413;color:#f3e2b0;padding:5px 10px;cursor:pointer;font-weight:700;white-space:nowrap}
-      li button:disabled{opacity:.45;cursor:not-allowed}
+      .agency :global(li){display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;border:1px solid #2f4a57;border-radius:7px;background:#0a1c27}
+      .agency :global(li div){display:grid;gap:1px;min-width:0}
+      .agency :global(li b){font-size:12px;color:#eef5f7}
+      .agency :global(li span){font-size:9px;color:#8ba3ad}
+      .agency :global(li button){border:1px solid #9b8545;border-radius:6px;background:#2a2413;color:#f3e2b0;padding:5px 10px;cursor:pointer;font-weight:700;white-space:nowrap}
+      .agency :global(li button:disabled){opacity:.45;cursor:not-allowed}
     `}</style>
   </div>
 }

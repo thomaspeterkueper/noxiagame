@@ -1,3 +1,4 @@
+import { serviceKindFor } from '../services/publicServices'
 // lib/game/landmarks/interiors.ts
 // Aktualisiert: 26.10.2026 — CAMALEO-ArtLounge als dreigeschossiges Stadthaus (EG ArtLounge mit Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer; Galerie und Dachstudio oben, Treppe); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
 // Version:      1.7.0
@@ -9,18 +10,25 @@ export type LandmarkRoomKind =
   | 'mosque' | 'synagogue' | 'hindu_temple' | 'buddhist_temple' | 'community_hall'
   // Omnizedenz-Begegnungsstätte (gekauftes, umgebautes Haus oder gebauter Resonanzplatz).
   | 'resonance_place'
+  // Café, Bar, Restaurant, Kneipe: Gastraum mit Tresen, Tischen und Hockern (03.11.2026).
+  | 'hospitality'
+  // Friedhof als Außenraum mit Gedenkort (W-13, 05.11.2026).
+  | 'cemetery'
+  // Öffentliche Dienste (Gastronomie, 06.11.2026): öffnen den Innenraum-Motor (PublicServiceInterior).
+  | 'police' | 'fire_station' | 'doctors' | 'hospital'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
+  | 'grave' | 'tap' | 'tree' | 'memorial'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
-export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number }
+export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs' | 'memorial'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number }
 /** Bodenzone – rein optisch, blockiert nicht. */
 export type LandmarkZone = { id: string; kind: LandmarkZoneKind; x: number; y: number; w: number; h: number }
 /** Deckenlampe: heller Lichtkegel auf dem Boden. */
 export type LandmarkLamp = { x: number; y: number; r: number; warm?: boolean }
 /** Angestellte Person im Raum – steht an einem festen Platz und ist ansprechbar. */
 export type LandmarkStaff = { id: string; role: string; x: number; y: number; greeting: string }
-export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet'
+export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet' | 'grass' | 'gravel'
 export type LandmarkRoomLayout = {
   kind: LandmarkRoomKind
   noun: string
@@ -38,6 +46,8 @@ export type LandmarkRoomLayout = {
   hostAt?: LandmarkPoint
   /** Wo Besucher bei einem Termin sitzen oder stehen (freie Plätze). */
   gatherAt?: LandmarkPoint[]
+  /** Gastraum: Stehplätze am Tresen. */
+  counterAt?: LandmarkPoint[]
 }
 
 export const LANDMARK_ROOM = { width: 760, height: 480, left: 24, right: 736, top: 28, bottom: 456 }
@@ -145,6 +155,83 @@ function shopLayout(): LandmarkRoomLayout {
       { id: 'desk', label: 'KASSE', x: 555, y: 440, action: 'staff', text: 'Die Kasse. Hier steht jemand, der den Betrieb kennt.' },
     ],
   }
+}
+
+/**
+ * Gastraum (Thomas, 03.11.2026: Leute stehen nicht vor dem Lokal, sondern drinnen): Tresen mit
+ * Hockern und Stehplätzen, Tische mit Stühlen, Bedienung hinter dem Tresen.
+ */
+function hospitalityLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    { id: 'back-shelf', kind: 'shelf', x: 436, y: 34, w: 270, h: 18 },
+    { id: 'counter', kind: 'counter', x: 430, y: 92, w: 280, h: 28 },
+    { id: 'plant-0', kind: 'plant', x: 36, y: 410, w: 26, h: 26 },
+    { id: 'plant-1', kind: 'plant', x: 700, y: 410, w: 26, h: 26 },
+  ]
+  for (let i = 0; i < 5; i++) furniture.push({ id: `stool-${i}`, kind: 'chair', x: 438 + i * 36, y: 134, w: 20, h: 18 })
+  const tables = [[60, 130], [200, 130], [340, 130], [60, 270], [200, 270], [340, 270], [490, 260], [630, 260]]
+  tables.forEach(([x, y], index) => {
+    furniture.push({ id: `table-${index}`, kind: 'table', x, y, w: 64, h: 40 })
+    furniture.push({ id: `chair-${index}-a`, kind: 'chair', x: x + 22, y: y - 24, w: 20, h: 18 })
+    furniture.push({ id: `chair-${index}-b`, kind: 'chair', x: x + 22, y: y + 46, w: 20, h: 18 })
+  })
+  return {
+    kind: 'hospitality', noun: 'Gastraum', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [{ id: 'floor', kind: 'parquet', x: 24, y: 28, w: 712, h: 348 }, { id: 'entry', kind: 'tiles', x: 24, y: 376, w: 712, h: 80 }],
+    lamps: [{ x: 570, y: 100, r: 120, warm: true }, { x: 110, y: 170, r: 100, warm: true }, { x: 250, y: 170, r: 100, warm: true }, { x: 110, y: 310, r: 100, warm: true }, { x: 250, y: 310, r: 100, warm: true }, { x: 560, y: 300, r: 110 }],
+    staff: { id: 'service', role: 'Bedienung', x: 600, y: 72, greeting: 'Hallo! Setz dich, wohin du magst – oder komm an die Theke.' },
+    hostAt: { x: 500, y: 72 },
+    counterAt: [{ x: 630, y: 142 }, { x: 664, y: 142 }, { x: 698, y: 142 }, { x: 596, y: 142 }],
+    spots: [
+      { id: 'counter', label: 'THEKE', x: 560, y: 176, action: 'staff', text: 'Die Theke. Hier bestellt man, und hier wird geredet.' },
+      { id: 'tables', label: 'TISCHE', x: 200, y: 214, action: 'sit', text: 'Tische für zwei und für mehr.' },
+    ],
+  }
+}
+
+export type Stance = 'sit' | 'stool' | 'bar' | 'stand' | 'work'
+export const STANCE_LABEL: Record<Stance, string> = { sit: 'sitzt am Tisch', stool: 'sitzt an der Theke', bar: 'steht an der Theke', stand: 'steht im Raum', work: 'arbeitet' }
+
+function stanceHash(text: string) {
+  let h = 2166136261
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return h >>> 0
+}
+
+/**
+ * Wer im Gastraum wo ist. Mitarbeitende stehen hinter der Theke; Gäste entscheiden selbst
+ * (Hash aus Person und Zeitfenster `bucket`, das sich alle paar Minuten ändert): am Tisch sitzen,
+ * am Tresen sitzen, am Tresen stehen oder frei stehen. Ist eine Wahl voll, kommt die nächste.
+ */
+export function hospitalityPlacement(
+  layout: LandmarkRoomLayout,
+  people: ReadonlyArray<{ id: string; host: boolean }>,
+  bucket: number,
+): Array<{ id: string; at: LandmarkPoint; stance: Stance }> {
+  const center = (item: LandmarkFurniture) => ({ x: item.x + item.w / 2, y: item.y + item.h / 2 })
+  const pools: Record<Exclude<Stance, 'work'>, LandmarkPoint[]> = {
+    sit: layout.furniture.filter(item => item.id.startsWith('chair-')).map(center),
+    stool: layout.furniture.filter(item => item.id.startsWith('stool-')).map(center),
+    bar: [...(layout.counterAt ?? [])],
+    stand: [],
+  }
+  const used = [...pools.sit, ...pools.stool, ...pools.bar]
+  pools.stand = crowdSpots(layout, used.length + people.length + 10).filter(p => !used.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 26))
+  const out: Array<{ id: string; at: LandmarkPoint; stance: Stance }> = []
+  const hosts = people.filter(person => person.host)
+  const hostBase = layout.hostAt ?? layout.start
+  hosts.forEach((person, index) => out.push({ id: person.id, at: { x: hostBase.x - (index % 4) * 36 + Math.floor(index / 4) * 0, y: hostBase.y }, stance: 'work' }))
+  const guests = people.filter(person => !person.host).sort((a, b) => stanceHash(a.id + bucket) - stanceHash(b.id + bucket))
+  for (const person of guests) {
+    const roll = stanceHash(person.id + ':' + bucket) % 100
+    const order: Array<Exclude<Stance, 'work'>> = roll < 45 ? ['sit', 'stool', 'bar', 'stand'] : roll < 70 ? ['stool', 'bar', 'sit', 'stand'] : roll < 88 ? ['bar', 'stand', 'stool', 'sit'] : ['stand', 'bar', 'sit', 'stool']
+    const stance = order.find(key => pools[key].length > 0)
+    if (!stance) continue
+    const pool = pools[stance]
+    const [at] = pool.splice(stanceHash(person.id + bucket + stance) % pool.length, 1)
+    out.push({ id: person.id, at, stance })
+  }
+  return out
 }
 
 function workshopLayout(): LandmarkRoomLayout {
@@ -391,6 +478,53 @@ function resonancePlaceLayout(): LandmarkRoomLayout {
   }
 }
 
+/**
+ * Friedhof (W-13, 05.11.2026): Außenraum mit Wegekreuz, Grabfeldern, Bänken,
+ * Wasserstelle mit Gießkannen, Bäumen und einem Gedenkort. Die Grabsteine tragen
+ * keine Namen, solange die Simulation keine Gräber liefert (R-23) – erfunden wird nichts.
+ */
+function cemeteryLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = []
+  // Vier Grabfelder um das Wegekreuz, je drei Reihen
+  const fields = [{ x: 60, y: 60 }, { x: 440, y: 60 }, { x: 60, y: 262 }, { x: 440, y: 262 }]
+  fields.forEach((field, f) => {
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 7; col++) {
+      if (f === 1 && row === 0 && col >= 5) continue // Platz für den Gedenkort
+      furniture.push({ id: `grave-${f}-${row}-${col}`, kind: 'grave', x: field.x + col * 34, y: field.y + row * 44, w: 22, h: 26 })
+    }
+  })
+  furniture.push(
+    { id: 'memorial', kind: 'memorial', x: 620, y: 40, w: 90, h: 18 },
+    { id: 'tap', kind: 'tap', x: 330, y: 392, w: 26, h: 26 },
+    { id: 'bench-0', kind: 'bench', x: 300, y: 70, w: 18, h: 56 },
+    { id: 'bench-1', kind: 'bench', x: 442, y: 200, w: 56, h: 16 },
+    { id: 'bench-2', kind: 'bench', x: 160, y: 200, w: 56, h: 16 },
+    { id: 'tree-0', kind: 'tree', x: 30, y: 200, w: 34, h: 34 },
+    { id: 'tree-1', kind: 'tree', x: 700, y: 200, w: 34, h: 34 },
+    { id: 'tree-2', kind: 'tree', x: 380, y: 34, w: 30, h: 30 },
+    { id: 'tree-3', kind: 'tree', x: 700, y: 400, w: 30, h: 30 },
+  )
+  return {
+    kind: 'cemetery', noun: 'Friedhof', start: { x: 380, y: 432 }, exit: { x: 380, y: 452 }, furniture,
+    zones: [
+      { id: 'grass', kind: 'grass', x: 24, y: 28, w: 712, h: 428 },
+      { id: 'path-ns', kind: 'gravel', x: 352, y: 28, w: 56, h: 428 },
+      { id: 'path-ew', kind: 'gravel', x: 24, y: 218, w: 712, h: 36 },
+    ],
+    lamps: [],
+    staff: null,
+    hostAt: { x: 380, y: 236 },
+    gatherAt: [{ x: 340, y: 236 }, { x: 420, y: 236 }, { x: 300, y: 236 }, { x: 460, y: 236 }, { x: 380, y: 280 }, { x: 380, y: 196 }],
+    spots: [
+      { id: 'cross', label: 'WEGEKREUZ', x: 380, y: 236, text: 'Kieswege zwischen den Grabfeldern. Hier geht man langsam und spricht leise.' },
+      { id: 'fields', label: 'GRABFELDER', x: 326, y: 166, text: 'Grabreihen mit Steinen und Bepflanzung. Namen stehen hier erst, wenn in der Simulation jemand beigesetzt wird.' },
+      { id: 'memorial', label: 'GEDENKORT', x: 665, y: 90, action: 'memorial', text: 'Eine stille Wand mit einer Kerzenbank. Hier kannst du für dich eine Kerze anzünden, wenn du magst mit einem Namen. Nur du siehst, was du hier hinterlässt.' },
+      { id: 'tap', label: 'WASSERSTELLE', x: 343, y: 440, text: 'Ein Wasserhahn mit Gießkannen für die Grabpflege.' },
+      { id: 'bench', label: 'BANK', x: 470, y: 190, action: 'sit', text: 'Eine Bank unter dem Baum. Hier darf man einfach sitzen.' },
+    ],
+  }
+}
+
 /** Mehrgeschossige Häuser: Anzahl Geschosse je Raumart (alle anderen haben eines). */
 export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3 }
 
@@ -513,12 +647,19 @@ export function worshipRoomKind(religion?: string | null, buildingType?: string 
 }
 
 /** Landmark classes that have a walkable interior; all others show the place card. */
+/** Lokale, die einen Gastraum bekommen (OSM-amenity). */
+const HOSPITALITY_CLASSES = new Set(['cafe', 'bar', 'restaurant', 'pub', 'biergarten', 'fast_food', 'ice_cream'])
+
 export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, string>): LandmarkRoomKind | null {
   if (landmarkClass === 'library') return 'library'
   if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
   if (landmarkClass === 'community_centre') return 'community_hall'
   if (landmarkClass === 'resonance_place') return 'resonance_place'
+  if (landmarkClass === 'cemetery' || landmarkClass === 'grave_yard') return 'cemetery'
+  if (HOSPITALITY_CLASSES.has(landmarkClass)) return 'hospitality'
+  const service = serviceKindFor(landmarkClass)
+  if (service) return service
   return null
 }
 
@@ -533,6 +674,8 @@ export function buildingRoomKind(useCode?: string | null, source?: string | null
   const [prefix, value = ''] = String(useCode ?? '').split(':')
   if (prefix === 'a' && value === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (prefix === 'a' && value === 'community_centre') return 'community_hall'
+  if (prefix === 'a' && HOSPITALITY_CLASSES.has(value)) return 'hospitality'
+  if ((prefix === 'a' || prefix === 'b') && serviceKindFor(value)) return serviceKindFor(value)
   if (prefix === 'b' && ['church', 'chapel', 'cathedral'].includes(value)) return 'worship'
   if (prefix === 'b' && ['mosque', 'synagogue', 'temple'].includes(value)) return worshipRoomKind(tags?.religion, value)
   return null
@@ -550,6 +693,8 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'buddhist_temple': return buddhistTempleLayout()
     case 'community_hall': return communityHallLayout()
     case 'resonance_place': return resonancePlaceLayout()
+    case 'cemetery': return cemeteryLayout()
+    case 'hospitality': return hospitalityLayout()
     default: return workshopLayout()
   }
 }
@@ -679,7 +824,11 @@ export type LandmarkWaypoint = { id: string; label: string; x: number; y: number
 export function landmarkWaypoints(layout: LandmarkRoomLayout): LandmarkWaypoint[] {
   const out: LandmarkWaypoint[] = layout.spots.map(spot => ({ id: `spot:${spot.id}`, label: spot.label.charAt(0) + spot.label.slice(1).toLowerCase(), x: spot.x, y: spot.y, kind: spot.action === 'sit' ? 'Sitzplatz' : spot.action === 'staff' ? 'Tresen' : 'Bereich' }))
   const shelves = layout.furniture.filter(item => item.kind === 'shelf' || item.kind === 'shelf-low')
-  if (shelves.length) {
+  if (shelves.length && layout.kind === 'resonance_place') {
+    // Begegnungsstätte: keine Romane (die gibt es in der Bibliothek), nur Philosophie und Theologie (05.11.2026)
+    const first = shelves.find(item => item.kind === 'shelf') ?? shelves[0]
+    out.push({ id: 'shelf:lesen', label: 'Regal (Philosophie & Theologie)', x: first.x + Math.min(60, first.w / 2), y: first.y + first.h + 18, kind: 'Regal' })
+  } else if (shelves.length) {
     const first = shelves.find(item => item.kind === 'shelf') ?? shelves[0]
     out.push({ id: 'shelf:romane', label: 'Regale (Romane)', x: first.x + Math.min(60, first.w / 2), y: first.y + first.h + 18, kind: 'Regal' })
     const low = shelves.find(item => item.kind === 'shelf-low')

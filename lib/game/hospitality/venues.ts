@@ -29,6 +29,8 @@ export interface VenuePoint { x: number; y: number }
 
 export type VenueFurnitureKind =
   | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs' | 'lectern' | 'board' | 'dj-booth' | 'sofa'
+  // Öffentliche Dienste (05.11.2026): Löschfahrzeug, Krankenbett, Spinde.
+  | 'vehicle' | 'bed' | 'locker'
 
 export interface VenueFurniture {
   id: string
@@ -1059,6 +1061,8 @@ export interface ConversationFactsInput {
   playerWorkingFact?: string | null
   /** Lohn und Ruf des Gegenübers im Haus – nur Personal (playerShift.employerShiftFacts). */
   employmentFacts?: readonly string[]
+  /** Besonderer Anlass im Lokal, z. B. Beerdigungskaffee (funeralReception.ts) – steht früh, damit er nicht abgeschnitten wird. */
+  occasionFacts?: readonly string[]
 }
 
 function menuFact(layout: VenueLayout, menu: readonly VenueMenuItem[]): string {
@@ -1104,6 +1108,7 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     (name ? `Ihr befindet euch ${layout.locative} ${name}` : `Ihr befindet euch ${layout.locative}`) + clock,
   ]
   if (seesGuestRoom) facts.push(layout.roomFact)
+  for (const f of input.occasionFacts ?? []) facts.push(fit(f))
 
   if (staff) facts.push(`Du arbeitest hier und ${posture} ${self.spot.label}`)
   else if (self.roomRole === 'companion') facts.push(`Du bist mit deinem Gegenüber hergekommen und ${posture} ${self.spot.label}`)
@@ -1166,4 +1171,43 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
   }
 
   return facts.slice(0, MAX_CONVERSATION_FACTS).map(fit)
+}
+
+// ── Gemeinsam unterwegs (Thomas, 03.11.2026: „die Charaktere sind noch nicht sehr
+// authentisch, vor allem bei gemeinsamen Aktionen“) ─────────────────────────
+// Wer mit dem Spieler hereinkommt, bleibt bei ihm: Er setzt sich mit an den Tisch,
+// steht neben ihm am Tresen und geht mit, statt allein an der Tür stehen zu bleiben.
+
+/** Wo die Begleitung gerade ist: am selben Tisch, sonst neben dem Spieler. */
+export function companionPlace(layout: VenueLayout, input: { playerPos: VenuePoint; playerSeat: VenueSpot | null; taken: ReadonlySet<string> }): VenueSpot {
+  const { playerPos, playerSeat, taken } = input
+  if (playerSeat) {
+    const seats = layout.spots.filter(s => s.kind === 'seat' && s.id !== playerSeat.id && !taken.has(s.id))
+    const sameTable = seats.filter(s => s.label === playerSeat.label)
+    const pool = sameTable.length ? sameTable : seats.filter(s => Math.hypot(s.x - playerSeat.x, s.y - playerSeat.y) < 70)
+    const best = pool.sort((a, b) => Math.hypot(a.x - playerSeat.x, a.y - playerSeat.y) - Math.hypot(b.x - playerSeat.x, b.y - playerSeat.y))[0]
+    if (best) return best
+  }
+  for (const dx of [24, -24, 0]) {
+    const p = { x: playerPos.x + dx, y: playerPos.y + (dx === 0 ? 22 : 4) }
+    if (!isVenueBlocked(layout, p, 8)) return { id: 'with-player', kind: 'standing' as VenueSpotKind, x: p.x, y: p.y, roomId: layout.playerRoomId, label: 'neben dir', posture: 'standing' }
+  }
+  return { id: 'with-player', kind: 'standing' as VenueSpotKind, x: playerPos.x, y: playerPos.y + 20, roomId: layout.playerRoomId, label: 'neben dir', posture: 'standing' }
+}
+
+/**
+ * Was die Begleitung weiß: dass ihr zusammen gekommen seid, was ihr draußen
+ * ausgemacht habt (letzter eigener Satz) und wo ihr gerade seid. Das Personal
+ * sieht, dass zwei zusammen gekommen sind.
+ */
+export function companionFacts(input: { role: 'companion' | 'staff' | 'guest'; companionLabel: string; plan: string | null; sittingTogether: boolean }): string[] {
+  const plan = input.plan ? input.plan.replace(/\s+/g, ' ').trim() : null
+  if (input.role === 'companion') {
+    const facts = ['Du bist eben zusammen mit deinem Gegenüber hereingekommen; ihr seid zu zweit hier, du bleibst bei ihm']
+    if (plan) facts.push(`Draußen hast du zuletzt gesagt: „${plan.length > 90 ? plan.slice(0, 89) + '…' : plan}“ – knüpf daran an`)
+    facts.push(input.sittingTogether ? 'Ihr sitzt zusammen am Tisch; bestellen könnt ihr bei der Bedienung' : 'Ihr steht zusammen im Raum; schlag vor, wo ihr euch hinsetzt oder was ihr bestellt')
+    return facts.map(f => f.length > 140 ? f.slice(0, 139) + '…' : f)
+  }
+  if (input.role === 'staff') return [`Dein Gegenüber ist zusammen mit ${input.companionLabel} gekommen; begrüße beide und frag, was beide möchten`.slice(0, 140)]
+  return [`Dein Gegenüber ist zusammen mit ${input.companionLabel} hier`.slice(0, 140)]
 }

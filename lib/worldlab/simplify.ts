@@ -6,9 +6,11 @@
 // Koordinaten in der Kachel: Meter am Boden, x nach Osten, y nach Süden,
 // gemessen ab der Nordwestecke der Kachel.
 
+import { knownPlaceName } from './placeNames'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from './mercator'
 import { buildingUseCode } from './buildingUse'
 import { nearestRoadAngle, octagonRing, worshipMassing, type WorshipMassing } from './worshipShapes'
+import { forestLeaf, osmTreeCode } from './plantTags'
 
 export interface SourceFeature {
   id: string
@@ -34,7 +36,7 @@ export interface TilePlace { x: number; y: number; n: string; k: string; t?: Rec
 const PLACE_TAGS = ['religion', 'denomination', 'addr:street', 'addr:housenumber', 'opening_hours', 'start_date', 'operator', 'description', 'wikipedia', 'shop', 'cuisine', 'amenity', 'craft', 'office', 'tourism']
 
 export interface TileRoad { c: RoadClass; p: number[]; /** Straßenname, wenn bekannt. */ n?: string; /** 1: Kreisverkehr */ r?: 1; /** 1: Brücke */ b?: 1 }
-export interface TileArea { k: AreaKind; p: number[] }
+export interface TileArea { k: AreaKind; p: number[]; /** Name aus OSM (nur Friedhöfe, W-13: „Friedhof betreten“) */ n?: string; /** Wald: b Laub-, n Nadel-, m Mischwald, s Gebüsch (plantTags.ts) */ l?: 'b' | 'n' | 'm' | 's' }
 export interface TileBlock {
   x: number; y: number; w: number; d: number; a: number; k: BlockKind; l: number
   /** Echter Grundriss (Meter in der Kachel, x/y abwechselnd) – nur bei Hallen und Fabriken, deren Form kein Rechteck ist. */
@@ -72,6 +74,8 @@ export interface SimplifiedTile {
   tracks?: number[][]
   /** Einzelbäume und Bäume aus Alleen: Standorte x/y abwechselnd, nur die in dieser Kachel. */
   trees?: number[]
+  /** Baumart je Baum aus OSM (osmTreeCode), gleich lang wie trees/2; fehlt, wenn keine bekannt ist. */
+  ts?: string[]
   /** Wahrzeichen (Kirche, Bibliothek, Museum …): Lage, Name, Art und ausgewählte OSM-Angaben. */
   places?: TilePlace[]
   /** Flurstücke (Kataster): Kennung und Grenze in Metern der Kachel */
@@ -415,6 +419,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
       seen.add(key)
       ;(out.trees ??= []).push(round1(at.x), round1(at.y))
+      ;(out.ts ??= []).push(osmTreeCode(properties))
       continue
     }
     if (!Array.isArray(coordinates) || coordinates.length < 2) continue
@@ -439,6 +444,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       if (street && number) block.h = `${street} ${number}`.slice(0, 80)
       else if (number) block.h = number.slice(0, 20)
       if (typeof properties.name === 'string' && properties.name.trim()) block.nm = properties.name.trim().slice(0, 80)
+      else if (knownPlaceName(properties.noxia_source_id)) block.nm = knownPlaceName(properties.noxia_source_id)
       if (typeof properties.noxia_source_id === 'string' && properties.noxia_source_id.startsWith('osm:')) block.i = properties.noxia_source_id.slice(0, 40)
       const use = buildingUseCode(properties)
       if (use) block.u = use
@@ -450,9 +456,11 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
 
     // Allee: alle 8 m ein Baum entlang der Linie, jeder in der Kachel, in der er steht.
     if (feature.featureType === 'tree_row' && feature.geometry.kind === 'line') {
+      const code = osmTreeCode(properties)
       for (const at of samplesAlong(points, 8)) {
         if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
         ;(out.trees ??= []).push(round1(at.x), round1(at.y))
+        ;(out.ts ??= []).push(code)
       }
       continue
     }
@@ -511,7 +519,9 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
           }
         }
       }
-      if (clipped.length >= 4) out.areas.push({ k: kindHere as AreaKind, p: flat(clipped) })
+      const areaName = kindHere === 'cemetery' && typeof properties.name === 'string' ? properties.name.slice(0, 80) : undefined
+      const leaf = kindHere === 'forest' ? forestLeaf(feature.featureType, properties) : undefined
+      if (clipped.length >= 4) out.areas.push({ k: kindHere as AreaKind, p: flat(clipped), ...(areaName ? { n: areaName } : {}), ...(leaf ? { l: leaf } : {}) })
     }
   }
   // Feste Reihenfolge: Felder unten, dann Gärten und bebaute Fläche, Wald, Sportanlage,
@@ -521,6 +531,8 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
     plaza: 2, grounds: 4, playground: 5, track: 5, sand: 6, hardcourt: 6, clay: 6, pitch: 6, pool: 7, water: 8,
   }
   out.areas.sort((a, b) => order[a.k] - order[b.k])
+  // Baumarten nur mitschicken, wenn mindestens eine bekannt ist
+  if (out.ts && (out.ts.length * 2 !== (out.trees?.length ?? 0) || out.ts.every(code => !code))) delete out.ts
   const roadOrder: Record<RoadClass, number> = { path: 0, service: 1, street: 2, main: 3 }
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])
   if (out.rw && out.rw.length !== out.rivers.length) delete out.rw

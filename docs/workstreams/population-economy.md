@@ -663,3 +663,347 @@ Thomas, 29.10.2026: „Es sollte Personal oder wenigstens Roboter geben, damit w
      - den Schein selbst serverseitig ausstellen und prüfen;
      - optional eine Tabelle `job_referrals` (player, building, role, issued_at, used_at), damit die Auswertung sieht, welche Vermittlungen angetreten werden.
 
+### R-23 (Gastronomie, 02.11.2026): Bewohner sterben – Gräber, Trauer, Nachlass, Termine
+
+Thomas, 02.11.2026: „Zwischenidee: ein Friedhof.“ Auf Nachfrage entschieden, alle vier Teile:
+- ein begehbarer Ort;
+- Bewohner sterben;
+- Beerdigungen mit anschließendem Beerdigungskaffee;
+- ein Gedenkort, auch für Spieler selbst.
+
+Verteilt als Requests:
+- W-13 an die Erdkarte: Ort und Gedenken;
+- R-23 an Population: Sterben, Gräber, Trauer;
+- P-1 an Philosophie/NPC: die Trauerfeier.
+
+Den Beerdigungskaffee baut die Gastronomie.
+
+**Stand (02.11.2026):** In der Simulation stirbt niemand. `person_life_state` kennt bisher nur `adult` (65 Personen). `people` hat keine Spalte für den Tod.
+
+**Bitte – Vorschläge, die Entscheidung liegt bei euch:**
+1. **Sterblichkeit:** selten und nachvollziehbar, nach Alter (Geburtsjahr, `ageAtTick`) und später nach Gesundheit; kein Zufallstod junger Menschen ohne Grund.
+   - Lebensstufen `elder` und `deceased` in `person_life_state`;
+   - Ereignis `person_died` in `population_events` (Person, Tick, Ort).
+   - Tote bleiben als Eintrag erhalten. Sie erscheinen nicht mehr im Raum, im Gespräch, auf Stellen oder in Wohnungen.
+2. **Grab:** eine Tabelle, z. B. `person_graves` (Person, Friedhof als OSM-Kennung, Grabfeld, Beisetzung als Tick, Art: Erd- oder Urnengrab).
+   - Gewählt wird der nächste Friedhof am Wohnort, oder nach Religion, wenn es einen eigenen gibt.
+   - Die Erdkarte zeigt die Gräber (W-13).
+3. **Trauer:** Wer eine enge Beziehung hatte (Zuneigung ≥ 0,5), trauert eine Zeit lang (Affekt) und besucht ab und zu das Grab.
+   - Figuren wissen davon nur, was sie wissen können: Angehörige und Freunde sofort, Bekannte vom Hörensagen.
+4. **Nachlass** nach NOXIA-FIN-0001: Guthaben und Besitz als Transfer an Erben aus den Familienbeziehungen, sonst an die Gemeinde. Keine Emission, nichts verschwindet.
+   - Freie Stelle und Wohnung werden wieder vergeben.
+5. **Termine:**
+   - **Trauerfeier** als Sondertermin, `population_events` `place_activity_scheduled`, Art `funeral`, in Kapelle oder Kirche, mit Trauergemeinde aus den Beziehungen (siehe P-1 bei Philosophie/NPC).
+   - Danach der **Beerdigungskaffee** als Sondertermin im nächsten Lokal. Den baut die Gastronomie, Vertrag unten.
+6. **Beerdigungskaffee – Vertrag mit der Gastronomie** (im Lokal schon gebaut, 02.11.2026):
+
+   ```json
+   {
+     "event_type": "place_activity_scheduled",
+     "payload": {
+       "kind": "funeral_reception",
+       "tileEntityId": "<Lokal>",
+       "label": "Beerdigungskaffee",
+       "deceasedPersonId": "<id>", "deceasedName": "<Name>",
+       "hostPersonId": "<Angehörige(r)>",
+       "guestIds": ["<id>", "…"],
+       "startsTick": 1234, "endsTick": 1236
+     }
+   }
+   ```
+
+   - Die Trauergäste kaufen wie sonst im Lokal (`person_consumption_events`). Die Familie zahlt: Transfer Gastgeber → Betreiber, Posten Kaffee und Kuchen. Dann erscheinen sie im Raum.
+   - Das Lokal zeigt „Beerdigungskaffee“. Personal und Trauergäste wissen, für wen er ist. Der Spieler kann der Familie sein Beileid aussprechen.
+   - Ob der Spieler eingeladen ist (z. B. wenn er die Verstorbene kannte), könnt ihr als `playerProfileIds` mitgeben. Ohne Einladung ist er normaler Gast im Lokal.
+
+**Nachtrag 05.11.2026 (Gastronomie):**
+- Thomas: „Friedhof ist auch da, Grabsteine fehlen noch.“ Der begehbare Friedhof und die Karte sind fertig (W-13); es fehlen die Gräber selbst.
+- Bitte Punkt 2 (`person_graves`) vorziehen: Wer gestorben ist, bekommt ein Grab mit Namen, Lebensjahren, Friedhof (OSM-Kennung) und Grabfeld.
+- Die Erdkarte zeigt die Steine (W-19).
+
+### R-24 (Gastronomie, 03.11.2026): Kinder, Lebensläufe und gemeinsame Unternehmungen
+
+Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, Kindergarten, Spielplatz. Aktuell sind die Charaktere noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen.“
+
+**Stand (03.11.2026):** 65 Personen, alle erwachsen (`person_life_state` nur `adult`, Geburtsjahre 2031–2079). `person_parent_child` ist leer.
+
+**Bitte:**
+
+0. **Kinderschutz zuerst – Voraussetzung, bevor die erste minderjährige Figur ansprechbar ist:**
+   - Im Gesprächsweg (`/api/game/npc-conversation`) gelten für Figuren unter 18 feste Regeln, unabhängig vom Spielertext:
+     - keine Romantik, kein Flirt, nichts Sexuelles;
+     - keine Geheimnisse mit Erwachsenen, keine persönlichen Daten erfragen oder weitergeben;
+     - Kinder sprechen kurz und altersgerecht. Bei Grenztests verweisen sie auf ihre Eltern und beenden das Gespräch.
+   - Minderjährige können **nicht mitgenommen werden**: `lead_walk` und `visit_place` sind für sie gesperrt, kein „komm mit“ zu Spielern.
+   - Kleine Kinder sind nur mit einem Elternteil oder in Kita und Schule unterwegs.
+   - Lokale: keine Kinder in Bar und Nachtclub, kein Alkohol unter 18. Die Gastronomie prüft das im Innenraum, sobald Alter oder Lebensstufe an den Figuren hängt.
+1. **Lebensstufen** in `person_life_state`: Säugling, Kleinkind, Kindergartenkind (3–6), Schulkind (6–10), Jugendliche(r) (10–18), Ausbildung oder Studium, Beruf, Ruhestand – und `deceased` (R-23). Jede Stufe hat ihren Tagesablauf:
+   - Kita oder Schule am Vormittag;
+   - nachmittags Spielplatz, Sportverein, Hausaufgaben, mit Eltern einkaufen;
+   - abends zu Hause.
+2. **Geburt und Familie:** Kinder in Familien (`person_parent_child`), aus Paaren mit Kinderwunsch (`family_desire` gibt es schon). Ein Kind hat Name, Geburtsjahr, Aussehen, Eltern und Wohnung der Familie.
+   - Die Eltern wissen, wo ihr Kind gerade ist. Sie sprechen von ihm, wenn es passt.
+3. **Lebenslauf als Daten:** je Person die Stationen mit Jahr, z. B. Kita, Schule, Abschluss, Ausbildung, erste Stelle, Umzug, Heirat, Kinder, Rente.
+   - Daraus erzählt die Figur ihr Leben stimmig und erfindet nicht im Gespräch.
+   - Für die heutigen 65 Erwachsenen bitte einen glaubwürdigen Lebenslauf nachtragen, passend zu Rolle, Alter und Biografie.
+4. **Gemeinsame Unternehmungen der Bewohner untereinander:** Heute kauft jede Person einzeln (`person_consumption_events`). Echt wäre:
+   - Familien gehen zusammen ins Café, Freunde treffen sich an einem Tisch, Eltern mit Kind auf dem Spielplatz.
+   - Vorschlag: eine Gruppen-Kennung am Besuch (`group_id`) und gemeinsamer Ort mit gemeinsamer Zeit. Die Gastronomie setzt Gruppen dann an einen Tisch, und sie reden miteinander.
+   - Wer zahlt: einer für alle oder jeder selbst, als Transfer nach NOXIA-FIN-0001.
+5. **Gemeinsam mit dem Spieler** – Befunde aus dem Gesprächsprotokoll:
+   - 28.10.: Lukas Brüggemann geht mit Thomas „rüber zur Bar“. Im Metropol begrüßt nur der Barkeeper, Lukas schweigt.
+   - 31.10.: Hana Moreau führt zur Agentur, bleibt stehen („Doch, ich geh ja schon“).
+   - Victor Chen ist am 31.10. in St. Johannes und am 02.11. in Istanbul.
+   - **Gastronomie hat heute gebaut:** Die Begleitung bleibt im Lokal beim Spieler (selber Tisch, neben ihm am Tresen). Das Gespräch von draußen geht drinnen weiter, und das Personal begrüßt beide.
+   - **Bitte an euch:**
+     - Wer etwas zusagt („ich komme mit“), soll es in seinem Gedächtnis haben, auch beim nächsten Mal.
+     - Eine Begleitung soll auch selbst bestellen und zahlen können, als echter Kauf.
+     - Ortswechsel von Personen über Kontinente hinweg brauchen eine Reise.
+
+**Nachtrag R-24 (Gastronomie, 04.11.2026):**
+- Das Lokal ist für Kinder vorbereitet (`familyRules.ts`): Kakao, Kinderteller, keine Kinder in Bar und Nachtclub, kein Alkohol an Kinder.
+- Erkannt wird ein Kind an `lifeStage: 'child'` oder an einem bekannten Alter unter 18. Bitte liefert `lifeStage` mit den Bewohnern in `/api/game/population` und am Gast im Gäste-Abruf.
+- Serverseitig fehlt noch die Prüfung beim Ausgeben: `order_hospitality_item` kennt den Empfänger nicht. Wenn Kinder kommen, bitte `recipientPersonId` mitnehmen und Alkohol an Minderjährige ablehnen.
+
+### R-25 (Gastronomie, 03.11.2026): Paare und Beziehungen entwickeln sich – auch mit Spielern
+
+Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnten auch Spieler und NPC ein Paar werden, oder später ganz andere Konstellationen. Ich denke, das muss sich dynamisch im Spiel und auf den Stationen, Kolonien und Raumschiffen entwickeln. Roboter fehlen noch.“
+
+**Stand (03.11.2026):** `person_relationships` hat 118 Einträge: 68 `friend`, 30 `acquaintance`, 20 `partner` (zehn Paare). Sie sind gesetzt, nicht gewachsen. Spieler haben kein Alter in `profiles`.
+
+**Bitte – Bewohner untereinander:**
+1. **Beziehungen wachsen und enden:** aus Begegnungen am selben Ort (Arbeit, Lokal, Verein, Gottesdienst, Bordleben) entstehen Bekanntschaft, Freundschaft, Verliebtheit, Partnerschaft, Zusammenziehen, Familie (R-24). Auch Streit, Trennung, Versöhnung, Verwitwung (R-23).
+   - Langsam und begründet: Nähe, Zeit, gemeinsame Interessen, Werte.
+   - Jedes Ereignis steht in `population_events` und im Gedächtnis der Beteiligten.
+2. **Konstellationen offen:** gleich- und gemischtgeschlechtliche Paare, Alleinerziehende, Patchwork, Wahlfamilien, Wohngemeinschaften; später weitere Formen. Nichts ist fest verdrahtet: `relationship_type` plus Eigenschaften statt einer starren Liste.
+3. **Überall:** auf der Erde, auf Stationen, in Kolonien und an Bord.
+   - Wer reist, lernt an Bord und am Zielort Menschen kennen. Fernbeziehungen brauchen Nachrichten und Reisen.
+   - Auf kleinen Stationen und Schiffen wiegen Beziehungen schwerer: wenige Menschen, enger Raum.
+
+**Bitte – Spieler und Bewohner:**
+
+4. **Möglich, mit festen Regeln:**
+   - **Nur Erwachsene.**
+     - Heute weiß das Spiel nicht, wie alt ein Spieler ist, und es gibt den Schulpilot in Sundern.
+     - Ohne eine bestätigte Volljährigkeit gibt es keine Romantik mit Figuren. Schulkonten sind immer ausgeschlossen.
+     - Figuren unter 18 nie (R-24 Punkt 0).
+   - **Die Figur hat ihren eigenen Willen:**
+     - Zuneigung wächst nur über viele echte Begegnungen (`affinity`, `trust`).
+     - Sie kann Nein sagen, Abstand nehmen und eine Beziehung beenden.
+     - Kein Kauf von Zuneigung, keine Geschenke als Schalter.
+   - **Nichts Sexuelles.** Zärtlichkeit höchstens angedeutet. Der bestehende Grenzschutz im Gesprächsweg bleibt.
+   - **Gesund statt bindend:**
+     - Die Figur drängt nicht, macht nicht eifersüchtig auf das echte Leben und verlangt keine Zeit.
+     - Wirkt ein Spieler einsam oder abhängig, ermutigt sie ihn freundlich zu echten Kontakten.
+     - Fragt jemand ernsthaft, sagt sie, dass sie eine Spielfigur ist.
+5. **Daten:** Beziehung Spieler–Person als eigene Zeilen (z. B. `player_person_relationships`), nicht in `person_relationships`.
+   - Die Gastronomie setzt Paare im Lokal an einen Tisch. Die Figur weiß, wer ihr Partner ist, ob Bewohner oder Spieler.
+6. **Ganz andere Konstellationen**, auch mit Robotern (R-26): bitte erst mit Thomas entscheiden, nicht von selbst einführen.
+
+
+### R-26 (Gastronomie, 03.11.2026): Roboter als Teil der Bevölkerung
+
+Thomas, 03.11.2026: „Kinder brauchen natürlich auch Paare. Theoretisch könnten auch Spieler und NPC ein Paar werden, oder später ganz andere Konstellationen. Ich denke, das muss sich dynamisch im Spiel und auf den Stationen, Kolonien und Raumschiffen entwickeln. Roboter fehlen noch.“
+
+**Stand:**
+- Roboter gibt es als Maschinen: Inspektionsdrohnen und Robotermodule (`robotModuleManufacturing.ts`), den Kantinenschwarm der Hafenkantine (Gastronomie) und VERA in der Agentur für Arbeit (Gastronomie, ohne Eintrag in `people`).
+- Als Teil der Bevölkerung mit Arbeit, Tagesablauf und Gedächtnis gibt es keine.
+
+**Bitte:**
+1. **Roboter als Wesen der Simulation:** eigener Eintrag mit Art (`being_kind`: `human` | `robot`), Typ, Hersteller oder Herkunft (gefertigt aus Robotermodulen), Betreiber oder Eigentümer, Baujahr.
+   - Typen:
+     - Service: Ausschank, Kantine, Empfang;
+     - Wartung: Station, Schiff, Habitat;
+     - Logistik: Lager, Hafen;
+     - Pflege und Assistenz;
+     - Bordroboter auf Handelsschiffen;
+     - Vermittlung (wie VERA).
+2. **Bedürfnisse anders:** Energie, Wartung, Ersatzteile, Updates statt Hunger, Schlaf und Wohnung. Ausfälle haben Folgen, z. B. eine kaputte Kantine.
+3. **Arbeit und Ökonomie** nach NOXIA-FIN-0001:
+   - Roboter kosten Anschaffung und Wartung, keinen Lohn. Sie gehören jemandem.
+   - Wo sie Arbeit übernehmen, verändert das Stellen für Menschen. Das gehört in den Stellenmarkt (R-21).
+4. **Wo:** vor allem auf Stationen, in Kolonien und an Bord – dort, wo Menschen knapp sind. Auf der Erde eher Service und Logistik.
+5. **Gespräch:**
+   - Roboter sagen offen, dass sie Maschinen sind. Sie haben Gedächtnis, aber keine erfundenen Gefühle oder Lebensläufe.
+   - Ihr Wissen ist ihr Auftrag und ihr Ort.
+   - Beziehungen zwischen Menschen und Robotern: erst mit Thomas entscheiden (R-25 Punkt 6).
+6. **Für die Innenräume:** Liefert Roboter in `/api/game/population` mit `isRobot: true`.
+   - Der Innenraum zeichnet sie seit 03.11.2026 als Roboter mit eigenem Bild (`isRobot` in `lib/grid/RobotVisual.tsx`, Merkmal an `ColonyResident`).
+   - In der Gesprächsbeschreibung (`bio_short`, Rolle) bitte „Roboter“ nennen, damit die Figur sich nicht für einen Menschen hält.
+
+### R-27 (Erdkarte, 03.11.2026): Personentafel auf Deutsch – Rolle, Tätigkeit, letzte Handlung
+
+**Befund (Prüfung im Browser mit Thomas, 03.11.2026, Sundern Mitte):** Die Personentafel der Weltkarte zeigt rohe Kennungen: Rolle „service“ bzw. im Porträt „GENERAL“, „Tut gerade: idle“, „Zuletzt: hired“. Die Karte gibt dort `assignments[].roleCode`, `activityState` und `lastAction` aus `ColonyResident` unverändert aus (`app/world-lab/WorldPanels.tsx`, Personentafel; Porträt `NpcPortrait` in `lib/grid/NpcVisual.tsx`). Dass die Person „Person“ heißt, ist richtig: Man kennt sie nicht, und das Aussehen ist neutral (`personSceneLabel`).
+
+**Bitte:** Die Kennungen gehören zur Bevölkerung, darum hier: eine Funktion mit deutschen Bezeichnungen, z. B. `personStatusLabels(resident)` → `{ role: 'Servicekraft', doing: 'hat gerade nichts zu tun', last: 'hat eine Stelle bekommen' }`, für alle Werte von `roleCode`, `PersonActivityState` und `lastAction` (auch `employment.ts`, `circadian.ts`). Unbekannte Werte lieber weglassen als roh zeigen. Sobald es sie gibt, setzt die Erdkarte sie in Personentafel und Porträt ein (wir bauen das auf unserer Seite).
+
+### R-28 (Gastronomie, 03.11.2026): Echte Lokale – Personal, Käufe, Stellen
+
+Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
+
+**Anlass:** Seit 03.11.2026 gab es zwei verschiedene Lokale.
+- Echte Cafés, Bars, Kneipen und Restaurants der Karte öffneten einen einfachen Gastraum (Philosophie/NPC, `LandmarkWalkableInterior`, Raum `hospitality`), ohne Karte, Bestellen, Arbeiten und Begleitung.
+- NOXIA-Lokale wie Metropol öffneten das Lokal der Gastronomie.
+
+**Gebaut (Gastronomie, live):**
+- `noxia_real_venue` (`20261103180000_real_venues.sql`) und `POST /api/game/hospitality/real-venue`.
+  - Beim ersten Betreten bekommt das reale Lokal ein NOXIA-Lokal: staatlich wie Metropol, mit OSM-Kennung und Lage, `source_tags.real_venue`.
+  - Gibt es dort schon eines (gleiche Kennung oder höchstens 25 m), wird es genommen.
+- `app/earth/RealVenueInterior.tsx` öffnet dann das volle Lokal.
+  - Wer laut Simulation am Ort ist (`peopleAtPlace`), ist drinnen: Wer arbeitet, steht hinter dem Tresen, die anderen sind Gäste.
+  - Klappt das nicht, öffnet weiter der einfache Gastraum.
+
+**Bitte:**
+1. **Personal:** Neu angelegte reale Lokale haben `staff_capacity` null, damit ihr dort nicht ungefragt Leute einstellt.
+   - Entscheidet bitte, ob reale Lokale Stellen bekommen sollen, etwa nach Größe wie Metropol (2) oder Balkan Grill (3), mit dem Lohn aus der Gemeindekasse.
+   - Bis dahin arbeitet dort nur, wen eure Anwesenheit am Ort als arbeitend führt.
+2. **Käufe:** Wer am realen Ort zu Gast ist, kauft bisher nicht im Lokal (`person_consumption_events` hängen am NOXIA-Lokal). Sobald das NOXIA-Lokal existiert, bitte dort buchen. Dann erscheinen die Gäste mit ihrer Bestellung und als Aufgaben in der Schicht.
+3. **Stellenliste** (`/api/game/jobs`): nimmt reale Lokale schon mit (alle aktiven Lokale des Ortes). Ohne Personal sind sie geschlossen, und dort zu arbeiten ergibt erst mit Gästen Sinn.
+
+### R-29 (Gastronomie, 04.11.2026): Credits untereinander – Bewohner zahlen Spielern; Trinkgeld entfällt
+
+Thomas, 04.11.2026: „Ich denke, wir lassen Trinkgeld weg, aber es sollte Möglichkeiten geben, generell Credits untereinander auszutauschen.“ Entschieden:
+- Spieler an Spieler, Spieler an Bewohner, Bewohner an Spieler;
+- bar von Hand zu Hand und als Überweisung bei der Bank.
+
+**Trinkgeld (R-20 Punkt 3) entfällt.** Der Schichtweg gibt weiter `tip: 0` zurück; bitte nicht mehr bauen.
+
+**Gebaut (Gastronomie, live):** Migration `20261104190000_credit_transfers.sql`, Weg `/api/game/credits`.
+- Tabelle `credit_transfers`: jede Übergabe mit Kanal (bar/Bank), Absender, Empfänger, Betrag, Zweck, Ort.
+- Jede Übergabe ist ein Nullsummen-Transfer nach NOXIA-FIN-0001, ohne Steuer.
+- `noxia_player_give_credits`:
+  - Spieler zahlt bar an einen Bewohner, den er trifft (im Gespräch „Credits geben …“, in jedem Innenraum).
+  - Oder er überweist am Bankschalter an einen Spieler (Spielername) oder an einen Bewohner, dessen Namen er kennt.
+  - An Spieler höchstens 2000 Cr am Tag.
+  - Beim Bewohner landet das Geld in seinem Konto (`npc_ledger`, Art `gift_received`). Die Figur weiß im Gespräch, dass sie es bekommen hat.
+- `noxia_person_pay_player(person, profil, betrag, request_id, kanal, zweck, ort)` für euch: Ein Bewohner zahlt einem Spieler aus seinem Konto (Art `gift_sent`), nur mit Deckung und idempotent.
+
+**Bitte:**
+1. **Wann zahlen Bewohner Spielern?**
+   - Für eine Gefälligkeit (R-12 Gefälligkeiten), als Rückzahlung, als Lohn für einen kleinen Auftrag, als Geschenk unter Freunden (hohe Zuneigung).
+   - Vorschlag: eine Weltaktion `pay_player` im Gesprächsweg. Die Figur sagt es und zahlt wirklich über `noxia_person_pay_player`; nie ein Versprechen ohne Buchung.
+2. **Geschenke wirken:** Wer einem Bewohner etwas gibt, verändert die Beziehung ein wenig (Vertrauen, Zuneigung) – aber kein Kauf von Zuneigung (R-25 Punkt 4).
+   - Große Beträge ohne Grund machen eher misstrauisch.
+   - Bewohner geben das Geld aus wie anderes Einkommen.
+3. **Auswertung:** In der täglichen Gesprächsauswertung bitte auffällige Muster melden, etwa viele Überweisungen von neuen Konten an ein Konto.
+
+### R-30 (Gastronomie, 04.11.2026): Spieler unter sich – Raum-Chat und Kommen/Gehen in die tägliche Auswertung
+
+Thomas, 04.11.2026: „Da wir aktuell mit Ably max. 5 gleichzeitig haben können, solltest du die Chats zwischen Spielern auch freischalten. Alles, was gerade passiert, wenn jemand kommt, ist wichtig für uns, um einzuschätzen, wo wir aufpassen müssen.“
+
+**Gebaut (Gastronomie, live)**, Migration `20261104200000_player_room_log.sql`:
+- `player_room_messages`: was Spieler im Raum allen sagen.
+  - Gespeichert werden das Original und die gezeigte Fassung, dazu das Anliegen (`classifyConversationTopic`), Merkmale (`contact`, `messenger`, `provocation`) und wie viele andere Spieler im Raum waren.
+  - In der gezeigten Fassung sind Kontaktdaten entfernt (E-Mail, Telefon, Links, @Namen).
+- `player_room_events`: Kommen (`join`), Gehen (`leave`), Gesten (`gesture`: winkt, prostet zu) und Meldungen (`report`, mit Nachricht).
+- Sicht **`player_room_log`**: alles in einer Zeitlinie. Credits bar und Überweisungen stehen in `credit_transfers` (R-29).
+- Zugestellt wird über Ably (`noxia:room:<Haus>`, Spieler dürfen nur lesen), gesendet nur über `/api/game/room-chat`. Höchstens sechs Nachrichten je Minute und Spieler.
+
+**Bitte:**
+1. **„NOXIA Gesprächsauswertung“** um einen Abschnitt **„Spieler unter sich“** erweitern:
+   - Wer kam wann wohin, mit wem; was wurde gesagt (Anliegen, Häufungen); Gesten und Geld zwischen Spielern.
+   - **Auffälliges zuerst:** Meldungen, Merkmale `provocation`, `contact`, `messenger`.
+   - Ebenso, wenn jemand einem anderen wiederholt folgt, schreibt oder Geld gibt, vor allem neuen Konten.
+2. **Zum Schulpilot:** Gibt es Hinweise, dass ein Minderjähriger angesprochen wird, gehört das ganz nach oben, mit Vorschlag zum Eingreifen (Sperren, Raum schließen).
+3. Datenschutz in der Auswertung wie in R-22: zusammenfassen, keine persönlichen Angaben zitieren.
+
+### R-31 (Gastronomie, 04.11.2026): Aussehen für alle – Altersgruppen und Kleidung
+
+Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „gleicher Winkel wie unsere Karte, einfach strukturiert“. Aus drei Entwürfen (Figurenwerkstatt, Artefakt) gewählt: **„Kiesel wirkt am angenehmsten.“**
+
+**Der Stil:** eiförmiger Kopf, runde Körper ohne Umriss, leichte Schatten; eigene Formen, keine Nachbildung bekannter Spielfiguren.
+- Gezeichnet aus Werten: Alter, Statur, Haut, Haare, Bart, Kleidung, Ausdruck, Mensch oder Roboter.
+- Vier Blickrichtungen; Stehen, Gehen (vier Schritte), Sitzen.
+- `lib/figures/kiesel.ts` (`kieselSVG`, `kieselLookFor`, `kieselDirFrom`), getestet; `lib/figures/KieselFigure.tsx`.
+- Seit 04.11.2026 in allen Innenräumen des Lokal-Motors, für Bewohner, Spieler und Mitspieler.
+
+**Befund (04.11.2026):**
+- Von 65 Bewohnern haben 42 einen Eintrag in `person_appearance`. Die übrigen 23 werden aus der Kennung erzeugt und können auf Karte und im Lokal verschieden aussehen.
+- Alle 42 sind `adult`.
+- `clothing_profile` ist bei 41 leer.
+- Die Auswahl ist schmal: 5 Frisuren, 6 Hauttöne.
+
+**Bitte:**
+1. Ein Aussehen für alle Bewohner, auch für neue (Zuzug, Geburt, R-24).
+2. **Altersgruppen** aus dem Geburtsjahr: `child`, `teen`, `young_adult`, `adult`, `older`, neu `elder` ab etwa 75. Mit dem Alter ändert sich das Aussehen; graue Haare und Falten zeichnet Kiesel von selbst.
+3. **Kleidung** als eigene, wechselbare Schicht (NOXIA-LIVING, „Clothing next“): `clothing_profile` mit `work` (cafe, bar, restaurant, science, engineer, space …), `style` und `occasion` (Gottesdienst, Feier, Beerdigung).
+   - Kiesel kennt heute: Alltag, Café-Schürze, Barkeeper, Druckanzug, Festkleidung, Kleid, Overall, Kittel. Wünsche für mehr gern als Request an die Gastronomie.
+4. Mehr Vielfalt bei Frisuren und Haarfarben. Kiesel versteht `short`, `long`, `curly`, `braided`, `bun`, `shaved`; Haarfarben `dark`, `brown`, `light`, `red`, `grey`, `white`.
+5. **Roboter** mit `isRobot: true` (R-26); Kiesel zeichnet sie als Roboter.
+
+### R-32 (Gastronomie, 04.11.2026): Streit, Rangelei und Kampf – mit Folgen
+
+Thomas, 04.11.2026, auf die Frage, ob Figuren tanzen, mit Werkzeug arbeiten und kämpfen können: **„alles in genau dieser Steigerung, leider ist die Welt nicht nur nett.“**
+
+**Was die Gastronomie gebaut hat (nur Darstellung):**
+- Kiesel-Posen für Rangelei (Schubsen, Hinfallen) und Kampf (Zuschlagen, Abwehren, Getroffen, Am Boden), dazu ein sichtbares Pflaster für Verletzte (`lib/figures/kiesel.ts`).
+- `lib/game/hospitality/venueIncident.ts` liest einen Vorfall als `population_events` mit `event_type = 'venue_incident'`. Das Lokal zeigt:
+  - die Posen der Beteiligten;
+  - einen Hinweis für den Spieler;
+  - was Beteiligte und Anwesende davon wissen.
+- Ohne Ereignis gibt es keinen Streit; erfunden wird nichts.
+
+**Erwartetes Ereignis (Vorschlag, gern anpassen):**
+```json
+{ "tileEntityId": "<Lokal>", "level": "rangelei | kampf", "startsTick": 100, "endsTick": 101, "aftermathTick": 104,
+  "cause": "Streit um die Rechnung",
+  "participants": [{ "personId": "…", "role": "angreifer | verteidiger | schlichter", "outcome": "steht | am_boden | verletzt" }],
+  "removedIds": ["…"], "cancelled": false }
+```
+
+**Bitte (Population):**
+1. **Wann es Streit gibt** – aus dem, was die Figuren sind und erleben: Alkohol, Eifersucht, Schulden, alte Feindschaften, Gedränge.
+   - Selten und begründet, nie zufällig.
+   - Erst Worte, dann Rangelei, Kampf nur bei echter Eskalation.
+   - Kinder sind nie beteiligt.
+2. **Folgen, die bleiben:**
+   - Verletzung (wie lange, Arzt);
+   - Hausverbot nach Hausregel (der Türsteher begleitet hinaus, `removedIds`);
+   - Polizei bei Kampf;
+   - Erinnerung und Beziehung (Groll, Versöhnung);
+   - Ruf im Ort.
+3. **Spieler:**
+   - Ob und wie ein Spieler hineingezogen werden kann – auch von anderen Spielern –, welche Grenzen gelten und was er danach erlebt (Hausverbot, Strafe, Ruf).
+   - Erst nach eurer Regel bauen wir ein Eingreifen im Lokal: dazwischengehen, Türsteher holen, gehen.
+4. Ereignisse bitte in die tägliche Auswertung (R-30), damit sichtbar ist, wo es kracht.
+
+### R-33 (Gastronomie, 05.11.2026): Bewohner gehen zu Veranstaltungen
+
+Thomas, 04.11.2026: Mechaniken aus Second Life übernehmen, „alles nacheinander“.
+
+**Neu:** Eigentümer kündigen Veranstaltungen an, in echter Uhrzeit, damit sich Spieler verabreden können. Gespeichert in `venue_events`: `kind` `dj`, `konzert`, `lesung`, `quiz`, `feier` oder `stammtisch`, dazu `title`, `note`, `starts_at`, `ends_at` und `cancelled`. Das Lokal zeigt den Aushang, und die Figuren dort wissen davon (`eventFacts`).
+
+**Bitte:**
+1. Bewohner, die so etwas mögen, planen den Besuch ein und kommen zur angekündigten Zeit: zum Konzert, zur Lesung, zum Quiz. Die Zahl der Gäste steigt dann sichtbar.
+2. Sie erzählen vorher davon („Gehst du heute auch zum Quiz ins Metropol?“) und erinnern sich danach daran.
+3. Abgesagte Termine (`cancelled`) bitte nicht mehr berücksichtigen.
+
+### R-34 (Gastronomie, 06.11.2026): Polizei, Feuerwehr, Gesundheit – Einsätze und Folgen
+
+Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „ja, mache das“.
+
+**Gebaut (Gastronomie, 06.11.2026):**
+- Begehbare Räume für Polizeiwache, Feuerwache, Arztpraxis und Krankenhaus (`lib/game/services/publicServices.ts`, `app/earth/PublicServiceInterior.tsx`). Das Dienstpersonal steht immer da, die Praxis hat Sprechzeiten.
+- Angebote: Anzeige, Fundsache, Verlust, Mitmachen bei der Freiwilligen Feuerwehr, Termin, Besuch. Gespeichert in `service_cases` (`place_ref`, `service`, `kind`, `text`, `profile_id`, `status` offen/bearbeitet/erledigt).
+- Nach einer Schlägerei (`venue_incident`) kommt die Streife ins Lokal, bei Verletzten der Rettungsdienst (`incidentResponders`).
+- Uniformen für Polizei, Feuerwehr und Rettungsdienst im Kiesel-Stil.
+- Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117.
+
+**Bitte (Population):**
+1. **Personal aus der Bevölkerung:** Polizistinnen, Feuerwehrleute, Ärztinnen, Pflegekräfte und Sanitäter als echte Bewohner mit Arbeit an diesen Orten. Bis dahin stehen dort Dienstfiguren (`landmark-staff:<Ort>:<Aufgabe>`).
+2. **Einsätze:**
+   - Polizei bei Kampf, bei Hausverbots-Bruch (`venue_bans`) und bei Anzeigen;
+   - Feuerwehr bei Bränden, Unfällen und Unwetter (selten, begründet);
+   - Rettungsdienst bei Verletzten.
+
+   Bitte als Ereignis mit Ort, Zeit, Beteiligten und Ergebnis.
+3. **Folgen:** Verletzung mit Dauer, Arzt oder Krankenhaus; Polizeibericht und Ruf im Ort; Hausverbot; Erinnerung und Beziehung (wie R-32).
+4. **Gesundheit:** Krankheit, Genesung, Arzttermine, Geburten im Krankenhaus (R-24), Sterben im Krankenhaus mit Angehörigen (R-23). Die Praxis zeigt Patienten nur aus euren Daten.
+5. **Fälle der Spieler** (`service_cases`) auswerten:
+   - Anzeigen bearbeiten (Status, Ergebnis);
+   - Fundsachen zuordnen;
+   - Mitmachen bei der Feuerwehr als Mitglied mit Übungsabenden;
+   - Besuche bei Patienten.
+6. **Freiwillige Feuerwehr als Verein** (im Sauerland üblich): Mitglieder, Übungsabend, Feuerwehrfest – gern als Veranstaltung (`venue_events`).
+7. Kinder sind nie beteiligt, weder an Gewalt noch an Einsätzen.
+

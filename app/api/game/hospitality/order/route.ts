@@ -10,6 +10,7 @@
 //      { action: 'set_service', tileEntityId, service: 'toilet', available, priceCredits, guestsOnly }
 //      → Hausregeln ändern; nur der Eigentümer des Hauses (R-18).
 
+import { activeBanUntil } from '@/lib/game/hospitality/houseBans'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
@@ -71,6 +72,22 @@ export async function GET(req: NextRequest) {
     })),
     services: services ?? null,
     canEditHouse: owner === true,
+    // Für den Eigentümer: die ganze Karte der Lokalart mit Hauspreis und abbestellten Posten (Hausregeln, 04.11.2026).
+    houseMenu: owner === true ? await houseMenuFor(supabase, tileEntityId) : null,
+  })
+}
+
+async function houseMenuFor(supabase: any, tileEntityId: string) {
+  const { data: tile } = await supabase.from('tile_entities').select('entity_id').eq('id', tileEntityId).maybeSingle()
+  if (!tile) return []
+  const [{ data: base }, { data: overrides }] = await Promise.all([
+    supabase.from('hospitality_menu').select('item_code,label,price_credits').eq('entity_id', tile.entity_id).eq('active', true).order('price_credits'),
+    supabase.from('venue_price_overrides').select('item_code,price_credits,active').eq('tile_entity_id', tileEntityId),
+  ])
+  const byCode = new Map((overrides ?? []).map((row: any) => [String(row.item_code), row]))
+  return (base ?? []).map((row: any) => {
+    const o = byCode.get(String(row.item_code)) as any
+    return { itemCode: String(row.item_code), label: String(row.label), basePriceCredits: Number(row.price_credits), housePriceCredits: o?.price_credits == null ? null : Number(o.price_credits), active: o ? o.active !== false : true }
   })
 }
 
@@ -88,6 +105,8 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  // Hausverbot (05.11.2026): keine Bestellung.
+  if (await activeBanUntil(supabase, tileEntityId, profileId)) return NextResponse.json({ error: 'Du hast hier Hausverbot – hier wird dir nichts verkauft.' }, { status: 403 })
   const { data: tickRow } = await supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle()
   const { data, error } = await supabase.rpc('order_hospitality_item', {
     p_profile_id: profileId, p_tile_entity_id: tileEntityId, p_item_code: itemCode,

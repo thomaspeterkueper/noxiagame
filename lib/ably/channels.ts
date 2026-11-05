@@ -18,6 +18,8 @@ export const ABLY_CHANNELS = {
   world:        'noxia:world',
   builds:       (userId: string) => `noxia:builds:${userId}`,
   dm:           (userId: string) => `noxia:dm:${userId}`,
+  // Spieler im selben Raum (04.11.2026): Nachrichten vom Server, gespeichert in player_room_messages.
+  room:         (roomKey: string) => `noxia:room:${roomKey}`,
 } as const
 
 export const ABLY_EVENTS = {
@@ -27,4 +29,5 @@ export const ABLY_EVENTS = {
   world:       { updated: 'world.updated' },
   dm:          { message: 'dm.message' },
   chat:        { read: 'chat.read' },
+  room:        { message: 'room.message', whisper: 'room.whisper' },
 } as const

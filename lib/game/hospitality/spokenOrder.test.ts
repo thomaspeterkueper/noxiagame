@@ -24,6 +24,7 @@ check(DEFAULT_VENUE_SERVICES.toilet.available && DEFAULT_VENUE_SERVICES.toilet.p
 check(venueServiceRules(undefined) === DEFAULT_VENUE_SERVICES && venueServiceRules({ toilet: { priceCredits: 2, guestsOnly: true } }).toilet.priceCredits === 2, 'house rules override the default')
 check(toiletAccess(DEFAULT_VENUE_SERVICES.toilet, { hasOrdered: false }).ok, 'default: anyone may use it')
 check(!toiletAccess({ available: true, priceCredits: 0, guestsOnly: true }, { hasOrdered: false }).ok && toiletAccess({ available: true, priceCredits: 0, guestsOnly: true }, { hasOrdered: true }).ok, 'guests-only rule')
+{ const paid = toiletAccess({ available: true, priceCredits: 2, guestsOnly: false }, { hasOrdered: false }); check(paid.ok && paid.payCredits === 2 && paid.text.includes('2 Credits bezahlt'), 'a fee is booked, not refused') }
 check(toiletFact(DEFAULT_VENUE_SERVICES.toilet, true).includes('frei für jeden') && toiletFact(DEFAULT_VENUE_SERVICES.toilet, false).includes('WC'), 'staff know the rule, guests see the door')
 check(mentionsToilet('Ich suche eine Toilett') && mentionsToilet('Kann ich hier pinkeln?') && mentionsToilet('wo ist das WC') && !mentionsToilet('Einen Kaffee bitte'), 'toilet questions are recognized')
 

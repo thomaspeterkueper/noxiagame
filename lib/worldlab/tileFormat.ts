@@ -8,13 +8,13 @@
 // neuen Wert für TILE_FORMAT_SOURCES.
 
 /** Erhöhen, wenn sich die Erzeugung der Kacheln ändert. */
-export const TILE_FORMAT = '2026-10-31.2'
+export const TILE_FORMAT = '2026-11-06.1'
 
 /** Dateien, aus denen eine Kachel entsteht (relativ zum Projekt). */
-export const TILE_FORMAT_FILES = ['lib/worldlab/simplify.ts', 'lib/worldlab/lineDetails.server.ts', 'lib/worldlab/mercator.ts', 'lib/worldlab/worshipShapes.ts']
+export const TILE_FORMAT_FILES = ['lib/worldlab/simplify.ts', 'lib/worldlab/lineDetails.server.ts', 'lib/worldlab/mercator.ts', 'lib/worldlab/worshipShapes.ts', 'lib/worldlab/plantTags.ts']
 
 /** Fingerabdruck dieser Dateien beim letzten Erhöhen von TILE_FORMAT (sha256, 16 Zeichen). */
-export const TILE_FORMAT_SOURCES = '343cd23471139650'
+export const TILE_FORMAT_SOURCES = '4ed2b5641751b46d'
 
 /** Abgelegte Kachel noch gültig? Gleiches Format, dieselben Regionen mit demselben Stand. */
 export function storedTileValid(stored: { format: string; region_revs: Record<string, number> }, format: string, expected: Record<string, number>): boolean {

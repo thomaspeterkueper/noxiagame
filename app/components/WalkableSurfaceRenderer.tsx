@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react'
 import type { LocalSurfacePoint } from '@/lib/game/spatial/localSurfaceScene'
+import { KieselG, useKieselMotion, useMyLook } from '@/lib/figures/KieselFigure'
+import { kieselLookFor, type KieselPose } from '@/lib/figures/kiesel'
 
 export type SurfaceScreenPoint={x:number;y:number}
 
@@ -70,24 +72,19 @@ export function WalkableRoute({points,target}:{points:LocalSurfacePoint[];target
   </g>
 }
 
-/** Raumanzug draußen auf Mond, Phobos, Deimos: Lebenserhaltung auf dem Rücken, Helm mit Visier. */
-function SuitParts({scale=1,headY=-4,headR=4.5}:{scale?:number;headY?:number;headR?:number}){
-  return <g transform={`scale(${scale})`} pointerEvents="none">
-    <rect x="-7.2" y="3" width="4" height="10" rx="1.2" fill="#c9cdd0" stroke="#30383c" strokeWidth=".8"/>
-    <circle cy={headY} r={headR+1.9} fill="#dfe6ea" fillOpacity=".28" stroke="#e8eef1" strokeWidth="1.1"/>
-    <path d={`M${-headR*.9} ${headY-.6} Q0 ${headY-headR*1.3} ${headR*.9} ${headY-.6}`} fill="none" stroke="#f4d58a" strokeWidth="1.3" opacity=".9"/>
-  </g>
-}
-
-export function WalkablePlayer({point,label,suited=false}:{point:LocalSurfacePoint;label?:string;suited?:boolean}){
+/**
+ * Spielfigur auf Erdkarte und Oberflächen – seit 04.11.2026 als Kiesel (Blickrichtung
+ * und Gehen aus der Bewegung; draußen auf Mond, Phobos, Deimos im Druckanzug).
+ */
+export function WalkablePlayer({point,label,suited=false,seed,pose}:{point:LocalSurfacePoint;label?:string;suited?:boolean;seed?:string;pose?:KieselPose}){
+  const mine=useMyLook().look
   const p=projectSurfacePoint(point)
   const labelWidth=label?Math.max(44,Math.min(118,label.length*6.1+16)):0
+  const m=useKieselMotion(p.x,p.y)
   return <g transform={`translate(${p.x} ${p.y-9})`}>
-    <ellipse cy="11" rx="8" ry="3.5" fill="#000" opacity=".28"/>
-    <circle cy="-4" r="4.5" fill="#f0c49c" stroke="#493c18" strokeWidth="1.2"/>
-    <path d="M-6 12 Q0 0 6 12 L5 20 L-5 20 Z" fill="#d4ad43" stroke="#594717" strokeWidth="1.2"/>
-    {suited&&<SuitParts/>}
-    {label&&<g pointerEvents="none" transform="translate(0 -20)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill="#173845ee" stroke="#e4bd4b" strokeWidth=".9"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff7d8">{label}</text></g>}
+    <ellipse cy="11" rx="9" ry="3.5" fill="#e4bd4b" opacity=".35"/>
+    <g transform="translate(0 11)"><KieselG look={seed?kieselLookFor({id:seed},suited?'space':null):suited?{...mine,clothes:'druckanzug'}:mine} dir={m.dir} pose={pose??(m.moving?'gehen':'stehen')} moving={m.moving} height={38}/></g>
+    {label&&<g pointerEvents="none" transform="translate(0 -26)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill="#173845ee" stroke="#e4bd4b" strokeWidth=".9"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff7d8">{label}</text></g>}
   </g>
 }
 
@@ -102,60 +99,9 @@ export type WalkableActorAppearance={
   clothingProfile?:Record<string,unknown>
 }
 
-const ACTOR_SKIN:Record<string,string>={
-  skin_1:'#f4d2bd',
-  skin_2:'#e8b995',
-  skin_3:'#cf9670',
-  skin_4:'#ac7251',
-  skin_5:'#815039',
-  skin_6:'#573526',
-}
-const ACTOR_HAIR:Record<string,string>={
-  dark:'#252321',
-  brown:'#67452f',
-  light:'#c7a76f',
-  red:'#944d32',
-  grey:'#96928c',
-}
-const ACTOR_CLOTHES=['#2e6274','#466a52','#6b586d','#725c3f','#4f6079','#58686c']
-
-function actorHash(value:string){
-  let h=2166136261
-  for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}
-  return h>>>0
-}
-
-function actorClothingColor(appearance:WalkableActorAppearance|undefined,visualSeed:string){
-  const profile=appearance?.clothingProfile
-  const requested=typeof profile?.primaryColor==='string'?profile.primaryColor:typeof profile?.color==='string'?profile.color:null
-  if(requested&&/^#[0-9a-f]{6}$/i.test(requested))return requested
-  return ACTOR_CLOTHES[actorHash(visualSeed)%ACTOR_CLOTHES.length]
-}
-
-function ActorHair({style,color}:{style:string;color:string}){
-  if(style==='shaved')return <path d="M-3.7 -5.2 Q0 -7.2 3.7 -5.2" fill="none" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
-  if(style==='long')return <><path d="M-4 -5 Q-5 -1 -4 4 L-2.2 3 Q-3 -1 0 -6.4 Q3 -1 2.2 3 L4 4 Q5 -1 4 -5 Q0 -8 -4 -5Z" fill={color}/><path d="M-3.5 -5 Q0 -7.6 3.5 -5 L3 -2.8 Q0 -5 -3 -2.8Z" fill={color}/></>
-  if(style==='curly')return <g fill={color}><circle cx="-2.8" cy="-5.1" r="2"/><circle cx="0" cy="-6.1" r="2.2"/><circle cx="2.8" cy="-5.1" r="2"/><circle cx="-3.7" cy="-2.9" r="1.5"/><circle cx="3.7" cy="-2.9" r="1.5"/></g>
-  if(style==='braided')return <><path d="M-3.6 -5 Q0 -7.5 3.6 -5 L3 -2.7 Q0 -4.8 -3 -2.7Z" fill={color}/><path d="M3.1 -2.5 Q5 0 3.4 2 Q5 4 3.6 6" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>
-  return <path d="M-3.8 -5 Q0 -7.4 3.8 -5 L3.3 -2.7 Q0 -4.6 -3.3 -2.7Z" fill={color}/>
-}
-
-function ActorBody({appearance,clothingColor}:{appearance:WalkableActorAppearance|undefined;clothingColor:string}){
-  const frame=appearance?.bodyFrame??'average'
-  const presentation=appearance?.genderPresentation??'androgynous'
-  const shoulder=frame==='slender'?4.7:frame==='broad'?7:5.7
-  const hip=frame==='slender'?4.3:frame==='broad'?6.1:5
-  const waist=presentation==='feminine'?Math.max(3.5,shoulder-1.7):presentation==='masculine'?Math.max(4.3,shoulder-.6):(shoulder+hip)/2-.5
-  return <path
-    d={`M-${shoulder} 5 Q-${waist} 9 -${hip} 15 L-${Math.max(3.4,hip-.6)} 19 L${Math.max(3.4,hip-.6)} 19 L${hip} 15 Q${waist} 9 ${shoulder} 5 Q0 1 -${shoulder} 5Z`}
-    fill={clothingColor}
-    stroke="#173845"
-    strokeWidth="1"
-  />
-}
-
+/** Bewohner auf Erdkarte und Oberflächen – seit 04.11.2026 als Kiesel. */
 export function WalkableActor({
-  point,label,selected=false,onClick,appearance,visualSeed='actor',suited=false,
+  point,label,selected=false,onClick,appearance,visualSeed='actor',suited=false,work=null,pose,
 }:{
   point:LocalSurfacePoint
   label?:string
@@ -163,30 +109,20 @@ export function WalkableActor({
   onClick?:()=>void
   appearance?:WalkableActorAppearance
   visualSeed?:string
-  /** Draußen auf Mond, Phobos, Deimos: Raumanzug mit Helm und Rucksack. */
+  /** Draußen auf Mond, Phobos, Deimos: Druckanzug mit Helm. */
   suited?:boolean
+  /** Was die Person gerade arbeitet (für die Kleidung), z. B. 'cafe', 'engineer'. */
+  work?:string|null
+  pose?:KieselPose
 }){
   const p=projectSurfacePoint(point)
   const labelWidth=label?Math.max(42,Math.min(112,label.length*6.1+14)):0
-  const age=appearance?.visibleAgeBand??'adult'
-  const scale=age==='child'?.72:age==='teen'?.86:age==='older'?.96:1
-  const skin=ACTOR_SKIN[appearance?.skinToneCode??'']??ACTOR_SKIN.skin_3
-  const hair=ACTOR_HAIR[appearance?.hairColorCode??'']??ACTOR_HAIR.dark
-  const clothing=actorClothingColor(appearance,visualSeed)
-  const headRadius=age==='child'?4.4:4
+  const m=useKieselMotion(p.x,p.y)
+  const look=kieselLookFor({id:visualSeed,appearance},suited?'space':work)
   return <g transform={`translate(${p.x} ${p.y-8})`} onClick={onClick} style={onClick?{cursor:'pointer'}:undefined}>
-    <ellipse cy="10" rx={7*scale} ry={3*scale} fill="#000" opacity=".25"/>
-    <g transform={`scale(${scale}) translate(0 ${(1-scale)*6})`}>
-      {appearance?.hairStyleCode==='long'&&<ActorHair style="long" color={hair}/>}
-      <circle cy="-3" r={headRadius} fill={skin} stroke={selected?'#e4bd4b':'#173845'} strokeWidth={selected?1.5:1}/>
-      {appearance?.hairStyleCode!=='long'&&<ActorHair style={appearance?.hairStyleCode??'short'} color={hair}/>}
-      {appearance?.facialHairCode&&appearance.facialHairCode!=='none'&&<path d="M-2.8 -.8 Q0 2.2 2.8 -.8 Q2.2 3.3 0 3.6 Q-2.2 3.3 -2.8 -.8Z" fill={hair} opacity=".9"/>}
-      <ActorBody appearance={appearance} clothingColor={clothing}/>
-      {suited&&<SuitParts headY={-3} headR={headRadius}/>}
-      {age==='older'&&<path d="M-2.4 -1.8 H-0.5 M.5 -1.8 H2.4 M-.5 -1.8 H.5" stroke="#40515a" strokeWidth=".65" opacity=".8"/>}
-      {selected&&<ellipse cy="10" rx="9" ry="12" fill="none" stroke="#e4bd4b" strokeWidth="1.2" strokeDasharray="2 2"/>}
-    </g>
-    {label&&<g pointerEvents="none" transform="translate(0 -18)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill={selected?'#173845ee':'#071521d9'} stroke={selected?'#e4bd4b':'#57717d'} strokeWidth=".8"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="#edf4f5">{label}</text></g>}
+    <g transform="translate(0 10)"><KieselG look={look} dir={m.dir} pose={pose??(m.moving?'gehen':'stehen')} moving={m.moving} height={34}/></g>
+    {selected&&<ellipse cy="10" rx="9" ry="3.6" fill="none" stroke="#e4bd4b" strokeWidth="1.4"/>}
+    {label&&<g pointerEvents="none" transform="translate(0 -24)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill={selected?'#173845ee':'#071521d9'} stroke={selected?'#e4bd4b':'#57717d'} strokeWidth=".8"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="#edf4f5">{label}</text></g>}
   </g>
 }
 

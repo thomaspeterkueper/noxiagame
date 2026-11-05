@@ -5,9 +5,11 @@
 // kommen über die Optionen herein. So lässt sich dieselbe Maschine auch ohne
 // Anmeldung und Datenbank mit Testkacheln messen.
 
-import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
+import type { Application, Container, Graphics as PixiGraphics, Sprite, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
+import { kieselDirFrom, kieselSVG, type KieselDir, type KieselLook } from '@/lib/figures/kiesel'
 import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
 import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { ANCHOR_VISIBLE_MAX, COMMUTE_THRESHOLD_M, anchorSpread, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute, VISIBLE_WALK_MAX_M } from '@/lib/game/population/visibleMovement'
@@ -17,10 +19,14 @@ import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatt
 import { streetLabels } from '@/lib/worldlab/streetLabels'
 import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, WALK_CORE_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
-import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
+import { paintPlant, plantTextureKey, TREE_BASE_HEIGHT_M, TREE_PX, TREE_WORLD } from '@/lib/worldlab/treeSprites'
+import { foliage, plantDay, plantRegion, PLANTS, type PlantId, type PlantRegion } from '@/lib/worldlab/plants'
+import { plantSpots, type PlantSpot } from '@/lib/worldlab/plantPlacement'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
 import { polygonArea } from '@/lib/worldlab/simplify'
+import { graveSpots } from '@/lib/worldlab/graves'
+import { dayTint, hasChimney, hasSolar, heatingSeason, seeded, sunElevationDeg, windowLit } from '@/lib/worldlab/ambient'
 import { apronOutline, facilityClusters, nativeStandKind, padOutline, pointsAlong, type Pt } from '@/lib/worldlab/facility'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
 
@@ -78,6 +84,8 @@ export type WorldPick =
   | { type: 'plot'; source: string }
   | { type: 'parcel'; id: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
+  /** Baum oder Strauch (05.11.2026): Art, und woher wir sie kennen */
+  | { type: 'plant'; at: GeoPoint; species: PlantId; source: 'osm-species' | 'osm' | 'estimate'; region: PlantRegion; hint?: string }
 
 /** Plakette einer Begegnungsstätte: in jeder Zoomstufe sichtbar, ein Klick öffnet den Ort. */
 export interface WorldBeacon { at: GeoPoint; label?: string; pick: WorldPick; /** resonance: Begegnungsstätte (grün), worship: laufender Gottesdienst (gold) */ tone?: 'resonance' | 'worship' }
@@ -102,6 +110,8 @@ export interface WorldPerson {
   inside?: boolean
   /** Ohne Anker: Spaziergang auf Straßen in der Nähe dieses Punkts (Wohnung) statt irgendwo. */
   strollAround?: GeoPoint | null
+  /** W-17: Aussehen als Kiesel-Figur (`kieselLookFor`); fehlt es, die einfache Figur. */
+  look?: KieselLook
 }
 
 export interface WorldEngine {
@@ -110,6 +120,8 @@ export interface WorldEngine {
   setPeople: (people: WorldPerson[]) => void
   /** Wo eine Person gerade steht. */
   personAt: (id: string) => GeoPoint | null
+  /** Sprechblase über einer Person zeigen (Text) oder entfernen (null). */
+  speak: (id: string, text: string | null) => void
   /** Person geht in `seconds` Sekunden zu `to` und bleibt dort, bis `release` sie freigibt. */
   sendPerson: (id: string, to: GeoPoint, seconds: number) => void
   /** Die Person geht die Straße entlang voraus (Gespräch: lead_walk). */
@@ -156,12 +168,22 @@ export interface WorldEngine {
   reloadNoxia: () => Promise<void>
   /** Flurstück an einem Punkt (nur geladene Kacheln). */
   parcelIdAt: (at: GeoPoint) => string | null
+  /** Ist die Kachel an diesem Punkt fertig gezeichnet? */
+  tileReadyAt: (at: GeoPoint) => boolean
   /** Richtung der nächsten Straße bis 50 m (Grad wie tile_entities.rotation_deg), sonst null. */
   roadAngleAt: (at: GeoPoint) => number | null
   /** Umriss eines Grundstücks zeigen, das abgesteckt wird (null: ausblenden). */
   setLandPreview: (ring: GeoPoint[] | null, ok: boolean) => void
   /** Beschriftung an/aus: Straßennamen, Orte aus OSM ohne Funktion */
   setView: (view: ViewOptions) => void
+  /** W-17: Aussehen der eigenen Figur (Kiesel, wie in den Innenräumen). */
+  setPlayerLook: (look: KieselLook) => void
+  /** W-18: Veranstaltungen als Zeichen über dem Lokal (Zeichen und Uhrzeit, immer sichtbar). */
+  setEventMarks: (marks: Array<{ id: string; lat: number; lon: number; text: string; running: boolean }>) => void
+  /** Erster Start: hüpfender Pfeil über einem Ziel (null: keiner). */
+  setGuideArrow: (at: GeoPoint | null) => void
+  /** W-12: Ziel einer Vermittlung – Schild über dem Lokal (null: keins). */
+  setJobMark: (mark: { at: GeoPoint; text: string } | null) => void
   destroy: () => void
 }
 
@@ -229,15 +251,29 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     paintPattern(ctx, spec, AREA_COLORS[kind as keyof typeof AREA_COLORS])
     patterns.set(kind, { texture: PIXI.Texture.from(canvas), matrix: matrix(patternMatrix(spec.sizeM, ISO_Y)) })
   }
-  // Baumbilder (Laubbäume, Fichte).
-  const treeTextures: Texture[] = []
-  for (let variant = 0; variant < TREE_VARIANTS; variant++) {
-    const canvas = document.createElement('canvas')
-    canvas.width = TREE_PX.w; canvas.height = TREE_PX.h
-    const ctx = canvas.getContext('2d')
-    if (!ctx) break
-    paintTree(ctx, variant)
-    treeTextures.push(PIXI.Texture.from(canvas))
+  // Baum- und Strauchbilder je Art und heutigem Laub, bei Bedarf gezeichnet (05.11.2026)
+  const plantTextures = new Map<string, Texture>()
+  let plantDayNow = plantDay(Date.now(), options.start.lat)
+  function plantTexture(id: PlantId, region: PlantRegion): Texture | null {
+    const species = PLANTS[id], f = foliage(species, plantDayNow, region)
+    const key = plantTextureKey(species, f)
+    let texture = plantTextures.get(key)
+    if (!texture) {
+      const canvas = document.createElement('canvas')
+      canvas.width = TREE_PX.w; canvas.height = TREE_PX.h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      paintPlant(ctx, species, f)
+      texture = PIXI.Texture.from(canvas)
+      plantTextures.set(key, texture)
+    }
+    return texture
+  }
+  /** Bildgröße einer Pflanze gegenüber TREE_WORLD (12 m Baum) */
+  function plantSize(spot: PlantSpot) {
+    const species = PLANTS[spot.species]
+    if (species.form === 'bush' || species.form === 'hedge') return 0.55 * spot.scale
+    return Math.max(0.55, Math.min(1.8, species.heightM / TREE_BASE_HEIGHT_M * spot.scale))
   }
 
   // ── Messung ─────────────────────────────────────────────────────────
@@ -307,9 +343,24 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const ownedLayer = new PIXI.Container()
   // Symbole öffentlicher Gebäude (W-7): in jeder Zoomstufe sichtbar, gleich groß auf dem Bildschirm.
   const marks = new PIXI.Container({ isRenderGroup: true })
+  // W-18: Veranstaltungen – eigene Ebene, damit placeSigns sie nicht wegräumt
+  const eventLayer = new PIXI.Container()
   // Begegnungsstätten (Omnizedenz, 28.10.2026): eigene Plaketten, ebenfalls in jeder Zoomstufe.
   const beacons = new PIXI.Container({ isRenderGroup: true })
-  world.addChild(ground, lines, overlay, objects, labels, marks, beacons)
+  // Rauch aus Schornsteinen: eine Fläche über den Dächern, nur nahe der Kamera neu gezeichnet
+  const smoke = new PIXI.Graphics()
+  smoke.eventMode = 'none'
+  // Erster Start (05.11.2026): Pfeil über dem ersten Ziel
+  const guideLayer = new PIXI.Container()
+  guideLayer.eventMode = 'none'
+  // W-12: Schild über dem Lokal, in das die Agentur vermittelt hat
+  const jobLayer = new PIXI.Container()
+  jobLayer.eventMode = 'none'
+  world.addChild(ground, lines, overlay, objects, smoke, labels, marks, beacons, eventLayer, jobLayer, guideLayer)
+  // Tageszeit nach echtem Sonnenstand am Ort der Figur (Spieluhr = echte Zeit)
+  let sunNow = 30
+  let worldTint = 0xffffff
+  const windowLights = new Map<Container, { key: string; lon: number }>()
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -317,12 +368,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Beim Laufen näher heran (W-3: die Figur war zu klein)
   let zoom = options.zoom ?? 3.4
 
-  const playerSprite = new PIXI.Graphics()
+  const playerSprite = new PIXI.Container()
   // Boden-Ring: man findet sich auch zwischen Häusern (W-3)
-  playerSprite.ellipse(0, 0, 4.6, 2.3).stroke({ width: 0.7, color: 0xf2c94c, alpha: 0.95 })
-  playerSprite.ellipse(0, 0, 3.2, 1.6).fill({ color: 0x000000, alpha: 0.22 })
-  playerSprite.roundRect(-1.6, -6.4, 3.2, 5.4, 1.4).fill(0xd7ad3c).stroke({ width: 0.5, color: 0x5c481c })
-  playerSprite.circle(0, -7.6, 1.5).fill(0xf0c9a0).stroke({ width: 0.4, color: 0x5c481c })
+  const playerRing = new PIXI.Graphics()
+  playerRing.ellipse(0, 0, 4.6, 2.3).stroke({ width: 0.7, color: 0xf2c94c, alpha: 0.95 })
+  playerRing.ellipse(0, 0, 3.2, 1.6).fill({ color: 0x000000, alpha: 0.22 })
+  const playerFallback = new PIXI.Graphics()
+  playerFallback.roundRect(-1.6, -6.4, 3.2, 5.4, 1.4).fill(0xd7ad3c).stroke({ width: 0.5, color: 0x5c481c })
+  playerFallback.circle(0, -7.6, 1.5).fill(0xf0c9a0).stroke({ width: 0.4, color: 0x5c481c })
+  playerSprite.addChild(playerRing, playerFallback)
 
   // Tiefenstreifen: gleiche Reihenfolge wie eine einzige sortierte Liste, weil
   // die Streifen selbst nach Tiefe geordnet sind und jedes Objekt nach seiner
@@ -374,7 +428,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean; /** Schornsteine mit Rauch (Weltmeter, Höhe der Mündung) */ chimneys: Array<{ x: number; y: number; h: number; seed: number }>; /** Fensterlicht je Haus (abends sichtbar) */ lights: Container[]; /** Bäume und Sträucher (Weltmeter), für Klick und Jahreszeit */ plants: Array<{ x: number; y: number; spot: PlantSpot; region: PlantRegion; sprite: Sprite; k: number }>; /** Grabbeete (W-19), im Boden */ beds: PixiGraphics | null; /** Glitzern auf dem Wasser, zwei Gruppen im Wechsel */ glint: [PixiGraphics, PixiGraphics] | null }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -386,7 +440,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
    * Ein Baukörper: Quader mit Walmdach (bei quadratischem Grundriss eine Pyramide).
    * Mitte (cx, cy) und Achsen in Bodenmetern; `eave` Traufhöhe, `roofM` Dachaufbau.
    */
-  function drawMass(g: PixiGraphics, kind: BlockKind, cx: number, cy: number, hw: number, hd: number, cos: number, sin: number, eave: number, roofM: number, roofColor?: number) {
+  function drawMass(g: PixiGraphics, kind: BlockKind, cx: number, cy: number, hw: number, hd: number, cos: number, sin: number, eave: number, roofM: number, roofColor?: number, extras?: { solar?: boolean; chimney?: boolean; onChimney?: (x: number, y: number, h: number) => void }) {
     const style = BLOCK_STYLES[kind]
     const textures = art.get(kind)
     const corner = (lx: number, ly: number) => ({ x: cx + lx * cos - ly * sin, y: cy + lx * sin + ly * cos })
@@ -423,13 +477,15 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const r = [corner(-ridgeHalf, 0), corner(ridgeHalf, 0)]
     const top = eave + roofM
     const pitch = roofM / Math.max(0.5, Math.min(hw, hd))
-    type Face = { pts: Array<{ x: number; y: number; h: number }>; n: { x: number; y: number }; eave: [{ x: number; y: number }, { x: number; y: number }] }
+    type Face = { pts: Array<{ x: number; y: number; h: number }>; n: { x: number; y: number }; eave: [{ x: number; y: number }, { x: number; y: number }]; solar?: boolean }
     const faces: Face[] = [
       { pts: [{ ...c[0], h: eave }, { ...c[1], h: eave }, { ...r[1], h: top }, { ...r[0], h: top }], n: { x: sin, y: -cos }, eave: [c[0], c[1]] },
       { pts: [{ ...c[2], h: eave }, { ...c[3], h: eave }, { ...r[0], h: top }, { ...r[1], h: top }], n: { x: -sin, y: cos }, eave: [c[2], c[3]] },
       { pts: [{ ...c[1], h: eave }, { ...c[2], h: eave }, { ...r[1], h: top }], n: { x: cos, y: sin }, eave: [c[1], c[2]] },
       { pts: [{ ...c[3], h: eave }, { ...c[0], h: eave }, { ...r[0], h: top }], n: { x: -cos, y: -sin }, eave: [c[3], c[0]] },
     ]
+    // Solaranlage auf der langen Dachseite, die eher nach Süden zeigt (y zeigt nach Süden).
+    if (extras?.solar) { const best = faces[0].n.y >= faces[1].n.y ? faces[0] : faces[1]; if (best.n.y > -0.25) best.solar = true }
     faces.sort((a, b) => (a.n.x + a.n.y) - (b.n.x + b.n.y))
     for (const face of faces) {
       const pts = face.pts.flatMap(p => { const s = iso(p.x, p.y, p.h); return [s.x, s.y] })
@@ -442,8 +498,75 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       } else {
         g.poly(pts).fill(shade(style.roof, light)).stroke({ width: 0.3, color: OUTLINE, alpha: 0.55 })
       }
+      if (face.solar) drawSolarOnSlope(g, face.pts, light)
+    }
+    if (extras?.chimney) {
+      // Schornstein auf dem First, etwas neben der Mitte
+      const at = corner(ridgeHalf > 1 ? ridgeHalf * 0.45 : 0.6, ridgeHalf > 1 ? 0 : 0.6)
+      const h0 = top - 0.9, h1 = top + 0.9
+      drawStub(g, at.x, at.y, 0.34, cos, sin, h0, h1, 0x8a5646)
+      extras.onChimney?.(at.x, at.y, h1)
     }
     return c
+  }
+
+  /** Quader von Höhe h0 bis h1 (Schornstein): zwei sichtbare Seiten und Deckel. */
+  function drawStub(g: PixiGraphics, cx: number, cy: number, half: number, cos: number, sin: number, h0: number, h1: number, color: number) {
+    const corner = (lx: number, ly: number) => ({ x: cx + lx * cos - ly * sin, y: cy + lx * sin + ly * cos })
+    const c = [corner(-half, -half), corner(half, -half), corner(half, half), corner(-half, half)]
+    for (let i = 0; i < 4; i++) {
+      const a = c[i], b = c[(i + 1) % 4]
+      const nx = b.y - a.y, ny = -(b.x - a.x)
+      if (nx + ny <= 0) continue
+      const a0 = iso(a.x, a.y, h0), b0 = iso(b.x, b.y, h0), a1 = iso(a.x, a.y, h1), b1 = iso(b.x, b.y, h1)
+      g.poly([a0.x, a0.y, b0.x, b0.y, b1.x, b1.y, a1.x, a1.y]).fill(shade(color, nx - ny > 0 ? 1 : 0.8)).stroke({ width: 0.2, color: OUTLINE, alpha: 0.6 })
+    }
+    g.poly(c.flatMap(p => { const s = iso(p.x, p.y, h1); return [s.x, s.y] })).fill(0x3a2a24)
+  }
+
+  /**
+   * Solarmodule auf einer Dachfläche (Trapez: zwei Traufpunkte, darüber zwei Firstpunkte).
+   * Ein Rechteck mit Abstand zu Traufe, First und Graten, in Module geteilt.
+   */
+  function drawSolarOnSlope(g: PixiGraphics, pts: Array<{ x: number; y: number; h: number }>, light: number) {
+    if (pts.length !== 4) return
+    const [e0, e1, r1, r0] = pts
+    const eaveLen = Math.hypot(e1.x - e0.x, e1.y - e0.y), ridgeLen = Math.hypot(r1.x - r0.x, r1.y - r0.y)
+    const v0 = 0.14, v1 = 0.72
+    // Am oberen Rand ist die Fläche um die Grate schmaler: so weit einrücken, dass das Rechteck passt.
+    const inset = Math.max(0, (eaveLen - ridgeLen) / 2 / eaveLen) * v1 + 0.6 / Math.max(1, eaveLen)
+    const u0 = inset, u1 = 1 - inset
+    const widthM = (u1 - u0) * eaveLen
+    if (widthM < 2.2) return
+    const up = { x: (r0.x + r1.x - e0.x - e1.x) / 2, y: (r0.y + r1.y - e0.y - e1.y) / 2, h: (r0.h + r1.h - e0.h - e1.h) / 2 }
+    const at = (u: number, v: number) => iso(e0.x + (e1.x - e0.x) * u + up.x * v, e0.y + (e1.y - e0.y) * u + up.y * v, e0.h + (e1.h - e0.h) * u + up.h * v + 0.06)
+    const quad = (ua: number, ub: number, va: number, vb: number) => { const a = at(ua, va), b = at(ub, va), c = at(ub, vb), d = at(ua, vb); return [a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y] }
+    g.poly(quad(u0, u1, v0, v1)).fill(shade(0x24385a, 0.8 + light * 0.25)).stroke({ width: 0.16, color: 0xc9d3dc, alpha: 0.9 })
+    const cols = Math.max(2, Math.round(widthM / 1.1)), rows = 2
+    for (let i = 1; i < cols; i++) { const u = u0 + (u1 - u0) * i / cols, a = at(u, v0), b = at(u, v1); g.moveTo(a.x, a.y).lineTo(b.x, b.y) }
+    for (let j = 1; j < rows; j++) { const v = v0 + (v1 - v0) * j / rows, a = at(u0, v), b = at(u1, v); g.moveTo(a.x, a.y).lineTo(b.x, b.y) }
+    g.stroke({ width: 0.08, color: 0x7f9cc0, alpha: 0.7 })
+    // Ein heller Schimmer oben links: Glas
+    g.poly(quad(u0 + 0.02, u0 + (u1 - u0) * 0.35, v1 - 0.12, v1 - 0.03)).fill({ color: 0xffffff, alpha: 0.12 })
+  }
+
+  /** Reihen aufgeständerter Module auf einem Flachdach (Halle, Fabrik, Flachdach in warmen Breiten). */
+  function drawSolarFlat(g: PixiGraphics, cx: number, cy: number, hw: number, hd: number, cos: number, sin: number, eave: number) {
+    // Reihen quer zur kurzen Achse, nach Süden geneigt (vorn tiefer)
+    const long = hw >= hd
+    const L = (long ? hw : hd) * 0.78, D = (long ? hd : hw) * 0.7
+    if (L < 2 || D < 1.5) return
+    const ax = long ? { x: cos, y: sin } : { x: -sin, y: cos }      // entlang der Reihe
+    const bx = { x: -ax.y, y: ax.x }                                  // quer dazu
+    const p = (a: number, b: number, h: number) => iso(cx + ax.x * a + bx.x * b, cy + ax.y * a + bx.y * b, eave + h)
+    const step = 2.4
+    for (let b = -D; b + 1.3 <= D; b += step) {
+      const q = [p(-L, b, 0.25), p(L, b, 0.25), p(L, b + 1.3, 0.75), p(-L, b + 1.3, 0.75)]
+      g.poly(q.flatMap(s => [s.x, s.y])).fill(0x2a4064).stroke({ width: 0.14, color: 0xc9d3dc, alpha: 0.85 })
+      const cols = Math.max(2, Math.round(L * 2 / 1.1))
+      for (let i = 1; i < cols; i++) { const a = -L + 2 * L * i / cols, s0 = p(a, b, 0.25), s1 = p(a, b + 1.3, 0.75); g.moveTo(s0.x, s0.y).lineTo(s1.x, s1.y) }
+      g.stroke({ width: 0.07, color: 0x7f9cc0, alpha: 0.65 })
+    }
   }
 
   /** Ebenes Dach auf Höhe `eave`; `inward` zeigt quer zur Längsachse (Richtung der Dachbild-Reihen). */
@@ -500,7 +623,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     return ring
   }
 
-  function drawBlock(block: TileBlock, ox: number, oy: number, footprints?: Loaded['footprints']) {
+  function drawBlock(block: TileBlock, ox: number, oy: number, footprints?: Loaded['footprints'], ambient?: { chimneys: Loaded['chimneys']; extra: Container[] }) {
     const style = BLOCK_STYLES[block.k]
     const g = new PIXI.Graphics()
     let cos = Math.cos(block.a), sin = Math.sin(block.a)
@@ -527,12 +650,22 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Moschee: Nutzung b:mosque oder Wahrzeichen im Haus mit religion=muslim (Istanbul hat daneben echte Kirchen).
     const mosque = block.k === 'church' && (block.u === 'b:mosque' || landmarkIn({ cx, cy, hw, hd, cos, sin })?.tags.religion === 'muslim')
     const roofM = mosque ? 0 : warm ? (block.k === 'church' ? 1.2 : 0) : style.roofM
+    // Solaranlagen, Schornstein (05.11.2026): nur auf realen Häusern ohne NOXIA-Dach.
+    const ambientKey = block.i ?? (() => { const geo = toGeo({ x: cx, y: cy }); return geo.lat.toFixed(5) + ',' + geo.lon.toFixed(5) })()
+    const plainRoof = !look?.roof && !mosque
+    const areaM2 = block.w * block.d
+    const solar = plainRoof && hasSolar(block.k, ambientKey, areaM2)
+    const chimney = plainRoof && !warm && roofM > 0.01 && !shownRing && hasChimney(block.k, ambientKey)
     let c: Array<{ x: number; y: number }>
     if (shownRing) {
       c = drawPrism(g, block.k, shownRing, eave, { x: -sin, y: cos }, look?.roof)
+      // Nur bei rechteckigem Grundriss, sonst stehen Module über dem Rand
+      if (solar && polygonArea(shownRing) > 0.85 * (2 * hw) * (2 * hd)) drawSolarFlat(g, cx, cy, hw, hd, cos, sin, eave)
     } else {
-      c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, roofM, look?.roof)
+      c = drawMass(g, block.k, cx, cy, hw, hd, cos, sin, eave, roofM, look?.roof, { solar: solar && roofM > 0.01, chimney, onChimney: (x, y, h) => ambient?.chimneys.push({ x, y, h, seed: seeded('smoke:' + ambientKey) }) })
+      if (solar && roofM <= 0.01) drawSolarFlat(g, cx, cy, hw, hd, cos, sin, eave)
     }
+    g.tint = worldTint
     if (owner) claim(owner)
     if (mosque) {
       // Minarette an den beiden vorderen Ecken, Kuppel mittig auf dem Flachdach.
@@ -546,7 +679,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       g.poly(dome).fill(0xb9c7c2).stroke({ width: 0.4, color: OUTLINE, alpha: 0.7 })
       g.poly([mid.x - rx * 0.45, mid.y - ry * 0.75, mid.x - rx * 0.1, mid.y - ry * 0.98, mid.x - rx * 0.1, mid.y - ry * 0.5]).fill({ color: 0xffffff, alpha: 0.25 })
     }
-    if (block.k === 'church' && block.w >= 12 && !warm && !mosque) {
+    // Kapellen (Friedhofs-, Wegkapellen) haben keinen hohen Turm (05.11.2026: Auferstehungskapelle)
+    const chapel = block.u === 'b:chapel' || /kapelle|chapel/i.test(block.nm ?? '')
+    if (block.k === 'church' && block.w >= 12 && !warm && !mosque && !chapel) {
       // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
       // spitzem Pyramidendach – macht eine Kirche von Weitem erkennbar.
       if (cos + sin < 0) { cos = -cos; sin = -sin }
@@ -561,6 +696,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
     // Tiefe: der vorderste Fußpunkt entscheidet, was vor wem steht.
     g.zIndex = Math.max(...c.map(p => p.x + p.y))
+    // Licht in den Fenstern am Abend: eigene Fläche knapp vor dem Haus, nicht getönt.
+    if (ambient && !shownRing && !owner && (block.k === 'house' || block.k === 'row') && c.length === 4) {
+      const lit = drawWindowLights(c, block.l, style.storeyM, style.bayM, ambientKey)
+      if (lit) {
+        lit.zIndex = g.zIndex + 0.001
+        const geo = toGeo({ x: cx, y: cy })
+        windowLights.set(lit, { key: ambientKey, lon: geo.lon })
+        lit.visible = windowLit(sunNow, geo.lon, Date.now(), ambientKey)
+        lit.on('destroyed', () => windowLights.delete(lit))
+        ambient.extra.push(lit)
+      }
+    }
     // Für Klicks: was dieses Gebäude ist. Ein Wahrzeichen in oder dicht an ihm
     // wird beim Klick gesucht (es kann in der Nachbarkachel liegen).
     g.eventMode = block.o ? 'none' : 'static'
@@ -574,6 +721,33 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         core, cMinX: Math.min(...core.map(p => p.x)), cMaxX: Math.max(...core.map(p => p.x)), cMinY: Math.min(...core.map(p => p.y)), cMaxY: Math.max(...core.map(p => p.y)) })
     }
     return g
+  }
+
+  /** Warme Fenster auf den beiden Wänden zur Kamera, je Geschoss und Achse etwa jedes zweite. */
+  function drawWindowLights(c: Array<{ x: number; y: number }>, levels: number, storeyM: number, bayM: number, key: string) {
+    const lit = new PIXI.Graphics()
+    let any = false
+    for (let i = 0; i < 4; i++) {
+      const a = c[i], b = c[(i + 1) % 4]
+      const nx = b.y - a.y, ny = -(b.x - a.x)
+      if (nx + ny <= 0) continue
+      const length = Math.hypot(b.x - a.x, b.y - a.y)
+      const bays = Math.max(1, Math.floor(length / bayM))
+      const ux = (b.x - a.x) / length, uy = (b.y - a.y) / length
+      const out = 0.05 / Math.hypot(nx, ny)
+      for (let level = 0; level < Math.min(levels, 6); level++) for (let bay = 0; bay < bays; bay++) {
+        if (seeded(key + ':' + i + ':' + level + ':' + bay) > 0.45) continue
+        const mid = (bay + 0.5) * length / bays
+        const h0 = level * storeyM + 1.0, h1 = h0 + 1.25
+        const p = (t: number, h: number) => iso(a.x + ux * t + nx * out, a.y + uy * t + ny * out, h)
+        const q = [p(mid - 0.5, h0), p(mid + 0.5, h0), p(mid + 0.5, h1), p(mid - 0.5, h1)]
+        lit.poly(q.flatMap(s => [s.x, s.y])).fill({ color: 0xffd27a, alpha: 0.92 })
+        any = true
+      }
+    }
+    if (!any) { lit.destroy(); return null }
+    lit.eventMode = 'none'
+    return lit
   }
 
   /** Wahrzeichen in einem Gebäude oder bis 12 m davor (Kacheln rundum). */
@@ -611,6 +785,44 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     })
   }
 
+  /**
+   * Glitzern auf Wasser (05.11.2026): kurze helle Striche auf Flüssen und Wasserflächen,
+   * in zwei Gruppen, die im Wechsel auf- und abblenden.
+   */
+  function drawGlint(entry: Loaded) {
+    const { data, ox, oy } = entry
+    const groups = [new PIXI.Graphics(), new PIXI.Graphics()]
+    let count = 0
+    const dash = (x: number, y: number) => {
+      const a = iso(ox + x - 0.7, oy + y - 0.7), b = iso(ox + x + 0.7, oy + y + 0.7)
+      groups[count++ % 2].moveTo(a.x, a.y).lineTo(b.x, b.y)
+    }
+    data.rivers.forEach((river, i) => {
+      const width = data.rw?.[i] ?? RIVER_STYLE.widthM
+      if (width < 1.5) return
+      let carry = 0
+      for (let j = 0; j + 3 < river.length && count < 80; j += 2) {
+        const dx = river[j + 2] - river[j], dy = river[j + 3] - river[j + 1], len = Math.hypot(dx, dy)
+        for (let t = carry; t < len; t += 7) dash(river[j] + dx * t / len, river[j + 1] + dy * t / len)
+        carry = (carry + 7 - (len % 7)) % 7
+      }
+    })
+    for (const area of data.areas) {
+      if ((area.k !== 'water' && area.k !== 'pool') || count >= 140) continue
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: area.p[i], y: area.p[i + 1] })
+      const xs = ring.map(p => p.x), ys = ring.map(p => p.y)
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+      const step = Math.max(6, Math.sqrt((maxX - minX) * (maxY - minY) / 40))
+      for (let y = minY + step / 2; y < maxY && count < 140; y += step) for (let x = minX + step / 2 + ((y / step) % 2) * step / 2; x < maxX && count < 140; x += step) {
+        if (insidePolygon({ x, y }, ring)) dash(x, y)
+      }
+    }
+    if (!count) { groups.forEach(g => g.destroy()); return }
+    for (const g of groups) { g.stroke({ width: 0.35, color: 0xeaf6ff, cap: 'round' }); g.eventMode = 'none'; surfaceLayer.addChild(g) }
+    entry.glint = [groups[0], groups[1]]
+  }
+
   function drawGround(entry: Loaded) {
     const { data, ox, oy } = entry
     const g = new PIXI.Graphics()
@@ -632,6 +844,24 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       }
       g.stroke({ width: outline.widthM * 0.75, color: outline.color, cap: 'square' })
     }
+    // Gelände (NOXIA-WORLD-0004): Hangschattierung mit Licht aus Nordwesten und
+    // Höhenlinien alle 10 m, auf dem flachen Boden unter Straßen und Häusern.
+    const terrain = (data as TileTerrainPart).terrain
+    if (terrain) {
+      const shade = terrainShade(terrain, data.size)
+      for (const quad of shade.quads) {
+        const p = path(quad.p)
+        // Höhenfarbe: Täler satter, Höhen heller (05.11.2026)
+        const tint = heightTint(quad.h)
+        if (tint.alpha > 0.01) g.poly(p).fill({ color: tint.color, alpha: tint.alpha })
+        if (Math.abs(quad.light) >= 0.02) g.poly(p).fill({ color: quad.light > 0 ? 0xfff6dc : 0x1d2a2e, alpha: Math.min(0.5, Math.abs(quad.light) * (quad.light > 0 ? 0.38 : 0.5)) })
+      }
+      for (const line of shade.contours) {
+        const p = path(line.s)
+        for (let i = 0; i + 3 < p.length; i += 4) g.moveTo(p[i], p[i + 1]).lineTo(p[i + 2], p[i + 3])
+        g.stroke({ width: line.major ? 0.55 : 0.3, color: 0x6b5a3a, alpha: line.major ? 0.38 : 0.22 })
+      }
+    }
     const l = new PIXI.Graphics()
     const sf = new PIXI.Graphics()
     const stroke = (target: PixiGraphics, p: number[], width: number, color: number) => {
@@ -644,6 +874,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       stroke(l, path(river), width + Math.min(2.6, 0.8 + width * 0.35), 0x9a8f6a)
       stroke(sf, path(river), width, RIVER_STYLE.color)
     })
+    drawGlint(entry)
     // Bürgersteige: Bordstein und Gehweg nur an Fahrstraßen (nicht an Zufahrten,
     // Parkplatzgassen, Fußgängerzonen), damit Kreuzungen als Platz ineinanderlaufen (W-3).
     for (const road of data.roads) {
@@ -778,26 +1009,85 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       ;(place.p ? poiLabels : functional ? labels : osmLabelLayer).addChild(name)
       entry.labels.push(name)
     }
-    // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
-    const trees = data.trees ?? []
-    if (treeTextures.length) for (let i = 0; i + 1 < trees.length; i += 2) {
-      const x = ox + trees[i], y = oy + trees[i + 1]
-      const sprite = new PIXI.Sprite(treeTextures[treeVariant(x, y) % treeTextures.length])
+    // Bäume und Sträucher: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
+    // Standorte aus OSM und geschätzte in Wald, Park, Garten, Friedhof (plantPlacement.ts).
+    const centreGeo = toGeo({ x: ox + data.size / 2, y: oy + data.size / 2 })
+    const region = plantRegion(centreGeo.lat, centreGeo.lon)
+    for (const spot of plantSpots(data, { x: entry.tile.x * data.size, y: entry.tile.y * data.size }, centreGeo)) {
+      const texture = plantTexture(spot.species, region)
+      if (!texture) break
+      const x = ox + spot.x, y = oy + spot.y
+      const sprite = new PIXI.Sprite(texture)
       sprite.anchor.set(0.5, (TREE_PX.h - 4) / TREE_PX.h)
-      sprite.width = TREE_WORLD.w; sprite.height = TREE_WORLD.h
+      const k = plantSize(spot)
+      sprite.width = TREE_WORLD.w * k; sprite.height = TREE_WORLD.h * k
       const foot = iso(x, y)
       sprite.position.set(foot.x, foot.y)
       sprite.zIndex = x + y
+      sprite.tint = worldTint
+      sprite.eventMode = 'none'
       addObject(sprite)
       entry.trees.push(sprite)
+      entry.plants.push({ x, y, spot, region, sprite, k })
     }
+    drawGraves(entry)
+  }
+
+  /**
+   * W-19 (05.11.2026): Grabsteine auf Friedhofsflächen. Reihen quer zur Blickrichtung,
+   * je Reihe ein Objekt mit Tiefe; Grabbeete flach auf dem Boden. Ohne Namen (R-23).
+   */
+  function drawGraves(entry: Loaded) {
+    const { data, ox, oy } = entry
+    const cemeteries = data.areas.filter(area => area.k === 'cemetery')
+    if (!cemeteries.length) return
+    const blocked = [
+      ...data.blocks.map(block => ({ x: block.x, y: block.y, r: Math.max(block.w, block.d) / 2 + 1.5 })),
+      ...entry.plants.map(plant => ({ x: plant.spot.x, y: plant.spot.y, r: 1.6 })),
+    ]
+    const crosses = Math.abs(toGeo({ x: ox + data.size / 2, y: oy + data.size / 2 }).lat) >= 36
+    const origin = { x: entry.tile.x * data.size, y: entry.tile.y * data.size }
+    const beds = new PIXI.Graphics()
+    const rows = new Map<number, PixiGraphics>()
+    const a = { x: Math.SQRT1_2, y: -Math.SQRT1_2 }, n = { x: Math.SQRT1_2, y: Math.SQRT1_2 }
+    const at = (x: number, y: number, along: number, front: number, h: number) => iso(x + a.x * along + n.x * front, y + a.y * along + n.y * front, h)
+    const flat = (pts: Array<{ x: number; y: number }>) => pts.flatMap(q => [q.x, q.y])
+    for (const area of cemeteries) {
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: area.p[i], y: area.p[i + 1] })
+      for (const spot of graveSpots(ring, origin, blocked, crosses)) {
+        const x = ox + spot.x, y = oy + spot.y
+        const r = seeded('bed:' + (origin.x + spot.x).toFixed(1) + ',' + (origin.y + spot.y).toFixed(1))
+        // Grabbeet vor dem Stein: meist bepflanzt, manches mit Kies
+        beds.poly(flat([at(x, y, -0.4, 0.05, 0), at(x, y, 0.4, 0.05, 0), at(x, y, 0.4, 1.6, 0), at(x, y, -0.4, 1.6, 0)])).fill(r < 0.7 ? 0x6f8a52 : 0xbdb4a0)
+        let g = rows.get(spot.row)
+        if (!g) { g = new PIXI.Graphics(); g.zIndex = ox + oy + spot.row + 0.05; g.eventMode = 'none'; g.tint = worldTint; rows.set(spot.row, g) }
+        if (spot.cross) {
+          const wood = r > 0.5
+          const color = wood ? 0x5b4632 : 0xa7a39a
+          g.poly(flat([at(x, y, -0.07, 0, 0), at(x, y, 0.07, 0, 0), at(x, y, 0.07, 0, 1.05), at(x, y, -0.07, 0, 1.05)])).fill(color).stroke({ width: 0.06, color: 0x3c3a36, alpha: 0.7 })
+          g.poly(flat([at(x, y, -0.27, 0, 0.7), at(x, y, 0.27, 0, 0.7), at(x, y, 0.27, 0, 0.83), at(x, y, -0.27, 0, 0.83)])).fill(color).stroke({ width: 0.06, color: 0x3c3a36, alpha: 0.7 })
+        } else {
+          // Stehender Stein mit gerundeter Oberkante, leicht verschieden in Breite und Farbe
+          const w = 0.26 + r * 0.1, h = 0.62 + ((r * 7) % 1) * 0.18
+          const color = [0x8f8f8a, 0x7d7a74, 0x9b958a, 0x6c6e70][Math.floor(r * 4) % 4]
+          g.poly(flat([at(x, y, -w, 0, 0), at(x, y, w, 0, 0), at(x, y, w, 0, h - 0.1), at(x, y, w * 0.55, 0, h), at(x, y, 0, 0, h + 0.04), at(x, y, -w * 0.55, 0, h), at(x, y, -w, 0, h - 0.1)]))
+            .fill(color).stroke({ width: 0.07, color: 0x4e4e4a, alpha: 0.8 })
+        }
+      }
+    }
+    if (!rows.size) { beds.destroy(); return }
+    beds.eventMode = 'none'
+    ground.addChild(beds)
+    entry.beds = beds
+    for (const g of rows.values()) { addObject(g); entry.trees.push(g) }
   }
 
   function showTile(tile: TileId, data: SimplifiedTile) {
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false, chimneys: [], lights: [], plants: [], beds: null, glint: null })
     building.push(key)
   }
 
@@ -816,12 +1106,14 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const to = Math.min(entry.data.blocks.length, from + Math.max(1, Math.floor(budget)))
       if (to > from) {
         const chunk: Container[] = []
+        const litFrom = entry.lights.length
         for (let i = from; i < to; i++) {
           const block = entry.data.blocks[i]
           if (block.i && cleared.has(block.i)) continue   // abgerissen
-          chunk.push(drawBlock(block, entry.ox, entry.oy, entry.footprints))
+          chunk.push(drawBlock(block, entry.ox, entry.oy, entry.footprints, { chimneys: entry.chimneys, extra: entry.lights }))
         }
         for (const block of chunk) addObject(block)
+        for (const lit of entry.lights.slice(litFrom)) addObject(lit)
         entry.blocks.push(...chunk)
         budget -= to - from
       }
@@ -835,6 +1127,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     entry.surface?.destroy()
     entry.parcels?.destroy()
     entry.owned?.destroy()
+    entry.glint?.forEach(g => g.destroy())
+    for (const lit of entry.lights) lit.destroy()
+    entry.beds?.destroy()
     for (const tree of entry.trees) tree.destroy()
     for (const label of entry.labels) label.destroy()
     for (const block of entry.blocks) block.destroy()
@@ -1155,7 +1450,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // eine Arbeit in der Nähe hat, steht davor; die anderen gehen eine Straße
   // der geladenen Kacheln auf und ab. Gespräche können sie irgendwohin schicken.
   type Walker = {
-    spec: WorldPerson; figure: PixiGraphics; label: InstanceType<typeof PIXI.Text>
+    spec: WorldPerson; figure: Container; kiesel: KieselState; label: InstanceType<typeof PIXI.Text>
+    /** Sprechblase über der Figur (Gespräch in Hörweite), sonst nicht gesetzt. */
+    bubble?: InstanceType<typeof PIXI.Container>
     x: number; y: number; seed: number
     route: Array<{ x: number; y: number }> | null; routeLength: number
     /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer.
@@ -1169,16 +1466,69 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const walkers = new Map<string, Walker>()
   const PERSON_COLORS = [0x4f7fb3, 0xa4553f, 0x5f8f4a, 0x8a6aa8, 0x3f8f8a, 0xb08a3a]
   const hash = (text: string) => { let h = 2166136261; for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619); return h >>> 0 }
+  // ── Kiesel-Figuren (W-17) ───────────────────────────────────────────
+  // Jedes Aussehen, jede Richtung und jeder Schritt wird einmal als Bild gerechnet
+  // (SVG → Textur) und zwischengespeichert. Bis das Bild da ist, steht die einfache Figur.
+  const KIESEL_H = 11.5, KIESEL_W = KIESEL_H * 64 / 96
+  const kieselCache = new Map<string, Texture | 'loading'>()
+  function kieselTexture(look: KieselLook, dir: KieselDir, pose: 'stehen' | 'gehen', frame: number): Texture | null {
+    const key = JSON.stringify(look) + '|' + dir + '|' + pose + '|' + frame
+    const hit = kieselCache.get(key)
+    if (hit === 'loading') return null
+    if (hit) return hit
+    kieselCache.set(key, 'loading')
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 96" width="64" height="96">${kieselSVG(look, dir, pose, frame, pose === 'gehen')}</svg>`
+    const img = new Image()
+    img.onload = () => { if (!disposed) kieselCache.set(key, PIXI.Texture.from(img)) }
+    img.onerror = () => kieselCache.delete(key)
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+    return null
+  }
+  type KieselState = { look: KieselLook | null; sprite: InstanceType<typeof PIXI.Sprite>; fallback: PixiGraphics; dir: KieselDir; lastFoot: { x: number; y: number } | null; movedAt: number }
+  /** Blickrichtung und Schritt aus der Bewegung auf dem Bildschirm, dann das passende Bild. */
+  function stepKiesel(state: KieselState, foot: { x: number; y: number }, now: number) {
+    if (!state.look) return
+    const last = state.lastFoot
+    const dx = last ? foot.x - last.x : 0, dy = last ? foot.y - last.y : 0
+    if (Math.hypot(dx, dy) > 0.02) { state.dir = kieselDirFrom(dx * 20, dy * 20, state.dir); state.movedAt = now }
+    state.lastFoot = { x: foot.x, y: foot.y }
+    const moving = now - state.movedAt < 180
+    const frame = moving ? Math.floor(now / 140) % 4 : 0
+    const texture = kieselTexture(state.look, state.dir, moving ? 'gehen' : 'stehen', frame)
+    if (texture) { state.sprite.texture = texture; state.sprite.visible = true; state.fallback.visible = false }
+  }
+  function kieselSprite() {
+    const sprite = new PIXI.Sprite()
+    sprite.anchor.set(0.5, 0.97)
+    sprite.width = KIESEL_W; sprite.height = KIESEL_H
+    sprite.visible = false
+    return sprite
+  }
+  // Eigene Figur: Kiesel, sobald die Ansicht das Aussehen meldet
+  let playerKiesel: KieselState | null = null
+  function setPlayerLook(look: KieselLook) {
+    if (!playerKiesel) {
+      const sprite = kieselSprite()
+      sprite.scale.set(sprite.scale.x / 1.35, sprite.scale.y / 1.35)
+      playerSprite.addChild(sprite)
+      playerKiesel = { look, sprite, fallback: playerFallback, dir: 'se', lastFoot: null, movedAt: 0 }
+    } else playerKiesel.look = look
+  }
   function makeFigure(color: number) {
-    const g = new PIXI.Graphics()
-    g.ellipse(0, 0, 3, 1.5).fill({ color: 0x000000, alpha: 0.2 })
-    g.roundRect(-1.5, -6.1, 3, 5.1, 1.3).fill(color).stroke({ width: 0.45, color: 0x2e2a24 })
-    g.circle(0, -7.2, 1.4).fill(0xe8c4a0).stroke({ width: 0.4, color: 0x2e2a24 })
+    const g = new PIXI.Container()
+    const shadow = new PIXI.Graphics()
+    shadow.ellipse(0, 0, 3, 1.5).fill({ color: 0x000000, alpha: 0.2 })
+    const fallback = new PIXI.Graphics()
+    fallback.roundRect(-1.5, -6.1, 3, 5.1, 1.3).fill(color).stroke({ width: 0.45, color: 0x2e2a24 })
+    fallback.circle(0, -7.2, 1.4).fill(0xe8c4a0).stroke({ width: 0.4, color: 0x2e2a24 })
+    const sprite = kieselSprite()
+    sprite.scale.set(sprite.scale.x / 1.3, sprite.scale.y / 1.3)
+    g.addChild(shadow, fallback, sprite)
     g.eventMode = 'static'
     // Größer als die Figur, damit man sie auch beim Herauszoomen trifft.
     g.hitArea = new PIXI.Rectangle(-4.5, -11, 9, 13)
     g.scale.set(1.3)
-    return g
+    return { g, kiesel: { look: null, sprite, fallback, dir: 'se', lastFoot: null, movedAt: 0 } as KieselState }
   }
   /** Eine Straße für eine Person: aus den geladenen Kacheln um `base`, unter den nächsten fest nach ihrer Kennung gewählt. */
   function pickRoute(seed: number, base: { x: number; y: number } = player) {
@@ -1241,12 +1591,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
   function setPeople(list: WorldPerson[]) {
     const keep = new Set(list.map(person => person.id))
-    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy(); walker.label.destroy(); walkers.delete(id) }
+    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy({ children: true }); walker.label.destroy(); walker.bubble?.destroy(); walkers.delete(id) }
     for (const spec of list) {
       const known = walkers.get(spec.id)
       if (known) {
         const before = standPoint(known.spec, known.seed, known.slot, known.slots)
-        known.spec = spec; known.label.text = spec.label
+        known.spec = spec; known.label.text = spec.label; known.kiesel.look = spec.look ?? null
         const after = standPoint(spec, known.seed, known.slot, known.slots)
         // Neuer Ort aus der Simulation (z. B. Wohnung → Arbeit): hingehen statt springen.
         // Ein Weg aus einem Gespräch (Mitgehen, Hinschicken) hat Vorrang.
@@ -1256,14 +1606,16 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         continue
       }
       const seed = hash(spec.id)
-      const figure = makeFigure(spec.tint ?? PERSON_COLORS[seed % PERSON_COLORS.length])
+      const made = makeFigure(spec.tint ?? PERSON_COLORS[seed % PERSON_COLORS.length])
+      const figure = made.g
+      made.kiesel.look = spec.look ?? null
       ;(figure as unknown as { pick: WorldPick }).pick = { type: 'person', id: spec.id }
       const label = new PIXI.Text({ text: spec.label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 26, fontWeight: '600', fill: 0x1f2a30, stroke: { color: 0xf8f6ef, width: 6, join: 'round' } } })
       label.anchor.set(0.5, 1)
       label.scale.set(0.12)
       labels.addChild(label)
       const start = spec.anchor ? toWorld(spec.anchor) : { x: player.x + (seed % 40) - 20, y: player.y + ((seed >> 8) % 40) - 20 }
-      const walker: Walker = { spec, figure, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null, runM: seed % 997, lastAt: 0, slot: 0, slots: 1, crowdInside: false }
+      const walker: Walker = { spec, figure, kiesel: made.kiesel, label, x: start.x, y: start.y, seed, route: null, routeLength: 0, sent: null, runM: seed % 997, lastAt: 0, slot: 0, slots: 1, crowdInside: false }
       walkers.set(spec.id, walker)
       placeDepth(figure, start.x + start.y)
     }
@@ -1332,10 +1684,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const foot = iso(x, y)
       walker.figure.position.set(foot.x, foot.y)
       placeDepth(walker.figure, x + y)
+      stepKiesel(walker.kiesel, foot, now)
       walker.label.position.set(foot.x, foot.y - 12)
       const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent) && !(walker.crowdInside && !walker.sent) && !walker.sent?.hidden
       walker.figure.visible = near
       walker.label.visible = near && zoom >= 2.2
+      if (walker.bubble) { walker.bubble.position.set(foot.x, foot.y - 17); walker.bubble.visible = near && zoom >= 1.6 }
     }
   }
 
@@ -1601,6 +1955,30 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     ownedLayer.addChild(g)
     entry.owned = g
   }
+  /** Friedhof an einem Weltpunkt (nur geladene Kacheln): Name und seine Flächen in den Nachbarkacheln. */
+  function cemeteryAtWorld(p: { x: number; y: number }): { name: string; rings: Array<Array<{ x: number; y: number }>> } | null {
+    const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
+    const ringsOf = (entry: Loaded | undefined, name: string | null) => (entry?.data.areas ?? [])
+      .filter(area => area.k === 'cemetery' && (name === null || (area.n ?? 'Friedhof') === name))
+      .map(area => { const ring: Array<{ x: number; y: number }> = []; for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: entry!.ox + area.p[i], y: entry!.oy + area.p[i + 1] }); return { ring, name: area.n ?? 'Friedhof' } })
+    const hit = ringsOf(loaded.get(tileKey({ x: tx, y: ty })), null).find(item => insidePolygon(p, item.ring))
+    if (!hit) return null
+    const rings: Array<Array<{ x: number; y: number }>> = []
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) for (const item of ringsOf(loaded.get(tileKey({ x: tx + dx, y: ty + dy })), hit.name)) rings.push(item.ring)
+    return { name: hit.name, rings }
+  }
+  /** Kapelle (Blockart Kirche) auf dem Friedhof oder bis 25 m an seinem Rand. */
+  function chapelAtCemetery(rings: Array<Array<{ x: number; y: number }>>): { name: string; source?: string; at: GeoPoint } | null {
+    let best: { name: string; source?: string; at: GeoPoint; d: number } | null = null
+    for (const entry of loaded.values()) for (const block of entry.data.blocks) {
+      if (block.k !== 'church') continue
+      const c = { x: entry.ox + block.x, y: entry.oy + block.y }
+      const d = rings.some(ring => insidePolygon(c, ring)) ? 0 : Math.min(...rings.map(ring => distanceToRing(c, ring)))
+      if (d > 25 || (best && best.d <= d)) continue
+      best = { name: block.nm ?? 'Friedhofskapelle', source: block.i, at: toGeo(c), d }
+    }
+    return best ? { name: best.name, source: best.source, at: best.at } : null
+  }
   /** Flurstück an einem Weltpunkt (nur geladene Kacheln). */
   function parcelAtWorld(p: { x: number; y: number }): string | null {
     const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
@@ -1776,9 +2154,26 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const node = inputEnabled ? pickNode(event.offsetX, event.offsetY) : null
     light(node)
     if (!options.onHover) return
-    const pick = node ? pickAt(event.offsetX, event.offsetY) : null
+    const pick = node ? pickAt(event.offsetX, event.offsetY) : inputEnabled ? plantAt(event.offsetX, event.offsetY) : null
     if (pick) { hovering = true; options.onHover({ pick, x: event.clientX, y: event.clientY }) }
     else if (hovering) { hovering = false; options.onHover(null) }
+  }
+  /** Baum unter dem Mauszeiger: Krone als Rechteck über dem Fußpunkt, der vorderste gewinnt. */
+  function plantAt(offsetX: number, offsetY: number): WorldPick | null {
+    const centre = iso(camera.x, camera.y)
+    const u = (offsetX - app.screen.width / 2) / zoom + centre.x, v = (offsetY - app.screen.height / 2) / zoom + centre.y
+    const gx = (u + v / ISO_Y) / 2, gy = (v / ISO_Y - u) / 2
+    let best: Loaded['plants'][number] | null = null
+    for (const entry of loaded.values()) {
+      if (gx < entry.ox - 40 || gx > entry.ox + entry.data.size + 40 || gy < entry.oy - 40 || gy > entry.oy + entry.data.size + 40) continue
+      for (const plant of entry.plants) {
+        const foot = iso(plant.x, plant.y)
+        const halfW = TREE_WORLD.w * plant.k * 0.32, top = foot.y - TREE_WORLD.h * plant.k * 0.9
+        if (u < foot.x - halfW || u > foot.x + halfW || v < top || v > foot.y) continue
+        if (!best || plant.x + plant.y > best.x + best.y) best = plant
+      }
+    }
+    return best ? { type: 'plant', at: toGeo({ x: best.x, y: best.y }), species: best.spot.species, source: best.spot.source, region: best.region, hint: best.spot.hint } : null
   }
   const pointerLeave = () => { light(null); if (hovering) { hovering = false; options.onHover?.(null) } }
   const pointerUp = (event: PointerEvent) => {
@@ -1787,10 +2182,21 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     pressAt = null
     const pick = pickAt(event.offsetX, event.offsetY)
     if (pick) { options.onPick(pick); return }
+    const plant = plantAt(event.offsetX, event.offsetY)
+    if (plant) { options.onPick(plant); return }
     // Boden: Bildpunkt → Bodenpunkt (Höhe 0)
     const centre = iso(camera.x, camera.y)
     const u = (event.offsetX - app.screen.width / 2) / zoom + centre.x, v = (event.offsetY - app.screen.height / 2) / zoom + centre.y
     const groundX = (u + v / ISO_Y) / 2, groundY = (v / ISO_Y - u) / 2
+    // W-13: Friedhofsfläche – öffnet „Friedhof betreten“ mit dem Namen aus OSM
+    const cemetery = cemeteryAtWorld({ x: groundX, y: groundY })
+    if (cemetery) {
+      // Kapelle oder Trauerhalle auf dem Friedhof (oder bis 25 m davor) – eigener Raum (05.11.2026)
+      const chapel = chapelAtCemetery(cemetery.rings)
+      const tags: Record<string, string> = chapel ? { chapel_name: chapel.name, chapel_source: chapel.source ?? '', chapel_lat: String(chapel.at.lat), chapel_lon: String(chapel.at.lon) } : {}
+      options.onPick({ type: 'landmark', landmark: { at: toGeo({ x: groundX, y: groundY }), name: cemetery.name, kind: 'cemetery', tags } })
+      return
+    }
     const parcel = parcelAtWorld({ x: groundX, y: groundY })
     options.onPick(parcel ? { type: 'parcel', id: parcel, at: toGeo({ x: groundX, y: groundY }) } : { type: 'ground', at: toGeo({ x: groundX, y: groundY }) })
   }
@@ -1833,6 +2239,73 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   app.canvas.addEventListener('wheel', wheel, { passive: false })
   cleanup.push(() => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur) })
 
+  // ── Stimmung: Tageslicht, Wasser, Rauch, Pfeil (05.11.2026) ─────────
+  let ambientAt = -1e9, smokeAt = 0
+  let guide: { x: number; y: number; arrow: PixiGraphics } | null = null
+  function ambientStep(now: number) {
+    const geo = toGeo(player)
+    if (now - ambientAt > 20000) {
+      ambientAt = now
+      sunNow = sunElevationDeg(geo.lat, geo.lon, Date.now())
+      const tint = dayTint(sunNow)
+      if (tint !== worldTint) {
+        worldTint = tint
+        ground.tint = tint
+        lines.tint = tint
+        for (const entry of loaded.values()) {
+          for (const block of entry.blocks) if (!block.destroyed) (block as unknown as { tint: number }).tint = tint
+          for (const tree of entry.trees) if (!tree.destroyed) (tree as unknown as { tint: number }).tint = tint
+        }
+      }
+      for (const [lit, info] of windowLights) lit.visible = windowLit(sunNow, info.lon, Date.now(), info.key)
+      // Neuer Tag: Laub der Bäume nachführen
+      const day = plantDay(Date.now(), geo.lat)
+      if (day !== plantDayNow) {
+        plantDayNow = day
+        for (const entry of loaded.values()) for (const plant of entry.plants) { const texture = plantTexture(plant.spot.species, plant.region); if (texture && !plant.sprite.destroyed) plant.sprite.texture = texture }
+      }
+    }
+    // Wasser: zwei Gruppen blenden langsam im Wechsel
+    const wave = 0.5 + 0.5 * Math.sin(now / 950)
+    const glow = sunNow > -4 ? 1 : 0.45
+    for (const entry of loaded.values()) if (entry.glint) { entry.glint[0].alpha = (0.12 + 0.4 * wave) * glow; entry.glint[1].alpha = (0.12 + 0.4 * (1 - wave)) * glow }
+    // Rauch: nur in der Heizzeit, nur nahe der Kamera, wenige Wölkchen
+    if (now - smokeAt > 70) {
+      smokeAt = now
+      smoke.clear()
+      if (heatingSeason(geo.lat, Date.now()) && zoom >= 1.2) {
+        let drawn = 0
+        for (const entry of loaded.values()) for (const chimney of entry.chimneys) {
+          if (drawn >= 24) break
+          if (Math.abs(chimney.x - camera.x) > 180 || Math.abs(chimney.y - camera.y) > 180) continue
+          drawn++
+          for (let i = 0; i < 3; i++) {
+            const t = ((now / 5200 + chimney.seed + i / 3) % 1)
+            const at = iso(chimney.x + t * 2.6, chimney.y - t * 1.2, chimney.h + 0.3 + t * 5.5)
+            smoke.circle(at.x, at.y, 0.45 + t * 1.5).fill({ color: 0xeeeeea, alpha: 0.32 * (1 - t) * Math.min(1, t * 6) })
+          }
+        }
+      }
+    }
+    if (guide) {
+      const bob = Math.sin(now / 260) * 1.6
+      const top = iso(guide.x, guide.y, 20)
+      guide.arrow.position.set(top.x, top.y + bob)
+      guide.arrow.scale.set(Math.max(0.6, 2.4 / zoom))
+    }
+  }
+  function setGuide(at: GeoPoint | null) {
+    guideLayer.removeChildren().forEach(child => child.destroy())
+    guide = null
+    if (!at) return
+    const p = toWorld(at)
+    const arrow = new PIXI.Graphics()
+    // Nach unten zeigender Pfeil, golden mit dunklem Rand
+    arrow.poly([-2.2, -7, 2.2, -7, 2.2, -3.2, 4.2, -3.2, 0, 1.6, -4.2, -3.2, -2.2, -3.2]).fill(0xf2c94c).stroke({ width: 0.6, color: 0x3a2a0a })
+    guideLayer.addChild(arrow)
+    guide = { x: p.x, y: p.y, arrow }
+  }
+
   // ── Bild für Bild ───────────────────────────────────────────────────
   let hudAt = performance.now(), hudRebuilds = 0
   app.ticker.add(ticker => {
@@ -1863,14 +2336,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
 
     const foot = iso(player.x, player.y)
     playerSprite.position.set(foot.x, foot.y)
+    if (playerKiesel) stepKiesel(playerKiesel, foot, logicStart)
     placePlayerDepth()
     updateSeeThrough(logicStart)
     playerName.position.set(foot.x, foot.y - 13)
     updateRoute(logicStart)
+    ambientStep(logicStart)
     // Ein größer gezogenes Fenster kann den Zoom nach innen schieben.
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
     for (const mark of marks.children) mark.scale.set(2.2 / zoom)
+    for (const mark of eventLayer.children) mark.scale.set(2.2 / zoom)
+    for (const mark of jobLayer.children) mark.scale.set(2.3 / zoom)
     for (const beacon of beacons.children) beacon.scale.set(2.6 / zoom)
     poiLabels.visible = zoom >= 2.4 && view.osmPlaces
     parcelLayer.visible = zoom >= 2.2
@@ -1906,6 +2383,25 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     position: () => toGeo(player),
     setPeople,
+    speak(id, text) {
+      const walker = walkers.get(id)
+      if (!walker) return
+      walker.bubble?.destroy(); walker.bubble = undefined
+      if (!text) return
+      const words = new PIXI.Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 24, fill: 0x16241c, wordWrap: true, wordWrapWidth: 420, lineHeight: 30 } })
+      words.anchor.set(0.5, 1)
+      words.position.set(0, -10)
+      const w = words.width + 22, h = words.height + 14
+      const box = new PIXI.Graphics()
+      box.roundRect(-w / 2, -10 - h + 7, w, h, 12).fill({ color: 0xf4f8f5 }).stroke({ color: 0x9db3a6, width: 2 })
+      box.poly([-7, -10 + 7, 7, -10 + 7, 0, -10 + 17]).fill({ color: 0xf4f8f5 })
+      const bubble = new PIXI.Container()
+      bubble.addChild(box, words)
+      bubble.scale.set(0.12)
+      bubble.eventMode = 'none'
+      labels.addChild(bubble)
+      walker.bubble = bubble
+    },
     personAt(id) { const walker = walkers.get(id); return walker && !(walker.spec.inside && !walker.sent) ? toGeo(walker) : null },
     leadPerson(id, distanceM, seconds) {
       const walker = walkers.get(id)
@@ -1986,7 +2482,44 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     },
     reloadTiles: reload,
     parcelIdAt(at) { return parcelAtWorld(toWorld(at)) },
+    tileReadyAt(at) { const p = toWorld(at); return tileDoneAt(p.x, p.y) },
     setView(next) { view = { ...next }; applyView() },
+    setPlayerLook,
+    setGuideArrow: setGuide,
+    setJobMark(mark) {
+      for (const old of jobLayer.removeChildren()) old.destroy({ children: true })
+      if (!mark) return
+      const p = toWorld(mark.at)
+      const at = iso(p.x, p.y, 16)
+      const sign = new PIXI.Container()
+      const text = new PIXI.Text({ text: '💼 ' + mark.text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: 0x10302c } })
+      text.anchor.set(0.5, 0.5); text.scale.set(0.13)
+      const w = text.width + 3, h = text.height + 1.6
+      const plate = new PIXI.Graphics()
+      plate.roundRect(-w / 2, -h / 2, w, h, 1.4).fill({ color: 0xf2c94c, alpha: 0.97 }).stroke({ width: 0.5, color: 0x3a2a0a })
+      plate.poly([-1.2, h / 2, 1.2, h / 2, 0, h / 2 + 1.6]).fill(0xf2c94c).stroke({ width: 0.4, color: 0x3a2a0a })
+      sign.addChild(plate, text)
+      sign.position.set(at.x, at.y)
+      sign.scale.set(2.3 / zoom)
+      jobLayer.addChild(sign)
+    },
+    setEventMarks(list) {
+      for (const old of eventLayer.removeChildren()) old.destroy({ children: true })
+      for (const item of list) {
+        const p = toWorld({ lat: item.lat, lon: item.lon })
+        const at = iso(p.x, p.y, 16)
+        const mark = new PIXI.Container()
+        const text = new PIXI.Text({ text: item.text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: 0xfff4d6 } })
+        text.anchor.set(0.5, 0.5); text.scale.set(0.13)
+        const w = text.width + 3, h = text.height + 1.6
+        const plate = new PIXI.Graphics()
+        plate.roundRect(-w / 2, -h / 2, w, h, 1.4).fill({ color: item.running ? 0x8a2f52 : 0x4a2f6a, alpha: 0.95 }).stroke({ width: 0.5, color: 0xf0c96a })
+        mark.addChild(plate, text)
+        mark.position.set(at.x, at.y)
+        mark.scale.set(2.2 / zoom)
+        eventLayer.addChild(mark)
+      }
+    },
     roadAngleAt(at) {
       const p = toWorld(at)
       let best: { d: number; angle: number } | null = null

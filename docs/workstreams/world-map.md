@@ -163,6 +163,8 @@ Befund: Ein Klick auf freien Boden tat nichts, wenn dort kein Flurstück geladen
 - **Bauprüfung:** Abgestecktes Land zählt nicht als amtliches Kataster. Ohne Kataster darf keine Ecke eines Neubaus auf fremdem abgestecktem Land stehen; sonst gilt weiter die Gartenregel.
 - **Hessen:** Der Dienst liefert bei uns keine Nutzungsart (alle 2 020 hessischen Flurstücke ohne `usage`), so wären auch Straßen-Flurstücke verkäuflich gewesen. Ohne Nutzungsart erkennt die Karte Straßen jetzt an den Kartendaten: schmal, mit langer Straßenmitte darin (`looksLikeStreetParcel`). Geprüft am 28.10.2026 mit `GET /api/world-lab/parcels?lat=50.11&lon=8.68&dry=1&usage=1`: Der hessische Dienst antwortet, die Kennzeichen haben dasselbe Format wie die Flurstücke (Zuordnung vorsorglich vereinheitlicht, `parcelKey`, Zellfassung `v3-nutzung`). Er liefert für die Frankfurter Innenstadt aber nur wenige Nutzungsabschnitte (Main als Fließgewässer), nicht die der Häuser und Straßen. Warum, ist offen; bis dahin gilt die Straßenerkennung aus den Kartendaten.
 - **Teilstücke im Katastergebiet (Thomas, 28.10.2026: „wichtig ist vor allem Sundern“):** Die Flurstücke in Sundern sind groß und teuer (Acker 3 ha ≈ 21 000 Cr, Wohnflurstück mit sechs Häusern ≈ 63 000 Cr; Spieler haben meist um 5 000 Cr). In der Flurstückstafel steckt „Teilstück“ an der angeklickten Stelle ein Stück aus einem Flurstück der Gemeinde ab (ab 600 m², nicht bei Straßen, Gewässern, öffentlichen Flächen oder fremdem Eigentum). Das Stück muss ganz im Flurstück liegen; Häuser samt 6 m Garten, Straßen und andere Stücke sind tabu. Preis = Fläche × Bodenwert der Nutzung des Flurstücks × Lage, mindestens 300 Cr. Gespeichert als Flurstück mit Quelle `noxia_part` und `parent_ids`; an seiner Stelle geht es dem Mutterflurstück vor (überall das kleinste Flurstück am Punkt: Karte, Tafel, Bauprüfung). Das Mutterflurstück ist danach nicht mehr als Ganzes zu haben, nur weitere Teilstücke.
+- **Nur unbebaute Flurstücke (Thomas, 03.11.2026):** „Ist ein Haus darauf, kann man nur teilen, wenn einem das Grundstück gehört.“ Teilstücke gibt es nur von Flurstücken ohne Haus (`buildingsOn` in `landOffer.server.ts`, auch serverseitig geprüft); der Knopf „Teilstück“ erscheint dort nicht. Bebaute Flurstücke kauft man ganz und teilt sie dann als Eigentümer („Teilen“, Vermessungsgebühr).
+- **Verschieben:** Ist die Tafel „Teilstück abstecken“ offen, setzt ein Klick in dasselbe Flurstück das Stück an die neue Stelle (03.11.2026).
 - **Formen:** quadratisch 20, 30, 40, 60 m oder länglich 15 × 40, 20 × 40, 20 × 60, 30 × 60, 40 × 80 m; „drehen“ legt die lange Seite an die Straße oder quer dazu. Ausrichtung an der nächsten Straße bis 50 m.
 - Offen: Zwei Spieler, die gleichzeitig überlappendes Land abstecken, können beide kaufen (kein Sperren in der Datenbank). Fremde Spieler sehen neues Land wie neue Flurstücke erst, wenn ihre Kachel nicht mehr aus dem CDN kommt (bis zu einer Stunde).
 
@@ -441,7 +443,10 @@ Umgesetzt:
 2. **Kein Aufblitzen:** NOXIA-Gebäude mit `source` nicht als eigenen Block zeichnen, solange die Kachel ihres Hauses noch lädt.
 3. **Gilt ebenso für** Metropol und Balkan Grill (Gebäude des Ortes in realen Lokalen) und für alle späteren öffentlichen Gebäude an realen Adressen.
 
-### W-8 (Gastronomie, 28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular
+### W-8 (Gastronomie, 28.10.2026): Gebäudenamen auf der Erde ohne Kolonie-Vokabular – erledigt (02.11.2026)
+
+Umgesetzt: Namenstabelle für die Erde `lib/worldlab/earthNames.ts` (`habitat` → „Wohnhaus“, `residential_block` → „Wohnblock“, mit Tests). `/api/world-lab/buildings` nimmt sie für alle Namen, damit gelten sie in Beschriftung, Gebäudetafel, Zielliste und Hinweis; die Gesprächsfakten (`nearbyPlaces` in `WorldPanels.tsx`) geben als Art ebenfalls den Erdnamen statt der Kennung mit. Mond und Mars unverändert. Weitere Einträge bei Bedarf in die Tabelle.
+
 
 **Befund aus der Gesprächsauswertung (G-6, `docs/reviews/npc-gespraeche-testphase.md`):** Ein Pfarrer im Sauerland ist „auf dem Weg zum Habitat“. Erfunden hat er das nicht: Bei Sundern stehen zwei NOXIA-Gebäude der Art `habitat`. Die Weltkarte gibt der Figur ihren Namen aus `building_definitions` („Habitat“) als Ort in der Nähe mit (`nearbyPlaces`, `localFacts` in `app/world-lab/WorldPanels.tsx`).
 
@@ -481,7 +486,13 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).
 - Bevölkerung, Bedürfnisse, Geld.
 
-### W-12 (Gastronomie, 29.10.2026): Nach einer Vermittlung beim Lokal herauskommen
+### W-12 (Gastronomie, 29.10.2026): Nach einer Vermittlung beim Lokal herauskommen – Punkt 1 erledigt (02.11.2026)
+
+Umgesetzt wie vorgeschlagen, beide Seiten (die Gastronomie-Seite ist eine Zeile, daher gleich mit):
+- `EarthBuildingAccessLayer` hat `onRelocate?(entityId: string)`; aufgerufen in `onGoTo`, bevor das Lokal öffnet.
+- Die Weltkarte (`relocateTo` in `WorldPanels.tsx`) setzt die Figur 2 m vor die Vorderseite des Lokals (Südseite in seiner Drehung). Nach dem Verlassen steht sie also vor dem Lokal.
+- Punkt 2 ✅ 05.11.2026: Solange `noxia.jobReferral` gilt, steht über dem Lokal ein goldenes Schild mit der Stelle (`setJobMark` in `worldEngine.ts`); unten links eine Karte „Vermittelt“ mit Stelle, Lohn, Restzeit des Scheins, Entfernung und „Weg zeigen“. Die Karte liest den Schein alle 5 s und beim Wechsel der Tafel; wird er eingelöst oder zurückgegeben, verschwinden Schild und Karte.
+
 
 Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
 
@@ -561,3 +572,276 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 ## Zuordnung Ort↔Gebäude (06.11.2026)
 
 - `landmarkIn` nahm den ersten Ort im 12-m-Rand; jetzt gewinnt der beste: Orte innerhalb des Grundrisses vor Orten davor, danach der nächste zum Mittelpunkt. Betrifft dichte Städte (Istanbul), wo Nachbarhäuser sich Orte „stahlen".
+
+### W-13 (Gastronomie, 02.11.2026): Friedhöfe begehbar, mit Gedenkort – Punkte 1, 2, 3, 5, 6 erledigt (05.11.2026)
+
+Umgesetzt (Thomas, 05.11.2026: „W-13“):
+- **Betreten:** Klick auf eine Friedhofsfläche öffnet die Tafel „Friedhof“ mit dem Namen aus OSM (`TileArea.n`, nur Friedhöfe; Kachelformat `2026-11-05.1`, die Kacheln werden neu erzeugt), sonst „Friedhof“; davor stehend „Friedhof betreten“ (`cemeteryAtWorld` in `worldEngine.ts`).
+- **Außenraum** `cemetery` in `lib/game/landmarks/interiors.ts`: Kieswege als Kreuz, vier Grabfelder mit Steinen ohne Namen, drei Bänke, Wasserstelle mit Gießkannen, Bäume, Gedenkort; alle Ziele erreichbar (geprüft mit `landmarkPath`). Trauerhalle/Kapelle noch nicht – die Fläche sagt nicht, ob dort ein Gebäude steht.
+- **Menschen:** wer laut Simulation dort ist (`peopleAtPlace`, Umkreis 120 m statt 45 m, weil Friedhöfe groß sind); ansprechbar. Die Gesprächsfakten sagen: leise, ruhig, ernsthaft, keine erfundenen Verstorbenen; bei Verzweiflung die Telefonseelsorge (0800 111 0 111, 0800 111 0 222, telefonseelsorge.de).
+- **Gedenkort für Spieler** (Vorschlag übernommen: nur für ihn selbst sichtbar): Kerze anzünden, wahlweise mit Namen; Tabelle `player_memorials` (nur über den Server, höchstens 12 je Tag), `GET/POST /api/game/memorial`. Die eigenen Kerzen brennen an der Gedenkwand jedes Friedhofs.
+- **Würde:** keine Musik, kein Rennen (Umschalt-Taste wirkt dort nicht).
+- **Nachtrag 05.11.2026 (Thomas: „beim Neuen Friedhof die Auferstehungskapelle“):**
+  - Befund: In Sundern gab es gar keine Friedhofsflächen. Die Region `earth-sauerland` steht noch auf Importprofil 4; ihr Neuimport (Profil 6, mit Friedhöfen) scheitert immer wieder an der Zeit. Die Kapelle (`osm:way:246550928`, `building=chapel`) war da, aber in OSM ohne Namen.
+  - **Friedhöfe nachholen:** `POST /api/world-lab/areas` holt je Zelle einmal nur die Friedhöfe aus OSM (`landuse=cemetery`, `amenity=grave_yard`) und legt sie als `place_area` in die umfassende Region (`lib/worldlab/placeAreas.server.ts`, Zellen in `earth_area_cells`). Die Karte stößt das für die Zelle um die Figur selbst an; danach werden die Kacheln neu gelesen.
+  - **Bekannte Namen:** `lib/worldlab/placeNames.ts` – Namen, die in OSM fehlen, aber bekannt sind (von Thomas genannt), zuerst „Auferstehungskapelle“. Gehört zur Kachelerzeugung (Kachelformat `2026-11-05.2`).
+  - **Auch ohne Besuch:** Der stündliche Lauf `/api/cron/world-tiles` holt vor den Kacheln die Friedhöfe für bis zu vier noch fehlende Zellen um NOXIA-Gebäude (`importCemeteryCell`). Ist Overpass überlastet, springt die OSM-API ein. Geprüft (05.11.2026, `GET /api/world-lab/areas?…&dry=1`): Sundern hat „Neuer Friedhof“ (`osm:way:99559996`) und „Alter Friedhof“ (`osm:way:158013261`).
+  - Kapellen (`b:chapel` oder „…kapelle“ im Namen) bekommen keinen hohen Kirchturm mehr.
+  - **Kapelle am Friedhof:** Steht eine Kapelle (Blockart Kirche) auf dem Friedhof oder bis 25 m davor, zeigt die Friedhofstafel zusätzlich „Auferstehungskapelle betreten“ (Kirchenraum). Die Kapelle selbst ist auch direkt anklickbar.
+- **Offen:** Punkt 4 (Gräber mit Namen, Angehörige am Grab, Kerze/Blumen am Grab) wartet auf R-23 (`person_graves` gibt es noch nicht); Trauerhalle, sobald ein Gebäude auf der Fläche erkannt wird.
+
+
+Thomas, 02.11.2026: „Zwischenidee: ein Friedhof.“ Auf Nachfrage entschieden, alle vier Teile:
+- ein begehbarer Ort;
+- Bewohner sterben;
+- Beerdigungen mit anschließendem Beerdigungskaffee;
+- ein Gedenkort, auch für Spieler selbst.
+
+Verteilt als Requests:
+- W-13 an die Erdkarte: Ort und Gedenken;
+- R-23 an Population: Sterben, Gräber, Trauer;
+- P-1 an Philosophie/NPC: die Trauerfeier.
+
+Den Beerdigungskaffee baut die Gastronomie.
+
+**Stand:** Friedhöfe sind heute nur Fläche mit Grabmuster (`AreaKind` `cemetery`, `areaPatterns.ts`). Betreten kann man sie nicht.
+
+**Bitte:**
+1. **Betreten:** Ein Klick auf eine Friedhofsfläche öffnet „Friedhof betreten“ mit dem echten Namen aus OSM (`landuse=cemetery`, `amenity=grave_yard`). Fehlt der Name, steht dort „Friedhof“.
+2. **Außenraum** als begehbare Szene:
+   - Wege, Grabfelder, Bänke, Wasserstelle und Gießkannen, Bäume;
+   - die Trauerhalle oder Kapelle, falls auf der Fläche ein Gebäude steht.
+   - Grabfelder ohne Namen, solange es keine Gräber aus der Simulation gibt (R-23). Erfunden wird nichts.
+3. **Menschen:** Wer laut Simulation dort ist (`placePresence`, wie bei W-10): Grabpflege, Spaziergang, Trauerfeier. Ansprechbar mit ihrer echten ID.
+4. **Gräber aus der Simulation:** Sobald R-23 Gräber liefert, stehen sie mit Namen, Lebensjahren und Grabfeld im Raum.
+   - Angehörige kommen ab und zu ans Grab.
+   - Spieler können eine Kerze anzünden oder Blumen ablegen. Das ist ein kleiner Kauf beim Blumenladen oder der Friedhofsgärtnerei, falls es eine gibt.
+5. **Gedenkort für Spieler:** ein ruhiger Platz, etwa eine Gedenkwand oder ein Baum, an dem ein Spieler für sich eine Kerze anzündet, wahlweise mit einem Namen.
+   - Vorschlag: nur für ihn selbst sichtbar, nicht öffentlich. So muss niemand Fremdes lesen, und es braucht keine Moderation.
+   - Gesprächsfiguren dort: Wer über einen echten Verlust spricht, bekommt ernsthafte, ruhige Antworten.
+   - Bei Verzweiflung nennen sie die Telefonseelsorge (kostenlos, rund um die Uhr: 0800 111 0 111 oder 0800 111 0 222, online telefonseelsorge.de) – wie VERA in der Agentur (R-22).
+6. **Würde:** kein Lärm, keine Musik, kein Rennen auf den Grabfeldern. Kauf und Verkauf von Grabstellen höchstens über die Gemeinde (Friedhofsträger), nicht als Spekulationsware.
+
+### W-14 (Gastronomie, 03.11.2026): Kindergarten, Schule und Spielplatz betretbar
+
+Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, Kindergarten, Spielplatz. Aktuell sind die Charaktere noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen.“
+
+**Stand (03.11.2026):** 65 Personen, alle erwachsen (`person_life_state` nur `adult`, Geburtsjahre 2031–2079). `person_parent_child` ist leer.
+
+**Bitte:**
+1. **Spielplatz** (Fläche `playground` gibt es schon): ein Klick öffnet „Spielplatz betreten“, als Außenraum mit Schaukel, Rutsche, Sandkasten und Bänken für Eltern. Darin ist, wer laut Simulation dort ist (R-24): Kinder mit Eltern, nachmittags.
+2. **Kindergarten und Schulen** (OSM `amenity=kindergarten` und `school`; `buildingUse` kennt beide schon): „Betreten“ wie bei W-10.
+   - Die Innenräume (Gruppenraum, Klassenzimmer, Pausenhof) baut die Gastronomie, sobald es Kinder gibt (R-24).
+   - Gebt mir bitte die Art (`entry.kind`) an, unter der ihr sie öffnet.
+3. **Kinderschutz** (R-24 Punkt 0): Spieler sehen Kinder, können sie aber nicht wegführen. Auf der Karte führt keine Figur unter 18 einen Spieler irgendwohin.
+4. **Erledigt nebenbei:** `WorldPanels.tsx` gibt beim Betreten das Gespräch mit der Begleitung an das Lokal weiter (`companionHistory`, eine Zeile). Drinnen geht es weiter, statt neu anzufangen.
+
+### W-15 (Gastronomie, 03.11.2026): Echte Lokale öffnen das volle Lokal – drei kleine Änderungen in euren Dateien – offene Punkte erledigt (04.11.2026)
+
+**Nachtrag 04.11.2026 (Thomas: „W-15 sollten wir als nächstes bauen“, von der Gastronomie gebaut, bitte prüfen):**
+- **Begleitung in reale Lokale:** `landmarkInside` hat jetzt `companionId`.
+  - `companionFor` in `WorldPanels.tsx`: Wer zu diesem Ort unterwegs ist (`visits`, auch mit Kennung des Kartenpunkts), sonst wer in den letzten fünf Minuten mit dem Spieler losgegangen ist (`lead_walk`, `visit_place` mit Folgen; `ledAt`) und höchstens 25 m entfernt steht.
+  - Das gilt auch für NOXIA-Lokale (`enter`). Beim Verlassen geht die Begleitung wieder ihrer Wege (`releaseCompanion`).
+  - Alle Eingänge zu Kartenräumen laufen über `enterLandmark`.
+- **Stellenwand:** `/api/game/jobs` liefert zusätzlich `places` (auch reale Lokale), die Agentur nimmt sie mit. Reale Lokale ohne eigenes Personal fehlen dort, denn geschlossen gibt es keine Schicht (R-28).
+
+Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
+
+**Anlass:** Seit 03.11.2026 gab es zwei verschiedene Lokale.
+- Echte Cafés, Bars, Kneipen und Restaurants der Karte öffneten einen einfachen Gastraum (Philosophie/NPC, `LandmarkWalkableInterior`, Raum `hospitality`), ohne Karte, Bestellen, Arbeiten und Begleitung.
+- NOXIA-Lokale wie Metropol öffneten das Lokal der Gastronomie.
+
+**Gebaut (Gastronomie, live):**
+- `noxia_real_venue` (`20261103180000_real_venues.sql`) und `POST /api/game/hospitality/real-venue`.
+  - Beim ersten Betreten bekommt das reale Lokal ein NOXIA-Lokal: staatlich wie Metropol, mit OSM-Kennung und Lage, `source_tags.real_venue`.
+  - Gibt es dort schon eines (gleiche Kennung oder höchstens 25 m), wird es genommen.
+- `app/earth/RealVenueInterior.tsx` öffnet dann das volle Lokal.
+  - Wer laut Simulation am Ort ist (`peopleAtPlace`), ist drinnen: Wer arbeitet, steht hinter dem Tresen, die anderen sind Gäste.
+  - Klappt das nicht, öffnet weiter der einfache Gastraum.
+
+**In euren Dateien geändert** (bitte prüfen):
+1. `WorldPanels.tsx`: `landmarkInside` mit Raum `hospitality` öffnet `RealVenueInterior`, mit dem einfachen Gastraum als Rückfall.
+2. `WorldPanels.tsx`, `buildingAsLandmark`: Für Lokale war die Art bisher `place_of_worship`. Jetzt kommt sie aus der Nutzung (`a:cafe`, `a:pub` …) oder dem Kartenpunkt.
+3. `/api/world-lab/buildings`: Häuser mit `source_tags.real_venue` stehen nicht als NOXIA-Haus auf der Karte; das reale Haus bleibt, wie es ist.
+   - Folge: Die Stellenwand der Agentur kennt diese Lokale noch nicht.
+   - Wenn ihr wollt, liefert sie in einer eigenen Liste oder mit einem Merkmal, ohne NOXIA-Dach.
+
+**Offen für euch:** Wer mit einer Begleitung ein reales Lokal betritt, nimmt sie bisher nicht mit hinein. `landmarkInside` kennt keine `companionId` wie `inside`. Wenn ihr sie mitgebt, reiche ich sie samt Gespräch (`companionHistory`) durch.
+
+## Fix 04.11.2026: Reisebüro – „Buchung fehlgeschlagen“ (Gastronomie, auf Bitte von Thomas)
+
+- **Ursache:** Im Datenbank-Protokoll stand „permission denied for function noxia_book_earth_trip“ und „… for table earth_trips“. Die Server-Wege arbeiten als `service_role`, und neue Tabellen und Funktionen bekamen in diesem Projekt keine Rechte dafür.
+- **Ebenso betroffen:**
+  - bezahlte Schichten und echte Lokale der Gastronomie;
+  - Forschungsproben, Ausrüstung, Übungen, Wartung, `colony_treasury`, `person_health` u. a.
+- **Fix:** Migration `20261104140000_service_role_grants.sql`, live.
+  - Rechte für `service_role` auf alle Tabellen, Sequenzen und Funktionen in `public`, dazu als Standard für neue Objekte.
+  - `anon` und `authenticated` bekommen nichts.
+- **Geprüft** als `service_role`: Reise Sundern → Menden gebucht (Probe, zurückgerollt), Schichtstand lesbar.
+- **Für alle Teilprojekte:** Wer in einer Migration `revoke … from public` schreibt, entzieht damit auch `service_role` das Ausführen. Seit dem neuen Standard bleibt das Recht erhalten. Tests nur als `postgres` übersehen diesen Fehler – bitte auch als `service_role` prüfen (`set role service_role`).
+
+### W-16 (Gastronomie, 04.11.2026): Andere Spieler auf der Karte, im Auto und an Bord
+
+Thomas, 04.11.2026: „Andere Spieler sollten gleichzeitig in der gleichen Welt, Bar, Orten usw. sein können, sogar auf einem Raumschiff mitfliegen können oder im Auto.“
+
+**Gebaut (Gastronomie) – in allen Innenräumen des Lokal-Motors** (Lokale, Bank, Agentur, Akademie, Verwaltung, Raumhafen, Warenhaus):
+- `lib/multiplayer/roomPresence.ts` (`useRoomPresence`) über Supabase Realtime Presence, Kanal `noxia:room:<Haus>`.
+- Jeder meldet Name, Stelle im Raum, Sitzen, Schichtrolle und eine kurze Geste. In der Datenbank wird nichts gespeichert.
+- Andere Spieler stehen als blaue Figuren mit Namen im Raum. Anklicken zeigt: Winken, Zuprosten, „Credits geben …“ (bar, mit derselben Tagesgrenze wie Überweisungen).
+- Bewohner sehen, dass weitere Gäste da sind (ohne Namen); auch, wer dort gerade mitarbeitet.
+
+**Bitte (Erdkarte):**
+1. **Karte:** derselbe Weg auf der Weltkarte, Kanal je Kartenzelle (z. B. `noxia:cell:<Zelle>`). Mit der Spielerfigur, Name und Richtung; Nachbarzellen mit abonnieren, damit man sich an Zellgrenzen sieht.
+   - Den Hook könnt ihr übernehmen oder verallgemeinern; `peersFrom` ist getestet.
+2. **Gemeinsam gehen:** Ein Spieler kann einem anderen folgen, so wie einer Begleitung. Wer zusammen ein Haus betritt, ist drinnen im selben Raum; das geschieht schon über die Kennung des Hauses.
+3. **Im Auto:** wer mitfährt (Fahrer und Mitfahrer), sitzt im selben Fahrzeug und kommt zusammen an. Vorschlag: ein Kanal je Fahrzeug und eine Mitfahrt-Einladung des Fahrers.
+4. **Raumschiff:** Mitfliegen auf dem Schiff eines anderen Spielers oder auf einem Linienflug.
+   - Gemeinsame Abfahrt und Ankunft und dieselbe Reisezeit; an Bord sieht man sich.
+   - Das berührt Linienflug und Schiff parken (eure Migration) und das Anheuern bei Population (`noxia_crew_sign_on`). Bitte mit Population abstimmen, wer die Buchung „Mitflug bei Spieler X“ baut.
+5. **Begegnungsstätten, Bibliothek, Gotteshäuser** (`LandmarkWalkableInterior`, Philosophie/NPC): bitte denselben Hook einbauen, Kanal `noxia:room:<OSM-Kennung>`.
+
+**Bewusst noch nicht gebaut: freier Text-Chat zwischen Spielern.** Mit dem Schulpilot in Sundern braucht er Schutzregeln (Filter, Melden, Sperren, keine privaten Nachrichten an Minderjährige). Entscheidung bei Thomas.
+
+**Nicht geprüft:** echte Realtime-Verbindung von zwei Browsern. Die Testumgebung lässt keine Websockets zu Supabase durch. Geprüft sind die Darstellung mit nachgestellter Anwesenheit und die Buchung.
+
+### W-17 (Gastronomie, 04.11.2026): Kiesel-Figuren auf der Karte – auf der Weltkarte erledigt (05.11.2026)
+
+Umgesetzt in der Weltkarte (`app/world-lab/worldEngine.ts`): Bewohner und die eigene Figur sind Kiesel.
+- Aussehen: Bewohner über `kieselLookFor(person, Arbeitsort)` (`WorldLab.tsx`, `WorldPerson.look`), die eigene Figur über `useMyLook()` (`setPlayerLook`), also wie in den Innenräumen.
+- Richtung aus der Bewegung auf dem Bildschirm (`kieselDirFrom`), Gehen in vier Schritten, Stehen.
+- Jede Kombination aus Aussehen, Richtung, Pose und Schritt wird einmal als Bild gerechnet (SVG → Textur, 64 × 96 px) und zwischengespeichert; bis es da ist, steht die bisherige einfache Figur.
+- Noch offen: Arbeitsposen an Arbeitsorten, Mitspieler (W-16), Messung mit vielen Figuren.
+
+
+Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „gleicher Winkel wie unsere Karte, einfach strukturiert“. Aus drei Entwürfen (Figurenwerkstatt, Artefakt) gewählt: **„Kiesel wirkt am angenehmsten.“**
+
+**Der Stil:** eiförmiger Kopf, runde Körper ohne Umriss, leichte Schatten; eigene Formen, keine Nachbildung bekannter Spielfiguren.
+- Gezeichnet aus Werten: Alter, Statur, Haut, Haare, Bart, Kleidung, Ausdruck, Mensch oder Roboter.
+- Vier Blickrichtungen; Stehen, Gehen (vier Schritte), Sitzen.
+- `lib/figures/kiesel.ts` (`kieselSVG`, `kieselLookFor`, `kieselDirFrom`), getestet; `lib/figures/KieselFigure.tsx`.
+- Seit 04.11.2026 in allen Innenräumen des Lokal-Motors, für Bewohner, Spieler und Mitspieler.
+
+**Bitte:**
+1. Personen, Spieler und Mitspieler (W-16) auf der Karte als Kiesel zeichnen.
+   - Vorschlag: `kieselSVG(look, dir, 'gehen', frame)` einmal je Aussehen, Richtung und Schritt als Bild (PixiJS-Textur) rechnen und zwischenspeichern.
+   - In der Probebühne der Figurenwerkstatt liefen 50 Figuren so flüssig; 500 bitte auf echten Geräten messen.
+2. Die Richtung kommt aus der Bewegung auf dem Bildschirm (`kieselDirFrom`), die Kleidung aus `kieselLookFor(person, arbeit)`.
+3. Das bisherige `NpcFigure` (`lib/grid/NpcVisual.tsx`) bleibt, bis die Karte umgestellt ist.
+
+**Stand 04.11.2026 (Gastronomie, auf Thomas' Wunsch selbst umgestellt):**
+- Erdkarte und Oberflächen zeichnen Spieler und Bewohner jetzt als Kiesel: `WalkablePlayer` und `WalkableActor` in `app/components/WalkableSurfaceRenderer.tsx`, mit Blickrichtung und Gehen aus der Bewegung, auf Mond, Phobos und Deimos im Druckanzug.
+- Die Kolonie-Karte und die Landmarken (Gotteshaus, Bibliothek, Friedhof) laufen über `NpcFigure`, das jetzt Kiesel zeichnet.
+- Die eigene Figur sieht überall gleich aus (Profil-Kennung).
+- **Offen für die Erdkarte:**
+  - Arbeit auf der Karte sichtbar machen (Posen `haemmern`, `hacken`, `schaufeln`, `tragen` an Arbeitsorten, `pose`-Eigenschaft von `WalkableActor`);
+  - Leistung messen, wenn viele Figuren gleichzeitig laufen; bei Bedarf Bilder zwischenspeichern.
+
+### W-18 (Gastronomie, 05.11.2026): „Was ist los?“ auf der Karte – erledigt (05.11.2026)
+
+Umgesetzt:
+- `/api/world-lab/buildings` liefert `events`: nicht abgesagte Veranstaltungen, die laufen oder in den nächsten 24 Stunden beginnen, mit Lage und Namen des Lokals – auch für reale Lokale (`source_tags.real_venue`), die nicht als NOXIA-Haus auf der Karte stehen.
+- **Karte:** Über jedem Lokal steht die nächste Veranstaltung als Schild mit Zeichen und Uhrzeit („🎧 21:00“, „📖 jetzt“, laufend dunkelrot, angekündigt violett), in jeder Zoomstufe sichtbar, minütlich aktualisiert (`setEventMarks` in `worldEngine.ts`).
+- **Zielliste:** Gruppe „Was ist los?“ gleich nach den Begegnungsstätten, mit `eventLine` und Lokal, bis 6 km; Auswahl führt zum Lokal.
+- Verwendet `upcoming`, `eventLine`, `whenText`, `VENUE_EVENT_KINDS` aus `lib/game/hospitality/venueEvents.ts`.
+
+
+Seit 05.11.2026 gibt es Veranstaltungen in Lokalen (`venue_events`, `/api/game/hospitality/events`): DJ-Abend, Konzert, Lesung, Quiz, Feier, Stammtisch.
+
+**Bitte:**
+- Lokale mit laufender oder bald beginnender Veranstaltung auf der Karte kennzeichnen, z. B. mit dem Zeichen der Art (🎧 📖 ❓ …) und der Uhrzeit.
+- Optional eine Liste „Was ist los?“ in der Nähe.
+- Die Typen sind in `lib/game/hospitality/venueEvents.ts`; `upcoming()` und `eventLine()` lassen sich direkt verwenden.
+
+
+## Gelände: Hangschattierung und Höhenlinien (05.11.2026, Thomas: „zuerst Gelände“)
+
+- Grundlage: `docs/decisions/NOXIA-WORLD-0004-eigene-erdkarte-aus-mehreren-quellen.md` (eigene Karte aus mehreren Quellen, einmal holen, danach nur eigene Daten).
+- Höhenzellen der Kachelstufe 15 (9 × 9 Punkte, ≈ 95 m) in `earth_terrain_cells`; Rechnen und Zeichnen in `lib/worldlab/terrain.ts` (Tests daneben), Lesen und Holen in `lib/worldlab/terrainSource.server.ts`.
+- Geholt beim ersten Besuch (`/api/world-lab/refresh`, 3 × 3 Zellen) und täglich (`/api/cron/world-terrain`). Quelle zunächst Open-Meteo/Copernicus GLO-90 (Einzelfallprüfung im ADR).
+- Sichtbar als Hangschattierung und Höhenlinien auf dem Boden; die Kacheln bleiben flach.
+
+### W-19 (Gastronomie, 05.11.2026): Grabsteine auf der Weltkarte
+
+Thomas, 05.11.2026, nach dem Neuladen: „klappt, Friedhof ist auch da, Grabsteine fehlen noch.“
+
+**Befund:**
+- Im begehbaren Friedhof (`cemetery` in `lib/game/landmarks/interiors.ts`) stehen Grabfelder mit Steinen ohne Namen.
+- Auf der Weltkarte ist der Friedhof nur eine Fläche (`place_area`, `k = 'cemetery'`), ohne Steine.
+
+**Bitte:**
+1. Auf Friedhofsflächen der Karte Reihen von Grabsteinen zeichnen, im Winkel der Karte, mit Wegen dazwischen und ein paar Bäumen.
+2. Die Steine sollen dem Anblick im Inneren entsprechen; Kreuz und Stein je nach Ort, gern zurückhaltend.
+3. Ohne Namen, solange es keine Gräber aus der Simulation gibt (R-23, `person_graves`). Erfunden wird nichts.
+**Stand 05.11.2026 (Erdkarte):** Punkte 1–3 umgesetzt.
+- `lib/worldlab/graves.ts` (getestet): Grabplätze im Raster aus absoluten Kachelmetern (2,8 m Reihen, 1,6 m Gräber), Grabfelder von 5 × 7 mit Wegen dazwischen, 1,8 m Abstand zum Rand, Abstand zu Häusern (Kapelle) und Bäumen, hier und da eine Lücke; höchstens 1800 je Kachel.
+- Die Reihen laufen quer zur Blickrichtung, je Reihe ein Objekt mit Tiefe; die Figur steht richtig davor und dahinter. Grabbeete flach im Boden (meist grün, manche Kies).
+- Stehende Steine in vier Grautönen, leicht verschieden hoch; in kühleren Breiten (ab 36°) rund jedes siebte Grab ein Kreuz aus Holz oder Stein.
+- Keine Namen; die Steine sind nicht anklickbar, ein Klick geht weiter an den Friedhof.
+
+4. Später, mit R-23:
+   - Gräber mit Namen und Lebensjahren an ihrer Stelle;
+   - frische Gräber mit Blumen;
+   - Angehörige am Grab.
+
+
+## Stimmung und erster Schritt (05.11.2026, nach Forge of Empires)
+
+- `lib/worldlab/ambient.ts` (getestet): Solaranlagen auf etwa jedem dritten Wohnhaus und jeder zweiten Halle (Südseite des Dachs, auf Flachdächern aufgeständerte Reihen); Schornstein mit Rauch nur auf rund 6 % der Wohnhäuser, Rauch nur in der Heizzeit und nur nahe der Kamera.
+- Tageslicht nach echtem Sonnenstand am Ort der Figur: Boden, Häuser und Bäume werden in der Dämmerung wärmer, nachts gedämpft bläulich (nie dunkel). Fensterlicht ab der Dämmerung bis etwa Mitternacht, danach nur wenige Fenster.
+- Wasser glitzert: kurze helle Striche auf Flüssen und Wasserflächen, zwei Gruppen blenden im Wechsel.
+- Erster Start: goldener Pfeil über der nächsten Agentur für Arbeit (bis 3 km) und eine kleine Karte unten links; endet beim Ankommen (30 m), beim Hineingehen oder mit „Nicht nötig“. Nur für neue Spieler oder mit `?guide=1`.
+
+## Fix 05.11.2026: Gelände war nicht zu sehen
+
+- Thomas: „die begehbare Karte sieht immer noch nicht sehr nach Hügeln und Tälern aus“.
+- Ursache: Die Migration `20261105120000_earth_terrain_cells.sql` war nie live angewendet; Abruf und Ablage der Höhen liefen ins Leere, die Kacheln kamen ohne `terrain`. Jetzt angewendet (05.11.2026, 17:45).
+- Gefüllt wird beim Öffnen der Karte (3 × 3 Zellen um die Figur, danach werden die Kacheln frisch geladen) und täglich um 3:17 Uhr.
+- Darstellung kräftiger: Überhöhung 3,5 statt 2, jede Gitterzelle dreifach geteilt (weiche Hänge statt Kästchen), Schatten bis 50 % Deckung, dazu Höhenfarbe (`heightTint`: Täler satter grün, Höhen heller, Bezug 180–660 m).
+
+## Pflanzen mit echten Namen (05.11.2026, Thomas: „Bäume, am besten mit echten Namen … Büsche, Blumen“)
+
+Schritt 1: Aussehen (Thomas: „zu unserem Stil passen, zu liebevoll braucht es nicht“).
+- Befund: In Sundern gab es keinen einzigen Baum auf der Karte – OSM kennt dort keine Einzelbäume, die 457 Waldflächen waren nur Muster.
+- `lib/worldlab/plants.ts` (getestet): 19 Arten mit deutschem und lateinischem Namen, Form, Höhe, Rinde, Laub im Jahreslauf (Austrieb, Färbung, Laubfall, braunes Winterlaub bei Buche und Eiche), Blüte und Früchte (Kirsche, Apfel, Kastanie, Holunder), ein Satz je Art. Jahreszeit nach echtem Datum, Südhalbkugel versetzt, warme Breiten immer belaubt.
+  - Bäume: Fichte, Waldkiefer, Lärche, Rotbuche, Stieleiche, Hängebirke, Bergahorn, Winterlinde, Rosskastanie, Silberweide, Schwarzerle, Vogelkirsche, Apfel, Pyramidenpappel; Sträucher: Hasel, Holunder, Ligusterhecke.
+- `lib/worldlab/plantPlacement.ts` (getestet): Standorte im Raster aus absoluten Kachelmetern (nahtlos, beim Neuladen gleich):
+  - Wald alle ~10 m, Bestände von 50 m mit vorherrschender Art (Sauerland: Fichte, Buche, Eiche, Birke, Kiefer, Lärche, Ahorn);
+  - Parks, Wohngebiete, Friedhöfe in Gruppen; Kleingärten mit Obstbäumen; Sträucher in Parks, Gärten, Kleingärten;
+  - am Wasser Weide und Erle; Einzelbäume und Alleen aus OSM an ihrem Ort, Art geschätzt (Straßenbäume: Linde, Ahorn, Kastanie …);
+  - Abstand zu Straßen, Häusern, Wasser, Parkplätzen, Sportflächen; höchstens 900 je Kachel.
+  - Außerhalb Mitteleuropas nur „Laubbaum“/„Nadelbaum“ (Art nicht bekannt) – nichts Erfundenes.
+- `lib/worldlab/treeSprites.ts`: je Form ein schlichtes Bild (Kuppel, breite Eiche, schlanke Birke mit weißem Stamm, Kegel, Lärche, Schirmkiefer, Säulenpappel, Hängeweide, Obstbaum, Strauch, Hecke); kahle Äste, wenn wenig Laub hängt; Bilder je Art und Tag zwischengespeichert, beim Tageswechsel nachgeführt.
+- Klick oder Mauszeiger auf einen Baum: Tafel „BAUM“/„STRAUCH“ mit Namen („wahrscheinlich Rotbuche“ bei geschätzten), lateinischem Namen, Zustand heute, Höhe, woher bekannt, ein Satz zur Art.
+- Gräber halten Abstand zu den neuen Bäumen.
+
+Schritt 2 (06.11.2026), `TILE_FORMAT` 2026-11-06.1:
+- `lib/worldlab/plantTags.ts` (getestet, Teil des Kachel-Fingerabdrucks): Baumart aus `species`, `species:de`, `genus`, `taxon`, `leaf_type` → Kachelfeld `ts` (parallel zu `trees`); Waldart aus `leaf_type` → `TileArea.l` (b Laub-, n Nadel-, m Mischwald); Gebüsch und Heide (`natural=scrub|heath`) → `l: 's'`.
+- Befund Sauerland: 96 Gebüschflächen galten bisher als Wald; 142 der 477 Wälder kennen ihre Art (93 Nadel-, 47 Laub-, 2 Mischwald).
+- Verteilung: Nadelwald Fichte/Kiefer/Lärche, Laubwald Buche/Eiche/Ahorn/Birke/Linde/Esche/Erle, Gebüsch dichte Hasel und Holunder mit wenigen Birken und Kirschen. OSM-Bäume mit Art stehen genau so da (Tafel: „Standort und Art aus OpenStreetMap“); nennt OSM eine Art, die das Verzeichnis nicht kennt, steht „Laubbaum“/„Nadelbaum“. Esskastanie und Schlehe werden nicht zur Rosskastanie bzw. Kirsche.
+- Vier neue Arten für Städte: Platane, Gemeine Esche, Hainbuche, Robinie.
+- Warme Breiten: Nadelbaum nur, wenn OSM es sagt.
+
+Offen: Hecken (`barrier=hedge` wird bisher nicht importiert – Import erweitern); Waldart dort, wo OSM sie nicht kennt (Baumartenkarte, Lizenz prüfen); Blumen; Wissen und Ernte (andere Teilprojekte).
+
+### W-20 (Gastronomie, 06.11.2026): Polizei, Feuerwache, Praxis, Krankenhaus begehbar
+
+Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „ja, mache das“.
+
+**Gebaut (Gastronomie, 06.11.2026):**
+- Begehbare Räume für Polizeiwache, Feuerwache, Arztpraxis und Krankenhaus (`lib/game/services/publicServices.ts`, `app/earth/PublicServiceInterior.tsx`). Das Dienstpersonal steht immer da, die Praxis hat Sprechzeiten.
+- Angebote: Anzeige, Fundsache, Verlust, Mitmachen bei der Freiwilligen Feuerwehr, Termin, Besuch. Gespeichert in `service_cases` (`place_ref`, `service`, `kind`, `text`, `profile_id`, `status` offen/bearbeitet/erledigt).
+- Nach einer Schlägerei (`venue_incident`) kommt die Streife ins Lokal, bei Verletzten der Rettungsdienst (`incidentResponders`).
+- Uniformen für Polizei, Feuerwehr und Rettungsdienst im Kiesel-Stil.
+- Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117.
+
+**Schon eingehängt (Gastronomie, auf Thomas' Wunsch):**
+- `landmarkRoomKind` und `buildingRoomKind` (`lib/game/landmarks/interiors.ts`) kennen `police`, `fire_station`, `doctors` (auch `dentist`) und `hospital` (auch `clinic`).
+- `WorldPanels` öffnet dafür `PublicServiceInterior`.
+- In den Kartendaten gibt es 240 Arztpraxen, 123 Zahnärzte, 93 Krankenhausgebäude, 19 Polizei- und 15 Feuerwehrgebäude.
+
+**Bitte (Erdkarte):**
+1. Prüfen, dass „Betreten“ bei diesen Gebäuden und Punkten erscheint (Abstand, Eingang).
+2. Kennzeichen auf der Karte (Blaulicht, rotes Tor, weißes Kreuz).
+3. Einsatzfahrzeuge auf der Karte, wenn Population Einsätze meldet (R-34): Streifenwagen, Löschfahrzeug, Rettungswagen auf dem Weg zum Ort.
+4. Auf Kolonie, Mars und Raumschiff statt Wache und Feuerwehr ein Sicherheitszentrum und eine Medizinstation.
+

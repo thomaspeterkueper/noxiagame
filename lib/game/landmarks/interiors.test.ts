@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDMARK_LEVELS, LANDMARK_SPOT_REACH, buildingRoomKind, crowdSpots, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
+import { hospitalityPlacement, LANDMARK_LEVELS, LANDMARK_SPOT_REACH, buildingRoomKind, crowdSpots, isLandmarkRoomBlocked, landmarkRoomKind, landmarkRoomLayout, landmarkPath,
   landmarkStaffName, landmarkWaypoints, nearestLandmarkSpot, type LandmarkPoint, type LandmarkRoomLayout } from './interiors'
 
 /** Every position reachable from the entrance in 6 px steps. */
@@ -142,5 +142,29 @@ describe('landmark interiors', () => {
       expect(isLandmarkRoomBlocked(layout, arrival)).toBe(false)
       for (const spot of layout.spots) expect(landmarkPath(layout, arrival, spot).length, `${level}/${spot.id}`).toBeGreaterThan(2)
     }
+  })
+})
+
+describe('Gastraum', () => {
+  it('Café, Bar, Restaurant und Kneipe haben einen Gastraum', () => {
+    for (const kind of ['cafe', 'bar', 'restaurant', 'pub']) { expect(landmarkRoomKind(kind)).toBe('hospitality'); expect(buildingRoomKind('a:' + kind)).toBe('hospitality') }
+    expect(landmarkRoomKind('bank')).toBeNull()
+  })
+  it('Mitarbeitende stehen hinter der Theke, Gäste wählen selbst und niemand teilt sich einen Platz', () => {
+    const layout = landmarkRoomLayout('hospitality')
+    const people = [{ id: 'w1', host: true }, ...Array.from({ length: 14 }, (_, i) => ({ id: 'g' + i, host: false }))]
+    const placed = hospitalityPlacement(layout, people, 7)
+    expect(placed).toHaveLength(people.length)
+    expect(placed.find(item => item.id === 'w1')).toMatchObject({ stance: 'work' })
+    expect(placed.find(item => item.id === 'w1')!.at.y).toBeLessThan(92)
+    const keys = placed.map(item => item.at.x + ',' + item.at.y)
+    expect(new Set(keys).size).toBe(keys.length)
+    expect(new Set(placed.filter(item => item.stance !== 'work').map(item => item.stance)).size).toBeGreaterThan(1)
+  })
+  it('die Wahl wechselt mit dem Zeitfenster und ist sonst stabil', () => {
+    const layout = landmarkRoomLayout('hospitality')
+    const people = Array.from({ length: 6 }, (_, i) => ({ id: 'p' + i, host: false }))
+    expect(hospitalityPlacement(layout, people, 3)).toEqual(hospitalityPlacement(layout, people, 3))
+    expect(JSON.stringify(hospitalityPlacement(layout, people, 3))).not.toBe(JSON.stringify(hospitalityPlacement(layout, people, 4)))
   })
 })

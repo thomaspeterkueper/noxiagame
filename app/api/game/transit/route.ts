@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { completePlayerTransit, getPassengerOffers, getPlayerTransitState, startPlayerTransit } from '@/lib/game/core/transit'
+import { boardPlayerShip, completePlayerTransit, getPassengerOffers, getPlayerTransitState, startPlayerPassengerTransit, startPlayerTransit } from '@/lib/game/core/transit'
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -29,7 +29,9 @@ function transitError(error: unknown) {
       credits: match ? Number(match[2]) : undefined,
     }, { status: 400 })
   }
-  if (message.includes('NOXIA_PASSENGER_HAS_SHIP')) return NextResponse.json({ error: 'Mit eigenem Schiff läuft die Reise über den normalen Transit.' }, { status: 409 })
+  const notHere = message.match(/NOXIA_SHIP_NOT_HERE:(\S+)/)
+  if (notHere) return NextResponse.json({ error: `Dein Schiff liegt in ${notHere[1]} – flieg dorthin, um an Bord zu gehen.`, code: 'SHIP_NOT_HERE', shipLocation: notHere[1] }, { status: 409 })
+  if (message.includes('NOXIA_SHIP_IN_TRANSIT')) return NextResponse.json({ error: 'Dein Schiff ist gerade unterwegs.', code: 'SHIP_IN_TRANSIT' }, { status: 409 })
   if (message.includes('NOXIA_TRANSIT_ROUTE_UNKNOWN')) return NextResponse.json({ error: 'Für diese Route liegt noch kein Transfermodell vor.', code: 'ROUTE_UNKNOWN' }, { status: 400 })
   if (message.includes('NOXIA_TRANSIT_OUT_OF_RANGE')) return NextResponse.json({ error: 'Ziel liegt außerhalb der aktuellen Schiffsreichweite.', code: 'OUT_OF_RANGE' }, { status: 400 })
   if (message.includes('NOXIA_TRANSIT_ENERGY_INSUFFICIENT')) {
@@ -129,6 +131,27 @@ export async function POST(req: NextRequest) {
         },
         idempotent: result.idempotent,
       })
+    }
+
+    // Linienflug auch mit eigenem Schiff: das Schiff bleibt am Abflugort geparkt.
+    if (action === 'passenger') {
+      const destination = typeof body?.destination === 'string' ? body.destination.trim() : ''
+      if (!destination) return NextResponse.json({ error: 'Ziel fehlt' }, { status: 400 })
+      const result = await startPlayerPassengerTransit(user.id, destination)
+      return NextResponse.json({
+        ok: true,
+        transit: { status: result.status, from: result.from_location, to: result.destination, departedAt: result.departed_at, arrivesAt: result.arrives_at, totalSeconds: result.duration_seconds, remainingSeconds: result.remaining_seconds },
+        isPassenger: true,
+        ticketPrice: result.ticket_price ?? 0,
+        credits: result.credits,
+        idempotent: result.idempotent,
+      })
+    }
+
+    // An Bord des eigenen Schiffs gehen (nur dort, wo es liegt).
+    if (action === 'board') {
+      const boarded = await boardPlayerShip(user.id, typeof body?.shipId === 'string' ? body.shipId : undefined)
+      return NextResponse.json({ ...boarded })
     }
 
     if (action === 'complete') {

@@ -220,3 +220,81 @@ Der Probe-Gottesdienst am 28.10.2026 um 20 Uhr fand nicht statt: Spielstunde war
 - **Spieluhr** (`lib/game/gameClock.ts`, Test vorhanden): Uhrzeit und Wochentag gelten jetzt in Europe/Berlin, mit Sommerzeit. `clockTick(tick)` zählt Stunden so, dass `clockTick % 24` die deutsche Stunde und `floor(clockTick / 24) % 7` der Wochentag (0 = Montag) ist; Bezugspunkt: Tick 2598 = 28.10.2026, 19:00 UTC. Ticknummern bleiben, wie sie sind. Umgestellt: Schlaf und Arbeitszeit (`circadianState` mit `clockOffset`), Kinder, Öffnungszeiten der Lokale (`/api/game/hospitality/guests`), alle Wochenpläne der Gotteshäuser und Begegnungsstätten (`hostWindowsAt`). Einmaliger Sprung beim Umstellen: Die Spielzeit springt um 10 Stunden zurück, Tagesabläufe richten sich danach neu aus. Vorerst gilt die deutsche Zeit auch für Dvārakā, Frankfurt und den Mars („Koloniezeit“).
 - **Wandernde Termine** (`place_activity_slots`, Migration `20261029030000_place_activity_slots.sql`): täglicher Termin mit Stunde und Dauer. Nach jedem Termin wird gezählt, wer kam (ohne Gastgeber). Kam niemand, rückt er beim nächsten Mal eine Stunde weiter (`nextSlotHour`): nie vor 7 Uhr, Ende nie nach 22 Uhr, mindestens eine freie Stunde Abstand zum anderen Termin. Gut besuchte Zeiten bleiben. Fällt ein Termin auf den Wochenplan (z. B. Sonntag 10 Uhr), entfällt er und zählt nicht. Der Verlauf steht in `history`.
 - **Erster Einsatz:** Probe-Gottesdienst in St. Johannes täglich 11 und 17 Uhr (je zwei Stunden, Pfarrer Elias Hartmann). Der Sondertermin vom 28.10.2026 ist als `cancelled` markiert. Die Tafel des Hauses nennt die aktuellen Zeiten.
+
+## Anfragen aus anderen Teilprojekten
+
+### P-1 (Gastronomie, 02.11.2026): Trauerfeier je Tradition
+
+Thomas, 02.11.2026: „Zwischenidee: ein Friedhof.“ Auf Nachfrage entschieden, alle vier Teile:
+- ein begehbarer Ort;
+- Bewohner sterben;
+- Beerdigungen mit anschließendem Beerdigungskaffee;
+- ein Gedenkort, auch für Spieler selbst.
+
+Verteilt als Requests:
+- W-13 an die Erdkarte: Ort und Gedenken;
+- R-23 an Population: Sterben, Gräber, Trauer;
+- P-1 an Philosophie/NPC: die Trauerfeier.
+
+Den Beerdigungskaffee baut die Gastronomie.
+
+**Bitte:**
+1. **Art:** Sondertermin-Art `funeral` in `place_activity_scheduled` (neben `service`, `friday_prayer` …), angelegt von Population beim Tod (R-23).
+   - Ort: Trauerhalle oder Kapelle des Friedhofs, sonst die Kirche, Moschee, Synagoge oder der Tempel der Religion der Verstorbenen.
+   - Gastgeber: Pfarrer(in), Imam, Rabbiner(in), Trauerredner(in) – oder bei Omnizedenten jemand aus der Begegnungsstätte.
+2. **Ablauf** (`LiturgyPhase`) je Tradition, sorgfältig und respektvoll:
+   - katholisches Requiem mit Beisetzung;
+   - evangelische Trauerfeier;
+   - islamisch: rasch, mit Totengebet (Salat al-Dschanaza), Erdbestattung;
+   - jüdisch: Levaja, Kaddisch, Erdbestattung, danach Schiwa;
+   - hinduistisch: Feuerbestattung und Gebete;
+   - ohne Religion: freie Trauerrede.
+   - Danach der Gang zum Grab (W-13) und der Beerdigungskaffee (Gastronomie, Vertrag in R-23 Punkt 6).
+3. **Gespräch:** Die Trauernden wissen, wen sie verloren haben. Der Gastgeber spricht über die Verstorbene nur, was die Simulation über sie weiß – Name, Lebensjahre, Rolle, Beziehungen.
+4. **Spieler:** Teilnehmen dürfen alle, still und hinten. Wer die Verstorbene kannte, kann nach der Feier kondolieren.
+
+### P-2 (Gastronomie, 03.11.2026): Gastraum für Lokale – bitte nicht doppelt weiterbauen
+
+Thomas, 03.11.2026, Entscheidung: „Lokale zusammenführen“.
+
+**Anlass:** Seit 03.11.2026 gab es zwei verschiedene Lokale.
+- Echte Cafés, Bars, Kneipen und Restaurants der Karte öffneten einen einfachen Gastraum (Philosophie/NPC, `LandmarkWalkableInterior`, Raum `hospitality`), ohne Karte, Bestellen, Arbeiten und Begleitung.
+- NOXIA-Lokale wie Metropol öffneten das Lokal der Gastronomie.
+
+**Gebaut (Gastronomie, live):**
+- `noxia_real_venue` (`20261103180000_real_venues.sql`) und `POST /api/game/hospitality/real-venue`.
+  - Beim ersten Betreten bekommt das reale Lokal ein NOXIA-Lokal: staatlich wie Metropol, mit OSM-Kennung und Lage, `source_tags.real_venue`.
+  - Gibt es dort schon eines (gleiche Kennung oder höchstens 25 m), wird es genommen.
+- `app/earth/RealVenueInterior.tsx` öffnet dann das volle Lokal.
+  - Wer laut Simulation am Ort ist (`peopleAtPlace`), ist drinnen: Wer arbeitet, steht hinter dem Tresen, die anderen sind Gäste.
+  - Klappt das nicht, öffnet weiter der einfache Gastraum.
+
+**Bitte:**
+- Cafés, Bars, Kneipen und Restaurants gehören zur Gastronomie (`docs/workstreams/README.md`). Der Raum `hospitality` in `lib/game/landmarks/interiors.ts` bleibt nur als Rückfall.
+- Was ihr dort gebaut habt, ist im Lokal schon da oder wird übernommen:
+  - Gäste wechseln zwischen Tisch, Hocker und Stehplatz;
+  - Lounge-Musik;
+  - Vorlesen.
+- Wünsche bitte als Request an `hospitality.md`.
+- Bibliothek, Gotteshäuser, ArtLounge und Begegnungsstätten bleiben bei euch.
+
+### P-3 (Gastronomie, 04.11.2026): Haltung zu Streit und Gewalt
+
+Thomas, 04.11.2026: „leider ist die Welt nicht nur nett.“ Population regelt, wann es im Lokal zu Rangelei oder Kampf kommt (R-32); die Gastronomie zeigt es.
+
+**Bitte:** Wie gehen Figuren je nach Haltung und Tradition damit um?
+- Wer schlichtet, wer hält sich heraus, wer vergibt, wer trägt nach?
+- Gibt es Versöhnung, und wie?
+- Was sagen Seelsorger und Gemeinden dazu?
+
+Das fließt in das Wissen der Figuren ein (`incidentFacts`) und später in Gespräche danach.
+
+### P-4 (Gastronomie, 06.11.2026): Seelsorge im Krankenhaus und bei Einsätzen
+
+Seit 06.11.2026 gibt es ein begehbares Krankenhaus und Einsätze von Polizei und Rettungsdienst (R-34).
+
+**Bitte:**
+- Krankenhausseelsorge: Wer sitzt bei Sterbenden, wer spricht mit Angehörigen? Je Tradition. Raum der Stille im Krankenhaus.
+- Notfallseelsorge nach schweren Einsätzen, für Betroffene und Einsatzkräfte.
+- Was Figuren nach einem Unglück glauben und hoffen; das fließt in ihr Wissen ein.
+

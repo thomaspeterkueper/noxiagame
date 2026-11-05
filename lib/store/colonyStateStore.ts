@@ -44,6 +44,8 @@ export type ColonyResident = {
   personDepth?: { level: 'persistent' | 'situated' | 'developed' | 'focal'; score: number; reasons: string[] }
   displayName: string
   lifeStage?: 'child' | 'adult'
+  /** Maschine statt Mensch (R-26): Roboterfigur und -bild im Innenraum. */
+  isRobot?: boolean
   identityState?: 'unknown' | 'inferred' | 'known'
   /** Alter in Jahren, nur wenn der Spieler es erfahren hat (R-11). */
   knownAgeYears?: number | null

@@ -86,23 +86,25 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get('action')
 
   if (!action) {
-    const [{ data: shipTypes }, { data: ships }] = await Promise.all([
+    const [{ data: shipTypes }, { data: ships }, { data: me }] = await Promise.all([
       serviceClient.from('ship_types').select('*').order('cost_credits'),
       serviceClient
         .from('ships')
         .select('id, ship_type_id, location, is_active, created_at')
         .eq('profile_id', user.id)
         .order('created_at', { ascending: true }),
+      serviceClient.from('profiles').select('aboard_ship_id, current_location').eq('id', user.id).maybeSingle(),
     ])
 
-    const currentShip: any = (ships as any[])?.find(ship => ship.is_active)
-      ?? (ships as any[])?.[0]
-      ?? null
+    // Das Schiff, auf dem der Spieler ist (sonst gilt sein eigener Ort).
+    const aboardId = (me as { aboard_ship_id?: string | null } | null)?.aboard_ship_id ?? null
+    const currentShip: any = (ships as any[])?.find(ship => ship.id === aboardId) ?? null
 
     return NextResponse.json({
       shipTypes: shipTypes ?? [],
       currentShipTypeId: currentShip?.ship_type_id ?? 'freighter_mk1',
-      currentLocation: currentShip?.location ?? 'moon',
+      currentLocation: currentShip?.location ?? (me as { current_location?: string | null } | null)?.current_location ?? 'earth',
+      aboard: Boolean(currentShip),
     })
   }
 

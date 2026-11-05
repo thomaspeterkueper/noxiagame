@@ -11,6 +11,9 @@ import { NpcFigure, NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import {
   LANDMARK_LEVELS,
   LANDMARK_ROOM,
+  STANCE_LABEL,
+  hospitalityPlacement,
+  type Stance,
   crowdSpots,
   isLandmarkRoomBlocked,
   landmarkPath,
@@ -24,21 +27,26 @@ import {
   type LandmarkRoomKind,
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
-import { LIBRARY_BOOKS, LIBRARY_SHELVES, RESONANCE_READING_IDS, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
-import { READING_TEXTS } from '@/lib/game/landmarks/readingTexts'
-import { THEOLOGICAL_ESSAYS } from '@/lib/game/landmarks/theologicalEssays'
-import { IDENTITY_BOOK } from '@/lib/game/landmarks/identityBook'
+import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import type { ReadingDocument } from '@/lib/game/readings/types'
+import ResonanceShelf from './ResonanceShelf'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 import { isRoundKind, roundKeyOf } from '@/lib/game/rounds/roundTalk'
 import RoundTalk from './RoundTalk'
 import RoundBubbles from './RoundBubbles'
+import { RoomAudioControls, useLoungeMusic, useSpeech } from './RoomAudio'
+import { nextReadingChunk, readingSource } from '@/lib/game/landmarks/readAloud'
 import { useRoundTalk } from './useRoundTalk'
+import ConversationReport from '@/app/components/ConversationReport'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
 // ist ein typischer Grundriss für die Ortsart, nicht der vermessene Innenraum
 // des realen Gebäudes.
+/** Gäste wechseln ihren Platz etwa alle vier Minuten. */
+const STANCE_WINDOW_MS = 4 * 60 * 1000
+
 type Props = {
   kind: LandmarkRoomKind
   name: string
@@ -129,9 +137,48 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { reportPlayerPosition('landmark:' + kind, pos.x / 10, pos.y / 10) }, [pos, kind])
   const [active, setActive] = useState<LandmarkSpot | null>(null)
   const [candles, setCandles] = useState(3)
+  // W-13: Gedenkort auf dem Friedhof – eigene Kerzen, nur für den Spieler sichtbar
+  const isCemetery = kind === 'cemetery'
+  const [memorials, setMemorials] = useState<Array<{ id: string; placeRef: string; name: string | null; at: string }>>([])
+  const [memorialName, setMemorialName] = useState('')
+  const [memorialNote, setMemorialNote] = useState('')
+  const [memorialBusy, setMemorialBusy] = useState(false)
+  useEffect(() => {
+    if (!isCemetery) return
+    let live = true
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/game/memorial', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+        const json = await response.json().catch(() => null)
+        if (live && response.ok && Array.isArray(json?.candles)) setMemorials(json.candles)
+      } catch { /* ohne Kerzen */ }
+    })()
+    return () => { live = false }
+  }, [isCemetery])
+  // Der Gedenkort ist persönlich: an jedem Friedhof brennen die eigenen Kerzen
+  const memorialsHere = memorials
+  async function lightMemorial() {
+    if (memorialBusy) return
+    setMemorialBusy(true); setMemorialNote('')
+    try {
+      const { token } = await getSessionInfo()
+      if (!token) { setMemorialNote('Zum Anzünden bitte anmelden.'); return }
+      const response = await fetch('/api/game/memorial', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ placeRef: placeRef ?? name, placeName: name, name: memorialName }) })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) { setMemorialNote(String(json.error ?? 'Die Kerze ließ sich nicht anzünden.')); return }
+      setMemorials(current => [json.candle, ...current])
+      setMemorialNote(memorialName.trim() ? `Die Kerze für ${memorialName.trim()} brennt.` : 'Die Kerze brennt.')
+      setMemorialName('')
+    } catch { setMemorialNote('Die Kerze ließ sich gerade nicht anzünden.') } finally { setMemorialBusy(false) }
+  }
   const [seated, setSeated] = useState(false)
+  const speech = useSpeech()
+  const lounge = useLoungeMusic(kind === 'hospitality')
+  // Vorlesen: der zuletzt gelesene Abschnitt steht als Text da, die Sprachausgabe liest ihn mit.
+  const [reading, setReading] = useState<{ bookId: string; offset: number; text: string; done: boolean } | null>(null)
   const [bookId, setBookId] = useState('')
-  const [readingPart, setReadingPart] = useState<number | null>(null)
   const [talking, setTalking] = useState(false)
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
@@ -196,12 +243,43 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { readerPosRef.current = readerPos }, [readerPos])
   useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
   const isResonanceReading = kind === 'resonance_place'
-  const resonanceBooks = [...LIBRARY_BOOKS.filter(entry => (RESONANCE_READING_IDS as readonly string[]).includes(entry.id)), IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS]
-  const book = [...LIBRARY_BOOKS, IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS].find(entry => entry.id === bookId && (!isResonanceReading || resonanceBooks.some(item => item.id === entry.id))) ?? null
-  const readingText = isResonanceReading && book ? READING_TEXTS[book.id] : undefined
+  // Begegnungsstätte: das Regal (ResonanceShelf) holt die Schriften aus buecherwelten; hier nur die Bibliothek.
+  const book = isResonanceReading ? null : LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
+  const [resonanceActive, setResonanceActive] = useState(false)
+  // Vorlesen in der Bibliothek: freigegebener Wortlaut aus buecherwelten, sonst der Klappentext.
+  const [heldDoc, setHeldDoc] = useState<ReadingDocument | null>(null)
+  useEffect(() => {
+    if (!isLibrary || !held) return
+    const slug = held.id.split(':')[1]
+    if (!slug) return
+    let live = true
+    void (async () => {
+      const { token } = await getSessionInfo()
+      for (const kind of ['work', 'text']) {
+        const response = await fetch(`/api/game/readings?book=${kind}:${slug}`, { headers: { Authorization: 'Bearer ' + token } })
+        if (!response.ok) continue
+        const json = await response.json().catch(() => null) as { document?: ReadingDocument } | null
+        if (live && json?.document) setHeldDoc(json.document)
+        return
+      }
+    })().catch(() => { /* dann liest Mira den Klappentext */ })
+    return () => { live = false }
+  }, [isLibrary, held])
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
-  const placed = useMemo(() => {
+  // Gastraum: Gäste entscheiden selbst, wo sie sind, und wechseln alle paar Minuten.
+  const [stanceBucket, setStanceBucket] = useState(() => Math.floor(Date.now() / STANCE_WINDOW_MS))
+  useEffect(() => {
+    if (kind !== 'hospitality') return
+    const timer = setInterval(() => setStanceBucket(Math.floor(Date.now() / STANCE_WINDOW_MS)), 30000)
+    return () => clearInterval(timer)
+  }, [kind])
+  const placed = useMemo((): Array<{ person: RoomPerson; at: LandmarkPoint; stance?: Stance }> => {
+    if (kind === 'hospitality') {
+      const crowd = people.slice(0, 20)
+      const spots = new Map(hospitalityPlacement(layout, crowd.map(person => ({ id: person.id, host: Boolean(person.host) })), stanceBucket).map(item => [item.id, item]))
+      return crowd.flatMap(person => { const spot = spots.get(person.id); return spot ? [{ person, at: spot.at, stance: spot.stance }] : [] })
+    }
     const hosts = people.filter(person => person.host).slice(0, 1)
     const rest = people.filter(person => !hosts.includes(person)).slice(0, 14)
     // Größere Gemeinde: feste Plätze zuerst, dann freie Plätze daneben.
@@ -212,7 +290,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       ...hosts.map(person => ({ person, at: hostSpot })),
       ...others.map((person, index) => ({ person, at: spots[index] })),
     ]
-  }, [people, layout])
+  }, [people, layout, kind, stanceBucket])
   const [partnerId, setPartnerId] = useState<string | null>(null)
   const partner = partnerId ? placed.find(item => item.person.id === partnerId) ?? null : null
   const nearPerson = useMemo(() => {
@@ -234,7 +312,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       setPlayerMoving(false)
       setSeated(false)
       setPos(current => {
-        const step = event.shiftKey ? SPEED * 1.6 : SPEED
+        // Auf dem Friedhof rennt man nicht (W-13: Würde)
+        const step = event.shiftKey && kind !== 'cemetery' ? SPEED * 1.6 : SPEED
         const next = { x: current.x + (key === 'd' ? step : key === 'a' ? -step : 0), y: current.y + (key === 's' ? step : key === 'w' ? -step : 0) }
         if (!isLandmarkRoomBlocked(layout, next)) return next
         const slideX = { x: next.x, y: current.y }
@@ -272,6 +351,30 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() })
     })
   }, [layout, staff, staffGo, staffName])
+
+  /**
+   * „Ich hole es, und wir setzen uns an die Leseecke“: die Person holt das Buch am richtigen Regal,
+   * du gehst zum Leseplatz, sie setzt sich dazu und liest mit. Nach einer Weile geht sie zurück.
+   */
+  const readTogether = useCallback((book: LibraryBook) => {
+    if (!staff || staffTaskRef.current) return
+    const seat = waypoints.find(point => point.kind === 'Sitzplatz')
+    const shelf = waypoints.find(point => point.id === 'shelf:' + book.shelf) ?? waypoints.find(point => point.kind === 'Regal')
+    if (!seat || !shelf) { bringBook(book); return }
+    setStaffTask({ kind: 'visit', label: 'holt ein Buch' })
+    walkTo({ x: seat.x, y: seat.y }, () => setSeated(true))
+    staffGo(shelf, () => {
+      setStaffTask({ kind: 'bring', book })
+      const beside = { x: seat.x + 34, y: seat.y + 4 }
+      staffGo(isLandmarkRoomBlocked(layout, beside) ? seat : beside, () => {
+        setHeld(book)
+        setStatus(`${staffName} setzt sich zu dir und legt „${book.title}“ auf den Tisch.`)
+        setHistory(current => [...current, { role: 'assistant' as const, content: `So, hier ist „${book.title}“. Schlag auf, wo du magst – ich lese gern mit.` }].slice(-12))
+        setStaffTask({ kind: 'visit', label: 'liest mit dir' })
+        setTimeout(() => { setStaffTask({ kind: 'return' }); staffGo(staff, () => { setStaffTask(null); staffIdleSince.current = Date.now() }) }, 90000)
+      })
+    })
+  }, [layout, staff, staffGo, staffName, waypoints, walkTo, bringBook])
 
   // Bewegung aller Figuren: 25 Schritte je Sekunde.
   useEffect(() => {
@@ -330,7 +433,12 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const nearStaff = Boolean(staff && Math.hypot(pos.x - staffPos.x, pos.y - staffPos.y) <= STAFF_REACH)
   const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
-  const resonanceShelfOpen = isResonanceReading && shown?.action === 'books'
+  // Begegnungsstätte: Die Regale zeigen die Schriften zu Philosophie und Theologie, keine Romane
+  // (05.11.2026: „im Omnizedenz-Gebäude sieht man keine Bücher und Dokumente mehr“ – die
+  // Regale waren nur in der Bibliothek stöberbar, die Bücher nur am Bereich „Lesen & Denken“).
+  const resonanceShelf = isResonanceReading ? shelfAt(layout, pos) : null
+  // Am Bereich „Lesen & Denken“ genügt das Herantreten – auch über „Gehe zu …“ (05.11.2026).
+  const resonanceShelfOpen = isResonanceReading && (shown?.action === 'books' || near?.action === 'books' || Boolean(resonanceShelf))
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
   const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
@@ -364,6 +472,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       person.doing ? `Gerade ist hier: ${person.doing}.` : '',
       occasion && phase ? `Ablauf gerade: ${phase.title}. ${person.host ? 'Du leitest den Termin.' : 'Du nimmst teil; das sagt nichts darüber, was du glaubst.'}` : '',
       `Der Spieler steht bei dir im Raum.`,
+      // W-13: Friedhof – ruhig und ernst; bei Verzweiflung auf die Telefonseelsorge hinweisen
+      kind === 'cemetery' ? 'Du bist auf einem Friedhof. Sprich leise, ruhig und ernsthaft. Wenn jemand über einen echten Verlust spricht, hör zu und nimm es ernst; erfinde keine Verstorbenen.' : '',
+      kind === 'cemetery' ? 'Wirkt jemand verzweifelt oder spricht davon, nicht mehr leben zu wollen, nenne freundlich die Telefonseelsorge: kostenlos, rund um die Uhr, 0800 111 0 111 oder 0800 111 0 222, online telefonseelsorge.de.' : '',
     ].filter(Boolean)
   }
 
@@ -382,7 +493,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         body: JSON.stringify({ opening: true, npcId: person.id, npcName: person.name, npcRole: person.role, locationName: name, headline: `Begegnung in ${name}`, source: 'NOXIA place interior', localFacts: personFacts(person), history: [] }),
       })
       const data = await response.json().catch(() => ({}))
-      setHistory([{ role: 'assistant', content: response.ok && data.reply ? String(data.reply) : 'Hallo.' }])
+      const opening = response.ok && data.reply ? String(data.reply) : 'Hallo.'
+      setHistory([{ role: 'assistant', content: opening }])
+      speech.speak(opening, person.id)
     } finally { setSending(false) }
   }
 
@@ -407,8 +520,20 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         }),
       })
       const data = await response.json().catch(() => ({}))
-      setSermon({ text: response.ok && data.reply ? String(data.reply) : `${host.name} spricht leise; du verstehst heute nur Bruchstücke.`, by: host.name })
+      const sermonText = response.ok && data.reply ? String(data.reply) : `${host.name} spricht leise; du verstehst heute nur Bruchstücke.`
+      setSermon({ text: sermonText, by: host.name })
+      speech.speak(sermonText, host.id)
     } finally { setHearing(false) }
+  }
+
+  /** Mira liest vor: freie Lesefassung Abschnitt für Abschnitt, sonst den Klappentext. */
+  function readAloud() {
+    if (!held) return
+    const source = readingSource(held, heldDoc && heldDoc.slug === held.id.split(':')[1] ? heldDoc : null)
+    const offset = reading?.bookId === held.id && !reading.done ? reading.offset : 0
+    const part = nextReadingChunk(source.text, offset)
+    setReading({ bookId: held.id, offset: part.next, text: part.chunk, done: part.done })
+    speech.speak(part.chunk, `landmark-staff:${name}`)
   }
 
   function giveTip() {
@@ -460,9 +585,16 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, ich bin gerade beschäftigt – frag mich gleich noch einmal.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
+      speech.speak(reply, `landmark-staff:${name}`)
       if (conversationEnd.noteReply(`landmark-staff:${name}`, data)) return
       // Versprochen ist versprochen: „ich bringe …“ löst den Gang aus, ein genannter Titel wird erkannt.
-      if (isLibrary && /\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
+      if (isLibrary && staff && !seated && /\b(hol|hole|holen|bring|bringe)\b/i.test(reply) && /(leseecke|leseplatz|lesen|setz|sitz)/i.test(reply)) {
+        // Titel: in der Antwort, sonst im bisherigen Gespräch (zuletzt genannter zuerst).
+        const lower = (value: string) => value.toLowerCase()
+        const mentioned = (value: string) => LIBRARY_BOOKS.find(entry => lower(value).includes(lower(entry.title)))
+        const earlier = [...history, { role: 'user', content: text }].reverse().map(entry => mentioned(entry.content)).find(Boolean)
+        readTogether(mentioned(reply) ?? earlier ?? tip ?? pickTip(tipSeed.current += 3))
+      } else if (isLibrary && /\b(bring|hole?|bringe)\b/i.test(reply) && seated) {
         const named = LIBRARY_BOOKS.find(entry => reply.toLowerCase().includes(entry.title.toLowerCase()))
         bringBook(named ?? tip ?? pickTip(tipSeed.current += 3))
       } else if (data.worldAction?.type === 'visit_place') {
@@ -496,6 +628,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       const reply = response.ok && data.reply ? String(data.reply) : 'Entschuldige, gerade nicht – gleich wieder.'
       setHistory(current => [...current, { role: 'user' as const, content: text }, { role: 'assistant' as const, content: reply }].slice(-12))
       setMessage('')
+      speech.speak(reply, person.id)
       conversationEnd.noteReply(person.id, data)
     } finally { setSending(false) }
   }
@@ -504,7 +637,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
 
   return <div className="landmark-interior">
     <NpcVisualStyles/>
-    <header><div><small>INNENRAUM · {typeLabel.toUpperCase()}</small><b>{name}</b><span>WASD bewegen · Person anklicken · ESC verlassen</span></div><button onClick={onClose}>← Verlassen</button></header>
+    <header><div><small>INNENRAUM · {typeLabel.toUpperCase()}</small><b>{name}</b><span>WASD bewegen · Person anklicken · ESC verlassen</span></div><div className="head-tools"><RoomAudioControls speech={speech} music={lounge}/><button onClick={onClose}>← Verlassen</button></div></header>
     <main>
       <div className={'room ' + layout.kind} style={{ width: LANDMARK_ROOM.width, height: LANDMARK_ROOM.height }}>
         {layout.zones.map(zone => <div key={zone.id} className={'zone ' + zone.kind} style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}/>)}
@@ -518,13 +651,14 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           {item.kind === 'pinboard' && <><i className="note n1"/><i className="note n2"/><i className="note n3"/></>}
           {furnitureLabel(item) && <span className="label">{furnitureLabel(item)}</span>}
         </div>)}
+        {layout.kind === 'cemetery' && memorialsHere.slice(0, 12).map((item, index) => <i key={item.id} className="flame" style={{ left: 628 + (index % 6) * 13, top: 44 + Math.floor(index / 6) * 8 }}/>)}
         {layout.kind === 'worship' && Array.from({ length: Math.min(9, candles) }, (_, index) => <i key={index} className="flame" style={{ left: 654 + (index % 5) * 8, top: 88 + Math.floor(index / 5) * 9 }}/>)}
         {staff && <div className="npc" style={{ left: staffPos.x - 12, top: staffPos.y - 34 }}>
           <NpcFigure id={`landmark-staff:${name}`} name={staffName} role={staffTask?.kind === 'bring' ? 'bringt ein Buch' : staffTask?.kind === 'reshelve' ? 'sortiert ein' : staff.role} moving={staffMoving} showLabel={nearStaff || talkingNow || Boolean(staffTask)} showRoleLabel selected={talkingNow} onClick={() => { if (nearStaff) startTalk() }}/>
           {staffTask?.kind === 'bring' && <i className="carry"/>}
         </div>}
         {placed.map(item => <div key={item.person.id} className="npc" style={{ left: item.at.x - 12, top: item.at.y - 34 }}>
-          <NpcFigure id={item.person.id} name={item.person.name} role={item.person.doing ?? item.person.role} moving={false} showLabel={nearPerson?.person.id === item.person.id || partnerId === item.person.id || item.person.host} showRoleLabel selected={talkingNow && partnerId === item.person.id} onClick={() => { if (nearPerson?.person.id === item.person.id) void startTalkWith(item.person) }}/>
+          <NpcFigure id={item.person.id} name={item.person.name} role={item.person.doing ?? (item.stance ? `${item.person.role} · ${STANCE_LABEL[item.stance]}` : item.person.role)} moving={false} showLabel={nearPerson?.person.id === item.person.id || partnerId === item.person.id || item.person.host} showRoleLabel selected={talkingNow && partnerId === item.person.id} onClick={() => { if (nearPerson?.person.id === item.person.id) void startTalkWith(item.person) }}/>
         </div>)}
         {roundOn && !talkingNow && <RoundBubbles lines={round.lines} width={LANDMARK_ROOM.width} figures={placed.map(item => ({ id: item.person.id, x: item.at.x, y: item.at.y }))}/>}
         {layout.kind === 'library' && readerSeats.length > 0 && <div className="npc" style={{ left: readerPos.x - 12, top: readerPos.y - 34 }}>
@@ -532,6 +666,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         </div>}
         <div className={'player' + (seated ? ' seated' : '') + (playerMoving ? ' moving' : '')} style={{ left: pos.x - 10, top: pos.y - 24 }}><i/><span>Du</span>{held && <b className="held" title={held.title}/>}</div>
         {shelf && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>STÖBERN</button>}
+        {resonanceShelf && talkingNow && <button className="context" style={{ left: pos.x - 40, top: pos.y + 14 }} onClick={() => setTalking(false)}>LESEN</button>}
         {!shelf && near && near.action !== 'staff' && <button className="context" style={{ left: near.x - 40, top: near.y + 12 }} onClick={() => { setActive(near); setTalking(false) }}>{near.label}</button>}
         {staff && nearStaff && !talkingNow && <button className="context" style={{ left: staff.x - 40, top: staff.y + 14 }} onClick={startTalk}>ANSPRECHEN</button>}
         {nearPerson && !(talkingNow && partnerId === nearPerson.person.id) && <button className="context" style={{ left: nearPerson.at.x - 40, top: nearPerson.at.y + 14 }} onClick={() => void startTalkWith(nearPerson.person)}>ANSPRECHEN</button>}
@@ -575,30 +710,18 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><textarea value={message} rows={3} maxLength={500} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <ConversationReport npcId={partner ? partner.person.id : undefined}/>
         </>}
-        {!talkingNow && resonanceShelfOpen && !book && <div className="book">
-          <b>Philosophie · Lesen & denken</b>
-          <p>Alle philosophischen Werke sind frei lesbar. Volltexte sind dort verfügbar, wo eine überprüfte Manuskriptfassung hinterlegt ist.</p>
-          <div className="books"><section>{resonanceBooks.map((entry, index) => <div key={entry.id}>{index === 0 && <p><strong>Philosophie und Bewusstsein</strong></p>}{index === resonanceBooks.length - THEOLOGICAL_ESSAYS.length && <p><strong>Theologie und Bibelauslegung</strong></p>}<button onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button></div>)}</section></div>
-        </div>}
+        {!talkingNow && isResonanceReading && <ResonanceShelf atShelf={resonanceShelfOpen} onActiveChange={setResonanceActive}/>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
         </section></div></>}
-        {!talkingNow && book && (shelf || !shown || resonanceShelfOpen) && <div className="book">
+        {!talkingNow && book && (shelf || !shown) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
-          {isResonanceReading && (readingText ? <>
-            <p className="muted">Freie Lesefassung · {readingText.version} · ohne Credits oder Kauf</p>
-            {readingPart === null ? <div className="books"><section>{readingText.sections.map((part, index) => <button key={index} onClick={() => setReadingPart(index)}>{part.heading}</button>)}</section></div> : <>
-              <div className="row"><button className="act quiet" onClick={() => setReadingPart(null)}>← Inhaltsverzeichnis</button><span>{readingPart + 1} / {readingText.sections.length}</span></div>
-              <article style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.65,maxHeight:'55vh',overflowY:'auto',padding:'12px 0'}}>{readingText.sections[readingPart]?.text}</article>
-              <div className="row"><button className="act quiet" disabled={readingPart === 0} onClick={() => setReadingPart(n => Math.max(0, (n ?? 0)-1))}>← Vorheriger Teil</button><button className="act" disabled={readingPart + 1 >= readingText.sections.length} onClick={() => setReadingPart(n => Math.min(readingText.sections.length-1,(n ?? 0)+1))}>Nächster Teil →</button></div>
-            </>}
-            {readingText.source && <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>}
-          </> : <p className="muted">Einführungstext · vollständige Manuskriptfassung noch nicht zugeordnet</p>)}
-          <button className="act" onClick={() => { setBookId(''); setReadingPart(null) }}>← Zurück zum Regal</button>
+          <button className="act" onClick={() => setBookId('')}>← Zurück zum Regal</button>
         </div>}
         {status && <div className="status">{status}</div>}
         {!talkingNow && held && !book && <div className="book held-card">
@@ -606,19 +729,31 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <b>{held.title}</b>
           <i>{held.genre}</i>
           {seated ? <p>{held.teaser}</p> : <p>Setz dich an einen Leseplatz, um darin zu lesen.</p>}
+          {seated && staff && isLibrary && <>
+            {reading?.bookId === held.id && <blockquote className="reading">{reading.text}</blockquote>}
+            <button className="act" onClick={readAloud}>{reading?.bookId === held.id && !reading.done ? `Weiterlesen (${staffName})` : reading?.bookId === held.id ? `Noch einmal von vorn (${staffName})` : `${staffName} liest vor`}</button>
+          </>}
           {atCounter ? <button className="act" onClick={() => { setHeld(null); setStatus(`Du gibst „${held.title}“ an der Ausleihe zurück.`) }}>Zurückgeben</button> : <button className="act quiet" onClick={() => setHeld(null)}>Weglegen</button>}
         </div>}
-        {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length > 0 && <p>{placed.map(item => item.person.name).join(', ')} {placed.length === 1 ? 'ist' : 'sind'} gerade hier. Geh hin und sprich {placed.length === 1 ? 'sie oder ihn' : 'jemanden'} an.</p>}
-        {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length === 0 && !isLibrary && kind !== 'artlounge' && <p className="muted">Gerade ist niemand hier, mit dem du sprechen kannst. Zu den Gottesdiensten, Gebeten und Runden ist meist jemand da.</p>}
-        {!talkingNow && !shown && !shelf && !book && !held && <p>{isLibrary ? `Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern${staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.` : `Du kannst dich frei umsehen${staff ? `; ${staffName} hilft dir am Tresen weiter` : ''}.`}</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !resonanceActive && !staff && placed.length > 0 && <p>{placed.map(item => item.person.name).join(', ')} {placed.length === 1 ? 'ist' : 'sind'} gerade hier. Geh hin und sprich {placed.length === 1 ? 'sie oder ihn' : 'jemanden'} an.</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !resonanceActive && !staff && placed.length === 0 && !isLibrary && kind !== 'artlounge' && <p className="muted">Gerade ist niemand hier, mit dem du sprechen kannst. Zu den Gottesdiensten, Gebeten und Runden ist meist jemand da.</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !resonanceActive && <p>{isLibrary ? `Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern${staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.` : `Du kannst dich frei umsehen${staff ? `; ${staffName} hilft dir am Tresen weiter` : ''}.`}</p>}
         {!talkingNow && !shown && !shelf && realName && <p className="muted">Heute steht hier laut OpenStreetMap „{realName}“. Im Spiel (2086) ist der Betrieb eine erfundene Nachfolgerin.</p>}
         {!talkingNow && shown && <p>{shown.text}</p>}
         {!talkingNow && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}
+        {!talkingNow && shown?.action === 'memorial' && <div className="plea">
+          <small>GEDENKEN · NUR FÜR DICH</small>
+          <span>Wenn du magst, mit einem Namen. Niemand sonst sieht, was du hier hinterlässt.</span>
+          <input value={memorialName} maxLength={80} data-noxia-private onChange={event => setMemorialName(event.target.value)} placeholder="Name (freiwillig)"/>
+          <div className="row"><button className="act" disabled={memorialBusy} onClick={() => void lightMemorial()}>{memorialBusy ? '…' : 'Kerze anzünden'}</button></div>
+          {memorialNote && <p>{memorialNote}</p>}
+          {memorialsHere.length > 0 && <p className="muted">Deine Kerzen: {memorialsHere.slice(0, 8).map(item => item.name ?? 'ohne Namen').join(', ')}{memorialsHere.length > 8 ? ' …' : ''}</p>}
+        </div>}
         {!talkingNow && shown?.action === 'candle' && <button className="act" onClick={() => setCandles(count => Math.min(9, count + 1))}>Kerze anzünden</button>}
         {!talkingNow && shown?.action === 'stairs' && shown.toLevel !== undefined && <button className="act" onClick={() => onLevel(shown.toLevel as number)}>{shown.toLevel === 0 ? 'Ins Erdgeschoss' : shown.toLevel > level ? `Ins ${shown.toLevel}. Obergeschoss` : `Ins ${shown.toLevel}. Obergeschoss hinunter`}</button>}
         {!talkingNow && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
         {!talkingNow && <div className="moves"><small>GEHE ZU …</small><div>
-          {waypoints.map(point => <button key={point.id} onClick={() => walkTo(point, () => { if (point.id === 'exit') onClose(); else if (point.kind === 'Sitzplatz') setSeated(true) })}>{point.label}</button>)}
+          {waypoints.map(point => <button key={point.id} onClick={() => walkTo(point, () => { if (point.id === 'exit') onClose(); else { const spot = layout.spots.find(item => 'spot:' + item.id === point.id); if (spot) setActive(spot); if (point.kind === 'Sitzplatz') setSeated(true) } })}>{point.label}</button>)}
         </div></div>}
         {!talkingNow && facts.length > 0 && <dl>{facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl>}
         <div className="note">Typischer Grundriss für diese Ortsart – nicht der vermessene Innenraum des realen Gebäudes. Ortsdaten: OpenStreetMap.</div>
@@ -650,6 +785,15 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .zone.concrete{background:#9a9b96;background-image:linear-gradient(#90918c 1px,transparent 1px),linear-gradient(90deg,#90918c 1px,transparent 1px);background-size:120px 120px}
       .floor-tag{position:absolute;left:50%;top:6px;transform:translateX(-50%);font:800 8px monospace;letter-spacing:.14em;color:#f3ead6;background:#17313ccc;padding:3px 8px;border-radius:3px;z-index:3;pointer-events:none}
       .f.stairs{background:repeating-linear-gradient(180deg,#c9b48f 0 8px,#a8916a 8px 10px);border:2px solid #6b5230;box-shadow:3px 4px 0 #0003}
+      .zone.grass{background:#8faa6e;background-image:radial-gradient(#9ab878 1px,transparent 1.2px);background-size:7px 7px}
+      .zone.gravel{background:#cfc6b2;background-image:radial-gradient(#b7ad97 1px,transparent 1.3px);background-size:5px 5px;box-shadow:inset 0 0 0 2px #b9af9a}
+      .f.grave{background:#8f8f8a;border:2px solid #5e5e59;border-radius:9px 9px 2px 2px;box-shadow:0 7px 0 -2px #6f8a52,2px 3px 0 #0003}
+      .f.tap{background:#6c7a84;border:2px solid #3d474e;border-radius:50%;box-shadow:inset 0 0 0 5px #8fa3ae}
+      .f.tap::after{content:'';position:absolute;right:-12px;bottom:-2px;width:10px;height:12px;background:#4f8a5a;border-radius:2px 2px 4px 4px}
+      .f.tree{background:radial-gradient(circle at 40% 35%,#6f9a52,#3f6a33);border-radius:50%;border:2px solid #2f5228;box-shadow:3px 4px 0 #0003}
+      .f.memorial{background:#cfc8b8;border:2px solid #8c8471;border-radius:2px;box-shadow:inset 0 -6px 0 #b4ab97,2px 3px 0 #0003}
+      .room.cemetery{background:#7e9a62}
+      .plea input{border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:6px 8px;font:inherit}
       .zone.parquet{background:repeating-linear-gradient(90deg,#b98a57 0 38px,#a97a4a 38px 40px);box-shadow:inset 0 2px 0 #0002}
       .f.piano{background:#15151a;border:2px solid #000;border-radius:10px 46px 10px 10px;box-shadow:inset 0 -14px 0 #2a2a33,3px 4px 0 #0004}
       .f.piano::after{content:'';position:absolute;left:6px;right:46px;bottom:3px;height:9px;background:repeating-linear-gradient(90deg,#f4f0e6 0 5px,#222 5px 6px)}
@@ -719,7 +863,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .note{position:absolute;top:2px;width:10px;height:7px;border:1px solid #0003}
       .note.n1{left:6px;background:#f7e9a8}.note.n2{left:30px;background:#dfe9f5;top:1px}.note.n3{left:56px;background:#f4cfc9}
       .flame{position:absolute;width:4px;height:7px;border-radius:50% 50% 45% 45%;background:#ffd76a;box-shadow:0 0 6px 2px #ffb84a99}
-      .npc{position:absolute;z-index:2}
+      .npc{position:absolute;z-index:2;transition:left 1.6s ease-in-out,top 1.6s ease-in-out}
       .npc .carry{position:absolute;left:18px;top:14px;width:9px;height:12px;background:#b24a3d;border:1px solid #3b1a14;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .player .held{position:absolute;left:16px;top:10px;width:8px;height:11px;background:#2f5d6b;border:1px solid #1a3038;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .plea{display:grid;gap:5px;padding:9px 10px;border:1px solid #6b8793;border-radius:7px;background:#0f2230;color:#dfe9ee}
@@ -743,6 +887,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .moves button{border:1px solid #476476;border-radius:5px;background:#102b3c;color:#dce9ee;padding:4px 7px;font:700 9px system-ui;cursor:pointer}
       .moves button:hover{background:#173b50}
       .held-card{border-color:#2f5d6b}
+      .head-tools{display:flex;align-items:center;gap:10px}
+      .reading{margin:6px 0;padding:6px 10px;border-left:3px solid #7fb59b;background:#0c1d1a;font-size:12px;line-height:1.55;color:#dcebe3;font-style:italic;max-height:30vh;overflow:auto}
       .player{position:absolute;width:20px;height:28px;pointer-events:none;z-index:3}
       .player i{position:absolute;left:3px;top:8px;width:14px;height:18px;border-radius:7px 7px 3px 3px;background:#d4ad43;border:1.5px solid #594717}
       .player i::before{content:'';position:absolute;left:1.5px;top:-9px;width:8px;height:8px;border-radius:50%;background:#f0c49c;border:1.5px solid #493c18}
