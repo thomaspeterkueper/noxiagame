@@ -793,3 +793,21 @@ Thomas, 05.11.2026, nach dem Neuladen: „klappt, Friedhof ist auch da, Grabstei
 - Ursache: Die Migration `20261105120000_earth_terrain_cells.sql` war nie live angewendet; Abruf und Ablage der Höhen liefen ins Leere, die Kacheln kamen ohne `terrain`. Jetzt angewendet (05.11.2026, 17:45).
 - Gefüllt wird beim Öffnen der Karte (3 × 3 Zellen um die Figur, danach werden die Kacheln frisch geladen) und täglich um 3:17 Uhr.
 - Darstellung kräftiger: Überhöhung 3,5 statt 2, jede Gitterzelle dreifach geteilt (weiche Hänge statt Kästchen), Schatten bis 50 % Deckung, dazu Höhenfarbe (`heightTint`: Täler satter grün, Höhen heller, Bezug 180–660 m).
+
+## Pflanzen mit echten Namen (05.11.2026, Thomas: „Bäume, am besten mit echten Namen … Büsche, Blumen“)
+
+Schritt 1: Aussehen (Thomas: „zu unserem Stil passen, zu liebevoll braucht es nicht“).
+- Befund: In Sundern gab es keinen einzigen Baum auf der Karte – OSM kennt dort keine Einzelbäume, die 457 Waldflächen waren nur Muster.
+- `lib/worldlab/plants.ts` (getestet): 19 Arten mit deutschem und lateinischem Namen, Form, Höhe, Rinde, Laub im Jahreslauf (Austrieb, Färbung, Laubfall, braunes Winterlaub bei Buche und Eiche), Blüte und Früchte (Kirsche, Apfel, Kastanie, Holunder), ein Satz je Art. Jahreszeit nach echtem Datum, Südhalbkugel versetzt, warme Breiten immer belaubt.
+  - Bäume: Fichte, Waldkiefer, Lärche, Rotbuche, Stieleiche, Hängebirke, Bergahorn, Winterlinde, Rosskastanie, Silberweide, Schwarzerle, Vogelkirsche, Apfel, Pyramidenpappel; Sträucher: Hasel, Holunder, Ligusterhecke.
+- `lib/worldlab/plantPlacement.ts` (getestet): Standorte im Raster aus absoluten Kachelmetern (nahtlos, beim Neuladen gleich):
+  - Wald alle ~10 m, Bestände von 50 m mit vorherrschender Art (Sauerland: Fichte, Buche, Eiche, Birke, Kiefer, Lärche, Ahorn);
+  - Parks, Wohngebiete, Friedhöfe in Gruppen; Kleingärten mit Obstbäumen; Sträucher in Parks, Gärten, Kleingärten;
+  - am Wasser Weide und Erle; Einzelbäume und Alleen aus OSM an ihrem Ort, Art geschätzt (Straßenbäume: Linde, Ahorn, Kastanie …);
+  - Abstand zu Straßen, Häusern, Wasser, Parkplätzen, Sportflächen; höchstens 900 je Kachel.
+  - Außerhalb Mitteleuropas nur „Laubbaum“/„Nadelbaum“ (Art nicht bekannt) – nichts Erfundenes.
+- `lib/worldlab/treeSprites.ts`: je Form ein schlichtes Bild (Kuppel, breite Eiche, schlanke Birke mit weißem Stamm, Kegel, Lärche, Schirmkiefer, Säulenpappel, Hängeweide, Obstbaum, Strauch, Hecke); kahle Äste, wenn wenig Laub hängt; Bilder je Art und Tag zwischengespeichert, beim Tageswechsel nachgeführt.
+- Klick oder Mauszeiger auf einen Baum: Tafel „BAUM“/„STRAUCH“ mit Namen („wahrscheinlich Rotbuche“ bei geschätzten), lateinischem Namen, Zustand heute, Höhe, woher bekannt, ein Satz zur Art.
+- Gräber halten Abstand zu den neuen Bäumen.
+
+Offen (Schritt 2 ff.): Arten aus OSM-Merkmalen (`species`, `genus`, `leaf_type`) in die Kacheln übernehmen (braucht neues `TILE_FORMAT`); Waldart aus `leaf_type` bzw. Baumartenkarte (Lizenz prüfen); Hecken aus `barrier=hedge`; Blumen; Wissen und Ernte (andere Teilprojekte).

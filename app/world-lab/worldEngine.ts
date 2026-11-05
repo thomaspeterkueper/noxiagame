@@ -5,7 +5,7 @@
 // kommen über die Optionen herein. So lässt sich dieselbe Maschine auch ohne
 // Anmeldung und Datenbank mit Testkacheln messen.
 
-import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
+import type { Application, Container, Graphics as PixiGraphics, Sprite, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
 import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
@@ -19,7 +19,9 @@ import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatt
 import { streetLabels } from '@/lib/worldlab/streetLabels'
 import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, WALK_CORE_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
-import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/lib/worldlab/treeSprites'
+import { paintPlant, plantTextureKey, TREE_BASE_HEIGHT_M, TREE_PX, TREE_WORLD } from '@/lib/worldlab/treeSprites'
+import { foliage, plantDay, plantRegion, PLANTS, type PlantId, type PlantRegion } from '@/lib/worldlab/plants'
+import { plantSpots, type PlantSpot } from '@/lib/worldlab/plantPlacement'
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
 import { polygonArea } from '@/lib/worldlab/simplify'
@@ -82,6 +84,8 @@ export type WorldPick =
   | { type: 'plot'; source: string }
   | { type: 'parcel'; id: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
+  /** Baum oder Strauch (05.11.2026): Art, und woher wir sie kennen */
+  | { type: 'plant'; at: GeoPoint; species: PlantId; source: 'osm' | 'estimate'; region: PlantRegion }
 
 /** Plakette einer Begegnungsstätte: in jeder Zoomstufe sichtbar, ein Klick öffnet den Ort. */
 export interface WorldBeacon { at: GeoPoint; label?: string; pick: WorldPick; /** resonance: Begegnungsstätte (grün), worship: laufender Gottesdienst (gold) */ tone?: 'resonance' | 'worship' }
@@ -247,15 +251,29 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     paintPattern(ctx, spec, AREA_COLORS[kind as keyof typeof AREA_COLORS])
     patterns.set(kind, { texture: PIXI.Texture.from(canvas), matrix: matrix(patternMatrix(spec.sizeM, ISO_Y)) })
   }
-  // Baumbilder (Laubbäume, Fichte).
-  const treeTextures: Texture[] = []
-  for (let variant = 0; variant < TREE_VARIANTS; variant++) {
-    const canvas = document.createElement('canvas')
-    canvas.width = TREE_PX.w; canvas.height = TREE_PX.h
-    const ctx = canvas.getContext('2d')
-    if (!ctx) break
-    paintTree(ctx, variant)
-    treeTextures.push(PIXI.Texture.from(canvas))
+  // Baum- und Strauchbilder je Art und heutigem Laub, bei Bedarf gezeichnet (05.11.2026)
+  const plantTextures = new Map<string, Texture>()
+  let plantDayNow = plantDay(Date.now(), options.start.lat)
+  function plantTexture(id: PlantId, region: PlantRegion): Texture | null {
+    const species = PLANTS[id], f = foliage(species, plantDayNow, region)
+    const key = plantTextureKey(species, f)
+    let texture = plantTextures.get(key)
+    if (!texture) {
+      const canvas = document.createElement('canvas')
+      canvas.width = TREE_PX.w; canvas.height = TREE_PX.h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      paintPlant(ctx, species, f)
+      texture = PIXI.Texture.from(canvas)
+      plantTextures.set(key, texture)
+    }
+    return texture
+  }
+  /** Bildgröße einer Pflanze gegenüber TREE_WORLD (12 m Baum) */
+  function plantSize(spot: PlantSpot) {
+    const species = PLANTS[spot.species]
+    if (species.form === 'bush' || species.form === 'hedge') return 0.55 * spot.scale
+    return Math.max(0.55, Math.min(1.8, species.heightM / TREE_BASE_HEIGHT_M * spot.scale))
   }
 
   // ── Messung ─────────────────────────────────────────────────────────
@@ -410,7 +428,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean; /** Schornsteine mit Rauch (Weltmeter, Höhe der Mündung) */ chimneys: Array<{ x: number; y: number; h: number; seed: number }>; /** Fensterlicht je Haus (abends sichtbar) */ lights: Container[]; /** Grabbeete (W-19), im Boden */ beds: PixiGraphics | null; /** Glitzern auf dem Wasser, zwei Gruppen im Wechsel */ glint: [PixiGraphics, PixiGraphics] | null }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean; /** Schornsteine mit Rauch (Weltmeter, Höhe der Mündung) */ chimneys: Array<{ x: number; y: number; h: number; seed: number }>; /** Fensterlicht je Haus (abends sichtbar) */ lights: Container[]; /** Bäume und Sträucher (Weltmeter), für Klick und Jahreszeit */ plants: Array<{ x: number; y: number; spot: PlantSpot; region: PlantRegion; sprite: Sprite; k: number }>; /** Grabbeete (W-19), im Boden */ beds: PixiGraphics | null; /** Glitzern auf dem Wasser, zwei Gruppen im Wechsel */ glint: [PixiGraphics, PixiGraphics] | null }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -984,19 +1002,26 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       ;(place.p ? poiLabels : functional ? labels : osmLabelLayer).addChild(name)
       entry.labels.push(name)
     }
-    // Bäume: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
-    const trees = data.trees ?? []
-    if (treeTextures.length) for (let i = 0; i + 1 < trees.length; i += 2) {
-      const x = ox + trees[i], y = oy + trees[i + 1]
-      const sprite = new PIXI.Sprite(treeTextures[treeVariant(x, y) % treeTextures.length])
+    // Bäume und Sträucher: Objekte mit Tiefe, damit sie vor und hinter Häusern stehen.
+    // Standorte aus OSM und geschätzte in Wald, Park, Garten, Friedhof (plantPlacement.ts).
+    const centreGeo = toGeo({ x: ox + data.size / 2, y: oy + data.size / 2 })
+    const region = plantRegion(centreGeo.lat, centreGeo.lon)
+    for (const spot of plantSpots(data, { x: entry.tile.x * data.size, y: entry.tile.y * data.size }, centreGeo)) {
+      const texture = plantTexture(spot.species, region)
+      if (!texture) break
+      const x = ox + spot.x, y = oy + spot.y
+      const sprite = new PIXI.Sprite(texture)
       sprite.anchor.set(0.5, (TREE_PX.h - 4) / TREE_PX.h)
-      sprite.width = TREE_WORLD.w; sprite.height = TREE_WORLD.h
+      const k = plantSize(spot)
+      sprite.width = TREE_WORLD.w * k; sprite.height = TREE_WORLD.h * k
       const foot = iso(x, y)
       sprite.position.set(foot.x, foot.y)
       sprite.zIndex = x + y
       sprite.tint = worldTint
+      sprite.eventMode = 'none'
       addObject(sprite)
       entry.trees.push(sprite)
+      entry.plants.push({ x, y, spot, region, sprite, k })
     }
     drawGraves(entry)
   }
@@ -1011,7 +1036,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (!cemeteries.length) return
     const blocked = [
       ...data.blocks.map(block => ({ x: block.x, y: block.y, r: Math.max(block.w, block.d) / 2 + 1.5 })),
-      ...Array.from({ length: Math.floor((data.trees?.length ?? 0) / 2) }, (_, i) => ({ x: data.trees![i * 2], y: data.trees![i * 2 + 1], r: 1.6 })),
+      ...entry.plants.map(plant => ({ x: plant.spot.x, y: plant.spot.y, r: 1.6 })),
     ]
     const crosses = Math.abs(toGeo({ x: ox + data.size / 2, y: oy + data.size / 2 }).lat) >= 36
     const origin = { x: entry.tile.x * data.size, y: entry.tile.y * data.size }
@@ -1055,7 +1080,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false, chimneys: [], lights: [], beds: null, glint: null })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false, chimneys: [], lights: [], plants: [], beds: null, glint: null })
     building.push(key)
   }
 
@@ -2122,9 +2147,26 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const node = inputEnabled ? pickNode(event.offsetX, event.offsetY) : null
     light(node)
     if (!options.onHover) return
-    const pick = node ? pickAt(event.offsetX, event.offsetY) : null
+    const pick = node ? pickAt(event.offsetX, event.offsetY) : inputEnabled ? plantAt(event.offsetX, event.offsetY) : null
     if (pick) { hovering = true; options.onHover({ pick, x: event.clientX, y: event.clientY }) }
     else if (hovering) { hovering = false; options.onHover(null) }
+  }
+  /** Baum unter dem Mauszeiger: Krone als Rechteck über dem Fußpunkt, der vorderste gewinnt. */
+  function plantAt(offsetX: number, offsetY: number): WorldPick | null {
+    const centre = iso(camera.x, camera.y)
+    const u = (offsetX - app.screen.width / 2) / zoom + centre.x, v = (offsetY - app.screen.height / 2) / zoom + centre.y
+    const gx = (u + v / ISO_Y) / 2, gy = (v / ISO_Y - u) / 2
+    let best: Loaded['plants'][number] | null = null
+    for (const entry of loaded.values()) {
+      if (gx < entry.ox - 40 || gx > entry.ox + entry.data.size + 40 || gy < entry.oy - 40 || gy > entry.oy + entry.data.size + 40) continue
+      for (const plant of entry.plants) {
+        const foot = iso(plant.x, plant.y)
+        const halfW = TREE_WORLD.w * plant.k * 0.32, top = foot.y - TREE_WORLD.h * plant.k * 0.9
+        if (u < foot.x - halfW || u > foot.x + halfW || v < top || v > foot.y) continue
+        if (!best || plant.x + plant.y > best.x + best.y) best = plant
+      }
+    }
+    return best ? { type: 'plant', at: toGeo({ x: best.x, y: best.y }), species: best.spot.species, source: best.spot.source, region: best.region } : null
   }
   const pointerLeave = () => { light(null); if (hovering) { hovering = false; options.onHover?.(null) } }
   const pointerUp = (event: PointerEvent) => {
@@ -2133,6 +2175,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     pressAt = null
     const pick = pickAt(event.offsetX, event.offsetY)
     if (pick) { options.onPick(pick); return }
+    const plant = plantAt(event.offsetX, event.offsetY)
+    if (plant) { options.onPick(plant); return }
     // Boden: Bildpunkt → Bodenpunkt (Höhe 0)
     const centre = iso(camera.x, camera.y)
     const u = (event.offsetX - app.screen.width / 2) / zoom + centre.x, v = (event.offsetY - app.screen.height / 2) / zoom + centre.y
@@ -2207,6 +2251,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         }
       }
       for (const [lit, info] of windowLights) lit.visible = windowLit(sunNow, info.lon, Date.now(), info.key)
+      // Neuer Tag: Laub der Bäume nachführen
+      const day = plantDay(Date.now(), geo.lat)
+      if (day !== plantDayNow) {
+        plantDayNow = day
+        for (const entry of loaded.values()) for (const plant of entry.plants) { const texture = plantTexture(plant.spot.species, plant.region); if (texture && !plant.sprite.destroyed) plant.sprite.texture = texture }
+      }
     }
     // Wasser: zwei Gruppen blenden langsam im Wechsel
     const wave = 0.5 + 0.5 * Math.sin(now / 950)
