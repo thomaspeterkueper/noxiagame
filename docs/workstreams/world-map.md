@@ -709,7 +709,14 @@ Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „g
   - Arbeit auf der Karte sichtbar machen (Posen `haemmern`, `hacken`, `schaufeln`, `tragen` an Arbeitsorten, `pose`-Eigenschaft von `WalkableActor`);
   - Leistung messen, wenn viele Figuren gleichzeitig laufen; bei Bedarf Bilder zwischenspeichern.
 
-### W-18 (Gastronomie, 05.11.2026): „Was ist los?“ auf der Karte
+### W-18 (Gastronomie, 05.11.2026): „Was ist los?“ auf der Karte – erledigt (05.11.2026)
+
+Umgesetzt:
+- `/api/world-lab/buildings` liefert `events`: nicht abgesagte Veranstaltungen, die laufen oder in den nächsten 24 Stunden beginnen, mit Lage und Namen des Lokals – auch für reale Lokale (`source_tags.real_venue`), die nicht als NOXIA-Haus auf der Karte stehen.
+- **Karte:** Über jedem Lokal steht die nächste Veranstaltung als Schild mit Zeichen und Uhrzeit („🎧 21:00“, „📖 jetzt“, laufend dunkelrot, angekündigt violett), in jeder Zoomstufe sichtbar, minütlich aktualisiert (`setEventMarks` in `worldEngine.ts`).
+- **Zielliste:** Gruppe „Was ist los?“ gleich nach den Begegnungsstätten, mit `eventLine` und Lokal, bis 6 km; Auswahl führt zum Lokal.
+- Verwendet `upcoming`, `eventLine`, `whenText`, `VENUE_EVENT_KINDS` aus `lib/game/hospitality/venueEvents.ts`.
+
 
 Seit 05.11.2026 gibt es Veranstaltungen in Lokalen (`venue_events`, `/api/game/hospitality/events`): DJ-Abend, Konzert, Lesung, Quiz, Feier, Stammtisch.
 

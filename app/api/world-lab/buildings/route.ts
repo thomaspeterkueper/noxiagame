@@ -22,6 +22,12 @@ export async function GET(req: NextRequest) {
   ])
   // Abgerissene reale Gebäude: die Karte zeichnet dort eine freie Fläche (nur der Eigentümer darf bauen).
   const { data: parcelOwners } = await supabase.from('earth_parcel_owners').select('parcel_id,profile_id').limit(5000)
+  // W-18: Veranstaltungen in Lokalen (laufend oder in den nächsten 24 Stunden), auch in realen Lokalen
+  const nowIso = new Date().toISOString(), dayIso = new Date(Date.now() + 86_400_000).toISOString()
+  const { data: eventRows } = await supabase.from('venue_events').select('id,tile_entity_id,kind,title,note,starts_at,ends_at').eq('cancelled', false).gt('ends_at', nowIso).lt('starts_at', dayIso).order('starts_at').limit(100)
+  const eventTileIds = [...new Set((eventRows ?? []).map(row => String(row.tile_entity_id)))]
+  const { data: eventTiles } = eventTileIds.length ? await supabase.from('tile_entities').select('id,entity_id,display_name,latitude_deg,longitude_deg,location_id').in('id', eventTileIds) : { data: [] as any[] }
+  const eventTile = new Map((eventTiles ?? []).filter((row: any) => row.location_id === earth.id && row.latitude_deg !== null).map((row: any) => [String(row.id), row]))
   const { data: cleared } = await supabase.from('earth_cleared_buildings').select('source_ref,profile_id,latitude_deg,longitude_deg,footprint_width_m,footprint_depth_m,rotation_deg,display_name,cleared_at').limit(1000)
   // Namen wie auf der Erde üblich (W-8: „Habitat“ → „Wohnhaus“)
   const names = new Map<string, string>((definitions ?? []).map((row: any) => [String(row.key), earthBuildingName(String(row.key), String(row.name))]))
@@ -43,6 +49,12 @@ export async function GET(req: NextRequest) {
           : row.owner_class === 'CORPORATION' ? 'Corporation'
             : row.actors?.display_name ?? row.profiles?.username ?? 'Anderer Pilot',
     })),
+    events: (eventRows ?? []).flatMap((row: any) => {
+      const tile = eventTile.get(String(row.tile_entity_id))
+      if (!tile) return []
+      return [{ id: row.id, tileEntityId: row.tile_entity_id, kind: row.kind, title: row.title, note: row.note ?? null, startsAt: row.starts_at, endsAt: row.ends_at,
+        venueName: buildingLabel(String(tile.entity_id), names.get(String(tile.entity_id)), tile.display_name), lat: Number(tile.latitude_deg), lon: Number(tile.longitude_deg) }]
+    }),
     parcels: (parcelOwners ?? []).map(row => ({ id: String(row.parcel_id), own: row.profile_id === profileId })),
     plots: (cleared ?? []).map(row => ({
       source: String(row.source_ref), own: row.profile_id === profileId, name: row.display_name ?? 'Freie Fläche',

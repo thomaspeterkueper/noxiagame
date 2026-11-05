@@ -22,6 +22,7 @@ import TimeSlider from './TimeSlider'
 import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPanels'
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
+import { eventLine, eventRunning, upcoming, VENUE_EVENT_KINDS, whenText, type VenueEvent } from '@/lib/game/hospitality/venueEvents'
 import { DEFAULT_VIEW, loadView, saveView, showPlace, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { worshipWhen, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import { MEETING_WALK_LIMIT_M, meetingPlaces, nearestMeetingPlace, type MeetingPlace } from '@/lib/worldlab/meetingPlaces'
@@ -42,6 +43,7 @@ import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type 
 type BuildRow = { id: string; name?: string; buildable_id: string; status?: string; created_at?: string; completes_at?: string; latitude_deg?: number | null; longitude_deg?: number | null; footprint_width_m?: number | null; footprint_depth_m?: number | null; rotation_deg?: number | null }
 
 const MEETING_GROUP = 'Omnizedenz-Begegnungsstätten'
+const EVENTS_GROUP = 'Was ist los?'
 const WORSHIP_GROUP = 'Gottesdienste und Gebete'
 /** Gotteshaus als Wahrzeichen (für Tafel und Innenraum seiner Religion). */
 function worshipLandmark(item: WorshipItem) {
@@ -118,6 +120,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [hover, setHover] = useState<{ pick: WorldPick; x: number; y: number } | null>(null)
   const [targetId, setTargetId] = useState('')
   const [plots, setPlots] = useState<WorldPlot[]>([])
+  // W-18: Veranstaltungen in Lokalen (aus /api/world-lab/buildings)
+  const [events, setEvents] = useState<Array<VenueEvent & { lat: number; lon: number }>>([])
   // Zeitregler: Stand der Abrisse zu einem früheren Zeitpunkt (null = jetzt)
   const [asOf, setAsOf] = useState<string | null>(null)
   const [parcelOwners, setParcelOwners] = useState<Array<{ id: string; own: boolean }>>([])
@@ -224,7 +228,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
           const json = response.ok ? await response.json() : null
           const list = (json?.buildings ?? []) as NoxiaBuilding[]
           noxiaRef.current = list
-          if (!disposed) { setNoxia(list); setPlots(Array.isArray(json?.plots) ? json.plots : []); setParcelOwners(Array.isArray(json?.parcels) ? json.parcels : []) }
+          if (!disposed) { setNoxia(list); setPlots(Array.isArray(json?.plots) ? json.plots : []); setParcelOwners(Array.isArray(json?.parcels) ? json.parcels : []); setEvents(Array.isArray(json?.events) ? json.events : []) }
           // Neuer Spieler: nach dem Onboarding den Innenraum des Startcafés öffnen (?starterCafe=<id>), einmal.
           if (starterCafe.current === undefined) {
             const params = new URLSearchParams(window.location.search)
@@ -656,11 +660,36 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     }
     for (const site of sites) list.push({ id: 's:' + site.id, label: site.name + ' · im Bau', distanceM: metresBetween(here, site.at), group: 'Baustellen', panel: { kind: 'site', id: site.id } })
     for (const item of engineReady?.landmarks() ?? []) if (showPlace(view, item.landmark)) list.push({ id: 'l:' + item.landmark.at.lat + ',' + item.landmark.at.lon, label: item.landmark.name + ' · ' + landmarkLabel(item.landmark.kind, item.landmark.tags), distanceM: item.distanceM, group: item.landmark.poi ? 'Läden und Lokale' : 'Orte', panel: { kind: 'landmark', landmark: item.landmark } })
-    const rank = (group: string) => group === MEETING_GROUP ? 2 : group === WORSHIP_GROUP ? 1 : 0
+    // W-18: „Was ist los?“ – Veranstaltungen in Lokalen bis 6 km, laufende zuerst
+    for (const item of upcoming(events, Date.now(), 12) as typeof events) {
+      const distanceM = metresBetween(here, { lat: item.lat, lon: item.lon })
+      if (distanceM > 6000) continue
+      const venue = noxia.find(building => building.id === item.tileEntityId)
+      list.push({ id: 'e:' + item.id, label: `${VENUE_EVENT_KINDS[item.kind]?.icon ?? '•'} ${eventLine(item, Date.now())} · ${item.venueName ?? 'Lokal'}`, distanceM, group: EVENTS_GROUP,
+        panel: venue ? { kind: 'building', at: { lat: venue.lat, lon: venue.lon }, title: venue.name, noxiaId: venue.id } : { kind: 'building', at: { lat: item.lat, lon: item.lon }, title: item.venueName ?? 'Lokal' } })
+    }
+    const rank = (group: string) => group === MEETING_GROUP ? 3 : group === EVENTS_GROUP ? 2 : group === WORSHIP_GROUP ? 1 : 0
     return list.sort((a, b) => rank(b.group) - rank(a.group) || a.group.localeCompare(b.group, 'de') || a.distanceM - b.distanceM)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting, view, earthWorship])
+  }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting, view, earthWorship, events])
   const groups = [...new Set(targets.map(target => target.group))]
+  // W-18: Zeichen über Lokalen mit laufender oder heute beginnender Veranstaltung (minütlich neu)
+  useEffect(() => {
+    if (!engineReady) return
+    const draw = () => {
+      const now = Date.now()
+      // je Lokal nur die nächste Veranstaltung
+      const seen = new Set<string>()
+      const marks = (upcoming(events, now, 50) as typeof events).filter(item => !seen.has(item.tileEntityId) && seen.add(item.tileEntityId)).map(item => ({
+        id: item.id, lat: item.lat, lon: item.lon, running: eventRunning(item, now),
+        text: `${VENUE_EVENT_KINDS[item.kind]?.icon ?? '•'} ${eventRunning(item, now) ? 'jetzt' : whenText(item.startsAt, now).replace(/^heute /, '')}`,
+      }))
+      engineReady.setEventMarks(marks)
+    }
+    draw()
+    const timer = setInterval(draw, 60_000)
+    return () => clearInterval(timer)
+  }, [engineReady, events])
   const home = noxia.find(building => building.own) ?? null
   const nearestMeeting = here ? nearestMeetingPlace(meeting, here) : null
   // Läuft in der Nähe (bis 6 km) ein Gottesdienst oder Gebet? Dann ein Knopf dorthin.

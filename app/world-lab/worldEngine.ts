@@ -166,6 +166,8 @@ export interface WorldEngine {
   setLandPreview: (ring: GeoPoint[] | null, ok: boolean) => void
   /** Beschriftung an/aus: Straßennamen, Orte aus OSM ohne Funktion */
   setView: (view: ViewOptions) => void
+  /** W-18: Veranstaltungen als Zeichen über dem Lokal (Zeichen und Uhrzeit, immer sichtbar). */
+  setEventMarks: (marks: Array<{ id: string; lat: number; lon: number; text: string; running: boolean }>) => void
   destroy: () => void
 }
 
@@ -311,9 +313,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const ownedLayer = new PIXI.Container()
   // Symbole öffentlicher Gebäude (W-7): in jeder Zoomstufe sichtbar, gleich groß auf dem Bildschirm.
   const marks = new PIXI.Container({ isRenderGroup: true })
+  // W-18: Veranstaltungen – eigene Ebene, damit placeSigns sie nicht wegräumt
+  const eventLayer = new PIXI.Container()
   // Begegnungsstätten (Omnizedenz, 28.10.2026): eigene Plaketten, ebenfalls in jeder Zoomstufe.
   const beacons = new PIXI.Container({ isRenderGroup: true })
-  world.addChild(ground, lines, overlay, objects, labels, marks, beacons)
+  world.addChild(ground, lines, overlay, objects, labels, marks, beacons, eventLayer)
   app.stage.addChild(world)
 
   const player = { ...toWorld(startGeo) }
@@ -1871,6 +1875,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     zoom = Math.max(zoom, minZoom())
     labels.visible = zoom >= LABEL_MIN_ZOOM
     for (const mark of marks.children) mark.scale.set(2.2 / zoom)
+    for (const mark of eventLayer.children) mark.scale.set(2.2 / zoom)
     for (const beacon of beacons.children) beacon.scale.set(2.6 / zoom)
     poiLabels.visible = zoom >= 2.4 && view.osmPlaces
     parcelLayer.visible = zoom >= 2.2
@@ -2007,6 +2012,23 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     parcelIdAt(at) { return parcelAtWorld(toWorld(at)) },
     tileReadyAt(at) { const p = toWorld(at); return tileDoneAt(p.x, p.y) },
     setView(next) { view = { ...next }; applyView() },
+    setEventMarks(list) {
+      for (const old of eventLayer.removeChildren()) old.destroy({ children: true })
+      for (const item of list) {
+        const p = toWorld({ lat: item.lat, lon: item.lon })
+        const at = iso(p.x, p.y, 16)
+        const mark = new PIXI.Container()
+        const text = new PIXI.Text({ text: item.text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: 0xfff4d6 } })
+        text.anchor.set(0.5, 0.5); text.scale.set(0.13)
+        const w = text.width + 3, h = text.height + 1.6
+        const plate = new PIXI.Graphics()
+        plate.roundRect(-w / 2, -h / 2, w, h, 1.4).fill({ color: item.running ? 0x8a2f52 : 0x4a2f6a, alpha: 0.95 }).stroke({ width: 0.5, color: 0xf0c96a })
+        mark.addChild(plate, text)
+        mark.position.set(at.x, at.y)
+        mark.scale.set(2.2 / zoom)
+        eventLayer.addChild(mark)
+      }
+    },
     roadAngleAt(at) {
       const p = toWorld(at)
       let best: { d: number; angle: number } | null = null
