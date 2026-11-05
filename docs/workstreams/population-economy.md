@@ -962,3 +962,14 @@ Thomas, 04.11.2026, auf die Frage, ob Figuren tanzen, mit Werkzeug arbeiten und 
    - Erst nach eurer Regel bauen wir ein Eingreifen im Lokal: dazwischengehen, Türsteher holen, gehen.
 4. Ereignisse bitte in die tägliche Auswertung (R-30), damit sichtbar ist, wo es kracht.
 
+### R-33 (Gastronomie, 05.11.2026): Bewohner gehen zu Veranstaltungen
+
+Thomas, 04.11.2026: Mechaniken aus Second Life übernehmen, „alles nacheinander“.
+
+**Neu:** Eigentümer kündigen Veranstaltungen an, in echter Uhrzeit, damit sich Spieler verabreden können. Gespeichert in `venue_events`: `kind` `dj`, `konzert`, `lesung`, `quiz`, `feier` oder `stammtisch`, dazu `title`, `note`, `starts_at`, `ends_at` und `cancelled`. Das Lokal zeigt den Aushang, und die Figuren dort wissen davon (`eventFacts`).
+
+**Bitte:**
+1. Bewohner, die so etwas mögen, planen den Besuch ein und kommen zur angekündigten Zeit: zum Konzert, zur Lesung, zum Quiz. Die Zahl der Gäste steigt dann sichtbar.
+2. Sie erzählen vorher davon („Gehst du heute auch zum Quiz ins Metropol?“) und erinnern sich danach daran.
+3. Abgesagte Termine (`cancelled`) bitte nicht mehr berücksichtigen.
+

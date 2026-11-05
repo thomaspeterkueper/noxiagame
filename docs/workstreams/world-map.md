@@ -708,3 +708,13 @@ Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „g
 - **Offen für die Erdkarte:**
   - Arbeit auf der Karte sichtbar machen (Posen `haemmern`, `hacken`, `schaufeln`, `tragen` an Arbeitsorten, `pose`-Eigenschaft von `WalkableActor`);
   - Leistung messen, wenn viele Figuren gleichzeitig laufen; bei Bedarf Bilder zwischenspeichern.
+
+### W-18 (Gastronomie, 05.11.2026): „Was ist los?“ auf der Karte
+
+Seit 05.11.2026 gibt es Veranstaltungen in Lokalen (`venue_events`, `/api/game/hospitality/events`): DJ-Abend, Konzert, Lesung, Quiz, Feier, Stammtisch.
+
+**Bitte:**
+- Lokale mit laufender oder bald beginnender Veranstaltung auf der Karte kennzeichnen, z. B. mit dem Zeichen der Art (🎧 📖 ❓ …) und der Uhrzeit.
+- Optional eine Liste „Was ist los?“ in der Nähe.
+- Die Typen sind in `lib/game/hospitality/venueEvents.ts`; `upcoming()` und `eventLine()` lassen sich direkt verwenden.
+

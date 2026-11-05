@@ -204,6 +204,13 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Gespeichert wird alles mit Reichweite und Standort (`player_room_messages.range`, `to_profile_id`, `pos_x`, `pos_y`). Der Verlauf zeigt fremdes Geflüster nicht.
   - Im Browser geprüft.
 
+- **05.11.2026 – Veranstaltungen (Second Life, Teil 5):**
+  - Tabelle `venue_events` (Thomas bestätigt) und `/api/game/hospitality/events`.
+  - Der Eigentümer kündigt DJ-Abend, Konzert, Lesung, Quiz, Feier oder Stammtisch an (echte Uhrzeit, höchstens zehn Termine, zwei Monate im Voraus) und kann absagen.
+  - Im Lokal hängt der Aushang, dazu „Was ist los? · anderswo“.
+  - Die Figuren wissen davon: Das Personal kennt das Programm, Gäste wissen, was gerade läuft, und kennen die nächste Ankündigung.
+  - Tests; im Browser geprüft. Bewohner kommen zu Veranstaltungen: R-33; Karte: W-18.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -222,6 +229,8 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-33** (05.11.2026): Bewohner gehen zu Veranstaltungen – `population-economy.md`.
+- **W-18** (05.11.2026): „Was ist los?“ auf der Karte – `world-map.md`.
 - **R-32** (04.11.2026): Streit, Rangelei und Kampf – mit Folgen – `population-economy.md`.
 - **P-3** (04.11.2026): Haltung zu Streit und Gewalt – NPC-Religion.
 - **W-17** (04.11.2026): Kiesel-Figuren auf der Karte – `world-map.md`.

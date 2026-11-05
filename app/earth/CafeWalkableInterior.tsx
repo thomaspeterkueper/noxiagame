@@ -7,6 +7,8 @@
 // Gäste aus echten Käufen, Karte und Bestellen, Zimmer, Wissen des Personals.
 // Bewegung, Personen, Gespräch und Tafel liefert der Motor.
 
+import VenueEvents, { useVenueEvents } from './VenueEvents'
+import { eventFacts } from '@/lib/game/hospitality/venueEvents'
 import { incidentAt, incidentFacts, incidentNotice, incidentPose, incidentRunning, type VenueIncident } from '@/lib/game/hospitality/venueIncident'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import HospitalityItemIcon from './HospitalityItemIcon'
@@ -88,6 +90,8 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   // Beerdigungskaffee (R-23 Punkt 6), wenn Population einen für dieses Lokal angesetzt hat.
   const[reception,setReception]=useState<FuneralReception|null>(null)
   const[incident,setIncident]=useState<{at:VenueIncident;tick:number}|null>(null)
+  // Veranstaltungen (Second Life, Teil 5): Aushang, „Was ist los?“, Wissen der Figuren.
+  const venueEvents=useVenueEvents(entityId)
   const[displayName,setDisplayName]=useState<string|null>(null)
   const[placeKnowledge,setPlaceKnowledge]=useState<string[]>([])
   const[visits,setVisits]=useState<Visit[]>([])
@@ -514,7 +518,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
-      occasionFacts:[...incidentFacts(incident?.at??null,self.id,incident?.tick??0,Object.fromEntries(ctx.shown.map(e=>[e.resident.id,personSceneLabel(e.resident)]))),...familyFacts({selfIsMinor:isMinor(ctx.shown.find(e=>e.resident.id===self.id)?.resident),staff:self.roomRole==='staff',minorsPresent:ctx.shown.filter(e=>isMinor(e.resident)).length}),...(ctx.companion?companionFacts({role:ctx.companion.id===self.id?'companion':self.roomRole==='staff'?'staff':'guest',companionLabel:ctx.companion.label,plan:ctx.companion.plan,sittingTogether:Boolean(ctx.seat)}):[]),...receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')})],
+      occasionFacts:[...eventFacts(venueEvents.events,self.roomRole==='staff',Date.now()),...incidentFacts(incident?.at??null,self.id,incident?.tick??0,Object.fromEntries(ctx.shown.map(e=>[e.resident.id,personSceneLabel(e.resident)]))),...familyFacts({selfIsMinor:isMinor(ctx.shown.find(e=>e.resident.id===self.id)?.resident),staff:self.roomRole==='staff',minorsPresent:ctx.shown.filter(e=>isMinor(e.resident)).length}),...(ctx.companion?companionFacts({role:ctx.companion.id===self.id?'companion':self.roomRole==='staff'?'staff':'guest',companionLabel:ctx.companion.label,plan:ctx.companion.plan,sittingTogether:Boolean(ctx.seat)}):[]),...receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')})],
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
       entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
       playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):venueReferralFacts(referral,self.roomRole==='staff',false)[0]??null,
@@ -540,7 +544,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     floorMood:layout.danceFloor&&(shift?.role==='dj'||music!=='House')?music.toLowerCase():null,
     gate:layout.entry?{open:entryPaid||Boolean(shift),blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,
     sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:serviceRules.toilet.priceCredits>0?'Zur Toilette ('+serviceRules.toilet.priceCredits+' Cr)':'Zur Toilette',useLabel:serviceRules.toilet.priceCredits>0?'WC BENUTZEN · '+serviceRules.toilet.priceCredits+' CR':'WC BENUTZEN',use:ctx=>void payToilet(ctx)},
-    renderOffer:ctx=>shift?<>{renderIncident()}{renderShift(ctx)}</>:<>{renderIncident()}{renderReception(ctx)}{customerOffer(ctx)}{renderJobs(ctx)}{houseMenu&&!underConversion&&!emptyHouse&&<VenueHouseRules key={menuVersion} tileEntityId={entityId} items={houseMenu} toilet={serviceRules.toilet} onSaved={text=>{ctx.setStatus(text);setMenuVersion(v=>v+1)}}/>}</>,
+    renderOffer:ctx=>shift?<>{renderIncident()}{renderShift(ctx)}</>:<>{renderIncident()}{renderReception(ctx)}{customerOffer(ctx)}{renderJobs(ctx)}{!underConversion&&!emptyHouse&&<VenueEvents tileEntityId={entityId} data={venueEvents} onStatus={ctx.setStatus}/>}{houseMenu&&!underConversion&&!emptyHouse&&<VenueHouseRules key={menuVersion} tileEntityId={entityId} items={houseMenu} toilet={serviceRules.toilet} onSaved={text=>{ctx.setStatus(text);setMenuVersion(v=>v+1)}}/>}</>,
   }
 
   return <WalkableInterior entityId={entityId} buildingName={houseName||buildingName} companion={companion} companionHistory={companionHistory} onClose={onClose} fitting={fitting} onContext={ctx=>{ctxRef.current=ctx}}/>
