@@ -754,7 +754,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {landmark.kind === 'station' && landmarkNear
         ? <div className="row"><span>Du stehst am Bahnhof – von hier fahren Züge weiter.</span><button onClick={() => setPanel({ kind: 'travel', at: landmark.at })}>Reise buchen</button></div>
         : room && landmarkNear
-        ? <div className="row"><span>{room === 'cemetery' ? 'Du stehst am Friedhof.' : 'Du stehst davor.'}</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>{room === 'cemetery' ? 'Friedhof betreten' : 'Betreten'}</button></div>
+        ? <><div className="row"><span>{room === 'cemetery' ? 'Du stehst am Friedhof.' : 'Du stehst davor.'}</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>{room === 'cemetery' ? 'Friedhof betreten' : 'Betreten'}</button></div>
+          {room === 'cemetery' && landmark.tags.chapel_name && <div className="row"><span>Auf dem Friedhof: {landmark.tags.chapel_name}</span><button onClick={() => enterLandmark('worship', { at: { lat: Number(landmark.tags.chapel_lat), lon: Number(landmark.tags.chapel_lon) }, name: landmark.tags.chapel_name, kind: 'place_of_worship', tags: { religion: 'christian', building: 'chapel' } }, landmark.tags.chapel_source || undefined)}>{landmark.tags.chapel_name} betreten</button></div>}</>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}

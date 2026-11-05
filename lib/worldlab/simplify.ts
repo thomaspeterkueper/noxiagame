@@ -6,6 +6,7 @@
 // Koordinaten in der Kachel: Meter am Boden, x nach Osten, y nach Süden,
 // gemessen ab der Nordwestecke der Kachel.
 
+import { knownPlaceName } from './placeNames'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from './mercator'
 import { buildingUseCode } from './buildingUse'
 import { nearestRoadAngle, octagonRing, worshipMassing, type WorshipMassing } from './worshipShapes'
@@ -439,6 +440,7 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
       if (street && number) block.h = `${street} ${number}`.slice(0, 80)
       else if (number) block.h = number.slice(0, 20)
       if (typeof properties.name === 'string' && properties.name.trim()) block.nm = properties.name.trim().slice(0, 80)
+      else if (knownPlaceName(properties.noxia_source_id)) block.nm = knownPlaceName(properties.noxia_source_id)
       if (typeof properties.noxia_source_id === 'string' && properties.noxia_source_id.startsWith('osm:')) block.i = properties.noxia_source_id.slice(0, 40)
       const use = buildingUseCode(properties)
       if (use) block.u = use

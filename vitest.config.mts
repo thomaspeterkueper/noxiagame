@@ -39,6 +39,7 @@ export default defineConfig({
       'lib/game/spatial/localSceneRuntime.test.ts',
       'lib/worldlab/simplify.test.ts',
       'lib/worldlab/reanchor.test.ts',
+      'lib/worldlab/placeAreas.test.ts',
       'lib/worldlab/earthNames.test.ts',
       'lib/worldlab/viewOptions.test.ts',
       'lib/worldlab/landPlot.test.ts',

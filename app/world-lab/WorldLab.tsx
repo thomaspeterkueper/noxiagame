@@ -553,6 +553,26 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       } catch (reason) { console.error('[world-lab] Linien', reason) }
     })()
   }, [hud, engineReady])
+  // W-13: Friedhofsflächen der Zelle einmal nachholen (fehlten in Sundern ganz)
+  const areaCells = useRef(new Set<string>())
+  useEffect(() => {
+    if (!hud || !engineReady) return
+    const here = { lat: hud.lat, lon: hud.lon }
+    const cell = parcelCell(here)
+    if (areaCells.current.has(cell.key)) return
+    areaCells.current.add(cell.key)
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        const response = await fetch('/api/world-lab/areas', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(here) })
+        const json = await response.json().catch(() => null)
+        // Neue Flächen: Regionsdaten auf dem Server neu lesen (fresh), dann die Kacheln neu
+        if (json?.ok && !json.cached && json.areas > 0) { fresh.current = String(Date.now()); engineReady.reloadTiles() }
+        if (json && json.ok === false) console.error('[world-lab] Friedhöfe', json.error)
+      } catch (reason) { console.error('[world-lab] Friedhöfe', reason) }
+    })()
+  }, [hud, engineReady])
 
   // Flurstücke (Länder mit offenem Kataster): Zelle um die Figur einmal je Besuch holen lassen; neue Daten → Kacheln neu.
   const parcelCells = useRef(new Set<string>())

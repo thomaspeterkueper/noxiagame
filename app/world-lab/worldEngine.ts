@@ -1669,17 +1669,29 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     ownedLayer.addChild(g)
     entry.owned = g
   }
-  /** Name des Friedhofs an einem Weltpunkt (nur geladene Kacheln), sonst null. */
-  function cemeteryAtWorld(p: { x: number; y: number }): string | null {
+  /** Friedhof an einem Weltpunkt (nur geladene Kacheln): Name und seine Flächen in den Nachbarkacheln. */
+  function cemeteryAtWorld(p: { x: number; y: number }): { name: string; rings: Array<Array<{ x: number; y: number }>> } | null {
     const tx = anchorTile.x + Math.floor(p.x / tileSizeM), ty = anchorTile.y + Math.floor(p.y / tileSizeM)
-    const entry = loaded.get(tileKey({ x: tx, y: ty }))
-    for (const area of entry?.data.areas ?? []) {
-      if (area.k !== 'cemetery') continue
-      const ring: Array<{ x: number; y: number }> = []
-      for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: entry!.ox + area.p[i], y: entry!.oy + area.p[i + 1] })
-      if (insidePolygon(p, ring)) return area.n ?? 'Friedhof'
+    const ringsOf = (entry: Loaded | undefined, name: string | null) => (entry?.data.areas ?? [])
+      .filter(area => area.k === 'cemetery' && (name === null || (area.n ?? 'Friedhof') === name))
+      .map(area => { const ring: Array<{ x: number; y: number }> = []; for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: entry!.ox + area.p[i], y: entry!.oy + area.p[i + 1] }); return { ring, name: area.n ?? 'Friedhof' } })
+    const hit = ringsOf(loaded.get(tileKey({ x: tx, y: ty })), null).find(item => insidePolygon(p, item.ring))
+    if (!hit) return null
+    const rings: Array<Array<{ x: number; y: number }>> = []
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) for (const item of ringsOf(loaded.get(tileKey({ x: tx + dx, y: ty + dy })), hit.name)) rings.push(item.ring)
+    return { name: hit.name, rings }
+  }
+  /** Kapelle (Blockart Kirche) auf dem Friedhof oder bis 25 m an seinem Rand. */
+  function chapelAtCemetery(rings: Array<Array<{ x: number; y: number }>>): { name: string; source?: string; at: GeoPoint } | null {
+    let best: { name: string; source?: string; at: GeoPoint; d: number } | null = null
+    for (const entry of loaded.values()) for (const block of entry.data.blocks) {
+      if (block.k !== 'church') continue
+      const c = { x: entry.ox + block.x, y: entry.oy + block.y }
+      const d = rings.some(ring => insidePolygon(c, ring)) ? 0 : Math.min(...rings.map(ring => distanceToRing(c, ring)))
+      if (d > 25 || (best && best.d <= d)) continue
+      best = { name: block.nm ?? 'Friedhofskapelle', source: block.i, at: toGeo(c), d }
     }
-    return null
+    return best ? { name: best.name, source: best.source, at: best.at } : null
   }
   /** Flurstück an einem Weltpunkt (nur geladene Kacheln). */
   function parcelAtWorld(p: { x: number; y: number }): string | null {
@@ -1873,7 +1885,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const groundX = (u + v / ISO_Y) / 2, groundY = (v / ISO_Y - u) / 2
     // W-13: Friedhofsfläche – öffnet „Friedhof betreten“ mit dem Namen aus OSM
     const cemetery = cemeteryAtWorld({ x: groundX, y: groundY })
-    if (cemetery) { options.onPick({ type: 'landmark', landmark: { at: toGeo({ x: groundX, y: groundY }), name: cemetery, kind: 'cemetery', tags: {} } }); return }
+    if (cemetery) {
+      // Kapelle oder Trauerhalle auf dem Friedhof (oder bis 25 m davor) – eigener Raum (05.11.2026)
+      const chapel = chapelAtCemetery(cemetery.rings)
+      const tags: Record<string, string> = chapel ? { chapel_name: chapel.name, chapel_source: chapel.source ?? '', chapel_lat: String(chapel.at.lat), chapel_lon: String(chapel.at.lon) } : {}
+      options.onPick({ type: 'landmark', landmark: { at: toGeo({ x: groundX, y: groundY }), name: cemetery.name, kind: 'cemetery', tags } })
+      return
+    }
     const parcel = parcelAtWorld({ x: groundX, y: groundY })
     options.onPick(parcel ? { type: 'parcel', id: parcel, at: toGeo({ x: groundX, y: groundY }) } : { type: 'ground', at: toGeo({ x: groundX, y: groundY }) })
   }
