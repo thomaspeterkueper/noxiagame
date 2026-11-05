@@ -34,3 +34,28 @@ export function prepareRoomMessage(raw: string): PreparedMessage | null {
   if (topic === 'provocation') flags.push('provocation')
   return { text, shown, topic, flags }
 }
+
+// ── Flüstern, Sagen, Rufen (05.11.2026, Second-Life-Mechanik) ──────────────
+// Flüstern geht nur an einen Spieler (privat zugestellt), Sagen hört, wer in der
+// Nähe steht, Rufen der ganze Raum. Gespeichert wird alles (Testphase).
+
+export type ChatRange = 'whisper' | 'say' | 'shout'
+export const CHAT_RANGES: readonly ChatRange[] = ['whisper', 'say', 'shout']
+/** Reichweite im Raum in Bildpunkten des Innenraums (760 × 470). */
+export const SAY_RANGE_PX = 300
+export const WHISPER_RANGE_PX = 80
+
+export interface HeardMessage { senderId: string; range?: ChatRange; toId?: string | null; x?: number | null; y?: number | null }
+
+/** Hört man die Nachricht dort, wo man steht? Eigene immer. */
+export function heardAt(m: HeardMessage, me: { id: string; x: number; y: number }): boolean {
+  if (m.senderId === me.id) return true
+  const range = m.range ?? 'say'
+  if (range === 'whisper') return m.toId === me.id
+  if (range === 'shout') return true
+  if (typeof m.x !== 'number' || typeof m.y !== 'number') return true
+  return Math.hypot(m.x - me.x, m.y - me.y) <= SAY_RANGE_PX
+}
+
+export const rangeLabel = (r: ChatRange | undefined) => r === 'whisper' ? 'flüstert' : r === 'shout' ? 'ruft' : 'sagt'
+

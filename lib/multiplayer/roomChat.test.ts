@@ -21,3 +21,17 @@ describe('prepareRoomMessage', () => {
     expect(prepareRoomMessage('a'.repeat(400))!.text.length).toBe(300)
   })
 })
+
+import { heardAt, rangeLabel } from './roomChat'
+describe('chat range', () => {
+  const me = { id: 'me', x: 100, y: 100 }
+  it('whisper only to the one meant, say nearby, shout everywhere', () => {
+    expect(heardAt({ senderId: 'a', range: 'whisper', toId: 'me' }, me)).toBe(true)
+    expect(heardAt({ senderId: 'a', range: 'whisper', toId: 'b' }, me)).toBe(false)
+    expect(heardAt({ senderId: 'a', range: 'say', x: 150, y: 120 }, me)).toBe(true)
+    expect(heardAt({ senderId: 'a', range: 'say', x: 600, y: 400 }, me)).toBe(false)
+    expect(heardAt({ senderId: 'a', range: 'shout', x: 600, y: 400 }, me)).toBe(true)
+    expect(heardAt({ senderId: 'me', range: 'whisper', toId: 'b' }, me)).toBe(true)
+    expect(rangeLabel('shout')).toBe('ruft')
+  })
+})

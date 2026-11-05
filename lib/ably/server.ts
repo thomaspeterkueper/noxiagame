@@ -96,6 +96,11 @@ export async function publishWorldUpdated(): Promise<void> {
 }
 
 // ── Raum-Chat: Nachricht eines Spielers an alle im Raum (04.11.2026) ─────────
-export async function publishRoomMessage(roomKey: string, data: { id: string; senderId: string; senderName: string; text: string; at: string }): Promise<void> {
+export type RoomMessageData = { id: string; senderId: string; senderName: string; text: string; at: string; range?: 'whisper' | 'say' | 'shout'; toId?: string | null; x?: number | null; y?: number | null; room?: string }
+export async function publishRoomMessage(roomKey: string, data: RoomMessageData): Promise<void> {
   await publish(ABLY_CHANNELS.room(roomKey), ABLY_EVENTS.room.message, data)
+}
+/** Flüstern: nur an den einen Spieler (sein privater Kanal), nicht in den Raum. */
+export async function publishWhisper(toProfileId: string, data: RoomMessageData): Promise<void> {
+  await publish(ABLY_CHANNELS.dm(toProfileId), ABLY_EVENTS.room.whisper, data)
 }

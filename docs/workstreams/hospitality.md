@@ -198,6 +198,12 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Bei einer Schicht kommt die Arbeitskleidung darüber.
   - Im Browser geprüft.
 
+- **05.11.2026 – Flüstern, Sagen, Rufen (Second Life, Teil 4):**
+  - Im Raum-Chat wählt man „Sagen“ (hören die in der Nähe, etwa zwei Fünftel des Raums) oder „Rufen“ (der ganze Raum).
+  - Flüstern geht über den eigenen Ably-Kanal nur an den einen Spieler; wer zu weit weg steht, geht erst hin.
+  - Gespeichert wird alles mit Reichweite und Standort (`player_room_messages.range`, `to_profile_id`, `pos_x`, `pos_y`). Der Verlauf zeigt fremdes Geflüster nicht.
+  - Im Browser geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

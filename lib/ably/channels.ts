@@ -29,5 +29,5 @@ export const ABLY_EVENTS = {
   world:       { updated: 'world.updated' },
   dm:          { message: 'dm.message' },
   chat:        { read: 'chat.read' },
-  room:        { message: 'room.message' },
+  room:        { message: 'room.message', whisper: 'room.whisper' },
 } as const

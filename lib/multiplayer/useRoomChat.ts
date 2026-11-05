@@ -11,7 +11,7 @@ import { getSessionInfo } from '@/lib/supabase/auth'
 import { useAblyChannel } from '@/lib/ably/client'
 import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 
-export interface RoomMessage { id: string; senderId: string; senderName: string; text: string; at: string }
+export interface RoomMessage { id: string; senderId: string; senderName: string; text: string; at: string; range?: 'whisper' | 'say' | 'shout'; toId?: string | null; x?: number | null; y?: number | null; room?: string }
 
 async function post(body: Record<string, unknown>, keepalive = false) {
   const { token } = await getSessionInfo()
@@ -20,7 +20,7 @@ async function post(body: Record<string, unknown>, keepalive = false) {
   return { ok: response.ok, data: await response.json().catch(() => ({})) }
 }
 
-export function useRoomChat(room: string | null, roomName: string, peers: number) {
+export function useRoomChat(room: string | null, roomName: string, peers: number, myId: string | null = null) {
   const [messages, setMessages] = useState<RoomMessage[]>([])
   const peersRef = useRef(peers)
   peersRef.current = peers
@@ -47,12 +47,17 @@ export function useRoomChat(room: string | null, roomName: string, peers: number
     const m = data as RoomMessage
     if (m && typeof m.id === 'string' && typeof m.text === 'string') add(m)
   })
+  // Geflüstertes kommt über den eigenen Kanal – nur, wenn es in diesem Raum gesagt wurde.
+  useAblyChannel(room && myId ? ABLY_CHANNELS.dm(myId) : '', ABLY_EVENTS.room.whisper, data => {
+    const m = data as RoomMessage
+    if (m && typeof m.id === 'string' && typeof m.text === 'string' && m.room === room) add(m)
+  })
 
   return {
     messages,
-    async say(text: string): Promise<{ ok: boolean; error?: string; cleaned?: boolean }> {
+    async say(text: string, opts: { range?: 'whisper' | 'say' | 'shout'; toProfileId?: string; x?: number; y?: number } = {}): Promise<{ ok: boolean; error?: string; cleaned?: boolean }> {
       if (!room) return { ok: false }
-      const r = await post({ action: 'say', room, roomName, text, peers: peersRef.current }).catch(() => null)
+      const r = await post({ action: 'say', room, roomName, text, peers: peersRef.current, ...opts }).catch(() => null)
       if (!r) return { ok: false, error: 'Keine Verbindung.' }
       if (!r.ok) return { ok: false, error: String(r.data.error ?? 'Nicht gesendet.') }
       if (r.data.message) add(r.data.message)
