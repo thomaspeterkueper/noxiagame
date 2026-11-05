@@ -43,7 +43,7 @@ export default function ConversationReport({ npcId, compact = false }: { npcId?:
   const muted = { fontSize: compact ? 9 : 10, color: '#8ea3ad', lineHeight: 1.4 }
   return <div style={{ marginTop: 4 }}>
     <p style={{ ...muted, margin: 0 }}>
-      Gespräche werden automatisch ausgewertet, kein Mensch liest sie.{' '}
+      Automatisch ausgewertet, kein Mensch liest mit – außer bei Verdacht auf reale Straftaten.{' '}
       {state === 'sent'
         ? <span>Danke – der Ausschnitt ist gemeldet.</span>
         : <button type="button" onClick={() => setOpen(v => !v)} style={{ ...muted, background: 'none', border: 0, padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>Gespräch melden</button>}

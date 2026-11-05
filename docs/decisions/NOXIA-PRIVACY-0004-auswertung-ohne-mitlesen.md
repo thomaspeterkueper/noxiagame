@@ -25,6 +25,11 @@ Wer weiß, dass mitgelesen wird, spricht nicht mehr authentisch. Für das Experi
 - **Melden:** `ConversationReport` unter jedem NPC-Gespräch, „melden“ neben Raum-Nachrichten. `/api/game/conversation-report` kopiert den Ausschnitt in `conversation_reports` (90 Tage). Nur diese Kopie ist für Admins lesbar; jeder Abruf landet in `admin_conversation_read_audit`.
 - **Hinweis:** `/testbetrieb`, Dashboard-Hinweis und Zeile unter jedem Gespräch.
 
+## Ergänzungen
+
+- [NOXIA-SAFETY-0001](NOXIA-SAFETY-0001-schutzfilter-realwelt.md): einzige Ausnahme von „kein Mensch liest mit“ – vom Schutzfilter gesicherte Ausschnitte bei Verdacht auf reale Straftaten.
+- [NOXIA-LEARN-0001](NOXIA-LEARN-0001-npcs-lernen-von-spielern.md): Figuren lernen aus Aussagen über die Welt; gestuftes Vergessen statt 14 Tagen.
+
 ## Offen
 
 - Rechtliche Prüfung der Formulierungen, besonders bei Schulen und Minderjährigen.

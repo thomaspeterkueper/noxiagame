@@ -1,5 +1,6 @@
 // app/api/game/room-chat/route.ts
-// Erstellt: 04.11.2026 — Spieler reden im Raum miteinander; alles wird für die Auswertung gespeichert
+// Erstellt: 04.11.2026 — Spieler reden im Raum miteinander; automatische Auswertung (NOXIA-PRIVACY-0004)
+// 05.11.2026 — Schutzfilter für Realwelt-Kriminalität (NOXIA-SAFETY-0001)
 // GET  ?room=… → { messages: [{ id, senderId, senderName, text, at }] } (letzte 30 Minuten)
 // POST { action: 'say', room, roomName, text, peers, range, toProfileId, x, y } → speichern; Sagen/Rufen an den Raum,
 //      Flüstern nur an den einen Spieler (05.11.2026)
@@ -13,6 +14,8 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { prepareRoomMessage, ROOM_MESSAGES_PER_MINUTE } from '@/lib/multiplayer/roomChat'
 import { publishRoomMessage, publishWhisper } from '@/lib/ably/server'
 import { CHAT_RANGES, type ChatRange } from '@/lib/multiplayer/roomChat'
+import { assessRealWorldRisk, riskFlags } from '@/lib/game/safety/realWorldRisk'
+import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 
 const ROOM_RE = /^[A-Za-z0-9:_-]{3,80}$/
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -73,6 +76,31 @@ export async function POST(req: NextRequest) {
     range, to_profile_id: toId, pos_x: posX, pos_y: posY,
   }).select('id,created_at').single()
   if (error || !row) return NextResponse.json({ error: 'Nicht gesendet.' }, { status: 500 })
+
+  // Schutzfilter (NOXIA-SAFETY-0001): die Nachricht im Zusammenhang der letzten
+  // 30 Minuten bewerten – beim Flüstern beide Seiten, sonst die eigenen Nachrichten.
+  // Die Nachricht wird trotzdem zugestellt; bei Verdacht wird der Ausschnitt gesichert.
+  try {
+    const since = new Date(Date.now() - 30 * 60_000).toISOString()
+    let windowQuery = supabase.from('player_room_messages').select('sender_id,sender_name,text,created_at')
+      .eq('room_key', room).gte('created_at', since).order('created_at', { ascending: false }).limit(10)
+    windowQuery = range === 'whisper'
+      ? windowQuery.eq('range', 'whisper').or(`and(sender_id.eq.${profileId},to_profile_id.eq.${toId}),and(sender_id.eq.${toId},to_profile_id.eq.${profileId})`)
+      : windowQuery.eq('sender_id', profileId)
+    const { data: window } = await windowQuery
+    const lines = (window ?? []).reverse()
+    const risk = assessRealWorldRisk(lines.map(l => String(l.text)))
+    if (risk.level !== 'none') {
+      const flags = [...new Set([...prepared.flags.filter(f => !f.startsWith('risk:')), ...riskFlags(risk)])]
+      await supabase.from('player_room_messages').update({ flags }).eq('id', row.id)
+    }
+    if (risk.level === 'suspect') await secureSuspicion(supabase, {
+      subjectProfileId: profileId, source: 'room', risk, roomKey: room, locationName: roomName,
+      excerpt: lines.map(l => ({ speaker: String(l.sender_name), text: String(l.text), at: String(l.created_at) })),
+    })
+  } catch (safetyError) {
+    console.error('[safety] room assessment failed', safetyError instanceof Error ? safetyError.message : safetyError)
+  }
   const message = { id: String(row.id), senderId: profileId, senderName, text: prepared.shown, at: String(row.created_at), range, toId, x: posX, y: posY, room }
   if (range === 'whisper') await publishWhisper(toId!, message)
   else await publishRoomMessage(room, message)
