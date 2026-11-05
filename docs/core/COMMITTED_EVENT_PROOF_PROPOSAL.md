@@ -71,3 +71,45 @@ Reviewed `docs/core/CORE_CONTRACT.md`, `docs/core/TIME_TICK_EVENT_REPLAY_MAP.md`
 **Decision gate C — reader:** a trusted server reader must join the event to its authoritative domain transition, verify authorization and settlement/asset identity, and only then emit a canonical receipt. The current adapter remains an untrusted-shape validator; `committed: true` is not evidence. Missing verification must fail closed.
 
 **Test gate:** before changing adapter sorting, add concurrency tests where transaction A obtains a candidate ordering value, B commits first, then A commits; plus same-timestamp contradictory building transitions, retry after rollback, and mismatched domain references. Until a concrete backend and transaction harness are available, these remain **specified but unexecuted** integration tests, not passed tests.
+
+## Read-only schema audit procedure (2026-11-05)
+
+**Scope:** staging or a read-only database connection only. This is an audit plan, **not** evidence that the queries were executed. No DDL/DML or commit-order inference from IDs/timestamps.
+
+```sql
+-- Actual event/projection columns, types, nullability and defaults.
+SELECT table_schema, table_name, ordinal_position, column_name, data_type,
+       is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name IN ('simulation_events', 'entity_states', 'tick_log')
+ORDER BY table_schema, table_name, ordinal_position;
+
+-- Actual primary/unique/foreign-key constraints.
+SELECT n.nspname AS schema_name, c.relname AS table_name,
+       con.conname AS constraint_name, con.contype,
+       pg_get_constraintdef(con.oid) AS definition
+FROM pg_constraint con
+JOIN pg_class c ON c.oid = con.conrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relname IN ('simulation_events', 'entity_states', 'tick_log')
+ORDER BY n.nspname, c.relname, con.conname;
+
+-- Trigger definitions and row-level-security posture.
+SELECT n.nspname AS schema_name, c.relname AS table_name,
+       c.relrowsecurity AS rls_enabled, c.relforcerowsecurity AS rls_forced,
+       t.tgname AS trigger_name, pg_get_triggerdef(t.oid) AS trigger_definition
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_trigger t ON t.tgrelid = c.oid AND NOT t.tgisinternal
+WHERE c.relname IN ('simulation_events', 'entity_states', 'tick_log')
+ORDER BY n.nspname, c.relname, t.tgname;
+
+-- Reader access and policy review.
+SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE tablename IN ('simulation_events', 'entity_states', 'tick_log')
+ORDER BY schemaname, tablename, policyname;
+```
+
+**Review outputs:** map each authoritative command to its owning table/function, lock discipline, actor authorization, audit trigger, idempotency key and independently verifiable event link. Store potentially sensitive schema details in restricted engineering review, not public NPC/player history. A successful join or read permission alone does not prove authorization.
+
+**Stop conditions:** without a persisted proof binding an event to a successful authorized domain transition, or without proven causal order for contradictory same-asset changes, the projection stays unverified. Never substitute `occurred_at`, legacy `sequence`, `tick`, or lexicographic IDs as proof.
