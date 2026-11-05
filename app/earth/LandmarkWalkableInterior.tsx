@@ -27,10 +27,9 @@ import {
   type LandmarkRoomKind,
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
-import { LIBRARY_BOOKS, LIBRARY_SHELVES, RESONANCE_READING_IDS, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
-import { READING_TEXTS } from '@/lib/game/landmarks/readingTexts'
-import { THEOLOGICAL_ESSAYS } from '@/lib/game/landmarks/theologicalEssays'
-import { IDENTITY_BOOK } from '@/lib/game/landmarks/identityBook'
+import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import type { ReadingDocument } from '@/lib/game/readings/types'
+import ResonanceShelf from './ResonanceShelf'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 import { isRoundKind, roundKeyOf } from '@/lib/game/rounds/roundTalk'
@@ -180,7 +179,6 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   // Vorlesen: der zuletzt gelesene Abschnitt steht als Text da, die Sprachausgabe liest ihn mit.
   const [reading, setReading] = useState<{ bookId: string; offset: number; text: string; done: boolean } | null>(null)
   const [bookId, setBookId] = useState('')
-  const [readingPart, setReadingPart] = useState<number | null>(null)
   const [talking, setTalking] = useState(false)
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
@@ -245,9 +243,28 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { readerPosRef.current = readerPos }, [readerPos])
   useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
   const isResonanceReading = kind === 'resonance_place'
-  const resonanceBooks = [...LIBRARY_BOOKS.filter(entry => (RESONANCE_READING_IDS as readonly string[]).includes(entry.id)), IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS]
-  const book = (isResonanceReading ? resonanceBooks : [...LIBRARY_BOOKS, IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS]).find(entry => entry.id === bookId) ?? null
-  const readingText = isResonanceReading && book ? READING_TEXTS[book.id] : undefined
+  // Begegnungsstätte: das Regal (ResonanceShelf) holt die Schriften aus buecherwelten; hier nur die Bibliothek.
+  const book = isResonanceReading ? null : LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
+  const [resonanceActive, setResonanceActive] = useState(false)
+  // Vorlesen in der Bibliothek: freigegebener Wortlaut aus buecherwelten, sonst der Klappentext.
+  const [heldDoc, setHeldDoc] = useState<ReadingDocument | null>(null)
+  useEffect(() => {
+    if (!isLibrary || !held) return
+    const slug = held.id.split(':')[1]
+    if (!slug) return
+    let live = true
+    void (async () => {
+      const { token } = await getSessionInfo()
+      for (const kind of ['work', 'text']) {
+        const response = await fetch(`/api/game/readings?book=${kind}:${slug}`, { headers: { Authorization: 'Bearer ' + token } })
+        if (!response.ok) continue
+        const json = await response.json().catch(() => null) as { document?: ReadingDocument } | null
+        if (live && json?.document) setHeldDoc(json.document)
+        return
+      }
+    })().catch(() => { /* dann liest Mira den Klappentext */ })
+    return () => { live = false }
+  }, [isLibrary, held])
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
   // Gastraum: Gäste entscheiden selbst, wo sie sind, und wechseln alle paar Minuten.
@@ -512,7 +529,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   /** Mira liest vor: freie Lesefassung Abschnitt für Abschnitt, sonst den Klappentext. */
   function readAloud() {
     if (!held) return
-    const source = readingSource(held)
+    const source = readingSource(held, heldDoc && heldDoc.slug === held.id.split(':')[1] ? heldDoc : null)
     const offset = reading?.bookId === held.id && !reading.done ? reading.offset : 0
     const part = nextReadingChunk(source.text, offset)
     setReading({ bookId: held.id, offset: part.next, text: part.chunk, done: part.done })
@@ -695,29 +712,16 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           <div className="chat"><textarea value={message} rows={3} maxLength={500} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
           <ConversationReport npcId={partner ? partner.person.id : undefined}/>
         </>}
-        {!talkingNow && resonanceShelfOpen && !book && <div className="book">
-          <b>Philosophie · Lesen & denken</b>
-          <p>Alle philosophischen Werke sind frei lesbar. Volltexte sind dort verfügbar, wo eine überprüfte Manuskriptfassung hinterlegt ist.</p>
-          <div className="books"><section>{resonanceBooks.map((entry, index) => <div key={entry.id}>{index === 0 && <p><strong>Philosophie und Bewusstsein</strong></p>}{index === resonanceBooks.length - THEOLOGICAL_ESSAYS.length && <p><strong>Theologie und Bibelauslegung</strong></p>}<button onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button></div>)}</section></div>
-        </div>}
+        {!talkingNow && isResonanceReading && <ResonanceShelf atShelf={resonanceShelfOpen} onActiveChange={setResonanceActive}/>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
         </section></div></>}
-        {!talkingNow && book && (shelf || !shown || resonanceShelfOpen) && <div className="book">
+        {!talkingNow && book && (shelf || !shown) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
-          {isResonanceReading && (readingText ? <>
-            <p className="muted">Freie Lesefassung · {readingText.version} · ohne Credits oder Kauf</p>
-            {readingPart === null ? <div className="books"><section>{readingText.sections.map((part, index) => <button key={index} onClick={() => setReadingPart(index)}>{part.heading}</button>)}</section></div> : <>
-              <div className="row"><button className="act quiet" onClick={() => setReadingPart(null)}>← Inhaltsverzeichnis</button><span>{readingPart + 1} / {readingText.sections.length}</span></div>
-              <article style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.65,maxHeight:'55vh',overflowY:'auto',padding:'12px 0'}}>{readingText.sections[readingPart]?.text}</article>
-              <div className="row"><button className="act quiet" disabled={readingPart === 0} onClick={() => setReadingPart(n => Math.max(0, (n ?? 0)-1))}>← Vorheriger Teil</button><button className="act" disabled={readingPart + 1 >= readingText.sections.length} onClick={() => setReadingPart(n => Math.min(readingText.sections.length-1,(n ?? 0)+1))}>Nächster Teil →</button></div>
-            </>}
-            {readingText.source && <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>}
-          </> : <p className="muted">Einführungstext · vollständige Manuskriptfassung noch nicht zugeordnet</p>)}
-          <button className="act" onClick={() => { setBookId(''); setReadingPart(null) }}>← Zurück zum Regal</button>
+          <button className="act" onClick={() => setBookId('')}>← Zurück zum Regal</button>
         </div>}
         {status && <div className="status">{status}</div>}
         {!talkingNow && held && !book && <div className="book held-card">
@@ -731,9 +735,9 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </>}
           {atCounter ? <button className="act" onClick={() => { setHeld(null); setStatus(`Du gibst „${held.title}“ an der Ausleihe zurück.`) }}>Zurückgeben</button> : <button className="act quiet" onClick={() => setHeld(null)}>Weglegen</button>}
         </div>}
-        {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length > 0 && <p>{placed.map(item => item.person.name).join(', ')} {placed.length === 1 ? 'ist' : 'sind'} gerade hier. Geh hin und sprich {placed.length === 1 ? 'sie oder ihn' : 'jemanden'} an.</p>}
-        {!talkingNow && !shown && !shelf && !book && !held && !staff && placed.length === 0 && !isLibrary && kind !== 'artlounge' && <p className="muted">Gerade ist niemand hier, mit dem du sprechen kannst. Zu den Gottesdiensten, Gebeten und Runden ist meist jemand da.</p>}
-        {!talkingNow && !shown && !shelf && !book && !held && <p>{isLibrary ? `Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern${staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.` : `Du kannst dich frei umsehen${staff ? `; ${staffName} hilft dir am Tresen weiter` : ''}.`}</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !resonanceActive && !staff && placed.length > 0 && <p>{placed.map(item => item.person.name).join(', ')} {placed.length === 1 ? 'ist' : 'sind'} gerade hier. Geh hin und sprich {placed.length === 1 ? 'sie oder ihn' : 'jemanden'} an.</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !resonanceActive && !staff && placed.length === 0 && !isLibrary && kind !== 'artlounge' && <p className="muted">Gerade ist niemand hier, mit dem du sprechen kannst. Zu den Gottesdiensten, Gebeten und Runden ist meist jemand da.</p>}
+        {!talkingNow && !shown && !shelf && !book && !held && !resonanceActive && <p>{isLibrary ? `Du kannst dich frei im Raum bewegen. Geh an ein Regal, um in den Büchern zu stöbern${staff ? `, oder sprich ${staffName} an der Ausleihe an` : ''}.` : `Du kannst dich frei umsehen${staff ? `; ${staffName} hilft dir am Tresen weiter` : ''}.`}</p>}
         {!talkingNow && !shown && !shelf && realName && <p className="muted">Heute steht hier laut OpenStreetMap „{realName}“. Im Spiel (2086) ist der Betrieb eine erfundene Nachfolgerin.</p>}
         {!talkingNow && shown && <p>{shown.text}</p>}
         {!talkingNow && shown?.action === 'learn' && <button className="act" onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button>}

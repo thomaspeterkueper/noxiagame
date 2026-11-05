@@ -38,6 +38,7 @@ const cards: Array<[keyof Overview['metrics'], string]> = [
 ]
 const modules = [
   { href: '/admin/wuensche', title: 'Wünsche & Gebete', description: 'Wünsche prüfen und bearbeiten' },
+  { href: '/admin/buecher', title: 'Bücher & Texte', description: 'Was aus buecherwelten im Spiel lesbar ist – frei, als Leseprobe oder nur Klappentext' },
   { href: '/admin/npcs', title: 'NPC-Observatorium', description: 'Biografie, Bedürfnisse, Stimmung, Erinnerungen und Beziehungen' },
   { href: '/admin/dialoge', title: 'Gesprächsauswertung', description: 'Kennzahlen ohne Mitlesen, Meldungen von Spielern, Testkonten' },
   { href: '/admin/welt', title: 'Weltsimulation', description: 'Standorte, Bevölkerung, Simulationstakte und Ereignisse' },

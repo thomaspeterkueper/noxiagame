@@ -21,6 +21,7 @@ export default defineConfig({
       'lib/figures/kiesel.test.ts', 'lib/figures/playerLook.test.ts',
       'lib/speech/browserSpeech.test.ts',
       'lib/game/landmarks/readAloud.test.ts',
+      'lib/game/readings/manuscript.test.ts',
       'lib/game/music/lounge.test.ts',
       'lib/game/rounds/roundTalk.test.ts',
       'lib/worldlab/placeStories.test.ts',

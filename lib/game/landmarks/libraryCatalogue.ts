@@ -26,20 +26,6 @@ export const LIBRARY_SHELVES: ReadonlyArray<{ id: LibraryBook['shelf']; label: s
   { id: 'sachbuecher', label: 'Sachbücher' },
 ]
 
-/**
- * Kuratierte Auswahl für die Omnizedenz-Begegnungsstätten. Ohne Manuskriptfreigabe nur bibliografische Kurztexte.
- * „Die Physik des Ich“ kommt als IDENTITY_BOOK mit Volltext dazu; „Physik der Seele“ war nur der Projektname
- * (Vorfassung „Kosmologie der Seele“) und ist kein eigenes Werk (05.11.2026).
- */
-export const RESONANCE_READING_IDS = [
-  'sachbuecher:gott-ist-eine-wolke',
-  'sachbuecher:philosophie-der-omnizedenz',
-  'sachbuecher:vom-kleinen-und-grossen',
-  'sachbuecher:die-verkoerperte-seele',
-  'sachbuecher:fluide-hermeneutik',
-  'sachbuecher:biochemie-der-verbundenheit',
-] as const
-
 export const LIBRARY_BOOKS: readonly LibraryBook[] = [
   { id: 'sachbuecher:philosophie-der-omnizedenz', shelf: 'sachbuecher', author: LIBRARY_AUTHOR, title: 'Die Philosophie der Omnizedenz – Band I', genre: 'Philosophie / Grundlagen und Symbolsystem', teaser: 'Einführung in die Omnizedenz und das lebendige Symbolsystem. Freie Lesefassung des Manuskripts Band I, Version 0.1.' },
   { id: 'sachbuecher:vom-kleinen-und-grossen', shelf: 'sachbuecher', author: LIBRARY_AUTHOR, title: 'Vom Kleinen und Großen', genre: 'Philosophie / Einführung in das omnizedente Denken', teaser: 'Wie lebt das Ganze in seinen Teilen? Ein philosophischer Text über Entfaltung, Resonanz und die Beziehung des Kleinen zum Großen. Die eigenständige Lesefassung muss noch anhand des Originalmanuskripts abgeglichen werden.' },

@@ -18,5 +18,6 @@ describe('Vorlesen', () => {
   })
   it('ohne Lesefassung wird der Klappentext gelesen', () => {
     expect(readingSource({ id: 'x:y', title: 'Titel', genre: 'Roman', teaser: 'Ein Satz.' })).toEqual({ text: 'Titel. Roman. Ein Satz.', kind: 'blurb' })
+    expect(readingSource({ id: 'x:y', title: 'Titel', genre: 'Roman', teaser: 'Ein Satz.' }, { sections: [{ heading: 'Eins', text: '### Teil\nWort.' }] })).toEqual({ text: 'Eins. Teil\nWort.', kind: 'manuscript' })
   })
 })
