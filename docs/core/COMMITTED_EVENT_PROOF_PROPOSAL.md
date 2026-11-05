@@ -152,3 +152,18 @@ ORDER BY n.nspname, c.relname, t.tgname;
 **Ordering decision test (staging only, separate transactions):** A locks and modifies an asset, B attempts a conflicting modification and must block or fail; A commits; B resumes and must revalidate state/permissions before its own commit. Repeat with A rolling back, with equal world year and legacy sequence, and with requests delivered to the projector in reverse order. Record which *existing* row lock, constraint, or transaction protocol establishes the causal order. Until verified, do not introduce a new commit counter or assert that the legacy sequence provides commit order.
 
 **Outcome of this documentation change:** the audit plan is more precise; no live database privilege, concurrency, or integration test has been executed by this change.
+
+
+## Static migration evidence: event schema and provenance gaps (2026-11-05)
+
+**Inspected repository SQL (not a live/staging DB):**
+- `supabase/migrations/20260831160000_noxia_events_entity_states.sql`
+- `supabase/migrations/20260901123000_runtime_simulation_events_forward_compat.sql`
+
+**Observed in the checked-in schema:** `public.simulation_events.id` is a UUID primary key; `tick` is nullable; `occurred_at` and `created_at` are timestamps; `effect_group_id` is a UUID with a nonunique index. There is no declared `commitSequence` or uniqueness constraint for a per-asset commit order in these definitions. `canonical_event_id` has a nonunique index and is KG-owned, so it is not a substitute for Core commit identity. `entity_states.source_event` is a nullable FK to `simulation_events.id` with `ON DELETE SET NULL`, not a mandatory immutable evidence link. `entity_states_one_current_idx` enforces at most one current state per `(subject_type,subject_id)`, but does not itself prove history ordering or authorization.
+
+**Observed trigger path:** the forward-compat migration defines `noxia_record_player_build_event()` as a `SECURITY DEFINER` trigger on `player_builds`, recording `build.*` events in `simulation_events`; its `actor_id` is derived from `new.profile_id`. This establishes a repository-level *intended* audit path for build status transitions, not that every status change was authorized or that the trigger function's effective permissions/search path are safe in the deployed database. The migration also rebinds tile-entity state triggers after a legacy table-shape repair.
+
+**Implication:** a read-only reader cannot derive a trustworthy, transactionally ordered `CommittedWorldReceipt` for arbitrary demolition, reuse or municipal decisions from these columns alone. Do not map `simulation_events.id`, `effect_group_id`, `occurred_at` or `entity_states.source_event` directly to a proven commit-order key. The lack of a declared key in these two migrations is **not** proof that later migrations or deployed schema lack one.
+
+**Next bounded engineering check:** search later migrations and owning command implementations for event-writing authorization and asset-row locks, then run the existing read-only catalog queries against staging. Until that evidence exists, keep the verified reader blocked and do not emit destructive city-history projections. This is a static source review only: no SQL executed, no concurrency test run.
