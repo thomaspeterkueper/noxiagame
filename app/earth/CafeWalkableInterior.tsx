@@ -7,6 +7,8 @@
 // Gäste aus echten Käufen, Karte und Bestellen, Zimmer, Wissen des Personals.
 // Bewegung, Personen, Gespräch und Tafel liefert der Motor.
 
+import { BAN_CHOICES, VenueFurnishPanel, useVenueHouse } from './VenueHouse'
+import { banLabel, banText, cleanFurnishing, tableMoveAllowed, withFurnishing, type Furnishing } from '@/lib/game/hospitality/furnishing'
 import VenueEvents, { useVenueEvents } from './VenueEvents'
 import { eventFacts } from '@/lib/game/hospitality/venueEvents'
 import { incidentAt, incidentFacts, incidentNotice, incidentPose, incidentRunning, type VenueIncident } from '@/lib/game/hospitality/venueIncident'
@@ -116,7 +118,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[entryPaidUntil,setEntryPaidUntil]=useState<number|null>(null)
 
   const effectiveType=conversion?.type??buildingTypeId
-  const layout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(effectiveType),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[effectiveType,upper,areaM2])
+  const baseLayout=useMemo(()=>{const base=venueLayoutForSize(venueLayoutForBuildingType(effectiveType),venueSizeForArea(areaM2));return hasUpperFloor(upper)?withUpperFloor(base):base},[effectiveType,upper,areaM2])
+  // Einrichten und Hausrecht (Second Life, Teil 6): umgestellte Tische, Schmuck, Hausverbot.
+  const house=useVenueHouse(entityId)
+  const[furnishDraft,setFurnishDraft]=useState<Furnishing|null>(null)
+  const furnishing=useMemo(()=>cleanFurnishing(furnishDraft??house.furnishing,baseLayout),[furnishDraft,house.furnishing,baseLayout])
+  const layout=useMemo(()=>withFurnishing(baseLayout,furnishing),[baseLayout,furnishing])
+  const bannedText=banText(house.banned,Date.now())
   // Der Name des Hauses: aus den Daten, sonst der übergebene Name ohne Art-Präfix („Bar · Metropol“ → „Metropol“).
   // Nur die Art („Café“) ist kein Hausname – sonst hieße es „im Café Café“ (Gespräch 01.11.2026).
   const rawHouseName=displayName??buildingName.split(' · ').pop()??buildingName
@@ -248,7 +256,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const entryItem=menu?.items.find(item=>item.itemCode===ENTRY_ITEM_CODE)??null
   const entryPaid=(entryPaidUntil!==null&&entryPaidUntil>nowMs)||orders.some(entry=>entry.itemCode===ENTRY_ITEM_CODE)
   const things:PlacedThing[]=orders.filter(entry=>entry.itemCode!==ENTRY_ITEM_CODE).map(entry=>({key:entry.key,icon:<HospitalityItemIcon code={entry.itemCode} size={18} title={entry.label}/>,title:entry.label,forId:entry.forId,at:entry.at,broughtToTable:entry.tableService}))
-  const service=(figures:readonly VenueFigure[])=>underConversion||emptyHouse?'closed':venueService(layout,figures,playerHour,hours)
+  const service=(figures:readonly VenueFigure[])=>underConversion||emptyHouse||bannedText?'closed':venueService(layout,figures,playerHour,hours)
   const readyText=conversion?.readyAt?new Date(conversion.readyAt).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'}):null
   const canteenHint=arrivalPoint?' Bis dahin gibt es Wasser und Ration in der Hafenkantine.':''
 
@@ -498,6 +506,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(kind,hours):undefined,
     service,
     closedText:figures=>{
+      if(bannedText)return{headline:'HAUSVERBOT',detail:bannedText+' Der Eigentümer hat es ausgesprochen.'}
       if(underConversion)return{headline:'IM UMBAU',detail:'Dieses Haus wird gerade zum '+layout.noun+' umgebaut'+(readyText?'; fertig etwa '+readyText+'.':'.')+' Bis dahin ist hier Baustelle.'}
       if(emptyHouse)return{headline:'LEER',detail:'Dieses Haus gehört jemandem, hat aber noch keine Nutzung. Ein Umbau zum Lokal wird auf der Karte am Gebäude beauftragt.'}
       const reason=venueClosedReason(layout,figures,playerHour,hours)
@@ -539,6 +548,13 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     loaded:true,
     markers:shift?tasks.slice(0,4).map(task=>({key:task.key,x:task.at.x,y:task.at.y,label:task.label})):[],
     playerTag:shift?ROLE_LABEL[shift.role]:null,
+    furnish:{editing:Boolean(furnishDraft),decor:furnishing.decor,
+      onMoveTable:(id,x,y)=>{if(!furnishDraft)return;if(tableMoveAllowed(baseLayout,id,{x,y},furnishing))setFurnishDraft({...furnishing,tables:{...furnishing.tables,[id]:{x,y}}})},
+      onMoveDecor:(id,x,y)=>{if(furnishDraft)setFurnishDraft({...furnishing,decor:furnishing.decor.map(d=>d.id===id?{...d,x,y}:d)})},
+      onRemoveDecor:id=>{if(furnishDraft)setFurnishDraft({...furnishing,decor:furnishing.decor.filter(d=>d.id!==id)})}},
+    banPeer:house.canEdit?(peer,hours)=>{void house.ban(peer.profileId,hours).then(error=>ctxRef.current?.setStatus(error??peer.name+' hat hier Hausverbot ('+banLabel(hours)+').'))}:undefined,
+    banChoices:BAN_CHOICES,
+    renderOwner:ctx=>!underConversion&&!emptyHouse&&!bannedText?<VenueFurnishPanel house={house} draft={furnishDraft} setDraft={setFurnishDraft} center={{x:Math.round(baseLayout.width/2),y:Math.round(baseLayout.height/2)}} onStatus={ctx.setStatus}/>:null,
     jointContext:reception?(personId:string)=>({mourning:['host','mourner'].includes(receptionRole(reception,personId,false))}):undefined,
     poseFor:incident?(personId:string)=>incidentPose(incident.at,personId,incident.tick):undefined,
     floorMood:layout.danceFloor&&(shift?.role==='dj'||music!=='House')?music.toLowerCase():null,

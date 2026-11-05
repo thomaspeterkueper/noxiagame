@@ -6,6 +6,7 @@
 // POST { action: 'event', room, roomName, kind, detail, peers } → join, leave, gesture
 // POST { action: 'report', room, roomName, messageId, detail } → Meldung einer Nachricht
 
+import { activeBanUntil } from '@/lib/game/hospitality/houseBans'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
   if (body?.action !== 'say') return NextResponse.json({ error: 'Unbekannte Aktion.' }, { status: 400 })
   const prepared = prepareRoomMessage(String(body?.text ?? ''))
   if (!prepared) return NextResponse.json({ error: 'Nachricht fehlt.' }, { status: 400 })
+  if (UUID_RE.test(room) && await activeBanUntil(supabase, room, profileId)) return NextResponse.json({ error: 'Du hast hier Hausverbot.' }, { status: 403 })
   const range: ChatRange = CHAT_RANGES.includes(body?.range as ChatRange) ? body!.range as ChatRange : 'say'
   const toId = range === 'whisper' ? String(body?.toProfileId ?? '') : null
   if (range === 'whisper' && (!toId || !UUID_RE.test(toId) || toId === profileId)) return NextResponse.json({ error: 'Flüstern geht nur an einen anderen Spieler.' }, { status: 400 })

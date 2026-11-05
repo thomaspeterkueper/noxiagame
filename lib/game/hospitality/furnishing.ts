@@ -117,6 +117,23 @@ export function cleanFurnishing(raw: unknown, base: VenueLayout): Furnishing {
   return out
 }
 
+/** Für den Server: nur Form und Grenzen (die Geometrie prüft der Raum beim Laden). */
+export function sanitizeFurnishing(raw: unknown): Furnishing {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { tables?: unknown; decor?: unknown }
+  const tables: Record<string, VenuePoint> = {}
+  const t = r.tables && typeof r.tables === 'object' ? r.tables as Record<string, unknown> : {}
+  for (const [id, p] of Object.entries(t).slice(0, 24)) {
+    const v = (p ?? {}) as Partial<VenuePoint>
+    if (/^table-\d{1,2}$/.test(id) && Number.isFinite(v.x) && Number.isFinite(v.y)) tables[id] = { x: Math.max(0, Math.min(VENUE_WIDTH, Math.round(v.x!))), y: Math.max(0, Math.min(470, Math.round(v.y!))) }
+  }
+  const decor: DecorItem[] = []
+  for (const d of (Array.isArray(r.decor) ? r.decor : []).slice(0, DECOR_MAX)) {
+    const v = (d ?? {}) as Partial<DecorItem>
+    if (v.kind && v.kind in DECOR_KINDS && Number.isFinite(v.x) && Number.isFinite(v.y)) decor.push({ id: typeof v.id === 'string' && /^[a-z0-9-]{1,24}$/i.test(v.id) ? v.id : `d${decor.length + 1}`, kind: v.kind, x: Math.max(0, Math.min(VENUE_WIDTH, Math.round(v.x!))), y: Math.max(0, Math.min(470, Math.round(v.y!))) })
+  }
+  return { tables, decor }
+}
+
 /** Was jeder im Raum sieht. */
 export function furnishingFacts(f: Furnishing | null | undefined): string[] {
   if (!f) return []

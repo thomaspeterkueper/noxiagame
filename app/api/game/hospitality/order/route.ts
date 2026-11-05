@@ -10,6 +10,7 @@
 //      { action: 'set_service', tileEntityId, service: 'toilet', available, priceCredits, guestsOnly }
 //      → Hausregeln ändern; nur der Eigentümer des Hauses (R-18).
 
+import { activeBanUntil } from '@/lib/game/hospitality/houseBans'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
@@ -104,6 +105,8 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  // Hausverbot (05.11.2026): keine Bestellung.
+  if (await activeBanUntil(supabase, tileEntityId, profileId)) return NextResponse.json({ error: 'Du hast hier Hausverbot – hier wird dir nichts verkauft.' }, { status: 403 })
   const { data: tickRow } = await supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle()
   const { data, error } = await supabase.rpc('order_hospitality_item', {
     p_profile_id: profileId, p_tile_entity_id: tileEntityId, p_item_code: itemCode,
