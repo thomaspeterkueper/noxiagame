@@ -179,3 +179,18 @@ ORDER BY n.nspname, c.relname, t.tgname;
 **Concrete gap:** the RPC return shape and trigger-generated event rows do not expose a verified, stable join from a municipal decision through an authorized command to a particular committed event and its causal predecessor. This is an interface gap in the reviewed source, not proof that no other schema or RPC provides such a link.
 
 **Next bounded test gate:** locate the latest definition of `noxia_complete_build` and inspect its row locks, permission checks, idempotent retry and event creation in the same transaction; test with a nonproductive database fixture. Check PR #597's current reader against the same verified-proof boundary before adding any projection. No SQL was run in this review.
+
+
+## Build completion RPC source audit (2026-11-05, bounded review)
+
+**Source inspected:** `supabase/migrations/20260910081500_atomic_game_commands.sql` at the PR #539 development branch. This is the checked-in function definition, **not** proof of the latest deployed definition; later `CREATE OR REPLACE` definitions, function grants, and RPC callers still need review.
+
+- `noxia_complete_build(p_build_id, p_create_entity)` is declared `SECURITY DEFINER`, with `search_path = public`. It locks the matching `player_builds` row `FOR UPDATE` before reading/modifying its completion status. Thus concurrent calls targeting the **same build row** are serialized at that row boundary, but this is not a global or per-settlement commit order.
+- It rejects missing builds, non-building targets, non-`building` statuses and not-yet-due completion; completed builds return an idempotent response. It writes `status = 'complete'` and creates the corresponding `tile_entities` row within the same SQL transaction. A partial unique `source_build_id` conflict guard prevents duplicate materialization in the normal path.
+- The function's visible body does **not** check `auth.uid()`, the invoking role, ownership, or a municipal decision reference. That does not establish an exploit: the intended service-only caller and actual `EXECUTE` grants/RLS context must be audited before drawing a security conclusion. It **does** mean the function body alone is insufficient evidence of caller authorization.
+- The JSON result includes `build_id`, `status`, `entity_id` and `idempotent`, but no persisted event ID, decision reference, or transactional order proof. The row lock and event triggers are useful primitives, not a complete receipt.
+- The `status = 'complete'` legacy-repair branch can create a previously missing entity. The reader must not interpret the idempotent response as proof that an entity was already present before the retry.
+
+**Next testable gate (staging only):** identify the *last* definition of this exact function signature in migration order and check `pg_get_functiondef`, `has_function_privilege` for `anon`, `authenticated` and the service role, plus the server caller's authenticated/authorized build ownership checks. Then run two concurrent completions of one fixture build and verify one materialized entity, a single effective status transition, audit linkage and retry behavior. Do not run destructive tests against production.
+
+**Scope limit:** this analysis concerns completion of an existing build, **not** authorization for demolition, conversion, ownership transfer, or municipal governance. Those need separate owning commands and proof paths. No SQL was executed during this review.
