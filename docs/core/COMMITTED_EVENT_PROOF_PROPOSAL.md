@@ -194,3 +194,10 @@ ORDER BY n.nspname, c.relname, t.tgname;
 **Next testable gate (staging only):** identify the *last* definition of this exact function signature in migration order and check `pg_get_functiondef`, `has_function_privilege` for `anon`, `authenticated` and the service role, plus the server caller's authenticated/authorized build ownership checks. Then run two concurrent completions of one fixture build and verify one materialized entity, a single effective status transition, audit linkage and retry behavior. Do not run destructive tests against production.
 
 **Scope limit:** this analysis concerns completion of an existing build, **not** authorization for demolition, conversion, ownership transfer, or municipal governance. Those need separate owning commands and proof paths. No SQL was executed during this review.
+
+
+## RPC grant evidence and regression gate (2026-11-05)
+
+The checked-in `20260910081500_atomic_game_commands.sql` explicitly revokes `EXECUTE` on `public.noxia_complete_build(uuid,boolean)` from `public`, `anon`, and `authenticated`, and grants it to `service_role`. This narrows the earlier authorization uncertainty: **the migration intends service-role-only execution**, while the function body itself does not verify the human actor, ownership, or a municipal mandate. It does **not** prove the effective grants on the deployed database, the security of the service caller, or absence of later grant changes. Verify those separately before enabling any reader or write path.
+
+The static regression test `scripts/atomicBuildRpcGrants.test.mjs` protects the checked-in grant/revoke boundary. It is a source-contract test only: it cannot prove deployed privileges or end-to-end actor authorization. A staging database check of `pg_get_functiondef`, `has_function_privilege`, and server-side ownership checks remains mandatory. Do not use this build RPC as a demolition or municipal decision command.
