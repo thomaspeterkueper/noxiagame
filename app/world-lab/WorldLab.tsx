@@ -31,6 +31,7 @@ import { MEETING_WALK_LIMIT_M, meetingPlaces, nearestMeetingPlace, type MeetingP
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingVisual } from '@/lib/game/buildings/visuals'
 import { getBuildingEntryDefinition } from '@/lib/game/buildings/entry'
+import { loadReferral, REFERRAL_VALID_MS, referralTitle, referralValid, type JobReferral } from '@/lib/game/jobs/referral'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { sourceForAwarenessItem, type WorldAwarenessItem } from '@/lib/game/worldAwareness'
 import { blockArt } from '@/lib/worldlab/blocks'
@@ -651,6 +652,27 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     return () => clearTimeout(timer)
   }, [guideOn, guideTarget, panel])
 
+  // W-12 Punkt 2 (05.11.2026): Solange ein Vermittlungsschein gilt, steht über dem
+  // Lokal ein Schild; unten links eine kleine Karte mit „Weg zeigen“.
+  const [referral, setReferral] = useState<JobReferral | null>(null)
+  const [referralNow, setReferralNow] = useState(0)
+  useEffect(() => {
+    const read = () => { const ref = loadReferral(), now = Date.now(); setReferralNow(now); setReferral(current => {
+      const next = referralValid(ref, now) ? ref : null
+      return current?.buildingId === next?.buildingId && current?.issuedAtMs === next?.issuedAtMs ? current : next
+    }) }
+    read()
+    const timer = setInterval(read, 5000)
+    window.addEventListener('storage', read)
+    return () => { clearInterval(timer); window.removeEventListener('storage', read) }
+  }, [panel.kind])
+  const referralBuilding = referral ? noxia.find(building => building.id === referral.buildingId) ?? null : null
+  useEffect(() => {
+    if (!engineReady) return
+    engineReady.setJobMark(referral && referralBuilding ? { at: { lat: referralBuilding.lat, lon: referralBuilding.lon }, text: referral.roleLabel } : null)
+  }, [engineReady, referral, referralBuilding])
+  const referralLeft = referral ? Math.max(0, REFERRAL_VALID_MS - (referralNow - referral.issuedAtMs)) : 0
+
   // Weg zum Ort der offenen Tafel zeigen, sobald er mehr als 25 m entfernt ist.
   const routeTarget = panelLocation(panel, sites, plots)
   const routeKey = routeTarget ? routeTarget.lat.toFixed(6) + ',' + routeTarget.lon.toFixed(6) : ''
@@ -850,6 +872,14 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       {refresh.text && <p className="note">{refresh.text}</p>}
       {error && <p className="error">{error}</p>}
       {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
+    </div>}
+    {referral && referralBuilding && !guideShown && !overheard && panel.kind !== 'inside' && !trip && <div className="guide job" role="status">
+      <small>VERMITTELT</small>
+      <b>{referralTitle(referral)}</b>
+      <span>{referral.paid ? `${referral.wage} Credits für ${referral.gameHours} Spielstunden` : 'Ehrenamtlich'} · der Schein gilt noch {Math.max(1, Math.round(referralLeft / 60000))} min{engineReady ? ` · ${kmText(engineReady.distanceTo({ lat: referralBuilding.lat, lon: referralBuilding.lon }))}` : ''}</span>
+      <div className="guide-actions">
+        <button onClick={() => choosePanel({ kind: 'building', at: { lat: referralBuilding.lat, lon: referralBuilding.lon }, title: referralBuilding.name, noxiaId: referralBuilding.id })}>Weg zeigen</button>
+      </div>
     </div>}
     {guideShown && guideTarget && !overheard && <div className="guide" role="status">
       <small>ERSTER SCHRITT</small>

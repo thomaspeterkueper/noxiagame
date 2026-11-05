@@ -178,6 +178,8 @@ export interface WorldEngine {
   setEventMarks: (marks: Array<{ id: string; lat: number; lon: number; text: string; running: boolean }>) => void
   /** Erster Start: hüpfender Pfeil über einem Ziel (null: keiner). */
   setGuideArrow: (at: GeoPoint | null) => void
+  /** W-12: Ziel einer Vermittlung – Schild über dem Lokal (null: keins). */
+  setJobMark: (mark: { at: GeoPoint; text: string } | null) => void
   destroy: () => void
 }
 
@@ -333,7 +335,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Erster Start (05.11.2026): Pfeil über dem ersten Ziel
   const guideLayer = new PIXI.Container()
   guideLayer.eventMode = 'none'
-  world.addChild(ground, lines, overlay, objects, smoke, labels, marks, beacons, eventLayer, guideLayer)
+  // W-12: Schild über dem Lokal, in das die Agentur vermittelt hat
+  const jobLayer = new PIXI.Container()
+  jobLayer.eventMode = 'none'
+  world.addChild(ground, lines, overlay, objects, smoke, labels, marks, beacons, eventLayer, jobLayer, guideLayer)
   // Tageszeit nach echtem Sonnenstand am Ort der Figur (Spieluhr = echte Zeit)
   let sunNow = 30
   let worldTint = 0xffffff
@@ -2281,6 +2286,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     labels.visible = zoom >= LABEL_MIN_ZOOM
     for (const mark of marks.children) mark.scale.set(2.2 / zoom)
     for (const mark of eventLayer.children) mark.scale.set(2.2 / zoom)
+    for (const mark of jobLayer.children) mark.scale.set(2.3 / zoom)
     for (const beacon of beacons.children) beacon.scale.set(2.6 / zoom)
     poiLabels.visible = zoom >= 2.4 && view.osmPlaces
     parcelLayer.visible = zoom >= 2.2
@@ -2419,6 +2425,23 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     setView(next) { view = { ...next }; applyView() },
     setPlayerLook,
     setGuideArrow: setGuide,
+    setJobMark(mark) {
+      for (const old of jobLayer.removeChildren()) old.destroy({ children: true })
+      if (!mark) return
+      const p = toWorld(mark.at)
+      const at = iso(p.x, p.y, 16)
+      const sign = new PIXI.Container()
+      const text = new PIXI.Text({ text: '💼 ' + mark.text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 40, fontWeight: '800', fill: 0x10302c } })
+      text.anchor.set(0.5, 0.5); text.scale.set(0.13)
+      const w = text.width + 3, h = text.height + 1.6
+      const plate = new PIXI.Graphics()
+      plate.roundRect(-w / 2, -h / 2, w, h, 1.4).fill({ color: 0xf2c94c, alpha: 0.97 }).stroke({ width: 0.5, color: 0x3a2a0a })
+      plate.poly([-1.2, h / 2, 1.2, h / 2, 0, h / 2 + 1.6]).fill(0xf2c94c).stroke({ width: 0.4, color: 0x3a2a0a })
+      sign.addChild(plate, text)
+      sign.position.set(at.x, at.y)
+      sign.scale.set(2.3 / zoom)
+      jobLayer.addChild(sign)
+    },
     setEventMarks(list) {
       for (const old of eventLayer.removeChildren()) old.destroy({ children: true })
       for (const item of list) {

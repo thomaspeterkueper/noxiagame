@@ -491,7 +491,7 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 Umgesetzt wie vorgeschlagen, beide Seiten (die Gastronomie-Seite ist eine Zeile, daher gleich mit):
 - `EarthBuildingAccessLayer` hat `onRelocate?(entityId: string)`; aufgerufen in `onGoTo`, bevor das Lokal öffnet.
 - Die Weltkarte (`relocateTo` in `WorldPanels.tsx`) setzt die Figur 2 m vor die Vorderseite des Lokals (Südseite in seiner Drehung). Nach dem Verlassen steht sie also vor dem Lokal.
-- Punkt 2 (Ziel markieren, solange `noxia.jobReferral` gilt) noch offen.
+- Punkt 2 ✅ 05.11.2026: Solange `noxia.jobReferral` gilt, steht über dem Lokal ein goldenes Schild mit der Stelle (`setJobMark` in `worldEngine.ts`); unten links eine Karte „Vermittelt“ mit Stelle, Lohn, Restzeit des Scheins, Entfernung und „Weg zeigen“. Die Karte liest den Schein alle 5 s und beim Wechsel der Tafel; wird er eingelöst oder zurückgegeben, verschwinden Schild und Karte.
 
 
 Thomas, 29.10.2026: „bei offenen Stellen, die die Agentur kennt, können wir ja auch direkt vermitteln“.
