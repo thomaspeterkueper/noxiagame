@@ -8,6 +8,8 @@
 export const EARTH_BUILDING_NAMES: Record<string, string> = {
   habitat: 'Wohnhaus',
   residential_block: 'Wohnblock',
+  // Arten ohne Eintrag in building_definitions (sonst stünde die Kennung da, z. B. „⌂ factory“)
+  factory: 'Fabrik',
 }
 
 /** Name einer Gebäudeart auf der Erde (sonst der allgemeine Name). */
@@ -21,7 +23,7 @@ export function earthBuildingName(typeId: string, generic: string | undefined): 
  * Häuser tragen nur ihren Namen.
  */
 export function buildingLabel(typeId: string, generic: string | undefined, displayName: string | null | undefined): string {
-  const kind = generic ?? typeId
+  const kind = earthBuildingName(typeId, generic)
   const own = displayName?.trim()
   if (!own) return kind
   if (typeId === 'acquired_building') return own

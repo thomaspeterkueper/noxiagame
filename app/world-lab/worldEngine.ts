@@ -563,7 +563,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       g.poly(dome).fill(0xb9c7c2).stroke({ width: 0.4, color: OUTLINE, alpha: 0.7 })
       g.poly([mid.x - rx * 0.45, mid.y - ry * 0.75, mid.x - rx * 0.1, mid.y - ry * 0.98, mid.x - rx * 0.1, mid.y - ry * 0.5]).fill({ color: 0xffffff, alpha: 0.25 })
     }
-    if (block.k === 'church' && block.w >= 12 && !warm && !mosque) {
+    // Kapellen (Friedhofs-, Wegkapellen) haben keinen hohen Turm (05.11.2026: Auferstehungskapelle)
+    const chapel = block.u === 'b:chapel' || /kapelle|chapel/i.test(block.nm ?? '')
+    if (block.k === 'church' && block.w >= 12 && !warm && !mosque && !chapel) {
       // Kirchturm an der Stirnseite, die zur Kamera zeigt: quadratisch, mit
       // spitzem Pyramidendach – macht eine Kirche von Weitem erkennbar.
       if (cos + sin < 0) { cos = -cos; sin = -sin }

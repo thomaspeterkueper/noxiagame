@@ -12,6 +12,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { CRON_SECRET_HEADER } from '@/lib/game/config'
 import { geoToMerc, tileAt, type TileId } from '@/lib/worldlab/mercator'
 import { loadBaseTile } from '@/lib/worldlab/tileSource.server'
+import { parcelCell } from '@/lib/worldlab/alkis'
+import { importCemeteryCell } from '@/lib/worldlab/placeAreas.server'
 
 export const maxDuration = 300
 
@@ -40,6 +42,26 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Friedhöfe (W-13) für die Zellen um NOXIA-Gebäude nachholen, die noch fehlen – höchstens vier je Lauf,
+  // vor den Kacheln, damit diese die neuen Flächen gleich enthalten.
+  const cells = new Map<string, { cell: ReturnType<typeof parcelCell>; point: { lat: number; lon: number } }>()
+  for (const row of buildings ?? []) {
+    const point = { lat: Number(row.latitude_deg), lon: Number(row.longitude_deg) }
+    const cell = parcelCell(point)
+    if (!cells.has(cell.key)) cells.set(cell.key, { cell, point })
+  }
+  const { data: knownCells } = cells.size ? await supabase.from('earth_area_cells').select('cell,error,fetched_at').in('cell', [...cells.keys()]) : { data: [] as Array<{ cell: string; error: string | null; fetched_at: string }> }
+  const known = new Map((knownCells ?? []).map(row => [String(row.cell), row]))
+  let areaCells = 0, areasAdded = 0
+  for (const [key, item] of cells) {
+    if (areaCells >= 4) break
+    const seen = known.get(key)
+    if (seen && (!seen.error || Date.now() - Date.parse(seen.fetched_at) < 3600_000)) continue
+    areaCells++
+    const result = await importCemeteryCell(supabase, item.cell, item.point)
+    if (result.ok) areasAdded += result.added
+  }
+
   let stored = 0, built = 0, failed = 0, unchecked = 0
   for (const tile of wanted.values()) {
     if (built >= BUILD_LIMIT || Date.now() - started > TIME_BUDGET_MS) { unchecked++; continue }
@@ -49,7 +71,7 @@ export async function GET(req: NextRequest) {
       else built++
     } catch { failed++ }
   }
-  const summary = { ok: true, tiles: wanted.size, stored, built, failed, unchecked, ms: Date.now() - started }
+  const summary = { ok: true, tiles: wanted.size, stored, built, failed, unchecked, areaCells, areasAdded, ms: Date.now() - started }
   console.log('[world-tiles]', JSON.stringify(summary))
   return NextResponse.json(summary)
 }

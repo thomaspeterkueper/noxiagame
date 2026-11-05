@@ -122,3 +122,17 @@ export async function storeCemeteries(supabase: Supabase, regionId: string, rows
   }
   return fresh.length
 }
+
+/** Eine Zelle holen und vermerken (Route und stündlicher Lauf). */
+export async function importCemeteryCell(supabase: Supabase, cell: Box & { key: string }, point: { lat: number; lon: number }) {
+  try {
+    const regionId = await regionFor(supabase, point)
+    const added = regionId ? await storeCemeteries(supabase, regionId, await fetchCemeteries(cell)) : 0
+    await supabase.from('earth_area_cells').upsert({ cell: cell.key, areas: added, error: regionId ? null : 'keine Region', fetched_at: new Date().toISOString() })
+    return { ok: true as const, added }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await supabase.from('earth_area_cells').upsert({ cell: cell.key, areas: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
+    return { ok: false as const, error: message }
+  }
+}
