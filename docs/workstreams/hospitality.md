@@ -211,6 +211,17 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Die Figuren wissen davon: Das Personal kennt das Programm, Gäste wissen, was gerade läuft, und kennen die nächste Ankündigung.
   - Tests; im Browser geprüft. Bewohner kommen zu Veranstaltungen: R-33; Karte: W-18.
 
+- **05.11.2026 – Einrichten und Hausrecht (Second Life, Teil 6):**
+  - Tabellen `venue_furnishing` und `venue_bans` (Thomas bestätigt), `/api/game/hospitality/house`.
+  - **Einrichten:** Wem das Lokal gehört, der zieht im Raum die Tische mit ihren Stühlen und Plätzen an eine andere Stelle und schmückt mit Pflanze, Stehlampe, Bild, Girlande, Teppich und Kerzen (höchstens zwölf Stück).
+    - Das geht auch, wenn geschlossen ist.
+    - Tresen, Tanzfläche, Einlass und Ausgang bleiben frei; die Wege passen sich an (`furnishing.ts`, mit Tests).
+    - Die Figuren sehen den Schmuck.
+  - **Hausrecht:** Der Eigentümer gibt einem Mitspieler Hausverbot für 24 Stunden, eine Woche oder auf Dauer, und kann es wieder aufheben.
+    - Wer Hausverbot hat, sieht das Lokal als geschlossen, mit Angabe, bis wann.
+    - Bestellen und Raum-Chat sind für ihn auch auf dem Server gesperrt; nach höchstens 30 Sekunden greift es auch drinnen.
+  - Im Browser geprüft. Damit sind alle sechs Teile der Second-Life-Mechaniken gebaut.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
