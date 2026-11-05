@@ -74,14 +74,28 @@ export function tileTerrain(cellHeights: readonly number[], tile: TileId): numbe
 
 export interface TerrainShade {
   /** Vierecke in Metern der Kachel (x nach Osten, y nach Süden), je mit Helligkeit −1 … 1 (0 = eben) */
-  quads: Array<{ p: [number, number, number, number, number, number, number, number]; light: number }>
+  quads: Array<{ p: [number, number, number, number, number, number, number, number]; light: number; /** mittlere Höhe in Metern */ h: number }>
   /** Höhenlinien als Strecken x0, y0, x1, y1 in Metern der Kachel; major = jede fünfte Linie */
   contours: Array<{ s: number[]; major: boolean }>
 }
 
 /** Licht aus Nordwesten, 45° hoch; Überhöhung, damit sanfte Hänge sichtbar werden. */
 const LIGHT = { x: -Math.SQRT1_2 * Math.SQRT1_2, y: -Math.SQRT1_2 * Math.SQRT1_2, z: Math.SQRT1_2 }
-const EXAGGERATION = 2
+const EXAGGERATION = 3.5
+/** Jede Gitterzelle wird so oft je Seite geteilt (bilinear), damit Hänge weich verlaufen statt in Kacheln. */
+const SUBDIVIDE = 3
+
+/**
+ * Höhenfarbe (05.11.2026, Thomas: „sieht nicht nach Hügeln und Tälern aus“):
+ * Täler etwas dunkler und satter grün, Höhen heller und trockener. Bezug ist
+ * die absolute Höhe; im Sauerland (250–650 m) reicht das von deutlich bis kräftig.
+ * Ergebnis: Farbe und Deckkraft für eine Fläche über dem Boden.
+ */
+export function heightTint(h: number): { color: number; alpha: number } {
+  const t = Math.max(0, Math.min(1, (h - 180) / 480))
+  if (t < 0.5) return { color: 0x24432c, alpha: 0.2 * (1 - t / 0.5) }
+  return { color: 0xfff2cc, alpha: 0.24 * ((t - 0.5) / 0.5) }
+}
 
 /**
  * Hangschattierung und Höhenlinien für eine Kachel.
@@ -94,16 +108,23 @@ export function terrainShade(heights: readonly number[], sizeM: number, interval
   if (n < 2 || n * n !== heights.length) return { quads, contours }
   const step = sizeM / (n - 1)
   const h = (i: number, j: number) => heights[j * n + i]
-  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
-    const a = h(i, j), b = h(i + 1, j), c = h(i + 1, j + 1), d = h(i, j + 1)
+  // Höhe an einer beliebigen Stelle (bilinear), in Gitterkoordinaten
+  const at = (u: number, v: number) => {
+    const i = Math.min(n - 2, Math.floor(u)), j = Math.min(n - 2, Math.floor(v)), fu = u - i, fv = v - j
+    return (h(i, j) * (1 - fu) + h(i + 1, j) * fu) * (1 - fv) + (h(i, j + 1) * (1 - fu) + h(i + 1, j + 1) * fu) * fv
+  }
+  const m = (n - 1) * SUBDIVIDE, sub = step / SUBDIVIDE
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+    const u0 = i / SUBDIVIDE, v0 = j / SUBDIVIDE, du = 1 / SUBDIVIDE
+    const a = at(u0, v0), b = at(u0 + du, v0), c = at(u0 + du, v0 + du), d = at(u0, v0 + du)
     // Steigung je Meter (x nach Osten, y nach Süden)
-    const dzdx = ((b - a) + (c - d)) / 2 / step * EXAGGERATION
-    const dzdy = ((d - a) + (c - b)) / 2 / step * EXAGGERATION
+    const dzdx = ((b - a) + (c - d)) / 2 / sub * EXAGGERATION
+    const dzdy = ((d - a) + (c - b)) / 2 / sub * EXAGGERATION
     const len = Math.hypot(dzdx, dzdy, 1)
     const lit = (-dzdx * LIGHT.x - dzdy * LIGHT.y + LIGHT.z) / len
     const light = Math.max(-1, Math.min(1, (lit - LIGHT.z) * 3))
-    const x0 = i * step, y0 = j * step, x1 = x0 + step, y1 = y0 + step
-    if (Math.abs(light) >= 0.02) quads.push({ p: [x0, y0, x1, y0, x1, y1, x0, y1], light })
+    const x0 = i * sub, y0 = j * sub, x1 = x0 + sub, y1 = y0 + sub
+    quads.push({ p: [x0, y0, x1, y0, x1, y1, x0, y1], light, h: (a + b + c + d) / 4 })
   }
   // Höhenlinien: Marching Squares je Zelle
   let min = Infinity, max = -Infinity

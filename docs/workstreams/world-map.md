@@ -786,3 +786,10 @@ Thomas, 05.11.2026, nach dem Neuladen: „klappt, Friedhof ist auch da, Grabstei
 - Tageslicht nach echtem Sonnenstand am Ort der Figur: Boden, Häuser und Bäume werden in der Dämmerung wärmer, nachts gedämpft bläulich (nie dunkel). Fensterlicht ab der Dämmerung bis etwa Mitternacht, danach nur wenige Fenster.
 - Wasser glitzert: kurze helle Striche auf Flüssen und Wasserflächen, zwei Gruppen blenden im Wechsel.
 - Erster Start: goldener Pfeil über der nächsten Agentur für Arbeit (bis 3 km) und eine kleine Karte unten links; endet beim Ankommen (30 m), beim Hineingehen oder mit „Nicht nötig“. Nur für neue Spieler oder mit `?guide=1`.
+
+## Fix 05.11.2026: Gelände war nicht zu sehen
+
+- Thomas: „die begehbare Karte sieht immer noch nicht sehr nach Hügeln und Tälern aus“.
+- Ursache: Die Migration `20261105120000_earth_terrain_cells.sql` war nie live angewendet; Abruf und Ablage der Höhen liefen ins Leere, die Kacheln kamen ohne `terrain`. Jetzt angewendet (05.11.2026, 17:45).
+- Gefüllt wird beim Öffnen der Karte (3 × 3 Zellen um die Figur, danach werden die Kacheln frisch geladen) und täglich um 3:17 Uhr.
+- Darstellung kräftiger: Überhöhung 3,5 statt 2, jede Gitterzelle dreifach geteilt (weiche Hänge statt Kästchen), Schatten bis 50 % Deckung, dazu Höhenfarbe (`heightTint`: Täler satter grün, Höhen heller, Bezug 180–660 m).

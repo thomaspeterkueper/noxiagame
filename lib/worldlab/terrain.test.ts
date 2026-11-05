@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { geoToMerc, tileAt } from './mercator'
-import { TERRAIN_N, terrainCellOf, terrainCellsAround, terrainLattice, terrainShade, tileTerrain } from './terrain'
+import { heightTint, TERRAIN_N, terrainCellOf, terrainCellsAround, terrainLattice, terrainShade, tileTerrain } from './terrain'
 
 const sundern = { lat: 51.3285, lon: 8.0006 }
 
@@ -45,8 +45,16 @@ describe('Höhengitter', () => {
 describe('Hangschattierung und Höhenlinien', () => {
   it('eben: keine Schattierung, keine Linien', () => {
     const shade = terrainShade(Array(81).fill(300), 190)
-    expect(shade.quads).toHaveLength(0)
+    expect(shade.quads.every(q => Math.abs(q.light) < 0.02 && q.h === 300)).toBe(true)
     expect(shade.contours).toHaveLength(0)
+  })
+
+  it('Höhenfarbe: Tal dunkler, Höhe heller, Mitte neutral', () => {
+    expect(heightTint(200).color).toBe(0x24432c)
+    expect(heightTint(200).alpha).toBeGreaterThan(0.15)
+    expect(heightTint(420).alpha).toBeLessThan(0.02)
+    expect(heightTint(640).color).toBe(0xfff2cc)
+    expect(heightTint(640).alpha).toBeGreaterThan(0.2)
   })
 
   it('Hang nach Nordwesten ist hell, nach Südosten dunkel', () => {

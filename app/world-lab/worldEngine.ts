@@ -7,7 +7,7 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
-import { terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
+import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { kieselDirFrom, kieselSVG, type KieselDir, type KieselLook } from '@/lib/figures/kiesel'
 import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
@@ -825,7 +825,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (terrain) {
       const shade = terrainShade(terrain, data.size)
       for (const quad of shade.quads) {
-        g.poly(path(quad.p)).fill({ color: quad.light > 0 ? 0xfff6dc : 0x1d2a2e, alpha: Math.min(0.42, Math.abs(quad.light) * (quad.light > 0 ? 0.32 : 0.4)) })
+        const p = path(quad.p)
+        // Höhenfarbe: Täler satter, Höhen heller (05.11.2026)
+        const tint = heightTint(quad.h)
+        if (tint.alpha > 0.01) g.poly(p).fill({ color: tint.color, alpha: tint.alpha })
+        if (Math.abs(quad.light) >= 0.02) g.poly(p).fill({ color: quad.light > 0 ? 0xfff6dc : 0x1d2a2e, alpha: Math.min(0.5, Math.abs(quad.light) * (quad.light > 0 ? 0.38 : 0.5)) })
       }
       for (const line of shade.contours) {
         const p = path(line.s)
