@@ -12,7 +12,9 @@ type Box = { south: number; west: number; north: number; east: number }
 type OverpassWay = { type?: string; id?: number; tags?: Record<string, string>; geometry?: Array<{ lat: number; lon: number } | null> }
 
 const ENDPOINTS = ['https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']
-const TIMEOUT_MS = 15_000
+const TIMEOUT_MS = 20_000
+const OSM_API = 'https://api.openstreetmap.org/api/0.6/map'
+const isCemetery = (tags: Record<string, string>) => tags.landuse === 'cemetery' || tags.amenity === 'grave_yard'
 /** Friedhöfe ragen weit über die Zelle hinaus: großzügiger Rand (Grad) */
 const MARGIN = 0.004
 
@@ -35,7 +37,42 @@ export function cemeteryRows(ways: readonly OverpassWay[]) {
   })
 }
 
+/** Kartenausschnitt der OSM-API (XML) → Friedhofswege mit Geometrie. */
+export function parseOsmCemeteries(xml: string): OverpassWay[] {
+  const decode = (v: string) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+  const nodes = new Map<string, { lat: number; lon: number }>()
+  for (const m of xml.matchAll(/<node\b([^>]*)\/?>/g)) {
+    const id = m[1].match(/\bid="(\d+)"/)?.[1], lat = m[1].match(/\blat="([-\d.]+)"/)?.[1], lon = m[1].match(/\blon="([-\d.]+)"/)?.[1]
+    if (id && lat && lon) nodes.set(id, { lat: Number(lat), lon: Number(lon) })
+  }
+  const ways: OverpassWay[] = []
+  for (const m of xml.matchAll(/<way\b[^>]*\bid="(\d+)"[^>]*>([\s\S]*?)<\/way>/g)) {
+    const tags: Record<string, string> = {}
+    for (const t of m[2].matchAll(/<tag k="([^"]*)" v="([^"]*)"\s*\/>/g)) tags[decode(t[1])] = decode(t[2])
+    if (!isCemetery(tags)) continue
+    ways.push({ type: 'way', id: Number(m[1]), tags, geometry: [...m[2].matchAll(/<nd ref="(\d+)"\s*\/>/g)].map(nd => nodes.get(nd[1]) ?? null) })
+  }
+  return ways
+}
+
+/** Overpass ist oft überlastet (05.11.2026: alle Spiegel in der Zeitüberschreitung): dann die OSM-API. */
+async function fetchFromOsmApi(box: Box) {
+  const m = MARGIN / 2
+  const bbox = [box.west - m, box.south - m, box.east + m, box.north + m].map(v => v.toFixed(6)).join(',')
+  const response = await fetch(`${OSM_API}?bbox=${bbox}`, { headers: { 'user-agent': 'NOXIA/0.1 world-lab-areas (noxiagame.vercel.app)' }, signal: AbortSignal.timeout(25_000), cache: 'no-store' })
+  if (!response.ok) throw new Error('OSM-API HTTP ' + response.status)
+  return cemeteryRows(parseOsmCemeteries(await response.text()))
+}
+
 export async function fetchCemeteries(box: Box) {
+  try { return await fetchFromOverpass(box) } catch (overpass) {
+    try { return await fetchFromOsmApi(box) } catch (api) {
+      throw new Error(`${overpass instanceof Error ? overpass.message : String(overpass)} | ${api instanceof Error ? api.message : String(api)}`)
+    }
+  }
+}
+
+async function fetchFromOverpass(box: Box) {
   const query = cemeteryQuery(box)
   const controllers = ENDPOINTS.map(() => new AbortController())
   const failures: string[] = []
