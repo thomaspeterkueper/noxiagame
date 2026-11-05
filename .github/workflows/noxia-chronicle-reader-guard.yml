@@ -8,6 +8,7 @@ on:
       - 'lib/worldlab/buildingChronicleReadGuard.test.mjs'
       - 'lib/worldlab/buildingChronicle.ts'
       - 'lib/worldlab/buildingChronicle.lifecycle.test.mjs'
+      - 'lib/worldlab/buildingChronicle.equalInstant.test.mjs'
       - '.github/workflows/noxia-chronicle-reader-guard.yml'
   workflow_dispatch:
 
@@ -28,4 +29,4 @@ jobs:
         with:
           node-version: '24'
       - name: Run fail-closed reader guard regression
-        run: node --test lib/worldlab/buildingChronicleReadGuard.test.mjs lib/worldlab/buildingChronicle.lifecycle.test.mjs
+        run: node --test lib/worldlab/buildingChronicleReadGuard.test.mjs lib/worldlab/buildingChronicle.lifecycle.test.mjs lib/worldlab/buildingChronicle.equalInstant.test.mjs
