@@ -11,6 +11,17 @@ import { fetchCemeteries, regionFor, storeCemeteries } from '@/lib/worldlab/plac
 
 export const maxDuration = 60
 
+/** GET ?lat=…&lon=…&dry=1: nur abfragen, nichts speichern – zur Prüfung, welche Friedhöfe OSM dort kennt. */
+export async function GET(req: NextRequest) {
+  const lat = Number(req.nextUrl.searchParams.get('lat')), lon = Number(req.nextUrl.searchParams.get('lon'))
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || req.nextUrl.searchParams.get('dry') !== '1') return NextResponse.json({ error: 'lat, lon und dry=1' }, { status: 400 })
+  const cell = parcelCell({ lat, lon })
+  try {
+    const rows = await fetchCemeteries(cell)
+    return NextResponse.json({ cell, cemeteries: rows.map(row => ({ id: row.properties.noxia_source_id, name: (row.properties as { name?: string }).name ?? null, points: row.geometry.coordinates.length, first: row.geometry.coordinates[0] })) })
+  } catch (error) { return NextResponse.json({ cell, error: error instanceof Error ? error.message : String(error) }) }
+}
+
 export async function POST(req: NextRequest) {
   if (!await verifiedBearerUserId(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({})) as { lat?: number; lon?: number }
