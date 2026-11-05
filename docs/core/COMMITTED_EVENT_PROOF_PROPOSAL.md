@@ -113,3 +113,42 @@ ORDER BY schemaname, tablename, policyname;
 **Review outputs:** map each authoritative command to its owning table/function, lock discipline, actor authorization, audit trigger, idempotency key and independently verifiable event link. Store potentially sensitive schema details in restricted engineering review, not public NPC/player history. A successful join or read permission alone does not prove authorization.
 
 **Stop conditions:** without a persisted proof binding an event to a successful authorized domain transition, or without proven causal order for contradictory same-asset changes, the projection stays unverified. Never substitute `occurred_at`, legacy `sequence`, `tick`, or lexicographic IDs as proof.
+
+## Read-only permission and ordering evidence supplement (2026-11-05)
+
+The schema audit above is insufficient by itself: an enabled RLS flag does not establish the **effective** privileges of the application role, and trigger definitions do not establish the transaction boundaries of the caller. Run the following **read-only** checks in the same staging environment and with the same DB role used by the proposed server reader; do not log secrets or personal data.
+
+```sql
+-- Effective execution identity and table-level access for the actual reader role.
+SELECT current_user AS execution_role, session_user AS login_role,
+       current_setting('row_security') AS row_security_setting;
+SELECT n.nspname AS schema_name, c.relname AS relation_name,
+       has_table_privilege(current_user, c.oid, 'SELECT') AS can_select,
+       has_table_privilege(current_user, c.oid, 'INSERT') AS can_insert,
+       has_table_privilege(current_user, c.oid, 'UPDATE') AS can_update,
+       has_table_privilege(current_user, c.oid, 'DELETE') AS can_delete,
+       c.relrowsecurity AS rls_enabled, c.relforcerowsecurity AS rls_forced
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'p') AND c.relname IN
+  ('simulation_events', 'entity_states', 'tick_log')
+ORDER BY n.nspname, c.relname;
+
+-- Identify trigger functions, but inspect their definitions and callers separately.
+SELECT n.nspname AS schema_name, c.relname AS relation_name,
+       t.tgname AS trigger_name, p.oid::regprocedure AS function_identity,
+       p.prosecdef AS security_definer
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_proc p ON p.oid = t.tgfoid
+WHERE NOT t.tgisinternal
+  AND c.relname IN ('simulation_events', 'entity_states', 'tick_log')
+ORDER BY n.nspname, c.relname, t.tgname;
+```
+
+**Review caveats:** `current_user` can differ from the application identity under `SET ROLE` or `SECURITY DEFINER`; table privileges alone do not prove row visibility or command authorization. Check function bodies, ownership, search paths, and call sites before trusting a proof. For a privileged service role, explicitly verify that the reader does not expose unrestricted event rows to clients.
+
+**Ordering decision test (staging only, separate transactions):** A locks and modifies an asset, B attempts a conflicting modification and must block or fail; A commits; B resumes and must revalidate state/permissions before its own commit. Repeat with A rolling back, with equal world year and legacy sequence, and with requests delivered to the projector in reverse order. Record which *existing* row lock, constraint, or transaction protocol establishes the causal order. Until verified, do not introduce a new commit counter or assert that the legacy sequence provides commit order.
+
+**Outcome of this documentation change:** the audit plan is more precise; no live database privilege, concurrency, or integration test has been executed by this change.
