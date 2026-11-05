@@ -768,6 +768,12 @@ Thomas, 05.11.2026, nach dem Neuladen: „klappt, Friedhof ist auch da, Grabstei
 1. Auf Friedhofsflächen der Karte Reihen von Grabsteinen zeichnen, im Winkel der Karte, mit Wegen dazwischen und ein paar Bäumen.
 2. Die Steine sollen dem Anblick im Inneren entsprechen; Kreuz und Stein je nach Ort, gern zurückhaltend.
 3. Ohne Namen, solange es keine Gräber aus der Simulation gibt (R-23, `person_graves`). Erfunden wird nichts.
+**Stand 05.11.2026 (Erdkarte):** Punkte 1–3 umgesetzt.
+- `lib/worldlab/graves.ts` (getestet): Grabplätze im Raster aus absoluten Kachelmetern (2,8 m Reihen, 1,6 m Gräber), Grabfelder von 5 × 7 mit Wegen dazwischen, 1,8 m Abstand zum Rand, Abstand zu Häusern (Kapelle) und Bäumen, hier und da eine Lücke; höchstens 1800 je Kachel.
+- Die Reihen laufen quer zur Blickrichtung, je Reihe ein Objekt mit Tiefe; die Figur steht richtig davor und dahinter. Grabbeete flach im Boden (meist grün, manche Kies).
+- Stehende Steine in vier Grautönen, leicht verschieden hoch; in kühleren Breiten (ab 36°) rund jedes siebte Grab ein Kreuz aus Holz oder Stein.
+- Keine Namen; die Steine sind nicht anklickbar, ein Klick geht weiter an den Friedhof.
+
 4. Später, mit R-23:
    - Gräber mit Namen und Lebensjahren an ihrer Stelle;
    - frische Gräber mit Blumen;

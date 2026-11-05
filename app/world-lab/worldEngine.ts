@@ -23,6 +23,7 @@ import { paintTree, treeVariant, TREE_PX, TREE_VARIANTS, TREE_WORLD } from '@/li
 import { FrameStats, type FrameSummary } from '@/lib/worldlab/frameStats'
 import type { BlockKind, SimplifiedTile, TileBlock, TilePlace } from '@/lib/worldlab/simplify'
 import { polygonArea } from '@/lib/worldlab/simplify'
+import { graveSpots } from '@/lib/worldlab/graves'
 import { dayTint, hasChimney, hasSolar, heatingSeason, seeded, sunElevationDeg, windowLit } from '@/lib/worldlab/ambient'
 import { apronOutline, facilityClusters, nativeStandKind, padOutline, pointsAlong, type Pt } from '@/lib/worldlab/facility'
 import { growView, minZoomForTiles, tilesForView, type ViewRect } from '@/lib/worldlab/viewTiles'
@@ -404,7 +405,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Kacheln ─────────────────────────────────────────────────────────
   // Eine gezeigte Kachel wird nicht in einem Bild aufgebaut, sondern Stück für
   // Stück (BUILD_BUDGET): erst der Boden, dann die Blöcke in Portionen.
-  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean; /** Schornsteine mit Rauch (Weltmeter, Höhe der Mündung) */ chimneys: Array<{ x: number; y: number; h: number; seed: number }>; /** Fensterlicht je Haus (abends sichtbar) */ lights: Container[]; /** Glitzern auf dem Wasser, zwei Gruppen im Wechsel */ glint: [PixiGraphics, PixiGraphics] | null }
+  type Loaded = { tile: TileId; data: SimplifiedTile; ox: number; oy: number; ground: PixiGraphics | null; lines: PixiGraphics | null; surface: PixiGraphics | null; blocks: Container[]; trees: Container[]; labels: Container[]; footprints: Array<{ ring: Footprint; minX: number; maxX: number; minY: number; maxY: number; /** Hindernis für die Figur: kleiner als das Haus, damit man in dichten Orten durchkommt */ core: Footprint; cMinX: number; cMaxX: number; cMinY: number; cMaxY: number }>; parcels: PixiGraphics | null; owned: PixiGraphics | null; done: boolean; /** Schornsteine mit Rauch (Weltmeter, Höhe der Mündung) */ chimneys: Array<{ x: number; y: number; h: number; seed: number }>; /** Fensterlicht je Haus (abends sichtbar) */ lights: Container[]; /** Grabbeete (W-19), im Boden */ beds: PixiGraphics | null; /** Glitzern auf dem Wasser, zwei Gruppen im Wechsel */ glint: [PixiGraphics, PixiGraphics] | null }
   const loaded = new Map<string, Loaded>()
   const fetched = new Map<string, SimplifiedTile>()
   const inFlight = new Set<string>()
@@ -988,13 +989,64 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       addObject(sprite)
       entry.trees.push(sprite)
     }
+    drawGraves(entry)
+  }
+
+  /**
+   * W-19 (05.11.2026): Grabsteine auf Friedhofsflächen. Reihen quer zur Blickrichtung,
+   * je Reihe ein Objekt mit Tiefe; Grabbeete flach auf dem Boden. Ohne Namen (R-23).
+   */
+  function drawGraves(entry: Loaded) {
+    const { data, ox, oy } = entry
+    const cemeteries = data.areas.filter(area => area.k === 'cemetery')
+    if (!cemeteries.length) return
+    const blocked = [
+      ...data.blocks.map(block => ({ x: block.x, y: block.y, r: Math.max(block.w, block.d) / 2 + 1.5 })),
+      ...Array.from({ length: Math.floor((data.trees?.length ?? 0) / 2) }, (_, i) => ({ x: data.trees![i * 2], y: data.trees![i * 2 + 1], r: 1.6 })),
+    ]
+    const crosses = Math.abs(toGeo({ x: ox + data.size / 2, y: oy + data.size / 2 }).lat) >= 36
+    const origin = { x: entry.tile.x * data.size, y: entry.tile.y * data.size }
+    const beds = new PIXI.Graphics()
+    const rows = new Map<number, PixiGraphics>()
+    const a = { x: Math.SQRT1_2, y: -Math.SQRT1_2 }, n = { x: Math.SQRT1_2, y: Math.SQRT1_2 }
+    const at = (x: number, y: number, along: number, front: number, h: number) => iso(x + a.x * along + n.x * front, y + a.y * along + n.y * front, h)
+    const flat = (pts: Array<{ x: number; y: number }>) => pts.flatMap(q => [q.x, q.y])
+    for (const area of cemeteries) {
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < area.p.length; i += 2) ring.push({ x: area.p[i], y: area.p[i + 1] })
+      for (const spot of graveSpots(ring, origin, blocked, crosses)) {
+        const x = ox + spot.x, y = oy + spot.y
+        const r = seeded('bed:' + (origin.x + spot.x).toFixed(1) + ',' + (origin.y + spot.y).toFixed(1))
+        // Grabbeet vor dem Stein: meist bepflanzt, manches mit Kies
+        beds.poly(flat([at(x, y, -0.4, 0.05, 0), at(x, y, 0.4, 0.05, 0), at(x, y, 0.4, 1.6, 0), at(x, y, -0.4, 1.6, 0)])).fill(r < 0.7 ? 0x6f8a52 : 0xbdb4a0)
+        let g = rows.get(spot.row)
+        if (!g) { g = new PIXI.Graphics(); g.zIndex = ox + oy + spot.row + 0.05; g.eventMode = 'none'; g.tint = worldTint; rows.set(spot.row, g) }
+        if (spot.cross) {
+          const wood = r > 0.5
+          const color = wood ? 0x5b4632 : 0xa7a39a
+          g.poly(flat([at(x, y, -0.07, 0, 0), at(x, y, 0.07, 0, 0), at(x, y, 0.07, 0, 1.05), at(x, y, -0.07, 0, 1.05)])).fill(color).stroke({ width: 0.06, color: 0x3c3a36, alpha: 0.7 })
+          g.poly(flat([at(x, y, -0.27, 0, 0.7), at(x, y, 0.27, 0, 0.7), at(x, y, 0.27, 0, 0.83), at(x, y, -0.27, 0, 0.83)])).fill(color).stroke({ width: 0.06, color: 0x3c3a36, alpha: 0.7 })
+        } else {
+          // Stehender Stein mit gerundeter Oberkante, leicht verschieden in Breite und Farbe
+          const w = 0.26 + r * 0.1, h = 0.62 + ((r * 7) % 1) * 0.18
+          const color = [0x8f8f8a, 0x7d7a74, 0x9b958a, 0x6c6e70][Math.floor(r * 4) % 4]
+          g.poly(flat([at(x, y, -w, 0, 0), at(x, y, w, 0, 0), at(x, y, w, 0, h - 0.1), at(x, y, w * 0.55, 0, h), at(x, y, 0, 0, h + 0.04), at(x, y, -w * 0.55, 0, h), at(x, y, -w, 0, h - 0.1)]))
+            .fill(color).stroke({ width: 0.07, color: 0x4e4e4a, alpha: 0.8 })
+        }
+      }
+    }
+    if (!rows.size) { beds.destroy(); return }
+    beds.eventMode = 'none'
+    ground.addChild(beds)
+    entry.beds = beds
+    for (const g of rows.values()) { addObject(g); entry.trees.push(g) }
   }
 
   function showTile(tile: TileId, data: SimplifiedTile) {
     const key = tileKey(tile)
     if (loaded.has(key) || disposed) return
     const ox = (tile.x - anchorTile.x) * tileSizeM, oy = (tile.y - anchorTile.y) * tileSizeM
-    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false, chimneys: [], lights: [], glint: null })
+    loaded.set(key, { tile, data, ox, oy, ground: null, lines: null, surface: null, blocks: [], trees: [], labels: [], footprints: [], parcels: null, owned: null, done: false, chimneys: [], lights: [], beds: null, glint: null })
     building.push(key)
   }
 
@@ -1036,6 +1088,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     entry.owned?.destroy()
     entry.glint?.forEach(g => g.destroy())
     for (const lit of entry.lights) lit.destroy()
+    entry.beds?.destroy()
     for (const tree of entry.trees) tree.destroy()
     for (const label of entry.labels) label.destroy()
     for (const block of entry.blocks) block.destroy()

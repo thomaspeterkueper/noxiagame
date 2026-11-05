@@ -56,7 +56,7 @@ export default defineConfig({
       'lib/worldlab/detailCells.test.ts',
       'lib/worldlab/streetLabels.test.ts',
       'lib/worldlab/address.test.ts',
-      'lib/worldlab/walking.test.ts', 'lib/worldlab/ambient.test.ts',
+      'lib/worldlab/walking.test.ts', 'lib/worldlab/ambient.test.ts', 'lib/worldlab/graves.test.ts',
       'lib/worldlab/landmarks.test.ts',
       'lib/worldlab/placeSearch.test.ts',
       'lib/worldlab/buildingUse.test.ts',
