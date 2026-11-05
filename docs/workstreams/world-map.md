@@ -557,3 +557,7 @@ Thomas (02.11.2026): „Ausgrabungsstätte im Spiel“ und „Spielort um 1600 v
 - Gebäude der Art „Kirche" werden als Moschee gezeichnet, wenn `block.u === 'b:mosque'` oder ein Wahrzeichen im Haus `religion=muslim` trägt: Flachdach, Kuppel mittig, ein bis zwei Minarette an den vorderen Ecken, kein Kirchturm, kein Dachreiter.
 - Christliche Kirchen (z. B. in Istanbul) bleiben unverändert Kirchen (in warmen Breiten flach, ohne Turm).
 - Offen: regionale Dachformen allgemein, Zuordnung Ort↔Gebäude in Istanbul.
+
+## Zuordnung Ort↔Gebäude (06.11.2026)
+
+- `landmarkIn` nahm den ersten Ort im 12-m-Rand; jetzt gewinnt der beste: Orte innerhalb des Grundrisses vor Orten davor, danach der nächste zum Mittelpunkt. Betrifft dichte Städte (Istanbul), wo Nachbarhäuser sich Orte „stahlen".

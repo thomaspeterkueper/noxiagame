@@ -579,15 +579,22 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   /** Wahrzeichen in einem Gebäude oder bis 12 m davor (Kacheln rundum). */
   function landmarkIn(box: Box, poi = false): WorldLandmark | undefined {
     const tx = anchorTile.x + Math.floor(box.cx / tileSizeM), ty = anchorTile.y + Math.floor(box.cy / tileSizeM)
+    // Nicht der erste Treffer im 12-m-Rand, sondern der beste: Orte im Haus gehen vor Orten davor,
+    // unter gleichen der nächste zum Mittelpunkt (dichte Städte wie Istanbul).
+    let best: { score: number; place: TilePlace; ox: number; oy: number } | undefined
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const entry = loaded.get(tileKey({ x: tx + dx, y: ty + dy }))
       for (const place of entry?.data.places ?? []) {
         if (Boolean(place.p) !== poi) continue
         const px = entry!.ox + place.x - box.cx, py = entry!.oy + place.y - box.cy
-        if (Math.abs(px * box.cos + py * box.sin) <= box.hw + 12 && Math.abs(-px * box.sin + py * box.cos) <= box.hd + 12) return landmarkOf(place, entry!.ox, entry!.oy)
+        const u = Math.abs(px * box.cos + py * box.sin), v = Math.abs(-px * box.sin + py * box.cos)
+        if (u > box.hw + 12 || v > box.hd + 12) continue
+        const inside = u <= box.hw && v <= box.hd
+        const score = (inside ? 0 : 1000) + Math.hypot(px, py)
+        if (!best || score < best.score) best = { score, place, ox: entry!.ox, oy: entry!.oy }
       }
     }
-    return undefined
+    return best ? landmarkOf(best.place, best.ox, best.oy) : undefined
   }
   function landmarkOf(place: TilePlace, ox: number, oy: number): WorldLandmark {
     return { at: toGeo({ x: ox + place.x, y: oy + place.y }), name: place.n, kind: effectivePlaceKind(place.k, place.t), tags: place.t ?? {}, ...(place.p ? { poi: true } : {}) }
