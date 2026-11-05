@@ -684,7 +684,14 @@ Thomas, 04.11.2026: „Andere Spieler sollten gleichzeitig in der gleichen Welt,
 
 **Nicht geprüft:** echte Realtime-Verbindung von zwei Browsern. Die Testumgebung lässt keine Websockets zu Supabase durch. Geprüft sind die Darstellung mit nachgestellter Anwesenheit und die Buchung.
 
-### W-17 (Gastronomie, 04.11.2026): Kiesel-Figuren auf der Karte
+### W-17 (Gastronomie, 04.11.2026): Kiesel-Figuren auf der Karte – auf der Weltkarte erledigt (05.11.2026)
+
+Umgesetzt in der Weltkarte (`app/world-lab/worldEngine.ts`): Bewohner und die eigene Figur sind Kiesel.
+- Aussehen: Bewohner über `kieselLookFor(person, Arbeitsort)` (`WorldLab.tsx`, `WorldPerson.look`), die eigene Figur über `useMyLook()` (`setPlayerLook`), also wie in den Innenräumen.
+- Richtung aus der Bewegung auf dem Bildschirm (`kieselDirFrom`), Gehen in vier Schritten, Stehen.
+- Jede Kombination aus Aussehen, Richtung, Pose und Schritt wird einmal als Bild gerechnet (SVG → Textur, 64 × 96 px) und zwischengespeichert; bis es da ist, steht die bisherige einfache Figur.
+- Noch offen: Arbeitsposen an Arbeitsorten, Mitspieler (W-16), Messung mit vielen Figuren.
+
 
 Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „gleicher Winkel wie unsere Karte, einfach strukturiert“. Aus drei Entwürfen (Figurenwerkstatt, Artefakt) gewählt: **„Kiesel wirkt am angenehmsten.“**
 

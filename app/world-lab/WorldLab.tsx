@@ -22,6 +22,8 @@ import TimeSlider from './TimeSlider'
 import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPanels'
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
+import { kieselLookFor } from '@/lib/figures/kiesel'
+import { useMyLook } from '@/lib/figures/KieselFigure'
 import { eventLine, eventRunning, upcoming, VENUE_EVENT_KINDS, whenText, type VenueEvent } from '@/lib/game/hospitality/venueEvents'
 import { DEFAULT_VIEW, loadView, saveView, showPlace, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { worshipWhen, type WorshipItem } from '@/lib/worldlab/worshipTypes'
@@ -352,11 +354,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         return { id: resident.id, label: personSceneLabel(resident), activity: 'idle' as const, inside: true, anchor: live.home, anchorRadiusM: 5 }
       }
       if (!surface && live) {
-        return { id: resident.id, label: personSceneLabel(resident), activity, inside: false, anchor: null, strollAround: live.home }
+        return { id: resident.id, label: personSceneLabel(resident), look: kieselLookFor({ id: resident.id, appearance: resident.appearance as never }), activity, inside: false, anchor: null, strollAround: live.home }
       }
       return {
         id: resident.id,
         label: personSceneLabel(resident),
+        look: kieselLookFor({ id: resident.id, appearance: resident.appearance as never }, atWork ? workplace?.typeId ?? null : null),
         activity, inside: inside || inRoom(surface),
         anchor: surface ? { lat: surface.lat, lon: surface.lon } : place ? { lat: place.lat, lon: place.lon } : null,
         anchorRadiusM: surface ? 3 : place ? Math.max(place.w, place.d) / 2 : undefined,
@@ -673,6 +676,9 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noxia, sites, engineReady, hereKey, tilesLoaded, meeting, view, earthWorship, events])
   const groups = [...new Set(targets.map(target => target.group))]
+  // W-17: eigene Figur als Kiesel, wie in den Innenräumen
+  const myLook = useMyLook().look
+  useEffect(() => { engineReady?.setPlayerLook(myLook) }, [engineReady, myLook])
   // W-18: Zeichen über Lokalen mit laufender oder heute beginnender Veranstaltung (minütlich neu)
   useEffect(() => {
     if (!engineReady) return
