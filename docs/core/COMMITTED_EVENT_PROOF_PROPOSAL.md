@@ -50,3 +50,24 @@ The ordering scope (whole world, settlement, or aggregate) and transaction bound
 4. What is the recovery behavior when event audit writing succeeds but projection updating fails?
 
 Until answered, no migration, merge, deployment, or world-state write is implied.
+
+## Repository contract cross-check (2026-11-05)
+
+Reviewed `docs/core/CORE_CONTRACT.md`, `docs/core/TIME_TICK_EVENT_REPLAY_MAP.md`, and `lib/game/evolution/committedEventAdapter.ts` on PR #539. These establish the following **documented** guarantees, not a live database audit:
+
+| Existing mechanism | Guaranteed purpose | What it does **not** prove |
+| --- | --- | --- |
+| `tick_log.tick_number` / `claim_due_ticks()` | Unique, serialized due-tick claims | Total order of arbitrary building, civic, or market commits between ticks |
+| `simulation_events.occurred_at` | Event occurrence time | Unique ordering of simultaneous commits or successful authorization |
+| `simulation_events.tick` | Optional simulation-tick context | Transactional commit order for non-tick commands |
+| `entity_states.source_event` | Link from temporal projection to source event | That a client-provided receipt was issued by an authorized command |
+| Command UUID or locked domain transition | Domain-specific idempotency | Universal cross-domain event ordering |
+| `CommittedWorldReceipt.sequence` | Legacy chronicle ordering input | Uniqueness or authenticated commit precedence |
+
+**Decision gate A — evidence first:** inspect the actual schema constraints, event triggers, command transaction boundaries and permission policies before choosing an ordering mechanism. A PostgreSQL sequence value alone does not guarantee *commit order* under concurrent transactions (a transaction allocated first can commit last). Neither UUID ordering nor timestamp sorting solves this. If strict total order is needed, use a demonstrably serialized commit protocol or explicitly record causal dependencies and reject unresolved concurrency.
+
+**Decision gate B — scope:** first specify whether the projection needs only per-building/parcel order, per-settlement order, or global order. For independent assets, a partial order with stable tie handling may suffice; for demolition/rebuild of the same parcel, causal order must be proven. Cross-settlement trades require their own domain transaction guarantees rather than pretending two settlement counters form a global order.
+
+**Decision gate C — reader:** a trusted server reader must join the event to its authoritative domain transition, verify authorization and settlement/asset identity, and only then emit a canonical receipt. The current adapter remains an untrusted-shape validator; `committed: true` is not evidence. Missing verification must fail closed.
+
+**Test gate:** before changing adapter sorting, add concurrency tests where transaction A obtains a candidate ordering value, B commits first, then A commits; plus same-timestamp contradictory building transitions, retry after rollback, and mismatched domain references. Until a concrete backend and transaction harness are available, these remain **specified but unexecuted** integration tests, not passed tests.
