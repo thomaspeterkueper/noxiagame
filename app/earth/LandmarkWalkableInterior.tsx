@@ -420,7 +420,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   // (05.11.2026: „im Omnizedenz-Gebäude sieht man keine Bücher und Dokumente mehr“ – die
   // Regale waren nur in der Bibliothek stöberbar, die Bücher nur am Bereich „Lesen & Denken“).
   const resonanceShelf = isResonanceReading ? shelfAt(layout, pos) : null
-  const resonanceShelfOpen = isResonanceReading && (shown?.action === 'books' || Boolean(resonanceShelf))
+  // Am Bereich „Lesen & Denken“ genügt das Herantreten – auch über „Gehe zu …“ (05.11.2026).
+  const resonanceShelfOpen = isResonanceReading && (shown?.action === 'books' || near?.action === 'books' || Boolean(resonanceShelf))
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
   const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
@@ -748,7 +749,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {!talkingNow && shown?.action === 'stairs' && shown.toLevel !== undefined && <button className="act" onClick={() => onLevel(shown.toLevel as number)}>{shown.toLevel === 0 ? 'Ins Erdgeschoss' : shown.toLevel > level ? `Ins ${shown.toLevel}. Obergeschoss` : `Ins ${shown.toLevel}. Obergeschoss hinunter`}</button>}
         {!talkingNow && shown?.action === 'sit' && <button className="act" onClick={() => setSeated(value => !value)}>{seated ? 'Aufstehen' : 'Hinsetzen'}</button>}
         {!talkingNow && <div className="moves"><small>GEHE ZU …</small><div>
-          {waypoints.map(point => <button key={point.id} onClick={() => walkTo(point, () => { if (point.id === 'exit') onClose(); else if (point.kind === 'Sitzplatz') setSeated(true) })}>{point.label}</button>)}
+          {waypoints.map(point => <button key={point.id} onClick={() => walkTo(point, () => { if (point.id === 'exit') onClose(); else { const spot = layout.spots.find(item => 'spot:' + item.id === point.id); if (spot) setActive(spot); if (point.kind === 'Sitzplatz') setSeated(true) } })}>{point.label}</button>)}
         </div></div>}
         {!talkingNow && facts.length > 0 && <dl>{facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl>}
         <div className="note">Typischer Grundriss für diese Ortsart – nicht der vermessene Innenraum des realen Gebäudes. Ortsdaten: OpenStreetMap.</div>
