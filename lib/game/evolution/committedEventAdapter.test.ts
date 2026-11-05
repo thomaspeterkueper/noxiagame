@@ -206,4 +206,21 @@ for (const input of [[extraFields[1], extraTwin], [extraTwin, extraFields[1]]]) 
     'public history shape must not depend on duplicate input order')
 }
 
+// Legacy sequence is not yet an authenticated, uniquely scoped commit order.
+// Two distinct Core events can share it; do not silently reject either while
+// the authoritative persisted ordering contract is under review.
+const sharedLegacySequence = [
+  receipt('same-seq-rename', 2090, true, { action: 'rename', assetId: 'hall', name: 'Bürgerhaus' }),
+  receipt('same-seq-retire', 2090, true, { action: 'retire', assetId: 'lab' }),
+]
+for (const input of [sharedLegacySequence, [...sharedLegacySequence].reverse()]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 2 && result.rejected.length === 0,
+    'legacy sequence collision alone must not reject independent committed receipts')
+  assert(result.events.every(event => event.sequence === 1),
+    'adapter must preserve legacy sequence without inventing commit precedence')
+}
+// This adapter only sorts a display/replay projection; the server reader must
+// independently verify both receipts and their authoritative commit ordering.
+
 console.log('Committed city event adapter: tests passed')
